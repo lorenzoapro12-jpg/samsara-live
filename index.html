@@ -3167,20 +3167,21 @@ function resolveChart(candles, padL, padR, chartH, W) {
     ctx.fillRect(x + candleW*0.15, Math.min(yO, yC), candleW*0.7, bodyH);
   }
   
-  // --- Heatmap Liquidité (Bookmap : accumulation continue + historique) ---
+  // --- Heatmap Liquidité (Bookmap : alignée sur les bougies OHLCV) ---
   if (overlays.liq && histHeatmap && histHeatmap.bids) {
     const hm = histHeatmap;
-    const t0 = candles[vs].time, t1 = candles[Math.min(candles.length - 1, ve - 1)].time;
-    const winS = Math.max(hm.dt, t1 - t0);
-    const nowS = Date.now() / 1000;
-    const colW = Math.max(1, pw * hm.dt / winS);
+    const intervalS = (candles.length > 1 && candles[1].time > candles[0].time) ? (candles[1].time - candles[0].time) : 900;
+    const winT0 = candles[vs].time;
+    const winT1 = candles[Math.min(candles.length - 1, ve - 1)].time + intervalS;
+    const gap = pw / Math.max(1, ve - vs);
+    const colW = Math.max(1, hm.dt / intervalS * gap);
     const binH = Math.max(1, ph * hm.dp / range - 0.5);
-    const xf = t => pad.left + pw - pw * Math.min(1, (nowS - t) / winS);
+    const xf = t => pad.left + (t - winT0) / intervalS * gap;
     const drawSide = (cells, pal) => {
       for (const [col, pb, v] of cells) {
         const t = hm.t0 + col * hm.dt;
-        if (t < t0 || t > nowS) continue;
-        const x = xf(t); if (x < pad.left || x > pad.left + pw) continue;
+        if (t < winT0 || t > winT1) continue;
+        const x = xf(t); if (x < pad.left - colW || x > pad.left + pw) continue;
         const y = pad.top + ph * (1 - (pb * hm.dp - minP) / range);
         if (y < pad.top - binH || y > pad.top + ph) continue;
         ctx.fillStyle = pal[v] || pal[255];
