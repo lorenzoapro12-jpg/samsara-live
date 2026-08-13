@@ -2085,16 +2085,16 @@ registerStrategy('bb_grid', {
   },
   trigger(candles, idx, params, indicators) {
     if (idx < params.period) return 'idle';
-    const bb = indicators.bb;
+    const bbLower = indicators.bb_lower, bbUpper = indicators.bb_upper;
     const close = candles[idx].close;
-    if (close <= bb.lower[idx] * 1.002) return 'enter';
-    if (close >= bb.upper[idx] * 0.998) return 'exit';
+    if (bbLower && close <= bbLower[idx] * 1.002) return 'enter';
+    if (bbUpper && close >= bbUpper[idx] * 0.998) return 'exit';
     return null;
   },
   generateLevels(candles, idx, params, indicators) {
-    const bb = indicators.bb;
-    const low = (params.priceLow > 0) ? params.priceLow : bb.lower[idx];
-    const high = (params.priceHigh > 0) ? params.priceHigh : bb.mid[idx];
+    const bbLower = indicators.bb_lower, bbMid = indicators.bb_mid;
+    const low = (params.priceLow > 0) ? params.priceLow : bbLower[idx];
+    const high = (params.priceHigh > 0) ? params.priceHigh : bbMid[idx];
     return distributeGridLevels(low, high, params.gridLevels);
   },
   execution(level, entryCandle, params) {
@@ -2260,7 +2260,10 @@ class GridBot {
     const ind = {};
 
     // Always compute common ones
-    if (closes.length >= 20) ind.bb = calcBollinger(closes, 20, 2);
+    if (closes.length >= 20) {
+      const bb20 = calcBollinger(closes, 20, 2);
+      ind.bb_upper = bb20.upper; ind.bb_lower = bb20.lower; ind.bb_mid = bb20.sma;
+    }
     if (closes.length >= 14) ind.rsi = calcRSI(closes, 14);
 
     // Strategy-specific
@@ -2270,7 +2273,8 @@ class GridBot {
     }
     if (key === STRATEGIES.bb_grid) {
       if (closes.length >= key.params.period.value) {
-        ind.bb = calcBollinger(closes, key.params.period.value, key.params.stddev.value);
+        const bbP = calcBollinger(closes, key.params.period.value, key.params.stddev.value);
+        ind.bb_upper = bbP.upper; ind.bb_lower = bbP.lower; ind.bb_mid = bbP.sma;
       }
     }
     if (key === STRATEGIES.rsi_grid) {
