@@ -1756,17 +1756,19 @@ async function fetchPrice() {
 }
 
 // ============ LIQUIDITÉ (DEPTH) ============
-let depth = null, depthTimer = null;
+let depth = null, depthTimer = null, liqHist = [];
 async function fetchDepth() {
   try {
     const r = await fetch(`https://api.binance.com/api/v3/depth?symbol=${activeSymbol}&limit=5000`);
     const d = await r.json();
     depth = { bids: d.bids.map(b => [parseFloat(b[0]), parseFloat(b[1])]), asks: d.asks.map(a => [parseFloat(a[0]), parseFloat(a[1])]) };
+    liqHist.push({ t: Date.now(), bids: depth.bids.filter(b => b[1] > 0.3), asks: depth.asks.filter(a => a[1] > 0.3) });
+    if (liqHist.length > 240) liqHist.splice(0, liqHist.length - 240);
     if (overlays.liq) drawChart();
   } catch(e) {}
 }
 function toggleDepth(on) {
-  if (on) { fetchDepth(); if (!depthTimer) depthTimer = setInterval(fetchDepth, 15000); }
+  if (on) { fetchDepth(); if (!depthTimer) depthTimer = setInterval(fetchDepth, 5000); }
   else { clearInterval(depthTimer); depthTimer = null; }
 }
 
@@ -3161,15 +3163,14 @@ function resolveChart(candles, padL, padR, chartH, W) {
     ctx.fillRect(x + candleW*0.15, Math.min(yO, yC), candleW*0.7, bodyH);
   }
   
-  // --- Heatmap Liquidité (Depth) — par-dessus les bougies ---
-  if (overlays.liq && depth) {
-    const bins = 48, binH = range / bins, bB = new Array(bins).fill(0), bA = new Array(bins).fill(0);
-    for (const side of [['bids', bB], ['asks', bA]]) for (const [p, q] of depth[side[0]]) { const b = Math.floor((p - minP) / binH); if (b >= 0 && b < bins) side[1][b] += q; }
-    const mQ = Math.max(1, ...bB, ...bA), ax = W - pad.right;
-    for (let b = 0; b < bins; b++) {
-      const y = pad.top + ph - (b + 1) * (ph / bins), h = Math.max(1, ph / bins - 1);
-      if (bB[b] > 0) { ctx.fillStyle = `rgba(38,166,154,${0.2 + 0.6 * bB[b] / mQ})`; ctx.fillRect(ax - 2 - Math.max(2, bB[b] / mQ * 36), y, Math.max(2, bB[b] / mQ * 36), h); }
-      if (bA[b] > 0) { ctx.fillStyle = `rgba(239,83,80,${0.2 + 0.6 * bA[b] / mQ})`; ctx.fillRect(ax - 2 - Math.max(2, bA[b] / mQ * 36), y, Math.max(2, bA[b] / mQ * 36), h); }
+  // --- Heatmap Liquidité (historique Bookmap) ---
+  if (overlays.liq && liqHist.length > 1) {
+    const now = Date.now(), histWin = Math.max(60000, now - liqHist[0].t);
+    let mQ = 1; for (const s of liqHist) { for (const b of s.bids) if (b[1] > mQ) mQ = b[1]; for (const a of s.asks) if (a[1] > mQ) mQ = a[1]; }
+    for (const s of liqHist) {
+      const x = pad.left + pw - pw * Math.min(1, (now - s.t) / histWin);
+      for (const [p, q] of s.bids) { const y = pad.top + ph * (1 - (p - minP) / range); if (y >= pad.top && y <= pad.top + ph) { ctx.fillStyle = `rgba(38,166,154,${0.15 + 0.65 * q / mQ})`; ctx.fillRect(x - 1, y, 2, 1.5); } }
+      for (const [p, q] of s.asks) { const y = pad.top + ph * (1 - (p - minP) / range); if (y >= pad.top && y <= pad.top + ph) { ctx.fillStyle = `rgba(239,83,80,${0.15 + 0.65 * q / mQ})`; ctx.fillRect(x - 1, y, 2, 1.5); } }
     }
   }
   
