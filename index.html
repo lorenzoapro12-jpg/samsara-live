@@ -1768,7 +1768,7 @@ async function fetchHeatmap() {
   } catch(e) {}
 }
 function toggleDepth(on) {
-  if (on) { fetchHeatmap(); if (!depthTimer) depthTimer = setInterval(fetchHeatmap, 300000); }
+  if (on) { fetchHeatmap(); if (!depthTimer) depthTimer = setInterval(fetchHeatmap, 60000); }
   else { clearInterval(depthTimer); depthTimer = null; }
 }
 
@@ -3128,9 +3128,9 @@ function resolveChart(candles, padL, padR, chartH, W) {
     }
   }
   
-  // --- Volume Profile ---
+  // --- Volume Profile (Market Profile : POC + Value Area 70%) ---
   if (overlays.vp && visible.length >= 5) {
-    const bins = 24;
+    const bins = Math.max(24, Math.min(72, Math.round(range / 100)));
     const binH = range / bins;
     const profile = new Array(bins).fill(0);
     for (const c of visible) {
@@ -3139,15 +3139,36 @@ function resolveChart(candles, padL, padR, chartH, W) {
       for (let b = loBin; b <= hiBin; b++) profile[b] += c.volume;
     }
     const maxVol = Math.max(...profile) || 1;
-    const vpMaxW = 38;
+    const pocBin = profile.indexOf(maxVol);
+    const totalVol = profile.reduce((s, v) => s + v, 0);
+    const order = profile.map((v, i) => i).sort((a, b) => profile[b] - profile[a]);
+    let acc = 0, vaLo = bins, vaHi = -1;
+    for (const b of order) {
+      acc += profile[b];
+      if (b < vaLo) vaLo = b;
+      if (b > vaHi) vaHi = b;
+      if (acc >= totalVol * 0.7) break;
+    }
+    const vpMaxW = 48;
+    const yOf = b => pad.top + ph - (b + 0.5) * (ph / bins);
     for (let b = 0; b < bins; b++) {
       if (profile[b] === 0) continue;
-      const y = pad.top + ph - (b + 1) * (ph / bins);
-      const w = (profile[b] / maxVol) * vpMaxW;
-      const isPOC = profile[b] === maxVol;
-      ctx.fillStyle = isPOC ? 'rgba(100,180,255,0.7)' : 'rgba(100,180,255,0.25)';
-      ctx.fillRect(W - pad.right + 2, y, w, Math.max(1, ph / bins - 1));
+      const t = profile[b] / maxVol;
+      const w = t * vpMaxW;
+      ctx.fillStyle = (b === pocBin) ? 'rgba(255,200,40,0.9)'
+        : (b >= vaLo && b <= vaHi) ? `rgba(100,180,255,${0.25 + 0.5 * t})`
+        : `rgba(100,180,255,${0.12 + 0.2 * t})`;
+      ctx.fillRect(W - pad.right + 2, pad.top + ph - (b + 1) * (ph / bins), w, Math.max(1, ph / bins - 1));
     }
+    ctx.strokeStyle = 'rgba(255,200,40,0.8)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(W - pad.right - 2, yOf(pocBin)); ctx.lineTo(W - pad.right + 2 + vpMaxW + 6, yOf(pocBin)); ctx.stroke();
+    ctx.strokeStyle = 'rgba(100,180,255,0.45)'; ctx.setLineDash([2, 2]);
+    for (const b of [vaLo, vaHi]) {
+      ctx.beginPath(); ctx.moveTo(W - pad.right - 2, yOf(b)); ctx.lineTo(W - pad.right + 2 + vpMaxW + 6, yOf(b)); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = '8px monospace';
+    ctx.fillText('POC $' + (minP + (pocBin + 0.5) * binH).toFixed(0), W - pad.right + 4, pad.top + 9);
   }
 
   // Candles
