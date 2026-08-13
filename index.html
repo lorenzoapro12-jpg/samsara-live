@@ -1031,7 +1031,7 @@ let rsDragStartEnd = 0;
 let crossX = null, crossY = null;  // coordonnées canvas du curseur
 
 // ============ INDICATOR STATE ============
-const overlays = { ema20: false, ema50: false, ema100: false, ema200: false, sma20: false, sma50: false, bb: false, vwap: false, ichimoku: false, sar: false, sr: false, fib: false, vp: false };
+const overlays = { ema20: false, ema50: false, ema100: false, ema200: false, sma20: false, sma50: false, bb: false, vwap: false, ichimoku: false, sar: false, sr: false, fib: false, vp: false, liq: false };
 const activeSubs = { vol: true, rsi: false, macd: false, stoch: false, atr: false, obv: false, mfi: false, williamsR: false, cci: false, adx: false, ao: false, equity: false };
 const subHeights = { vol: 110, rsi: 120, macd: 120, stoch: 120, atr: 110, obv: 110, mfi: 120, williamsR: 120, cci: 120, adx: 120, ao: 110, equity: 140 };
 
@@ -1063,13 +1063,14 @@ const INDICATORS = [
     { key: 'sr', label: 'Supports/Résistances', tag: 'ch' },
     { key: 'fib', label: 'Fibonacci Retracement', tag: 'ch' },
     { key: 'vp', label: 'Volume Profile', tag: 'ch' },
+    { key: 'liq', label: 'Liquidité (Depth)', tag: 'ch' }
   ]}
 ];
 
 function isOverlay(key) { return key in overlays; }
 function isActive(key) { return (overlays[key] || activeSubs[key]) || false; }
 function toggleAny(key) {
-  if (isOverlay(key)) { overlays[key] = !overlays[key]; drawChart(); }
+  if (isOverlay(key)) { overlays[key] = !overlays[key]; if (key === 'liq') toggleDepth(overlays.liq); drawChart(); }
   else { activeSubs[key] = !activeSubs[key]; resizeCanvas(); drawChart(); }
   buildDropdown();
   const lbl = document.getElementById('lbl_' + key);
@@ -1125,6 +1126,7 @@ window.addEventListener('resize', () => {
 
 function toggleInd(key, label) {
   overlays[key] = !overlays[key];
+  if (key === 'liq') toggleDepth(overlays.liq);
   label.classList.toggle('active', overlays[key]);
   drawChart();
 }
@@ -1751,6 +1753,21 @@ async function fetchPrice() {
     el.textContent = '$' + price.toLocaleString('en-US', {minimumFractionDigits: 3, maximumFractionDigits: 3});
     livePrice = price;
   } catch(e) {}
+}
+
+// ============ LIQUIDITÉ (DEPTH) ============
+let depth = null, depthTimer = null;
+async function fetchDepth() {
+  try {
+    const r = await fetch(`https://api.binance.com/api/v3/depth?symbol=${activeSymbol}&limit=5000`);
+    const d = await r.json();
+    depth = { bids: d.bids.map(b => [parseFloat(b[0]), parseFloat(b[1])]), asks: d.asks.map(a => [parseFloat(a[0]), parseFloat(a[1])]) };
+    if (overlays.liq) drawChart();
+  } catch(e) {}
+}
+function toggleDepth(on) {
+  if (on) { fetchDepth(); if (!depthTimer) depthTimer = setInterval(fetchDepth, 15000); }
+  else { clearInterval(depthTimer); depthTimer = null; }
 }
 
 // ============ INDICATEURS ============
@@ -3125,6 +3142,24 @@ function resolveChart(candles, padL, padR, chartH, W) {
       ctx.fillStyle = isPOC ? 'rgba(100,180,255,0.7)' : 'rgba(100,180,255,0.25)';
       ctx.fillRect(W - pad.right + 2, y, w, Math.max(1, ph / bins - 1));
     }
+  }
+
+  // --- Heatmap Liquidité (Depth) ---
+  if (overlays.liq && depth) {
+    const bins = 48, binH = range / bins;
+    const bB = new Array(bins).fill(0), bA = new Array(bins).fill(0);
+    for (const [p, q] of depth.bids) { const b = Math.floor((p - minP) / binH); if (b >= 0 && b < bins) bB[b] += q; }
+    for (const [p, q] of depth.asks) { const b = Math.floor((p - minP) / binH); if (b >= 0 && b < bins) bA[b] += q; }
+    const mQ = Math.max(1, ...bB, ...bA);
+    const bx = W - pad.right - 48, bw = 46, half = bw / 2;
+    for (let b = 0; b < bins; b++) {
+      const y = pad.top + ph - (b + 1) * (ph / bins);
+      const h = Math.max(1, ph / bins - 1);
+      const wB = (bB[b] / mQ) * half, wA = (bA[b] / mQ) * half;
+      if (wB > 0.5) { ctx.fillStyle = `rgba(38,166,154,${0.25 + 0.55 * bB[b] / mQ})`; ctx.fillRect(bx + half - wB, y, wB, h); }
+      if (wA > 0.5) { ctx.fillStyle = `rgba(239,83,80,${0.25 + 0.55 * bA[b] / mQ})`; ctx.fillRect(bx + half, y, wA, h); }
+    }
+    ctx.fillStyle = 'rgba(128,128,128,0.35)'; ctx.fillRect(bx + half - 0.5, pad.top, 1, ph);
   }
   
   // Candles
