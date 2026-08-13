@@ -1757,6 +1757,8 @@ async function fetchPrice() {
 
 // ============ LIQUIDITÉ (HEATMAP HISTORIQUE) ============
 let histHeatmap = null, depthTimer = null;
+const HEAT_BID = (() => { const a = []; for (let i = 0; i < 256; i++) { const t = i / 255; a.push(`rgba(${10 + 80 * t | 0},${60 + 180 * t | 0},${55 + 165 * t | 0},${0.2 + 0.65 * t})`); } return a; })();
+const HEAT_ASK = (() => { const a = []; for (let i = 0; i < 256; i++) { const t = i / 255; a.push(`rgba(${60 + 195 * t | 0},${15 + 105 * t | 0},${15 + 75 * t | 0},${0.2 + 0.65 * t})`); } return a; })();
 async function fetchHeatmap() {
   try {
     const r = await fetch('https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/master/heatmap.json?t=' + Date.now(), { cache: 'no-store' });
@@ -3165,24 +3167,28 @@ function resolveChart(candles, padL, padR, chartH, W) {
     ctx.fillRect(x + candleW*0.15, Math.min(yO, yC), candleW*0.7, bodyH);
   }
   
-  // --- Heatmap Liquidité (historique Bookmap) ---
+  // --- Heatmap Liquidité (Bookmap : accumulation continue + historique) ---
   if (overlays.liq && histHeatmap && histHeatmap.bids) {
     const hm = histHeatmap;
-    const winS = Math.max(60, candles[Math.min(candles.length - 1, ve - 1)].time - candles[vs].time);
+    const t0 = candles[vs].time, t1 = candles[Math.min(candles.length - 1, ve - 1)].time;
+    const winS = Math.max(hm.dt, t1 - t0);
     const nowS = Date.now() / 1000;
+    const colW = Math.max(1, pw * hm.dt / winS);
+    const binH = Math.max(1, ph * hm.dp / range - 0.5);
     const xf = t => pad.left + pw - pw * Math.min(1, (nowS - t) / winS);
-    for (const [col, pb, v] of hm.bids) {
-      const y = pad.top + ph * (1 - (pb * hm.dp - minP) / range);
-      if (y < pad.top || y > pad.top + ph) continue;
-      const x = xf(hm.t0 + col * hm.dt); if (x < pad.left || x > pad.left + pw) continue;
-      ctx.fillStyle = `rgba(38,166,154,${0.12 + 0.6 * v / 255})`; ctx.fillRect(x - 1, y, 2, 1.5);
-    }
-    for (const [col, pb, v] of hm.asks) {
-      const y = pad.top + ph * (1 - (pb * hm.dp - minP) / range);
-      if (y < pad.top || y > pad.top + ph) continue;
-      const x = xf(hm.t0 + col * hm.dt); if (x < pad.left || x > pad.left + pw) continue;
-      ctx.fillStyle = `rgba(239,83,80,${0.12 + 0.6 * v / 255})`; ctx.fillRect(x - 1, y, 2, 1.5);
-    }
+    const drawSide = (cells, pal) => {
+      for (const [col, pb, v] of cells) {
+        const t = hm.t0 + col * hm.dt;
+        if (t < t0 || t > nowS) continue;
+        const x = xf(t); if (x < pad.left || x > pad.left + pw) continue;
+        const y = pad.top + ph * (1 - (pb * hm.dp - minP) / range);
+        if (y < pad.top - binH || y > pad.top + ph) continue;
+        ctx.fillStyle = pal[v] || pal[255];
+        ctx.fillRect(x, y, colW, binH);
+      }
+    };
+    drawSide(hm.bids, HEAT_BID);
+    drawSide(hm.asks, HEAT_ASK);
   }
   
   // Time labels (X axis)
