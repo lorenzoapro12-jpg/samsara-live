@@ -1,0 +1,4063 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saṃsāra — Les Sœurs</title>
+<style>
+/* ═══════════════════════════════════════════
+   FRUTIGER AERO THEME — skeuomorphic glass
+   ═══════════════════════════════════════════ */
+:root {
+  /* Sky gradient — deep blue zenith to soft green horizon */
+  --bg: linear-gradient(175deg,
+    #7bb8e0 0%, #8ecae6 12%, #a0d8ef 25%,
+    #b8e3f5 40%, #c9ecf8 55%, #d4f1fb 70%,
+    #c5eed8 85%, #b7e8c9 100%);
+  --bg-color: #b8e3f5;
+  /* Glass — Vista-style frosted */
+  --surface: rgba(255,255,255,0.48);
+  --surface-solid: rgba(250,252,255,0.88);
+  --surface2: rgba(220,240,252,0.55);
+  --glass-edge: rgba(255,255,255,0.7);
+  --border: rgba(140,200,230,0.45);
+  --border-bright: rgba(80,170,210,0.65);
+  --text: #143040; --text2: #2d5a6e;
+  --accent: #008fa0; --accent-glow: rgba(0,170,190,0.25);
+  --green: #1fa870; --red: #e04a3a; --blue: #1e88e5; --purple: #7c4dff;
+  --hausser: #0d9e88; --baissier: #e85d42;
+  --shadow: 0 8px 32px rgba(60,150,190,0.25);
+  --shadow-sm: 0 2px 10px rgba(60,150,190,0.15);
+  /* Glossy specular highlight — sharp white at top */
+  --gloss: linear-gradient(175deg,
+    rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.45) 6%,
+    rgba(255,255,255,0.05) 45%, rgba(255,255,255,0.0) 65%,
+    rgba(180,220,240,0.15) 100%);
+  --btn-gloss: linear-gradient(180deg,
+    rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.25) 8%,
+    rgba(255,255,255,0.0) 35%, rgba(255,255,255,0.0) 100%);
+  --radius-sm: 12px; --radius: 18px; --radius-lg: 24px;
+  --font: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* ═══ Gemini Aero — ombres multi-couches ═══ */
+  --aero-shadow-glass:
+    0 2px 4px rgba(0,0,0,0.1),
+    0 12px 28px rgba(0,0,0,0.15),
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    inset 0 -1px 2px rgba(0,0,0,0.05);
+  --aero-shadow-frame:
+    0 8px 32px rgba(0,80,160,0.25),
+    inset 0 1px 1px rgba(255,255,255,1),
+    inset 0 0 12px rgba(255,255,255,0.6);
+  --aero-border-light: linear-gradient(180deg,
+    rgba(255,255,255,0.9) 0%, rgba(180,215,255,0.6) 50%, rgba(120,180,240,0.4) 100%);
+  --aero-border-outer: rgba(140,180,220,0.6);
+  --aero-gloss-gradient: linear-gradient(180deg,
+    rgba(255,255,255,0.78) 0%, rgba(255,255,255,0.28) 48%, rgba(255,255,255,0) 50%);
+  --aero-text-emboss: 0 1px 0 rgba(255,255,255,0.9);
+  --aero-etched-dark: rgba(0,40,80,0.18);
+  --aero-etched-light: rgba(255,255,255,0.85);
+  --canvas-bg: #f8fcff;
+}
+.dark {
+  --bg: linear-gradient(175deg,
+    #061220 0%, #0a1e30 15%, #0e2640 30%,
+    #112d4e 48%, #0f3055 65%, #0c2848 82%,
+    #0a1e35 100%);
+  --bg-color: #0a1e30;
+  --surface: rgba(15,35,60,0.55);
+  --surface-solid: rgba(10,25,45,0.9);
+  --surface2: rgba(12,30,50,0.6);
+  --glass-edge: rgba(40,90,140,0.4);
+  --border: rgba(30,80,130,0.35);
+  --border-bright: rgba(0,180,220,0.5);
+  --text: #c8e6f5; --text2: #7ab8d4;
+  --accent: #00d4ee; --accent-glow: rgba(0,210,240,0.22);
+  --green: #4ae0a4; --red: #ff7670; --blue: #5cb8ff; --purple: #b794ff;
+  --hausser: #2de4c0; --baissier: #ff7b60;
+  --shadow: 0 8px 32px rgba(0,160,200,0.2);
+  --shadow-sm: 0 2px 10px rgba(0,160,200,0.12);
+  --gloss: linear-gradient(175deg,
+    rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.06) 6%,
+    rgba(255,255,255,0.0) 40%, rgba(255,255,255,0.0) 100%);
+  --btn-gloss: linear-gradient(180deg,
+    rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.04) 10%,
+    rgba(255,255,255,0.0) 100%);
+
+  /* ═══ Gemini Aero Dark — abyssal ocean ═══ */
+  --aero-shadow-glass:
+    0 4px 12px rgba(0,0,0,0.5),
+    0 16px 40px rgba(0,10,30,0.8),
+    inset 0 1px 0 rgba(255,255,255,0.35),
+    inset 0 -1px 3px rgba(0,0,0,0.6);
+  --aero-shadow-frame:
+    0 10px 40px rgba(0,200,255,0.15),
+    0 0 20px rgba(0,120,210,0.2),
+    inset 0 1px 1px rgba(255,255,255,0.5),
+    inset 0 0 15px rgba(0,180,255,0.15);
+  --aero-border-light: linear-gradient(180deg,
+    rgba(255,255,255,0.4) 0%, rgba(20,80,140,0.4) 50%, rgba(5,25,50,0.6) 100%);
+  --aero-border-outer: rgba(10,40,80,0.8);
+  --aero-gloss-gradient: linear-gradient(180deg,
+    rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.08) 48%, rgba(255,255,255,0) 50%);
+  --aero-text-emboss: 0 -1px 1px rgba(0,0,0,0.9), 0 0 8px rgba(0,180,255,0.3);
+  --aero-etched-dark: rgba(0,0,0,0.65);
+  --aero-etched-light: rgba(255,255,255,0.12);
+  --canvas-bg: #0a1628;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+/* Subtle noise texture overlay */
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+body {
+  background: var(--bg-color); background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px; line-height: 1.5;
+  display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: 30px; /* Aero taskbar */
+}
+
+/* ═══ HEADER — Vista glass bar ═══ */
+.header {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--gloss), var(--surface);
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  border-bottom: 1px solid var(--glass-edge);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.35);
+  padding: 10px 18px; display: flex; align-items: center; justify-content: space-between;
+}
+.header-left { display:flex; align-items:center; gap:14px; }
+.header-left h1 {
+  font-size:19px; color:var(--accent); font-weight:800; letter-spacing:-0.5px;
+  text-shadow: 0 0 18px var(--accent-glow), 0 1px 0 rgba(255,255,255,0.5);
+}
+.price-badge {
+  background: var(--btn-gloss), var(--surface2);
+  border: 1px solid var(--glass-edge); border-radius: var(--radius-lg);
+  padding: 5px 14px; font-size: 15px; font-weight: 700;
+  font-variant-numeric: tabular-nums; transition: all 0.25s ease;
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.5);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+}
+.price-up {
+  color: var(--green) !important;
+  border-color: rgba(31,168,112,0.5);
+  background: var(--btn-gloss), rgba(31,168,112,0.08);
+}
+.price-down {
+  color: var(--red) !important;
+  border-color: rgba(224,74,58,0.5);
+  background: var(--btn-gloss), rgba(224,74,58,0.08);
+}
+.cycle-badge {
+  font-size: 11px; color: var(--text2);
+  background: var(--btn-gloss), var(--surface2);
+  padding: 4px 14px; border-radius: var(--radius-lg);
+  border: 1px solid var(--border); font-weight: 600;
+}
+.header-right { display:flex; align-items:center; gap:10px; }
+.theme-btn {
+  background: var(--btn-gloss), var(--surface2);
+  border: 1px solid var(--glass-edge); color: var(--text);
+  padding: 5px 12px; border-radius: var(--radius-lg);
+  cursor: pointer; font-size: 13px; font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.25,0.8,0.25,1.2);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.5);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.3);
+}
+.theme-btn:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 18px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.5);
+  transform: translateY(-2px);
+}
+.theme-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08), inset 0 1px 2px rgba(0,0,0,0.05);
+}
+.refresh-dot {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--green);
+  animation: pulse 2s infinite; flex-shrink: 0;
+  box-shadow: 0 0 10px rgba(31,168,112,0.5);
+}
+@keyframes pulse { 0%,100%{opacity:1; box-shadow:0 0 6px var(--green)} 50%{opacity:0.25; box-shadow:0 0 2px var(--green)} }
+
+/* ═══ INDICATOR BAR — Vista Aero toolbar ═══ */
+.indicator-bar {
+  display: flex; align-items: center; gap: 2px;
+  padding: 4px 8px;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.75) 0%, rgba(230,240,250,0.5) 48%,
+    rgba(205,225,245,0.65) 50%, rgba(225,240,255,0.8) 100%);
+  border-radius: 0; border-bottom: 1px solid rgba(180,205,230,0.8);
+  box-shadow: 0 2px 6px rgba(0,40,80,0.08), inset 0 1px 0 rgba(255,255,255,0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+  font-size: 11px; z-index: 150; position: relative;
+}
+.dark .indicator-bar {
+  background: linear-gradient(180deg,
+    rgba(40,65,95,0.6) 0%, rgba(20,35,55,0.4) 48%,
+    rgba(10,20,35,0.6) 50%, rgba(25,45,70,0.6) 100%);
+  border-bottom-color: rgba(60,95,135,0.5);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.indicator-bar::-webkit-scrollbar { display: none; }
+.indicator-bar .sep {
+  width: 1px; height: 22px; margin: 0 6px; flex-shrink: 0;
+  background: var(--aero-etched-dark);
+  border-right: 1px solid var(--aero-etched-light);
+}
+.indicator-bar .section-title {
+  color: var(--text2); font-weight: 700; font-size: 9px;
+  letter-spacing: 0.8px; text-transform: uppercase; flex-shrink: 0;
+}
+.indicator-bar label {
+  display: flex; align-items: center; gap: 4px; padding: 5px 12px;
+  border-radius: 5px; cursor: pointer; white-space: nowrap;
+  border: 1px solid rgba(150,185,220,0.5);
+  transition: all 0.15s ease;
+  user-select: none; font-size: 11px; font-weight: 600;
+  color: #1a365d;
+  text-shadow: var(--aero-text-emboss);
+  background: linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(220,235,250,0.3) 100%);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.8);
+}
+.dark .indicator-bar label {
+  color: #e2e8f0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.02) 100%);
+  border-color: rgba(255,255,255,0.15);
+  text-shadow: var(--aero-text-emboss);
+}
+.indicator-bar label:hover {
+  background: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(200,230,255,0.6) 100%);
+  border-color: #3b82f6;
+  box-shadow: 0 0 8px rgba(59,130,246,0.4), inset 0 1px 0 #fff;
+  transform: translateY(-1px);
+}
+.dark .indicator-bar label:hover {
+  background: linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.06) 100%);
+  border-color: #38bdf8;
+  box-shadow: 0 0 10px rgba(56,189,248,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+/* Pressed/inset active state */
+.indicator-bar label.active {
+  background: linear-gradient(180deg, rgba(160,200,240,0.7) 0%, rgba(200,225,255,0.9) 100%);
+  border-color: #1d4ed8; color: #0f172a;
+  font-weight: 700; text-shadow: none;
+  box-shadow: inset 0 2px 4px rgba(0,20,60,0.4),
+              inset 0 -1px 1px rgba(255,255,255,0.6),
+              0 0 6px rgba(37,99,235,0.3);
+}
+.dark .indicator-bar label.active {
+  background: linear-gradient(180deg, rgba(15,45,80,0.8) 0%, rgba(30,75,125,0.9) 100%);
+  border-color: #38bdf8; color: #f8fafc;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.8),
+              inset 0 -1px 1px rgba(255,255,255,0.2),
+              0 0 10px rgba(56,189,248,0.4);
+}
+.indicator-bar input { display: none; }
+.ind-label { font-weight: 600; }
+.ov { color: #3b8ed4; } .sg { color: #c07d10; } .ch { color: #e040fb; }
+.tag-ch { background: rgba(224,64,251,0.12); color: #e040fb; }
+
+/* ═══ MAIN LAYOUT ═══ */
+.main-area { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+
+/* ═══ P#1 CHART CONTAINER — Vista glass frame ═══ */
+.chart-container {
+  flex: 1; min-width: 0; position: relative;
+  border-radius: 12px; padding: 8px; overflow: hidden;
+  background: var(--gloss), var(--surface);
+  backdrop-filter: blur(16px) saturate(1.8);
+  -webkit-backdrop-filter: blur(16px) saturate(1.8);
+  border: 1px solid var(--aero-border-outer);
+  box-shadow: var(--aero-shadow-frame);
+}
+/* Inner border — biseau lumineux */
+.chart-container::before {
+  content: ''; position: absolute; inset: 0; border-radius: 11px;
+  padding: 1px;
+  background: var(--aero-border-light);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none; z-index: 3;
+}
+/* Curved gloss — reflet spéculaire Frutiger AMPLIFIÉ */
+.chart-container::after {
+  content: ''; position: absolute; top: 0; left: -20%; width: 140%; height: 55%;
+  background: radial-gradient(ellipse 100% 60% at 50% 0%,
+    rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.35) 40%, rgba(255,255,255,0.08) 70%, rgba(255,255,255,0) 100%);
+  border-radius: 0 0 50% 50% / 0 0 20% 20%;
+  pointer-events: none; z-index: 2;
+  transition: opacity 0.3s ease;
+}
+.dark .chart-container::after {
+  background: radial-gradient(ellipse 100% 60% at 50% 0%,
+    rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0) 100%);
+}
+/* Canvas — encastré avec bezel intérieur + fond blanc */
+.chart-container canvas {
+  display: block; width: 100%; height: 100%; position: relative; z-index: 1;
+  border-radius: 6px;
+  background: var(--canvas-bg);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.25), inset 0 -1px 2px rgba(255,255,255,0.2);
+}
+/* Amplification : reflet double + bulle glossy */
+.chart-container .gloss-bubble {
+  position: absolute; top: -12px; right: 10%; width: 80px; height: 40px;
+  background: radial-gradient(ellipse 70% 50% at 50% 50%,
+    rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.15) 60%, transparent 100%);
+  border-radius: 50%; filter: blur(6px); pointer-events: none; z-index: 2;
+}
+
+/* ═══ FEED PANEL — frosted glass side drawer ═══ */
+.feed-panel {
+  display: flex; flex-shrink: 0; width: 390px;
+  border-left: 2px solid var(--glass-edge);
+  background: var(--gloss), var(--surface);
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden;
+  z-index: 90;
+  box-shadow: -6px 0 24px rgba(0,0,0,0.2), inset 1px 0 0 rgba(255,255,255,0.15);
+}
+.feed-panel.collapsed { width: 34px; }
+.feed-panel-handle {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; flex-shrink: 0; cursor: pointer;
+  background: var(--btn-gloss), var(--surface2);
+  color: var(--text2); font-size: 10px; font-weight: 700;
+  user-select: none; writing-mode: vertical-rl; text-transform: uppercase;
+  letter-spacing: 2px; transition: all 0.25s; padding: 12px 0;
+  border-right: 1px solid var(--glass-edge); text-align: center;
+}
+.feed-panel-handle:hover {
+  color: var(--accent);
+  background: var(--btn-gloss), var(--accent-glow);
+  text-shadow: 0 0 10px var(--accent-glow);
+}
+.feed-panel-body { flex: 1; overflow-y: auto; overflow-x: hidden; }
+.feed-panel.collapsed .feed-panel-body { display: none; }
+.feed { padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+
+/* ═══ SKELETON ═══ */
+.skeleton {
+  background: linear-gradient(110deg, var(--surface2) 30%, var(--glass-edge) 50%, var(--surface2) 70%);
+  background-size: 200% 100%; animation: skeleton-loading 1.6s infinite;
+  border-radius: var(--radius);
+}
+@keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.skeleton-card { height: 120px; width: 100%; margin-bottom: 14px; }
+
+/* ═══ DEMON CARD — glossy bubble Aero ═══ */
+.demon-card {
+  position: relative; overflow: hidden;
+  background: var(--gloss), var(--surface-solid);
+  border: 1px solid var(--glass-edge);
+  border-bottom-color: rgba(160,190,220,0.5);
+  border-radius: var(--radius-lg); padding: 18px;
+  box-shadow: var(--aero-shadow-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.demon-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 45%;
+  background: var(--aero-gloss-gradient); pointer-events: none; z-index: 0;
+}
+.demon-card > * { position: relative; z-index: 1; }
+.demon-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.demon-avatar {
+  font-size: 28px; flex-shrink: 0;
+  filter: drop-shadow(0 3px 6px var(--accent-glow));
+}
+.demon-name {
+  font-weight:800; color:var(--accent); font-size:15px; letter-spacing:-0.3px;
+  text-shadow: 0 0 14px var(--accent-glow), var(--aero-text-emboss);
+}
+.demon-role { font-size:11px; color:var(--text2); }
+.demon-body { font-size:13px; color:var(--text); line-height:1.8; }
+
+/* ═══ SISTER CARD — glass card Aero enhanced ═══ */
+.sister-card {
+  position: relative; overflow: hidden;
+  background: var(--gloss), var(--surface-solid);
+  border: 1px solid var(--glass-edge);
+  border-bottom-color: rgba(160,190,220,0.5);
+  border-radius: var(--radius-lg);
+  transition: all 0.25s cubic-bezier(0.25,0.8,0.25,1.2);
+  box-shadow: var(--aero-shadow-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.sister-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 45%;
+  background: var(--aero-gloss-gradient); pointer-events: none; z-index: 0;
+}
+.sister-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 6px 20px rgba(0,100,200,0.2),
+              inset 0 1px 0 rgba(255,255,255,1),
+              inset 0 0 8px rgba(255,255,255,0.8);
+  transform: translateY(-3px);
+}
+.sister-card-header {
+  position: relative; z-index: 1;
+  padding: 12px 14px; cursor: pointer; display: flex; align-items: center; gap: 12px;
+  user-select: none;
+  background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 100%);
+}
+.sister-avatar { font-size: 20px; flex-shrink: 0; }
+.sister-info { flex:1; min-width:0; }
+.sister-title { font-weight: 700; font-size: 13px; color: var(--text); }
+.sister-subtitle {
+  font-size: 11px; color: var(--text2); margin-top: 3px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sister-meta { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
+.badge {
+  font-size: 10px; padding: 3px 8px; border-radius: var(--radius-sm);
+  font-weight: 600; white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.3);
+}
+.badge-regime { background: rgba(59,142,212,0.12); color: #3b8ed4; border: 1px solid rgba(59,142,212,0.3); }
+.badge-conf { background: rgba(192,125,16,0.1); color: var(--accent); border: 1px solid rgba(192,125,16,0.25); }
+.badge-hausser { background: rgba(13,158,136,0.1); color: var(--hausser); border: 1px solid rgba(13,158,136,0.25); }
+.badge-baissier { background: rgba(232,93,66,0.1); color: var(--baissier); border: 1px solid rgba(232,93,66,0.25); }
+.sister-expand { font-size: 11px; color: var(--text2); transition: transform 0.25s; }
+.sister-card.open .sister-expand { transform: rotate(180deg); }
+.sister-card-body {
+  display: none; padding: 14px 16px;
+  border-top: 1px solid var(--glass-edge);
+  font-size: 12px; line-height: 1.7;
+  max-height: 70vh; overflow-y: auto;
+  background: linear-gradient(180deg, var(--surface2) 0%, transparent 100%);
+}
+.sister-card.open .sister-card-body { display: block; }
+.sister-card-body h3 { color: var(--accent); font-size: 14px; margin: 14px 0 8px; font-weight:700; }
+.sister-card-body h4 { color: var(--text); font-size: 12px; margin: 10px 0 5px; font-weight:600; }
+.sister-card-body p { margin: 5px 0; color: var(--text); }
+.sister-card-body strong { color: var(--text); }
+.sister-card-body em { color: var(--text2); }
+.sister-card-body blockquote {
+  border-left: 3px solid var(--purple); padding: 5px 12px;
+  margin: 10px 0; color: var(--text2);
+  background: var(--surface2); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.sister-card-body code {
+  background: var(--surface2); padding: 2px 6px;
+  border-radius: 4px; font-size: 11px; font-family: 'Cascadia Code', monospace;
+}
+.sister-card-body pre {
+  background: var(--surface2); padding: 12px; border-radius: var(--radius-sm);
+  overflow-x: auto; font-size: 11px; margin: 10px 0;
+  border: 1px solid var(--border);
+}
+
+/* ═══ AVATAR ORBS — glossy 3D spheres ═══ */
+.avatar-orb {
+  width: 42px; height: 42px; border-radius: 50%; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: bold; font-size: 18px; color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6); flex-shrink: 0;
+  background: radial-gradient(circle at 35% 30%, #60c5ff 0%, #0077e6 50%, #003b99 85%, #001a50 100%);
+  border: 1px solid rgba(255,255,255,0.8);
+  box-shadow: 0 3px 8px rgba(0,20,50,0.35),
+              inset 0 -3px 6px rgba(0,0,0,0.4),
+              inset 0 3px 6px rgba(255,255,255,0.6);
+}
+.avatar-orb::after {
+  content: ''; position: absolute; top: 3px; left: 7px;
+  width: 26px; height: 13px;
+  border-radius: 15px 15px 8px 8px / 12px 12px 4px 4px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.1) 100%);
+  pointer-events: none;
+}
+.avatar-orb.emerald {
+  background: radial-gradient(circle at 35% 30%, #52f0b0 0%, #00a86b 50%, #005c38 85%, #002b1a 100%);
+}
+.avatar-orb.amber {
+  background: radial-gradient(circle at 35% 30%, #ffd060 0%, #e67e00 50%, #994c00 85%, #4a2200 100%);
+}
+.avatar-orb.ruby {
+  background: radial-gradient(circle at 35% 30%, #ff7070 0%, #cc1a1a 50%, #7a0a0a 85%, #3d0202 100%);
+}
+.avatar-orb.amethyst {
+  background: radial-gradient(circle at 35% 30%, #c9a0ff 0%, #7c3aed 50%, #4a1d8a 85%, #1e0848 100%);
+}
+.sister-card-body hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+.sister-card-body ul, .sister-card-body ol { margin: 8px 0; padding-left: 20px; }
+
+.targets-mini { display: flex; flex-direction: column; gap: 5px; margin: 10px 0; }
+.target-chip {
+  font-size: 10px; padding: 5px 10px; border-radius: var(--radius-sm);
+  background: var(--btn-gloss), var(--surface2);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.3);
+}
+.target-chip .dir { font-weight: 800; font-size: 12px; }
+.target-chip.hausser { border-left: 3px solid var(--hausser); }
+.target-chip.baissier { border-left: 3px solid var(--baissier); }
+
+/* ═══ LOADING / ERROR ═══ */
+.loading { text-align:center; padding:48px; color:var(--text2); }
+.error {
+  text-align:center; padding:40px; color:var(--red);
+  background: var(--gloss), var(--surface);
+  border: 1px solid rgba(224,74,58,0.4); border-radius: var(--radius);
+  margin: 16px;
+}
+
+/* ═══ DROPDOWN ═══ */
+.ind-dropdown { display: inline-block; flex-shrink: 0; }
+.ind-dropdown-btn {
+  background: var(--btn-gloss), var(--surface2);
+  border: 1px solid var(--glass-edge); color: var(--text);
+  padding: 4px 14px; border-radius: var(--radius-lg);
+  cursor: pointer; font-size: 11px; font-weight: 600;
+  white-space: nowrap; transition: all 0.2s cubic-bezier(0.25,0.8,0.25,1.2);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.5);
+}
+.ind-dropdown-btn:hover {
+  border-color: var(--accent); color: var(--accent);
+  box-shadow: 0 4px 16px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.5);
+  transform: translateY(-1px);
+}
+.ind-dropdown-menu {
+  display: none; position: fixed; z-index: 999;
+  background: var(--gloss), var(--surface-solid);
+  backdrop-filter: blur(30px) saturate(1.5);
+  -webkit-backdrop-filter: blur(30px) saturate(1.5);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius-lg);
+  min-width: 270px; max-height: 60vh; overflow-y: auto;
+  box-shadow: 0 16px 48px rgba(40,120,160,0.25),
+              inset 0 1px 0 rgba(255,255,255,0.4);
+  padding: 8px 0;
+}
+.ind-dropdown-menu.open { display: block; }
+.ind-dropdown-menu .cat-title {
+  font-size: 9px; font-weight: 700; color: var(--text2);
+  text-transform: uppercase; padding: 8px 16px 3px; letter-spacing: 1px;
+}
+.ind-dropdown-menu .cat-title:first-child { padding-top: 10px; }
+.ind-dropdown-menu label {
+  display: flex; align-items: center; gap: 8px; padding: 5px 16px;
+  font-size: 12px; cursor: pointer; transition: background 0.15s;
+}
+.ind-dropdown-menu label:hover { background: var(--surface2); }
+.ind-dropdown-menu label input { margin: 0; accent-color: var(--accent); }
+.ind-dropdown-menu label .tag {
+  font-size: 8px; padding: 2px 6px; border-radius: 4px; margin-left: auto;
+  font-weight: 700;
+}
+.tag-ov { background: rgba(59,142,212,0.12); color: #3b8ed4; }
+.tag-sg { background: rgba(192,125,16,0.12); color: #c07d10; }
+
+/* ═══ SCROLLBARS — aqua glass ═══ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(130,200,230,0.6), rgba(80,170,210,0.4));
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(80,180,210,0.8), rgba(60,160,200,0.6));
+}
+
+/* ═══ KEYBOARD HINT ═══ */
+.kbd-hint {
+  font-size: 10px; color: var(--text2);
+  border: 1px solid var(--border); padding: 2px 6px;
+  border-radius: 4px; background: var(--btn-gloss), var(--surface2);
+}
+
+/* ═══ P#4 AURORA — background lens flare ═══ */
+.aero-aurora {
+  position: fixed; top: -20%; left: 20%;
+  width: 60vw; height: 50vh;
+  background: radial-gradient(circle, rgba(120,220,255,0.25) 0%, rgba(0,160,255,0.08) 45%, transparent 70%);
+  filter: blur(60px); pointer-events: none; z-index: 0;
+}
+.dark .aero-aurora {
+  background: radial-gradient(circle, rgba(0,180,216,0.18) 0%, rgba(9,9,121,0.1) 50%, transparent 75%);
+}
+
+/* ═══ P#4 HEADER ORB — glossy 3D logo sphere ═══ */
+.header-orb {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  background: radial-gradient(circle at 35% 25%, #ffffff 0%, #60a5fa 30%, #1d4ed8 70%, #0f172a 100%);
+  border: 1px solid rgba(255,255,255,0.9);
+  box-shadow: 0 0 12px rgba(59,130,246,0.5),
+              inset 0 -2px 4px rgba(0,0,0,0.5),
+              inset 0 2px 4px rgba(255,255,255,0.9);
+  position: relative; display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+.header-orb::after {
+  content: ''; position: absolute; top: 2px; left: 6px;
+  width: 20px; height: 9px;
+  border-radius: 10px 10px 4px 4px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 100%);
+}
+
+/* ═══ P#4 TASKBAR — Vista glass status bar ═══ */
+.aero-taskbar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 30px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px; font-size: 11px; z-index: 2000; color: var(--text2);
+  background: linear-gradient(180deg,
+    rgba(240,248,255,0.85) 0%, rgba(200,225,250,0.65) 45%,
+    rgba(170,205,240,0.75) 50%, rgba(190,220,250,0.9) 100%);
+  border-top: 1px solid rgba(255,255,255,0.9);
+  box-shadow: 0 -2px 10px rgba(0,30,60,0.12);
+  backdrop-filter: blur(20px) saturate(2);
+  -webkit-backdrop-filter: blur(20px) saturate(2);
+}
+.dark .aero-taskbar {
+  color: #7ab8d4;
+  background: linear-gradient(180deg,
+    rgba(20,40,65,0.85) 0%, rgba(10,20,35,0.7) 45%,
+    rgba(5,10,20,0.85) 50%, rgba(15,30,50,0.9) 100%);
+  border-top: 1px solid rgba(0,180,255,0.3);
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.6);
+}
+.aero-taskbar .taskbar-left { display: flex; align-items: center; gap: 12px; }
+.aero-taskbar .taskbar-right { display: flex; align-items: center; gap: 10px; }
+.aero-taskbar .taskbar-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  box-shadow: 0 0 6px var(--green);
+  transition: background 0.3s;
+}
+
+/* ═══ TYPO — Vista embossed headers ═══ */
+h1, h2, h3, .dashboard-title {
+  letter-spacing: 0.03em;
+  text-shadow: var(--aero-text-emboss);
+}
+
+/* ═══ RESPONSIVE ═══ */
+@media (max-width: 768px) {
+  body { font-size: 12px; }
+  .header { padding: 8px 12px; }
+  .header-left h1 { font-size: 15px; }
+  .header-left { gap: 8px; }
+  .price-badge { font-size: 13px; padding: 3px 8px; }
+  .cycle-badge { font-size: 10px; padding: 3px 8px; }
+  .header-right { gap: 6px; }
+  .header-right #updated { display: none; }
+  .theme-btn { font-size: 11px; padding: 4px 8px; }
+
+  .indicator-bar { padding: 5px 10px; gap: 4px; }
+  .indicator-bar label { padding: 3px 7px; font-size: 10px; gap: 3px; }
+  .indicator-bar .section-title { font-size: 8px; }
+  .indicator-bar .sep { height: 14px; margin: 0 3px; }
+  .ind-dropdown-btn { font-size: 10px; padding: 3px 8px; }
+  .ind-dropdown-menu { min-width: 220px; max-height: 50vh; font-size: 11px; }
+
+  .main-area { flex-direction: column; overflow: hidden; }
+  .chart-container { height: 100%; }
+  .feed-panel { display: none !important; }
+
+  /* Grid bot — stacked single column on mobile */
+  .strat-section:not(.collapsed) { height: 200px; }
+  .strat-section { height: 36px; } /* larger touch target */
+  .strat-handle { height: 36px; padding: 0 14px; font-size: 13px; }
+  .strat-body { height: calc(100% - 36px); }
+  .strat-cols { flex-direction: column; gap: 8px; }
+  .strat-col-config { flex: none; width: 100%; }
+  .strat-col-actions { flex: none; width: 100%; flex-direction: row; flex-wrap: wrap; gap: 4px; }
+  .strat-col-actions .strat-btn { flex: 1; min-width: 80px; font-size: 10px; padding: 6px 8px; }
+  .strat-col-actions .strat-toggle { width: 100%; text-align: center; }
+  .strat-col-stats { flex: none; width: 100%; min-width: unset; font-size: 10px; }
+  .strat-body { padding: 8px 10px; }
+  .strat-section .strat-row { margin-bottom: 4px; }
+  .strat-section .strat-row label { min-width: 55px; font-size: 9px; }
+  .strat-section .strat-row select,
+  .strat-section .strat-row input[type="number"],
+  .strat-section .strat-row input[type="datetime-local"] { font-size: 10px; padding: 3px 5px; }
+  .strat-section .strat-stats { font-size: 10px; line-height: 1.4; }
+  .strat-section .strat-btn { font-size: 10px; }
+
+  .feed { padding: 10px; gap: 10px; word-break: break-word; overflow-wrap: break-word; }
+  .demon-card { padding: 12px; }
+  .demon-name { font-size: 13px; }
+  .demon-body { font-size: 11px; }
+  .sister-card-header { padding: 10px 12px; gap: 8px; }
+  .sister-avatar { font-size: 16px; }
+  .sister-title { font-size: 12px; }
+  .sister-card-body { max-height: none; overflow-y: visible; font-size: 11px; }
+  .sister-card-body pre { max-width: 100%; overflow-x: auto; font-size: 10px; }
+  .sister-card-body blockquote { margin: 8px 0; padding: 4px 8px; }
+  .targets-mini { gap: 3px; }
+  .target-chip { font-size: 9px; padding: 4px 7px; gap: 4px; flex-wrap: wrap; }
+  .demon-header { flex-wrap: wrap; }
+  .sister-meta { gap: 3px; }
+}
+
+@media (max-width: 400px) {
+  .header-left h1 { font-size: 13px; }
+  .price-badge { font-size: 11px; }
+  .indicator-bar label { padding: 2px 5px; font-size: 9px; }
+  .indicator-bar .section-title { display: none; }
+  .aero-taskbar { height: 24px; padding: 0 8px; font-size: 10px; }
+  .header-orb { width: 26px; height: 26px; font-size: 12px; }
+
+  /* Grid bot — ultra-compact */
+  .strat-section:not(.collapsed) { height: 170px; }
+  .strat-section { height: 34px; }
+  .strat-handle { height: 34px; font-size: 12px; }
+  .strat-body { height: calc(100% - 34px); }
+  .strat-col-actions .strat-btn { font-size: 9px; padding: 4px 6px; }
+  .strat-section .strat-row label { min-width: 45px; font-size: 8px; }
+  .strat-section .strat-row select,
+  .strat-section .strat-row input[type="number"],
+  .strat-section .strat-row input[type="datetime-local"] { font-size: 9px; }
+}
+
+/* ═══ GRID BOT SECTION — bottom panel under chart ═══ */
+.strat-section {
+  flex-shrink: 0; overflow: hidden;
+  border-top: 1px solid var(--glass-edge);
+  background: var(--gloss), var(--surface);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 28px; /* collapsed */
+}
+.strat-section:not(.collapsed) { height: 280px; }
+.strat-handle {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 28px; padding: 0 18px; cursor: pointer;
+  font-size: 12px; font-weight: 700; color: var(--accent);
+  background: var(--btn-gloss), var(--surface2);
+  border-bottom: 1px solid var(--glass-edge);
+  user-select: none; letter-spacing: 0.3px;
+  text-shadow: var(--aero-text-emboss);
+}
+.strat-handle:hover { color: var(--accent); text-shadow: 0 0 12px var(--accent-glow); }
+.strat-handle-arrow { font-size: 14px; transition: transform 0.3s; }
+.strat-section:not(.collapsed) .strat-handle-arrow { transform: rotate(90deg); }
+.strat-body { height: calc(100% - 28px); overflow-y: auto; padding: 12px 18px; }
+.strat-cols { display: flex; gap: 18px; height: 100%; }
+.strat-col-config { flex: 0 0 320px; }
+.strat-col-actions { flex: 0 0 130px; display: flex; flex-direction: column; gap: 5px; }
+.strat-col-stats { flex: 1; min-width: 200px; font-size: 11px; }
+
+/* Override grid bot panel styles — now inline/horizontal */
+.strat-section .strat-row { display: flex; align-items: center; margin-bottom: 6px; gap: 6px; }
+.strat-section .strat-row label { min-width: 75px; font-size: 10px; color: var(--text2); font-weight: 600; }
+.strat-section .strat-row select,
+.strat-section .strat-row input[type="number"],
+.strat-section .strat-row input[type="datetime-local"] {
+  flex: 1; padding: 3px 6px; font-size: 11px;
+  background: var(--surface2); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-family: var(--font);
+}
+.strat-section .strat-btn {
+  padding: 5px 10px; font-size: 11px; font-weight: 700; cursor: pointer; border: none;
+  border-radius: var(--radius-sm); font-family: var(--font);
+  background: var(--btn-gloss), linear-gradient(135deg, var(--accent), #006d7a);
+  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  box-shadow: var(--aero-shadow-glass); transition: transform 0.1s;
+}
+.strat-section .strat-btn:hover { transform: scale(1.02); }
+.strat-section .strat-btn.secondary {
+  background: var(--btn-gloss), var(--surface2); color: var(--text);
+}
+.strat-section .strat-btn.forward {
+  background: var(--btn-gloss), linear-gradient(135deg, #26a69a, #00695c);
+}
+.strat-section .strat-stats {
+  padding: 8px; background: var(--surface2);
+  border-radius: var(--radius-sm); border: 1px solid var(--border);
+  line-height: 1.6; font-size: 11px;
+}
+.strat-section .strat-toggle {
+  font-size: 10px; color: var(--accent); cursor: pointer;
+  text-align: center; text-decoration: underline; margin-top: 4px;
+}
+.strat-section input.auto-mode {
+  opacity: 0.45; font-style: italic;
+}
+.stat-val { font-weight: 700; color: var(--accent); }
+.stat-pos { color: #26a69a; font-weight: 700; }
+.stat-neg { color: #ef5350; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- Aurora background lens flare -->
+<div class="aero-aurora"></div>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-orb">🔮</div>
+    <h1>Saṃsāra</h1>
+    <span class="price-badge" id="price">—</span>
+    <span class="cycle-badge" id="cycle">—</span>
+  </div>
+  <div class="header-right">
+    <span id="updated" style="font-size:10px;color:var(--text2);font-variant-numeric:tabular-nums"></span>
+    <button class="theme-btn" onclick="toggleFeed()" id="feedBtn" title="Sœurs & Démon">📋✓</button>
+    <button class="theme-btn" onclick="resetView()" title="Réinitialiser le zoom">↺</button>
+    <span class="refresh-dot" id="dot" title="Flux temps réel actif"></span>
+    <button class="theme-btn" onclick="toggleTheme()" id="themeBtn" title="Raccourci: D">☾</button>
+  </div>
+</div>
+
+<div class="indicator-bar" id="indicatorBar">
+  <span class="section-title">Overlays</span>
+  <label id="lbl_ema20" onclick="toggleInd('ema20',this)"><span class="ind-label ov">EMA20</span></label>
+  <label id="lbl_ema50" onclick="toggleInd('ema50',this)"><span class="ind-label ov">EMA50</span></label>
+  <label id="lbl_ema100" onclick="toggleInd('ema100',this)"><span class="ind-label ov">EMA100</span></label>
+  <label id="lbl_ema200" onclick="toggleInd('ema200',this)"><span class="ind-label ov">EMA200</span></label>
+  <label id="lbl_sma20" onclick="toggleInd('sma20',this)"><span class="ind-label ov">SMA20</span></label>
+  <label id="lbl_sma50" onclick="toggleInd('sma50',this)"><span class="ind-label ov">SMA50</span></label>
+  <label id="lbl_bb" onclick="toggleInd('bb',this)"><span class="ind-label ov">Bollinger</span></label>
+  <span class="sep"></span>
+  <span class="section-title">Sous-graphes</span>
+  <label id="lbl_vol" class="active" onclick="toggleSub('vol',this)"><span class="ind-label sg">Volume</span></label>
+  <label id="lbl_rsi" onclick="toggleSub('rsi',this)"><span class="ind-label sg">RSI</span></label>
+  <label id="lbl_macd" onclick="toggleSub('macd',this)"><span class="ind-label sg">MACD</span></label>
+  <label id="lbl_stoch" onclick="toggleSub('stoch',this)"><span class="ind-label sg">Stoch</span></label>
+  <label id="lbl_atr" onclick="toggleSub('atr',this)"><span class="ind-label sg">ATR</span></label>
+  <span class="sep"></span>
+  <span class="section-title">Intervalle</span>
+  <label id="int_1m" onclick="changeInterval('1m',this)"><span class="ind-label">1m</span></label>
+  <label id="int_5m" onclick="changeInterval('5m',this)"><span class="ind-label">5m</span></label>
+  <label id="int_15m" class="active" onclick="changeInterval('15m',this)"><span class="ind-label">15m</span></label>
+  <label id="int_1h" onclick="changeInterval('1h',this)"><span class="ind-label">1h</span></label>
+  <label id="int_4h" onclick="changeInterval('4h',this)"><span class="ind-label">4h</span></label>
+  <label id="int_1d" onclick="changeInterval('1d',this)"><span class="ind-label">1D</span></label>
+  <span class="sep"></span>
+  <span class="section-title">Paire</span>
+  <label id="sym_BTCUSDT" class="active" onclick="changeSymbol('BTCUSDT',this)"><span class="ind-label">BTC</span></label>
+  <label id="sym_SOLUSDT" onclick="changeSymbol('SOLUSDT',this)"><span class="ind-label">SOL</span></label>
+  <label id="sym_XRPUSDT" onclick="changeSymbol('XRPUSDT',this)"><span class="ind-label">XRP</span></label>
+  <label id="sym_TAOUSDT" onclick="changeSymbol('TAOUSDT',this)"><span class="ind-label">TAO</span></label>
+  <label id="sym_BTCSOL" onclick="changeSymbol('BTCSOL',this)"><span class="ind-label">BTC/SOL</span></label>
+  <span class="sep"></span>
+  <div class="ind-dropdown">
+    <button class="ind-dropdown-btn" id="indDropdownBtn" onclick="toggleDropdown(event)">➕ Indicateurs ▾</button>
+  </div>
+</div>
+
+<!-- Menu dropdown déplacé hors de la barre pour éviter la troncation overflow -->
+<div class="ind-dropdown-menu" id="indMenu" onclick="event.stopPropagation()"></div>
+
+<div class="main-area">
+<div class="chart-container"><div class="gloss-bubble"></div><canvas id="chart"></canvas></div>
+
+<div class="feed-panel collapsed" id="feedPanel">
+  <div class="feed-panel-handle" onclick="toggleFeed()" id="feedHandle">Sœurs & Démon</div>
+  <div class="feed-panel-body">
+    <div class="feed" id="feed">
+      <div class="loading">🔮 En attente des données…</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══ GRID BOT SECTION — bottom panel under chart ═══ -->
+<div class="strat-section collapsed" id="stratSection">
+  <div class="strat-handle" onclick="toggleStratPanel()">
+    <span>🤖 Grid Bot</span>
+    <span class="strat-handle-arrow">▸</span>
+  </div>
+  <div class="strat-body" id="stratBody">
+    <div class="strat-cols">
+      <!-- Colonne gauche : config -->
+      <div class="strat-col-config">
+        <div class="strat-row">
+          <label>Stratégie</label>
+          <select id="stratSelect" onchange="onStratChange()">
+            <option value="bb_grid">Grille Bollinger</option>
+            <option value="rsi_grid">Grille RSI</option>
+            <option value="ema_grid">Grille EMA Pullback</option>
+            <option value="dumb_grid">Grille Fixe (benchmark)</option>
+          </select>
+        </div>
+        <div class="strat-row">
+          <label>Capital</label>
+          <input type="number" id="stratCapital" value="1000" min="100" max="100000" step="100" onchange="onStratParamChange()">
+        </div>
+        <div id="stratParams"></div>
+        <div class="strat-row">
+          <label>Du</label>
+          <input type="datetime-local" id="stratDateFrom" style="flex:1;font-size:11px;padding:2px 6px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font)">
+        </div>
+        <div class="strat-row">
+          <label>Au</label>
+          <input type="datetime-local" id="stratDateTo" style="flex:1;font-size:11px;padding:2px 6px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font)">
+        </div>
+      </div>
+      <!-- Colonne milieu : boutons -->
+      <div class="strat-col-actions">
+        <button class="strat-btn" onclick="onBacktestClick()">▶ Backtest</button>
+        <button class="strat-btn secondary" onclick="onFullBacktestClick()">▶ Complet</button>
+        <button class="strat-btn forward" id="stratFwdBtn" onclick="onForwardClick()">🔴 Forward</button>
+        <button class="strat-btn secondary" id="stratDumbCmp" onclick="onCompareDumbGrid()">📊 vs Grille Fixe</button>
+        <button class="strat-btn secondary" onclick="showWalkForward()">🔬 Walk-Forward</button>
+        <div class="strat-toggle" onclick="toggleAdvanced()" id="advToggle">⚙ Avancé ▸</div>
+      </div>
+      <!-- Colonne droite : stats -->
+      <div class="strat-col-stats">
+        <div class="strat-stats" id="stratStats" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile : modal Sœurs & Démon -->
+<div id="samsaraModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:1000;background:var(--bg-color);background:var(--bg);flex-direction:column;overflow:hidden">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--gloss),var(--surface);backdrop-filter:blur(28px) saturate(1.4);-webkit-backdrop-filter:blur(28px) saturate(1.4);border-bottom:1px solid var(--glass-edge);box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,0.35)">
+    <span style="font-weight:800;font-size:17px;color:var(--accent);text-shadow:0 0 14px var(--accent-glow),0 1px 0 rgba(255,255,255,0.5)">🔮 Sœurs & Démon</span>
+    <button onclick="closeSamsaraModal()" style="background:var(--btn-gloss),var(--surface2);border:1px solid var(--glass-edge);color:var(--text);padding:5px 14px;border-radius:var(--radius-lg);font-size:14px;cursor:pointer;font-weight:600;box-shadow:var(--shadow-sm),inset 0 1px 0 rgba(255,255,255,0.5);transition:all 0.2s">✕</button>
+  </div>
+  <div id="samsaraModalBody" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:14px;background:radial-gradient(ellipse at 50% 0%,rgba(255,255,255,0.08) 0%,transparent 70%))">
+    <div class="loading">🔮 En attente des données…</div>
+  </div>
+</div>
+
+<script>
+// ============ THEME ============
+const themeKey = 'samsara-theme-v2';
+let dark = localStorage.getItem(themeKey) === 'dark';
+function applyTheme() { document.body.classList.toggle('dark', dark); document.getElementById('themeBtn').textContent = dark ? '☀' : '☾'; }
+function toggleTheme() { dark = !dark; localStorage.setItem(themeKey, dark ? 'dark' : 'light'); applyTheme(); }
+applyTheme();
+
+// ============ SHORTCUTS UX ============
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'f' || e.key === 'F') { toggleFeed(); e.preventDefault(); }
+  if (e.key === 'd' || e.key === 'D') { toggleTheme(); e.preventDefault(); }
+  if (e.key === 'r' || e.key === 'R') { resetView(); e.preventDefault(); }
+  if (e.key === 'Escape') { document.getElementById('indMenu').classList.remove('open'); }
+  // Flèches : scroller horizontalement
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    e.preventDefault();
+    const visible = viewEnd - viewStart;
+    const step = e.shiftKey ? 10 : 1;
+    const delta = e.key === 'ArrowRight' ? step : -step;
+    const newStart = Math.max(0, Math.min(candles.length - visible, viewStart + delta));
+    viewStart = newStart;
+    viewEnd = newStart + visible;
+    drawChart();
+  }
+});
+
+// ============ FEED TOGGLE ============
+let feedVisible = false;
+function toggleFeed() {
+  if (window.innerWidth <= 768) {
+    openSamsaraModal(); return;
+  }
+  feedVisible = !feedVisible;
+  const panel = document.getElementById('feedPanel');
+  const btn = document.getElementById('feedBtn');
+  if (feedVisible) { panel.classList.remove('collapsed'); if (btn) btn.textContent = '📋'; }
+  else { panel.classList.add('collapsed'); if (btn) btn.textContent = '📋✓'; }
+  // Attendre la fin de la transition CSS (0.3s) avant de redimensionner
+  setTimeout(() => { resizeCanvas(); drawChart(); }, 350);
+}
+
+function openSamsaraModal() {
+  const modal = document.getElementById('samsaraModal');
+  modal.style.display = 'flex';
+  renderFeedTo(document.getElementById('samsaraModalBody'));
+}
+function closeSamsaraModal() {
+  document.getElementById('samsaraModal').style.display = 'none';
+}
+
+// ============ RESET VIEW ============
+function resetView() {
+  viewStart = Math.max(0, candles.length - 50);
+  viewEnd = candles.length;
+  priceScale = 1.0;
+  pricePan = 0;
+  drawChart();
+}
+
+// ============ POLYFILL ============
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r) {
+    if (typeof r === 'number') r = {tl:r, tr:r, br:r, bl:r};
+    this.beginPath(); this.moveTo(x+r.tl, y); this.lineTo(x+w-r.tr, y);
+    this.quadraticCurveTo(x+w, y, x+w, y+r.tr); this.lineTo(x+w, y+h-r.br);
+    this.quadraticCurveTo(x+w, y+h, x+w-r.br, y+h); this.lineTo(x+r.bl, y+h);
+    this.quadraticCurveTo(x, y+h, x, y+h-r.bl); this.lineTo(x, y+r.tl);
+    this.quadraticCurveTo(x, y, x+r.tl, y); this.closePath();
+  };
+}
+
+// ============ DATA ============
+const DATA_URL = 'https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/master/samsara-data.json';
+let samsaraData = null, livePrice = null, candles = [], chartInterval = '15m';
+let activeSymbol = 'BTCUSDT';  // BTCUSDT, ETHUSDT, SOLUSDT, XRPUSDT, TAOUSDT, ou BTCSOL (ratio)
+
+// ============ VIEWPORT (zoom/pan) ============
+let viewStart = 0, viewEnd = 100;  // indices dans candles
+let isPanning = false, panStartX = 0, panStartView = 0;
+
+// Échelle verticale (1.0 = auto, drag molette sur colonne prix)
+let priceScale = 1.0, pricePan = 0;  // pricePan en % du range
+let isPriceDrag = false, priceDragStart = 0, priceScaleStart = 1, pricePanStart = 0;
+
+// ============ RANGE SELECTOR ============
+const RS_HEIGHT = 38;
+let rsDragging = null;    // 'body', 'left', 'right', ou null
+let rsDragStartX = 0;
+let rsDragStartView = 0;
+let rsDragStartEnd = 0;
+
+// ============ CROSSHAIR ============
+let crossX = null, crossY = null;  // coordonnées canvas du curseur
+
+// ============ INDICATOR STATE ============
+const overlays = { ema20: false, ema50: false, ema100: false, ema200: false, sma20: false, sma50: false, bb: false, vwap: false, ichimoku: false, sar: false, sr: false, fib: false, vp: false };
+const activeSubs = { vol: true, rsi: false, macd: false, stoch: false, atr: false, obv: false, mfi: false, williamsR: false, cci: false, adx: false, ao: false, equity: false };
+const subHeights = { vol: 110, rsi: 120, macd: 120, stoch: 120, atr: 110, obv: 110, mfi: 120, williamsR: 120, cci: 120, adx: 120, ao: 110, equity: 140 };
+
+// Registre de tous les indicateurs pour la dropdown
+const INDICATORS = [
+  { cat: 'Overlays', items: [
+    { key: 'ema20', label: 'EMA 20', tag: 'ov' }, { key: 'ema50', label: 'EMA 50', tag: 'ov' },
+    { key: 'ema100', label: 'EMA 100', tag: 'ov' }, { key: 'ema200', label: 'EMA 200', tag: 'ov' },
+    { key: 'sma20', label: 'SMA 20', tag: 'ov' }, { key: 'sma50', label: 'SMA 50', tag: 'ov' },
+    { key: 'bb', label: 'Bollinger Bands (20,2)', tag: 'ov' },
+    { key: 'vwap', label: 'VWAP', tag: 'ov' },
+    { key: 'ichimoku', label: 'Ichimoku Cloud', tag: 'ov' },
+    { key: 'sar', label: 'Parabolic SAR', tag: 'ov' },
+  ]},
+  { cat: 'Sous-graphes', items: [
+    { key: 'vol', label: 'Volume', tag: 'sg' },
+    { key: 'rsi', label: 'RSI (14)', tag: 'sg' },
+    { key: 'macd', label: 'MACD (12,26,9)', tag: 'sg' },
+    { key: 'stoch', label: 'Stochastique (14,3,3)', tag: 'sg' },
+    { key: 'atr', label: 'ATR (14)', tag: 'sg' },
+    { key: 'obv', label: 'OBV — On-Balance Volume', tag: 'sg' },
+    { key: 'mfi', label: 'MFI — Money Flow Index (14)', tag: 'sg' },
+    { key: 'williamsR', label: 'Williams %R (14)', tag: 'sg' },
+    { key: 'cci', label: 'CCI (20)', tag: 'sg' },
+    { key: 'adx', label: 'ADX/DMI (14)', tag: 'sg' },
+    { key: 'ao', label: 'Awesome Oscillator', tag: 'sg' },
+  ]},
+  { cat: 'Chartiste', items: [
+    { key: 'sr', label: 'Supports/Résistances', tag: 'ch' },
+    { key: 'fib', label: 'Fibonacci Retracement', tag: 'ch' },
+    { key: 'vp', label: 'Volume Profile', tag: 'ch' },
+  ]}
+];
+
+function isOverlay(key) { return key in overlays; }
+function isActive(key) { return (overlays[key] || activeSubs[key]) || false; }
+function toggleAny(key) {
+  if (isOverlay(key)) { overlays[key] = !overlays[key]; drawChart(); }
+  else { activeSubs[key] = !activeSubs[key]; resizeCanvas(); drawChart(); }
+  buildDropdown();
+  const lbl = document.getElementById('lbl_' + key);
+  if (lbl) lbl.classList.toggle('active', isActive(key));
+}
+
+function buildDropdown() {
+  const menu = document.getElementById('indMenu');
+  let html = '';
+  for (const cat of INDICATORS) {
+    html += `<div class="cat-title">${cat.cat}</div>`;
+    for (const item of cat.items) {
+      const checked = isActive(item.key) ? ' checked' : '';
+      html += `<label><input type="checkbox"${checked} onchange="toggleAny('${item.key}')">${item.label}<span class="tag tag-${item.tag}">${item.tag.toUpperCase()}</span></label>`;
+    }
+  }
+  menu.innerHTML = html;
+}
+
+function toggleDropdown(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('indMenu');
+  const btn = document.getElementById('indDropdownBtn');
+  
+  if (menu.classList.contains('open')) {
+    menu.classList.remove('open');
+    return;
+  }
+  
+  const rect = btn.getBoundingClientRect();
+  menu.style.top = (rect.bottom + 4) + 'px';
+  // Éviter le débordement à droite
+  const menuWidth = 260;
+  if (rect.left + menuWidth > window.innerWidth) {
+    menu.style.left = 'auto';
+    menu.style.right = '10px';
+  } else {
+    menu.style.left = rect.left + 'px';
+    menu.style.right = 'auto';
+  }
+  
+  menu.classList.add('open');
+  buildDropdown();
+}
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('indMenu');
+  if (!menu.contains(e.target)) menu.classList.remove('open');
+});
+// Fermer le dropdown si la fenêtre est redimensionnée
+window.addEventListener('resize', () => {
+  document.getElementById('indMenu').classList.remove('open');
+});
+
+function toggleInd(key, label) {
+  overlays[key] = !overlays[key];
+  label.classList.toggle('active', overlays[key]);
+  drawChart();
+}
+function toggleSub(key, label) {
+  activeSubs[key] = !activeSubs[key];
+  label.classList.toggle('active', activeSubs[key]);
+  resizeCanvas(); drawChart();
+}
+
+async function changeInterval(interval, label) {
+  document.querySelectorAll('#indicatorBar label[id^="int_"]').forEach(l => l.classList.remove('active'));
+  label.classList.add('active');
+  chartInterval = interval;
+  priceScale = 1.0; pricePan = 0;
+  viewStart = 0; viewEnd = 50;
+  delete klineCache[getKlineCacheKey(activeSymbol, chartInterval)];
+  await fetchKlines();
+  viewStart = Math.max(0, candles.length - 50);
+  viewEnd = candles.length;
+  refreshRefSR();
+  drawChart();
+}
+
+async function changeSymbol(symbol, label) {
+  document.querySelectorAll('#indicatorBar label[id^="sym_"]').forEach(l => l.classList.remove('active'));
+  label.classList.add('active');
+  activeSymbol = symbol;
+  const tp = document.getElementById('taskbarPair');
+  if (tp) tp.textContent = symbol;
+  priceScale = 1.0; pricePan = 0;
+  viewStart = 0; viewEnd = 50;
+  delete klineCache[getKlineCacheKey(activeSymbol, chartInterval)];
+  await fetchKlines();
+  viewStart = Math.max(0, candles.length - 50);
+  viewEnd = candles.length;
+  refreshRefSR();
+  drawChart();
+}
+
+// ============ CANVAS ============
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+let hasSubChart = true; // volume or indicator
+
+// --- Crosshair ---
+let rafPending = false;
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  crossX = e.clientX - rect.left;
+  crossY = e.clientY - rect.top;
+  
+  // Curseur Range Selector
+  if (crossY > rect.height - RS_HEIGHT && !isPanning && !isPriceDrag && !rsDragging) {
+    const padL = 16, padR = 75;
+    const rsw = rect.width - padL - padR;
+    const vs = Math.max(0, viewStart), ve = Math.min(candles.length, viewEnd);
+    const toRSX = (i) => padL + (i / Math.max(1, candles.length - 1)) * rsw;
+    const vrX = toRSX(vs), vrX2 = toRSX(Math.min(ve - 1, candles.length - 1));
+    const vrW = Math.max(12, vrX2 - vrX);
+    if (crossX >= vrX - 4 && crossX <= vrX + 6) {
+      canvas.style.cursor = 'ew-resize';
+    } else if (crossX >= vrX + vrW - 6 && crossX <= vrX + vrW + 4) {
+      canvas.style.cursor = 'ew-resize';
+    } else if (crossX >= vrX && crossX <= vrX + vrW) {
+      canvas.style.cursor = 'grab';
+    } else {
+      canvas.style.cursor = 'default';
+    }
+  } else if (crossX > rect.width - 75 && !isPanning && !isPriceDrag) {
+    canvas.style.cursor = 'ns-resize';
+  } else if (!isPanning && !isPriceDrag) {
+    canvas.style.cursor = 'crosshair';
+  }
+  if (!rafPending) {
+    rafPending = true;
+    requestAnimationFrame(() => { rafPending = false; drawChart(); });
+  }
+});
+canvas.addEventListener('mouseleave', () => { crossX = null; crossY = null; rafPending = false; drawChart(); });
+
+// --- Zoom molette ---
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+  const W = rect.width;
+  
+  // Si souris sur colonne de prix (droite) → zoom vertical
+  if (mouseX > W - 75) {
+    const factor = e.deltaY > 0 ? 1.15 : 0.85;
+    priceScale = Math.max(0.3, Math.min(5, priceScale * factor));
+    pricePan *= factor; // garder le point central
+    drawChart();
+    return;
+  }
+  
+  const visible = viewEnd - viewStart;
+  const factor = e.deltaY > 0 ? 1.3 : 0.7;
+  const center = viewStart + visible / 2;
+  const newVisible = Math.max(8, Math.min(candles.length, Math.round(visible * factor)));
+  viewStart = Math.max(0, Math.round(center - newVisible / 2));
+  viewEnd = Math.min(candles.length, viewStart + newVisible);
+  if (viewEnd - viewStart < 10) { viewEnd = Math.min(candles.length, viewStart + 10); }
+  drawChart();
+}, { passive: false });
+
+// --- Pan cliquer-glisser ---
+canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const padL = 16, padR = 75;
+  const rsw = rect.width - padL - padR;
+  
+  // Range Selector ?
+  if (my > rect.height - RS_HEIGHT && candles.length > 5 && rsw > 20) {
+    const toRSX = (i) => padL + (i / Math.max(1, candles.length - 1)) * rsw;
+    const vs = Math.max(0, viewStart), ve = Math.min(candles.length, viewEnd);
+    const vrX = toRSX(vs), vrX2 = toRSX(Math.min(ve - 1, candles.length - 1));
+    const vrW = Math.max(12, vrX2 - vrX);
+    
+    if (mx >= vrX - 4 && mx <= vrX + 6) {
+      rsDragging = 'left';
+    } else if (mx >= vrX + vrW - 6 && mx <= vrX + vrW + 4) {
+      rsDragging = 'right';
+    } else if (mx >= vrX && mx <= vrX + vrW) {
+      rsDragging = 'body';
+      rsDragStartX = mx;
+      rsDragStartView = viewStart;
+      rsDragStartEnd = viewEnd;
+    } else if (mx >= padL && mx <= rect.width - padR) {
+      // Click en dehors → centrer le viewport sur le clic
+      const frac = (mx - padL) / rsw;
+      const target = Math.round(frac * candles.length);
+      const visible = viewEnd - viewStart;
+      viewStart = Math.max(0, Math.min(candles.length - visible, target - Math.round(visible / 2)));
+      viewEnd = viewStart + visible;
+      drawChart();
+    }
+    if (rsDragging) {
+      rsDragStartX = mx;
+      rsDragStartView = viewStart;
+      rsDragStartEnd = viewEnd;
+      e.preventDefault();
+    }
+    return;
+  }
+  
+  if (mx > rect.width - 75) {
+    // Drag colonne prix → pan vertical
+    isPriceDrag = true;
+    priceDragStart = e.clientY;
+    priceScaleStart = priceScale;
+    pricePanStart = pricePan;
+    canvas.style.cursor = 'ns-resize';
+  } else {
+    isPanning = true;
+    panStartX = e.clientX;
+    panStartView = viewStart;
+    canvas.style.cursor = 'grabbing';
+  }
+});
+window.addEventListener('mousemove', (e) => {
+  // Range Selector dragging
+  if (rsDragging) {
+    const rect = canvas.getBoundingClientRect();
+    const padL = 16, padR = 75;
+    const rsw = rect.width - padL - padR;
+    const mx = e.clientX - rect.left;
+    const frac = Math.max(0, Math.min(1, (mx - padL) / rsw));
+    const visible = rsDragStartEnd - rsDragStartView;
+    
+    if (rsDragging === 'body') {
+      const dxPx = mx - rsDragStartX;
+      const dxCandles = Math.round((dxPx / rsw) * candles.length);
+      viewStart = Math.max(0, Math.min(candles.length - visible, rsDragStartView + dxCandles));
+      viewEnd = viewStart + visible;
+    } else if (rsDragging === 'left') {
+      const targetStart = Math.round(frac * candles.length);
+      viewStart = Math.max(0, Math.min(rsDragStartEnd - 3, targetStart));
+      viewEnd = rsDragStartEnd;
+    } else if (rsDragging === 'right') {
+      const targetEnd = Math.round(frac * candles.length);
+      viewEnd = Math.min(candles.length, Math.max(rsDragStartView + 3, targetEnd));
+      viewStart = rsDragStartView;
+    }
+    drawChart();
+    return;
+  }
+  
+  if (isPriceDrag) {
+    const dy = e.clientY - priceDragStart;
+    const rect = canvas.getBoundingClientRect();
+    pricePan = pricePanStart - (dy / rect.height) * 2 * priceScaleStart;
+    drawChart();
+    return;
+  }
+  if (!isPanning) return;
+  const rect = canvas.getBoundingClientRect();
+  const dx = (e.clientX - panStartX) / rect.width;
+  const visible = viewEnd - viewStart;
+  const shift = Math.round(-dx * visible);
+  viewStart = Math.max(0, Math.min(candles.length - visible, panStartView + shift));
+  viewEnd = viewStart + visible;
+  drawChart();
+});
+window.addEventListener('mouseup', () => { 
+  rsDragging = null;
+  isPanning = false; isPriceDrag = false; 
+  canvas.style.cursor = ''; 
+});
+
+// --- Double-click reset zoom ---
+canvas.addEventListener('dblclick', () => {
+  viewStart = Math.max(0, candles.length - 50);
+  viewEnd = candles.length;
+  priceScale = 1.0;
+  pricePan = 0;
+  drawChart();
+});
+
+// Tap sur mobile = tooltip OHLCV
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const tx = e.clientX - rect.left;
+  const ty = e.clientY - rect.top;
+  // Colonne de prix → ignorer
+  if (tx > rect.width - 55) return;
+  // Si déjà un crosshair affiché au même endroit → le retirer
+  if (crossX !== null && Math.abs(crossX - tx) < 8 && Math.abs(crossY - ty) < 8) {
+    crossX = null; crossY = null;
+  } else {
+    crossX = tx; crossY = ty;
+  }
+  drawChart();
+});
+
+// ============ TOUCH (Mobile) ============
+let touchMode = null; // 'pan', 'price', 'pinch'
+let touchStartX = 0, touchStartY = 0;
+let touchStartView = 0, touchStartPriceScale = 1, touchStartPricePan = 0;
+let pinchStartDist = 0, pinchStartVisible = 0;
+
+function getTouchDist(t1, t2) {
+  const dx = t1.clientX - t2.clientX;
+  const dy = t1.clientY - t2.clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+canvas.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 1) {
+    const rect = canvas.getBoundingClientRect();
+    const tx = e.touches[0].clientX - rect.left;
+    if (tx > rect.width - 55) {
+      touchMode = 'price';
+      touchStartY = e.touches[0].clientY;
+      touchStartPriceScale = priceScale;
+      touchStartPricePan = pricePan;
+    } else {
+      touchMode = 'pan';
+      touchStartX = e.touches[0].clientX;
+      touchStartView = viewStart;
+    }
+    e.preventDefault();
+  } else if (e.touches.length === 2) {
+    touchMode = 'pinch';
+    pinchStartDist = getTouchDist(e.touches[0], e.touches[1]);
+    pinchStartVisible = viewEnd - viewStart;
+    e.preventDefault();
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  if (touchMode === 'pan') {
+    const rect = canvas.getBoundingClientRect();
+    const dx = (e.touches[0].clientX - touchStartX) / rect.width;
+    const visible = viewEnd - viewStart;
+    const shift = Math.round(-dx * visible);
+    viewStart = Math.max(0, Math.min(candles.length - visible, touchStartView + shift));
+    viewEnd = viewStart + visible;
+    drawChart();
+    e.preventDefault();
+  } else if (touchMode === 'price') {
+    const dy = e.touches[0].clientY - touchStartY;
+    const rect = canvas.getBoundingClientRect();
+    pricePan = touchStartPricePan - (dy / rect.height) * 2 * touchStartPriceScale;
+    drawChart();
+    e.preventDefault();
+  } else if (touchMode === 'pinch') {
+    const dist = getTouchDist(e.touches[0], e.touches[1]);
+    if (pinchStartDist > 0 && dist > 8) {
+      // Ratio absolu : écarter 2× les doigts = zoom 2×
+      const ratio = pinchStartDist / dist;
+      const newVisible = Math.max(5, Math.min(candles.length, pinchStartVisible * ratio));
+      // Centre dynamique au milieu des deux doigts — ancré à la position des doigts
+      const rect = canvas.getBoundingClientRect();
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      const chartW = rect.width - 40;
+      const centerFrac = Math.max(0, Math.min(1, (midX - 12) / Math.max(1, chartW)));
+      const centerIdx = viewStart + (viewEnd - viewStart) * centerFrac;
+      // Ancrer au point de pincement (pas au milieu)
+      viewStart = Math.max(0, Math.round(centerIdx - newVisible * centerFrac));
+      viewEnd = Math.min(candles.length, viewStart + Math.round(newVisible));
+      if (viewEnd - viewStart < 5) { viewEnd = Math.min(candles.length, viewStart + 5); }
+      drawChart();
+    }
+    e.preventDefault();
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', () => {
+  touchMode = null; pinchStartDist = 0; pinchStartVisible = 0;
+  canvas.style.cursor = '';
+});
+
+function isMobile() { return window.innerWidth <= 768; }
+function resizeCanvas() {
+  const container = canvas.parentElement;
+  const totalH = container.clientHeight;
+  if (totalH < 100) return;
+  canvas.width = container.clientWidth * window.devicePixelRatio;
+  canvas.height = totalH * window.devicePixelRatio;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  canvas.style.width = container.clientWidth + 'px';
+  canvas.style.height = totalH + 'px';
+}
+window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
+
+// ============ API ============
+// Cache klines pour éviter les 429 Binance
+const klineCache = {};
+function getKlineCacheKey(symbol, interval) { return `${symbol}_${interval}`; }
+
+async function fetchKlines() {
+  try {
+    const cacheKey = getKlineCacheKey(activeSymbol, chartInterval);
+    const now = Date.now();
+    const cached = klineCache[cacheKey];
+    
+    // Sauvegarder l'état du viewport pour l'auto-scroll intelligent
+    const prevLen = candles.length;
+    const wasAtRightEdge = prevLen > 0 && viewEnd >= prevLen - 1;
+    const visibleRange = viewEnd - viewStart;
+    
+    // Réutiliser le cache si < 30s (sauf si symbole/intervalle a changé)
+    if (cached && (now - cached.ts < 30000) && cached.symbol === activeSymbol && cached.interval === chartInterval) {
+      candles = cached.data;
+      // Auto-scroll : si l'utilisateur était calé à droite, suivre les nouvelles bougies
+      if (wasAtRightEdge && candles.length > prevLen) {
+        viewEnd = candles.length;
+        viewStart = Math.max(0, viewEnd - visibleRange);
+      }
+      return;
+    }
+
+    if (activeSymbol === 'BTCSOL') {
+      // Ratio BTC/SOL : fetch les deux et calcule le ratio
+      const [btcData, solData] = await Promise.all([
+        fetchKlinesRaw('BTCUSDT'),
+        fetchKlinesRaw('SOLUSDT')
+      ]);
+      // Aligner sur les timestamps communs
+      const solMap = new Map(solData.map(k => [k[0], k]));
+      const merged = [];
+      for (const bk of btcData) {
+        const sk = solMap.get(bk[0]);
+        if (sk) {
+          const btcClose = parseFloat(bk[4]), solClose = parseFloat(sk[4]);
+          const ratio = btcClose / solClose;
+          merged.push({
+            time: bk[0] / 1000, open: ratio, high: ratio, low: ratio, close: ratio, volume: parseFloat(bk[5])
+          });
+        }
+      }
+      candles = merged;
+      // BTCSOL : le merge peut perdre des bougies → cap viewEnd
+      viewEnd = Math.min(viewEnd, candles.length);
+      viewStart = Math.min(viewStart, candles.length - 1);
+    } else {
+      const raw = await fetchKlinesRaw(activeSymbol);
+      candles = raw.map(k => ({
+        time: k[0] / 1000, open: parseFloat(k[1]), high: parseFloat(k[2]),
+        low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5])
+      }));
+    }
+    // Auto-scroll : si l'utilisateur était calé à droite, suivre les nouvelles bougies
+    if (wasAtRightEdge && candles.length > prevLen) {
+      viewEnd = candles.length;
+      viewStart = Math.max(0, viewEnd - visibleRange);
+    }
+    // Invalider le cache de mémoization (nouvelles données)
+    memoCache.clear();
+    // Stocker dans le cache
+    klineCache[cacheKey] = { data: candles, ts: Date.now(), symbol: activeSymbol, interval: chartInterval };
+    // NE PAS réinitialiser viewStart/viewEnd — respecter le zoom/pan utilisateur
+  } catch(e) { console.error('Klines:', e); }
+}
+
+// ============ MEMOIZATION INDICATEURS ============
+const memoCache = new Map();
+function memoKey(fnName, h) { return `${fnName}_${h}`; }
+function candlesHash() {
+  // Hash incluant close/volume de la dernière bougie pour détecter les mises à jour live
+  if (!candles.length) return 0;
+  const last = candles[candles.length - 1];
+  return `${candles.length}_${candles[0].time}_${last.time}_${last.close}_${last.volume}`;
+}
+function memoized(fnName, fn, ...args) {
+  const key = memoKey(fnName, candlesHash());
+  if (memoCache.has(key)) return memoCache.get(key);
+  const result = fn(...args);
+  memoCache.set(key, result);
+  return result;
+}
+
+async function fetchKlinesRaw(symbol) {
+  let allData = [];
+  let endTime = Date.now();
+  for (let page = 0; page < 3; page++) {
+    const resp = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${chartInterval}&limit=1000&endTime=${endTime}`);
+    if (!resp.ok) throw new Error(`Binance HTTP ${resp.status}`);
+    const data = await resp.json();
+    if (!Array.isArray(data) || !data.length) break;
+    allData = [...data, ...allData];
+    endTime = data[0][0] - 1;
+    if (data.length < 1000) break;
+  }
+  return allData;
+}
+
+// ============ MULTI-TF S/R ENGINE ============
+const SR_CACHE = {}; // key: 'SYMBOL_INTERVAL' → { levels, candles, ts }
+const SR_REFETCH_MS = 60000;
+
+function getRefIntervals(interval) {
+  if (['1m','5m','15m','30m'].includes(interval)) return ['1h','4h'];
+  if (interval === '1h') return ['4h','1d'];
+  if (interval === '4h') return ['1d','1w'];
+  if (interval === '1d') return ['1w'];
+  return [];
+}
+
+function getSRLookback(interval) {
+  if (['1m','5m'].includes(interval)) return 5;
+  if (['15m','30m'].includes(interval)) return 4;
+  if (interval === '1h') return 4;
+  if (interval === '4h') return 3;
+  if (interval === '1d') return 2;
+  if (interval === '1w') return 2;
+  return 2;
+}
+
+function findPivots(candles, lookback) {
+  const highs = [], lows = [];
+  for (let i = lookback; i < candles.length - lookback; i++) {
+    let isPh = true, isPl = true;
+    for (let j = i - lookback; j <= i + lookback; j++) {
+      if (j === i) continue;
+      if (candles[j].high >= candles[i].high) isPh = false;
+      if (candles[j].low <= candles[i].low) isPl = false;
+    }
+    // Stocke volume + timestamp pour pondération ultérieure
+    if (isPh) highs.push({ price: candles[i].high, idx: i, volume: candles[i].volume, time: candles[i].time });
+    if (isPl) lows.push({ price: candles[i].low,   idx: i, volume: candles[i].volume, time: candles[i].time });
+  }
+  return { highs, lows };
+}
+
+function clusterSR(pivots, tolerance) {
+  // Prix = moyenne pondérée par log-volume. Score = somme des poids individuels.
+  const levels = [], used = new Set();
+  const sorted = [...pivots].sort((a, b) => b.price - a.price);
+  for (const p of sorted) {
+    if (used.has(p.idx)) continue;
+    const pw = p.weight || 1;
+    let sumPriceW = pw * p.price, sumW = pw, count = 1;
+    for (const p2 of sorted) {
+      if (p2.idx === p.idx || used.has(p2.idx)) continue;
+      if (Math.abs(p2.price - p.price) / p.price < tolerance) {
+        const w2 = p2.weight || 1;
+        sumPriceW += w2 * p2.price; sumW += w2; count++;
+        used.add(p2.idx);
+      }
+    }
+    if (count >= 2) levels.push({ price: sumPriceW / sumW, touches: count, score: sumW });
+    used.add(p.idx);
+  }
+  return levels.sort((a, b) => b.score - a.score);
+}
+
+function computeSR(candles, interval, maxCandles = 500) {
+  const subset = candles.slice(-maxCandles);
+  if (subset.length < 20) return [];
+  const lookback = getSRLookback(interval);
+  const lastIdx = subset.length - 1;
+  
+  // Tolérance dynamique basée sur ATR / prix
+  const closes = subset.map(c => c.close), highs = subset.map(c => c.high), lows = subset.map(c => c.low);
+  const atrArr = calcATR(highs, lows, closes, 14);
+  const lastATR = atrArr[atrArr.length - 1] || 0;
+  const lastPrice = closes[lastIdx] || 1;
+  const tolerance = Math.max(0.002, Math.min(0.01, (lastATR / lastPrice) * 0.6));
+  
+  // Demi-vie par TF (en nombre de bougies)
+  const halfLives = { '1m': 240, '5m': 120, '15m': 60, '30m': 40, '1h': 40, '4h': 20, '1d': 10, '1w': 5 };
+  const halfLife = halfLives[interval] || 30;
+  
+  // Pondération par pivot : recency × log-volume
+  function weightPivot(p) {
+    const ageCandles = lastIdx - p.idx;
+    const recency = Math.exp(-ageCandles * Math.LN2 / halfLife);
+    const volW = Math.log(1 + p.volume);
+    return recency * volW;
+  }
+  
+  const { highs: ph, lows: pl } = findPivots(subset, lookback);
+  const scoredHighs = ph.map(p => ({ ...p, weight: weightPivot(p) }));
+  const scoredLows  = pl.map(p => ({ ...p, weight: weightPivot(p) }));
+  
+  // Cluster séparément highs et lows
+  const all = [...clusterSR(scoredHighs, tolerance), ...clusterSR(scoredLows, tolerance)];
+  all.sort((a, b) => b.score - a.score);
+  
+  // Dédup highs/lows qui coïncident
+  const deduped = [];
+  for (const lvl of all) {
+    let merged = false;
+    for (const d of deduped) {
+      if (Math.abs(d.price - lvl.price) / Math.max(d.price, lvl.price) < tolerance * 0.8) {
+        d.score += lvl.score; d.touches += lvl.touches; merged = true; break;
+      }
+    }
+    if (!merged) deduped.push({...lvl});
+  }
+  return deduped.sort((a, b) => b.score - a.score);
+}
+
+async function fetchSRKlines(symbol, interval) {
+  const cacheKey = `SR_${symbol}_${interval}`;
+  const cached = SR_CACHE[cacheKey];
+  const now = Date.now();
+  if (cached && (now - cached.ts < SR_REFETCH_MS)) return cached;
+  try {
+    const resp = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=500`);
+    if (!resp.ok) throw new Error(`Binance ${resp.status}`);
+    const raw = await resp.json();
+    const data = raw.map(k => ({
+      time: k[0]/1000, open: parseFloat(k[1]), high: parseFloat(k[2]),
+      low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5])
+    }));
+    const levels = computeSR(data, interval, 500);
+    const entry = { candles: data, levels, ts: now };
+    SR_CACHE[cacheKey] = entry;
+    return entry;
+  } catch(e) {
+    console.error('SR fetch:', symbol, interval, e.message);
+    return cached || { candles: [], levels: [], ts: 0 };
+  }
+}
+
+function getMultiTFLevels() {
+  const all = [];
+  // Current TF from main candles (500)
+  const currLevels = computeSR(candles, chartInterval, 500);
+  for (const l of currLevels.slice(0, 5)) {
+    all.push({ ...l, tf: chartInterval, tier: 0 });
+  }
+  // Ref TFs from cache
+  const refs = getRefIntervals(chartInterval);
+  refs.forEach((refInt, idx) => {
+    const cacheKey = `SR_${activeSymbol}_${refInt}`;
+    const cached = SR_CACHE[cacheKey];
+    if (cached && cached.levels) {
+      for (const l of cached.levels.slice(0, 4)) {
+        all.push({ ...l, tf: refInt, tier: idx + 1 });
+      }
+    }
+  });
+  // Cross-TF dedup 0.5%
+  const deduped = [];
+  for (const lvl of all) {
+    let merged = false;
+    for (const d of deduped) {
+      if (Math.abs(d.price - lvl.price) / Math.max(d.price, lvl.price) < 0.005) {
+        d.score += lvl.score;
+        d.touches += lvl.touches;
+        d.tier = Math.min(d.tier, lvl.tier);
+        merged = true; break;
+      }
+    }
+    if (!merged) deduped.push({...lvl});
+  }
+  return deduped.sort((a, b) => b.score - a.score);
+}
+
+async function refreshRefSR() {
+  if (!overlays.sr) return;
+  const refs = getRefIntervals(chartInterval);
+  for (const refInt of refs) {
+    fetchSRKlines(activeSymbol, refInt); // fire & forget
+  }
+}
+
+async function fetchPrice() {
+  try {
+    let price;
+    if (activeSymbol === 'BTCSOL') {
+      const [btc, sol] = await Promise.all([
+        fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT').then(r => r.json()),
+        fetch('https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT').then(r => r.json())
+      ]);
+      price = parseFloat(btc.price) / parseFloat(sol.price);
+    } else {
+      const resp = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${activeSymbol}`);
+      const data = await resp.json();
+      price = parseFloat(data.price);
+    }
+    const el = document.getElementById('price');
+    if (livePrice && price > livePrice) el.className = 'price-badge price-up';
+    else if (livePrice && price < livePrice) el.className = 'price-badge price-down';
+    else el.className = 'price-badge';
+    el.textContent = '$' + price.toLocaleString('en-US', {minimumFractionDigits: 3, maximumFractionDigits: 3});
+    livePrice = price;
+  } catch(e) {}
+}
+
+// ============ INDICATEURS ============
+function calcEMA(data, period) {
+  const k = 2 / (period + 1);
+  const out = new Array(data.length).fill(null);
+  let sum = 0;
+  for (let i = 0; i < period; i++) sum += data[i];
+  out[period - 1] = sum / period;
+  for (let i = period; i < data.length; i++) out[i] = data[i] * k + out[i - 1] * (1 - k);
+  return out;
+}
+
+function calcSMA(data, period) {
+  const out = new Array(data.length).fill(null);
+  for (let i = period - 1; i < data.length; i++) {
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) sum += data[j];
+    out[i] = sum / period;
+  }
+  return out;
+}
+
+function calcBollinger(data, period, stdDev) {
+  const sma = calcSMA(data, period);
+  const upper = new Array(data.length).fill(null);
+  const lower = new Array(data.length).fill(null);
+  for (let i = period - 1; i < data.length; i++) {
+    let sumSq = 0;
+    for (let j = i - period + 1; j <= i; j++) sumSq += (data[j] - sma[i]) ** 2;
+    const std = Math.sqrt(sumSq / period);
+    upper[i] = sma[i] + stdDev * std;
+    lower[i] = sma[i] - stdDev * std;
+  }
+  return { sma, upper, lower };
+}
+
+function calcRSI(data, period) {
+  const out = new Array(data.length).fill(null);
+  if (data.length < period + 1) return out;
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = data[i] - data[i - 1];
+    if (d > 0) gains += d; else losses -= d;
+  }
+  let avgGain = gains / period, avgLoss = losses / period;
+  out[period] = 100 - 100 / (1 + avgGain / (avgLoss || 1e-10));
+  for (let i = period + 1; i < data.length; i++) {
+    const d = data[i] - data[i - 1];
+    avgGain = (avgGain * (period - 1) + (d > 0 ? d : 0)) / period;
+    avgLoss = (avgLoss * (period - 1) + (d < 0 ? -d : 0)) / period;
+    out[i] = 100 - 100 / (1 + avgGain / (avgLoss || 1e-10));
+  }
+  return out;
+}
+
+function calcMACD(data) {
+  const ema12 = calcEMA(data, 12);
+  const ema26 = calcEMA(data, 26);
+  const macdLine = new Array(data.length).fill(null);
+  for (let i = 0; i < data.length; i++) {
+    if (ema12[i] !== null && ema26[i] !== null) macdLine[i] = ema12[i] - ema26[i];
+  }
+  const signal = calcEMA(macdLine.filter(v => v !== null), 9);
+  // Re-align signal
+  const signalAligned = new Array(data.length).fill(null);
+  let si = 0;
+  for (let i = 0; i < data.length; i++) {
+    if (macdLine[i] !== null && si < signal.length) signalAligned[i] = signal[si++];
+  }
+  const histogram = new Array(data.length).fill(null);
+  for (let i = 0; i < data.length; i++) {
+    if (macdLine[i] !== null && signalAligned[i] !== null) histogram[i] = macdLine[i] - signalAligned[i];
+  }
+  return { macdLine, signal: signalAligned, histogram };
+}
+
+function calcStoch(highs, lows, closes, kPeriod, dPeriod) {
+  const kOut = new Array(closes.length).fill(null);
+  const dOut = new Array(closes.length).fill(null);
+  for (let i = kPeriod - 1; i < closes.length; i++) {
+    const h = Math.max(...highs.slice(i - kPeriod + 1, i + 1));
+    const l = Math.min(...lows.slice(i - kPeriod + 1, i + 1));
+    kOut[i] = ((closes[i] - l) / (h - l || 1)) * 100;
+  }
+  // SMA of %K for %D
+  for (let i = kPeriod + dPeriod - 2; i < closes.length; i++) {
+    let sum = 0, count = 0;
+    for (let j = i - dPeriod + 1; j <= i; j++) {
+      if (kOut[j] !== null) { sum += kOut[j]; count++; }
+    }
+    if (count > 0) dOut[i] = sum / count;
+  }
+  return { k: kOut, d: dOut };
+}
+
+function calcATR(highs, lows, closes, period) {
+  const tr = [null];
+  for (let i = 1; i < closes.length; i++) {
+    tr.push(Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i-1]), Math.abs(lows[i] - closes[i-1])));
+  }
+  const atr = new Array(closes.length).fill(null);
+  let sum = 0;
+  for (let i = 1; i <= period; i++) sum += tr[i];
+  atr[period] = sum / period;
+  for (let i = period + 1; i < closes.length; i++) {
+    atr[i] = (atr[i-1] * (period - 1) + tr[i]) / period;
+  }
+  return atr;
+}
+
+function calcVWAP(highs, lows, closes, volumes) {
+  const out = new Array(closes.length).fill(null);
+  let cumPV = 0, cumV = 0;
+  for (let i = 0; i < closes.length; i++) {
+    const tp = (highs[i] + lows[i] + closes[i]) / 3;
+    cumPV += tp * volumes[i];
+    cumV += volumes[i];
+    out[i] = cumPV / (cumV || 1);
+  }
+  return out;
+}
+
+function calcIchimoku(highs, lows, closes) {
+  const tenkan = [], kijun = [], senkouA = [], senkouB = [], chikou = [];
+  for (let i = 0; i < closes.length; i++) {
+    if (i >= 8) {
+      const h9 = Math.max(...highs.slice(i - 8, i + 1));
+      const l9 = Math.min(...lows.slice(i - 8, i + 1));
+      tenkan.push((h9 + l9) / 2);
+    } else tenkan.push(null);
+    if (i >= 25) {
+      const h26 = Math.max(...highs.slice(i - 25, i + 1));
+      const l26 = Math.min(...lows.slice(i - 25, i + 1));
+      kijun.push((h26 + l26) / 2);
+    } else kijun.push(null);
+    senkouA.push(null); senkouB.push(null);
+    if (i >= 25) {
+      senkouA[i] = ((tenkan[i] || 0) + (kijun[i] || 0)) / 2;
+    }
+    if (i >= 51) {
+      const h52 = Math.max(...highs.slice(i - 51, i + 1));
+      const l52 = Math.min(...lows.slice(i - 51, i + 1));
+      senkouB[i] = (h52 + l52) / 2;
+    }
+    chikou.push(i >= 25 ? closes[i - 25] : null);
+  }
+  // Shift senkou forward 26 periods
+  const shiftedA = new Array(closes.length + 26).fill(null);
+  const shiftedB = new Array(closes.length + 26).fill(null);
+  for (let i = 0; i < senkouA.length; i++) {
+    if (senkouA[i] !== null && i + 26 < shiftedA.length) shiftedA[i + 26] = senkouA[i];
+    if (senkouB[i] !== null && i + 26 < shiftedB.length) shiftedB[i + 26] = senkouB[i];
+  }
+  return { tenkan, kijun, senkouA: shiftedA, senkouB: shiftedB, chikou };
+}
+
+function calcSAR(highs, lows, closes, afStep = 0.02, afMax = 0.2) {
+  const out = new Array(closes.length).fill(null);
+  let isUp = true, af = afStep, ep = highs[0], sar = lows[0];
+  for (let i = 1; i < closes.length; i++) {
+    const prevSar = sar;
+    sar = sar + af * (ep - sar);
+    if (isUp) {
+      if (sar > lows[i]) { isUp = false; sar = ep; ep = lows[i]; af = afStep; }
+      else { if (highs[i] > ep) { ep = highs[i]; af = Math.min(afMax, af + afStep); } }
+      if (sar > lows[i - 1]) sar = lows[i - 1];
+      if (i > 1 && sar > lows[i - 2]) sar = lows[i - 2];
+    } else {
+      if (sar < highs[i]) { isUp = true; sar = ep; ep = highs[i]; af = afStep; }
+      else { if (lows[i] < ep) { ep = lows[i]; af = Math.min(afMax, af + afStep); } }
+      if (sar < highs[i - 1]) sar = highs[i - 1];
+      if (i > 1 && sar < highs[i - 2]) sar = highs[i - 2];
+    }
+    out[i] = sar;
+  }
+  return out;
+}
+
+function calcOBV(closes, volumes) {
+  const out = new Array(closes.length).fill(0);
+  for (let i = 1; i < closes.length; i++) {
+    if (closes[i] > closes[i - 1]) out[i] = out[i - 1] + volumes[i];
+    else if (closes[i] < closes[i - 1]) out[i] = out[i - 1] - volumes[i];
+    else out[i] = out[i - 1];
+  }
+  return out;
+}
+
+function calcMFI(highs, lows, closes, volumes, period) {
+  const tp = closes.map((c, i) => (highs[i] + lows[i] + c) / 3);
+  const mf = tp.map((p, i) => p * volumes[i]);
+  const out = new Array(closes.length).fill(null);
+  for (let i = period; i < closes.length; i++) {
+    let posFlow = 0, negFlow = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      if (tp[j] > tp[j - 1]) posFlow += mf[j];
+      else if (tp[j] < tp[j - 1]) negFlow += mf[j];
+    }
+    out[i] = 100 - 100 / (1 + posFlow / (negFlow || 1));
+  }
+  return out;
+}
+
+function calcWilliamsR(highs, lows, closes, period) {
+  const out = new Array(closes.length).fill(null);
+  for (let i = period - 1; i < closes.length; i++) {
+    const h = Math.max(...highs.slice(i - period + 1, i + 1));
+    const l = Math.min(...lows.slice(i - period + 1, i + 1));
+    out[i] = ((h - closes[i]) / (h - l || 1)) * -100;
+  }
+  return out;
+}
+
+function calcCCI(highs, lows, closes, period) {
+  const tp = closes.map((c, i) => (highs[i] + lows[i] + c) / 3);
+  const out = new Array(closes.length).fill(null);
+  for (let i = period - 1; i < closes.length; i++) {
+    const slice = tp.slice(i - period + 1, i + 1);
+    const sma = slice.reduce((a, b) => a + b, 0) / period;
+    const mad = slice.reduce((a, b) => a + Math.abs(b - sma), 0) / period;
+    out[i] = (tp[i] - sma) / (0.015 * (mad || 1));
+  }
+  return out;
+}
+
+function calcADX(highs, lows, closes, period) {
+  const plusDM = [], minusDM = [], tr = [], atrArr = [];
+  const adx = new Array(closes.length).fill(null);
+  const plusDI = new Array(closes.length).fill(null);
+  const minusDI = new Array(closes.length).fill(null);
+  for (let i = 0; i < closes.length; i++) {
+    if (i === 0) { plusDM.push(0); minusDM.push(0); tr.push(highs[i] - lows[i]); }
+    else {
+      const up = highs[i] - highs[i - 1];
+      const dn = lows[i - 1] - lows[i];
+      plusDM.push(up > dn && up > 0 ? up : 0);
+      minusDM.push(dn > up && dn > 0 ? dn : 0);
+      tr.push(Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1])));
+    }
+  }
+  // Wilder's smoothing
+  let atrSum = tr.slice(0, period).reduce((a, b) => a + b, 0);
+  let pdmSum = plusDM.slice(0, period).reduce((a, b) => a + b, 0);
+  let ndmSum = minusDM.slice(0, period).reduce((a, b) => a + b, 0);
+  atrArr[period - 1] = atrSum;
+  plusDI[period - 1] = (pdmSum / atrSum) * 100;
+  minusDI[period - 1] = (ndmSum / atrSum) * 100;
+  for (let i = period; i < closes.length; i++) {
+    atrSum = atrSum - atrSum / period + tr[i];
+    pdmSum = pdmSum - pdmSum / period + plusDM[i];
+    ndmSum = ndmSum - ndmSum / period + minusDM[i];
+    atrArr[i] = atrSum;
+    plusDI[i] = (pdmSum / atrSum) * 100;
+    minusDI[i] = (ndmSum / atrSum) * 100;
+    if (i >= period * 2 - 1) {
+      let adxSum = 0;
+      for (let j = i - period + 1; j <= i; j++) {
+        const dx = Math.abs((plusDI[j] - minusDI[j]) / ((plusDI[j] + minusDI[j]) || 1)) * 100;
+        adxSum += dx;
+      }
+      adx[i] = adxSum / period;
+    }
+  }
+  return { adx, plusDI, minusDI };
+}
+
+function calcAO(highs, lows) {
+  const mid = highs.map((h, i) => (h + lows[i]) / 2);
+  const sma5 = calcSMA(mid, 5);
+  const sma34 = calcSMA(mid, 34);
+  const out = new Array(mid.length).fill(null);
+  for (let i = 0; i < mid.length; i++) {
+    if (sma5[i] !== null && sma34[i] !== null) out[i] = sma5[i] - sma34[i];
+  }
+  return out;
+}
+
+// ============ STRATEGY ENGINE ============
+// Grid bot FSM — Pure functional evaluator: (MarketState, BotState, Config) => {nextBotState, orders}
+// Constraint: ALL functions MUST only access candles[0..idx], never the full array beyond idx
+const ST_FEE_MAKER = 0.001;   // 0.1%
+const ST_FEE_TAKER = 0.001;   // 0.1%
+const ST_DEFAULT_CAPITAL = 1000; // USDT
+
+const ST_STATES = { IDLE: 'idle', ACTIVE: 'active', RANGE_EXIT: 'range_exit' };
+
+// Registry of all strategies
+const STRATEGIES = {};
+
+function registerStrategy(key, def) { STRATEGIES[key] = def; }
+
+// Helper: distribute N levels evenly between low and high price
+function distributeGridLevels(low, high, n) {
+  const levels = [];
+  for (let i = 0; i < n; i++) {
+    const price = n > 1 ? low + ((high - low) * i) / (n - 1) : low;
+    levels.push({ price, side: 'buy' });
+  }
+  return levels;
+}
+
+// ─── Bollinger Grid Strategy ───
+registerStrategy('bb_grid', {
+  label: 'Grille Bollinger',
+  params: {
+    priceLow: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix inférieur', advanced: false, hint: '0 = auto (bande inf BB)' },
+    priceHigh: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix supérieur', advanced: false, hint: '0 = auto (bande mid BB)' },
+    gridLevels: { value: 10, min: 2, max: 500, step: 1, label: 'Niveaux' },
+    tpPct: { value: 0.5, min: 0.1, max: 5, step: 0.1, label: 'Take Profit %' },
+    slPct: { value: 3, min: 0.5, max: 10, step: 0.5, label: 'Stop Loss %' },
+    period: { value: 20, min: 10, max: 50, step: 1, label: 'Période BB', advanced: true },
+    stddev: { value: 2, min: 1, max: 4, step: 0.5, label: 'Écart-type', advanced: true },
+    reentryThreshold: { value: 0.3, min: 0.1, max: 2, step: 0.1, label: 'Seuil réalignement %', advanced: true },
+  },
+  trigger(candles, idx, params, indicators) {
+    if (idx < params.period) return 'idle';
+    const bb = indicators.bb;
+    const close = candles[idx].close;
+    if (close <= bb.lower[idx] * 1.002) return 'enter';
+    if (close >= bb.upper[idx] * 0.998) return 'exit';
+    return null;
+  },
+  generateLevels(candles, idx, params, indicators) {
+    const bb = indicators.bb;
+    const low = (params.priceLow > 0) ? params.priceLow : bb.lower[idx];
+    const high = (params.priceHigh > 0) ? params.priceHigh : bb.mid[idx];
+    return distributeGridLevels(low, high, params.gridLevels);
+  },
+  execution(level, entryCandle, params) {
+    return { tp: level.price * (1 + params.tpPct / 100), sl: level.price * (1 - params.slPct / 100) };
+  }
+});
+
+// ─── RSI Grid Strategy ───
+registerStrategy('rsi_grid', {
+  label: 'Grille RSI',
+  params: {
+    priceLow: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix inférieur', advanced: false, hint: '0 = auto (-5% prix)' },
+    priceHigh: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix supérieur', advanced: false, hint: '0 = auto (+5% prix)' },
+    gridLevels: { value: 10, min: 2, max: 500, step: 1, label: 'Niveaux' },
+    tpPct: { value: 0.8, min: 0.1, max: 5, step: 0.1, label: 'Take Profit %' },
+    slPct: { value: 4, min: 0.5, max: 10, step: 0.5, label: 'Stop Loss %' },
+    oversold: { value: 30, min: 15, max: 45, step: 1, label: 'Seuil survente', advanced: true },
+    rsiPeriod: { value: 14, min: 5, max: 30, step: 1, label: 'Période RSI', advanced: true },
+    exitRsi: { value: 50, min: 40, max: 70, step: 1, label: 'Seuil sortie RSI', advanced: true },
+  },
+  trigger(candles, idx, params, indicators) {
+    if (idx < params.rsiPeriod) return 'idle';
+    const rsi = indicators.rsi;
+    if (rsi[idx] !== null && rsi[idx] <= params.oversold) return 'enter';
+    if (rsi[idx] !== null && rsi[idx] >= params.exitRsi) return 'exit';
+    return null;
+  },
+  generateLevels(candles, idx, params, indicators) {
+    const price = candles[idx].close;
+    const defaultSpan = price * 0.05; // 5% default range
+    const low = (params.priceLow > 0) ? params.priceLow : (price - defaultSpan);
+    const high = (params.priceHigh > 0) ? params.priceHigh : (price + defaultSpan);
+    return distributeGridLevels(low, high, params.gridLevels);
+  },
+  execution(level, entryCandle, params) {
+    return { tp: level.price * (1 + params.tpPct/100), sl: level.price * (1 - params.slPct/100) };
+  }
+});
+
+// ─── EMA Pullback Grid Strategy ───
+registerStrategy('ema_grid', {
+  label: 'Grille EMA Pullback',
+  params: {
+    priceLow: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix inférieur', advanced: false, hint: '0 = auto (EMA)' },
+    priceHigh: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix supérieur', advanced: false, hint: '0 = auto (prix courant)' },
+    gridLevels: { value: 10, min: 2, max: 500, step: 1, label: 'Niveaux' },
+    tpPct: { value: 0.5, min: 0.1, max: 5, step: 0.1, label: 'Take Profit %' },
+    slPct: { value: 3, min: 0.5, max: 10, step: 0.5, label: 'Stop Loss %' },
+    emaPeriod: { value: 50, min: 10, max: 200, step: 10, label: 'Période EMA', advanced: true },
+    pullbackPct: { value: 2, min: 0.5, max: 10, step: 0.5, label: 'Pullback min %', advanced: true },
+    trendMinBars: { value: 5, min: 3, max: 20, step: 1, label: 'Bars tendance min', advanced: true },
+  },
+  trigger(candles, idx, params, indicators) {
+    if (idx < params.emaPeriod + params.trendMinBars) return 'idle';
+    const ema = indicators.ema;
+    const close = candles[idx].close;
+    let trendUp = true;
+    for (let i = idx - params.trendMinBars + 1; i <= idx; i++) {
+      if (candles[i].close <= ema[i]) { trendUp = false; break; }
+    }
+    if (!trendUp) return 'idle';
+    const distPct = ((close - ema[idx]) / ema[idx]) * 100;
+    if (distPct <= params.pullbackPct && distPct > 0) return 'enter';
+    if (distPct > params.pullbackPct * 2) return 'exit';
+    return null;
+  },
+  generateLevels(candles, idx, params, indicators) {
+    const ema = indicators.ema[idx];
+    const price = candles[idx].close;
+    const low = (params.priceLow > 0) ? params.priceLow : ema;
+    const high = (params.priceHigh > 0) ? params.priceHigh : price;
+    return distributeGridLevels(low, high, params.gridLevels);
+  },
+  execution(level, entryCandle, params) {
+    return { tp: level.price * (1 + params.tpPct/100), sl: level.price * (1 - params.slPct/100) };
+  }
+});
+
+// ─── S/R Grid Strategy ───
+registerStrategy('sr_grid', {
+  label: 'Grille S/R',
+  params: {
+    priceLow: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix inférieur', advanced: false, hint: '0 = auto' },
+    priceHigh: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix supérieur', advanced: false, hint: '0 = auto' },
+    gridLevels: { value: 6, min: 2, max: 500, step: 1, label: 'Niveaux' },
+    tpPct: { value: 0.5, min: 0.1, max: 5, step: 0.1, label: 'Take Profit %' },
+    slPct: { value: 2, min: 0.5, max: 8, step: 0.5, label: 'Stop Loss %' },
+    srMinScore: { value: 2, min: 1, max: 10, step: 1, label: 'Score S/R min', advanced: true },
+  },
+  trigger(candles, idx, params, indicators) {
+    return null;
+  },
+  generateLevels(candles, idx, params, indicators) {
+    const price = candles[idx].close;
+    const low = (params.priceLow > 0) ? params.priceLow : (price * 0.95);
+    const high = (params.priceHigh > 0) ? params.priceHigh : (price * 1.05);
+    return distributeGridLevels(low, high, params.gridLevels);
+  },
+  execution(level, entryCandle, params) {
+    return { tp: level.price * (1 + params.tpPct/100), sl: level.price * (1 - params.slPct/100) };
+  }
+});
+
+// ─── Dumb Grid (fixed intervals, no TA) ───
+registerStrategy('dumb_grid', {
+  label: 'Grille Fixe (benchmark)',
+  params: {
+    priceLow: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix inférieur', advanced: false, hint: '0 = auto (-5%)' },
+    priceHigh: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix supérieur', advanced: false, hint: '0 = auto (+5%)' },
+    gridLevels: { value: 10, min: 2, max: 500, step: 1, label: 'Niveaux' },
+    tpPct: { value: 0.5, min: 0.1, max: 5, step: 0.1, label: 'Take Profit %' },
+    slPct: { value: 3, min: 0.5, max: 10, step: 0.5, label: 'Stop Loss %' },
+  },
+  trigger(candles, idx, params, indicators) {
+    if (idx < 2) return 'idle';
+    return 'enter';
+  },
+  generateLevels(candles, idx, params, indicators) {
+    const price = candles[idx].close;
+    const low = (params.priceLow > 0) ? params.priceLow : (price * 0.95);
+    const high = (params.priceHigh > 0) ? params.priceHigh : (price * 1.05);
+    return distributeGridLevels(low, high, params.gridLevels);
+  },
+  execution(level, entryCandle, params) {
+    return { tp: level.price * (1 + params.tpPct/100), sl: level.price * (1 - params.slPct/100) };
+  }
+});
+
+// ─── GridBot class — runs a strategy over candles ───
+class GridBot {
+  constructor(strategyKey, capital) {
+    this.strategy = STRATEGIES[strategyKey];
+    this.capital = capital || ST_DEFAULT_CAPITAL;
+    this.reset();
+  }
+
+  reset() {
+    this.state = ST_STATES.IDLE;
+    this.gridLevels = [];     // {price, side, status:'pending'|'filled'|'closed', entryIdx, exitIdx, pnl, tp, sl}
+    this.trades = [];         // completed round-trips
+    this.cash = this.capital;
+    this.asset = 0;
+    this.lastRealignIdx = -1;
+    this.realignThreshold = 0.003; // 0.3% default
+  }
+
+  // Build params object from strategy defaults (overridden by user config)
+  buildParams(userParams) {
+    const p = {};
+    for (const [k, def] of Object.entries(this.strategy.params)) {
+      p[k] = (userParams && userParams[k] !== undefined) ? userParams[k] : def.value;
+    }
+    return p;
+  }
+
+  // Pre-compute indicators needed by this strategy
+  // Only uses candles[0..limit] — safe against look-ahead
+  computeIndicators(candles, limit) {
+    const closes = candles.slice(0, limit + 1).map(c => c.close);
+    const highs = candles.slice(0, limit + 1).map(c => c.high);
+    const lows = candles.slice(0, limit + 1).map(c => c.low);
+    const vols = candles.slice(0, limit + 1).map(c => c.volume);
+    const ind = {};
+
+    // Always compute common ones
+    if (closes.length >= 20) ind.bb = calcBollinger(closes, 20, 2);
+    if (closes.length >= 14) ind.rsi = calcRSI(closes, 14);
+
+    // Strategy-specific
+    const key = this.strategy;
+    if (key === STRATEGIES.bb_grid || key === STRATEGIES.ema_grid) {
+      if (closes.length >= 50) ind.ema = calcEMA(closes, 50);
+    }
+    if (key === STRATEGIES.bb_grid) {
+      if (closes.length >= key.params.period.value) {
+        ind.bb = calcBollinger(closes, key.params.period.value, key.params.stddev.value);
+      }
+    }
+    if (key === STRATEGIES.rsi_grid) {
+      const rsiP = key.params.rsiPeriod.value;
+      if (closes.length >= rsiP) ind.rsi = calcRSI(closes, rsiP);
+    }
+
+    return ind;
+  }
+
+  // Step one candle — pure functional evaluation
+  step(candles, idx, params, indicators) {
+    const s = this.strategy;
+    const trigger = s.trigger(candles, idx, params, indicators);
+
+    // State transitions
+    if (trigger === 'exit') {
+      this.state = ST_STATES.IDLE;
+      this._closeAllLevels(candles[idx]);
+      this.gridLevels = [];
+    }
+    if (trigger === 'enter' && this.state !== ST_STATES.ACTIVE) {
+      this.state = ST_STATES.ACTIVE;
+      this._setupGrid(candles, idx, params, indicators);
+    }
+
+    // If active, check fills on existing levels
+    if (this.state === ST_STATES.ACTIVE) {
+      this._checkFills(candles, idx, params);
+    }
+
+    return { state: this.state, gridLevels: [...this.gridLevels], trades: [...this.trades] };
+  }
+
+  _setupGrid(candles, idx, params, indicators) {
+    const levels = this.strategy.generateLevels(candles, idx, params, indicators);
+    const sizePerLevel = this.cash / levels.length;
+    this.gridLevels = levels.map(l => ({
+      price: l.price,
+      side: l.side || 'buy',
+      size: sizePerLevel / l.price, // quantity in base asset
+      cost: sizePerLevel,
+      status: 'pending',
+      entryIdx: null,
+      exitIdx: null,
+      pnl: 0,
+      tp: null,
+      sl: null,
+      reactivationCount: 0
+    }));
+    this.lastRealignIdx = idx;
+  }
+
+  _checkFills(candles, idx, params) {
+    const c = candles[idx];
+    // Pessimistic execution: if both tp and sl hit in same candle, sl wins
+    for (const level of this.gridLevels) {
+      if (level.status === 'pending') {
+        // Fill: price crosses below level price (buy limit)
+        if (c.low <= level.price && c.high >= level.price) {
+          level.status = 'filled';
+          level.entryIdx = idx;
+          this.cash -= level.cost;
+          this.asset += level.size;
+          const exec = this.strategy.execution(level, c, params);
+          level.tp = exec.tp;
+          level.sl = exec.sl;
+        }
+      } else if (level.status === 'filled') {
+        // Check SL first (pessimistic)
+        if (c.low <= level.sl && c.high >= level.sl) {
+          this._closeLevel(level, idx, level.sl, true);
+        } else if (c.high >= level.tp && c.low <= level.tp) {
+          this._closeLevel(level, idx, level.tp, false);
+        }
+      }
+    }
+
+    // Realignment check — only if price moved significantly
+    if (idx - this.lastRealignIdx > 5) {
+      const realignPct = params.reentryThreshold || 0.3;
+      const avgLevel = this.gridLevels.reduce((s, l) => s + l.price, 0) / this.gridLevels.length || 1;
+      if (Math.abs((c.close - avgLevel) / avgLevel) > realignPct / 100) {
+        // Close pending levels, regenerate
+        this.gridLevels = this.gridLevels.filter(l => l.status !== 'pending');
+        const indicators = this.computeIndicators(candles, idx);
+        const newLevels = this.strategy.generateLevels(candles, idx, params, indicators);
+        const remainingCash = this.cash;
+        const sizePerLevel = remainingCash / Math.max(1, newLevels.length);
+        for (const l of newLevels) {
+          // Don't add if we already have a level at this price (within 0.2%)
+          const exists = this.gridLevels.some(ex => Math.abs((ex.price - l.price) / l.price) < 0.002);
+          if (!exists) {
+            this.gridLevels.push({
+              price: l.price, side: l.side || 'buy',
+              size: sizePerLevel / l.price, cost: sizePerLevel,
+              status: 'pending', entryIdx: null, exitIdx: null,
+              pnl: 0, tp: null, sl: null, reactivationCount: 0
+            });
+          }
+        }
+        this.lastRealignIdx = idx;
+      }
+    }
+  }
+
+  _closeLevel(level, idx, exitPrice, isStopLoss) {
+    const proceeds = level.size * exitPrice;
+    const entryFee = level.cost * ST_FEE_MAKER;          // entries always maker (limit order)
+    const exitFee = proceeds * (isStopLoss ? ST_FEE_TAKER : ST_FEE_MAKER);
+    const pnl = proceeds - level.cost - entryFee - exitFee;
+    this.cash += proceeds - exitFee;
+    this.asset -= level.size;
+    level.status = 'closed';
+    level.exitIdx = idx;
+    level.pnl = pnl;
+    this.trades.push({
+      entryPrice: level.price,
+      exitPrice: exitPrice,
+      entryIdx: level.entryIdx,
+      exitIdx: idx,
+      pnl: pnl,
+      pnlPct: (pnl / level.cost) * 100,
+      entryTime: null, // filled in by backtest runner
+      exitTime: null
+    });
+  }
+
+  _closeAllLevels(candle) {
+    for (const level of this.gridLevels) {
+      if (level.status === 'filled') {
+        this._closeLevel(level, -1, candle.close, true); // force close = taker
+      } else if (level.status === 'pending') {
+        level.status = 'closed';
+        level.pnl = 0;
+        this.cash += level.cost; // return unspent capital
+        // Don't add to trades — never filled
+      }
+    }
+  }
+
+  // Compute current equity = cash + unrealized P&L
+  equity(markPrice) {
+    const unrealized = this.gridLevels
+      .filter(l => l.status === 'filled')
+      .reduce((sum, l) => sum + l.size * markPrice - l.cost, 0);
+    return this.cash + unrealized;
+  }
+
+  // Realized P&L only
+  realizedPnl() {
+    return this.trades.reduce((sum, t) => sum + t.pnl, 0);
+  }
+}
+
+// ============ BACKTEST ENGINE ============
+let btResult = null;      // Last backtest result
+let btBot = null;         // Active bot instance (for forward test)
+let btActiveStrategy = 'bb_grid';
+let btUserParams = {};
+let btCapital = ST_DEFAULT_CAPITAL;
+
+function runBacktest(strategyKey, candles, startIdx, endIdx, userParams, capital) {
+  const bot = new GridBot(strategyKey, capital || ST_DEFAULT_CAPITAL);
+  const params = bot.buildParams(userParams || {});
+  const equityCurve = [];  // {idx, total, realized, unrealized}
+  const n = endIdx - startIdx;
+  if (n < 20) return { error: 'Pas assez de bougies (min 20)' };
+
+  // Pre-compute ALL indicators once for the full range
+  // This is safe because the strategy only accesses candles[0..idx] at each step
+  const fullIndicators = bot.computeIndicators(candles, endIdx);
+
+  // Mark initial equity
+  equityCurve.push({ idx: startIdx, total: capital, realized: 0, unrealized: 0 });
+
+  for (let i = startIdx; i <= endIdx; i++) {
+    // Slice indicators to current candle to prevent look-ahead
+    const sliceInd = {};
+    for (const [k, arr] of Object.entries(fullIndicators)) {
+      if (arr && arr[i] !== undefined) {
+        // Create a truncated view: values beyond i are null
+        sliceInd[k] = arr.map((v, j) => j <= i ? v : null);
+      }
+    }
+    bot.step(candles, i, params, sliceInd);
+
+    const markPrice = candles[i].close;
+    equityCurve.push({
+      idx: i,
+      total: bot.equity(markPrice),
+      realized: bot.realizedPnl(),
+      unrealized: bot.equity(markPrice) - capital - bot.realizedPnl()
+    });
+  }
+
+  // Force close remaining positions at last price
+  const lastPrice = candles[endIdx].close;
+  bot._closeAllLevels({ close: lastPrice });
+
+  // Compute stats
+  const trades = bot.trades;
+  const winningTrades = trades.filter(t => t.pnl > 0);
+  const losingTrades = trades.filter(t => t.pnl < 0);
+  const totalPnl = bot.realizedPnl();
+  const totalReturn = (totalPnl / capital) * 100;
+  const winRate = trades.length > 0 ? (winningTrades.length / trades.length) * 100 : 0;
+
+  // Average win/loss
+  const avgWin = winningTrades.length > 0 ? winningTrades.reduce((s, t) => s + t.pnl, 0) / winningTrades.length : 0;
+  const avgLoss = losingTrades.length > 0 ? Math.abs(losingTrades.reduce((s, t) => s + t.pnl, 0) / losingTrades.length) : 0;
+  const profitFactor = avgLoss > 0 ? (avgWin * winningTrades.length) / (avgLoss * losingTrades.length) : (totalPnl > 0 ? Infinity : 0);
+
+  // Max drawdown from equity curve
+  let peak = capital, maxDD = 0, maxDDPct = 0;
+  for (const pt of equityCurve) {
+    if (pt.total > peak) peak = pt.total;
+    const dd = peak - pt.total;
+    const ddPct = (dd / peak) * 100;
+    if (ddPct > maxDDPct) { maxDDPct = ddPct; maxDD = dd; }
+  }
+
+  // Sharpe ratio (simplified: using per-candle returns, annualized)
+  let sharpe = 0;
+  if (equityCurve.length > 2) {
+    const returns = [];
+    for (let i = 1; i < equityCurve.length; i++) {
+      returns.push((equityCurve[i].total / equityCurve[i - 1].total) - 1);
+    }
+    const meanRet = returns.reduce((s, r) => s + r, 0) / returns.length;
+    const variance = returns.reduce((s, r) => s + (r - meanRet) ** 2, 0) / returns.length;
+    const stdDev = Math.sqrt(variance);
+    if (stdDev > 0) {
+      // Annualize based on candle interval
+      const periodsPerYear = chartInterval === '1m' ? 525600 : chartInterval === '5m' ? 105120 :
+        chartInterval === '15m' ? 35040 : chartInterval === '1h' ? 8760 :
+        chartInterval === '4h' ? 2190 : chartInterval === '1d' ? 365 : 35040;
+      sharpe = (meanRet / stdDev) * Math.sqrt(periodsPerYear);
+    }
+  }
+
+  const result = {
+    strategy: strategyKey,
+    params: params,
+    capital: capital,
+    startIdx, endIdx,
+    totalPnl, totalReturn,
+    tradeCount: trades.length,
+    winRate, avgWin, avgLoss,
+    profitFactor: profitFactor === Infinity ? '∞' : profitFactor.toFixed(2),
+    maxDrawdown: maxDD,
+    maxDrawdownPct: maxDDPct,
+    sharpe: sharpe.toFixed(3),
+    equityCurve: equityCurve,
+    trades: trades,
+    bot: bot,
+    timestamp: Date.now()
+  };
+
+  btResult = result;
+  btBot = bot;
+  return result;
+}
+
+// Quick backtest on currently visible candles
+function runVisibleBacktest() {
+  if (!candles || candles.length < 20) return;
+  const vs = Math.max(0, viewStart);
+  const ve = Math.min(candles.length - 1, viewEnd);
+  const result = runBacktest(btActiveStrategy, candles, vs, ve, btUserParams, btCapital);
+  if (!result.error) {
+    console.log('Backtest:', result.strategy,
+      '| Trades:', result.tradeCount,
+      '| P&L:', result.totalPnl.toFixed(2), 'USDT',
+      '| Return:', result.totalReturn.toFixed(2) + '%',
+      '| Win:', result.winRate.toFixed(1) + '%',
+      '| Sharpe:', result.sharpe,
+      '| MaxDD:', result.maxDrawdownPct.toFixed(1) + '%',
+      '| PF:', result.profitFactor);
+    drawChart(); // trigger redraw with markers
+  }
+  return result;
+}
+
+// Run backtest on full candle history
+function runFullBacktest() {
+  if (!candles || candles.length < 20) return;
+  const result = runBacktest(btActiveStrategy, candles, 0, candles.length - 1, btUserParams, btCapital);
+  console.log('Full Backtest:', result.strategy,
+    '| Range:', candles.length, 'candles',
+    '| Trades:', result.tradeCount,
+    '| Return:', result.totalReturn.toFixed(2) + '%',
+    '| Sharpe:', result.sharpe,
+    '| MaxDD:', result.maxDrawdownPct.toFixed(1) + '%');
+  return result;
+}
+
+// ============ DRAWING ============
+const COLORS = {
+  ema20: '#f0b90b', ema50: '#ff6b35', ema100: '#e91e63', ema200: '#9c27b0',
+  sma20: '#00bcd4', sma50: '#4caf50',
+  bb_upper: '#607d8b', bb_mid: '#607d8b', bb_lower: '#607d8b',
+  vwap: '#ff9800', ichi_tenkan: '#2196f3', ichi_kijun: '#e91e63',
+  ichi_senkouA: '#4caf5022', ichi_senkouB: '#f4433622', ichi_senkouA_line: '#4caf5066', ichi_senkouB_line: '#f4433666',
+  sar: '#00e5ff',
+  volume_up: '#26a69a55', volume_down: '#ef535055',
+  rsi: '#bb86fc', macd: '#f0b90b', macd_signal: '#ff6b35', macd_hist_up: '#26a69a', macd_hist_down: '#ef5350',
+  stoch_k: '#f0b90b', stoch_d: '#ff6b35', atr: '#03dac6',
+  obv: '#ff9800', mfi: '#9c27b0', williamsR: '#00bcd4', cci: '#ff5722',
+  adx: '#f0b90b', adx_plusDI: '#26a69a', adx_minusDI: '#ef5350',
+  ao_up: '#26a69a88', ao_down: '#ef535088',
+  equity_total: '#ffc107', equity_realized: '#26a69a', equity_bench: '#607d8b',
+  trade_buy: '#26a69a', trade_sell: '#ef5350',
+  grid_buy_pending: 'rgba(38,166,154,0.5)', grid_buy_filled: '#26a69a',
+  grid_tp: 'rgba(255,193,7,0.6)', grid_sl: 'rgba(239,83,80,0.5)',
+  grid: null, text: null
+};
+
+function drawChart() {
+  const W = canvas.width / window.devicePixelRatio;
+  const H = canvas.height / window.devicePixelRatio;
+  COLORS.grid = dark ? 'rgba(0,229,255,0.08)' : 'rgba(0,188,212,0.12)';
+  COLORS.text = getComputedStyle(document.body).getPropertyValue('--text2');
+  
+  ctx.clearRect(0, 0, W, H);
+  if (candles.length < 2) return;
+  
+  let subTotal = 0;
+  for (const [k, active] of Object.entries(activeSubs)) {
+    if (active) subTotal += subHeights[k] || 80;
+  }
+  // Main chart gets remaining height, minus range selector
+  const mainH = Math.max(200, H - subTotal - 4 - RS_HEIGHT);
+  
+  // Filigrane paire active
+  ctx.save();
+  ctx.globalAlpha = 0.03;
+  ctx.fillStyle = dark ? '#ffffff' : '#000000';
+  ctx.font = '900 64px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(activeSymbol, (W - 50) / 2, mainH / 2);
+  ctx.restore();
+
+  resolveChart(candles, 16, 75, mainH, W);
+
+  // Compteur bougies visibles + plage dates + % variation
+  ctx.fillStyle = COLORS.text; ctx.font = '10px monospace';
+  const vsC = Math.max(0, viewStart), veC = Math.min(candles.length, viewEnd);
+  const firstC = candles[vsC], lastC = candles[Math.max(0, veC - 1)];
+  const pctChange = firstC && lastC ? ((lastC.close - firstC.close) / firstC.close * 100) : 0;
+  const pctStr = pctChange >= 0 ? '+' + pctChange.toFixed(2) + '%' : pctChange.toFixed(2) + '%';
+  const pctColor = pctChange >= 0 ? '#26a69a' : '#ef5350';
+  const fmtDate = ts => {
+    const d = new Date(ts * 1000);
+    return d.toLocaleDateString('fr-FR', {day:'2-digit',month:'2-digit'}) + ' ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'});
+  };
+  const rangeStr = firstC ? fmtDate(firstC.time) + ' → ' + fmtDate(lastC.time) : '';
+  ctx.fillText(`${veC - vsC}/${candles.length} · ${rangeStr}`, 18, 12);
+  ctx.fillStyle = pctColor; ctx.font = 'bold 10px monospace';
+  ctx.fillText(pctStr, 18, 25);
+  
+  // Empiler les sous-graphes
+  let yOff = mainH + 4;
+  const subOrder = ['vol', 'rsi', 'macd', 'stoch', 'atr', 'obv', 'mfi', 'williamsR', 'cci', 'adx', 'ao', 'equity'];
+  for (const key of subOrder) {
+    if (activeSubs[key]) {
+      resolveSub(candles, yOff, subHeights[key] || 80, W, key);
+      yOff += subHeights[key] || 80;
+    }
+  }
+
+  // --- Crosshair ---
+  if (crossX !== null && crossY !== null && crossY < mainH) {
+    // Vertical line
+    ctx.strokeStyle = dark ? '#ffffff30' : '#00000030';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(crossX, 0); ctx.lineTo(crossX, mainH); ctx.stroke();
+    
+    // Horizontal line (stops before price column)
+    ctx.beginPath(); ctx.moveTo(16, crossY); ctx.lineTo(W - 75, crossY); ctx.stroke();
+    
+    // Price at crosshair Y
+    const pad = { left: 16, right: 75, top: 10, bottom: 20 };
+    const ph = mainH - pad.top - pad.bottom;
+    const vs2 = Math.max(0, viewStart);
+    const ve2 = Math.min(candles.length, viewEnd);
+    const vis = candles.slice(vs2, ve2);
+    const allP = vis.flatMap(c => [c.high, c.low]);
+    let mnP = Math.min(...allP), mxP = Math.max(...allP);
+    const natRange = mxP - mnP || 1;
+    if (overlays.bb && candles.length >= 20) {
+      const bb2 = calcBollinger(candles.map(c=>c.close), 20, 2);
+      for (let i = vs2; i < ve2; i++) {
+        if (bb2.upper[i] !== null) { mxP = Math.max(mxP, bb2.upper[i]); mnP = Math.min(mnP, bb2.lower[i]); }
+      }
+      const maxExt = natRange * 0.15;
+      mxP = Math.min(mxP, Math.max(...allP) + maxExt);
+      mnP = Math.max(mnP, Math.min(...allP) - maxExt);
+    }
+    const midP2 = (mxP + mnP) / 2;
+    const halfR2 = ((mxP - mnP) / 2) * priceScale;
+    mnP = midP2 - halfR2 + pricePan * natRange;
+    mxP = midP2 + halfR2 + pricePan * natRange;
+    const rng = mxP - mnP || 1;
+    const priceAtCursor = mxP - ((crossY - pad.top) / ph) * rng;
+    
+    // Badge prix crosshair — dans colonne droite, collé au prix
+    const priceStr = '$' + priceAtCursor.toFixed(3);
+    const bw = ctx.measureText(priceStr).width + 14;
+    const bX = W - 75 + (75 - bw)/2;
+    const bY = Math.max(2, Math.min(mainH - 20, crossY - 9));
+    ctx.fillStyle = dark ? 'rgba(22,27,34,0.95)' : 'rgba(246,248,250,0.95)';
+    ctx.strokeStyle = '#d2991d'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(bX, bY, bw, 18, 4); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#d2991d'; ctx.font = 'bold 11px monospace';
+    ctx.fillText(priceStr, bX + 7, bY + 13);
+
+    // OHLCV tooltip — 2 colonnes, semi-transparent
+    const chartPw = W - 16 - 75;
+    const candleIdx = Math.round((crossX - 16) / (chartPw / vis.length));
+    if (candleIdx >= 0 && candleIdx < vis.length) {
+      const candle = vis[candleIdx];
+      const isUp = candle.close >= candle.open;
+      const cColor = isUp ? '#26a69a' : '#ef5350';
+      const onRight = crossX > W / 2;
+      const tX = onRight ? Math.max(16, crossX - 145) : Math.min(W - 160, crossX + 12);
+      const tY = Math.max(30, Math.min(mainH - 85, crossY - 65));
+      
+      ctx.save();
+      ctx.fillStyle = dark ? 'rgba(22,27,34,0.92)' : 'rgba(255,255,255,0.92)';
+      ctx.strokeStyle = cColor; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(tX, tY, 135, 72, 6); ctx.fill(); ctx.stroke();
+      
+      ctx.fillStyle = COLORS.text; ctx.font = '10px monospace';
+      ctx.fillText('O: ' + candle.open.toFixed(3), tX + 8, tY + 16);
+      ctx.fillText('H: ' + candle.high.toFixed(3), tX + 72, tY + 16);
+      ctx.fillText('L: ' + candle.low.toFixed(3), tX + 8, tY + 34);
+      ctx.fillText('C: ' + candle.close.toFixed(3), tX + 72, tY + 34);
+      
+      const volStr = candle.volume >= 1000 ? (candle.volume / 1000).toFixed(1) + 'K' : candle.volume.toFixed(0);
+      ctx.fillStyle = dark ? '#8b949e' : '#656d76';
+      ctx.fillText('Vol: ' + volStr, tX + 8, tY + 54);
+      ctx.restore();
+    }
+  }
+
+  // --- Crosshair sous-graphes ---
+  if (crossX !== null && crossY !== null && crossY > mainH) {
+    const vs3 = Math.max(0, viewStart);
+    const ve3 = Math.min(candles.length, viewEnd);
+    const vis3 = candles.slice(vs3, ve3);
+    const cIdx = Math.round((crossX - 16) / ((W - 16 - 75) / vis3.length));
+    if (cIdx >= 0 && cIdx < vis3.length) {
+      const realIdx = vs3 + cIdx;
+      // Ligne verticale à travers tous les sous-graphes
+      ctx.strokeStyle = dark ? '#ffffff20' : '#00000020';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.moveTo(crossX, mainH + 2); ctx.lineTo(crossX, H); ctx.stroke();
+
+      let sY = mainH + 4;
+      for (const key of subOrder) {
+        if (!activeSubs[key]) continue;
+        const sh = subHeights[key] || 80;
+        // Badge valeur dans colonne droite
+        const val = getSubIndicatorValue(key, realIdx);
+        if (val !== null) {
+          const txt = subLabel(key) + ' ' + val;
+          const tw = ctx.measureText(txt).width + 12;
+          const tx = W - 75 + (75 - tw)/2;
+          const ty = sY + 4;
+          ctx.fillStyle = dark ? 'rgba(22,27,34,0.9)' : 'rgba(246,248,250,0.9)';
+          ctx.strokeStyle = subColor(key); ctx.lineWidth = 0.8;
+          ctx.beginPath(); ctx.roundRect(tx, ty, tw, 15, 3); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = COLORS.text; ctx.font = '9px monospace';
+          ctx.fillText(txt, tx + 6, ty + 11);
+        }
+        sY += sh;
+      }
+    }
+  }
+  
+  // Range Selector — mini timeline en bas
+  if (candles.length > 5) {
+    drawRangeSelector(candles, W, H);
+  }
+}
+
+// ============ RANGE SELECTOR ============
+function drawRangeSelector(candles, W, H) {
+  const rsY = H - RS_HEIGHT;
+  const padL = 16, padR = 75;
+  const rsw = W - padL - padR;
+  const rsh = RS_HEIGHT - 8;
+  if (rsw < 20 || candles.length < 2) return;
+  
+  // Fond
+  ctx.fillStyle = dark ? 'rgba(10,20,40,0.7)' : 'rgba(240,248,255,0.7)';
+  ctx.strokeStyle = dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(padL, rsY + 2, rsw, RS_HEIGHT - 6, 5); ctx.fill(); ctx.stroke();
+  
+  // Mini courbe des closes
+  const closes = candles.map(c => c.close);
+  const allMin = Math.min(...closes), allMax = Math.max(...closes);
+  const rng = allMax - allMin || 1;
+  const toY = (v) => rsY + rsh + 2 - ((v - allMin) / rng) * (rsh - 4);
+  const toX = (i) => padL + (i / Math.max(1, candles.length - 1)) * rsw;
+  
+  // Fill area
+  ctx.save();
+  ctx.globalAlpha = 0.18;
+  ctx.fillStyle = '#26a69a';
+  ctx.beginPath();
+  ctx.moveTo(padL, rsY + rsh + 2);
+  for (let i = 0; i < candles.length; i++) {
+    ctx.lineTo(toX(i), toY(closes[i]));
+  }
+  ctx.lineTo(W - padR, rsY + rsh + 2);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+  
+  // Line
+  ctx.strokeStyle = '#26a69a'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i < candles.length; i++) {
+    const x = toX(i), y = toY(closes[i]);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  
+  // Viewport rectangle
+  const vs = Math.max(0, viewStart), ve = Math.min(candles.length, viewEnd);
+  const vx1 = toX(vs), vx2 = toX(Math.min(ve - 1, candles.length - 1));
+  const vrX = Math.max(padL, vx1), vrW = Math.max(12, Math.min(rsw - (vrX - padL), vx2 - vrX));
+  
+  // Ombre du viewport
+  ctx.fillStyle = dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
+  ctx.fillRect(vrX, rsY + 2, vrW, RS_HEIGHT - 6);
+  
+  // Bordure viewport
+  ctx.strokeStyle = dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(vrX, rsY + 2, vrW, RS_HEIGHT - 6);
+  
+  // Poignées gauche/droite
+  const handleW = 4;
+  ctx.fillStyle = dark ? '#ffffff' : '#000000';
+  ctx.fillRect(vrX - 1, rsY + 4, handleW, RS_HEIGHT - 14);
+  ctx.fillRect(vrX + vrW - 3, rsY + 4, handleW, RS_HEIGHT - 14);
+  
+  // Compteur bougies sur le RS
+  ctx.fillStyle = COLORS.text; ctx.font = '8px monospace';
+  ctx.fillText(candles.length + ' bougies', padL + 4, rsY + 12);
+  
+  // Label viewport
+  const vpLabel = (ve - vs) + '/' + candles.length;
+  ctx.fillText(vpLabel, vrX + Math.max(0, vrW / 2 - 15), rsY + 12);
+  
+  // Légende sessions — fond opaque, droite du RS
+  const sesColors = [
+    { label: 'Asie', color: '#ff9800', hours: '00-09' },
+    { label: 'Europe', color: '#2196f3', hours: '07-16' },
+    { label: 'US', color: '#9c27b0', hours: '13-21' }
+  ];
+  const legW = 130, legH = 14;
+  const legX = W - padR - legW - 2, legY = rsY + 4;
+  ctx.fillStyle = dark ? 'rgba(15,25,45,0.85)' : 'rgba(255,255,255,0.85)';
+  ctx.strokeStyle = dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.roundRect(legX, legY, legW, legH, 3); ctx.fill(); ctx.stroke();
+  ctx.font = 'bold 7px sans-serif';
+  sesColors.forEach((s, i) => {
+    const sx = legX + 4 + i * 42;
+    ctx.fillStyle = s.color;
+    ctx.fillRect(sx, legY + 2, 9, 10);
+    ctx.fillStyle = dark ? '#ddd' : '#222';
+    ctx.fillText(s.label, sx + 11, legY + 11);
+  });
+}
+
+function resolveChart(candles, padL, padR, chartH, W) {
+  const pad = { left: padL, right: padR, top: 10, bottom: 20 };
+  const pw = W - pad.left - pad.right;
+  const ph = chartH - pad.top - pad.bottom;
+  if (ph < 30) return;
+
+  // Viewport
+  const vs = Math.max(0, viewStart);
+  const ve = Math.min(candles.length, viewEnd);
+  const visible = candles.slice(vs, ve);
+  if (visible.length < 2) return;
+  
+  const closes = candles.map(c => c.close);
+  const prices = visible.flatMap(c => [c.high, c.low]);
+  let minP = Math.min(...prices), maxP = Math.max(...prices);
+  const naturalRange = maxP - minP || 1;
+  
+  // Étendre si Bollinger actif, mais cap à ±15% du range naturel
+  if (overlays.bb && candles.length >= 20) {
+    const bb = calcBollinger(closes, 20, 2);
+    for (let i = vs; i < ve; i++) {
+      if (bb.upper[i] !== null) { maxP = Math.max(maxP, bb.upper[i]); minP = Math.min(minP, bb.lower[i]); }
+    }
+    const maxExt = naturalRange * 0.15;
+    maxP = Math.min(maxP, Math.max(...prices) + maxExt);
+    minP = Math.max(minP, Math.min(...prices) - maxExt);
+  }
+  
+  // Appliquer échelle verticale manuelle
+  const midP = (maxP + minP) / 2;
+  const halfRange = ((maxP - minP) / 2) * priceScale;
+  minP = midP - halfRange + pricePan * naturalRange;
+  maxP = midP + halfRange + pricePan * naturalRange;
+  const range = maxP - minP || 1;
+  
+  const gap = pw / visible.length;
+  const candleW = Math.max(1, Math.min(40, gap * 0.8));
+  
+  // Sessions de marché — fonds colorés (UTC)
+  // Asie 00:00-09:00, Europe 07:00-16:00, US 13:00-21:00
+  const sessionDefs = [
+    { start: 0, end: 9, color: 'rgba(255,152,0,0.06)', label: 'Asie' },
+    { start: 7, end: 16, color: 'rgba(33,150,243,0.06)', label: 'Europe' },
+    { start: 13, end: 21, color: 'rgba(156,39,176,0.06)', label: 'US' }
+  ];
+  for (const s of sessionDefs) {
+    // Trouver le début/fin de chaque bloc de session dans les bougies visibles
+    let blockStart = -1;
+    for (let i = vs; i < ve; i++) {
+      const h = new Date(candles[Math.min(i, candles.length - 1)].time * 1000).getUTCHours();
+      const inSession = h >= s.start && h < s.end;
+      if (inSession && blockStart === -1) blockStart = i;
+      if (!inSession && blockStart !== -1) {
+        const x1 = pad.left + gap * (blockStart - vs);
+        const x2 = pad.left + gap * (i - vs) + gap / 2;
+        ctx.fillStyle = s.color;
+        ctx.fillRect(x1, pad.top, x2 - x1, ph);
+        blockStart = -1;
+      }
+    }
+    if (blockStart !== -1) {
+      const x1 = pad.left + gap * (blockStart - vs);
+      ctx.fillStyle = s.color;
+      ctx.fillRect(x1, pad.top, W - pad.right - x1, ph);
+    }
+  }
+  
+  // Grid
+  ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 0.5;
+  const gridN = 6;
+  for (let i = 0; i <= gridN; i++) {
+    const y = pad.top + (ph / gridN) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    const price = maxP - (range / gridN) * i;
+    ctx.fillStyle = COLORS.text; ctx.font = '9px monospace';
+    const label = '$' + price.toFixed(3);
+    ctx.fillText(label, W - pad.right + 3, y + 3);
+  }
+  
+  // Marqueur prix live sur axe Y — triangle + badge couleur
+  if (livePrice && livePrice >= minP && livePrice <= maxP) {
+    const yLP = pad.top + ph * (1 - (livePrice - minP) / range);
+    // Triangle pointant vers la gauche
+    const triX = W - pad.right + 2, triY = yLP;
+    ctx.fillStyle = '#f0b90b'; 
+    ctx.beginPath(); ctx.moveTo(triX, triY - 4); ctx.lineTo(triX + 8, triY); ctx.lineTo(triX, triY + 4);
+    ctx.closePath(); ctx.fill();
+    // Badge prix
+    const lpStr = '$' + livePrice.toFixed(3);
+    ctx.font = 'bold 10px monospace';
+    const lw = ctx.measureText(lpStr).width + 10;
+    ctx.fillStyle = dark ? 'rgba(22,27,34,0.92)' : 'rgba(246,248,250,0.92)';
+    ctx.strokeStyle = '#f0b90b'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(triX + 10, triY - 10, lw, 20, 5); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#f0b90b';
+    ctx.fillText(lpStr, triX + 15, triY + 4);
+  }
+  
+  // Bollinger
+  if (overlays.bb && candles.length >= 20) {
+    const bb = memoized('bb', calcBollinger, closes, 20, 2);
+    drawLine(bb.upper, minP, range, pad, gap, ph, COLORS.bb_upper, [3, 3], 1, vs);
+    drawLine(bb.sma, minP, range, pad, gap, ph, COLORS.bb_mid, [], 1, vs);
+    drawLine(bb.lower, minP, range, pad, gap, ph, COLORS.bb_lower, [3, 3], 1, vs);
+    // Fill between
+    ctx.save(); ctx.globalAlpha = 0.08;
+    ctx.fillStyle = '#607d8b'; ctx.beginPath();
+    let started = false;
+    for (let i = vs; i < ve; i++) {
+      if (i >= bb.upper.length || bb.upper[i] === null) continue;
+      const x = pad.left + gap * (i - vs) + gap / 2;
+      const y = pad.top + ph * (1 - (bb.upper[i] - minP) / range);
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    }
+    for (let i = ve - 1; i >= vs; i--) {
+      if (i >= bb.lower.length || bb.lower[i] === null) continue;
+      const x = pad.left + gap * (i - vs) + gap / 2;
+      const y = pad.top + ph * (1 - (bb.lower[i] - minP) / range);
+      ctx.lineTo(x, y);
+    }
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  
+  // EMAs & SMAs
+  if (overlays.ema20) drawLine(memoized('ema20', calcEMA, closes, 20), minP, range, pad, gap, ph, COLORS.ema20, [], 1.5, vs);
+  if (overlays.ema50) drawLine(memoized('ema50', calcEMA, closes, 50), minP, range, pad, gap, ph, COLORS.ema50, [], 1.5, vs);
+  if (overlays.ema100) drawLine(memoized('ema100', calcEMA, closes, 100), minP, range, pad, gap, ph, COLORS.ema100, [4, 4], 1, vs);
+  if (overlays.ema200) drawLine(memoized('ema200', calcEMA, closes, 200), minP, range, pad, gap, ph, COLORS.ema200, [2, 6], 1, vs);
+  if (overlays.sma20) drawLine(memoized('sma20', calcSMA, closes, 20), minP, range, pad, gap, ph, COLORS.sma20, [6, 3], 1, vs);
+  if (overlays.sma50) drawLine(memoized('sma50', calcSMA, closes, 50), minP, range, pad, gap, ph, COLORS.sma50, [8, 4], 1, vs);
+
+  // VWAP
+  if (overlays.vwap) {
+    const vwap = memoized('vwap', calcVWAP, candles.map(c=>c.high), candles.map(c=>c.low), closes, candles.map(c=>c.volume));
+    drawLine(vwap, minP, range, pad, gap, ph, COLORS.vwap, [], 1.5, vs);
+  }
+
+  // Ichimoku
+  if (overlays.ichimoku && candles.length >= 52) {
+    const highs = candles.map(c=>c.high), lows = candles.map(c=>c.low);
+    const ichi = memoized('ichimoku', calcIchimoku, highs, lows, closes);
+    drawLine(ichi.tenkan, minP, range, pad, gap, ph, COLORS.ichi_tenkan, [], 1, vs);
+    drawLine(ichi.kijun, minP, range, pad, gap, ph, COLORS.ichi_kijun, [], 1, vs);
+    // Senkou cloud fill
+    ctx.save(); ctx.globalAlpha = 0.15;
+    ctx.beginPath(); let started = false;
+    for (let i = vs; i < ve; i++) {
+      if (i >= ichi.senkouA.length || ichi.senkouA[i] === null) continue;
+      // Clamp to visible price range
+      const ya = Math.max(pad.top, Math.min(pad.top + ph, pad.top + ph * (1 - (ichi.senkouA[i] - minP) / range)));
+      if (!started) { ctx.moveTo(pad.left + gap * (i - vs) + gap/2, ya); started = true; }
+      else ctx.lineTo(pad.left + gap * (i - vs) + gap/2, ya);
+    }
+    for (let i = ve - 1; i >= vs; i--) {
+      if (i >= ichi.senkouB.length || ichi.senkouB[i] === null) continue;
+      const yb = Math.max(pad.top, Math.min(pad.top + ph, pad.top + ph * (1 - (ichi.senkouB[i] - minP) / range)));
+      ctx.lineTo(pad.left + gap * (i - vs) + gap/2, yb);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#4caf50'; ctx.fill();
+    ctx.fillStyle = '#f44336'; // cette couleur sera sous la verte
+    ctx.restore();
+  }
+
+  // Parabolic SAR
+  if (overlays.sar) {
+    const highs2 = candles.map(c=>c.high), lows2 = candles.map(c=>c.low);
+    const sarData = calcSAR(highs2, lows2, closes);
+    for (let i = vs; i < ve; i++) {
+      if (sarData[i] === null) continue;
+      const x = pad.left + gap * (i - vs) + gap/2;
+      const y = pad.top + ph * (1 - (sarData[i] - minP) / range);
+      if (y < pad.top || y > pad.top + ph) continue;
+      ctx.fillStyle = COLORS.sar; ctx.font = '7px sans-serif';
+      ctx.fillText('●', x - 3, y + 3);
+    }
+  }
+  
+  // ═══ CHARTISTE ═══
+  
+  // --- Supports / Résistances (Multi-TF) ---
+  if (overlays.sr) {
+    const levels = getMultiTFLevels();
+    // Tier → style visuel
+    const styles = [
+      { name: 'Mineur', color: '#ce93d8', bg: 'rgba(206,147,216,0.10)', dash: [4, 5], width: 1 },
+      { name: 'Interm.', color: '#26c6da', bg: 'rgba(38,198,218,0.12)', dash: [10, 5], width: 1.8 },
+      { name: 'Majeur',  color: '#ffc107', bg: 'rgba(255,193,7,0.16)',   dash: [],       width: 2.5 }
+    ];
+    
+    for (const lvl of levels.slice(0, 6)) {
+      if (lvl.price < minP - range*0.05 || lvl.price > maxP + range*0.05) continue;
+      const s = styles[Math.min(lvl.tier, 2)];
+      const y = pad.top + ph * (1 - (lvl.price - minP) / range);
+      
+      // Zone colorée pour niveaux majeurs
+      if (lvl.tier >= 2) {
+        const zoneH = Math.max(3, ph * 0.0016);
+        ctx.fillStyle = s.bg;
+        ctx.fillRect(pad.left, y - zoneH, W - pad.left - pad.right, zoneH * 2);
+      }
+      
+      // Ligne
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = s.width;
+      if (s.dash.length) ctx.setLineDash(s.dash);
+      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+      ctx.setLineDash([]);
+      
+      // Badge droite — fond opaque coloré
+      const priceStr = '$' + lvl.price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+      const badgeText = priceStr + ' ·' + lvl.tf;
+      ctx.font = (lvl.tier >= 2 ? 'bold ' : '') + '9px ' + getComputedStyle(document.body).fontFamily;
+      const tw = ctx.measureText(badgeText).width + 14;
+      const bx = W - pad.right - tw - 4, by = y - 10;
+      
+      // Fond badge
+      ctx.fillStyle = dark 
+        ? (lvl.tier >= 2 ? 'rgba(255,193,7,0.22)' : lvl.tier >= 1 ? 'rgba(38,198,218,0.18)' : 'rgba(206,147,216,0.14)')
+        : (lvl.tier >= 2 ? 'rgba(255,193,7,0.28)' : lvl.tier >= 1 ? 'rgba(38,198,218,0.22)' : 'rgba(206,147,216,0.18)');
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.roundRect(bx, by, tw, 20, 5); ctx.fill(); ctx.stroke();
+      
+      // Texte badge
+      ctx.fillStyle = dark ? '#fff' : '#111';
+      ctx.fillText(badgeText, bx + 7, by + 14);
+      
+      // Prix à gauche aussi pour les majeurs
+      if (lvl.tier >= 2) {
+        ctx.fillStyle = s.color;
+        ctx.font = 'bold 9px monospace';
+        const leftStr = '$' + lvl.price.toFixed(2);
+        ctx.fillText(leftStr, pad.left + 3, y - 5);
+      }
+    }
+    
+    // Mini-légende en haut à gauche (sous le compteur)
+    const legY = 38;
+    ctx.font = '8px sans-serif';
+    styles.forEach((s, i) => {
+      const lx = 18 + i * 75;
+      ctx.fillStyle = s.color;
+      ctx.fillRect(lx, legY, 18, 3);
+      ctx.fillStyle = COLORS.text;
+      ctx.fillText(s.name, lx + 22, legY + 4);
+    });
+  }
+  
+  // --- Fibonacci Retracement ---
+  if (overlays.fib && visible.length >= 10) {
+    const fibHigh = Math.max(...visible.map(c => c.high));
+    const fibLow = Math.min(...visible.map(c => c.low));
+    const fibRange = fibHigh - fibLow;
+    const isUpTrend = visible[visible.length - 1].close > visible[0].close;
+    const fibLevels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+    for (const lvl of fibLevels) {
+      const price = isUpTrend ? fibHigh - fibRange * lvl : fibLow + fibRange * lvl;
+      if (price < minP - range * 0.1 || price > maxP + range * 0.1) continue;
+      const y = pad.top + ph * (1 - (price - minP) / range);
+      ctx.strokeStyle = 'rgba(255,193,7,0.5)';
+      ctx.lineWidth = 1; ctx.setLineDash([4, 6]);
+      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(255,193,7,0.9)'; ctx.font = '8px monospace';
+      const label = (lvl * 100).toFixed(1) + '% $' + price.toFixed(2);
+      const lw = ctx.measureText(label).width;
+      ctx.fillText(label, W - pad.right - lw - 4, y - 3);
+    }
+  }
+  
+  // --- Volume Profile ---
+  if (overlays.vp && visible.length >= 5) {
+    const bins = 24;
+    const binH = range / bins;
+    const profile = new Array(bins).fill(0);
+    for (const c of visible) {
+      const loBin = Math.max(0, Math.floor((c.low - minP) / binH));
+      const hiBin = Math.min(bins - 1, Math.floor((c.high - minP) / binH));
+      for (let b = loBin; b <= hiBin; b++) profile[b] += c.volume;
+    }
+    const maxVol = Math.max(...profile) || 1;
+    const vpMaxW = 38;
+    for (let b = 0; b < bins; b++) {
+      if (profile[b] === 0) continue;
+      const y = pad.top + ph - (b + 1) * (ph / bins);
+      const w = (profile[b] / maxVol) * vpMaxW;
+      const isPOC = profile[b] === maxVol;
+      ctx.fillStyle = isPOC ? 'rgba(100,180,255,0.7)' : 'rgba(100,180,255,0.25)';
+      ctx.fillRect(W - pad.right + 2, y, w, Math.max(1, ph / bins - 1));
+    }
+  }
+  
+  // Candles
+  for (let i = 0; i < visible.length; i++) {
+    const c = visible[i];
+    const x = pad.left + gap * i;
+    const isGreen = c.close >= c.open;
+    const color = isGreen ? '#26a69a' : '#ef5350';
+    const yO = pad.top + ph * (1 - (c.open - minP) / range);
+    const yC = pad.top + ph * (1 - (c.close - minP) / range);
+    const yH = pad.top + ph * (1 - (c.high - minP) / range);
+    const yL = pad.top + ph * (1 - (c.low - minP) / range);
+    ctx.strokeStyle = color; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(x + candleW/2, yH); ctx.lineTo(x + candleW/2, yL); ctx.stroke();
+    const bodyH = Math.max(0.5, Math.abs(yC - yO));
+    ctx.fillStyle = color;
+    ctx.fillRect(x + candleW*0.15, Math.min(yO, yC), candleW*0.7, bodyH);
+  }
+  
+  // Time labels (X axis)
+  ctx.fillStyle = COLORS.text; ctx.font = '9px monospace';
+  const numLabels = Math.min(6, visible.length);
+  for (let j = 0; j < numLabels; j++) {
+    const idx = Math.round((visible.length - 1) * j / (numLabels - 1));
+    if (idx >= visible.length) continue;
+    const t = new Date(visible[idx].time * 1000);
+    let label;
+    if (chartInterval === '1m' || chartInterval === '5m') label = t.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    else if (chartInterval === '1d') label = t.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'});
+    else label = t.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'}) + ' ' + t.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    const tx = pad.left + gap * idx;
+    ctx.fillText(label, tx - 25, chartH - 3);
+  }
+  
+  // Price line (live)
+  if (livePrice) {
+    const yP = pad.top + ph * (1 - (livePrice - minP) / range);
+    ctx.strokeStyle = '#f0b90b'; ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
+    ctx.beginPath(); ctx.moveTo(pad.left, yP); ctx.lineTo(W - pad.right, yP); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = dark ? 'rgba(22,27,34,0.9)' : 'rgba(246,248,250,0.9)';
+    ctx.strokeStyle = '#f0b90b'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(W - pad.right - 72, yP - 12, 68, 18, 4); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#f0b90b'; ctx.font = 'bold 11px monospace';
+    ctx.fillText('$' + livePrice.toFixed(3), W - pad.right - 68, yP + 2);
+  }
+
+  // ─── Trade markers (backtest) ───
+  if (btResult && btResult.trades && btResult.trades.length > 0) {
+    for (const trade of btResult.trades) {
+      // Entry marker
+      if (trade.entryIdx >= vs && trade.entryIdx < ve) {
+        const ex = pad.left + gap * (trade.entryIdx - vs) + gap/2;
+        const ey = pad.top + ph * (1 - (trade.entryPrice - minP) / range);
+        if (ey > pad.top && ey < pad.top + ph) {
+          // Green triangle up for buy entry
+          ctx.fillStyle = COLORS.trade_buy;
+          ctx.beginPath(); ctx.moveTo(ex, ey - 7); ctx.lineTo(ex - 5, ey + 2); ctx.lineTo(ex + 5, ey + 2); ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = COLORS.trade_buy; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(ex, ey - 10); ctx.lineTo(ex, ey + 6); ctx.stroke();
+        }
+      }
+      // Exit marker
+      if (trade.exitIdx >= vs && trade.exitIdx < ve && trade.exitIdx >= 0) {
+        const xx = pad.left + gap * (trade.exitIdx - vs) + gap/2;
+        const xy = pad.top + ph * (1 - (trade.exitPrice - minP) / range);
+        if (xy > pad.top && xy < pad.top + ph) {
+          const isWin = trade.pnl > 0;
+          ctx.fillStyle = isWin ? COLORS.trade_buy : COLORS.trade_sell;
+          // Triangle down for sell exit
+          ctx.beginPath(); ctx.moveTo(xx, xy + 7); ctx.lineTo(xx - 5, xy - 2); ctx.lineTo(xx + 5, xy - 2); ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = isWin ? COLORS.trade_buy : COLORS.trade_sell; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(xx, xy + 10); ctx.lineTo(xx, xy - 6); ctx.stroke();
+          // PnL label
+          const pnlStr = (trade.pnlPct >= 0 ? '+' : '') + trade.pnlPct.toFixed(2) + '%';
+          ctx.fillStyle = isWin ? '#26a69a' : '#ef5350';
+          ctx.font = '8px monospace';
+          ctx.fillText(pnlStr, xx + 6, xy - 4);
+        }
+      }
+    }
+  }
+
+  // ─── Grid level lines (active bot) ───
+  const activeBot = btBot || (btResult && btResult.bot);
+  if (activeBot && activeBot.gridLevels && activeBot.gridLevels.length > 0) {
+    for (const level of activeBot.gridLevels) {
+      if (level.price < minP - range * 0.1 || level.price > maxP + range * 0.1) continue;
+      const ly = pad.top + ph * (1 - (level.price - minP) / range);
+      if (ly < pad.top || ly > pad.top + ph) continue;
+
+      if (level.status === 'pending') {
+        // Dashed green — buy limit waiting
+        ctx.strokeStyle = COLORS.grid_buy_pending; ctx.lineWidth = 1;
+        ctx.setLineDash([5, 3]);
+        ctx.beginPath(); ctx.moveTo(pad.left, ly); ctx.lineTo(W - pad.right, ly); ctx.stroke();
+        ctx.setLineDash([]);
+        // Label
+        const label = 'BUY $' + level.price.toFixed(2);
+        ctx.fillStyle = COLORS.grid_buy_pending; ctx.font = '8px monospace';
+        ctx.fillText(label, pad.left + 4, ly - 3);
+      } else if (level.status === 'filled') {
+        // Solid green — active position
+        ctx.strokeStyle = COLORS.grid_buy_filled; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(pad.left, ly); ctx.lineTo(W - pad.right, ly); ctx.stroke();
+        // TP line (gold dashed)
+        if (level.tp && level.tp < maxP + range * 0.2 && level.tp > minP - range * 0.2) {
+          const tpy = pad.top + ph * (1 - (level.tp - minP) / range);
+          ctx.strokeStyle = COLORS.grid_tp; ctx.lineWidth = 0.8;
+          ctx.setLineDash([3, 4]);
+          ctx.beginPath(); ctx.moveTo(pad.left, tpy); ctx.lineTo(W - pad.right, tpy); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = COLORS.grid_tp; ctx.font = '7px monospace';
+          ctx.fillText('TP ' + ((level.tp/level.price - 1)*100).toFixed(2) + '%', pad.left + 4, tpy - 2);
+        }
+        // SL line (red dashed)
+        if (level.sl && level.sl < maxP + range * 0.2 && level.sl > minP - range * 0.2) {
+          const sly = pad.top + ph * (1 - (level.sl - minP) / range);
+          ctx.strokeStyle = COLORS.grid_sl; ctx.lineWidth = 0.8;
+          ctx.setLineDash([3, 4]);
+          ctx.beginPath(); ctx.moveTo(pad.left, sly); ctx.lineTo(W - pad.right, sly); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = COLORS.grid_sl; ctx.font = '7px monospace';
+          ctx.fillText('SL', pad.left + 4, sly - 2);
+        }
+      }
+    }
+  }
+}
+
+function drawLine(data, minP, range, pad, gap, ph, color, dash, width, dataOffset) {
+  ctx.strokeStyle = color; ctx.lineWidth = width;
+  if (dash.length > 0) ctx.setLineDash(dash);
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i < data.length; i++) {
+    if (data[i] === null) continue;
+    const idx = i - (dataOffset || 0);
+    if (idx < 0) continue;
+    const x = pad.left + gap * idx + gap / 2;
+    if (x < pad.left || x > pad.left + gap * 500) continue; // safety
+    const y = pad.top + ph * (1 - (data[i] - minP) / range);
+    if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// Titre + badge sous-graphe
+function subTitle(key) {
+  const map = { vol:'VOLUME', rsi:'RSI (14)', macd:'MACD (12,26,9)', stoch:'STOCH (14,3)', atr:'ATR (14)', obv:'OBV', mfi:'MFI (14)', williamsR:'%R (14)', cci:'CCI (20)', adx:'ADX (14)', ao:'AO', equity:'GRID EQUITY' };
+  return map[key] || key.toUpperCase();
+}
+
+// Grille + labels d'échelle pour sous-graphes (o: {levels, min, max | span, f})
+function subGrid(y0, pad, ph, W, o) {
+  ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 0.5;
+  o.levels.forEach(l => {
+    const y = o.span ? y0 + pad.top + ph/2 - (l / o.span) * ph : y0 + pad.top + ph * (1 - (l - (o.min || 0)) / ((o.max || 100) - (o.min || 0)));
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    ctx.fillStyle = COLORS.text; ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'right'; ctx.fillText(o.f ? o.f(l) : l, W - 8, y + 3); ctx.textAlign = 'left';
+  });
+}
+
+function resolveSub(candles, y0, subH, W, key) {
+  const pad = { left: 16, right: 75, top: 18, bottom: 12 };
+  const pw = W - pad.left - pad.right;
+  const ph = subH - pad.top - pad.bottom;
+  if (ph < 20) return;
+  
+  // Séparateur supérieur
+  ctx.strokeStyle = dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.left, y0); ctx.lineTo(W - pad.right, y0); ctx.stroke();
+  
+  // Label nom du sous-graphe en haut à gauche
+  ctx.fillStyle = subColor(key); ctx.font = 'bold 11px monospace';
+  ctx.fillText(subTitle(key), pad.left + 6, y0 + 13);
+  
+  // Utiliser le range visible pour les subs aussi
+  const vs = Math.max(0, viewStart);
+  const ve = Math.min(candles.length, viewEnd);
+  const visible = candles.slice(vs, ve);
+  const gap = pw / visible.length;
+  
+  if (key === 'vol') {
+    const volumes = candles.map(c => c.volume);
+    const maxV = Math.max(...volumes.slice(vs, ve));
+    // Grid + échelle
+    const fmtV = v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : v.toFixed(0);
+    subGrid(y0, pad, ph, W, { levels: [0, maxV/2, maxV], min: 0, max: maxV, f: fmtV });
+    // Volume bars
+    const barW = Math.max(1, gap * 0.7);
+    for (let i = vs; i < ve; i++) {
+      const c = candles[i];
+      const x = pad.left + gap * (i - vs);
+      const h = (c.volume / maxV) * ph;
+      const y = y0 + pad.top + ph - h;
+      ctx.fillStyle = c.close >= c.open ? '#26a69a44' : '#ef535044';
+      ctx.fillRect(x + gap*0.15, y, barW, h);
+    }
+  } else if (key === 'rsi') {
+    const closes = candles.map(c => c.close);
+    const rsi = memoized('sub_rsi', calcRSI, closes, 14);
+    subGrid(y0, pad, ph, W, { levels: [30, 50, 70] });
+    // RSI line
+    ctx.strokeStyle = COLORS.rsi; ctx.lineWidth = 1.5;
+    ctx.beginPath(); let started = false;
+    for (let i = vs; i < ve; i++) {
+      if (i >= rsi.length || rsi[i] === null) continue;
+      const x = pad.left + gap * (i - vs) + gap/2;
+      const y = y0 + pad.top + ph * (1 - rsi[i] / 100);
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  } else if (key === 'macd') {
+    const closes = candles.map(c => c.close);
+    const macd = memoized('sub_macd', calcMACD, closes);
+    const allVals = [...macd.macdLine.filter(v => v !== null), ...macd.signal.filter(v => v !== null), ...macd.histogram.filter(v => v !== null)];
+    const absMax = Math.max(Math.abs(Math.min(...allVals)), Math.abs(Math.max(...allVals))) || 1;
+    const scale = (ph / 2) / absMax;
+    const midY = y0 + pad.top + ph / 2;
+    subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: v => v.toFixed(2) });
+    // Histogram
+    const barW = Math.max(1, gap * 0.6);
+    for (let i = vs; i < ve; i++) {
+      if (i >= macd.histogram.length || macd.histogram[i] === null) continue;
+      const x = pad.left + gap * (i - vs);
+      const h = macd.histogram[i] * scale;
+      ctx.fillStyle = macd.histogram[i] >= 0 ? '#26a69a88' : '#ef535088';
+      ctx.fillRect(x + gap*0.2, Math.min(midY, midY - h), barW, Math.abs(h));
+    }
+    // MACD line
+    drawLineAt(macd.macdLine, midY, scale, pad, gap, COLORS.macd, [], 1.5, vs);
+    drawLineAt(macd.signal, midY, scale, pad, gap, COLORS.macd_signal, [], 1, vs);
+  } else if (key === 'stoch') {
+    const highs = candles.map(c => c.high), lows = candles.map(c => c.low), closes = candles.map(c => c.close);
+    const stoch = memoized('sub_stoch', calcStoch, highs, lows, closes, 14, 3);
+    subGrid(y0, pad, ph, W, { levels: [20, 50, 80] });
+    drawLineAt(stoch.k, y0 + pad.top + ph, ph/100, pad, gap, COLORS.stoch_k, [], 1.5, vs);
+    drawLineAt(stoch.d, y0 + pad.top + ph, ph/100, pad, gap, COLORS.stoch_d, [3, 3], 1, vs);
+  } else if (key === 'atr') {
+    const highs = candles.map(c => c.high), lows = candles.map(c => c.low), closes = candles.map(c => c.close);
+    const atr = memoized('sub_atr', calcATR, highs, lows, closes, 14);
+    const maxA = Math.max(...atr.filter(v => v !== null)) || 1;
+    const scale = ph / maxA;
+    subGrid(y0, pad, ph, W, { levels: [0, maxA/2, maxA], min: 0, max: maxA, f: v => '$' + v.toFixed(1) });
+    drawLineAt(atr, y0 + pad.top + ph, scale, pad, gap, COLORS.atr, [], 1.5, vs);
+  } else if (key === 'obv') {
+    const closes = candles.map(c => c.close), volumes = candles.map(c => c.volume);
+    const obv = memoized('sub_obv', calcOBV, closes, volumes);
+    const visObv = obv.slice(vs, ve);
+    const absMax = Math.max(Math.abs(Math.min(...visObv)), Math.abs(Math.max(...visObv))) || 1;
+    const scale = (ph / 2) / absMax;
+    const midY = y0 + pad.top + ph / 2;
+    const fmtOBV = v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : v.toFixed(0);
+    subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: fmtOBV });
+    drawLineAt(obv, midY, scale, pad, gap, COLORS.obv, [], 1.5, vs);
+  } else if (key === 'mfi') {
+    const closes = candles.map(c => c.close), highs = candles.map(c => c.high), lows = candles.map(c => c.low), vols = candles.map(c => c.volume);
+    const mfi = memoized('sub_mfi', calcMFI, highs, lows, closes, vols, 14);
+    drawBandSub(y0, pad, ph, W, gap, mfi, COLORS.mfi, vs, ve, [20, 50, 80]);
+  } else if (key === 'williamsR') {
+    const closes = candles.map(c => c.close), highs = candles.map(c => c.high), lows = candles.map(c => c.low);
+    const wr = memoized('sub_wr', calcWilliamsR, highs, lows, closes, 14);
+    drawBandSub(y0, pad, ph, W, gap, wr, COLORS.williamsR, vs, ve, [-80, -50, -20], -100, 0);
+  } else if (key === 'cci') {
+    const closes = candles.map(c => c.close), highs = candles.map(c => c.high), lows = candles.map(c => c.low);
+    const cci = memoized('sub_cci', calcCCI, highs, lows, closes, 20);
+    subGrid(y0, pad, ph, W, { levels: [100, 0, -100], span: 200 });
+    drawLineAt(cci, y0 + pad.top + ph/2, ph/400, pad, gap, COLORS.cci, [], 1.5, vs);
+  } else if (key === 'adx') {
+    const closes = candles.map(c => c.close), highs = candles.map(c => c.high), lows = candles.map(c => c.low);
+    const adxData = memoized('sub_adx', calcADX, highs, lows, closes, 14);
+    subGrid(y0, pad, ph, W, { levels: [25, 50] });
+    drawLineAt(adxData.adx, y0 + pad.top + ph, ph/100, pad, gap, COLORS.adx, [], 1.5, vs);
+    drawLineAt(adxData.plusDI, y0 + pad.top + ph, ph/100, pad, gap, COLORS.adx_plusDI, [3, 3], 1, vs);
+    drawLineAt(adxData.minusDI, y0 + pad.top + ph, ph/100, pad, gap, COLORS.adx_minusDI, [3, 3], 1, vs);
+  } else if (key === 'ao') {
+    const highs = candles.map(c => c.high), lows = candles.map(c => c.low);
+    const ao = memoized('sub_ao', calcAO, highs, lows);
+    const allV = ao.filter(v => v !== null);
+    const absMax = Math.max(Math.abs(Math.min(...allV)), Math.abs(Math.max(...allV))) || 1;
+    const scale = (ph / 2) / absMax;
+    const midY = y0 + pad.top + ph / 2;
+    subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: v => v.toFixed(2) });
+    const barW = Math.max(1, gap * 0.6);
+    for (let i = vs; i < ve; i++) {
+      if (ao[i] === null) continue;
+      const x = pad.left + gap * (i - vs);
+      const h = ao[i] * scale;
+      ctx.fillStyle = ao[i] >= 0 ? COLORS.ao_up : COLORS.ao_down;
+      ctx.fillRect(x + gap*0.2, Math.min(midY, midY - h), barW, Math.abs(h));
+    }
+  } else if (key === 'equity') {
+    // Equity curve sub-chart — shows total equity (gold) + realized PnL (green)
+    if (!btResult || !btResult.equityCurve || btResult.equityCurve.length < 2) {
+      ctx.fillStyle = COLORS.text; ctx.font = '10px monospace';
+      ctx.fillText('Pas de backtest — lancez un backtest', pad.left + 10, y0 + pad.top + ph/2);
+      return;
+    }
+    const eq = btResult.equityCurve;
+    const startCap = btResult.capital;
+    const allTotals = eq.map(e => e.total);
+    const minEq = Math.min(...allTotals);
+    const maxEq = Math.max(...allTotals);
+    const rangeEq = maxEq - minEq || 1;
+
+    // Grid + échelle $
+    const eqFmt = v => '$' + v.toLocaleString('en-US', {maximumFractionDigits: 0});
+    subGrid(y0, pad, ph, W, { levels: [minEq, minEq + rangeEq / 2, maxEq], min: minEq, max: maxEq, f: eqFmt });
+    // Capital baseline
+    const capY = y0 + pad.top + ph * (1 - (startCap - minEq) / rangeEq);
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 0.5;
+    ctx.setLineDash([3, 6]);
+    ctx.beginPath(); ctx.moveTo(pad.left, capY); ctx.lineTo(W - pad.right, capY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw equity curve — total (gold)
+    ctx.strokeStyle = COLORS.equity_total; ctx.lineWidth = 1.8;
+    ctx.beginPath(); let started = false;
+    let firstEqIdx = eq[0].idx, lastEqIdx = eq[eq.length - 1].idx;
+    for (let j = 0; j < eq.length; j++) {
+      const e = eq[j];
+      if (e.idx < vs || e.idx > ve) continue;
+      const x = pad.left + gap * (e.idx - vs) + gap/2;
+      const y = y0 + pad.top + ph * (1 - (e.total - minEq) / rangeEq);
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Draw realized PnL (green)
+    ctx.strokeStyle = COLORS.equity_realized; ctx.lineWidth = 1.2;
+    ctx.beginPath(); started = false;
+    for (let j = 0; j < eq.length; j++) {
+      const e = eq[j];
+      if (e.idx < vs || e.idx > ve) continue;
+      const x = pad.left + gap * (e.idx - vs) + gap/2;
+      const realizedTotal = startCap + e.realized;
+      const y = y0 + pad.top + ph * (1 - (realizedTotal - minEq) / rangeEq);
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Labels
+    const retPct = ((allTotals[allTotals.length-1] - startCap) / startCap * 100);
+    const retStr = (retPct >= 0 ? '+' : '') + retPct.toFixed(2) + '%';
+    ctx.fillStyle = retPct >= 0 ? '#26a69a' : '#ef5350';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillText(retStr, pad.left + 4, y0 + pad.top + 12);
+
+    // Legend
+    ctx.fillStyle = COLORS.equity_total; ctx.font = '9px monospace';
+    ctx.fillText('─ Equity', pad.left + 65, y0 + pad.top + 12);
+    ctx.fillStyle = COLORS.equity_realized;
+    ctx.fillText('─ Realized', pad.left + 125, y0 + pad.top + 12);
+  }
+}
+
+function drawLineAt(data, baseY, scale, pad, gap, color, dash, width, dataOffset) {
+  ctx.strokeStyle = color; ctx.lineWidth = width;
+  if (dash.length > 0) ctx.setLineDash(dash);
+  ctx.beginPath(); let started = false;
+  for (let i = 0; i < data.length; i++) {
+    if (data[i] === null) continue;
+    const idx = i - (dataOffset || 0);
+    if (idx < 0) continue;
+    const x = pad.left + gap * idx + gap / 2;
+    const y = baseY - data[i] * scale;
+    if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+}
+
+// Helper pour sous-graphes bandés (MFI, Williams %R, etc.)
+function drawBandSub(y0, pad, ph, W, gap, data, color, vs, ve, levels, dataMin, dataMax) {
+  const dMin = dataMin !== undefined ? dataMin : 0;
+  const dMax = dataMax !== undefined ? dataMax : 100;
+  subGrid(y0, pad, ph, W, { levels, min: dMin, max: dMax });
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+  ctx.beginPath(); let started = false;
+  for (let i = vs; i < ve; i++) {
+    if (i >= data.length || data[i] === null) continue;
+    const x = pad.left + gap * (i - vs) + gap / 2;
+    const y = y0 + pad.top + ph * (1 - (data[i] - dMin) / (dMax - dMin));
+    if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+// ============ SAMSARA ============
+
+// Helpers pour le crosshair des sous-graphes
+function subLabel(key) {
+  const map = { vol:'Vol', rsi:'RSI', macd:'MACD', stoch:'%K', atr:'ATR', obv:'OBV', mfi:'MFI', williamsR:'%R', cci:'CCI', adx:'ADX', ao:'AO', equity:'Equity' };
+  return map[key] || key;
+}
+function subColor(key) {
+  const map = { vol:'#8b949e', rsi:COLORS.rsi, macd:COLORS.macd, stoch:COLORS.stoch_k, atr:COLORS.atr, obv:COLORS.obv, mfi:COLORS.mfi, williamsR:COLORS.williamsR, cci:COLORS.cci, adx:COLORS.adx, ao:COLORS.ao_up, equity:COLORS.equity_total };
+  return map[key] || '#8b949e';
+}
+function getSubIndicatorValue(key, idx) {
+  const c = candles;
+  if (idx < 0 || idx >= c.length) return null;
+  const closes = c.map(x => x.close), highs = c.map(x => x.high), lows = c.map(x => x.low), vols = c.map(x => x.volume);
+  try {
+    switch(key) {
+      case 'vol': return c[idx].volume >= 1000 ? (c[idx].volume/1000).toFixed(1)+'K' : c[idx].volume.toFixed(0);
+      case 'rsi': { const v = memoized('gsi_rsi', calcRSI, closes, 14); return v[idx] !== null ? v[idx].toFixed(1) : null; }
+      case 'macd': { const v = memoized('gsi_macd', calcMACD, closes); return v.macdLine[idx] !== null ? v.macdLine[idx].toFixed(2) : null; }
+      case 'stoch': { const v = memoized('gsi_stoch', calcStoch, highs, lows, closes, 14, 3); return v.k[idx] !== null ? v.k[idx].toFixed(1) : null; }
+      case 'atr': { const v = memoized('gsi_atr', calcATR, highs, lows, closes, 14); return v[idx] !== null ? v[idx].toFixed(1) : null; }
+      case 'obv': { const v = memoized('gsi_obv', calcOBV, closes, vols); return v[idx] !== null ? (v[idx]/1e6).toFixed(2)+'M' : null; }
+      case 'mfi': { const v = memoized('gsi_mfi', calcMFI, highs, lows, closes, vols, 14); return v[idx] !== null ? v[idx].toFixed(1) : null; }
+      case 'williamsR': { const v = memoized('gsi_wr', calcWilliamsR, highs, lows, closes, 14); return v[idx] !== null ? v[idx].toFixed(1) : null; }
+      case 'cci': { const v = memoized('gsi_cci', calcCCI, highs, lows, closes, 20); return v[idx] !== null ? v[idx].toFixed(1) : null; }
+      case 'adx': { const v = memoized('gsi_adx', calcADX, highs, lows, closes, 14); return v.adx[idx] !== null ? v.adx[idx].toFixed(1) : null; }
+      case 'ao': { const v = memoized('gsi_ao', calcAO, highs, lows); return v[idx] !== null ? v[idx].toFixed(2) : null; }
+      default: return null;
+    }
+  } catch(e) { return null; }
+}
+
+async function fetchSamsara() {
+  try {
+    const resp = await fetch(DATA_URL, { cache: 'no-cache' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    samsaraData = await resp.json();
+    renderFeed();
+    document.getElementById('dot').style.background = 'var(--green)';
+    const td = document.getElementById('taskbarDot');
+    if (td) td.style.background = 'var(--green)';
+  } catch(e) {
+    document.getElementById('dot').style.background = 'var(--red)';
+    const td = document.getElementById('taskbarDot');
+    if (td) td.style.background = 'var(--red)';
+    const feed = document.getElementById('feed');
+    feed.innerHTML = '<div class="error">⚠️ ' + e.message + '</div>';
+  }
+}
+
+function sisterEmoji(s) {
+  const sub = (s.subtitle || '').toLowerCase();
+  const regime = (s.regime || '').toLowerCase();
+  const dirs = (s.targets || []).map(t => (t.direction || '').toUpperCase());
+  const hc = dirs.filter(d => d === 'HAUSSIER').length;
+  const bc = dirs.filter(d => d === 'BAISSIER').length;
+
+  // Regime-based
+  if (regime.includes('haussi')) return '🚀';
+  if (regime.includes('baiss')) return '🐻';
+  if (regime.includes('range') || regime.includes('latérale')) return '🌀';
+  if (regime.includes('accumul')) return '📦';
+  if (regime.includes('distrib')) return '📤';
+  if (regime.includes('volatil')) return '🌊';
+
+  // Subtitle keywords
+  if (sub.includes('breakout') || sub.includes('cassure')) return '💥';
+  if (sub.includes('support')) return '🧱';
+  if (sub.includes('résistance') || sub.includes('resistance')) return '🧗';
+  if (sub.includes('divergence')) return '🔀';
+  if (sub.includes('retournement') || sub.includes('reversal')) return '🔄';
+  if (sub.includes('impulsion')) return '⚡';
+  if (sub.includes('correction') || sub.includes('pullback')) return '📐';
+  if (sub.includes('liquidité') || sub.includes('liquidity')) return '💧';
+
+  // Direction-based fallback
+  if (hc > bc) return '📈';
+  if (bc > hc) return '📉';
+  return '🔮';
+}
+
+function sisterOrbColor(s) {
+  const dirs = (s.targets || []).map(t => (t.direction || '').toUpperCase());
+  const hc = dirs.filter(d => d === 'HAUSSIER').length;
+  const bc = dirs.filter(d => d === 'BAISSIER').length;
+  if (hc > bc) return 'emerald';
+  if (bc > hc) return 'ruby';
+  return 'amber';
+}
+
+function escHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+function toggleSister(id) {
+  const card = document.getElementById(id);
+  const wasOpen = card.classList.contains('open');
+  card.classList.toggle('open');
+  if (!wasOpen && card.classList.contains('open') && window.innerWidth <= 768) {
+    setTimeout(() => {
+      const panel = document.getElementById('feedPanel');
+      const body = panel.querySelector('.feed-panel-body');
+      const header = card.querySelector('.sister-card-header');
+      if (body && header) body.scrollTop = header.offsetTop - body.offsetTop - 8;
+    }, 50);
+  }
+}
+
+function renderInline(t) {
+  return escHtml(t).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(.+?)\*/g, '<em>$1</em>').replace(/`(.+?)`/g, '<code>$1</code>');
+}
+
+function renderTranscript(content) {
+  let html = '', inBq = false, inCode = false, codeBuf = '';
+  const lines = content.split('\n');
+  for (const line of lines) {
+    if (line.startsWith('```')) {
+      if (inCode) { html += '<pre><code>' + escHtml(codeBuf.trim()) + '</code></pre>'; codeBuf = ''; inCode = false; }
+      else inCode = true;
+      continue;
+    }
+    if (inCode) { codeBuf += line + '\n'; continue; }
+    if (line.startsWith('### ')) { html += '<h4>' + escHtml(line.slice(4)) + '</h4>'; continue; }
+    if (line.startsWith('## ')) { html += '<h3>' + escHtml(line.slice(3)) + '</h3>'; continue; }
+    if (line.startsWith('# ')) { html += '<h3>' + escHtml(line.slice(2)) + '</h3>'; continue; }
+    if (line.startsWith('>')) {
+      if (!inBq) { html += '<blockquote>'; inBq = true; }
+      html += renderInline(line.replace(/^>\s?/, '')) + '<br>';
+      continue;
+    } else if (inBq) { html += '</blockquote>'; inBq = false; }
+    if (line.match(/^---/)) { html += '<hr>'; continue; }
+    if (line.match(/^\s*[\*\-\+]\s/)) { html += '<li>' + renderInline(line.replace(/^\s*[\*\-\+]\s/, '')) + '</li>'; continue; }
+    if (line.trim() === '') { html += '<br>'; continue; }
+    html += '<p>' + renderInline(line) + '</p>';
+  }
+  if (inBq) html += '</blockquote>';
+  return html;
+}
+
+function renderFeed() {
+  renderFeedTo(document.getElementById('feed'));
+}
+
+function renderFeedTo(container) {
+  if (!samsaraData) {
+    container.innerHTML = '<div class="loading">🔮 En attente des données…</div>';
+    return;
+  }
+  const d = samsaraData;
+  document.getElementById('cycle').textContent = 'Cycle ' + d.cycle;
+  document.getElementById('updated').textContent = new Date(d.updated).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+  
+  let html = '';
+  html += '<div class="demon-card">';
+  html += '<div class="demon-header">';
+  html += '<div class="demon-avatar"><div class="avatar-orb">👁</div></div>';
+  html += '<div><div class="demon-name">Le Démon</div><div class="demon-role">Métrique Macro & Invariants</div></div>';
+  html += '<span style="margin-left:auto;font-size:10px;color:var(--text2);font-variant-numeric:tabular-nums">Dir ' + d.metrics.overall.direction + '% · Range ' + d.metrics.overall.range + '%</span>';
+  html += '</div>';
+  html += '<div class="demon-body">' + escHtml(d.demon).replace(/\n/g,'<br>') + '</div>';
+  html += '</div>';
+  
+  const sisters = [...(d.transcripts||[])].reverse();
+  for (const s of sisters) {
+    const dirs = (s.targets||[]).map(t => t.direction);
+    const hc = dirs.filter(d => d === 'HAUSSIER').length, bc = dirs.filter(d => d === 'BAISSIER').length;
+    html += '<div class="sister-card" id="sister-' + s.cycle + '">';
+    html += '<div class="sister-card-header" onclick="toggleSister(\'sister-' + s.cycle + '\')">';
+    html += '<span class="sister-avatar"><div class="avatar-orb ' + sisterOrbColor(s) + '">' + sisterEmoji(s) + '</div></span>';
+    html += '<div class="sister-info">';
+    html += '<div class="sister-title">Sœur ' + s.n2 + ' → Sœur ' + (s.n2+1) + '</div>';
+    html += '<div class="sister-subtitle">' + escHtml(s.subtitle).substring(0,100) + '</div>';
+    html += '<div class="sister-meta">';
+    if (s.regime) html += '<span class="badge badge-regime">' + escHtml(s.regime).substring(0,55) + '</span>';
+    if (s.global_confidence) html += '<span class="badge badge-conf">conf ' + s.global_confidence + '</span>';
+    if (hc>0) html += '<span class="badge badge-hausser">' + hc + '↗</span>';
+    if (bc>0) html += '<span class="badge badge-baissier">' + bc + '↘</span>';
+    html += '</div></div><span class="sister-expand">▼</span></div>';
+    html += '<div class="sister-card-body">';
+    if ((s.targets||[]).length>0) {
+      html += '<div class="targets-mini">';
+      s.targets.forEach(t => {
+        html += '<div class="target-chip ' + (t.direction==='HAUSSIER'?'hausser':'baissier') + '">';
+        html += '<span><strong>' + t.horizon + '</strong> <span class="dir">' + (t.direction==='HAUSSIER'?'↗':'↘') + '</span></span>';
+        html += '<span>→ <strong>$' + t.target.toLocaleString() + '</strong></span>';
+        html += '<span style="color:var(--text2)">($' + (t.range_low/1000).toFixed(1) + 'k–$' + (t.range_high/1000).toFixed(1) + 'k)</span>';
+        html += '<span style="color:var(--accent);font-weight:700">' + t.confidence + '</span>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+    html += renderTranscript(s.content);
+    html += '</div></div>';
+  }
+  container.innerHTML = html;
+}
+
+// ============ STRATEGY PANEL ============
+let forwardRunning = false;
+let forwardInterval = null;
+
+function toggleStratPanel() {
+  const section = document.getElementById('stratSection');
+  section.classList.toggle('collapsed');
+  // After transition, resize canvas
+  setTimeout(() => { resizeCanvas(); drawChart(); }, 350);
+}
+
+function onStratChange() {
+  btActiveStrategy = document.getElementById('stratSelect').value;
+  btUserParams = {};
+  buildStratParamUI();
+  onStratParamChange();
+}
+
+function onStratParamChange() {
+  const stratKey = document.getElementById('stratSelect').value;
+  const strat = STRATEGIES[stratKey];
+  if (!strat) return;
+  btUserParams = {};
+  for (const [k, def] of Object.entries(strat.params)) {
+    const el = document.getElementById('sp_' + k);
+    if (el) {
+      const raw = el.value;
+      btUserParams[k] = (raw === '' || raw === null) ? 0 : (parseFloat(raw) || def.value);
+    }
+  }
+  btCapital = parseFloat(document.getElementById('stratCapital').value) || ST_DEFAULT_CAPITAL;
+  // Clear old results when params change
+  btResult = null;
+}
+
+function buildStratParamUI() {
+  const stratKey = document.getElementById('stratSelect').value;
+  const strat = STRATEGIES[stratKey];
+  if (!strat) return;
+  const container = document.getElementById('stratParams');
+  const isAdvanced = container.classList.contains('advanced');
+  let html = '';
+  for (const [k, def] of Object.entries(strat.params)) {
+    // In simple mode, skip advanced params
+    if (!isAdvanced && def.advanced) continue;
+    const val = btUserParams[k] !== undefined ? btUserParams[k] : def.value;
+    const isAutoField = (k === 'priceLow' || k === 'priceHigh') && (!val || val <= 0);
+    const autoClass = isAutoField ? ' auto-mode' : '';
+    const placeholder = isAutoField ? ' placeholder="Auto"' : '';
+    html += '<div class="strat-row">';
+    html += '<label title="' + (def.label || k) + '">' + (def.label || k) + (def.advanced ? ' *' : '') + '</label>';
+    html += '<input type="number" id="sp_' + k + '" value="' + (isAutoField ? '' : val) + '" min="' + def.min + '" max="' + def.max + '" step="' + (def.step || 1) + '" onchange="onStratParamChange()" style="flex:1;width:60px;padding:4px 6px;font-size:11px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font)" class="' + autoClass + '"' + placeholder + '>';
+    html += '</div>';
+  }
+  container.innerHTML = html;
+}
+
+function getDateRangeIndices() {
+  const fromEl = document.getElementById('stratDateFrom');
+  const toEl = document.getElementById('stratDateTo');
+  let startIdx = -1, endIdx = -1;
+  if (fromEl && fromEl.value) {
+    const fromTs = new Date(fromEl.value).getTime() / 1000;
+    for (let i = 0; i < candles.length; i++) {
+      if (candles[i].time >= fromTs) { startIdx = i; break; }
+    }
+  }
+  if (toEl && toEl.value) {
+    const toTs = new Date(toEl.value).getTime() / 1000;
+    for (let i = candles.length - 1; i >= 0; i--) {
+      if (candles[i].time <= toTs) { endIdx = i; break; }
+    }
+  }
+  return { startIdx, endIdx };
+}
+
+function onBacktestClick() {
+  const range = getDateRangeIndices();
+  let vs, ve;
+  if (range.startIdx >= 0 && range.endIdx >= 0) {
+    vs = range.startIdx;
+    ve = range.endIdx;
+  } else {
+    vs = Math.max(0, viewStart);
+    ve = Math.min(candles.length - 1, viewEnd);
+  }
+  const result = runBacktest(btActiveStrategy, candles, vs, ve, btUserParams, btCapital);
+  if (result && !result.error) {
+    showStratStats(result);
+    drawChart();
+  }
+}
+
+function onFullBacktestClick() {
+  const result = runFullBacktest();
+  if (result && !result.error) {
+    showStratStats(result);
+  }
+}
+
+function onForwardClick() {
+  if (forwardRunning) {
+    stopForward();
+    return;
+  }
+  startForward();
+}
+
+function startForward() {
+  if (!btResult) {
+    // Run a backtest first to initialize
+    const result = runFullBacktest();
+    if (result.error) return;
+  }
+  forwardRunning = true;
+  const btn = document.getElementById('stratFwdBtn');
+  btn.textContent = '🟢 Forward (arrêter)';
+  btn.classList.add('forward');
+
+  // Track the last candle index processed
+  let lastProcessedIdx = btResult ? btResult.endIdx : candles.length - 1;
+
+  forwardInterval = setInterval(() => {
+    if (!btBot || candles.length <= lastProcessedIdx + 1) {
+      // Check if candle closed (new full candle appeared)
+      if (candles.length > lastProcessedIdx + 1) {
+        const params = btBot.buildParams(btUserParams);
+        const newIdx = candles.length - 1;
+        // Process all new closed candles
+        for (let i = lastProcessedIdx + 1; i <= newIdx; i++) {
+          const indicators = btBot.computeIndicators(candles, i);
+          btBot.step(candles, i, params, indicators);
+        }
+        lastProcessedIdx = newIdx;
+
+        // Update equity curve
+        if (btResult) {
+          const markPrice = candles[newIdx].close;
+          btResult.equityCurve.push({
+            idx: newIdx,
+            total: btBot.equity(markPrice),
+            realized: btBot.realizedPnl(),
+            unrealized: btBot.equity(markPrice) - btCapital - btBot.realizedPnl()
+          });
+          btResult.trades = [...btBot.trades];
+          btResult.totalPnl = btBot.realizedPnl();
+          btResult.totalReturn = (btResult.totalPnl / btCapital) * 100;
+          btResult.tradeCount = btBot.trades.length;
+        }
+        drawChart();
+        updateForwardStats();
+      }
+    }
+  }, 5000);
+}
+
+function stopForward() {
+  forwardRunning = false;
+  if (forwardInterval) { clearInterval(forwardInterval); forwardInterval = null; }
+  const btn = document.getElementById('stratFwdBtn');
+  btn.textContent = '🔴 Forward Test';
+  btn.classList.remove('forward');
+}
+
+function updateForwardStats() {
+  if (!btResult) return;
+  const div = document.getElementById('stratStats');
+  div.style.display = 'block';
+  const pnlStr = btResult.totalPnl >= 0 ? '+' + btResult.totalPnl.toFixed(2) : btResult.totalPnl.toFixed(2);
+  div.innerHTML =
+    '<div>🔄 <b>Forward</b> | Trades: <span class="stat-val">' + btResult.tradeCount + '</span></div>' +
+    '<div>P&L live: <span class="' + (btResult.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' USDT</span></div>' +
+    '<div>Return: <span class="' + (btResult.totalReturn >= 0 ? 'stat-pos' : 'stat-neg') + '">' + btResult.totalReturn.toFixed(2) + '%</span></div>';
+}
+
+function showStratStats(result) {
+  const div = document.getElementById('stratStats');
+  div.style.display = 'block';
+  const pnlStr = result.totalPnl >= 0 ? '+' + result.totalPnl.toFixed(2) : result.totalPnl.toFixed(2);
+  div.innerHTML =
+    '<div>Trades: <span class="stat-val">' + result.tradeCount + '</span> | Win: <span class="' + (result.winRate >= 50 ? 'stat-pos' : 'stat-neg') + '">' + result.winRate.toFixed(1) + '%</span></div>' +
+    '<div>P&L: <span class="' + (result.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' USDT</span> (' + (result.totalReturn >= 0 ? '+' : '') + result.totalReturn.toFixed(2) + '%)</div>' +
+    '<div>Max DD: <span class="stat-neg">' + result.maxDrawdownPct.toFixed(1) + '%</span> | Sharpe: <span class="stat-val">' + result.sharpe + '</span></div>' +
+    '<div>PF: <span class="stat-val">' + result.profitFactor + '</span> | Avg Win: <span class="stat-pos">' + result.avgWin.toFixed(2) + '</span> | Avg Loss: <span class="stat-neg">' + result.avgLoss.toFixed(2) + '</span></div>';
+}
+
+function onCompareDumbGrid() {
+  if (!candles || candles.length < 20) return;
+  const vs = Math.max(0, viewStart);
+  const ve = Math.min(candles.length - 1, viewEnd);
+  const taResult = runBacktest(btActiveStrategy, candles, vs, ve, btUserParams, btCapital);
+  const dumbParams = { priceLow: 0, priceHigh: 0, gridLevels: btUserParams.gridLevels || 10, tpPct: btUserParams.tpPct || 0.5, slPct: btUserParams.slPct || 3 };
+  const dumbResult = runBacktest('dumb_grid', candles, vs, ve, dumbParams, btCapital);
+
+  const div = document.getElementById('stratStats');
+  div.style.display = 'block';
+  div.innerHTML =
+    '<div style="margin-bottom:6px;color:var(--accent);font-weight:700">📊 Comparaison TA vs Grille Fixe</div>' +
+    '<div><b>' + STRATEGIES[btActiveStrategy].label + '</b>: <span class="' + (taResult.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + (taResult.totalPnl >= 0 ? '+' : '') + taResult.totalPnl.toFixed(2) + ' USDT</span> (' + taResult.tradeCount + ' trades, Sharpe ' + taResult.sharpe + ')</div>' +
+    '<div><b>Grille Fixe</b>: <span class="' + (dumbResult.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + (dumbResult.totalPnl >= 0 ? '+' : '') + dumbResult.totalPnl.toFixed(2) + ' USDT</span> (' + dumbResult.tradeCount + ' trades, Sharpe ' + dumbResult.sharpe + ')</div>' +
+    '<div>Delta: <span class="' + ((taResult.totalPnl - dumbResult.totalPnl) >= 0 ? 'stat-pos' : 'stat-neg') + '">' + ((taResult.totalPnl - dumbResult.totalPnl) >= 0 ? '+' : '') + (taResult.totalPnl - dumbResult.totalPnl).toFixed(2) + ' USDT</span></div>';
+  btResult = taResult;
+  btBot = taResult.bot;
+  drawChart();
+}
+
+function toggleAdvanced() {
+  const container = document.getElementById('stratParams');
+  const toggle = document.getElementById('advToggle');
+  if (container.classList.contains('advanced')) {
+    container.classList.remove('advanced');
+    toggle.textContent = '⚙ Mode avancé ▸';
+  } else {
+    container.classList.add('advanced');
+    toggle.textContent = '⚙ Mode simple ▸';
+  }
+  buildStratParamUI();
+}
+
+// Build initial param UI on load
+setTimeout(() => { buildStratParamUI(); }, 100);
+
+// ============ WALK-FORWARD ANALYSIS ============
+function runWalkForward(strategyKey, candles, userParams, capital, segments) {
+  segments = segments || 3;
+  if (candles.length < 60) return { error: 'Pas assez de bougies (min 60)' };
+  const segSize = Math.floor(candles.length / segments);
+  const results = [];
+
+  for (let s = 0; s < segments; s++) {
+    const inStart = s * segSize;
+    const inEnd = (s + 1) * segSize - 1;
+    const outStart = inEnd + 1;
+    const outEnd = Math.min(candles.length - 1, outStart + segSize - 1);
+
+    if (outStart >= candles.length) break;
+
+    // In-sample: optimize params (simple grid search on one param for now)
+    const inSample = runBacktest(strategyKey, candles, inStart, inEnd, userParams, capital);
+    // Out-sample: test with same params
+    const outSample = runBacktest(strategyKey, candles, outStart, outEnd, userParams, capital);
+
+    results.push({
+      segment: s + 1,
+      inSample: { startIdx: inStart, endIdx: inEnd, trades: inSample.tradeCount, return: inSample.totalReturn, sharpe: parseFloat(inSample.sharpe), maxDD: inSample.maxDrawdownPct },
+      outSample: { startIdx: outStart, endIdx: outEnd, trades: outSample.tradeCount, return: outSample.totalReturn, sharpe: parseFloat(outSample.sharpe), maxDD: outSample.maxDrawdownPct }
+    });
+  }
+
+  // Compute degradation ratio
+  let avgInSharpe = 0, avgOutSharpe = 0;
+  let count = 0;
+  for (const r of results) {
+    if (!isNaN(r.inSample.sharpe) && !isNaN(r.outSample.sharpe)) {
+      avgInSharpe += r.inSample.sharpe;
+      avgOutSharpe += r.outSample.sharpe;
+      count++;
+    }
+  }
+  avgInSharpe = count > 0 ? avgInSharpe / count : 0;
+  avgOutSharpe = count > 0 ? avgOutSharpe / count : 0;
+  const degradationRatio = avgInSharpe > 0 ? avgOutSharpe / avgInSharpe : 0;
+
+  // Sensitivity: vary gridLevels ±20%
+  const sensResults = [];
+  if (userParams.gridLevels) {
+    const base = userParams.gridLevels;
+    for (const mult of [0.8, 0.9, 1.0, 1.1, 1.2]) {
+      const modParams = { ...userParams, gridLevels: Math.round(base * mult) };
+      const r = runBacktest(strategyKey, candles, 0, candles.length - 1, modParams, capital);
+      sensResults.push({ param: 'gridLevels', value: Math.round(base * mult), return: r.totalReturn, sharpe: parseFloat(r.sharpe) });
+    }
+  }
+
+  return {
+    strategy: strategyKey,
+    segments: results,
+    degradationRatio: degradationRatio,
+    sensitivity: sensResults,
+    interpretation: degradationRatio < 0.5 ? '⚠️ Overfit probable (ratio < 0.5)' :
+                    degradationRatio < 0.7 ? '⚠️ Faible robustesse' :
+                    degradationRatio < 0.9 ? '✅ Correct' : '✅ Robuste'
+  };
+}
+
+function showWalkForward() {
+  if (!candles || candles.length < 60) return;
+  const wf = runWalkForward(btActiveStrategy, candles, btUserParams, btCapital, 3);
+
+  const div = document.getElementById('stratStats');
+  div.style.display = 'block';
+  let html = '<div style="color:var(--accent);font-weight:700;margin-bottom:6px">🔬 Walk-Forward (' + wf.segments.length + ' segments)</div>';
+
+  for (const seg of wf.segments) {
+    html += '<div style="margin-bottom:4px;font-size:10px">';
+    html += '<b>S' + seg.segment + '</b> In: <span class="stat-val">' + seg.inSample.return.toFixed(2) + '%</span> (Sharpe ' + seg.inSample.sharpe.toFixed(2) + ') ';
+    html += '→ Out: <span class="' + (seg.outSample.return >= 0 ? 'stat-pos' : 'stat-neg') + '">' + seg.outSample.return.toFixed(2) + '%</span> (Sharpe ' + seg.outSample.sharpe.toFixed(2) + ')';
+    html += '</div>';
+  }
+
+  html += '<div style="margin-top:6px"><b>Degradation Ratio:</b> <span class="' + (wf.degradationRatio >= 0.7 ? 'stat-pos' : 'stat-neg') + '">' + wf.degradationRatio.toFixed(3) + '</span></div>';
+  html += '<div style="font-size:10px;color:var(--text2)">' + wf.interpretation + '</div>';
+
+  // Sensitivity
+  if (wf.sensitivity && wf.sensitivity.length > 0) {
+    html += '<div style="margin-top:6px;font-size:10px"><b>Sensibilité gridLevels ±20%:</b></div>';
+    for (const s of wf.sensitivity) {
+      html += '<span style="margin-right:8px">' + s.value + ': <span class="' + (s.return >= 0 ? 'stat-pos' : 'stat-neg') + '">' + s.return.toFixed(2) + '%</span></span>';
+    }
+  }
+
+  div.innerHTML = html;
+}
+async function init() {
+  resizeCanvas();
+  await fetchPrice();
+  await fetchKlines();
+  viewStart = Math.max(0, candles.length - 50);
+  viewEnd = candles.length;
+  drawChart();
+  await fetchSamsara();
+  // Pre-fetch S/R ref TFs au démarrage
+  refreshRefSR();
+  setInterval(fetchPrice, 1000);
+  setInterval(async () => { await fetchKlines(); drawChart(); }, 5000);
+  setInterval(fetchSamsara, 60000);
+  // Refresh S/R ref TFs every 60s
+  setInterval(refreshRefSR, 60000);
+  // Taskbar clock
+  setInterval(() => {
+    const c = document.getElementById('taskbarClock');
+    if (c) c.textContent = new Date().toLocaleTimeString('fr-FR');
+  }, 1000);
+}
+init();
+</script>
+<!-- Vista Aero Taskbar -->
+<div class="aero-taskbar" id="taskbar">
+  <div class="taskbar-left">
+    <span>🔮 Saṃsāra</span>
+    <span id="taskbarPair">BTC/USDT</span>
+  </div>
+  <div class="taskbar-right">
+    <span class="taskbar-dot" id="taskbarDot" style="background:var(--green)"></span>
+    <span id="taskbarClock">--:--:--</span>
+  </div>
+</div>
+
+</body>
+</html>
