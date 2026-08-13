@@ -3144,24 +3144,6 @@ function resolveChart(candles, padL, padR, chartH, W) {
     }
   }
 
-  // --- Heatmap Liquidité (Depth) ---
-  if (overlays.liq && depth) {
-    const bins = 48, binH = range / bins;
-    const bB = new Array(bins).fill(0), bA = new Array(bins).fill(0);
-    for (const [p, q] of depth.bids) { const b = Math.floor((p - minP) / binH); if (b >= 0 && b < bins) bB[b] += q; }
-    for (const [p, q] of depth.asks) { const b = Math.floor((p - minP) / binH); if (b >= 0 && b < bins) bA[b] += q; }
-    const mQ = Math.max(1, ...bB, ...bA);
-    const bx = W - pad.right - 48, bw = 46, half = bw / 2;
-    for (let b = 0; b < bins; b++) {
-      const y = pad.top + ph - (b + 1) * (ph / bins);
-      const h = Math.max(1, ph / bins - 1);
-      const wB = (bB[b] / mQ) * half, wA = (bA[b] / mQ) * half;
-      if (wB > 0.5) { ctx.fillStyle = `rgba(38,166,154,${0.25 + 0.55 * bB[b] / mQ})`; ctx.fillRect(bx + half - wB, y, wB, h); }
-      if (wA > 0.5) { ctx.fillStyle = `rgba(239,83,80,${0.25 + 0.55 * bA[b] / mQ})`; ctx.fillRect(bx + half, y, wA, h); }
-    }
-    ctx.fillStyle = 'rgba(128,128,128,0.35)'; ctx.fillRect(bx + half - 0.5, pad.top, 1, ph);
-  }
-  
   // Candles
   for (let i = 0; i < visible.length; i++) {
     const c = visible[i];
@@ -3177,6 +3159,20 @@ function resolveChart(candles, padL, padR, chartH, W) {
     const bodyH = Math.max(0.5, Math.abs(yC - yO));
     ctx.fillStyle = color;
     ctx.fillRect(x + candleW*0.15, Math.min(yO, yC), candleW*0.7, bodyH);
+  }
+  
+  // --- Heatmap Liquidité (Depth) — par-dessus les bougies ---
+  if (overlays.liq && depth) {
+    const bins = 48, binH = range / bins, bB = new Array(bins).fill(0), bA = new Array(bins).fill(0);
+    for (const [p, q] of depth.bids) { const b = Math.floor((p - minP) / binH); if (b >= 0 && b < bins) bB[b] += q; }
+    for (const [p, q] of depth.asks) { const b = Math.floor((p - minP) / binH); if (b >= 0 && b < bins) bA[b] += q; }
+    const mQ = Math.max(1, ...bB, ...bA), ax = W - pad.right;
+    for (let b = 0; b < bins; b++) {
+      const y = pad.top + ph - (b + 1) * (ph / bins), h = Math.max(1, ph / bins - 1);
+      const wB = Math.max(2, bB[b] / mQ * 36), wA = Math.max(2, bA[b] / mQ * 36);
+      if (bB[b] > 0) { ctx.fillStyle = `rgba(38,166,154,${0.2 + 0.6 * bB[b] / mQ})`; ctx.fillRect(ax - 2 - wB, y, wB, h); }
+      if (bA[b] > 0) { ctx.fillStyle = `rgba(239,83,80,${0.2 + 0.6 * bA[b] / mQ})`; ctx.fillRect(ax - 2 - wA, y, wA, h); }
+    }
   }
   
   // Time labels (X axis)
@@ -4069,6 +4065,7 @@ async function init() {
   await fetchSamsara();
   // Pre-fetch S/R ref TFs au démarrage
   refreshRefSR();
+  toggleDepth(overlays.liq);
   setInterval(fetchPrice, 1000);
   setInterval(async () => { await fetchKlines(); drawChart(); }, 5000);
   setInterval(fetchSamsara, 60000);
