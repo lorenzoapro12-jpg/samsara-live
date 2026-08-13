@@ -3164,14 +3164,12 @@ function resolveChart(candles, padL, padR, chartH, W) {
   // --- Heatmap Liquidité (Depth) — par-dessus les bougies ---
   if (overlays.liq && depth) {
     const bins = 48, binH = range / bins, bB = new Array(bins).fill(0), bA = new Array(bins).fill(0);
-    for (const [p, q] of depth.bids) { const b = Math.floor((p - minP) / binH); if (b >= 0 && b < bins) bB[b] += q; }
-    for (const [p, q] of depth.asks) { const b = Math.floor((p - minP) / binH); if (b >= 0 && b < bins) bA[b] += q; }
+    for (const side of [['bids', bB], ['asks', bA]]) for (const [p, q] of depth[side[0]]) { const b = Math.floor((p - minP) / binH); if (b >= 0 && b < bins) side[1][b] += q; }
     const mQ = Math.max(1, ...bB, ...bA), ax = W - pad.right;
     for (let b = 0; b < bins; b++) {
       const y = pad.top + ph - (b + 1) * (ph / bins), h = Math.max(1, ph / bins - 1);
-      const wB = Math.max(2, bB[b] / mQ * 36), wA = Math.max(2, bA[b] / mQ * 36);
-      if (bB[b] > 0) { ctx.fillStyle = `rgba(38,166,154,${0.2 + 0.6 * bB[b] / mQ})`; ctx.fillRect(ax - 2 - wB, y, wB, h); }
-      if (bA[b] > 0) { ctx.fillStyle = `rgba(239,83,80,${0.2 + 0.6 * bA[b] / mQ})`; ctx.fillRect(ax - 2 - wA, y, wA, h); }
+      if (bB[b] > 0) { ctx.fillStyle = `rgba(38,166,154,${0.2 + 0.6 * bB[b] / mQ})`; ctx.fillRect(ax - 2 - Math.max(2, bB[b] / mQ * 36), y, Math.max(2, bB[b] / mQ * 36), h); }
+      if (bA[b] > 0) { ctx.fillStyle = `rgba(239,83,80,${0.2 + 0.6 * bA[b] / mQ})`; ctx.fillRect(ax - 2 - Math.max(2, bA[b] / mQ * 36), y, Math.max(2, bA[b] / mQ * 36), h); }
     }
   }
   
@@ -3706,6 +3704,13 @@ function renderFeedTo(container) {
   html += '</div>';
   html += '<div class="demon-body">' + escHtml(d.demon).replace(/\n/g,'<br>') + '</div>';
   html += '</div>';
+
+  if (d.radar) {
+    const r = d.radar, f = v => v==null?'—':v.toLocaleString('en-US',{maximumFractionDigits:4});
+    html += '<div class="demon-card"><div class="demon-header"><div class="demon-avatar"><div class="avatar-orb">📡</div></div><div><div class="demon-name">SOL Radar</div><div class="demon-role">Microstructure (pipeline 24/7)</div></div></div><div class="demon-body" style="font-size:10px">';
+    html += 'Funding <b>' + f(r.funding_rate) + '%</b> · OI 24h <b>' + f(r.oi_change_1d_pct) + '%</b> · L/S <b>' + f(r.ls_ratio) + '</b> (' + f(r.long_pct) + '/' + f(r.short_pct) + ') · CVD <b>' + f(r.cvd) + '</b><br>';
+    html += 'GEX <b>' + escHtml(f(r.gex_state)) + '</b> γ ' + f(r.dealer_gamma) + ' · Premium <b>' + f(r.premium_pct) + '%</b> ' + escHtml(f(r.premium_state)) + ' · Walls <b>' + escHtml(f(r.gamma_walls)) + '</b></div></div>';
+  }
   
   const sisters = [...(d.transcripts||[])].reverse();
   for (const s of sisters) {
