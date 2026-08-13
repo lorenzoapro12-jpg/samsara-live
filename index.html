@@ -3579,7 +3579,7 @@ function getSubIndicatorValue(key, idx) {
 
 async function fetchSamsara() {
   try {
-    const resp = await fetch(DATA_URL, { cache: 'no-cache' });
+    const resp = await fetch(DATA_URL + '?t=' + Date.now(), { cache: 'no-store' });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     samsaraData = await resp.json();
     renderFeed();
