@@ -26,7 +26,6 @@ sys.path.insert(0, "/root/projects/sol-radar")
 REPO = "/root/samsara-live"
 OUT = f"{REPO}/market-data.json"
 HEATMAP_JSON = f"{REPO}/heatmap.json"
-IRAN_STATE = "/root/projects/sol-radar/iran_monitor/state.json"
 DB = "/root/projects/sol-radar/pipeline_marche_crypto/stockage/base_history.db"
 
 STATUS: dict[str, str] = {}
@@ -226,29 +225,6 @@ def liquidity():
     }
 
 
-# ─── 9. IRAN MONITOR (live) ──────────────────────────────────
-@block("iran")
-def iran():
-    subprocess.run(
-        [sys.executable, "iran_monitor/monitor.py", "--quiet"],
-        cwd="/root/projects/sol-radar", timeout=150,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
-    )
-    with open(IRAN_STATE) as f:
-        s = json.load(f)
-    hist = s.get("history", [])
-    ms = None
-    if len(hist) >= 2:
-        ms = round(hist[-1]["score"] - hist[0]["score"], 2)
-    return {
-        "score": round(s["last_score"], 1),
-        "category": s["last_category"],
-        "last_update": s.get("last_update"),
-        "momentum": ms,
-        "signal_count": hist[-1].get("signal_count") if hist else None,
-    }
-
-
 def main():
     ts = now_iso()
     print(f"📡 market-data — {ts}")
@@ -267,7 +243,6 @@ def main():
     gx = gex()
     pm = premium()
     liq = liquidity()
-    ir = iran()
 
     data["btc"] = spot or {}
     data["macro"] = mac or {}
@@ -286,7 +261,6 @@ def main():
     data["micro"] = micro
 
     data["liquidity"] = liq or {}
-    data["iran"] = ir or {}
     data["status"] = STATUS
     data["errors"] = ERRORS
 
