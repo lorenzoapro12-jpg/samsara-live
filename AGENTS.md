@@ -88,7 +88,14 @@ Six cartes, entièrement dérivées de `market-data.json` :
 | `gex` | Deribit via `scenario_engine/gex.py` | |
 | `premium` | Coinbase via `scenario_engine/coinbase_premium.py` | |
 | `liquidity` | `heatmap.json` local (fenêtre 15 min) | |
-| `iran` | `iran_monitor/monitor.py` → `state.json` | |
+
+> **Le bloc `iran` a été SUPPRIMÉ le 10/09/2026.** Le scorer géopolitique
+> mesurait des titres de presse, pas une tension (canal macro lu dans une DB
+> gelée au 16/08, aucune déduplication, flux tronqué à 13-19 items sur ~300,
+> modèle de cycle invalidé). Preuve : le saut 52,0 → 65,7 était composé à
+> 95 % de la simple expiration de trois titres d'apaisement du 16/08.
+> Ne pas le réintroduire sans reconstruire la chaîne de sources.
+> Archive : `/root/audit-fossile-20260910/iran_monitor-FINAL-20260910.tar.gz`.
 
 ## Test de rendu sans navigateur
 

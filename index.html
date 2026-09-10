@@ -3668,7 +3668,7 @@ function renderFeed() { renderFeedTo(document.getElementById('feed')); }
 function renderFeedTo(container) {
   if (!marketData) { container.innerHTML = '<div class="loading">📊 En attente des données…</div>'; return; }
   const d = marketData, b = d.btc||{}, m = d.macro||{}, tf = d.tf||{},
-        x = d.micro||{}, lq = d.liquidity||{}, ir = d.iran||{}, st = d.status||{};
+        x = d.micro||{}, lq = d.liquidity||{}, st = d.status||{};
   const upd = d.updated ? new Date(d.updated) : null;
   const hhmm = upd ? upd.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '—';
 
@@ -3692,10 +3692,8 @@ function renderFeedTo(container) {
   let macroBody = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:11px">'
     + '<div>DXY<br><b style="font-size:14px">' + dxyTxt + '</b></div>'
     + '<div>VIX<br><b style="font-size:14px">' + fmtNum(m.vix,1) + '</b></div>'
-    + '<div>Iran<br><b style="font-size:14px">' + fmtNum(ir.score,1) + '</b> <span class="badge badge-conf">' + escHtml(ir.category||'—') + '</span></div>'
-    + '<div>Momentum Iran<br><b style="font-size:14px" class="' + (ir.momentum>0?'stat-neg':'stat-pos') + '">' + (ir.momentum>0?'+':'') + fmtNum(ir.momentum,1) + '</b></div>'
     + '</div>';
-  html += mCard('🌍','Macro','DXY · VIX · Iran', '', macroBody);
+  html += mCard('🌍','Macro','DXY · VIX', '', macroBody);
 
   // ── 3. INDICATEURS ──
   let indBody = '';
