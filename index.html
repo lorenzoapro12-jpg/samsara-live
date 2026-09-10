@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Saṃsāra — Les Sœurs</title>
+<title>Saṃsāra — Marché live</title>
 <style>
 /* ═══════════════════════════════════════════
    FRUTIGER AERO THEME — skeuomorphic glass
@@ -813,7 +813,7 @@ h1, h2, h3, .dashboard-title {
   </div>
   <div class="header-right">
     <span id="updated" style="font-size:10px;color:var(--text2);font-variant-numeric:tabular-nums"></span>
-    <button class="theme-btn" onclick="toggleFeed()" id="feedBtn" title="Sœurs & Démon">📋✓</button>
+    <button class="theme-btn" onclick="toggleFeed()" id="feedBtn" title="Marché live">📋✓</button>
     <button class="theme-btn" onclick="resetView()" title="Réinitialiser le zoom">↺</button>
     <span class="refresh-dot" id="dot" title="Flux temps réel actif"></span>
     <button class="theme-btn" onclick="toggleTheme()" id="themeBtn" title="Raccourci: D">☾</button>
@@ -864,10 +864,10 @@ h1, h2, h3, .dashboard-title {
 <div class="chart-container"><div class="gloss-bubble"></div><canvas id="chart"></canvas></div>
 
 <div class="feed-panel collapsed" id="feedPanel">
-  <div class="feed-panel-handle" onclick="toggleFeed()" id="feedHandle">Sœurs & Démon</div>
+  <div class="feed-panel-handle" onclick="toggleFeed()" id="feedHandle">Marché live</div>
   <div class="feed-panel-body">
     <div class="feed" id="feed">
-      <div class="loading">🔮 En attente des données…</div>
+      <div class="loading">📊 En attente des données…</div>
     </div>
   </div>
 </div>
@@ -923,14 +923,14 @@ h1, h2, h3, .dashboard-title {
   </div>
 </div>
 
-<!-- Mobile : modal Sœurs & Démon -->
-<div id="samsaraModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:1000;background:var(--bg-color);background:var(--bg);flex-direction:column;overflow:hidden">
+<!-- Mobile : modal Marché live -->
+<div id="marketModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:1000;background:var(--bg-color);background:var(--bg);flex-direction:column;overflow:hidden">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--gloss),var(--surface);backdrop-filter:blur(28px) saturate(1.4);-webkit-backdrop-filter:blur(28px) saturate(1.4);border-bottom:1px solid var(--glass-edge);box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,0.35)">
-    <span style="font-weight:800;font-size:17px;color:var(--accent);text-shadow:0 0 14px var(--accent-glow),0 1px 0 rgba(255,255,255,0.5)">🔮 Sœurs & Démon</span>
-    <button onclick="closeSamsaraModal()" style="background:var(--btn-gloss),var(--surface2);border:1px solid var(--glass-edge);color:var(--text);padding:5px 14px;border-radius:var(--radius-lg);font-size:14px;cursor:pointer;font-weight:600;box-shadow:var(--shadow-sm),inset 0 1px 0 rgba(255,255,255,0.5);transition:all 0.2s">✕</button>
+    <span style="font-weight:800;font-size:17px;color:var(--accent);text-shadow:0 0 14px var(--accent-glow),0 1px 0 rgba(255,255,255,0.5)">📊 Marché live</span>
+    <button onclick="closeMarketModal()" style="background:var(--btn-gloss),var(--surface2);border:1px solid var(--glass-edge);color:var(--text);padding:5px 14px;border-radius:var(--radius-lg);font-size:14px;cursor:pointer;font-weight:600;box-shadow:var(--shadow-sm),inset 0 1px 0 rgba(255,255,255,0.5);transition:all 0.2s">✕</button>
   </div>
-  <div id="samsaraModalBody" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:14px;background:radial-gradient(ellipse at 50% 0%,rgba(255,255,255,0.08) 0%,transparent 70%))">
-    <div class="loading">🔮 En attente des données…</div>
+  <div id="marketModalBody" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:14px;background:radial-gradient(ellipse at 50% 0%,rgba(255,255,255,0.08) 0%,transparent 70%))">
+    <div class="loading">📊 En attente des données…</div>
   </div>
 </div>
 
@@ -966,7 +966,7 @@ window.addEventListener('keydown', (e) => {
 let feedVisible = false;
 function toggleFeed() {
   if (window.innerWidth <= 768) {
-    openSamsaraModal(); return;
+    openMarketModal(); return;
   }
   feedVisible = !feedVisible;
   const panel = document.getElementById('feedPanel');
@@ -977,13 +977,13 @@ function toggleFeed() {
   setTimeout(() => { resizeCanvas(); drawChart(); }, 350);
 }
 
-function openSamsaraModal() {
-  const modal = document.getElementById('samsaraModal');
+function openMarketModal() {
+  const modal = document.getElementById('marketModal');
   modal.style.display = 'flex';
-  renderFeedTo(document.getElementById('samsaraModalBody'));
+  renderFeedTo(document.getElementById('marketModalBody'));
 }
-function closeSamsaraModal() {
-  document.getElementById('samsaraModal').style.display = 'none';
+function closeMarketModal() {
+  document.getElementById('marketModal').style.display = 'none';
 }
 
 // ============ RESET VIEW ============
@@ -1008,8 +1008,8 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 }
 
 // ============ DATA ============
-const DATA_URL = 'https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/master/samsara-data.json';
-let samsaraData = null, livePrice = null, candles = [], chartInterval = '15m';
+const DATA_URL = 'https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/master/market-data.json';
+let marketData = null, livePrice = null, candles = [], chartInterval = '15m';
 let activeSymbol = 'BTCUSDT';  // BTCUSDT, ETHUSDT, SOLUSDT, XRPUSDT, TAOUSDT, ou BTCSOL (ratio)
 
 // ============ VIEWPORT (zoom/pan) ============
@@ -3617,11 +3617,12 @@ function getSubIndicatorValue(key, idx) {
   } catch(e) { return null; }
 }
 
-async function fetchSamsara() {
+// ═══════════════ MARCHÉ LIVE (market-data.json) ═══════════════
+async function fetchMarket() {
   try {
     const resp = await fetch(DATA_URL + '?t=' + Date.now(), { cache: 'no-store' });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    samsaraData = await resp.json();
+    marketData = await resp.json();
     renderFeed();
     document.getElementById('dot').style.background = 'var(--green)';
     const td = document.getElementById('taskbarDot');
@@ -3635,155 +3636,125 @@ async function fetchSamsara() {
   }
 }
 
-function sisterEmoji(s) {
-  const sub = (s.subtitle || '').toLowerCase();
-  const regime = (s.regime || '').toLowerCase();
-  const dirs = (s.targets || []).map(t => (t.direction || '').toUpperCase());
-  const hc = dirs.filter(d => d === 'HAUSSIER').length;
-  const bc = dirs.filter(d => d === 'BAISSIER').length;
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+const isNum = v => (v !== null && v !== undefined && !isNaN(v));
+const fmtNum = (v,d=2) => isNum(v) ? Number(v).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}) : '—';
+const fmtUsd = v => isNum(v) ? '$' + Math.round(v).toLocaleString('en-US') : '—';
+const fmtBig = v => { if(!isNum(v)) return '—'; const a=Math.abs(v);
+  if(a>=1e9) return '$'+(v/1e9).toFixed(2)+'B'; if(a>=1e6) return '$'+(v/1e6).toFixed(2)+'M';
+  if(a>=1e3) return '$'+(v/1e3).toFixed(1)+'K'; return '$'+v.toFixed(2); };
+const fmtK = v => isNum(v) ? '$' + (v>=1000 ? (v/1000).toFixed(1)+'k' : Math.round(v)) : '—';
+const pctSpan = v => { if(!isNum(v)) return '—'; const c = v>0?'stat-pos':(v<0?'stat-neg':''); return '<span class="'+c+'">'+(v>0?'+':'')+fmtNum(v)+'%</span>'; };
 
-  // Regime-based
-  if (regime.includes('haussi')) return '🚀';
-  if (regime.includes('baiss')) return '🐻';
-  if (regime.includes('range') || regime.includes('latérale')) return '🌀';
-  if (regime.includes('accumul')) return '📦';
-  if (regime.includes('distrib')) return '📤';
-  if (regime.includes('volatil')) return '🌊';
-
-  // Subtitle keywords
-  if (sub.includes('breakout') || sub.includes('cassure')) return '💥';
-  if (sub.includes('support')) return '🧱';
-  if (sub.includes('résistance') || sub.includes('resistance')) return '🧗';
-  if (sub.includes('divergence')) return '🔀';
-  if (sub.includes('retournement') || sub.includes('reversal')) return '🔄';
-  if (sub.includes('impulsion')) return '⚡';
-  if (sub.includes('correction') || sub.includes('pullback')) return '📐';
-  if (sub.includes('liquidité') || sub.includes('liquidity')) return '💧';
-
-  // Direction-based fallback
-  if (hc > bc) return '📈';
-  if (bc > hc) return '📉';
-  return '🔮';
+function mCard(icon, title, sub, right, body) {
+  return '<div class="demon-card"><div class="demon-header">'
+    + '<div class="demon-avatar"><div class="avatar-orb">' + icon + '</div></div>'
+    + '<div><div class="demon-name">' + title + '</div><div class="demon-role">' + sub + '</div></div>'
+    + (right ? '<span style="margin-left:auto;font-size:10px;color:var(--text2);font-variant-numeric:tabular-nums">' + right + '</span>' : '')
+    + '</div><div class="demon-body">' + body + '</div></div>';
+}
+function crossTag(isDeath) {
+  return isDeath
+    ? '<span class="badge badge-baissier">DEATH CROSS</span>'
+    : '<span class="badge badge-hausser">GOLDEN CROSS</span>';
+}
+function wallLine(arr) {
+  if (!arr || !arr.length) return '—';
+  return arr.slice(0,5).map(w => '<b>' + fmtK(w[0]) + '</b>&nbsp;<span style="color:var(--text2)">' + fmtNum(w[1],0) + '</span>').join(' · ');
 }
 
-function sisterOrbColor(s) {
-  const dirs = (s.targets || []).map(t => (t.direction || '').toUpperCase());
-  const hc = dirs.filter(d => d === 'HAUSSIER').length;
-  const bc = dirs.filter(d => d === 'BAISSIER').length;
-  if (hc > bc) return 'emerald';
-  if (bc > hc) return 'ruby';
-  return 'amber';
-}
-
-function escHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-
-function toggleSister(id) {
-  const card = document.getElementById(id);
-  const wasOpen = card.classList.contains('open');
-  card.classList.toggle('open');
-  if (!wasOpen && card.classList.contains('open') && window.innerWidth <= 768) {
-    setTimeout(() => {
-      const panel = document.getElementById('feedPanel');
-      const body = panel.querySelector('.feed-panel-body');
-      const header = card.querySelector('.sister-card-header');
-      if (body && header) body.scrollTop = header.offsetTop - body.offsetTop - 8;
-    }, 50);
-  }
-}
-
-function renderInline(t) {
-  return escHtml(t).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(.+?)\*/g, '<em>$1</em>').replace(/`(.+?)`/g, '<code>$1</code>');
-}
-
-function renderTranscript(content) {
-  let html = '', inBq = false, inCode = false, codeBuf = '';
-  const lines = content.split('\n');
-  for (const line of lines) {
-    if (line.startsWith('```')) {
-      if (inCode) { html += '<pre><code>' + escHtml(codeBuf.trim()) + '</code></pre>'; codeBuf = ''; inCode = false; }
-      else inCode = true;
-      continue;
-    }
-    if (inCode) { codeBuf += line + '\n'; continue; }
-    if (line.startsWith('### ')) { html += '<h4>' + escHtml(line.slice(4)) + '</h4>'; continue; }
-    if (line.startsWith('## ')) { html += '<h3>' + escHtml(line.slice(3)) + '</h3>'; continue; }
-    if (line.startsWith('# ')) { html += '<h3>' + escHtml(line.slice(2)) + '</h3>'; continue; }
-    if (line.startsWith('>')) {
-      if (!inBq) { html += '<blockquote>'; inBq = true; }
-      html += renderInline(line.replace(/^>\s?/, '')) + '<br>';
-      continue;
-    } else if (inBq) { html += '</blockquote>'; inBq = false; }
-    if (line.match(/^---/)) { html += '<hr>'; continue; }
-    if (line.match(/^\s*[\*\-\+]\s/)) { html += '<li>' + renderInline(line.replace(/^\s*[\*\-\+]\s/, '')) + '</li>'; continue; }
-    if (line.trim() === '') { html += '<br>'; continue; }
-    html += '<p>' + renderInline(line) + '</p>';
-  }
-  if (inBq) html += '</blockquote>';
-  return html;
-}
-
-function renderFeed() {
-  renderFeedTo(document.getElementById('feed'));
-}
+function renderFeed() { renderFeedTo(document.getElementById('feed')); }
 
 function renderFeedTo(container) {
-  if (!samsaraData) {
-    container.innerHTML = '<div class="loading">🔮 En attente des données…</div>';
-    return;
-  }
-  const d = samsaraData;
-  document.getElementById('cycle').textContent = 'Cycle ' + d.cycle;
-  document.getElementById('updated').textContent = new Date(d.updated).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
-  
-  let html = '';
-  html += '<div class="demon-card">';
-  html += '<div class="demon-header">';
-  html += '<div class="demon-avatar"><div class="avatar-orb">👁</div></div>';
-  html += '<div><div class="demon-name">Le Démon</div><div class="demon-role">Métrique Macro & Invariants</div></div>';
-  html += '<span style="margin-left:auto;font-size:10px;color:var(--text2);font-variant-numeric:tabular-nums">Dir ' + d.metrics.overall.direction + '% · Range ' + d.metrics.overall.range + '%</span>';
-  html += '</div>';
-  html += '<div class="demon-body">' + escHtml(d.demon).replace(/\n/g,'<br>') + '</div>';
-  html += '</div>';
+  if (!marketData) { container.innerHTML = '<div class="loading">📊 En attente des données…</div>'; return; }
+  const d = marketData, b = d.btc||{}, m = d.macro||{}, tf = d.tf||{},
+        x = d.micro||{}, lq = d.liquidity||{}, ir = d.iran||{}, st = d.status||{};
+  const upd = d.updated ? new Date(d.updated) : null;
+  const hhmm = upd ? upd.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '—';
 
-  if (d.radar) {
-    const r = d.radar, f = v => v==null?'—':v.toLocaleString('en-US',{maximumFractionDigits:4});
-    html += '<div class="demon-card"><div class="demon-header"><div class="demon-avatar"><div class="avatar-orb">📡</div></div><div><div class="demon-name">SOL Radar</div><div class="demon-role">Microstructure (pipeline 24/7)</div></div></div><div class="demon-body" style="font-size:10px">';
-    html += 'Funding <b>' + f(r.funding_rate) + '%</b> · OI 24h <b>' + f(r.oi_change_1d_pct) + '%</b> · L/S <b>' + f(r.ls_ratio) + '</b> (' + f(r.long_pct) + '/' + f(r.short_pct) + ') · CVD <b>' + f(r.cvd) + '</b><br>';
-    html += 'GEX <b>' + escHtml(f(r.gex_state)) + '</b> γ ' + f(r.dealer_gamma) + ' · Premium <b>' + f(r.premium_pct) + '%</b> ' + escHtml(f(r.premium_state)) + ' · Walls <b>' + escHtml(f(r.gamma_walls)) + '</b></div></div>';
+  const cy = document.getElementById('cycle');
+  if (cy) cy.textContent = 'DXY ' + fmtNum(m.dxy_spot,2) + ' · VIX ' + fmtNum(m.vix,1);
+  const up = document.getElementById('updated');
+  if (up) up.textContent = hhmm;
+
+  let html = '';
+
+  // ── 1. MARCHÉ ──
+  html += mCard('📊','Marché live','Binance spot · maj ' + hhmm + ' UTC', '',
+    '<div style="font-size:17px;font-weight:800;letter-spacing:-0.3px">' + fmtUsd(b.price)
+    + ' <span style="font-size:13px" class="' + (b.change_24h_pct>0?'stat-pos':'stat-neg') + '">'
+    + (b.change_24h_pct>0?'+':'') + fmtNum(b.change_24h_pct) + '%</span></div>'
+    + '<div style="margin-top:5px;font-size:11px">Haut&nbsp;<b>' + fmtUsd(b.high_24h) + '</b> · Bas&nbsp;<b>'
+    + fmtUsd(b.low_24h) + '</b><br>Volume 24h&nbsp;<b>' + fmtBig(b.quote_volume_24h_usd) + '</b></div>');
+
+  // ── 2. MACRO ──
+  const dxyTxt = fmtNum(m.dxy_spot,2) + (m.dxy_is_weekend ? ' <span style="color:var(--text2)">(clôture)</span>' : '');
+  let macroBody = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:11px">'
+    + '<div>DXY<br><b style="font-size:14px">' + dxyTxt + '</b></div>'
+    + '<div>VIX<br><b style="font-size:14px">' + fmtNum(m.vix,1) + '</b></div>'
+    + '<div>Iran<br><b style="font-size:14px">' + fmtNum(ir.score,1) + '</b> <span class="badge badge-conf">' + escHtml(ir.category||'—') + '</span></div>'
+    + '<div>Momentum Iran<br><b style="font-size:14px" class="' + (ir.momentum>0?'stat-neg':'stat-pos') + '">' + (ir.momentum>0?'+':'') + fmtNum(ir.momentum,1) + '</b></div>'
+    + '</div>';
+  html += mCard('🌍','Macro','DXY · VIX · Iran', '', macroBody);
+
+  // ── 3. INDICATEURS ──
+  let indBody = '';
+  const tfLabel = { '4h':'4 h', '1h':'1 h', '1d':'1 j' };
+  for (const k of ['4h','1h','1d']) {
+    const t = tf[k]; if (!t) continue;
+    indBody += '<div style="margin-bottom:7px">'
+      + '<b>' + (tfLabel[k]||k) + '</b> · RSI&nbsp;<b>' + fmtNum(t.rsi_14,1) + '</b> '
+      + crossTag(t.death_cross_4h) + '<br>'
+      + '<span style="font-size:10px;color:var(--text2)">EMA20 ' + fmtUsd(t.ema20_4h) + ' / EMA50 ' + fmtUsd(t.ema50_4h)
+      + ' (gap ' + fmtNum(t.ema_gap_pct,2) + '%) · S <b>' + fmtUsd(t.support_30) + '</b> / R <b>' + fmtUsd(t.resistance_30)
+      + '</b> · range ' + fmtNum(t.range_24h_pct,2) + '%</span></div>';
   }
-  
-  const sisters = [...(d.transcripts||[])].reverse();
-  for (const s of sisters) {
-    const dirs = (s.targets||[]).map(t => t.direction);
-    const hc = dirs.filter(d => d === 'HAUSSIER').length, bc = dirs.filter(d => d === 'BAISSIER').length;
-    html += '<div class="sister-card" id="sister-' + s.cycle + '">';
-    html += '<div class="sister-card-header" onclick="toggleSister(\'sister-' + s.cycle + '\')">';
-    html += '<span class="sister-avatar"><div class="avatar-orb ' + sisterOrbColor(s) + '">' + sisterEmoji(s) + '</div></span>';
-    html += '<div class="sister-info">';
-    html += '<div class="sister-title">Sœur ' + s.n2 + ' → Sœur ' + (s.n2+1) + '</div>';
-    html += '<div class="sister-subtitle">' + escHtml(s.subtitle).substring(0,100) + '</div>';
-    html += '<div class="sister-meta">';
-    if (s.regime) html += '<span class="badge badge-regime">' + escHtml(s.regime).substring(0,55) + '</span>';
-    if (s.global_confidence) html += '<span class="badge badge-conf">conf ' + s.global_confidence + '</span>';
-    if (hc>0) html += '<span class="badge badge-hausser">' + hc + '↗</span>';
-    if (bc>0) html += '<span class="badge badge-baissier">' + bc + '↘</span>';
-    html += '</div></div><span class="sister-expand">▼</span></div>';
-    html += '<div class="sister-card-body">';
-    if ((s.targets||[]).length>0) {
-      html += '<div class="targets-mini">';
-      s.targets.forEach(t => {
-        html += '<div class="target-chip ' + (t.direction==='HAUSSIER'?'hausser':'baissier') + '">';
-        html += '<span><strong>' + t.horizon + '</strong> <span class="dir">' + (t.direction==='HAUSSIER'?'↗':'↘') + '</span></span>';
-        html += '<span>→ <strong>$' + t.target.toLocaleString() + '</strong></span>';
-        html += '<span style="color:var(--text2)">($' + (t.range_low/1000).toFixed(1) + 'k–$' + (t.range_high/1000).toFixed(1) + 'k)</span>';
-        html += '<span style="color:var(--accent);font-weight:700">' + t.confidence + '</span>';
-        html += '</div>';
-      });
-      html += '</div>';
-    }
-    html += renderTranscript(s.content);
-    html += '</div></div>';
-  }
+  html += mCard('📈','Indicateurs','Multi-horizon · Binance 4h/1h/1d', '', indBody);
+
+  // ── 4. MICROSTRUCTURE ──
+  const gam = isNum(x.dealer_gamma) ? Math.round(x.dealer_gamma).toLocaleString('en-US') : '—';
+  let microBody = '<div style="font-size:11px">'
+    + '<div><b>Funding</b> ' + fmtNum(x.funding_rate_pct,4) + '% '
+    + '<span style="color:var(--text2)">(' + fmtNum(x.funding_annual_pct,2) + '% ann.)</span></div>'
+    + '<div><b>Open Interest</b> ' + (isNum(x.oi_btc)?x.oi_btc.toLocaleString('en-US',{maximumFractionDigits:0}):'—') + ' BTC '
+    + '<span style="color:var(--text2)">(' + fmtBig(x.oi_usd) + ')</span> '
+    + '<span class="' + (x.oi_change_1d_pct>0?'stat-pos':'stat-neg') + '">Δ1j ' + fmtNum(x.oi_change_1d_pct,2) + '%</span> '
+    + '<span class="' + (x.oi_change_5d_pct>0?'stat-pos':'stat-neg') + '">Δ5j ' + fmtNum(x.oi_change_5d_pct,2) + '%</span></div>'
+    + '<div><b>L/S comptes</b> ' + fmtNum(x.ls_ratio,4) + ' <span style="color:var(--text2)">('
+    + fmtNum(x.long_pct,1) + '/' + fmtNum(x.short_pct,1) + ')</span>'
+    + ' · <b>Top traders</b> ' + fmtNum(x.top_ls_ratio,4)
+    + ' · <b>Taker B/S</b> ' + fmtNum(x.taker_ratio,4) + '</div>'
+    + '<div><b>CVD</b> ' + fmtBig(x.cvd) + ' <span style="color:var(--text2)">(' + escHtml(x.cvd_updated_at||'—') + ')</span></div>'
+    + '<hr style="border:none;border-top:1px solid var(--glass-edge);margin:6px 0">'
+    + '<div><b>GEX</b> ' + escHtml(x.gex_state||'—') + ' · γ ' + gam + ' · walls <b>'
+    + (x.gamma_walls||[]).map(fmtK).join(' / ') + '</b></div>'
+    + '<div><b>Premium Coinbase</b> ' + fmtNum(x.premium_pct,4) + '% '
+    + '<span class="badge ' + (x.premium_state==='NEGATIVE'?'badge-baissier':'badge-hausser') + '">' + escHtml(x.premium_state||'—') + '</span> '
+    + (x.us_demand ? '<span style="color:var(--text2)">demande US ✓</span>' : '<span style="color:var(--text2)">pas de demande US</span>') + '</div>'
+    + (x.squeeze_reason ? '<div style="margin-top:4px;color:var(--text2)">Squeeze : ' + escHtml(x.squeeze_reason) + '</div>' : '')
+    + '</div>';
+  html += mCard('📡','Microstructure','Binance Futures · Deribit · Coinbase', '', microBody);
+
+  // ── 5. LIQUIDITÉ ──
+  let liqBody = '<div style="font-size:11px">'
+    + '<div>Ratio <b>bid/ask</b> (15 min) : <b class="' + (lq.ratio_bid_ask>1?'stat-pos':'stat-neg') + '">' + fmtNum(lq.ratio_bid_ask,2) + '</b></div>'
+    + '<div style="margin-top:5px"><span class="badge badge-hausser">BIDS</span> ' + wallLine(lq.bid_walls) + '</div>'
+    + '<div style="margin-top:4px"><span class="badge badge-baissier">ASKS</span> ' + wallLine(lq.ask_walls) + '</div>'
+    + '<div style="margin-top:6px;color:var(--text2);font-size:10px">Murs = profondeur cumulée, fenêtre 15 min · heatmap 24 h</div>'
+    + '</div>';
+  html += mCard('💧','Liquidité','Carnet Binance · pôles de liquidation', '', liqBody);
+
+  // ── 6. ÉTAT DU FLUX ──
+  const nOk = Object.values(st).filter(v => v === 'ok').length, nTot = Object.keys(st).length || 9;
+  const errs = d.errors || [];
+  let stBody = '<div style="font-size:11px">'
+    + '<b class="' + (errs.length ? 'stat-neg' : 'stat-pos') + '">' + nOk + '/' + nTot + ' blocs live</b>'
+    + ' <span style="color:var(--text2)">· ' + escHtml(d.generator||'') + '</span>'
+    + (errs.length ? '<div style="margin-top:4px" class="stat-neg">⚠️ ' + errs.map(escHtml).join('<br>⚠️ ') + '</div>' : '')
+    + '<div style="margin-top:4px;color:var(--text2);font-size:10px">Sources : ' + escHtml(d.source||'—') + '</div>'
+    + '</div>';
+  html += mCard('🔌','Flux','Pas d\'erreur silencieuse', '', stBody);
+
   container.innerHTML = html;
 }
 
@@ -4107,13 +4078,13 @@ async function init() {
   viewStart = Math.max(0, candles.length - 50);
   viewEnd = candles.length;
   drawChart();
-  await fetchSamsara();
+  await fetchMarket();
   // Pre-fetch S/R ref TFs au démarrage
   refreshRefSR();
   toggleDepth(overlays.liq);
   setInterval(fetchPrice, 1000);
   setInterval(async () => { await fetchKlines(); drawChart(); }, 5000);
-  setInterval(fetchSamsara, 60000);
+  setInterval(fetchMarket, 60000);
   // Refresh S/R ref TFs every 60s
   setInterval(refreshRefSR, 60000);
   // Taskbar clock
