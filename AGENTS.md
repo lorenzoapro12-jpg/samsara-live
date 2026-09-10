@@ -103,12 +103,24 @@ Chrome est cassé dans le conteneur (`cannot read kernel generated uuid`).
 Le rendu se teste dans node avec un DOM stubbé :
 
 ```bash
-cd /root/audit-fossile-20260910 && node test_render.js
+# TOUJOURS les deux commandes, dans cet ordre :
+python3 /root/audit-fossile-20260910/refresh_harness.py \
+  && node /root/audit-fossile-20260910/test_render.js
 ```
 
-Le harnais extrait le `<script>` inline du dashboard, l'exécute, appelle
-`fetchMarket()` puis `renderFeedTo()`, et vérifie 15 contrôles de non-régression
-(valeurs réelles présentes, zéro trace Renaissance, 6 cartes rendues).
+⚠️ **Piège vécu le 10/09/2026.** `test_render.js` n'extrait pas le HTML
+lui-même : il lit `/tmp/js_0.js`, un fichier temporaire persisté entre les
+runs. Sans `refresh_harness.py`, le harnais teste une version **périmée** et
+échoue sur ce qui a déjà été corrigé (cas réel : « Iran retiré » ✗ alors que
+`index.html` n'avait plus une occurrence — le harnais lisait encore la copie
+de travail, en retard de 4). `refresh_harness.py` synchronise
+`/root/samsara-live/index.html` → `/root/samsara-dashboard.html` puis
+régénère `/tmp/js_0.js`.
+
+Le harnais exécute le `<script>` inline, appelle `fetchMarket()` puis
+`renderFeedTo()`, et vérifie **16 contrôles** de non-régression : valeurs
+réelles présentes, **absence du scorer Iran** (rendu *et* JSON — contrôle
+négatif), zéro trace Renaissance, 6 cartes rendues.
 
 ## Historique
 
