@@ -1,13 +1,13 @@
 {
- "updated": "2026-09-10T08:33:11+00:00",
+ "updated": "2026-09-10T08:33:31+00:00",
  "generator": "publish.py v3.0 — live-only (10/09/2026)",
  "source": "binance · deribit · coinbase · yahoo · sol-radar-daemon",
  "btc": {
-  "price": 78048.0,
-  "change_24h_pct": -2.031,
+  "price": 78081.75,
+  "change_24h_pct": -1.989,
   "high_24h": 79760.0,
   "low_24h": 77770.0,
-  "quote_volume_24h_usd": 1095810535.8371484
+  "quote_volume_24h_usd": 1096637735.356927
  },
  "macro": {
   "dxy_spot": 98.76799774169922,
@@ -17,15 +17,15 @@
  },
  "tf": {
   "4h": {
-   "rsi_14": 38.6,
-   "ema20_4h": 78644.05,
-   "ema50_4h": 78883.78,
+   "rsi_14": 38.9,
+   "ema20_4h": 78648.94,
+   "ema50_4h": 78889.67,
    "death_cross_4h": true,
-   "ema_gap_pct": 0.3,
+   "ema_gap_pct": 0.31,
    "support_30": 77620.01,
    "resistance_30": 80559.99,
-   "last_close": 78048.0,
-   "avg_volume_10": 1945.24,
+   "last_close": 78081.75,
+   "avg_volume_10": 1946.4,
    "last_5_candles": [
     {
      "open": 78596.7,
@@ -70,26 +70,26 @@
     {
      "open": 78112.0,
      "high": 78170.74,
-     "low": 78041.64,
-     "close": 78048.0,
-     "body": 0.08,
+     "low": 78038.0,
+     "close": 78081.75,
+     "body": 0.04,
      "direction": "🔴",
      "wick_top": 0.08,
-     "wick_bottom": 0.01
+     "wick_bottom": 0.06
     }
    ],
    "range_24h_pct": 3.79
   },
   "1h": {
-   "rsi_14": 41.9,
-   "ema20_4h": 78378.34,
-   "ema50_4h": 78476.23,
+   "rsi_14": 42.5,
+   "ema20_4h": 78383.23,
+   "ema50_4h": 78482.12,
    "death_cross_4h": true,
-   "ema_gap_pct": 0.12,
+   "ema_gap_pct": 0.13,
    "support_30": 77770.0,
    "resistance_30": 79760.0,
-   "last_close": 78048.0,
-   "avg_volume_10": 422.27,
+   "last_close": 78081.75,
+   "avg_volume_10": 423.44,
    "last_5_candles": [
     {
      "open": 78328.08,
@@ -134,26 +134,26 @@
     {
      "open": 78112.0,
      "high": 78170.74,
-     "low": 78041.64,
-     "close": 78048.0,
-     "body": 0.08,
+     "low": 78038.0,
+     "close": 78081.75,
+     "body": 0.04,
      "direction": "🔴",
      "wick_top": 0.08,
-     "wick_bottom": 0.01
+     "wick_bottom": 0.06
     }
    ],
    "range_24h_pct": 2.56
   },
   "1d": {
-   "rsi_14": 42.1,
-   "ema20_4h": 77825.8,
-   "ema50_4h": 74508.46,
+   "rsi_14": 42.2,
+   "ema20_4h": 77830.69,
+   "ema50_4h": 74514.35,
    "death_cross_4h": false,
    "ema_gap_pct": 4.45,
    "support_30": 62535.24,
    "resistance_30": 82300.0,
-   "last_close": 78048.0,
-   "avg_volume_10": 13203.88,
+   "last_close": 78081.75,
+   "avg_volume_10": 13205.04,
    "last_5_candles": [
     {
      "open": 79831.75,
@@ -199,11 +199,11 @@
      "open": 78306.43,
      "high": 78564.39,
      "low": 77906.48,
-     "close": 78048.0,
-     "body": 0.33,
+     "close": 78081.75,
+     "body": 0.29,
      "direction": "🔴",
      "wick_top": 0.33,
-     "wick_bottom": 0.18
+     "wick_bottom": 0.22
     }
    ],
    "range_24h_pct": 31.61
@@ -212,9 +212,9 @@
  "micro": {
   "funding_rate_pct": 0.00695,
   "funding_annual_pct": 7.61,
-  "mark_price": 78007.90106522,
-  "oi_btc": 105192.573,
-  "oi_usd": 8205851827,
+  "mark_price": 78036.4,
+  "oi_btc": 105196.969,
+  "oi_usd": 8209192752,
   "oi_change_1d_pct": -1.43,
   "oi_change_5d_pct": -2.6,
   "ls_ratio": 1.4944,
@@ -226,9 +226,9 @@
   "cvd_updated_at": "2026-09-10 08:32:37",
   "cvd_buy_vol_24h": 54635490102.73049,
   "cvd_sell_vol_24h": 55794686127.365234,
-  "spot_deribit": 78018.49,
+  "spot_deribit": 78066.2,
   "gex_state": "NEUTRAL",
-  "dealer_gamma": -8400.85,
+  "dealer_gamma": -8413.22,
   "gamma_walls": [
    80000.0,
    78000.0,
@@ -241,11 +241,11 @@
   "squeeze_viable": false,
   "squeeze_strength": 0.0,
   "squeeze_reason": "Dealers NEUTRAL — no gamma squeeze potential",
-  "premium_pct": -0.0313,
+  "premium_pct": -0.0323,
   "premium_state": "NEGATIVE",
   "us_demand": false,
-  "coinbase_mid": 78014.98,
-  "binance_mid": 78039.36
+  "coinbase_mid": 78066.79,
+  "binance_mid": 78091.99
  },
  "liquidity": {
   "tick_max": 1440,
@@ -307,10 +307,10 @@
   "total_ask": 23456
  },
  "iran": {
-  "score": 64.5,
+  "score": 65.3,
   "category": "TENSIONS",
-  "last_update": "2026-09-10T08:33:16.732564+00:00",
-  "momentum": 9.8,
+  "last_update": "2026-09-10T08:33:35.173179+00:00",
+  "momentum": 9.4,
   "signal_count": 7
  },
  "status": {
