@@ -1503,8 +1503,10 @@ async function fetchKlines() {
       for (const bk of btcData) {
         const sk = solMap.get(bk[0]);
         if (sk) {
-          // OHLC du ratio : high/low = enveloppe du CORPS (open->close), aucune meche inventee
-          // (l'extremite reelle depend de la correlation des jambes). Les 4 champs valaient le meme ratio -> ATR/Stoch/SAR faux.
+          // OHLC du ratio : high/low = enveloppe du CORPS (open->close). On n'invente pas de meches :
+          // la vraie extremite intra-bougie du ratio depend de la correlation des deux jambes, non
+          // observable depuis deux OHLC (ne PAS « ameliorer » en btcHigh/solLow -> meches fictives).
+          // Les 4 champs valaient le meme ratio -> bougies sans corps ni meche, ATR/Stoch/SAR faux.
           const op = parseFloat(bk[1]) / parseFloat(sk[1]);
           const cl = parseFloat(bk[4]) / parseFloat(sk[4]);
           merged.push({
