@@ -1496,10 +1496,15 @@ async function fetchKlines() {
       for (const bk of btcData) {
         const sk = solMap.get(bk[0]);
         if (sk) {
-          const btcClose = parseFloat(bk[4]), solClose = parseFloat(sk[4]);
-          const ratio = btcClose / solClose;
+          // OHLC du ratio : la bougie garde son CORPS (open -> close). high/low = enveloppe du
+          // corps — on n'invente pas de meches : la vraie extremite intra-bougie du ratio depend
+          // de la correlation des deux jambes, non observable depuis deux OHLC. Les 4 champs
+          // valaient auparavant le meme ratio -> bougies sans corps ni meche, ATR/Stoch/SAR faux.
+          const op = parseFloat(bk[1]) / parseFloat(sk[1]);
+          const cl = parseFloat(bk[4]) / parseFloat(sk[4]);
           merged.push({
-            time: bk[0] / 1000, open: ratio, high: ratio, low: ratio, close: ratio, volume: parseFloat(bk[5])
+            time: bk[0] / 1000, open: op, high: Math.max(op, cl), low: Math.min(op, cl),
+            close: cl, volume: parseFloat(bk[5])
           });
         }
       }
@@ -1881,12 +1886,18 @@ function calcATR(highs, lows, closes, period) {
   return atr;
 }
 
-function calcVWAP(highs, lows, closes, volumes) {
+function calcVWAP(highs, lows, closes, volumes, times, interval) {
   const out = new Array(closes.length).fill(null);
-  let cumPV = 0, cumV = 0;
+  // Ancrage : un cumul depuis la PREMIERE bougie chargee (3000 = 125 jours en 1h) donne une
+  // moyenne longue, pas un VWAP. Intraday -> reset a chaque jour UTC (vrai VWAP de session) ;
+  // en 4h/1d/1w, pas de session intraday ou s'ancrer -> l'ancrage est recale toutes les 20 bougies.
+  const sec = { '1m':60,'3m':180,'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400,'1d':86400,'1w':604800 }[interval];
+  const bucket = !sec ? 0 : (sec < 86400 ? 86400 : sec * 20);
+  let cumPV = 0, cumV = 0, b = null;
   for (let i = 0; i < closes.length; i++) {
-    const tp = (highs[i] + lows[i] + closes[i]) / 3;
-    cumPV += tp * volumes[i];
+    const key = (times && bucket) ? Math.floor(times[i] / bucket) : 0;
+    if (key !== b) { b = key; cumPV = 0; cumV = 0; }
+    cumPV += ((highs[i] + lows[i] + closes[i]) / 3) * volumes[i];
     cumV += volumes[i];
     out[i] = cumPV / (cumV || 1);
   }
@@ -1929,9 +1940,15 @@ function calcIchimoku(highs, lows, closes) {
 
 function calcSAR(highs, lows, closes, afStep = 0.02, afMax = 0.2) {
   const out = new Array(closes.length).fill(null);
-  let isUp = true, af = afStep, ep = highs[0], sar = lows[0];
+  if (closes.length < 2) return out;
+  // Tendance initiale DEDUITE des deux premieres cloture, et non supposee haussiere :
+  // demarrer systematiquement long faussait les premieres bougies (surtout en TF eleve).
+  let isUp = closes[1] >= closes[0];
+  let af = afStep;
+  let ep = isUp ? highs[0] : lows[0];
+  let sar = isUp ? lows[0] : highs[0];
+  out[0] = sar;
   for (let i = 1; i < closes.length; i++) {
-    const prevSar = sar;
     sar = sar + af * (ep - sar);
     if (isUp) {
       if (sar > lows[i]) { isUp = false; sar = ep; ep = lows[i]; af = afStep; }
@@ -2228,6 +2245,7 @@ registerStrategy('dumb_grid', {
 // ─── GridBot class — runs a strategy over candles ───
 class GridBot {
   constructor(strategyKey, capital) {
+    this.strategyKey = strategyKey;            // chaine — pour les tests de type dans computeIndicators
     this.strategy = STRATEGIES[strategyKey];
     this.capital = capital || ST_DEFAULT_CAPITAL;
     this.reset();
@@ -2240,7 +2258,7 @@ class GridBot {
     this.cash = this.capital;
     this.asset = 0;
     this.lastRealignIdx = -1;
-    this.realignThreshold = 0.003; // 0.3% default
+    this._skipFillIdx = -1;   // bougie de mise en place : non remplissable (anti look-ahead)
   }
 
   // Build params object from strategy defaults (overridden by user config)
@@ -2252,37 +2270,37 @@ class GridBot {
     return p;
   }
 
-  // Pre-compute indicators needed by this strategy
-  // Only uses candles[0..limit] — safe against look-ahead
-  computeIndicators(candles, limit) {
+  // Pre-compute indicators needed by this strategy.
+  // Only uses candles[0..limit] — safe against look-ahead.
+  // `params` = params FUSIONNES (buildParams), pas les defauts du registre : sans ca les
+  // sliders « Periode BB » / « Ecart-type » / « Periode RSI » n'ont aucun effet.
+  computeIndicators(candles, limit, params) {
+    const p = params || this.buildParams({});
     const closes = candles.slice(0, limit + 1).map(c => c.close);
-    const highs = candles.slice(0, limit + 1).map(c => c.high);
-    const lows = candles.slice(0, limit + 1).map(c => c.low);
-    const vols = candles.slice(0, limit + 1).map(c => c.volume);
     const ind = {};
+    const key = this.strategyKey;
 
-    // Always compute common ones
-    if (closes.length >= 20) {
+    if (key === 'bb_grid') {
+      const period = p.period || 20, stddev = (p.stddev === undefined ? 2 : p.stddev);
+      if (closes.length >= period) {
+        const bb = calcBollinger(closes, period, stddev);
+        ind.bb_upper = bb.upper; ind.bb_lower = bb.lower; ind.bb_mid = bb.sma;
+      }
+    }
+    if (key === 'ema_grid') {
+      if (closes.length >= 50) ind.ema = calcEMA(closes, 50);
+    }
+    if (key === 'rsi_grid') {
+      const rsiP = p.rsiPeriod || 14;
+      if (closes.length >= rsiP) ind.rsi = calcRSI(closes, rsiP);
+    }
+
+    // Filet : un trigger qui lit bb_*/rsi doit trouver un tableau, jamais undefined
+    if (!ind.bb_upper && closes.length >= 20) {
       const bb20 = calcBollinger(closes, 20, 2);
       ind.bb_upper = bb20.upper; ind.bb_lower = bb20.lower; ind.bb_mid = bb20.sma;
     }
-    if (closes.length >= 14) ind.rsi = calcRSI(closes, 14);
-
-    // Strategy-specific
-    const key = this.strategy;
-    if (key === STRATEGIES.bb_grid || key === STRATEGIES.ema_grid) {
-      if (closes.length >= 50) ind.ema = calcEMA(closes, 50);
-    }
-    if (key === STRATEGIES.bb_grid) {
-      if (closes.length >= key.params.period.value) {
-        const bbP = calcBollinger(closes, key.params.period.value, key.params.stddev.value);
-        ind.bb_upper = bbP.upper; ind.bb_lower = bbP.lower; ind.bb_mid = bbP.sma;
-      }
-    }
-    if (key === STRATEGIES.rsi_grid) {
-      const rsiP = key.params.rsiPeriod.value;
-      if (closes.length >= rsiP) ind.rsi = calcRSI(closes, rsiP);
-    }
+    if (!ind.rsi && closes.length >= 14) ind.rsi = calcRSI(closes, 14);
 
     return ind;
   }
@@ -2301,10 +2319,13 @@ class GridBot {
     if (trigger === 'enter' && this.state !== ST_STATES.ACTIVE) {
       this.state = ST_STATES.ACTIVE;
       this._setupGrid(candles, idx, params, indicators);
+      // Les ordres viennent d'etre places SUR la cloture de cette bougie : leur remplissage
+      // ne peut pas etre constate avec le high/low de la bougie qui les a vus naitre.
+      this._skipFillIdx = idx;
     }
 
     // If active, check fills on existing levels
-    if (this.state === ST_STATES.ACTIVE) {
+    if (this.state === ST_STATES.ACTIVE && idx !== this._skipFillIdx) {
       this._checkFills(candles, idx, params);
     }
 
@@ -2339,7 +2360,10 @@ class GridBot {
         if (c.low <= level.price && c.high >= level.price) {
           level.status = 'filled';
           level.entryIdx = idx;
-          this.cash -= level.cost;
+          // Frais maker d'entree debites du cash MAINTENANT : le P&L les comptait deja,
+          // mais le grand livre les ignorait -> cash != capital + realizedPnl.
+          level.entryFee = level.cost * ST_FEE_MAKER;
+          this.cash -= level.cost + level.entryFee;
           this.asset += level.size;
           const exec = this.strategy.execution(level, c, params);
           level.tp = exec.tp;
@@ -2362,7 +2386,7 @@ class GridBot {
       if (Math.abs((c.close - avgLevel) / avgLevel) > realignPct / 100) {
         // Close pending levels, regenerate
         this.gridLevels = this.gridLevels.filter(l => l.status !== 'pending');
-        const indicators = this.computeIndicators(candles, idx);
+        const indicators = this.computeIndicators(candles, idx, params);
         const newLevels = this.strategy.generateLevels(candles, idx, params, indicators);
         const remainingCash = this.cash;
         const sizePerLevel = remainingCash / Math.max(1, newLevels.length);
@@ -2385,10 +2409,11 @@ class GridBot {
 
   _closeLevel(level, idx, exitPrice, isStopLoss) {
     const proceeds = level.size * exitPrice;
-    const entryFee = level.cost * ST_FEE_MAKER;          // entries always maker (limit order)
+    // entryFee a ete debite du cash au fill ; fallback pour un niveau construit hors _checkFills
+    const entryFee = (level.entryFee === undefined ? level.cost * ST_FEE_MAKER : level.entryFee);
     const exitFee = proceeds * (isStopLoss ? ST_FEE_TAKER : ST_FEE_MAKER);
     const pnl = proceeds - level.cost - entryFee - exitFee;
-    this.cash += proceeds - exitFee;
+    this.cash += proceeds - exitFee;   // entryFee deja sorti du cash : ne pas le reprendre ici
     this.asset -= level.size;
     level.status = 'closed';
     level.exitIdx = idx;
@@ -2410,20 +2435,23 @@ class GridBot {
       if (level.status === 'filled') {
         this._closeLevel(level, -1, candle.close, true); // force close = taker
       } else if (level.status === 'pending') {
+        // Un niveau pending n'a JAMAIS debite le cash (le debit a lieu au fill, _checkFills).
+        // Le rembourser ici inventait du capital : 1000 -> 2000 sans un seul trade.
+        // On le solde a zero, sans toucher au cash. Pas de trade — jamais rempli.
         level.status = 'closed';
         level.pnl = 0;
-        this.cash += level.cost; // return unspent capital
-        // Don't add to trades — never filled
       }
     }
   }
 
-  // Compute current equity = cash + unrealized P&L
+  // Compute current equity = cash + mark-to-market des positions ouvertes.
+  // ATTENTION : l.cost a DEJA ete debite du cash au fill. Le resoustraire ici comptait le
+  // cout deux fois -> equity sous-evaluee de tout le capital deploye (MaxDD > 100%).
   equity(markPrice) {
-    const unrealized = this.gridLevels
+    const mv = this.gridLevels
       .filter(l => l.status === 'filled')
-      .reduce((sum, l) => sum + l.size * markPrice - l.cost, 0);
-    return this.cash + unrealized;
+      .reduce((sum, l) => sum + l.size * markPrice, 0);
+    return this.cash + mv;
   }
 
   // Realized P&L only
@@ -2448,7 +2476,7 @@ function runBacktest(strategyKey, candles, startIdx, endIdx, userParams, capital
 
   // Pre-compute ALL indicators once for the full range
   // This is safe because the strategy only accesses candles[0..idx] at each step
-  const fullIndicators = bot.computeIndicators(candles, endIdx);
+  const fullIndicators = bot.computeIndicators(candles, endIdx, params);
 
   // Mark initial equity
   equityCurve.push({ idx: startIdx, total: capital, realized: 0, unrealized: 0 });
@@ -2580,7 +2608,7 @@ const COLORS = {
   sma20: '#00bcd4', sma50: '#4caf50',
   bb_upper: '#607d8b', bb_mid: '#607d8b', bb_lower: '#607d8b',
   vwap: '#ff9800', ichi_tenkan: '#2196f3', ichi_kijun: '#e91e63',
-  ichi_senkouA: '#4caf5022', ichi_senkouB: '#f4433622', ichi_senkouA_line: '#4caf5066', ichi_senkouB_line: '#f4433666',
+  ichi_senkouA: '#4caf5022', ichi_senkouB: '#f4433622',
   sar: '#00e5ff',
   volume_up: '#26a69a55', volume_down: '#ef535055',
   rsi: '#bb86fc', macd: '#f0b90b', macd_signal: '#ff6b35', macd_hist_up: '#26a69a', macd_hist_down: '#ef5350',
@@ -2990,7 +3018,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
 
   // VWAP
   if (overlays.vwap) {
-    const vwap = memoized('vwap', calcVWAP, candles.map(c=>c.high), candles.map(c=>c.low), closes, candles.map(c=>c.volume));
+    const vwap = memoized('vwap', calcVWAP, candles.map(c=>c.high), candles.map(c=>c.low), closes, candles.map(c=>c.volume), candles.map(c=>c.time), chartInterval);
     drawLine(vwap, minP, range, pad, gap, ph, COLORS.vwap, [], 1.5, vs);
   }
 
@@ -3000,24 +3028,31 @@ function resolveChart(candles, padL, padR, chartH, W) {
     const ichi = memoized('ichimoku', calcIchimoku, highs, lows, closes);
     drawLine(ichi.tenkan, minP, range, pad, gap, ph, COLORS.ichi_tenkan, [], 1, vs);
     drawLine(ichi.kijun, minP, range, pad, gap, ph, COLORS.ichi_kijun, [], 1, vs);
-    // Senkou cloud fill
-    ctx.save(); ctx.globalAlpha = 0.15;
-    ctx.beginPath(); let started = false;
-    for (let i = vs; i < ve; i++) {
-      if (i >= ichi.senkouA.length || ichi.senkouA[i] === null) continue;
-      // Clamp to visible price range
-      const ya = Math.max(pad.top, Math.min(pad.top + ph, pad.top + ph * (1 - (ichi.senkouA[i] - minP) / range)));
-      if (!started) { ctx.moveTo(pad.left + gap * (i - vs) + gap/2, ya); started = true; }
-      else ctx.lineTo(pad.left + gap * (i - vs) + gap/2, ya);
+    // Kumo : un remplissage PAR SEGMENT de signe constant.
+    // Senkou A au-dessus de B = nuage haussier (vert) ; en dessous = baissier (rouge).
+    const kx = i => pad.left + gap * (i - vs) + gap/2;
+    const ky = v => Math.max(pad.top, Math.min(pad.top + ph, pad.top + ph * (1 - (v - minP) / range)));
+    const flushKumo = (s, e, up) => {
+      if (s === null || e <= s) return;
+      ctx.beginPath();
+      for (let i = s; i <= e; i++) ctx.lineTo(kx(i), ky(ichi.senkouA[i]));
+      for (let i = e; i >= s; i--) ctx.lineTo(kx(i), ky(ichi.senkouB[i]));
+      ctx.closePath();
+      ctx.fillStyle = up ? '#26a69a' : '#ef5350';
+      ctx.fill();
+    };
+    ctx.save(); ctx.globalAlpha = 0.18;
+    let kStart = null, kUp = false;
+    for (let i = vs; i <= ve; i++) {
+      const sa = ichi.senkouA[i], sb = ichi.senkouB[i];
+      if (sa === null || sa === undefined || sb === null || sb === undefined) {
+        flushKumo(kStart, i - 1, kUp); kStart = null; continue;
+      }
+      const up = sa >= sb;
+      if (kStart !== null && up !== kUp) { flushKumo(kStart, i - 1, kUp); kStart = null; }
+      if (kStart === null) { kStart = Math.max(vs, i - 1); kUp = up; }
     }
-    for (let i = ve - 1; i >= vs; i--) {
-      if (i >= ichi.senkouB.length || ichi.senkouB[i] === null) continue;
-      const yb = Math.max(pad.top, Math.min(pad.top + ph, pad.top + ph * (1 - (ichi.senkouB[i] - minP) / range)));
-      ctx.lineTo(pad.left + gap * (i - vs) + gap/2, yb);
-    }
-    ctx.closePath();
-    ctx.fillStyle = '#4caf50'; ctx.fill();
-    ctx.fillStyle = '#f44336'; // cette couleur sera sous la verte
+    flushKumo(kStart, ve, kUp);
     ctx.restore();
   }
 
