@@ -1070,7 +1070,13 @@ const INDICATORS = [
 function isOverlay(key) { return key in overlays; }
 function isActive(key) { return (overlays[key] || activeSubs[key]) || false; }
 function toggleAny(key) {
-  if (isOverlay(key)) { overlays[key] = !overlays[key]; if (key === 'liq') toggleDepth(overlays.liq); drawChart(); }
+  if (isOverlay(key)) {
+    overlays[key] = !overlays[key];
+    if (key === 'liq') toggleDepth(overlays.liq);
+    // S/R : dessiner tout de suite, puis redessiner quand les TF de reference sont arrives.
+    if (key === 'sr' && overlays.sr) { drawChart(); refreshRefSR().then(drawChart); }
+    else drawChart();
+  }
   else { activeSubs[key] = !activeSubs[key]; resizeCanvas(); drawChart(); }
   buildDropdown();
   const lbl = document.getElementById('lbl_' + key);
@@ -1128,7 +1134,8 @@ function toggleInd(key, label) {
   overlays[key] = !overlays[key];
   if (key === 'liq') toggleDepth(overlays.liq);
   label.classList.toggle('active', overlays[key]);
-  drawChart();
+  if (key === 'sr' && overlays.sr) { drawChart(); refreshRefSR().then(drawChart); }
+  else drawChart();
 }
 function toggleSub(key, label) {
   activeSubs[key] = !activeSubs[key];
@@ -1146,7 +1153,7 @@ async function changeInterval(interval, label) {
   await fetchKlines();
   viewStart = Math.max(0, candles.length - 50);
   viewEnd = candles.length;
-  refreshRefSR();
+  await refreshRefSR();
   drawChart();
 }
 
@@ -1162,7 +1169,7 @@ async function changeSymbol(symbol, label) {
   await fetchKlines();
   viewStart = Math.max(0, candles.length - 50);
   viewEnd = candles.length;
-  refreshRefSR();
+  await refreshRefSR();
   drawChart();
 }
 
@@ -1496,10 +1503,8 @@ async function fetchKlines() {
       for (const bk of btcData) {
         const sk = solMap.get(bk[0]);
         if (sk) {
-          // OHLC du ratio : la bougie garde son CORPS (open -> close). high/low = enveloppe du
-          // corps — on n'invente pas de meches : la vraie extremite intra-bougie du ratio depend
-          // de la correlation des deux jambes, non observable depuis deux OHLC. Les 4 champs
-          // valaient auparavant le meme ratio -> bougies sans corps ni meche, ATR/Stoch/SAR faux.
+          // OHLC du ratio : high/low = enveloppe du CORPS (open->close), aucune meche inventee
+          // (l'extremite reelle depend de la correlation des jambes). Les 4 champs valaient le meme ratio -> ATR/Stoch/SAR faux.
           const op = parseFloat(bk[1]) / parseFloat(sk[1]);
           const cl = parseFloat(bk[4]) / parseFloat(sk[4]);
           merged.push({
@@ -1618,7 +1623,8 @@ function clusterSR(pivots, tolerance) {
         used.add(p2.idx);
       }
     }
-    if (count >= 2) levels.push({ price: sumPriceW / sumW, touches: count, score: sumW });
+    // count >= 1 : ne PAS jeter les pivots isoles (un niveau touche une fois est reel, c'est le tri par score qui ecarte le bruit).
+    if (count >= 1) levels.push({ price: sumPriceW / sumW, touches: count, score: sumW });
     used.add(p.idx);
   }
   return levels.sort((a, b) => b.score - a.score);
@@ -1696,8 +1702,8 @@ async function fetchSRKlines(symbol, interval) {
 
 function getMultiTFLevels() {
   const all = [];
-  // Current TF from main candles (500)
-  const currLevels = computeSR(candles, chartInterval, 500);
+  // Memoise : getMultiTFLevels tourne a chaque drawChart (crosshair = 60 fps), computeSR est en O(pivots²).
+  const currLevels = memoized('sr_' + activeSymbol + '_' + chartInterval, computeSR, candles, chartInterval, 500);
   for (const l of currLevels.slice(0, 5)) {
     all.push({ ...l, tf: chartInterval, tier: 0 });
   }
@@ -1720,7 +1726,8 @@ function getMultiTFLevels() {
       if (Math.abs(d.price - lvl.price) / Math.max(d.price, lvl.price) < 0.005) {
         d.score += lvl.score;
         d.touches += lvl.touches;
-        d.tier = Math.min(d.tier, lvl.tier);
+        // MAX, pas MIN : un niveau present sur le TF courant ET le daily heritait tier 0 -> « Mineur » pointille.
+        d.tier = Math.max(d.tier, lvl.tier);
         merged = true; break;
       }
     }
@@ -1731,10 +1738,8 @@ function getMultiTFLevels() {
 
 async function refreshRefSR() {
   if (!overlays.sr) return;
-  const refs = getRefIntervals(chartInterval);
-  for (const refInt of refs) {
-    fetchSRKlines(activeSymbol, refInt); // fire & forget
-  }
+  // Awaits : en fire-and-forget le 1er rendu n'avait que le TF courant, les majeurs poussaient jusqu'a 60 s apres.
+  await Promise.all(getRefIntervals(chartInterval).map(i => fetchSRKlines(activeSymbol, i)));
 }
 
 async function fetchPrice() {
@@ -1941,8 +1946,7 @@ function calcIchimoku(highs, lows, closes) {
 function calcSAR(highs, lows, closes, afStep = 0.02, afMax = 0.2) {
   const out = new Array(closes.length).fill(null);
   if (closes.length < 2) return out;
-  // Tendance initiale DEDUITE des deux premieres cloture, et non supposee haussiere :
-  // demarrer systematiquement long faussait les premieres bougies (surtout en TF eleve).
+  // Tendance initiale DEDUITE des deux premieres clotures : un demarrage long systematique faussait le debut.
   let isUp = closes[1] >= closes[0];
   let af = afStep;
   let ep = isUp ? highs[0] : lows[0];
@@ -2089,15 +2093,31 @@ function distributeGridLevels(low, high, n) {
   return levels;
 }
 
+// ─── Helpers communs aux strategies de grille ───
+// Ces params etaient copies dans les 5 grilles : toute nouvelle grille DOIT passer par ici.
+function gridParams(levels, tp, sl, loHint, hiHint) {
+  return {
+    priceLow: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix inférieur', hint: loHint },
+    priceHigh: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix supérieur', hint: hiHint },
+    gridLevels: { value: levels, min: 2, max: 500, step: 1, label: 'Niveaux' },
+    tpPct: { value: tp, min: 0.1, max: 5, step: 0.1, label: 'Take Profit %' },
+    slPct: { value: sl, min: 0.5, max: 10, step: 0.5, label: 'Stop Loss %' },
+  };
+}
+// Borne manuelle si > 0, sinon la borne auto calculee par la strategie
+function gridRange(params, autoLow, autoHigh) {
+  return { low: (params.priceLow > 0) ? params.priceLow : autoLow,
+           high: (params.priceHigh > 0) ? params.priceHigh : autoHigh };
+}
+function gridExec(level, entryCandle, params) {
+  return { tp: level.price * (1 + params.tpPct / 100), sl: level.price * (1 - params.slPct / 100) };
+}
+
 // ─── Bollinger Grid Strategy ───
 registerStrategy('bb_grid', {
   label: 'Grille Bollinger',
   params: {
-    priceLow: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix inférieur', advanced: false, hint: '0 = auto (bande inf BB)' },
-    priceHigh: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix supérieur', advanced: false, hint: '0 = auto (bande mid BB)' },
-    gridLevels: { value: 10, min: 2, max: 500, step: 1, label: 'Niveaux' },
-    tpPct: { value: 0.5, min: 0.1, max: 5, step: 0.1, label: 'Take Profit %' },
-    slPct: { value: 3, min: 0.5, max: 10, step: 0.5, label: 'Stop Loss %' },
+    ...gridParams(10, 0.5, 3, '0 = auto (bande inf BB)', '0 = auto (bande mid BB)'),
     period: { value: 20, min: 10, max: 50, step: 1, label: 'Période BB', advanced: true },
     stddev: { value: 2, min: 1, max: 4, step: 0.5, label: 'Écart-type', advanced: true },
     reentryThreshold: { value: 0.3, min: 0.1, max: 2, step: 0.1, label: 'Seuil réalignement %', advanced: true },
@@ -2111,25 +2131,17 @@ registerStrategy('bb_grid', {
     return null;
   },
   generateLevels(candles, idx, params, indicators) {
-    const bbLower = indicators.bb_lower, bbMid = indicators.bb_mid;
-    const low = (params.priceLow > 0) ? params.priceLow : bbLower[idx];
-    const high = (params.priceHigh > 0) ? params.priceHigh : bbMid[idx];
-    return distributeGridLevels(low, high, params.gridLevels);
+    const r = gridRange(params, indicators.bb_lower[idx], indicators.bb_mid[idx]);
+    return distributeGridLevels(r.low, r.high, params.gridLevels);
   },
-  execution(level, entryCandle, params) {
-    return { tp: level.price * (1 + params.tpPct / 100), sl: level.price * (1 - params.slPct / 100) };
-  }
+  execution: gridExec
 });
 
 // ─── RSI Grid Strategy ───
 registerStrategy('rsi_grid', {
   label: 'Grille RSI',
   params: {
-    priceLow: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix inférieur', advanced: false, hint: '0 = auto (-5% prix)' },
-    priceHigh: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix supérieur', advanced: false, hint: '0 = auto (+5% prix)' },
-    gridLevels: { value: 10, min: 2, max: 500, step: 1, label: 'Niveaux' },
-    tpPct: { value: 0.8, min: 0.1, max: 5, step: 0.1, label: 'Take Profit %' },
-    slPct: { value: 4, min: 0.5, max: 10, step: 0.5, label: 'Stop Loss %' },
+    ...gridParams(10, 0.8, 4, '0 = auto (-5% prix)', '0 = auto (+5% prix)'),
     oversold: { value: 30, min: 15, max: 45, step: 1, label: 'Seuil survente', advanced: true },
     rsiPeriod: { value: 14, min: 5, max: 30, step: 1, label: 'Période RSI', advanced: true },
     exitRsi: { value: 50, min: 40, max: 70, step: 1, label: 'Seuil sortie RSI', advanced: true },
@@ -2141,27 +2153,19 @@ registerStrategy('rsi_grid', {
     if (rsi[idx] !== null && rsi[idx] >= params.exitRsi) return 'exit';
     return null;
   },
-  generateLevels(candles, idx, params, indicators) {
+  generateLevels(candles, idx, params) {
     const price = candles[idx].close;
-    const defaultSpan = price * 0.05; // 5% default range
-    const low = (params.priceLow > 0) ? params.priceLow : (price - defaultSpan);
-    const high = (params.priceHigh > 0) ? params.priceHigh : (price + defaultSpan);
-    return distributeGridLevels(low, high, params.gridLevels);
+    const r = gridRange(params, price * 0.95, price * 1.05);
+    return distributeGridLevels(r.low, r.high, params.gridLevels);
   },
-  execution(level, entryCandle, params) {
-    return { tp: level.price * (1 + params.tpPct/100), sl: level.price * (1 - params.slPct/100) };
-  }
+  execution: gridExec
 });
 
 // ─── EMA Pullback Grid Strategy ───
 registerStrategy('ema_grid', {
   label: 'Grille EMA Pullback',
   params: {
-    priceLow: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix inférieur', advanced: false, hint: '0 = auto (EMA)' },
-    priceHigh: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix supérieur', advanced: false, hint: '0 = auto (prix courant)' },
-    gridLevels: { value: 10, min: 2, max: 500, step: 1, label: 'Niveaux' },
-    tpPct: { value: 0.5, min: 0.1, max: 5, step: 0.1, label: 'Take Profit %' },
-    slPct: { value: 3, min: 0.5, max: 10, step: 0.5, label: 'Stop Loss %' },
+    ...gridParams(10, 0.5, 3, '0 = auto (EMA)', '0 = auto (prix courant)'),
     emaPeriod: { value: 50, min: 10, max: 200, step: 10, label: 'Période EMA', advanced: true },
     pullbackPct: { value: 2, min: 0.5, max: 10, step: 0.5, label: 'Pullback min %', advanced: true },
     trendMinBars: { value: 5, min: 3, max: 20, step: 1, label: 'Bars tendance min', advanced: true },
@@ -2181,65 +2185,51 @@ registerStrategy('ema_grid', {
     return null;
   },
   generateLevels(candles, idx, params, indicators) {
-    const ema = indicators.ema[idx];
-    const price = candles[idx].close;
-    const low = (params.priceLow > 0) ? params.priceLow : ema;
-    const high = (params.priceHigh > 0) ? params.priceHigh : price;
-    return distributeGridLevels(low, high, params.gridLevels);
+    const r = gridRange(params, indicators.ema[idx], candles[idx].close);
+    return distributeGridLevels(r.low, r.high, params.gridLevels);
   },
-  execution(level, entryCandle, params) {
-    return { tp: level.price * (1 + params.tpPct/100), sl: level.price * (1 - params.slPct/100) };
-  }
+  execution: gridExec
 });
 
 // ─── S/R Grid Strategy ───
+// Grille bornee par les S/R les plus proches (computeSR du TF courant, filtre srMinScore). PERMANENTE comme dumb_grid : l'alpha est dans le PLACEMENT. Pas de look-ahead.
 registerStrategy('sr_grid', {
   label: 'Grille S/R',
   params: {
-    priceLow: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix inférieur', advanced: false, hint: '0 = auto' },
-    priceHigh: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix supérieur', advanced: false, hint: '0 = auto' },
-    gridLevels: { value: 6, min: 2, max: 500, step: 1, label: 'Niveaux' },
-    tpPct: { value: 0.5, min: 0.1, max: 5, step: 0.1, label: 'Take Profit %' },
-    slPct: { value: 2, min: 0.5, max: 8, step: 0.5, label: 'Stop Loss %' },
+    ...gridParams(6, 0.5, 2, '0 = auto (support le plus proche)', '0 = auto (résistance la plus proche)'),
     srMinScore: { value: 2, min: 1, max: 10, step: 1, label: 'Score S/R min', advanced: true },
   },
-  trigger(candles, idx, params, indicators) {
-    return null;
+  trigger(candles, idx) {
+    if (idx < 60) return 'idle';   // laisser de l'historique pour que les pivots existent
+    return 'enter';
   },
-  generateLevels(candles, idx, params, indicators) {
+  generateLevels(candles, idx, params) {
     const price = candles[idx].close;
-    const low = (params.priceLow > 0) ? params.priceLow : (price * 0.95);
-    const high = (params.priceHigh > 0) ? params.priceHigh : (price * 1.05);
-    return distributeGridLevels(low, high, params.gridLevels);
+    const levels = computeSR(candles.slice(Math.max(0, idx - 299), idx + 1), chartInterval, 500)
+      .filter(l => l.score >= params.srMinScore);
+    const sup = levels.filter(l => l.price < price).sort((a, b) => b.price - a.price)[0];
+    const res = levels.filter(l => l.price > price).sort((a, b) => a.price - b.price)[0];
+    // Aucun niveau ne passe le filtre -> repli sur ±5% (comportement de dumb_grid)
+    const r = gridRange(params, sup ? sup.price : price * 0.95, res ? res.price : price * 1.05);
+    return distributeGridLevels(r.low, r.high, params.gridLevels);
   },
-  execution(level, entryCandle, params) {
-    return { tp: level.price * (1 + params.tpPct/100), sl: level.price * (1 - params.slPct/100) };
-  }
+  execution: gridExec
 });
 
 // ─── Dumb Grid (fixed intervals, no TA) ───
 registerStrategy('dumb_grid', {
   label: 'Grille Fixe (benchmark)',
-  params: {
-    priceLow: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix inférieur', advanced: false, hint: '0 = auto (-5%)' },
-    priceHigh: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix supérieur', advanced: false, hint: '0 = auto (+5%)' },
-    gridLevels: { value: 10, min: 2, max: 500, step: 1, label: 'Niveaux' },
-    tpPct: { value: 0.5, min: 0.1, max: 5, step: 0.1, label: 'Take Profit %' },
-    slPct: { value: 3, min: 0.5, max: 10, step: 0.5, label: 'Stop Loss %' },
-  },
-  trigger(candles, idx, params, indicators) {
+  params: gridParams(10, 0.5, 3, '0 = auto (-5%)', '0 = auto (+5%)'),
+  trigger(candles, idx) {
     if (idx < 2) return 'idle';
     return 'enter';
   },
-  generateLevels(candles, idx, params, indicators) {
+  generateLevels(candles, idx, params) {
     const price = candles[idx].close;
-    const low = (params.priceLow > 0) ? params.priceLow : (price * 0.95);
-    const high = (params.priceHigh > 0) ? params.priceHigh : (price * 1.05);
-    return distributeGridLevels(low, high, params.gridLevels);
+    const r = gridRange(params, price * 0.95, price * 1.05);
+    return distributeGridLevels(r.low, r.high, params.gridLevels);
   },
-  execution(level, entryCandle, params) {
-    return { tp: level.price * (1 + params.tpPct/100), sl: level.price * (1 - params.slPct/100) };
-  }
+  execution: gridExec
 });
 
 // ─── GridBot class — runs a strategy over candles ───
@@ -2270,10 +2260,8 @@ class GridBot {
     return p;
   }
 
-  // Pre-compute indicators needed by this strategy.
   // Only uses candles[0..limit] — safe against look-ahead.
-  // `params` = params FUSIONNES (buildParams), pas les defauts du registre : sans ca les
-  // sliders « Periode BB » / « Ecart-type » / « Periode RSI » n'ont aucun effet.
+  // `params` = params FUSIONNES (buildParams) : sans ca « Periode BB » / « Ecart-type » / « Periode RSI » sont INERTES.
   computeIndicators(candles, limit, params) {
     const p = params || this.buildParams({});
     const closes = candles.slice(0, limit + 1).map(c => c.close);
@@ -2360,8 +2348,7 @@ class GridBot {
         if (c.low <= level.price && c.high >= level.price) {
           level.status = 'filled';
           level.entryIdx = idx;
-          // Frais maker d'entree debites du cash MAINTENANT : le P&L les comptait deja,
-          // mais le grand livre les ignorait -> cash != capital + realizedPnl.
+          // Frais maker d'entree debites du cash MAINTENANT (le P&L les comptait, pas le grand livre).
           level.entryFee = level.cost * ST_FEE_MAKER;
           this.cash -= level.cost + level.entryFee;
           this.asset += level.size;
@@ -2435,18 +2422,14 @@ class GridBot {
       if (level.status === 'filled') {
         this._closeLevel(level, -1, candle.close, true); // force close = taker
       } else if (level.status === 'pending') {
-        // Un niveau pending n'a JAMAIS debite le cash (le debit a lieu au fill, _checkFills).
-        // Le rembourser ici inventait du capital : 1000 -> 2000 sans un seul trade.
-        // On le solde a zero, sans toucher au cash. Pas de trade — jamais rempli.
+        // Un niveau pending n'a JAMAIS debite le cash : le rembourser inventait du capital (1000 -> 2000 sans trade).
         level.status = 'closed';
         level.pnl = 0;
       }
     }
   }
 
-  // Compute current equity = cash + mark-to-market des positions ouvertes.
-  // ATTENTION : l.cost a DEJA ete debite du cash au fill. Le resoustraire ici comptait le
-  // cout deux fois -> equity sous-evaluee de tout le capital deploye (MaxDD > 100%).
+  // ATTENTION : l.cost a DEJA ete debite au fill — le resoustraire compte le cout deux fois (MaxDD > 100%).
   equity(markPrice) {
     const mv = this.gridLevels
       .filter(l => l.status === 'filled')
@@ -3028,8 +3011,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
     const ichi = memoized('ichimoku', calcIchimoku, highs, lows, closes);
     drawLine(ichi.tenkan, minP, range, pad, gap, ph, COLORS.ichi_tenkan, [], 1, vs);
     drawLine(ichi.kijun, minP, range, pad, gap, ph, COLORS.ichi_kijun, [], 1, vs);
-    // Kumo : un remplissage PAR SEGMENT de signe constant.
-    // Senkou A au-dessus de B = nuage haussier (vert) ; en dessous = baissier (rouge).
+    // Kumo : un remplissage PAR SEGMENT de signe constant (A >= B vert haussier, sinon rouge baissier).
     const kx = i => pad.left + gap * (i - vs) + gap/2;
     const ky = v => Math.max(pad.top, Math.min(pad.top + ph, pad.top + ph * (1 - (v - minP) / range)));
     const flushKumo = (s, e, up) => {
@@ -4112,8 +4094,8 @@ async function init() {
   viewEnd = candles.length;
   drawChart();
   await fetchMarket();
-  // Pre-fetch S/R ref TFs au démarrage
-  refreshRefSR();
+  // Pre-fetch des TF de reference S/R : no-op si l'overlay est eteint, c'est le toggle qui declenche.
+  await refreshRefSR();
   toggleDepth(overlays.liq);
   setInterval(fetchPrice, 1000);
   setInterval(async () => { await fetchKlines(); drawChart(); }, 5000);
