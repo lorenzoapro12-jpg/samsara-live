@@ -323,10 +323,10 @@ body {
 .aero-grid {
   position: fixed; inset: -12%; z-index: -1; pointer-events: none;
   background-image:
-    linear-gradient(to right, rgba(255,255,255,0.15) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,0.15) 1px, transparent 1px),
-    linear-gradient(to right, rgba(90,150,200,0.09) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(90,150,200,0.09) 1px, transparent 1px);
+    linear-gradient(to right, rgba(255,255,255,0.26) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.26) 1px, transparent 1px),
+    linear-gradient(to right, rgba(60,130,190,0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(60,130,190,0.14) 1px, transparent 1px);
   background-size:
     38px 38px, 38px 38px,
     190px 190px, 190px 190px;
@@ -623,106 +623,17 @@ body {
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ═══ P#4 AURORA — rideaux d'aurore boréale (bandes, pas une brume) ═══ */
-.aero-aurora {
-  position: fixed; top: -22%; left: 14%;
-  width: 68vw; height: 58vh;
-  background:
-    /* rideaux : bandes obliques décalées, teintes boréales */
-    linear-gradient(158deg, transparent 28%, rgba(140,255,215,0.16) 38%, transparent 45%),
-    linear-gradient(158deg, transparent 46%, rgba(120,220,255,0.22) 55%, transparent 62%),
-    linear-gradient(158deg, transparent 62%, rgba(185,150,255,0.14) 70%, transparent 77%),
-    /* halo diffus sous les rideaux */
-    radial-gradient(circle at 50% 42%, rgba(120,220,255,0.20) 0%, rgba(0,160,255,0.07) 45%, transparent 72%);
-  filter: blur(46px); pointer-events: none; z-index: -1;
-}
-
 /* ═══ BOKEH — profondeur de champ (motif central, absent jusqu'ici) ═══
    « soft, out-of-focus light patterns known as bokeh ». Disques de tailles
    et de teintes variées (blanc, cyan, vert d'eau, jaune solaire) = flou
    d'arrière-plan d'une photo. Un seul élément, statique, un seul calque. */
-.aero-bokeh {
-  position: fixed; inset: -8%; z-index: -1; pointer-events: none;
-  background-repeat: no-repeat;
-  background-image:
-    /* soleil — la lumière vient toujours d'en haut à gauche */
-    radial-gradient(circle at 18% 10%, rgba(255,247,196,0.50) 0%, rgba(255,236,150,0.16) 24%, transparent 50%),
-    radial-gradient(circle at 76% 16%, rgba(255,255,255,0.40) 0%, rgba(255,255,255,0.09) 45%, transparent 68%),
-    radial-gradient(circle at 90% 60%, rgba(178,240,255,0.32) 0%, transparent 62%),
-    radial-gradient(circle at 28% 80%, rgba(168,255,214,0.28) 0%, transparent 60%),
-    radial-gradient(circle at 54% 42%, rgba(255,255,255,0.20) 0%, transparent 55%),
-    radial-gradient(circle at 10% 50%, rgba(198,234,255,0.24) 0%, transparent 58%),
-    radial-gradient(circle at 64% 88%, rgba(255,250,205,0.20) 0%, transparent 55%);
-  filter: blur(3px);
-}
-
 /* ═══ EAU — bulles + caustiques (l'autre moitié de « verre ET eau ») ═══
    Bulle = cerne lumineux + point spéculaire décalé, centre transparent.
    Chaque bulle = 2 dégradés de même `background-position`/`-size` (le tile),
    donc cerne et reflet restent alignés quelle que soit la taille. */
-.aero-water {
-  position: fixed; inset: -10%; z-index: -1; pointer-events: none;
-  background-repeat: no-repeat;
-  background-image:
-    radial-gradient(circle at 41% 35%, rgba(255,255,255,0.95) 0 6%, transparent 7%),
-    radial-gradient(circle at 50% 50%, transparent 60%, rgba(255,255,255,0.52) 66%, rgba(190,235,255,0.20) 74%, transparent 80%),
-    radial-gradient(circle at 41% 35%, rgba(255,255,255,0.92) 0 6%, transparent 7%),
-    radial-gradient(circle at 50% 50%, transparent 62%, rgba(255,255,255,0.42) 68%, transparent 78%),
-    radial-gradient(circle at 41% 35%, rgba(255,255,255,0.88) 0 7%, transparent 8%),
-    radial-gradient(circle at 50% 50%, transparent 64%, rgba(255,255,255,0.34) 70%, transparent 80%),
-    radial-gradient(circle at 41% 35%, rgba(255,255,255,0.82) 0 6%, transparent 7%),
-    radial-gradient(circle at 50% 50%, transparent 62%, rgba(255,255,255,0.28) 68%, transparent 78%),
-    /* caustiques : rayons de lumière réfractée dans l'eau */
-    linear-gradient(114deg, transparent 42%, rgba(255,255,255,0.10) 46%, transparent 50%),
-    linear-gradient(114deg, transparent 60%, rgba(200,240,255,0.08) 64%, transparent 68%);
-  background-size:
-    86px 86px, 86px 86px,
-    142px 142px, 142px 142px,
-    58px 58px, 58px 58px,
-    112px 112px, 112px 112px,
-    100% 100%, 100% 100%;
-  background-position:
-    25% 26%, 25% 26%,
-    73% 57%, 73% 57%,
-    51% 83%, 51% 83%,
-    89% 31%, 89% 31%,
-    0 0, 0 0;
-  animation: aeroWater 78s ease-in-out infinite;
-  will-change: transform;
-}
 /* « Energetic » du backronym Aero : dérive lente, transform seul (composité) */
-@keyframes aeroWater {
-  0%   { transform: translate3d(0, 1.6%, 0); }
-  50%  { transform: translate3d(-1.2%, -1.6%, 0); }
-  100% { transform: translate3d(0, 1.6%, 0); }
-}
-
-.dark .aero-bokeh {
-  background-image:
-    radial-gradient(circle at 18% 10%, rgba(150,215,255,0.22) 0%, transparent 52%),
-    radial-gradient(circle at 76% 16%, rgba(255,255,255,0.15) 0%, transparent 60%),
-    radial-gradient(circle at 90% 60%, rgba(0,200,255,0.15) 0%, transparent 58%),
-    radial-gradient(circle at 28% 80%, rgba(0,230,200,0.12) 0%, transparent 56%),
-    radial-gradient(circle at 54% 42%, rgba(255,255,255,0.07) 0%, transparent 50%),
-    radial-gradient(circle at 10% 50%, rgba(90,180,255,0.13) 0%, transparent 54%),
-    radial-gradient(circle at 64% 88%, rgba(185,140,255,0.10) 0%, transparent 52%);
-}
-.dark .aero-water {
-  background-image:
-    radial-gradient(circle at 41% 35%, rgba(255,255,255,0.75) 0 6%, transparent 7%),
-    radial-gradient(circle at 50% 50%, transparent 60%, rgba(120,230,255,0.40) 66%, rgba(60,180,240,0.16) 74%, transparent 80%),
-    radial-gradient(circle at 41% 35%, rgba(255,255,255,0.70) 0 6%, transparent 7%),
-    radial-gradient(circle at 50% 50%, transparent 62%, rgba(120,230,255,0.32) 68%, transparent 78%),
-    radial-gradient(circle at 41% 35%, rgba(255,255,255,0.66) 0 7%, transparent 8%),
-    radial-gradient(circle at 50% 50%, transparent 64%, rgba(160,120,255,0.24) 70%, transparent 80%),
-    radial-gradient(circle at 41% 35%, rgba(255,255,255,0.60) 0 6%, transparent 7%),
-    radial-gradient(circle at 50% 50%, transparent 62%, rgba(120,230,255,0.22) 68%, transparent 78%),
-    linear-gradient(114deg, transparent 42%, rgba(0,200,255,0.10) 46%, transparent 50%),
-    linear-gradient(114deg, transparent 60%, rgba(120,230,255,0.07) 64%, transparent 68%);
-}
-
 /* Ambiance décorative : la respecter coûte plus qu'elle ne rapporte */
 @media (prefers-reduced-motion: reduce) {
-  .aero-water { animation: none; }
 }
 
 /* ═══ P#4 HEADER ORB — globe terrestre en verre ═══
@@ -865,6 +776,192 @@ h1, h2, h3, .dashboard-title {
 .stat-val { font-weight: 700; color: var(--accent); }
 .stat-pos { color: #26a69a; font-weight: 700; }
 .stat-neg { color: #ef5350; font-weight: 700; }
+/* ══════════════════════════════════════════════════════════════════════════
+   LIQUID GLASS v2 — refonte du design (15/09/2026)
+
+   Ce qui n'allait pas, et qui n'était PAS un problème de couleur : l'UI
+   couvrait 100 % du viewport en bandes opaques bord à bord. Chez Apple le
+   liquid glass repose sur des COUCHES FLOTTANTES séparées par des gouttières,
+   posées sur un fond vivant. Sans gouttière il n'y a rien à traverser : le
+   verre n'a nulle part où exister. Aucun réglage de teinte ne répare ça — il
+   fallait changer la géométrie.
+
+   Structure (règle de nikdelvin/liquid-glass, MIT — §4.3 du rapport) :
+   z-0 fond vivant / z-1 trame / z-2 filtre hyalite / z-3 contenu.
+   ⚠️ Le TEXTE ne doit JAMAIS être dans le nœud qui porte le filtre, sinon il
+   est déformé. D'où : hyalite sur les surfaces, jamais sur les pastilles.
+
+   Inséré AVANT le bloc RESPONSIVE à dessein : les @media mobiles doivent
+   continuer de gagner la cascade (leçon du 14/09 — un bloc placé après les
+   @media les neutralise silencieusement).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --lg-r-bar: 999px;          /* capsules : barres */
+  --lg-r-card: 26px;          /* squircles : cartes */
+  --lg-gutter: 10px;          /* la gouttière par où le fond apparaît */
+  --lg-gap: 9px;
+  --lg-tint: rgba(255,255,255,0.42);
+  --lg-tint-solid: rgba(255,255,255,0.62);
+  --lg-tint-hi: rgba(255,255,255,0.80);
+  /* Cerne lumineux directionnel — valeurs de rdev/liquid-glass-react (MIT) :
+     « 0 0 0 0.5px … inset, 0 1px 3px … inset, 0 1px 4px rgba(0,0,0,0.35) ».
+     Un cerne SANS biseau : c'est ce qui remplace la pliure rejetée. */
+  --lg-rim: 0 1px 0 rgba(255,255,255,0.85) inset,
+            0 0 0 0.5px rgba(255,255,255,0.55) inset,
+            0 1px 3px rgba(255,255,255,0.30) inset,
+            0 -1px 2px rgba(255,255,255,0.28) inset,
+            0 1px 4px rgba(0,0,0,0.30) inset;
+  --lg-shadow: 0 18px 44px rgba(5,28,52,0.26), 0 3px 10px rgba(5,28,52,0.16);
+  --lg-shadow-sm: 0 6px 18px rgba(5,28,52,0.24), 0 1px 4px rgba(5,28,52,0.16);
+}
+
+/* ── 1. LE FOND VIVANT ────────────────────────────────────────────────────
+   Un verre posé sur un aplat pâle n'a rien à montrer : c'est ce qui rendait
+   tout plat. Maillage de dégradés radiaux sur un fond saturé, comme un fond
+   d'écran Apple. C'est CE fond que les panneaux réfractent.
+   ⚠️ Sur `body` et non sur un pseudo-élément : un `body::before` en z-index
+   négatif se fait recouvrir par le fond propagé au canvas — le maillage était
+   invisible. `background-attachment: fixed` garde le fond en place sous les
+   gouttières. */
+body {
+  background:
+    radial-gradient(circle at 15% 20%, rgba(255,255,255,0.65) 0 46px, rgba(255,255,255,0) 47px),
+    radial-gradient(circle at 82% 15%, rgba(255,255,255,0.45) 0 88px, rgba(255,255,255,0) 89px),
+    radial-gradient(circle at 38% 78%, rgba(255,255,255,0.38) 0 130px, rgba(255,255,255,0) 131px),
+    radial-gradient(circle at 68% 48%, rgba(255,255,255,0.50) 0 22px, rgba(255,255,255,0) 23px),
+    radial-gradient(circle at 8% 62%,  rgba(255,255,255,0.42) 0 66px, rgba(255,255,255,0) 67px),
+    radial-gradient(circle at 92% 82%, rgba(255,255,255,0.40) 0 104px, rgba(255,255,255,0) 105px),
+    radial-gradient(circle at 52% 8%,  rgba(255,255,255,0.35) 0 30px, rgba(255,255,255,0) 31px),
+    radial-gradient(75% 55% at 8% 4%,    rgba(150,120,255,0.58) 0%, rgba(150,120,255,0) 60%),
+    radial-gradient(70% 55% at 92% 8%,   rgba(72,222,255,0.62) 0%, rgba(72,222,255,0) 62%),
+    radial-gradient(90% 70% at 76% 95%,  rgba(118,240,190,0.62) 0%, rgba(118,240,190,0) 66%),
+    radial-gradient(55% 48% at 20% 90%,  rgba(255,205,130,0.52) 0%, rgba(255,205,130,0) 60%),
+    linear-gradient(158deg, #57c8f5 0%, #6fd9e8 26%, #8ce6cf 50%, #b9f0b4 72%, #ffe6a8 92%, #fff3cf 100%);
+  background-attachment: fixed;
+}
+body.dark {
+  background:
+    radial-gradient(78% 58% at 12% 8%,   rgba(96,60,200,0.50) 0%, rgba(96,60,200,0) 62%),
+    radial-gradient(70% 56% at 88% 14%,  rgba(0,150,190,0.42) 0%, rgba(0,150,190,0) 64%),
+    radial-gradient(90% 70% at 70% 92%,  rgba(20,140,120,0.38) 0%, rgba(20,140,120,0) 66%),
+    linear-gradient(158deg, #05121f 0%, #061c30 30%, #07242f 55%, #08302c 80%, #0a2318 100%);
+  background-attachment: fixed;
+}
+/* La trame ne sert qu'à donner à courber à la réfraction : elle doit rester une
+   texture. À 0,42 de blanc sur un fond clair c'était du papier peint. */
+.aero-grid { opacity: 0.75; }
+/* Les couches d'ambiance (aurore/bokeh/eau) ont été retirées : devenues des
+   voiles clairs posés sur le fond vivant, elles ne servaient plus à rien. */
+
+/* ── 2. LES COUCHES FLOTTANTES : les gouttières ───────────────────────────
+   `body` est un flex column : le `gap` crée les gouttières ENTRE les bandes,
+   le `padding` celles des bords. C'est par là que le fond vivant apparaît — et
+   c'est sur ces bords que les panneaux réfractent. */
+body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
+.main-area { gap: var(--lg-gap); padding: 0; }
+
+/* ── 3. LE VERRE — six surfaces, pas une de plus ──────────────────────────
+   Chaque `var(--hyalite, <givre>)` : le givre est le repli là où le filtre SVG
+   de `backdrop-filter` ne rend pas (Safari, Firefox) — le rendu ne régresse
+   pas, il perd seulement la réfraction. */
+.header, .indicator-bar, .chart-container, .feed-panel,
+.strat-section, .aero-taskbar {
+  background: var(--lg-tint);
+  border: none;
+  box-shadow: var(--lg-shadow), var(--lg-rim), var(--hyalite-edge, none);
+  overflow: hidden; position: relative;
+}
+.header {
+  margin: 0; padding: 9px 16px; border-radius: var(--lg-r-bar);
+  backdrop-filter: var(--hyalite, blur(6px) saturate(1.6));
+  -webkit-backdrop-filter: var(--hyalite, blur(6px) saturate(1.6));
+}
+.indicator-bar {
+  margin: 0; padding: 5px 12px; border-radius: var(--lg-r-bar);
+  border-bottom: none;
+  backdrop-filter: var(--hyalite, blur(6px) saturate(1.5));
+  -webkit-backdrop-filter: var(--hyalite, blur(6px) saturate(1.5));
+}
+.chart-container {
+  /* 8 px de bord ne laissaient aucun bord de verre : la réfraction n'avait pas
+     de quoi exister. 16 px lui en donnent un. C'est le prix : 8 px de graphe en
+     moins par côté. */
+  padding: 16px; border-radius: var(--lg-r-card);
+  backdrop-filter: var(--hyalite, blur(5px) saturate(1.7));
+  -webkit-backdrop-filter: var(--hyalite, blur(5px) saturate(1.7));
+}
+.feed-panel {
+  border-left: none; border-radius: var(--lg-r-card);
+  backdrop-filter: var(--hyalite, blur(6px) saturate(1.5));
+  -webkit-backdrop-filter: var(--hyalite, blur(6px) saturate(1.5));
+}
+.strat-section {
+  border-top: none; border-radius: var(--lg-r-card);
+  backdrop-filter: var(--hyalite, blur(6px) saturate(1.5));
+  -webkit-backdrop-filter: var(--hyalite, blur(6px) saturate(1.5));
+}
+.aero-taskbar {
+  /* Elle était fixée bord à bord : capsule flottante, fond visible autour. */
+  left: var(--lg-gutter); right: var(--lg-gutter); bottom: var(--lg-gutter);
+  border-top: none; border-radius: var(--lg-r-bar); padding: 0 16px;
+  backdrop-filter: var(--hyalite, blur(6px) saturate(1.6));
+  -webkit-backdrop-filter: var(--hyalite, blur(6px) saturate(1.6));
+}
+
+/* ── 4. LES PASTILLES — le segmented control d'Apple ──────────────────────
+   Inactif : TEXTE SEUL, aucun fond. Actif : une pastille pleine. Rien d'autre.
+   Sur 23 pastilles c'est la seule façon de rester lisible sans réintroduire
+   les 46 contours. */
+.indicator-bar label {
+  border-radius: var(--lg-r-bar); padding: 5px 12px;
+  border: 1px solid transparent; background: transparent;
+  box-shadow: none; text-shadow: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.indicator-bar label:hover { background: rgba(255,255,255,0.42); }
+.dark .indicator-bar label:hover { background: rgba(255,255,255,0.14); }
+.indicator-bar label.active {
+  background: #0b6bcb; color: #fff; font-weight: 700;
+  box-shadow: 0 1px 5px rgba(6,40,80,0.40), inset 0 1px 0 rgba(255,255,255,0.35);
+}
+.dark .indicator-bar label.active { background: #0f86d8; color: #fff; }
+.indicator-bar label.active .ind-label { color: #fff; }
+.indicator-bar .section-title { opacity: 0.42; font-weight: 600; letter-spacing: 0.4px; }
+.indicator-bar .sep { opacity: 0.5; height: 18px; }
+
+/* Les pastilles du header : capsules plates, comme les boutons d'Apple. */
+.price-badge, .cycle-badge, .theme-btn, .strat-btn, .ind-dropdown-btn {
+  border: 1px solid transparent !important;
+  border-radius: var(--lg-r-bar);
+  background: var(--lg-tint-solid) !important;
+  box-shadow: var(--lg-shadow-sm), var(--lg-rim) !important;
+  text-shadow: none !important;
+}
+.price-badge { font-size: 15px; padding: 5px 15px; }
+.theme-btn:hover, .strat-btn:hover, .ind-dropdown-btn:hover {
+  background: var(--lg-tint-hi) !important; transform: none !important;
+}
+.theme-btn:active, .strat-btn:active { transform: scale(0.97) !important; }
+
+/* ── 5. TYPOGRAPHIE ───────────────────────────────────────────────────────
+   Apple laisse respirer ; les intitulés se lisent APRÈS les données. */
+h1 { letter-spacing: -0.4px; }
+.stat-val, .feed-val, .stat-label { text-shadow: none; }
+
+/* ── 6. DARK ──────────────────────────────────────────────────────────────
+   Le verre sombre garde la même structure : teinte, cerne, réfraction. */
+body.dark .header, body.dark .indicator-bar, body.dark .chart-container,
+body.dark .feed-panel, body.dark .strat-section, body.dark .aero-taskbar {
+  background: rgba(18,30,46,0.60);
+  box-shadow: var(--lg-shadow), inset 0 0 0 0.5px rgba(255,255,255,0.16),
+              0 1px 3px rgba(255,255,255,0.08) inset, var(--hyalite-edge, none);
+}
+body.dark .price-badge, body.dark .cycle-badge, body.dark .theme-btn,
+body.dark .strat-btn, body.dark .ind-dropdown-btn {
+  background: rgba(26,42,62,0.78) !important;
+}
+
 /* ═══ RESPONSIVE ═══
    ⚠️ NE PAS REMONTER CE BLOC. Les règles .strat-* qu'il surcharge sont définies
    plus haut (section GRID BOT) : placé avant elles, l'ancien bloc était
@@ -990,6 +1087,28 @@ h1, h2, h3, .dashboard-title {
   .strat-section .strat-row input[type="number"],
   .strat-section .strat-row input[type="datetime-local"] { font-size: 10px; }
 }
+
+/* ── AJUSTEMENTS MOBILES DE LA REFONTE (en dernier : gagne la cascade) ─────
+   Sur 390 px, chaque pixel de graphe compte et une capsule trop gourmande
+   tronque le badge DXY/VIX. */
+@media (max-width: 800px) {
+  :root { --lg-gutter: 7px; --lg-gap: 6px; }
+  .chart-container { padding: 11px; border-radius: 20px; }
+  .header { padding: 7px 12px; }
+  /* Les boutons ne doivent JAMAIS être recouverts : ils ne se compriment pas,
+     c'est le badge du milieu qui cède, avec des points de suspension. */
+  .header-right { flex-shrink: 0; }
+  .price-badge { flex-shrink: 0; }
+  .cycle-badge {
+    flex-shrink: 1; min-width: 0; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+    font-size: 10px; padding: 3px 8px;
+  }
+  .price-badge { padding: 4px 11px; font-size: 14px; }
+  /* Aucun défilement natif ne doit apparaître dans la carte du graphe. */
+  .chart-container * { scrollbar-width: none; }
+  .chart-container ::-webkit-scrollbar { display: none; }
+}
 </style>
 </head>
 <body>
@@ -997,9 +1116,6 @@ h1, h2, h3, .dashboard-title {
 <!-- Ambiance Frutiger Aero : photo de fond derrière le verre dépoli.
      Ordre = profondeur : aurore → bokeh → eau (bulles/caustiques). -->
 <div class="aero-grid"></div>
-<div class="aero-aurora"></div>
-<div class="aero-bokeh"></div>
-<div class="aero-water"></div>
 
 <div class="header">
   <div class="header-left">
@@ -1958,12 +2074,41 @@ h1, h2, h3, .dashboard-title {
 (function initHyalite() {
   if (typeof Hyalite === 'undefined') return;
   if (!Hyalite.supported()) return;          // Chromium seulement ; sinon flou CSS
-  // Grandes surfaces seulement : sur une barre de 30-40 px, le bevel est bridé à
-  // la demi-petite-dimension et le déplacement (~7 px) ne se lit pas — vérifié au
-  // zoom 4x. Ces deux-là sont assez vastes pour qu'un vrai bord de verre existe.
+  // TROIS surfaces réfractantes, pas six. Deux mesures décident :
+  //  · la réfraction est INVISIBLE sur une barre de 30-40 px (bevel bridé à la
+  //    demi-petite-dimension, déplacement retombé à ~7 px) — vérifié au zoom 4x ;
+  //  · le coût croît avec le nombre de surfaces : 368 ms/frame à 2, 2302 ms à 6
+  //    dans ce conteneur (rendu logiciel, sans GPU — les valeurs absolues ne
+  //    valent pas pour une machine réelle, le RAPPORT si).
+  // Les trois barres gardent donc un givre simple + le cerne spéculaire : elles
+  // lisent comme du verre, sans payer une passe de filtre pour un effet nul.
   const LG = { slope: 1.9, dispersion: 1.6, shade: 0.5, rim: 1.8, edge: 0.4 };
-  Hyalite.watch(document.body, '.feed-panel',      Object.assign({ bevel: 30, thickness: 52, blur: 9  }, LG));
-  Hyalite.watch(document.body, '.strat-section',   Object.assign({ bevel: 26, thickness: 44, blur: 8  }, LG));
+  const b = (bevel, thickness, blur) => Object.assign({ bevel, thickness, blur }, LG);
+  Hyalite.watch(document.body, '.chart-container',  b(28, 50, 4));
+  Hyalite.watch(document.body, '.feed-panel',       b(28, 50, 4));
+  Hyalite.watch(document.body, '.strat-section',    b(24, 42, 4));
+})();
+
+// ============ GARDE-FOU DE PERF (déterministe) ============
+// Les filtres de réfraction coûtent une passe GPU par surface, à chaque repaint du
+// graphe. Mesuré ici : 4x le coût du givre simple. Sur une machine modeste ce serait
+// pénible. On mesure donc UNE fois, et si l'appareil ne tient pas ~12 fps on retire la
+// réfraction — le givre CSS reste, la refonte visuelle est intacte, seul l'effet optique
+// disparaît. Pas de texte qui demande la permission : un seuil mesuré et une décision.
+(function perfGuard() {
+  if (typeof Hyalite === 'undefined') return;
+  requestAnimationFrame(function () {
+    var t0 = performance.now();
+    requestAnimationFrame(function () {
+      var dt = performance.now() - t0;
+      if (dt > 80) {
+        document.querySelectorAll('svg').forEach(function (s) { s.remove(); });
+        document.querySelectorAll('*').forEach(function (e) { e.style.removeProperty('--hyalite'); });
+        document.documentElement.setAttribute('data-glass', 'degrade');
+        console.info('Refraction desactivee : frames a ' + Math.round(dt) + ' ms (seuil 80 ms).');
+      }
+    });
+  });
 })();
 
 // ============ THEME ============
