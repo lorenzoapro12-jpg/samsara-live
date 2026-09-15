@@ -784,9 +784,9 @@ h1, h2, h3, .dashboard-title {
   --lg-r-card: 32px;          /* squircles : cartes */
   --lg-gutter: 13px;          /* la gouttière par où le fond apparaît */
   --lg-gap: 11px;
-  --lg-tint: rgba(255,255,255,0.50);
-  --lg-tint-solid: rgba(255,255,255,0.70);
-  --lg-tint-hi: rgba(255,255,255,0.86);
+  --lg-tint: rgba(255,255,255,0.62);
+  --lg-tint-solid: rgba(255,255,255,0.80);
+  --lg-tint-hi: rgba(255,255,255,0.92);
   /* Cerne lumineux directionnel — valeurs de rdev/liquid-glass-react (MIT) : « 0 0 0 0.5px … inset, 0 1px 3px … inset, 0 1px 4px rgba(0,0,0,0.35) ». Un cerne SANS biseau : c'est ce qui remplace la pliure rejetée. */
   --lg-rim: 0 1px 0 rgba(255,255,255,0.85) inset,
             0 0 0 0.5px rgba(255,255,255,0.55) inset,
@@ -903,7 +903,12 @@ body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
    au lieu de poser un rectangle blanc. Valeurs très claires : les bougies gardent
    leur contraste (rouge/vert sombres sur ~0,88 de luminance). */
 .chart-container canvas {
-  background: linear-gradient(160deg, #eef1fb 0%, #f4f6fd 42%, #fbfcff 100%);
+  /* Légèrement plus profond que le cadre, et une ombre interne sur le pourtour :
+     le contenu se lit CREUSÉ sous la matière au lieu d'être posé dessus. C'est ce
+     qui manquait — le canvas était plus lumineux que le verre qui l'entoure. */
+  background: linear-gradient(160deg, #e9edf9 0%, #eef1fc 45%, #f6f8fe 100%);
+  box-shadow: inset 0 0 20px rgba(58,78,140,0.075),
+              inset 0 1px 0 rgba(255,255,255,0.6);
 }
 .dark .chart-container canvas, body.dark .chart-container canvas {
   background: linear-gradient(160deg, #0b1120 0%, #101728 48%, #151d32 100%);
