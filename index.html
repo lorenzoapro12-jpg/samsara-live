@@ -1079,15 +1079,26 @@ body.dark .strat-btn, body.dark .ind-dropdown-btn {
 @media (max-width: 800px) {
   :root { --lg-gutter: 7px; --lg-gap: 6px; }
   .chart-container { padding: 11px; border-radius: 20px; }
-  .header { padding: 7px 12px; }
+  /* À 390 px : orbe + prix + DXY/VIX + 3 boutons ne tiennent pas ensemble.
+     Comprimé ici plutôt que tronqué — et vérifié par `scrollWidth > clientWidth`,
+     le critère même de l'audit (un contrôle de positions ne l'attrape pas). */
+  .header { padding: 6px 9px; gap: 6px; }
+  /* Sous 520 px, place insuffisante pour orbe + prix + DXY/VIX + 3 boutons.
+     L'orbe est DÉCORATIF, le badge porte de la donnée : c'est l'orbe qui cède.
+     Même arbitrage que le h1, déjà masqué sous 480 px. */
+  .header-orb { display: none; }
+  .price-badge { padding: 3px 7px; font-size: 12px; }
+  /* Sous 375 px (SE 1re gen, Android anciens) même l'orbe retiré ne suffit plus :
+     le prix disparaît du header — il reste affiché en gros sur l'axe Y du graphe. */
+  @media (max-width: 375px) { .price-badge { display: none; } }
   /* Les boutons ne doivent JAMAIS être recouverts : ils ne se compriment pas,
      c'est le badge du milieu qui cède, avec des points de suspension. */
   .header-right { flex-shrink: 0; }
-  .price-badge { flex-shrink: 0; padding: 4px 11px; font-size: 14px; }
+  .price-badge { flex-shrink: 0; padding: 3px 8px; font-size: 12.5px; }
   .cycle-badge {
     flex-shrink: 1; min-width: 0; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis;
-    font-size: 10px; padding: 3px 8px;
+    font-size: 9.5px; padding: 2px 7px;
   }
   /* Aucun défilement natif ne doit apparaître dans la carte du graphe. */
 }
