@@ -121,7 +121,13 @@ body {
   color: var(--text);
   font-family: var(--font);
   font-size: 13px; line-height: 1.5;
-  display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+  display: flex; flex-direction: column;
+  height: 100vh;
+  height: 100dvh; /* iOS/Android : 100vh inclut la barre d'URL → le bas (Range
+                     Selector, taskbar) passait sous le pli, inaccessible
+                     puisque overflow:hidden. 100dvh suit la hauteur visible. */
+  overflow: hidden;
+  -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   padding-bottom: 30px; /* Aero taskbar */
 }
@@ -313,6 +319,10 @@ body {
   border-radius: 6px;
   background: var(--canvas-bg);
   box-shadow: inset 0 2px 6px rgba(0,0,0,0.25), inset 0 -1px 2px rgba(255,255,255,0.2);
+  /* Le chart gère lui-même pan / pinch (touchstart→touchmove, passive:false).
+     Sans ceci le navigateur mobile déclenche son propre scroll/zoom en
+     concurrence : pan saccadé, et le double-tap zoome la page. */
+  touch-action: none;
 }
 /* Amplification : reflet double + bulle glossy */
 .chart-container .gloss-bubble {
@@ -649,84 +659,6 @@ h1, h2, h3, .dashboard-title {
   text-shadow: var(--aero-text-emboss);
 }
 
-/* ═══ RESPONSIVE ═══ */
-@media (max-width: 768px) {
-  body { font-size: 12px; }
-  .header { padding: 8px 12px; }
-  .header-left h1 { font-size: 15px; }
-  .header-left { gap: 8px; }
-  .price-badge { font-size: 13px; padding: 3px 8px; }
-  .cycle-badge { font-size: 10px; padding: 3px 8px; }
-  .header-right { gap: 6px; }
-  .header-right #updated { display: none; }
-  .theme-btn { font-size: 11px; padding: 4px 8px; }
-
-  .indicator-bar { padding: 5px 10px; gap: 4px; }
-  .indicator-bar label { padding: 3px 7px; font-size: 10px; gap: 3px; }
-  .indicator-bar .section-title { font-size: 8px; }
-  .indicator-bar .sep { height: 14px; margin: 0 3px; }
-  .ind-dropdown-btn { font-size: 10px; padding: 3px 8px; }
-  .ind-dropdown-menu { min-width: 220px; max-height: 50vh; font-size: 11px; }
-
-  .main-area { flex-direction: column; overflow: hidden; }
-  .chart-container { height: 100%; }
-  .feed-panel { display: none !important; }
-
-  /* Grid bot — stacked single column on mobile */
-  .strat-section:not(.collapsed) { height: 200px; }
-  .strat-section { height: 36px; } /* larger touch target */
-  .strat-handle { height: 36px; padding: 0 14px; font-size: 13px; }
-  .strat-body { height: calc(100% - 36px); }
-  .strat-cols { flex-direction: column; gap: 8px; }
-  .strat-col-config { flex: none; width: 100%; }
-  .strat-col-actions { flex: none; width: 100%; flex-direction: row; flex-wrap: wrap; gap: 4px; }
-  .strat-col-actions .strat-btn { flex: 1; min-width: 80px; font-size: 10px; padding: 6px 8px; }
-  .strat-col-actions .strat-toggle { width: 100%; text-align: center; }
-  .strat-col-stats { flex: none; width: 100%; min-width: unset; font-size: 10px; }
-  .strat-body { padding: 8px 10px; }
-  .strat-section .strat-row { margin-bottom: 4px; }
-  .strat-section .strat-row label { min-width: 55px; font-size: 9px; }
-  .strat-section .strat-row select,
-  .strat-section .strat-row input[type="number"],
-  .strat-section .strat-row input[type="datetime-local"] { font-size: 10px; padding: 3px 5px; }
-  .strat-section .strat-stats { font-size: 10px; line-height: 1.4; }
-  .strat-section .strat-btn { font-size: 10px; }
-
-  .feed { padding: 10px; gap: 10px; word-break: break-word; overflow-wrap: break-word; }
-  .demon-card { padding: 12px; }
-  .demon-name { font-size: 13px; }
-  .demon-body { font-size: 11px; }
-  .sister-card-header { padding: 10px 12px; gap: 8px; }
-  .sister-avatar { font-size: 16px; }
-  .sister-title { font-size: 12px; }
-  .sister-card-body { max-height: none; overflow-y: visible; font-size: 11px; }
-  .sister-card-body pre { max-width: 100%; overflow-x: auto; font-size: 10px; }
-  .sister-card-body blockquote { margin: 8px 0; padding: 4px 8px; }
-  .targets-mini { gap: 3px; }
-  .target-chip { font-size: 9px; padding: 4px 7px; gap: 4px; flex-wrap: wrap; }
-  .demon-header { flex-wrap: wrap; }
-  .sister-meta { gap: 3px; }
-}
-
-@media (max-width: 400px) {
-  .header-left h1 { font-size: 13px; }
-  .price-badge { font-size: 11px; }
-  .indicator-bar label { padding: 2px 5px; font-size: 9px; }
-  .indicator-bar .section-title { display: none; }
-  .aero-taskbar { height: 24px; padding: 0 8px; font-size: 10px; }
-  .header-orb { width: 26px; height: 26px; font-size: 12px; }
-
-  /* Grid bot — ultra-compact */
-  .strat-section:not(.collapsed) { height: 170px; }
-  .strat-section { height: 34px; }
-  .strat-handle { height: 34px; font-size: 12px; }
-  .strat-body { height: calc(100% - 34px); }
-  .strat-col-actions .strat-btn { font-size: 9px; padding: 4px 6px; }
-  .strat-section .strat-row label { min-width: 45px; font-size: 8px; }
-  .strat-section .strat-row select,
-  .strat-section .strat-row input[type="number"],
-  .strat-section .strat-row input[type="datetime-local"] { font-size: 9px; }
-}
 
 /* ═══ GRID BOT SECTION — bottom panel under chart ═══ */
 .strat-section {
@@ -797,6 +729,129 @@ h1, h2, h3, .dashboard-title {
 .stat-val { font-weight: 700; color: var(--accent); }
 .stat-pos { color: #26a69a; font-weight: 700; }
 .stat-neg { color: #ef5350; font-weight: 700; }
+/* ═══ RESPONSIVE ═══
+   ⚠️ NE PAS REMONTER CE BLOC. Les règles .strat-* qu'il surcharge sont définies
+   plus haut (section GRID BOT) : placé avant elles, l'ancien bloc était
+   neutralisé par la cascade (même spécificité, base plus tardive) et tout le
+   layout mobile du Grid Bot était du code mort. Il doit rester le dernier. */
+@media (max-width: 768px) {
+  body { font-size: 12px; -webkit-tap-highlight-color: transparent; }
+  .header { padding: 6px 8px; gap: 6px; }
+  .header-left { gap: 6px; min-width: 0; flex: 1 1 auto; }
+  .header-left h1 { font-size: 15px; }
+  .header-right { gap: 6px; flex-shrink: 0; }
+  .header-right #updated { display: none; }
+  .price-badge { font-size: 13px; padding: 3px 8px; white-space: nowrap; flex-shrink: 0; }
+  /* DXY/VIX : une seule ligne tronquée. Sans nowrap, le badge se replie sur
+     3 lignes (68 px de haut) et fait passer le header de ~44 à 85 px. */
+  .cycle-badge {
+    font-size: 10px; padding: 3px 8px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    min-width: 0; max-width: 46vw;
+  }
+  .theme-btn { font-size: 11px; padding: 4px 7px; }
+
+  /* Cibles tactiles : 20 px de haut, intappables au pouce */
+  .indicator-bar {
+    padding: 4px 10px; gap: 4px;
+    -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+  }
+  .indicator-bar label { padding: 7px 11px; font-size: 11px; gap: 3px; }
+  .indicator-bar label:active { transform: scale(0.94); }
+  .indicator-bar .section-title { font-size: 8px; }
+  .indicator-bar .sep { height: 18px; margin: 0 3px; }
+  .ind-dropdown-btn { font-size: 11px; padding: 7px 10px; }
+  .ind-dropdown-menu { min-width: 220px; max-height: 50vh; font-size: 11px; }
+
+  /* Ruban : au pouce, Intervalle et Paire étaient à ~3 écrans de scroll à
+     droite — les deux commandes les plus utilisées. Remontées en tête via
+     `order`. Titres et `sep` sont des éléments span frères, dans l'ordre
+     titre, sep, titre, sep… d'où les nth-of-type (1-2 Overlays, 3-4
+     Sous-graphes, 5-6 Intervalle, 7-8 Paire). Si l'ordre des span du ruban
+     change, ces deux sélecteurs sont à réaligner. */
+  .indicator-bar > span:nth-of-type(5),
+  .indicator-bar > span:nth-of-type(6),
+  .indicator-bar > label[id^="int_"] { order: -2; }
+  .indicator-bar > span:nth-of-type(7),
+  .indicator-bar > span:nth-of-type(8),
+  .indicator-bar > label[id^="sym_"] { order: -1; }
+
+  .main-area { flex-direction: column; overflow: hidden; }
+  .chart-container { height: 100%; }
+  .feed-panel { display: none !important; }
+  /* Modal « Marché live » : le body est un flex column, ses cartes se
+     comprimaient (6 cartes mesurées à 93/77/158/166/123/76 px pour 1178 px de
+     contenu, scrollHeight === clientHeight) → ~390 px de données illisibles. */
+  #marketModalBody > * { flex-shrink: 0; }
+
+  /* Grid bot — colonnes empilées. La config fait ~250 px : à 200 px de section
+     les 5 boutons d'action restaient sous la ligne de flottaison, il fallait
+     scroller pour lancer le backtest. */
+  .strat-section:not(.collapsed) { height: 330px; height: min(46dvh, 330px); }
+  .strat-section { height: 36px; } /* cible tactile */
+  .strat-handle { height: 36px; padding: 0 14px; font-size: 13px; }
+  .strat-body { height: calc(100% - 36px); padding: 8px 10px; }
+  .strat-cols { flex-direction: column; gap: 8px; }
+  .strat-col-config { flex: none; width: 100%; }
+  .strat-col-actions { flex: none; width: 100%; flex-direction: row; flex-wrap: wrap; gap: 4px; }
+  .strat-col-actions .strat-btn { flex: 1; min-width: 80px; font-size: 10px; padding: 8px 8px; }
+  .strat-col-actions .strat-toggle { width: 100%; text-align: center; }
+  .strat-col-stats { flex: none; width: 100%; min-width: unset; font-size: 10px; }
+  .strat-section .strat-row { margin-bottom: 4px; }
+  .strat-section .strat-row label { min-width: 55px; font-size: 10px; }
+  .strat-section .strat-row select,
+  .strat-section .strat-row input[type="number"],
+  .strat-section .strat-row input[type="datetime-local"] { font-size: 11px; padding: 4px 5px; }
+  .strat-section .strat-stats { font-size: 10px; line-height: 1.4; }
+  .strat-section .strat-btn { font-size: 10px; }
+
+  .feed { padding: 10px; gap: 10px; word-break: break-word; overflow-wrap: break-word; }
+  .demon-card { padding: 12px; }
+  .demon-name { font-size: 13px; }
+  .demon-body { font-size: 11px; }
+  .sister-card-header { padding: 10px 12px; gap: 8px; }
+  .sister-avatar { font-size: 16px; }
+  .sister-title { font-size: 12px; }
+  .sister-card-body { max-height: none; overflow-y: visible; font-size: 11px; }
+  .sister-card-body pre { max-width: 100%; overflow-x: auto; font-size: 10px; }
+  .sister-card-body blockquote { margin: 8px 0; padding: 4px 8px; }
+  .targets-mini { gap: 3px; }
+  .target-chip { font-size: 9px; padding: 4px 7px; gap: 4px; flex-wrap: wrap; }
+  .demon-header { flex-wrap: wrap; }
+  .sister-meta { gap: 3px; }
+}
+
+/* Sous 480 px les 4 blocs du header ne tiennent plus sur une ligne.
+   On sacrifie le mot-symbole (l'orbe et le <title> portent l'identité) et on
+   resserre paddings/gaps de quelques px pour que « DXY xx · VIX xx » — 132 px —
+   reste lisible en entier sur un 390 px plutôt que tronqué en « DXY xx · … ». */
+@media (max-width: 480px) {
+  .header-left h1 { display: none; }
+  .header { padding: 6px 6px; gap: 4px; }
+  .header-left { gap: 4px; }
+  .theme-btn { padding: 4px 6px; }
+  .price-badge { font-size: 12px; padding: 3px 7px; }
+  .cycle-badge { padding: 3px 6px; max-width: 40vw; }
+}
+
+@media (max-width: 400px) {
+  .price-badge { font-size: 11px; }
+  .indicator-bar label { padding: 6px 9px; font-size: 10px; }
+  .indicator-bar .section-title { display: none; }
+  .aero-taskbar { height: 24px; padding: 0 8px; font-size: 10px; }
+  .header-orb { width: 26px; height: 26px; font-size: 12px; }
+
+  /* Grid bot — ultra-compact */
+  .strat-section:not(.collapsed) { height: 310px; height: min(46dvh, 310px); }
+  .strat-section { height: 34px; }
+  .strat-handle { height: 34px; font-size: 12px; }
+  .strat-body { height: calc(100% - 34px); }
+  .strat-col-actions .strat-btn { font-size: 9px; padding: 6px 6px; }
+  .strat-section .strat-row label { min-width: 45px; font-size: 9px; }
+  .strat-section .strat-row select,
+  .strat-section .strat-row input[type="number"],
+  .strat-section .strat-row input[type="datetime-local"] { font-size: 10px; }
+}
 </style>
 </head>
 <body>
@@ -1453,14 +1508,23 @@ canvas.addEventListener('touchend', () => {
 function isMobile() { return window.innerWidth <= 768; }
 function resizeCanvas() {
   const container = canvas.parentElement;
-  const totalH = container.clientHeight;
-  if (totalH < 100) return;
-  canvas.width = container.clientWidth * window.devicePixelRatio;
-  canvas.height = totalH * window.devicePixelRatio;
+  // ⚠️ clientWidth/clientHeight INCLUENT le padding du conteneur (8 px de
+  // chaque côté) : le canvas était donc dimensionné 16 px trop grand, sa
+  // boîte débordait celle du conteneur et `overflow:hidden` rognait le bord
+  // droit et le bas — libellés de prix tronqués et pastille de prix coupée
+  // (« $77036.96( »), à toutes les largeurs.
+  const cs = getComputedStyle(container);
+  const innerW = container.clientWidth
+    - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const innerH = container.clientHeight
+    - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  if (innerH < 100) return;
+  canvas.width = innerW * window.devicePixelRatio;
+  canvas.height = innerH * window.devicePixelRatio;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-  canvas.style.width = container.clientWidth + 'px';
-  canvas.style.height = totalH + 'px';
+  canvas.style.width = innerW + 'px';
+  canvas.style.height = innerH + 'px';
 }
 window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
 
@@ -2628,7 +2692,9 @@ function drawChart() {
   ctx.save();
   ctx.globalAlpha = 0.03;
   ctx.fillStyle = dark ? '#ffffff' : '#000000';
-  ctx.font = '900 64px sans-serif';
+  // Taille bridée au tracé disponible : à 64 px fixes « BTCUSDT » (~330 px)
+  // débordait du graphe sur téléphone et se faisait rogner par le bord gauche.
+  ctx.font = '900 ' + Math.min(64, Math.round((W - 16 - 75) / 5.6)) + 'px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(activeSymbol, (W - 50) / 2, mainH / 2);
   ctx.restore();
@@ -2957,15 +3023,25 @@ function resolveChart(candles, padL, padR, chartH, W) {
     ctx.fillStyle = '#f0b90b'; 
     ctx.beginPath(); ctx.moveTo(triX, triY - 4); ctx.lineTo(triX + 8, triY); ctx.lineTo(triX, triY + 4);
     ctx.closePath(); ctx.fill();
-    // Badge prix
+    // Badge prix — désormais l'unique pastille de prix (l'axe Y).
+    // pad.right = 75 px pour un libellé 3 décimales de 76 px : le badge sortait
+    // du canvas de ~13 px (« $77085.0(| ») à toutes les largeurs. On le recale
+    // vers la gauche au lieu d'élargir pad.right (13 sites couplés au
+    // Range Selector et au hit-test souris).
     const lpStr = '$' + livePrice.toFixed(3);
     ctx.font = 'bold 10px monospace';
     const lw = ctx.measureText(lpStr).width + 10;
-    ctx.fillStyle = dark ? 'rgba(22,27,34,0.92)' : 'rgba(246,248,250,0.92)';
+    const bx = Math.min(triX + 10, W - 3 - lw);
+    // Opaque : le badge recule sur le libellé de grille de même ordonnée quand
+    // la colonne est étroite, et le laissait transparaître en transparence.
+    ctx.fillStyle = dark ? '#161b22' : '#f6f8fa';
     ctx.strokeStyle = '#f0b90b'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.roundRect(triX + 10, triY - 10, lw, 20, 5); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(bx, triY - 10, lw, 20, 5); ctx.fill(); ctx.stroke();
+    // Triangle redessiné par-dessus : il reste visible si le badge a reculé
     ctx.fillStyle = '#f0b90b';
-    ctx.fillText(lpStr, triX + 15, triY + 4);
+    ctx.beginPath(); ctx.moveTo(triX, triY - 4); ctx.lineTo(triX + 8, triY); ctx.lineTo(triX, triY + 4);
+    ctx.closePath(); ctx.fill();
+    ctx.fillText(lpStr, bx + 5, triY + 4);
   }
   
   // Bollinger
@@ -3232,32 +3308,38 @@ function resolveChart(candles, padL, padR, chartH, W) {
     drawSide(hm.asks, HEAT_ASK);
   }
   
-  // Time labels (X axis)
+  // Time labels (X axis) — densité ET format déduits de la largeur réellement
+  // disponible. Avec 6 libellés fixes, sur téléphone (299 px de tracé) ils se
+  // chevauchaient (« 15/09 01:0015/09 03:30 ») ; et le décalage fixe `tx - 25`
+  // rognait le premier libellé au bord gauche, même sur desktop.
   ctx.fillStyle = COLORS.text; ctx.font = '9px monospace';
-  const numLabels = Math.min(6, visible.length);
+  const tickAvailW = W - pad.left - pad.right;
+  const intraday = ['1m','5m','15m','1h','4h'].includes(chartInterval);
+  const fmtTick = t => {
+    if (chartInterval === '1d' || chartInterval === '1w') return t.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'});
+    // Intraday étroit : garder l'heure seule (la plage datée est en haut à gauche)
+    if (intraday && tickAvailW < 420) return t.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    return t.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'}) + ' ' + t.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+  };
+  const tickW = ctx.measureText(fmtTick(new Date(visible[0].time * 1000))).width;
+  const numLabels = Math.min(6, Math.max(2, Math.floor(tickAvailW / (tickW + 18))));
   for (let j = 0; j < numLabels; j++) {
     const idx = Math.round((visible.length - 1) * j / (numLabels - 1));
     if (idx >= visible.length) continue;
-    const t = new Date(visible[idx].time * 1000);
-    let label;
-    if (chartInterval === '1m' || chartInterval === '5m') label = t.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
-    else if (chartInterval === '1d') label = t.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'});
-    else label = t.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'}) + ' ' + t.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
-    const tx = pad.left + gap * idx;
-    ctx.fillText(label, tx - 25, chartH - 3);
+    const label = fmtTick(new Date(visible[idx].time * 1000));
+    const lw = ctx.measureText(label).width;
+    // Centré sur la bougie, puis contraint à l'intérieur du tracé
+    const tx = Math.max(pad.left, Math.min(W - pad.right - lw, pad.left + gap * idx - lw / 2));
+    ctx.fillText(label, tx, chartH - 3);
   }
   
-  // Price line (live)
+  // Price line (live) — la pastille de prix est sur l'axe Y (voir plus bas) :
+  // elle y était dupliquée ici, créant deux badges identiques côte à côte.
   if (livePrice) {
     const yP = pad.top + ph * (1 - (livePrice - minP) / range);
     ctx.strokeStyle = '#f0b90b'; ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
     ctx.beginPath(); ctx.moveTo(pad.left, yP); ctx.lineTo(W - pad.right, yP); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = dark ? 'rgba(22,27,34,0.9)' : 'rgba(246,248,250,0.9)';
-    ctx.strokeStyle = '#f0b90b'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.roundRect(W - pad.right - 72, yP - 12, 68, 18, 4); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#f0b90b'; ctx.font = 'bold 11px monospace';
-    ctx.fillText('$' + livePrice.toFixed(3), W - pad.right - 68, yP + 2);
   }
 
   // ─── Trade markers (backtest) ───
