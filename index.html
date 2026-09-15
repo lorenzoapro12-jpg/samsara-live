@@ -779,8 +779,8 @@ h1, h2, h3, .dashboard-title {
 /* ══════════════════════════════════════════════════════════════════════════
    LIQUID GLASS v2 — refonte du design (15/09/2026)
 
-   Ce qui n'allait pas, et qui n'était PAS un problème de couleur : l'UI
-   couvrait 100 % du viewport en bandes opaques bord à bord. Chez Apple le
+   Ce qui n'allait pas, et qui n'était PAS une couleur : l'UI couvrait 100 % du viewport en
+   bandes opaques bord à bord. Chez Apple le
    liquid glass repose sur des COUCHES FLOTTANTES séparées par des gouttières,
    posées sur un fond vivant. Sans gouttière il n'y a rien à traverser : le
    verre n'a nulle part où exister. Aucun réglage de teinte ne répare ça — il
@@ -871,42 +871,33 @@ body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
   border: none;
   box-shadow: var(--lg-shadow), var(--lg-rim), var(--hyalite-edge, none);
   overflow: hidden; position: relative;
+  /* Une seule déclaration pour les six : le repli est le même partout. */
+  backdrop-filter: var(--hyalite, blur(6px) saturate(1.6));
+  -webkit-backdrop-filter: var(--hyalite, blur(6px) saturate(1.6));
 }
 .header {
   margin: 0; padding: 9px 16px; border-radius: var(--lg-r-bar);
-  backdrop-filter: var(--hyalite, blur(6px) saturate(1.6));
-  -webkit-backdrop-filter: var(--hyalite, blur(6px) saturate(1.6));
 }
 .indicator-bar {
   margin: 0; padding: 5px 12px; border-radius: var(--lg-r-bar);
   border-bottom: none;
-  backdrop-filter: var(--hyalite, blur(6px) saturate(1.5));
-  -webkit-backdrop-filter: var(--hyalite, blur(6px) saturate(1.5));
 }
 .chart-container {
   /* 8 px de bord ne laissaient aucun bord de verre : la réfraction n'avait pas
      de quoi exister. 16 px lui en donnent un. C'est le prix : 8 px de graphe en
      moins par côté. */
   padding: 16px; border-radius: var(--lg-r-card);
-  backdrop-filter: var(--hyalite, blur(5px) saturate(1.7));
-  -webkit-backdrop-filter: var(--hyalite, blur(5px) saturate(1.7));
 }
 .feed-panel {
   border-left: none; border-radius: var(--lg-r-card);
-  backdrop-filter: var(--hyalite, blur(6px) saturate(1.5));
-  -webkit-backdrop-filter: var(--hyalite, blur(6px) saturate(1.5));
 }
 .strat-section {
   border-top: none; border-radius: var(--lg-r-card);
-  backdrop-filter: var(--hyalite, blur(6px) saturate(1.5));
-  -webkit-backdrop-filter: var(--hyalite, blur(6px) saturate(1.5));
 }
 .aero-taskbar {
   /* Elle était fixée bord à bord : capsule flottante, fond visible autour. */
   left: var(--lg-gutter); right: var(--lg-gutter); bottom: var(--lg-gutter);
   border-top: none; border-radius: var(--lg-r-bar); padding: 0 16px;
-  backdrop-filter: var(--hyalite, blur(6px) saturate(1.6));
-  -webkit-backdrop-filter: var(--hyalite, blur(6px) saturate(1.6));
 }
 
 /* ── 4. LES PASTILLES — le segmented control d'Apple ──────────────────────
@@ -1098,16 +1089,13 @@ body.dark .strat-btn, body.dark .ind-dropdown-btn {
   /* Les boutons ne doivent JAMAIS être recouverts : ils ne se compriment pas,
      c'est le badge du milieu qui cède, avec des points de suspension. */
   .header-right { flex-shrink: 0; }
-  .price-badge { flex-shrink: 0; }
+  .price-badge { flex-shrink: 0; padding: 4px 11px; font-size: 14px; }
   .cycle-badge {
     flex-shrink: 1; min-width: 0; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis;
     font-size: 10px; padding: 3px 8px;
   }
-  .price-badge { padding: 4px 11px; font-size: 14px; }
   /* Aucun défilement natif ne doit apparaître dans la carte du graphe. */
-  .chart-container * { scrollbar-width: none; }
-  .chart-container ::-webkit-scrollbar { display: none; }
 }
 </style>
 </head>
