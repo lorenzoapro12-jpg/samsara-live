@@ -777,12 +777,7 @@ h1, h2, h3, .dashboard-title {
 .stat-val { font-weight: 700; color: var(--accent); }
 .stat-pos { color: #26a69a; font-weight: 700; }
 .stat-neg { color: #ef5350; font-weight: 700; }
-/* ══ LIQUID GLASS v2 (15/09/2026) — le DÉTAIL des principes et les mesures sont
-   dans le skill frutiger-aero-css §« REFONTE liquid glass ». Résumé : gouttières
-   (couches flottantes) + fond vif ET structuré + teinte ~0,28 + arête spéculaire.
-   Structure nikdelvin (MIT) : z0 fond / z1 trame / z2 filtre hyalite / z3 contenu —
-   le TEXTE ne doit jamais être dans le nœud filtré. Inséré AVANT le bloc
-   RESPONSIVE : les @media mobiles doivent gagner la cascade. ══ */
+/* ══ LIQUID GLASS v2 (15/09/2026) — le DÉTAIL des principes et les mesures sont dans le skill frutiger-aero-css §« REFONTE liquid glass ». Résumé : gouttières (couches flottantes) + fond vif ET structuré + teinte ~0,28 + arête spéculaire. Structure nikdelvin (MIT) : z0 fond / z1 trame / z2 filtre hyalite / z3 contenu — le TEXTE ne doit jamais être dans le nœud filtré. Inséré AVANT le bloc RESPONSIVE : les @media mobiles doivent gagner la cascade. ══ */
 
 :root {
   --lg-r-bar: 999px;          /* capsules : barres */
@@ -792,9 +787,7 @@ h1, h2, h3, .dashboard-title {
   --lg-tint: rgba(255,255,255,0.50);
   --lg-tint-solid: rgba(255,255,255,0.70);
   --lg-tint-hi: rgba(255,255,255,0.86);
-  /* Cerne lumineux directionnel — valeurs de rdev/liquid-glass-react (MIT) :
-     « 0 0 0 0.5px … inset, 0 1px 3px … inset, 0 1px 4px rgba(0,0,0,0.35) ».
-     Un cerne SANS biseau : c'est ce qui remplace la pliure rejetée. */
+  /* Cerne lumineux directionnel — valeurs de rdev/liquid-glass-react (MIT) : « 0 0 0 0.5px … inset, 0 1px 3px … inset, 0 1px 4px rgba(0,0,0,0.35) ». Un cerne SANS biseau : c'est ce qui remplace la pliure rejetée. */
   --lg-rim: 0 1px 0 rgba(255,255,255,0.85) inset,
             0 0 0 0.5px rgba(255,255,255,0.55) inset,
             0 1px 3px rgba(255,255,255,0.30) inset,
@@ -804,9 +797,7 @@ h1, h2, h3, .dashboard-title {
   --lg-shadow-sm: 0 6px 18px rgba(5,28,52,0.24), 0 1px 4px rgba(5,28,52,0.16);
 }
 
-/* ── 1. LE FOND VIVANT — vif ET saturé (un verre sur un aplat pâle = plastique
-   blanc : c'est la couleur qui traverse qui fait le verre). Sur `body`, jamais un
-   `body::before` en z-index négatif : le fond propagé au canvas le recouvre. */
+/* ── 1. LE FOND VIVANT — vif ET saturé (un verre sur un aplat pâle = plastique blanc : c'est la couleur qui traverse qui fait le verre). Sur `body`, jamais un `body::before` en z-index négatif : le fond propagé au canvas le recouvre. */
 body {
   background:
     radial-gradient(circle at 15% 20%, rgba(255,255,255,0.30) 0 46px, rgba(255,255,255,0) 47px),
@@ -833,14 +824,11 @@ body.dark {
 .aero-grid { opacity: 0.6; }
 /* Les couches d'ambiance (aurore/bokeh/eau) ont été retirées — voiles clairs. */
 
-/* ── 2. LES GOUTTIÈRES — `body` flex column : `gap` = entre les bandes,
-   `padding` = aux bords. Sans elles, rien à traverser. */
+/* ── 2. LES GOUTTIÈRES — `body` flex column : `gap` = entre les bandes, `padding` = aux bords. Sans elles, rien à traverser. */
 body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
 .main-area { gap: var(--lg-gap); padding: 0; }
 
-/* ── 3. LE VERRE — hyalite sur les GRANDES surfaces seulement (invisible sur une
-   barre de 30-40 px, et le coût croît avec le nombre de surfaces). Le givre de
-   chaque `var(--hyalite, …)` est le repli Safari/Firefox : pas de régression. */
+/* ── 3. LE VERRE — hyalite sur les GRANDES surfaces seulement (invisible sur une barre de 30-40 px, et le coût croît avec le nombre de surfaces). Le givre de chaque `var(--hyalite, …)` est le repli Safari/Firefox : pas de régression. */
 .header, .indicator-bar, .chart-container, .feed-panel,
 .strat-section, .aero-taskbar {
   background: var(--lg-tint);
@@ -859,9 +847,7 @@ body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
   border-bottom: none;
 }
 .chart-container {
-  /* 8 px de bord ne laissaient aucun bord de verre : la réfraction n'avait pas
-     de quoi exister. 16 px lui en donnent un. C'est le prix : 8 px de graphe en
-     moins par côté. */
+  /* 8 px de bord ne laissaient aucun bord de verre : la réfraction n'avait pas de quoi exister. 16 px lui en donnent un. C'est le prix : 8 px de graphe en moins par côté. */
   padding: 16px; border-radius: var(--lg-r-card);
 }
 .feed-panel {
@@ -876,14 +862,11 @@ body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
   border-top: none; border-radius: var(--lg-r-bar); padding: 0 16px;
 }
 
-/* ── 4. LES PASTILLES — segmented control : inactif = texte seul, actif =
-   pastille pleine. Sur 23 pastilles, seule façon de rester lisible sans
-   réintroduire les 46 contours. */
+/* ── 4. LES PASTILLES — segmented control : inactif = texte seul, actif = pastille pleine. Sur 23 pastilles, seule façon de rester lisible sans réintroduire les 46 contours. */
 .indicator-bar label {
   color: #10233d;
   border-radius: var(--lg-r-bar); padding: 5px 12px;
-  /* Un fond doux, PAS un contour : sans lui le texte coloré tombait sur le fond
-     d'écran qui défile derrière le verre — surface instable = illisible. */
+  /* Un fond doux, PAS un contour : sans lui le texte coloré tombait sur le fond d'écran qui défile derrière le verre — surface instable = illisible. */
   border: 1px solid transparent; background: rgba(255,255,255,0.42);
   box-shadow: none; text-shadow: none;
   transition: background 0.15s ease, color 0.15s ease;
@@ -913,8 +896,20 @@ body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
 }
 .theme-btn:active, .strat-btn:active { transform: scale(0.97) !important; }
 
-/* ── 5. L'ARÊTE SPÉCULAIRE — anneau de 1,5 px au masque + dégradé angulaire
-   à 135deg (rdev/liquid-glass-react, MIT). Détail : skill frutiger-aero-css. */
+/* ── 4bis. LE FOND DU CANVAS SUIT LE SITE ─────────────────────────────────
+   Le canvas a son fond EN CSS et le dessin est transparent par-dessus : un simple
+   dégradé suffit, sans toucher au moteur. Même sens (160deg) et même famille que
+   le fond de page, pour que la carte du graphe se lise dans la continuité du fond
+   au lieu de poser un rectangle blanc. Valeurs très claires : les bougies gardent
+   leur contraste (rouge/vert sombres sur ~0,88 de luminance). */
+.chart-container canvas {
+  background: linear-gradient(160deg, #eef1fb 0%, #f4f6fd 42%, #fbfcff 100%);
+}
+.dark .chart-container canvas, body.dark .chart-container canvas {
+  background: linear-gradient(160deg, #0b1120 0%, #101728 48%, #151d32 100%);
+}
+
+/* ── 5. L'ARÊTE SPÉCULAIRE — anneau de 1,5 px au masque + dégradé angulaire à 135deg (rdev/liquid-glass-react, MIT). Détail : skill frutiger-aero-css. */
 .header::after, .indicator-bar::after, .chart-container::after,
 .feed-panel::after, .strat-section::after, .aero-taskbar::after {
   content: ''; position: absolute; inset: 0; border-radius: inherit;
@@ -943,11 +938,7 @@ body.dark .strat-btn, body.dark .ind-dropdown-btn {
   background: rgba(26,42,62,0.78) !important;
 }
 
-/* ═══ RESPONSIVE ═══
-   ⚠️ NE PAS REMONTER CE BLOC. Les règles .strat-* qu'il surcharge sont définies
-   plus haut (section GRID BOT) : placé avant elles, l'ancien bloc était
-   neutralisé par la cascade (même spécificité, base plus tardive) et tout le
-   layout mobile du Grid Bot était du code mort. Il doit rester le dernier. */
+/* ═══ RESPONSIVE ═══ ⚠️ NE PAS REMONTER CE BLOC. Les règles .strat-* qu'il surcharge sont définies plus haut (section GRID BOT) : placé avant elles, l'ancien bloc était neutralisé par la cascade (même spécificité, base plus tardive) et tout le layout mobile du Grid Bot était du code mort. Il doit rester le dernier. */
 @media (max-width: 768px) {
   body { font-size: 12px; -webkit-tap-highlight-color: transparent; }
   .header { padding: 6px 8px; gap: 6px; }
@@ -956,8 +947,7 @@ body.dark .strat-btn, body.dark .ind-dropdown-btn {
   .header-right { gap: 6px; flex-shrink: 0; }
   .header-right #updated { display: none; }
   .price-badge { font-size: 13px; padding: 3px 8px; white-space: nowrap; flex-shrink: 0; }
-  /* DXY/VIX : une seule ligne tronquée. Sans nowrap, le badge se replie sur
-     3 lignes (68 px de haut) et fait passer le header de ~44 à 85 px. */
+  /* DXY/VIX : une seule ligne tronquée. Sans nowrap, le badge se replie sur 3 lignes (68 px de haut) et fait passer le header de ~44 à 85 px. */
   .cycle-badge {
     font-size: 10px; padding: 3px 8px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -977,12 +967,7 @@ body.dark .strat-btn, body.dark .ind-dropdown-btn {
   .ind-dropdown-btn { font-size: 11px; padding: 7px 10px; }
   .ind-dropdown-menu { min-width: 220px; max-height: 50vh; font-size: 11px; }
 
-  /* Ruban : au pouce, Intervalle et Paire étaient à ~3 écrans de scroll à
-     droite — les deux commandes les plus utilisées. Remontées en tête via
-     `order`. Titres et `sep` sont des éléments span frères, dans l'ordre
-     titre, sep, titre, sep… d'où les nth-of-type (1-2 Overlays, 3-4
-     Sous-graphes, 5-6 Intervalle, 7-8 Paire). Si l'ordre des span du ruban
-     change, ces deux sélecteurs sont à réaligner. */
+  /* Ruban : au pouce, Intervalle et Paire étaient à ~3 écrans de scroll à droite — les deux commandes les plus utilisées. Remontées en tête via `order`. Titres et `sep` sont des éléments span frères, dans l'ordre titre, sep, titre, sep… d'où les nth-of-type (1-2 Overlays, 3-4 Sous-graphes, 5-6 Intervalle, 7-8 Paire). Si l'ordre des span du ruban change, ces deux sélecteurs sont à réaligner. */
   .indicator-bar > span:nth-of-type(5),
   .indicator-bar > span:nth-of-type(6),
   .indicator-bar > label[id^="int_"] { order: -2; }
@@ -993,14 +978,10 @@ body.dark .strat-btn, body.dark .ind-dropdown-btn {
   .main-area { flex-direction: column; overflow: hidden; }
   .chart-container { height: 100%; }
   .feed-panel { display: none !important; }
-  /* Modal « Marché live » : le body est un flex column, ses cartes se
-     comprimaient (6 cartes mesurées à 93/77/158/166/123/76 px pour 1178 px de
-     contenu, scrollHeight === clientHeight) → ~390 px de données illisibles. */
+  /* Modal « Marché live » : le body est un flex column, ses cartes se comprimaient (6 cartes mesurées à 93/77/158/166/123/76 px pour 1178 px de contenu, scrollHeight === clientHeight) → ~390 px de données illisibles. */
   #marketModalBody > * { flex-shrink: 0; }
 
-  /* Grid bot — colonnes empilées. La config fait ~250 px : à 200 px de section
-     les 5 boutons d'action restaient sous la ligne de flottaison, il fallait
-     scroller pour lancer le backtest. */
+  /* Grid bot — colonnes empilées. La config fait ~250 px : à 200 px de section les 5 boutons d'action restaient sous la ligne de flottaison, il fallait scroller pour lancer le backtest. */
   .strat-section:not(.collapsed) { height: 330px; height: min(46dvh, 330px); }
   .strat-section { height: 36px; } /* cible tactile */
   .strat-handle { height: 36px; padding: 0 14px; font-size: 13px; }
@@ -1035,10 +1016,7 @@ body.dark .strat-btn, body.dark .ind-dropdown-btn {
   .sister-meta { gap: 3px; }
 }
 
-/* Sous 480 px les 4 blocs du header ne tiennent plus sur une ligne.
-   On sacrifie le mot-symbole (l'orbe et le <title> portent l'identité) et on
-   resserre paddings/gaps de quelques px pour que « DXY xx · VIX xx » — 132 px —
-   reste lisible en entier sur un 390 px plutôt que tronqué en « DXY xx · … ». */
+/* Sous 480 px les 4 blocs du header ne tiennent plus sur une ligne. On sacrifie le mot-symbole (l'orbe et le <title> portent l'identité) et on resserre paddings/gaps de quelques px pour que « DXY xx · VIX xx » — 132 px — reste lisible en entier sur un 390 px plutôt que tronqué en « DXY xx · … ». */
 @media (max-width: 480px) {
   .header-left h1 { display: none; }
   .header { padding: 6px 6px; gap: 4px; }
@@ -1053,8 +1031,7 @@ body.dark .strat-btn, body.dark .ind-dropdown-btn {
   .indicator-bar label { padding: 6px 9px; font-size: 10px; }
   .indicator-bar .section-title { display: none; }
   .aero-taskbar { height: 24px; padding: 0 8px; font-size: 10px; }
-  /* .header-orb : plus de font-size ici — l'orbe est un globe CSS, l'emoji
-     🔮 a été masqué (font-size: 0). La fixer ici ressuscitait le 🔮 en 12 px. */
+  /* .header-orb : plus de font-size ici — l'orbe est un globe CSS, l'emoji 🔮 a été masqué (font-size: 0). La fixer ici ressuscitait le 🔮 en 12 px. */
   .header-orb { width: 26px; height: 26px; }
 
   /* Grid bot — ultra-compact */
@@ -4082,13 +4059,17 @@ function resolveChart(candles, padL, padR, chartH, W) {
   const gap = pw / visible.length;
   const candleW = Math.max(1, Math.min(40, gap * 0.8));
   
-  // Sessions de marché — fonds colorés (UTC)
-  // Asie 00:00-09:00, Europe 07:00-16:00, US 13:00-21:00
+  // Sessions de marché (UTC) — Asie 00-09, Europe 07-16, US 13-21.
+  // Avant : de GROSSES BANDES pleines sur toute la hauteur de la zone de prix, qui
+  // écrasaient la lecture de la courbe. Maintenant : un voile quasi imperceptible
+  // (0,013) qui garde le contexte, PLUS un BANDEAU FIN (6 px) au bas de la zone —
+  // une règle temporelle, lisible sans jamais concurrencer le prix.
   const sessionDefs = [
-    { start: 0, end: 9, color: 'rgba(255,152,0,0.028)', label: 'Asie' },
-    { start: 7, end: 16, color: 'rgba(33,150,243,0.028)', label: 'Europe' },
-    { start: 13, end: 21, color: 'rgba(156,39,176,0.028)', label: 'US' }
+    { start: 0, end: 9, veil: 'rgba(255,152,0,0.013)', bar: 'rgba(255,152,0,0.75)', label: 'Asie' },
+    { start: 7, end: 16, veil: 'rgba(33,150,243,0.013)', bar: 'rgba(33,150,243,0.75)', label: 'Europe' },
+    { start: 13, end: 21, veil: 'rgba(156,39,176,0.013)', bar: 'rgba(156,39,176,0.75)', label: 'US' }
   ];
+  const SESS_H = 6;  // hauteur du bandeau, en px
   for (const s of sessionDefs) {
     // Trouver le début/fin de chaque bloc de session dans les bougies visibles
     let blockStart = -1;
@@ -4099,15 +4080,19 @@ function resolveChart(candles, padL, padR, chartH, W) {
       if (!inSession && blockStart !== -1) {
         const x1 = pad.left + gap * (blockStart - vs);
         const x2 = pad.left + gap * (i - vs) + gap / 2;
-        ctx.fillStyle = s.color;
+        ctx.fillStyle = s.veil;
         ctx.fillRect(x1, pad.top, x2 - x1, ph);
+        ctx.fillStyle = s.bar;
+        ctx.fillRect(x1, pad.top + ph - SESS_H, x2 - x1 - 1, SESS_H);
         blockStart = -1;
       }
     }
     if (blockStart !== -1) {
       const x1 = pad.left + gap * (blockStart - vs);
-      ctx.fillStyle = s.color;
+      ctx.fillStyle = s.veil;
       ctx.fillRect(x1, pad.top, W - pad.right - x1, ph);
+      ctx.fillStyle = s.bar;
+      ctx.fillRect(x1, pad.top + ph - SESS_H, W - pad.right - x1, SESS_H);
     }
   }
   
