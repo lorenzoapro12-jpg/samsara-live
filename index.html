@@ -929,7 +929,6 @@ body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
   mix-blend-mode: screen;
 }
 /* Typographie : Apple laisse respirer, les intitulés se lisent APRÈS les données. */
-h1 { letter-spacing: -0.4px; }
 .stat-val, .feed-val, .stat-label { text-shadow: none; }
 
 /* ── 6. DARK — même structure : teinte, cerne, réfraction. */
@@ -1084,8 +1083,8 @@ body.dark .strat-btn, body.dark .ind-dropdown-btn {
      Même arbitrage que le h1, déjà masqué sous 480 px. */
   .header-orb { display: none; }
   .price-badge { padding: 3px 7px; font-size: 12px; }
-  /* Sous 375 px (SE 1re gen, Android anciens) même l'orbe retiré ne suffit plus :
-     le prix disparaît du header — il reste affiché en gros sur l'axe Y du graphe. */
+  /* Sous 375 px même sans orbe ça ne tient plus : le prix quitte le header — il
+     reste affiché en gros sur l'axe Y du graphe. */
   @media (max-width: 375px) { .price-badge { display: none; } }
   /* Les boutons ne doivent JAMAIS être recouverts : ils ne se compriment pas,
      c'est le badge du milieu qui cède, avec des points de suspension. */
