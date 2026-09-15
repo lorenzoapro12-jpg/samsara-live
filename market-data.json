@@ -1,31 +1,31 @@
 {
- "updated": "2026-09-15T03:03:53+00:00",
+ "updated": "2026-09-15T03:18:53+00:00",
  "generator": "publish.py v3.0 — live-only (10/09/2026)",
  "source": "binance · deribit · coinbase · yahoo · sol-radar-daemon",
  "btc": {
-  "price": 77807.09,
-  "change_24h_pct": 0.202,
+  "price": 77731.03,
+  "change_24h_pct": -0.028,
   "high_24h": 79600.0,
   "low_24h": 77379.41,
-  "quote_volume_24h_usd": 1095265456.119
+  "quote_volume_24h_usd": 1087746896.4599006
  },
  "macro": {
-  "dxy_spot": 99.59100341796875,
+  "dxy_spot": 99.58599853515625,
   "dxy_date": "2026-09-15",
   "dxy_is_weekend": false,
   "vix": 17.1
  },
  "tf": {
   "4h": {
-   "rsi_14": 50.5,
-   "ema20_4h": 77742.48,
-   "ema50_4h": 77934.23,
+   "rsi_14": 49.8,
+   "ema20_4h": 77735.23,
+   "ema50_4h": 77931.25,
    "death_cross_4h": true,
    "ema_gap_pct": 0.25,
    "support_30": 76046.58,
    "resistance_30": 79890.0,
-   "last_close": 77807.09,
-   "avg_volume_10": 2018.6,
+   "last_close": 77731.04,
+   "avg_volume_10": 2030.76,
    "last_5_candles": [
     {
      "open": 77892.24,
@@ -70,26 +70,26 @@
     {
      "open": 78189.2,
      "high": 78250.46,
-     "low": 77750.0,
-     "close": 77807.09,
-     "body": 0.49,
+     "low": 77702.0,
+     "close": 77731.04,
+     "body": 0.59,
      "direction": "🔴",
      "wick_top": 0.08,
-     "wick_bottom": 0.07
+     "wick_bottom": 0.04
     }
    ],
    "range_24h_pct": 5.05
   },
   "1h": {
-   "rsi_14": 43.9,
-   "ema20_4h": 78179.13,
-   "ema50_4h": 77870.35,
+   "rsi_14": 42.6,
+   "ema20_4h": 78171.89,
+   "ema50_4h": 77867.37,
    "death_cross_4h": false,
-   "ema_gap_pct": 0.4,
+   "ema_gap_pct": 0.39,
    "support_30": 76388.72,
    "resistance_30": 79600.0,
-   "last_close": 77807.09,
-   "avg_volume_10": 470.04,
+   "last_close": 77731.04,
+   "avg_volume_10": 482.2,
    "last_5_candles": [
     {
      "open": 78557.99,
@@ -134,9 +134,9 @@
     {
      "open": 77913.73,
      "high": 77913.73,
-     "low": 77772.1,
-     "close": 77807.09,
-     "body": 0.14,
+     "low": 77702.0,
+     "close": 77731.04,
+     "body": 0.23,
      "direction": "🔴",
      "wick_top": 0.0,
      "wick_bottom": 0.04
@@ -145,15 +145,15 @@
    "range_24h_pct": 4.2
   },
   "1d": {
-   "rsi_14": 56.2,
-   "ema20_4h": 77199.44,
-   "ema50_4h": 73567.25,
+   "rsi_14": 55.9,
+   "ema20_4h": 77192.97,
+   "ema50_4h": 73564.59,
    "death_cross_4h": false,
-   "ema_gap_pct": 4.94,
+   "ema_gap_pct": 4.93,
    "support_30": 62751.1,
    "resistance_30": 82300.0,
-   "last_close": 77807.1,
-   "avg_volume_10": 11951.61,
+   "last_close": 77739.2,
+   "avg_volume_10": 11963.9,
    "last_5_candles": [
     {
      "open": 76568.73,
@@ -198,23 +198,23 @@
     {
      "open": 78189.2,
      "high": 78250.46,
-     "low": 77750.0,
-     "close": 77807.1,
-     "body": 0.49,
+     "low": 77702.0,
+     "close": 77739.2,
+     "body": 0.58,
      "direction": "🔴",
      "wick_top": 0.08,
-     "wick_bottom": 0.07
+     "wick_bottom": 0.05
     }
    ],
    "range_24h_pct": 31.15
   }
  },
  "micro": {
-  "funding_rate_pct": 0.00477,
-  "funding_annual_pct": 5.23,
-  "mark_price": 77776.10386232,
-  "oi_btc": 103150.0,
-  "oi_usd": 8022605113,
+  "funding_rate_pct": 0.00518,
+  "funding_annual_pct": 5.67,
+  "mark_price": 77709.3,
+  "oi_btc": 103384.963,
+  "oi_usd": 8033973105,
   "oi_change_1d_pct": -1.32,
   "oi_change_5d_pct": -1.51,
   "ls_ratio": 1.2717,
@@ -222,13 +222,13 @@
   "short_pct": 44.0,
   "top_ls_ratio": 2.1764,
   "taker_ratio": 1.1898,
-  "cvd": -1193111703.445427,
-  "cvd_updated_at": "2026-09-15 03:03:21",
-  "cvd_buy_vol_24h": 57035631865.68663,
-  "cvd_sell_vol_24h": 58228743569.26149,
-  "spot_deribit": 77783.18,
+  "cvd": -1191747725.1649675,
+  "cvd_updated_at": "2026-09-15 03:18:21",
+  "cvd_buy_vol_24h": 57041425652.06169,
+  "cvd_sell_vol_24h": 58233173377.35587,
+  "spot_deribit": 77729.8,
   "gex_state": "NEUTRAL",
-  "dealer_gamma": -7943.08,
+  "dealer_gamma": -7930.29,
   "gamma_walls": [
    80000.0,
    78000.0,
@@ -241,40 +241,40 @@
   "squeeze_viable": false,
   "squeeze_strength": 0.0,
   "squeeze_reason": "Dealers NEUTRAL — no gamma squeeze potential",
-  "premium_pct": -0.0284,
+  "premium_pct": -0.0278,
   "premium_state": "NEUTRAL",
   "us_demand": false,
-  "coinbase_mid": 77785.01,
-  "binance_mid": 77807.1
+  "coinbase_mid": 77726.15,
+  "binance_mid": 77747.76
  },
  "liquidity": {
   "tick_max": 1440,
   "dt_seconds": 60,
-  "ratio_bid_ask": 1.05,
+  "ratio_bid_ask": 1.01,
   "bid_walls": [
    [
     77500,
-    1662
+    1633
    ],
    [
     77200,
-    1376
+    1451
    ],
    [
     77240,
     992
    ],
    [
-    77560,
-    985
+    77540,
+    940
    ],
    [
-    77220,
-    928
+    77480,
+    918
    ],
    [
     77140,
-    862
+    912
    ]
   ],
   "ask_walls": [
@@ -291,20 +291,20 @@
     1248
    ],
    [
-    78120,
-    993
+    78020,
+    896
    ],
    [
-    77900,
-    800
+    77980,
+    849
    ],
    [
-    78040,
-    799
+    77860,
+    779
    ]
   ],
-  "total_bid": 22111,
-  "total_ask": 21008
+  "total_bid": 21832,
+  "total_ask": 21632
  },
  "status": {
   "btc_spot": "ok",
