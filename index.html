@@ -37,7 +37,8 @@
     rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.25) 8%,
     rgba(255,255,255,0.0) 35%, rgba(255,255,255,0.0) 100%);
   --radius-sm: 12px; --radius: 18px; --radius-lg: 24px;
-  --font: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI Variable',
+          system-ui, 'Segoe UI', sans-serif;
 
   /* ═══ Gemini Aero — ombres multi-couches ═══ */
   --aero-shadow-glass:
@@ -323,10 +324,10 @@ body {
 .aero-grid {
   position: fixed; inset: -12%; z-index: -1; pointer-events: none;
   background-image:
-    linear-gradient(to right, rgba(255,255,255,0.26) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,0.26) 1px, transparent 1px),
-    linear-gradient(to right, rgba(60,130,190,0.14) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(60,130,190,0.14) 1px, transparent 1px);
+    linear-gradient(to right, rgba(255,255,255,0.11) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.11) 1px, transparent 1px),
+    linear-gradient(to right, rgba(120,140,220,0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(120,140,220,0.07) 1px, transparent 1px);
   background-size:
     38px 38px, 38px 38px,
     190px 190px, 190px 190px;
@@ -785,11 +786,11 @@ h1, h2, h3, .dashboard-title {
 
 :root {
   --lg-r-bar: 999px;          /* capsules : barres */
-  --lg-r-card: 30px;          /* squircles : cartes */
+  --lg-r-card: 32px;          /* squircles : cartes */
   --lg-gutter: 13px;          /* la gouttière par où le fond apparaît */
   --lg-gap: 11px;
-  --lg-tint: rgba(255,255,255,0.28);
-  --lg-tint-solid: rgba(255,255,255,0.46);
+  --lg-tint: rgba(255,255,255,0.34);
+  --lg-tint-solid: rgba(255,255,255,0.54);
   --lg-tint-hi: rgba(255,255,255,0.68);
   /* Cerne lumineux directionnel — valeurs de rdev/liquid-glass-react (MIT) :
      « 0 0 0 0.5px … inset, 0 1px 3px … inset, 0 1px 4px rgba(0,0,0,0.35) ».
@@ -808,30 +809,28 @@ h1, h2, h3, .dashboard-title {
    `body::before` en z-index négatif : le fond propagé au canvas le recouvre. */
 body {
   background:
-    radial-gradient(circle at 15% 20%, rgba(255,255,255,0.65) 0 46px, rgba(255,255,255,0) 47px),
-    radial-gradient(circle at 82% 15%, rgba(255,255,255,0.45) 0 88px, rgba(255,255,255,0) 89px),
-    radial-gradient(circle at 38% 78%, rgba(255,255,255,0.38) 0 130px, rgba(255,255,255,0) 131px),
-    radial-gradient(circle at 68% 48%, rgba(255,255,255,0.50) 0 22px, rgba(255,255,255,0) 23px),
-    radial-gradient(circle at 8% 62%,  rgba(255,255,255,0.42) 0 66px, rgba(255,255,255,0) 67px),
-    radial-gradient(circle at 92% 82%, rgba(255,255,255,0.40) 0 104px, rgba(255,255,255,0) 105px),
-    radial-gradient(circle at 52% 8%,  rgba(255,255,255,0.35) 0 30px, rgba(255,255,255,0) 31px),
-    radial-gradient(70% 50% at 12% 8%,   rgba(168,92,255,0.88) 0%, rgba(168,92,255,0) 58%),
-    radial-gradient(65% 52% at 90% 12%,  rgba(0,208,255,0.92) 0%, rgba(0,208,255,0) 60%),
-    radial-gradient(85% 65% at 72% 92%,  rgba(0,232,170,0.88) 0%, rgba(0,232,170,0) 62%),
-    radial-gradient(50% 45% at 24% 88%,  rgba(255,148,86,0.62) 0%, rgba(255,148,86,0) 58%),
-    linear-gradient(160deg, #1b6fd4 0%, #16a8d8 28%, #23c9b4 52%, #6ee08a 74%, #ffd166 94%);
+    radial-gradient(circle at 15% 20%, rgba(255,255,255,0.30) 0 46px, rgba(255,255,255,0) 47px),
+    radial-gradient(circle at 82% 15%, rgba(255,255,255,0.20) 0 88px, rgba(255,255,255,0) 89px),
+    radial-gradient(circle at 38% 78%, rgba(255,255,255,0.16) 0 130px, rgba(255,255,255,0) 131px),
+    radial-gradient(circle at 8% 62%,  rgba(255,255,255,0.18) 0 66px, rgba(255,255,255,0) 67px),
+    radial-gradient(circle at 92% 82%, rgba(255,255,255,0.17) 0 104px, rgba(255,255,255,0) 105px),
+    radial-gradient(68% 52% at 14% 6%,   rgba(122,102,255,0.72) 0%, rgba(122,102,255,0) 62%),
+    radial-gradient(62% 50% at 88% 16%,  rgba(88,158,255,0.66) 0%, rgba(88,158,255,0) 64%),
+    radial-gradient(78% 62% at 76% 94%,  rgba(196,110,240,0.58) 0%, rgba(196,110,240,0) 66%),
+    radial-gradient(52% 44% at 26% 86%,  rgba(74,126,222,0.54) 0%, rgba(74,126,222,0) 60%),
+    linear-gradient(158deg, #16205a 0%, #26307e 24%, #3a4aa8 46%, #5668c4 68%, #7c8ede 86%, #a3b2ec 100%);
   background-attachment: fixed;
 }
 body.dark {
   background:
-    radial-gradient(78% 58% at 12% 8%,   rgba(96,60,200,0.50) 0%, rgba(96,60,200,0) 62%),
-    radial-gradient(70% 56% at 88% 14%,  rgba(0,150,190,0.42) 0%, rgba(0,150,190,0) 64%),
-    radial-gradient(90% 70% at 70% 92%,  rgba(20,140,120,0.38) 0%, rgba(20,140,120,0) 66%),
-    linear-gradient(158deg, #05121f 0%, #061c30 30%, #07242f 55%, #08302c 80%, #0a2318 100%);
+    radial-gradient(76% 56% at 14% 8%,   rgba(96,72,210,0.38) 0%, rgba(96,72,210,0) 62%),
+    radial-gradient(68% 54% at 86% 16%,  rgba(50,110,210,0.32) 0%, rgba(50,110,210,0) 64%),
+    radial-gradient(84% 66% at 74% 94%,  rgba(140,70,190,0.30) 0%, rgba(140,70,190,0) 66%),
+    linear-gradient(158deg, #080a1c 0%, #0d1130 30%, #141a44 56%, #1c2456 80%, #232c66 100%);
   background-attachment: fixed;
 }
 /* Trame : juste assez de structure pour que la réfraction ait à courber. */
-.aero-grid { opacity: 0.75; }
+.aero-grid { opacity: 0.6; }
 /* Les couches d'ambiance (aurore/bokeh/eau) ont été retirées — voiles clairs. */
 
 /* ── 2. LES GOUTTIÈRES — `body` flex column : `gap` = entre les bandes,
@@ -849,8 +848,8 @@ body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
   box-shadow: var(--lg-shadow), var(--lg-rim), var(--hyalite-edge, none);
   overflow: hidden; position: relative;
   /* Une seule déclaration pour les six : le repli est le même partout. */
-  backdrop-filter: var(--hyalite, blur(11px) saturate(1.7));
-  -webkit-backdrop-filter: var(--hyalite, blur(11px) saturate(1.7));
+  backdrop-filter: var(--hyalite, blur(16px) saturate(1.9));
+  -webkit-backdrop-filter: var(--hyalite, blur(16px) saturate(1.9));
 }
 .header {
   margin: 0; padding: 9px 16px; border-radius: var(--lg-r-bar);
@@ -2071,9 +2070,9 @@ body.dark .strat-btn, body.dark .ind-dropdown-btn {
   // lisent comme du verre, sans payer une passe de filtre pour un effet nul.
   const LG = { slope: 1.9, dispersion: 1.6, shade: 0.5, rim: 1.8, edge: 0.4 };
   const b = (bevel, thickness, blur) => Object.assign({ bevel, thickness, blur }, LG);
-  Hyalite.watch(document.body, '.chart-container',  b(30, 54, 12));
-  Hyalite.watch(document.body, '.feed-panel',       b(30, 54, 12));
-  Hyalite.watch(document.body, '.strat-section',    b(26, 46, 12));
+  Hyalite.watch(document.body, '.chart-container',  b(34, 60, 16));
+  Hyalite.watch(document.body, '.feed-panel',       b(34, 60, 16));
+  Hyalite.watch(document.body, '.strat-section',    b(28, 50, 16));
 })();
 
 // ============ GARDE-FOU DE PERF (déterministe) ============
