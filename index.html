@@ -803,10 +803,9 @@ h1, h2, h3, .dashboard-title {
   --lg-shadow-sm: 0 6px 18px rgba(5,28,52,0.24), 0 1px 4px rgba(5,28,52,0.16);
 }
 
-/* ── 1. LE FOND VIVANT — vif ET saturé : un verre sur un aplat pâle donne du
-   plastique blanc, c'est la couleur qui traverse qui fait le verre. Sur `body`,
-   JAMAIS sur un `body::before` en z-index négatif (le fond propagé au canvas le
-   recouvre — maillage invisible, vérifié au computed style). */
+/* ── 1. LE FOND VIVANT — vif ET saturé (un verre sur un aplat pâle = plastique
+   blanc : c'est la couleur qui traverse qui fait le verre). Sur `body`, jamais un
+   `body::before` en z-index négatif : le fond propagé au canvas le recouvre. */
 body {
   background:
     radial-gradient(circle at 15% 20%, rgba(255,255,255,0.65) 0 46px, rgba(255,255,255,0) 47px),
@@ -835,8 +834,8 @@ body.dark {
 .aero-grid { opacity: 0.75; }
 /* Les couches d'ambiance (aurore/bokeh/eau) ont été retirées — voiles clairs. */
 
-/* ── 2. LES GOUTTIÈRES — `body` est un flex column : `gap` = gouttières entre
-   les bandes, `padding` = celles des bords. Sans elles, rien à traverser. */
+/* ── 2. LES GOUTTIÈRES — `body` flex column : `gap` = entre les bandes,
+   `padding` = aux bords. Sans elles, rien à traverser. */
 body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
 .main-area { gap: var(--lg-gap); padding: 0; }
 
@@ -912,13 +911,10 @@ body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
 }
 .theme-btn:active, .strat-btn:active { transform: scale(0.97) !important; }
 
-/* ── 5. L'ARÊTE SPÉCULAIRE — la signature iOS qui manquait. Pas un `border` :
-   un ANNEAU de 1,5 px découpé au masque (`mask-composite: exclude`) rempli d'un
-   dégradé angulaire — lumineux en haut, absent en bas. C'est ce bord NON UNIFORME
-   qui lit « verre » plutôt que « boîte ». Angle FIGÉ à 135deg (le pilotage souris
-   de rdev coûterait une boucle de mise en page par frame). Deux calques dans un
-   seul pseudo-élément : `screen` (halo) + `overlay` (arête dure).
-   Valeurs : rdev/liquid-glass-react, MIT. */
+/* ── 5. L'ARÊTE SPÉCULAIRE — la signature iOS qui manquait : pas un `border`,
+   un ANNEAU de 1,5 px découpé au masque et rempli d'un dégradé angulaire (non
+   uniforme : lumineux en haut, absent en bas). Angle FIGÉ à 135deg. Valeurs
+   rdev/liquid-glass-react, MIT. */
 .header::after, .indicator-bar::after, .chart-container::after,
 .feed-panel::after, .strat-section::after, .aero-taskbar::after {
   content: ''; position: absolute; inset: 0; border-radius: inherit;
