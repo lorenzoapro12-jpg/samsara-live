@@ -785,11 +785,10 @@ h1, h2, h3, .dashboard-title {
    posées sur un fond vivant. Sans gouttière il n'y a rien à traverser : le
    verre n'a nulle part où exister. Aucun réglage de teinte ne répare ça — il
    fallait changer la géométrie.
-
-   Structure (règle de nikdelvin/liquid-glass, MIT — §4.3 du rapport) :
-   z-0 fond vivant / z-1 trame / z-2 filtre hyalite / z-3 contenu.
-   ⚠️ Le TEXTE ne doit JAMAIS être dans le nœud qui porte le filtre, sinon il
-   est déformé. D'où : hyalite sur les surfaces, jamais sur les pastilles.
+   Structure (nikdelvin/liquid-glass, MIT — §4.3 du rapport) : z-0 fond vivant /
+   z-1 trame / z-2 filtre hyalite / z-3 contenu. ⚠️ Le TEXTE ne doit JAMAIS être
+   dans le nœud qui porte le filtre, sinon il est déformé. D'où : hyalite sur les
+   surfaces, jamais sur les pastilles.
 
    Inséré AVANT le bloc RESPONSIVE à dessein : les @media mobiles doivent
    continuer de gagner la cascade (leçon du 14/09 — un bloc placé après les
