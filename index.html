@@ -244,7 +244,7 @@ body {
      l'erreur — un fond à 0,28 sur un ruban bleu clair ne se lit plus. */
   background: rgba(255,255,255,0.62);
 }
-.dark .indicator-bar label { color: #e2e8f0; background: rgba(255,255,255,0.14); }
+.dark .indicator-bar label { color: #eef3f9; background: rgba(255,255,255,0.20); }
 /* Survol : UNE seule propriété change. Ni halo, ni bordure bleue, ni soulèvement. */
 .indicator-bar label:hover { background: rgba(255,255,255,0.82); }
 .dark .indicator-bar label:hover { background: rgba(255,255,255,0.28); }
@@ -258,7 +258,7 @@ body {
 .indicator-bar label.active .ind-label { color: #fff; }
 .indicator-bar input { display: none; }
 .ind-label { font-weight: 600; }
-.ov { color: #3b8ed4; } .sg { color: #c07d10; } .ch { color: #e040fb; }
+.ov { color: #17558f; } .sg { color: #8a5606; } .ch { color: #9c1fb8; }
 .tag-ch { background: rgba(224,64,251,0.12); color: #e040fb; }
 
 /* ═══ MAIN LAYOUT ═══ */
@@ -789,9 +789,9 @@ h1, h2, h3, .dashboard-title {
   --lg-r-card: 32px;          /* squircles : cartes */
   --lg-gutter: 13px;          /* la gouttière par où le fond apparaît */
   --lg-gap: 11px;
-  --lg-tint: rgba(255,255,255,0.34);
-  --lg-tint-solid: rgba(255,255,255,0.54);
-  --lg-tint-hi: rgba(255,255,255,0.68);
+  --lg-tint: rgba(255,255,255,0.50);
+  --lg-tint-solid: rgba(255,255,255,0.70);
+  --lg-tint-hi: rgba(255,255,255,0.86);
   /* Cerne lumineux directionnel — valeurs de rdev/liquid-glass-react (MIT) :
      « 0 0 0 0.5px … inset, 0 1px 3px … inset, 0 1px 4px rgba(0,0,0,0.35) ».
      Un cerne SANS biseau : c'est ce qui remplace la pliure rejetée. */
@@ -814,11 +814,11 @@ body {
     radial-gradient(circle at 38% 78%, rgba(255,255,255,0.16) 0 130px, rgba(255,255,255,0) 131px),
     radial-gradient(circle at 8% 62%,  rgba(255,255,255,0.18) 0 66px, rgba(255,255,255,0) 67px),
     radial-gradient(circle at 92% 82%, rgba(255,255,255,0.17) 0 104px, rgba(255,255,255,0) 105px),
-    radial-gradient(68% 52% at 14% 6%,   rgba(122,102,255,0.72) 0%, rgba(122,102,255,0) 62%),
-    radial-gradient(62% 50% at 88% 16%,  rgba(88,158,255,0.66) 0%, rgba(88,158,255,0) 64%),
-    radial-gradient(78% 62% at 76% 94%,  rgba(196,110,240,0.58) 0%, rgba(196,110,240,0) 66%),
-    radial-gradient(52% 44% at 26% 86%,  rgba(74,126,222,0.54) 0%, rgba(74,126,222,0) 60%),
-    linear-gradient(158deg, #16205a 0%, #26307e 24%, #3a4aa8 46%, #5668c4 68%, #7c8ede 86%, #a3b2ec 100%);
+    radial-gradient(68% 52% at 14% 6%,   rgba(150,132,255,0.52) 0%, rgba(150,132,255,0) 62%),
+    radial-gradient(62% 50% at 88% 16%,  rgba(126,176,255,0.48) 0%, rgba(126,176,255,0) 64%),
+    radial-gradient(78% 62% at 76% 94%,  rgba(202,158,246,0.44) 0%, rgba(202,158,246,0) 66%),
+    radial-gradient(52% 44% at 26% 86%,  rgba(140,168,236,0.40) 0%, rgba(140,168,236,0) 60%),
+    linear-gradient(158deg, #a6b1e8 0%, #b8c2ee 26%, #cbd3f3 50%, #dce2f8 70%, #eaeefc 88%, #f7fafe 100%);
   background-attachment: fixed;
 }
 body.dark {
@@ -880,20 +880,23 @@ body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
    pastille pleine. Sur 23 pastilles, seule façon de rester lisible sans
    réintroduire les 46 contours. */
 .indicator-bar label {
+  color: #10233d;
   border-radius: var(--lg-r-bar); padding: 5px 12px;
-  border: 1px solid transparent; background: transparent;
+  /* Un fond doux, PAS un contour : sans lui le texte coloré tombait sur le fond
+     d'écran qui défile derrière le verre — surface instable = illisible. */
+  border: 1px solid transparent; background: rgba(255,255,255,0.42);
   box-shadow: none; text-shadow: none;
   transition: background 0.15s ease, color 0.15s ease;
 }
-.indicator-bar label:hover { background: rgba(255,255,255,0.42); }
-.dark .indicator-bar label:hover { background: rgba(255,255,255,0.14); }
+.indicator-bar label:hover { background: rgba(255,255,255,0.66); }
+.dark .indicator-bar label:hover { background: rgba(255,255,255,0.22); }
 .indicator-bar label.active {
   background: #0b6bcb; color: #fff; font-weight: 700;
   box-shadow: 0 1px 5px rgba(6,40,80,0.40), inset 0 1px 0 rgba(255,255,255,0.35);
 }
 .dark .indicator-bar label.active { background: #0f86d8; color: #fff; }
 .indicator-bar label.active .ind-label { color: #fff; }
-.indicator-bar .section-title { opacity: 0.42; font-weight: 600; letter-spacing: 0.4px; }
+.indicator-bar .section-title { opacity: 0.68; font-weight: 600; letter-spacing: 0.4px; }
 .indicator-bar .sep { opacity: 0.5; height: 18px; }
 
 /* Les pastilles du header : capsules plates, comme les boutons d'Apple. */
@@ -910,10 +913,8 @@ body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
 }
 .theme-btn:active, .strat-btn:active { transform: scale(0.97) !important; }
 
-/* ── 5. L'ARÊTE SPÉCULAIRE — la signature iOS qui manquait : pas un `border`,
-   un ANNEAU de 1,5 px découpé au masque et rempli d'un dégradé angulaire (non
-   uniforme : lumineux en haut, absent en bas). Angle FIGÉ à 135deg. Valeurs
-   rdev/liquid-glass-react, MIT. */
+/* ── 5. L'ARÊTE SPÉCULAIRE — anneau de 1,5 px au masque + dégradé angulaire
+   à 135deg (rdev/liquid-glass-react, MIT). Détail : skill frutiger-aero-css. */
 .header::after, .indicator-bar::after, .chart-container::after,
 .feed-panel::after, .strat-section::after, .aero-taskbar::after {
   content: ''; position: absolute; inset: 0; border-radius: inherit;
