@@ -906,7 +906,11 @@ body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
   /* Légèrement plus profond que le cadre, et une ombre interne sur le pourtour :
      le contenu se lit CREUSÉ sous la matière au lieu d'être posé dessus. C'est ce
      qui manquait — le canvas était plus lumineux que le verre qui l'entoure. */
-  background: linear-gradient(160deg, #e9edf9 0%, #eef1fc 45%, #f6f8fe 100%);
+  background:
+    radial-gradient(60% 50% at 12% 8%,  rgba(146,128,250,0.22) 0%, rgba(146,128,250,0) 62%),
+    radial-gradient(55% 45% at 88% 14%, rgba(126,176,255,0.20) 0%, rgba(126,176,255,0) 64%),
+    radial-gradient(70% 55% at 72% 92%, rgba(196,152,246,0.18) 0%, rgba(196,152,246,0) 66%),
+    linear-gradient(160deg, #eceffb 0%, #f0f2fd 45%, #f7f9ff 100%);
   box-shadow: inset 0 0 20px rgba(58,78,140,0.075),
               inset 0 1px 0 rgba(255,255,255,0.6);
 }
@@ -4064,11 +4068,9 @@ function resolveChart(candles, padL, padR, chartH, W) {
   const gap = pw / visible.length;
   const candleW = Math.max(1, Math.min(40, gap * 0.8));
   
-  // Sessions de marché (UTC) — Asie 00-09, Europe 07-16, US 13-21.
-  // Avant : de GROSSES BANDES pleines sur toute la hauteur de la zone de prix, qui
-  // écrasaient la lecture de la courbe. Maintenant : un voile quasi imperceptible
-  // (0,013) qui garde le contexte, PLUS un BANDEAU FIN (6 px) au bas de la zone —
-  // une règle temporelle, lisible sans jamais concurrencer le prix.
+  // Sessions (UTC) Asie 00-09, Europe 07-16, US 13-21. Voile quasi imperceptible
+  // (0,013) pour le contexte + BANDEAU FIN de 6 px au bas de la zone (règle
+  // temporelle) — les grosses bandes pleines écrasaient la lecture de la courbe.
   const sessionDefs = [
     { start: 0, end: 9, veil: 'rgba(255,152,0,0.013)', bar: 'rgba(255,152,0,0.75)', label: 'Asie' },
     { start: 7, end: 16, veil: 'rgba(33,150,243,0.013)', bar: 'rgba(33,150,243,0.75)', label: 'Europe' },
@@ -4374,11 +4376,19 @@ function resolveChart(candles, padL, padR, chartH, W) {
     const yC = pad.top + ph * (1 - (c.close - minP) / range);
     const yH = pad.top + ph * (1 - (c.high - minP) / range);
     const yL = pad.top + ph * (1 - (c.low - minP) / range);
+    // Halo clair : le fond coloré fait tomber le contraste des bougies à 2,2-3,1:1.
+    ctx.strokeStyle = 'rgba(255,255,255,0.78)'; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(x + candleW/2, yH); ctx.lineTo(x + candleW/2, yL); ctx.stroke();
     ctx.strokeStyle = color; ctx.lineWidth = 0.8;
     ctx.beginPath(); ctx.moveTo(x + candleW/2, yH); ctx.lineTo(x + candleW/2, yL); ctx.stroke();
     const bodyH = Math.max(0.5, Math.abs(yC - yO));
+    const bodyW = candleW * 0.7, bodyX = x + candleW*0.15, bodyY = Math.min(yO, yC);
     ctx.fillStyle = color;
-    ctx.fillRect(x + candleW*0.15, Math.min(yO, yC), candleW*0.7, bodyH);
+    ctx.fillRect(bodyX, bodyY, bodyW, bodyH);
+    if (bodyW >= 3 && bodyH >= 3) {   // sous 3 px le liseré dégrade plus qu'il n'aide
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1;
+      ctx.strokeRect(bodyX + 0.5, bodyY + 0.5, bodyW - 1, bodyH - 1);
+    }
   }
   
   // --- Heatmap Liquidité (Bookmap : alignée sur les bougies OHLCV) ---
