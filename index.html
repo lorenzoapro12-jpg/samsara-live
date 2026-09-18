@@ -839,6 +839,22 @@ body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
 .chart-container {
   /* 8 px de bord ne laissaient aucun bord de verre : la réfraction n'avait pas de quoi exister. 16 px lui en donnent un. C'est le prix : 8 px de graphe en moins par côté. */
   padding: 16px; border-radius: var(--lg-r-card);
+  /* Le flou vit dans .lg-ring, pas sur la surface entière : le canvas opaque couvre tout
+     l'intérieur, mais Chromium recomposait le flou de 1404×632 à CHAQUE frame du canvas
+     (1687 → 265 ms/frame mesurés, 3000 bougies + heatmap, rendu logiciel). */
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+/* Anneau : même verre, masqué à la bande de bord (padding du conteneur), sous le canvas. */
+.lg-ring {
+  position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0;
+  padding: inherit;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  backdrop-filter: var(--hyalite, blur(16px) saturate(1.9));
+  -webkit-backdrop-filter: var(--hyalite, blur(16px) saturate(1.9));
+  box-shadow: var(--hyalite-edge, none);
 }
 .feed-panel {
   border-left: none; border-radius: var(--lg-r-card);
@@ -847,7 +863,10 @@ body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
   border-top: none; border-radius: var(--lg-r-card);
 }
 .aero-taskbar {
-  /* Elle était fixée bord à bord : capsule flottante, fond visible autour. */
+  /* ⚠️ `fixed` doit être RÉAFFIRMÉ ici : le bloc « six surfaces » ci-dessus impose `relative`,
+     et `bottom: 13px` ne serait plus qu'un décalage vers le haut (recouvrait le bas du Grid Bot
+     de 2 px, 59 px de vide sous la barre, mesuré). La taskbar est ancrée à la fenêtre. */
+  position: fixed;
   left: var(--lg-gutter); right: var(--lg-gutter); bottom: var(--lg-gutter);
   border-top: none; border-radius: var(--lg-r-bar); padding: 0 16px;
 }
@@ -901,8 +920,8 @@ body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
   background: linear-gradient(160deg, #0b1120 0%, #101728 48%, #151d32 100%);
 }
 
-html[data-glass="degrade"] .chart-container, html[data-glass="degrade"] .feed-panel,
-html[data-glass="degrade"] .strat-section, html[data-glass="degrade"] .chart-container canvas {
+html[data-glass="degrade"] .chart-container .lg-ring, html[data-glass="degrade"] .feed-panel,
+html[data-glass="degrade"] .strat-section {
   backdrop-filter: blur(16px) saturate(1.9) !important; -webkit-backdrop-filter: blur(16px) saturate(1.9) !important;
 }
 
@@ -1135,7 +1154,7 @@ body.dark .strat-btn, body.dark .ind-dropdown-btn {
 <div class="ind-dropdown-menu" id="indMenu" onclick="event.stopPropagation()"></div>
 
 <div class="main-area">
-<div class="chart-container"><div class="gloss-bubble"></div><canvas id="chart"></canvas></div>
+<div class="chart-container"><div class="gloss-bubble"></div><div class="lg-ring"></div><canvas id="chart"></canvas></div>
 
 <div class="feed-panel collapsed" id="feedPanel">
   <div class="feed-panel-handle" onclick="toggleFeed()" id="feedHandle">Marché live</div>
@@ -2039,8 +2058,12 @@ body.dark .strat-btn, body.dark .ind-dropdown-btn {
   if (!Hyalite.supported()) return;          // Chromium seulement ; sinon flou CSS
   const LG = { slope: 1.9, dispersion: 1.6, shade: 0.5, rim: 1.8, edge: 0.4 };
   const b = (bevel, thickness, blur) => Object.assign({ bevel, thickness, blur }, LG);
-  const CIBLES = [['.chart-container', b(34,60,16)], ['.feed-panel', b(34,60,16)],
-                  ['.strat-section', b(28,50,16)]];
+  const CIBLES = [['.feed-panel', b(34,60,16)], ['.strat-section', b(28,50,16)]];
+  // ⚠️ `.chart-container .lg-ring` est VOLONTAIREMENT absent : hyalite rastérise la carte
+  // de déplacement sur toute la boîte de l'élément, le masque d'anneau ne réduit donc rien
+  // (mesuré : 1820 ms/frame avec hyalite sur l'anneau, 281 ms avec le flou CSS sur le même
+  // anneau, 1687 ms avec hyalite sur toute la surface). L'anneau garde le repli `blur(16px)`
+  // — 16 px de bord, sous l'arête spéculaire : la différence ne se lit pas.
   const veilles = CIBLES.map(c => Hyalite.watch(document.body, c[0], c[1]));
   // On retire la RÉFRACTION, pas les <svg> (tous ne sont pas à hyalite) : detach()
   // rend la main au repli CSS, la refonte visuelle reste entière.
@@ -2329,8 +2352,17 @@ const canvas = document.getElementById('chart');
 const ctx = canvas.getContext('2d');
 let hasSubChart = true; // volume or indicator
 
-// --- Crosshair ---
+// --- Une frame = un dessin ---
+// Toute mutation de vue (pan, molette, drags, doigt) change l'état puis demande le dessin
+// par ici : sans ce filtre un trackpad émet 100+ événements/s et drawChart partait 2× par
+// déplacement (handler `window` du pan + handler `canvas` du crosshair). Le coût n'est pas
+// le tracé (2-6 ms) mais le repaint du verre derrière le canvas — d'où un dessin par frame.
 let rafPending = false;
+function scheduleDraw() {
+  if (rafPending) return;
+  rafPending = true;
+  requestAnimationFrame(() => { rafPending = false; drawChart(); });
+}
 canvas.addEventListener('mousemove', (e) => {
   const rect = canvas.getBoundingClientRect();
   crossX = e.clientX - rect.left;
@@ -2358,10 +2390,7 @@ canvas.addEventListener('mousemove', (e) => {
   } else if (!isPanning && !isPriceDrag) {
     canvas.style.cursor = 'crosshair';
   }
-  if (!rafPending) {
-    rafPending = true;
-    requestAnimationFrame(() => { rafPending = false; drawChart(); });
-  }
+  if (!rafPending) scheduleDraw();
 });
 canvas.addEventListener('mouseleave', () => { crossX = null; crossY = null; rafPending = false; drawChart(); });
 
@@ -2378,7 +2407,7 @@ canvas.addEventListener('wheel', (e) => {
     const factor = e.deltaY > 0 ? 1.15 : 0.85;
     priceScale = Math.max(0.3, Math.min(5, priceScale * factor));
     pricePan *= factor; // garder le point central
-    drawChart();
+    scheduleDraw();
     return;
   }
   
@@ -2389,7 +2418,7 @@ canvas.addEventListener('wheel', (e) => {
   viewStart = Math.max(0, Math.round(center - newVisible / 2));
   viewEnd = Math.min(candles.length, viewStart + newVisible);
   if (viewEnd - viewStart < 10) { viewEnd = Math.min(candles.length, viewStart + 10); }
-  drawChart();
+  scheduleDraw();
 }, { passive: false });
 
 // --- Pan cliquer-glisser ---
@@ -2472,7 +2501,7 @@ window.addEventListener('mousemove', (e) => {
       viewEnd = Math.min(candles.length, Math.max(rsDragStartView + 3, targetEnd));
       viewStart = rsDragStartView;
     }
-    drawChart();
+    scheduleDraw();
     return;
   }
   
@@ -2480,7 +2509,7 @@ window.addEventListener('mousemove', (e) => {
     const dy = e.clientY - priceDragStart;
     const rect = canvas.getBoundingClientRect();
     pricePan = pricePanStart - (dy / rect.height) * 2 * priceScaleStart;
-    drawChart();
+    scheduleDraw();
     return;
   }
   if (!isPanning) return;
@@ -2490,7 +2519,7 @@ window.addEventListener('mousemove', (e) => {
   const shift = Math.round(-dx * visible);
   viewStart = Math.max(0, Math.min(candles.length - visible, panStartView + shift));
   viewEnd = viewStart + visible;
-  drawChart();
+  scheduleDraw();
 });
 window.addEventListener('mouseup', () => { 
   rsDragging = null;
@@ -2566,13 +2595,13 @@ canvas.addEventListener('touchmove', (e) => {
     const shift = Math.round(-dx * visible);
     viewStart = Math.max(0, Math.min(candles.length - visible, touchStartView + shift));
     viewEnd = viewStart + visible;
-    drawChart();
+    scheduleDraw();
     e.preventDefault();
   } else if (touchMode === 'price') {
     const dy = e.touches[0].clientY - touchStartY;
     const rect = canvas.getBoundingClientRect();
     pricePan = touchStartPricePan - (dy / rect.height) * 2 * touchStartPriceScale;
-    drawChart();
+    scheduleDraw();
     e.preventDefault();
   } else if (touchMode === 'pinch') {
     const dist = getTouchDist(e.touches[0], e.touches[1]);
@@ -2590,7 +2619,7 @@ canvas.addEventListener('touchmove', (e) => {
       viewStart = Math.max(0, Math.round(centerIdx - newVisible * centerFrac));
       viewEnd = Math.min(candles.length, viewStart + Math.round(newVisible));
       if (viewEnd - viewStart < 5) { viewEnd = Math.min(candles.length, viewStart + 5); }
-      drawChart();
+      scheduleDraw();
     }
     e.preventDefault();
   }
