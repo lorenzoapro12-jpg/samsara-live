@@ -412,80 +412,15 @@ body {
 .demon-role { font-size:11px; color:var(--text2); }
 .demon-body { font-size:13px; color:var(--text); line-height:1.8; }
 
-/* ═══ SISTER CARD — glass card Aero enhanced ═══ */
-.sister-card {
-  position: relative; overflow: hidden;
-  background: var(--gloss), var(--surface-solid);
-  border: 1px solid var(--glass-edge);
-  border-bottom-color: rgba(160,190,220,0.5);
-  border-radius: var(--radius-lg);
-  transition: all 0.25s cubic-bezier(0.25,0.8,0.25,1.2);
-  box-shadow: var(--aero-shadow-glass);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-}
-.sister-card::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 45%;
-  background: var(--aero-gloss-gradient); pointer-events: none; z-index: 0;
-}
-.sister-card:hover {
-  border-color: var(--accent);
-  box-shadow: 0 6px 20px rgba(0,100,200,0.2),
-              inset 0 1px 0 rgba(255,255,255,1),
-              inset 0 0 8px rgba(255,255,255,0.8);
-  transform: translateY(-3px);
-}
-.sister-card-header {
-  position: relative; z-index: 1;
-  padding: 12px 14px; cursor: pointer; display: flex; align-items: center; gap: 12px;
-  user-select: none;
-  background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 100%);
-}
-.sister-avatar { font-size: 20px; flex-shrink: 0; }
-.sister-info { flex:1; min-width:0; }
-.sister-title { font-weight: 700; font-size: 13px; color: var(--text); }
-.sister-subtitle {
-  font-size: 11px; color: var(--text2); margin-top: 3px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.sister-meta { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
+/* (Les règles .sister-* ont été retirées le 18/09/2026 : 0 émission JS depuis la refonte
+   live-only du 10/09 — vérifié sur le DOM rendu et sur tout le code du fichier.) */
 .badge {
   font-size: 10px; padding: 3px 8px; border-radius: var(--radius-sm);
   font-weight: 600; white-space: nowrap;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.3);
 }
-.badge-regime { background: rgba(59,142,212,0.12); color: #3b8ed4; border: 1px solid rgba(59,142,212,0.3); }
-.badge-conf { background: rgba(192,125,16,0.1); color: var(--accent); border: 1px solid rgba(192,125,16,0.25); }
 .badge-hausser { background: rgba(13,158,136,0.1); color: var(--hausser); border: 1px solid rgba(13,158,136,0.25); }
 .badge-baissier { background: rgba(232,93,66,0.1); color: var(--baissier); border: 1px solid rgba(232,93,66,0.25); }
-.sister-expand { font-size: 11px; color: var(--text2); transition: transform 0.25s; }
-.sister-card.open .sister-expand { transform: rotate(180deg); }
-.sister-card-body {
-  display: none; padding: 14px 16px;
-  border-top: 1px solid var(--glass-edge);
-  font-size: 12px; line-height: 1.7;
-  max-height: 70vh; overflow-y: auto;
-  background: linear-gradient(180deg, var(--surface2) 0%, transparent 100%);
-}
-.sister-card.open .sister-card-body { display: block; }
-.sister-card-body h3 { color: var(--accent); font-size: 14px; margin: 14px 0 8px; font-weight:700; }
-.sister-card-body h4 { color: var(--text); font-size: 12px; margin: 10px 0 5px; font-weight:600; }
-.sister-card-body p { margin: 5px 0; color: var(--text); }
-.sister-card-body strong { color: var(--text); }
-.sister-card-body em { color: var(--text2); }
-.sister-card-body blockquote {
-  border-left: 3px solid var(--purple); padding: 5px 12px;
-  margin: 10px 0; color: var(--text2);
-  background: var(--surface2); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-}
-.sister-card-body code {
-  background: var(--surface2); padding: 2px 6px;
-  border-radius: 4px; font-size: 11px; font-family: 'Cascadia Code', monospace;
-}
-.sister-card-body pre {
-  background: var(--surface2); padding: 12px; border-radius: var(--radius-sm);
-  overflow-x: auto; font-size: 11px; margin: 10px 0;
-  border: 1px solid var(--border);
-}
 
 /* ═══ AVATAR ORBS — glossy 3D spheres ═══ */
 .avatar-orb {
@@ -506,33 +441,6 @@ body {
   background: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.1) 100%);
   pointer-events: none;
 }
-.avatar-orb.emerald {
-  background: radial-gradient(circle at 35% 30%, #52f0b0 0%, #00a86b 50%, #005c38 85%, #002b1a 100%);
-}
-.avatar-orb.amber {
-  background: radial-gradient(circle at 35% 30%, #ffd060 0%, #e67e00 50%, #994c00 85%, #4a2200 100%);
-}
-.avatar-orb.ruby {
-  background: radial-gradient(circle at 35% 30%, #ff7070 0%, #cc1a1a 50%, #7a0a0a 85%, #3d0202 100%);
-}
-.avatar-orb.amethyst {
-  background: radial-gradient(circle at 35% 30%, #c9a0ff 0%, #7c3aed 50%, #4a1d8a 85%, #1e0848 100%);
-}
-.sister-card-body hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
-.sister-card-body ul, .sister-card-body ol { margin: 8px 0; padding-left: 20px; }
-
-.targets-mini { display: flex; flex-direction: column; gap: 5px; margin: 10px 0; }
-.target-chip {
-  font-size: 10px; padding: 5px 10px; border-radius: var(--radius-sm);
-  background: var(--btn-gloss), var(--surface2);
-  border: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.3);
-}
-.target-chip .dir { font-weight: 800; font-size: 12px; }
-.target-chip.hausser { border-left: 3px solid var(--hausser); }
-.target-chip.baissier { border-left: 3px solid var(--baissier); }
-
 /* ═══ LOADING / ERROR ═══ */
 .loading { text-align:center; padding:48px; color:var(--text2); }
 .error {
@@ -705,7 +613,10 @@ h1, h2, h3, .dashboard-title {
   transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   height: 28px; /* collapsed */
 }
-.strat-section:not(.collapsed) { height: 280px; }
+/* Ouvert : la phrase « comment ça marche » + l'aperçu de grille occupent ~40 px de plus qu'avant.
+   280 px obligeaient à scroller DANS la section pour atteindre TP / SL / Du / Au. 46dvh s'adapte
+   aux fenêtres courtes, le max garde le graphe utilisable sur un écran normal. */
+.strat-section:not(.collapsed) { height: 320px; height: min(46dvh, 320px); }
 .strat-handle {
   display: flex; align-items: center; justify-content: space-between;
   height: 28px; padding: 0 18px; cursor: pointer;
@@ -724,7 +635,14 @@ h1, h2, h3, .dashboard-title {
    parasite dans cette bande. Même traitement que le feed-panel. */
 .strat-section.collapsed .strat-body { display: none; }
 .strat-cols { display: flex; gap: 18px; height: 100%; }
-.strat-col-config { flex: 0 0 320px; }
+/* Config sur 2 colonnes, lues par paires : (Capital|Niveaux) (Prix inf|Prix sup) (TP|SL) (Du|Au).
+   8 champs empilés + l'aperçu de grille débordaient du corps (356 px pour 292) : il fallait
+   scroller DANS la section pour atteindre TP / SL / Du / Au. L'ordre des params de gridParams()
+   fait ces paires — ne pas déplacer gridLevels. Le `>` est obligatoire : avec `display: contents`
+   les champs de #stratParams restent des enfants du DOM, `:first-child` les viserait. */
+.strat-col-config { flex: 0 0 460px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; align-content: start; }
+.strat-col-config > .strat-row:first-child, .strat-col-config > .strat-help { grid-column: 1 / -1; }
+#stratParams { display: contents; }
 .strat-col-actions { flex: 0 0 130px; display: flex; flex-direction: column; gap: 5px; }
 .strat-col-stats { flex: 1; min-width: 200px; font-size: 11px; }
 
@@ -758,6 +676,11 @@ h1, h2, h3, .dashboard-title {
   border-radius: var(--radius-sm); border: 1px solid var(--border);
   line-height: 1.6; font-size: 11px;
 }
+/* « Comment ça marche » + aperçu de la grille (sous le select Stratégie, au-dessus des params) */
+.strat-help { font-size: 10px; line-height: 1.45; color: var(--text2); margin: -2px 0 7px; }
+.strat-help .strat-auto { color: var(--text); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.strat-stats .verdict { font-weight: 700; margin-bottom: 5px; }
+.strat-stats .strat-note { margin-top: 4px; color: var(--text2); font-size: 10px; }
 .strat-section .strat-toggle {
   font-size: 10px; color: var(--accent); cursor: pointer;
   text-align: center; text-decoration: underline; margin-top: 4px;
@@ -1010,7 +933,7 @@ body.dark .strat-btn, body.dark .ind-dropdown-btn {
   .strat-handle { height: 36px; padding: 0 14px; font-size: 13px; }
   .strat-body { height: calc(100% - 36px); padding: 8px 10px; }
   .strat-cols { flex-direction: column; gap: 8px; }
-  .strat-col-config { flex: none; width: 100%; }
+  .strat-col-config { display: block; flex: none; width: 100%; }
   .strat-col-actions { flex: none; width: 100%; flex-direction: row; flex-wrap: wrap; gap: 4px; }
   .strat-col-actions .strat-btn { flex: 1; min-width: 80px; font-size: 10px; padding: 8px 8px; }
   .strat-col-actions .strat-toggle { width: 100%; text-align: center; }
@@ -1027,16 +950,7 @@ body.dark .strat-btn, body.dark .ind-dropdown-btn {
   .demon-card { padding: 12px; }
   .demon-name { font-size: 13px; }
   .demon-body { font-size: 11px; }
-  .sister-card-header { padding: 10px 12px; gap: 8px; }
-  .sister-avatar { font-size: 16px; }
-  .sister-title { font-size: 12px; }
-  .sister-card-body { max-height: none; overflow-y: visible; font-size: 11px; }
-  .sister-card-body pre { max-width: 100%; overflow-x: auto; font-size: 10px; }
-  .sister-card-body blockquote { margin: 8px 0; padding: 4px 8px; }
-  .targets-mini { gap: 3px; }
-  .target-chip { font-size: 9px; padding: 4px 7px; gap: 4px; flex-wrap: wrap; }
   .demon-header { flex-wrap: wrap; }
-  .sister-meta { gap: 3px; }
 }
 
 /* Sous 480 px les 4 blocs du header ne tiennent plus sur une ligne. On sacrifie le mot-symbole (l'orbe et le <title> portent l'identité) et on resserre paddings/gaps de quelques px pour que « DXY xx · VIX xx » — 132 px — reste lisible en entier sur un 390 px plutôt que tronqué en « DXY xx · … ». */
@@ -1185,13 +1099,10 @@ body.dark .strat-btn, body.dark .ind-dropdown-btn {
       <div class="strat-col-config">
         <div class="strat-row">
           <label>Stratégie</label>
-          <select id="stratSelect" onchange="onStratChange()">
-            <option value="bb_grid">Grille Bollinger</option>
-            <option value="rsi_grid">Grille RSI</option>
-            <option value="ema_grid">Grille EMA Pullback</option>
-            <option value="dumb_grid">Grille Fixe (benchmark)</option>
-          </select>
+          <select id="stratSelect" onchange="onStratChange()"></select>
         </div>
+        <!-- « Comment ça marche » + ce que la grille FERAIT maintenant : rempli par renderStratHelp() -->
+        <div class="strat-help" id="stratHelp"></div>
         <div class="strat-row">
           <label>Capital</label>
           <input type="number" id="stratCapital" value="1000" min="100" max="100000" step="100" onchange="onStratParamChange()">
@@ -3314,6 +3225,16 @@ const ST_STATES = { IDLE: 'idle', ACTIVE: 'active', RANGE_EXIT: 'range_exit' };
 // Registry of all strategies
 const STRATEGIES = {};
 
+// « Comment ça marche » en une phrase, affiché sous le nom. Sans ça, un débutant ne peut pas
+// savoir que Bollinger n'achète QUE sur la bande basse (d'où un backtest qui ne fait rien).
+const STRAT_DESC = {
+  bb_grid:   'achète à chaque niveau dès que le prix touche la bande de Bollinger basse. Plage auto : bande basse → bande médiane, donc aucune entrée tant que le prix ne descend pas jusque-là.',
+  rsi_grid:  'n\'arme la grille que si le RSI passe sous le seuil de survente (prix qui chute). Plage auto : prix courant ±5 %.',
+  ema_grid:  'achète les replis sur l\'EMA tant que la tendance reste haussière. Plage auto : EMA → prix courant.',
+  sr_grid:   'grille PERMANENTE bornée par le support et la résistance les plus proches. Repli sur ±5 % si aucun niveau n\'atteint le score minimum.',
+  dumb_grid: 'témoin sans aucun signal : grille fixe ±5 % toujours active. C\'est la référence que les autres doivent battre.',
+};
+
 function registerStrategy(key, def) { STRATEGIES[key] = def; }
 
 // Helper: distribute N levels evenly between low and high price
@@ -3328,11 +3249,13 @@ function distributeGridLevels(low, high, n) {
 
 // ─── Helpers communs aux strategies de grille ───
 // Ces params etaient copies dans les 5 grilles : toute nouvelle grille DOIT passer par ici.
+// ORDRE = ordre d'affichage, lu par paires sur 2 colonnes : (Capital|Niveaux) (Prix inf|Prix sup)
+// (TP|SL). Ne pas remettre gridLevels au milieu de la plage : les paires n'ont plus de sens.
 function gridParams(levels, tp, sl, loHint, hiHint) {
   return {
+    gridLevels: { value: levels, min: 2, max: 500, step: 1, label: 'Niveaux' },
     priceLow: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix inférieur', hint: loHint },
     priceHigh: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix supérieur', hint: hiHint },
-    gridLevels: { value: levels, min: 2, max: 500, step: 1, label: 'Niveaux' },
     tpPct: { value: tp, min: 0.1, max: 5, step: 0.1, label: 'Take Profit %' },
     slPct: { value: sl, min: 0.5, max: 10, step: 0.5, label: 'Stop Loss %' },
   };
@@ -5063,7 +4986,7 @@ function toggleStratPanel() {
   const section = document.getElementById('stratSection');
   section.classList.toggle('collapsed');
   // After transition, resize canvas
-  setTimeout(() => { resizeCanvas(); drawChart(); }, 350);
+  setTimeout(() => { resizeCanvas(); drawChart(); renderStratHelp(); }, 350);
 }
 
 function onStratChange() {
@@ -5090,6 +5013,62 @@ function onStratParamChange() {
   btResult = null;
 }
 
+// Le select des stratégies vient du REGISTRE : une stratégie enregistrée est sélectionnable,
+// sans risque d'oubli (sr_grid était implémentée et auditée depuis le 11/09, mais absente du
+// select codé en dur — elle était donc inatteignable).
+function fillStrategySelect() {
+  const sel = document.getElementById('stratSelect');
+  if (!sel) return;
+  sel.innerHTML = Object.entries(STRATEGIES)
+    .map(([k, s]) => '<option value="' + k + '">' + s.label + '</option>').join('');
+  sel.value = btActiveStrategy;
+}
+
+// Ce que la grille FERAIT si le signal tombait sur la dernière bougie : bornes, pas, état du
+// signal. C'est la réponse à « pourquoi le backtest ne fait rien ? » — la plupart des grilles
+// n'entrent QUE sur un signal, donc rien ne se passe tant qu'il n'est pas armé.
+function previewGrid() {
+  if (!candles || candles.length < 60) return null;
+  const strat = STRATEGIES[btActiveStrategy];
+  if (!strat || !strat.generateLevels) return null;
+  const idx = candles.length - 1;
+  const bot = new GridBot(btActiveStrategy, btCapital);
+  const params = bot.buildParams(btUserParams);
+  const ind = bot.computeIndicators(candles, idx, params);
+  let levels;
+  try { levels = strat.generateLevels(candles, idx, params, ind) || []; }
+  catch (e) { return null; }
+  if (levels.length < 2) return null;
+  return {
+    lo: levels[0].price, hi: levels[levels.length - 1].price, n: levels.length,
+    step: levels[1].price - levels[0].price,
+    manual: params.priceLow > 0 || params.priceHigh > 0,
+    signal: strat.trigger(candles, idx, params, ind),
+  };
+}
+
+function renderStratHelp() {
+  const el = document.getElementById('stratHelp');
+  const strat = STRATEGIES[btActiveStrategy];
+  if (!el || !strat) return;
+  let html = '<b>' + strat.label + '</b> — ' + (STRAT_DESC[btActiveStrategy] || '');
+  const p = previewGrid();
+  if (!p) {
+    html += '<div class="strat-auto">Aperçu de la grille : en attente des bougies…</div>';
+  } else {
+    const f = v => '$' + v.toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+    const sig = p.signal === 'enter' ? '<span class="stat-pos">signal armé</span>'
+      : p.signal === 'exit' ? '<span class="stat-neg">signal de sortie</span>'
+      : p.signal === 'idle' ? 'signal pas encore armé' : 'pas de signal sur cette bougie';
+    const tp = (btUserParams.tpPct !== undefined) ? btUserParams.tpPct : strat.params.tpPct.value;
+    const sl = (btUserParams.slPct !== undefined) ? btUserParams.slPct : strat.params.slPct.value;
+    html += '<div class="strat-auto">' + (p.manual ? 'Bornes saisies à la main' : 'Auto') + ' : '
+      + f(p.lo) + ' → ' + f(p.hi) + ' · ' + p.n + ' niveaux · pas de ' + f(p.step)
+      + ' · TP +' + tp + ' % / SL −' + sl + ' % · ' + sig + '</div>';
+  }
+  el.innerHTML = html;
+}
+
 function buildStratParamUI() {
   const stratKey = document.getElementById('stratSelect').value;
   const strat = STRATEGIES[stratKey];
@@ -5105,11 +5084,14 @@ function buildStratParamUI() {
     const autoClass = isAutoField ? ' auto-mode' : '';
     const placeholder = isAutoField ? ' placeholder="Auto"' : '';
     html += '<div class="strat-row">';
-    html += '<label title="' + (def.label || k) + '">' + (def.label || k) + (def.advanced ? ' *' : '') + '</label>';
+    // `hint` explique le « 0 = auto » (défini par gridParams) : sans lui, un champ grisé
+    // « Auto » ne dit pas QUELLE borne la stratégie va choisir.
+    html += '<label title="' + (def.hint || def.label || k) + '">' + (def.label || k) + (def.advanced ? ' *' : '') + '</label>';
     html += '<input type="number" id="sp_' + k + '" value="' + (isAutoField ? '' : val) + '" min="' + def.min + '" max="' + def.max + '" step="' + (def.step || 1) + '" onchange="onStratParamChange()" style="flex:1;width:60px;padding:4px 6px;font-size:11px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font)" class="' + autoClass + '"' + placeholder + '>';
     html += '</div>';
   }
   container.innerHTML = html;
+  renderStratHelp();
 }
 
 function getDateRangeIndices() {
@@ -5230,15 +5212,37 @@ function updateForwardStats() {
     '<div>Return: <span class="' + (btResult.totalReturn >= 0 ? 'stat-pos' : 'stat-neg') + '">' + btResult.totalReturn.toFixed(2) + '%</span></div>';
 }
 
+// Durée d'une bougie en minutes : traduit la fenêtre testée en « 8 h » / « 3,2 j ».
+const INTERVAL_MIN = { '1m': 1, '5m': 5, '15m': 15, '1h': 60, '4h': 240, '1d': 1440 };
+
 function showStratStats(result) {
   const div = document.getElementById('stratStats');
   div.style.display = 'block';
-  const pnlStr = result.totalPnl >= 0 ? '+' + result.totalPnl.toFixed(2) : result.totalPnl.toFixed(2);
-  div.innerHTML =
-    '<div>Trades: <span class="stat-val">' + result.tradeCount + '</span> | Win: <span class="' + (result.winRate >= 50 ? 'stat-pos' : 'stat-neg') + '">' + result.winRate.toFixed(1) + '%</span></div>' +
-    '<div>P&L: <span class="' + (result.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' USDT</span> (' + (result.totalReturn >= 0 ? '+' : '') + result.totalReturn.toFixed(2) + '%)</div>' +
-    '<div>Max DD: <span class="stat-neg">' + result.maxDrawdownPct.toFixed(1) + '%</span> | Sharpe: <span class="stat-val">' + result.sharpe + '</span></div>' +
-    '<div>PF: <span class="stat-val">' + result.profitFactor + '</span> | Avg Win: <span class="stat-pos">' + result.avgWin.toFixed(2) + '</span> | Avg Loss: <span class="stat-neg">' + result.avgLoss.toFixed(2) + '</span></div>';
+  const pnlStr = (result.totalPnl >= 0 ? '+' : '') + result.totalPnl.toFixed(2);
+  // Verdict : le seul juge qui compte est « garder le BTC » sur la MÊME période. Une grille qui
+  // gagne 0,40 % quand le BTC fait 3 % a perdu du terrain, malgré un P&L positif.
+  const c0 = candles[result.startIdx], c1 = candles[result.endIdx];
+  const hold = (c0 && c1 && c0.close) ? (c1.close - c0.close) / c0.close * 100 : null;
+  const ret = result.totalReturn;
+  const mins = (result.endIdx - result.startIdx + 1) * (INTERVAL_MIN[chartInterval] || 15);
+  const durStr = mins >= 1440 ? (mins / 1440).toFixed(1) + ' j' : mins >= 60 ? (mins / 60).toFixed(1) + ' h' : mins + ' min';
+  let html = '';
+  if (hold !== null) {
+    const v = (ret > 0 && ret > hold) ? ['stat-pos', '✅ gagne et bat le marché']
+      : (ret > 0) ? ['stat-val', '⚠️ gagne, mais garder le BTC rapportait plus']
+      : (ret > hold) ? ['stat-val', '⚠️ perd, mais moins que le marché']
+      : ['stat-neg', '❌ perd alors que garder le BTC montait'];
+    html += '<div class="verdict"><span class="' + v[0] + '">' + v[1] + '</span> — '
+      + (ret >= 0 ? '+' : '') + ret.toFixed(2) + ' % en ' + durStr + ', BTC '
+      + (hold >= 0 ? '+' : '') + hold.toFixed(2) + ' % sur la même période</div>';
+  }
+  html +=
+    '<div>Trades: <span class="stat-val">' + result.tradeCount + '</span> | Win: <span title="Part des trades clôturés en profit" class="' + (result.winRate >= 50 ? 'stat-pos' : 'stat-neg') + '">' + result.winRate.toFixed(1) + '%</span></div>' +
+    '<div>P&L: <span title="Profit ou perte en USDT, frais 0,1 % déjà déduits" class="' + (result.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' USDT</span> (' + (ret >= 0 ? '+' : '') + ret.toFixed(2) + ' %)</div>' +
+    '<div>Perte max: <span title="Plus forte baisse depuis un sommet du capital (drawdown)" class="stat-neg">' + result.maxDrawdownPct.toFixed(1) + '%</span> | Sharpe: <span title="Rendement par unité de risque, annualisé. Au-delà de 1 c\'est bon ; sur une fenêtre courte il ne veut rien dire." class="stat-val">' + result.sharpe + '</span></div>' +
+    '<div>Gains/pertes: <span title="Total des gains divisé par le total des pertes. Au-dessus de 1, la grille gagne." class="stat-val">' + result.profitFactor + '</span> | Gain moyen: <span title="Gain moyen par trade gagnant" class="stat-pos">' + result.avgWin.toFixed(2) + '</span> | Perte moyenne: <span title="Perte moyenne par trade perdant" class="stat-neg">' + result.avgLoss.toFixed(2) + '</span></div>';
+  if (result.tradeCount < 10) html += '<div class="strat-note">' + result.tradeCount + ' trade(s) : trop peu pour conclure — visez 30, ou élargissez la période avec les champs « Du » / « Au ».</div>';
+  div.innerHTML = html;
 }
 
 function onCompareDumbGrid() {
@@ -5275,7 +5279,7 @@ function toggleAdvanced() {
 }
 
 // Build initial param UI on load
-setTimeout(() => { buildStratParamUI(); }, 100);
+setTimeout(() => { fillStrategySelect(); buildStratParamUI(); }, 100);
 
 // ============ WALK-FORWARD ANALYSIS ============
 function runWalkForward(strategyKey, candles, userParams, capital, segments) {
