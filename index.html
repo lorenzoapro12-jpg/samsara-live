@@ -905,6 +905,13 @@ body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
 }
 .theme-btn:active, .strat-btn:active { transform: scale(0.97) !important; }
 
+/* ⚠️ La règle de groupe ci-dessus écrase le FOND des boutons en verre clair, mais la base
+   garde `color:#fff` : « ▶ Backtest » et « 🔴 Forward » s'écrivaient blanc sur blanc — les
+   deux actions principales étaient illisibles. Le fond plein est réaffirmé ici. */
+.strat-btn { background: linear-gradient(135deg, var(--accent), #006d7a) !important; color: #fff !important; }
+.strat-btn.secondary { background: var(--lg-tint-solid) !important; color: var(--text) !important; }
+.strat-btn.forward { background: linear-gradient(135deg, #26a69a, #00695c) !important; color: #fff !important; }
+
 /* ── 4bis. FOND DU CANVAS = celui du site, dans un arc sûr (loin du rouge/teal). */
 .chart-container canvas {
   /* Ombre interne : le contenu se lit creusé sous la matière, pas posé dessus. */
