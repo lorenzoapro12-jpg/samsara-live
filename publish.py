@@ -12,6 +12,7 @@ Sortie : /root/samsara-live/market-data.json
 Règle « pas d'erreur silencieuse » : chaque collecteur est isolé, son état est
 publié dans `status`, et le script sort en code 1 si au moins un bloc échoue.
 """
+import fcntl
 import json
 import os
 import subprocess
@@ -42,15 +43,68 @@ def http_json(url: str, timeout: int = 20):
         return json.loads(r.read())
 
 
-def block(name: str):
-    """Isole un collecteur : capture l'exception, publie son état, ne casse rien."""
+def dump_atomic(obj, path: str) -> None:
+    """Écriture atomique. Un disque plein (vécu le 17/09) ou une mort du processus
+    pendant l'écriture ne doit pas laisser un JSON tronqué derrière lui."""
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=1)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
+GIT_LOCK = "/root/.hermes/samsara-git.lock"
+
+
+def git_publish(paths, msg: str, branch: str = "master") -> bool:
+    """Publie SOUS VERROU, en ne committant QUE les chemins demandés.
+
+    Deux écrivains (publish.py et heatmap.py) partagent ce dépôt. Sans verrou ni
+    pathspec, l'un peut committer le fichier que l'autre vient de préparer, ou tomber
+    sur un index.lock. Le push est réessayé après rebase : une divergence distante ne
+    doit pas bloquer la publication indéfiniment.
+    """
+    with open(GIT_LOCK, "w") as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
+
+        def g(*a, **k):
+            return subprocess.run(["git", "-C", REPO, *a], **k)
+
+        g("add", "--", *paths, check=True)
+        if g("diff", "--cached", "--quiet", "--", *paths).returncode == 0:
+            return False
+        g("commit", "-q", "-m", msg, "--", *paths, check=True)
+        for _ in range(3):
+            if g("push", "-q", "origin", branch, timeout=90).returncode == 0:
+                return True
+            g("pull", "-q", "--rebase", "origin", branch)
+        raise RuntimeError("push impossible après 3 essais")
+
+
+def block(name: str, required: tuple = ()):
+    """Isole un collecteur : capture l'exception, publie son état, ne casse rien.
+
+    `required` : champs dont l'absence (`None`) rend le bloc INCOMPLET. Sans ce
+    contrôle, un collecteur renvoyant un dict plein de `None` passait pour « ok » —
+    une source morte s'affichait donc comme vivante, soit exactement l'inverse de la
+    règle annoncée en tête de ce fichier.
+    """
     def deco(fn):
         def wrap(*a, **k):
             try:
                 v = fn(*a, **k)
-                STATUS[name] = "ok" if v not in (None, {}, []) else "vide"
                 if v in (None, {}, []):
+                    STATUS[name] = "vide"
                     ERRORS.append(f"{name}: aucun résultat")
+                    return v
+                missing = [f for f in required
+                           if isinstance(v, dict) and v.get(f) is None]
+                if missing:
+                    STATUS[name] = "incomplet:" + ",".join(missing)
+                    ERRORS.append(f"{name}: champs absents {missing}")
+                    return v
+                STATUS[name] = "ok"
                 return v
             except Exception as e:
                 STATUS[name] = f"error: {type(e).__name__}: {e}"
@@ -74,7 +128,7 @@ def btc_spot():
 
 
 # ─── 2. INDICATEURS MULTI-TF ─────────────────────────────────
-@block("indicators")
+@block("indicators", required=("4h", "1h", "1d"))
 def indicators():
     import fetch_macro as fm  # réutilise du code testé, pas de dépendance Renaissance
     out = {}
@@ -85,7 +139,7 @@ def indicators():
 
 
 # ─── 3. MACRO (DXY / VIX) ────────────────────────────────────
-@block("macro")
+@block("macro", required=("dxy_spot", "vix"))
 def macro():
     import fetch_macro as fm
     dxy_spot = fm.get_dxy_spot() or {}
@@ -98,7 +152,7 @@ def macro():
 
 
 # ─── 4. MICROSTRUCTURE FUTURES (Binance fapi, direct live) ───
-@block("micro_futures")
+@block("micro_futures", required=("funding_rate_pct", "mark_price", "oi_btc"))
 def micro_futures():
     F = "https://fapi.binance.com"
     r = {}
@@ -137,7 +191,7 @@ def micro_futures():
 
 
 # ─── 5. CVD (checkpoint daemon — seule table réellement vivante) ──
-@block("cvd")
+@block("cvd", required=("cvd", "updated_at"))
 def cvd():
     import sqlite3
     con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
@@ -150,6 +204,16 @@ def cvd():
     con.close()
     if not row:
         return None
+    # Le daemon écrit `datetime('now')` (binance_ws.py:120) → UTC, mais SANS fuseau
+    # (M12 de l'audit). On le parse donc explicitement comme de l'UTC.
+    try:
+        age = (datetime.now(timezone.utc).replace(tzinfo=None)
+               - datetime.strptime(row["updated_at"][:19], "%Y-%m-%d %H:%M:%S")
+               ).total_seconds()
+        if age > 1800:
+            raise RuntimeError(f"CVD figé depuis {int(age / 60)} min")
+    except ValueError:
+        pass
     return {
         "cvd": row["cvd"],
         "buy_vol_24h": row["buy_vol"],
@@ -159,7 +223,7 @@ def cvd():
 
 
 # ─── 6. GEX / DERIBIT ────────────────────────────────────────
-@block("gex")
+@block("gex", required=("gex_state", "gamma_walls"))
 def gex():
     from scenario_engine import gex as G
     rep = G.compute_gex()
@@ -180,12 +244,15 @@ def gex():
 
 
 # ─── 7. PREMIUM COINBASE ─────────────────────────────────────
-@block("premium")
+@block("premium", required=("premium_pct", "coinbase_mid"))
 def premium():
     from scenario_engine import coinbase_premium as CP
     p = CP.fetch_premium()
-    if not p:
-        return None
+    # `not p` laissait passer le cas d'erreur : fetch_premium() renvoie
+    # {"timestamp":…, "error":…} (coinbase_premium.py:138-141) — dict NON vide, donc
+    # déclaré « ok », et les cinq champs partaient à None.
+    if not p or p.get("error"):
+        raise RuntimeError(str((p or {}).get("error") or "réponse vide"))
     return {
         "premium_pct": p.get("premium_pct"),
         "premium_state": p.get("premium_state"),
@@ -196,10 +263,21 @@ def premium():
 
 
 # ─── 8. MURS DE LIQUIDITÉ (heatmap locale, vivante) ──────────
-@block("liquidity")
+@block("liquidity", required=("ratio_bid_ask", "total_bid"))
 def liquidity():
     with open(HEATMAP_JSON) as f:
         h = json.load(f)
+    # La heatmap est produite toutes les 3 min : au-delà de 10 min elle est morte, et
+    # les « murs » affichés seraient des vestiges. On refuse de les publier.
+    _upd = h.get("updated")
+    if _upd:
+        try:
+            _age = (datetime.now(timezone.utc)
+                    - datetime.fromisoformat(_upd)).total_seconds()
+            if _age > 600:
+                raise RuntimeError(f"heatmap figée depuis {int(_age / 60)} min")
+        except ValueError:
+            pass
     dp = h["dp"]
     tmax = max(e[0] for e in h["bids"])
     t_from = tmax - 15
@@ -264,8 +342,7 @@ def main():
     data["status"] = STATUS
     data["errors"] = ERRORS
 
-    with open(OUT, "w") as f:
-        json.dump(data, f, ensure_ascii=False, indent=1)
+    dump_atomic(data, OUT)
 
     # ─── résumé pour le log cron ───
     b = data["btc"]
@@ -274,16 +351,15 @@ def main():
     if ERRORS:
         print(f"  ⚠️  {len(ERRORS)} bloc(s) en échec : {ERRORS}")
 
-    # ─── git push ───
-    os.chdir(REPO)
-    subprocess.run(["git", "add", "market-data.json"], check=True)
-    if subprocess.run(["git", "diff", "--cached", "--quiet"]).returncode == 1:
-        msg = f"market-data — BTC ${b.get('price', '?'):,} live [{ts[11:16]}]" if b.get("price") else f"market-data live [{ts[11:16]}]"
-        subprocess.run(["git", "commit", "-m", msg], check=True)
-        subprocess.run(["git", "push", "origin", "master"], check=True, timeout=90)
-        print(f"  ✓ Poussé — {msg}")
-    else:
-        print("  − Aucun changement")
+    # ─── publication : verrou partagé, commit limité au fichier ───
+    msg = (f"market-data — BTC ${b.get('price', '?'):,} live [{ts[11:16]}]"
+           if b.get("price") else f"market-data live [{ts[11:16]}]")
+    try:
+        pushed = git_publish(["market-data.json"], msg)
+        print(f"  ✓ Poussé — {msg}" if pushed else "  − Aucun changement")
+    except Exception as e:
+        print(f"  ❌ publication impossible : {type(e).__name__}: {e}")
+        return 1
 
     return 1 if ERRORS else 0
 
