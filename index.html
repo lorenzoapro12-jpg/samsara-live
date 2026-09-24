@@ -197,6 +197,18 @@ body {
 }
 @keyframes pulse { 0%,100%{opacity:1; box-shadow:0 0 6px var(--green)} 50%{opacity:0.25; box-shadow:0 0 2px var(--green)} }
 
+/* Bandeau d'âge. Le cron publie toutes les 15 min : au-delà, la donnée est vieille et
+   ça doit se VOIR, pas se déduire d'un point vert. */
+.age-banner {
+  display: none; padding: 7px 12px; margin: 0 0 8px;
+  border-radius: 10px; font-size: 12px; font-weight: 600;
+  background: rgba(224,74,58,0.14); color: #8a2d20;
+  border: 1px solid rgba(224,74,58,0.35);
+}
+.age-banner.retard { background: rgba(240,185,11,0.16); color: #7a5600; border-color: rgba(240,185,11,0.45); }
+.dark .age-banner { background: rgba(255,118,112,0.16); color: #ffb4ae; border-color: rgba(255,118,112,0.4); }
+.dark .age-banner.retard { background: rgba(240,185,11,0.14); color: #f5c458; border-color: rgba(240,185,11,0.4); }
+
 /* ═══ INDICATOR BAR — Vista Aero toolbar ═══ */
 .indicator-bar {
   display: flex; align-items: center; gap: 2px;
@@ -257,6 +269,11 @@ body {
 .indicator-bar input { display: none; }
 .ind-label { font-weight: 600; }
 .ov { color: #17558f; } .sg { color: #8a5606; } .ch { color: #9c1fb8; }
+/* Thème sombre : ces trois teintes sont calibrées pour un fond CLAIR. Aucune n'avait
+   d'équivalent sombre, donc les intitulés de pastilles (EMA20, RSI, Volume…) restaient
+   bleu nuit / brun / violet foncé sur une barre sombre — illisibles au rendu du
+   24/09/2026. La teinte garde son code sémantique, seule la luminosité change. */
+.dark .ov { color: #8ec5ff; } .dark .sg { color: #f5c458; } .dark .ch { color: #e695ff; }
 .tag-ch { background: rgba(224,64,251,0.12); color: #e040fb; }
 
 /* ═══ MAIN LAYOUT ═══ */
@@ -3766,8 +3783,15 @@ function drawChart() {
   scaleSeq++;   // une frame = un calcul d'échelle : invalide le cache de priceWindow()
   const W = canvas.width / window.devicePixelRatio;
   const H = canvas.height / window.devicePixelRatio;
-  COLORS.grid = dark ? 'rgba(0,229,255,0.08)' : 'rgba(0,188,212,0.12)';
+  COLORS.grid = dark ? 'rgba(0,229,255,0.10)' : 'rgba(0,90,120,0.14)';
   COLORS.text = getComputedStyle(document.body).getPropertyValue('--text2');
+  // Palette du graphique ALIGNÉE sur l'identité Aero, au lieu des teintes
+  // TradingView par défaut (#26a69a / #ef5350) qui juraient avec l'interface.
+  // Les deux thèmes sont servis par les variables CSS : rien à dupliquer ici.
+  const cssv = n => getComputedStyle(document.body).getPropertyValue(n).trim();
+  COLORS.axis = cssv('--text') || COLORS.text;
+  COLORS.candleUp = cssv('--green') || '#26a69a';
+  COLORS.candleDown = cssv('--red') || '#ef5350';
   
   ctx.clearRect(0, 0, W, H);
   if (candles.length < 2) return;
@@ -4113,7 +4137,8 @@ function resolveChart(candles, padL, padR, chartH, W) {
     const y = pad.top + (ph / gridN) * i;
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
     const price = maxP - (range / gridN) * i;
-    ctx.fillStyle = COLORS.text; ctx.font = '9px monospace';
+    ctx.fillStyle = COLORS.axis || COLORS.text;
+    ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
     const label = '$' + price.toFixed(3);
     ctx.fillText(label, W - pad.right + 3, y + 3);
   }
@@ -4379,7 +4404,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
     const c = visible[i];
     const x = pad.left + gap * i;
     const isGreen = c.close >= c.open;
-    const color = isGreen ? '#26a69a' : '#ef5350';
+    const color = isGreen ? (COLORS.candleUp || '#26a69a') : (COLORS.candleDown || '#ef5350');
     const yO = pad.top + ph * (1 - (c.open - minP) / range);
     const yC = pad.top + ph * (1 - (c.close - minP) / range);
     const yH = pad.top + ph * (1 - (c.high - minP) / range);
@@ -4400,7 +4425,9 @@ function resolveChart(candles, padL, padR, chartH, W) {
   }
   
   // --- Heatmap Liquidité (Bookmap : grille native -> un seul drawImage) ---
-  if (overlays.liq && histHeatmap && histHeatmap.bids) {
+  // `histHeatmap.sym` n'était JAMAIS comparé au symbole affiché : le carnet BTC se
+  // dessinait tel quel sur les graphes ETH, SOL, XRP, TAO et sur le ratio BTC/SOL.
+  if (overlays.liq && histHeatmap && histHeatmap.bids && histHeatmap.sym === activeSymbol) {
     const hm = histHeatmap;
     const intervalS = (candles.length > 1 && candles[1].time > candles[0].time) ? (candles[1].time - candles[0].time) : 900;
     const winT0 = candles[vs].time;
@@ -4423,7 +4450,10 @@ function resolveChart(candles, padL, padR, chartH, W) {
       ctx.imageSmoothingEnabled = gp < 0.9;
       ctx.drawImage(layer.cv, c0, 0, c1 - c0, layer.h,
         pad.left + (hm.t0 + c0 * hm.dt - winT0) / intervalS * gap,
-        pad.top + ph * (1 - ((layer.h - 1) * hm.dp - minP) / range),
+        // Ligne 0 de l'image = la tranche de prix la PLUS HAUTE (cf. buildHeatLayer).
+        // Le sommet se pose donc à layer.h * dp et non (layer.h - 1) * dp : le cran
+        // de 20 $ d'écart décalait verticalement toute la heatmap.
+        pad.top + ph * (1 - (layer.h * hm.dp - minP) / range),
         (c1 - c0) * gp, layer.h * ph * hm.dp / range);
       ctx.restore();
     }
@@ -4576,7 +4606,7 @@ function subGrid(y0, pad, ph, W, o) {
   o.levels.forEach(l => {
     const y = o.span ? y0 + pad.top + ph/2 - (l / o.span) * ph : y0 + pad.top + ph * (1 - (l - (o.min || 0)) / ((o.max || 100) - (o.min || 0)));
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
-    ctx.fillStyle = COLORS.text; ctx.font = 'bold 10px monospace';
+    ctx.fillStyle = COLORS.axis || COLORS.text; ctx.font = 'bold 10px ui-monospace, SFMono-Regular, Menlo, monospace';
     ctx.textAlign = 'right'; ctx.fillText(o.f ? o.f(l) : l, W - 8, y + 3); ctx.textAlign = 'left';
   });
 }
@@ -4614,8 +4644,12 @@ function resolveSub(candles, y0, subH, W, key) {
       const x = pad.left + gap * (i - vs);
       const h = (c.volume / maxV) * ph;
       const y = y0 + pad.top + ph - h;
-      ctx.fillStyle = c.close >= c.open ? '#26a69a44' : '#ef535044';
+      // L'alpha 0x44 (27 %) rendait le volume quasi invisible sur le fond clair :
+      // le volume est une DONNÉE, il se lit au même titre que les bougies.
+      ctx.fillStyle = c.close >= c.open ? (COLORS.candleUp || '#26a69a') : (COLORS.candleDown || '#ef5350');
+      ctx.globalAlpha = 0.62;
       ctx.fillRect(x + gap*0.15, y, barW, h);
+      ctx.globalAlpha = 1;
     }
   } else if (key === 'rsi') {
     const closes = candles.map(c => c.close);
@@ -4846,9 +4880,28 @@ async function fetchMarket() {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     marketData = await resp.json();
     renderFeed();
-    document.getElementById('dot').style.background = 'var(--green)';
+    // ─── ÂGE DE LA DONNÉE ────────────────────────────────────────────────
+    // Un HTTP 200 ne prouve RIEN sur la fraîcheur : une source morte reste servie
+    // indéfiniment et le point restait vert. C'est la panne du 16/08 — la Roue a lu
+    // 13 cycles de données gelées sans qu'aucun voyant ne bronche.
+    // Cadence attendue : 15 min. 20 min = un tick manqué, 32 min = deux.
+    const ageMin = marketData.updated
+      ? (Date.now() - Date.parse(marketData.updated)) / 60000 : null;
+    const etat = ageMin === null ? 'inconnu'
+               : ageMin > 32 ? 'fige'
+               : ageMin > 20 ? 'retard' : 'ok';
+    const teinte = { ok: 'var(--green)', retard: '#f0b90b', fige: 'var(--red)',
+                     inconnu: 'var(--text2)' }[etat];
+    const dot = document.getElementById('dot');
+    if (dot) {
+      dot.style.background = teinte;
+      dot.style.animation = etat === 'ok' ? '' : 'none';   // ne pas pulser sur du figé
+      dot.title = ageMin === null
+        ? 'Âge de la donnée inconnu (champ updated absent)'
+        : `Dernière publication il y a ${Math.round(ageMin)} min`;
+    }
     const td = document.getElementById('taskbarDot');
-    if (td) td.style.background = 'var(--green)';
+    if (td) td.style.background = teinte;
   } catch(e) {
     document.getElementById('dot').style.background = 'var(--red)';
     const td = document.getElementById('taskbarDot');
@@ -4875,10 +4928,13 @@ function mCard(icon, title, sub, right, body) {
     + (right ? '<span style="margin-left:auto;font-size:10px;color:var(--text2);font-variant-numeric:tabular-nums">' + right + '</span>' : '')
     + '</div><div class="demon-body">' + body + '</div></div>';
 }
+// TROIS états, pas deux. `undefined` (champ absent de market-data.json) tombait dans
+// la branche « else » et affichait « GOLDEN CROSS » : un signal haussier fabriqué à
+// partir d'une absence. Une donnée manquante doit se voir comme manquante.
 function crossTag(isDeath) {
-  return isDeath
-    ? '<span class="badge badge-baissier">DEATH CROSS</span>'
-    : '<span class="badge badge-hausser">GOLDEN CROSS</span>';
+  if (isDeath === true)  return '<span class="badge badge-baissier">DEATH CROSS</span>';
+  if (isDeath === false) return '<span class="badge badge-hausser">GOLDEN CROSS</span>';
+  return '<span class="badge" style="background:rgba(120,140,160,0.18);color:var(--text2)">n/d</span>';
 }
 function wallLine(arr) {
   if (!arr || !arr.length) return '—';
@@ -4887,12 +4943,33 @@ function wallLine(arr) {
 
 function renderFeed() { renderFeedTo(document.getElementById('feed')); }
 
+// Bandeau d'âge. Il est injecté DANS le même innerHTML que les cartes, donc il
+// s'affiche dans le conteneur réellement visible (#marketModalBody) — un bandeau
+// inséré avant #feed partait dans le panneau latéral replié et restait invisible
+// (constaté au rendu : présent dans le DOM, absent de l'écran).
+function ageBannerHtml(d) {
+  const upd = d && d.updated ? Date.parse(d.updated) : NaN;
+  if (isNaN(upd)) {
+    return '<div class="age-banner" style="display:block">⏳ Âge de la donnée inconnu — champ <b>updated</b> absent</div>';
+  }
+  const age = (Date.now() - upd) / 60000;
+  if (age <= 20) return '';
+  const fige = age > 32;
+  return '<div class="age-banner' + (fige ? '' : ' retard') + '" style="display:block">'
+    + (fige
+        ? '⏸ Données figées depuis ' + Math.round(age) + ' min — le cron de publication ne tourne plus'
+        : '⏳ Dernière publication il y a ' + Math.round(age) + ' min (cadence attendue : 15 min)')
+    + '</div>';
+}
+
 function renderFeedTo(container) {
   if (!marketData) { container.innerHTML = '<div class="loading">📊 En attente des données…</div>'; return; }
   const d = marketData, b = d.btc||{}, m = d.macro||{}, tf = d.tf||{},
         x = d.micro||{}, lq = d.liquidity||{}, st = d.status||{};
   const upd = d.updated ? new Date(d.updated) : null;
-  const hhmm = upd ? upd.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '—';
+  // Le libellé annonce « UTC » : il faut donc formater EN UTC. Sans `timeZone`,
+  // c'était l'heure locale du poste (Paris, +2 h en été) affichée sous l'étiquette UTC.
+  const hhmm = upd ? upd.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'UTC'}) : '—';
 
   const cy = document.getElementById('cycle');
   if (cy) cy.textContent = 'DXY ' + fmtNum(m.dxy_spot,2) + ' · VIX ' + fmtNum(m.vix,1);
@@ -4975,7 +5052,9 @@ function renderFeedTo(container) {
     + '</div>';
   html += mCard('🔌','Flux','Pas d\'erreur silencieuse', '', stBody);
 
-  container.innerHTML = html;
+  // Le bandeau d'âge voyage AVEC les cartes : il apparaît donc dans le conteneur
+  // réellement affiché, quel qu'il soit.
+  container.innerHTML = ageBannerHtml(d) + html;
 }
 
 // ============ STRATEGY PANEL ============
