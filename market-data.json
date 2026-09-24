@@ -1,0 +1,320 @@
+{
+ "updated": "2026-09-24T09:18:05+00:00",
+ "generator": "publish.py v3.0 — live-only (10/09/2026)",
+ "source": "binance · deribit · coinbase · yahoo · sol-radar-daemon",
+ "btc": {
+  "price": 83382.01,
+  "change_24h_pct": -2.971,
+  "high_24h": 86024.01,
+  "low_24h": 83301.0,
+  "quote_volume_24h_usd": 1820310755.1080868
+ },
+ "macro": {
+  "dxy_spot": 101.18000030517578,
+  "dxy_date": "2026-09-24",
+  "dxy_is_weekend": false,
+  "vix": 16.21
+ },
+ "tf": {
+  "4h": {
+   "rsi_14": 46.9,
+   "ema20_4h": 84319.99,
+   "ema50_4h": 82397.04,
+   "death_cross_4h": false,
+   "ema_gap_pct": 2.33,
+   "support_30": 80126.04,
+   "resistance_30": 87395.67,
+   "last_close": 83382.0,
+   "avg_volume_10": 3038.09,
+   "last_5_candles": [
+    {
+     "open": 83996.0,
+     "high": 84565.21,
+     "low": 83500.01,
+     "close": 84518.0,
+     "body": 0.62,
+     "direction": "🟢",
+     "wick_top": 0.06,
+     "wick_bottom": 0.59
+    },
+    {
+     "open": 84518.0,
+     "high": 84670.01,
+     "low": 84212.68,
+     "close": 84397.6,
+     "body": 0.14,
+     "direction": "🔴",
+     "wick_top": 0.18,
+     "wick_bottom": 0.22
+    },
+    {
+     "open": 84397.6,
+     "high": 84494.5,
+     "low": 83744.7,
+     "close": 83934.01,
+     "body": 0.55,
+     "direction": "🔴",
+     "wick_top": 0.11,
+     "wick_bottom": 0.22
+    },
+    {
+     "open": 83934.01,
+     "high": 84612.01,
+     "low": 83781.89,
+     "close": 84524.02,
+     "body": 0.7,
+     "direction": "🟢",
+     "wick_top": 0.1,
+     "wick_bottom": 0.18
+    },
+    {
+     "open": 84524.02,
+     "high": 84622.01,
+     "low": 83301.0,
+     "close": 83382.0,
+     "body": 1.35,
+     "direction": "🔴",
+     "wick_top": 0.12,
+     "wick_bottom": 0.1
+    }
+   ],
+   "range_24h_pct": 9.07
+  },
+  "1h": {
+   "rsi_14": 33.7,
+   "ema20_4h": 84355.13,
+   "ema50_4h": 84748.96,
+   "death_cross_4h": true,
+   "ema_gap_pct": 0.46,
+   "support_30": 83301.0,
+   "resistance_30": 87278.54,
+   "last_close": 83382.0,
+   "avg_volume_10": 616.47,
+   "last_5_candles": [
+    {
+     "open": 84046.0,
+     "high": 84400.0,
+     "low": 83959.55,
+     "close": 83978.02,
+     "body": 0.08,
+     "direction": "🔴",
+     "wick_top": 0.42,
+     "wick_bottom": 0.02
+    },
+    {
+     "open": 83978.02,
+     "high": 84225.07,
+     "low": 83918.84,
+     "close": 84113.99,
+     "body": 0.16,
+     "direction": "🟢",
+     "wick_top": 0.13,
+     "wick_bottom": 0.07
+    },
+    {
+     "open": 84114.0,
+     "high": 84612.01,
+     "low": 83950.0,
+     "close": 84524.02,
+     "body": 0.49,
+     "direction": "🟢",
+     "wick_top": 0.1,
+     "wick_bottom": 0.19
+    },
+    {
+     "open": 84524.02,
+     "high": 84622.01,
+     "low": 83301.0,
+     "close": 83660.0,
+     "body": 1.02,
+     "direction": "🔴",
+     "wick_top": 0.12,
+     "wick_bottom": 0.42
+    },
+    {
+     "open": 83660.01,
+     "high": 83743.43,
+     "low": 83380.0,
+     "close": 83382.0,
+     "body": 0.33,
+     "direction": "🔴",
+     "wick_top": 0.1,
+     "wick_bottom": 0.0
+    }
+   ],
+   "range_24h_pct": 4.77
+  },
+  "1d": {
+   "rsi_14": 62.0,
+   "ema20_4h": 80292.49,
+   "ema50_4h": 76097.64,
+   "death_cross_4h": false,
+   "ema_gap_pct": 5.51,
+   "support_30": 74967.97,
+   "resistance_30": 87395.67,
+   "last_close": 83382.0,
+   "avg_volume_10": 17466.83,
+   "last_5_candles": [
+    {
+     "open": 81249.99,
+     "high": 81497.33,
+     "low": 80126.04,
+     "close": 81178.0,
+     "body": 0.09,
+     "direction": "🔴",
+     "wick_top": 0.3,
+     "wick_bottom": 1.29
+    },
+    {
+     "open": 81178.01,
+     "high": 87395.67,
+     "low": 80850.22,
+     "close": 86620.0,
+     "body": 6.7,
+     "direction": "🟢",
+     "wick_top": 0.96,
+     "wick_bottom": 0.4
+    },
+    {
+     "open": 86620.01,
+     "high": 86717.6,
+     "low": 85114.0,
+     "close": 86208.56,
+     "body": 0.48,
+     "direction": "🔴",
+     "wick_top": 0.11,
+     "wick_bottom": 1.26
+    },
+    {
+     "open": 86208.57,
+     "high": 87278.54,
+     "low": 83500.01,
+     "close": 84397.6,
+     "body": 2.1,
+     "direction": "🔴",
+     "wick_top": 1.24,
+     "wick_bottom": 1.04
+    },
+    {
+     "open": 84397.6,
+     "high": 84622.01,
+     "low": 83301.0,
+     "close": 83382.0,
+     "body": 1.2,
+     "direction": "🔴",
+     "wick_top": 0.27,
+     "wick_bottom": 0.1
+    }
+   ],
+   "range_24h_pct": 16.58
+  }
+ },
+ "micro": {
+  "funding_rate_pct": 0.00049,
+  "funding_annual_pct": 0.53,
+  "mark_price": 83351.55994203,
+  "oi_btc": 97262.078,
+  "oi_usd": 8106945925,
+  "oi_change_1d_pct": -7.7,
+  "oi_change_5d_pct": -8.74,
+  "ls_ratio": 1.2202,
+  "long_pct": 55.0,
+  "short_pct": 45.0,
+  "top_ls_ratio": 1.9297,
+  "taker_ratio": 0.6697,
+  "cvd": -1204829446.142118,
+  "cvd_updated_at": "2026-09-24 09:17:30",
+  "cvd_buy_vol_24h": 63971976443.95606,
+  "cvd_sell_vol_24h": 65176805890.22513,
+  "spot_deribit": 83358.22,
+  "gex_state": "NEUTRAL",
+  "dealer_gamma": -10212.58,
+  "gamma_walls": [
+   85000.0,
+   84000.0,
+   82000.0
+  ],
+  "flip_levels": [
+   20000.0
+  ],
+  "num_strikes": 97,
+  "squeeze_viable": false,
+  "squeeze_strength": 0.0,
+  "squeeze_reason": "Dealers NEUTRAL — no gamma squeeze potential",
+  "premium_pct": -0.0309,
+  "premium_state": "NEGATIVE",
+  "us_demand": false,
+  "coinbase_mid": 83356.23,
+  "binance_mid": 83382.01
+ },
+ "liquidity": {
+  "tick_max": 1440,
+  "dt_seconds": 60,
+  "ratio_bid_ask": 1.16,
+  "bid_walls": [
+   [
+    83000,
+    4023
+   ],
+   [
+    83080,
+    2880
+   ],
+   [
+    83100,
+    1696
+   ],
+   [
+    83200,
+    1666
+   ],
+   [
+    82780,
+    1216
+   ],
+   [
+    83300,
+    1170
+   ]
+  ],
+  "ask_walls": [
+   [
+    83980,
+    4080
+   ],
+   [
+    84240,
+    1216
+   ],
+   [
+    84420,
+    1216
+   ],
+   [
+    84500,
+    904
+   ],
+   [
+    83740,
+    812
+   ],
+   [
+    84620,
+    788
+   ]
+  ],
+  "total_bid": 32255,
+  "total_ask": 27687
+ },
+ "status": {
+  "btc_spot": "ok",
+  "indicators": "ok",
+  "macro": "ok",
+  "micro_futures": "ok",
+  "cvd": "ok",
+  "gex": "ok",
+  "premium": "ok",
+  "liquidity": "ok"
+ },
+ "errors": []
+}

@@ -1,0 +1,6 @@
+__pycache__/
+# AGENTS.md décrit le poste de travail et la liste des domaines autorisés/bloqués
+# du filtrage réseau interne. Il reste présent en copie de travail sur le serveur
+# (utile au contexte projet) mais ne doit JAMAIS être publié sur un dépôt public.
+AGENTS.md
+*.bak.*
