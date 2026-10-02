@@ -1,0 +1,16 @@
+__pycache__/
+# AGENTS.md décrit le poste de travail et la liste des domaines autorisés/bloqués
+# du filtrage réseau interne. Il reste présent en copie de travail sur le serveur
+# (utile au contexte projet) mais ne doit JAMAIS être publié sur un dépôt public.
+AGENTS.md
+*.bak.*
+
+# ── DONNÉES HORS DÉPÔT (ordre de Lorenzo, 02/10/2026) ──────────────────────────
+# samsara-data.json : archive gelée des lettres « Renaissance/Sœurs ». Lu par RIEN
+# (index.html ne le référence pas ; publish.py ne l'écrit plus). Il était PUBLIÉ sur
+# un dépôt public depuis la refonte du 10/09. Copie conservée hors dépôt :
+# /root/archive-samsara/samsara-data.json
+samsara-data.json
+# publish.py : code serveur, révèle /root/.hermes/roue-predictions et
+# /root/projects/sol-radar — c'est-à-dire les autres projets. Rien de public ne le lit.
+publish.py
