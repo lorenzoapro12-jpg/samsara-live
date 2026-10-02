@@ -88,28 +88,40 @@ def load_state():
 
 
 def git_publish_heatmap(updated_iso):
-    """Publie SOUS VERROU PARTAGÉ, en ne committant QUE heatmap.json.
+    """Publie SOUS VERROU PARTAGÉ, dans un INDEX DÉDIÉ.
 
-    publish.py utilise le même verrou : sans lui, l'un committait le fichier préparé
-    par l'autre, ou levait une fausse erreur sur `git commit` vide d'index.
+    ⚠️ Le pathspec ne suffit pas — mesuré le 02/10/2026 : ce commit a embarqué 14
+    fichiers sans rapport, laissés INDEXÉS par un autre processus, sous le message
+    « Heatmap … ». `git commit -- <chemin>` ignore les modifications non indexées des
+    autres chemins, mais committe tout ce qui est déjà dans l'index. On commet donc
+    depuis un index à nous, et l'index partagé est remis à niveau après.
     """
     os.makedirs(os.path.dirname(GIT_LOCK) or ".", exist_ok=True)
+    P = "heatmap.json"
     with open(GIT_LOCK, "w") as lk:
         fcntl.flock(lk, fcntl.LOCK_EX)
 
-        def g(*a, **k):
+        def shared(*a, **k):
             return subprocess.run(["git", "-C", REPO, *a], **k)
 
-        g("add", "--", "heatmap.json", check=True)
-        if g("diff", "--cached", "--quiet", "--", "heatmap.json").returncode == 0:
+        env = dict(os.environ, GIT_INDEX_FILE=os.path.join(CFG["state_dir"], "index-heatmap"))
+
+        def g(*a, **k):
+            k["env"] = env
+            return subprocess.run(["git", "-C", REPO, *a], **k)
+
+        g("read-tree", "HEAD", check=True)       # base = HEAD, JAMAIS l'index partagé
+        g("add", "--", P, check=True)
+        if g("diff", "--cached", "--quiet", "--", P).returncode == 0:
             print("no change")
             return True
-        g("commit", "-q", "-m", f"Heatmap {updated_iso[:16]}", "--", "heatmap.json",
-          check=True)
+        g("commit", "-q", "-m", f"Heatmap {updated_iso[:16]}", check=True)
+
+        shared("reset", "-q", "HEAD", "--", P)   # l'index partagé rejoint HEAD
         for _ in range(3):
-            if g("push", "-q", GIT_REMOTE, GIT_BRANCH, timeout=90).returncode == 0:
+            if shared("push", "-q", GIT_REMOTE, GIT_BRANCH, timeout=90).returncode == 0:
                 return True
-            g("pull", "-q", "--rebase", GIT_REMOTE, GIT_BRANCH)
+            shared("pull", "-q", "--rebase", GIT_REMOTE, GIT_BRANCH)
         raise RuntimeError("push impossible après 3 essais")
 
 

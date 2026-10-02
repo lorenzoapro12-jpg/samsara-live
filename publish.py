@@ -77,29 +77,48 @@ def dump_atomic(obj, path: str) -> None:
 
 
 def git_publish(paths, msg: str, branch=None) -> bool:
-    """Publie SOUS VERROU, en ne committant QUE les chemins demandés.
+    """Publie SOUS VERROU, dans un INDEX DÉDIÉ.
 
-    Deux écrivains (publish.py et heatmap.py) partagent ce dépôt. Sans verrou ni
-    pathspec, l'un peut committer le fichier que l'autre vient de préparer, ou tomber
-    sur un index.lock. Le push est réessayé après rebase : une divergence distante ne
-    doit pas bloquer la publication indéfiniment.
+    ⚠️ LE PATHSPEC NE SUFFIT PAS — mesuré le 02/10/2026. Le cron de la heatmap a
+    committé 14 fichiers sans rapport sous le message « Heatmap 2026-10-02T12:19 »,
+    parce qu'un autre processus les avait laissés INDEXÉS auparavant. `git commit --
+    <chemin>` ignore les modifications non indexées des autres chemins, mais il
+    committe **tout ce qui est déjà dans l'index** : l'index est un état partagé entre
+    les écrivains, et c'est lui, la fuite. Le message de commit devient faux — donc
+    l'historique ment, ce qui est pire que de ne rien committer.
+
+    On travaille donc dans un index à nous (`GIT_INDEX_FILE`), initialisé depuis HEAD.
+    L'index partagé n'est jamais utilisé pour le commit ; il est remis à niveau
+    APRÈS, sinon `git status` afficherait le fichier modifié indéfiniment.
+
+    Le push et le rebase, eux, se font dans l'index normal : à ce stade notre commit
+    existe, et les laisser dans l'index dédié désynchroniserait l'arbre de travail.
     """
     branch = branch or GIT_BRANCH
     os.makedirs(os.path.dirname(GIT_LOCK) or ".", exist_ok=True)
     with open(GIT_LOCK, "w") as lk:
         fcntl.flock(lk, fcntl.LOCK_EX)
 
-        def g(*a, **k):
+        def shared(*a, **k):
             return subprocess.run(["git", "-C", REPO, *a], **k)
 
+        env = dict(os.environ, GIT_INDEX_FILE=os.path.join(CFG["state_dir"], "index-publish"))
+
+        def g(*a, **k):
+            k["env"] = env
+            return subprocess.run(["git", "-C", REPO, *a], **k)
+
+        g("read-tree", "HEAD", check=True)       # base = HEAD, JAMAIS l'index partagé
         g("add", "--", *paths, check=True)
         if g("diff", "--cached", "--quiet", "--", *paths).returncode == 0:
-            return False
-        g("commit", "-q", "-m", msg, "--", *paths, check=True)
+            return False                          # rien à publier : silence
+        g("commit", "-q", "-m", msg, check=True)
+
+        shared("reset", "-q", "HEAD", "--", *paths)   # l'index partagé rejoint HEAD
         for _ in range(3):
-            if g("push", "-q", GIT_REMOTE, branch, timeout=90).returncode == 0:
+            if shared("push", "-q", GIT_REMOTE, branch, timeout=90).returncode == 0:
                 return True
-            g("pull", "-q", "--rebase", GIT_REMOTE, branch)
+            shared("pull", "-q", "--rebase", GIT_REMOTE, branch)
         raise RuntimeError("push impossible après 3 essais")
 
 
