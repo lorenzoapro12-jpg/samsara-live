@@ -1,0 +1,24 @@
+{
+  "_lisez_moi": "Copiez ce fichier en forbidden.local.json et remplissez `terms`. La MÉCANIQUE du contrôle est publique, les MOTS ne le sont pas : écrire ici les motifs réels reviendrait à publier ce qu'on cherche à empêcher.",
+  "_format": "Chaque entrée est une expression régulière, insensible à la casse, cherchée dans TOUT fichier publié (index.html entier, commentaires inclus).",
+
+  "_ancrage": "ANCREZ VOS MOTIFS. Un motif court sans borne matche tout mot qui le contient : mesuré, un motif de trois lettres a produit 24 faux positifs au premier essai sur des mots courants du code. Entourez vos motifs de \\b.",
+
+  "_quoi_mettre": [
+    "le contexte professionnel : employeur, lieu de travail, politiques réseau internes, listes de domaines autorisés ou bloqués",
+    "les noms de vos autres projets et de vos dépôts privés",
+    "les noms propres et identifiants personnels (sauf ceux qui sont déjà publics par construction, comme le nom du dépôt lui-même dans son URL)",
+    "les noms de fichiers d'archives internes",
+    "les sujets sensibles dont la seule mention révèle un intérêt ou une activité"
+  ],
+
+  "_ce_quil_ne_faut_pas_y_mettre": [
+    "des motifs sans borne (faux positifs en série)",
+    "des mots courants du domaine (sinon le contrôle échoue sur du code légitime)"
+  ],
+
+  "terms": [
+    "exemple-motif-interne",
+    "\\bexemple\\b"
+  ]
+}

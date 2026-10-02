@@ -1,16 +1,34 @@
 __pycache__/
-# AGENTS.md décrit le poste de travail et la liste des domaines autorisés/bloqués
-# du filtrage réseau interne. Il reste présent en copie de travail sur le serveur
-# (utile au contexte projet) mais ne doit JAMAIS être publié sur un dépôt public.
-AGENTS.md
 *.bak.*
 
-# ── DONNÉES HORS DÉPÔT (ordre de Lorenzo, 02/10/2026) ──────────────────────────
-# samsara-data.json : archive gelée des lettres « Renaissance/Sœurs ». Lu par RIEN
-# (index.html ne le référence pas ; publish.py ne l'écrit plus). Il était PUBLIÉ sur
-# un dépôt public depuis la refonte du 10/09. Copie conservée hors dépôt :
-# /root/archive-samsara/samsara-data.json
+# ══════════════════════════════════════════════════════════════════════════════
+# FICHIERS HORS DÉPÔT
+#
+# Ce dépôt est PUBLIC. Les règles ci-dessous existent pour qu'un `git add -A`
+# n'y fasse jamais entrer ce qui suit. Les commentaires DOIVENT rester neutres :
+# un .gitignore est publié comme n'importe quel autre fichier, et un commentaire
+# trop bavard y laisse entrer exactement ce que la règle empêche (constaté le
+# 02/10/2026 — c'est le fichier lui-même qui décrivait le contexte à ne pas publier).
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Contexte de travail, poste, politiques réseau internes.
+AGENTS.md
+
+# Configuration d'installation (chemins de machine). Le code publié n'en contient
+# aucun : `samsara_config.py` lit ce fichier s'il existe, sinon il se rabat sur des
+# défauts dérivés de son propre emplacement. Modèle documenté : config.example.json
+config.local.json
+
+# Données d'archive interne. Ce dépôt ne publie que des données de marché.
 samsara-data.json
-# publish.py : code serveur, révèle /root/.hermes/roue-predictions et
-# /root/projects/sol-radar — c'est-à-dire les autres projets. Rien de public ne le lit.
-publish.py
+
+# État persistant de l'accumulateur de heatmap — données de travail, pas de sortie.
+.state/
+
+# Listes de motifs interdits du harnais de test : la MÉCANIQUE du contrôle est
+# publique (tests/forbidden.example.json), les MOTS ne le sont pas.
+tests/forbidden.local.json
+
+# Journaux et sauvegardes locaux.
+*.log
+*.tmp

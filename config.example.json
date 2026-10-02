@@ -1,0 +1,29 @@
+{
+  "_lisez_moi": "Copiez ce fichier en config.local.json et remplissez. config.local.json est GITIGNORÉ : c'est le seul endroit où des chemins de machine ont le droit d'exister. Le code publié ne contient aucun chemin.",
+  "_sans_ce_fichier": "Le dépôt tourne quand même : tout ce qui ne dépend que de sources publiques (Binance, la heatmap locale, les fichiers déjà présents) fonctionne sans aucune configuration.",
+  "_null": "Une valeur null veut dire « prends le défaut ». Recopier ce fichier tel quel est donc sans effet.",
+
+  "repo_dir": null,
+  "_repo_dir": "Racine du dépôt. Défaut : le dossier de samsara_config.py.",
+
+  "state_dir": null,
+  "_state_dir": "État persistant de la heatmap (les 24 h accumulées). Défaut : <repo>/.state. ⚠️ Changer cette valeur REPART D'UN ÉTAT VIDE : 24 h de carnet perdues.",
+
+  "out_dir": null,
+  "_out_dir": "Où écrire heatmap.json et market-data.json. Défaut : repo_dir.",
+
+  "git_lock": null,
+  "_git_lock": "Verrou partagé entre les deux écrivains (heatmap + publish). Défaut : <state_dir>/git.lock.",
+
+  "git_remote": "origin",
+  "_git_remote": "Nom du remote git à pousser.",
+
+  "git_branch": "master",
+  "_git_branch": "Branche publiée.",
+
+  "extra_module_paths": [],
+  "_extra_module_paths": "Chemins ajoutés à sys.path, pour les modules qui ne sont pas dans ce dépôt. Vide = deux blocs de market-data.json restent indisponibles (voir README). Défaut : [].",
+
+  "cvd_database": null,
+  "_cvd_database": "Fichier SQLite du collecteur CVD, lu en LECTURE SEULE (mode=ro). Absent = le bloc `cvd` n'est pas publié. Défaut : null."
+}
