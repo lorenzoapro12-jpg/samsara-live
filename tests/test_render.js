@@ -143,8 +143,9 @@ try {
     // GEX en USD / 1 % : l'ancien calcul publiait des BTC sous des seuils en dollars.
     ['GEX en USD / 1 %', /GEX<\/b>[\s\S]*?[+−]\$[\d.]+[MBK]<\/b> \/ 1 %/.test(feed.innerHTML)],
     // CVD fenêtré : l'ancien était un cumul depuis le premier démarrage du daemon.
-    ['CVD 1h / 4h / 24h', /1h&nbsp;[+−]?\$/.test(feed.innerHTML) && /24h&nbsp;[+−]?\$/.test(feed.innerHTML)],
-    ['OI Δ24h glissant', feed.innerHTML.includes('Δ24h ' + fmt(D.micro.oi_change_24h_pct) + '%')],
+    // Chaque fenêtre est nommée ET porte sa valeur signée (barres divergentes depuis le 04/10).
+    ['CVD 1h / 4h / 24h', ['1h', '4h', '24h'].every(w => new RegExp('dv-lbl">' + w + '</span>[\\s\\S]*?dv-val"><span[^>]*>[+−]?\\$[\\d.]+[KMB]?</span>').test(feed.innerHTML))],
+    ['OI Δ24h glissant', feed.innerHTML.includes('Δ24h ' + (D.micro.oi_change_24h_pct > 0 ? '+' : '') + fmt(D.micro.oi_change_24h_pct) + '%')],
     // S/R : fenêtre réelle (30 bougies), plus l'ancien « 16 j » faux pour les trois TF.
     ['Fenêtre S/R réelle', /min\/max 5 j/.test(feed.innerHTML) && /min\/max 30 h/.test(feed.innerHTML) && !/16 j/.test(feed.innerHTML)],
     ['Tous blocs ok', new RegExp(Object.keys(D.status).length+'/'+Object.keys(D.status).length+' blocs').test(feed.innerHTML)],
