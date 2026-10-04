@@ -17,7 +17,14 @@ AGENTS.md
 # Configuration d'installation (chemins de machine). Le code publié n'en contient
 # aucun : `samsara_config.py` lit ce fichier s'il existe, sinon il se rabat sur des
 # défauts dérivés de son propre emplacement. Modèle documenté : config.example.json
+#
+# ⚠️ Le motif couvre aussi les VARIANTES (`config.local.json.*`) : mesuré le 04/10/2026,
+# un agent avait copié la config de production sous `config.local.json.production` — que
+# la règle au nom exact laissait passer. Un `git add -A` l'aurait publiée avec les chemins
+# de la machine. Nommer un fichier de configuration n'importe comment ne doit pas suffire
+# à le rendre publiable.
 config.local.json
+config.local.json.*
 
 # Données d'archive interne. Ce dépôt ne publie que des données de marché.
 samsara-data.json
