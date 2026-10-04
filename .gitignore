@@ -1,14 +1,16 @@
 __pycache__/
-*.bak.*
+# Sauvegardes : le motif couvre TOUTES les conventions de nommage usuelles
+# (`x.bak`, `x.bak-20261004`, `x.bak.1`). Un motif trop précis laisse passer la
+# variante qu'on écrit par habitude — et c'est celle-là qui se publie.
+*.bak*
 
 # ══════════════════════════════════════════════════════════════════════════════
 # FICHIERS HORS DÉPÔT
 #
 # Ce dépôt est PUBLIC. Les règles ci-dessous existent pour qu'un `git add -A`
-# n'y fasse jamais entrer ce qui suit. Les commentaires DOIVENT rester neutres :
-# un .gitignore est publié comme n'importe quel autre fichier, et un commentaire
-# trop bavard y laisse entrer exactement ce que la règle empêche (constaté le
-# 02/10/2026 — c'est le fichier lui-même qui décrivait le contexte à ne pas publier).
+# n'y fasse jamais entrer ce qui suit. Les commentaires DOIVENT rester neutres : ce
+# fichier est publié comme n'importe quel autre, et un commentaire qui raconte un
+# incident décrit exactement le contexte que la règle empêche de publier.
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Contexte de travail, poste, politiques réseau internes.
@@ -18,11 +20,10 @@ AGENTS.md
 # aucun : `samsara_config.py` lit ce fichier s'il existe, sinon il se rabat sur des
 # défauts dérivés de son propre emplacement. Modèle documenté : config.example.json
 #
-# ⚠️ Le motif couvre aussi les VARIANTES (`config.local.json.*`) : mesuré le 04/10/2026,
-# un agent avait copié la config de production sous `config.local.json.production` — que
-# la règle au nom exact laissait passer. Un `git add -A` l'aurait publiée avec les chemins
-# de la machine. Nommer un fichier de configuration n'importe comment ne doit pas suffire
-# à le rendre publiable.
+# ⚠️ Le motif couvre aussi les VARIANTES (`config.local.json.*`) : un fichier de
+# configuration renommé reste une configuration d'installation. Un nom exact laissait
+# passer `config.local.json.<quoi>` — et un `git add -A` publiait alors les chemins de
+# la machine. Renommer ne doit pas suffire à rendre publiable.
 config.local.json
 config.local.json.*
 

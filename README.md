@@ -17,9 +17,17 @@ python3 -m http.server 8000       # ou n'importe quel serveur statique
 # puis ouvrir http://localhost:8000
 ```
 
-Ouvrir `index.html` en `file://` fonctionne aussi (le JavaScript est entièrement inline,
-aucun asset externe). Un serveur local est préférable : certains navigateurs restreignent
-les appels réseau depuis `file://`.
+⚠️ **La page lit ses données sur GitHub, pas dans le dossier que tu viens de servir.**
+`market-data.json` et `heatmap.json` sont chargés par des URL **absolues**
+(`raw.githubusercontent.com/...`) : un clone local sert la **page**, et affiche les données
+**de la branche publiée**. Modifier un JSON dans ton clone ne change donc rien à l'affichage,
+et un clone qui n'a jamais été publié n'affichera jamais ses propres données.
+
+Pour visualiser tes propres fichiers, remplace les deux URL par des chemins relatifs dans
+`index.html` — la page est autonome par ailleurs (JavaScript inline, aucun asset externe).
+
+Ouvrir `index.html` en `file://` fonctionne aussi pour le rendu, mais les appels réseau y
+sont restreints par certains navigateurs : un serveur local est préférable.
 
 ---
 

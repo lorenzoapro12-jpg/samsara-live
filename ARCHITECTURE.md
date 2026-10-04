@@ -21,8 +21,13 @@
                                                                     (le dashboard, autonome)
 ```
 
-`index.html` ne lit **que** deux fichiers du dépôt et Binance. Tout le reste est agrégé
-côté serveur et arrive déjà digéré.
+`index.html` ne lit **que** deux fichiers du dépôt — `market-data.json` et `heatmap.json` —
+**et il les lit sur GitHub Raw, par URL absolue**, pas dans le dossier qui sert la page. Tout
+le reste est agrégé côté serveur et arrive déjà digéré.
+
+⚠️ Conséquence directe : servir le dépôt en local affiche la **page**, avec les données de la
+**branche publiée**. Un clone non publié n'affiche jamais ses propres fichiers. Pour voir des
+données locales, il faut rendre ces deux URL relatives.
 
 ---
 

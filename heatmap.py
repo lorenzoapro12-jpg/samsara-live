@@ -48,7 +48,14 @@ DT = 60           # secondes par colonne (1 min)
 DP = 20.0         # $ par bin de prix
 WINDOW_S = 24 * 3600
 REF = 100.0       # qty BTC de référence pour l'échelle d'intensité
-PUSH_MIN_S = 120  # intervalle minimal entre deux publications
+# Intervalle minimal entre deux publications. Mesuré le 04/10/2026 : à 120 s, ce fichier
+# (≈ 2,1 Mo de JSON, recompressé à ≈ 440 Ko par git) produisait **574 commits par jour**,
+# soit ≈ 250 Mo d'historique quotidien — pour une fenêtre **glissante** de 24 h dont les
+# versions anciennes n'ont aucune valeur. La croissance était d'un facteur ~6 au-dessus de
+# ce qu'un dépôt public peut porter. 900 s = 15 min, aligné sur la cadence du publisher.
+# L'accumulateur local, lui, continue d'enregistrer chaque minute : seule la PUBLICATION
+# est espacée, pas la donnée.
+PUSH_MIN_S = 900
 
 
 def dump_atomic(obj, path):
