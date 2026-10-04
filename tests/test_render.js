@@ -121,13 +121,19 @@ try {
   // Contrôles de non-régression — valeurs lues depuis la source, pas codées en dur
   const D = DATA;
   const usd = v => Math.round(v).toLocaleString('en-US');
+  // ⚠️ Même formateur que `fmtNum` de index.html — PAS `toFixed`.
+  // Mesuré le 04/10/2026 : pour 0,615, `toFixed(2)` rend « 0.61 » et `toLocaleString`
+  // rend « 0.62 ». Le harnais échouait donc sur SON propre rendu, uniquement les jours où
+  // la variation tombait sur un x,xx5 — un faux rouge dépendant de la donnée vivante.
+  const fmt = (v, d = 2) => Number(v).toLocaleString('en-US',
+    { minimumFractionDigits: d, maximumFractionDigits: d });
   const checks = [
     ['Prix BTC réel', feed.innerHTML.includes(usd(D.btc.price))],
-    ['Variation 24h', feed.innerHTML.includes(D.btc.change_24h_pct.toFixed(2))],
+    ['Variation 24h', feed.innerHTML.includes(fmt(D.btc.change_24h_pct))],
     ['L/S réel', feed.innerHTML.includes(String(D.micro.ls_ratio))],
-    ['Funding réel', feed.innerHTML.includes(String(D.micro.funding_rate_pct).slice(0,6).replace(/0+$/,'').replace(/\.$/,'')) || feed.innerHTML.includes(D.micro.funding_annual_pct.toFixed(2))],
+    ['Funding réel', feed.innerHTML.includes(fmt(D.micro.funding_annual_pct))],
     ['OI réel', feed.innerHTML.includes(Math.round(D.micro.oi_btc).toLocaleString('en-US'))],
-    ['DXY réel', feed.innerHTML.includes(D.macro.dxy_spot.toFixed(2))],
+    ['DXY réel', feed.innerHTML.includes(fmt(D.macro.dxy_spot))],
     ['Support 4h réel', feed.innerHTML.includes(usd(D.tf['4h'].support_30))],
     ['Cross 4h', feed.innerHTML.includes(D.tf['4h'].death_cross_4h ? 'DEATH CROSS' : 'GOLDEN CROSS')],
     ['Mur bid dominant', feed.innerHTML.includes((D.liquidity.bid_walls[0][0]/1000).toFixed(1)+'k')],
