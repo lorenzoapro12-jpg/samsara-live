@@ -12,14 +12,16 @@ dépendance n'est simplement pas branchée dans cet environnement sort en `non c
 et ne compte PAS comme un échec — un dépôt cloné doit pouvoir tourner et dire ce qui
 lui manque.
 
-Dépendances non incluse dans ce dépôt (voir README) :
+Dépendances non incluses dans ce dépôt (voir README) :
   · `fetch_macro`      → blocs `indicators`, `macro`
-  · `scenario_engine`  → blocs `gex`, `premium`
-  · une base SQLite    → bloc `cvd`
+  · `scenario_engine`  → bloc `premium`
 Sans elles, le script tourne, publie les autres blocs, et l'indique dans `status`.
+Depuis le 04/10/2026, `cvd`, `gex` et `liquidity` ne dépendent plus que de sources
+publiques (Binance, Deribit) : ils tournent dans un clone nu.
 """
 import fcntl
 import json
+import math
 import os
 import subprocess
 import sys
@@ -29,14 +31,13 @@ from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import samsara_config as SC
+import options_gex
 
 CFG = SC.load()
 SC.add_module_paths(CFG)
 
 REPO = CFG["repo_dir"]
 OUT = SC.out(CFG, "market-data.json")
-HEATMAP_JSON = SC.out(CFG, "heatmap.json")
-DB = CFG["cvd_database"]
 GIT_LOCK = CFG["git_lock"]
 GIT_REMOTE = CFG["git_remote"]
 GIT_BRANCH = CFG["git_branch"]
@@ -186,9 +187,15 @@ def btc_spot():
 def indicators():
     fm = _module("fetch_macro")  # réutilise du code testé
     out = {}
-    for tf in ("4h", "1h", "1d"):
+    for tf, heures in (("4h", 4), ("1h", 1), ("1d", 24)):
         c = fm.get_btc_klines(tf, 200)
-        out[tf] = fm.compute_indicators(c)
+        ind = fm.compute_indicators(c)
+        if ind:
+            # Support / résistance / « range » = min / max des 30 DERNIÈRES bougies du TF :
+            # 5 jours en 4h, 30 heures en 1h, 30 jours en 1j. La page affichait « 16 j » pour
+            # les trois. On publie la fenêtre réelle pour que l'étiquette ne puisse plus mentir.
+            ind["sr_window_h"] = 30 * heures
+        out[tf] = ind
     return out
 
 
@@ -221,11 +228,19 @@ def micro_futures():
     r["oi_btc"] = float(oi["openInterest"])
     r["oi_usd"] = round(float(oi["openInterest"]) * float(pi["markPrice"]))
 
-    hist = http_json(f"{F}/futures/data/openInterestHist?symbol=BTCUSDT&period=1d&limit=6")
-    if hist and len(hist) >= 2:
+    # Variations d'OI sur la série HORAIRE, aux deux bouts de la même série (une seule
+    # cadence, aucun mélange avec l'OI live ci-dessus). L'ancienne version lisait la série
+    # `period=1d`, dont les points tombent à 00:00 UTC : son « Δ1j » comparait minuit à
+    # minuit et ignorait tout ce qui s'était passé depuis. Mesuré le 04/10/2026 à 11 h :
+    # « Δ1j » −0,26 % publié, +1,18 % réels sur 24 h glissantes — signe inversé.
+    hist = http_json(f"{F}/futures/data/openInterestHist?symbol=BTCUSDT&period=1h&limit=121")
+    if hist and len(hist) >= 25:
         cur = float(hist[-1]["sumOpenInterest"])
-        r["oi_change_1d_pct"] = round((cur / float(hist[-2]["sumOpenInterest"]) - 1) * 100, 2)
-        if len(hist) >= 6:
+        r["oi_change_24h_pct"] = round((cur / float(hist[-25]["sumOpenInterest"]) - 1) * 100, 2)
+        r["oi_change_1d_pct"] = r["oi_change_24h_pct"]     # ancien nom, même sens désormais
+        r["oi_hist_at"] = datetime.fromtimestamp(hist[-1]["timestamp"] / 1000, timezone.utc
+                                                 ).isoformat(timespec="minutes")
+        if len(hist) >= 121:
             r["oi_change_5d_pct"] = round((cur / float(hist[0]["sumOpenInterest"]) - 1) * 100, 2)
 
     ls = http_json(f"{F}/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=1h&limit=1")
@@ -244,66 +259,52 @@ def micro_futures():
     return r
 
 
-# ─── 5. CVD (checkpoint du collecteur — seule table réellement vivante) ──
-@block("cvd", required=("cvd", "updated_at"))
+# ─── 5. CVD SPOT PAR FENÊTRE (bougies Binance) ───────────────
+# Le bloc lisait le checkpoint du daemon (`cvd_checkpoint`) et le publiait sous les noms
+# `cvd_buy_vol_24h` / `cvd_sell_vol_24h`. Or ce checkpoint est CUMULÉ depuis le premier
+# démarrage du daemon (restauré à chaque relance, jamais remis à zéro) : mesuré le
+# 04/10/2026, 70 Md$ d'achats et 72 Md$ de ventes — des mois de flux, pas 24 h. La page
+# affichait donc « CVD −1,92 B$ » comme une lecture du moment. Aucune fenêtre n'est
+# récupérable dans ce checkpoint.
+#
+# Chaque bougie Binance porte le volume quote total (k[7]) et sa part achetée au taker
+# (k[10]) : delta = achats taker − ventes taker = 2·k[10] − k[7]. C'est EXACT (Binance
+# agrège elle-même ses trades), fenêtré, public, et sans dépendance.
+def cvd_fenetres(klines, fenetres=(("1h", 12), ("4h", 48), ("24h", 288))):
+    """CVD (USD) et part d'achats taker (%) sur les N dernières bougies 5 min."""
+    out = {}
+    for nom, n in fenetres:
+        s = klines[-n:]
+        q = sum(float(k[7]) for k in s)
+        tb = sum(float(k[10]) for k in s)
+        out[f"cvd_{nom}_usd"] = round(2 * tb - q)
+        out[f"taker_buy_{nom}_pct"] = round(tb / q * 100, 1) if q else None
+    return out
+
+
+@block("cvd", required=("cvd_1h_usd", "cvd_24h_usd"))
 def cvd():
-    import sqlite3
-    if not DB:
-        raise NonConfigure("cvd_database absent de config.local.json")
-    if not os.path.exists(DB):
-        raise NonConfigure(f"base introuvable : {DB}")
-    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
-    con.row_factory = sqlite3.Row
-    row = con.execute("""
-        SELECT cvd, buy_vol, sell_vol, last_price, updated_at
-        FROM cvd_checkpoint WHERE symbol='btcusdt'
-        ORDER BY updated_at DESC LIMIT 1
-    """).fetchone()
-    con.close()
-    if not row:
-        return None
-    # Le collecteur écrit `datetime('now')` → UTC, mais SANS fuseau (M12 de l'audit).
-    # On le parse donc explicitement comme de l'UTC.
-    try:
-        age = (datetime.now(timezone.utc).replace(tzinfo=None)
-               - datetime.strptime(row["updated_at"][:19], "%Y-%m-%d %H:%M:%S")
-               ).total_seconds()
-        if age > 1800:
-            raise RuntimeError(f"CVD figé depuis {int(age / 60)} min")
-    except ValueError:
-        pass
-    return {
-        "cvd": row["cvd"],
-        "buy_vol_24h": row["buy_vol"],
-        "sell_vol_24h": row["sell_vol"],
-        "updated_at": row["updated_at"],
-    }
+    k = http_json("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=288")
+    if not k or len(k) < 288:
+        raise RuntimeError(f"{len(k or [])} bougies 5 min reçues sur 288")
+    out = cvd_fenetres(k)
+    # La dernière bougie est EN COURS : les fenêtres sont glissantes et finissent maintenant.
+    out["cvd_window_end"] = now_iso()
+    return out
 
 
 # ─── 6. GEX / DERIBIT ────────────────────────────────────────
-@block("gex", required=("gex_state", "gamma_walls"))
+# Calcul refait dans `options_gex.py` : l'ancien (scenario_engine) ne pouvait produire
+# que « NEUTRAL » — 427 relevés sur 427. Le pourquoi est en tête de ce module.
+@block("gex", required=("gex_state", "gex_usd_1pct", "gamma_walls"))
 def gex():
-    try:
-        from scenario_engine import gex as G
-    except ImportError as e:
-        raise NonConfigure(
-            "module « scenario_engine » introuvable — l'ajouter à extra_module_paths"
-        ) from e
-    rep = G.compute_gex()
-    if not rep or "error" in rep:
-        raise RuntimeError((rep or {}).get("error", "réponse vide"))
-    sq = G.assess_gex_for_squeeze(rep)
-    return {
-        "spot_deribit": rep.get("spot_price"),
-        "gex_state": rep.get("gex_state"),
-        "dealer_gamma": rep.get("total_dealer_gamma"),
-        "gamma_walls": rep.get("gamma_walls"),
-        "flip_levels": rep.get("flip_levels"),
-        "num_strikes": rep.get("num_strikes"),
-        "squeeze_viable": sq.get("squeeze_viable"),
-        "squeeze_strength": sq.get("squeeze_strength"),
-        "squeeze_reason": sq.get("reason"),
-    }
+    D = "https://www.deribit.com/api/v2/public"
+    idx = http_json(f"{D}/get_index_price?index_name=btc_usd")["result"]["index_price"]
+    res = http_json(f"{D}/get_book_summary_by_currency?currency=BTC&kind=option")["result"]
+    rep = options_gex.rapport(res, float(idx))
+    rep["spot_deribit"] = round(float(idx), 2)
+    rep["dealer_gamma"] = rep["gex_usd_1pct"]          # ancien nom, désormais en USD / 1 %
+    return rep
 
 
 # ─── 7. PRIME COINBASE ───────────────────────────────────────
@@ -330,47 +331,65 @@ def premium():
     }
 
 
-# ─── 8. MURS DE LIQUIDITÉ (heatmap locale, vivante) ──────────
+# ─── 8. MURS DE LIQUIDITÉ (carnet Binance, en BTC) ───────────
+# L'ancienne version SOMMAIT les cellules de heatmap.json sur 15 min. Or une cellule n'est
+# pas une quantité : c'est une INTENSITÉ d'affichage, 255·√(q/100) plafonnée à 255, où q
+# est le plus gros ordre unique du bin de 20 $. Les « murs » publiés (ex. 84 500 → 1 948)
+# et le ratio bid/ask étaient donc des sommes de scores compressés, sans unité — et la page
+# les présentait comme une « profondeur cumulée ». On lit maintenant le carnet lui-même.
+DP_MURS = 20.0          # même grille de prix que heatmap.json : un mur tombe sur une ligne de la heatmap
+BANDES_PCT = (0.1, 0.5, 1.0)
+
+
+def analyse_carnet(bids, asks):
+    """bids/asks : listes [prix, quantité] (chaînes ou nombres), meilleur prix en tête.
+
+    Une bande n'est publiée que si le carnet reçu la COUVRE des deux côtés : 5 000 niveaux
+    Binance vont à ≈ ±1 % (mesuré : −1,13 % / +0,96 % le 04/10/2026) ; un total sur une
+    bande à moitié vue serait un chiffre tronqué présenté comme complet.
+    """
+    b = [(float(p), float(q)) for p, q in bids]
+    a = [(float(p), float(q)) for p, q in asks]
+    mid = (b[0][0] + a[0][0]) / 2
+    couverture = min(1 - b[-1][0] / mid, a[-1][0] / mid - 1) * 100
+    bandes = {}
+    for pct in BANDES_PCT:
+        if pct > couverture:
+            continue
+        tb = sum(q for p, q in b if p >= mid * (1 - pct / 100))
+        ta = sum(q for p, q in a if p <= mid * (1 + pct / 100))
+        bandes[f"{pct:g}"] = {"bid_btc": round(tb, 2), "ask_btc": round(ta, 2),
+                              "ratio": round(tb / ta, 2) if ta else None}
+    ref = "0.5" if "0.5" in bandes else (next(iter(bandes)) if bandes else None)
+
+    def murs(cote):
+        agg = defaultdict(float)
+        for p, q in cote:
+            if abs(p / mid - 1) * 100 <= couverture:
+                agg[math.floor(p / DP_MURS) * DP_MURS] += q
+        return [[int(p), round(q, 1)] for p, q in sorted(agg.items(), key=lambda x: -x[1])[:6]]
+
+    return {
+        "mid": round(mid, 2),
+        "couverture_pct": round(couverture, 3),
+        "bandes": bandes,
+        "bande_ref_pct": float(ref) if ref else None,
+        "ratio_bid_ask": bandes[ref]["ratio"] if ref else None,
+        "total_bid": bandes[ref]["bid_btc"] if ref else None,
+        "total_ask": bandes[ref]["ask_btc"] if ref else None,
+        "bid_walls": murs(b),
+        "ask_walls": murs(a),
+        "wall_bin_usd": int(DP_MURS),
+        "unit": "BTC",
+    }
+
+
 @block("liquidity", required=("ratio_bid_ask", "total_bid"))
 def liquidity():
-    if not os.path.exists(HEATMAP_JSON):
-        raise NonConfigure(f"heatmap.json absent ({HEATMAP_JSON}) — lancer heatmap.py")
-    with open(HEATMAP_JSON) as f:
-        h = json.load(f)
-    # La heatmap est produite toutes les 3 min : au-delà de 10 min elle est morte, et
-    # les « murs » affichés seraient des vestiges. On refuse de les publier.
-    _upd = h.get("updated")
-    if _upd:
-        try:
-            _age = (datetime.now(timezone.utc)
-                    - datetime.fromisoformat(_upd)).total_seconds()
-            if _age > 600:
-                raise RuntimeError(f"heatmap figée depuis {int(_age / 60)} min")
-        except ValueError:
-            pass
-    dp = h["dp"]
-    tmax = max(e[0] for e in h["bids"])
-    t_from = tmax - 15
-
-    def agg(entries):
-        d = defaultdict(float)
-        for t, lvl, s in entries:
-            if t >= t_from:
-                d[lvl * dp] += s
-        return d
-
-    B = agg(h["bids"])
-    A = agg(h["asks"])
-    tb, ta = sum(B.values()), sum(A.values())
-    return {
-        "tick_max": tmax,
-        "dt_seconds": h.get("dt"),
-        "ratio_bid_ask": round(tb / ta, 2) if ta else None,
-        "bid_walls": [[int(p), round(s)] for p, s in sorted(B.items(), key=lambda x: -x[1])[:6]],
-        "ask_walls": [[int(p), round(s)] for p, s in sorted(A.items(), key=lambda x: -x[1])[:6]],
-        "total_bid": round(tb),
-        "total_ask": round(ta),
-    }
+    d = http_json("https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit=5000")
+    out = analyse_carnet(d["bids"], d["asks"])
+    out["snapshot_at"] = now_iso()
+    return out
 
 
 def main():
@@ -380,8 +399,8 @@ def main():
 
     data: dict = {
         "updated": ts,
-        "generator": "publish.py v3.1 — live-only, sans chemin de machine (02/10/2026)",
-        "source": "binance · deribit · coinbase · yahoo · collecteur cvd local",
+        "generator": "publish.py v3.2 — CVD fenêtré, GEX en USD, carnet en BTC (04/10/2026)",
+        "source": "binance · deribit · coinbase · yahoo",
     }
 
     spot = btc_spot()
@@ -399,10 +418,9 @@ def main():
 
     micro = dict(mic or {})
     if cv:
-        micro["cvd"] = cv["cvd"]
-        micro["cvd_updated_at"] = cv["updated_at"]
-        micro["cvd_buy_vol_24h"] = cv["buy_vol_24h"]
-        micro["cvd_sell_vol_24h"] = cv["sell_vol_24h"]
+        micro.update(cv)
+        micro["cvd"] = cv["cvd_24h_usd"]                  # ancien nom : désormais 24 h glissantes
+        micro["cvd_updated_at"] = cv["cvd_window_end"]
     if gx:
         micro.update(gx)
     if pm:

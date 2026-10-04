@@ -11,7 +11,7 @@ ko=0
 etape() { printf '\n\033[1m── %s ──\033[0m\n' "$1"; }
 
 etape "0. Compilation des scripts Python"
-for f in ../publish.py ../heatmap.py ../samsara_config.py refresh_harness.py scan-public.py; do
+for f in ../publish.py ../heatmap.py ../samsara_config.py ../options_gex.py refresh_harness.py scan-public.py test_calculs.py; do
   if python3 -m py_compile "$f" 2>/dev/null; then
     echo "  ✓ $f"
   else
@@ -19,16 +19,22 @@ for f in ../publish.py ../heatmap.py ../samsara_config.py refresh_harness.py sca
   fi
 done
 
-etape "1. Extraction du JavaScript inline"
+etape "1. Calculs serveur (CVD, carnet, GEX) — hors ligne"
+python3 test_calculs.py || ko=1
+
+etape "2. Indicateurs de la page (SAR, ADX, RSI, EMA) — hors ligne"
+node test_indicateurs.js || ko=1
+
+etape "3. Extraction du JavaScript inline"
 python3 refresh_harness.py || ko=1
 
-etape "2. Non-régression du dashboard (rendu réel, DOM stubbé)"
+etape "4. Non-régression du dashboard (rendu réel, DOM stubbé)"
 node test_render.js || ko=1
 
-etape "3. Panneau ⚡ (fetch RÉSEAU réel vers Binance)"
+etape "5. Panneau ⚡ (fetch RÉSEAU réel vers Binance)"
 node test_live.js || ko=1
 
-etape "4. Scan de TOUS les fichiers publiés"
+etape "6. Scan de TOUS les fichiers publiés"
 python3 scan-public.py || ko=1
 
 printf '\n\033[1m════════════════════════════════════════\033[0m\n'

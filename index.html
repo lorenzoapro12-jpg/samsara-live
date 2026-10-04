@@ -2606,72 +2606,101 @@ window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
 const klineCache = {};
 function getKlineCacheKey(symbol, interval) { return `${symbol}_${interval}`; }
 
+const toCandle = k => ({
+  time: k[0] / 1000, open: parseFloat(k[1]), high: parseFloat(k[2]),
+  low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5])
+});
+// Ratio BTC/SOL aligné sur les timestamps communs.
+function ratioCandles(btcData, solData) {
+  const solMap = new Map(solData.map(k => [k[0], k]));
+  const merged = [];
+  for (const bk of btcData) {
+    const sk = solMap.get(bk[0]);
+    if (sk) {
+      // OHLC du ratio : high/low = enveloppe du CORPS (open->close). On n'invente pas de meches :
+      // la vraie extremite intra-bougie du ratio depend de la correlation des deux jambes, non
+      // observable depuis deux OHLC (ne PAS « ameliorer » en btcHigh/solLow -> meches fictives).
+      // Les 4 champs valaient le meme ratio -> bougies sans corps ni meche, ATR/Stoch/SAR faux.
+      const op = parseFloat(bk[1]) / parseFloat(sk[1]);
+      const cl = parseFloat(bk[4]) / parseFloat(sk[4]);
+      merged.push({
+        time: bk[0] / 1000, open: op, high: Math.max(op, cl), low: Math.min(op, cl),
+        close: cl, volume: parseFloat(bk[5])
+      });
+    }
+  }
+  return merged;
+}
+// Fusionne les dernières bougies dans l'historique : remplace celles qui existent (la bougie
+// en cours, et la précédente qui vient de clore), ajoute les nouvelles. Renvoie false s'il
+// manque des bougies entre l'historique et la queue reçue (onglet longtemps en veille) :
+// l'appelant recharge alors tout, plutôt que de dessiner un trou.
+function mergeTail(arr, tail) {
+  if (!arr.length || !tail.length) return false;
+  if (tail[0].time > arr[arr.length - 1].time) return false;
+  for (const c of tail) {
+    let j = arr.length - 1;
+    while (j >= 0 && arr[j].time > c.time) j--;
+    if (j >= 0 && arr[j].time === c.time) arr[j] = c;
+    else if (j === arr.length - 1) arr.push(c);
+  }
+  return true;
+}
+
+// RAFRAÎCHISSEMENT INCRÉMENTAL. L'ancienne version rechargeait les 3 000 bougies (3 requêtes,
+// ≈ 450 Ko de JSON) toutes les 30 s pour mettre à jour UNE bougie — et cette bougie restait
+// figée 30 s pendant que le badge de prix bougeait chaque seconde. L'historique n'est chargé
+// qu'une fois par symbole/intervalle ; ensuite, toutes les 5 s, on ne demande que les 2
+// dernières bougies (≈ 300 octets).
 async function fetchKlines() {
+  const cacheKey = getKlineCacheKey(activeSymbol, chartInterval);
+  const sym = activeSymbol;
+  const encore = () => cacheKey === getKlineCacheKey(activeSymbol, chartInterval);
   try {
-    const cacheKey = getKlineCacheKey(activeSymbol, chartInterval);
-    const now = Date.now();
     const cached = klineCache[cacheKey];
-    
     // Sauvegarder l'état du viewport pour l'auto-scroll intelligent
     const prevLen = candles.length;
     const wasAtRightEdge = prevLen > 0 && viewEnd >= prevLen - 1;
     const visibleRange = viewEnd - viewStart;
-    
-    // Réutiliser le cache si < 30s (sauf si symbole/intervalle a changé)
-    if (cached && (now - cached.ts < 30000) && cached.symbol === activeSymbol && cached.interval === chartInterval) {
-      candles = cached.data;
+    const suivre = () => {
       // Auto-scroll : si l'utilisateur était calé à droite, suivre les nouvelles bougies
       if (wasAtRightEdge && candles.length > prevLen) {
         viewEnd = candles.length;
         viewStart = Math.max(0, viewEnd - visibleRange);
       }
-      return;
+    };
+
+    if (cached && cached.data.length) {
+      const tail = sym === 'BTCSOL'
+        ? ratioCandles(...await Promise.all([fetchKlinesRaw('BTCUSDT', 2), fetchKlinesRaw('SOLUSDT', 2)]))
+        : (await fetchKlinesRaw(sym, 2)).map(toCandle);
+      if (!encore()) return;            // symbole/intervalle changé pendant l'attente
+      if (mergeTail(cached.data, tail)) {
+        candles = cached.data;
+        cached.ts = Date.now();
+        memoCache.clear();              // la bougie en cours a changé : indicateurs à refaire
+        suivre();
+        return;
+      }
     }
 
-    if (activeSymbol === 'BTCSOL') {
-      // Ratio BTC/SOL : fetch les deux et calcule le ratio
-      const [btcData, solData] = await Promise.all([
-        fetchKlinesRaw('BTCUSDT'),
-        fetchKlinesRaw('SOLUSDT')
-      ]);
-      // Aligner sur les timestamps communs
-      const solMap = new Map(solData.map(k => [k[0], k]));
-      const merged = [];
-      for (const bk of btcData) {
-        const sk = solMap.get(bk[0]);
-        if (sk) {
-          // OHLC du ratio : high/low = enveloppe du CORPS (open->close). On n'invente pas de meches :
-          // la vraie extremite intra-bougie du ratio depend de la correlation des deux jambes, non
-          // observable depuis deux OHLC (ne PAS « ameliorer » en btcHigh/solLow -> meches fictives).
-          // Les 4 champs valaient le meme ratio -> bougies sans corps ni meche, ATR/Stoch/SAR faux.
-          const op = parseFloat(bk[1]) / parseFloat(sk[1]);
-          const cl = parseFloat(bk[4]) / parseFloat(sk[4]);
-          merged.push({
-            time: bk[0] / 1000, open: op, high: Math.max(op, cl), low: Math.min(op, cl),
-            close: cl, volume: parseFloat(bk[5])
-          });
-        }
-      }
-      candles = merged;
+    let fresh;
+    if (sym === 'BTCSOL') {
+      fresh = ratioCandles(...await Promise.all([fetchKlinesRaw('BTCUSDT'), fetchKlinesRaw('SOLUSDT')]));
+    } else {
+      fresh = (await fetchKlinesRaw(sym)).map(toCandle);
+    }
+    if (!encore()) return;
+    candles = fresh;
+    if (sym === 'BTCSOL') {
       // BTCSOL : le merge peut perdre des bougies → cap viewEnd
       viewEnd = Math.min(viewEnd, candles.length);
       viewStart = Math.min(viewStart, candles.length - 1);
-    } else {
-      const raw = await fetchKlinesRaw(activeSymbol);
-      candles = raw.map(k => ({
-        time: k[0] / 1000, open: parseFloat(k[1]), high: parseFloat(k[2]),
-        low: parseFloat(k[3]), close: parseFloat(k[4]), volume: parseFloat(k[5])
-      }));
     }
-    // Auto-scroll : si l'utilisateur était calé à droite, suivre les nouvelles bougies
-    if (wasAtRightEdge && candles.length > prevLen) {
-      viewEnd = candles.length;
-      viewStart = Math.max(0, viewEnd - visibleRange);
-    }
+    suivre();
     // Invalider le cache de mémoization (nouvelles données)
     memoCache.clear();
-    // Stocker dans le cache
-    klineCache[cacheKey] = { data: candles, ts: Date.now(), symbol: activeSymbol, interval: chartInterval };
+    klineCache[cacheKey] = { data: candles, ts: Date.now(), symbol: sym, interval: chartInterval };
     // NE PAS réinitialiser viewStart/viewEnd — respecter le zoom/pan utilisateur
   } catch(e) { console.error('Klines:', e); }
 }
@@ -2693,7 +2722,12 @@ function memoized(fnName, fn, ...args) {
   return result;
 }
 
-async function fetchKlinesRaw(symbol) {
+async function fetchKlinesRaw(symbol, last) {
+  if (last) {
+    const resp = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${chartInterval}&limit=${last}`);
+    if (!resp.ok) throw new Error(`Binance HTTP ${resp.status}`);
+    return resp.json();
+  }
   let allData = [];
   let endTime = Date.now();
   for (let page = 0; page < 3; page++) {
@@ -2881,6 +2915,11 @@ async function refreshRefSR() {
   await Promise.all(getRefIntervals(chartInterval).map(i => fetchSRKlines(activeSymbol, i)));
 }
 
+// Décimales selon l'ordre de grandeur du prix. 3 décimales fixes (badge, axe, infobulle)
+// affichaient un 0 inventé sur BTC (cotation au centime) et tronquaient XRP (0,0001 $).
+function pxDec(v) { const a = Math.abs(v); return a >= 10 ? 2 : a >= 1 ? 4 : 6; }
+function fmtPrix(v) { return v.toFixed(pxDec(v)); }
+
 async function fetchPrice() {
   try {
     let price;
@@ -2899,7 +2938,8 @@ async function fetchPrice() {
     if (livePrice && price > livePrice) el.className = 'price-badge price-up';
     else if (livePrice && price < livePrice) el.className = 'price-badge price-down';
     else el.className = 'price-badge';
-    el.textContent = '$' + price.toLocaleString('en-US', {minimumFractionDigits: 3, maximumFractionDigits: 3});
+    const dec = pxDec(price);
+    el.textContent = '$' + price.toLocaleString('en-US', {minimumFractionDigits: dec, maximumFractionDigits: dec});
     livePrice = price;
   } catch(e) {}
 }
@@ -2943,9 +2983,17 @@ function buildHeatLayer(hm) {
   heatLayer.key = hm.updated;
   return heatLayer;
 }
+// heatmap.json pèse ≈ 2 Mo et n'est republié que toutes les 15 min. Avec un `?t=` unique et
+// `no-store`, chaque minute retéléchargeait les 2 Mo (≈ 120 Mo/h, overlay allumé). Sans le
+// paramètre et en `no-cache`, le navigateur REVALIDE par ETag : réponse 304 de quelques
+// centaines d'octets tant que le fichier n'a pas changé (vérifié le 04/10/2026). Contrepartie :
+// le CDN de GitHub garde sa copie jusqu'à 5 min (max-age=300) — sans effet sur une couche
+// de 24 h publiée au quart d'heure.
+const HEATMAP_URL = 'https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/master/heatmap.json';
 async function fetchHeatmap() {
+  if (document.hidden) return;
   try {
-    const r = await fetch('https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/master/heatmap.json?t=' + Date.now(), { cache: 'no-store' });
+    const r = await fetch(HEATMAP_URL, { cache: 'no-cache' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     histHeatmap = await r.json();
     if (overlays.liq) drawChart();
@@ -3105,8 +3153,11 @@ function calcIchimoku(highs, lows, closes) {
       const l52 = Math.min(...lows.slice(i - 51, i + 1));
       senkouB[i] = (h52 + l52) / 2;
     }
-    chikou.push(i >= 25 ? closes[i - 25] : null);
   }
+  // Chikou = cloture COURANTE reportee 26 periodes EN ARRIERE : a l'indice i, la cloture
+  // de i+25 (convention TradingView, decalage 26 => offset 25). L'ancienne formule lisait
+  // closes[i-25] : un prix d'il y a 25 bougies avance dans le futur, l'inverse du Chikou.
+  for (let i = 0; i < closes.length; i++) chikou.push(i + 25 < closes.length ? closes[i + 25] : null);
   // Shift senkou forward 26 periods
   const shiftedA = new Array(closes.length + 26).fill(null);
   const shiftedB = new Array(closes.length + 26).fill(null);
@@ -3120,25 +3171,31 @@ function calcIchimoku(highs, lows, closes) {
 function calcSAR(highs, lows, closes, afStep = 0.02, afMax = 0.2) {
   const out = new Array(closes.length).fill(null);
   if (closes.length < 2) return out;
-  // Tendance initiale DEDUITE des deux premieres clotures : un demarrage long systematique faussait le debut.
-  let isUp = closes[1] >= closes[0];
+  // Algorithme de TradingView (ta.sar), tendance initiale deduite des deux premieres clotures.
+  // Le bornage par les deux bougies precedentes se fait dans la direction COURANTE, donc
+  // APRES un eventuel retournement — et le SAR d'un retournement est pose au-dela de la
+  // bougie (max(haut, EP) / min(bas, EP)). L'ancienne version bornait dans l'ANCIENNE
+  // direction : le SAR baissier etait ramene sous le prix et se retournait a la bougie
+  // suivante. Mesure le 04/10/2026 sur 1 000 bougies 1h BTC : 221 points DANS la bougie et
+  // 398 retournements ; la version actuelle donne 0 et 76, identique a ta.sar.
+  let isUp = closes[1] > closes[0];
   let af = afStep;
-  let ep = isUp ? highs[0] : lows[0];
+  let ep = isUp ? highs[1] : lows[1];
   let sar = isUp ? lows[0] : highs[0];
-  out[0] = sar;
   for (let i = 1; i < closes.length; i++) {
+    let premiere = (i === 1);
     sar = sar + af * (ep - sar);
-    if (isUp) {
-      if (sar > lows[i]) { isUp = false; sar = ep; ep = lows[i]; af = afStep; }
-      else { if (highs[i] > ep) { ep = highs[i]; af = Math.min(afMax, af + afStep); } }
-      if (sar > lows[i - 1]) sar = lows[i - 1];
-      if (i > 1 && sar > lows[i - 2]) sar = lows[i - 2];
-    } else {
-      if (sar < highs[i]) { isUp = true; sar = ep; ep = highs[i]; af = afStep; }
-      else { if (lows[i] < ep) { ep = lows[i]; af = Math.min(afMax, af + afStep); } }
-      if (sar < highs[i - 1]) sar = highs[i - 1];
-      if (i > 1 && sar < highs[i - 2]) sar = highs[i - 2];
+    if (isUp && sar > lows[i]) {
+      premiere = true; isUp = false; sar = Math.max(highs[i], ep); ep = lows[i]; af = afStep;
+    } else if (!isUp && sar < highs[i]) {
+      premiere = true; isUp = true; sar = Math.min(lows[i], ep); ep = highs[i]; af = afStep;
     }
+    if (!premiere) {
+      if (isUp && highs[i] > ep) { ep = highs[i]; af = Math.min(afMax, af + afStep); }
+      if (!isUp && lows[i] < ep) { ep = lows[i]; af = Math.min(afMax, af + afStep); }
+    }
+    if (isUp) { sar = Math.min(sar, lows[i - 1]); if (i > 1) sar = Math.min(sar, lows[i - 2]); }
+    else      { sar = Math.max(sar, highs[i - 1]); if (i > 1) sar = Math.max(sar, highs[i - 2]); }
     out[i] = sar;
   }
   return out;
@@ -3206,27 +3263,32 @@ function calcADX(highs, lows, closes, period) {
       tr.push(Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1])));
     }
   }
-  // Wilder's smoothing
-  let atrSum = tr.slice(0, period).reduce((a, b) => a + b, 0);
-  let pdmSum = plusDM.slice(0, period).reduce((a, b) => a + b, 0);
-  let ndmSum = minusDM.slice(0, period).reduce((a, b) => a + b, 0);
-  atrArr[period - 1] = atrSum;
-  plusDI[period - 1] = (pdmSum / atrSum) * 100;
-  minusDI[period - 1] = (ndmSum / atrSum) * 100;
+  // Lissage de Wilder sur TR/+DM/-DM, amorce sur les `period` premieres VRAIES variations
+  // (indices 1..period : la bougie 0 n'a pas de veille, son TR n'est pas un vrai range).
+  if (closes.length <= period * 2) return { adx, plusDI, minusDI };
+  let atrSum = tr.slice(1, period + 1).reduce((a, b) => a + b, 0);
+  let pdmSum = plusDM.slice(1, period + 1).reduce((a, b) => a + b, 0);
+  let ndmSum = minusDM.slice(1, period + 1).reduce((a, b) => a + b, 0);
+  // ADX = DX LISSE PAR WILDER (moyenne des `period` premiers DX, puis recursion 1/period).
+  // L'ancienne version prenait une moyenne SIMPLE glissante des DX : ecart mesure jusqu'a
+  // 12,8 pts avec la definition de Wilder (TradingView) sur 200 bougies 1h BTC.
+  let dxSeed = 0, adxPrev = null;
   for (let i = period; i < closes.length; i++) {
-    atrSum = atrSum - atrSum / period + tr[i];
-    pdmSum = pdmSum - pdmSum / period + plusDM[i];
-    ndmSum = ndmSum - ndmSum / period + minusDM[i];
+    if (i > period) {
+      atrSum = atrSum - atrSum / period + tr[i];
+      pdmSum = pdmSum - pdmSum / period + plusDM[i];
+      ndmSum = ndmSum - ndmSum / period + minusDM[i];
+    }
     atrArr[i] = atrSum;
     plusDI[i] = (pdmSum / atrSum) * 100;
     minusDI[i] = (ndmSum / atrSum) * 100;
-    if (i >= period * 2 - 1) {
-      let adxSum = 0;
-      for (let j = i - period + 1; j <= i; j++) {
-        const dx = Math.abs((plusDI[j] - minusDI[j]) / ((plusDI[j] + minusDI[j]) || 1)) * 100;
-        adxSum += dx;
-      }
-      adx[i] = adxSum / period;
+    const dx = Math.abs((plusDI[i] - minusDI[i]) / ((plusDI[i] + minusDI[i]) || 1)) * 100;
+    if (adxPrev === null) {
+      dxSeed += dx;
+      if (i === period * 2 - 1) { adxPrev = dxSeed / period; adx[i] = adxPrev; }
+    } else {
+      adxPrev = (adxPrev * (period - 1) + dx) / period;
+      adx[i] = adxPrev;
     }
   }
   return { adx, plusDI, minusDI };
@@ -3541,6 +3603,11 @@ class GridBot {
           const exec = this.strategy.execution(level, c, params);
           level.tp = exec.tp;
           level.sl = exec.sl;
+          // Un achat limite sous le prix est rempli EN DESCENDANT : si la même bougie descend
+          // ensuite jusqu'au stop, la perte a eu lieu. L'ancienne version ne testait le stop
+          // qu'à la bougie suivante — un rebond entre-temps effaçait une perte réelle (biais
+          // optimiste). Le take-profit, lui, n'est pas pris : l'ordre haut/bas est inconnu.
+          if (c.low <= level.sl) this._closeLevel(level, idx, level.sl, true);
         }
       } else if (level.status === 'filled') {
         // Check SL first (pessimistic)
@@ -3640,25 +3707,38 @@ function runBacktest(strategyKey, candles, startIdx, endIdx, userParams, capital
   const bot = new GridBot(strategyKey, capital || ST_DEFAULT_CAPITAL);
   const params = bot.buildParams(userParams || {});
   const equityCurve = [];  // {idx, total, realized, unrealized}
+  // La DERNIÈRE bougie Binance est EN COURS : son haut/bas n'est pas définitif. La jouer,
+  // c'est constater des remplissages qui peuvent ne jamais avoir lieu, ou en rater. Toutes
+  // les entrées (visible, complet, dates, comparaison, walk-forward) passent par ici.
+  endIdx = Math.min(endIdx, candles.length - 2);
   const n = endIdx - startIdx;
-  if (n < 20) return { error: 'Pas assez de bougies (min 20)' };
+  if (n < 20) return { error: 'Pas assez de bougies closes (min 20)' };
 
   // Pre-compute ALL indicators once for the full range
   // This is safe because the strategy only accesses candles[0..idx] at each step
   const fullIndicators = bot.computeIndicators(candles, endIdx, params);
 
+  // Vues anti look-ahead : un indice > bougie courante lit `null`. L'ancienne version
+  // COPIAIT chaque tableau à chaque bougie (arr.map) : O(n²) — 3 000 bougies × 3 000 × 4
+  // indicateurs ≈ 36 M d'écritures par backtest, et le walk-forward en lance des dizaines.
+  // Une vue Proxy donne la même garantie en O(1) par bougie.
+  let cur = startIdx;
+  const sliceInd = {};
+  for (const [k, arr] of Object.entries(fullIndicators)) {
+    if (!arr) continue;
+    sliceInd[k] = new Proxy(arr, {
+      get(t, p) {
+        if (typeof p === 'string' && p.length && p.charCodeAt(0) <= 57 && +p > cur) return null;
+        return t[p];
+      }
+    });
+  }
+
   // Mark initial equity
   equityCurve.push({ idx: startIdx, total: capital, realized: 0, unrealized: 0 });
 
   for (let i = startIdx; i <= endIdx; i++) {
-    // Slice indicators to current candle to prevent look-ahead
-    const sliceInd = {};
-    for (const [k, arr] of Object.entries(fullIndicators)) {
-      if (arr && arr[i] !== undefined) {
-        // Create a truncated view: values beyond i are null
-        sliceInd[k] = arr.map((v, j) => j <= i ? v : null);
-      }
-    }
+    cur = i;
     bot.step(candles, i, params, sliceInd);
 
     const markPrice = candles[i].close;
@@ -3877,7 +3957,7 @@ function drawChart() {
     const priceAtCursor = sc.maxP - ((crossY - pad.top) / ph) * sc.range;
     
     // Badge prix crosshair — dans colonne droite, collé au prix
-    const priceStr = '$' + priceAtCursor.toFixed(3);
+    const priceStr = '$' + fmtPrix(priceAtCursor);
     const bw = ctx.measureText(priceStr).width + 14;
     const bX = W - 75 + (75 - bw)/2;
     const bY = Math.max(2, Math.min(mainH - 20, crossY - 9));
@@ -3904,10 +3984,10 @@ function drawChart() {
       ctx.beginPath(); ctx.roundRect(tX, tY, 135, 72, 6); ctx.fill(); ctx.stroke();
       
       ctx.fillStyle = COLORS.text; ctx.font = '10px monospace';
-      ctx.fillText('O: ' + candle.open.toFixed(3), tX + 8, tY + 16);
-      ctx.fillText('H: ' + candle.high.toFixed(3), tX + 72, tY + 16);
-      ctx.fillText('L: ' + candle.low.toFixed(3), tX + 8, tY + 34);
-      ctx.fillText('C: ' + candle.close.toFixed(3), tX + 72, tY + 34);
+      ctx.fillText('O: ' + fmtPrix(candle.open), tX + 8, tY + 16);
+      ctx.fillText('H: ' + fmtPrix(candle.high), tX + 72, tY + 16);
+      ctx.fillText('L: ' + fmtPrix(candle.low), tX + 8, tY + 34);
+      ctx.fillText('C: ' + fmtPrix(candle.close), tX + 72, tY + 34);
       
       const volStr = candle.volume >= 1000 ? (candle.volume / 1000).toFixed(1) + 'K' : candle.volume.toFixed(0);
       ctx.fillStyle = dark ? '#8b949e' : '#656d76';
@@ -4152,7 +4232,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
     const price = maxP - (range / gridN) * i;
     ctx.fillStyle = COLORS.axis || COLORS.text;
     ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
-    const label = '$' + price.toFixed(3);
+    const label = '$' + fmtPrix(price);
     ctx.fillText(label, W - pad.right + 3, y + 3);
   }
   
@@ -4169,7 +4249,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
     // du canvas de ~13 px (« $77085.0(| ») à toutes les largeurs. On le recale
     // vers la gauche au lieu d'élargir pad.right (13 sites couplés au
     // Range Selector et au hit-test souris).
-    const lpStr = '$' + livePrice.toFixed(3);
+    const lpStr = '$' + fmtPrix(livePrice);
     ctx.font = 'bold 10px monospace';
     const lw = ctx.measureText(lpStr).width + 10;
     const bx = Math.min(triX + 10, W - 3 - lw);
@@ -4931,7 +5011,6 @@ const fmtUsd = v => isNum(v) ? '$' + Math.round(v).toLocaleString('en-US') : '�
 const fmtBig = v => { if(!isNum(v)) return '—'; const a=Math.abs(v);
   if(a>=1e9) return '$'+(v/1e9).toFixed(2)+'B'; if(a>=1e6) return '$'+(v/1e6).toFixed(2)+'M';
   if(a>=1e3) return '$'+(v/1e3).toFixed(1)+'K'; return '$'+v.toFixed(2); };
-const fmtK = v => isNum(v) ? '$' + (v>=1000 ? (v/1000).toFixed(1)+'k' : Math.round(v)) : '—';
 const pctSpan = v => { if(!isNum(v)) return '—'; const c = v>0?'stat-pos':(v<0?'stat-neg':''); return '<span class="'+c+'">'+(v>0?'+':'')+fmtNum(v)+'%</span>'; };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -4957,7 +5036,7 @@ function openLiveModal() {
   if (!m) return;
   m.style.display = 'flex';
   renderLive();
-  if (!liveTimer) liveTimer = setInterval(renderLive, 5000);
+  if (!liveTimer) liveTimer = setInterval(() => { if (!document.hidden) renderLive(); }, 5000);
 }
 function closeLiveModal() {
   const m = document.getElementById('liveModal');
@@ -5003,11 +5082,18 @@ async function renderLive() {
   const hi = parseFloat(t24.highPrice), lo = parseFloat(t24.lowPrice);
   const chg = parseFloat(t24.priceChangePercent);
   const rank = liveRank(px, lo, hi);
-  // ── carnet ±1 % : profondeur réellement posée autour du prix ──
+  // ── carnet : profondeur réellement posée autour du prix ──
+  // 500 niveaux Binance ne couvrent que ≈ ±0,13 % du prix (mesuré le 04/10/2026). La carte
+  // annonçait « ±1 % » et sommait en réalité tout le carnet reçu, soit ±0,13 %. On mesure
+  // donc une bande que ce carnet COUVRE, et on affiche la couverture réelle.
+  const BANDE = 0.1;
+  const bidsD = depth.bids || [], asksD = depth.asks || [];
+  const couv = (bidsD.length && asksD.length)
+    ? Math.min(1 - parseFloat(bidsD[bidsD.length - 1][0]) / px, parseFloat(asksD[asksD.length - 1][0]) / px - 1) * 100 : NaN;
   let bv = 0, av = 0;
-  for (const r of (depth.bids || [])) if (parseFloat(r[0]) >= px * 0.99) bv += parseFloat(r[1]);
-  for (const r of (depth.asks || [])) if (parseFloat(r[0]) <= px * 1.01) av += parseFloat(r[1]);
-  const ratio = av > 0 ? bv / av : NaN;
+  for (const r of bidsD) if (parseFloat(r[0]) >= px * (1 - BANDE / 100)) bv += parseFloat(r[1]);
+  for (const r of asksD) if (parseFloat(r[0]) <= px * (1 + BANDE / 100)) av += parseFloat(r[1]);
+  const ratio = (av > 0 && couv >= BANDE) ? bv / av : NaN;
   // ── tape : 500 derniers trades. isBuyerMaker=true -> l'acheteur était PASSIF -> vente agressive ──
   let buy = 0, sell = 0;
   for (const t of (trades || [])) { const q = parseFloat(t.qty); if (t.isBuyerMaker) sell += q; else buy += q; }
@@ -5047,7 +5133,8 @@ async function renderLive() {
   const carnetTxt = !isFinite(ratio) ? '—'
     : ratio >= 1.4 ? 'déséquilibre ACHETEUR marqué' : ratio >= 1.1 ? 'léger penchant acheteur'
     : ratio <= 0.7 ? 'déséquilibre VENDEUR marqué' : ratio <= 0.9 ? 'léger penchant vendeur' : 'équilibré';
-  html += mCard('💧', 'Carnet live ±1 %', 'Binance spot · 500 niveaux · instantané', '',
+  html += mCard('💧', 'Carnet live ±' + BANDE + ' %', 'Binance spot · 500 niveaux, vus jusqu\'à ±'
+    + (isFinite(couv) ? couv.toFixed(2) : '—') + ' % · instantané', '',
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">Bids <b>' + fmtNum(bv, 1) + ' BTC</b> · Asks <b>' + fmtNum(av, 1) + ' BTC</b></div>'
     + '<div style="margin-top:6px;font-size:15px;font-weight:800" class="' + (ratio >= 1 ? pos : neg) + '">Ratio bid/ask '
     + (isFinite(ratio) ? ratio.toFixed(2) : '—') + '</div>'
@@ -5109,10 +5196,15 @@ function crossTag(isDeath) {
   if (isDeath === false) return '<span class="badge badge-hausser">GOLDEN CROSS</span>';
   return '<span class="badge" style="background:rgba(120,140,160,0.18);color:var(--text2)">n/d</span>';
 }
+// Prix complet, pas « $84.5k » : deux murs à 20 $ d'écart s'affichaient identiques.
 function wallLine(arr) {
   if (!arr || !arr.length) return '—';
-  return arr.slice(0,5).map(w => '<b>' + fmtK(w[0]) + '</b>&nbsp;<span style="color:var(--text2)">' + fmtNum(w[1],0) + '</span>').join(' · ');
+  return arr.slice(0,5).map(w => '<b>' + fmtUsd(w[0]) + '</b>&nbsp;<span style="color:var(--text2)">' + fmtNum(w[1],1) + '&nbsp;BTC</span>').join(' · ');
 }
+// Montant signé lisible : « −$6.83M » plutôt que « $-6.83M ».
+const fmtSigned = v => !isNum(v) ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + fmtBig(Math.abs(v));
+const signCls = v => v > 0 ? 'stat-pos' : (v < 0 ? 'stat-neg' : '');
+const BADGE_NEUTRE = 'background:rgba(120,140,160,0.18);color:var(--text2)';
 
 function renderFeed() { renderFeedTo(document.getElementById('feed')); }
 
@@ -5164,68 +5256,120 @@ function renderFeedTo(container) {
   html += mCard('📊','Marché live','Binance spot · maj ' + hhmm + ' UTC'
       + (ageMin !== null ? ' (+' + ageMin + ' min — le badge du haut est live)' : ''), '',
     '<div style="font-size:17px;font-weight:800;letter-spacing:-0.3px">' + fmtUsd(b.price)
-    + ' <span style="font-size:13px" class="' + (b.change_24h_pct>0?'stat-pos':'stat-neg') + '">'
+    + ' <span style="font-size:13px" class="' + signCls(b.change_24h_pct) + '">'
     + (b.change_24h_pct>0?'+':'') + fmtNum(b.change_24h_pct) + '%</span></div>'
     + '<div style="margin-top:5px;font-size:11px">Haut&nbsp;<b>' + fmtUsd(b.high_24h) + '</b> · Bas&nbsp;<b>'
     + fmtUsd(b.low_24h) + '</b><br>Volume 24h&nbsp;<b>' + fmtBig(b.quote_volume_24h_usd) + '</b></div>');
 
   // ── 2. MACRO ──
-  const dxyTxt = fmtNum(m.dxy_spot,2) + (m.dxy_is_weekend ? ' <span style="color:var(--text2)">(clôture)</span>' : '');
+  // Week-end : DXY et VIX sont TOUS DEUX des dernières clôtures (marchés fermés), pas des
+  // valeurs du moment — l'ancienne carte ne le disait que pour le DXY.
+  const ferme = m.dxy_is_weekend ? ' <span style="color:var(--text2);font-weight:400;font-size:10px">(clôture'
+    + (m.dxy_date ? ' du ' + escHtml(m.dxy_date) : '') + ')</span>' : '';
   let macroBody = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:11px">'
-    + '<div>DXY<br><b style="font-size:14px">' + dxyTxt + '</b></div>'
-    + '<div>VIX<br><b style="font-size:14px">' + fmtNum(m.vix,1) + '</b></div>'
+    + '<div>DXY<br><b style="font-size:14px">' + fmtNum(m.dxy_spot,2) + ferme + '</b></div>'
+    + '<div>VIX<br><b style="font-size:14px">' + fmtNum(m.vix,1) + (m.dxy_is_weekend ? ' <span style="color:var(--text2);font-weight:400;font-size:10px">(clôture)</span>' : '') + '</b></div>'
     + '</div>';
   html += mCard('🌍','Macro','DXY · VIX', '', macroBody);
 
   // ── 3. INDICATEURS ──
   let indBody = '';
   const tfLabel = { '4h':'4 h', '1h':'1 h', '1d':'1 j' };
+  // S / R / amplitude = min / max des 30 DERNIÈRES bougies du TF (fetch_macro) : 5 j en 4h,
+  // 30 h en 1h, 30 j en 1j. L'étiquette disait « 16 j, 100 b. 4h » pour les trois, et le
+  // champ s'appelle `range_24h_pct` alors qu'il ne couvre jamais 24 h. Les champs `*_4h`
+  // (ema20_4h, death_cross_4h) portent en réalité les valeurs DU TF de la ligne.
+  const srH = { '4h': 120, '1h': 30, '1d': 720 };
+  const dureeTxt = h => h % 24 === 0 ? (h / 24) + ' j' : h + ' h';
   for (const k of ['4h','1h','1d']) {
     const t = tf[k]; if (!t) continue;
+    const fen = dureeTxt(t.sr_window_h || srH[k]);
     indBody += '<div style="margin-bottom:7px">'
       + '<b>' + (tfLabel[k]||k) + '</b> · RSI&nbsp;<b>' + fmtNum(t.rsi_14,1) + '</b> '
       + crossTag(t.death_cross_4h) + '<br>'
       + '<span style="font-size:10px;color:var(--text2)">EMA20 ' + fmtUsd(t.ema20_4h) + ' / EMA50 ' + fmtUsd(t.ema50_4h)
-      + ' (gap ' + fmtNum(t.ema_gap_pct,2) + '%) · S <b>' + fmtUsd(t.support_30) + '</b> / R <b>' + fmtUsd(t.resistance_30)
-      + '</b> <span style="font-size:9px;color:var(--text2)">(16 j, 100 b. 4h)</span> · range ' + fmtNum(t.range_24h_pct,2) + '%</span></div>';
+      + ' (écart ' + fmtNum(t.ema_gap_pct,2) + '%) · S <b>' + fmtUsd(t.support_30) + '</b> / R <b>' + fmtUsd(t.resistance_30)
+      + '</b> · amplitude ' + fmtNum(t.range_24h_pct,2) + '% <span style="font-size:9px">(min/max ' + fen + ')</span></span></div>';
   }
-  html += mCard('📈','Indicateurs','Multi-horizon · Binance 4h/1h/1d', '', indBody);
+  html += mCard('📈','Indicateurs','Binance 4h/1h/1d · RSI Wilder · bougie en cours incluse', '', indBody);
 
   // ── 4. MICROSTRUCTURE ──
-  const gam = isNum(x.dealer_gamma) ? Math.round(x.dealer_gamma).toLocaleString('en-US') : '—';
+  // OI : variation sur 24 h GLISSANTES (historique horaire Binance). L'ancien « Δ1j » comparait minuit
+  // à minuit : −0,26 % affichés le 04/10 à 11 h pour +1,18 % réels.
+  const oi24 = isNum(x.oi_change_24h_pct) ? x.oi_change_24h_pct : x.oi_change_1d_pct;
+  // CVD : fenêtré (bougies 5 min Binance). Un fichier de l'ancien format porte le CUMUL du
+  // daemon depuis son premier démarrage (des mois de flux) : il n'a pas de sens ici, on ne
+  // l'affiche pas comme une lecture du moment.
+  const cvdCell = (lbl, v, tb) => '<span class="' + signCls(v) + '">' + lbl + '&nbsp;' + fmtSigned(v) + '</span>'
+    + (isNum(tb) ? '&nbsp;<span style="color:var(--text2)">(' + fmtNum(tb,1) + '%&nbsp;achat)</span>' : '');
+  const cvdHtml = isNum(x.cvd_1h_usd)
+    ? [cvdCell('1h', x.cvd_1h_usd, x.taker_buy_1h_pct), cvdCell('4h', x.cvd_4h_usd, x.taker_buy_4h_pct),
+       cvdCell('24h', x.cvd_24h_usd, x.taker_buy_24h_pct)].join(' · ')
+    : '— <span style="color:var(--text2)">(en attente du nouveau format)</span>';
+  // GEX : USD de delta par mouvement de 1 %, convention calls + / puts −. L'ancien calcul
+  // sortait « NEUTRAL » 427 fois sur 427 : il est remplacé, voir options_gex.py.
+  let gexHtml;
+  if (isNum(x.gex_usd_1pct)) {
+    const zg = isNum(x.zero_gamma)
+      ? 'zéro γ <b>' + fmtUsd(x.zero_gamma) + '</b> <span style="color:var(--text2)">(spot '
+        + (x.spot_vs_zero_gamma_pct > 0 ? '+' : '') + fmtNum(x.spot_vs_zero_gamma_pct,1) + '%)</span>'
+      : '<span style="color:var(--text2)">zéro γ hors ±15 %</span>';
+    gexHtml = '<div><b>GEX</b> <span class="badge ' + (x.gex_usd_1pct > 0 ? 'badge-hausser' : 'badge-baissier') + '">'
+      + escHtml(x.gex_state||'—') + '</span> <b class="' + signCls(x.gex_usd_1pct) + '">' + fmtSigned(x.gex_usd_1pct) + '</b> / 1 % · ' + zg + '</div>'
+      + '<div>Call wall <b>' + fmtUsd(x.call_wall) + '</b> · Put wall <b>' + fmtUsd(x.put_wall) + '</b>'
+      + ' · échéances ≤ 7 j ' + fmtSigned(x.gex_0_7j_usd_1pct) + '</div>'
+      + '<div style="font-size:10px;color:var(--text2)">' + (x.num_options || '—') + ' options Deribit · '
+      + escHtml(x.gex_convention || '') + '</div>';
+  } else {
+    gexHtml = '<div><b>GEX</b> — <span style="color:var(--text2)">(en attente du nouveau format)</span></div>';
+  }
+  const premCls = /NEGATIVE/.test(x.premium_state || '') ? 'badge badge-baissier'
+                : /POSITIVE/.test(x.premium_state || '') ? 'badge badge-hausser' : 'badge';
   let microBody = '<div style="font-size:11px">'
     + '<div><b>Funding</b> ' + fmtNum(x.funding_rate_pct,4) + '% '
     + '<span style="color:var(--text2)">(' + fmtNum(x.funding_annual_pct,2) + '% ann.)</span></div>'
     + '<div><b>Open Interest</b> ' + (isNum(x.oi_btc)?x.oi_btc.toLocaleString('en-US',{maximumFractionDigits:0}):'—') + ' BTC '
     + '<span style="color:var(--text2)">(' + fmtBig(x.oi_usd) + ')</span> '
-    + '<span class="' + (x.oi_change_1d_pct>0?'stat-pos':'stat-neg') + '">Δ1j ' + fmtNum(x.oi_change_1d_pct,2) + '%</span> '
-    + '<span class="' + (x.oi_change_5d_pct>0?'stat-pos':'stat-neg') + '">Δ5j ' + fmtNum(x.oi_change_5d_pct,2) + '%</span></div>'
+    + '<span class="' + signCls(oi24) + '">Δ24h ' + fmtNum(oi24,2) + '%</span> '
+    + '<span class="' + signCls(x.oi_change_5d_pct) + '">Δ5j ' + fmtNum(x.oi_change_5d_pct,2) + '%</span></div>'
     + '<div><b>L/S comptes</b> ' + fmtNum(x.ls_ratio,4) + ' <span style="color:var(--text2)">('
     + fmtNum(x.long_pct,1) + '/' + fmtNum(x.short_pct,1) + ')</span>'
     + ' · <b>Top traders</b> ' + fmtNum(x.top_ls_ratio,4)
     + ' · <b>Taker B/S</b> ' + fmtNum(x.taker_ratio,4) + '</div>'
-    + '<div><b>CVD</b> ' + fmtBig(x.cvd) + ' <span style="color:var(--text2)">(' + escHtml(x.cvd_updated_at||'—') + ')</span></div>'
+    + '<div><b>CVD spot</b> ' + cvdHtml + '</div>'
     + '<hr style="border:none;border-top:1px solid var(--glass-edge);margin:6px 0">'
-    + '<div><b>GEX</b> ' + escHtml(x.gex_state||'—') + ' · γ ' + gam + ' · walls <b>'
-    + (x.gamma_walls||[]).map(fmtK).join(' / ') + '</b></div>'
-    + '<div><b>Premium Coinbase</b> ' + fmtNum(x.premium_pct,4) + '% '
-    + '<span class="badge ' + (x.premium_state==='NEGATIVE'?'badge-baissier':'badge-hausser') + '">' + escHtml(x.premium_state||'—') + '</span> '
+    + gexHtml
+    + '<div style="margin-top:4px"><b>Premium Coinbase</b> ' + fmtNum(x.premium_pct,4) + '% '
+    + '<span class="' + premCls + '"' + (premCls === 'badge' ? ' style="' + BADGE_NEUTRE + '"' : '') + '>' + escHtml(x.premium_state||'—') + '</span> '
     + (x.us_demand ? '<span style="color:var(--text2)">demande US ✓</span>' : '<span style="color:var(--text2)">pas de demande US</span>') + '</div>'
-    + (x.squeeze_reason ? '<div style="margin-top:4px;color:var(--text2)">Squeeze : ' + escHtml(x.squeeze_reason) + '</div>' : '')
     + '</div>';
   html += mCard('📡','Microstructure','Binance Futures · Deribit · Coinbase', '', microBody);
 
   // ── 5. LIQUIDITÉ ──
-  let liqBody = '<div style="font-size:11px">'
-    + '<div>Ratio <b>bid/ask</b> (15 min) : <b class="' + (lq.ratio_bid_ask>1?'stat-pos':'stat-neg') + '">' + fmtNum(lq.ratio_bid_ask,2) + '</b></div>'
-    + '<div style="margin-top:5px"><span class="badge badge-hausser">BIDS</span> ' + wallLine(lq.bid_walls) + '</div>'
-    + '<div style="margin-top:4px"><span class="badge badge-baissier">ASKS</span> ' + wallLine(lq.ask_walls) + '</div>'
-    + '<div style="margin-top:6px;color:var(--text2);font-size:10px">Murs = profondeur cumulée, fenêtre 15 min · heatmap 24 h</div>'
-    + '</div>';
-  html += mCard('💧','Liquidité','Carnet Binance · pôles de liquidation', '', liqBody);
+  // En BTC réels, lus dans le carnet à la publication. L'ancien format sommait des scores
+  // d'intensité de heatmap (sans unité) et les présentait comme une « profondeur cumulée ».
+  let liqBody;
+  if (lq.unit === 'BTC') {
+    const bandes = lq.bandes || {};
+    const autres = Object.keys(bandes).sort((a, b) => a - b)
+      .map(k => '±' + k + ' % : ' + fmtNum(bandes[k].ratio,2)).join(' · ');
+    liqBody = '<div style="font-size:11px">'
+      + '<div>Ratio <b>bid/ask</b> ±' + lq.bande_ref_pct + ' % : <b class="' + (lq.ratio_bid_ask>1?'stat-pos':'stat-neg') + '">'
+      + fmtNum(lq.ratio_bid_ask,2) + '</b> <span style="color:var(--text2)">(' + fmtNum(lq.total_bid,1) + ' / '
+      + fmtNum(lq.total_ask,1) + ' BTC)</span></div>'
+      + '<div style="color:var(--text2);font-size:10px">' + autres + ' · carnet vu jusqu\'à ±' + fmtNum(lq.couverture_pct,2) + ' %</div>'
+      + '<div style="margin-top:5px"><span class="badge badge-hausser">BIDS</span> ' + wallLine(lq.bid_walls) + '</div>'
+      + '<div style="margin-top:4px"><span class="badge badge-baissier">ASKS</span> ' + wallLine(lq.ask_walls) + '</div>'
+      + '<div style="margin-top:6px;color:var(--text2);font-size:10px">Murs = BTC posés par tranche de ' + (lq.wall_bin_usd || 20)
+      + ' $ · instantané du carnet à la publication — un mur peut être retiré à tout moment</div>'
+      + '</div>';
+  } else {
+    liqBody = '<div style="font-size:11px;color:var(--text2)">Format ancien (scores d\'intensité sans unité) — en attente de la prochaine publication.</div>';
+  }
+  html += mCard('💧','Liquidité','Carnet Binance spot · BTC posés', '', liqBody);
 
   // ── 6. ÉTAT DU FLUX ──
-  const nOk = Object.values(st).filter(v => v === 'ok').length, nTot = Object.keys(st).length || 9;
+  const nOk = Object.values(st).filter(v => v === 'ok').length, nTot = Object.keys(st).length || 8;
   const errs = d.errors || [];
   let stBody = '<div style="font-size:11px">'
     + '<b class="' + (errs.length ? 'stat-neg' : 'stat-pos') + '">' + nOk + '/' + nTot + ' blocs live</b>'
@@ -5421,37 +5565,33 @@ function startForward() {
   // Track the last candle index processed
   let lastProcessedIdx = btResult ? btResult.endIdx : candles.length - 1;
 
+  // L'ancienne boucle exigeait à la fois `candles.length <= dernier + 1` et `> dernier + 1` :
+  // son corps ne s'exécutait JAMAIS (et sans bot il aurait planté). Le forward ne jouait rien.
   forwardInterval = setInterval(() => {
-    if (!btBot || candles.length <= lastProcessedIdx + 1) {
-      // Check if candle closed (new full candle appeared)
-      if (candles.length > lastProcessedIdx + 1) {
-        const params = btBot.buildParams(btUserParams);
-        const newIdx = candles.length - 1;
-        // Process all new closed candles
-        for (let i = lastProcessedIdx + 1; i <= newIdx; i++) {
-          const indicators = btBot.computeIndicators(candles, i);
-          btBot.step(candles, i, params, indicators);
-        }
-        lastProcessedIdx = newIdx;
-
-        // Update equity curve
-        if (btResult) {
-          const markPrice = candles[newIdx].close;
-          btResult.equityCurve.push({
-            idx: newIdx,
-            total: btBot.equity(markPrice),
-            realized: btBot.realizedPnl(),
-            unrealized: btBot.equity(markPrice) - btCapital - btBot.realizedPnl()
-          });
-          btResult.trades = [...btBot.trades];
-          btResult.totalPnl = btBot.realizedPnl();
-          btResult.totalReturn = (btResult.totalPnl / btCapital) * 100;
-          btResult.tradeCount = btBot.trades.length;
-        }
-        drawChart();
-        updateForwardStats();
-      }
+    if (!btBot) return;
+    // Seules les bougies CLOSES sont jouées : la dernière est en cours.
+    const lastClosed = candles.length - 2;
+    if (lastClosed <= lastProcessedIdx) return;
+    const params = btBot.buildParams(btUserParams);
+    for (let i = lastProcessedIdx + 1; i <= lastClosed; i++) {
+      btBot.step(candles, i, params, btBot.computeIndicators(candles, i, params));
     }
+    lastProcessedIdx = lastClosed;
+    if (btResult) {
+      const markPrice = candles[lastClosed].close;
+      btResult.equityCurve.push({
+        idx: lastClosed,
+        total: btBot.equity(markPrice),
+        realized: btBot.realizedPnl(),
+        unrealized: btBot.equity(markPrice) - btCapital - btBot.realizedPnl()
+      });
+      btResult.trades = [...btBot.trades];
+      btResult.totalPnl = btBot.realizedPnl();
+      btResult.totalReturn = (btResult.totalPnl / btCapital) * 100;
+      btResult.tradeCount = btBot.trades.length;
+    }
+    drawChart();
+    updateForwardStats();
   }, 5000);
 }
 
@@ -5645,11 +5785,20 @@ async function init() {
   // Pre-fetch des TF de reference S/R : no-op si l'overlay est eteint, c'est le toggle qui declenche.
   await refreshRefSR();
   toggleDepth(overlays.liq);
-  setInterval(fetchPrice, 1000);
-  setInterval(async () => { await fetchKlines(); drawChart(); }, 5000);
-  setInterval(fetchMarket, 60000);
+  // Onglet caché = aucune requête. La page restait ouverte en arrière-plan toute la journée
+  // en interrogeant Binance chaque seconde ; au retour, tout est rafraîchi d'un coup.
+  const visible = fn => () => { if (!document.hidden) return fn(); };
+  setInterval(visible(fetchPrice), 1000);
+  setInterval(visible(async () => { await fetchKlines(); drawChart(); }), 5000);
+  setInterval(visible(fetchMarket), 60000);
   // Refresh S/R ref TFs every 60s
-  setInterval(refreshRefSR, 60000);
+  setInterval(visible(refreshRefSR), 60000);
+  document.addEventListener('visibilitychange', async () => {
+    if (document.hidden) return;
+    fetchPrice(); fetchMarket();
+    if (overlays.liq) fetchHeatmap();
+    await fetchKlines(); drawChart();
+  });
   // Taskbar clock
   setInterval(() => {
     const c = document.getElementById('taskbarClock');

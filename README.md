@@ -3,8 +3,8 @@
 Dashboard BTC en un seul fichier HTML, autonome, sans build ni dépendance : il s'ouvre
 dans un navigateur et se rafraîchit tout seul depuis des sources publiques.
 
-**Ce dépôt est complet pour lire, modifier et tester le dashboard.** Deux blocs de
-données dépendent de collecteurs qui n'y sont pas — c'est documenté et le script le dit
+**Ce dépôt est complet pour lire, modifier et tester le dashboard.** Trois blocs de
+données dépendent de modules qui n'y sont pas — c'est documenté et le script le dit
 lui-même à l'exécution (voir « Ce qui n'est pas ici »).
 
 ---
@@ -39,6 +39,7 @@ sont restreints par certains navigateurs : un serveur local est préférable.
 | `market-data.json` | Les données des cartes « Marché live ». Réécrit par `publish.py`. |
 | `heatmap.json` | La heatmap de liquidité sur 24 h. Réécrite par `heatmap.py`. |
 | `publish.py` | Agrège 8 sources → `market-data.json`. |
+| `options_gex.py` | Calcul du GEX (exposition gamma des options Deribit), sans réseau — testable hors ligne. |
 | `heatmap.py` | Accumule le carnet d'ordres en heatmap glissante → `heatmap.json`. |
 | `samsara_config.py` | Charge la configuration locale. **Aucun chemin n'est écrit dans le code.** |
 | `config.example.json` | Modèle de configuration, documenté. |
@@ -68,7 +69,7 @@ endroit où des chemins de machine ont le droit d'exister.
 | `git_lock` | `<state_dir>/git.lock` | verrou partagé entre les deux écrivains |
 | `git_remote` / `git_branch` | `origin` / `master` | où pousser |
 | `extra_module_paths` | `[]` | modules hors dépôt (voir plus bas) |
-| `cvd_database` | `null` | SQLite d'un collecteur CVD, lu en **lecture seule** |
+| `cvd_database` | `null` | **obsolète** (plus lue depuis le 04/10/2026), acceptée pour compatibilité |
 
 ⚠️ **`state_dir` doit rester stable.** Le changer repart d'un état vide : les 24 h de
 carnet accumulées sont perdues, et la heatmap affichée devient un rectangle vide.
@@ -79,7 +80,7 @@ carnet accumulées sont perdues, et la heatmap affichée devient un rectangle vi
 
 ```bash
 python3 heatmap.py     # à lancer toutes les minutes : il accumule, il ne recalcule pas
-python3 publish.py     # à lancer après heatmap.py : il lit 8 sources
+python3 publish.py     # indépendant de heatmap.py : il lit 8 sources
 ```
 
 `heatmap.py` **accumule**. Une seule exécution ne produit qu'une colonne d'une minute :
@@ -102,9 +103,12 @@ un échec : un dépôt fraîchement cloné doit pouvoir tourner et dire ce qui l
 bash tests/run-all.sh
 ```
 
-Quatre étapes : compilation, extraction du JavaScript inline, non-régression du rendu
-(DOM stubbé dans node), panneau ⚡ (**appels réseau réels** vers Binance), puis un scan de
-**tous les fichiers suivis par git**.
+Dans l'ordre : compilation ; calculs serveur **hors ligne** (`tests/test_calculs.py` :
+CVD, carnet, GEX sur des données construites à la main) ; indicateurs de la page **hors
+ligne** (`tests/test_indicateurs.js` : SAR, ADX, RSI, EMA comparés à des implémentations
+de référence) ; extraction du JavaScript inline ; non-régression du rendu (DOM stubbé
+dans node) ; panneau ⚡ (**appels réseau réels** vers Binance) ; scan de **tous les
+fichiers suivis par git**.
 
 Les harnais de rendu consomment un fichier JavaScript extrait de `index.html` — il faut
 le régénérer après chaque modification du dashboard :
@@ -140,30 +144,42 @@ Sans le fichier local, le contrôle tourne sur l'exemple et **n'attrape rien** �
 
 ## Ce qui n'est pas ici — et pourquoi
 
-Trois blocs de `market-data.json` dépendent de collecteurs hors dépôt. Sans eux, le
+Trois blocs de `market-data.json` dépendent de modules hors dépôt. Sans eux, le
 script tourne, publie le reste, et l'indique dans `status` :
 
 | Bloc | Dépendance | Source |
 |---|---|---|
 | `indicators`, `macro` | module `fetch_macro` | DXY, VIX, indicateurs multi-échelle |
-| `gex`, `premium` | module `scenario_engine` | Deribit (GEX), prime Coinbase |
-| `cvd` | une base SQLite | flux agressif accumulé par un collecteur |
+| `premium` | module `scenario_engine` | prime Coinbase |
 
-Ces modules se branchent via `extra_module_paths` et `cvd_database` dans
-`config.local.json`. **Ils ne sont pas publics** : `cvd` lit une base vivante, et
-Deribit, Coinbase et Yahoo ne sont pas joignables depuis n'importe quel poste — leur
-agrégation doit rester côté serveur.
+Ces modules se branchent via `extra_module_paths` dans `config.local.json`. Deribit,
+Coinbase et Yahoo ne sont pas joignables depuis n'importe quel poste — leur agrégation
+doit rester côté serveur.
 
-Les blocs qui ne dépendent que de **Binance** (`btc_spot`, `micro_futures`) et de la
-**heatmap locale** (`liquidity`) fonctionnent partout, sans configuration.
+Les cinq autres blocs ne dépendent que de sources publiques et fonctionnent partout, sans
+configuration : **Binance** (`btc_spot`, `micro_futures`, `cvd`, `liquidity`) et
+**Deribit** (`gex`, calculé dans `options_gex.py`).
+
+### Ce que mesure chaque chiffre (révision du 04/10/2026)
+
+| Champ | Mesure |
+|---|---|
+| `cvd_{1h,4h,24h}_usd` | achats − ventes **au taker**, spot BTCUSDT, en USD, sur des bougies 5 min (fenêtres glissantes) |
+| `oi_change_24h_pct` | variation de l'open interest sur **24 h glissantes** (historique horaire) |
+| `gex_usd_1pct` | USD de delta que les dealers doivent couvrir pour 1 % de mouvement — **convention** : dealers acheteurs des calls, vendeurs des puts |
+| `zero_gamma` | prix où le GEX total change de signe (recalculé sur une grille de prix, ±15 %) |
+| `liquidity.bandes` | BTC posés à ±0,1 / ±0,5 / ±1 % du mid — une bande n'est publiée que si le carnet reçu la couvre |
+| `bid_walls`, `ask_walls` | BTC posés par tranche de 20 $ (même grille que la heatmap) |
+| `support_30`, `resistance_30`, `range_24h_pct` | min / max des **30 dernières bougies** du TF (`sr_window_h` heures) — le nom `range_24h` est historique |
 
 ---
 
 ## Panneau ⚡ (lecture live)
 
 Le bouton **⚡** ouvre une lecture directe, rafraîchie toutes les 5 secondes : prix,
-bid/ask et spread, position dans le range 24 h, carnet ±1 %, tape des 500 derniers
-trades, et l'âge de tout ce qui n'est pas live.
+bid/ask et spread, position dans le range 24 h, carnet ±0,1 % (la bande que couvrent
+les 500 niveaux reçus — environ ±0,13 %), tape des 500 derniers trades, et l'âge de tout
+ce qui n'est pas live.
 
 Il n'interroge que **Binance**. Les autres sources sont agrégées côté serveur dans
 `market-data.json` et arrivent avec leur retard — le panneau l'affiche explicitement.
@@ -178,7 +194,7 @@ est documenté dans la page, et `tests/test_live.js` échoue si le mélange revi
 
 ## Dépendances
 
-- **Python 3.8+** — `urllib`, `sqlite3`, `fcntl` : bibliothèque standard uniquement.
+- **Python 3.8+** — `urllib`, `fcntl`, `math` : bibliothèque standard uniquement.
 - **Node** — uniquement pour les tests.
 - Aucun `pip install`, aucun build, aucune étape de compilation.
 

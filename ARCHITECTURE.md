@@ -3,11 +3,10 @@
 ## Le pipeline
 
 ```
-                       api.binance.com ──────────────┐
+                       api.binance.com ──────────────┐   (spot, klines 5 min, carnet)
                        fapi.binance.com ─────────────┤
-                       Deribit · Coinbase · Yahoo ───┤   (via modules hors dépôt)
-                       SQLite (collecteur CVD) ──────┤
-                       heatmap.json ─────────────────┤
+                       Deribit (options) ────────────┤   (GEX : options_gex.py)
+                       Coinbase · Yahoo ─────────────┤   (via modules hors dépôt)
                                                       ▼
                                               publish.py  ──▶ market-data.json ──┐
                                                                                 │
@@ -36,7 +35,7 @@ données locales, il faut rendre ces deux URL relatives.
 | Élément | Cadence | Producteur |
 |---|---|---|
 | Badge de prix, bougies, panneau ⚡ | **1 à 5 secondes** | `index.html` → Binance, directement |
-| `heatmap.json` | **~3 minutes** | `heatmap.py` (état accumulé toutes les minutes) |
+| `heatmap.json` | **15 minutes** (publication) | `heatmap.py` (état accumulé toutes les minutes, publié au plus toutes les 15 min) |
 | `market-data.json` | **15 minutes** | `publish.py` |
 
 **C'est la source de confusion numéro un du projet.** Deux chiffres affichés côte à côte
@@ -49,9 +48,10 @@ live affichait **−207 pts** quand la valeur réelle était **−45 pts**. Le b
 donc entre le perp **et** le spot du **même instant du fichier** ; la dérive du spot est
 publiée **séparément**. `tests/test_live.js` échoue si le mélange revient.
 
-Chaque donnée datée affiche son âge. Une donnée périmée au-delà de son seuil **n'est pas
-publiée du tout** plutôt que publiée comme si elle était fraîche :
-heatmap > 10 min → le bloc `liquidity` refuse ; CVD > 30 min → le bloc `cvd` refuse.
+Chaque donnée datée affiche son âge. Depuis le 04/10/2026, aucun bloc ne lit plus une
+source intermédiaire qui pourrait être figée : `cvd` et `liquidity` interrogent Binance au
+moment de la publication (ils lisaient auparavant une base locale et `heatmap.json`, avec
+des seuils de refus à 30 et 10 min).
 
 ---
 
@@ -63,13 +63,24 @@ heatmap > 10 min → le bloc `liquidity` refuse ; CVD > 30 min → le bloc `cvd`
 | `indicators` | Binance klines 4h/1h/1d | `fetch_macro` |
 | `macro` | DXY, VIX | `fetch_macro` |
 | `micro_futures` | Binance `fapi` | — |
-| `cvd` | SQLite, lecture seule | une base vivante |
-| `gex` | Deribit | `scenario_engine` |
+| `cvd` | Binance klines 5 min (achats taker vs total) | — |
+| `gex` | Deribit, calcul dans `options_gex.py` | — |
 | `premium` | Coinbase vs Binance | `scenario_engine` |
-| `liquidity` | `heatmap.json` | — |
+| `liquidity` | Binance carnet (5 000 niveaux), en BTC | — |
 
-Trois blocs sur huit tournent partout sans configuration. Les cinq autres se branchent
-par `extra_module_paths` et `cvd_database` dans `config.local.json`.
+Cinq blocs sur huit tournent partout sans configuration. Les trois autres se branchent
+par `extra_module_paths` dans `config.local.json`.
+
+### Unités et fenêtres — à lire avant de comparer deux chiffres
+
+| Chiffre | Unité | Fenêtre |
+|---|---|---|
+| CVD | USD | 1 h / 4 h / 24 h glissantes, spot BTCUSDT |
+| Δ OI | % | 24 h glissantes / 5 j (historique horaire) |
+| GEX | USD de delta par 1 % de mouvement | instantané ; **convention** calls + / puts − (le positionnement réel des dealers n'est pas observable) |
+| murs de liquidité | BTC posés par tranche de 20 $ | instantané du carnet |
+| ratio bid/ask | BTC / BTC | bande ±0,5 % (ou la plus large couverte) |
+| S / R / amplitude | prix | 30 dernières bougies du TF : 5 j (4h), 30 h (1h), 30 j (1j) |
 
 ## Les deux écrivains, un seul dépôt
 
@@ -79,14 +90,18 @@ Sans précaution, l'un committe le fichier que l'autre vient de préparer, ou to
 
 ```
 verrou partagé (fcntl.flock sur git_lock)
-  ├─ git add   -- <mes chemins>       ← pathspec OBLIGATOIRE : un `git add -A`
-  ├─ git diff --cached --quiet        ← rien à publier ? on sort en silence
-  ├─ git commit -m … -- <mes chemins>
+  ├─ GIT_INDEX_FILE=<state_dir>/index-<écrivain>   ← index DÉDIÉ, jamais l'index partagé
+  ├─ git read-tree HEAD                ← base = HEAD
+  ├─ git add   -- <mes chemins>        ← pathspec
+  ├─ git diff --cached --quiet         ← rien à publier ? on sort en silence
+  ├─ git commit -m …                   ← ne peut contenir QUE mes chemins
+  ├─ git reset -q HEAD -- <mes chemins>   (index partagé remis à niveau)
   └─ git push  ×3 essais, avec `pull --rebase` entre chaque
 ```
 
-Le **pathspec** n'est pas une optimisation : sans lui, un écrivain embarque le travail de
-l'autre dans son commit et le message devient faux.
+Le pathspec seul ne suffit pas : `git commit -- <chemin>` committe aussi **tout ce qui est
+déjà indexé** dans l'index partagé. Un autre processus qui a laissé des fichiers indexés les
+fait partir sous le message de l'écrivain — l'historique ment. D'où l'index dédié.
 
 ---
 

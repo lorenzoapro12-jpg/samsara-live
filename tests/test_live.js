@@ -123,6 +123,10 @@ const usd = v => Math.round(v).toLocaleString('en-US');
     ['Range 24 h (haut/bas réels)', /Haut\s*<b>[\d.,]+<\/b>/.test(html) && /Bas\s*<b>[\d.,]+<\/b>/.test(html)],
     ['Carnet live : ratio affiché', /Ratio bid\/ask\s*[\d.,]+/.test(html) || /Ratio bid\/ask\s*—/.test(html)],
     ['Carnet live : valeurs en BTC', /Bids\s*<b>[\d.,]+ BTC<\/b>/.test(html)],
+    // 500 niveaux couvrent ≈ ±0,13 % : la carte annonçait « ±1 % ». La bande affichée doit
+    // être couverte, et la couverture réelle doit se lire.
+    ['Carnet live : bande couverte (pas « ±1 % »)', /Carnet live ±0\.1 %/.test(html) && !/Carnet live ±1 %/.test(html)],
+    ['Carnet live : couverture réelle affichée', /vus jusqu'à ±(\d+\.\d\d|—) %/.test(html)],
     ['Tape live : taker buy en %', /Taker buy\s*[\d.,]+\s*%/.test(html)],
     ['Tape live : delta net signé', /Delta net/.test(html)],
     ['Bloc « non live » : perp depuis le fichier', html.includes(num(DATA.micro.mark_price, 1))],

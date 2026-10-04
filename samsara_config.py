@@ -21,7 +21,9 @@ Clés (toutes optionnelles)
   git_remote          nom du remote                           défaut : origin
   git_branch          branche publiée                         défaut : master
   extra_module_paths  chemins à ajouter à sys.path            défaut : []
-  cvd_database        SQLite du collecteur CVD (lecture seule) défaut : None
+  cvd_database        OBSOLÈTE depuis le 04/10/2026 — plus lue   défaut : None
+                      (le CVD vient des bougies Binance) ; acceptée pour ne pas
+                      casser une config existante.
 
 Les chemins relatifs sont résolus depuis le dossier du dépôt. Une valeur `null` ou absente
 prend le défaut : il n'y a pas de « clé manquante » qui casse le script.
@@ -114,5 +116,4 @@ def describe(cfg):
         "repo_dir": "défini" if cfg["repo_dir"] != HERE else "= dossier du script",
         "state_dir": "défini" if cfg["state_dir"] != os.path.join(cfg["repo_dir"], ".state") else "par défaut",
         "modules_privés": len(cfg["extra_module_paths"]),
-        "base_cvd": "branchée" if cfg["cvd_database"] else "absente",
     }

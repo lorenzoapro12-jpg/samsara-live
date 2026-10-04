@@ -136,8 +136,17 @@ try {
     ['DXY réel', feed.innerHTML.includes(fmt(D.macro.dxy_spot))],
     ['Support 4h réel', feed.innerHTML.includes(usd(D.tf['4h'].support_30))],
     ['Cross 4h', feed.innerHTML.includes(D.tf['4h'].death_cross_4h ? 'DEATH CROSS' : 'GOLDEN CROSS')],
-    ['Mur bid dominant', feed.innerHTML.includes((D.liquidity.bid_walls[0][0]/1000).toFixed(1)+'k')],
+    ['Mur bid dominant (prix complet)', feed.innerHTML.includes('$' + usd(D.liquidity.bid_walls[0][0]))],
+    ['Murs en BTC', /BTC<\/span>/.test(feed.innerHTML) && D.liquidity.unit === 'BTC'],
+    ['Ratio carnet sur sa bande', feed.innerHTML.includes('±' + D.liquidity.bande_ref_pct + ' %')],
     ['GEX', feed.innerHTML.includes(D.micro.gex_state)],
+    // GEX en USD / 1 % : l'ancien calcul publiait des BTC sous des seuils en dollars.
+    ['GEX en USD / 1 %', /GEX<\/b>[\s\S]*?[+−]\$[\d.]+[MBK]<\/b> \/ 1 %/.test(feed.innerHTML)],
+    // CVD fenêtré : l'ancien était un cumul depuis le premier démarrage du daemon.
+    ['CVD 1h / 4h / 24h', /1h&nbsp;[+−]?\$/.test(feed.innerHTML) && /24h&nbsp;[+−]?\$/.test(feed.innerHTML)],
+    ['OI Δ24h glissant', feed.innerHTML.includes('Δ24h ' + fmt(D.micro.oi_change_24h_pct) + '%')],
+    // S/R : fenêtre réelle (30 bougies), plus l'ancien « 16 j » faux pour les trois TF.
+    ['Fenêtre S/R réelle', /min\/max 5 j/.test(feed.innerHTML) && /min\/max 30 h/.test(feed.innerHTML) && !/16 j/.test(feed.innerHTML)],
     ['Tous blocs ok', new RegExp(Object.keys(D.status).length+'/'+Object.keys(D.status).length+' blocs').test(feed.innerHTML)],
     ['6 cartes rendues', (feed.innerHTML.match(/demon-card/g)||[]).length === 6],
     ['Aucun motif interdit dans le RENDU', hitsFeed.length === 0],
