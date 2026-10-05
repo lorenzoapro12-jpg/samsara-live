@@ -32,7 +32,7 @@ function mkEl(id) {
   return store[id] = {
     id, style: {}, textContent: '', innerHTML: '', value: '', dataset: {},
     classList: { add(){}, remove(){}, toggle(){}, contains(){ return false; } },
-    addEventListener(){}, appendChild(){}, removeChild(){}, setAttribute(){},
+    addEventListener(){}, appendChild(){}, removeChild(){}, setAttribute(){}, getAttribute(){ return null; },
     querySelector(){ return null; }, querySelectorAll(){ return []; },
     getContext(){ return null; }, focus(){}, remove(){},
     getBoundingClientRect(){ return { width: 900, height: 600, left: 0, top: 0 }; }

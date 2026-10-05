@@ -11,7 +11,7 @@ ko=0
 etape() { printf '\n\033[1m── %s ──\033[0m\n' "$1"; }
 
 etape "0. Compilation des scripts Python"
-for f in ../publish.py ../heatmap.py ../samsara_config.py ../options_gex.py refresh_harness.py scan-public.py test_calculs.py; do
+for f in ../publish.py ../heatmap.py ../samsara_config.py ../options_gex.py refresh_harness.py scan-public.py test_calculs.py test_palette.py test_contrat.py theme_css.py; do
   if python3 -m py_compile "$f" 2>/dev/null; then
     echo "  ✓ $f"
   else
@@ -37,8 +37,11 @@ node test_live.js || ko=1
 etape "6. Scan de TOUS les fichiers publiés"
 python3 scan-public.py || ko=1
 
-etape "7. Palette (contraste WCAG, séparation daltonisme) — hors ligne"
+etape "7. Palette de CHAQUE thème (contraste WCAG, séparation daltonisme) — hors ligne"
 python3 test_palette.py || ko=1
+
+etape "8. Contrat de la page (registre des thèmes, verre, performance, réseau) — hors ligne"
+python3 test_contrat.py || ko=1
 
 printf '\n\033[1m════════════════════════════════════════\033[0m\n'
 if [ "$ko" -eq 0 ]; then

@@ -1,83 +1,135 @@
-// ============ LIQUID GLASS (hyalite, MIT © 2026 VII-Cae) ============
-// Garde `typeof` obligatoire : le harnais de rendu n'exécute que le plus gros
-// Hyalite absent dans le harnais de rendu -> l'app doit tourner sans lui.
-// La réfraction coûte ~98 % du budget de frame (1695 ms avec, 23 ms sans, ici en
-// rendu logiciel) ; le NOMBRE de surfaces n'y change presque rien (3->1 : -7 %).
-(function initHyalite() {
-  if (typeof Hyalite === 'undefined') return;
-  if (!Hyalite.supported()) return;          // Chromium seulement ; sinon flou CSS
-  const LG = { slope: 1.9, dispersion: 1.6, shade: 0.5, rim: 1.8, edge: 0.4 };
-  const b = (bevel, thickness, blur) => Object.assign({ bevel, thickness, blur }, LG);
-  const CIBLES = [['.feed-panel', b(34,60,16)], ['.strat-section', b(28,50,16)]];
-  // ⚠️ `.chart-container .lg-ring` est VOLONTAIREMENT absent : hyalite rastérise la carte
-  // de déplacement sur toute la boîte de l'élément, le masque d'anneau ne réduit donc rien
-  // (mesuré : 1820 ms/frame avec hyalite sur l'anneau, 281 ms avec le flou CSS sur le même
-  // anneau, 1687 ms avec hyalite sur toute la surface). L'anneau garde le repli `blur(16px)`
-  // — 16 px de bord, sous l'arête spéculaire : la différence ne se lit pas.
-  const veilles = CIBLES.map(c => Hyalite.watch(document.body, c[0], c[1]));
-  // On retire la RÉFRACTION, pas les <svg> (tous ne sont pas à hyalite) : detach()
-  // rend la main au repli CSS, la refonte visuelle reste entière.
-  window.__sansRefraction = function (motif) {
-    veilles.forEach(w => { try { w.stop(); } catch (e) {} });
-    CIBLES.forEach(c => document.querySelectorAll(c[0]).forEach(el => {
-      try { Hyalite.detach(el); } catch (e) {}
-      el.style.removeProperty('--hyalite');
-    }));
-    document.documentElement.setAttribute('data-glass', 'degrade');
-    console.info('Réfraction désactivée : ' + motif);
-  };
-})();
-
-// ============ GARDE-FOU DE PERF (déterministe) ============
-// Médiane de plusieurs frames APRÈS stabilisation : un échantillon unique pris au
-// chargement décide au hasard. Sortie anticipée si une frame crève le seuil.
-(function perfGuard() {
-  const SEUIL = 22;   // ms — ~45 fps ; au-delà, la réfraction n'est pas tenable
-  if (!window.__sansRefraction) return;
-  const force = new URLSearchParams(location.search).get('glass');
-  if (force === 'off') { window.__sansRefraction('forcé par ?glass=off'); return; }
-  if (force === 'force' || document.documentElement.dataset.hyalite === 'force') return;
-  function sonde() {
-    return new Promise(function (res) {
-      var d = [], last = performance.now(), n = 0;
-      function step(t) {
-        var dt = t - last; last = t;
-        if (n++) d.push(dt);                        // la 1re frame est polluée
-        if (dt > SEUIL * 2.5 || d.length >= 12) {
-          d.sort(function (a, b) { return a - b; });
-          res(d[Math.floor(d.length / 2)] || dt);
-        } else requestAnimationFrame(step);
-      }
-      requestAnimationFrame(step);
-    });
-  }
-  setTimeout(function () {                          // laisser le graphe se poser
-    sonde().then(function (ms) {
-      if (ms > SEUIL) window.__sansRefraction('médiane ' + Math.round(ms) + ' ms/frame');
-      else console.info('Réfraction conservée : médiane ' + Math.round(ms) + ' ms/frame.');
-    });
-  }, 2500);
-})();
-
-// ============ THEME ============
-const themeKey = 'samsara-theme-v2';
-let dark = localStorage.getItem(themeKey) === 'dark';
-// L'icône (lune / soleil) suit la classe `dark` en CSS : rien à réécrire dans le bouton.
-function applyTheme() { document.body.classList.toggle('dark', dark); }
-function toggleTheme() {
-  dark = !dark; localStorage.setItem(themeKey, dark ? 'dark' : 'light'); applyTheme();
-  // Le graphique et les pastilles portent des couleurs PAR THÈME : on les repeint tout de suite.
-  peindrePastilles(); drawChart();
+// ============ THÈMES ============
+// Le registre, ce sont les <link data-theme-id> d'index.html : une seule source de vérité,
+// relue telle quelle par tests/test_contrat.py. Le thème courant est l'attribut data-theme
+// de <html>, posé AVANT le premier rendu par le petit script en tête de page.
+const THEME_CLE = 'samsara-theme';
+const THEMES = Array.from(document.querySelectorAll('link[data-theme-id]')).map(l => ({
+  id: l.getAttribute('data-theme-id'),
+  nom: l.getAttribute('data-nom') || l.getAttribute('data-theme-id'),
+  mode: l.getAttribute('data-mode') || 'clair',
+  verre: l.getAttribute('data-verre') || 'aucun',
+  paire: l.getAttribute('data-paire') || null
+}));
+function themeCourant() {
+  const id = document.documentElement.getAttribute('data-theme');
+  return THEMES.find(t => t.id === id) || THEMES[0] || { id: 'aero', nom: 'Aero', mode: 'clair', verre: 'aucun', paire: null };
 }
-applyTheme();
+let dark = themeCourant().mode === 'sombre';
+function appliquerTheme(id) {
+  if (!THEMES.some(t => t.id === id)) return;
+  document.documentElement.setAttribute('data-theme', id);
+  try { localStorage.setItem(THEME_CLE, id); } catch (e) {}
+  dark = themeCourant().mode === 'sombre';
+  // Tout ce qui porte une couleur PAR THÈME hors du CSS : relu une fois, ici, pas à chaque image.
+  lireJetons(); peindrePastilles(); verreDuTheme(); remplirMenuThemes();
+  drawChart();
+}
+function themeSuivant() {
+  const i = THEMES.findIndex(t => t.id === themeCourant().id);
+  appliquerTheme(THEMES[(i + 1) % THEMES.length].id);
+}
+// D : le jumeau de l'autre mode (Aero ↔ Aero nuit) ; un thème sans jumeau passe au suivant.
+function themeJumeau() { const p = themeCourant().paire; if (p) appliquerTheme(p); else themeSuivant(); }
+function remplirMenuThemes() {
+  const m = document.getElementById('themeMenu');
+  if (!m) return;
+  const cur = themeCourant().id;
+  // L'aperçu porte data-theme=<id> : il reçoit les VRAIS jetons du thème, pas une copie.
+  m.innerHTML = '<div class="cat-title">Thème · T suivant · D clair / sombre</div>' + THEMES.map(t =>
+    '<button class="theme-item" role="menuitemradio" aria-checked="' + (t.id === cur) + '" onclick="appliquerTheme(\'' + t.id + '\')">'
+    + '<span class="theme-apercu" data-theme="' + t.id + '"><i></i><i></i><i></i><i></i></span>'
+    + '<span class="theme-nom">' + escHtml(t.nom) + '</span>'
+    + '<span class="theme-mode">' + (t.mode === 'sombre' ? 'sombre' : 'clair') + '</span></button>').join('');
+}
+function ouvrirThemes(e) {
+  if (e) e.stopPropagation();
+  const m = document.getElementById('themeMenu'), b = document.getElementById('themeBtn');
+  document.getElementById('indMenu').classList.remove('open');
+  if (m.classList.contains('open')) { m.classList.remove('open'); return; }
+  remplirMenuThemes();
+  m.classList.add('open');
+  const r = b.getBoundingClientRect();
+  m.style.top = (r.bottom + 8) + 'px';
+  m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, r.right - m.offsetWidth)) + 'px';
+}
+
+// ============ VERRE (selon le thème) ============
+// data-verre du thème : aucun · givre (flou CSS, jeton --verre) · refraction (hyalite).
+// hyalite (51 Ko, code tiers) n'est chargé QUE si le thème courant le demande, et après le
+// premier dessin du graphique : il ne pèse plus sur le chargement des autres thèmes.
+// La réfraction coûte ~98 % du budget d'image en rendu logiciel (1695 ms avec, 23 sans) ;
+// le nombre de surfaces n'y change presque rien (3 → 1 : −7 %).
+const VERRE = { veilles: null, cibles: null, chargement: null, degrade: false };
+function chargerHyalite() {
+  if (typeof Hyalite !== 'undefined') return Promise.resolve(true);
+  if (!VERRE.chargement) VERRE.chargement = new Promise(res => {
+    const s = document.createElement('script');
+    s.src = 'js/vendor/hyalite.js'; s.async = true;
+    s.onload = () => res(typeof Hyalite !== 'undefined');
+    s.onerror = () => res(false);
+    document.head.appendChild(s);
+  });
+  return VERRE.chargement;
+}
+// On retire la RÉFRACTION, pas le verre : detach() rend la main au repli CSS (--verre).
+function couperRefraction(motif) {
+  if (!VERRE.veilles) return;
+  VERRE.veilles.forEach(w => { try { w.stop(); } catch (e) {} });
+  VERRE.veilles = null;
+  VERRE.cibles.forEach(c => document.querySelectorAll(c[0]).forEach(el => {
+    try { Hyalite.detach(el); } catch (e) {}
+    el.style.removeProperty('--hyalite'); el.style.removeProperty('--hyalite-edge');
+  }));
+  if (motif) console.info('Réfraction désactivée : ' + motif);
+}
+function verreDuTheme() {
+  const force = (typeof URLSearchParams !== 'undefined' && location.search)
+    ? new URLSearchParams(location.search).get('glass') : null;
+  if (themeCourant().verre !== 'refraction' || force === 'off' || VERRE.degrade) {
+    couperRefraction(force === 'off' && VERRE.veilles ? 'forcé par ?glass=off' : null);
+    return;
+  }
+  if (VERRE.veilles) return;
+  chargerHyalite().then(ok => {
+    if (!ok || !Hyalite.supported() || themeCourant().verre !== 'refraction' || VERRE.veilles) return;
+    const LG = { slope: 1.9, dispersion: 1.6, shade: 0.5, rim: 1.8, edge: 0.4 };
+    const b = (bevel, thickness, blur) => Object.assign({ bevel, thickness, blur }, LG);
+    // ⚠️ `.chart-container .lg-ring` est VOLONTAIREMENT absent : hyalite rastérise la carte de
+    // déplacement sur toute la boîte de l'élément, le masque d'anneau ne réduit rien (mesuré :
+    // 1820 ms/image avec hyalite sur l'anneau, 281 ms avec le flou CSS sur le même anneau).
+    VERRE.cibles = [['.feed-panel', b(34, 60, 16)], ['.strat-section', b(28, 50, 16)]];
+    VERRE.veilles = VERRE.cibles.map(c => Hyalite.watch(document.body, c[0], c[1]));
+    if (force !== 'force') sonderRefraction();
+  });
+}
+// Garde-fou : médiane de plusieurs images APRÈS stabilisation (un échantillon unique pris au
+// chargement décide au hasard). Au-delà de 22 ms (~45 i/s), la réfraction n'est pas tenable :
+// on la coupe pour la session, le verre CSS reste.
+function sonderRefraction() {
+  const SEUIL = 22;
+  setTimeout(() => {
+    const d = []; let last = performance.now(), n = 0;
+    (function step(t) {
+      const dt = t - last; last = t;
+      if (n++) d.push(dt);                          // la 1re image est polluée
+      if (dt > SEUIL * 2.5 || d.length >= 12) {
+        d.sort((a, c) => a - c);
+        const ms = d[Math.floor(d.length / 2)] || dt;
+        if (ms > SEUIL) { VERRE.degrade = true; couperRefraction('médiane ' + Math.round(ms) + ' ms/image'); }
+        else console.info('Réfraction conservée : médiane ' + Math.round(ms) + ' ms/image.');
+      } else requestAnimationFrame(step);
+    })(last);
+  }, 2500);
+}
 
 // ============ SHORTCUTS UX ============
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (e.key === 'f' || e.key === 'F') { toggleFeed(); e.preventDefault(); }
-  if (e.key === 'd' || e.key === 'D') { toggleTheme(); e.preventDefault(); }
+  if (e.key === 'd' || e.key === 'D') { themeJumeau(); e.preventDefault(); }
+  if (e.key === 't' || e.key === 'T') { themeSuivant(); e.preventDefault(); }
   if (e.key === 'r' || e.key === 'R') { resetView(); e.preventDefault(); }
-  if (e.key === 'Escape') { document.getElementById('indMenu').classList.remove('open'); }
+  if (e.key === 'Escape') { document.getElementById('indMenu').classList.remove('open'); document.getElementById('themeMenu').classList.remove('open'); }
   // Flèches : scroller horizontalement
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
     e.preventDefault();
@@ -227,6 +279,7 @@ function buildDropdown() {
 
 function toggleDropdown(e) {
   e.stopPropagation();
+  document.getElementById('themeMenu').classList.remove('open');
   const menu = document.getElementById('indMenu');
   const btn = document.getElementById('indDropdownBtn');
   
@@ -251,12 +304,15 @@ function toggleDropdown(e) {
   buildDropdown();
 }
 document.addEventListener('click', (e) => {
-  const menu = document.getElementById('indMenu');
-  if (!menu.contains(e.target)) menu.classList.remove('open');
+  for (const id of ['indMenu', 'themeMenu']) {
+    const menu = document.getElementById(id);
+    if (menu && !menu.contains(e.target)) menu.classList.remove('open');
+  }
 });
-// Fermer le dropdown si la fenêtre est redimensionnée
+// Fermer les menus si la fenêtre est redimensionnée
 window.addEventListener('resize', () => {
   document.getElementById('indMenu').classList.remove('open');
+  document.getElementById('themeMenu').classList.remove('open');
 });
 
 function toggleInd(key, label) {
@@ -1866,74 +1922,87 @@ function runFullBacktest() {
 }
 
 // ============ DRAWING ============
+// Valeurs de repli seulement : la palette réelle vient des jetons du thème (lireJetons).
 const COLORS = {
-  ema20: '#f0b90b', ema50: '#ff6b35', ema100: '#e91e63', ema200: '#9c27b0',
-  sma20: '#00bcd4', sma50: '#4caf50',
+  ema20: '#eda100', ema50: '#2a78d6', ema100: '#eb6834', ema200: '#4a3aa7', sma20: '#e87ba4', sma50: '#008300',
   bb_upper: '#607d8b', bb_mid: '#607d8b', bb_lower: '#607d8b',
-  vwap: '#ff9800', ichi_tenkan: '#2196f3', ichi_kijun: '#e91e63',
-  ichi_senkouA: '#4caf5022', ichi_senkouB: '#f4433622',
-  sar: '#00e5ff',
-  volume_up: '#26a69a55', volume_down: '#ef535055',
-  rsi: '#bb86fc', macd: '#f0b90b', macd_signal: '#ff6b35', macd_hist_up: '#26a69a', macd_hist_down: '#ef5350',
-  stoch_k: '#f0b90b', stoch_d: '#ff6b35', atr: '#03dac6',
-  obv: '#ff9800', mfi: '#9c27b0', williamsR: '#00bcd4', cci: '#ff5722',
-  adx: '#f0b90b', adx_plusDI: '#26a69a', adx_minusDI: '#ef5350',
-  ao_up: '#26a69a88', ao_down: '#ef535088',
-  equity_total: '#ffc107', equity_realized: '#26a69a', equity_bench: '#607d8b',
-  trade_buy: '#26a69a', trade_sell: '#ef5350',
-  grid_buy_pending: 'rgba(38,166,154,0.5)', grid_buy_filled: '#26a69a',
-  grid_tp: 'rgba(255,193,7,0.6)', grid_sl: 'rgba(239,83,80,0.5)',
-  grid: null, text: null
+  vwap: '#ff9800', ichi_tenkan: '#2196f3', ichi_kijun: '#e91e63', sar: '#00a5bd',
+  rsi: '#8e5bd8', macd: '#d79a00', macd_signal: '#ff6b35',
+  stoch_k: '#d79a00', stoch_d: '#ff6b35', atr: '#00a693',
+  obv: '#ff9800', mfi: '#9c27b0', williamsR: '#00a5bd', cci: '#ff5722', adx: '#d79a00',
+  equity_total: '#e0a800',
+  candleUp: '#0d9672', candleDown: '#e5484d',
+  grid: 'rgba(127,127,127,0.12)', text: '#45597a'
 };
-// Overlays : palette VALIDÉE au script (ordre jaune > bleu > orange > violet > magenta > vert,
-// toutes vérifications passées en clair ET en sombre, sur les fonds réels du graphique).
-// Garde trois repères d'avant : EMA20 jaune, EMA200 violet, SMA50 vert. En clair le jaune est
-// sous 3:1 : chaque ligne porte donc son étiquette en bout de tracé (et un point dans le ruban).
-const PALETTE_OVERLAYS = {
-  clair:  { ema20: '#eda100', ema50: '#2a78d6', ema100: '#eb6834', ema200: '#4a3aa7', sma20: '#e87ba4', sma50: '#008300' },
-  sombre: { ema20: '#c98500', ema50: '#3987e5', ema100: '#d95926', ema200: '#9085e9', sma20: '#d55181', sma50: '#008300' }
-};
+// Identité des overlays : chaque ligne porte son étiquette en bout de tracé (et un point dans
+// le ruban) — elle ne repose jamais sur la couleur seule. tests/test_palette.py échoue si un
+// overlay sous 3:1 sur le fond du graphique n'a pas d'étiquette ici.
 const ETIQ_OVERLAYS = { ema20: 'EMA20', ema50: 'EMA50', ema100: 'EMA100', ema200: 'EMA200', sma20: 'SMA20', sma50: 'SMA50' };
-// Une seule famille de caractères pour tout le graphique : celle de l'interface.
-const POLICE_UI = "'Segoe UI Variable Text','Segoe UI Variable',-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,'Segoe UI',Roboto,sans-serif";
+// Une seule famille de caractères pour tout le graphique : celle de l'interface (jeton --font).
+let POLICE_UI = "'Segoe UI Variable Text','Segoe UI Variable',-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,'Segoe UI',Roboto,sans-serif";
 function chartFont(px, poids) { return (poids || 500) + ' ' + px + 'px ' + POLICE_UI; }
-// Couleurs du thème courant -> COLORS. Lu à chaque frame : un changement de thème est immédiat.
-function couleursTheme() {
-  const cs = getComputedStyle(document.body);
-  const v = n => cs.getPropertyValue(n).trim();
-  Object.assign(COLORS, PALETTE_OVERLAYS[dark ? 'sombre' : 'clair']);
-  const up = v('--up') || '#0f9d7a', down = v('--down') || '#e5484d';
+// Même teinte, autre opacité : « #rrggbb » ou « rgb(a)(…) » → rgba. Sinon, inchangée.
+function avecAlpha(c, a) {
+  const h = /^#([0-9a-f]{6})$/i.exec(c || '');
+  if (h) { const n = parseInt(h[1], 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; }
+  const m = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(c || '');
+  return m ? 'rgba(' + m[1] + ',' + m[2] + ',' + m[3] + ',' + a + ')' : c;
+}
+// Jetons du thème → COLORS. Lu au chargement et à chaque changement de thème — JAMAIS par image :
+// un getComputedStyle par image de glissement forçait un recalcul de style 60 fois par seconde.
+function lireJetons() {
+  const cs = getComputedStyle(document.documentElement);
+  const v = (n, d) => ((cs.getPropertyValue(n) || '') + '').trim() || d;
+  const num = (n, d) => { const x = parseFloat(v(n, '')); return isFinite(x) ? x : d; };
+  for (const k of ['ema20', 'ema50', 'ema100', 'ema200', 'sma20', 'sma50']) COLORS[k] = v('--ov-' + k, COLORS[k]);
+  COLORS.bb_upper = COLORS.bb_mid = COLORS.bb_lower = v('--ov-bb', COLORS.bb_mid);
+  COLORS.vwap = v('--ov-vwap', COLORS.vwap); COLORS.sar = v('--ov-sar', COLORS.sar);
+  COLORS.ichi_tenkan = v('--ov-ichi-t', COLORS.ichi_tenkan); COLORS.ichi_kijun = v('--ov-ichi-k', COLORS.ichi_kijun);
+  const S = { rsi: 'rsi', macd: 'macd', macd_signal: 'signal', stoch_k: 'stoch-k', stoch_d: 'stoch-d', atr: 'atr',
+              obv: 'obv', mfi: 'mfi', williamsR: 'wr', cci: 'cci', adx: 'adx', equity_total: 'equity' };
+  for (const [k, j] of Object.entries(S)) COLORS[k] = v('--s-' + j, COLORS[k]);
+  const up = v('--up', COLORS.candleUp), down = v('--down', COLORS.candleDown);
   COLORS.candleUp = up; COLORS.candleDown = down;
-  COLORS.macd_hist_up = COLORS.adx_plusDI = COLORS.trade_buy = COLORS.grid_buy_filled = COLORS.equity_realized = up;
-  COLORS.macd_hist_down = COLORS.adx_minusDI = COLORS.trade_sell = down;
-  COLORS.ao_up = up + '88'; COLORS.ao_down = down + '88';
-  COLORS.ink1 = v('--ink-1') || '#10233d';
-  COLORS.ink3 = v('--ink-3') || '#5f6e8c';
-  COLORS.upInk = v('--up-ink') || up; COLORS.downInk = v('--down-ink') || down;
-  COLORS.accent2 = v('--accent-2') || '#4f5fe0';
-  COLORS.surface = dark ? '#121a30' : '#f4f6fe';
-  COLORS.grid = dark ? 'rgba(170,190,255,0.07)' : 'rgba(36,56,110,0.08)';
-  COLORS.text = v('--ink-2') || COLORS.text;
+  COLORS.adx_plusDI = COLORS.trade_buy = COLORS.grid_buy_filled = COLORS.equity_realized = up;
+  COLORS.adx_minusDI = COLORS.trade_sell = down;
+  COLORS.grid_buy_pending = avecAlpha(up, 0.5); COLORS.grid_sl = avecAlpha(down, 0.5);
+  COLORS.ink1 = v('--ink-1', '#10233d'); COLORS.text = v('--ink-2', '#45597a'); COLORS.ink3 = v('--ink-3', '#5f6e8c');
   COLORS.axis = COLORS.text;
+  COLORS.upInk = v('--up-ink', up); COLORS.downInk = v('--down-ink', down);
+  COLORS.accent2 = v('--accent-2', '#4f5fe0');
+  COLORS.surface = v('--chart-surface', '#f4f6fe');
+  COLORS.grid = v('--grille', COLORS.grid);
+  COLORS.hairline = v('--hairline', 'rgba(127,127,127,0.18)');
+  COLORS.reticule = v('--reticule', 'rgba(127,127,127,0.4)');
+  COLORS.bulle = v('--bulle', 'rgba(255,255,255,0.94)');
+  COLORS.warn = v('--warn', '#f0a50b');
+  COLORS.sess = [v('--sess-asie', 'rgba(255,152,0,0.75)'), v('--sess-europe', 'rgba(33,150,243,0.75)'), v('--sess-us', 'rgba(156,39,176,0.75)')];
+  COLORS.sr = [v('--sr-1', '#ce93d8'), v('--sr-2', '#26c6da'), v('--sr-3', '#ffc107')];
+  COLORS.fib = v('--fib', '#f0a50b'); COLORS.vp = v('--vp', '#64b4ff'); COLORS.vpPoc = v('--vp-poc', '#ffc828');
+  COLORS.grid_tp = avecAlpha(COLORS.sr[2], 0.6);
+  COLORS.filigrane = num('--filigrane', 0.05);
+  COLORS.volAlpha = num('--vol-alpha', 0.55);
+  COLORS.bandeAlpha = num('--bande-alpha', 0.08);
+  COLORS.aura = num('--aura', 0);
+  POLICE_UI = v('--font', POLICE_UI);
 }
 // Légende dans le ruban : chaque pastille d'overlay porte le point de la couleur de sa ligne.
 const PASTILLES = { ema20: 'ema20', ema50: 'ema50', ema100: 'ema100', ema200: 'ema200', sma20: 'sma20', sma50: 'sma50',
                     bb: 'bb_mid', rsi: 'rsi', macd: 'macd', stoch: 'stoch_k', atr: 'atr' };
 function peindrePastilles() {
-  Object.assign(COLORS, PALETTE_OVERLAYS[dark ? 'sombre' : 'clair']);
   for (const [id, k] of Object.entries(PASTILLES)) {
     const el = document.getElementById('lbl_' + id);
     if (el && el.style && el.style.setProperty && COLORS[k]) el.style.setProperty('--dot', COLORS[k]);
   }
 }
+let jetonsLus = false;
 
 function drawChart() {
   scaleSeq++;   // une frame = un calcul d'échelle : invalide le cache de priceWindow()
   const W = canvas.width / window.devicePixelRatio;
   const H = canvas.height / window.devicePixelRatio;
-  // Palette du graphique ALIGNÉE sur les jetons du thème (hausse / baisse validées, encre,
-  // grille) : plus aucune teinte TradingView en dur qui jure avec l'interface.
-  couleursTheme();
+  // Palette : jetons du thème, lus UNE fois (lireJetons) — pas un getComputedStyle par image.
+  if (!jetonsLus) { lireJetons(); jetonsLus = true; }
   
   ctx.clearRect(0, 0, W, H);
   if (candles.length < 2) return;
@@ -1947,7 +2016,7 @@ function drawChart() {
   
   // Filigrane : paire + intervalle, graisse fine, espacé — une signature, pas un tampon.
   ctx.save();
-  ctx.globalAlpha = dark ? 0.05 : 0.045;
+  ctx.globalAlpha = COLORS.filigrane;
   ctx.fillStyle = COLORS.ink1;
   // Taille bridée au tracé disponible : à 64 px fixes le filigrane débordait du graphe
   // sur téléphone et se faisait rogner par le bord gauche.
@@ -1999,7 +2068,7 @@ function drawChart() {
   // --- Crosshair ---
   if (crossX !== null && crossY !== null && crossY < mainH) {
     // Vertical line
-    ctx.strokeStyle = dark ? 'rgba(232,237,255,0.30)' : 'rgba(16,35,61,0.28)';
+    ctx.strokeStyle = COLORS.reticule;
     ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
     ctx.beginPath(); ctx.moveTo(crossX, 0); ctx.lineTo(crossX, mainH); ctx.stroke();
     
@@ -2041,7 +2110,7 @@ function drawChart() {
       const tY = Math.max(30, Math.min(mainH - 85, crossY - 65));
       
       ctx.save();
-      ctx.fillStyle = dark ? 'rgba(18,26,48,0.94)' : 'rgba(255,255,255,0.94)';
+      ctx.fillStyle = COLORS.bulle;
       ctx.shadowColor = 'rgba(16,35,61,0.18)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 4;
       ctx.beginPath(); ctx.roundRect(tX, tY, 135, 72, 10); ctx.fill();
       ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
@@ -2070,7 +2139,7 @@ function drawChart() {
     if (cIdx >= 0 && cIdx < vis3.length) {
       const realIdx = vs3 + cIdx;
       // Ligne verticale à travers tous les sous-graphes
-      ctx.strokeStyle = dark ? '#ffffff20' : '#00000020';
+      ctx.strokeStyle = COLORS.reticule;
       ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.moveTo(crossX, mainH + 2); ctx.lineTo(crossX, H); ctx.stroke();
 
@@ -2085,7 +2154,7 @@ function drawChart() {
           const tw = ctx.measureText(txt).width + 12;
           const tx = W - 75 + (75 - tw)/2;
           const ty = sY + 4;
-          ctx.fillStyle = dark ? 'rgba(22,27,34,0.9)' : 'rgba(246,248,250,0.9)';
+          ctx.fillStyle = COLORS.bulle;
           ctx.strokeStyle = subColor(key); ctx.lineWidth = 0.8;
           ctx.beginPath(); ctx.roundRect(tx, ty, tw, 15, 3); ctx.fill(); ctx.stroke();
           ctx.fillStyle = COLORS.text; ctx.font = chartFont(9);
@@ -2111,8 +2180,8 @@ function drawRangeSelector(candles, W, H) {
   if (rsw < 20 || candles.length < 2) return;
   
   // Fond
-  ctx.fillStyle = dark ? 'rgba(10,20,40,0.7)' : 'rgba(240,248,255,0.7)';
-  ctx.strokeStyle = dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+  ctx.fillStyle = avecAlpha(COLORS.surface, 0.7);
+  ctx.strokeStyle = COLORS.hairline;
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.roundRect(padL, rsY + 2, rsw, RS_HEIGHT - 6, 5); ctx.fill(); ctx.stroke();
   
@@ -2151,17 +2220,17 @@ function drawRangeSelector(candles, W, H) {
   const vrX = Math.max(padL, vx1), vrW = Math.max(12, Math.min(rsw - (vrX - padL), vx2 - vrX));
   
   // Ombre du viewport
-  ctx.fillStyle = dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
+  ctx.fillStyle = avecAlpha(COLORS.ink1, 0.1);
   ctx.fillRect(vrX, rsY + 2, vrW, RS_HEIGHT - 6);
   
   // Bordure viewport
-  ctx.strokeStyle = dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)';
+  ctx.strokeStyle = avecAlpha(COLORS.ink1, 0.45);
   ctx.lineWidth = 1.5;
   ctx.strokeRect(vrX, rsY + 2, vrW, RS_HEIGHT - 6);
   
   // Poignées gauche/droite
   const handleW = 4;
-  ctx.fillStyle = dark ? '#ffffff' : '#000000';
+  ctx.fillStyle = COLORS.ink1;
   ctx.fillRect(vrX - 1, rsY + 4, handleW, RS_HEIGHT - 14);
   ctx.fillRect(vrX + vrW - 3, rsY + 4, handleW, RS_HEIGHT - 14);
   
@@ -2175,14 +2244,14 @@ function drawRangeSelector(candles, W, H) {
   
   // Légende sessions — fond opaque, droite du RS
   const sesColors = [
-    { label: 'Asie', color: '#ff9800', hours: '00-09' },
-    { label: 'Europe', color: '#2196f3', hours: '07-16' },
-    { label: 'US', color: '#9c27b0', hours: '13-21' }
+    { label: 'Asie', color: COLORS.sess[0], hours: '00-09' },
+    { label: 'Europe', color: COLORS.sess[1], hours: '07-16' },
+    { label: 'US', color: COLORS.sess[2], hours: '13-21' }
   ];
   const legW = 130, legH = 14;
   const legX = W - padR - legW - 2, legY = rsY + 4;
-  ctx.fillStyle = dark ? 'rgba(15,25,45,0.85)' : 'rgba(255,255,255,0.85)';
-  ctx.strokeStyle = dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
+  ctx.fillStyle = COLORS.bulle;
+  ctx.strokeStyle = COLORS.hairline;
   ctx.lineWidth = 0.5;
   ctx.beginPath(); ctx.roundRect(legX, legY, legW, legH, 3); ctx.fill(); ctx.stroke();
   ctx.font = chartFont(7, 650);
@@ -2190,7 +2259,7 @@ function drawRangeSelector(candles, W, H) {
     const sx = legX + 4 + i * 42;
     ctx.fillStyle = s.color;
     ctx.fillRect(sx, legY + 2, 9, 10);
-    ctx.fillStyle = dark ? '#ddd' : '#222';
+    ctx.fillStyle = COLORS.ink1;
     ctx.fillText(s.label, sx + 11, legY + 11);
   });
 }
@@ -2256,9 +2325,9 @@ function resolveChart(candles, padL, padR, chartH, W) {
   
   // Sessions (UTC) : voile imperceptible + BANDEAU FIN de 6 px (règle temporelle).
   const sessionDefs = [
-    { start: 0, end: 9, veil: 'rgba(255,152,0,0.013)', bar: 'rgba(255,152,0,0.75)', label: 'Asie' },
-    { start: 7, end: 16, veil: 'rgba(33,150,243,0.013)', bar: 'rgba(33,150,243,0.75)', label: 'Europe' },
-    { start: 13, end: 21, veil: 'rgba(156,39,176,0.013)', bar: 'rgba(156,39,176,0.75)', label: 'US' }
+    { start: 0, end: 9, veil: avecAlpha(COLORS.sess[0], 0.013), bar: COLORS.sess[0], label: 'Asie' },
+    { start: 7, end: 16, veil: avecAlpha(COLORS.sess[1], 0.013), bar: COLORS.sess[1], label: 'Europe' },
+    { start: 13, end: 21, veil: avecAlpha(COLORS.sess[2], 0.013), bar: COLORS.sess[2], label: 'US' }
   ];
   const SESS_H = 6;  // hauteur du bandeau, en px
   for (const s of sessionDefs) {
@@ -2340,7 +2409,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
     drawLine(bb.lower, minP, range, pad, gap, ph, COLORS.bb_lower, [3, 3], 1, vs);
     // Fill between
     ctx.save(); ctx.globalAlpha = 0.08;
-    ctx.fillStyle = '#607d8b'; ctx.beginPath();
+    ctx.fillStyle = COLORS.bb_mid; ctx.beginPath();
     let started = false;
     for (let i = vs; i < ve; i++) {
       if (i >= bb.upper.length || bb.upper[i] === null) continue;
@@ -2425,9 +2494,9 @@ function resolveChart(candles, padL, padR, chartH, W) {
     const levels = getMultiTFLevels();
     // Tier → style visuel
     const styles = [
-      { name: 'Mineur', color: '#ce93d8', bg: 'rgba(206,147,216,0.10)', dash: [4, 5], width: 1 },
-      { name: 'Interm.', color: '#26c6da', bg: 'rgba(38,198,218,0.12)', dash: [10, 5], width: 1.8 },
-      { name: 'Majeur',  color: '#ffc107', bg: 'rgba(255,193,7,0.16)',   dash: [],       width: 2.5 }
+      { name: 'Mineur', color: COLORS.sr[0], bg: avecAlpha(COLORS.sr[0], 0.10), dash: [4, 5], width: 1 },
+      { name: 'Interm.', color: COLORS.sr[1], bg: avecAlpha(COLORS.sr[1], 0.12), dash: [10, 5], width: 1.8 },
+      { name: 'Majeur',  color: COLORS.sr[2], bg: avecAlpha(COLORS.sr[2], 0.16), dash: [],       width: 2.5 }
     ];
     
     for (const lvl of levels.slice(0, 6)) {
@@ -2452,20 +2521,21 @@ function resolveChart(candles, padL, padR, chartH, W) {
       // Badge droite — fond opaque coloré
       const priceStr = '$' + lvl.price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
       const badgeText = priceStr + ' ·' + lvl.tf;
-      ctx.font = (lvl.tier >= 2 ? 'bold ' : '') + '9px ' + getComputedStyle(document.body).fontFamily;
+      ctx.font = chartFont(9, lvl.tier >= 2 ? 700 : 500);
       const tw = ctx.measureText(badgeText).width + 14;
       const bx = W - pad.right - tw - 4, by = y - 10;
       
       // Fond badge
-      ctx.fillStyle = dark 
-        ? (lvl.tier >= 2 ? 'rgba(255,193,7,0.22)' : lvl.tier >= 1 ? 'rgba(38,198,218,0.18)' : 'rgba(206,147,216,0.14)')
-        : (lvl.tier >= 2 ? 'rgba(255,193,7,0.28)' : lvl.tier >= 1 ? 'rgba(38,198,218,0.22)' : 'rgba(206,147,216,0.18)');
+      // Fond opaque (la bulle du thème) puis la teinte du niveau : lisible sur les bougies.
+      ctx.fillStyle = COLORS.bulle;
+      ctx.beginPath(); ctx.roundRect(bx, by, tw, 20, 5); ctx.fill();
+      ctx.fillStyle = avecAlpha(s.color, lvl.tier >= 2 ? 0.24 : 0.18);
       ctx.strokeStyle = s.color;
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.roundRect(bx, by, tw, 20, 5); ctx.fill(); ctx.stroke();
       
       // Texte badge
-      ctx.fillStyle = dark ? '#fff' : '#111';
+      ctx.fillStyle = COLORS.ink1;
       ctx.fillText(badgeText, bx + 7, by + 14);
       
       // Prix à gauche aussi pour les majeurs
@@ -2500,11 +2570,11 @@ function resolveChart(candles, padL, padR, chartH, W) {
       const price = isUpTrend ? fibHigh - fibRange * lvl : fibLow + fibRange * lvl;
       if (price < minP - range * 0.1 || price > maxP + range * 0.1) continue;
       const y = pad.top + ph * (1 - (price - minP) / range);
-      ctx.strokeStyle = 'rgba(255,193,7,0.5)';
+      ctx.strokeStyle = avecAlpha(COLORS.fib, 0.5);
       ctx.lineWidth = 1; ctx.setLineDash([4, 6]);
       ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(255,193,7,0.9)'; ctx.font = chartFont(8);
+      ctx.fillStyle = avecAlpha(COLORS.fib, 0.9); ctx.font = chartFont(8);
       const label = (lvl * 100).toFixed(1) + '% $' + price.toFixed(2);
       const lw = ctx.measureText(label).width;
       ctx.fillText(label, W - pad.right - lw - 4, y - 3);
@@ -2538,19 +2608,19 @@ function resolveChart(candles, padL, padR, chartH, W) {
       if (profile[b] === 0) continue;
       const t = profile[b] / maxVol;
       const w = t * vpMaxW;
-      ctx.fillStyle = (b === pocBin) ? 'rgba(255,200,40,0.9)'
-        : (b >= vaLo && b <= vaHi) ? `rgba(100,180,255,${0.25 + 0.5 * t})`
-        : `rgba(100,180,255,${0.12 + 0.2 * t})`;
+      ctx.fillStyle = (b === pocBin) ? avecAlpha(COLORS.vpPoc, 0.9)
+        : (b >= vaLo && b <= vaHi) ? avecAlpha(COLORS.vp, 0.25 + 0.5 * t)
+        : avecAlpha(COLORS.vp, 0.12 + 0.2 * t);
       ctx.fillRect(W - pad.right + 2, pad.top + ph - (b + 1) * (ph / bins), w, Math.max(1, ph / bins - 1));
     }
-    ctx.strokeStyle = 'rgba(255,200,40,0.8)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = avecAlpha(COLORS.vpPoc, 0.8); ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(W - pad.right - 2, yOf(pocBin)); ctx.lineTo(W - pad.right + 2 + vpMaxW + 6, yOf(pocBin)); ctx.stroke();
-    ctx.strokeStyle = 'rgba(100,180,255,0.45)'; ctx.setLineDash([2, 2]);
+    ctx.strokeStyle = avecAlpha(COLORS.vp, 0.45); ctx.setLineDash([2, 2]);
     for (const b of [vaLo, vaHi]) {
       ctx.beginPath(); ctx.moveTo(W - pad.right - 2, yOf(b)); ctx.lineTo(W - pad.right + 2 + vpMaxW + 6, yOf(b)); ctx.stroke();
     }
     ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = chartFont(8);
+    ctx.fillStyle = COLORS.ink1; ctx.font = chartFont(8);
     ctx.fillText('POC $' + (minP + (pocBin + 0.5) * binH).toFixed(0), W - pad.right + 4, pad.top + 9);
   }
 
@@ -2772,7 +2842,7 @@ function drawLine(data, minP, range, pad, gap, ph, color, dash, width, dataOffse
       // dernière bougie recouvrait l'étiquette).
       etiquettesAFaire.push(() => {
         ctx.font = chartFont(9, 650);
-        ctx.fillStyle = dark ? 'rgba(18,26,48,0.9)' : 'rgba(255,255,255,0.92)';
+        ctx.fillStyle = COLORS.bulle;
         ctx.beginPath(); ctx.roundRect(ex, ey, w, 16, 8); ctx.fill();
         ctx.fillStyle = color; ctx.beginPath(); ctx.arc(ex + 7, ey + 8, 3, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = COLORS.ink1; ctx.fillText(etiquette, ex + 12, ey + 11.5);
@@ -2805,7 +2875,7 @@ function resolveSub(candles, y0, subH, W, key) {
   if (ph < 20) return;
   
   // Séparateur supérieur : un filet, pas un trait
-  ctx.strokeStyle = dark ? 'rgba(170,190,255,0.14)' : 'rgba(36,56,110,0.14)'; ctx.lineWidth = 1;
+  ctx.strokeStyle = COLORS.hairline; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(pad.left, y0 + 0.5); ctx.lineTo(W - pad.right, y0 + 0.5); ctx.stroke();
   
   // Titre du sous-graphe : point de sa couleur + intitulé à l'encre (le texte ne porte pas la couleur de la donnée)
@@ -2838,7 +2908,7 @@ function resolveSub(candles, y0, subH, W, key) {
       // L'alpha 0x44 (27 %) rendait le volume quasi invisible sur le fond clair :
       // le volume est une DONNÉE, il se lit au même titre que les bougies.
       ctx.fillStyle = c.close >= c.open ? COLORS.candleUp : COLORS.candleDown;
-      ctx.globalAlpha = dark ? 0.68 : 0.5;
+      ctx.globalAlpha = COLORS.volAlpha;
       if (barW >= 4 && h >= 3) { ctx.beginPath(); ctx.roundRect(x + gap*0.15, y, barW, h, [Math.min(2, barW / 4), Math.min(2, barW / 4), 0, 0]); ctx.fill(); }
       else ctx.fillRect(x + gap*0.15, y, barW, h);
       ctx.globalAlpha = 1;
@@ -2847,7 +2917,7 @@ function resolveSub(candles, y0, subH, W, key) {
     const closes = candles.map(c => c.close);
     const rsi = memoized('sub_rsi', calcRSI, closes, 14);
     // Bande 30-70 teintée : la zone « normale » se lit d'un coup d'œil, les sorties ressortent.
-    ctx.save(); ctx.globalAlpha = dark ? 0.10 : 0.07; ctx.fillStyle = COLORS.rsi;
+    ctx.save(); ctx.globalAlpha = COLORS.bandeAlpha; ctx.fillStyle = COLORS.rsi;
     ctx.fillRect(pad.left, y0 + pad.top + ph * 0.3, pw, ph * 0.4); ctx.restore();
     subGrid(y0, pad, ph, W, { levels: [30, 50, 70] });
     // RSI line
@@ -2877,7 +2947,7 @@ function resolveSub(candles, y0, subH, W, key) {
       if (i >= macd.histogram.length || macd.histogram[i] === null) continue;
       const x = pad.left + gap * (i - vs);
       const h = macd.histogram[i] * scale;
-      ctx.fillStyle = macd.histogram[i] >= 0 ? '#26a69a88' : '#ef535088';
+      ctx.fillStyle = avecAlpha(macd.histogram[i] >= 0 ? COLORS.candleUp : COLORS.candleDown, 0.55);
       ctx.fillRect(x + gap*0.2, Math.min(midY, midY - h), barW, Math.abs(h));
     }
     // MACD line
@@ -2939,7 +3009,7 @@ function resolveSub(candles, y0, subH, W, key) {
       if (ao[i] === null) continue;
       const x = pad.left + gap * (i - vs);
       const h = ao[i] * scale;
-      ctx.fillStyle = ao[i] >= 0 ? COLORS.ao_up : COLORS.ao_down;
+      ctx.fillStyle = avecAlpha(ao[i] >= 0 ? COLORS.candleUp : COLORS.candleDown, 0.55);
       ctx.fillRect(x + gap*0.2, Math.min(midY, midY - h), barW, Math.abs(h));
     }
   } else if (key === 'equity') {
@@ -2961,7 +3031,7 @@ function resolveSub(candles, y0, subH, W, key) {
     subGrid(y0, pad, ph, W, { levels: [minEq, minEq + rangeEq / 2, maxEq], min: minEq, max: maxEq, f: eqFmt });
     // Capital baseline
     const capY = y0 + pad.top + ph * (1 - (startCap - minEq) / rangeEq);
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 0.5;
+    ctx.strokeStyle = avecAlpha(COLORS.ink3, 0.5); ctx.lineWidth = 0.5;
     ctx.setLineDash([3, 6]);
     ctx.beginPath(); ctx.moveTo(pad.left, capY); ctx.lineTo(W - pad.right, capY); ctx.stroke();
     ctx.setLineDash([]);
@@ -3046,8 +3116,8 @@ function subLabel(key) {
   return map[key] || key;
 }
 function subColor(key) {
-  const map = { vol:'#8b949e', rsi:COLORS.rsi, macd:COLORS.macd, stoch:COLORS.stoch_k, atr:COLORS.atr, obv:COLORS.obv, mfi:COLORS.mfi, williamsR:COLORS.williamsR, cci:COLORS.cci, adx:COLORS.adx, ao:COLORS.ao_up, equity:COLORS.equity_total };
-  return map[key] || '#8b949e';
+  const map = { vol:COLORS.ink3, rsi:COLORS.rsi, macd:COLORS.macd, stoch:COLORS.stoch_k, atr:COLORS.atr, obv:COLORS.obv, mfi:COLORS.mfi, williamsR:COLORS.williamsR, cci:COLORS.cci, adx:COLORS.adx, ao:COLORS.candleUp, equity:COLORS.equity_total };
+  return map[key] || COLORS.ink3;
 }
 function getSubIndicatorValue(key, idx) {
   const c = candles;
@@ -3088,12 +3158,14 @@ async function fetchMarket() {
     const etat = ageMin === null ? 'inconnu'
                : ageMin > 32 ? 'fige'
                : ageMin > 20 ? 'retard' : 'ok';
-    const teinte = { ok: 'var(--green)', retard: '#f0b90b', fige: 'var(--red)',
-                     inconnu: 'var(--text2)' }[etat];
+    const teinte = { ok: 'var(--up)', retard: 'var(--warn)', fige: 'var(--down)',
+                     inconnu: 'var(--ink-3)' }[etat];
     const dot = document.getElementById('dot');
     if (dot) {
       dot.style.background = teinte;
       dot.classList.toggle('calme', etat !== 'ok');        // ne pas onduler sur du figé
+      // Une onde par publication reçue (deux passages), puis le calme : pas d'animation infinie.
+      if (etat === 'ok') { dot.classList.remove('ping'); void dot.offsetWidth; dot.classList.add('ping'); }
       dot.title = ageMin === null
         ? 'Âge de la donnée inconnu (champ updated absent)'
         : `Dernière publication il y a ${Math.round(ageMin)} min`;
@@ -3101,9 +3173,9 @@ async function fetchMarket() {
     const td = document.getElementById('taskbarDot');
     if (td) td.style.background = teinte;
   } catch(e) {
-    document.getElementById('dot').style.background = 'var(--red)';
+    document.getElementById('dot').style.background = 'var(--down)';
     const td = document.getElementById('taskbarDot');
-    if (td) td.style.background = 'var(--red)';
+    if (td) td.style.background = 'var(--down)';
     const feed = document.getElementById('feed');
     feed.innerHTML = '<div class="error">⚠️ ' + e.message + '</div>';
   }
@@ -3233,7 +3305,7 @@ async function renderLive() {
     + '</b></div>' + liveBar(rank)
     + '<div style="margin-top:5px;font-size:12px">Position dans le range : <b>' + rank.toFixed(1) + ' %</b>'
     + ' · amplitude <b>' + fmtNum((hi / lo - 1) * 100) + ' %</b></div>'
-    + '<div style="margin-top:5px;font-size:11px;color:var(--text2)">Volume 24 h <b>' + fmtBig(parseFloat(t24.quoteVolume))
+    + '<div style="margin-top:5px;font-size:11px;color:var(--ink-2)">Volume 24 h <b>' + fmtBig(parseFloat(t24.quoteVolume))
     + '</b> · ' + parseInt(t24.count, 10).toLocaleString('fr-FR') + ' trades</div>');
 
   // 3 — CARNET LIVE ±1 %
@@ -3245,7 +3317,7 @@ async function renderLive() {
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">Bids <b>' + fmtNum(bv, 1) + ' BTC</b> · Asks <b>' + fmtNum(av, 1) + ' BTC</b></div>'
     + '<div style="margin-top:6px;font-size:15px;font-weight:800" class="' + (ratio >= 1 ? pos : neg) + '">Ratio bid/ask '
     + (isFinite(ratio) ? ratio.toFixed(2) : '—') + '</div>'
-    + '<div style="margin-top:4px;font-size:11px;color:var(--text2)">' + carnetTxt
+    + '<div style="margin-top:4px;font-size:11px;color:var(--ink-2)">' + carnetTxt
     + ' — un carnet est PÉRISSABLE : valable quelques minutes, et un mur peut être retiré</div>');
 
   // 4 — TAPE LIVE
@@ -3268,14 +3340,14 @@ async function renderLive() {
     // ce perp (daté) au spot LIVE fabriquait un basis de −207 pts au lieu de −45. C'est
     // exactement le péché que ce panneau est censé rendre impossible.
     + ' · basis <b>' + (isNum(mi.mark_price) && isNum(bf.price) ? (mi.mark_price - bf.price).toFixed(1) + ' pts' : '—') + '</b>'
-    + ' <span style="color:var(--text2)">(perp et spot du même instant du fichier)</span><br>'
+    + ' <span style="color:var(--ink-2)">(perp et spot du même instant du fichier)</span><br>'
     + 'Dérive du spot depuis la publication <b>' + (isNum(bf.price) ? (px - bf.price).toFixed(1) + ' pts' : '—') + '</b>'
     + ' · funding <b>' + (isNum(mi.funding_rate_pct) ? fmtNum(mi.funding_rate_pct, 5) + ' %/8h' : '—') + '</b>'
     + ' · annualisé <b>' + (isNum(mi.funding_annual_pct) ? fmtNum(mi.funding_annual_pct, 1) + ' %' : '—') + '</b><br>'
     + 'OI <b>' + (isNum(mi.oi_btc) ? fmtNum(mi.oi_btc, 0) + ' BTC' : '—') + '</b>'
     + ' · L/S retail <b>' + (isNum(mi.ls_ratio) ? fmtNum(mi.ls_ratio, 3) : '—') + '</b>'
     + ' · variation 24 h (fichier) <b>' + (isNum(bf.change_24h_pct) ? fmtNum(bf.change_24h_pct) + ' %' : '—') + '</b></div>'
-    + '<div style="margin-top:8px;font-size:11px;color:var(--text2);line-height:1.45">'
+    + '<div style="margin-top:8px;font-size:11px;color:var(--ink-2);line-height:1.45">'
     + '<b>Piège mesuré le 02/10 :</b> soustraire le perp du fichier au spot live affichait un basis de '
     + '<b>−207 pts</b> quand le vrai basis valait <b>−45 pts</b>. Deux cadences différentes ne se soustraient '
     + 'jamais — c&#39;est l&#39;erreur exacte que ce panneau existe pour éviter.<br><br>'
@@ -3679,7 +3751,7 @@ function buildStratParamUI() {
     // `hint` explique le « 0 = auto » (défini par gridParams) : sans lui, un champ grisé
     // « Auto » ne dit pas QUELLE borne la stratégie va choisir.
     html += '<label title="' + (def.hint || def.label || k) + '">' + (def.label || k) + (def.advanced ? ' *' : '') + '</label>';
-    html += '<input type="number" id="sp_' + k + '" value="' + (isAutoField ? '' : val) + '" min="' + def.min + '" max="' + def.max + '" step="' + (def.step || 1) + '" onchange="onStratParamChange()" style="flex:1;width:60px;padding:4px 6px;font-size:11px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font)" class="' + autoClass + '"' + placeholder + '>';
+    html += '<input type="number" id="sp_' + k + '" value="' + (isAutoField ? '' : val) + '" min="' + def.min + '" max="' + def.max + '" step="' + (def.step || 1) + '" onchange="onStratParamChange()" style="width:60px" class="' + autoClass + '"' + placeholder + '>';
     html += '</div>';
   }
   container.innerHTML = html;
@@ -3948,7 +4020,7 @@ function showWalkForward() {
   }
 
   html += '<div style="margin-top:6px"><b>Degradation Ratio:</b> <span class="' + (wf.degradationRatio >= 0.7 ? 'stat-pos' : 'stat-neg') + '">' + wf.degradationRatio.toFixed(3) + '</span></div>';
-  html += '<div style="font-size:10px;color:var(--text2)">' + wf.interpretation + '</div>';
+  html += '<div style="font-size:10px;color:var(--ink-2)">' + wf.interpretation + '</div>';
 
   // Sensitivity
   if (wf.sensitivity && wf.sensitivity.length > 0) {
@@ -3961,6 +4033,7 @@ function showWalkForward() {
   div.innerHTML = html;
 }
 async function init() {
+  lireJetons(); jetonsLus = true;
   peindrePastilles();
   resizeCanvas();
   await fetchPrice();
@@ -3968,6 +4041,7 @@ async function init() {
   viewStart = Math.max(0, candles.length - 50);
   viewEnd = candles.length;
   drawChart();
+  verreDuTheme();          // hyalite n'arrive qu'APRÈS le premier dessin, et seulement si le thème le veut
   await fetchMarket();
   // Pre-fetch des TF de reference S/R : no-op si l'overlay est eteint, c'est le toggle qui declenche.
   await refreshRefSR();

@@ -1,0 +1,114 @@
+/* Thème « Aero nuit » — le même verre liquide, de nuit.
+   Déclaré dans index.html : <link data-theme="aero-nuit" data-mode="sombre" data-verre="refraction">. */
+[data-theme="aero-nuit"] {
+  color-scheme: dark;
+
+  --fond:
+    radial-gradient(42% 36% at 90% 4%,  rgba(34,190,230,0.22) 0%, rgba(34,190,230,0) 68%),
+    radial-gradient(70% 56% at 10% 4%,  rgba(108,76,232,0.42) 0%, rgba(108,76,232,0) 64%),
+    radial-gradient(82% 62% at 80% 100%, rgba(176,70,200,0.30) 0%, rgba(176,70,200,0) 66%),
+    radial-gradient(50% 40% at 18% 96%, rgba(40,110,230,0.26) 0%, rgba(40,110,230,0) 62%),
+    linear-gradient(160deg, #06081a 0%, #0b0f2e 32%, #111743 60%, #182059 100%);
+  --trame:
+    linear-gradient(to right, rgba(150,220,255,0.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(150,220,255,0.16) 1px, transparent 1px),
+    linear-gradient(to right, rgba(0,180,240,0.13) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0,180,240,0.13) 1px, transparent 1px);
+  --trame-opacite: 0.6;
+  --grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  --verre: blur(16px) saturate(1.9);
+  --surface: rgba(16,22,50,0.62);
+  --surface-reflet:
+    linear-gradient(135deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.34) 30%, rgba(255,255,255,0.62) 62%, rgba(255,255,255,0) 100%),
+    linear-gradient(315deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.26) 38%, rgba(255,255,255,0) 72%);
+  --capsule: rgba(26,42,62,0.78);
+  --capsule-hover: rgba(38,58,86,0.86);
+  --capsule-ombre:
+    0 6px 18px rgba(5,28,52,0.24), 0 1px 4px rgba(5,28,52,0.16),
+    0 1px 0 rgba(255,255,255,0.85) inset, 0 0 0 0.5px rgba(255,255,255,0.55) inset,
+    0 1px 3px rgba(255,255,255,0.30) inset, 0 -1px 2px rgba(255,255,255,0.28) inset,
+    0 1px 4px rgba(0,0,0,0.30) inset;
+  --pill: rgba(255,255,255,0.06);
+  --pill-hover: rgba(255,255,255,0.22);
+  --dot-anneau: rgba(10,14,36,0.7);
+  --poignee: rgba(255,255,255,0.03);
+  --poignee-hover: rgba(255,255,255,0.08);
+
+  --ink-1: #e8edff; --ink-2: #a9b5d6; --ink-3: #8391b5;
+  --up: #1eac85; --down: #c93b48;
+  --up-ink: #3fd6a6; --down-ink: #ff7d84;
+  --up-soft: rgba(30,172,133,0.18); --down-soft: rgba(201,59,72,0.22);
+  --warn: #f0b90b; --warn-ink: #f5c458; --warn-soft: rgba(240,185,11,0.14);
+  --accent: #38bdf8; --accent-2: #8b9bff;
+  --brand: linear-gradient(120deg, #1fbfe2 0%, #5b7bff 55%, #9d74ff 100%);
+  --accent-glow: rgba(110,130,255,0.34);
+  --hairline: rgba(170,190,255,0.11);
+  --rail: rgba(170,190,255,0.09);
+
+  --card: rgba(24,32,62,0.74);
+  --card-solid: #1a2244;
+  --card-edge: rgba(255,255,255,0.07);
+  --card-shadow: 0 1px 2px rgba(0,0,0,0.35), 0 16px 36px -12px rgba(0,0,0,0.65);
+  --card-hi: rgba(255,255,255,0.06);
+  --card-reflet: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0));
+  --forward: linear-gradient(135deg, #1eac85, #0b6e58);
+  --modal-fond: linear-gradient(170deg, #0b0f2e 0%, #111743 60%, #182059 100%);
+  --modal-ombre: 0 6px 20px -12px rgba(0,0,0,0.6);
+  --ombre-douce: 0 2px 8px rgba(0,0,0,0.35);
+  --selection: rgba(110,130,255,0.32);
+  --defil: rgba(139,155,255,0.28);
+  --defil-hover: rgba(139,155,255,0.45);
+
+  --chart-1: #0b1120; --chart-2: #101728; --chart-3: #141c34;
+  --chart-lueur:
+    radial-gradient(60% 50% at 10% 6%,  rgba(108,76,232,0.10) 0%, rgba(108,76,232,0) 62%),
+    radial-gradient(50% 40% at 92% 10%, rgba(34,190,230,0.07) 0%, rgba(34,190,230,0) 64%);
+  --chart-creux: inset 0 0 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
+  --chart-surface: #121a30;
+  --grille: rgba(170,190,255,0.07);
+  --reticule: rgba(232,237,255,0.30);
+  --bulle: rgba(18,26,48,0.94);
+  --filigrane: 0.05;
+  --vol-alpha: 0.68;
+  --bande-alpha: 0.10;
+  --ov-ema20: #c98500; --ov-ema50: #3987e5; --ov-ema100: #d95926;
+  --ov-ema200: #9085e9; --ov-sma20: #d55181; --ov-sma50: #008300;
+  --ov-bb: #7d93a6; --ov-vwap: #ff9800; --ov-sar: #00e5ff;
+  --ov-ichi-t: #2196f3; --ov-ichi-k: #e91e63;
+  --s-rsi: #bb86fc; --s-macd: #f0b90b; --s-signal: #ff6b35;
+  --s-stoch-k: #f0b90b; --s-stoch-d: #ff6b35; --s-atr: #03dac6;
+  --s-obv: #ff9800; --s-mfi: #c06ad6; --s-wr: #00bcd4; --s-cci: #ff5722;
+  --s-adx: #f0b90b; --s-equity: #ffc107;
+}
+
+[data-theme="aero-nuit"] .header-orb {
+  --orbe:
+    radial-gradient(ellipse 58% 20% at 50% 3%, rgba(255,255,255,0.9) 0%, transparent 72%),
+    radial-gradient(ellipse 28% 20% at 31% 43%, #46bb74 0 62%, transparent 64%),
+    radial-gradient(ellipse 22% 27% at 67% 63%, #37ab68 0 62%, transparent 64%),
+    radial-gradient(ellipse 17% 14% at 57% 27%, #52c481 0 62%, transparent 64%),
+    radial-gradient(ellipse 13% 18% at 80% 44%, #46bb74 0 62%, transparent 64%),
+    radial-gradient(circle at 35% 25%, #ffffff 0%, #7ee0f2 18%, #2f8ad8 52%, #0b2a5c 84%, #05122a 100%);
+  --orbe-ombre: 0 0 12px rgba(59,130,246,0.5), inset 0 -2px 4px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.9);
+  border: 1px solid rgba(255,255,255,0.9);
+}
+[data-theme="aero-nuit"] .header-orb::after {
+  content: ''; position: absolute; top: 2px; left: 6px; width: 20px; height: 9px;
+  border-radius: 10px 10px 4px 4px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 100%);
+}
+[data-theme="aero-nuit"] .header-orb::before {
+  content: ''; position: absolute; inset: -5px -10px; border-radius: 50%; pointer-events: none;
+  border: 1.5px solid rgba(139,155,255,0.6); border-top-color: transparent;
+  transform: rotate(-22deg);
+}
+[data-theme="aero-nuit"] .chart-container::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  pointer-events: none; z-index: 3;
+  background: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(20,80,140,0.4) 50%, rgba(5,25,50,0.6) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}

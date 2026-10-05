@@ -1,49 +1,32 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""test_palette.py — la palette du dashboard, MESURÉE et non affirmée.
+"""test_palette.py — la palette du dashboard, MESURÉE et non affirmée, pour CHAQUE thème.
 
 POURQUOI CE HARNAIS
 -------------------
-Le bloc CSS « AERO SUBLIMÉ (04/10/2026) » d'`index.html` affirme, en commentaire :
+Le 04/10/2026, un bloc CSS affirmait en commentaire une validation WCAG / daltonisme dont le
+script n'avait pas été conservé. Une affirmation sans reproduction ne protège de rien : la
+retouche suivante d'une couleur peut casser le contraste sans que personne le sache. Premier
+écart trouvé par ce harnais (05/10/2026) : --up clair à 2,99:1, sous le seuil de 0,01.
 
-    « Couleurs hausse / baisse et palette des overlays VALIDÉES au script
-      (luminosité, chroma, séparation daltonisme, contraste) sur les fonds réels
-      du graphique, dans les deux thèmes. »
+Depuis que les thèmes sont des fichiers (themes/<id>.css, déclarés par les <link
+data-theme-id> d'index.html), le harnais lit le REGISTRE de la page et mesure chaque thème
+déclaré : un nouveau thème n'entre pas sans tenir les mêmes seuils que les autres.
 
-    « Overlays : palette VALIDÉE au script (...). En clair le jaune est sous 3:1 :
-      chaque ligne porte donc son étiquette en bout de tracé. »
-
-Ces phrases sont VERSIONNÉES ; le script qui les produit n'a pas été conservé (mesure
-one-shot de la session du 04/10/2026). Une affirmation sans reproduction ne protège de
-rien : la prochaine retouche d'une couleur peut casser le contraste, et personne ne le
-saura avant de l'avoir sous les yeux.
-Ce harnais remplace l'affirmation par une mesure. Il relit les couleurs DANS `index.html`
-(la source publiée, pas une copie), recalcule les ratios, et sort en code ≠ 0 si une
-couleur publiée cesse de tenir.
-
-CE QU'IL MESURE — ET CE QU'IL NE MESURE PAS
--------------------------------------------
-1. Contraste WCAG 2.1 des encres de texte sur `--card-solid` de chaque thème
-   (AA texte normal ≥ 4,5:1). ⚠️ Les cartes réelles sont semi-transparentes
-   (`--card: rgba(...)`) posées sur un dégradé : le contraste vrai dépend de la position
-   dans la page. On teste la borne opaque `--card-solid`, qui est la surface documentée
-   du texte. Ce n'est pas une approximation du rendu, c'est un PLANCHER.
-2. Contraste non-textuel (WCAG 1.4.11, ≥ 3:1) des marques `--up` / `--down` sur CHAQUE
-   borne des dégradés réels du canvas (clair : `#eceffb→#f7f9ff`, sombre :
-   `#0b1120→#141c34`). Tester toutes les bornes = tester le pire cas.
-3. Séparation daltonisme : distance CIEDE2000 entre `--up` et `--down`, et entre
-   `--up-ink` et `--down-ink`, sous protanopie, deutéranopie et tritanopie.
-   Modèle : Machado, Oliveira & Fernandes (2009), sévérité 1,0, appliqué au RVB LINÉAIRE.
-   Seuil : 8 (le seuil annoncé par la livraison du 04/10).
-   ⚠️ Le script d'origine n'a pas été conservé : ce harnais reproduit l'INTENTION, pas
-   l'algorithme d'origine. Les chiffres ne sont donc pas comparables terme à terme avec
-   ceux de la note de livraison — ils sont REPRODUCTIBLES, ce qui est la propriété
-   recherchée.
-4. Palette des overlays du graphique : séparation minimale deux à deux (CIEDE2000 ≥ 8
-   en vision normale) dans chaque thème.
-5. Traçabilité de l'exception : un overlay sous 3:1 sur le fond du canvas doit porter une
-   étiquette en bout de tracé (`ETIQ_OVERLAYS`). Une exception documentée est une
-   décision ; une exception silencieuse est un bug. Échec si l'exception n'est pas couverte.
+CE QU'IL MESURE (par thème)
+---------------------------
+1. Contraste WCAG 2.1 des encres --ink-1/2/3 sur --card-solid (AA texte ≥ 4,5:1). Les
+   cartes réelles sont semi-transparentes : --card-solid est la borne opaque documentée, un
+   PLANCHER, pas une approximation du rendu.
+2. Texte signé --up-ink / --down-ink sur --card-solid (AA ≥ 4,5:1).
+3. Marques --up / --down (bougies, barres) sur CHAQUE borne du fond du graphique
+   (--chart-1/2/3) : WCAG 1.4.11 ≥ 3:1. Toutes les bornes = le pire cas.
+4. Séparation daltonisme : CIEDE2000 entre --up/--down et --up-ink/--down-ink sous
+   protanopie, deutéranopie, tritanopie (Machado, Oliveira & Fernandes 2009, sévérité 1,0,
+   RVB linéaire). Seuil 8.
+5. Overlays (--ov-ema20 … --ov-sma50) : séparation deux à deux ≥ 8 en vision normale.
+6. Traçabilité des exceptions : un overlay sous 3:1 sur le fond du graphique doit porter son
+   étiquette en bout de tracé (ETIQ_OVERLAYS, js/). Exception silencieuse = échec.
 
 USAGE
     python3 tests/test_palette.py     # code de sortie 0 = tout tient
@@ -52,7 +35,8 @@ import re
 import sys
 from pathlib import Path
 
-HTML = Path(__file__).resolve().parent.parent / "index.html"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 SEUIL_AA_TEXTE = 4.5
 SEUIL_NON_TEXTE = 3.0
 SEUIL_DALTONISME = 8.0
@@ -188,142 +172,94 @@ def simule(rgb, matrice):
     return tuple(min(1.0, max(0.0, srgb(x))) for x in out)
 
 
-# ─────────────────────────── lecture de la source ───────────────────────────
-_page = HTML.read_text(encoding="utf-8", errors="replace")
-# La page référence ses feuilles et ses scripts : on lit ce qui est SERVI, pas un seul fichier.
-src = "\n".join([_page] + [(HTML.parent / r).read_text(encoding="utf-8", errors="replace")
-                            for r in re.findall(r'\b(?:href|src)="((?:css|js|themes)/[^"]+)"', _page)])
+# ─────────────────────────── lecture des thèmes ───────────────────────────
+from theme_css import themes_declares, tous_jetons, resout, couleur, compose, REPO
 
 
-def bloc_apres(ancre, motif, depuis=0):
-    i = src.index(ancre, depuis)
-    j = src.index(motif, i)
-    k = src.index("}", j)
-    return src[j:k], i
+def rgb(jetons, nom, fond=None):
+    c = couleur(resout(jetons, jetons[nom]))
+    if c[3] < 1:
+        if fond is None:
+            raise ValueError(f"{nom} est translucide ({c[3]:.2f}) : il faut une couleur opaque")
+        return compose(c, fond)
+    return c[:3]
 
 
-def variables(bloc):
-    return {m.group(1): m.group(2).strip()
-            for m in re.finditer(r"--([a-z0-9-]+)\s*:\s*([^;]+);", bloc)}
+def hexa(c):
+    return "#" + "".join(f"{round(x * 255):02x}" for x in c[:3])
 
 
-def resout(vars_, nom):
-    v = vars_[nom]
-    m = re.fullmatch(r"var\((--[a-z0-9-]+)\)", v)
-    return vars_[m.group(1)[2:]] if m else v
+THEMES = themes_declares()
+if not THEMES:
+    print("⛔ aucun thème déclaré dans index.html (<link data-theme-id>) — harnais inexploitable")
+    sys.exit(2)
+SRC_JS = "\n".join((REPO / src).read_text(encoding="utf-8")
+                   for src in re.findall(r'<script\b[^>]*\bsrc="(js/(?!vendor/)[^"]+)"',
+                                         (REPO / "index.html").read_text(encoding="utf-8")))
+_m = re.search(r"const ETIQ_OVERLAYS\s*=\s*\{([^}]*)\}", SRC_JS)
+ETIQ = set(re.findall(r"(\w+)\s*:\s*'", _m.group(1))) if _m else set()
+NOMS_OV = ["ema20", "ema50", "ema100", "ema200", "sma20", "sma50"]
 
+for t in THEMES:
+    th = t["id"]
+    J = tous_jetons(t)
+    titre(f"THÈME « {t['nom']} » ({th}, {t['mode']}) — {t['href']}")
+    try:
+        fond_carte = rgb(J, "--card-solid")
+        fonds_canvas = [rgb(J, n) for n in ("--chart-1", "--chart-2", "--chart-3")]
+    except (KeyError, ValueError) as e:
+        echec(f"{th} · jeton de fond", str(e))
+        continue
 
-def coul(vars_, nom):
-    return parse_hex(resout(vars_, nom))
+    # 1-2. texte sur la carte opaque
+    for nom in ("--ink-1", "--ink-2", "--ink-3", "--up-ink", "--down-ink"):
+        r = contraste(rgb(J, nom, fond_carte), fond_carte)
+        (ok if r >= SEUIL_AA_TEXTE else echec)(f"{th} · {nom} sur carte {hexa(fond_carte)}",
+                                               f"{r:.2f}:1 (AA ≥ {SEUIL_AA_TEXTE})")
 
+    # 3. marques sur chaque borne du fond du graphique
+    for nom in ("--up", "--down"):
+        pire = min(((contraste(rgb(J, nom, f), f), f) for f in fonds_canvas), key=lambda x: x[0])
+        (ok if pire[0] >= SEUIL_NON_TEXTE else echec)(
+            f"{th} · {nom} {resout(J, J[nom])}", f"{pire[0]:.2f}:1 (pire borne {hexa(pire[1])}, ≥ {SEUIL_NON_TEXTE})")
 
-ANCRE = "AERO SUBLIMÉ (04/10/2026)"
-bloc_clair, pos = bloc_apres(ANCRE, ":root {")
-bloc_sombre, _ = bloc_apres(ANCRE, ".dark {", pos)
-THEMES = {"clair": variables(bloc_clair), "sombre": variables(bloc_sombre)}
+    # 4. séparation daltonisme
+    for a_, b_, fond in (("--up", "--down", fonds_canvas[1]), ("--up-ink", "--down-ink", fond_carte)):
+        a, b = rgb(J, a_, fond), rgb(J, b_, fond)
+        mini = min((ciede2000(simule(a, m), simule(b, m)), n) for n, m in DALTONISME.items())
+        (ok if mini[0] >= SEUIL_DALTONISME else echec)(
+            f"{th} · {a_}/{b_} daltonisme", f"ΔE min {mini[0]:5.1f} ({mini[1]}, ≥ {SEUIL_DALTONISME})")
 
-# Fonds réels du canvas : toutes les bornes de tous les dégradés déclarés.
-i4 = src.index("4bis. FOND DU CANVAS")
-CANVAS = {"clair": [], "sombre": []}
-for m in re.finditer(r"\.dark[^{]*\.chart-container canvas\s*\{([^}]*)\}", src[i4:], re.S):
-    CANVAS["sombre"] += re.findall(r"#[0-9a-fA-F]{6}", m.group(1))
-m = re.search(r"\.chart-container canvas\s*\{([^}]*)\}", src[i4:], re.S)
-CANVAS["clair"] = re.findall(r"#[0-9a-fA-F]{6}", m.group(1))
-CANVAS = {k: sorted({parse_hex(h) for h in v}) for k, v in CANVAS.items()}
-
-# Palette des overlays + les étiquettes qui couvrent l'exception.
-_i = src.index("const PALETTE_OVERLAYS")
-bloc_pal = src[_i:src.index("};", _i)]
-
-
-def _seg(texte, apres, avant=None):
-    s = texte.split(apres, 1)[1]
-    return s.split(avant, 1)[0] if avant else s
-
-
-NOMS_OVERLAYS = {}
-OVERLAYS = {}
-for th, seg in (("clair", _seg(bloc_pal, "clair", "sombre")),
-                ("sombre", _seg(bloc_pal, "sombre:"))):
-    trouve = re.findall(r"(\w+)\s*:\s*'(#[0-9a-fA-F]{6})'", seg)
-    NOMS_OVERLAYS[th] = [k for k, _ in trouve]
-    OVERLAYS[th] = [parse_hex(h) for _, h in trouve]
-ETIQ = set(re.findall(r"(\w+)\s*:\s*'", _seg(src, "const ETIQ_OVERLAYS", "};")))
-
-for k, v in CANVAS.items():
-    if not v:
-        print(f"⛔ fond de canvas introuvable pour le thème {k} — harnais inexploitable")
-        sys.exit(2)
-
-# ─────────────────────────── 1. contraste du texte ───────────────────────────
-TEXTES = ("ink-1", "ink-2", "ink-3")
-titre(f"1. Texte sur la carte opaque (WCAG AA ≥ {SEUIL_AA_TEXTE}:1)")
-for th, v in THEMES.items():
-    fond = coul(v, "card-solid")
-    for nom in TEXTES:
-        r = contraste(coul(v, nom), fond)
-        (ok if r >= SEUIL_AA_TEXTE else echec)(f"{th} · {nom} sur {resout(v, 'card-solid')}",
-                                               f"{r:.2f}:1")
-
-# ─────────────────────────── 2. texte signé ───────────────────────────
-titre(f"2. Texte signé (hausse/baisse) sur la carte (AA ≥ {SEUIL_AA_TEXTE}:1)")
-for th, v in THEMES.items():
-    fond = coul(v, "card-solid")
-    for nom in ("up-ink", "down-ink"):
-        r = contraste(coul(v, nom), fond)
-        (ok if r >= SEUIL_AA_TEXTE else echec)(f"{th} · {nom} sur {resout(v, 'card-solid')}",
-                                               f"{r:.2f}:1")
-
-# ─────────────────────────── 3. marques sur le canvas ───────────────────────────
-titre(f"3. Marques hausse/baisse sur le FOND RÉEL du canvas (≥ {SEUIL_NON_TEXTE}:1, pire borne)")
-for th, v in THEMES.items():
-    for nom in ("up", "down"):
-        c = coul(v, nom)
-        pire = min(((contraste(c, f), f) for f in CANVAS[th]), key=lambda t: t[0])
-        detail = f"{pire[0]:.2f}:1 (borne #{''.join(f'{int(x*255):02x}' for x in pire[1])})"
-        (ok if pire[0] >= SEUIL_NON_TEXTE else echec)(f"{th} · {nom} {resout(v, nom)}", detail)
-
-# ─────────────────────────── 4. séparation daltonisme ───────────────────────────
-titre(f"4. Séparation hausse/baisse sous daltonisme (CIEDE2000 ≥ {SEUIL_DALTONISME})")
-for th, v in THEMES.items():
-    for paire in (("up", "down"), ("up-ink", "down-ink")):
-        a, b = coul(v, paire[0]), coul(v, paire[1])
-        for nom, mat in DALTONISME.items():
-            d = ciede2000(simule(a, mat), simule(b, mat))
-            (ok if d >= SEUIL_DALTONISME else echec)(
-                f"{th} · {paire[0]}/{paire[1]} — {nom}", f"ΔE {d:5.1f}")
-
-# ─────────────────────────── 5. overlays ───────────────────────────
-titre(f"5. Overlays du graphique : séparation deux à deux (ΔE ≥ {SEUIL_OVERLAYS})")
-for th, cols in OVERLAYS.items():
+    # 5. overlays deux à deux
+    try:
+        ovs = [rgb(J, "--ov-" + n, fonds_canvas[1]) for n in NOMS_OV]
+    except KeyError as e:
+        echec(f"{th} · overlays", f"jeton manquant {e}")
+        continue
     mini, qui = 1e9, None
-    for i in range(len(cols)):
-        for j in range(i + 1, len(cols)):
-            d = ciede2000(cols[i], cols[j])
+    for i in range(len(ovs)):
+        for j in range(i + 1, len(ovs)):
+            d = ciede2000(ovs[i], ovs[j])
             if d < mini:
-                mini, qui = d, (NOMS_OVERLAYS[th][i], NOMS_OVERLAYS[th][j])
-    (ok if mini >= SEUIL_OVERLAYS else echec)(
-        f"{th} · {len(cols)} overlays", f"ΔE min {mini:5.1f} ({qui[0]}/{qui[1]})")
+                mini, qui = d, (NOMS_OV[i], NOMS_OV[j])
+    (ok if mini >= SEUIL_OVERLAYS else echec)(f"{th} · {len(ovs)} overlays deux à deux",
+                                              f"ΔE min {mini:5.1f} ({qui[0]}/{qui[1]}, ≥ {SEUIL_OVERLAYS})")
 
-# ─────────────────────────── 6. exceptions traçables ───────────────────────────
-titre(f"6. Overlays sous {SEUIL_NON_TEXTE}:1 sur le fond du canvas : étiquetés, pas silencieux")
-for th, cols in OVERLAYS.items():
-    sous = [(NOMS_OVERLAYS[th][i], c, min(contraste(c, f) for f in CANVAS[th]))
-            for i, c in enumerate(cols)
-            if min(contraste(c, f) for f in CANVAS[th]) < SEUIL_NON_TEXTE]
-    manquants = [n for n in NOMS_OVERLAYS[th] if n not in ETIQ]
+    # 6. exceptions sous 3:1 : étiquetées, pas silencieuses
+    sous = [(n, min(contraste(c, f) for f in fonds_canvas)) for n, c in zip(NOMS_OV, ovs)]
+    sous = [(n, r) for n, r in sous if r < SEUIL_NON_TEXTE]
+    manquants = [n for n, _ in sous if n not in ETIQ]
     if not sous:
         ok(f"{th} · aucun overlay sous {SEUIL_NON_TEXTE}:1", "rien à rattraper")
     elif manquants:
-        echec(f"{th} · exception SANS étiquette",
-              f"{len(sous)} sous {SEUIL_NON_TEXTE}:1, sans libellé : {', '.join(manquants)}")
+        echec(f"{th} · exception SANS étiquette", ", ".join(manquants))
     else:
-        detail = ", ".join(f"{n} {r:.2f}:1" for n, _, r in sous)
-        ok(f"{th} · {len(sous)}/{len(cols)} sous {SEUIL_NON_TEXTE}:1, tous étiquetés", detail)
+        ok(f"{th} · {len(sous)}/{len(ovs)} sous {SEUIL_NON_TEXTE}:1, tous étiquetés",
+           ", ".join(f"{n} {r:.2f}:1" for n, r in sous))
 
 lignes.append("")
 lignes.append("═" * 52)
-lignes.append("✅ TOUS LES CONTRÔLES DE PALETTE PASSENT" if not ko
+lignes.append(f"✅ PALETTE : TOUS LES CONTRÔLES PASSENT ({len(THEMES)} thème(s))" if not ko
               else "❌ AU MOINS UN CONTRÔLE DE PALETTE A ÉCHOUÉ")
 print("\n".join(lignes))
 sys.exit(ko)

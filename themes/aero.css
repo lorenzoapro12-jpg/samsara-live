@@ -1,0 +1,136 @@
+/* Thème « Aero » — verre liquide clair, l'identité d'origine du dashboard.
+   Déclaré dans index.html : <link data-theme="aero" data-mode="clair" data-verre="refraction">.
+   Contrat : css/app.css (en-tête) ; mesures : tests/test_palette.py et tests/test_contrat.py. */
+[data-theme="aero"] {
+  color-scheme: light;
+
+  /* Fond : aurore statique (rien ne bouge derrière le verre) + bulles de bokeh. */
+  --fond:
+    radial-gradient(circle at 15% 20%, rgba(255,255,255,0.30) 0 46px, rgba(255,255,255,0) 47px),
+    radial-gradient(circle at 82% 15%, rgba(255,255,255,0.22) 0 88px, rgba(255,255,255,0) 89px),
+    radial-gradient(circle at 38% 78%, rgba(255,255,255,0.16) 0 130px, rgba(255,255,255,0) 131px),
+    radial-gradient(circle at 92% 82%, rgba(255,255,255,0.17) 0 104px, rgba(255,255,255,0) 105px),
+    radial-gradient(40% 36% at 88% 6%,  rgba(80,214,236,0.55) 0%, rgba(80,214,236,0) 70%),
+    radial-gradient(64% 50% at 10% 4%,  rgba(128,112,255,0.58) 0%, rgba(128,112,255,0) 64%),
+    radial-gradient(72% 56% at 82% 100%, rgba(244,150,210,0.44) 0%, rgba(244,150,210,0) 66%),
+    radial-gradient(52% 44% at 20% 94%, rgba(110,190,255,0.42) 0%, rgba(110,190,255,0) 62%),
+    linear-gradient(160deg, #9ea8ec 0%, #b7bff1 28%, #d1d7f7 56%, #e6ebfb 80%, #f6f8fe 100%);
+  /* Trame : la structure que la réfraction courbe (sur un dégradé lisse, elle serait invisible). */
+  --trame:
+    linear-gradient(to right, rgba(255,255,255,0.11) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.11) 1px, transparent 1px),
+    linear-gradient(to right, rgba(120,140,220,0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(120,140,220,0.07) 1px, transparent 1px);
+  --trame-opacite: 0.6;
+  --grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  /* Verre */
+  --verre: blur(16px) saturate(1.9);
+  --surface: rgba(255,255,255,0.62);
+  --surface-reflet:
+    linear-gradient(135deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.34) 30%, rgba(255,255,255,0.62) 62%, rgba(255,255,255,0) 100%),
+    linear-gradient(315deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.26) 38%, rgba(255,255,255,0) 72%);
+  --capsule: rgba(255,255,255,0.80);
+  --capsule-hover: rgba(255,255,255,0.92);
+  /* Cerne lumineux directionnel (rdev/liquid-glass-react, MIT) sous une ombre portée douce. */
+  --capsule-ombre:
+    0 6px 18px rgba(5,28,52,0.24), 0 1px 4px rgba(5,28,52,0.16),
+    0 1px 0 rgba(255,255,255,0.85) inset, 0 0 0 0.5px rgba(255,255,255,0.55) inset,
+    0 1px 3px rgba(255,255,255,0.30) inset, 0 -1px 2px rgba(255,255,255,0.28) inset,
+    0 1px 4px rgba(0,0,0,0.30) inset;
+  --pill: rgba(255,255,255,0.38);
+  --pill-hover: rgba(255,255,255,0.66);
+  --dot-anneau: rgba(255,255,255,0.7);
+  --poignee: rgba(255,255,255,0.22);
+  --poignee-hover: rgba(255,255,255,0.4);
+
+  /* Encre : trois niveaux, AA (≥ 4,5:1) mesuré sur la carte opaque. */
+  --ink-1: #10233d; --ink-2: #45597a; --ink-3: #5f6e8c;
+  /* Marques ≥ 3:1 sur chaque borne du fond du graphique ; texte signé AA sur la carte.
+     #0f9d7a mesurait 2,99:1 sur #eceffb (sous WCAG 1.4.11 de 0,01) → #0d9672 : 3,26:1. */
+  --up: #0d9672; --down: #e5484d;
+  --up-ink: #0a7d62; --down-ink: #c8323a;
+  --up-soft: rgba(13,150,114,0.13); --down-soft: rgba(229,72,77,0.12);
+  --warn: #f0a50b; --warn-ink: #8a5a00; --warn-soft: rgba(240,165,11,0.16);
+  --accent: #0b84b0; --accent-2: #4f5fe0;
+  --brand: linear-gradient(120deg, #13b4d4 0%, #4f6cf0 55%, #8b5cf6 100%);
+  --accent-glow: rgba(79,108,240,0.30);
+  --hairline: rgba(36,56,110,0.10);
+  --rail: rgba(36,56,110,0.08);
+
+  /* Cartes */
+  --card: rgba(255,255,255,0.76);
+  --card-solid: #ffffff;
+  --card-edge: rgba(255,255,255,0.95);
+  --card-shadow: 0 1px 2px rgba(16,35,61,0.06), 0 12px 30px -10px rgba(30,45,110,0.26);
+  --card-hi: rgba(255,255,255,0.65);
+  --card-reflet: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0));
+  --forward: linear-gradient(135deg, #0d9672, #0b6e58);
+  --modal-fond: linear-gradient(170deg, #c3cbf4 0%, #dfe4fa 42%, #f4f6fe 100%);
+  --modal-ombre: 0 6px 20px -12px rgba(30,45,110,0.4);
+  --ombre-douce: 0 2px 8px rgba(30,45,110,0.15);
+  --selection: rgba(79,108,240,0.24);
+  --defil: rgba(79,108,240,0.28);
+  --defil-hover: rgba(79,108,240,0.45);
+
+  /* Graphique — fond du canvas : TOUTES ces bornes sont testées (3:1 des bougies). */
+  --chart-1: #eceffb; --chart-2: #f0f2fd; --chart-3: #f7f9ff;
+  --chart-lueur:
+    radial-gradient(60% 50% at 12% 8%,  rgba(146,128,250,0.22) 0%, rgba(146,128,250,0) 62%),
+    radial-gradient(55% 45% at 88% 14%, rgba(126,176,255,0.20) 0%, rgba(126,176,255,0) 64%),
+    radial-gradient(70% 55% at 72% 92%, rgba(196,152,246,0.18) 0%, rgba(196,152,246,0) 66%);
+  --chart-creux: inset 0 0 20px rgba(58,78,140,0.075), inset 0 1px 0 rgba(255,255,255,0.6);
+  --chart-surface: #f4f6fe;
+  --grille: rgba(36,56,110,0.08);
+  --reticule: rgba(16,35,61,0.28);
+  --bulle: rgba(255,255,255,0.94);
+  --filigrane: 0.045;
+  --vol-alpha: 0.5;
+  --bande-alpha: 0.07;
+  /* Overlays : ordre jaune > bleu > orange > violet > rose > vert. En clair, trois sont sous
+     3:1 (ema20, sma20, ema100) : chaque ligne porte son étiquette en bout de tracé. */
+  --ov-ema20: #eda100; --ov-ema50: #2a78d6; --ov-ema100: #eb6834;
+  --ov-ema200: #4a3aa7; --ov-sma20: #e87ba4; --ov-sma50: #008300;
+  --ov-bb: #607d8b; --ov-vwap: #ff9800; --ov-sar: #00a5bd;
+  --ov-ichi-t: #2196f3; --ov-ichi-k: #e91e63;
+  --s-rsi: #8e5bd8; --s-macd: #d79a00; --s-signal: #ff6b35;
+  --s-stoch-k: #d79a00; --s-stoch-d: #ff6b35; --s-atr: #00a693;
+  --s-obv: #ff9800; --s-mfi: #9c27b0; --s-wr: #00a5bd; --s-cci: #ff5722;
+  --s-adx: #d79a00; --s-equity: #e0a800;
+}
+
+/* ── Décor propre au thème ── */
+/* Le globe en verre : « a recurring symbol is the Earth globe » (Frutiger Aero). */
+[data-theme="aero"] .header-orb {
+  --orbe:
+    radial-gradient(ellipse 58% 20% at 50% 3%, rgba(255,255,255,0.9) 0%, transparent 72%),
+    radial-gradient(ellipse 28% 20% at 31% 43%, #46bb74 0 62%, transparent 64%),
+    radial-gradient(ellipse 22% 27% at 67% 63%, #37ab68 0 62%, transparent 64%),
+    radial-gradient(ellipse 17% 14% at 57% 27%, #52c481 0 62%, transparent 64%),
+    radial-gradient(ellipse 13% 18% at 80% 44%, #46bb74 0 62%, transparent 64%),
+    radial-gradient(circle at 35% 25%, #ffffff 0%, #7ee0f2 18%, #2f8ad8 52%, #0b2a5c 84%, #05122a 100%);
+  --orbe-ombre: 0 0 12px rgba(59,130,246,0.5), inset 0 -2px 4px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.9);
+  border: 1px solid rgba(255,255,255,0.9);
+}
+[data-theme="aero"] .header-orb::after {
+  content: ''; position: absolute; top: 2px; left: 6px; width: 20px; height: 9px;
+  border-radius: 10px 10px 4px 4px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 100%);
+}
+/* Orbite : un anneau incliné autour du globe — le cycle. Immobile : une rotation infinie
+   redessinait la page en continu. */
+[data-theme="aero"] .header-orb::before {
+  content: ''; position: absolute; inset: -5px -10px; border-radius: 50%; pointer-events: none;
+  border: 1.5px solid rgba(79,108,240,0.55); border-top-color: transparent;
+  transform: rotate(-22deg);
+}
+/* Biseau lumineux à l'intérieur du cadre du graphique. */
+[data-theme="aero"] .chart-container::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  pointer-events: none; z-index: 3;
+  background: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(180,215,255,0.6) 50%, rgba(120,180,240,0.4) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
