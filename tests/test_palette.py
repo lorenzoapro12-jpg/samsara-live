@@ -189,7 +189,10 @@ def simule(rgb, matrice):
 
 
 # ─────────────────────────── lecture de la source ───────────────────────────
-src = HTML.read_text(encoding="utf-8", errors="replace")
+_page = HTML.read_text(encoding="utf-8", errors="replace")
+# La page référence ses feuilles et ses scripts : on lit ce qui est SERVI, pas un seul fichier.
+src = "\n".join([_page] + [(HTML.parent / r).read_text(encoding="utf-8", errors="replace")
+                            for r in re.findall(r'\b(?:href|src)="((?:css|js|themes)/[^"]+)"', _page)])
 
 
 def bloc_apres(ancre, motif, depuis=0):

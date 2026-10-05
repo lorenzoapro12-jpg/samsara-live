@@ -1,4 +1,4 @@
-// Contrôles HORS LIGNE des indicateurs calculés DANS la page (index.html).
+// Contrôles HORS LIGNE des indicateurs calculés DANS la page (js/, chargé par index.html).
 //
 // Chaque fonction est extraite de la source publiée, puis comparée à une implémentation
 // de référence écrite indépendamment, sur une série OHLC pseudo-aléatoire reproductible.
@@ -7,7 +7,7 @@
 //     DANS la bougie, 398 retournements au lieu de 76 ;
 //   · ADX : moyenne simple des DX au lieu du lissage de Wilder — jusqu'à 12,8 pts d'écart.
 const fs = require('fs'), path = require('path');
-const SRC = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const SRC = require('./sources').scriptsApp().map(s => s.texte).join('\n');
 
 function extraire(nom) {
   const i = SRC.indexOf('function ' + nom + '(');

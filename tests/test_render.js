@@ -4,6 +4,7 @@
 const fs = require('fs'), vm = require('vm'), os = require('os'), path = require('path');
 const REPO = path.resolve(__dirname, '..');
 const fb = require('./forbidden');
+const { texteServi } = require('./sources');
 
 const JS_PATH = path.join(os.tmpdir(), 'samsara-inline.js');
 if (!fs.existsSync(JS_PATH)) {
@@ -113,7 +114,7 @@ try {
   // ── Contrôle d'absence : aucun motif interdit, nulle part ──
   const fbList = fb.load();
   const hitsFeed = fb.find(feed.innerHTML, fbList.terms);
-  const hitsSrc = fb.find(fs.readFileSync(path.join(REPO, 'index.html'), 'utf8'), fbList.terms);
+  const hitsSrc = fb.find(texteServi(), fbList.terms);   // page + css/ + js/ + themes/
 
   console.log('\n════════════════════════════════════════');
   console.log(`  motifs interdits : ${fbList.terms.length} (${fbList.file}${fbList.local ? '' : ' — EXEMPLE, aucun motif réel'})`);
@@ -121,7 +122,7 @@ try {
   // Contrôles de non-régression — valeurs lues depuis la source, pas codées en dur
   const D = DATA;
   const usd = v => Math.round(v).toLocaleString('en-US');
-  // ⚠️ Même formateur que `fmtNum` de index.html — PAS `toFixed`.
+  // ⚠️ Même formateur que `fmtNum` de js/app.js — PAS `toFixed`.
   // Mesuré le 04/10/2026 : pour 0,615, `toFixed(2)` rend « 0.61 » et `toLocaleString`
   // rend « 0.62 ». Le harnais échouait donc sur SON propre rendu, uniquement les jours où
   // la variation tombait sur un x,xx5 — un faux rouge dépendant de la donnée vivante.

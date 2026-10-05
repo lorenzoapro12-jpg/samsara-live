@@ -1,0 +1,1459 @@
+/* ═══════════════════════════════════════════
+   FRUTIGER AERO THEME — skeuomorphic glass
+   ═══════════════════════════════════════════ */
+:root {
+  /* Sky gradient — deep blue zenith to soft green horizon */
+  --bg: linear-gradient(175deg,
+    #7bb8e0 0%, #8ecae6 12%, #a0d8ef 25%,
+    #b8e3f5 40%, #c9ecf8 55%, #d4f1fb 70%,
+    #c5eed8 85%, #b7e8c9 100%);
+  --bg-color: #b8e3f5;
+  /* Glass — Vista-style frosted */
+  --surface: rgba(255,255,255,0.48);
+  --surface-solid: rgba(250,252,255,0.88);
+  --surface2: rgba(220,240,252,0.55);
+  --glass-edge: rgba(255,255,255,0.7);
+  --border: rgba(140,200,230,0.45);
+  --border-bright: rgba(80,170,210,0.65);
+  --text: #143040; --text2: #2d5a6e;
+  --accent: #008fa0; --accent-glow: rgba(0,170,190,0.25);
+  --green: #1fa870; --red: #e04a3a; --blue: #1e88e5; --purple: #7c4dff;
+  --hausser: #0d9e88; --baissier: #e85d42;
+  --shadow: 0 8px 32px rgba(60,150,190,0.25);
+  --shadow-sm: 0 2px 10px rgba(60,150,190,0.15);
+  /* Glossy specular highlight — sharp white at top */
+  --gloss: linear-gradient(175deg,
+    rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.45) 6%,
+    rgba(255,255,255,0.05) 45%, rgba(255,255,255,0.0) 65%,
+    rgba(180,220,240,0.15) 100%);
+  --btn-gloss: linear-gradient(180deg,
+    rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.25) 8%,
+    rgba(255,255,255,0.0) 35%, rgba(255,255,255,0.0) 100%);
+  --radius-sm: 12px; --radius: 18px; --radius-lg: 24px;
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI Variable',
+          system-ui, 'Segoe UI', sans-serif;
+
+  /* ═══ Gemini Aero — ombres multi-couches ═══ */
+  --aero-shadow-glass:
+    0 2px 4px rgba(0,0,0,0.1),
+    0 12px 28px rgba(0,0,0,0.15),
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    inset 0 -1px 2px rgba(0,0,0,0.05);
+  --aero-shadow-frame:
+    0 8px 32px rgba(0,80,160,0.25),
+    inset 0 1px 1px rgba(255,255,255,1),
+    inset 0 0 12px rgba(255,255,255,0.6);
+  --aero-border-light: linear-gradient(180deg,
+    rgba(255,255,255,0.9) 0%, rgba(180,215,255,0.6) 50%, rgba(120,180,240,0.4) 100%);
+  --aero-border-outer: rgba(140,180,220,0.6);
+  --aero-gloss-gradient: linear-gradient(180deg,
+    rgba(255,255,255,0.78) 0%, rgba(255,255,255,0.28) 48%, rgba(255,255,255,0) 50%);
+  --aero-text-emboss: 0 1px 0 rgba(255,255,255,0.9);
+  --aero-etched-dark: rgba(0,40,80,0.18);
+  --aero-etched-light: rgba(255,255,255,0.85);
+  --canvas-bg: #f8fcff;
+}
+.dark {
+  --bg: linear-gradient(175deg,
+    #061220 0%, #0a1e30 15%, #0e2640 30%,
+    #112d4e 48%, #0f3055 65%, #0c2848 82%,
+    #0a1e35 100%);
+  --bg-color: #0a1e30;
+  --surface: rgba(15,35,60,0.55);
+  --surface-solid: rgba(10,25,45,0.9);
+  --surface2: rgba(12,30,50,0.6);
+  --glass-edge: rgba(40,90,140,0.4);
+  --border: rgba(30,80,130,0.35);
+  --border-bright: rgba(0,180,220,0.5);
+  --text: #c8e6f5; --text2: #7ab8d4;
+  --accent: #00d4ee; --accent-glow: rgba(0,210,240,0.22);
+  --green: #4ae0a4; --red: #ff7670; --blue: #5cb8ff; --purple: #b794ff;
+  --hausser: #2de4c0; --baissier: #ff7b60;
+  --shadow: 0 8px 32px rgba(0,160,200,0.2);
+  --shadow-sm: 0 2px 10px rgba(0,160,200,0.12);
+  --gloss: linear-gradient(175deg,
+    rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.06) 6%,
+    rgba(255,255,255,0.0) 40%, rgba(255,255,255,0.0) 100%);
+  --btn-gloss: linear-gradient(180deg,
+    rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.04) 10%,
+    rgba(255,255,255,0.0) 100%);
+
+  /* ═══ Gemini Aero Dark — abyssal ocean ═══ */
+  --aero-shadow-glass:
+    0 4px 12px rgba(0,0,0,0.5),
+    0 16px 40px rgba(0,10,30,0.8),
+    inset 0 1px 0 rgba(255,255,255,0.35),
+    inset 0 -1px 3px rgba(0,0,0,0.6);
+  --aero-shadow-frame:
+    0 10px 40px rgba(0,200,255,0.15),
+    0 0 20px rgba(0,120,210,0.2),
+    inset 0 1px 1px rgba(255,255,255,0.5),
+    inset 0 0 15px rgba(0,180,255,0.15);
+  --aero-border-light: linear-gradient(180deg,
+    rgba(255,255,255,0.4) 0%, rgba(20,80,140,0.4) 50%, rgba(5,25,50,0.6) 100%);
+  --aero-border-outer: rgba(10,40,80,0.8);
+  --aero-gloss-gradient: linear-gradient(180deg,
+    rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.08) 48%, rgba(255,255,255,0) 50%);
+  --aero-text-emboss: 0 -1px 1px rgba(0,0,0,0.9), 0 0 8px rgba(0,180,255,0.3);
+  --aero-etched-dark: rgba(0,0,0,0.65);
+  --aero-etched-light: rgba(255,255,255,0.12);
+  --canvas-bg: #0a1628;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+/* Subtle noise texture overlay */
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+body {
+  background: var(--bg-color); background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px; line-height: 1.5;
+  display: flex; flex-direction: column;
+  height: 100vh;
+  height: 100dvh; /* iOS/Android : 100vh inclut la barre d'URL → le bas (Range
+                     Selector, taskbar) passait sous le pli, inaccessible
+                     puisque overflow:hidden. 100dvh suit la hauteur visible. */
+  overflow: hidden;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: 30px; /* Aero taskbar */
+}
+
+/* ═══ HEADER — Vista glass bar ═══ */
+.header {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--gloss), var(--surface);
+  backdrop-filter: blur(12px) saturate(1.4); -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  border-bottom: 1px solid var(--glass-edge);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.35);
+  padding: 10px 18px; display: flex; align-items: center; justify-content: space-between;
+}
+.header-left { display:flex; align-items:center; gap:14px; }
+.header-left h1 {
+  font-size:19px; color:var(--accent); font-weight:800; letter-spacing:-0.5px;
+  text-shadow: 0 0 18px var(--accent-glow), 0 1px 0 rgba(255,255,255,0.5);
+}
+.price-badge {
+  background: var(--btn-gloss), var(--surface2);
+  border: 1px solid var(--glass-edge); border-radius: var(--radius-lg);
+  padding: 5px 14px; font-size: 15px; font-weight: 700;
+  font-variant-numeric: tabular-nums; transition: all 0.25s ease;
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.5);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+}
+.price-up {
+  color: var(--green) !important;
+  border-color: rgba(31,168,112,0.5);
+  background: var(--btn-gloss), rgba(31,168,112,0.08);
+}
+.price-down {
+  color: var(--red) !important;
+  border-color: rgba(224,74,58,0.5);
+  background: var(--btn-gloss), rgba(224,74,58,0.08);
+}
+.cycle-badge {
+  font-size: 11px; color: var(--text2);
+  background: var(--btn-gloss), var(--surface2);
+  padding: 4px 14px; border-radius: var(--radius-lg);
+  border: 1px solid var(--border); font-weight: 600;
+}
+.header-right { display:flex; align-items:center; gap:10px; }
+.theme-btn {
+  background: var(--btn-gloss), var(--surface2);
+  border: 1px solid var(--glass-edge); color: var(--text);
+  padding: 5px 12px; border-radius: var(--radius-lg);
+  cursor: pointer; font-size: 13px; font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.25,0.8,0.25,1.2);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.5);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.3);
+}
+.theme-btn:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 18px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.5);
+  transform: translateY(-2px);
+}
+.theme-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08), inset 0 1px 2px rgba(0,0,0,0.05);
+}
+.refresh-dot {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--green);
+  animation: pulse 2s infinite; flex-shrink: 0;
+  box-shadow: 0 0 10px rgba(31,168,112,0.5);
+}
+@keyframes pulse { 0%,100%{opacity:1; box-shadow:0 0 6px var(--green)} 50%{opacity:0.25; box-shadow:0 0 2px var(--green)} }
+
+/* Bandeau d'âge. Le cron publie toutes les 15 min : au-delà, la donnée est vieille et
+   ça doit se VOIR, pas se déduire d'un point vert. */
+.age-banner {
+  display: none; padding: 7px 12px; margin: 0 0 8px;
+  border-radius: 10px; font-size: 12px; font-weight: 600;
+  background: rgba(224,74,58,0.14); color: #8a2d20;
+  border: 1px solid rgba(224,74,58,0.35);
+}
+.age-banner.retard { background: rgba(240,185,11,0.16); color: #7a5600; border-color: rgba(240,185,11,0.45); }
+.dark .age-banner { background: rgba(255,118,112,0.16); color: #ffb4ae; border-color: rgba(255,118,112,0.4); }
+.dark .age-banner.retard { background: rgba(240,185,11,0.14); color: #f5c458; border-color: rgba(240,185,11,0.4); }
+
+/* ═══ INDICATOR BAR — Vista Aero toolbar ═══ */
+.indicator-bar {
+  display: flex; align-items: center; gap: 2px;
+  padding: 4px 8px;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.75) 0%, rgba(230,240,250,0.5) 48%,
+    rgba(205,225,245,0.65) 50%, rgba(225,240,255,0.8) 100%);
+  border-radius: 0; border-bottom: 1px solid rgba(180,205,230,0.8);
+  box-shadow: 0 2px 6px rgba(0,40,80,0.08), inset 0 1px 0 rgba(255,255,255,0.95);
+  backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+  font-size: 11px; z-index: 150; position: relative;
+}
+.dark .indicator-bar {
+  background: linear-gradient(180deg,
+    rgba(40,65,95,0.6) 0%, rgba(20,35,55,0.4) 48%,
+    rgba(10,20,35,0.6) 50%, rgba(25,45,70,0.6) 100%);
+  border-bottom-color: rgba(60,95,135,0.5);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.indicator-bar::-webkit-scrollbar { display: none; }
+.indicator-bar .sep {
+  width: 1px; height: 22px; margin: 0 6px; flex-shrink: 0;
+  background: var(--aero-etched-dark);
+  border-right: 1px solid var(--aero-etched-light);
+}
+.indicator-bar .section-title {
+  /* Mêmes capitales (c'est un intitulé de groupe, il reste utile) mais beaucoup plus
+     bas dans la hiérarchie : il doit se lire après les pastilles, pas avant. */
+  color: var(--text2); opacity: 0.5; font-weight: 600; font-size: 9px;
+  letter-spacing: 0.5px; text-transform: uppercase; flex-shrink: 0;
+}
+.indicator-bar label {
+  display: flex; align-items: center; gap: 4px; padding: 5px 12px;
+  border-radius: 7px; cursor: pointer; white-space: nowrap;
+  /* `transparent` et non supprimée : les métriques ne bougent pas d'un pixel */
+  border: 1px solid transparent;
+  transition: background 0.15s ease;
+  user-select: none; font-size: 11px; font-weight: 600;
+  color: #1a365d;
+  /* Teinte franche et SANS trait : c'est le contraste qui définit la pastille, pas un
+     contour. Retirer les 46 contours était juste ; retirer aussi le contraste était
+     l'erreur — un fond à 0,28 sur un ruban bleu clair ne se lit plus. */
+  background: rgba(255,255,255,0.62);
+}
+.dark .indicator-bar label { color: #eef3f9; background: rgba(255,255,255,0.20); }
+/* Survol : UNE seule propriété change. Ni halo, ni bordure bleue, ni soulèvement. */
+.indicator-bar label:hover { background: rgba(255,255,255,0.82); }
+.dark .indicator-bar label:hover { background: rgba(255,255,255,0.28); }
+/* Actif : une pastille PLEINE, lisible d'un coup d'œil — pas un métal enfoncé à
+   3 box-shadows internes. C'est l'état qui porte l'information, il doit être net. */
+.indicator-bar label.active {
+  background: #2b6cb0; color: #fff; font-weight: 700;
+  box-shadow: 0 1px 4px rgba(20,60,110,0.35);
+}
+.dark .indicator-bar label.active { background: #0d84c9; color: #fff; }
+.indicator-bar label.active .ind-label { color: #fff; }
+.indicator-bar input { display: none; }
+.ind-label { font-weight: 600; }
+.ov { color: #17558f; } .sg { color: #8a5606; } .ch { color: #9c1fb8; }
+/* Thème sombre : ces trois teintes sont calibrées pour un fond CLAIR. Aucune n'avait
+   d'équivalent sombre, donc les intitulés de pastilles (EMA20, RSI, Volume…) restaient
+   bleu nuit / brun / violet foncé sur une barre sombre — illisibles au rendu du
+   24/09/2026. La teinte garde son code sémantique, seule la luminosité change. */
+.dark .ov { color: #8ec5ff; } .dark .sg { color: #f5c458; } .dark .ch { color: #e695ff; }
+.tag-ch { background: rgba(224,64,251,0.12); color: #e040fb; }
+
+/* ═══ MAIN LAYOUT ═══ */
+.main-area { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+
+/* ═══ P#1 CHART CONTAINER — Vista glass frame ═══ */
+.chart-container {
+  flex: 1; min-width: 0; position: relative;
+  border-radius: 12px; padding: 8px; overflow: hidden;
+  background: var(--gloss), var(--surface);
+  backdrop-filter: blur(10px) saturate(1.8); -webkit-backdrop-filter: blur(10px) saturate(1.8);
+  border: 1px solid var(--aero-border-outer);
+  box-shadow: var(--aero-shadow-frame);
+}
+/* Inner border — biseau lumineux */
+.chart-container::before {
+  content: ''; position: absolute; inset: 0; border-radius: 11px;
+  padding: 1px;
+  background: var(--aero-border-light);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none; z-index: 3;
+}
+/* Curved gloss — reflet spéculaire Frutiger AMPLIFIÉ */
+.chart-container::after {
+  content: ''; position: absolute; top: 0; left: -20%; width: 140%; height: 55%;
+  background: radial-gradient(ellipse 100% 60% at 50% 0%,
+    rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.35) 40%, rgba(255,255,255,0.08) 70%, rgba(255,255,255,0) 100%);
+  border-radius: 0 0 50% 50% / 0 0 20% 20%;
+  pointer-events: none; z-index: 2;
+  transition: opacity 0.3s ease;
+}
+.dark .chart-container::after {
+  background: radial-gradient(ellipse 100% 60% at 50% 0%,
+    rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.05) 60%, rgba(255,255,255,0) 100%);
+}
+/* Canvas — encastré avec bezel intérieur + fond blanc */
+.chart-container canvas {
+  display: block; width: 100%; height: 100%; position: relative; z-index: 1;
+  border-radius: 6px;
+  background: var(--canvas-bg);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.25), inset 0 -1px 2px rgba(255,255,255,0.2);
+  /* Le chart gère lui-même pan / pinch (touchstart→touchmove, passive:false).
+     Sans ceci le navigateur mobile déclenche son propre scroll/zoom en
+     concurrence : pan saccadé, et le double-tap zoome la page. */
+  touch-action: none;
+}
+/* Amplification : reflet double + bulle glossy */
+.chart-container .gloss-bubble {
+  position: absolute; top: -12px; right: 10%; width: 80px; height: 40px;
+  background: radial-gradient(ellipse 70% 50% at 50% 50%,
+    rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.15) 60%, transparent 100%);
+  border-radius: 50%; filter: blur(6px); pointer-events: none; z-index: 2;
+}
+
+/* ═══ TRAME DE FOND — ce que la réfraction courbe ═══
+   Une réfraction sur un dégradé lisse est invisible : le verre ne déforme que
+   s'il y a une structure derrière. Trame fine + règles plus marquées toutes les
+   5, façon papier millimétré — lisible dans les 8 px qui bordent chaque panneau,
+   et c'est là que le verre plie. */
+.aero-grid {
+  position: fixed; inset: -12%; z-index: -1; pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.11) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.11) 1px, transparent 1px),
+    linear-gradient(to right, rgba(120,140,220,0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(120,140,220,0.07) 1px, transparent 1px);
+  background-size:
+    38px 38px, 38px 38px,
+    190px 190px, 190px 190px;
+}
+.dark .aero-grid {
+  background-image:
+    linear-gradient(to right, rgba(150,220,255,0.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(150,220,255,0.16) 1px, transparent 1px),
+    linear-gradient(to right, rgba(0,180,240,0.13) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0,180,240,0.13) 1px, transparent 1px);
+}
+
+/* ═══ LIQUID GLASS — hyalite v0.5.0 (MIT © 2026 VII-Cae) ═══
+   `var(--hyalite, <flou existant>)` : hyalite écrit --hyalite sur chaque élément
+   attaché. Là où le filtre SVG de backdrop ne rend pas (Safari, Firefox), c'est
+   le flou d'origine qui s'applique — le rendu actuel, à l'identique.
+   ⚠️ --hyalite est héritée : ne la consommer QUE sur les éléments attachés. */
+
+/* Cache le <svg> des filtres sans display:none (Blink ignore ces filtres-là) */
+.hyalite-filters { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* ═══ FEED PANEL — frosted glass side drawer ═══ */
+.feed-panel {
+  display: flex; flex-shrink: 0; width: 390px;
+  border-left: 2px solid var(--glass-edge);
+  background: var(--gloss), var(--surface);
+  backdrop-filter: var(--hyalite, blur(24px) saturate(1.3)); -webkit-backdrop-filter: var(--hyalite, blur(24px) saturate(1.3));
+  box-shadow: -6px 0 24px rgba(0,0,0,0.2), var(--hyalite-edge, none);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden;
+  z-index: 90;
+  box-shadow: -6px 0 24px rgba(0,0,0,0.2), inset 1px 0 0 rgba(255,255,255,0.15);
+}
+.feed-panel.collapsed { width: 34px; }
+.feed-panel-handle {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; flex-shrink: 0; cursor: pointer;
+  background: var(--btn-gloss), var(--surface2);
+  color: var(--text2); font-size: 10px; font-weight: 700;
+  user-select: none; writing-mode: vertical-rl; text-transform: uppercase;
+  letter-spacing: 2px; transition: all 0.25s; padding: 12px 0;
+  border-right: 1px solid var(--glass-edge); text-align: center;
+}
+.feed-panel-handle:hover {
+  color: var(--accent);
+  background: var(--btn-gloss), var(--accent-glow);
+  text-shadow: 0 0 10px var(--accent-glow);
+}
+.feed-panel-body { flex: 1; overflow-y: auto; overflow-x: hidden; }
+.feed-panel.collapsed .feed-panel-body { display: none; }
+.feed { padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+
+/* ═══ SKELETON ═══ */
+.skeleton {
+  background: linear-gradient(110deg, var(--surface2) 30%, var(--glass-edge) 50%, var(--surface2) 70%);
+  background-size: 200% 100%; animation: skeleton-loading 1.6s infinite;
+  border-radius: var(--radius);
+}
+@keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.skeleton-card { height: 120px; width: 100%; margin-bottom: 14px; }
+
+/* ═══ DEMON CARD — glossy bubble Aero ═══ */
+.demon-card {
+  position: relative; overflow: hidden;
+  background: var(--gloss), var(--surface-solid);
+  border: 1px solid var(--glass-edge);
+  border-bottom-color: rgba(160,190,220,0.5);
+  border-radius: var(--radius-lg); padding: 18px;
+  box-shadow: var(--aero-shadow-glass);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+.demon-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 45%;
+  background: var(--aero-gloss-gradient); pointer-events: none; z-index: 0;
+}
+.demon-card > * { position: relative; z-index: 1; }
+.demon-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.demon-avatar {
+  font-size: 28px; flex-shrink: 0;
+  filter: drop-shadow(0 3px 6px var(--accent-glow));
+}
+.demon-name {
+  font-weight:800; color:var(--accent); font-size:15px; letter-spacing:-0.3px;
+  text-shadow: 0 0 14px var(--accent-glow), var(--aero-text-emboss);
+}
+.demon-role { font-size:11px; color:var(--text2); }
+.demon-body { font-size:13px; color:var(--text); line-height:1.8; }
+
+/* (Les règles .sister-* ont été retirées le 18/09/2026 : 0 émission JS depuis la refonte
+   live-only du 10/09 — vérifié sur le DOM rendu et sur tout le code du fichier.) */
+.badge {
+  font-size: 10px; padding: 3px 8px; border-radius: var(--radius-sm);
+  font-weight: 600; white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.3);
+}
+.badge-hausser { background: rgba(13,158,136,0.1); color: var(--hausser); border: 1px solid rgba(13,158,136,0.25); }
+.badge-baissier { background: rgba(232,93,66,0.1); color: var(--baissier); border: 1px solid rgba(232,93,66,0.25); }
+
+/* ═══ AVATAR ORBS — glossy 3D spheres ═══ */
+.avatar-orb {
+  width: 42px; height: 42px; border-radius: 50%; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: bold; font-size: 18px; color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6); flex-shrink: 0;
+  background: radial-gradient(circle at 35% 30%, #60c5ff 0%, #0077e6 50%, #003b99 85%, #001a50 100%);
+  border: 1px solid rgba(255,255,255,0.8);
+  box-shadow: 0 3px 8px rgba(0,20,50,0.35),
+              inset 0 -3px 6px rgba(0,0,0,0.4),
+              inset 0 3px 6px rgba(255,255,255,0.6);
+}
+.avatar-orb::after {
+  content: ''; position: absolute; top: 3px; left: 7px;
+  width: 26px; height: 13px;
+  border-radius: 15px 15px 8px 8px / 12px 12px 4px 4px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.1) 100%);
+  pointer-events: none;
+}
+/* ═══ LOADING / ERROR ═══ */
+.loading { text-align:center; padding:48px; color:var(--text2); }
+.error {
+  text-align:center; padding:40px; color:var(--red);
+  background: var(--gloss), var(--surface);
+  border: 1px solid rgba(224,74,58,0.4); border-radius: var(--radius);
+  margin: 16px;
+}
+
+/* ═══ DROPDOWN ═══ */
+.ind-dropdown { display: inline-block; flex-shrink: 0; }
+.ind-dropdown-btn {
+  background: var(--btn-gloss), var(--surface2);
+  border: 1px solid var(--glass-edge); color: var(--text);
+  padding: 4px 14px; border-radius: var(--radius-lg);
+  cursor: pointer; font-size: 11px; font-weight: 600;
+  white-space: nowrap; transition: all 0.2s cubic-bezier(0.25,0.8,0.25,1.2);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.5);
+}
+.ind-dropdown-btn:hover {
+  border-color: var(--accent); color: var(--accent);
+  box-shadow: 0 4px 16px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.5);
+  transform: translateY(-1px);
+}
+.ind-dropdown-menu {
+  display: none; position: fixed; z-index: 999;
+  background: var(--gloss), var(--surface-solid);
+  backdrop-filter: blur(30px) saturate(1.5); -webkit-backdrop-filter: blur(30px) saturate(1.5);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius-lg);
+  min-width: 270px; max-height: 60vh; overflow-y: auto;
+  box-shadow: 0 16px 48px rgba(40,120,160,0.25),
+              inset 0 1px 0 rgba(255,255,255,0.4);
+  padding: 8px 0;
+}
+.ind-dropdown-menu.open { display: block; }
+.ind-dropdown-menu .cat-title {
+  font-size: 9px; font-weight: 700; color: var(--text2);
+  text-transform: uppercase; padding: 8px 16px 3px; letter-spacing: 1px;
+}
+.ind-dropdown-menu .cat-title:first-child { padding-top: 10px; }
+.ind-dropdown-menu label {
+  display: flex; align-items: center; gap: 8px; padding: 5px 16px;
+  font-size: 12px; cursor: pointer; transition: background 0.15s;
+}
+.ind-dropdown-menu label:hover { background: var(--surface2); }
+.ind-dropdown-menu label input { margin: 0; accent-color: var(--accent); }
+.ind-dropdown-menu label .tag {
+  font-size: 8px; padding: 2px 6px; border-radius: 4px; margin-left: auto;
+  font-weight: 700;
+}
+.tag-ov { background: rgba(59,142,212,0.12); color: #3b8ed4; }
+.tag-sg { background: rgba(192,125,16,0.12); color: #c07d10; }
+
+/* ═══ SCROLLBARS — aqua glass ═══ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(130,200,230,0.6), rgba(80,170,210,0.4));
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(80,180,210,0.8), rgba(60,160,200,0.6));
+}
+
+/* ═══ KEYBOARD HINT ═══ */
+.kbd-hint {
+  font-size: 10px; color: var(--text2);
+  border: 1px solid var(--border); padding: 2px 6px;
+  border-radius: 4px; background: var(--btn-gloss), var(--surface2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PHOTOGRAPHIE DE FOND (z-index: -1)
+   Frutiger Aero = « surfaces imitant le VERRE et l'EAU » + photo de
+   nature idéalisée (ciel, bokeh, bulles, caustiques, soleil) par-dessus
+   laquelle on pose du verre dépoli. Les couches ambiantes vivent donc
+   DERRIÈRE l'UI : c'est ce que `backdrop-filter` a à dépoli. Le canvas
+   garde son fond opaque (--canvas-bg) → lisibilité des données intacte.
+   Aucun asset externe, tout en dégradés CSS.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ═══ P#4 AURORA — rideaux d'aurore boréale (bandes, pas une brume) ═══ */
+/* ═══ BOKEH — profondeur de champ (motif central, absent jusqu'ici) ═══
+   « soft, out-of-focus light patterns known as bokeh ». Disques de tailles
+   et de teintes variées (blanc, cyan, vert d'eau, jaune solaire) = flou
+   d'arrière-plan d'une photo. Un seul élément, statique, un seul calque. */
+/* ═══ EAU — bulles + caustiques (l'autre moitié de « verre ET eau ») ═══
+   Bulle = cerne lumineux + point spéculaire décalé, centre transparent.
+   Chaque bulle = 2 dégradés de même `background-position`/`-size` (le tile),
+   donc cerne et reflet restent alignés quelle que soit la taille. */
+/* « Energetic » du backronym Aero : dérive lente, transform seul (composité) */
+/* Ambiance décorative : la respecter coûte plus qu'elle ne rapporte */
+@media (prefers-reduced-motion: reduce) {
+}
+
+/* ═══ P#4 HEADER ORB — globe terrestre en verre ═══
+   « A recurring symbol is the Earth globe, used to represent the increasing
+   global connectivity of the internet » (Aesthetics Wiki). L'orbe était une
+   simple sphère bleue : c'est LE symbole récurrent du style, il manquait.
+   Le 🔮 du markup est masqué (font-size 0) — le globe le remplace. */
+.header-orb {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  background:
+    /* calotte polaire + masses continentales (ordre : le premier est au-dessus) */
+    radial-gradient(ellipse 58% 20% at 50% 3%, rgba(255,255,255,0.9) 0%, transparent 72%),
+    radial-gradient(ellipse 28% 20% at 31% 43%, #46bb74 0 62%, transparent 64%),
+    radial-gradient(ellipse 22% 27% at 67% 63%, #37ab68 0 62%, transparent 64%),
+    radial-gradient(ellipse 17% 14% at 57% 27%, #52c481 0 62%, transparent 64%),
+    radial-gradient(ellipse 13% 18% at 80% 44%, #46bb74 0 62%, transparent 64%),
+    /* océan + sphère */
+    radial-gradient(circle at 35% 25%, #ffffff 0%, #7ee0f2 18%, #2f8ad8 52%, #0b2a5c 84%, #05122a 100%);
+  border: 1px solid rgba(255,255,255,0.9);
+  box-shadow: 0 0 12px rgba(59,130,246,0.5),
+              inset 0 -2px 4px rgba(0,0,0,0.5),
+              inset 0 2px 4px rgba(255,255,255,0.9);
+  position: relative; display: flex; align-items: center; justify-content: center;
+  font-size: 0;
+}
+.header-orb::after {
+  content: ''; position: absolute; top: 2px; left: 6px;
+  width: 20px; height: 9px;
+  border-radius: 10px 10px 4px 4px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 100%);
+}
+
+/* ═══ P#4 TASKBAR — Vista glass status bar ═══ */
+.aero-taskbar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 30px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px; font-size: 11px; z-index: 2000; color: var(--text2);
+  background: linear-gradient(180deg,
+    rgba(240,248,255,0.85) 0%, rgba(200,225,250,0.65) 45%,
+    rgba(170,205,240,0.75) 50%, rgba(190,220,250,0.9) 100%);
+  border-top: 1px solid rgba(255,255,255,0.9);
+  box-shadow: 0 -2px 10px rgba(0,30,60,0.12);
+  backdrop-filter: blur(12px) saturate(1.8); -webkit-backdrop-filter: blur(12px) saturate(1.8);
+}
+.dark .aero-taskbar {
+  color: #7ab8d4;
+  background: linear-gradient(180deg,
+    rgba(20,40,65,0.85) 0%, rgba(10,20,35,0.7) 45%,
+    rgba(5,10,20,0.85) 50%, rgba(15,30,50,0.9) 100%);
+  border-top: 1px solid rgba(0,180,255,0.3);
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.6);
+}
+.aero-taskbar .taskbar-left { display: flex; align-items: center; gap: 12px; }
+.aero-taskbar .taskbar-right { display: flex; align-items: center; gap: 10px; }
+.aero-taskbar .taskbar-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  box-shadow: 0 0 6px var(--green);
+  transition: background 0.3s;
+}
+
+/* ═══ TYPO — Vista embossed headers ═══ */
+h1, h2, h3, .dashboard-title {
+  letter-spacing: 0.03em;
+  text-shadow: var(--aero-text-emboss);
+}
+
+
+/* ═══ GRID BOT SECTION — bottom panel under chart ═══ */
+.strat-section {
+  flex-shrink: 0; overflow: hidden;
+  border-top: 1px solid var(--glass-edge);
+  background: var(--gloss), var(--surface);
+  backdrop-filter: var(--hyalite, blur(20px) saturate(1.3)); -webkit-backdrop-filter: var(--hyalite, blur(20px) saturate(1.3));
+  box-shadow: var(--hyalite-edge, none);
+  transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 28px; /* collapsed */
+}
+/* Ouvert : la phrase « comment ça marche » + l'aperçu de grille occupent ~40 px de plus qu'avant.
+   280 px obligeaient à scroller DANS la section pour atteindre TP / SL / Du / Au. 46dvh s'adapte
+   aux fenêtres courtes, le max garde le graphe utilisable sur un écran normal. */
+.strat-section:not(.collapsed) { height: 320px; height: min(46dvh, 320px); }
+.strat-handle {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 28px; padding: 0 18px; cursor: pointer;
+  font-size: 12px; font-weight: 700; color: var(--accent);
+  background: var(--btn-gloss), var(--surface2);
+  border-bottom: 1px solid var(--glass-edge);
+  user-select: none; letter-spacing: 0.3px;
+  text-shadow: var(--aero-text-emboss);
+}
+.strat-handle:hover { color: var(--accent); text-shadow: 0 0 12px var(--accent-glow); }
+.strat-handle-arrow { font-size: 14px; transition: transform 0.3s; }
+.strat-section:not(.collapsed) .strat-handle-arrow { transform: rotate(90deg); }
+.strat-body { height: calc(100% - 28px); overflow-y: auto; padding: 12px 18px; }
+/* Replié, la section fait 28 px et le corps `calc(100% - 28px)` = 0 + padding
+   → 24 px de haut, toujours en `overflow-y: auto` : barre de défilement
+   parasite dans cette bande. Même traitement que le feed-panel. */
+.strat-section.collapsed .strat-body { display: none; }
+.strat-cols { display: flex; gap: 18px; height: 100%; }
+/* Config sur 2 colonnes, lues par paires : (Capital|Niveaux) (Prix inf|Prix sup) (TP|SL) (Du|Au).
+   8 champs empilés + l'aperçu de grille débordaient du corps (356 px pour 292) : il fallait
+   scroller DANS la section pour atteindre TP / SL / Du / Au. L'ordre des params de gridParams()
+   fait ces paires — ne pas déplacer gridLevels. Le `>` est obligatoire : avec `display: contents`
+   les champs de #stratParams restent des enfants du DOM, `:first-child` les viserait. */
+.strat-col-config { flex: 0 0 460px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; align-content: start; }
+.strat-col-config > .strat-row:first-child, .strat-col-config > .strat-help { grid-column: 1 / -1; }
+#stratParams { display: contents; }
+.strat-col-actions { flex: 0 0 130px; display: flex; flex-direction: column; gap: 5px; }
+.strat-col-stats { flex: 1; min-width: 200px; font-size: 11px; }
+
+/* Override grid bot panel styles — now inline/horizontal */
+.strat-section .strat-row { display: flex; align-items: center; margin-bottom: 6px; gap: 6px; }
+.strat-section .strat-row label { min-width: 75px; font-size: 10px; color: var(--text2); font-weight: 600; }
+.strat-section .strat-row select,
+.strat-section .strat-row input[type="number"],
+.strat-section .strat-row input[type="datetime-local"] {
+  flex: 1; padding: 3px 6px; font-size: 11px;
+  background: var(--surface2); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-family: var(--font);
+}
+.strat-section .strat-btn {
+  padding: 5px 10px; font-size: 11px; font-weight: 700; cursor: pointer; border: none;
+  border-radius: var(--radius-sm); font-family: var(--font);
+  background: var(--btn-gloss), linear-gradient(135deg, var(--accent), #006d7a);
+  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  box-shadow: var(--aero-shadow-glass); transition: transform 0.1s;
+}
+.strat-section .strat-btn:hover { transform: scale(1.02); }
+.strat-section .strat-btn.secondary {
+  background: var(--btn-gloss), var(--surface2); color: var(--text);
+}
+.strat-section .strat-btn.forward {
+  background: var(--btn-gloss), linear-gradient(135deg, #26a69a, #00695c);
+}
+.strat-section .strat-stats {
+  padding: 8px; background: var(--surface2);
+  border-radius: var(--radius-sm); border: 1px solid var(--border);
+  line-height: 1.6; font-size: 11px;
+}
+/* « Comment ça marche » + aperçu de la grille (sous le select Stratégie, au-dessus des params) */
+.strat-help { font-size: 10px; line-height: 1.45; color: var(--text2); margin: -2px 0 7px; }
+.strat-help .strat-auto { color: var(--text); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.strat-stats .verdict { font-weight: 700; margin-bottom: 5px; }
+.strat-stats .strat-note { margin-top: 4px; color: var(--text2); font-size: 10px; }
+.strat-section .strat-toggle {
+  font-size: 10px; color: var(--accent); cursor: pointer;
+  text-align: center; text-decoration: underline; margin-top: 4px;
+}
+.strat-section input.auto-mode {
+  opacity: 0.45; font-style: italic;
+}
+.stat-val { font-weight: 700; color: var(--accent); }
+.stat-pos { color: #26a69a; font-weight: 700; }
+.stat-neg { color: #ef5350; font-weight: 700; }
+/* ══ LIQUID GLASS v2 (15/09/2026) — le DÉTAIL des principes et les mesures sont dans le skill frutiger-aero-css §« REFONTE liquid glass ». Résumé : gouttières (couches flottantes) + fond vif ET structuré + teinte ~0,28 + arête spéculaire. Structure nikdelvin (MIT) : z0 fond / z1 trame / z2 filtre hyalite / z3 contenu — le TEXTE ne doit jamais être dans le nœud filtré. Inséré AVANT le bloc RESPONSIVE : les @media mobiles doivent gagner la cascade. ══ */
+
+:root {
+  --lg-r-bar: 999px;          /* capsules : barres */
+  --lg-r-card: 32px;          /* squircles : cartes */
+  --lg-gutter: 13px;          /* la gouttière par où le fond apparaît */
+  --lg-gap: 11px;
+  --lg-tint: rgba(255,255,255,0.62);
+  --lg-tint-solid: rgba(255,255,255,0.80);
+  --lg-tint-hi: rgba(255,255,255,0.92);
+  /* Cerne lumineux directionnel — valeurs de rdev/liquid-glass-react (MIT) : « 0 0 0 0.5px … inset, 0 1px 3px … inset, 0 1px 4px rgba(0,0,0,0.35) ». Un cerne SANS biseau : c'est ce qui remplace la pliure rejetée. */
+  --lg-rim: 0 1px 0 rgba(255,255,255,0.85) inset,
+            0 0 0 0.5px rgba(255,255,255,0.55) inset,
+            0 1px 3px rgba(255,255,255,0.30) inset,
+            0 -1px 2px rgba(255,255,255,0.28) inset,
+            0 1px 4px rgba(0,0,0,0.30) inset;
+  --lg-shadow: 0 22px 52px rgba(4,22,44,0.34), 0 4px 12px rgba(4,22,44,0.20);
+  --lg-shadow-sm: 0 6px 18px rgba(5,28,52,0.24), 0 1px 4px rgba(5,28,52,0.16);
+}
+
+/* ── 1. LE FOND VIVANT — vif ET saturé (un verre sur un aplat pâle = plastique blanc : c'est la couleur qui traverse qui fait le verre). Sur `body`, jamais un `body::before` en z-index négatif : le fond propagé au canvas le recouvre. */
+body {
+  background:
+    radial-gradient(circle at 15% 20%, rgba(255,255,255,0.30) 0 46px, rgba(255,255,255,0) 47px),
+    radial-gradient(circle at 82% 15%, rgba(255,255,255,0.20) 0 88px, rgba(255,255,255,0) 89px),
+    radial-gradient(circle at 38% 78%, rgba(255,255,255,0.16) 0 130px, rgba(255,255,255,0) 131px),
+    radial-gradient(circle at 8% 62%,  rgba(255,255,255,0.18) 0 66px, rgba(255,255,255,0) 67px),
+    radial-gradient(circle at 92% 82%, rgba(255,255,255,0.17) 0 104px, rgba(255,255,255,0) 105px),
+    radial-gradient(68% 52% at 14% 6%,   rgba(150,132,255,0.52) 0%, rgba(150,132,255,0) 62%),
+    radial-gradient(62% 50% at 88% 16%,  rgba(126,176,255,0.48) 0%, rgba(126,176,255,0) 64%),
+    radial-gradient(78% 62% at 76% 94%,  rgba(202,158,246,0.44) 0%, rgba(202,158,246,0) 66%),
+    radial-gradient(52% 44% at 26% 86%,  rgba(140,168,236,0.40) 0%, rgba(140,168,236,0) 60%),
+    linear-gradient(158deg, #a6b1e8 0%, #b8c2ee 26%, #cbd3f3 50%, #dce2f8 70%, #eaeefc 88%, #f7fafe 100%);
+  background-attachment: fixed;
+}
+body.dark {
+  background:
+    radial-gradient(76% 56% at 14% 8%,   rgba(96,72,210,0.38) 0%, rgba(96,72,210,0) 62%),
+    radial-gradient(68% 54% at 86% 16%,  rgba(50,110,210,0.32) 0%, rgba(50,110,210,0) 64%),
+    radial-gradient(84% 66% at 74% 94%,  rgba(140,70,190,0.30) 0%, rgba(140,70,190,0) 66%),
+    linear-gradient(158deg, #080a1c 0%, #0d1130 30%, #141a44 56%, #1c2456 80%, #232c66 100%);
+  background-attachment: fixed;
+}
+/* Trame : juste assez de structure pour que la réfraction ait à courber. */
+.aero-grid { opacity: 0.6; }
+/* Les couches d'ambiance (aurore/bokeh/eau) ont été retirées — voiles clairs. */
+
+/* ── 2. LES GOUTTIÈRES — `body` flex column : `gap` = entre les bandes, `padding` = aux bords. Sans elles, rien à traverser. */
+body { padding: var(--lg-gutter); padding-bottom: 46px; gap: var(--lg-gap); }
+.main-area { gap: var(--lg-gap); padding: 0; }
+
+/* ── 3. LE VERRE — hyalite sur les GRANDES surfaces seulement (invisible sur une barre de 30-40 px, et le coût croît avec le nombre de surfaces). Le givre de chaque `var(--hyalite, …)` est le repli Safari/Firefox : pas de régression. */
+.header, .indicator-bar, .chart-container, .feed-panel,
+.strat-section, .aero-taskbar {
+  background: var(--lg-tint);
+  border: none;
+  box-shadow: var(--lg-shadow), var(--lg-rim), var(--hyalite-edge, none);
+  overflow: hidden; position: relative;
+  /* Une seule déclaration pour les six : le repli est le même partout. */
+  backdrop-filter: var(--hyalite, blur(16px) saturate(1.9)); -webkit-backdrop-filter: var(--hyalite, blur(16px) saturate(1.9));
+}
+.header {
+  margin: 0; padding: 9px 16px; border-radius: var(--lg-r-bar);
+}
+.indicator-bar {
+  margin: 0; padding: 5px 12px; border-radius: var(--lg-r-bar);
+  border-bottom: none;
+}
+.chart-container {
+  /* 8 px de bord ne laissaient aucun bord de verre : la réfraction n'avait pas de quoi exister. 16 px lui en donnent un. C'est le prix : 8 px de graphe en moins par côté. */
+  padding: 16px; border-radius: var(--lg-r-card);
+  /* Le flou vit dans .lg-ring, pas sur la surface entière : le canvas opaque couvre tout
+     l'intérieur, mais Chromium recomposait le flou de 1404×632 à CHAQUE frame du canvas
+     (1687 → 265 ms/frame mesurés, 3000 bougies + heatmap, rendu logiciel). */
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+/* Anneau : même verre, masqué à la bande de bord (padding du conteneur), sous le canvas. */
+.lg-ring {
+  position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0;
+  padding: inherit;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  backdrop-filter: var(--hyalite, blur(16px) saturate(1.9));
+  -webkit-backdrop-filter: var(--hyalite, blur(16px) saturate(1.9));
+  box-shadow: var(--hyalite-edge, none);
+}
+.feed-panel {
+  border-left: none; border-radius: var(--lg-r-card);
+}
+.strat-section {
+  border-top: none; border-radius: var(--lg-r-card);
+}
+.aero-taskbar {
+  /* ⚠️ `fixed` doit être RÉAFFIRMÉ ici : le bloc « six surfaces » ci-dessus impose `relative`,
+     et `bottom: 13px` ne serait plus qu'un décalage vers le haut (recouvrait le bas du Grid Bot
+     de 2 px, 59 px de vide sous la barre, mesuré). La taskbar est ancrée à la fenêtre. */
+  position: fixed;
+  left: var(--lg-gutter); right: var(--lg-gutter); bottom: var(--lg-gutter);
+  border-top: none; border-radius: var(--lg-r-bar); padding: 0 16px;
+}
+
+/* ── 4. LES PASTILLES — segmented control : inactif = texte seul, actif = pastille pleine. Sur 23 pastilles, seule façon de rester lisible sans réintroduire les 46 contours. */
+.indicator-bar label {
+  color: #10233d;
+  border-radius: var(--lg-r-bar); padding: 5px 12px;
+  /* Un fond doux, PAS un contour : sans lui le texte coloré tombait sur le fond d'écran qui défile derrière le verre — surface instable = illisible. */
+  border: 1px solid transparent; background: rgba(255,255,255,0.42);
+  box-shadow: none; text-shadow: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.indicator-bar label:hover { background: rgba(255,255,255,0.66); }
+.dark .indicator-bar label:hover { background: rgba(255,255,255,0.22); }
+.indicator-bar label.active {
+  background: #0b6bcb; color: #fff; font-weight: 700;
+  box-shadow: 0 1px 5px rgba(6,40,80,0.40), inset 0 1px 0 rgba(255,255,255,0.35);
+}
+.dark .indicator-bar label.active { background: #0f86d8; color: #fff; }
+.indicator-bar label.active .ind-label { color: #fff; }
+.indicator-bar .section-title { opacity: 0.68; font-weight: 600; letter-spacing: 0.4px; }
+.indicator-bar .sep { opacity: 0.5; height: 18px; }
+
+/* Les pastilles du header : capsules plates, comme les boutons d'Apple. */
+.price-badge, .cycle-badge, .theme-btn, .strat-btn, .ind-dropdown-btn {
+  border: 1px solid transparent !important;
+  border-radius: var(--lg-r-bar);
+  background: var(--lg-tint-solid) !important;
+  box-shadow: var(--lg-shadow-sm), var(--lg-rim) !important;
+  text-shadow: none !important;
+}
+.price-badge { font-size: 15px; padding: 5px 15px; }
+.theme-btn:hover, .strat-btn:hover, .ind-dropdown-btn:hover {
+  background: var(--lg-tint-hi) !important; transform: none !important;
+}
+.theme-btn:active, .strat-btn:active { transform: scale(0.97) !important; }
+
+/* ⚠️ La règle de groupe ci-dessus écrase le FOND des boutons en verre clair, mais la base
+   garde `color:#fff` : « ▶ Backtest » et « 🔴 Forward » s'écrivaient blanc sur blanc — les
+   deux actions principales étaient illisibles. Le fond plein est réaffirmé ici. */
+.strat-btn { background: linear-gradient(135deg, var(--accent), #006d7a) !important; color: #fff !important; }
+.strat-btn.secondary { background: var(--lg-tint-solid) !important; color: var(--text) !important; }
+.strat-btn.forward { background: linear-gradient(135deg, #26a69a, #00695c) !important; color: #fff !important; }
+
+/* ── 4bis. FOND DU CANVAS = celui du site, dans un arc sûr (loin du rouge/teal). */
+.chart-container canvas {
+  /* Ombre interne : le contenu se lit creusé sous la matière, pas posé dessus. */
+  background:
+    radial-gradient(60% 50% at 12% 8%,  rgba(146,128,250,0.22) 0%, rgba(146,128,250,0) 62%),
+    radial-gradient(55% 45% at 88% 14%, rgba(126,176,255,0.20) 0%, rgba(126,176,255,0) 64%),
+    radial-gradient(70% 55% at 72% 92%, rgba(196,152,246,0.18) 0%, rgba(196,152,246,0) 66%),
+    linear-gradient(160deg, #eceffb 0%, #f0f2fd 45%, #f7f9ff 100%);
+  box-shadow: inset 0 0 20px rgba(58,78,140,0.075),
+              inset 0 1px 0 rgba(255,255,255,0.6);
+}
+.dark .chart-container canvas, body.dark .chart-container canvas {
+  background: linear-gradient(160deg, #0b1120 0%, #101728 48%, #151d32 100%);
+}
+
+html[data-glass="degrade"] .chart-container .lg-ring, html[data-glass="degrade"] .feed-panel,
+html[data-glass="degrade"] .strat-section {
+  backdrop-filter: blur(16px) saturate(1.9) !important; -webkit-backdrop-filter: blur(16px) saturate(1.9) !important;
+}
+
+/* ── 5. L'ARÊTE SPÉCULAIRE — anneau de 1,5 px au masque + dégradé angulaire à 135deg (rdev/liquid-glass-react, MIT). Détail : skill frutiger-aero-css. */
+.header::after, .indicator-bar::after, .chart-container::after,
+.feed-panel::after, .strat-section::after, .aero-taskbar::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  pointer-events: none; padding: 1.5px;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.34) 30%,
+                    rgba(255,255,255,0.62) 62%, rgba(255,255,255,0) 100%),
+    linear-gradient(315deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.26) 38%,
+                    rgba(255,255,255,0) 72%);
+  mix-blend-mode: screen;
+}
+/* Typographie : Apple laisse respirer, les intitulés se lisent APRÈS les données. */
+.stat-val, .feed-val, .stat-label { text-shadow: none; }
+
+/* ── 6. DARK — même structure : teinte, cerne, réfraction. */
+body.dark .header, body.dark .indicator-bar, body.dark .chart-container,
+body.dark .feed-panel, body.dark .strat-section, body.dark .aero-taskbar {
+  background: rgba(18,30,46,0.60);
+  box-shadow: var(--lg-shadow), inset 0 0 0 0.5px rgba(255,255,255,0.16),
+              0 1px 3px rgba(255,255,255,0.08) inset, var(--hyalite-edge, none);
+}
+body.dark .price-badge, body.dark .cycle-badge, body.dark .theme-btn,
+body.dark .strat-btn, body.dark .ind-dropdown-btn {
+  background: rgba(26,42,62,0.78) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   AERO SUBLIMÉ (04/10/2026) — même identité verre liquide, portée plus haut.
+   Ce bloc ne crée AUCUNE nouvelle surface `backdrop-filter` (la réfraction coûte déjà
+   l'essentiel du budget de frame) et n'anime jamais le fond derrière le verre.
+   Couleurs hausse / baisse et palette des overlays VALIDÉES au script (luminosité, chroma,
+   séparation daltonisme, contraste) sur les fonds réels du graphique, dans les deux thèmes.
+   ══════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --font: 'Segoe UI Variable Text', 'Segoe UI Variable', -apple-system, BlinkMacSystemFont,
+          'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;
+  /* Encre : trois niveaux, contraste AA (≥ 4,5:1) mesuré sur la carte claire. */
+  --ink-1: #10233d; --ink-2: #45597a; --ink-3: #5f6e8c;
+  --text: var(--ink-1); --text2: var(--ink-2);
+  /* Marques (bougies, barres) — validées ≥ 3:1 sur le fond du graphique.
+     #0f9d7a mesurait 2,99:1 sur la borne la plus défavorable du canvas clair (#eceffb) :
+     sous le seuil WCAG 1.4.11 de 0,01. #0d9672 mesure 3,26:1 sur cette même borne
+     (et 3,55:1 sur #f7f9ff), en gardant ΔE 12,5 en protanopie contre le rouge.
+     Mesure reproductible : tests/test_palette.py. */
+  --up: #0d9672; --down: #e5484d;
+  /* Texte signé — plus foncé que la marque : AA sur le verre clair. */
+  --up-ink: #0a7d62; --down-ink: #c8323a;
+  --up-soft: rgba(13,150,114,0.13); --down-soft: rgba(229,72,77,0.12);
+  --green: var(--up); --red: var(--down); --hausser: var(--up-ink); --baissier: var(--down-ink);
+  --accent: #0b84b0; --accent-2: #4f5fe0;
+  --brand: linear-gradient(120deg, #13b4d4 0%, #4f6cf0 55%, #8b5cf6 100%);
+  --accent-glow: rgba(79,108,240,0.30);
+  --hairline: rgba(36,56,110,0.10);
+  --rail: rgba(36,56,110,0.08);
+  --card: rgba(255,255,255,0.76);
+  --card-solid: #ffffff;
+  --card-edge: rgba(255,255,255,0.95);
+  --card-shadow: 0 1px 2px rgba(16,35,61,0.06), 0 12px 30px -10px rgba(30,45,110,0.26);
+}
+.dark {
+  --ink-1: #e8edff; --ink-2: #a9b5d6; --ink-3: #8391b5;
+  --up: #1eac85; --down: #c93b48;
+  --up-ink: #3fd6a6; --down-ink: #ff7d84;
+  --up-soft: rgba(30,172,133,0.18); --down-soft: rgba(201,59,72,0.22);
+  --accent: #38bdf8; --accent-2: #8b9bff;
+  --brand: linear-gradient(120deg, #1fbfe2 0%, #5b7bff 55%, #9d74ff 100%);
+  --accent-glow: rgba(110,130,255,0.34);
+  --hairline: rgba(170,190,255,0.11);
+  --rail: rgba(170,190,255,0.09);
+  --card: rgba(24,32,62,0.74);
+  --card-solid: #1a2244;
+  --card-edge: rgba(255,255,255,0.07);
+  --card-shadow: 0 1px 2px rgba(0,0,0,0.35), 0 16px 36px -12px rgba(0,0,0,0.65);
+}
+::selection { background: rgba(79,108,240,0.24); }
+:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+/* ── Le ciel : aurore plus profonde (statique — rien ne bouge derrière le verre). */
+body {
+  background:
+    radial-gradient(circle at 15% 20%, rgba(255,255,255,0.30) 0 46px, rgba(255,255,255,0) 47px),
+    radial-gradient(circle at 82% 15%, rgba(255,255,255,0.22) 0 88px, rgba(255,255,255,0) 89px),
+    radial-gradient(circle at 38% 78%, rgba(255,255,255,0.16) 0 130px, rgba(255,255,255,0) 131px),
+    radial-gradient(circle at 92% 82%, rgba(255,255,255,0.17) 0 104px, rgba(255,255,255,0) 105px),
+    radial-gradient(40% 36% at 88% 6%,  rgba(80,214,236,0.55) 0%, rgba(80,214,236,0) 70%),
+    radial-gradient(64% 50% at 10% 4%,  rgba(128,112,255,0.58) 0%, rgba(128,112,255,0) 64%),
+    radial-gradient(72% 56% at 82% 100%, rgba(244,150,210,0.44) 0%, rgba(244,150,210,0) 66%),
+    radial-gradient(52% 44% at 20% 94%, rgba(110,190,255,0.42) 0%, rgba(110,190,255,0) 62%),
+    linear-gradient(160deg, #9ea8ec 0%, #b7bff1 28%, #d1d7f7 56%, #e6ebfb 80%, #f6f8fe 100%);
+  background-attachment: fixed;
+}
+body.dark {
+  background:
+    radial-gradient(42% 36% at 90% 4%,  rgba(34,190,230,0.22) 0%, rgba(34,190,230,0) 68%),
+    radial-gradient(70% 56% at 10% 4%,  rgba(108,76,232,0.42) 0%, rgba(108,76,232,0) 64%),
+    radial-gradient(82% 62% at 80% 100%, rgba(176,70,200,0.30) 0%, rgba(176,70,200,0) 66%),
+    radial-gradient(50% 40% at 18% 96%, rgba(40,110,230,0.26) 0%, rgba(40,110,230,0) 62%),
+    linear-gradient(160deg, #06081a 0%, #0b0f2e 32%, #111743 60%, #182059 100%);
+  background-attachment: fixed;
+}
+body.dark .header, body.dark .indicator-bar, body.dark .chart-container,
+body.dark .feed-panel, body.dark .strat-section, body.dark .aero-taskbar {
+  background: rgba(16,22,50,0.62);
+}
+
+/* ── En-tête ─────────────────────────────────────────────────────────────────── */
+.header-left h1 {
+  font-size: 20px; font-weight: 750; letter-spacing: -0.2px;
+  background: var(--brand); -webkit-background-clip: text; background-clip: text;
+  color: transparent; -webkit-text-fill-color: transparent; text-shadow: none;
+}
+/* Orbite : un anneau incliné tourne autour du globe en une minute — le cycle. */
+.header-orb { overflow: visible; }
+.header-orb::before {
+  content: ''; position: absolute; inset: -5px -10px; border-radius: 50%;
+  border: 1.5px solid rgba(79,108,240,0.55); border-top-color: transparent;
+  transform: rotate(-22deg); animation: orbite 60s linear infinite; pointer-events: none;
+}
+.dark .header-orb::before { border-color: rgba(139,155,255,0.6); border-top-color: transparent; }
+@keyframes orbite { to { transform: rotate(338deg); } }
+
+.header .price-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 16px; font-weight: 650; letter-spacing: -0.2px;
+  color: var(--ink-1) !important; font-variant-numeric: tabular-nums;
+}
+.header .price-badge.price-up, .header .price-badge.price-down { color: var(--ink-1) !important; }
+.price-badge.price-up::before, .price-badge.price-down::before {
+  content: ''; width: 0; height: 0; border-left: 4.5px solid transparent; border-right: 4.5px solid transparent;
+}
+.price-badge.price-up::before { border-bottom: 7px solid var(--up); }
+.price-badge.price-down::before { border-top: 7px solid var(--down); }
+.cycle-badge { color: var(--ink-1); font-weight: 650; }
+.cycle-badge .mchip { white-space: nowrap; }
+.cycle-badge .mchip + .mchip { margin-left: 12px; }
+.cycle-badge .mchip i {
+  font-style: normal; font-size: 9.5px; font-weight: 700; letter-spacing: 0.6px;
+  color: var(--ink-3); margin-right: 5px;
+}
+/* Boutons-icônes ronds (SVG inline : même dessin sur tous les systèmes, contrairement aux émojis). */
+.theme-btn.ico-btn {
+  width: 34px; height: 34px; padding: 0 !important; color: var(--ink-2);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: color .15s ease, background .15s ease;
+}
+.theme-btn.ico-btn svg { width: 17px; height: 17px; display: block; }
+.theme-btn.ico-btn:hover { color: var(--accent-2); }
+.theme-btn.ico-btn.on {
+  color: #fff; background: var(--brand) !important;
+  box-shadow: 0 4px 14px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.35) !important;
+}
+#themeBtn .ico-soleil, .dark #themeBtn .ico-lune { display: none; }
+.dark #themeBtn .ico-soleil { display: block; }
+#updated { color: var(--ink-3) !important; font-weight: 600; }
+/* Point « live » : une onde qui s'élargit plutôt qu'un clignotement. */
+.refresh-dot { position: relative; animation: none; box-shadow: 0 0 0 3px var(--up-soft); }
+.refresh-dot::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%; background: inherit;
+  animation: onde 2.4s cubic-bezier(.2,.6,.3,1) infinite;
+}
+.refresh-dot.calme { box-shadow: none; }
+.refresh-dot.calme::after { animation: none; opacity: 0; }
+@keyframes onde { from { transform: scale(1); opacity: 0.55; } to { transform: scale(3); opacity: 0; } }
+
+/* ── Ruban d'outils ──────────────────────────────────────────────────────────── */
+.indicator-bar label { color: var(--ink-1); background: rgba(255,255,255,0.38); }
+.dark .indicator-bar label { color: var(--ink-1); background: rgba(255,255,255,0.06); }
+.indicator-bar label .ind-label { color: inherit; display: inline-flex; align-items: center; }
+.indicator-bar label.active, .dark .indicator-bar label.active {
+  background: var(--brand); color: #fff;
+  box-shadow: 0 3px 12px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.35);
+}
+/* Légende DANS la pastille : le point a la couleur exacte de la ligne tracée. */
+.indicator-bar label[style*="--dot"] .ind-label::before {
+  content: ''; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; flex-shrink: 0;
+  background: var(--dot); box-shadow: 0 0 0 2px rgba(255,255,255,0.7);
+}
+.dark .indicator-bar label[style*="--dot"] .ind-label::before { box-shadow: 0 0 0 2px rgba(10,14,36,0.7); }
+.indicator-bar .sep {
+  width: 1px; background: linear-gradient(180deg, transparent, var(--hairline), transparent);
+  border: none; opacity: 1;
+}
+.indicator-bar .section-title { color: var(--ink-3); opacity: 1; font-size: 9px; letter-spacing: 0.8px; }
+.ind-dropdown-btn { color: var(--ink-1) !important; }
+.ind-dropdown-menu {
+  background: var(--card-solid); border: 1px solid var(--hairline); border-radius: 18px;
+  box-shadow: var(--card-shadow); backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.ind-dropdown-menu .cat-title { color: var(--ink-3); letter-spacing: 0.9px; }
+.ind-dropdown-menu label { color: var(--ink-1); border-radius: 10px; margin: 0 6px; }
+.ind-dropdown-menu label:hover { background: var(--rail); }
+
+/* ── Graphique : le canvas garde son fond opaque ; seules les nuances changent. ── */
+.dark .chart-container canvas, body.dark .chart-container canvas {
+  background:
+    radial-gradient(60% 50% at 10% 6%, rgba(108,76,232,0.10) 0%, rgba(108,76,232,0) 62%),
+    radial-gradient(50% 40% at 92% 10%, rgba(34,190,230,0.07) 0%, rgba(34,190,230,0) 64%),
+    linear-gradient(160deg, #0b1120 0%, #101728 48%, #141c34 100%);
+}
+
+/* ── Panneau latéral ─────────────────────────────────────────────────────────── */
+.feed-panel-handle {
+  position: relative; color: var(--ink-2); background: rgba(255,255,255,0.22);
+  border-right: 1px solid var(--hairline); letter-spacing: 3px; font-size: 9.5px;
+}
+.dark .feed-panel-handle { background: rgba(255,255,255,0.03); }
+.feed-panel-handle::after {
+  content: ''; position: absolute; left: 0; top: 22%; bottom: 22%; width: 3px;
+  border-radius: 0 3px 3px 0; background: var(--brand); opacity: 0.85;
+}
+.feed-panel-handle:hover { color: var(--accent-2); background: rgba(255,255,255,0.4); text-shadow: none; }
+.feed { gap: 12px; }
+
+/* ── Cartes : verre posé, une teinte par carte ──────────────────────────────── */
+.demon-card {
+  --teinte: #4f6cf0;
+  background: var(--card); border: 1px solid var(--card-edge); border-radius: 22px;
+  padding: 15px 16px 16px;
+  box-shadow: var(--card-shadow), inset 0 1px 0 rgba(255,255,255,0.65);
+  /* Pas de flou propre : la carte est DANS un panneau déjà en verre — double coût, zéro gain. */
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.dark .demon-card { box-shadow: var(--card-shadow), inset 0 1px 0 rgba(255,255,255,0.06); }
+.demon-card::before {
+  height: 42%; background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0));
+}
+.dark .demon-card::before { background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0)); }
+/* Filet de couleur en tête de carte : l'identité de la carte, discrète. */
+.demon-card::after {
+  content: ''; position: absolute; top: 0; left: 22px; right: 22px; height: 2px;
+  border-radius: 0 0 2px 2px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--teinte), transparent); opacity: 0.7;
+}
+.carte-marche { --teinte: #0ea5c6; } .carte-macro { --teinte: #16a37a; }
+.carte-ind { --teinte: #4f6cf0; }   .carte-micro { --teinte: #8b5cf6; }
+.carte-liq { --teinte: #0891b2; }   .carte-flux { --teinte: #64748b; }
+.carte-live { --teinte: #f59e0b; }  .carte-tape { --teinte: #0ea5e9; }
+.carte-temps { --teinte: #7c8db5; }
+.demon-header { gap: 11px; margin-bottom: 12px; flex-wrap: nowrap; }
+.demon-titres { min-width: 0; }
+.demon-avatar { filter: none; }
+.avatar-orb {
+  width: 34px; height: 34px; color: #fff;
+  background: var(--teinte);
+  background: radial-gradient(circle at 32% 26%, color-mix(in srgb, var(--teinte) 30%, white) 0%,
+              var(--teinte) 55%, color-mix(in srgb, var(--teinte) 70%, black) 100%);
+  border: 1px solid rgba(255,255,255,0.85);
+  box-shadow: 0 4px 12px rgba(30,45,110,0.22), inset 0 -3px 6px rgba(0,0,0,0.22),
+              inset 0 2px 4px rgba(255,255,255,0.5);
+}
+.avatar-orb svg { width: 17px; height: 17px; position: relative; z-index: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25)); }
+.avatar-orb::after { top: 2px; left: 6px; width: 20px; height: 9px; }
+.demon-name { color: var(--ink-1); font-size: 14px; font-weight: 700; letter-spacing: -0.1px; text-shadow: none; }
+.demon-role { font-size: 10.5px; color: var(--ink-3); line-height: 1.35; }
+.demon-right { margin-left: auto; font-size: 10px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.demon-body { font-size: 12px; line-height: 1.5; color: var(--ink-1); }
+@keyframes entree { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.demon-card.entree { animation: entree .55s cubic-bezier(.2,.7,.2,1) both; }
+.demon-card.entree:nth-child(2) { animation-delay: .05s; } .demon-card.entree:nth-child(3) { animation-delay: .1s; }
+.demon-card.entree:nth-child(4) { animation-delay: .15s; } .demon-card.entree:nth-child(5) { animation-delay: .2s; }
+.demon-card.entree:nth-child(6) { animation-delay: .25s; } .demon-card.entree:nth-child(7) { animation-delay: .3s; }
+
+/* Pastilles de texte signées et badges */
+.stat-pos { color: var(--up-ink); font-weight: 700; }
+.stat-neg { color: var(--down-ink); font-weight: 700; }
+.badge {
+  border: none !important; border-radius: 999px; padding: 2px 8px; font-size: 9.5px;
+  font-weight: 700; letter-spacing: 0.4px; box-shadow: none;
+}
+.badge-hausser { background: var(--up-soft); color: var(--up-ink); }
+.badge-baissier { background: var(--down-soft); color: var(--down-ink); }
+.chip {
+  display: inline-flex; align-items: center; gap: 3px; padding: 1px 8px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 650; white-space: nowrap; background: var(--rail); color: var(--ink-2);
+}
+.chip.pos { background: var(--up-soft); color: var(--up-ink); }
+.chip.neg { background: var(--down-soft); color: var(--down-ink); }
+.lbl { font-size: 9.5px; font-weight: 700; letter-spacing: 0.7px; text-transform: uppercase; color: var(--ink-3); }
+.mute { color: var(--ink-3); }
+.fine { font-size: 10.5px; color: var(--ink-3); line-height: 1.45; }
+
+/* Chiffre héros + tuiles */
+.hero { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.hero-val { font-size: 26px; font-weight: 700; letter-spacing: -0.6px; color: var(--ink-1); line-height: 1.15; }
+.tuiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.tuile { background: var(--rail); border-radius: 14px; padding: 8px 11px 9px; min-width: 0; }
+.tuile .val { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; color: var(--ink-1); line-height: 1.3; }
+.tuile .sub { font-size: 10.5px; color: var(--ink-3); }
+.bloc { margin-top: 13px; }
+.bloc-titre { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.ligne { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 8px; }
+
+/* Position dans une plage (bas/haut 24 h, canal S/R) */
+.track { margin-top: 8px; }
+.track-rail { position: relative; height: 6px; border-radius: 999px; background: var(--rail); }
+.track-fill {
+  position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; opacity: 0.55;
+  background: var(--teinte);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--teinte) 15%, transparent), var(--teinte));
+}
+.track-dot {
+  position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
+  background: var(--teinte); box-shadow: 0 0 0 2px var(--card-solid), 0 2px 6px rgba(0,0,0,0.25);
+}
+.track-legende { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; color: var(--ink-3); margin-top: 5px; }
+.track-legende b { color: var(--ink-1); font-weight: 650; }
+
+/* Jauge RSI : zones 30 / 70 teintées, un point à la valeur */
+/* En ligne, dans la tête de la ligne TF : la seule barre pleine largeur reste le canal S/R. */
+.rsi-meter { position: relative; flex: 1 1 70px; max-width: 130px; height: 5px; border-radius: 999px; background: var(--rail); margin: 0 4px; }
+.rsi-zone { position: absolute; top: 0; bottom: 0; width: 30%; }
+.rsi-zone.bas { left: 0; border-radius: 999px 0 0 999px; background: var(--up-soft); }
+.rsi-zone.haut { right: 0; border-radius: 0 999px 999px 0; background: var(--down-soft); }
+.rsi-dot {
+  position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%;
+  background: var(--accent-2); box-shadow: 0 0 0 2px var(--card-solid), 0 2px 6px rgba(0,0,0,0.2);
+}
+.rsi-meter.chaud .rsi-dot { background: var(--down); }
+.rsi-meter.froid .rsi-dot { background: var(--up); }
+.tf-row + .tf-row { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--hairline); }
+.tf-tete { display: flex; align-items: center; gap: 8px; }
+.tf-nom {
+  font-size: 10.5px; font-weight: 750; color: var(--ink-1); background: var(--rail);
+  border-radius: 7px; padding: 1px 7px; min-width: 30px; text-align: center;
+}
+.tf-rsi { font-size: 11px; color: var(--ink-3); }
+.tf-rsi b { color: var(--ink-1); font-size: 13px; }
+.tf-tete .badge { margin-left: auto; }
+.tf-row .track { margin-top: 9px; }
+.tf-pied { margin-top: 6px; font-size: 10.5px; color: var(--ink-3); line-height: 1.45; }
+
+/* Barre à deux segments (L/S, bids/asks) — 2 px de surface entre les segments */
+.split { display: flex; gap: 2px; height: 8px; border-radius: 999px; overflow: hidden; margin-top: 6px; }
+.split > span { display: block; height: 100%; }
+.split-a { background: var(--up); }
+.split-b { flex: 1; background: var(--down); }
+.split-legende { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; color: var(--ink-3); margin-top: 4px; }
+.split-legende b { color: var(--ink-1); font-weight: 650; }
+
+/* Barres divergentes (CVD) centrées sur zéro */
+.dv-row { display: grid; grid-template-columns: 28px minmax(40px, 1fr) auto; align-items: center; gap: 8px; margin: 4px 0; }
+.dv-lbl { font-size: 10.5px; font-weight: 700; color: var(--ink-3); }
+.dv-bar { position: relative; height: 8px; background: var(--rail); border-radius: 999px; }
+.dv-axe { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--ink-3); opacity: 0.45; }
+.dv-fill { position: absolute; top: 0; bottom: 0; }
+.dv-fill.pos { background: var(--up); border-radius: 0 999px 999px 0; }
+.dv-fill.neg { background: var(--down); border-radius: 999px 0 0 999px; }
+.dv-val { font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+
+/* Mini-axe de prix (GEX) : put wall · zéro γ · spot · call wall */
+.axe { position: relative; height: 56px; margin: 8px 2px 4px; }
+.axe-rail { position: absolute; left: 0; right: 0; top: 27px; height: 2px; border-radius: 2px; background: var(--rail); }
+.axe-pt { position: absolute; top: 0; bottom: 0; width: 0; }
+.axe-pt i {
+  position: absolute; top: 23px; left: -5px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--ink-3); box-shadow: 0 0 0 2px var(--card-solid);
+}
+.axe-pt b {
+  position: absolute; transform: translateX(-50%); white-space: nowrap;
+  font-size: 10px; font-weight: 650; color: var(--ink-2); font-variant-numeric: tabular-nums;
+}
+.axe-pt b em { font-style: normal; color: var(--ink-3); font-weight: 600; margin-right: 3px; }
+.axe-pt.haut b { top: 2px; } .axe-pt.bas b { bottom: 0; }
+.axe-pt.spot i { width: 12px; height: 12px; left: -6px; top: 22px; background: var(--accent-2); }
+.axe-pt.put i { background: var(--down); } .axe-pt.call i { background: var(--up); }
+.axe-pt.zg i { border-radius: 2px; transform: rotate(45deg); background: var(--ink-2); }
+
+/* Échelle des murs : asks au-dessus, mid, bids au-dessous — comme un carnet */
+.ladder { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; }
+.lad-row { display: grid; grid-template-columns: 62px minmax(30px, 1fr) 64px; align-items: center; gap: 8px; font-size: 11px; font-variant-numeric: tabular-nums; }
+.lad-px { color: var(--ink-1); font-weight: 650; }
+.lad-bar { position: relative; height: 9px; }
+.lad-bar span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0 4px 4px 0; opacity: 0.8; }
+.lad-row.ask .lad-bar span { background: var(--down); }
+.lad-row.bid .lad-bar span { background: var(--up); }
+.lad-q { text-align: right; color: var(--ink-2); }
+.lad-mid { display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--ink-3); margin: 3px 0; }
+.lad-mid::before, .lad-mid::after { content: ''; flex: 1; height: 1px; background: var(--hairline); }
+
+/* État du flux */
+.etats { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.etat { font-size: 10.5px; font-weight: 650; padding: 2px 9px; border-radius: 999px; background: var(--up-soft); color: var(--up-ink); }
+.etat.ko { background: var(--down-soft); color: var(--down-ink); }
+
+/* Bandeau d'âge */
+.age-banner {
+  display: flex !important; align-items: center; gap: 9px; border-radius: 16px; padding: 9px 13px;
+  font-weight: 650; border: 1px solid rgba(229,72,77,0.28);
+  background: linear-gradient(135deg, rgba(229,72,77,0.14), rgba(229,72,77,0.06)); color: var(--down-ink);
+}
+.age-banner::before {
+  content: ''; flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: currentColor;
+  box-shadow: 0 0 0 4px rgba(229,72,77,0.15);
+}
+.age-banner.retard { color: #8a5a00; border-color: rgba(240,165,11,0.35); background: linear-gradient(135deg, rgba(240,165,11,0.16), rgba(240,165,11,0.06)); }
+.dark .age-banner { color: #ffb4b8; }
+.dark .age-banner.retard { color: #f5c458; }
+
+/* ── Modales mobiles ─────────────────────────────────────────────────────────── */
+.modal {
+  position: fixed; inset: 0; flex-direction: column; overflow: hidden;
+  background: linear-gradient(170deg, #c3cbf4 0%, #dfe4fa 42%, #f4f6fe 100%);
+}
+.dark .modal { background: linear-gradient(170deg, #0b0f2e 0%, #111743 60%, #182059 100%); }
+.modal-tete {
+  display: flex; align-items: center; justify-content: space-between; padding: 12px 16px;
+  background: var(--card); border-bottom: 1px solid var(--hairline); box-shadow: 0 6px 20px -12px rgba(30,45,110,0.4);
+}
+.modal-titre {
+  font-weight: 800; font-size: 17px; letter-spacing: -0.2px;
+  background: var(--brand); -webkit-background-clip: text; background-clip: text;
+  color: transparent; -webkit-text-fill-color: transparent;
+}
+.modal-titre span { -webkit-text-fill-color: var(--ink-3); color: var(--ink-3); font-size: 11px; font-weight: 600; }
+.modal-fermer {
+  width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--hairline); cursor: pointer;
+  background: var(--card-solid); color: var(--ink-1); display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(30,45,110,0.15);
+}
+.modal-fermer svg { width: 15px; height: 15px; }
+.modal-corps {
+  flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px;
+}
+/* Les cartes ne se compriment JAMAIS dans la colonne : sinon elles sont rognées (overflow). */
+.modal-corps > * { flex-shrink: 0; }
+.modal-titre #liveClock { display: block; margin-top: 1px; }
+
+/* ── Grid Bot ────────────────────────────────────────────────────────────────── */
+.strat-handle { color: var(--ink-1); background: transparent; border-bottom: 1px solid var(--hairline); text-shadow: none; }
+.strat-handle:hover { color: var(--accent-2); text-shadow: none; }
+.strat-section .strat-row label { color: var(--ink-3); }
+.strat-section .strat-row select,
+.strat-section .strat-row input[type="number"],
+.strat-section .strat-row input[type="datetime-local"] {
+  background: var(--card); color: var(--ink-1); border: 1px solid var(--hairline);
+  border-radius: 10px; padding: 4px 8px; transition: border-color .15s ease, box-shadow .15s ease;
+}
+.strat-section .strat-row select:focus,
+.strat-section .strat-row input:focus {
+  outline: none; border-color: var(--accent-2); box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.strat-btn { background: var(--brand) !important; letter-spacing: 0.2px; }
+.strat-btn.secondary { background: var(--card) !important; color: var(--ink-1) !important; }
+.strat-btn.forward { background: linear-gradient(135deg, var(--up), #0b6e58) !important; }
+.strat-section .strat-stats { background: var(--card); border: 1px solid var(--hairline); border-radius: 14px; padding: 10px 12px; }
+.strat-section .strat-toggle { color: var(--accent-2); text-decoration: none; font-weight: 650; }
+.strat-help { color: var(--ink-3); }
+
+/* ── Barre des tâches, défilement ───────────────────────────────────────────── */
+.aero-taskbar { color: var(--ink-2); font-weight: 600; font-variant-numeric: tabular-nums; }
+.dark .aero-taskbar { color: var(--ink-2); }
+::-webkit-scrollbar-thumb { background: rgba(79,108,240,0.28); border: none; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(79,108,240,0.45); }
+
+/* Mouvement : décoratif, donc coupé à la demande du système. */
+@media (prefers-reduced-motion: reduce) {
+  .header-orb::before, .refresh-dot::after, .demon-card.entree { animation: none !important; }
+}
+
+/* ═══ RESPONSIVE ═══ ⚠️ NE PAS REMONTER CE BLOC. Les règles .strat-* qu'il surcharge sont définies plus haut (section GRID BOT) : placé avant elles, l'ancien bloc était neutralisé par la cascade (même spécificité, base plus tardive) et tout le layout mobile du Grid Bot était du code mort. Il doit rester le dernier. */
+@media (max-width: 768px) {
+  body { font-size: 12px; -webkit-tap-highlight-color: transparent; }
+  .header { padding: 6px 8px; gap: 6px; }
+  .header-left { gap: 6px; min-width: 0; flex: 1 1 auto; }
+  .header-left h1 { font-size: 15px; }
+  .header-right { gap: 6px; flex-shrink: 0; }
+  .header-right #updated { display: none; }
+  .price-badge { font-size: 13px; padding: 3px 8px; white-space: nowrap; flex-shrink: 0; }
+  /* DXY/VIX : une seule ligne tronquée. Sans nowrap, le badge se replie sur 3 lignes (68 px de haut) et fait passer le header de ~44 à 85 px. */
+  .cycle-badge {
+    font-size: 10px; padding: 3px 8px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    min-width: 0; max-width: 46vw;
+  }
+  .theme-btn { font-size: 11px; padding: 4px 7px; }
+
+  /* Cibles tactiles : 20 px de haut, intappables au pouce */
+  .indicator-bar {
+    padding: 4px 10px; gap: 4px;
+    -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+  }
+  .indicator-bar label { padding: 7px 11px; font-size: 11px; gap: 3px; }
+  .indicator-bar label:active { transform: scale(0.94); }
+  .indicator-bar .section-title { font-size: 8px; }
+  .indicator-bar .sep { height: 18px; margin: 0 3px; }
+  .ind-dropdown-btn { font-size: 11px; padding: 7px 10px; }
+  .ind-dropdown-menu { min-width: 220px; max-height: 50vh; font-size: 11px; }
+
+  /* Ruban : au pouce, Intervalle et Paire étaient à ~3 écrans de scroll à droite — les deux commandes les plus utilisées. Remontées en tête via `order`. Titres et `sep` sont des éléments span frères, dans l'ordre titre, sep, titre, sep… d'où les nth-of-type (1-2 Overlays, 3-4 Sous-graphes, 5-6 Intervalle, 7-8 Paire). Si l'ordre des span du ruban change, ces deux sélecteurs sont à réaligner. */
+  .indicator-bar > span:nth-of-type(5),
+  .indicator-bar > span:nth-of-type(6),
+  .indicator-bar > label[id^="int_"] { order: -2; }
+  .indicator-bar > span:nth-of-type(7),
+  .indicator-bar > span:nth-of-type(8),
+  .indicator-bar > label[id^="sym_"] { order: -1; }
+
+  .main-area { flex-direction: column; overflow: hidden; }
+  .chart-container { height: 100%; }
+  .feed-panel { display: none !important; }
+  /* Modal « Marché live » : le body est un flex column, ses cartes se comprimaient (6 cartes mesurées à 93/77/158/166/123/76 px pour 1178 px de contenu, scrollHeight === clientHeight) → ~390 px de données illisibles. */
+  #marketModalBody > * { flex-shrink: 0; }
+
+  /* Grid bot — colonnes empilées. La config fait ~250 px : à 200 px de section les 5 boutons d'action restaient sous la ligne de flottaison, il fallait scroller pour lancer le backtest. */
+  .strat-section:not(.collapsed) { height: 330px; height: min(46dvh, 330px); }
+  .strat-section { height: 36px; } /* cible tactile */
+  .strat-handle { height: 36px; padding: 0 14px; font-size: 13px; }
+  .strat-body { height: calc(100% - 36px); padding: 8px 10px; }
+  .strat-cols { flex-direction: column; gap: 8px; }
+  .strat-col-config { display: block; flex: none; width: 100%; }
+  .strat-col-actions { flex: none; width: 100%; flex-direction: row; flex-wrap: wrap; gap: 4px; }
+  .strat-col-actions .strat-btn { flex: 1; min-width: 80px; font-size: 10px; padding: 8px 8px; }
+  .strat-col-actions .strat-toggle { width: 100%; text-align: center; }
+  .strat-col-stats { flex: none; width: 100%; min-width: unset; font-size: 10px; }
+  .strat-section .strat-row { margin-bottom: 4px; }
+  .strat-section .strat-row label { min-width: 55px; font-size: 10px; }
+  .strat-section .strat-row select,
+  .strat-section .strat-row input[type="number"],
+  .strat-section .strat-row input[type="datetime-local"] { font-size: 11px; padding: 4px 5px; }
+  .strat-section .strat-stats { font-size: 10px; line-height: 1.4; }
+  .strat-section .strat-btn { font-size: 10px; }
+
+  .feed { padding: 10px; gap: 10px; word-break: break-word; overflow-wrap: break-word; }
+  .demon-card { padding: 12px; }
+  .demon-name { font-size: 13px; }
+  .demon-body { font-size: 11px; }
+  .demon-header { flex-wrap: nowrap; }
+  .hero-val { font-size: 24px; }
+}
+
+/* Sous 480 px les 4 blocs du header ne tiennent plus sur une ligne. On sacrifie le mot-symbole (l'orbe et le <title> portent l'identité) et on resserre paddings/gaps de quelques px pour que « DXY xx · VIX xx » — 132 px — reste lisible en entier sur un 390 px plutôt que tronqué en « DXY xx · … ». */
+@media (max-width: 480px) {
+  .header-left h1 { display: none; }
+  .header { padding: 6px 6px; gap: 4px; }
+  .header-left { gap: 4px; }
+  .theme-btn { padding: 4px 6px; }
+  .price-badge { font-size: 12px; padding: 3px 7px; }
+  .cycle-badge { padding: 3px 6px; max-width: 40vw; }
+}
+
+@media (max-width: 400px) {
+  .price-badge { font-size: 11px; }
+  .indicator-bar label { padding: 6px 9px; font-size: 10px; }
+  .indicator-bar .section-title { display: none; }
+  .aero-taskbar { height: 24px; padding: 0 8px; font-size: 10px; }
+  /* .header-orb : plus de font-size ici — l'orbe est un globe CSS, l'emoji 🔮 a été masqué (font-size: 0). La fixer ici ressuscitait le 🔮 en 12 px. */
+  .header-orb { width: 26px; height: 26px; }
+
+  /* Grid bot — ultra-compact */
+  .strat-section:not(.collapsed) { height: 310px; height: min(46dvh, 310px); }
+  .strat-section { height: 34px; }
+  .strat-handle { height: 34px; font-size: 12px; }
+  .strat-body { height: calc(100% - 34px); }
+  .strat-col-actions .strat-btn { font-size: 9px; padding: 6px 6px; }
+  .strat-section .strat-row label { min-width: 45px; font-size: 9px; }
+  .strat-section .strat-row select,
+  .strat-section .strat-row input[type="number"],
+  .strat-section .strat-row input[type="datetime-local"] { font-size: 10px; }
+}
+
+/* ── MOBILE (en dernier : gagne la cascade). Sur 390 px chaque pixel de graphe
+   compte et une capsule trop gourmande tronque le badge DXY/VIX. */
+@media (max-width: 800px) {
+  :root { --lg-gutter: 7px; --lg-gap: 6px; }
+  .chart-container { padding: 11px; border-radius: 20px; }
+  /* À 390 px : orbe + prix + DXY/VIX + 3 boutons ne tiennent pas ensemble.
+     Comprimé ici plutôt que tronqué — et vérifié par `scrollWidth > clientWidth`,
+     le critère même de l'audit (un contrôle de positions ne l'attrape pas). */
+  .header { padding: 6px 9px; gap: 6px; }
+  /* Sous 520 px, place insuffisante pour orbe + prix + DXY/VIX + 3 boutons.
+     L'orbe est DÉCORATIF, le badge porte de la donnée : c'est l'orbe qui cède.
+     Même arbitrage que le h1, déjà masqué sous 480 px. */
+  .header-orb { display: none; }
+  .price-badge { padding: 3px 7px; font-size: 12px; }
+  /* Sous 375 px ça ne tient plus : le prix quitte le header (il reste sur l'axe Y). */
+  @media (max-width: 375px) { .price-badge { display: none; } }
+  /* Les boutons ne doivent JAMAIS être recouverts : ils ne se compriment pas,
+     c'est le badge du milieu qui cède, avec des points de suspension. */
+  .header-right { flex-shrink: 0; }
+  .price-badge { flex-shrink: 0; padding: 3px 8px; font-size: 12.5px; }
+  .cycle-badge {
+    flex-shrink: 1; min-width: 0; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+    font-size: 9.5px; padding: 2px 7px;
+  }
+  /* Aucun défilement natif ne doit apparaître dans la carte du graphe. */
+  .theme-btn.ico-btn { width: 30px; height: 30px; }
+  .theme-btn.ico-btn svg { width: 15px; height: 15px; }
+  .cycle-badge .mchip + .mchip { margin-left: 8px; }
+}

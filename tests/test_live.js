@@ -4,6 +4,7 @@
 const fs = require('fs'), vm = require('vm'), os = require('os'), path = require('path');
 const REPO = path.resolve(__dirname, '..');
 const fb = require('./forbidden');
+const { texteServi } = require('./sources');
 
 const JS_PATH = path.join(os.tmpdir(), 'samsara-inline.js');
 if (!fs.existsSync(JS_PATH)) {
@@ -26,7 +27,7 @@ globalThis.__TEST__ = {
 globalThis.__files = [];`;
 
 const DATA = JSON.parse(fs.readFileSync(path.join(REPO, 'market-data.json'), 'utf8'));
-const SRC = fs.readFileSync(path.join(REPO, 'index.html'), 'utf8');
+const SRC = texteServi();   // page + css/ + js/ + themes/ : tout ce qui est servi
 
 const store = {};
 function mkEl(id) {

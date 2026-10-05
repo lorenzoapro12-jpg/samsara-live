@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prépare le harnais de rendu : extrait le JavaScript inline de index.html.
+"""Prépare le harnais de rendu : assemble le JavaScript de la page (js/, dans l'ordre d'index.html).
 
 POURQUOI CE SCRIPT EXISTE (10/09/2026, réécrit le 02/10/2026)
 ------------------------------------------------------------
@@ -32,14 +32,26 @@ if not os.path.exists(SRC):
 
 html = open(SRC, encoding="utf-8").read()
 
-# On exclut les <script src=…> : seuls les blocs inline portent la logique.
-blocks = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, re.S)
-if not blocks:
-    sys.exit(f"✗ aucun <script> inline trouvé dans {SRC}")
+# Les scripts de l'application, dans l'ordre où la page les exécute. Depuis que la page est
+# découpée en fichiers, le code vit dans js/ : on suit les <script src> d'index.html (même
+# règle que tests/sources.js), le code tiers de js/vendor/ excepté — l'app tourne sans lui.
+morceaux = []
+for attrs, corps in re.findall(r"<script\b([^>]*)>(.*?)</script>", html, re.S):
+    m = re.search(r'\bsrc="([^"]+)"', attrs)
+    if m:
+        if m.group(1).startswith("js/vendor/"):
+            continue
+        chemin = os.path.join(REPO, m.group(1))
+        if not os.path.exists(chemin):
+            sys.exit(f"✗ index.html charge {m.group(1)}, introuvable")
+        morceaux.append((m.group(1), open(chemin, encoding="utf-8").read()))
+    elif corps.strip():
+        morceaux.append(("index.html (inline)", corps))
+if not morceaux:
+    sys.exit(f"✗ aucun script d'application trouvé via {SRC}")
 
-blocks.sort(key=len, reverse=True)
-open(JS, "w", encoding="utf-8").write(blocks[0])
-
-print(f"✓ JavaScript extrait de {os.path.relpath(SRC, REPO)}")
-print(f"✓ {JS} régénéré ({len(blocks[0]):,} caractères, {len(blocks)} bloc(s) inline)")
+open(JS, "w", encoding="utf-8").write("\n;\n".join(t for _, t in morceaux))
+total = sum(len(t) for _, t in morceaux)
+print(f"✓ JavaScript assemblé depuis {os.path.relpath(SRC, REPO)} : " + ", ".join(f for f, _ in morceaux))
+print(f"✓ {JS} régénéré ({total:,} caractères, {len(morceaux)} fichier(s))")
 print(f"  → lancer : node {os.path.join('tests', 'test_render.js')}")
