@@ -107,8 +107,7 @@ body {
   font-family: var(--font);
   font-size: 13px; line-height: 1.5;
   color: var(--ink-1);
-  background: var(--fond);
-  background-attachment: fixed;
+  background: var(--fond);   /* pas de « fixed » : la page ne défile jamais, il ne servait à rien */
   display: flex; flex-direction: column; gap: var(--gap);
   height: 100vh;
   height: 100dvh;   /* mobile : 100vh inclut la barre d'URL, le bas passait sous le pli */

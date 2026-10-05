@@ -333,29 +333,39 @@ async function changeInterval(interval, label) {
   label.classList.add('active');
   chartInterval = interval;
   priceScale = 1.0; pricePan = 0;
-  viewStart = 0; viewEnd = 50;
-  delete klineCache[getKlineCacheKey(activeSymbol, chartInterval)];
-  await fetchKlines();
-  viewStart = Math.max(0, candles.length - 50);
-  viewEnd = candles.length;
-  await refreshRefSR();
-  drawChart();
+  await afficherSerie();
 }
 
 async function changeSymbol(symbol, label) {
-  document.querySelectorAll('#indicatorBar label[id^="sym_"]').forEach(l => l.classList.remove('active'));
+  document.querySelectorAll('label[id^="sym_"]').forEach(l => l.classList.remove('active'));
   label.classList.add('active');
   activeSymbol = symbol;
   const tp = document.getElementById('taskbarPair');
   if (tp) tp.textContent = symbol;
   priceScale = 1.0; pricePan = 0;
-  viewStart = 0; viewEnd = 50;
-  delete klineCache[getKlineCacheKey(activeSymbol, chartInterval)];
-  await fetchKlines();
-  viewStart = Math.max(0, candles.length - 50);
-  viewEnd = candles.length;
-  await refreshRefSR();
+  await afficherSerie();
+}
+
+// Changer d'intervalle ou de paire. Avant : le cache était EFFACÉ puis trois pages de 1000
+// bougies rechargées l'une après l'autre, le graphique attendant aussi les niveaux S/R des autres TF
+// (≈ 850 ms à chaque clic, mesuré). Maintenant : un historique déjà vu s'affiche aussitôt depuis
+// le cache, puis sa queue se met à jour ; un historique neuf s'affiche dès sa première page.
+async function afficherSerie() {
+  const cle = getKlineCacheKey(activeSymbol, chartInterval);
+  const c = klineCache[cle];
+  if (c && c.data.length) {
+    candles = c.data;
+    viewStart = Math.max(0, candles.length - 50); viewEnd = candles.length;
+  } else {
+    candles = []; viewStart = 0; viewEnd = 50;   // jamais les bougies d'un autre intervalle sous ce titre
+  }
+  memoCache.clear();
   drawChart();
+  await fetchKlines();
+  if (cle !== getKlineCacheKey(activeSymbol, chartInterval)) return;   // un autre clic est passé
+  if (!c || !c.data.length) { viewStart = Math.max(0, candles.length - 50); viewEnd = candles.length; }
+  drawChart();
+  refreshRefSR().then(() => { if (cle === getKlineCacheKey(activeSymbol, chartInterval)) drawChart(); });
 }
 
 // ============ CANVAS ============
@@ -368,6 +378,18 @@ let hasSubChart = true; // volume or indicator
 // par ici : sans ce filtre un trackpad émet 100+ événements/s et drawChart partait 2× par
 // déplacement (handler `window` du pan + handler `canvas` du crosshair). Le coût n'est pas
 // le tracé (2-6 ms) mais le repaint du verre derrière le canvas — d'où un dessin par frame.
+// Pendant un geste (glisser, molette, doigt), le verre de la page est suspendu (html.geste,
+// css/app.css) : sans cela chaque image du graphique recalculait le flou des surfaces —
+// 167 ms par image mesurées avec le verre, 33 sans, en rendu logiciel. Un thème sans verre
+// n'a rien à suspendre.
+let gesteFin = null;
+function geste(actif) {
+  if (themeCourant().verre === 'aucun') return;
+  const h = document.documentElement;
+  clearTimeout(gesteFin);
+  if (actif) { if (!h.classList.contains('geste')) h.classList.add('geste'); }
+  else gesteFin = setTimeout(() => h.classList.remove('geste'), 200);
+}
 let rafPending = false;
 function scheduleDraw() {
   if (rafPending) return;
@@ -408,6 +430,7 @@ canvas.addEventListener('mouseleave', () => { crossX = null; crossY = null; rafP
 // --- Zoom molette ---
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
+  geste(true); geste(false);       // une rafale de molette = un geste
   const rect = canvas.getBoundingClientRect();
   const mouseX = e.clientX - rect.left;
   const mouseY = e.clientY - rect.top;
@@ -434,6 +457,7 @@ canvas.addEventListener('wheel', (e) => {
 
 // --- Pan cliquer-glisser ---
 canvas.addEventListener('mousedown', (e) => {
+  geste(true);
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const my = e.clientY - rect.top;
@@ -533,6 +557,7 @@ window.addEventListener('mousemove', (e) => {
   scheduleDraw();
 });
 window.addEventListener('mouseup', () => { 
+  geste(false);
   rsDragging = null;
   isPanning = false; isPriceDrag = false; 
   canvas.style.cursor = ''; 
@@ -576,6 +601,7 @@ function getTouchDist(t1, t2) {
 }
 
 canvas.addEventListener('touchstart', (e) => {
+  geste(true);
   if (e.touches.length === 1) {
     const rect = canvas.getBoundingClientRect();
     const tx = e.touches[0].clientX - rect.left;
@@ -637,6 +663,7 @@ canvas.addEventListener('touchmove', (e) => {
 }, { passive: false });
 
 canvas.addEventListener('touchend', () => {
+  geste(false);
   touchMode = null; pinchStartDist = 0; pinchStartVisible = 0;
   canvas.style.cursor = '';
 });
@@ -662,7 +689,11 @@ function resizeCanvas() {
   canvas.style.width = innerW + 'px';
   canvas.style.height = innerH + 'px';
 }
-window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
+let resizeRaf = 0;
+window.addEventListener('resize', () => {
+  if (resizeRaf) return;
+  resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; resizeCanvas(); drawChart(); });
+});
 
 // ============ API ============
 // Cache klines pour éviter les 429 Binance
@@ -710,14 +741,15 @@ function mergeTail(arr, tail) {
   return true;
 }
 
-// RAFRAÎCHISSEMENT INCRÉMENTAL. L'ancienne version rechargeait les 3 000 bougies (3 requêtes,
-// ≈ 450 Ko de JSON) toutes les 30 s pour mettre à jour UNE bougie — et cette bougie restait
-// figée 30 s pendant que le badge de prix bougeait chaque seconde. L'historique n'est chargé
-// qu'une fois par symbole/intervalle ; ensuite, toutes les 5 s, on ne demande que les 2
-// dernières bougies (≈ 300 octets).
+// RAFRAÎCHISSEMENT INCRÉMENTAL. L'historique n'est chargé qu'une fois par symbole/intervalle ;
+// ensuite, toutes les 5 s, on ne demande que les 2 dernières bougies (≈ 300 octets).
+//
+// CHARGEMENT EN DEUX TEMPS. La page la plus récente (1000 bougies) est dessinée dès qu'elle
+// arrive ; les deux pages plus anciennes partent ensuite EN PARALLÈLE et se raccrochent à
+// gauche sans bouger la vue. Avant : trois requêtes l'une après l'autre avant le moindre dessin.
 async function fetchKlines() {
   const cacheKey = getKlineCacheKey(activeSymbol, chartInterval);
-  const sym = activeSymbol;
+  const sym = activeSymbol, itv = chartInterval;
   const encore = () => cacheKey === getKlineCacheKey(activeSymbol, chartInterval);
   try {
     const cached = klineCache[cacheKey];
@@ -743,16 +775,12 @@ async function fetchKlines() {
         cached.ts = Date.now();
         memoCache.clear();              // la bougie en cours a changé : indicateurs à refaire
         suivre();
+        if (cached.partiel) completerHistorique(cacheKey, sym, itv);
         return;
       }
     }
 
-    let fresh;
-    if (sym === 'BTCSOL') {
-      fresh = ratioCandles(...await Promise.all([fetchKlinesRaw('BTCUSDT'), fetchKlinesRaw('SOLUSDT')]));
-    } else {
-      fresh = (await fetchKlinesRaw(sym)).map(toCandle);
-    }
+    const fresh = await premierePage(sym, itv);
     if (!encore()) return;
     candles = fresh;
     if (sym === 'BTCSOL') {
@@ -761,11 +789,77 @@ async function fetchKlines() {
       viewStart = Math.min(viewStart, candles.length - 1);
     }
     suivre();
-    // Invalider le cache de mémoization (nouvelles données)
     memoCache.clear();
-    klineCache[cacheKey] = { data: candles, ts: Date.now(), symbol: sym, interval: chartInterval };
+    // `partiel` : il reste de l'historique à aller chercher (une page pleine en appelle d'autres).
+    klineCache[cacheKey] = { data: candles, ts: Date.now(), symbol: sym, interval: itv, partiel: candles.length >= 990 };
+    completerHistorique(cacheKey, sym, itv);
     // NE PAS réinitialiser viewStart/viewEnd — respecter le zoom/pan utilisateur
   } catch(e) { console.error('Klines:', e); }
+}
+
+const KLINE_MS = { '1m': 6e4, '5m': 3e5, '15m': 9e5, '30m': 18e5, '1h': 36e5, '4h': 144e5, '1d': 864e5, '1w': 6048e5 };
+const PAGES_HISTORIQUE = 3;   // 3 × 1000 bougies, comme avant
+// Une page Binance : jusqu'à 1000 bougies dont l'ouverture est ≤ endTime.
+async function pageKlines(symbol, interval, endTime) {
+  const resp = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=1000&endTime=${endTime}`);
+  if (!resp.ok) throw new Error(`Binance HTTP ${resp.status}`);
+  const d = await resp.json();
+  return Array.isArray(d) ? d : [];
+}
+// La page la plus récente d'un historique. Une même page demandée deux fois (survol puis clic)
+// ne part qu'une fois : la promesse en vol est partagée.
+const pagesEnVol = new Map();
+function premierePage(sym, itv) {
+  const cle = sym + '_' + itv;
+  if (pagesEnVol.has(cle)) return pagesEnVol.get(cle);
+  const fin = Date.now();
+  const p = (sym === 'BTCSOL'
+    ? Promise.all([pageKlines('BTCUSDT', itv, fin), pageKlines('SOLUSDT', itv, fin)]).then(([b, s]) => ratioCandles(b, s))
+    : pageKlines(sym, itv, fin).then(d => d.map(toCandle)))
+    .finally(() => pagesEnVol.delete(cle));
+  pagesEnVol.set(cle, p);
+  return p;
+}
+// Les pages plus anciennes, en parallèle (leurs bornes se calculent : 1000 × la durée d'une
+// bougie). Elles se raccrochent à gauche de l'historique ; la vue est décalée d'autant, l'œil ne
+// voit rien bouger.
+const historiqueEnCours = new Set();
+async function completerHistorique(cacheKey, sym, itv) {
+  const c = klineCache[cacheKey];
+  if (!c || !c.partiel || !c.data.length || !KLINE_MS[itv] || historiqueEnCours.has(cacheKey)) return;
+  historiqueEnCours.add(cacheKey);
+  try {
+    const t0 = c.data[0].time * 1000;
+    const fins = [];
+    for (let k = 0; k < PAGES_HISTORIQUE - 1; k++) fins.push(t0 - 1 - k * 1000 * KLINE_MS[itv]);
+    const jambes = sym === 'BTCSOL' ? ['BTCUSDT', 'SOLUSDT'] : [sym];
+    const pages = await Promise.all(jambes.map(j => Promise.all(fins.map(f => pageKlines(j, itv, f)))));
+    const brut = pages.map(pj => pj.slice().reverse().flat());          // ordre chronologique
+    let anciennes = sym === 'BTCSOL' ? ratioCandles(brut[0], brut[1]) : brut[0].map(toCandle);
+    const cur = klineCache[cacheKey];                                    // relu : la queue a pu avancer
+    if (!cur || !cur.data.length) return;
+    const premier = cur.data[0].time, vu = new Set();
+    anciennes = anciennes.filter(x => x.time < premier && !vu.has(x.time) && vu.add(x.time)).sort((a, b) => a.time - b.time);
+    cur.partiel = false;
+    if (!anciennes.length) return;
+    cur.data = anciennes.concat(cur.data);
+    if (cacheKey === getKlineCacheKey(activeSymbol, chartInterval)) {
+      candles = cur.data;
+      viewStart += anciennes.length; viewEnd += anciennes.length;
+      memoCache.clear();
+      scheduleDraw();
+    }
+  } catch (e) { console.error('Historique:', e); }
+  finally { historiqueEnCours.delete(cacheKey); }
+}
+// Préchargement au survol d'un intervalle ou d'une paire : la première page part pendant que
+// le pointeur s'approche ; au clic, l'historique est déjà là (ou en vol, et la requête est partagée).
+function precharger(sym, itv) {
+  const cle = getKlineCacheKey(sym, itv);
+  if (klineCache[cle]) return;
+  premierePage(sym, itv).then(d => {
+    if (!klineCache[cle] && d.length) klineCache[cle] = { data: d, ts: Date.now(), symbol: sym, interval: itv, partiel: d.length >= 990 };
+  }).catch(() => {});
 }
 
 // ============ MEMOIZATION INDICATEURS ============
@@ -784,25 +878,21 @@ function memoized(fnName, fn, ...args) {
   memoCache.set(key, result);
   return result;
 }
+// Colonnes de l'historique, construites UNE fois par état des données (le mémo est vidé à chaque
+// mise à jour). Elles étaient refaites plusieurs fois PAR IMAGE — 3000 éléments à chaque
+// fois, par overlay et par sous-graphe : autant d'allocations à ramasser pendant un glissement.
+function cols() {
+  return memoized('cols', () => ({
+    close: candles.map(c => c.close), high: candles.map(c => c.high), low: candles.map(c => c.low),
+    vol: candles.map(c => c.volume), time: candles.map(c => c.time)
+  }));
+}
 
+// La queue d'un historique (les `last` dernières bougies) : le rafraîchissement des 5 s.
 async function fetchKlinesRaw(symbol, last) {
-  if (last) {
-    const resp = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${chartInterval}&limit=${last}`);
-    if (!resp.ok) throw new Error(`Binance HTTP ${resp.status}`);
-    return resp.json();
-  }
-  let allData = [];
-  let endTime = Date.now();
-  for (let page = 0; page < 3; page++) {
-    const resp = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${chartInterval}&limit=1000&endTime=${endTime}`);
-    if (!resp.ok) throw new Error(`Binance HTTP ${resp.status}`);
-    const data = await resp.json();
-    if (!Array.isArray(data) || !data.length) break;
-    allData = [...data, ...allData];
-    endTime = data[0][0] - 1;
-    if (data.length < 1000) break;
-  }
-  return allData;
+  const resp = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${chartInterval}&limit=${last}`);
+  if (!resp.ok) throw new Error(`Binance HTTP ${resp.status}`);
+  return resp.json();
 }
 
 // ============ MULTI-TF S/R ENGINE ============
@@ -2005,7 +2095,11 @@ function drawChart() {
   if (!jetonsLus) { lireJetons(); jetonsLus = true; }
   
   ctx.clearRect(0, 0, W, H);
-  if (candles.length < 2) return;
+  if (candles.length < 2) {
+    ctx.save(); ctx.fillStyle = COLORS.ink3 || '#5f6e8c'; ctx.font = chartFont(12, 600); ctx.textAlign = 'center';
+    ctx.fillText('Chargement ' + activeSymbol + ' · ' + chartInterval + '…', (W - 50) / 2, H / 2); ctx.restore();
+    return;
+  }
   
   let subTotal = 0;
   for (const [k, active] of Object.entries(activeSubs)) {
@@ -2185,34 +2279,27 @@ function drawRangeSelector(candles, W, H) {
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.roundRect(padL, rsY + 2, rsw, RS_HEIGHT - 6, 5); ctx.fill(); ctx.stroke();
   
-  // Mini courbe des closes
-  const closes = candles.map(c => c.close);
-  const allMin = Math.min(...closes), allMax = Math.max(...closes);
-  const rng = allMax - allMin || 1;
-  const toY = (v) => rsY + rsh + 2 - ((v - allMin) / rng) * (rsh - 4);
+  // Mini courbe des 3000 clôtures : tracée UNE fois par état des données et par taille
+  // (Path2D mémorisé), puis rejouée — elle était recalculée point par point à chaque image.
   const toX = (i) => padL + (i / Math.max(1, candles.length - 1)) * rsw;
-  
-  // Fill area
-  ctx.save();
-  ctx.globalAlpha = 0.16;
-  ctx.fillStyle = COLORS.accent2;
-  ctx.beginPath();
-  ctx.moveTo(padL, rsY + rsh + 2);
-  for (let i = 0; i < candles.length; i++) {
-    ctx.lineTo(toX(i), toY(closes[i]));
-  }
-  ctx.lineTo(W - padR, rsY + rsh + 2);
-  ctx.closePath(); ctx.fill();
-  ctx.restore();
-  
-  // Line
-  ctx.strokeStyle = COLORS.accent2; ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  for (let i = 0; i < candles.length; i++) {
-    const x = toX(i), y = toY(closes[i]);
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-  }
-  ctx.stroke();
+  const mini = memoized('rs_' + Math.round(W) + 'x' + Math.round(H), () => {
+    const closes = cols().close;
+    let lo = Infinity, hi = -Infinity;
+    for (const v of closes) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    const rng = hi - lo || 1;
+    const toY = (v) => rsY + rsh + 2 - ((v - lo) / rng) * (rsh - 4);
+    const ligne = new Path2D(), aire = new Path2D();
+    aire.moveTo(padL, rsY + rsh + 2);
+    for (let i = 0; i < closes.length; i++) {
+      const x = toX(i), y = toY(closes[i]);
+      aire.lineTo(x, y);
+      i === 0 ? ligne.moveTo(x, y) : ligne.lineTo(x, y);
+    }
+    aire.lineTo(W - padR, rsY + rsh + 2); aire.closePath();
+    return { ligne, aire };
+  });
+  ctx.save(); ctx.globalAlpha = 0.16; ctx.fillStyle = COLORS.accent2; ctx.fill(mini.aire); ctx.restore();
+  ctx.strokeStyle = COLORS.accent2; ctx.lineWidth = 1.2; ctx.stroke(mini.ligne);
   
   // Viewport rectangle
   const vs = Math.max(0, viewStart), ve = Math.min(candles.length, viewEnd);
@@ -2283,7 +2370,7 @@ function priceWindow(vs, ve) {
   const naturalRange = maxP - minP || 1, rawMin = minP, rawMax = maxP;
   // Étendre si Bollinger actif, mais cap à ±15% du range naturel
   if (overlays.bb && candles.length >= 20) {
-    const bb = memoized('bb', calcBollinger, candles.map(c => c.close), 20, 2);
+    const bb = memoized('bb', calcBollinger, cols().close, 20, 2);
     for (let i = vs; i < ve; i++) {
       if (bb.upper[i] === null) continue;
       if (bb.upper[i] > maxP) maxP = bb.upper[i];
@@ -2316,9 +2403,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
   const { minP, maxP, range } = priceWindow(vs, ve);
   // closes n'est construit QUE si un overlay le demande (3000 éléments par frame sinon) :
   // les seuls lecteurs sont bb, ema/sma, vwap, ichimoku et sar, tous sous ces drapeaux.
-  const closes = (overlays.bb || overlays.ema20 || overlays.ema50 || overlays.ema100 || overlays.ema200 ||
-                  overlays.sma20 || overlays.sma50 || overlays.vwap || overlays.ichimoku || overlays.sar)
-    ? candles.map(c => c.close) : [];
+  const closes = cols().close;   // mémorisé : gratuit d'une image à l'autre
   
   const gap = pw / visible.length;
   const candleW = Math.max(1, Math.min(40, gap * 0.8));
@@ -2436,13 +2521,13 @@ function resolveChart(candles, padL, padR, chartH, W) {
 
   // VWAP
   if (overlays.vwap) {
-    const vwap = memoized('vwap', calcVWAP, candles.map(c=>c.high), candles.map(c=>c.low), closes, candles.map(c=>c.volume), candles.map(c=>c.time), chartInterval);
+    const vwap = memoized('vwap', calcVWAP, cols().high, cols().low, closes, cols().vol, cols().time, chartInterval);
     drawLine(vwap, minP, range, pad, gap, ph, COLORS.vwap, [], 1.5, vs);
   }
 
   // Ichimoku
   if (overlays.ichimoku && candles.length >= 52) {
-    const highs = candles.map(c=>c.high), lows = candles.map(c=>c.low);
+    const highs = cols().high, lows = cols().low;
     const ichi = memoized('ichimoku', calcIchimoku, highs, lows, closes);
     drawLine(ichi.tenkan, minP, range, pad, gap, ph, COLORS.ichi_tenkan, [], 1, vs);
     drawLine(ichi.kijun, minP, range, pad, gap, ph, COLORS.ichi_kijun, [], 1, vs);
@@ -2475,8 +2560,8 @@ function resolveChart(candles, padL, padR, chartH, W) {
 
   // Parabolic SAR
   if (overlays.sar) {
-    const highs2 = candles.map(c=>c.high), lows2 = candles.map(c=>c.low);
-    const sarData = calcSAR(highs2, lows2, closes);
+    const highs2 = cols().high, lows2 = cols().low;
+    const sarData = memoized('sar', calcSAR, highs2, lows2, closes);
     for (let i = vs; i < ve; i++) {
       if (sarData[i] === null) continue;
       const x = pad.left + gap * (i - vs) + gap/2;
@@ -2893,8 +2978,9 @@ function resolveSub(candles, y0, subH, W, key) {
   const gap = pw / visible.length;
   
   if (key === 'vol') {
-    const volumes = candles.map(c => c.volume);
-    const maxV = Math.max(...volumes.slice(vs, ve));
+    let maxV = 0;
+    for (let i = vs; i < ve; i++) if (candles[i].volume > maxV) maxV = candles[i].volume;
+    maxV = maxV || 1;
     // Grid + échelle
     const fmtV = v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : v.toFixed(0);
     subGrid(y0, pad, ph, W, { levels: [0, maxV/2, maxV], min: 0, max: maxV, f: fmtV });
@@ -2914,7 +3000,7 @@ function resolveSub(candles, y0, subH, W, key) {
       ctx.globalAlpha = 1;
     }
   } else if (key === 'rsi') {
-    const closes = candles.map(c => c.close);
+    const closes = cols().close;
     const rsi = memoized('sub_rsi', calcRSI, closes, 14);
     // Bande 30-70 teintée : la zone « normale » se lit d'un coup d'œil, les sorties ressortent.
     ctx.save(); ctx.globalAlpha = COLORS.bandeAlpha; ctx.fillStyle = COLORS.rsi;
@@ -2931,7 +3017,7 @@ function resolveSub(candles, y0, subH, W, key) {
     }
     ctx.stroke();
   } else if (key === 'macd') {
-    const closes = candles.map(c => c.close);
+    const closes = cols().close;
     const macd = memoized('sub_macd', calcMACD, closes);
     // Échelle sur la FENÊTRE VISIBLE : calculée sur les 3 000 bougies, un extrême d'il y a
     // des semaines écrasait la vue courante en une ligne plate (±900 d'échelle pour ±40 de signal).
@@ -2954,20 +3040,20 @@ function resolveSub(candles, y0, subH, W, key) {
     drawLineAt(macd.macdLine, midY, scale, pad, gap, COLORS.macd, [], 1.5, vs);
     drawLineAt(macd.signal, midY, scale, pad, gap, COLORS.macd_signal, [], 1, vs);
   } else if (key === 'stoch') {
-    const highs = candles.map(c => c.high), lows = candles.map(c => c.low), closes = candles.map(c => c.close);
+    const highs = cols().high, lows = cols().low, closes = cols().close;
     const stoch = memoized('sub_stoch', calcStoch, highs, lows, closes, 14, 3);
     subGrid(y0, pad, ph, W, { levels: [20, 50, 80] });
     drawLineAt(stoch.k, y0 + pad.top + ph, ph/100, pad, gap, COLORS.stoch_k, [], 1.5, vs);
     drawLineAt(stoch.d, y0 + pad.top + ph, ph/100, pad, gap, COLORS.stoch_d, [3, 3], 1, vs);
   } else if (key === 'atr') {
-    const highs = candles.map(c => c.high), lows = candles.map(c => c.low), closes = candles.map(c => c.close);
+    const highs = cols().high, lows = cols().low, closes = cols().close;
     const atr = memoized('sub_atr', calcATR, highs, lows, closes, 14);
     const maxA = Math.max(...atr.filter(v => v !== null)) || 1;
     const scale = ph / maxA;
     subGrid(y0, pad, ph, W, { levels: [0, maxA/2, maxA], min: 0, max: maxA, f: v => '$' + v.toFixed(1) });
     drawLineAt(atr, y0 + pad.top + ph, scale, pad, gap, COLORS.atr, [], 1.5, vs);
   } else if (key === 'obv') {
-    const closes = candles.map(c => c.close), volumes = candles.map(c => c.volume);
+    const closes = cols().close, volumes = cols().vol;
     const obv = memoized('sub_obv', calcOBV, closes, volumes);
     const visObv = obv.slice(vs, ve);
     const absMax = Math.max(Math.abs(Math.min(...visObv)), Math.abs(Math.max(...visObv))) || 1;
@@ -2977,27 +3063,27 @@ function resolveSub(candles, y0, subH, W, key) {
     subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: fmtOBV });
     drawLineAt(obv, midY, scale, pad, gap, COLORS.obv, [], 1.5, vs);
   } else if (key === 'mfi') {
-    const closes = candles.map(c => c.close), highs = candles.map(c => c.high), lows = candles.map(c => c.low), vols = candles.map(c => c.volume);
+    const closes = cols().close, highs = cols().high, lows = cols().low, vols = cols().vol;
     const mfi = memoized('sub_mfi', calcMFI, highs, lows, closes, vols, 14);
     drawBandSub(y0, pad, ph, W, gap, mfi, COLORS.mfi, vs, ve, [20, 50, 80]);
   } else if (key === 'williamsR') {
-    const closes = candles.map(c => c.close), highs = candles.map(c => c.high), lows = candles.map(c => c.low);
+    const closes = cols().close, highs = cols().high, lows = cols().low;
     const wr = memoized('sub_wr', calcWilliamsR, highs, lows, closes, 14);
     drawBandSub(y0, pad, ph, W, gap, wr, COLORS.williamsR, vs, ve, [-80, -50, -20], -100, 0);
   } else if (key === 'cci') {
-    const closes = candles.map(c => c.close), highs = candles.map(c => c.high), lows = candles.map(c => c.low);
+    const closes = cols().close, highs = cols().high, lows = cols().low;
     const cci = memoized('sub_cci', calcCCI, highs, lows, closes, 20);
     subGrid(y0, pad, ph, W, { levels: [100, 0, -100], span: 200 });
     drawLineAt(cci, y0 + pad.top + ph/2, ph/400, pad, gap, COLORS.cci, [], 1.5, vs);
   } else if (key === 'adx') {
-    const closes = candles.map(c => c.close), highs = candles.map(c => c.high), lows = candles.map(c => c.low);
+    const closes = cols().close, highs = cols().high, lows = cols().low;
     const adxData = memoized('sub_adx', calcADX, highs, lows, closes, 14);
     subGrid(y0, pad, ph, W, { levels: [25, 50] });
     drawLineAt(adxData.adx, y0 + pad.top + ph, ph/100, pad, gap, COLORS.adx, [], 1.5, vs);
     drawLineAt(adxData.plusDI, y0 + pad.top + ph, ph/100, pad, gap, COLORS.adx_plusDI, [3, 3], 1, vs);
     drawLineAt(adxData.minusDI, y0 + pad.top + ph, ph/100, pad, gap, COLORS.adx_minusDI, [3, 3], 1, vs);
   } else if (key === 'ao') {
-    const highs = candles.map(c => c.high), lows = candles.map(c => c.low);
+    const highs = cols().high, lows = cols().low;
     const ao = memoized('sub_ao', calcAO, highs, lows);
     const allV = ao.filter(v => v !== null);
     const absMax = Math.max(Math.abs(Math.min(...allV)), Math.abs(Math.max(...allV))) || 1;
@@ -3122,7 +3208,7 @@ function subColor(key) {
 function getSubIndicatorValue(key, idx) {
   const c = candles;
   if (idx < 0 || idx >= c.length) return null;
-  const closes = c.map(x => x.close), highs = c.map(x => x.high), lows = c.map(x => x.low), vols = c.map(x => x.volume);
+  const { close: closes, high: highs, low: lows, vol: vols } = cols();
   try {
     switch(key) {
       case 'vol': return c[idx].volume >= 1000 ? (c[idx].volume/1000).toFixed(1)+'K' : c[idx].volume.toFixed(0);
@@ -4036,13 +4122,22 @@ async function init() {
   lireJetons(); jetonsLus = true;
   peindrePastilles();
   resizeCanvas();
-  await fetchPrice();
+  drawChart();             // « Chargement… » plutôt qu'un cadre vide
+  // Tout part EN MÊME TEMPS : prix, bougies, publication. Avant, le prix était attendu avant
+  // les bougies, et les bougies avant les cartes (premier dessin à 1,55 s, mesuré en local).
+  const prix = fetchPrice().then(() => scheduleDraw());
+  const marche = fetchMarket();
   await fetchKlines();
   viewStart = Math.max(0, candles.length - 50);
   viewEnd = candles.length;
   drawChart();
   verreDuTheme();          // hyalite n'arrive qu'APRÈS le premier dessin, et seulement si le thème le veut
-  await fetchMarket();
+  await Promise.all([prix, marche]);
+  // Préchargement au survol : la première page d'un historique part avant le clic.
+  document.querySelectorAll('label[id^="int_"]').forEach(l =>
+    l.addEventListener('pointerenter', () => precharger(activeSymbol, l.id.slice(4))));
+  document.querySelectorAll('label[id^="sym_"]').forEach(l =>
+    l.addEventListener('pointerenter', () => precharger(l.id.slice(4), chartInterval)));
   // Pre-fetch des TF de reference S/R : no-op si l'overlay est eteint, c'est le toggle qui declenche.
   await refreshRefSR();
   toggleDepth(overlays.liq);
