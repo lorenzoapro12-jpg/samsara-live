@@ -914,11 +914,15 @@ body.dark .strat-btn, body.dark .ind-dropdown-btn {
   /* Encre : trois niveaux, contraste AA (≥ 4,5:1) mesuré sur la carte claire. */
   --ink-1: #10233d; --ink-2: #45597a; --ink-3: #5f6e8c;
   --text: var(--ink-1); --text2: var(--ink-2);
-  /* Marques (bougies, barres) — validées ≥ 3:1 sur le fond du graphique. */
-  --up: #0f9d7a; --down: #e5484d;
+  /* Marques (bougies, barres) — validées ≥ 3:1 sur le fond du graphique.
+     #0f9d7a mesurait 2,99:1 sur la borne la plus défavorable du canvas clair (#eceffb) :
+     sous le seuil WCAG 1.4.11 de 0,01. #0d9672 mesure 3,26:1 sur cette même borne
+     (et 3,55:1 sur #f7f9ff), en gardant ΔE 12,5 en protanopie contre le rouge.
+     Mesure reproductible : tests/test_palette.py. */
+  --up: #0d9672; --down: #e5484d;
   /* Texte signé — plus foncé que la marque : AA sur le verre clair. */
   --up-ink: #0a7d62; --down-ink: #c8323a;
-  --up-soft: rgba(15,157,122,0.13); --down-soft: rgba(229,72,77,0.12);
+  --up-soft: rgba(13,150,114,0.13); --down-soft: rgba(229,72,77,0.12);
   --green: var(--up); --red: var(--down); --hausser: var(--up-ink); --baissier: var(--down-ink);
   --accent: #0b84b0; --accent-2: #4f5fe0;
   --brand: linear-gradient(120deg, #13b4d4 0%, #4f6cf0 55%, #8b5cf6 100%);

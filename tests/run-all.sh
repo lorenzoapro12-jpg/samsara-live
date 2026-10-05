@@ -37,6 +37,9 @@ node test_live.js || ko=1
 etape "6. Scan de TOUS les fichiers publiés"
 python3 scan-public.py || ko=1
 
+etape "7. Palette (contraste WCAG, séparation daltonisme) — hors ligne"
+python3 test_palette.py || ko=1
+
 printf '\n\033[1m════════════════════════════════════════\033[0m\n'
 if [ "$ko" -eq 0 ]; then
   echo "✅ TOUS LES CONTRÔLES PASSENT"
