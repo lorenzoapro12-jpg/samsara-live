@@ -28,6 +28,9 @@ python3 test_meta.py || ko=1
 etape "2. Indicateurs de la page (SAR, ADX, RSI, EMA) — hors ligne"
 node test_indicateurs.js || ko=1
 
+etape "2b. Légendes : dérivées du code qui calcule, mode sans effet sur les valeurs, aucun conseil — hors ligne"
+node test_fiches.js || ko=1
+
 etape "3. Extraction du JavaScript inline"
 python3 refresh_harness.py || ko=1
 

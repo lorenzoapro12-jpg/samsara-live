@@ -136,7 +136,10 @@ try {
     ['OI réel', feed.innerHTML.includes(Math.round(D.micro.oi_btc).toLocaleString('en-US'))],
     ['DXY réel', feed.innerHTML.includes(fmt(D.macro.dxy_spot))],
     ['Support 4h réel', feed.innerHTML.includes(usd(D.tf['4h'].support_30))],
-    ['Cross 4h', feed.innerHTML.includes(D.tf['4h'].death_cross_4h ? 'DEATH CROSS' : 'GOLDEN CROSS')],
+    // L'état EMA20 / EMA50 du TF, sous son vrai nom : le badge disait « DEATH CROSS », nom
+    // d'un croisement de SMA50 / SMA200 en daily — un autre objet (voir indicateurs.py).
+    ['État EMA20 / EMA50 4h', feed.innerHTML.includes((D.tf['4h'].ema20_sous_ema50 ?? D.tf['4h'].death_cross_4h) ? 'EMA20 &lt; EMA50' : 'EMA20 &gt; EMA50')
+      && !/DEATH CROSS|GOLDEN CROSS/.test(feed.innerHTML)],
     ['Mur bid dominant (prix complet)', feed.innerHTML.includes('$' + usd(D.liquidity.bid_walls[0][0]))],
     ['Murs en BTC', /BTC<\/span>/.test(feed.innerHTML) && D.liquidity.unit === 'BTC'],
     ['Ratio carnet sur sa bande', feed.innerHTML.includes('±' + D.liquidity.bande_ref_pct + ' %')],

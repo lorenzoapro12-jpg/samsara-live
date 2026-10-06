@@ -83,6 +83,24 @@ réseau à lancer depuis le poste qui affichera la carte. Harnais : `tests/test_
 (calculs, hors ligne) et `tests/test_bookmap_rendu.js` (rendu réel dans Chromium, Binance
 simulé ; « non exécuté » sans Playwright).
 
+## Légendes et mode débutant / expert
+
+Chaque indicateur a sa fiche (bouton **i** à côté du chiffre, ou **?** pour le glossaire) :
+une explication simple, la valeur avec son âge, **comment ça se lit** — chaque lecture marquée
+*usuel*, *convention*, *débattu* ou *mesuré* —, ce que ça ne dit pas, et, quand la
+littérature se contredit (GEX, ratio L/S, DXY), la contradiction elle-même.
+
+- La **formule** d'un champ du fichier est lue dans `meta.champs` (publiée par `publish.py`) ;
+  celle d'un indicateur du graphique est construite avec `PARAM` (`js/app.js`), les paramètres
+  mêmes du calcul. Aucune formule n'est rédigée à côté du code.
+- Le mode **Débutant / Expert** (bouton, touche M) n'est qu'une classe : le HTML est identique
+  dans les deux modes, seul le niveau de détail affiché change — jamais une valeur.
+- Une fiche dit comment l'indicateur **se lit**, jamais quoi acheter ou vendre.
+
+`tests/test_fiches.js` fait tenir ces règles : champs décrits par le producteur, libellés et
+formules qui suivent `PARAM` (il le modifie pour le vérifier), aucun nombre réécrit à la main,
+même HTML dans les deux modes, aucun conseil.
+
 ## Configuration
 
 ```bash
