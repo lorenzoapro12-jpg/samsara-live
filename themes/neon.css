@@ -131,9 +131,12 @@
 [data-theme="neon"] .hero-val { font-family: 'Samsara Neon Chiffres', ui-monospace, monospace; letter-spacing: 0; }
 
 /* ── Surfaces : coins biseautés, filet de néon ── */
+/* Le cadre du GRAPHIQUE n'est pas biseauté : mesuré (06/10/2026), le clip-path sur le conteneur
+   du canvas coûtait à lui seul ×1,43 le CPU de référence pendant un glissement (le masque est
+   réappliqué à chaque image) ; retiré, ×1,00. Sur les autres surfaces, il ne coûte rien de
+   mesurable. Le graphique garde ses coins de visée. */
 [data-theme="neon"] .header,
 [data-theme="neon"] .indicator-bar,
-[data-theme="neon"] .chart-container,
 [data-theme="neon"] .feed-panel,
 [data-theme="neon"] .strat-section,
 [data-theme="neon"] .aero-taskbar,

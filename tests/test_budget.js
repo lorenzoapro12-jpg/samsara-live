@@ -15,7 +15,7 @@
 // graphique n'y coûtait RIEN (×1,02), parce qu'il se calcule à la composition, dans le
 // processus graphique (21,7 → 39 ms par image ici). Une mesure qui ne voit pas ce que la règle
 // interdisait ne peut pas la remplacer : on compte donc tout.
-//   · au repos   : ms de CPU par seconde, 3 s sans interaction. Une animation infinie qui
+//   · au repos   : ms de CPU par seconde, 6 s sans interaction. Une animation infinie qui
 //                  REPEINT (fond, ombre, couleur…) coûte cher ici ; une animation de `transform`
 //                  / `opacity` coûte la seule composition (bien moins, mais pas rien).
 //   · en geste   : ms de CPU par image pendant un glissement du graphique (une image = un
@@ -127,10 +127,11 @@ async function mesurer(nav, theme, injection, bc) {
   await cdp.send('Performance.enable');
   const tache = async () => (await cdp.send('Performance.getMetrics')).metrics.find(m => m.name === 'TaskDuration').value * 1000;
   const cpu = async () => (await bc.send('SystemInfo.getProcessInfo')).processInfo.reduce((s, p) => s + p.cpuTime, 0) * 1000;
-  // Repos : 3 s sans rien toucher.
+  // Repos : 6 s sans rien toucher. (3 s ne suffisaient pas : le compteur de CPU avance par pas
+  // de 10 ms, soit ±0,17 sur un rapport mesuré sur 3 s.)
   const r0 = await tache(), c0 = await cpu();
-  await page.waitForTimeout(3000);
-  const principalRepos = (await tache() - r0) / 3, repos = (await cpu() - c0) / 3;
+  await page.waitForTimeout(6000);
+  const principalRepos = (await tache() - r0) / 6, repos = (await cpu() - c0) / 6;
   // Geste : glisser le graphique, un déplacement par image, 90 images.
   const box = await page.$eval('#chart', c => { const r = c.getBoundingClientRect(); return { x: r.left + r.width * 0.6, y: r.top + r.height * 0.45 }; });
   await page.mouse.move(box.x, box.y);
