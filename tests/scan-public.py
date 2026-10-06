@@ -57,6 +57,12 @@ def main():
         except re.error as e:
             print(f"  ⚠️  motif invalide « {t} » : {e}")
 
+    # La liste de motifs se contient forcément elle-même : on ne scanne pas l'exemple quand
+    # c'est lui qui fournit les motifs (sinon un clone frais échoue toujours sur ce seul
+    # fichier). Avec un fichier local, l'exemple est scanné comme les autres.
+    if not is_local:
+        files = [f for f in files if f != "tests/forbidden.example.json"]
+
     hits, skipped = [], []
     for rel in files:
         p = os.path.join(REPO, rel)
