@@ -4,9 +4,9 @@ Dashboard BTC en fichiers statiques, sans build ni dépendance : servi tel quel 
 Pages, il s'ouvre dans un navigateur et se rafraîchit tout seul depuis des sources publiques.
 Plusieurs thèmes, choisis à la volée (bouton palette, touche T).
 
-**Ce dépôt est complet pour lire, modifier et tester le dashboard.** Trois blocs de
-données dépendent de modules qui n'y sont pas — c'est documenté et le script le dit
-lui-même à l'exécution (voir « Ce qui n'est pas ici »).
+**Ce dépôt est complet** : la page, les deux producteurs et TOUS leurs calculs. Depuis le
+06/10/2026, aucun bloc de `market-data.json` ne dépend plus d'un module hors dépôt — chaque
+champ publié est décrit dans `meta` par le code qui le calcule (voir « Les légendes »).
 
 ---
 
@@ -74,7 +74,7 @@ endroit où des chemins de machine ont le droit d'exister.
 | `out_dir` | `repo_dir` | où écrire les JSON publiés |
 | `git_lock` | `<state_dir>/git.lock` | verrou partagé entre les deux écrivains |
 | `git_remote` / `git_branch` | `origin` / `master` | où pousser |
-| `extra_module_paths` | `[]` | modules hors dépôt (voir plus bas) |
+| `extra_module_paths` | `[]` | ne sert plus qu'à `publish.py --comparer` (parité avec d'anciens modules) |
 | `cvd_database` | `null` | **obsolète** (plus lue depuis le 04/10/2026), acceptée pour compatibilité |
 
 ⚠️ **`state_dir` doit rester stable.** Le changer repart d'un état vide : les 24 h de
@@ -173,21 +173,40 @@ Sans le fichier local, le contrôle tourne sur l'exemple et **n'attrape rien** �
 
 ## Ce qui n'est pas ici — et pourquoi
 
-Trois blocs de `market-data.json` dépendent de modules hors dépôt. Sans eux, le
-script tourne, publie le reste, et l'indique dans `status` :
+Plus rien côté calcul. Jusqu'au 05/10/2026, trois blocs (`indicators`, `macro`,
+`premium`) étaient calculés par des modules d'un autre projet : aucun harnais de ce dépôt
+ne pouvait vérifier qu'un libellé décrivait sa formule, et plusieurs mentaient (voir
+`indicateurs.py`). Ils sont désormais calculés ici — `indicateurs.py` pour le bloc `tf`,
+`publish.py` pour le DXY / VIX (Yahoo) et la prime (Coinbase) — avec **parité exacte**
+vérifiée contre les anciens modules :
 
-| Bloc | Dépendance | Source |
-|---|---|---|
-| `indicators`, `macro` | module `fetch_macro` | DXY, VIX, indicateurs multi-échelle |
-| `premium` | module `scenario_engine` | prime Coinbase |
+```bash
+python3 publish.py --comparer   # sur la machine qui a encore les anciens modules
+                                # (extra_module_paths) : aucun fichier écrit, aucun push
+```
 
-Ces modules se branchent via `extra_module_paths` dans `config.local.json`. Deribit,
-Coinbase et Yahoo ne sont pas joignables depuis n'importe quel poste — leur agrégation
-doit rester côté serveur.
+Toutes les sources sont publiques (**Binance**, **Deribit**, **Coinbase**, **Yahoo**) ;
+seules certaines ne sont pas joignables depuis n'importe quel poste, d'où l'agrégation
+côté serveur.
 
-Les cinq autres blocs ne dépendent que de sources publiques et fonctionnent partout, sans
-configuration : **Binance** (`btc_spot`, `micro_futures`, `cvd`, `liquidity`) et
-**Deribit** (`gex`, calculé dans `options_gex.py`).
+### Les légendes : dérivées du code, jamais rédigées à côté
+
+`market-data.json` porte un bloc `meta.champs` : pour chaque champ, son libellé, son unité,
+sa fenêtre, sa formule, sa source et sa **nature** — `mesure`, `modèle` (ex. Black-Scholes),
+`convention` (hypothèse non observable, ex. le signe du GEX), `seuil` (classement par des
+seuils de ce code) ou `horodatage`. Il est **construit avec les constantes du calcul** :
+changer une période change la description. `tests/test_meta.py` vérifie que :
+
+- chaque champ publié est décrit, et rien d'autre ;
+- chaque nombre ou unité contenu dans un NOM (`_1h`, `_14`, `_usd`…) est celui de la
+  formule — un nom faux doit le déclarer (`nom_trompeur`), sinon le harnais échoue ;
+- chaque valeur est retrouvée par une implémentation de référence paramétrée par sa
+  description ;
+- et qu'il attrape bien les dérives (il les simule).
+
+`heatmap.json` publie de même son `encodage` : ce qu'est une cellule (intensité
+`255·√(q/100)`, `q` = plus gros niveau de prix de la tranche), comment la décoder, et
+comment fusionner deux cellules (le MAX, jamais la somme).
 
 ### Ce que mesure chaque chiffre (révision du 04/10/2026)
 

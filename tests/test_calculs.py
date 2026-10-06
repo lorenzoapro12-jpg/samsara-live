@@ -19,6 +19,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 import options_gex as G   # noqa: E402
 import publish as P       # noqa: E402  (l'import ne lance rien : main() est gardé)
+import indicateurs as I   # noqa: E402
+import heatmap as H       # noqa: E402  (idem : main() est gardé)
 
 CHECKS = []
 
@@ -87,6 +89,59 @@ check("call wall / put wall", r["call_wall"] == 110000 and r["put_wall"] == 9000
 check("échéance passée ignorée", len(G.options_utiles(
     [{"instrument_name": "BTC-1JAN20-100000-C", "open_interest": 5, "mark_iv": 50, "underlying_price": 1e5}], now)) == 0)
 check("nom illisible ignoré", G.parse_instrument("ETH-1JAN27-100-C") is None)
+
+# ── Indicateurs (indicateurs.py) — des cas qui se vérifient de tête ──────────
+def b(c, h=None, l=None, v=1.0, close_ms=0):
+    return {"open": c, "high": h if h is not None else c, "low": l if l is not None else c, "close": c,
+            "volume": v, "close_time": "x", "close_ms": close_ms}
+
+
+plat = [b(100.0) for _ in range(60)]
+o = I.indicateurs_tf(plat, 4, maintenant_ms=10)
+check("closes constantes : EMA20 = EMA50 = prix, écart nul", o["ema20"] == o["ema50"] == 100.0 and o["ema_ecart_pct"] == 0, o)
+monte = [b(100.0 + i) for i in range(60)]
+check("hausse continue : RSI = 100 (aucune baisse)", I.indicateurs_tf(monte, 4, 10)["rsi_14"] == 100.0)
+check("moins de 50 bougies : TF non publié", I.indicateurs_tf(monte[:49], 4, 10) is None)
+fen = [b(100.0, 100.0, 100.0) for _ in range(29)] + [b(100.0, 130.0, 50.0)] + [b(100.0) for _ in range(30)]
+o = I.indicateurs_tf(fen, 4, 10)
+check("S/R : l'extrême sort de la fenêtre après 30 bougies", o["support_30"] == 100.0 and o["resistance_30"] == 100.0, o)
+o = I.indicateurs_tf([b(100.0)] * 30 + [b(100.0, 130.0, 50.0)] + [b(100.0)] * 29, 4, 10)   # 30ᵉ en partant de la fin
+check("S/R : l'extrême reste DANS la fenêtre à 30 bougies", o["support_30"] == 50.0 and o["resistance_30"] == 130.0)
+check("amplitude rapportée au PLUS BAS : (130 − 50) / 50 = 160 %", o["amplitude_30_pct"] == 160.0 == o["range_24h_pct"])
+check("fenêtre S/R publiée en heures : 30 × 4 h = 120 h", o["sr_window_h"] == 120)
+check("bougie en cours : clôture après « maintenant »",
+      I.indicateurs_tf([b(100.0)] * 59 + [b(100.0, close_ms=99)], 4, 50)["bougie_en_cours"] is True
+      and I.indicateurs_tf([b(100.0)] * 60, 4, 50)["bougie_en_cours"] is False)
+check("poids de l'amorce : EMA50 sur 200 bougies ≈ 0,25 %", 0.2 < I.poids_amorce_pct(50) < 0.3, I.poids_amorce_pct(50))
+
+# ── DXY : dernière clôture d'un jour ouvré ──────────────────────────────────
+ven = datetime(2026, 10, 2, 20, tzinfo=timezone.utc)          # vendredi
+sam = ven + timedelta(days=1)
+res = {"timestamp": [int((ven - timedelta(days=1)).timestamp()), int(ven.timestamp()), int(sam.timestamp())],
+       "indicators": {"quote": [{"close": [101.0, 102.0, 103.0]}]}}
+d = P.dxy_derniere_cloture(res, sam)
+check("DXY : la barre du samedi est ignorée, le vendredi retenu", d["value"] == 102.0 and d["date"] == "2026-10-02", d)
+check("DXY : « fermé » se lit sur l'horloge (samedi → oui)", d["is_weekend"] is True)
+res["indicators"]["quote"][0]["close"][1] = None
+check("DXY : un close manquant est sauté", P.dxy_derniere_cloture(res, ven)["value"] == 101.0)
+
+# ── Prime Coinbase ───────────────────────────────────────────────────────────
+cb, bn = {"bid": 99969.0, "ask": 99971.0, "mid": 99970.0}, {"bid": 99999.0, "ask": 100001.0, "mid": 100000.0}
+p = P.calcul_prime(cb, bn, {"mid": 0.9997})
+check("prime brute −0,03 % : sous le seuil → NEUTRAL (seuil strict)", p["premium_pct"] == -0.03 and p["premium_state"] == "NEUTRAL", p)
+check("hors USDT : un USDT à 0,9997 $ explique TOUTE la prime (≈ 0 %)", abs(p["premium_hors_usdt_pct"]) < 0.0001, p)
+check("sans cours USDT : la prime historique reste publiée", P.calcul_prime(cb, bn, None)["premium_hors_usdt_pct"] is None)
+
+# ── Heatmap : ce qu'est une cellule ─────────────────────────────────────────
+e = H.encodage()
+check("encodage publié = constantes du calcul", e["ref_btc"] == H.REF and e["plafond"] == H.PLAFOND and e["niveaux"] == H.NIVEAUX)
+check("100 BTC et plus : saturé", H.intensite(100) == H.intensite(5000) == 255)
+check("décodage : q dans [ref·(v/255)², ref·((v+1)/255)²[", all(
+    e["ref_btc"] * (H.intensite(q) / 255) ** 2 <= q < e["ref_btc"] * ((H.intensite(q) + 1) / 255) ** 2
+    for q in (0.002, 0.5, 1, 7.3, 42, 99.9)))
+check("fusion par MAX exacte : intensité(max q) = max(intensités)",
+      all(H.intensite(max(a, b)) == max(H.intensite(a), H.intensite(b)) for a in (0.1, 3, 50) for b in (0.2, 9, 120)))
+check("sous le seuil publié : cellule absente", H.intensite(e["seuil_btc"] * 0.99) == 0 and H.intensite(e["seuil_btc"] * 1.01) == 1)
 
 ko = CHECKS.count(False)
 print(f"\n{'✅ CALCULS SERVEUR : TOUS LES CONTRÔLES PASSENT' if not ko else f'❌ {ko} contrôle(s) en échec'}")

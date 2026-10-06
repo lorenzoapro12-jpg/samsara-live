@@ -6,7 +6,7 @@
                        api.binance.com ──────────────┐   (spot, klines 5 min, carnet)
                        fapi.binance.com ─────────────┤
                        Deribit (options) ────────────┤   (GEX : options_gex.py)
-                       Coinbase · Yahoo ─────────────┤   (via modules hors dépôt)
+                       Coinbase · Yahoo ─────────────┤   (prime, DXY, VIX : publish.py)
                                                       ▼
                                               publish.py  ──▶ market-data.json ──┐
                                                                                 │
@@ -57,19 +57,20 @@ des seuils de refus à 30 et 10 min).
 
 ## Les 8 blocs de `market-data.json`
 
-| Bloc | Source | Dépendance hors dépôt |
+| Bloc | Source | Calcul |
 |---|---|---|
 | `btc_spot` | Binance `api` | — |
-| `indicators` | Binance klines 4h/1h/1d | `fetch_macro` |
-| `macro` | DXY, VIX | `fetch_macro` |
+| `indicators` | Binance klines 4h/1h/1d | `indicateurs.py` |
+| `macro` | DXY, VIX (Yahoo) | `publish.py` |
 | `micro_futures` | Binance `fapi` | — |
 | `cvd` | Binance klines 5 min (achats taker vs total) | — |
 | `gex` | Deribit, calcul dans `options_gex.py` | — |
-| `premium` | Coinbase vs Binance | `scenario_engine` |
+| `premium` | Coinbase vs Binance (+ USDT-USD) | `publish.py` |
 | `liquidity` | Binance carnet (5 000 niveaux), en BTC | — |
 
-Cinq blocs sur huit tournent partout sans configuration. Les trois autres se branchent
-par `extra_module_paths` dans `config.local.json`.
+Les huit blocs tournent dans un clone nu, sans configuration (depuis le 06/10/2026).
+Chaque champ est décrit dans `meta.champs`, construit avec les constantes du calcul et
+vérifié par `tests/test_meta.py` : une légende ne se rédige plus à côté du code.
 
 ### Unités et fenêtres — à lire avant de comparer deux chiffres
 
@@ -185,5 +186,6 @@ d'animation infinie ni de `mix-blend-mode`, aucune ressource externe).
   harnais de l'exécuter tel quel dans node.
 - **La heatmap ne se recalcule pas.** Elle s'accumule. Redémarrer l'accumulateur repart
   d'une fenêtre vide qu'il faut 24 h à remplir.
-- **Deux secrets de conception restent hors dépôt** : la base CVD et les modules d'accès
-  aux sources non-Binance. Le dépôt le dit à l'exécution plutôt que d'échouer en silence.
+- **Plus aucun calcul hors dépôt** (06/10/2026) : indicateurs, DXY / VIX et prime sont
+  calculés ici. `publish.py --comparer` vérifie la parité avec les anciens modules sur la
+  machine qui les a encore.
