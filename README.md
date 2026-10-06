@@ -83,6 +83,26 @@ réseau à lancer depuis le poste qui affichera la carte. Harnais : `tests/test_
 (calculs, hors ligne) et `tests/test_bookmap_rendu.js` (rendu réel dans Chromium, Binance
 simulé ; « non exécuté » sans Playwright).
 
+## Réglages d'affichage
+
+Bouton **Réglages** de l'en-tête. Ils changent le niveau de DÉTAIL, jamais une valeur : un
+chiffre affiché garde sa valeur et porte sa bande ou sa tranche.
+
+- **Panneau ⚡** (lu par la page sur Binance, donc libre) : profondeur du carnet (100 à
+  5 000 niveaux — la cadence ralentit avec le poids de la requête), bandes affichées (une
+  bande non couverte par le carnet reçu est dite « non couverte »), nombre de trades, seuils
+  de LECTURE du ratio et des achats au marché (ils choisissent la phrase, pas le chiffre).
+- **Carte « Liquidité »** (fichier de 15 min) : les bandes proposées sont celles que le
+  serveur a PUBLIÉES ; s'il publie le profil du carnet, des bandes supplémentaires s'y
+  calculent « à la tranche près ». La tranche des murs est un multiple de `wall_bin_usd`
+  publié (des sommes regroupées : exact) ; nombre de murs, seuil minimal.
+- **Heatmap du graphique** : fusion des tranches et des colonnes par MAX (on fusionne, on
+  n'affine jamais), seuil d'intensité. En dézoom, la fusion par MAX se fait d'elle-même au
+  pixel : le lissage, qui moyennait et effaçait les murs isolés, est coupé.
+
+`tests/test_reglages.js` le vérifie, y compris avec un fichier aux constantes inhabituelles
+(tranche de 25 $, bandes de 0,2 / 0,7 %) : la page affiche CES valeurs, aucune recopiée.
+
 ## Légendes et mode débutant / expert
 
 Chaque indicateur a sa fiche (bouton **i** à côté du chiffre, ou **?** pour le glossaire) :

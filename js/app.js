@@ -1186,37 +1186,38 @@ const HEAT_ASK = (() => { const a = []; for (let i = 0; i < 256; i++) { const t 
 // fois par payload puis composée en UN drawImage, au lieu d'un fillRect par cellule
 // (jusqu'à 128 k appels/frame, ~175 ms mesuré, pour un rendu quasi identique : en 15m les
 // colonnes se tuilent déjà à ~0,93 px). Le coût était le NOMBRE d'appels, pas la surface peinte.
-let heatLayer = null;   // { cv, w, h, img, key }
-function heatGrid(hm) {
-  if (hm._g) return hm._g;
-  let w = 0, h = 0;
-  for (const side of [hm.bids, hm.asks]) for (const [c, pb] of side) { if (c >= w) w = c + 1; if (pb >= h) h = pb + 1; }
-  // Palettes -> Uint32 ABGR (ordre mémoire d'ImageData, little-endian) : un pixel écrit
-  // sans reparser une chaîne CSS par cellule.
-  const u32 = pal => { const a = new Uint32Array(256);
-    for (let i = 0; i < 256; i++) { const m = pal[i].match(/[\d.]+/g);
-      a[i] = ((+m[3] * 255 | 0) << 24 | (+m[2] << 16) | (+m[1] << 8) | +m[0]) >>> 0; }
-    return a; };
-  return (hm._g = { w, h, bid: u32(HEAT_BID), ask: u32(HEAT_ASK) });
+let heatLayer = null;   // { cv, w, h, P1, dt, dp, cle }
+// Palettes -> Uint32 ABGR (ordre mémoire d'ImageData, little-endian) : un pixel écrit sans
+// reparser une chaîne CSS par cellule.
+const HEAT_U32 = (() => { const u32 = pal => { const a = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) { const m = pal[i].match(/[\d.]+/g);
+    a[i] = ((+m[3] * 255 | 0) << 24 | (+m[2] << 16) | (+m[1] << 8) | +m[0]) >>> 0; }
+  return a; }; return { bid: u32(HEAT_BID), ask: u32(HEAT_ASK) }; })();
+/** Couche heatmap, FUSIONNÉE par MAX (kt colonnes × kp tranches, js/reglages.js), cellules
+ *  sous `seuil` retirées. L'image ne couvre que les tranches présentes (de P0 à P1) : elle
+ *  partait du prix 0 $ — 1 441 × 4 333 px pour ~150 lignes utiles. */
+function buildHeatLayer(hm, kt, kp, seuil) {
+  const cle = hm.updated + '|' + kt + '|' + kp + '|' + seuil;
+  if (heatLayer && heatLayer.cle === cle) return heatLayer;   // payload et réglages inchangés
+  const bids = fusionnerCellules(hm.bids, kt, kp, seuil), asks = fusionnerCellules(hm.asks, kt, kp, seuil);
+  let W = 0, P0 = Infinity, P1 = -Infinity;
+  for (const side of [bids, asks]) for (const [C, P] of side) { if (C >= W) W = C + 1; if (P < P0) P0 = P; if (P > P1) P1 = P; }
+  if (!W) return null;
+  const H = P1 - P0 + 1;
+  const cv = (heatLayer && heatLayer.cv.width === W && heatLayer.cv.height === H) ? heatLayer.cv : document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const img = new ImageData(W, H), px = new Uint32Array(img.data.buffer), val = new Uint8Array(W * H);
+  // Ligne 0 en HAUT = tranche la plus haute (drawImage descend, le prix monte). Quand bids et
+  // asks tombent dans la même case fusionnée, la plus forte intensité l'emporte.
+  for (const [cells, pal] of [[bids, HEAT_U32.bid], [asks, HEAT_U32.ask]])
+    for (const [C, P, v] of cells) { const i = (P1 - P) * W + C; if (v >= val[i]) { val[i] = v; px[i] = pal[v] || pal[255]; } }
+  cv.getContext('2d').putImageData(img, 0, 0);
+  return (heatLayer = { cv, w: W, h: H, P1, dt: hm.dt * kt, dp: hm.dp * kp, cle });
 }
-function buildHeatLayer(hm) {
-  const g = heatGrid(hm);
-  if (!g.w || !g.h) return null;
-  if (!heatLayer || heatLayer.w !== g.w || heatLayer.h !== g.h) {
-    const cv = document.createElement('canvas');
-    cv.width = g.w; cv.height = g.h;
-    heatLayer = { cv, w: g.w, h: g.h, img: new ImageData(g.w, g.h), key: null };
-  }
-  if (heatLayer.key === hm.updated) return heatLayer;   // payload inchangé -> rien à refaire
-  const px = new Uint32Array(heatLayer.img.data.buffer);
-  px.fill(0);
-  // Ligne 0 en HAUT = prix le plus haut (drawImage descend, le prix monte).
-  for (const [cells, pal] of [[hm.bids, g.bid], [hm.asks, g.ask]])
-    for (const [c, pb, v] of cells) px[(g.h - 1 - pb) * g.w + c] = pal[v] || pal[255];
-  heatLayer.cv.getContext('2d').putImageData(heatLayer.img, 0, 0);
-  heatLayer.key = hm.updated;
-  return heatLayer;
-}
+/** Facteur de fusion AUTOMATIQUE : quand une colonne (ou une tranche) fait moins d'un pixel,
+ *  on regroupe par MAX jusqu'à l'atteindre, au lieu de laisser le lissage MOYENNER — une
+ *  moyenne efface un mur isolé. Puissances de 2 : la couche n'est refaite qu'à chaque palier. */
+const palier = x => x <= 1 ? 1 : Math.pow(2, Math.ceil(Math.log2(x)));
 // heatmap.json pèse ≈ 2 Mo et n'est republié que toutes les 15 min. Avec un `?t=` unique et
 // `no-store`, chaque minute retéléchargeait les 2 Mo (≈ 120 Mo/h, overlay allumé). Sans le
 // paramètre et en `no-cache`, le navigateur REVALIDE par ETag : réponse 304 de quelques
@@ -2843,28 +2844,28 @@ function resolveChart(candles, padL, padR, chartH, W) {
     const winT0 = candles[vs].time;
     const winT1 = candles[Math.min(candles.length - 1, ve - 1)].time + intervalS;
     const gap = pw / Math.max(1, ve - vs);
-    const layer = buildHeatLayer(hm);
-    // Seules les colonnes natives qui couvrent la fenêtre sont blittées (sinon, en
-    // intraday serré, le rect de destination fait des dizaines de milliers de px de large).
-    const c0 = Math.max(0, Math.floor((winT0 - hm.t0) / hm.dt));
-    const c1 = Math.min(layer ? layer.w : 0, Math.ceil((winT1 - hm.t0) / hm.dt));
+    const RH = REGLAGES.heat;
+    const kt = Math.max(RH.fusionT, palier(1 / (hm.dt / intervalS * gap)));
+    const kp = Math.max(RH.fusionP, palier(1 / (ph * hm.dp / range)));
+    const layer = buildHeatLayer(hm, kt, kp, RH.seuil);
+    // Seules les colonnes qui couvrent la fenêtre sont blittées (sinon, en intraday serré, le
+    // rect de destination fait des dizaines de milliers de px de large).
+    const c0 = Math.max(0, Math.floor((winT0 - hm.t0) / (layer ? layer.dt : hm.dt)));
+    const c1 = Math.min(layer ? layer.w : 0, Math.ceil((winT1 - hm.t0) / (layer ? layer.dt : hm.dt)));
     if (layer && c1 > c0) {
-      const gp = hm.dt / intervalS * gap;              // largeur écran d'une colonne native
+      const gp = layer.dt / intervalS * gap;           // largeur écran d'une colonne (fusionnée)
       ctx.save();
       // Clip sur la zone de prix : la heatmap ne déborde plus dans les gouttières.
       ctx.beginPath(); ctx.rect(pad.left, pad.top, pw, ph); ctx.clip();
-      // Interpolation COUPÉE à l'échelle ~1 px/colonne (le lissage vertical, bin ≈ 6 px,
-      // gommait les bandes de prix qu'on vient lire) ; GARDÉE en dézoom, où plusieurs
-      // colonnes natives tombent dans un pixel — là, le plus proche voisin jette des
-      // colonnes (3000 bougies : 1440 colonnes écrasées dans 41 px).
-      ctx.imageSmoothingEnabled = gp < 0.9;
+      // Interpolation COUPÉE : le lissage MOYENNE les colonnes et gomme les murs. Le dézoom
+      // est traité par la fusion automatique (MAX) ci-dessus : chaque case fait ≥ 1 px.
+      ctx.imageSmoothingEnabled = false;
       ctx.drawImage(layer.cv, c0, 0, c1 - c0, layer.h,
-        pad.left + (hm.t0 + c0 * hm.dt - winT0) / intervalS * gap,
-        // Ligne 0 de l'image = la tranche de prix la PLUS HAUTE (cf. buildHeatLayer).
-        // Le sommet se pose donc à layer.h * dp et non (layer.h - 1) * dp : le cran
-        // de 20 $ d'écart décalait verticalement toute la heatmap.
-        pad.top + ph * (1 - (layer.h * hm.dp - minP) / range),
-        (c1 - c0) * gp, layer.h * ph * hm.dp / range);
+        pad.left + (hm.t0 + c0 * layer.dt - winT0) / intervalS * gap,
+        // Ligne 0 de l'image = la tranche la PLUS HAUTE (P1, cf. buildHeatLayer) : son sommet
+        // est à (P1 + 1) × dp — et non P1 × dp, le cran d'une tranche décalait toute la heatmap.
+        pad.top + ph * (1 - ((layer.P1 + 1) * layer.dp - minP) / range),
+        (c1 - c0) * gp, layer.h * ph * layer.dp / range);
       ctx.restore();
     }
   }
@@ -3399,8 +3400,11 @@ function openLiveModal() {
   if (!m) return;
   m.style.display = 'flex';
   renderLive();
-  if (!liveTimer) liveTimer = setInterval(() => { if (!document.hidden) renderLive(); }, 5000);
+  if (!liveTimer) liveTimer = setInterval(() => { if (!document.hidden) renderLive(); }, cadenceLive());
 }
+// 5 000 niveaux pèsent 250 chez Binance (contre 25 pour 500) : la cadence ralentit avec la
+// profondeur pour rester loin du plafond de 6 000 par minute.
+function cadenceLive() { return REGLAGES.live.niveaux >= 5000 ? 15000 : REGLAGES.live.niveaux >= 1000 ? 8000 : 5000; }
 function closeLiveModal() {
   const m = document.getElementById('liveModal');
   if (m) m.style.display = 'none';
@@ -3426,14 +3430,14 @@ async function renderLive() {
   if (!box) return;
   const clk = document.getElementById('liveClock');
   let t24, depth, trades;
-  const t0 = Date.now();
+  const t0 = Date.now(), RL = REGLAGES.live;
   try {
     const o = { cache: 'no-store' };
     const B = 'https://api.binance.com/api/v3/';
     [t24, depth, trades] = await Promise.all([
       fetch(B + 'ticker/24hr?symbol=BTCUSDT', o).then(r => r.json()),
-      fetch(B + 'depth?symbol=BTCUSDT&limit=500', o).then(r => r.json()),
-      fetch(B + 'trades?symbol=BTCUSDT&limit=500', o).then(r => r.json()),
+      fetch(B + 'depth?symbol=BTCUSDT&limit=' + RL.niveaux, o).then(r => r.json()),
+      fetch(B + 'trades?symbol=BTCUSDT&limit=' + RL.trades, o).then(r => r.json()),
     ]);
   } catch (e) {
     box.innerHTML = '<div class="loading">⚡ Binance injoignable depuis ce poste — ' + escHtml(e && e.message ? e.message : e) + '</div>';
@@ -3450,14 +3454,12 @@ async function renderLive() {
   // 500 niveaux Binance ne couvrent que ≈ ±0,13 % du prix (mesuré le 04/10/2026). La carte
   // annonçait « ±1 % » et sommait en réalité tout le carnet reçu, soit ±0,13 %. On mesure
   // donc une bande que ce carnet COUVRE, et on affiche la couverture réelle.
-  const BANDE = 0.1;
-  const bidsD = depth.bids || [], asksD = depth.asks || [];
-  const couv = (bidsD.length && asksD.length)
-    ? Math.min(1 - parseFloat(bidsD[bidsD.length - 1][0]) / px, parseFloat(asksD[asksD.length - 1][0]) / px - 1) * 100 : NaN;
-  let bv = 0, av = 0;
-  for (const r of bidsD) if (parseFloat(r[0]) >= px * (1 - BANDE / 100)) bv += parseFloat(r[1]);
-  for (const r of asksD) if (parseFloat(r[0]) <= px * (1 + BANDE / 100)) av += parseFloat(r[1]);
-  const ratio = (av > 0 && couv >= BANDE) ? bv / av : NaN;
+  // Profondeur et bandes sont des RÉGLAGES : cette page va chercher ce carnet elle-même.
+  const mesures = RL.bandes.map(b => [b, bandeLive(depth, px, b)]);
+  const BANDE = RL.bandes[0], m0 = mesures[0][1] || {};
+  const couv = isNum(m0.couverture) ? m0.couverture : NaN;
+  const bv = m0.couverte ? m0.bid : 0, av = m0.couverte ? m0.ask : 0;
+  const ratio = m0.couverte ? m0.ratio : NaN;
   // ── tape : 500 derniers trades. isBuyerMaker=true -> l'acheteur était PASSIF -> vente agressive ──
   let buy = 0, sell = 0;
   for (const t of (trades || [])) { const q = parseFloat(t.qty); if (t.isBuyerMaker) sell += q; else buy += q; }
@@ -3495,22 +3497,26 @@ async function renderLive() {
     + '</b> · ' + parseInt(t24.count, 10).toLocaleString('fr-FR') + ' trades</div>');
 
   // 3 — CARNET LIVE ±1 %
-  const carnetTxt = !isFinite(ratio) ? '—'
-    : ratio >= 1.4 ? 'déséquilibre ACHETEUR marqué' : ratio >= 1.1 ? 'léger penchant acheteur'
-    : ratio <= 0.7 ? 'déséquilibre VENDEUR marqué' : ratio <= 0.9 ? 'léger penchant vendeur' : 'équilibré';
-  html += mCard('💧', 'Carnet live ±' + BANDE + ' %', 'Binance spot · 500 niveaux, vus jusqu\'à ±'
+  // Seuils de LECTURE (réglables) : ils choisissent la phrase, jamais le ratio affiché.
+  const carnetTxt = !isFinite(ratio) ? (m0.couverte === false ? 'bande non couverte par le carnet reçu' : '—')
+    : ratio >= RL.ratioMarque ? 'déséquilibre ACHETEUR marqué' : ratio >= RL.ratioLeger ? 'léger penchant acheteur'
+    : ratio <= 1 / RL.ratioMarque ? 'déséquilibre VENDEUR marqué' : ratio <= 1 / RL.ratioLeger ? 'léger penchant vendeur' : 'équilibré';
+  const autresBandes = mesures.slice(1).map(([b, m]) => '±' + b + ' % : ' + (!m ? '—' : m.couverte ? '<b>' + m.ratio.toFixed(2) + '</b>' : 'non couverte')).join(' · ');
+  html += mCard('💧', 'Carnet live ±' + BANDE + ' %', 'Binance spot · ' + RL.niveaux.toLocaleString('fr-FR') + ' niveaux, vus jusqu\'à ±'
     + (isFinite(couv) ? couv.toFixed(2) : '—') + ' % · instantané', '',
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">Bids <b>' + fmtNum(bv, 1) + ' BTC</b> · Asks <b>' + fmtNum(av, 1) + ' BTC</b></div>'
     + '<div style="margin-top:6px;font-size:15px;font-weight:800" class="' + (ratio >= 1 ? pos : neg) + '">Ratio bid/ask '
     + (isFinite(ratio) ? ratio.toFixed(2) : '—') + '</div>'
+    + (autresBandes ? '<div style="margin-top:4px;font-size:11.5px;font-variant-numeric:tabular-nums">' + autresBandes + '</div>' : '')
     + '<div style="margin-top:4px;font-size:11px;color:var(--ink-2)">' + carnetTxt
     + ' — un carnet est PÉRISSABLE : valable quelques minutes, et un mur peut être retiré</div>');
 
   // 4 — TAPE LIVE
+  const tD = RL.takerDominant / 100, tL = RL.takerLeger / 100;
   const tapeTxt = !isFinite(taker) ? '—'
-    : taker >= 0.60 ? 'acheteurs agressifs dominants' : taker >= 0.53 ? 'léger penchant acheteur'
-    : taker <= 0.40 ? 'vendeurs agressifs dominants' : taker <= 0.47 ? 'léger penchant vendeur' : 'partagé';
-  html += mCard('🌊', 'Tape live', '500 derniers trades · fenêtre ' + (spanS === null ? '—' : spanS + ' s') + ' · agression, pas intention', '',
+    : taker >= tD ? 'acheteurs agressifs dominants' : taker >= tL ? 'léger penchant acheteur'
+    : taker <= 1 - tD ? 'vendeurs agressifs dominants' : taker <= 1 - tL ? 'léger penchant vendeur' : 'partagé';
+  html += mCard('🌊', 'Tape live', RL.trades + ' derniers trades · fenêtre ' + (spanS === null ? '—' : spanS + ' s') + ' · agression, pas intention', '',
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">Achats au taker <b>' + fmtNum(buy, 1) + ' BTC</b> · Ventes <b>' + fmtNum(sell, 1) + ' BTC</b></div>'
     + '<div style="margin-top:6px;font-size:15px;font-weight:800" class="' + (taker >= 0.5 ? pos : neg) + '">Taker buy '
     + (isFinite(taker) ? (taker * 100).toFixed(1) + ' %' : '—') + '</div>'
@@ -3635,7 +3641,7 @@ function axePrix(points) {
 }
 // Échelle des murs : asks au-dessus, mid, bids au-dessous — rangés par prix, barre ∝ BTC.
 function ladderHtml(asks, bids, mid) {
-  const a = (asks || []).slice(0, 5), b = (bids || []).slice(0, 5);
+  const a = asks || [], b = bids || [];
   const max = Math.max(1, ...a.map(w => w[1]), ...b.map(w => w[1]));
   const ligne = (w, cote) => '<div class="lad-row ' + cote + '"><span class="lad-px">' + fmtUsd(w[0]) + '</span>'
     + '<div class="lad-bar"><span style="width:' + (w[1] / max * 100).toFixed(1) + '%"></span></div>'
@@ -3845,19 +3851,28 @@ function renderFeedTo(container) {
   // d'intensité de heatmap (sans unité) et les présentait comme une « profondeur cumulée ».
   let liqBody;
   if (lq.unit === 'BTC') {
-    const bandes = lq.bandes || {};
+    // Bandes : celles que le SERVEUR a publiées (clés de `bandes`) ; la bande affichée en tête
+    // est la référence publiée, ou celle choisie dans les réglages PARMI les publiées. Les
+    // bandes « perso » se calculent sur le profil publié, à la tranche près, et le disent.
+    const bandes = lq.bandes || {}, RC = REGLAGES.carnet;
+    const cle = (RC.bande !== null && bandes[String(RC.bande)]) ? String(RC.bande) : String(lq.bande_ref_pct);
+    const bt = bandes[cle] || { ratio: lq.ratio_bid_ask, bid_btc: lq.total_bid, ask_btc: lq.total_ask };
     const autres = Object.keys(bandes).sort((a, b) => a - b)
       .map(k => '±' + k + ' % : ' + fmtNum(bandes[k].ratio,2)).join(' · ');
-    liqBody = '<div class="bloc-titre"><span class="lbl">Carnet ±' + lq.bande_ref_pct + ' %' + infoBtn('carnet') + '</span>'
-      + '<span class="fine">Ratio <b>bid/ask</b> ±' + lq.bande_ref_pct + ' % : <b class="' + (lq.ratio_bid_ask>1?'stat-pos':'stat-neg') + '">'
-      + fmtNum(lq.ratio_bid_ask,2) + '</b></span></div>'
-      + splitHtml(lq.total_bid, lq.total_ask, 'Bids&nbsp;<b>' + fmtNum(lq.total_bid,1) + ' BTC</b>', 'Asks&nbsp;<b>' + fmtNum(lq.total_ask,1) + ' BTC</b>')
+    const perso = RC.bandesPerso.map(b => [b, bandeProfil(lq, b)]).filter(([, r]) => r)
+      .map(([b, r]) => '±' + b + ' % ≈ ' + fmtNum(r.ratio,2)).join(' · ');
+    liqBody = '<div class="bloc-titre"><span class="lbl">Carnet ±' + cle + ' %' + infoBtn('carnet') + '</span>'
+      + '<span class="fine">Ratio <b>bid/ask</b> ±' + cle + ' % : <b class="' + (bt.ratio>1?'stat-pos':'stat-neg') + '">'
+      + fmtNum(bt.ratio,2) + '</b></span></div>'
+      + splitHtml(bt.bid_btc, bt.ask_btc, 'Bids&nbsp;<b>' + fmtNum(bt.bid_btc,1) + ' BTC</b>', 'Asks&nbsp;<b>' + fmtNum(bt.ask_btc,1) + ' BTC</b>')
       + '<div class="fine" style="margin-top:4px">' + autres + ' · carnet vu jusqu\'à ±' + fmtNum(lq.couverture_pct,2) + ' %</div>'
-      + lectureCourte('carnet', lq.ratio_bid_ask)
+      + (perso ? '<div class="fine">Sur le profil publié (à ' + lq.wall_bin_usd + ' $ près) : ' + perso + '</div>' : '')
+      + lectureCourte('carnet', bt.ratio)
       // La tranche est LUE dans le fichier (`wall_bin_usd`) ; absente, on ne l'invente pas.
       + '<div class="bloc"><div class="bloc-titre"><span class="lbl">Murs' + infoBtn('murs') + '</span><span class="fine">BTC posés par tranche de '
-      + (isNum(lq.wall_bin_usd) ? lq.wall_bin_usd + ' $' : '(tranche non publiée)') + '</span></div>'
-      + ladderHtml(lq.ask_walls, lq.bid_walls, lq.mid) + '</div>'
+      + (isNum(lq.wall_bin_usd) ? (lq.wall_bin_usd * (Array.isArray(lq.profil_bids) ? RC.trancheX : 1)) + ' $' : '(tranche non publiée)') + '</span></div>'
+      + ladderHtml(mursFusionnes(lq, 'ask', Array.isArray(lq.profil_asks) ? RC.trancheX : 1, RC.murs, RC.murMin),
+                   mursFusionnes(lq, 'bid', Array.isArray(lq.profil_bids) ? RC.trancheX : 1, RC.murs, RC.murMin), lq.mid) + '</div>'
       + '<div class="fine" style="margin-top:8px">Instantané du carnet à la publication — un mur peut être retiré à tout moment.</div>';
   } else {
     liqBody = '<div class="fine">Format ancien (scores d\'intensité sans unité) — en attente de la prochaine publication.</div>';

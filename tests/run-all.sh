@@ -31,6 +31,9 @@ node test_indicateurs.js || ko=1
 etape "2b. Légendes : dérivées du code qui calcule, mode sans effet sur les valeurs, aucun conseil — hors ligne"
 node test_fiches.js || ko=1
 
+etape "2c. Réglages : le détail change, jamais la valeur ; constantes du fichier lues, jamais recopiées — hors ligne"
+node test_reglages.js || ko=1
+
 etape "3. Extraction du JavaScript inline"
 python3 refresh_harness.py || ko=1
 

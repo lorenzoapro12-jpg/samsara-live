@@ -10,44 +10,19 @@
 //   · une lecture n'est pas un conseil -> aucun impératif d'achat / de vente.
 //
 // USAGE   node tests/test_fiches.js
-const fs = require('fs'), vm = require('vm'), path = require('path'), { execFileSync } = require('child_process');
-const { scriptsApp, REPO } = require('./sources');
+const fs = require('fs'), path = require('path'), { execFileSync } = require('child_process');
+const { REPO } = require('./sources');
 
 let ko = 0;
 const check = (nom, ok, det) => { if (!ok) ko++; console.log(`  ${ok ? '✓' : '✗'} ${nom}${!ok && det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 300) : ''}`); };
 const titre = t => console.log(`\n── ${t} ──`);
 
-// ── Le code de la page, exécuté dans un DOM minimal ──────────────────────────
-const scripts = scriptsApp();
+// ── Le code de la page, exécuté dans un DOM minimal (tests/bac.js) ───────────
+const { chargerPage, element: el } = require('./bac');
 const SRC_APP = fs.readFileSync(path.join(REPO, 'js/app.js'), 'utf8');
-let code = scripts.map(s => s.texte).join('\n;\n').replace(/\ninit\(\);\s*$/, '\n');
-code += `
-globalThis.__T__ = {
-  get FICHES() { return FICHES; }, get PARAM() { return PARAM; }, get INDICATORS() { return INDICATORS; },
-  ETIQ, subTitle, ficheHtml, lectureCourte, renderFeedTo, modeCourant, FICHE_IND,
-  setData(d) { marketData = d; },
-};`;
-const MODE = { v: null };
-const el = () => ({ style: {}, dataset: {}, innerHTML: '', textContent: '', classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-  addEventListener() {}, appendChild() {}, setAttribute() {}, getAttribute() { return null; }, querySelector() { return null; }, querySelectorAll() { return []; },
-  getContext() { return null; }, getBoundingClientRect() { return { width: 900, height: 600, left: 0, top: 0, bottom: 0 }; } });
-const store = {};
-const ls = { getItem: k => (k === 'samsara-mode' ? MODE.v : null), setItem() {}, removeItem() {} };
-const sandbox = {
-  console, Date, Math, JSON, Intl, Object, Array, String, Number, Boolean, Error, Promise, RegExp, Set, Map, isNaN, isFinite,
-  parseFloat, parseInt, encodeURIComponent, decodeURIComponent, undefined,
-  document: { getElementById: id => store[id] || (store[id] = el()), querySelector: () => el(), querySelectorAll: () => [], addEventListener() {},
-    createElement: () => el(), body: el(), documentElement: el(), head: el(), hidden: false },
-  window: { innerWidth: 1440, innerHeight: 900, addEventListener() {}, matchMedia: () => ({ matches: false, addEventListener() {} }), localStorage: ls, location: {} },
-  localStorage: ls, requestAnimationFrame: () => 0, setTimeout: () => 0, setInterval: () => 0, clearTimeout() {}, clearInterval() {},
-  fetch: async () => ({ ok: false }), navigator: {}, performance: { now: () => 0 }, getComputedStyle: () => ({ getPropertyValue: () => '' }),
-  ResizeObserver: function () { this.observe = () => {}; }, Image: function () {}, location: {},
-  CanvasRenderingContext2D: function () {}, history: { pushState() {}, replaceState() {} },
-};
-sandbox.globalThis = sandbox;
-vm.createContext(sandbox);
-vm.runInContext(code, sandbox);
-const T = sandbox.__T__;
+const page = chargerPage();
+const T = page.T;
+const MODE = { set v(m) { if (m === null) delete page.stockage['samsara-mode']; else page.stockage['samsara-mode'] = m; } };
 
 // Les descriptions publiées par le serveur : celles que publish.py écrit dans meta.champs.
 const META = JSON.parse(execFileSync('python3', ['-c',
