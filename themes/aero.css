@@ -87,6 +87,7 @@
   --filigrane: 0.045;
   --vol-alpha: 0.5;
   --bande-alpha: 0.07;
+  --aura: 0.10;
   /* Overlays : ordre jaune > bleu > orange > violet > rose > vert. En clair, trois sont sous
      3:1 (ema20, sma20, ema100) : chaque ligne porte son étiquette en bout de tracé. */
   --ov-ema20: #eda100; --ov-ema50: #2a78d6; --ov-ema100: #eb6834;

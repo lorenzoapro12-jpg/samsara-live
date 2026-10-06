@@ -1,7 +1,8 @@
 # Saṃsāra — dashboard marché live
 
-Dashboard BTC en un seul fichier HTML, autonome, sans build ni dépendance : il s'ouvre
-dans un navigateur et se rafraîchit tout seul depuis des sources publiques.
+Dashboard BTC en fichiers statiques, sans build ni dépendance : servi tel quel par GitHub
+Pages, il s'ouvre dans un navigateur et se rafraîchit tout seul depuis des sources publiques.
+Plusieurs thèmes, choisis à la volée (bouton palette, touche T).
 
 **Ce dépôt est complet pour lire, modifier et tester le dashboard.** Trois blocs de
 données dépendent de modules qui n'y sont pas — c'est documenté et le script le dit
@@ -24,7 +25,8 @@ python3 -m http.server 8000       # ou n'importe quel serveur statique
 et un clone qui n'a jamais été publié n'affichera jamais ses propres données.
 
 Pour visualiser tes propres fichiers, remplace les deux URL par des chemins relatifs dans
-`index.html` — la page est autonome par ailleurs (JavaScript inline, aucun asset externe).
+`js/app.js` — la page est autonome par ailleurs (aucune police, aucun CDN, aucune image
+distante : `tests/test_contrat.py` le vérifie).
 
 Ouvrir `index.html` en `file://` fonctionne aussi pour le rendu, mais les appels réseau y
 sont restreints par certains navigateurs : un serveur local est préférable.
@@ -35,7 +37,11 @@ sont restreints par certains navigateurs : un serveur local est préférable.
 
 | Fichier | Rôle |
 |---|---|
-| `index.html` | **Le dashboard.** HTML + CSS + JS inline. C'est 95 % du projet. |
+| `index.html` | **Le dashboard** : le balisage, et le registre des thèmes (`<link data-theme-id>`). |
+| `css/app.css` | La structure et les composants. **Aucune couleur en dur** : tout passe par des jetons. |
+| `themes/<id>.css` | Un fichier par thème : les valeurs des jetons, sous `[data-theme="<id>"]`. |
+| `js/app.js` | L'application (graphique, indicateurs, cartes, Grid Bot). |
+| `js/vendor/hyalite.js` | Réfraction « verre liquide » (MIT, verbatim), chargée seulement si le thème la demande. |
 | `market-data.json` | Les données des cartes « Marché live ». Réécrit par `publish.py`. |
 | `heatmap.json` | La heatmap de liquidité sur 24 h. Réécrite par `heatmap.py`. |
 | `publish.py` | Agrège 8 sources → `market-data.json`. |
@@ -97,6 +103,27 @@ un échec : un dépôt fraîchement cloné doit pouvoir tourner et dire ce qui l
 
 ---
 
+## Les thèmes
+
+Un thème est un fichier `themes/<id>.css` qui donne des valeurs aux jetons de
+`css/app.css`, sous le sélecteur `[data-theme="<id>"]`, et une ligne dans `index.html` :
+
+```html
+<link rel="stylesheet" href="themes/<id>.css" data-theme-id="<id>" data-nom="Nom"
+      data-mode="clair|sombre" data-verre="aucun|givre|refraction" data-paire="<jumeau>">
+```
+
+Le plus simple est de copier un thème existant (`themes/kala.css` est le plus court) et de
+changer ses valeurs. Le graphique lit ses couleurs dans les mêmes jetons. Un thème n'entre
+pas sans passer les mêmes contrôles que les autres : `tests/test_palette.py` (contraste,
+daltonisme, overlays) et `tests/test_contrat.py` (jetons du noyau présents, règles toutes
+scopées, aucun `backdrop-filter` posé par le thème, aucune animation infinie).
+
+Le verre (`data-verre`) coûte cher : un flou recalculé à chaque image du graphique. Un
+thème `aucun` est le plus rapide ; les autres suspendent leur verre pendant les gestes.
+
+---
+
 ## Les tests
 
 ```bash
@@ -106,12 +133,14 @@ bash tests/run-all.sh
 Dans l'ordre : compilation ; calculs serveur **hors ligne** (`tests/test_calculs.py` :
 CVD, carnet, GEX sur des données construites à la main) ; indicateurs de la page **hors
 ligne** (`tests/test_indicateurs.js` : SAR, ADX, RSI, EMA comparés à des implémentations
-de référence) ; extraction du JavaScript inline ; non-régression du rendu (DOM stubbé
+de référence) ; assemblage du JavaScript de la page ; non-régression du rendu (DOM stubbé
 dans node) ; panneau ⚡ (**appels réseau réels** vers Binance) ; scan de **tous les
-fichiers suivis par git**.
+fichiers suivis par git** ; palette de **chaque thème** (`tests/test_palette.py` : contraste
+WCAG, séparation sous daltonisme) ; contrat de la page (`tests/test_contrat.py` : registre
+des thèmes, jetons obligatoires, règles de performance, réseau).
 
-Les harnais de rendu consomment un fichier JavaScript extrait de `index.html` — il faut
-le régénérer après chaque modification du dashboard :
+Les harnais de rendu consomment le JavaScript de la page, assemblé dans l'ordre des
+`<script src>` d'`index.html` — il faut le régénérer après chaque modification :
 
 ```bash
 python3 tests/refresh_harness.py && node tests/test_render.js

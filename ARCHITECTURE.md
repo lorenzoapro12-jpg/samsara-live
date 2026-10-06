@@ -156,8 +156,9 @@ Le fichier local absent, le contrôle tourne sur l'exemple et **le dit à l'écr
 
 ## Le harnais de test
 
-`index.html` porte son JavaScript **inline**. Les tests l'extraient pour l'exécuter dans
-node avec un DOM stubbé — il n'y a rien à compiler, rien à instrumenter.
+Le JavaScript de la page vit dans `js/` (chargé par les `<script src>` d'`index.html`).
+Les tests l'assemblent dans le même ordre pour l'exécuter dans node avec un DOM stubbé —
+il n'y a rien à compiler, rien à instrumenter.
 
 Deux harnais, deux régimes :
 
@@ -168,15 +169,20 @@ Deux harnais, deux régimes :
   tape vraiment Binance et vérifie la chaîne complète. Non déterministe par nature : il
   vérifie des propriétés (formes, cohérence, absence de `NaN`), pas des valeurs figées.
 
-`refresh_harness.py` régénère le JavaScript extrait. Sans lui, les harnais testent une
+`refresh_harness.py` régénère le JavaScript assemblé. Sans lui, les harnais testent une
 version périmée et échouent sur des contrôles déjà corrigés — faux échec vécu.
+
+Deux harnais hors ligne gardent l'apparence et la vitesse : `test_palette.py` mesure chaque
+thème déclaré, `test_contrat.py` fait tenir les règles de la page (thèmes, verre, pas
+d'animation infinie ni de `mix-blend-mode`, aucune ressource externe).
 
 ---
 
 ## Ce qui n'est pas traité
 
-- **`index.html` fait 280 Ko dans un seul fichier.** C'est un choix assumé : aucun build,
-  aucune dépendance, un `git clone` et ça tourne. Le coût est la lisibilité.
+- **Aucun build, aucune dépendance** : des fichiers statiques, un `git clone` et ça tourne.
+  `js/app.js` reste un seul gros script (pas de modules) : c'est ce qui permet aux
+  harnais de l'exécuter tel quel dans node.
 - **La heatmap ne se recalcule pas.** Elle s'accumule. Redémarrer l'accumulateur repart
   d'une fenêtre vide qu'il faut 24 h à remplir.
 - **Deux secrets de conception restent hors dépôt** : la base CVD et les modules d'accès

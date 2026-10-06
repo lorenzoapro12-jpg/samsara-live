@@ -1,0 +1,111 @@
+/* Thème « Kāla » — le temps, et le noir. Une nuit profonde, des surfaces mates, une seule
+   lumière (menthe), des hausses et des baisses franches. Sans verre : le chemin le plus
+   rapide de la page (aucun flou à recalculer, rien à suspendre pendant un geste).
+   Déclaré dans index.html : <link data-theme="kala" data-mode="sombre" data-verre="aucun">. */
+[data-theme="kala"] {
+  color-scheme: dark;
+
+  /* Fond : presque noir, deux lueurs d'aurore en haut, une braise en bas. Statique. */
+  --fond:
+    radial-gradient(55% 40% at 90% -8%, rgba(0,224,184,0.17) 0%, rgba(0,224,184,0) 70%),
+    radial-gradient(50% 42% at 4% -6%,  rgba(122,92,255,0.24) 0%, rgba(122,92,255,0) 70%),
+    radial-gradient(70% 45% at 55% 112%, rgba(255,77,141,0.09) 0%, rgba(255,77,141,0) 70%),
+    linear-gradient(180deg, #06080f 0%, #070a12 60%, #080b15 100%);
+  --verre: none;
+
+  /* Surfaces mates : une arête de lumière d'un pixel en haut, un filet sur le pourtour. */
+  --surface: rgba(13,17,28,0.88);
+  --surface-ombre: inset 0 0 0 1px rgba(255,255,255,0.055), 0 24px 48px -26px rgba(0,0,0,0.9);
+  --surface-reflet: linear-gradient(180deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.02) 30%, rgba(255,255,255,0) 60%);
+  --capsule: rgba(255,255,255,0.045);
+  --capsule-hover: rgba(255,255,255,0.09);
+  --capsule-ombre: inset 0 0 0 1px rgba(255,255,255,0.08);
+  --pill: transparent;
+  --pill-hover: rgba(255,255,255,0.06);
+  --pill-actif: rgba(0,224,184,0.13);
+  --pill-actif-ink: #8ef5df;
+  --pill-actif-ombre: inset 0 0 0 1px rgba(0,224,184,0.42), 0 0 16px -6px rgba(0,224,184,0.55);
+  --dot-anneau: #0d111c;
+  --poignee: rgba(255,255,255,0.02);
+  --poignee-hover: rgba(255,255,255,0.06);
+
+  --ink-1: #f2f5ff; --ink-2: #b4bdd6; --ink-3: #8a94b0;
+  --up: #16c995; --down: #ff4d6d;
+  --up-ink: #3fe3b2; --down-ink: #ff6b85;
+  --up-soft: rgba(22,201,149,0.14); --down-soft: rgba(255,77,109,0.15);
+  --warn: #ffb020; --warn-ink: #ffc65c; --warn-soft: rgba(255,176,32,0.14);
+  --accent: #00e0b8; --accent-2: #8f7bff;
+  --brand: linear-gradient(120deg, #00e0b8 0%, #4aa8ff 48%, #9b6bff 100%);
+  --brand-ink: #05070d;
+  --accent-glow: rgba(0,224,184,0.30);
+  --hairline: rgba(160,180,255,0.10);
+  --rail: rgba(160,180,255,0.07);
+
+  --card: rgba(19,25,39,0.82);
+  --card-solid: #121826;
+  --card-edge: rgba(255,255,255,0.06);
+  --card-shadow: 0 18px 40px -22px rgba(0,0,0,0.85);
+  --card-hi: rgba(255,255,255,0.05);
+  --card-reflet: none;
+  --forward: linear-gradient(135deg, #16c995, #0b8a66);
+  --modal-fond: linear-gradient(180deg, #070a12 0%, #0b0f1a 100%);
+  --modal-ombre: 0 10px 30px -18px rgba(0,0,0,0.9);
+  --ombre-douce: 0 2px 10px rgba(0,0,0,0.5);
+  --selection: rgba(0,224,184,0.25);
+  --defil: rgba(160,180,255,0.16);
+  --defil-hover: rgba(160,180,255,0.30);
+  --prix-lueur: 0 0 24px rgba(0,224,184,0.20);
+
+  /* Graphique */
+  --chart-1: #070a12; --chart-2: #0a0e18; --chart-3: #0d1220;
+  --chart-lueur:
+    radial-gradient(45% 35% at 86% 0%, rgba(0,224,184,0.07) 0%, rgba(0,224,184,0) 70%),
+    radial-gradient(40% 35% at 8% 0%,  rgba(122,92,255,0.07) 0%, rgba(122,92,255,0) 70%);
+  --chart-creux: inset 0 0 0 1px rgba(255,255,255,0.04);
+  --chart-surface: #0a0e18;
+  --grille: rgba(160,180,255,0.055);
+  --reticule: rgba(200,215,255,0.35);
+  --bulle: rgba(16,21,34,0.96);
+  --filigrane: 0.035;
+  --vol-alpha: 0.55;
+  --bande-alpha: 0.08;
+  --aura: 0.12;
+  --ov-ema20: #f5b301; --ov-ema50: #4aa8ff; --ov-ema100: #ff7a3d;
+  --ov-ema200: #b39dff; --ov-sma20: #ff6fb5; --ov-sma50: #5be37d;
+  --ov-bb: #8a94b0; --ov-vwap: #ffb020; --ov-sar: #00e0b8;
+  --ov-ichi-t: #4aa8ff; --ov-ichi-k: #ff6fb5;
+  --s-rsi: #b39dff; --s-macd: #f5b301; --s-signal: #ff7a3d;
+  --s-stoch-k: #f5b301; --s-stoch-d: #ff7a3d; --s-atr: #00e0b8;
+  --s-obv: #4aa8ff; --s-mfi: #b39dff; --s-wr: #4aa8ff; --s-cci: #ff7a3d;
+  --s-adx: #f5b301; --s-equity: #ffc14d;
+  --sess-asie: rgba(255,176,32,0.70);
+  --sess-europe: rgba(74,168,255,0.70);
+  --sess-us: rgba(155,107,255,0.70);
+  --sr-1: #b39dff; --sr-2: #4ad6ff; --sr-3: #ffc14d;
+  --fib: #ffb020; --vp: #4aa8ff; --vp-poc: #ffc14d;
+}
+
+/* ── Décor propre au thème ── */
+/* La roue : huit rayons sur un anneau en dégradé conique, un moyeu de lumière. Statique. */
+[data-theme="kala"] .header-orb {
+  width: 30px; height: 30px;
+  --orbe:
+    radial-gradient(circle, #00e0b8 0 11%, #06080f 13% 34%, transparent 36%),
+    repeating-conic-gradient(from 22.5deg, rgba(6,8,15,0.92) 0deg 5deg, transparent 5deg 45deg),
+    radial-gradient(circle, transparent 0 62%, #06080f 64% 100%),
+    conic-gradient(from 210deg, #00e0b8, #4aa8ff, #9b6bff, #ff4d8d, #ffb020, #00e0b8);
+  --orbe-ombre: 0 0 18px rgba(0,224,184,0.35), inset 0 0 0 1px rgba(255,255,255,0.12);
+}
+/* Icônes des cartes : pastilles mates teintées, pas de sphère brillante. */
+[data-theme="kala"] .avatar-orb {
+  width: 32px; height: 32px; border-radius: 10px;
+  color: var(--teinte);
+  background: rgba(255,255,255,0.05);
+  background: color-mix(in srgb, var(--teinte) 16%, transparent);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-color: color-mix(in srgb, var(--teinte) 40%, transparent);
+  box-shadow: none;
+}
+[data-theme="kala"] .avatar-orb::after { display: none; }
+[data-theme="kala"] .avatar-orb svg { filter: none; }
+[data-theme="kala"] .demon-card::after { height: 1px; left: 16px; right: 16px; opacity: 0.9; }

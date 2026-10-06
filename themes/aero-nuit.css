@@ -72,6 +72,7 @@
   --filigrane: 0.05;
   --vol-alpha: 0.68;
   --bande-alpha: 0.10;
+  --aura: 0.12;
   --ov-ema20: #c98500; --ov-ema50: #3987e5; --ov-ema100: #d95926;
   --ov-ema200: #9085e9; --ov-sma20: #d55181; --ov-sma50: #008300;
   --ov-bb: #7d93a6; --ov-vwap: #ff9800; --ov-sar: #00e5ff;

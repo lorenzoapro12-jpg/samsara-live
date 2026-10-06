@@ -45,6 +45,7 @@ function ouvrirThemes(e) {
   if (e) e.stopPropagation();
   const m = document.getElementById('themeMenu'), b = document.getElementById('themeBtn');
   document.getElementById('indMenu').classList.remove('open');
+  document.getElementById('paireMenu').classList.remove('open');
   if (m.classList.contains('open')) { m.classList.remove('open'); return; }
   remplirMenuThemes();
   m.classList.add('open');
@@ -129,7 +130,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'd' || e.key === 'D') { themeJumeau(); e.preventDefault(); }
   if (e.key === 't' || e.key === 'T') { themeSuivant(); e.preventDefault(); }
   if (e.key === 'r' || e.key === 'R') { resetView(); e.preventDefault(); }
-  if (e.key === 'Escape') { document.getElementById('indMenu').classList.remove('open'); document.getElementById('themeMenu').classList.remove('open'); }
+  if (e.key === 'Escape') { document.getElementById('indMenu').classList.remove('open'); document.getElementById('themeMenu').classList.remove('open'); document.getElementById('paireMenu').classList.remove('open'); }
   // Flèches : scroller horizontalement
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
     e.preventDefault();
@@ -280,6 +281,7 @@ function buildDropdown() {
 function toggleDropdown(e) {
   e.stopPropagation();
   document.getElementById('themeMenu').classList.remove('open');
+  document.getElementById('paireMenu').classList.remove('open');
   const menu = document.getElementById('indMenu');
   const btn = document.getElementById('indDropdownBtn');
   
@@ -304,15 +306,14 @@ function toggleDropdown(e) {
   buildDropdown();
 }
 document.addEventListener('click', (e) => {
-  for (const id of ['indMenu', 'themeMenu']) {
+  for (const id of ['indMenu', 'themeMenu', 'paireMenu']) {
     const menu = document.getElementById(id);
     if (menu && !menu.contains(e.target)) menu.classList.remove('open');
   }
 });
 // Fermer les menus si la fenêtre est redimensionnée
 window.addEventListener('resize', () => {
-  document.getElementById('indMenu').classList.remove('open');
-  document.getElementById('themeMenu').classList.remove('open');
+  for (const id of ['indMenu', 'themeMenu', 'paireMenu']) document.getElementById(id).classList.remove('open');
 });
 
 function toggleInd(key, label) {
@@ -336,12 +337,28 @@ async function changeInterval(interval, label) {
   await afficherSerie();
 }
 
+const NOMS_PAIRES = { BTCUSDT: 'BTC/USDT', SOLUSDT: 'SOL/USDT', XRPUSDT: 'XRP/USDT', TAOUSDT: 'TAO/USDT', BTCSOL: 'BTC/SOL' };
+function ouvrirPaires(e) {
+  if (e) e.stopPropagation();
+  const m = document.getElementById('paireMenu'), b = document.getElementById('paireBtn');
+  for (const id of ['indMenu', 'themeMenu']) document.getElementById(id).classList.remove('open');
+  if (m.classList.contains('open')) { m.classList.remove('open'); return; }
+  m.classList.add('open');
+  const r = b.getBoundingClientRect();
+  m.style.top = (r.bottom + 8) + 'px';
+  m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, r.left)) + 'px';
+}
 async function changeSymbol(symbol, label) {
   document.querySelectorAll('label[id^="sym_"]').forEach(l => l.classList.remove('active'));
   label.classList.add('active');
   activeSymbol = symbol;
   const tp = document.getElementById('taskbarPair');
   if (tp) tp.textContent = symbol;
+  const pn = document.getElementById('paireNom');
+  if (pn) pn.textContent = NOMS_PAIRES[symbol] || symbol;
+  document.getElementById('paireMenu').classList.remove('open');
+  // Le dernier prix d'une AUTRE paire ne doit ni colorer la flèche ni allumer l'éclair.
+  livePrice = null; fetchPrice();
   priceScale = 1.0; pricePan = 0;
   await afficherSerie();
 }
@@ -692,7 +709,7 @@ function resizeCanvas() {
 let resizeRaf = 0;
 window.addEventListener('resize', () => {
   if (resizeRaf) return;
-  resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; resizeCanvas(); drawChart(); });
+  resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; resizeCanvas(); drawChart(); ajusterKpis(); ajusterRuban(); });
 });
 
 // ============ API ============
@@ -782,16 +799,30 @@ async function fetchKlines() {
 
     const fresh = await premierePage(sym, itv);
     if (!encore()) return;
-    candles = fresh;
-    if (sym === 'BTCSOL') {
-      // BTCSOL : le merge peut perdre des bougies → cap viewEnd
-      viewEnd = Math.min(viewEnd, candles.length);
-      viewStart = Math.min(viewStart, candles.length - 1);
+    // Rechargement (première visite, ou queue qui ne se raccorde plus : onglet longtemps en
+    // veille). Si l'historique en cache chevauche la page fraîche, on le GARDE jusqu'à elle :
+    // les indices de la vue restent valables. Sinon on repart de la page fraîche, vue à droite.
+    // ⚠️ Remplacer 3000 bougies par 1000 sans recaler la vue laissait viewStart/viewEnd au-delà
+    // de la fin (graphique vide, « −1950/3000 » ; trouvé au rejeu le 06/10/2026).
+    const ancien = klineCache[cacheKey];
+    let data = fresh, partiel = fresh.length >= 990;
+    if (ancien && ancien.data.length && fresh.length && ancien.data[ancien.data.length - 1].time >= fresh[0].time) {
+      let k = ancien.data.length;
+      while (k > 0 && ancien.data[k - 1].time >= fresh[0].time) k--;
+      data = ancien.data.slice(0, k).concat(fresh);
+      partiel = ancien.partiel;
     }
-    suivre();
+    candles = data;
+    if (wasAtRightEdge || data === fresh) {
+      viewEnd = candles.length;
+      viewStart = Math.max(0, viewEnd - Math.max(10, visibleRange || 50));
+    } else {
+      viewEnd = Math.min(viewEnd, candles.length);
+      viewStart = Math.max(0, Math.min(viewStart, viewEnd - 10));
+    }
     memoCache.clear();
     // `partiel` : il reste de l'historique à aller chercher (une page pleine en appelle d'autres).
-    klineCache[cacheKey] = { data: candles, ts: Date.now(), symbol: sym, interval: itv, partiel: candles.length >= 990 };
+    klineCache[cacheKey] = { data: candles, ts: Date.now(), symbol: sym, interval: itv, partiel };
     completerHistorique(cacheKey, sym, itv);
     // NE PAS réinitialiser viewStart/viewEnd — respecter le zoom/pan utilisateur
   } catch(e) { console.error('Klines:', e); }
@@ -1073,33 +1104,43 @@ async function refreshRefSR() {
 function pxDec(v) { const a = Math.abs(v); return a >= 10 ? 2 : a >= 1 ? 4 : 6; }
 function fmtPrix(v) { return v.toFixed(pxDec(v)); }
 
+// Prix ET variation 24 h dans la MÊME requête (ticker/24hr) : les deux chiffres du bloc héros
+// ont donc toujours le même horodatage — rien à soustraire entre deux cadences.
 async function fetchPrice() {
+  const sym = activeSymbol;
   try {
-    let price;
-    if (activeSymbol === 'BTCSOL') {
-      const [btc, sol] = await Promise.all([
-        fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT').then(r => r.json()),
-        fetch('https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT').then(r => r.json())
-      ]);
-      price = parseFloat(btc.price) / parseFloat(sol.price);
+    const t24 = s => fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=' + s).then(r => r.json());
+    let price, var24;
+    if (sym === 'BTCSOL') {
+      const [b, so] = await Promise.all([t24('BTCUSDT'), t24('SOLUSDT')]);
+      price = parseFloat(b.lastPrice) / parseFloat(so.lastPrice);
+      // Variation du RATIO : ratio courant sur ratio des ouvertures — pas la différence des
+      // deux variations, qui n'en est qu'une approximation.
+      const ouv = parseFloat(b.openPrice) / parseFloat(so.openPrice);
+      var24 = ouv > 0 ? (price / ouv - 1) * 100 : NaN;
     } else {
-      const resp = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${activeSymbol}`);
-      const data = await resp.json();
-      price = parseFloat(data.price);
+      const d = await t24(sym);
+      price = parseFloat(d.lastPrice); var24 = parseFloat(d.priceChangePercent);
     }
+    if (sym !== activeSymbol || !isFinite(price)) return;   // la paire a changé pendant l'attente
     const el = document.getElementById('price');
     if (livePrice && price > livePrice) el.className = 'price-badge price-up';
     else if (livePrice && price < livePrice) el.className = 'price-badge price-down';
     else el.className = 'price-badge';
-    // Éclair doux à chaque changement : le mouvement se VOIT sans que le chiffre reste coloré.
+    // Éclair bref de la COULEUR du chiffre à chaque changement (450 ms, peinture du seul texte).
+    // L'ancien éclair animait un `filter` 900 ms sur ~1 s : l'en-tête ne cessait jamais d'animer.
     if (livePrice && price !== livePrice && el.animate
         && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
-      const c = getComputedStyle(document.body).getPropertyValue(price > livePrice ? '--up' : '--down').trim();
-      el.animate([{ filter: 'drop-shadow(0 0 7px ' + c + ')' }, { filter: 'drop-shadow(0 0 0 transparent)' }],
-                 { duration: 900, easing: 'ease-out' });
+      el.animate([{ color: price > livePrice ? COLORS.upInk : COLORS.downInk }, { color: COLORS.ink1 }],
+                 { duration: 450, easing: 'ease-out' });
     }
     const dec = pxDec(price);
     el.textContent = '$' + price.toLocaleString('en-US', {minimumFractionDigits: dec, maximumFractionDigits: dec});
+    const v = document.getElementById('var24');
+    if (v) {
+      v.textContent = isFinite(var24) ? (var24 > 0 ? '+' : var24 < 0 ? '−' : '') + Math.abs(var24).toFixed(2) + ' %' : '';
+      v.className = 'var24' + (var24 > 0 ? ' pos' : var24 < 0 ? ' neg' : '');
+    }
     livePrice = price;
   } catch(e) {}
 }
@@ -2458,6 +2499,25 @@ function resolveChart(candles, padL, padR, chartH, W) {
     ctx.fillText(label, W - pad.right + 3, y + 3);
   }
   
+  // Halo sous la courbe des clôtures (jeton --aura, 0 = aucun) : le sens de la vue se lit
+  // avant le détail. Teinte = sens de la vue, opacité qui s'éteint vers le bas du tracé.
+  if (COLORS.aura > 0 && visible.length > 1) {
+    const coul = visible[visible.length - 1].close >= visible[0].close ? COLORS.candleUp : COLORS.candleDown;
+    const g = ctx.createLinearGradient(0, pad.top, 0, pad.top + ph);
+    g.addColorStop(0, avecAlpha(coul, COLORS.aura)); g.addColorStop(1, avecAlpha(coul, 0));
+    const xc = i => pad.left + gap * i + candleW / 2;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(pad.left, pad.top, pw, ph); ctx.clip();
+    ctx.beginPath();
+    for (let i = 0; i < visible.length; i++) {
+      const y = pad.top + ph * (1 - (visible[i].close - minP) / range);
+      i ? ctx.lineTo(xc(i), y) : ctx.moveTo(xc(i), y);
+    }
+    ctx.lineTo(xc(visible.length - 1), pad.top + ph); ctx.lineTo(xc(0), pad.top + ph); ctx.closePath();
+    ctx.fillStyle = g; ctx.fill();
+    ctx.restore();
+  }
+
   // Marqueur prix live sur axe Y — triangle + badge couleur
   if (livePrice && livePrice >= minP && livePrice <= maxP) {
     const yLP = pad.top + ph * (1 - (livePrice - minP) / range);
@@ -2472,18 +2532,18 @@ function resolveChart(candles, padL, padR, chartH, W) {
     // vers la gauche au lieu d'élargir pad.right (13 sites couplés au
     // Range Selector et au hit-test souris).
     const lpStr = '$' + fmtPrix(livePrice);
-    ctx.font = chartFont(10, 650);
-    const lw = ctx.measureText(lpStr).width + 10;
+    ctx.font = chartFont(11, 700);
+    const lw = ctx.measureText(lpStr).width + 12;
     const bx = Math.min(triX + 10, W - 3 - lw);
     // Opaque : le badge recule sur le libellé de grille de même ordonnée quand
     // la colonne est étroite, et le laissait transparaître en transparence.
     ctx.fillStyle = tagC;
-    ctx.beginPath(); ctx.roundRect(bx, triY - 10, lw, 20, 10); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(bx, triY - 11, lw, 22, 11); ctx.fill();
     // Pointe vers le tracé : elle reste visible si le badge a reculé
     ctx.beginPath(); ctx.moveTo(triX, triY - 4); ctx.lineTo(triX + 8, triY); ctx.lineTo(triX, triY + 4);
     ctx.closePath(); ctx.fill();
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(lpStr, bx + 5, triY + 4);
+    ctx.fillText(lpStr, bx + 6, triY + 4);
   }
   
   // Bollinger
@@ -2805,8 +2865,12 @@ function resolveChart(candles, padL, padR, chartH, W) {
   if (livePrice) {
     const yP = pad.top + ph * (1 - (livePrice - minP) / range);
     const enCours2 = candles[candles.length - 1];
-    ctx.save(); ctx.globalAlpha = 0.6;
+    ctx.save();
     ctx.strokeStyle = (enCours2 && livePrice < enCours2.open) ? COLORS.candleDown : COLORS.candleUp;
+    // Un trait large et pâle sous le pointillé : la ligne du dernier prix se trouve d'un coup d'œil.
+    ctx.globalAlpha = 0.14; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(pad.left, yP); ctx.lineTo(W - pad.right, yP); ctx.stroke();
+    ctx.globalAlpha = 0.75;
     ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
     ctx.beginPath(); ctx.moveTo(pad.left, yP); ctx.lineTo(W - pad.right, yP); ctx.stroke();
     ctx.setLineDash([]); ctx.restore();
@@ -3547,6 +3611,20 @@ const tuile = (lbl, val, sub) => '<div class="tuile"><div class="lbl">' + lbl + 
   + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>';
 
 function renderFeed() { renderFeedTo(document.getElementById('feed')); }
+// Ce qui ne tient pas dans la bande est masqué EN ENTIER, en partant de la fin (ordre d'utilité).
+function ajusterKpis() {
+  const cy = document.getElementById('cycle');
+  if (!cy || !cy.querySelectorAll) return;
+  const items = Array.from(cy.querySelectorAll('.kpi'));
+  items.forEach(k => { k.hidden = false; });
+  for (let i = items.length - 1; i > 0 && cy.scrollWidth > cy.clientWidth + 1; i--) items[i].hidden = true;
+}
+// Le ruban défile quand il ne tient pas : le fondu de droite ne s'affiche qu'à ce moment-là.
+function ajusterRuban() {
+  const r = document.getElementById('indicatorBar');
+  if (r && r.classList) r.classList.toggle('deborde', r.scrollWidth > r.clientWidth + 1
+    && r.scrollLeft + r.clientWidth < r.scrollWidth - 2);
+}
 
 // Bandeau d'âge. Il est injecté DANS le même innerHTML que les cartes, donc il
 // s'affiche dans le conteneur réellement visible (#marketModalBody) — un bandeau
@@ -3576,8 +3654,29 @@ function renderFeedTo(container) {
   // c'était l'heure locale du poste (Paris, +2 h en été) affichée sous l'étiquette UTC.
   const hhmm = upd ? upd.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'UTC'}) : '—';
 
+  // Bande de chiffres clés de l'en-tête : la publication en un coup d'œil, par ordre d'utilité
+  // (ce qui ne tient pas en largeur est coupé à droite). TOUTES ces valeurs viennent du même
+  // fichier, au même instant ; son âge ferme la bande. Rien n'y est mêlé au prix live.
   const cy = document.getElementById('cycle');
-  if (cy) cy.innerHTML = '<span class="mchip"><i>DXY</i>' + fmtNum(m.dxy_spot,2) + '</span><span class="mchip"><i>VIX</i>' + fmtNum(m.vix,1) + '</span>';
+  if (cy) {
+    // Signe moins typographique partout (« −2.0% » comme « −$76M »), pas un tiret.
+    const kpi = (lbl, val, cls) => '<span class="kpi"><i>' + lbl + '</i><b' + (cls ? ' class="' + cls + '"' : '') + '>'
+      + String(val).replace(/^-/, '−') + '</b></span>';
+    const t4 = tf['4h'] || {};
+    const oiK = isNum(x.oi_change_24h_pct) ? x.oi_change_24h_pct : x.oi_change_1d_pct;
+    const ageK = upd ? Math.max(0, Math.round((Date.now() - upd.getTime()) / 60000)) : null;
+    cy.innerHTML = kpi('RSI 4h', fmtNum(t4.rsi_14, 1))
+      + kpi('Funding', pctSigne(x.funding_annual_pct, 1), signCls(x.funding_annual_pct))
+      + kpi('OI 24h', pctSigne(oiK, 1), signCls(oiK))
+      + kpi('CVD 24h', fmtSigned(x.cvd_24h_usd), signCls(x.cvd_24h_usd))
+      + kpi('GEX', isNum(x.gex_usd_1pct) ? (x.gex_usd_1pct > 0 ? 'long γ' : 'short γ') : '—', signCls(x.gex_usd_1pct))
+      + kpi('L/S', fmtNum(x.ls_ratio, 2))
+      + kpi('DXY', fmtNum(m.dxy_spot, 2))
+      + kpi('VIX', fmtNum(m.vix, 1))
+      + '<span class="kpi-age" title="Âge de la publication">' + (ageK === null ? '—' : ageK + ' min') + '</span>';
+    cy.classList.toggle('vieux', ageK !== null && ageK > 20);
+    ajusterKpis();
+  }
   const up = document.getElementById('updated');
   if (up) up.textContent = hhmm;
 
@@ -4133,6 +4232,8 @@ async function init() {
   drawChart();
   verreDuTheme();          // hyalite n'arrive qu'APRÈS le premier dessin, et seulement si le thème le veut
   await Promise.all([prix, marche]);
+  ajusterRuban();
+  document.getElementById('indicatorBar').addEventListener('scroll', ajusterRuban, { passive: true });
   // Préchargement au survol : la première page d'un historique part avant le clic.
   document.querySelectorAll('label[id^="int_"]').forEach(l =>
     l.addEventListener('pointerenter', () => precharger(activeSymbol, l.id.slice(4))));

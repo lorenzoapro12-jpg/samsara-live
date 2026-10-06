@@ -12,6 +12,7 @@
      jumeau de l'autre mode (touche D). tests/test_contrat.py vérifie chaque thème déclaré. -->
 <link rel="stylesheet" href="themes/aero.css" data-theme-id="aero" data-nom="Aero" data-mode="clair" data-verre="refraction" data-paire="aero-nuit">
 <link rel="stylesheet" href="themes/aero-nuit.css" data-theme-id="aero-nuit" data-nom="Aero nuit" data-mode="sombre" data-verre="refraction" data-paire="aero">
+<link rel="stylesheet" href="themes/kala.css" data-theme-id="kala" data-nom="Kāla" data-mode="sombre" data-verre="aucun">
 <script>
 /* Le thème est posé AVANT le premier rendu : posé par app.js (différé), la page s'afficherait
    un instant dans le thème par défaut. */
@@ -37,11 +38,19 @@
 
 <div class="header">
   <div class="header-left">
-    <div class="header-orb">🔮</div>
+    <div class="header-orb" aria-hidden="true"></div>
     <h1>Saṃsāra</h1>
-    <span class="price-badge" id="price">—</span>
-    <span class="cycle-badge" id="cycle">—</span>
+    <!-- Le prix héros : paire, dernier prix, variation 24 h — tous les trois de Binance, À LA
+         SECONDE (même requête). Rien ici ne vient du fichier de 15 min : deux cadences ne se
+         mélangent pas dans le même bloc. -->
+    <div class="hero-prix">
+      <button class="paire-btn" id="paireBtn" onclick="ouvrirPaires(event)" aria-haspopup="menu" title="Changer de paire"><span id="paireNom">BTC/USDT</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+      <span class="price-badge" id="price">—</span>
+      <span class="var24" id="var24" title="Variation sur 24 h glissantes — Binance, à la seconde"></span>
+    </div>
   </div>
+  <!-- Chiffres clés de la dernière PUBLICATION (market-data.json, 15 min) — avec leur âge. -->
+  <div class="kpis" id="cycle" onclick="toggleFeed()" title="Dernière publication (cadence 15 min) — cliquer pour le détail"></div>
   <div class="header-right">
     <span id="updated"></span>
     <button class="theme-btn ico-btn" onclick="toggleFeed()" id="feedBtn" title="Marché live (F)" aria-label="Marché live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
@@ -77,20 +86,21 @@
   <label id="int_4h" onclick="changeInterval('4h',this)"><span class="ind-label">4h</span></label>
   <label id="int_1d" onclick="changeInterval('1d',this)"><span class="ind-label">1D</span></label>
   <span class="sep"></span>
-  <span class="section-title">Paire</span>
-  <label id="sym_BTCUSDT" class="active" onclick="changeSymbol('BTCUSDT',this)"><span class="ind-label">BTC</span></label>
-  <label id="sym_SOLUSDT" onclick="changeSymbol('SOLUSDT',this)"><span class="ind-label">SOL</span></label>
-  <label id="sym_XRPUSDT" onclick="changeSymbol('XRPUSDT',this)"><span class="ind-label">XRP</span></label>
-  <label id="sym_TAOUSDT" onclick="changeSymbol('TAOUSDT',this)"><span class="ind-label">TAO</span></label>
-  <label id="sym_BTCSOL" onclick="changeSymbol('BTCSOL',this)"><span class="ind-label">BTC/SOL</span></label>
-  <span class="sep"></span>
   <div class="ind-dropdown">
-    <button class="ind-dropdown-btn" id="indDropdownBtn" onclick="toggleDropdown(event)">➕ Indicateurs ▾</button>
+    <button class="ind-dropdown-btn" id="indDropdownBtn" onclick="toggleDropdown(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Indicateurs</button>
   </div>
 </div>
 
 <!-- Menu dropdown déplacé hors de la barre pour éviter la troncation overflow -->
 <div class="ind-dropdown-menu" id="indMenu" onclick="event.stopPropagation()"></div>
+<div class="paire-menu" id="paireMenu" role="menu" aria-label="Paires" onclick="event.stopPropagation()">
+  <div class="cat-title">Paire</div>
+  <label id="sym_BTCUSDT" class="active" role="menuitemradio" onclick="changeSymbol('BTCUSDT',this)"><span class="ind-label">BTC / USDT</span></label>
+  <label id="sym_SOLUSDT" role="menuitemradio" onclick="changeSymbol('SOLUSDT',this)"><span class="ind-label">SOL / USDT</span></label>
+  <label id="sym_XRPUSDT" role="menuitemradio" onclick="changeSymbol('XRPUSDT',this)"><span class="ind-label">XRP / USDT</span></label>
+  <label id="sym_TAOUSDT" role="menuitemradio" onclick="changeSymbol('TAOUSDT',this)"><span class="ind-label">TAO / USDT</span></label>
+  <label id="sym_BTCSOL" role="menuitemradio" onclick="changeSymbol('BTCSOL',this)"><span class="ind-label">BTC / SOL</span></label>
+</div>
 <div class="theme-menu" id="themeMenu" role="menu" aria-label="Thèmes" onclick="event.stopPropagation()"></div>
 
 <div class="main-area">
