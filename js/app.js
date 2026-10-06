@@ -3300,7 +3300,7 @@ async function fetchMarket() {
     renderFeed();
     // ─── ÂGE DE LA DONNÉE ────────────────────────────────────────────────
     // Un HTTP 200 ne prouve RIEN sur la fraîcheur : une source morte reste servie
-    // indéfiniment et le point restait vert. C'est la panne du 16/08 — la Roue a lu
+    // indéfiniment et le point restait vert. C'est la panne du 16/08 — un consommateur a lu
     // 13 cycles de données gelées sans qu'aucun voyant ne bronche.
     // Cadence attendue : 15 min. 20 min = un tick manqué, 32 min = deux.
     const ageMin = marketData.updated
