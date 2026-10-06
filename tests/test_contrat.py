@@ -23,9 +23,12 @@ sans bruit. Ce harnais les fait tenir :
    · Feuilles de THÈME : ces effets sont permis s'ils tiennent leur BUDGET D'IMAGE, mesuré par
      tests/test_budget.js contre le thème de référence et consigné dans tests/budget-themes.json
      avec l'empreinte de la feuille. Ici, sans navigateur, on exige : une mesure À JOUR (même
-     empreinte) et dans le budget ; des animations infinies qui n'animent QUE `transform` et
-     `opacity` (le compositeur les joue, rien n'est repeint) ; leur arrêt sous
-     prefers-reduced-motion ; des @keyframes préfixés par le thème.
+     empreinte) et dans le budget — exigée aussi pour tout thème À STRUCTURE ; des animations
+     infinies qui n'animent QUE `transform` et `opacity` ; leur arrêt sous
+     prefers-reduced-motion ; des @keyframes préfixés par le thème. NB : même limitée à
+     transform / opacity, une animation infinie recompose la page en continu — mesuré le
+     06/10/2026, ×35 le CPU de référence au repos. Le budget la refuse ; les thèmes livrés
+     n'en ont plus (effets liés à un événement).
    · Partout : aucun @import (une requête bloquante de plus, en série).
 5. RÉSEAU — la page n'interroge que Binance et GitHub Raw. Aucune ressource externe :
    pas de police, de CDN ni d'image distante ; les url() CSS sont relatives ou data:.
@@ -201,7 +204,8 @@ for f in [x for x in TOUS_SERVIS if x.endswith(".css") and (REPO / x).exists()]:
                     pb.append(f"animation infinie « {nom} » anime {', '.join(autres)} (seuls transform et opacity ne repeignent pas)")
         if not re.search(r"@media\s*\(\s*prefers-reduced-motion\s*:\s*reduce\s*\)", css) or "animation: none" not in css:
             pb.append("animations infinies sans arrêt sous prefers-reduced-motion")
-    if couteux:
+    # Mesure exigée : effets coûteux, OU structure de thème (elle déplace le graphique).
+    if couteux or t.get("structure"):
         m = (BUDGETS.get("themes") or {}).get(t["id"])
         emp = hashlib.sha256((REPO / f).read_bytes()).hexdigest()[:16]
         if not m:
@@ -211,8 +215,8 @@ for f in [x for x in TOUS_SERVIS if x.endswith(".css") and (REPO / x).exists()]:
         elif not m.get("dans_le_budget"):
             pb.append("HORS BUDGET d'après la dernière mesure")
     detail = "; ".join(pb) if pb else (
-        f"effets mesurés : repos ×{BUDGETS['themes'][t['id']]['rapport_repos']}, geste ×{BUDGETS['themes'][t['id']]['rapport_geste']} (CPU, tous processus)"
-        if couteux else "aucun effet coûteux")
+        f"mesuré : repos ×{BUDGETS['themes'][t['id']]['rapport_repos']}, geste ×{BUDGETS['themes'][t['id']]['rapport_geste']} (CPU, tous processus)"
+        if (couteux or t.get("structure")) else "aucun effet coûteux")
     (echec if pb else ok)(f, detail)
 if BUDGETS:
     ce = BUDGETS.get("contre_epreuves") or {}

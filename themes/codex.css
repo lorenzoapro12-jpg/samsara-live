@@ -11,8 +11,10 @@
    paire bleu / rouge-orangé qui reste séparée sous les trois daltonismes (vert / rouge, la
    paire « naturelle », se confond en deutéranopie). Mesuré par tests/test_palette.py.
 
-   EFFETS ET BUDGET. Une seule animation infinie : la flamme de chandelle du point « flux
-   actif » (opacité et transform, calque à part). Mesurée : tests/test_budget.js. */
+   EFFETS ET BUDGET — MESURÉS (tests/test_budget.js). La flamme de chandelle du point « flux
+   actif » tournait en boucle : ×2,25 le CPU de référence AU REPOS pour un point de 10 px (la
+   page est recomposée tant qu'une animation tourne). Elle vacille désormais à chaque
+   publication reçue (.ping), deux passages, puis se tient immobile. */
 
 @font-face {
   font-family: 'Samsara Codex Lettrine';
@@ -198,12 +200,13 @@
 [data-theme="codex"] .codex-colophon { font-family: var(--police-titre); color: var(--down-ink); margin-right: 8px; letter-spacing: 0.08em; }
 
 /* Point « flux actif » : une flamme de chandelle (opacité et transform seulement). */
-[data-theme="codex"] .refresh-dot { background: #c8781c; box-shadow: 0 0 8px rgba(200,120,28,0.7);
-  will-change: transform, opacity; animation: codex-flamme 3.1s steps(1) infinite; }
+[data-theme="codex"] .refresh-dot { background: #c8781c; box-shadow: 0 0 8px rgba(200,120,28,0.7); }
+[data-theme="codex"] .refresh-dot.ping { animation: codex-flamme 1.6s steps(1) 2; }
+[data-theme="codex"] .refresh-dot.ping::after { animation: none; }
 @keyframes codex-flamme { 0% { opacity: 1; transform: scale(1); } 23% { opacity: 0.82; transform: scale(0.92); }
   41% { opacity: 1; transform: scale(1.05); } 67% { opacity: 0.9; transform: scale(0.97); } 84% { opacity: 1; transform: scale(1.02); } }
 @media (prefers-reduced-motion: reduce) {
-  [data-theme="codex"] .refresh-dot { animation: none; }
+  [data-theme="codex"] .refresh-dot.ping { animation: none; }
 }
 @media (max-width: 768px) {
   [data-theme="codex"] .codex-registre { padding: 2px 8px; }

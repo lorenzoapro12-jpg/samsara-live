@@ -6,10 +6,14 @@
    Déclaré dans index.html : <link data-theme="neon" data-mode="sombre" data-verre="aucun"
    data-structure="hud">.
 
-   EFFETS ET BUDGET. Ce thème utilise des animations infinies (balayage, scintillement du
-   point live, glitch du titre). Elles n'animent que `transform` et `opacity` sur des calques
-   à eux : le compositeur les joue, le thread principal ne repeint rien. C'est MESURÉ, pas
-   affirmé : tests/test_budget.js — et toutes s'arrêtent sous prefers-reduced-motion. */
+   EFFETS ET BUDGET — MESURÉS (tests/test_budget.js, 06/10/2026). La première version animait
+   à l'infini (balayage, point live, glitch), en `transform` / `opacity` seulement, sur l'idée
+   que le compositeur les jouerait « gratuitement ». La mesure de TOUS les processus l'a
+   démentie : 950 ms de CPU par seconde AU REPOS (×35 le thème de référence) — tant qu'une
+   animation tourne, la page est recomposée 60 fois par seconde. Les effets sont donc liés à
+   un ÉVÉNEMENT : le balayage passe quand une nouvelle publication arrive, le titre glitche à
+   l'application du thème et au survol, le point live pulse à chaque mise à jour. Au repos,
+   plus rien ne bouge. Tout s'arrête sous prefers-reduced-motion. */
 
 @font-face {
   font-family: 'Samsara Neon Titre';
@@ -192,39 +196,44 @@
 [data-theme="neon"] .hud-coin-hd { right: 6px; top: 6px; border-right-width: 2px; border-top-width: 2px; }
 [data-theme="neon"] .hud-coin-bg { left: 6px; bottom: 6px; border-left-width: 2px; border-bottom-width: 2px; }
 [data-theme="neon"] .hud-coin-bd { right: 6px; bottom: 6px; border-right-width: 2px; border-bottom-width: 2px; border-color: var(--accent-2); }
-/* Le balayage : un trait lumineux qui descend. Il anime `transform` seulement, sur son propre
-   calque (will-change) : le compositeur le joue sans repeindre le graphique. */
+/* Le balayage : un trait lumineux qui descend UNE fois, quand une nouvelle publication arrive
+   (js/structures.js pose .actif). Hors de ce passage, il n'existe pas pour le compositeur. */
 [data-theme="neon"] .hud-balayage {
   position: absolute; z-index: 2; left: 16px; right: 16px; top: 16px; height: 2px; pointer-events: none;
   background: linear-gradient(90deg, transparent, rgba(34,230,255,0.55), transparent);
-  will-change: transform; animation: neon-balayage 6s linear infinite;
+  display: none;
 }
+[data-theme="neon"] .hud-balayage.actif { display: block; animation: neon-balayage 2.5s linear 1 both; }
 @keyframes neon-balayage { from { transform: translateY(0); opacity: 0.0; } 8% { opacity: 1; } 92% { opacity: 1; } to { transform: translateY(62vh); opacity: 0; } }
 
 /* Le titre « glitche » : deux copies décalées (cyan / magenta) qui sautent par paliers. */
 [data-theme="neon"] .header-left h1[data-glitch] { position: relative; background: none; -webkit-text-fill-color: currentColor; color: var(--ink-1);
   text-shadow: 0 0 10px rgba(34,230,255,0.6); }
+/* Le titre glitche deux fois à l'application du thème, puis au survol — jamais en boucle. */
 [data-theme="neon"] .header-left h1[data-glitch]::before,
 [data-theme="neon"] .header-left h1[data-glitch]::after {
-  content: attr(data-glitch); position: absolute; left: 0; top: 0; pointer-events: none;
-  will-change: transform, opacity; opacity: 0;
+  content: attr(data-glitch); position: absolute; left: 0; top: 0; pointer-events: none; opacity: 0;
 }
-[data-theme="neon"] .header-left h1[data-glitch]::before { color: #22e6ff; animation: neon-glitch-a 7s steps(1) infinite; }
-[data-theme="neon"] .header-left h1[data-glitch]::after { color: #ff4fd8; animation: neon-glitch-b 7s steps(1) infinite; }
-@keyframes neon-glitch-a { 0%, 91%, 100% { opacity: 0; transform: none; } 92% { opacity: 0.85; transform: translate(-2px, -1px); }
-  94% { opacity: 0.85; transform: translate(2px, 1px); } 96% { opacity: 0; } }
-@keyframes neon-glitch-b { 0%, 92%, 100% { opacity: 0; transform: none; } 93% { opacity: 0.85; transform: translate(2px, 0); }
-  95% { opacity: 0.85; transform: translate(-1px, 1px); } 97% { opacity: 0; } }
+[data-theme="neon"] .header-left h1[data-glitch]::before { color: #22e6ff; animation: neon-glitch-a 1.8s steps(1) 2; }
+[data-theme="neon"] .header-left h1[data-glitch]::after { color: #ff4fd8; animation: neon-glitch-b 1.8s steps(1) 2; }
+[data-theme="neon"] .header-left h1[data-glitch]:hover::before { animation: neon-glitch-a 0.9s steps(1) 3; }
+[data-theme="neon"] .header-left h1[data-glitch]:hover::after { animation: neon-glitch-b 0.9s steps(1) 3; }
+@keyframes neon-glitch-a { 0%, 55%, 100% { opacity: 0; transform: none; } 60% { opacity: 0.85; transform: translate(-2px, -1px); }
+  70% { opacity: 0.85; transform: translate(2px, 1px); } 80% { opacity: 0; } }
+@keyframes neon-glitch-b { 0%, 62%, 100% { opacity: 0; transform: none; } 66% { opacity: 0.85; transform: translate(2px, 0); }
+  76% { opacity: 0.85; transform: translate(-1px, 1px); } 84% { opacity: 0; } }
 
-/* Point « flux actif » : un néon qui respire (opacité seulement). */
-[data-theme="neon"] .refresh-dot { background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: neon-respire 2.4s ease-in-out infinite; }
-@keyframes neon-respire { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+/* Point « flux actif » : un néon qui pulse à chaque publication reçue (.ping, posé par la
+   page : deux passages puis le calme). */
+[data-theme="neon"] .refresh-dot { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+[data-theme="neon"] .refresh-dot.ping { animation: neon-respire 1.2s ease-in-out 2; }
+@keyframes neon-respire { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 [data-theme="neon"] .hud-invite { color: var(--accent); margin-right: 8px; font-weight: 700; text-shadow: 0 0 6px rgba(34,230,255,0.8); }
 
 /* Mouvement réduit : tout s'arrête, le décor reste. */
 @media (prefers-reduced-motion: reduce) {
-  [data-theme="neon"] .hud-balayage,
-  [data-theme="neon"] .refresh-dot,
+  [data-theme="neon"] .hud-balayage.actif,
+  [data-theme="neon"] .refresh-dot.ping,
   [data-theme="neon"] .header-left h1[data-glitch]::before,
   [data-theme="neon"] .header-left h1[data-glitch]::after { animation: none; }
   [data-theme="neon"] .hud-balayage { display: none; }

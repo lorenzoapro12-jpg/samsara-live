@@ -103,12 +103,23 @@ STRUCTURES.hud = {
     c.deplacer($('indicatorBar'), main.parentNode, main.nextSibling);
     const cc = document.querySelector('.chart-container');
     for (const k of ['hg', 'hd', 'bg', 'bd']) c.decor('i', 'hud-coin hud-coin-' + k, cc);
-    c.decor('i', 'hud-balayage', cc);
+    const balayage = c.decor('i', 'hud-balayage', cc);
+    // Le balayage passe UNE fois par publication NOUVELLE (l'heure de #updated change) : un
+    // effet lié à un événement, jamais en boucle (mesuré : une boucle coûtait ×35 au repos).
+    const heure = $('updated');
+    let vue = heure ? heure.textContent : '';
+    const obs = heure && typeof MutationObserver !== 'undefined' ? new MutationObserver(() => {
+      if (heure.textContent === vue) return;
+      vue = heure.textContent;
+      balayage.classList.remove('actif'); void balayage.offsetWidth; balayage.classList.add('actif');
+    }) : null;
+    if (obs) obs.observe(heure, { childList: true, characterData: true, subtree: true });
+    balayage.addEventListener('animationend', () => balayage.classList.remove('actif'));
     const h1 = document.querySelector('.header-left h1');
     c.attribut(h1, 'data-glitch', h1 ? h1.textContent : '');
     const tl = document.querySelector('.taskbar-left');
     if (tl) c.decor('span', 'hud-invite', tl, tl.firstChild, '>_');
-    return () => c.defaire();
+    return () => { if (obs) obs.disconnect(); c.defaire(); };
   },
 };
 

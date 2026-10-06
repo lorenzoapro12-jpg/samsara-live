@@ -1,70 +1,82 @@
 {
- "mesure_le": "2026-10-06T11:15Z",
+ "mesure_le": "2026-10-06T11:23Z",
  "machine": "linux x64, Chromium headless (rendu logiciel)",
  "budget": {
-  "reposMsParS": 25,
-  "gesteRapport": 1.35
+  "reposRapport": 1.6,
+  "gesteRapport": 1.3
  },
  "reference": "kala",
  "themes": {
   "aero": {
    "feuille": "themes/aero.css",
    "empreinte": "4475acb57e3ecc91",
-   "repos_ms_par_s": 8,
-   "geste_ms_par_image": 10.83,
-   "rapport_geste": 1.013,
-   "ecart_repos_ms_par_s": 1.7,
-   "dans_le_budget": true
+   "repos_ms_par_s": 150,
+   "geste_ms_par_image": 35.11,
+   "rapport_repos": 5.625,
+   "rapport_geste": 1.254,
+   "principal_repos_ms_par_s": 7.9,
+   "principal_geste_ms_par_image": 10.32,
+   "dans_le_budget": false
   },
   "aero-nuit": {
    "feuille": "themes/aero-nuit.css",
    "empreinte": "051786497802f721",
-   "repos_ms_par_s": 7.7,
-   "geste_ms_par_image": 11.14,
-   "rapport_geste": 1.042,
-   "ecart_repos_ms_par_s": 1.4,
-   "dans_le_budget": true
+   "repos_ms_par_s": 83.3,
+   "geste_ms_par_image": 36.89,
+   "rapport_repos": 3.125,
+   "rapport_geste": 1.317,
+   "principal_repos_ms_par_s": 7.5,
+   "principal_geste_ms_par_image": 10.57,
+   "dans_le_budget": false
   },
   "kala": {
    "feuille": "themes/kala.css",
    "empreinte": "96fed342f0401bbe",
-   "repos_ms_par_s": 6.3,
-   "geste_ms_par_image": 10.69,
+   "repos_ms_par_s": 26.7,
+   "geste_ms_par_image": 28,
+   "rapport_repos": 1,
    "rapport_geste": 1,
-   "ecart_repos_ms_par_s": 0,
+   "principal_repos_ms_par_s": 6.4,
+   "principal_geste_ms_par_image": 10.32,
    "dans_le_budget": true
   },
   "neon": {
    "feuille": "themes/neon.css",
    "empreinte": "35d92358ebea5aed",
-   "repos_ms_par_s": 8.2,
-   "geste_ms_par_image": 11.98,
-   "rapport_geste": 1.121,
-   "ecart_repos_ms_par_s": 1.9,
-   "dans_le_budget": true
+   "repos_ms_par_s": 950,
+   "geste_ms_par_image": 60,
+   "rapport_repos": 35.625,
+   "rapport_geste": 2.143,
+   "principal_repos_ms_par_s": 6.6,
+   "principal_geste_ms_par_image": 10.81,
+   "dans_le_budget": false
   },
   "codex": {
    "feuille": "themes/codex.css",
    "empreinte": "340d6c900e60c9bd",
-   "repos_ms_par_s": 5.8,
-   "geste_ms_par_image": 8.94,
-   "rapport_geste": 0.836,
-   "ecart_repos_ms_par_s": -0.5,
-   "dans_le_budget": true
+   "repos_ms_par_s": 60,
+   "geste_ms_par_image": 25.22,
+   "rapport_repos": 2.25,
+   "rapport_geste": 0.901,
+   "principal_repos_ms_par_s": 5.7,
+   "principal_geste_ms_par_image": 8.69,
+   "dans_le_budget": false
   }
  },
  "contre_epreuves": {
   "animation infinie qui repeint (fond)": {
-   "repos_ms_par_s": 236.7,
-   "geste_ms_par_image": 37.08,
-   "rapport_geste": 3.468,
+   "repos_ms_par_s": 2876.7,
+   "geste_ms_par_image": 158.67,
+   "rapport_repos": 107.875,
+   "rapport_geste": 5.667,
    "refusee": true
   },
   "flou posé sur le graphique": {
-   "repos_ms_par_s": 9.4,
-   "geste_ms_par_image": 10.9,
-   "rapport_geste": 1.019,
-   "refusee": false
+   "repos_ms_par_s": 36.7,
+   "geste_ms_par_image": 42.56,
+   "rapport_repos": 1.375,
+   "rapport_geste": 1.52,
+   "refusee": true
   }
  }
 }

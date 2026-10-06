@@ -31,8 +31,15 @@
 // Seuils fixés le 06/10/2026 entre les thèmes tels qu'ils sont et les contre-épreuves, qui
 // doivent rester DEHORS (les rapports mesurés sont consignés dans tests/budget-themes.json).
 //
-// USAGE   node tests/test_budget.js               # mesure et vérifie
-//         node tests/test_budget.js --enregistrer # … et met à jour tests/budget-themes.json
+// PÉRIMÈTRE : le budget JUGE les thèmes sans verre (data-verre="aucun"). Les thèmes à verre
+// (Aero, Aero nuit) sont MESURÉS et rapportés, pas jugés : leur coût relève de la règle 3 du
+// contrat (verre choisi par le thème, appliqué par la structure) et d'un garde-fou à
+// l'exécution (js/app.js : la réfraction se coupe au-delà de 22 ms par image).
+//
+// USAGE   node tests/test_budget.js                    # mesure et vérifie tous les thèmes
+//         node tests/test_budget.js neon codex         # ces thèmes (+ la référence)
+//         node tests/test_budget.js --enregistrer      # … et met à jour tests/budget-themes.json
+//         --sans-contre-epreuves                       # pour itérer vite (rien n'est enregistré)
 const fs = require('fs'), path = require('path'), http = require('http'), crypto = require('crypto');
 const REPO = path.resolve(__dirname, '..');
 const FICHIER = path.join(__dirname, 'budget-themes.json');
@@ -50,8 +57,12 @@ if (!playwright) {
 }
 
 const index = fs.readFileSync(path.join(REPO, 'index.html'), 'utf8');
-const THEMES = [...index.matchAll(/<link\b[^>]*data-theme-id="([^"]+)"[^>]*>/g)].map(m => ({
-  id: m[1], href: (m[0].match(/href="([^"]+)"/) || [])[1], structure: (m[0].match(/data-structure="([^"]+)"/) || [])[1] || null }));
+const DECLARES = [...index.matchAll(/<link\b[^>]*data-theme-id="([^"]+)"[^>]*>/g)].map(m => ({
+  id: m[1], href: (m[0].match(/href="([^"]+)"/) || [])[1], structure: (m[0].match(/data-structure="([^"]+)"/) || [])[1] || null,
+  verre: (m[0].match(/data-verre="([^"]+)"/) || [])[1] || 'aucun' }));
+const DEMANDES = process.argv.slice(2).filter(a => !a.startsWith('--'));
+const THEMES = DEMANDES.length ? DECLARES.filter(t => t.id === REFERENCE || DEMANDES.includes(t.id)) : DECLARES;
+const SANS_CE = process.argv.includes('--sans-contre-epreuves');
 const empreinte = f => crypto.createHash('sha256').update(fs.readFileSync(path.join(REPO, f))).digest('hex').slice(0, 16);
 
 // ── Données simulées : bougies, prix, fichier publié ─────────────────────────
@@ -160,17 +171,26 @@ const mediane = xs => xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)
     const m = res[t.id];
     const okRepos = m.repos <= ref.repos * BUDGET.reposRapport, okGeste = m.geste <= ref.geste * BUDGET.gesteRapport;
     const okStruct = (m.structure || null) === t.structure;
-    if (!okRepos || !okGeste || !okStruct) ko++;
-    console.log(`  ${okRepos && okGeste && okStruct ? '✓' : '✗'} ${t.id.padEnd(10)} repos ${m.repos.toFixed(1).padStart(6)} ms/s (×${(m.repos / ref.repos).toFixed(2)}, ≤ ×${BUDGET.reposRapport})`
+    const juge = t.verre === 'aucun';
+    if (!okStruct || (juge && (!okRepos || !okGeste))) ko++;
+    console.log(`  ${!juge ? 'ⓘ' : okRepos && okGeste && okStruct ? '✓' : '✗'} ${t.id.padEnd(10)} repos ${m.repos.toFixed(1).padStart(6)} ms/s (×${(m.repos / ref.repos).toFixed(2)}, ≤ ×${BUDGET.reposRapport})`
       + ` · geste ${m.geste.toFixed(2).padStart(6)} ms/image (×${(m.geste / ref.geste).toFixed(2)}, ≤ ×${BUDGET.gesteRapport})`
       + ` · principal ${m.principalRepos.toFixed(1)} ms/s, ${m.principalGeste.toFixed(2)} ms/image`
-      + (t.structure ? ` · structure « ${m.structure} »` : '') + (okStruct ? '' : ' — STRUCTURE NON POSÉE'));
+      + (t.structure ? ` · structure « ${m.structure} »` : '') + (okStruct ? '' : ' — STRUCTURE NON POSÉE')
+      + (juge ? '' : ' — verre : mesuré, non jugé (règle 3)'));
     sortie.themes[t.id] = { feuille: t.href, empreinte: empreinte(t.href), repos_ms_par_s: +m.repos.toFixed(1), geste_ms_par_image: +m.geste.toFixed(2),
       rapport_repos: +(m.repos / ref.repos).toFixed(3), rapport_geste: +(m.geste / ref.geste).toFixed(3),
-      principal_repos_ms_par_s: +m.principalRepos.toFixed(1), principal_geste_ms_par_image: +m.principalGeste.toFixed(2), dans_le_budget: okRepos && okGeste };
+      principal_repos_ms_par_s: +m.principalRepos.toFixed(1), principal_geste_ms_par_image: +m.principalGeste.toFixed(2),
+      verre: t.verre, juge, dans_le_budget: okRepos && okGeste };
   }
   // Les contre-épreuves : chacune DOIT sortir du budget.
   console.log('');
+  if (SANS_CE) {
+    console.log('  − contre-épreuves non jouées (--sans-contre-epreuves) : rien n\'est enregistré');
+    serveur.close();
+    console.log(ko ? `\n❌ BUDGET : ${ko} thème(s) hors budget` : '\n✅ BUDGET : CHAQUE THÈME JUGÉ TIENT SON BUDGET');
+    process.exit(ko ? 1 : 0);
+  }
   const nav2 = await playwright.chromium.launch();
   const bc2 = await nav2.newBrowserCDPSession();
   sortie.contre_epreuves = {};
@@ -188,6 +208,12 @@ const mediane = xs => xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)
     }
   } finally { await nav2.close(); serveur.close(); }
   if (process.argv.includes('--enregistrer')) {
+    // Mesure partielle : les thèmes non mesurés gardent leur dernière mesure (même référence
+    // re-mesurée dans cette exécution : les rapports restent comparables à seuils égaux).
+    if (DEMANDES.length && fs.existsSync(FICHIER)) {
+      const ancien = JSON.parse(fs.readFileSync(FICHIER, 'utf8'));
+      sortie.themes = Object.assign({}, ancien.themes || {}, sortie.themes);
+    }
     fs.writeFileSync(FICHIER, JSON.stringify(sortie, null, 1) + '\n');
     console.log('\n  → mesures écrites dans tests/budget-themes.json');
   }
