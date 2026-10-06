@@ -1,0 +1,70 @@
+{
+ "mesure_le": "2026-10-06T11:15Z",
+ "machine": "linux x64, Chromium headless (rendu logiciel)",
+ "budget": {
+  "reposMsParS": 25,
+  "gesteRapport": 1.35
+ },
+ "reference": "kala",
+ "themes": {
+  "aero": {
+   "feuille": "themes/aero.css",
+   "empreinte": "4475acb57e3ecc91",
+   "repos_ms_par_s": 8,
+   "geste_ms_par_image": 10.83,
+   "rapport_geste": 1.013,
+   "ecart_repos_ms_par_s": 1.7,
+   "dans_le_budget": true
+  },
+  "aero-nuit": {
+   "feuille": "themes/aero-nuit.css",
+   "empreinte": "051786497802f721",
+   "repos_ms_par_s": 7.7,
+   "geste_ms_par_image": 11.14,
+   "rapport_geste": 1.042,
+   "ecart_repos_ms_par_s": 1.4,
+   "dans_le_budget": true
+  },
+  "kala": {
+   "feuille": "themes/kala.css",
+   "empreinte": "96fed342f0401bbe",
+   "repos_ms_par_s": 6.3,
+   "geste_ms_par_image": 10.69,
+   "rapport_geste": 1,
+   "ecart_repos_ms_par_s": 0,
+   "dans_le_budget": true
+  },
+  "neon": {
+   "feuille": "themes/neon.css",
+   "empreinte": "35d92358ebea5aed",
+   "repos_ms_par_s": 8.2,
+   "geste_ms_par_image": 11.98,
+   "rapport_geste": 1.121,
+   "ecart_repos_ms_par_s": 1.9,
+   "dans_le_budget": true
+  },
+  "codex": {
+   "feuille": "themes/codex.css",
+   "empreinte": "340d6c900e60c9bd",
+   "repos_ms_par_s": 5.8,
+   "geste_ms_par_image": 8.94,
+   "rapport_geste": 0.836,
+   "ecart_repos_ms_par_s": -0.5,
+   "dans_le_budget": true
+  }
+ },
+ "contre_epreuves": {
+  "animation infinie qui repeint (fond)": {
+   "repos_ms_par_s": 236.7,
+   "geste_ms_par_image": 37.08,
+   "rapport_geste": 3.468,
+   "refusee": true
+  },
+  "flou posé sur le graphique": {
+   "repos_ms_par_s": 9.4,
+   "geste_ms_par_image": 10.9,
+   "rapport_geste": 1.019,
+   "refusee": false
+  }
+ }
+}

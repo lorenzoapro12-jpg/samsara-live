@@ -211,7 +211,7 @@ for f in [x for x in TOUS_SERVIS if x.endswith(".css") and (REPO / x).exists()]:
         elif not m.get("dans_le_budget"):
             pb.append("HORS BUDGET d'après la dernière mesure")
     detail = "; ".join(pb) if pb else (
-        f"effets mesurés : repos +{(BUDGETS['themes'][t['id']]['ecart_repos_ms_par_s'])} ms/s, geste ×{BUDGETS['themes'][t['id']]['rapport_geste']}"
+        f"effets mesurés : repos ×{BUDGETS['themes'][t['id']]['rapport_repos']}, geste ×{BUDGETS['themes'][t['id']]['rapport_geste']} (CPU, tous processus)"
         if couteux else "aucun effet coûteux")
     (echec if pb else ok)(f, detail)
 if BUDGETS:

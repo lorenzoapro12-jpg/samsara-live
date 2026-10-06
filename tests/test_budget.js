@@ -9,26 +9,34 @@
 // thème peut utiliser ces effets s'il tient son budget, mesuré ici contre le thème de référence
 // (Kāla, « le chemin le plus rapide de la page »), sur la même machine, dans la même exécution.
 //
-// CE QUI EST MESURÉ (temps du THREAD PRINCIPAL, Performance.getMetrics → TaskDuration)
-//   · au repos   : ms de travail par seconde, 3 s sans interaction. Une animation infinie qui
-//                  REPEINT (fond, ombre, couleur…) coûte ici ; une animation de `transform` /
-//                  `opacity` sur son propre calque est jouée par le compositeur et ne coûte rien.
-//   · en geste   : ms de travail par image pendant un glissement du graphique (une image = un
-//                  déplacement), c'est-à-dire ce que le flou posé sur le graphique faisait doubler.
+// CE QUI EST MESURÉ : le temps CPU de TOUS les processus du navigateur (SystemInfo.getProcessInfo
+// — page, navigateur, processus graphique). Première version : le seul thread principal de la
+// page. La contre-épreuve du flou l'a prise en défaut (06/10/2026) : un flou posé sur le
+// graphique n'y coûtait RIEN (×1,02), parce qu'il se calcule à la composition, dans le
+// processus graphique (21,7 → 39 ms par image ici). Une mesure qui ne voit pas ce que la règle
+// interdisait ne peut pas la remplacer : on compte donc tout.
+//   · au repos   : ms de CPU par seconde, 3 s sans interaction. Une animation infinie qui
+//                  REPEINT (fond, ombre, couleur…) coûte cher ici ; une animation de `transform`
+//                  / `opacity` coûte la seule composition (bien moins, mais pas rien).
+//   · en geste   : ms de CPU par image pendant un glissement du graphique (une image = un
+//                  déplacement) — ce que le flou posé sur le graphique faisait exploser.
+// Le temps du seul thread principal est aussi relevé (colonne « principal »), pour le diagnostic.
 // Médiane de 3 essais. Les rapports au thème de référence sont portables d'une machine à l'autre ;
 // les millisecondes absolues ne le sont pas (ce conteneur n'a pas de GPU : rendu logiciel).
 //
 // BUDGET (tests/budget-themes.json garde la dernière mesure de chaque thème, avec l'empreinte
 // de sa feuille : tests/test_contrat.py refuse un effet coûteux sans mesure à jour)
-//   · repos : ≤ référence + BUDGET.reposMsParS ms/s
-//   · geste : ≤ BUDGET.gesteRapport × référence (ms/image)
+//   · repos : ≤ BUDGET.reposRapport × référence (ms de CPU par seconde)
+//   · geste : ≤ BUDGET.gesteRapport × référence (ms de CPU par image)
+// Seuils fixés le 06/10/2026 entre les thèmes tels qu'ils sont et les contre-épreuves, qui
+// doivent rester DEHORS (les rapports mesurés sont consignés dans tests/budget-themes.json).
 //
 // USAGE   node tests/test_budget.js               # mesure et vérifie
 //         node tests/test_budget.js --enregistrer # … et met à jour tests/budget-themes.json
 const fs = require('fs'), path = require('path'), http = require('http'), crypto = require('crypto');
 const REPO = path.resolve(__dirname, '..');
 const FICHIER = path.join(__dirname, 'budget-themes.json');
-const BUDGET = { reposMsParS: 25, gesteRapport: 1.35 };
+const BUDGET = { reposRapport: 1.6, gesteRapport: 1.3 };
 const REFERENCE = 'kala';
 
 let playwright = null;
@@ -87,7 +95,7 @@ const CONTRE_EPREUVES = {
   'flou posé sur le graphique': '[data-theme] .chart-container canvas { filter: blur(2px) saturate(1.4); }',
 };
 
-async function mesurer(nav, theme, injection) {
+async function mesurer(nav, theme, injection, bc) {
   const ctx = await nav.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
   await page.route('**/*', r => {
@@ -107,69 +115,76 @@ async function mesurer(nav, theme, injection) {
   const cdp = await ctx.newCDPSession(page);
   await cdp.send('Performance.enable');
   const tache = async () => (await cdp.send('Performance.getMetrics')).metrics.find(m => m.name === 'TaskDuration').value * 1000;
+  const cpu = async () => (await bc.send('SystemInfo.getProcessInfo')).processInfo.reduce((s, p) => s + p.cpuTime, 0) * 1000;
   // Repos : 3 s sans rien toucher.
-  const r0 = await tache();
+  const r0 = await tache(), c0 = await cpu();
   await page.waitForTimeout(3000);
-  const repos = (await tache() - r0) / 3;
+  const principalRepos = (await tache() - r0) / 3, repos = (await cpu() - c0) / 3;
   // Geste : glisser le graphique, un déplacement par image, 90 images.
   const box = await page.$eval('#chart', c => { const r = c.getBoundingClientRect(); return { x: r.left + r.width * 0.6, y: r.top + r.height * 0.45 }; });
   await page.mouse.move(box.x, box.y);
   await page.mouse.down();
-  const g0 = await tache();
+  const g0 = await tache(), d0 = await cpu();
   const N = 90;
   for (let i = 1; i <= N; i++) {
     await page.mouse.move(box.x - i * 4, box.y + Math.sin(i / 9) * 20);
     await page.evaluate(() => new Promise(r => requestAnimationFrame(() => r())));
   }
-  const geste = (await tache() - g0) / N;
+  const principalGeste = (await tache() - g0) / N, geste = (await cpu() - d0) / N;
   await page.mouse.up();
   const structure = await page.evaluate(() => document.documentElement.getAttribute('data-structure'));
   await ctx.close();
-  return { repos, geste, structure };
+  return { repos, geste, principalRepos, principalGeste, structure };
 }
 const mediane = xs => xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)];
 
 (async () => {
   await new Promise(r => serveur.listen(0, '127.0.0.1', r));
   const nav = await playwright.chromium.launch();
+  const bc = await nav.newBrowserCDPSession();
   const res = {};
   let ko = 0;
   try {
     for (const t of THEMES) {
       const essais = [];
-      for (let k = 0; k < 3; k++) essais.push(await mesurer(nav, t.id));
-      res[t.id] = { repos: mediane(essais.map(e => e.repos)), geste: mediane(essais.map(e => e.geste)), structure: essais[0].structure };
+      for (let k = 0; k < 3; k++) essais.push(await mesurer(nav, t.id, null, bc));
+      res[t.id] = { repos: mediane(essais.map(e => e.repos)), geste: mediane(essais.map(e => e.geste)),
+        principalRepos: mediane(essais.map(e => e.principalRepos)), principalGeste: mediane(essais.map(e => e.principalGeste)), structure: essais[0].structure };
     }
   } finally { await nav.close(); }
   const ref = res[REFERENCE];
-  console.log(`  référence « ${REFERENCE} » : repos ${ref.repos.toFixed(1)} ms/s · geste ${ref.geste.toFixed(2)} ms/image\n`);
+  console.log(`  référence « ${REFERENCE} » : repos ${ref.repos.toFixed(1)} ms CPU/s · geste ${ref.geste.toFixed(2)} ms CPU/image (tous processus)\n`);
   const sortie = { mesure_le: new Date().toISOString().slice(0, 16) + 'Z', machine: process.platform + ' ' + process.arch + ', Chromium headless (rendu logiciel)',
     budget: BUDGET, reference: REFERENCE, themes: {} };
   for (const t of THEMES) {
     const m = res[t.id];
-    const okRepos = m.repos <= ref.repos + BUDGET.reposMsParS, okGeste = m.geste <= ref.geste * BUDGET.gesteRapport;
+    const okRepos = m.repos <= ref.repos * BUDGET.reposRapport, okGeste = m.geste <= ref.geste * BUDGET.gesteRapport;
     const okStruct = (m.structure || null) === t.structure;
     if (!okRepos || !okGeste || !okStruct) ko++;
-    console.log(`  ${okRepos && okGeste && okStruct ? '✓' : '✗'} ${t.id.padEnd(10)} repos ${m.repos.toFixed(1).padStart(6)} ms/s (≤ ${(ref.repos + BUDGET.reposMsParS).toFixed(1)})`
+    console.log(`  ${okRepos && okGeste && okStruct ? '✓' : '✗'} ${t.id.padEnd(10)} repos ${m.repos.toFixed(1).padStart(6)} ms/s (×${(m.repos / ref.repos).toFixed(2)}, ≤ ×${BUDGET.reposRapport})`
       + ` · geste ${m.geste.toFixed(2).padStart(6)} ms/image (×${(m.geste / ref.geste).toFixed(2)}, ≤ ×${BUDGET.gesteRapport})`
+      + ` · principal ${m.principalRepos.toFixed(1)} ms/s, ${m.principalGeste.toFixed(2)} ms/image`
       + (t.structure ? ` · structure « ${m.structure} »` : '') + (okStruct ? '' : ' — STRUCTURE NON POSÉE'));
     sortie.themes[t.id] = { feuille: t.href, empreinte: empreinte(t.href), repos_ms_par_s: +m.repos.toFixed(1), geste_ms_par_image: +m.geste.toFixed(2),
-      rapport_geste: +(m.geste / ref.geste).toFixed(3), ecart_repos_ms_par_s: +(m.repos - ref.repos).toFixed(1), dans_le_budget: okRepos && okGeste };
+      rapport_repos: +(m.repos / ref.repos).toFixed(3), rapport_geste: +(m.geste / ref.geste).toFixed(3),
+      principal_repos_ms_par_s: +m.principalRepos.toFixed(1), principal_geste_ms_par_image: +m.principalGeste.toFixed(2), dans_le_budget: okRepos && okGeste };
   }
   // Les contre-épreuves : chacune DOIT sortir du budget.
   console.log('');
   const nav2 = await playwright.chromium.launch();
+  const bc2 = await nav2.newBrowserCDPSession();
   sortie.contre_epreuves = {};
   try {
     for (const [nom, css] of Object.entries(CONTRE_EPREUVES)) {
       const essais = [];
-      for (let k = 0; k < 3; k++) essais.push(await mesurer(nav2, REFERENCE, css));
+      for (let k = 0; k < 3; k++) essais.push(await mesurer(nav2, REFERENCE, css, bc2));
       const m = { repos: mediane(essais.map(e => e.repos)), geste: mediane(essais.map(e => e.geste)) };
-      const refuse = m.repos > ref.repos + BUDGET.reposMsParS || m.geste > ref.geste * BUDGET.gesteRapport;
+      const refuse = m.repos > ref.repos * BUDGET.reposRapport || m.geste > ref.geste * BUDGET.gesteRapport;
       if (!refuse) ko++;
       console.log(`  ${refuse ? '✓' : '✗'} contre-épreuve « ${nom} » ${refuse ? 'refusée' : 'ACCEPTÉE — la mesure est aveugle'} :`
-        + ` repos ${m.repos.toFixed(1)} ms/s · geste ${m.geste.toFixed(2)} ms/image (×${(m.geste / ref.geste).toFixed(2)})`);
-      sortie.contre_epreuves[nom] = { repos_ms_par_s: +m.repos.toFixed(1), geste_ms_par_image: +m.geste.toFixed(2), rapport_geste: +(m.geste / ref.geste).toFixed(3), refusee: refuse };
+        + ` repos ${m.repos.toFixed(1)} ms/s (×${(m.repos / ref.repos).toFixed(2)}) · geste ${m.geste.toFixed(2)} ms/image (×${(m.geste / ref.geste).toFixed(2)})`);
+      sortie.contre_epreuves[nom] = { repos_ms_par_s: +m.repos.toFixed(1), geste_ms_par_image: +m.geste.toFixed(2),
+        rapport_repos: +(m.repos / ref.repos).toFixed(3), rapport_geste: +(m.geste / ref.geste).toFixed(3), refusee: refuse };
     }
   } finally { await nav2.close(); serveur.close(); }
   if (process.argv.includes('--enregistrer')) {
