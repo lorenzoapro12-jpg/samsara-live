@@ -57,6 +57,32 @@ sont restreints par certains navigateurs : un serveur local est préférable.
 
 ---
 
+## La carte : `bookmap.html`
+
+Une seconde page, **à côté** du terminal (qu'elle ne modifie pas et dont elle ne charge aucun
+code) : la carte de liquidité, comme un trader garde ses OHLCV et sa bookmap ouvertes.
+
+- **Axe vertical en dollars**, axe horizontal le temps. La chaleur est la carte publiée
+  (`heatmap.json`, 1 min × 20 $, 24 h), prolongée par un carnet **live** lu par la page
+  (100 à 5 000 niveaux, toutes les 1 à 10 s, tranche de 1 à 20 $).
+- Le **prix est une ligne sur la chaleur** (clôtures 1 min, puis exécutions à la seconde),
+  avec le meilleur bid / ask en marches ; les **exécutions** sont des bulles (achats / ventes
+  au marché) ; les **murs** et le **gamma** du fichier de 15 min partent de leur instant de
+  lecture ; un carnet latéral, un profil des exécutions, le volume et le CVD par minute.
+- **Trois horloges, une surface** : chaque calque porte son âge SUR la carte (pastilles), et
+  ce qui n'a pas été observé est hachuré — ce n'est pas « vide ».
+- **Réglages** (palette, contraste, fusion, profondeur live, bulles) : ils changent le
+  détail, jamais la valeur. La fusion de la carte publiée prend le **MAX** (on fusionne,
+  on n'affine jamais) ; la lecture au pointeur décode l'intensité en BTC avec l'`encodage`
+  PUBLIÉ par `heatmap.py` — sans lui, la carte affiche des intensités et le dit.
+- Gestes : glisser, molette (temps ; Maj ou sur l'axe : prix), pincer, double-clic ou R
+  (vue par défaut), F (suivre), L (légende).
+
+Le temps réel à 100 ms (flux WebSocket) n'est **pas** construit : il dépend d'une sonde
+réseau à lancer depuis le poste qui affichera la carte. Harnais : `tests/test_bookmap.js`
+(calculs, hors ligne) et `tests/test_bookmap_rendu.js` (rendu réel dans Chromium, Binance
+simulé ; « non exécuté » sans Playwright).
+
 ## Configuration
 
 ```bash

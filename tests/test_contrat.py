@@ -62,11 +62,22 @@ def titre(t):
     lignes.append(f"── {t} ──")
 
 
+def servis_de(page):
+    """Les feuilles et scripts qu'une page charge (balises, plus le code tiers chargé à la demande)."""
+    html = (REPO / page).read_text(encoding="utf-8")
+    sv = re.findall(r'\b(?:href|src)="((?:css|js|themes)/[^"]+)"', html)
+    # hyalite est chargé à la demande par js/app.js, pas par une balise : il est servi aussi.
+    sv += [m for m in re.findall(r"'(js/vendor/[^']+)'", "\n".join(
+        (REPO / f).read_text(encoding="utf-8") for f in sv if f.endswith(".js") and (REPO / f).exists())) if m not in sv]
+    return sv
+
+
+# Toutes les pages servies : le terminal, et les pages À CÔTÉ (la carte). Une page ajoutée
+# à la racine est contrôlée sans qu'il faille penser à l'inscrire ici.
+PAGES = ["index.html"] + sorted(p.name for p in REPO.glob("*.html") if p.name != "index.html")
 html = PAGE.read_text(encoding="utf-8")
-servis = re.findall(r'\b(?:href|src)="((?:css|js|themes)/[^"]+)"', html)
-# hyalite est chargé à la demande par js/app.js, pas par une balise : il est servi aussi.
-servis += [m for m in re.findall(r"'(js/vendor/[^']+)'", "\n".join(
-    (REPO / f).read_text(encoding="utf-8") for f in servis if f.endswith(".js") and (REPO / f).exists())) if m not in servis]
+servis = servis_de("index.html")
+TOUS_SERVIS = sorted({f for pg in PAGES for f in servis_de(pg)})
 
 # ── 1. registre ──
 titre("1. Registre des thèmes (index.html)")
@@ -120,8 +131,8 @@ for t in THEMES:
         (ok if verre != "none" else echec)(f"{t['id']} · data-verre={t['verre']} ⇒ --verre posé", verre)
 
 # ── 4. performance ──
-titre("4. Performance des feuilles servies")
-for f in [x for x in servis if x.endswith(".css") and (REPO / x).exists()]:
+titre("4. Performance des feuilles servies (" + ", ".join(PAGES) + ")")
+for f in [x for x in TOUS_SERVIS if x.endswith(".css") and (REPO / x).exists()]:
     css = sans_commentaires((REPO / f).read_text(encoding="utf-8"))
     blend = [m for m in re.findall(r"mix-blend-mode\s*:\s*([\w-]+)", css) if m != "normal"]
     flou = re.findall(r"(?<![\w-])filter\s*:[^;]*blur\(", css)
@@ -142,8 +153,8 @@ for f in [x for x in servis if x.endswith(".css") and (REPO / x).exists()]:
     (echec if pb else ok)(f, "; ".join(pb))
 
 # ── 5. réseau ──
-titre("5. Réseau : Binance et GitHub Raw, rien d'autre")
-for f in ["index.html"] + servis:
+titre("5. Réseau : Binance et GitHub Raw, rien d'autre (" + ", ".join(PAGES) + ")")
+for f in PAGES + TOUS_SERVIS:
     if not (REPO / f).exists():
         echec(f"{f} · référencé par la page", "fichier absent")
         continue
@@ -154,9 +165,9 @@ for f in ["index.html"] + servis:
                 if not u.startswith("data:") and not u.startswith("#")]
         (echec if any(re.match(r"(https?:)?//", u) for u in urls) else ok)(f"{f} · url() relatives ou data:", ", ".join(urls[:3]))
         continue
-    if f == "index.html":
+    if f.endswith(".html"):
         ext = re.findall(r'<(?:script|link|img|iframe)\b[^>]*\b(?:src|href)="((?:https?:)?//[^"]+)"', txt)
-        (echec if ext else ok)("index.html · aucune ressource externe", ", ".join(ext[:3]))
+        (echec if ext else ok)(f"{f} · aucune ressource externe", ", ".join(ext[:3]))
         continue
     if f.startswith("js/vendor/"):
         continue    # code tiers verbatim : il n'émet aucune requête (filtre SVG local)

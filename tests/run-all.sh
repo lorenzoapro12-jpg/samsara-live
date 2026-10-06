@@ -37,6 +37,12 @@ node test_render.js || ko=1
 etape "5. Panneau ⚡ (fetch RÉSEAU réel vers Binance)"
 node test_live.js || ko=1
 
+etape "5b. Carte (bookmap) : fusion, décodage, exécutions, isolement — hors ligne"
+node test_bookmap.js || ko=1
+
+etape "5c. Carte (bookmap) rendue dans Chromium — Binance simulé (non exécuté sans Playwright)"
+node test_bookmap_rendu.js || ko=1
+
 etape "6. Scan de TOUS les fichiers publiés"
 python3 scan-public.py || ko=1
 
