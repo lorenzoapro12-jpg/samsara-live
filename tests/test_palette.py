@@ -27,6 +27,11 @@ CE QU'IL MESURE (par thème)
 5. Overlays (--ov-ema20 … --ov-sma50) : séparation deux à deux ≥ 8 en vision normale.
 6. Traçabilité des exceptions : un overlay sous 3:1 sur le fond du graphique doit porter son
    étiquette en bout de tracé (ETIQ_OVERLAYS, js/). Exception silencieuse = échec.
+7. Texte posé sur un DÉGRADÉ (06/10/2026) : --brand-ink sur --brand-fond (bouton actif, boutons du
+   Grid Bot), --pill-actif-ink sur --pill-actif (intervalle, indicateur actif) — mesuré sur
+   CHAQUE borne du dégradé (AA texte ≥ 4,5:1). Une borne translucide est composée sur la
+   carte opaque (plancher). C'est le cas exact d'un thème noir / néon : texte sombre sur un
+   néon clair passe, texte sombre sur un fond sombre ne passe pas.
 
 USAGE
     python3 tests/test_palette.py     # code de sortie 0 = tout tient
@@ -244,6 +249,24 @@ for t in THEMES:
                 mini, qui = d, (NOMS_OV[i], NOMS_OV[j])
     (ok if mini >= SEUIL_OVERLAYS else echec)(f"{th} · {len(ovs)} overlays deux à deux",
                                               f"ΔE min {mini:5.1f} ({qui[0]}/{qui[1]}, ≥ {SEUIL_OVERLAYS})")
+
+    # 7. texte sur dégradé : chaque borne
+    for encre, fond_tok in (("--brand-ink", "--brand-fond"), ("--pill-actif-ink", "--pill-actif")):
+        try:
+            texte = rgb(J, encre, fond_carte)
+            valeur = resout(J, J[fond_tok])
+        except (KeyError, ValueError) as e:
+            echec(f"{th} · {encre} sur {fond_tok}", f"illisible : {e}")
+            continue
+        bornes = re.findall(r"#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)", valeur)
+        if not bornes:
+            echec(f"{th} · {encre} sur {fond_tok}", f"aucune couleur trouvée dans {valeur[:40]}")
+            continue
+        pire = min(((contraste(texte, b), b) for b in
+                    (compose(couleur(x), fond_carte) if couleur(x)[3] < 1 else couleur(x)[:3] for x in bornes)),
+                   key=lambda x: x[0])
+        (ok if pire[0] >= SEUIL_AA_TEXTE else echec)(
+            f"{th} · {encre} sur {fond_tok} ({len(bornes)} borne(s))", f"{pire[0]:.2f}:1 (pire borne {hexa(pire[1])}, AA ≥ {SEUIL_AA_TEXTE})")
 
     # 6. exceptions sous 3:1 : étiquetées, pas silencieuses
     sous = [(n, min(contraste(c, f) for f in fonds_canvas)) for n, c in zip(NOMS_OV, ovs)]

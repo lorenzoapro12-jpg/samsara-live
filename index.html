@@ -13,6 +13,9 @@
 <link rel="stylesheet" href="themes/aero.css" data-theme-id="aero" data-nom="Aero" data-mode="clair" data-verre="refraction" data-paire="aero-nuit">
 <link rel="stylesheet" href="themes/aero-nuit.css" data-theme-id="aero-nuit" data-nom="Aero nuit" data-mode="sombre" data-verre="refraction" data-paire="aero">
 <link rel="stylesheet" href="themes/kala.css" data-theme-id="kala" data-nom="Kāla" data-mode="sombre" data-verre="aucun">
+<!-- data-structure : le thème change aussi la STRUCTURE de la page (js/structures.js). -->
+<link rel="stylesheet" href="themes/neon.css" data-theme-id="neon" data-nom="Néon" data-mode="sombre" data-verre="aucun" data-structure="hud">
+<link rel="stylesheet" href="themes/codex.css" data-theme-id="codex" data-nom="Codex" data-mode="clair" data-verre="aucun" data-structure="codex">
 <script>
 /* Le thème est posé AVANT le premier rendu : posé par app.js (différé), la page s'afficherait
    un instant dans le thème par défaut. */
@@ -25,7 +28,15 @@
       if (!t && localStorage.getItem('samsara-theme-v2') === 'dark') t = 'aero-nuit';
     } catch (e) {}
     var defaut = liens.length ? liens[0].getAttribute('data-theme-id') : 'aero';
-    document.documentElement.setAttribute('data-theme', connus[t] ? t : defaut);
+    var choisi = connus[t] ? t : defaut;
+    document.documentElement.setAttribute('data-theme', choisi);
+    /* Thème à STRUCTURE : la page reste invisible tant que js/structures.js ne l'a pas posée
+       (sinon elle s'afficherait un instant dans la structure de base). Filet : 2,5 s. */
+    var l = document.querySelector('link[data-theme-id="' + choisi + '"][data-structure]');
+    if (l) {
+      document.documentElement.setAttribute('data-structure-attendue', l.getAttribute('data-structure'));
+      setTimeout(function () { document.documentElement.setAttribute('data-structure-posee', ''); }, 2500);
+    }
   } catch (e) {}
   /* Mode de lecture (débutant / expert) : une classe, posée avant le premier rendu. Il change
      le niveau de DÉTAIL affiché, jamais une valeur (js/fiches.js). */
@@ -33,6 +44,7 @@
   catch (e) { document.documentElement.setAttribute('data-mode', 'debutant'); }
 })();
 </script>
+<script defer src="js/structures.js"></script>
 <script defer src="js/fiches.js"></script>
 <script defer src="js/reglages.js"></script>
 <script defer src="js/app.js"></script>

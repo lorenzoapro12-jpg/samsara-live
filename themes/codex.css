@@ -1,0 +1,215 @@
+/* Thème « Codex » — un manuscrit enluminé. Parchemin, encre ferro-gallique, rubriques au
+   vermillon, lapis-lazuli, feuille d'or ; une lettrine gothique en frontispice, des titres en
+   capitales romaines, des chiffres d'imprimeur alignés. STRUCTURE propre : « codex »
+   (js/structures.js) — registre des chiffres clés sous le titre, deux folios : la chronique du
+   marché au verso, la carte au recto, une reliure entre les deux ; la barre des tâches devient
+   le colophon.
+   Déclaré dans index.html : <link data-theme="codex" data-mode="clair" data-verre="aucun"
+   data-structure="codex">.
+
+   COULEURS. Hausse = LAPIS (bleu), baisse = VERMILLON : deux pigments de manuscrit, et une
+   paire bleu / rouge-orangé qui reste séparée sous les trois daltonismes (vert / rouge, la
+   paire « naturelle », se confond en deutéranopie). Mesuré par tests/test_palette.py.
+
+   EFFETS ET BUDGET. Une seule animation infinie : la flamme de chandelle du point « flux
+   actif » (opacité et transform, calque à part). Mesurée : tests/test_budget.js. */
+
+@font-face {
+  font-family: 'Samsara Codex Lettrine';
+  src: url('../fonts/codex-lettrine.woff2') format('woff2');
+  font-weight: 400; font-display: swap;
+}
+@font-face {
+  font-family: 'Cinzel';
+  src: url('../fonts/cinzel.woff2') format('woff2');
+  font-weight: 400 900; font-display: swap;
+}
+@font-face {
+  font-family: 'EB Garamond';
+  src: url('../fonts/eb-garamond.woff2') format('woff2');
+  font-weight: 400 800; font-display: swap;
+}
+
+[data-theme="codex"] {
+  color-scheme: light;
+  --font: 'EB Garamond', 'Garamond', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --police-titre: 'Cinzel', 'Trajan Pro', 'Times New Roman', serif;
+  /* Repli de la lettrine : EB Garamond (bas de casse), pas Cinzel (tout en capitales). */
+  --police-lettrine: 'Samsara Codex Lettrine', 'EB Garamond', 'Old English Text MT', serif;
+  --r-bar: 3px; --r-panel: 4px; --r-card: 3px; --r-tile: 2px;
+
+  /* Fond : parchemin — un grain de vélin (bruit SVG, statique), des taches de vieillissement. */
+  --fond:
+    radial-gradient(70% 60% at 15% 10%, rgba(255,250,235,0.65) 0%, rgba(255,250,235,0) 70%),
+    radial-gradient(60% 50% at 90% 95%, rgba(150,105,40,0.18) 0%, rgba(150,105,40,0) 70%),
+    radial-gradient(40% 30% at 70% 20%, rgba(170,120,50,0.10) 0%, rgba(170,120,50,0) 70%),
+    linear-gradient(170deg, #eadbb4 0%, #e3cf9f 55%, #d9c08a 100%);
+  --trame: none;
+  --grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='v'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.24 0 0 0 0 0.1 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23v)'/%3E%3C/svg%3E");
+  --verre: none;
+
+  --surface: rgba(244,233,204,0.94);
+  --surface-ombre: 0 0 0 1px rgba(120,80,30,0.45), 0 0 0 4px rgba(244,233,204,0.94), 0 0 0 5px rgba(150,110,40,0.55), 0 12px 26px -16px rgba(60,35,10,0.55);
+  --surface-reflet: none;
+  --capsule: rgba(255,248,228,0.75);
+  --capsule-hover: rgba(255,248,228,1);
+  --capsule-ombre: inset 0 0 0 1px rgba(120,80,30,0.45);
+  --pill: transparent;
+  --pill-hover: rgba(176,138,46,0.12);
+  --pill-actif: #8e1b12;
+  --pill-actif-ink: #fff7e6;
+  --pill-actif-ombre: inset 0 0 0 1px rgba(80,10,5,0.6);
+  --dot-anneau: #f4e9cc;
+  --poignee: rgba(142,27,18,0.05);
+  --poignee-hover: rgba(142,27,18,0.12);
+
+  --ink-1: #24160a; --ink-2: #4a3320; --ink-3: #6a4d2c;
+  --up: #1d4f91; --down: #b0381a;
+  --up-ink: #183f75; --down-ink: #8e1b12;
+  --up-soft: rgba(29,79,145,0.12); --down-soft: rgba(176,56,26,0.12);
+  --warn: #9a6a00; --warn-ink: #6e4b00; --warn-soft: rgba(176,138,46,0.18);
+  --accent: #8e1b12; --accent-2: #1d4f91;
+  --brand: linear-gradient(90deg, #8e1b12 0%, #8a5e00 50%, #1d4f91 100%);
+  --brand-ink: #fff7e6;
+  --accent-glow: rgba(176,138,46,0.35);
+  --hairline: rgba(110,75,30,0.30);
+  --rail: rgba(110,75,30,0.08);
+
+  --card: rgba(248,239,214,0.96);
+  --card-solid: #f6ecd2;
+  --card-edge: rgba(120,80,30,0.40);
+  --card-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 6px 16px -12px rgba(60,35,10,0.6);
+  --card-hi: rgba(255,255,255,0.5);
+  --card-reflet: none;
+  --forward: linear-gradient(135deg, #1d4f91, #12345f);
+  --modal-fond: #f4e9cc;
+  --modal-ombre: 0 0 0 1px rgba(120,80,30,0.5), 0 18px 40px -18px rgba(60,35,10,0.7);
+  --ombre-douce: 0 2px 8px rgba(60,35,10,0.25);
+  --selection: rgba(176,138,46,0.35);
+  --defil: rgba(110,75,30,0.35);
+  --defil-hover: rgba(110,75,30,0.55);
+  --prix-lueur: none;
+
+  /* Graphique : un vélin plus clair, encadré comme une carte. */
+  --chart-1: #f7eed6; --chart-2: #f2e6c8; --chart-3: #ecdcb6;
+  --chart-lueur: radial-gradient(70% 60% at 50% 40%, rgba(255,252,240,0.55) 0%, rgba(255,252,240,0) 70%);
+  --chart-creux: inset 0 0 0 1px rgba(120,80,30,0.35), inset 0 0 24px -8px rgba(120,80,30,0.35);
+  --chart-surface: #f2e6c8;
+  --grille: rgba(110,75,30,0.10);
+  --reticule: rgba(142,27,18,0.55);
+  --bulle: rgba(250,243,224,0.97);
+  --filigrane: 0.05;
+  --vol-alpha: 0.5;
+  --bande-alpha: 0.07;
+  --aura: 0;
+  --ov-ema20: #a0700a; --ov-ema50: #1d4f91; --ov-ema100: #b0381a;
+  --ov-ema200: #6a1b5f; --ov-sma20: #2e7d5b; --ov-sma50: #5c3b1e;
+  --ov-bb: #6a4d2c; --ov-vwap: #9a6a00; --ov-sar: #2e7d5b;
+  --ov-ichi-t: #1d4f91; --ov-ichi-k: #8e1b12;
+  --s-rsi: #6a1b5f; --s-macd: #1d4f91; --s-signal: #b0381a;
+  --s-stoch-k: #1d4f91; --s-stoch-d: #b0381a; --s-atr: #2e7d5b;
+  --s-obv: #1d4f91; --s-mfi: #6a1b5f; --s-wr: #1d4f91; --s-cci: #b0381a;
+  --s-adx: #9a6a00; --s-equity: #2e7d5b;
+  --sess-asie: rgba(154,106,0,0.70);
+  --sess-europe: rgba(29,79,145,0.70);
+  --sess-us: rgba(106,27,95,0.70);
+  --sr-1: #6a1b5f; --sr-2: #1d4f91; --sr-3: #9a6a00;
+  --fib: #9a6a00; --vp: #1d4f91; --vp-poc: #8e1b12;
+}
+
+/* ── Typographie : capitales romaines, rubriques, chiffres d'imprimeur alignés ── */
+[data-theme="codex"] body { font-size: 14px; font-variant-numeric: lining-nums tabular-nums; }
+[data-theme="codex"] body::before { opacity: 0.16; background-size: 220px 220px; }
+[data-theme="codex"] .demon-name,
+[data-theme="codex"] .modal-titre,
+[data-theme="codex"] .fiche-titre,
+[data-theme="codex"] .feed-panel-handle,
+[data-theme="codex"] .strat-handle,
+[data-theme="codex"] .lbl,
+[data-theme="codex"] .kpi i,
+[data-theme="codex"] .section-title { font-family: var(--police-titre); letter-spacing: 0.06em; }
+[data-theme="codex"] .demon-name { color: var(--down-ink); font-size: 13px; font-weight: 700; text-transform: uppercase; }
+[data-theme="codex"] .demon-name::before { content: '✠ '; color: var(--warn); font-weight: 400; }
+[data-theme="codex"] .price-badge { font-family: var(--font); font-weight: 600; font-size: 25px; font-variant-numeric: lining-nums tabular-nums; }
+[data-theme="codex"] .kpi b, [data-theme="codex"] .tuile .val, [data-theme="codex"] .hero-val { font-family: var(--font); font-variant-numeric: lining-nums tabular-nums; }
+
+/* Frontispice : le titre en gothique, sa lettrine enluminée (or sur lapis, filet vermillon). */
+[data-theme="codex"] .header-left h1 {
+  font-family: var(--police-lettrine); font-weight: 400; font-size: 26px; letter-spacing: 0.02em;
+  background: none; -webkit-text-fill-color: currentColor; color: var(--ink-1);
+}
+[data-theme="codex"] .header-left h1::first-letter {
+  float: left; font-size: 1.55em; line-height: 0.9; margin: 1px 4px 0 0; padding: 2px 5px 0;
+  color: #f3d27a; background: linear-gradient(160deg, #1d4f91, #12345f);
+  box-shadow: 0 0 0 1px #9a6a00, 0 0 0 3px #f4e9cc, 0 0 0 4px #8e1b12;
+}
+[data-theme="codex"] .header-orb {
+  --orbe: radial-gradient(circle at 50% 50%, #f3d27a 0 18%, #9a6a00 20% 30%, #8e1b12 32% 54%, #1d4f91 56% 100%);
+  --orbe-ombre: 0 0 0 2px #9a6a00, 0 2px 6px rgba(60,35,10,0.4);
+}
+
+/* ── Folios : filets doubles, rubriques ── */
+[data-theme="codex"] .demon-card {
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow), inset 0 0 0 3px var(--card-solid), inset 0 0 0 4px rgba(154,106,0,0.45);
+}
+[data-theme="codex"] .demon-card::after { left: 12px; right: 12px; height: 1px; opacity: 0.8;
+  background: linear-gradient(90deg, transparent, #8e1b12, transparent); }
+[data-theme="codex"] .avatar-orb {
+  width: 30px; height: 30px; border-radius: 2px; color: #f3d27a;
+  background: linear-gradient(160deg, var(--teinte), #12345f); border: 1px solid #9a6a00; box-shadow: none;
+}
+[data-theme="codex"] .avatar-orb::after { display: none; }
+[data-theme="codex"] .avatar-orb svg { filter: none; }
+[data-theme="codex"] .carte-marche { --teinte: #1d4f91; } [data-theme="codex"] .carte-macro { --teinte: #2e7d5b; }
+[data-theme="codex"] .carte-ind { --teinte: #6a1b5f; }    [data-theme="codex"] .carte-micro { --teinte: #8e1b12; }
+[data-theme="codex"] .carte-liq { --teinte: #1d4f91; }    [data-theme="codex"] .carte-flux { --teinte: #5c3b1e; }
+[data-theme="codex"] .carte-live { --teinte: #9a6a00; }   [data-theme="codex"] .carte-tape { --teinte: #1d4f91; }
+[data-theme="codex"] .carte-temps { --teinte: #6a4d2c; }
+
+/* ── Structure « codex » : registre, folios, reliure, colophon ── */
+[data-theme="codex"] .codex-registre {
+  position: relative; flex-shrink: 0; display: flex; align-items: center; gap: 12px;
+  padding: 2px 18px; background: var(--surface); box-shadow: var(--surface-ombre); border-radius: var(--r-bar);
+}
+[data-theme="codex"] .codex-registre .kpis { flex: 1; height: 36px; }
+[data-theme="codex"] .codex-registre-titre { flex-shrink: 0; font: 700 11px/1 var(--police-titre); letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--down-ink); }
+[data-theme="codex"] .codex-fleuron { flex-shrink: 0; color: var(--warn); font-size: 18px; }
+[data-theme="codex"][data-structure="codex"] .kpi { border-left: 0; }
+[data-theme="codex"][data-structure="codex"] .kpi + .kpi::before { content: '·'; position: absolute; margin-left: -18px; color: var(--warn); }
+[data-theme="codex"][data-structure="codex"] .kpi { position: relative; }
+[data-theme="codex"] .codex-reliure {
+  flex-shrink: 0; width: 14px; align-self: stretch; pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(60,35,10,0.0) 0%, rgba(60,35,10,0.35) 45%, rgba(60,35,10,0.45) 50%, rgba(60,35,10,0.35) 55%, rgba(60,35,10,0) 100%),
+    repeating-linear-gradient(180deg, transparent 0 46px, rgba(142,27,18,0.55) 46px 50px);
+}
+[data-theme="codex"][data-structure="codex"] .feed-panel { width: 420px; }
+[data-theme="codex"][data-structure="codex"] .feed-panel.collapsed { width: 34px; }
+[data-theme="codex"][data-structure="codex"] .feed-panel-handle { order: 2; border-right: 0; border-left: 1px solid var(--hairline); }
+[data-theme="codex"][data-structure="codex"] .feed-panel-handle::after { left: auto; right: 0; background: #8e1b12; }
+[data-theme="codex"] .codex-ornement { position: absolute; z-index: 3; width: 22px; height: 22px; pointer-events: none; color: #9a6a00;
+  border: 0 double #9a6a00; }
+[data-theme="codex"] .codex-ornement-hg { left: 5px; top: 5px; border-left-width: 4px; border-top-width: 4px; }
+[data-theme="codex"] .codex-ornement-hd { right: 5px; top: 5px; border-right-width: 4px; border-top-width: 4px; }
+[data-theme="codex"] .codex-ornement-bg { left: 5px; bottom: 5px; border-left-width: 4px; border-bottom-width: 4px; }
+[data-theme="codex"] .codex-ornement-bd { right: 5px; bottom: 5px; border-right-width: 4px; border-bottom-width: 4px; }
+[data-theme="codex"] .codex-colophon { font-family: var(--police-titre); color: var(--down-ink); margin-right: 8px; letter-spacing: 0.08em; }
+
+/* Point « flux actif » : une flamme de chandelle (opacité et transform seulement). */
+[data-theme="codex"] .refresh-dot { background: #c8781c; box-shadow: 0 0 8px rgba(200,120,28,0.7);
+  will-change: transform, opacity; animation: codex-flamme 3.1s steps(1) infinite; }
+@keyframes codex-flamme { 0% { opacity: 1; transform: scale(1); } 23% { opacity: 0.82; transform: scale(0.92); }
+  41% { opacity: 1; transform: scale(1.05); } 67% { opacity: 0.9; transform: scale(0.97); } 84% { opacity: 1; transform: scale(1.02); } }
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="codex"] .refresh-dot { animation: none; }
+}
+@media (max-width: 768px) {
+  [data-theme="codex"] .codex-registre { padding: 2px 8px; }
+  [data-theme="codex"] .codex-registre-titre, [data-theme="codex"] .codex-fleuron { display: none; }
+  /* Le téléphone masque les chiffres clés de l'en-tête (css/app.css) ; cette structure les
+     garde, dans sa bande, où ils ont la largeur de l'écran. */
+  [data-theme="codex"] .codex-registre .kpis { display: flex; height: 32px; }
+  [data-theme="codex"] .header-left h1 { font-size: 20px; }
+}

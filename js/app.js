@@ -8,7 +8,8 @@ const THEMES = Array.from(document.querySelectorAll('link[data-theme-id]')).map(
   nom: l.getAttribute('data-nom') || l.getAttribute('data-theme-id'),
   mode: l.getAttribute('data-mode') || 'clair',
   verre: l.getAttribute('data-verre') || 'aucun',
-  paire: l.getAttribute('data-paire') || null
+  paire: l.getAttribute('data-paire') || null,
+  structure: l.getAttribute('data-structure') || null     // js/structures.js
 }));
 function themeCourant() {
   const id = document.documentElement.getAttribute('data-theme');
@@ -20,9 +21,17 @@ function appliquerTheme(id) {
   document.documentElement.setAttribute('data-theme', id);
   try { localStorage.setItem(THEME_CLE, id); } catch (e) {}
   dark = themeCourant().mode === 'sombre';
-  // Tout ce qui porte une couleur PAR THÈME hors du CSS : relu une fois, ici, pas à chaque image.
+  // La STRUCTURE d'abord (elle déplace le graphique et redimensionne le canvas), puis tout ce
+  // qui porte une couleur par thème hors du CSS : relu une fois, ici, pas à chaque image.
+  appliquerStructure(themeCourant().structure);
   lireJetons(); peindrePastilles(); verreDuTheme(); remplirMenuThemes();
   drawChart();
+  redessinerApresPolices();
+}
+// Le canvas dessine son texte avec la police du thème (--font) : si elle n'est pas encore
+// chargée, il a pris la police de repli. On redessine une fois les polices prêtes.
+function redessinerApresPolices() {
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { lireJetons(); drawChart(); }).catch(() => {});
 }
 function themeSuivant() {
   const i = THEMES.findIndex(t => t.id === themeCourant().id);
@@ -38,7 +47,7 @@ function remplirMenuThemes() {
   m.innerHTML = '<div class="cat-title">Thème · T suivant · D clair / sombre</div>' + THEMES.map(t =>
     '<button class="theme-item" role="menuitemradio" aria-checked="' + (t.id === cur) + '" onclick="appliquerTheme(\'' + t.id + '\')">'
     + '<span class="theme-apercu" data-theme="' + t.id + '"><i></i><i></i><i></i><i></i></span>'
-    + '<span class="theme-nom">' + escHtml(t.nom) + '</span>'
+    + '<span class="theme-nom">' + escHtml(t.nom) + (t.structure && STRUCTURES[t.structure] ? ' <small class="theme-structure">· ' + escHtml(STRUCTURES[t.structure].nom.toLowerCase()) + '</small>' : '') + '</span>'
     + '<span class="theme-mode">' + (t.mode === 'sombre' ? 'sombre' : 'clair') + '</span></button>').join('');
 }
 function ouvrirThemes(e) {
@@ -4292,6 +4301,7 @@ function showWalkForward() {
 async function init() {
   appliquerMode(modeCourant());   // libellé du bouton ; la classe est déjà posée par index.html
   lireJetons(); jetonsLus = true;
+  redessinerApresPolices();
   peindrePastilles();
   resizeCanvas();
   drawChart();             // « Chargement… » plutôt qu'un cadre vide

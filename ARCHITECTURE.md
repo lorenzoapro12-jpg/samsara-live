@@ -174,8 +174,41 @@ Deux harnais, deux régimes :
 version périmée et échouent sur des contrôles déjà corrigés — faux échec vécu.
 
 Deux harnais hors ligne gardent l'apparence et la vitesse : `test_palette.py` mesure chaque
-thème déclaré, `test_contrat.py` fait tenir les règles de la page (thèmes, verre, pas
-d'animation infinie ni de `mix-blend-mode`, aucune ressource externe).
+thème déclaré (dont le texte posé sur un dégradé, à chaque borne), `test_contrat.py` fait
+tenir les règles de la page (thèmes, verre, réseau, et le budget d'image — voir plus bas).
+
+---
+
+## Les pages et leurs fichiers (06/10/2026)
+
+```
+index.html (terminal)                      bookmap.html (carte, page à côté)
+  js/structures.js  structure du thème        js/bookmap-calc.js  calculs purs
+  js/fiches.js      légendes, mode            js/bookmap.js       interface
+  js/reglages.js    réglages d'affichage      css/bookmap.css
+  js/app.js         le terminal
+  css/app.css + themes/*.css (+ fonts/)
+```
+
+La carte ne charge rien du terminal ; le terminal n'y fait qu'un lien. Les deux lisent les
+mêmes fichiers publiés et n'appellent que Binance et GitHub Raw (`test_contrat.py`, toutes
+pages).
+
+**Trois règles transverses, chacune tenue par un harnais :**
+
+| Règle | Où | Harnais |
+|---|---|---|
+| Une légende se DÉRIVE du code qui calcule | `meta.champs` (serveur), `PARAM` (page) | `test_meta.py`, `test_fiches.js` |
+| Un réglage change le détail, jamais la valeur ; les constantes du fichier sont lues | `js/reglages.js` | `test_reglages.js` |
+| Fusionner, jamais affiner : une intensité de heatmap se fusionne par MAX | carte, graphique | `test_bookmap.js`, `test_reglages.js` |
+| Un thème peut changer la structure, pas faire disparaître une valeur ou son âge | `js/structures.js` | `test_structures.js` |
+| Un effet visuel coûteux se paie dans un budget MESURÉ | feuilles de thème | `test_budget.js`, `test_contrat.py` |
+
+**Le budget d'image.** `test_budget.js` mesure, dans Chromium, le temps du thread principal au
+repos (ms par seconde) et par image pendant un glissement du graphique, pour chaque thème,
+contre le thème de référence, sur la même machine. Seuls les rapports voyagent d'une machine
+à l'autre. Deux contre-épreuves (une animation qui repeint, un flou sur le graphique) doivent
+sortir du budget : c'est la preuve que la mesure voit ce que l'ancienne règle interdisait.
 
 ---
 

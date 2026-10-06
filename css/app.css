@@ -5,7 +5,10 @@
    déclaré dans index.html par un <link data-theme>. Le contrat (jetons obligatoires,
    règles de performance) est vérifié par tests/test_contrat.py et tests/test_palette.py.
 
-   RÈGLES DE PERFORMANCE (mesurées le 05/10/2026, tests/test_contrat.py les fait tenir) :
+   RÈGLES DE PERFORMANCE (mesurées le 05/10/2026, tests/test_contrat.py les fait tenir) —
+   pour CETTE feuille et css/bookmap.css. Depuis le 06/10/2026, une feuille de THÈME peut user
+   de flou, de fusion ou d'animations infinies si elle tient son budget d'image, MESURÉ par
+   tests/test_budget.js (voir le contrat) :
    · pas de `backdrop-filter` ailleurs qu'ici, et seulement via le jeton --verre : un thème
      choisit son verre, il ne pose pas de filtre sur un élément de son choix. Cinq surfaces
      floutées recalculées à chaque image du graphique = 167 ms par image (33 sans) ;
@@ -40,7 +43,11 @@
   --capsule-ombre: 0 1px 3px rgba(0,0,0,0.12);
   --pill: transparent;
   --pill-hover: var(--rail);
-  --pill-actif: var(--brand);
+  /* Fond d'un élément qui porte du TEXTE (bouton actif, intervalle choisi, boutons du Grid
+     Bot) : le dégradé de marque par défaut ; un thème dont le dégradé est trop clair pour
+     son encre le redéfinit (tests/test_palette.py, contrôle 7, mesure chaque borne). */
+  --brand-fond: var(--brand);
+  --pill-actif: var(--brand-fond);
   --pill-actif-ink: #ffffff;
   --pill-actif-ombre: 0 3px 12px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.35);
   --dot-anneau: var(--card-solid);
@@ -273,7 +280,7 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
 .theme-btn:hover { color: var(--accent-2); background: var(--capsule-hover); }
 .theme-btn:active { transform: scale(0.97); }
 .theme-btn.ico-btn.on {
-  color: var(--brand-ink); background: var(--brand);
+  color: var(--brand-ink); background: var(--brand-fond);
   box-shadow: 0 4px 14px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.35);
 }
 /* Point « live » : une onde à chaque publication reçue (classe .ping posée par le JS),
@@ -744,7 +751,7 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
 .strat-btn {
   padding: 5px 10px; cursor: pointer;
   font-family: var(--font); font-size: 11px; font-weight: 700; letter-spacing: 0.2px;
-  color: var(--brand-ink); background: var(--brand);
+  color: var(--brand-ink); background: var(--brand-fond);
   border: 1px solid transparent; border-radius: var(--r-bar);
   box-shadow: var(--capsule-ombre);
   transition: transform .1s ease, box-shadow .15s ease;
@@ -874,6 +881,11 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
   .strat-col-actions .strat-btn { font-size: 9px; padding: 6px; }
   .strat-section .strat-row label { min-width: 45px; font-size: 9px; }
 }
+
+/* Thème à structure : invisible tant que js/structures.js ne l'a pas posée (filet 2,5 s dans
+   le script de tête). Évite d'afficher un instant la structure de base. */
+html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hidden; }
+.theme-structure { font-size: 10px; font-weight: 600; color: var(--ink-3); }
 
 /* ─── Légendes (js/fiches.js) ───────────────────────────────────────────────────
    Le MODE de lecture n'est qu'une classe sur <html> : le HTML est le même dans les deux

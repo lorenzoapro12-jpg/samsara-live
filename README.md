@@ -2,7 +2,7 @@
 
 Dashboard BTC en fichiers statiques, sans build ni dépendance : servi tel quel par GitHub
 Pages, il s'ouvre dans un navigateur et se rafraîchit tout seul depuis des sources publiques.
-Plusieurs thèmes, choisis à la volée (bouton palette, touche T).
+Cinq thèmes, choisis à la volée (bouton palette, touche T) — dont deux qui changent aussi la structure de la page.
 
 **Ce dépôt est complet** : la page, les deux producteurs et TOUS leurs calculs. Depuis le
 06/10/2026, aucun bloc de `market-data.json` ne dépend plus d'un module hors dépôt — chaque
@@ -82,6 +82,39 @@ Le temps réel à 100 ms (flux WebSocket) n'est **pas** construit : il dépend d
 réseau à lancer depuis le poste qui affichera la carte. Harnais : `tests/test_bookmap.js`
 (calculs, hors ligne) et `tests/test_bookmap_rendu.js` (rendu réel dans Chromium, Binance
 simulé ; « non exécuté » sans Playwright).
+
+## Thèmes : l'habillage ET la structure
+
+Cinq thèmes (bouton palette, touche T) : **Aero**, **Aero nuit**, **Kāla**, et deux thèmes qui
+changent aussi la **structure** de la page :
+
+- **Néon** (cyberpunk, structure « poste de pilotage ») : chiffres clés dans une bande de
+  télémétrie, panneau du marché en rail à gauche, console d'indicateurs sous le graphique,
+  coins de visée, balayage, titre qui « glitche » ; typographie d'écran.
+- **Codex** (médiéval, structure « manuscrit ») : frontispice à lettrine enluminée, registre des
+  chiffres clés, deux folios (la chronique au verso, la carte au recto) et leur reliure,
+  colophon ; parchemin, rubriques au vermillon, hausse au lapis, baisse au vermillon.
+
+Une structure (`js/structures.js`) DÉPLACE les nœuds existants (identifiants et gestionnaires
+inchangés) et ajoute du décor muet ; quitter le thème rend la page nœud pour nœud.
+`tests/test_structures.js` vérifie, sur bureau et sur téléphone, qu'aucune valeur ni aucun âge
+visible dans la structure de base ne disparaît, et la réversibilité.
+
+**Le contrat de performance a été révisé en le mesurant.** Les feuilles de structure gardent
+leurs interdits (flou, fusion, animation infinie). Une feuille de thème peut s'en servir si elle
+tient son budget d'image : `tests/test_budget.js` mesure, dans Chromium, le temps du thread
+principal au repos et par image pendant un glissement du graphique, contre le thème de référence
+(Kāla), et consigne le résultat avec l'empreinte de la feuille (`tests/budget-themes.json`).
+Deux contre-épreuves (une animation qui repeint, un flou sur le graphique) doivent être refusées,
+sinon c'est la mesure qui est aveugle. Sans navigateur, `tests/test_contrat.py` exige une mesure
+à jour, des animations infinies limitées à `transform` / `opacity`, et leur arrêt sous
+`prefers-reduced-motion`.
+
+**Polices** : sous-ensembles SIL OFL servis depuis `fonts/` (et non en `data:`) — le navigateur
+ne télécharge une police que si son thème est affiché, alors qu'une police en `data:` dans la
+feuille du thème serait téléchargée par TOUS les visiteurs (les feuilles de thème sont toutes
+chargées). Même origine, aucune ressource externe. `fonts/fabriquer.py` les refait ;
+`fonts/LISEZMOI.txt` dit ce qui a été modifié et pourquoi trois d'entre elles sont renommées.
 
 ## Réglages d'affichage
 
