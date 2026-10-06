@@ -83,15 +83,26 @@ async function ouvrir(nav, theme, vue) {
 /** Pour chaque cible : combien d'éléments existent, combien sont réellement visibles. */
 async function visibles(page) {
   return page.evaluate(CIBLES => {
+    // Visible = une partie de l'élément, dans l'intersection de l'écran et de TOUS ses
+    // conteneurs à défilement, n'est recouverte par rien. Un élément plus haut que son
+    // conteneur (la carte Microstructure dépasse le panneau) se juge sur sa partie visible —
+    // sonder son centre, hors du panneau, le déclarait à tort « caché » (06/10/2026).
     const vu = el => {
       if (!el) return false;
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) < 0.1) return false;
-      el.scrollIntoView({ block: 'center', inline: 'center' });
+      el.scrollIntoView({ block: 'start', inline: 'nearest' });
       const r = el.getBoundingClientRect();
       if (r.width < 2 || r.height < 2) return false;
-      const x = Math.min(window.innerWidth - 1, Math.max(0, r.left + r.width / 2)), y = Math.min(window.innerHeight - 1, Math.max(0, r.top + Math.min(r.height / 2, 12)));
-      if (r.right < 0 || r.bottom < 0 || r.left > window.innerWidth || r.top > window.innerHeight) return false;
+      let g = Math.max(0, r.left), h = Math.max(0, r.top), d = Math.min(window.innerWidth, r.right), b = Math.min(window.innerHeight, r.bottom);
+      for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+        const ca = getComputedStyle(a);
+        if (ca.overflowX === 'visible' && ca.overflowY === 'visible') continue;
+        const ra = a.getBoundingClientRect();
+        g = Math.max(g, ra.left); h = Math.max(h, ra.top); d = Math.min(d, ra.right); b = Math.min(b, ra.bottom);
+      }
+      if (d - g < 2 || b - h < 2) return false;
+      const x = (g + d) / 2, y = h + Math.min((b - h) / 2, 12);
       const dessus = document.elementFromPoint(x, y);
       return !!dessus && (dessus === el || el.contains(dessus) || dessus.contains(el));
     };
