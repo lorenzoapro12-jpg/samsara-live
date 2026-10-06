@@ -48,6 +48,8 @@ DT = 60           # secondes par colonne (1 min)
 DP = 20.0         # $ par bin de prix
 WINDOW_S = 24 * 3600
 REF = 100.0       # qty BTC de référence pour l'échelle d'intensité
+PLAFOND = 255     # intensité maximale (atteinte dès q ≥ REF)
+NIVEAUX = 5000    # niveaux de carnet demandés à Binance (le maximum de l'API)
 # Intervalle minimal entre deux publications. Mesuré le 04/10/2026 : à 120 s, ce fichier
 # (≈ 2,1 Mo de JSON, recompressé à ≈ 440 Ko par git) produisait **574 commits par jour**,
 # soit ≈ 250 Mo d'historique quotidien — pour une fenêtre **glissante** de 24 h dont les
@@ -70,7 +72,7 @@ def dump_atomic(obj, path):
 
 
 def fetch_depth():
-    url = "https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit=5000"
+    url = f"https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit={NIVEAUX}"
     req = urllib.request.Request(url, headers={"User-Agent": "Heatmap/1.0"})
     with urllib.request.urlopen(req, timeout=15) as r:
         return json.loads(r.read())
@@ -132,6 +134,36 @@ def git_publish_heatmap(updated_iso):
         raise RuntimeError("push impossible après 3 essais")
 
 
+def intensite(q):
+    """Quantité (BTC) -> intensité 0..PLAFOND. Racine : un mur de 4× pèse 2× à l'œil."""
+    return min(PLAFOND, int(PLAFOND * math.sqrt(q / REF)))
+
+
+def encodage():
+    """Ce qu'est une cellule, PUBLIÉ avec les cellules (06/10/2026).
+
+    Une cellule n'est PAS une quantité : la page qui la lit doit savoir la décoder, et ne
+    doit pas recopier REF chez elle — une constante recopiée diverge en silence le jour où
+    on la change ici. Construit depuis les constantes : il ne peut pas les contredire.
+    """
+    return {
+        "valeur": f"min({PLAFOND}, ent({PLAFOND} × √(q / ref)))",
+        "q": ("quantité du plus gros NIVEAU DE PRIX de la tranche, en BTC — un niveau peut "
+              "réunir plusieurs ordres posés au même prix"),
+        "ref_btc": REF,
+        "plafond": PLAFOND,
+        "sature_des_btc": REF,
+        "seuil_btc": round(REF / PLAFOND ** 2, 6),
+        "decodage": "q ∈ [ref × (v / plafond)², ref × ((v + 1) / plafond)²[ ; v = plafond : q ≥ ref (saturé)",
+        "agregation_tranche": "max",
+        "fusion": ("tranches ou colonnes voisines : prendre le MAX (exact : √ est croissante) ; "
+                   "jamais la somme (une somme d'intensités n'a pas d'unité)"),
+        "instantane": f"un carnet complet ({NIVEAUX} niveaux) lu une fois par colonne de {DT} s",
+        "niveaux": NIVEAUX,
+        "couverture": f"bande vue par {NIVEAUX} niveaux (≈ ±1 %) : hors de cette bande, « non observé », pas « vide »",
+    }
+
+
 def publish(state):
     cols = sorted(int(k) for k in state.keys())
     if not cols:
@@ -146,6 +178,7 @@ def publish(state):
     data = {
         "updated": datetime.now(timezone.utc).isoformat(),
         "sym": "BTCUSDT", "t0": t0, "dt": DT, "dp": DP,
+        "encodage": encodage(),
         "bids": bids, "asks": asks,
     }
     dump_atomic(data, OUT)
@@ -186,7 +219,7 @@ def main():
     cells = {"b": {}, "a": {}}
     for key in ("b", "a"):
         for pb, q in bins[key].items():
-            v = min(255, int(255 * math.sqrt(q / REF)))
+            v = intensite(q)
             if v >= 1:
                 cells[key][pb] = v
     state[str(col)] = cells

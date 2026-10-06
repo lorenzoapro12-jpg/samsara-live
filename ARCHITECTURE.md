@@ -6,7 +6,7 @@
                        api.binance.com ──────────────┐   (spot, klines 5 min, carnet)
                        fapi.binance.com ─────────────┤
                        Deribit (options) ────────────┤   (GEX : options_gex.py)
-                       Coinbase · Yahoo ─────────────┤   (via modules hors dépôt)
+                       Coinbase · Yahoo ─────────────┤   (prime, DXY, VIX : publish.py)
                                                       ▼
                                               publish.py  ──▶ market-data.json ──┐
                                                                                 │
@@ -57,19 +57,20 @@ des seuils de refus à 30 et 10 min).
 
 ## Les 8 blocs de `market-data.json`
 
-| Bloc | Source | Dépendance hors dépôt |
+| Bloc | Source | Calcul |
 |---|---|---|
 | `btc_spot` | Binance `api` | — |
-| `indicators` | Binance klines 4h/1h/1d | `fetch_macro` |
-| `macro` | DXY, VIX | `fetch_macro` |
+| `indicators` | Binance klines 4h/1h/1d | `indicateurs.py` |
+| `macro` | DXY, VIX (Yahoo) | `publish.py` |
 | `micro_futures` | Binance `fapi` | — |
 | `cvd` | Binance klines 5 min (achats taker vs total) | — |
 | `gex` | Deribit, calcul dans `options_gex.py` | — |
-| `premium` | Coinbase vs Binance | `scenario_engine` |
+| `premium` | Coinbase vs Binance (+ USDT-USD) | `publish.py` |
 | `liquidity` | Binance carnet (5 000 niveaux), en BTC | — |
 
-Cinq blocs sur huit tournent partout sans configuration. Les trois autres se branchent
-par `extra_module_paths` dans `config.local.json`.
+Les huit blocs tournent dans un clone nu, sans configuration (depuis le 06/10/2026).
+Chaque champ est décrit dans `meta.champs`, construit avec les constantes du calcul et
+vérifié par `tests/test_meta.py` : une légende ne se rédige plus à côté du code.
 
 ### Unités et fenêtres — à lire avant de comparer deux chiffres
 
@@ -173,8 +174,41 @@ Deux harnais, deux régimes :
 version périmée et échouent sur des contrôles déjà corrigés — faux échec vécu.
 
 Deux harnais hors ligne gardent l'apparence et la vitesse : `test_palette.py` mesure chaque
-thème déclaré, `test_contrat.py` fait tenir les règles de la page (thèmes, verre, pas
-d'animation infinie ni de `mix-blend-mode`, aucune ressource externe).
+thème déclaré (dont le texte posé sur un dégradé, à chaque borne), `test_contrat.py` fait
+tenir les règles de la page (thèmes, verre, réseau, et le budget d'image — voir plus bas).
+
+---
+
+## Les pages et leurs fichiers (06/10/2026)
+
+```
+index.html (terminal)                      bookmap.html (carte, page à côté)
+  js/structures.js  structure du thème        js/bookmap-calc.js  calculs purs
+  js/fiches.js      légendes, mode            js/bookmap.js       interface
+  js/reglages.js    réglages d'affichage      css/bookmap.css
+  js/app.js         le terminal
+  css/app.css + themes/*.css (+ fonts/)
+```
+
+La carte ne charge rien du terminal ; le terminal n'y fait qu'un lien. Les deux lisent les
+mêmes fichiers publiés et n'appellent que Binance et GitHub Raw (`test_contrat.py`, toutes
+pages).
+
+**Trois règles transverses, chacune tenue par un harnais :**
+
+| Règle | Où | Harnais |
+|---|---|---|
+| Une légende se DÉRIVE du code qui calcule | `meta.champs` (serveur), `PARAM` (page) | `test_meta.py`, `test_fiches.js` |
+| Un réglage change le détail, jamais la valeur ; les constantes du fichier sont lues | `js/reglages.js` | `test_reglages.js` |
+| Fusionner, jamais affiner : une intensité de heatmap se fusionne par MAX | carte, graphique | `test_bookmap.js`, `test_reglages.js` |
+| Un thème peut changer la structure, pas faire disparaître une valeur ou son âge | `js/structures.js` | `test_structures.js` |
+| Un effet visuel coûteux se paie dans un budget MESURÉ | feuilles de thème | `test_budget.js`, `test_contrat.py` |
+
+**Le budget d'image.** `test_budget.js` mesure, dans Chromium, le temps du thread principal au
+repos (ms par seconde) et par image pendant un glissement du graphique, pour chaque thème,
+contre le thème de référence, sur la même machine. Seuls les rapports voyagent d'une machine
+à l'autre. Deux contre-épreuves (une animation qui repeint, un flou sur le graphique) doivent
+sortir du budget : c'est la preuve que la mesure voit ce que l'ancienne règle interdisait.
 
 ---
 
@@ -185,5 +219,6 @@ d'animation infinie ni de `mix-blend-mode`, aucune ressource externe).
   harnais de l'exécuter tel quel dans node.
 - **La heatmap ne se recalcule pas.** Elle s'accumule. Redémarrer l'accumulateur repart
   d'une fenêtre vide qu'il faut 24 h à remplir.
-- **Deux secrets de conception restent hors dépôt** : la base CVD et les modules d'accès
-  aux sources non-Binance. Le dépôt le dit à l'exécution plutôt que d'échouer en silence.
+- **Plus aucun calcul hors dépôt** (06/10/2026) : indicateurs, DXY / VIX et prime sont
+  calculés ici. `publish.py --comparer` vérifie la parité avec les anciens modules sur la
+  machine qui les a encore.

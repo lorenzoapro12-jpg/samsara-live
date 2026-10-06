@@ -1,0 +1,250 @@
+/* Thème « Néon » — cyberpunk. Une ville la nuit vue d'un poste de pilotage : noir violacé,
+   néons cyan et magenta, jaune acide pour les alertes ; typographie d'écran (titres
+   géométriques, chiffres à chasse fixe) ; lignes de balayage, coins de visée, titre qui
+   « glitche ». STRUCTURE propre : « hud » (js/structures.js) — chiffres clés en bande de
+   télémétrie, panneau du marché en rail à gauche, console d'indicateurs sous le graphique.
+   Déclaré dans index.html : <link data-theme="neon" data-mode="sombre" data-verre="aucun"
+   data-structure="hud">.
+
+   EFFETS ET BUDGET — MESURÉS (tests/test_budget.js, 06/10/2026). La première version animait
+   à l'infini (balayage, point live, glitch), en `transform` / `opacity` seulement, sur l'idée
+   que le compositeur les jouerait « gratuitement ». La mesure de TOUS les processus l'a
+   démentie : 950 ms de CPU par seconde AU REPOS (×35 le thème de référence) — tant qu'une
+   animation tourne, la page est recomposée 60 fois par seconde. Les effets sont donc liés à
+   un ÉVÉNEMENT : le balayage passe quand une nouvelle publication arrive, le titre glitche à
+   l'application du thème et au survol, le point live pulse à chaque mise à jour. Au repos,
+   plus rien ne bouge. Tout s'arrête sous prefers-reduced-motion. */
+
+@font-face {
+  font-family: 'Samsara Neon Titre';
+  src: url('../fonts/neon-titre.woff2') format('woff2');
+  font-weight: 400 900; font-display: swap;
+}
+@font-face {
+  font-family: 'Samsara Neon Chiffres';
+  src: url('../fonts/neon-chiffres.woff2') format('woff2');
+  font-weight: 400; font-display: swap;
+}
+
+[data-theme="neon"] {
+  color-scheme: dark;
+  --font: 'Samsara Neon Chiffres', ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, monospace;
+  --police-titre: 'Samsara Neon Titre', 'Samsara Neon Chiffres', ui-monospace, sans-serif;
+  --r-bar: 4px; --r-panel: 6px; --r-card: 4px; --r-tile: 3px;
+
+  /* Fond : nuit violette, deux halos de néon, un sol en grille qui fuit vers l'horizon. Statique. */
+  --fond:
+    radial-gradient(60% 45% at 85% -10%, rgba(255,43,214,0.22) 0%, rgba(255,43,214,0) 70%),
+    radial-gradient(55% 40% at 5% -5%, rgba(0,229,255,0.20) 0%, rgba(0,229,255,0) 70%),
+    radial-gradient(80% 40% at 50% 115%, rgba(120,40,255,0.30) 0%, rgba(120,40,255,0) 70%),
+    linear-gradient(180deg, #05010d 0%, #07021a 55%, #0c0328 100%);
+  --trame:
+    linear-gradient(to right, rgba(0,229,255,0.10) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0,229,255,0.10) 1px, transparent 1px),
+    linear-gradient(to right, rgba(255,43,214,0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,43,214,0.08) 1px, transparent 1px);
+  --trame-opacite: 0.5;
+  --verre: none;
+
+  --surface: rgba(8,4,22,0.92);
+  --surface-ombre: 0 0 0 1px rgba(0,229,255,0.28), 0 0 22px -6px rgba(0,229,255,0.35), inset 0 0 30px -18px rgba(255,43,214,0.45);
+  --surface-reflet: linear-gradient(90deg, rgba(0,229,255,0.9), rgba(255,43,214,0.9) 60%, rgba(245,255,59,0.8));
+  --capsule: rgba(0,229,255,0.07);
+  --capsule-hover: rgba(0,229,255,0.16);
+  --capsule-ombre: inset 0 0 0 1px rgba(0,229,255,0.40);
+  --pill: transparent;
+  --pill-hover: rgba(255,43,214,0.12);
+  --pill-actif: rgba(0,229,255,0.16);
+  --pill-actif-ink: #b8f7ff;
+  --pill-actif-ombre: inset 0 0 0 1px rgba(0,229,255,0.75), 0 0 14px -2px rgba(0,229,255,0.65);
+  --dot-anneau: #07021a;
+  --poignee: rgba(255,43,214,0.06);
+  --poignee-hover: rgba(255,43,214,0.14);
+
+  --ink-1: #ecfbff; --ink-2: #b5c8e8; --ink-3: #8d9cc4;
+  --up: #22e6ff; --down: #ff4fa3;
+  --up-ink: #5cf0ff; --down-ink: #ff7ab9;
+  --up-soft: rgba(34,230,255,0.13); --down-soft: rgba(255,79,163,0.15);
+  --warn: #f5ff3b; --warn-ink: #f5ff3b; --warn-soft: rgba(245,255,59,0.12);
+  --accent: #22e6ff; --accent-2: #ff4fd8;
+  --brand: linear-gradient(90deg, #22e6ff 0%, #ff4fd8 55%, #f5ff3b 100%);
+  --brand-ink: #05010d;
+  --accent-glow: rgba(34,230,255,0.45);
+  --hairline: rgba(34,230,255,0.22);
+  --rail: rgba(34,230,255,0.07);
+
+  --card: rgba(10,5,26,0.92);
+  --card-solid: #0b0618;
+  --card-edge: rgba(34,230,255,0.30);
+  --card-shadow: 0 0 0 1px rgba(255,79,216,0.10), 0 10px 30px -18px rgba(0,0,0,0.9);
+  --card-hi: rgba(34,230,255,0.10);
+  --card-reflet: none;
+  --forward: linear-gradient(135deg, #22e6ff, #0090b0);
+  --modal-fond: #07021a;
+  --modal-ombre: 0 0 0 1px rgba(34,230,255,0.35), 0 20px 50px -20px rgba(0,0,0,0.95);
+  --ombre-douce: 0 0 12px rgba(34,230,255,0.25);
+  --selection: rgba(255,79,216,0.35);
+  --defil: rgba(34,230,255,0.25);
+  --defil-hover: rgba(34,230,255,0.45);
+  --prix-lueur: 0 0 12px rgba(34,230,255,0.55), 0 0 2px rgba(34,230,255,0.9);
+
+  /* Graphique */
+  --chart-1: #04010b; --chart-2: #06021a; --chart-3: #0a0322;
+  --chart-lueur:
+    linear-gradient(transparent 0 97%, rgba(34,230,255,0.06) 97% 100%),
+    radial-gradient(60% 40% at 50% 100%, rgba(255,79,216,0.08) 0%, rgba(255,79,216,0) 70%);
+  --chart-creux: inset 0 0 0 1px rgba(34,230,255,0.18);
+  --chart-surface: #06021a;
+  --grille: rgba(34,230,255,0.07);
+  --reticule: rgba(245,255,59,0.55);
+  --bulle: rgba(7,2,26,0.96);
+  --filigrane: 0.04;
+  --vol-alpha: 0.6;
+  --bande-alpha: 0.10;
+  --aura: 0.16;
+  --ov-ema20: #f5ff3b; --ov-ema50: #22e6ff; --ov-ema100: #ff9d2e;
+  --ov-ema200: #b98cff; --ov-sma20: #ff4fd8; --ov-sma50: #4dff8a;
+  --ov-bb: #8d9cc4; --ov-vwap: #ffd23b; --ov-sar: #22e6ff;
+  --ov-ichi-t: #22e6ff; --ov-ichi-k: #ff4fd8;
+  --s-rsi: #b98cff; --s-macd: #f5ff3b; --s-signal: #ff9d2e;
+  --s-stoch-k: #f5ff3b; --s-stoch-d: #ff9d2e; --s-atr: #22e6ff;
+  --s-obv: #22e6ff; --s-mfi: #b98cff; --s-wr: #22e6ff; --s-cci: #ff9d2e;
+  --s-adx: #f5ff3b; --s-equity: #4dff8a;
+  --sess-asie: rgba(245,255,59,0.75);
+  --sess-europe: rgba(34,230,255,0.75);
+  --sess-us: rgba(255,79,216,0.75);
+  --sr-1: #b98cff; --sr-2: #22e6ff; --sr-3: #f5ff3b;
+  --fib: #ffd23b; --vp: #22e6ff; --vp-poc: #f5ff3b;
+}
+
+/* ── Typographie ── */
+[data-theme="neon"] .header-left h1,
+[data-theme="neon"] .demon-name,
+[data-theme="neon"] .modal-titre,
+[data-theme="neon"] .fiche-titre,
+[data-theme="neon"] .feed-panel-handle,
+[data-theme="neon"] .strat-handle { font-family: var(--police-titre); letter-spacing: 0.08em; text-transform: uppercase; }
+[data-theme="neon"] .header-left h1 { font-size: 18px; font-weight: 800; }
+[data-theme="neon"] .price-badge,
+[data-theme="neon"] .kpi b,
+[data-theme="neon"] .tuile .val,
+[data-theme="neon"] .hero-val { font-family: 'Samsara Neon Chiffres', ui-monospace, monospace; letter-spacing: 0; }
+
+/* ── Surfaces : coins biseautés, filet de néon ── */
+/* Le cadre du GRAPHIQUE n'est pas biseauté : mesuré (06/10/2026), le clip-path sur le conteneur
+   du canvas coûtait à lui seul ×1,43 le CPU de référence pendant un glissement (le masque est
+   réappliqué à chaque image) ; retiré, ×1,00. Sur les autres surfaces, il ne coûte rien de
+   mesurable. Le graphique garde ses coins de visée. */
+[data-theme="neon"] .header,
+[data-theme="neon"] .indicator-bar,
+[data-theme="neon"] .feed-panel,
+[data-theme="neon"] .strat-section,
+[data-theme="neon"] .aero-taskbar,
+[data-theme="neon"] .hud-bande {
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+[data-theme="neon"] .demon-card {
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  border-color: var(--card-edge);
+}
+[data-theme="neon"] .demon-card::after { left: 0; right: auto; width: 46%; height: 2px; opacity: 1;
+  background: linear-gradient(90deg, var(--teinte), transparent); }
+[data-theme="neon"] .avatar-orb {
+  width: 30px; height: 30px; border-radius: 3px; color: var(--teinte);
+  background: rgba(34,230,255,0.06); border: 1px solid var(--teinte); box-shadow: 0 0 10px -2px var(--teinte);
+}
+[data-theme="neon"] .avatar-orb::after { display: none; }
+[data-theme="neon"] .avatar-orb svg { filter: none; }
+[data-theme="neon"] .carte-marche { --teinte: #22e6ff; } [data-theme="neon"] .carte-macro { --teinte: #4dff8a; }
+[data-theme="neon"] .carte-ind { --teinte: #b98cff; }    [data-theme="neon"] .carte-micro { --teinte: #ff4fd8; }
+[data-theme="neon"] .carte-liq { --teinte: #22e6ff; }    [data-theme="neon"] .carte-flux { --teinte: #f5ff3b; }
+[data-theme="neon"] .carte-live { --teinte: #f5ff3b; }   [data-theme="neon"] .carte-tape { --teinte: #22e6ff; }
+[data-theme="neon"] .carte-temps { --teinte: #b98cff; }
+[data-theme="neon"] .header-orb {
+  width: 28px; height: 28px; border-radius: 4px; transform: rotate(45deg);
+  --orbe: conic-gradient(from 0deg, #22e6ff, #ff4fd8, #f5ff3b, #22e6ff);
+  --orbe-ombre: 0 0 14px rgba(34,230,255,0.7), 0 0 4px rgba(255,79,216,0.9);
+}
+
+/* ── Lignes de balayage : une image fixe, composée une fois (pas d'animation). ── */
+[data-theme="neon"] body::before {
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,0.22) 0 1px, transparent 1px 3px);
+  background-size: auto; opacity: 0.5;
+}
+
+/* ── Structure « hud » : bande de télémétrie, rail à gauche, console sous le graphique ── */
+[data-theme="neon"] .hud-bande {
+  position: relative; flex-shrink: 0; display: flex; align-items: center; gap: 12px;
+  padding: 4px 16px 4px 12px; background: var(--surface); box-shadow: var(--surface-ombre);
+}
+[data-theme="neon"] .hud-bande .kpis { flex: 1; height: 34px; }
+[data-theme="neon"] .hud-bande-tag {
+  flex-shrink: 0; font: 700 10px/1 var(--police-titre); letter-spacing: 0.18em; color: var(--accent-2);
+  padding: 5px 8px; border: 1px solid var(--accent-2); text-shadow: 0 0 6px rgba(255,79,216,0.7);
+}
+[data-theme="neon"][data-structure="hud"] .kpi { border-left-color: rgba(34,230,255,0.25); }
+[data-theme="neon"][data-structure="hud"] .kpi b { color: var(--accent); text-shadow: 0 0 8px rgba(34,230,255,0.45); }
+[data-theme="neon"][data-structure="hud"] .kpi b.stat-neg { color: var(--down-ink); text-shadow: 0 0 8px rgba(255,79,163,0.45); }
+[data-theme="neon"][data-structure="hud"] .kpi b.stat-pos { color: var(--up-ink); }
+[data-theme="neon"][data-structure="hud"] .feed-panel-handle { border-right: 0; border-left: 1px solid var(--hairline); order: 2; }
+[data-theme="neon"][data-structure="hud"] .feed-panel-handle::after { left: auto; right: 0; }
+[data-theme="neon"][data-structure="hud"] .indicator-bar { order: 0; }
+
+/* Coins de visée et balayage du graphique (décor, sans interaction). */
+[data-theme="neon"] .hud-coin {
+  position: absolute; z-index: 3; width: 18px; height: 18px; pointer-events: none;
+  border: 0 solid var(--accent); filter: none;
+}
+[data-theme="neon"] .hud-coin-hg { left: 6px; top: 6px; border-left-width: 2px; border-top-width: 2px; }
+[data-theme="neon"] .hud-coin-hd { right: 6px; top: 6px; border-right-width: 2px; border-top-width: 2px; }
+[data-theme="neon"] .hud-coin-bg { left: 6px; bottom: 6px; border-left-width: 2px; border-bottom-width: 2px; }
+[data-theme="neon"] .hud-coin-bd { right: 6px; bottom: 6px; border-right-width: 2px; border-bottom-width: 2px; border-color: var(--accent-2); }
+/* Le balayage : un trait lumineux qui descend UNE fois, quand une nouvelle publication arrive
+   (js/structures.js pose .actif). Hors de ce passage, il n'existe pas pour le compositeur. */
+[data-theme="neon"] .hud-balayage {
+  position: absolute; z-index: 2; left: 16px; right: 16px; top: 16px; height: 2px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(34,230,255,0.55), transparent);
+  display: none;
+}
+[data-theme="neon"] .hud-balayage.actif { display: block; animation: neon-balayage 2.5s linear 1 both; }
+@keyframes neon-balayage { from { transform: translateY(0); opacity: 0.0; } 8% { opacity: 1; } 92% { opacity: 1; } to { transform: translateY(62vh); opacity: 0; } }
+
+/* Le titre « glitche » : deux copies décalées (cyan / magenta) qui sautent par paliers. */
+[data-theme="neon"] .header-left h1[data-glitch] { position: relative; background: none; -webkit-text-fill-color: currentColor; color: var(--ink-1);
+  text-shadow: 0 0 10px rgba(34,230,255,0.6); }
+/* Le titre glitche deux fois à l'application du thème, puis au survol — jamais en boucle. */
+[data-theme="neon"] .header-left h1[data-glitch]::before,
+[data-theme="neon"] .header-left h1[data-glitch]::after {
+  content: attr(data-glitch); position: absolute; left: 0; top: 0; pointer-events: none; opacity: 0;
+}
+[data-theme="neon"] .header-left h1[data-glitch]::before { color: #22e6ff; animation: neon-glitch-a 1.8s steps(1) 2; }
+[data-theme="neon"] .header-left h1[data-glitch]::after { color: #ff4fd8; animation: neon-glitch-b 1.8s steps(1) 2; }
+[data-theme="neon"] .header-left h1[data-glitch]:hover::before { animation: neon-glitch-a 0.9s steps(1) 3; }
+[data-theme="neon"] .header-left h1[data-glitch]:hover::after { animation: neon-glitch-b 0.9s steps(1) 3; }
+@keyframes neon-glitch-a { 0%, 55%, 100% { opacity: 0; transform: none; } 60% { opacity: 0.85; transform: translate(-2px, -1px); }
+  70% { opacity: 0.85; transform: translate(2px, 1px); } 80% { opacity: 0; } }
+@keyframes neon-glitch-b { 0%, 62%, 100% { opacity: 0; transform: none; } 66% { opacity: 0.85; transform: translate(2px, 0); }
+  76% { opacity: 0.85; transform: translate(-1px, 1px); } 84% { opacity: 0; } }
+
+/* Point « flux actif » : un néon qui pulse à chaque publication reçue (.ping, posé par la
+   page : deux passages puis le calme). */
+[data-theme="neon"] .refresh-dot { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+[data-theme="neon"] .refresh-dot.ping { animation: neon-respire 1.2s ease-in-out 2; }
+@keyframes neon-respire { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+[data-theme="neon"] .hud-invite { color: var(--accent); margin-right: 8px; font-weight: 700; text-shadow: 0 0 6px rgba(34,230,255,0.8); }
+
+/* Mouvement réduit : tout s'arrête, le décor reste. */
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="neon"] .hud-balayage.actif,
+  [data-theme="neon"] .refresh-dot.ping,
+  [data-theme="neon"] .header-left h1[data-glitch]::before,
+  [data-theme="neon"] .header-left h1[data-glitch]::after { animation: none; }
+  [data-theme="neon"] .hud-balayage { display: none; }
+}
+@media (max-width: 768px) {
+  [data-theme="neon"] .hud-bande { padding: 3px 8px; }
+  [data-theme="neon"] .hud-bande-tag { display: none; }
+  /* Le téléphone masque les chiffres clés de l'en-tête (css/app.css) ; cette structure les
+     garde, dans sa bande, où ils ont la largeur de l'écran. */
+  [data-theme="neon"] .hud-bande .kpis { display: flex; height: 32px; }
+}

@@ -27,7 +27,8 @@ def themes_declares():
     for balise in re.findall(r"<link\b[^>]*\bdata-theme-id=[^>]*>", html):
         a = attributs(balise)
         out.append({"id": a.get("data-theme-id"), "nom": a.get("data-nom"), "mode": a.get("data-mode"),
-                    "verre": a.get("data-verre"), "paire": a.get("data-paire"), "href": a.get("href")})
+                    "verre": a.get("data-verre"), "paire": a.get("data-paire"), "href": a.get("href"),
+                    "structure": a.get("data-structure")})
     return out
 
 
@@ -41,6 +42,16 @@ def regles(css):
         c = css[i]
         if c == "{":
             sel = css[debut_sel:i].strip()
+            if sel.startswith("@keyframes") or sel.startswith("@-webkit-keyframes"):
+                # Les étapes d'une animation (from, 50 %…) ne sont pas des sélecteurs : on saute
+                # le bloc entier. Son NOM est contrôlé à part (préfixé par le thème).
+                prof, k = 1, i + 1
+                while prof and k < n:
+                    prof += {"{": 1, "}": -1}.get(css[k], 0)
+                    k += 1
+                i = k
+                debut_sel = k
+                continue
             if sel.startswith("@"):
                 pile.append(("@", sel))
                 debut_sel = i + 1

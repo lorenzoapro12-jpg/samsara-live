@@ -1,0 +1,92 @@
+{
+ "mesure_le": "2026-10-06T11:36Z",
+ "machine": "linux x64, Chromium headless (rendu logiciel)",
+ "budget": {
+  "reposRapport": 1.6,
+  "gesteRapport": 1.3
+ },
+ "reference": "kala",
+ "themes": {
+  "aero": {
+   "feuille": "themes/aero.css",
+   "empreinte": "4475acb57e3ecc91",
+   "repos_ms_par_s": 70,
+   "geste_ms_par_image": 36,
+   "rapport_repos": 3.231,
+   "rapport_geste": 1.246,
+   "principal_repos_ms_par_s": 7.5,
+   "principal_geste_ms_par_image": 11.34,
+   "verre": "refraction",
+   "juge": false,
+   "dans_le_budget": false
+  },
+  "aero-nuit": {
+   "feuille": "themes/aero-nuit.css",
+   "empreinte": "051786497802f721",
+   "repos_ms_par_s": 65,
+   "geste_ms_par_image": 36.11,
+   "rapport_repos": 3,
+   "rapport_geste": 1.25,
+   "principal_repos_ms_par_s": 7.2,
+   "principal_geste_ms_par_image": 10.56,
+   "verre": "refraction",
+   "juge": false,
+   "dans_le_budget": false
+  },
+  "kala": {
+   "feuille": "themes/kala.css",
+   "empreinte": "96fed342f0401bbe",
+   "repos_ms_par_s": 21.7,
+   "geste_ms_par_image": 28.89,
+   "rapport_repos": 1,
+   "rapport_geste": 1,
+   "principal_repos_ms_par_s": 5,
+   "principal_geste_ms_par_image": 10.89,
+   "verre": "aucun",
+   "juge": true,
+   "dans_le_budget": true
+  },
+  "neon": {
+   "feuille": "themes/neon.css",
+   "empreinte": "2b7eb62af3515e4d",
+   "repos_ms_par_s": 26.7,
+   "geste_ms_par_image": 28.78,
+   "rapport_repos": 1.231,
+   "rapport_geste": 0.996,
+   "principal_repos_ms_par_s": 6.8,
+   "principal_geste_ms_par_image": 10.15,
+   "verre": "aucun",
+   "juge": true,
+   "dans_le_budget": true
+  },
+  "codex": {
+   "feuille": "themes/codex.css",
+   "empreinte": "f847dde70f3869a4",
+   "repos_ms_par_s": 25,
+   "geste_ms_par_image": 25.56,
+   "rapport_repos": 1.154,
+   "rapport_geste": 0.885,
+   "principal_repos_ms_par_s": 4.7,
+   "principal_geste_ms_par_image": 8.73,
+   "verre": "aucun",
+   "juge": true,
+   "dans_le_budget": true
+  }
+ },
+ "contre_epreuves": {
+  "animation infinie qui repeint (fond)": {
+   "repos_ms_par_s": 2836.7,
+   "geste_ms_par_image": 166,
+   "rapport_repos": 130.923,
+   "rapport_geste": 5.746,
+   "refusee": true
+  },
+  "flou posé sur le graphique": {
+   "repos_ms_par_s": 41.7,
+   "geste_ms_par_image": 43.33,
+   "rapport_repos": 1.923,
+   "rapport_geste": 1.5,
+   "refusee": true
+  }
+ }
+}

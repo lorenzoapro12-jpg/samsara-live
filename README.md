@@ -2,11 +2,11 @@
 
 Dashboard BTC en fichiers statiques, sans build ni dépendance : servi tel quel par GitHub
 Pages, il s'ouvre dans un navigateur et se rafraîchit tout seul depuis des sources publiques.
-Plusieurs thèmes, choisis à la volée (bouton palette, touche T).
+Cinq thèmes, choisis à la volée (bouton palette, touche T) — dont deux qui changent aussi la structure de la page.
 
-**Ce dépôt est complet pour lire, modifier et tester le dashboard.** Trois blocs de
-données dépendent de modules qui n'y sont pas — c'est documenté et le script le dit
-lui-même à l'exécution (voir « Ce qui n'est pas ici »).
+**Ce dépôt est complet** : la page, les deux producteurs et TOUS leurs calculs. Depuis le
+06/10/2026, aucun bloc de `market-data.json` ne dépend plus d'un module hors dépôt — chaque
+champ publié est décrit dans `meta` par le code qui le calcule (voir « Les légendes »).
 
 ---
 
@@ -57,6 +57,103 @@ sont restreints par certains navigateurs : un serveur local est préférable.
 
 ---
 
+## La carte : `bookmap.html`
+
+Une seconde page, **à côté** du terminal (qu'elle ne modifie pas et dont elle ne charge aucun
+code) : la carte de liquidité, comme un trader garde ses OHLCV et sa bookmap ouvertes.
+
+- **Axe vertical en dollars**, axe horizontal le temps. La chaleur est la carte publiée
+  (`heatmap.json`, 1 min × 20 $, 24 h), prolongée par un carnet **live** lu par la page
+  (100 à 5 000 niveaux, toutes les 1 à 10 s, tranche de 1 à 20 $).
+- Le **prix est une ligne sur la chaleur** (clôtures 1 min, puis exécutions à la seconde),
+  avec le meilleur bid / ask en marches ; les **exécutions** sont des bulles (achats / ventes
+  au marché) ; les **murs** et le **gamma** du fichier de 15 min partent de leur instant de
+  lecture ; un carnet latéral, un profil des exécutions, le volume et le CVD par minute.
+- **Trois horloges, une surface** : chaque calque porte son âge SUR la carte (pastilles), et
+  ce qui n'a pas été observé est hachuré — ce n'est pas « vide ».
+- **Réglages** (palette, contraste, fusion, profondeur live, bulles) : ils changent le
+  détail, jamais la valeur. La fusion de la carte publiée prend le **MAX** (on fusionne,
+  on n'affine jamais) ; la lecture au pointeur décode l'intensité en BTC avec l'`encodage`
+  PUBLIÉ par `heatmap.py` — sans lui, la carte affiche des intensités et le dit.
+- Gestes : glisser, molette (temps ; Maj ou sur l'axe : prix), pincer, double-clic ou R
+  (vue par défaut), F (suivre), L (légende).
+
+Le temps réel à 100 ms (flux WebSocket) n'est **pas** construit : il dépend d'une sonde
+réseau à lancer depuis le poste qui affichera la carte. Harnais : `tests/test_bookmap.js`
+(calculs, hors ligne) et `tests/test_bookmap_rendu.js` (rendu réel dans Chromium, Binance
+simulé ; « non exécuté » sans Playwright).
+
+## Thèmes : l'habillage ET la structure
+
+Cinq thèmes (bouton palette, touche T) : **Aero**, **Aero nuit**, **Kāla**, et deux thèmes qui
+changent aussi la **structure** de la page :
+
+- **Néon** (cyberpunk, structure « poste de pilotage ») : chiffres clés dans une bande de
+  télémétrie, panneau du marché en rail à gauche, console d'indicateurs sous le graphique,
+  coins de visée, balayage, titre qui « glitche » ; typographie d'écran.
+- **Codex** (médiéval, structure « manuscrit ») : frontispice à lettrine enluminée, registre des
+  chiffres clés, deux folios (la chronique au verso, la carte au recto) et leur reliure,
+  colophon ; parchemin, rubriques au vermillon, hausse au lapis, baisse au vermillon.
+
+Une structure (`js/structures.js`) DÉPLACE les nœuds existants (identifiants et gestionnaires
+inchangés) et ajoute du décor muet ; quitter le thème rend la page nœud pour nœud.
+`tests/test_structures.js` vérifie, sur bureau et sur téléphone, qu'aucune valeur ni aucun âge
+visible dans la structure de base ne disparaît, et la réversibilité.
+
+**Le contrat de performance a été révisé en le mesurant.** Les feuilles de structure gardent
+leurs interdits (flou, fusion, animation infinie). Une feuille de thème peut s'en servir si elle
+tient son budget d'image : `tests/test_budget.js` mesure, dans Chromium, le temps du thread
+principal au repos et par image pendant un glissement du graphique, contre le thème de référence
+(Kāla), et consigne le résultat avec l'empreinte de la feuille (`tests/budget-themes.json`).
+Deux contre-épreuves (une animation qui repeint, un flou sur le graphique) doivent être refusées,
+sinon c'est la mesure qui est aveugle. Sans navigateur, `tests/test_contrat.py` exige une mesure
+à jour, des animations infinies limitées à `transform` / `opacity`, et leur arrêt sous
+`prefers-reduced-motion`.
+
+**Polices** : sous-ensembles SIL OFL servis depuis `fonts/` (et non en `data:`) — le navigateur
+ne télécharge une police que si son thème est affiché, alors qu'une police en `data:` dans la
+feuille du thème serait téléchargée par TOUS les visiteurs (les feuilles de thème sont toutes
+chargées). Même origine, aucune ressource externe. `fonts/fabriquer.py` les refait ;
+`fonts/LISEZMOI.txt` dit ce qui a été modifié et pourquoi trois d'entre elles sont renommées.
+
+## Réglages d'affichage
+
+Bouton **Réglages** de l'en-tête. Ils changent le niveau de DÉTAIL, jamais une valeur : un
+chiffre affiché garde sa valeur et porte sa bande ou sa tranche.
+
+- **Panneau ⚡** (lu par la page sur Binance, donc libre) : profondeur du carnet (100 à
+  5 000 niveaux — la cadence ralentit avec le poids de la requête), bandes affichées (une
+  bande non couverte par le carnet reçu est dite « non couverte »), nombre de trades, seuils
+  de LECTURE du ratio et des achats au marché (ils choisissent la phrase, pas le chiffre).
+- **Carte « Liquidité »** (fichier de 15 min) : les bandes proposées sont celles que le
+  serveur a PUBLIÉES ; s'il publie le profil du carnet, des bandes supplémentaires s'y
+  calculent « à la tranche près ». La tranche des murs est un multiple de `wall_bin_usd`
+  publié (des sommes regroupées : exact) ; nombre de murs, seuil minimal.
+- **Heatmap du graphique** : fusion des tranches et des colonnes par MAX (on fusionne, on
+  n'affine jamais), seuil d'intensité. En dézoom, la fusion par MAX se fait d'elle-même au
+  pixel : le lissage, qui moyennait et effaçait les murs isolés, est coupé.
+
+`tests/test_reglages.js` le vérifie, y compris avec un fichier aux constantes inhabituelles
+(tranche de 25 $, bandes de 0,2 / 0,7 %) : la page affiche CES valeurs, aucune recopiée.
+
+## Légendes et mode débutant / expert
+
+Chaque indicateur a sa fiche (bouton **i** à côté du chiffre, ou **?** pour le glossaire) :
+une explication simple, la valeur avec son âge, **comment ça se lit** — chaque lecture marquée
+*usuel*, *convention*, *débattu* ou *mesuré* —, ce que ça ne dit pas, et, quand la
+littérature se contredit (GEX, ratio L/S, DXY), la contradiction elle-même.
+
+- La **formule** d'un champ du fichier est lue dans `meta.champs` (publiée par `publish.py`) ;
+  celle d'un indicateur du graphique est construite avec `PARAM` (`js/app.js`), les paramètres
+  mêmes du calcul. Aucune formule n'est rédigée à côté du code.
+- Le mode **Débutant / Expert** (bouton, touche M) n'est qu'une classe : le HTML est identique
+  dans les deux modes, seul le niveau de détail affiché change — jamais une valeur.
+- Une fiche dit comment l'indicateur **se lit**, jamais quoi acheter ou vendre.
+
+`tests/test_fiches.js` fait tenir ces règles : champs décrits par le producteur, libellés et
+formules qui suivent `PARAM` (il le modifie pour le vérifier), aucun nombre réécrit à la main,
+même HTML dans les deux modes, aucun conseil.
+
 ## Configuration
 
 ```bash
@@ -74,7 +171,7 @@ endroit où des chemins de machine ont le droit d'exister.
 | `out_dir` | `repo_dir` | où écrire les JSON publiés |
 | `git_lock` | `<state_dir>/git.lock` | verrou partagé entre les deux écrivains |
 | `git_remote` / `git_branch` | `origin` / `master` | où pousser |
-| `extra_module_paths` | `[]` | modules hors dépôt (voir plus bas) |
+| `extra_module_paths` | `[]` | ne sert plus qu'à `publish.py --comparer` (parité avec d'anciens modules) |
 | `cvd_database` | `null` | **obsolète** (plus lue depuis le 04/10/2026), acceptée pour compatibilité |
 
 ⚠️ **`state_dir` doit rester stable.** Le changer repart d'un état vide : les 24 h de
@@ -173,21 +270,40 @@ Sans le fichier local, le contrôle tourne sur l'exemple et **n'attrape rien** �
 
 ## Ce qui n'est pas ici — et pourquoi
 
-Trois blocs de `market-data.json` dépendent de modules hors dépôt. Sans eux, le
-script tourne, publie le reste, et l'indique dans `status` :
+Plus rien côté calcul. Jusqu'au 05/10/2026, trois blocs (`indicators`, `macro`,
+`premium`) étaient calculés par des modules d'un autre projet : aucun harnais de ce dépôt
+ne pouvait vérifier qu'un libellé décrivait sa formule, et plusieurs mentaient (voir
+`indicateurs.py`). Ils sont désormais calculés ici — `indicateurs.py` pour le bloc `tf`,
+`publish.py` pour le DXY / VIX (Yahoo) et la prime (Coinbase) — avec **parité exacte**
+vérifiée contre les anciens modules :
 
-| Bloc | Dépendance | Source |
-|---|---|---|
-| `indicators`, `macro` | module `fetch_macro` | DXY, VIX, indicateurs multi-échelle |
-| `premium` | module `scenario_engine` | prime Coinbase |
+```bash
+python3 publish.py --comparer   # sur la machine qui a encore les anciens modules
+                                # (extra_module_paths) : aucun fichier écrit, aucun push
+```
 
-Ces modules se branchent via `extra_module_paths` dans `config.local.json`. Deribit,
-Coinbase et Yahoo ne sont pas joignables depuis n'importe quel poste — leur agrégation
-doit rester côté serveur.
+Toutes les sources sont publiques (**Binance**, **Deribit**, **Coinbase**, **Yahoo**) ;
+seules certaines ne sont pas joignables depuis n'importe quel poste, d'où l'agrégation
+côté serveur.
 
-Les cinq autres blocs ne dépendent que de sources publiques et fonctionnent partout, sans
-configuration : **Binance** (`btc_spot`, `micro_futures`, `cvd`, `liquidity`) et
-**Deribit** (`gex`, calculé dans `options_gex.py`).
+### Les légendes : dérivées du code, jamais rédigées à côté
+
+`market-data.json` porte un bloc `meta.champs` : pour chaque champ, son libellé, son unité,
+sa fenêtre, sa formule, sa source et sa **nature** — `mesure`, `modèle` (ex. Black-Scholes),
+`convention` (hypothèse non observable, ex. le signe du GEX), `seuil` (classement par des
+seuils de ce code) ou `horodatage`. Il est **construit avec les constantes du calcul** :
+changer une période change la description. `tests/test_meta.py` vérifie que :
+
+- chaque champ publié est décrit, et rien d'autre ;
+- chaque nombre ou unité contenu dans un NOM (`_1h`, `_14`, `_usd`…) est celui de la
+  formule — un nom faux doit le déclarer (`nom_trompeur`), sinon le harnais échoue ;
+- chaque valeur est retrouvée par une implémentation de référence paramétrée par sa
+  description ;
+- et qu'il attrape bien les dérives (il les simule).
+
+`heatmap.json` publie de même son `encodage` : ce qu'est une cellule (intensité
+`255·√(q/100)`, `q` = plus gros niveau de prix de la tranche), comment la décoder, et
+comment fusionner deux cellules (le MAX, jamais la somme).
 
 ### Ce que mesure chaque chiffre (révision du 04/10/2026)
 
