@@ -1,0 +1,19 @@
+Polices des thèmes Néon et Codex — toutes sous SIL Open Font License 1.1 (licences jointes).
+
+Ce sont des VERSIONS MODIFIÉES au sens de l'OFL : sous-ensembles latins (pyftsubset,
+woff2, sans hinting) servis depuis ce dépôt, chargées par le navigateur uniquement quand le
+thème qui les utilise est actif. Conformément à la clause des noms réservés (Reserved Font
+Name), les polices qui en déclarent un ont été RENOMMÉES :
+
+  neon-titre.woff2       « Samsara Neon Titre »      ← Orbitron (RFN « Orbitron ») — orbitron.OFL.txt
+  neon-chiffres.woff2    « Samsara Neon Chiffres »   ← Share Tech Mono (RFN « Share ») — sharetechmono.OFL.txt
+  codex-lettrine.woff2   « Samsara Codex Lettrine »  ← UnifrakturMaguntia (RFN « UnifrakturMaguntia ») — unifraktur.OFL.txt
+  cinzel.woff2           Cinzel (aucun nom réservé)  — cinzel.OFL.txt
+  eb-garamond.woff2      EB Garamond (aucun nom réservé) — ebgaramond.OFL.txt
+
+Glyphes AJOUTÉS par composition (base + diacritique) pour écrire « Saṃsāra » d'une seule
+police : ā / Ā (a + macron) et ṃ / Ṃ (m + point souscrit) dans « Samsara Neon Titre », ā et ṃ
+dans « Samsara Codex Lettrine ». Tout se refait avec : python3 fonts/fabriquer.py (fonttools).
+
+Plages conservées : latin de base, Latin-1, Latin étendu A, ponctuation générale, flèches,
+quelques signes mathématiques et grecs. Un glyphe absent retombe sur la police système.

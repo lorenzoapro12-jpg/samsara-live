@@ -5,7 +5,10 @@
    déclaré dans index.html par un <link data-theme>. Le contrat (jetons obligatoires,
    règles de performance) est vérifié par tests/test_contrat.py et tests/test_palette.py.
 
-   RÈGLES DE PERFORMANCE (mesurées le 05/10/2026, tests/test_contrat.py les fait tenir) :
+   RÈGLES DE PERFORMANCE (mesurées le 05/10/2026, tests/test_contrat.py les fait tenir) —
+   pour CETTE feuille et css/bookmap.css. Depuis le 06/10/2026, une feuille de THÈME peut user
+   de flou, de fusion ou d'animations infinies si elle tient son budget d'image, MESURÉ par
+   tests/test_budget.js (voir le contrat) :
    · pas de `backdrop-filter` ailleurs qu'ici, et seulement via le jeton --verre : un thème
      choisit son verre, il ne pose pas de filtre sur un élément de son choix. Cinq surfaces
      floutées recalculées à chaque image du graphique = 167 ms par image (33 sans) ;
@@ -40,7 +43,11 @@
   --capsule-ombre: 0 1px 3px rgba(0,0,0,0.12);
   --pill: transparent;
   --pill-hover: var(--rail);
-  --pill-actif: var(--brand);
+  /* Fond d'un élément qui porte du TEXTE (bouton actif, intervalle choisi, boutons du Grid
+     Bot) : le dégradé de marque par défaut ; un thème dont le dégradé est trop clair pour
+     son encre le redéfinit (tests/test_palette.py, contrôle 7, mesure chaque borne). */
+  --brand-fond: var(--brand);
+  --pill-actif: var(--brand-fond);
   --pill-actif-ink: #ffffff;
   --pill-actif-ombre: 0 3px 12px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.35);
   --dot-anneau: var(--card-solid);
@@ -177,6 +184,10 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
   padding: 9px 16px; border-radius: var(--r-bar);
 }
 .header-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+/* Sur bureau, le prix héros ne cède JAMAIS de place : ce sont les chiffres clés (.kpis) qui
+   s'effacent, en entier, en partant de la fin (ajusterKpis). Sans cette règle, l'ajout de
+   boutons à droite faisait déborder la variation 24 h par-dessus le premier chiffre clé. */
+@media (min-width: 769px) { .header-left { flex-shrink: 0; } }
 .header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .header-orb {
   position: relative; flex-shrink: 0;
@@ -269,7 +280,7 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
 .theme-btn:hover { color: var(--accent-2); background: var(--capsule-hover); }
 .theme-btn:active { transform: scale(0.97); }
 .theme-btn.ico-btn.on {
-  color: var(--brand-ink); background: var(--brand);
+  color: var(--brand-ink); background: var(--brand-fond);
   box-shadow: 0 4px 14px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.35);
 }
 /* Point « live » : une onde à chaque publication reçue (classe .ping posée par le JS),
@@ -740,7 +751,7 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
 .strat-btn {
   padding: 5px 10px; cursor: pointer;
   font-family: var(--font); font-size: 11px; font-weight: 700; letter-spacing: 0.2px;
-  color: var(--brand-ink); background: var(--brand);
+  color: var(--brand-ink); background: var(--brand-fond);
   border: 1px solid transparent; border-radius: var(--r-bar);
   box-shadow: var(--capsule-ombre);
   transition: transform .1s ease, box-shadow .15s ease;
@@ -870,3 +881,95 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
   .strat-col-actions .strat-btn { font-size: 9px; padding: 6px; }
   .strat-section .strat-row label { min-width: 45px; font-size: 9px; }
 }
+
+/* Thème à structure : invisible tant que js/structures.js ne l'a pas posée (filet 2,5 s dans
+   le script de tête). Évite d'afficher un instant la structure de base. */
+html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hidden; }
+.theme-structure { font-size: 10px; font-weight: 600; color: var(--ink-3); }
+
+/* ─── Légendes (js/fiches.js) ───────────────────────────────────────────────────
+   Le MODE de lecture n'est qu'une classe sur <html> : le HTML est le même dans les deux
+   modes, seul ce qui s'affiche change. Une valeur ne peut donc pas en dépendre. */
+[data-mode="debutant"] .expert-seul,
+[data-mode="expert"] .debutant-seul { display: none !important; }
+.mode-btn { font: inherit; font-size: 11px; font-weight: 700; padding: 0 10px; min-width: 76px; }
+.mode-btn[aria-pressed="true"] { color: var(--accent); }
+.info-btn {
+  display: inline-flex; align-items: center; justify-content: center; vertical-align: 1px;
+  width: 15px; height: 15px; margin-left: 5px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--hairline); background: transparent; color: var(--ink-3);
+  font: 700 9.5px/1 Georgia, 'Times New Roman', serif; font-style: italic; cursor: pointer;
+  text-transform: none; letter-spacing: 0;
+}
+.info-btn:hover, .info-btn:focus-visible { color: var(--accent); border-color: var(--accent); outline: none; }
+.lecture-courte {
+  margin-top: 6px; padding: 5px 8px; border-radius: 8px; font-size: 11px; line-height: 1.4;
+  color: var(--ink-2); background: var(--rail); border-left: 2px solid var(--accent);
+}
+.fiches-ligne { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 10.5px; color: var(--ink-3); }
+.fiche-lien { white-space: nowrap; }
+.fiche-pop {
+  position: fixed; z-index: 1300; left: 50%; top: 12vh; transform: none;
+  width: min(420px, calc(100vw - 24px)); max-height: 76vh; overflow-y: auto;
+  padding: 12px 16px 14px; border-radius: 16px;
+  background: var(--card-solid); color: var(--ink-1);
+  border: 1px solid var(--hairline); box-shadow: var(--card-shadow);
+  font-size: 12.5px; line-height: 1.5;
+}
+.fiche-pop:not([style*="left"]) { left: calc(50% - min(210px, 50vw - 12px)); }
+.fiche-pop[hidden] { display: none; }
+.fiche-tete { display: flex; align-items: center; gap: 8px; }
+.fiche-titre { font-size: 14px; margin: 0; flex: 1; color: var(--ink-1); }
+.fiche-fermer { font: inherit; font-size: 18px; line-height: 1; border: 0; background: none; color: var(--ink-3); cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+.fiche-fermer:hover { color: var(--ink-1); background: var(--rail); }
+.fiche-nature { font-size: 9.5px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: var(--rail); color: var(--ink-2); }
+.fiche-nature.nature-convention, .fiche-nature.nature-seuil { background: var(--warn-soft, var(--rail)); color: var(--warn-ink, var(--ink-1)); }
+.fiche-nature.nature-modèle { color: var(--accent-2); }
+.fiche-simple { margin: 8px 0; color: var(--ink-1); }
+.fiche-valeur { margin: 6px 0; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.fiche-valeur b { color: var(--ink-1); }
+.fiche-tf { font-size: 10px; font-weight: 700; color: var(--ink-3); }
+.fiche-alerte { margin: 6px 0; padding: 6px 9px; border-radius: 8px; background: var(--warn-soft, var(--rail)); color: var(--ink-1); font-size: 11.5px; }
+.fiche-pop h4 { margin: 12px 0 4px; font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; color: var(--ink-3); }
+.fiche-lectures { margin: 0; padding-left: 0; list-style: none; }
+.fiche-lectures li { margin: 5px 0; color: var(--ink-2); }
+.statut { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; padding: 1px 6px; border-radius: 6px; margin-right: 4px; background: var(--rail); color: var(--ink-2); }
+.statut-débattu { background: var(--down-soft); color: var(--down-ink); }
+.statut-convention { background: var(--warn-soft, var(--rail)); color: var(--warn-ink, var(--ink-1)); }
+.statut-mesuré { background: var(--up-soft); color: var(--up-ink); }
+.fiche-debat { margin: 10px 0; padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--down-ink); color: var(--ink-2); font-size: 11.5px; }
+.fiche-limites, .fiche-indice { color: var(--ink-2); font-size: 11.5px; }
+.fiche-technique p { margin: 4px 0; color: var(--ink-1); font-size: 11.5px; }
+.fiche-technique dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 6px 0; font-size: 11px; }
+.fiche-technique dt { color: var(--ink-3); }
+.fiche-technique dd { margin: 0; color: var(--ink-2); word-break: break-word; }
+.fiche-pied { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--hairline); font-size: 10.5px; color: var(--ink-3); }
+.glossaire { display: flex; flex-wrap: wrap; gap: 5px; }
+.glossaire-item, .fiche-pop .lien {
+  font: inherit; font-size: 11.5px; padding: 4px 9px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--hairline); background: var(--rail); color: var(--ink-1);
+}
+.fiche-pop .lien { padding: 1px 8px; }
+.glossaire-item:hover, .fiche-pop .lien:hover { border-color: var(--accent); }
+@media (max-width: 768px) {
+  .fiche-pop { left: 8px !important; right: 8px; top: auto !important; bottom: 8px; width: auto; max-height: 70vh; }
+  .mode-btn { min-width: 0; padding: 0 7px; font-size: 10px; }
+}
+
+/* ─── Réglages d'affichage (js/reglages.js) ─── */
+.reglages-pop { left: auto; right: 16px; top: 64px; width: min(440px, calc(100vw - 24px)); }
+.reglage { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; font-size: 12px; color: var(--ink-2); }
+.reglage select, .ligne-reglage input {
+  font: inherit; font-size: 12px; color: var(--ink-1); background: var(--rail);
+  border: 1px solid var(--hairline); border-radius: 8px; padding: 4px 8px;
+}
+.ligne-reglage { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
+.ligne-reglage input { width: 64px; }
+.puces { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.puce-case {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--hairline); background: var(--rail); color: var(--ink-1); font-size: 11.5px; cursor: pointer;
+}
+.puce-case input { margin: 0; accent-color: var(--accent); }
+.puce-case.indispo { opacity: 0.45; cursor: not-allowed; }
+@media (max-width: 768px) { .reglages-pop { right: 8px !important; left: 8px !important; top: auto !important; bottom: 8px; width: auto; } }

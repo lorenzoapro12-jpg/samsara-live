@@ -42,6 +42,9 @@
   --warn: #f0b90b; --warn-ink: #f5c458; --warn-soft: rgba(240,185,11,0.14);
   --accent: #38bdf8; --accent-2: #8b9bff;
   --brand: linear-gradient(120deg, #1fbfe2 0%, #5b7bff 55%, #9d74ff 100%);
+  /* Même dégradé, bornes assombries : le TEXTE blanc qu'il porte y tient 4,5:1 sur chaque borne
+     (il tombait à 2,19:1 sur la borne cyan). Le logo garde --brand. */
+  --brand-fond: linear-gradient(120deg, #0c7d97 0%, #4a63ea 55%, #7d52ee 100%);
   --accent-glow: rgba(110,130,255,0.34);
   --hairline: rgba(170,190,255,0.11);
   --rail: rgba(170,190,255,0.09);

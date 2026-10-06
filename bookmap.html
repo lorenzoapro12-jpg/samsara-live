@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Saṃsāra — Carte du carnet</title>
+<meta name="description" content="Carte de liquidité BTC/USDT : carnet publié, carnet live, exécutions, murs et gamma, chacun avec son âge.">
+<!-- La carte est une page À CÔTÉ du terminal (index.html), qu'elle ne modifie pas et dont
+     elle ne charge aucun code. Elle n'interroge que Binance et GitHub Raw (contrat réseau :
+     tests/test_contrat.py). -->
+<link rel="stylesheet" href="css/bookmap.css">
+</head>
+<body>
+
+<header class="barre">
+  <div class="barre-gauche">
+    <a class="retour" href="index.html" title="Revenir au terminal">← Terminal</a>
+    <h1>Carte <span class="sous">BTC/USDT · carnet, exécutions, murs, gamma</span></h1>
+  </div>
+  <nav class="calques" id="calques" aria-label="Calques affichés"></nav>
+  <div class="barre-droite">
+    <button type="button" class="bouton" id="btnSuivre" aria-pressed="true" title="Suivre le présent (F) — double-clic sur la carte : vue par défaut">Suivre</button>
+    <button type="button" class="bouton" id="btnReglages" aria-controls="reglages" aria-expanded="false" title="Réglages d'affichage">Réglages</button>
+    <button type="button" class="bouton" id="btnLegende" aria-controls="legende" aria-expanded="false" title="Ce que montre la carte (L)">Légende</button>
+  </div>
+</header>
+
+<main class="scene">
+  <canvas id="carte" role="img" aria-label="Carte de liquidité : axe horizontal le temps, axe vertical le prix en dollars, la chaleur est la taille du plus gros niveau du carnet par tranche ; le prix, les exécutions, les murs et les niveaux de gamma sont dessinés par-dessus, chacun avec son âge."></canvas>
+  <div class="statut" id="statut" role="status" hidden></div>
+</main>
+
+<div class="lecture" id="lecture" role="tooltip" hidden></div>
+
+<section class="panneau-flottant" id="reglages" hidden aria-label="Réglages">
+  <div class="panneau-tete"><h2>Réglages</h2><button type="button" class="fermer" data-fermer aria-label="Fermer">×</button></div>
+  <p class="note">Un réglage change le NIVEAU DE DÉTAIL ou la couleur, jamais une valeur : la lecture au pointeur donne toujours le chiffre mesuré.</p>
+  <fieldset>
+    <legend>Couleurs</legend>
+    <label>Palette
+      <select id="rPalette">
+        <option value="classique">Classique (bleu → jaune → blanc)</option>
+        <option value="cividis">Cividis (lisible en daltonisme)</option>
+        <option value="cote">Bid / ask teintés</option>
+      </select>
+    </label>
+    <label>Seuil bas <output id="rSeuilVal"></output>
+      <input type="range" id="rSeuil" min="0" max="120" step="1">
+    </label>
+    <label>Saturation <output id="rSaturationVal"></output>
+      <input type="range" id="rSaturation" min="20" max="255" step="1">
+    </label>
+  </fieldset>
+  <fieldset>
+    <legend>Carte publiée — fusionner, jamais affiner</legend>
+    <label>Colonnes
+      <select id="rFusionT"><option value="1">1 min (publiée)</option><option value="5">5 min</option><option value="15">15 min</option><option value="60">1 h</option></select>
+    </label>
+    <label>Tranches
+      <select id="rFusionP"><option value="1">20 $ (publiée)</option><option value="2">40 $</option><option value="5">100 $</option><option value="10">200 $</option></select>
+    </label>
+    <p class="note">Fusion par MAXIMUM : une cellule fusionnée montre le plus gros niveau de son bloc. Une somme d'intensités n'aurait pas d'unité.</p>
+  </fieldset>
+  <fieldset>
+    <legend>Carnet live (lu par la page sur Binance)</legend>
+    <label>Profondeur
+      <select id="rNiveaux">
+        <option value="100">100 niveaux / 1 s</option>
+        <option value="500">500 niveaux / 1 s</option>
+        <option value="1000">1 000 niveaux / 2 s</option>
+        <option value="5000">5 000 niveaux / 10 s</option>
+      </select>
+    </label>
+    <label>Tranche
+      <select id="rDpLive"><option value="1">1 $</option><option value="5">5 $</option><option value="10">10 $</option><option value="20">20 $ (comme la carte publiée)</option></select>
+    </label>
+    <p class="note">Changer la profondeur ou la tranche repart d'un carnet live vide.</p>
+  </fieldset>
+  <fieldset>
+    <legend>Exécutions</legend>
+    <label>Bulle à partir de (BTC)
+      <select id="rBulleMin"><option value="0">tout</option><option value="0.1">0,1</option><option value="0.5">0,5</option><option value="1">1</option><option value="5">5</option><option value="20">20</option></select>
+    </label>
+    <label>Taille des bulles
+      <select id="rBulleEchelle"><option value="0.6">petite</option><option value="1">normale</option><option value="1.6">grande</option></select>
+    </label>
+  </fieldset>
+  <button type="button" class="bouton" id="rDefauts">Réglages par défaut</button>
+</section>
+
+<section class="panneau-flottant large" id="legende" hidden aria-label="Légende">
+  <div class="panneau-tete"><h2>Ce que montre la carte</h2><button type="button" class="fermer" data-fermer aria-label="Fermer">×</button></div>
+  <div class="barre-couleurs"><div id="barreCouleurs"></div><div class="grad" id="gradBarre"></div></div>
+  <p class="note" id="encodageEtat"></p>
+  <h3>Trois horloges sur une même surface</h3>
+  <p>Chaque calque porte son âge <b>sur la carte</b>. Deux chiffres côte à côte peuvent décrire deux instants différents : on ne les compare pas sans regarder leur pastille.</p>
+  <dl>
+    <dt>Carte publiée</dt>
+    <dd>Fichier du serveur, une colonne par minute, une tranche par 20 $, publié toutes les 15 min : la colonne la plus récente a donc jusqu'à ~16 min. La chaleur d'une case est la taille du <b>plus gros niveau de prix</b> de la tranche (pas la somme du carnet). Les cases saturées valent « au moins » la référence publiée.</dd>
+    <dt>Carnet live</dt>
+    <dd>Lu par la page sur Binance (100 à 5 000 niveaux, toutes les 1 à 10 s), à la tranche choisie. Il commence à l'ouverture de la page. Sa chaleur suit la même formule que la carte publiée quand le fichier publie son encodage ; sinon elle a sa propre échelle, et la carte le dit.</dd>
+    <dt>Non observé (hachures)</dt>
+    <dd>Aucun carnet lu à cet endroit : hors de la bande que le carnet couvre (≈ ±1 % pour 5 000 niveaux, bien moins pour 1 000), ou entre la fin de la carte publiée et l'ouverture de la page. Ce n'est pas « aucun ordre ».</dd>
+    <dt>Prix</dt>
+    <dd>La ligne blanche : clôtures 1 min (Binance), puis prix moyen des exécutions seconde par seconde. Les traits fins verticaux sont les plus hauts / plus bas de chaque minute. Les marches vertes et rouges sont le meilleur bid et le meilleur ask, à chaque lecture du carnet live.</dd>
+    <dt>Exécutions (bulles)</dt>
+    <dd>Volumes échangés <b>au marché</b>, regroupés par seconde et par tranche de prix : vert si les achats au marché dominent, rouge si ce sont les ventes ; l'arc blanc intérieur est la part achetée. Surface ∝ volume.</dd>
+    <dt>Murs (rectangles)</dt>
+    <dd>Fichier de 15 min : les tranches de 20 $ où la <b>somme</b> des ordres posés est la plus grande, au moment de la lecture. Ils partent de l'instant de lecture : avant, on ne sait pas.</dd>
+    <dt>Gamma (tirets violets)</dt>
+    <dd>Fichier de 15 min (options Deribit) : CW mur de calls, PW mur de puts, ZG zéro gamma, GW autres murs. Le signe repose sur une <b>convention</b> (dealers acheteurs des calls, vendeurs des puts) : le positionnement réel n'est pas observable.</dd>
+    <dt>Carnet latéral, profil, volume, CVD</dt>
+    <dd>À droite, la <b>somme</b> des ordres du dernier carnet live par tranche. À gauche, le profil des exécutions visibles. En bas, le volume par minute (achats au-dessus, ventes au-dessous) et le CVD — achats au marché moins ventes au marché, cumulés depuis le bord gauche de la vue.</dd>
+  </dl>
+  <h3>Gestes</h3>
+  <p>Glisser : déplacer. Molette : zoom dans le temps (sur l'axe des prix, ou avec Maj : zoom des prix). Pincer à deux doigts. Glisser sur un axe : l'étirer. Double-clic ou R : vue par défaut. F : suivre le présent. Flèches : se déplacer.</p>
+  <p class="note">Ce que la carte montre est une lecture du carnet, pas une recommandation : un mur peut être retiré avant d'être touché, et une bulle ne dit pas qui a acheté.</p>
+</section>
+
+<script src="js/bookmap-calc.js"></script>
+<script src="js/bookmap.js"></script>
+</body>
+</html>

@@ -22,7 +22,7 @@
   "_git_branch": "Branche publiée.",
 
   "extra_module_paths": [],
-  "_extra_module_paths": "Chemins ajoutés à sys.path, pour les modules qui ne sont pas dans ce dépôt. Vide = les blocs `indicators`, `macro` et `premium` restent indisponibles (voir README). Défaut : [].",
+  "_extra_module_paths": "Chemins ajoutés à sys.path. Depuis le 06/10/2026, aucun bloc n'en a besoin : ils ne servent plus qu'à `publish.py --comparer` (parité avec d'anciens modules). Défaut : [].",
 
   "cvd_database": null,
   "_cvd_database": "OBSOLÈTE depuis le 04/10/2026 : plus lue par publish.py (le bloc `cvd` se calcule sur les bougies Binance). Acceptée pour ne pas casser une configuration existante. Défaut : null."

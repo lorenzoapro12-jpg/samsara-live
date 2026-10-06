@@ -1,0 +1,137 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+   Saṃsāra — Carte (bookmap). Feuille propre à bookmap.html : la page est autonome.
+   Une carte de chaleur se lit sur fond sombre (la luminance porte la quantité) : la carte
+   est sombre quel que soit le thème du terminal.
+   Contrat de performance (tests/test_contrat.py) : ni flou, ni mix-blend-mode, ni
+   animation infinie, ni @import ; aucune ressource externe.
+   ══════════════════════════════════════════════════════════════════════════════ */
+:root {
+  color-scheme: dark;
+  --police-carte: 'Segoe UI Variable Text', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --fond-page: #070910;
+  --carte-fond: #090c14;
+  --carte-non-observe: #0d111b;
+  --carte-hachure: #222a3c;
+  --carte-panneau: #0b0e16;
+  --carte-grille: rgba(255, 255, 255, 0.055);
+  --carte-pastille: rgba(8, 11, 19, 0.88);
+  --carte-prix: #ffffff;
+  --carte-mur-bid: #3ee6b5;
+  --carte-mur-ask: #ff7a93;
+  --carte-gamma: #c9a7ff;
+  --carte-live: #7cc4ff;
+  --carte-publie: #ffd166;
+  --ink-1: #eef2ff;
+  --ink-2: #b3bbd3;
+  --ink-3: #8b94ae;
+  --up: #22c39a;
+  --down: #ff5a7a;
+  --accent: #ffd166;
+  --bord: rgba(255, 255, 255, 0.09);
+  --surface: #10141f;
+  --surface-2: #161b29;
+  --actif: rgba(124, 196, 255, 0.16);
+  --actif-ink: #bfe2ff;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--fond-page);
+  color: var(--ink-1);
+  font-family: var(--police-carte);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* ─── Barre ─── */
+.barre {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 12px; border-bottom: 1px solid var(--bord); background: var(--carte-panneau);
+}
+.barre-gauche { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+.barre h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: 0.2px; white-space: nowrap; }
+.barre .sous { font-weight: 400; color: var(--ink-3); font-size: 12px; margin-left: 6px; }
+.retour { color: var(--ink-2); text-decoration: none; font-size: 12.5px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--bord); }
+.retour:hover, .retour:focus-visible { color: var(--ink-1); background: var(--surface-2); }
+.calques { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; min-width: 0; }
+.barre-droite { display: flex; gap: 6px; }
+.puce, .bouton {
+  font: inherit; font-size: 12px; color: var(--ink-2); background: transparent;
+  border: 1px solid var(--bord); border-radius: 999px; padding: 4px 10px; cursor: pointer;
+}
+.puce, .bouton { white-space: nowrap; }
+.bouton { border-radius: 8px; }
+.puce:hover, .bouton:hover { color: var(--ink-1); background: var(--surface-2); }
+.puce[aria-pressed="true"], .bouton[aria-pressed="true"], .bouton[aria-expanded="true"] {
+  color: var(--actif-ink); background: var(--actif); border-color: rgba(124, 196, 255, 0.45);
+}
+.puce:focus-visible, .bouton:focus-visible, .retour:focus-visible, select:focus-visible, input:focus-visible, .fermer:focus-visible {
+  outline: 2px solid var(--carte-live); outline-offset: 1px;
+}
+
+/* ─── Scène ─── */
+.scene { position: relative; flex: 1; min-height: 0; }
+#carte { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+.statut {
+  position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px);
+  background: rgba(60, 14, 24, 0.92); color: #ffd0d8; border: 1px solid rgba(255, 90, 122, 0.5);
+  border-radius: 8px; padding: 5px 9px; font-size: 12px; pointer-events: none;
+}
+
+/* ─── Lecture au pointeur ─── */
+.lecture {
+  position: fixed; left: 0; top: 0; z-index: 20; pointer-events: none;
+  background: var(--carte-pastille); border: 1px solid var(--bord); border-radius: 8px;
+  padding: 6px 9px; font-size: 12px; line-height: 1.45; color: var(--ink-2); max-width: min(440px, 92vw);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.lecture b { color: var(--ink-1); }
+
+/* ─── Panneaux ─── */
+.panneau-flottant {
+  position: fixed; z-index: 30; top: 52px; right: 12px; width: min(360px, calc(100vw - 24px));
+  max-height: calc(100vh - 70px); overflow: auto;
+  background: var(--surface); border: 1px solid var(--bord); border-radius: 12px;
+  padding: 10px 14px 14px; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+.panneau-flottant.large { width: min(560px, calc(100vw - 24px)); }
+.panneau-tete { display: flex; align-items: center; justify-content: space-between; }
+.panneau-flottant h2 { font-size: 14px; margin: 4px 0; }
+.panneau-flottant h3 { font-size: 13px; margin: 14px 0 4px; color: var(--ink-1); }
+.panneau-flottant p, .panneau-flottant dd { color: var(--ink-2); line-height: 1.5; margin: 4px 0; }
+.panneau-flottant dt { color: var(--ink-1); font-weight: 600; margin-top: 8px; }
+.panneau-flottant dd { margin-left: 0; }
+.note { font-size: 12px; color: var(--ink-3) !important; }
+.fermer { font: inherit; font-size: 18px; line-height: 1; background: none; border: 0; color: var(--ink-2); cursor: pointer; padding: 4px 6px; border-radius: 6px; }
+.fermer:hover { color: var(--ink-1); background: var(--surface-2); }
+fieldset { border: 1px solid var(--bord); border-radius: 10px; margin: 10px 0; padding: 6px 10px 10px; }
+legend { color: var(--ink-2); font-size: 12px; padding: 0 4px; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-2); margin-top: 8px; }
+label output { color: var(--ink-1); font-weight: 600; }
+select, input[type="range"] { width: 100%; }
+select {
+  font: inherit; font-size: 12.5px; color: var(--ink-1); background: var(--surface-2);
+  border: 1px solid var(--bord); border-radius: 8px; padding: 5px 8px;
+}
+input[type="range"] { accent-color: var(--carte-live); }
+.barre-couleurs { margin: 6px 0 2px; }
+#barreCouleurs { height: 12px; border-radius: 4px; background-size: 100% 100%; image-rendering: pixelated; border: 1px solid var(--bord); }
+.grad { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); margin-top: 3px; }
+
+@media (max-width: 640px) {
+  .barre { padding: 6px 8px; gap: 6px; }
+  .barre .sous { display: none; }
+  .puce { padding: 3px 8px; font-size: 11.5px; }
+  .calques { order: 3; flex-basis: 100%; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+  .barre h1 { font-size: 14px; }
+  .bouton { padding: 4px 8px; }
+  .panneau-flottant { top: 96px; right: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; }
+}

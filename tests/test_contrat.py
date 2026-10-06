@@ -16,15 +16,28 @@ sans bruit. Ce harnais les fait tenir :
 3. VERRE — un thème ne pose jamais `backdrop-filter` lui-même : il choisit --verre, que
    css/app.css applique aux seules surfaces prévues. data-verre="aucun" ⇒ --verre: none.
    (Mesuré : cinq surfaces floutées recalculées à chaque image = 167 ms/image, 33 sans.)
-4. PERFORMANCE — dans toute feuille servie : aucun `mix-blend-mode` autre que normal, aucun
-   `filter: blur(…)` (posés sur le graphique : 33 → 17 ms/image sans), aucune animation
-   `infinite` (la page se redessinait en continu, même au repos), aucun @import.
+4. PERFORMANCE — RÉVISÉE LE 06/10/2026 EN LA MESURANT.
+   · Feuilles de STRUCTURE (css/app.css, css/bookmap.css) : interdits maintenus — aucun
+     `mix-blend-mode` autre que normal, aucun `filter: blur(…)` (posés sur le graphique : 33 →
+     17 ms/image sans), aucune animation `infinite` (la page se redessinait au repos).
+   · Feuilles de THÈME : ces effets sont permis s'ils tiennent leur BUDGET D'IMAGE, mesuré par
+     tests/test_budget.js contre le thème de référence et consigné dans tests/budget-themes.json
+     avec l'empreinte de la feuille. Ici, sans navigateur, on exige : une mesure À JOUR (même
+     empreinte) et dans le budget — exigée aussi pour tout thème À STRUCTURE ; des animations
+     infinies qui n'animent QUE `transform` et `opacity` ; leur arrêt sous
+     prefers-reduced-motion ; des @keyframes préfixés par le thème. NB : même limitée à
+     transform / opacity, une animation infinie recompose la page en continu — mesuré le
+     06/10/2026, ×35 le CPU de référence au repos. Le budget la refuse ; les thèmes livrés
+     n'en ont plus (effets liés à un événement).
+   · Partout : aucun @import (une requête bloquante de plus, en série).
 5. RÉSEAU — la page n'interroge que Binance et GitHub Raw. Aucune ressource externe :
    pas de police, de CDN ni d'image distante ; les url() CSS sont relatives ou data:.
 
 USAGE
     python3 tests/test_contrat.py     # code de sortie 0 = le contrat tient
 """
+import hashlib
+import json
 import re
 import sys
 from pathlib import Path
@@ -62,11 +75,22 @@ def titre(t):
     lignes.append(f"── {t} ──")
 
 
+def servis_de(page):
+    """Les feuilles et scripts qu'une page charge (balises, plus le code tiers chargé à la demande)."""
+    html = (REPO / page).read_text(encoding="utf-8")
+    sv = re.findall(r'\b(?:href|src)="((?:css|js|themes)/[^"]+)"', html)
+    # hyalite est chargé à la demande par js/app.js, pas par une balise : il est servi aussi.
+    sv += [m for m in re.findall(r"'(js/vendor/[^']+)'", "\n".join(
+        (REPO / f).read_text(encoding="utf-8") for f in sv if f.endswith(".js") and (REPO / f).exists())) if m not in sv]
+    return sv
+
+
+# Toutes les pages servies : le terminal, et les pages À CÔTÉ (la carte). Une page ajoutée
+# à la racine est contrôlée sans qu'il faille penser à l'inscrire ici.
+PAGES = ["index.html"] + sorted(p.name for p in REPO.glob("*.html") if p.name != "index.html")
 html = PAGE.read_text(encoding="utf-8")
-servis = re.findall(r'\b(?:href|src)="((?:css|js|themes)/[^"]+)"', html)
-# hyalite est chargé à la demande par js/app.js, pas par une balise : il est servi aussi.
-servis += [m for m in re.findall(r"'(js/vendor/[^']+)'", "\n".join(
-    (REPO / f).read_text(encoding="utf-8") for f in servis if f.endswith(".js") and (REPO / f).exists())) if m not in servis]
+servis = servis_de("index.html")
+TOUS_SERVIS = sorted({f for pg in PAGES for f in servis_de(pg)})
 
 # ── 1. registre ──
 titre("1. Registre des thèmes (index.html)")
@@ -86,6 +110,9 @@ for t in THEMES:
         pb.append(f"data-verre={t['verre']!r}")
     if t["paire"] and t["paire"] not in ids:
         pb.append(f"data-paire={t['paire']!r} inconnu")
+    if t.get("structure") and not re.search(r"STRUCTURES\." + re.escape(t["structure"]) + r"\s*=",
+                                           (REPO / "js" / "structures.js").read_text(encoding="utf-8")):
+        pb.append(f"data-structure={t['structure']!r} absente de js/structures.js")
     (echec if pb else ok)(f"{t['id']}", "; ".join(pb) or f"{t['mode']}, verre {t['verre']}"
                           + (f", jumeau {t['paire']}" if t["paire"] else ""))
 
@@ -120,30 +147,85 @@ for t in THEMES:
         (ok if verre != "none" else echec)(f"{t['id']} · data-verre={t['verre']} ⇒ --verre posé", verre)
 
 # ── 4. performance ──
-titre("4. Performance des feuilles servies")
-for f in [x for x in servis if x.endswith(".css") and (REPO / x).exists()]:
-    css = sans_commentaires((REPO / f).read_text(encoding="utf-8"))
+titre("4. Performance — interdits des feuilles de structure, budget MESURÉ des thèmes")
+_bud = REPO / "tests" / "budget-themes.json"
+BUDGETS = json.loads(_bud.read_text(encoding="utf-8")) if _bud.exists() else {}
+PAR_FEUILLE = {t["href"]: t for t in THEMES}
+
+
+def blocs_keyframes(css):
+    """{nom: corps} des @keyframes (accolades équilibrées)."""
+    out = {}
+    for m in re.finditer(r"@(?:-webkit-)?keyframes\s+([\w-]+)\s*\{", css):
+        prof, k = 1, m.end()
+        while prof and k < len(css):
+            prof += {"{": 1, "}": -1}.get(css[k], 0)
+            k += 1
+        out[m.group(1)] = css[m.end():k - 1]
+    return out
+
+
+for f in [x for x in TOUS_SERVIS if x.endswith(".css") and (REPO / x).exists()]:
+    brut = (REPO / f).read_text(encoding="utf-8")
+    css = sans_commentaires(brut)
     blend = [m for m in re.findall(r"mix-blend-mode\s*:\s*([\w-]+)", css) if m != "normal"]
     flou = re.findall(r"(?<![\w-])filter\s*:[^;]*blur\(", css)
     infini = [m for m in re.findall(r"animation(?:-iteration-count)?\s*:[^;]*", css) if "infinite" in m]
     imp = re.findall(r"@import", css)
     bf = re.findall(r"(?<![\w-])(?:-webkit-)?backdrop-filter\s*:(?!\s*(?:none|var\(--verre\)|var\(--hyalite, var\(--verre\)\))\s*(?:!important)?\s*;)[^;]+", css)
     pb = []
-    if blend:
-        pb.append(f"mix-blend-mode {blend[:2]}")
-    if flou:
-        pb.append(f"{len(flou)} filter: blur")
-    if infini:
-        pb.append(f"animation infinie : {infini[0].strip()[:50]}")
     if imp:
         pb.append("@import")
     if bf:
         pb.append(f"backdrop-filter hors --verre : {bf[0][:50]}")
-    (echec if pb else ok)(f, "; ".join(pb))
+    t = PAR_FEUILLE.get(f)
+    if t is None:
+        # Feuille de STRUCTURE : les interdits tiennent.
+        if blend:
+            pb.append(f"mix-blend-mode {blend[:2]}")
+        if flou:
+            pb.append(f"{len(flou)} filter: blur")
+        if infini:
+            pb.append(f"animation infinie : {infini[0].strip()[:50]}")
+        (echec if pb else ok)(f, "; ".join(pb))
+        continue
+    # Feuille de THÈME : budget mesuré, et garde-fous vérifiables sans navigateur.
+    couteux = bool(blend or flou or infini)
+    kf = blocs_keyframes(css)
+    hors_prefixe = [n for n in kf if not n.startswith(t["id"] + "-")]
+    if hors_prefixe:
+        pb.append(f"@keyframes non préfixés « {t['id']}- » : {', '.join(hors_prefixe)}")
+    if infini:
+        for decl in infini:
+            for nom in [n for n in kf if re.search(r"(?<![\w-])" + re.escape(n) + r"(?![\w-])", decl)]:
+                props = set(re.findall(r"([\w-]+)\s*:", re.sub(r"[^{};]+\{", "", kf[nom])))
+                autres = sorted(props - {"transform", "opacity"})
+                if autres:
+                    pb.append(f"animation infinie « {nom} » anime {', '.join(autres)} (seuls transform et opacity ne repeignent pas)")
+        if not re.search(r"@media\s*\(\s*prefers-reduced-motion\s*:\s*reduce\s*\)", css) or "animation: none" not in css:
+            pb.append("animations infinies sans arrêt sous prefers-reduced-motion")
+    # Mesure exigée : effets coûteux, OU structure de thème (elle déplace le graphique).
+    if couteux or t.get("structure"):
+        m = (BUDGETS.get("themes") or {}).get(t["id"])
+        emp = hashlib.sha256((REPO / f).read_bytes()).hexdigest()[:16]
+        if not m:
+            pb.append("effet coûteux SANS mesure : node tests/test_budget.js --enregistrer")
+        elif m.get("empreinte") != emp:
+            pb.append("mesure PÉRIMÉE (la feuille a changé depuis) : node tests/test_budget.js --enregistrer")
+        elif not m.get("dans_le_budget"):
+            pb.append("HORS BUDGET d'après la dernière mesure")
+    detail = "; ".join(pb) if pb else (
+        f"mesuré : repos ×{BUDGETS['themes'][t['id']]['rapport_repos']}, geste ×{BUDGETS['themes'][t['id']]['rapport_geste']} (CPU, tous processus)"
+        if (couteux or t.get("structure")) else "aucun effet coûteux")
+    (echec if pb else ok)(f, detail)
+if BUDGETS:
+    ce = BUDGETS.get("contre_epreuves") or {}
+    (ok if ce and all(v.get("refusee") for v in ce.values()) else echec)(
+        "contre-épreuves du budget refusées", ", ".join(f"{k} {'✓' if v.get('refusee') else '✗'}" for k, v in ce.items()) or "aucune enregistrée")
 
 # ── 5. réseau ──
-titre("5. Réseau : Binance et GitHub Raw, rien d'autre")
-for f in ["index.html"] + servis:
+titre("5. Réseau : Binance et GitHub Raw, rien d'autre (" + ", ".join(PAGES) + ")")
+for f in PAGES + TOUS_SERVIS:
     if not (REPO / f).exists():
         echec(f"{f} · référencé par la page", "fichier absent")
         continue
@@ -154,9 +236,9 @@ for f in ["index.html"] + servis:
                 if not u.startswith("data:") and not u.startswith("#")]
         (echec if any(re.match(r"(https?:)?//", u) for u in urls) else ok)(f"{f} · url() relatives ou data:", ", ".join(urls[:3]))
         continue
-    if f == "index.html":
+    if f.endswith(".html"):
         ext = re.findall(r'<(?:script|link|img|iframe)\b[^>]*\b(?:src|href)="((?:https?:)?//[^"]+)"', txt)
-        (echec if ext else ok)("index.html · aucune ressource externe", ", ".join(ext[:3]))
+        (echec if ext else ok)(f"{f} · aucune ressource externe", ", ".join(ext[:3]))
         continue
     if f.startswith("js/vendor/"):
         continue    # code tiers verbatim : il n'émet aucune requête (filtre SVG local)
