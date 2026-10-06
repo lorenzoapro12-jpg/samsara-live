@@ -32,6 +32,12 @@ const MAINTENANT = Date.now();
 let seed = 5;
 const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
 const hm = JSON.parse(fs.readFileSync(path.join(REPO, 'heatmap.json'), 'utf8'));
+// Le fichier du dépôt PEUT porter un `encodage` : le producteur en publie un depuis le
+// 06/10/2026. Quand le harnais veut le cas « encodage NON publié », il doit donc le RETIRER de
+// la réponse simulée — sinon il devient rouge tout seul, quinze minutes après la livraison du
+// producteur qui l'introduit, en accusant la carte d'un défaut qui n'existe pas. Un faux rouge
+// qui dépend de la donnée vivante ne vaut pas mieux qu'un faux vert.
+const sansEncodage = () => { const c = Object.assign({}, hm); delete c.encodage; return c; };
 const pMid = (() => { const a = hm.asks.filter(c => c[0] === Math.max(...hm.asks.map(x => x[0]))); return Math.min(...a.map(c => c[1])) * hm.dp; })();
 const MINUTES = [];
 { let p = pMid; for (let i = 1500; i >= 0; i--) { const t = Math.floor((MAINTENANT - i * 60e3) / 60e3) * 60e3, o = p, c = p + (rnd() - 0.5) * 60; const q = 20 + rnd() * 80;
@@ -82,7 +88,7 @@ async function ouvrir(nav, opts) {
     const cors = { 'access-control-allow-origin': '*' };
     if (h === 'api.binance.com') { const d = binance(u); return d ? r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(d) }) : r.fulfill({ status: 404 }); }
     if (h === 'raw.githubusercontent.com') {
-      if (u.includes('heatmap.json')) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(opts.encodage ? Object.assign({}, hm, { encodage }) : hm) });
+      if (u.includes('heatmap.json')) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(opts.encodage ? Object.assign({}, hm, { encodage }) : sansEncodage()) });
       return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, 'market-data.json')) });
     }
     return r.abort();
