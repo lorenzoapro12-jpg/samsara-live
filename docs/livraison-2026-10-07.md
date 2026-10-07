@@ -729,11 +729,26 @@ fichier modifié hors des trois ajouts voulus, `git worktree list` montre les de
 
 ### Ce qui n'a pas été vérifié
 
-- **Un passage réel du cron**, à l'heure où ce document est écrit : la cadence `5,20,35,50`
-  est posée (juste après `publish.py`, à `3,18,33,48`) et le premier passage automatique est
-  attendu à 21:20 UTC.
 - **Les tests de rendu dans Chromium** (étapes 9 à 9f du harnais) : Playwright n'est pas
   installé sur cette machine. Le harnais le dit et ne les compte pas comme verts.
-- **La rotation au-delà de 1 Mo** : la limite refuse l'écriture, elle ne découpe pas. Le cas
-  ne se produit pas à la cadence actuelle ; s'il devait arriver, le choix du découpage
-  appartient au propriétaire du dépôt.
+- **Le refus au-delà de 1 Mo en production** : le chemin est exercé par le harnais (limite
+  abaissée à 100 o : écriture refusée, anomalie consignée, fichier intact), mais jamais avec
+  un vrai fichier de 1 Mo — la limite refuse l'écriture, elle ne découpe pas, et le cas ne se
+  produit pas à la cadence actuelle. S'il devait arriver, le choix du découpage appartient au
+  propriétaire du dépôt.
+
+### Le premier passage réel (21:20:21 UTC)
+
+La cadence `5,20,35,50` est posée juste après `publish.py` (`3,18,33,48`). Constaté sur les
+journaux du planificateur : `publish` à **21:18:24** (`ok`), `historique` à **21:20:21** (`ok`).
+
+Le même contrôle rejoué depuis un **clone neuf**, sur le distant réel :
+
+```
+git fetch --depth 1 --filter=blob:none origin historique   → ok, .git = 152 Ko
+git show FETCH_HEAD:index.json                             → status ok, errors [], âge 54 s
+  positionnement 524 lignes (523 à l'amorçage + la publication de 21:18)
+  funding 500 · open-interest-1h 500 · long-short-1h 501 · aucun trou
+```
+
+La ligne ajoutée est bien celle du passage de `publish.py` de 21:18:17, en fin de série.
