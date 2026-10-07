@@ -53,79 +53,129 @@
   function sauver() { try { localStorage.setItem(CLE, JSON.stringify(R)); } catch (e) { /* navigation privée */ } }
 
   // ─── État ──────────────────────────────────────────────────────────────────
+  // Instants : ce qui vient de Binance (exécutions T, bougies) est à l'heure du SERVEUR ; les
+  // instants de lecture notés par la page (…A, …Lu, bid / ask) sont LOCAUX (Date.now()) et passent
+  // sur l'axe par axe(), avec l'écart mesuré par E.horloge. L'axe du temps est à l'heure Binance.
   const E = {
-    pub: null, pubF: null, pubCle: '', pubMaj: null, pubLu: null,
-    md: null, niv: null, mdLu: null,
+    pub: null, pubF: null, pubCle: '', pubMaj: null, pubLu: null, pubTexte: null,
+    md: null, niv: null, mdLu: null, mdTexte: null,
     live: null, liveRef: null, liveP99: 0, liveDebut: null, carnet: null, carnetA: null,
     exec: new BM.SeauxExecutions(1), execVus: new Set(), execRemplissage: null, execTrous: [],
     minutes: [], minutesA: null,
     bidask: [],
     erreurs: {},
+    horloge: new BM.Horloge(),
+    recul: { binance: new BM.Recul(), github: new BM.Recul() },
     vue: null, suivre: true,
     souris: null,
     session: Date.now(),
   };
-
-  /** L'instant présent sur l'axe du temps. */
-  const maintenant = () => Date.now();
+  /** L'instant présent sur l'axe du temps : l'heure de Binance. */
+  const maintenant = () => E.horloge.maintenant();
+  /** Un instant LOCAL noté par la page, placé sur l'axe (heure Binance). */
+  const axe = local => local + E.horloge.ecart;
 
   // ─── Réseau ────────────────────────────────────────────────────────────────
-  async function json(url, opts) {
-    const r = await fetch(url, opts || {});
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
+  // Délai maximal par source (≈ 2 à 3 cadences) : une requête qui ne répond pas (bascule Wi-Fi /
+  // 4G, flux bloqué) ne fige plus sa source sans rien dire — elle échoue, l'erreur s'affiche, et
+  // la boucle réessaie.
+  const DELAIS = { carnet: 5e3, executions: 5e3, bougies: 15e3, horloge: 5e3, carte: 30e3, fichier: 15e3 };
+  /** fetch avec délai maximal et porte de l'hôte (429 / 418). Rend { corps, s, r } : instants
+   *  LOCAUX d'envoi et de réception (en-têtes reçus). Une porte fermée ne laisse rien partir. */
+  async function lire(url, o) {
+    const porte = o.porte;
+    if (porte && porte.attente(Date.now()) > 0) { const e = new Error('en pause (limite de requêtes)'); e.pause = true; throw e; }
+    const ac = new AbortController(), minuteur = setTimeout(() => ac.abort(), o.delai);
+    try {
+      const s = Date.now();
+      let rep;
+      try { rep = await fetch(url, { cache: o.cache || 'default', signal: ac.signal }); }
+      catch (e) { throw new Error(ac.signal.aborted ? 'pas de réponse en ' + o.delai / 1000 + ' s' : 'réseau injoignable'); }
+      const r = Date.now();
+      if (rep.status === 429 || rep.status === 418) {
+        if (porte) porte.echec(rep.status, BM.lireRetryAfter(rep.headers.get('retry-after'), r), r);
+        majStatut();
+        const e = new Error('HTTP ' + rep.status); e.limite = true; throw e;
+      }
+      if (!rep.ok) throw new Error('HTTP ' + rep.status);
+      let corps;
+      try { corps = o.texte ? await rep.text() : await rep.json(); }
+      catch (e) { throw new Error(ac.signal.aborted ? 'réponse incomplète en ' + o.delai / 1000 + ' s' : 'réponse illisible'); }
+      if (porte) porte.succes();
+      return { corps, s, r };
+    } finally { clearTimeout(minuteur); }
   }
+  const binance = (chemin, delai) => lire(API + chemin, { delai, porte: E.recul.binance });
   function erreur(src, e) {
     E.erreurs[src] = e ? (e.message || String(e)) : null;
     majStatut();
   }
 
+  // L'horloge de Binance : un échantillon toutes les 5 min (poids 1), et au retour sur l'onglet.
+  async function lireHorloge() {
+    try {
+      const { corps, s, r } = await binance('time', DELAIS.horloge);
+      if (E.horloge.echantillon(s, r, +corps.serverTime)) sale();
+      erreur('horloge', null);
+    } catch (e) { erreur('horloge', e); throw e; }
+  }
+
+  // Les deux fichiers publiés : relus avec revalidation (cache 'no-cache' : un 304 ne retransfère
+  // rien). Un paramètre ?t= ne servait à rien — le CDN l'ignore — sinon à empêcher le 304. Le texte
+  // n'est analysé que si sa date de publication, lue en tête, a changé.
   async function lireHeatmap() {
     try {
-      const h = await json(HEATMAP_URL, { cache: 'no-cache' });
+      const { corps: txt } = await lire(HEATMAP_URL, { delai: DELAIS.carte, cache: 'no-cache', texte: true, porte: E.recul.github });
       E.pubLu = Date.now();
-      if (E.pub && h.updated && Date.parse(h.updated) === E.pubMaj) { erreur('carte', null); return; }
-      E.pub = BM.grillePubliee(h);
-      E.pubMaj = Date.parse(h.updated) || null;
+      const maj = BM.majEnTete(txt);
+      if (E.pub && maj !== null && maj === E.pubTexte) { erreur('carte', null); return; }
+      const g = BM.grillePubliee(JSON.parse(txt));
+      if (!g) throw new Error('format non reconnu par cette page');
+      E.pub = g; E.pubTexte = maj; E.pubMaj = g.majA;
       E.pubF = null; E.pubCle = '';
       erreur('carte', null);
       if (E.live && E.pub && E.pub.encodage && !E.liveRef) reinitLive();   // l'échelle commune devient possible
       majLegende();
       sale();
-    } catch (e) { erreur('carte', e); }
+    } catch (e) { erreur('carte', e); throw e; }
   }
   async function lireMarketData() {
     try {
-      const md = await json(DATA_URL + '?t=' + Date.now(), { cache: 'no-store' });
-      E.md = md; E.niv = BM.niveauxPublies(md); E.mdLu = Date.now();
+      const { corps: txt } = await lire(DATA_URL, { delai: DELAIS.fichier, cache: 'no-cache', texte: true, porte: E.recul.github });
+      E.mdLu = Date.now();
+      const maj = BM.majEnTete(txt);
+      if (E.md && maj !== null && maj === E.mdTexte) { erreur('fichier', null); return; }
+      const md = JSON.parse(txt);
+      E.md = md; E.mdTexte = maj; E.niv = BM.niveauxPublies(md);
       erreur('fichier', null);
       dessiner();
-    } catch (e) { erreur('fichier', e); }
+    } catch (e) { erreur('fichier', e); throw e; }
   }
 
   // Bougies 1 min : 24 h au démarrage (deux requêtes), puis les 3 dernières toutes les 10 s.
   async function lireMinutesInitiales() {
     try {
-      const a = await json(API + 'klines?symbol=' + SYMBOLE + '&interval=1m&limit=1000');
+      const a = (await binance('klines?symbol=' + SYMBOLE + '&interval=1m&limit=1000', DELAIS.bougies)).corps;
       let b = [];
-      if (a.length) b = await json(API + 'klines?symbol=' + SYMBOLE + '&interval=1m&limit=440&endTime=' + (a[0][0] - 1));
+      if (a.length) b = (await binance('klines?symbol=' + SYMBOLE + '&interval=1m&limit=440&endTime=' + (a[0][0] - 1), DELAIS.bougies)).corps;
       E.minutes = BM.minutes(b.concat(a));
       E.minutesA = Date.now();
       erreur('bougies', null);
       if (!E.vue) vueParDefaut();
       sale();
-    } catch (e) { erreur('bougies', e); }
+    } catch (e) { erreur('bougies', e); throw e; }
   }
   async function lireMinutes() {
+    if (!E.minutes.length) return lireMinutesInitiales();
     try {
-      const k = await json(API + 'klines?symbol=' + SYMBOLE + '&interval=1m&limit=3');
+      const k = (await binance('klines?symbol=' + SYMBOLE + '&interval=1m&limit=3', DELAIS.bougies)).corps;
       E.minutes = BM.fusionnerMinutes(E.minutes, BM.minutes(k));
-      const lim = Date.now() - 26 * 3600e3;
+      const lim = maintenant() - 26 * 3600e3;
       if (E.minutes.length && E.minutes[0].t < lim) E.minutes = E.minutes.filter(m => m.t >= lim);
       E.minutesA = Date.now();
       erreur('bougies', null);
       dessiner();
-    } catch (e) { erreur('bougies', e); }
+    } catch (e) { erreur('bougies', e); throw e; }
   }
 
   // Exécutions : les 1 000 dernières, puis un remplissage ARRIÈRE (pages de 1 000) jusqu'à la
@@ -136,12 +186,12 @@
   function lireExecutionsInitiales() { return execInit || (execInit = lireExecutionsInitiales0().finally(() => { if (E.exec.dernierId === null) execInit = null; })); }
   async function lireExecutionsInitiales0() {
     try {
-      const t = await json(API + 'aggTrades?symbol=' + SYMBOLE + '&limit=1000');
+      const t = (await binance('aggTrades?symbol=' + SYMBOLE + '&limit=1000', DELAIS.executions)).corps;
       for (const x of t) { E.exec.ajouter(x); E.execVus.add(x.a); }
       erreur('executions', null);
       dessiner();
       remplirArriere(t.length ? t[0].a : null);
-    } catch (e) { erreur('executions', e); }
+    } catch (e) { erreur('executions', e); throw e; }
   }
   async function remplirArriere(premierId) {
     if (premierId === null) return;
@@ -151,7 +201,7 @@
     while (E.execRemplissage.pages < PAGES_ARRIERE && id > 0 && E.exec.premier > objectif()) {
       const depuis = Math.max(0, id - 1000);
       try {
-        const t = await json(API + 'aggTrades?symbol=' + SYMBOLE + '&fromId=' + depuis + '&limit=' + (id - depuis));
+        const t = (await binance('aggTrades?symbol=' + SYMBOLE + '&fromId=' + depuis + '&limit=' + (id - depuis), DELAIS.executions)).corps;
         for (const x of t) E.exec.ajouterAncien(x, E.execVus);
         id = depuis;
         E.execRemplissage.pages++;
@@ -169,19 +219,19 @@
     try {
       let n = 0;
       for (let tour = 0; tour < 5; tour++) {
-        const t = await json(API + 'aggTrades?symbol=' + SYMBOLE + '&fromId=' + (E.exec.dernierId + 1) + '&limit=1000');
+        const t = (await binance('aggTrades?symbol=' + SYMBOLE + '&fromId=' + (E.exec.dernierId + 1) + '&limit=1000', DELAIS.executions)).corps;
         for (const x of t) if (E.exec.ajouter(x)) n++;
         if (t.length < 1000) break;
         if (tour === 4) {           // trop de retard (onglet longtemps caché) : on saute, et on le DIT
           const avant = E.exec.dernier;
-          const der = await json(API + 'aggTrades?symbol=' + SYMBOLE + '&limit=1');
+          const der = (await binance('aggTrades?symbol=' + SYMBOLE + '&limit=1', DELAIS.executions)).corps;
           if (der.length) { E.execTrous.push([avant, der[0].T]); E.exec.dernierId = der[0].a - 1; rattrapage++; }
         }
       }
-      E.exec.purger(Date.now() - 6 * 3600e3);
+      E.exec.purger(maintenant() - 6 * 3600e3);
       erreur('executions', null);
       if (n) dessiner();
-    } catch (e) { erreur('executions', e); }
+    } catch (e) { erreur('executions', e); throw e; }
   }
 
   // Carnet live : une lecture = une colonne de la grille live.
@@ -189,16 +239,16 @@
   async function lireCarnet() {
     const n = R.niveauxLive;
     try {
-      const d = await json(API + 'depth?symbol=' + SYMBOLE + '&limit=' + n);
-      const t = Date.now();
+      const { corps: d, s, r } = await binance('depth?symbol=' + SYMBOLE + '&limit=' + n, DELAIS.carnet);
+      const t = (s + r) / 2;      // instant LOCAL estimé de la lecture (le carnet ne porte pas d'heure)
       const a = BM.agregerCarnet(d, R.dpLive);
       E.carnet = a; E.carnetA = t;
       if (a.meilleurBid && a.meilleurAsk) E.bidask.push({ t, bid: a.meilleurBid, ask: a.meilleurAsk });
       if (E.bidask.length > 20000) E.bidask.splice(0, 5000);
-      poserColonneLive(a, t);
+      poserColonneLive(a, axe(t));
       erreur('carnet', null);
       sale();
-    } catch (e) { erreur('carnet', e); }
+    } catch (e) { erreur('carnet', e); throw e; }
   }
   const LIVE_CAPACITE = 1800, LIVE_BANDE = 0.015;   // colonnes ; ± bande de prix couverte par la grille
   function poserColonneLive(a, t) {
@@ -253,31 +303,58 @@
     return n;
   }
 
-  // ─── Boucles de lecture : arrêtées quand l'onglet est caché ─────────────────
-  const minuteurs = [];
-  function boucle(fn, ms) {
-    let actif = true, h = null;
-    const tour = async () => {
-      if (!actif) return;
-      if (!document.hidden) { try { await fn(); } catch (e) { /* chaque source gère son erreur */ } }
-      h = setTimeout(tour, typeof ms === 'function' ? ms() : ms);
+  // ─── Boucles de lecture ──────────────────────────────────────────────────────
+  // À pas FIXE : la k-ième lecture part à debut + k·période ; la durée de la requête ne s'ajoute
+  // pas à la période (elle faisait sauter des colonnes live). Sur échec : recul exponentiel par
+  // source ; sur 429 / 418 : la porte de l'hôte (toutes les sources de l'hôte attendent). Onglet
+  // caché : plus aucune lecture ; au retour, chaque source repart tout de suite (rattrapage).
+  const boucles = [];
+  function boucle(nom, fn, periode, porte) {
+    const per = () => (typeof periode === 'function' ? periode() : periode);
+    const b = { nom, debut: Date.now(), h: null, endormie: false, enCours: false, echecs: 0, prochain: null, dernier: 0 };
+    b.tour = async () => {
+      clearTimeout(b.h); b.h = null;
+      if (document.hidden) { b.endormie = true; return; }
+      if (b.enCours) return;
+      b.enCours = true; b.dernier = Date.now();
+      let ok = true, enPause = false;
+      try { await fn(); } catch (e) { ok = false; enPause = !!(e && e.pause); }
+      b.enCours = false;
+      const t = Date.now(), p = per();
+      let suivant;
+      if (ok) { b.echecs = 0; suivant = BM.prochainCreneau(b.debut, p, t); }
+      else if (enPause) suivant = t + p;
+      else { b.echecs++; suivant = t + BM.delaiReessai(p, b.echecs); b.debut = suivant; }
+      const att = porte ? porte.attente(t) : 0;
+      if (att > 0) { suivant = Math.max(suivant, t + att + 250); b.debut = suivant; }
+      b.prochain = suivant;
+      if (document.hidden) { b.endormie = true; return; }
+      b.h = setTimeout(b.tour, Math.max(0, suivant - t));
     };
-    tour();
-    const m = { arreter() { actif = false; clearTimeout(h); } };
-    minuteurs.push(m);
-    return m;
+    b.reveiller = () => {
+      if (b.enCours || Date.now() - b.dernier < 1000) return;
+      b.endormie = false; b.debut = Date.now(); b.tour();
+    };
+    boucles.push(b);
+    b.tour();
+    return b;
   }
   const pause = ms => new Promise(r => setTimeout(r, ms));
   let boucleCarnet = null;
   function demarrer() {
-    lireHeatmap(); lireMarketData(); lireMinutesInitiales(); lireExecutionsInitiales();
-    boucle(lireHeatmap, 5 * 60e3);
-    boucle(lireMarketData, 60e3);
-    setTimeout(() => boucle(lireMinutes, 10e3), 10e3);
-    setTimeout(() => boucle(lireExecutions, 1000), 1500);
-    boucleCarnet = boucle(lireCarnet, () => CADENCE_CARNET[R.niveauxLive]);
-    setInterval(dessiner, 1000);                   // les âges vieillissent même sans donnée neuve
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) { sale(); } });
+    // Chaque boucle lit dès son premier tour : aucun appel direct en plus (heatmap.json était
+    // téléchargé et analysé deux fois à chaque ouverture).
+    boucle('horloge', lireHorloge, BM.HORLOGE_PERIODE, E.recul.binance);
+    boucle('carte', lireHeatmap, 5 * 60e3, E.recul.github);
+    boucle('fichier', lireMarketData, 60e3, E.recul.github);
+    boucle('bougies', lireMinutes, 10e3, E.recul.binance);
+    boucle('executions', lireExecutions, 1000, E.recul.binance);
+    boucleCarnet = boucle('carnet', lireCarnet, () => CADENCE_CARNET[R.niveauxLive], E.recul.binance);
+    // Les âges vieillissent même sans donnée neuve ; le statut décompte les reprises.
+    setInterval(() => { dessiner(); majStatut(); }, 1000);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) { for (const b of boucles) b.reveiller(); sale(); }
+    });
   }
 
   // ─── Vue ───────────────────────────────────────────────────────────────────
@@ -288,7 +365,7 @@
     return null;
   }
   function vueParDefaut() {
-    const now = Date.now(), p = dernierPrix() || 86000;
+    const now = maintenant(), p = dernierPrix() || 86000;
     const largeur = 3 * 3600e3;
     E.vue = { t1: now - largeur * 0.93, t2: now + largeur * 0.07, p1: p * (1 - 0.009), p2: p * (1 + 0.009) };
     E.suivre = true;
@@ -297,7 +374,7 @@
   }
   function suivreMaintenant() {
     if (!E.suivre || !E.vue) return;
-    const now = Date.now(), L = E.vue.t2 - E.vue.t1, t2 = now + L * 0.07;
+    const now = maintenant(), L = E.vue.t2 - E.vue.t1, t2 = now + L * 0.07;
     // La vue avance par pas d'un pixel au plus : la chaleur n'est repeinte que si elle a bougé.
     if (Math.abs(t2 - E.vue.t2) >= L / Math.max(1, Z ? Z.chaleur.w : 1000)) { E.vue.t2 = t2; E.vue.t1 = t2 - L; chaleurSale = true; }
     const p = dernierPrix();
@@ -538,10 +615,12 @@
       if (E.live && E.liveDebut) {
         const xs = X(Math.max(E.liveDebut, E.live.t0));
         if (xs > 0 && xs < Z.chaleur.w) tirets(xs, C.live);
-        const l = ['Carnet live · dernier il y a ' + BM.age(now - E.carnetA),
+        const l = ['Carnet live · dernier il y a ' + BM.age(now - axe(E.carnetA)),
           R.niveauxLive + ' niveaux / ' + CADENCE_CARNET[R.niveauxLive] / 1000 + ' s · ' + R.dpLive + ' $ · depuis ' + BM.heure(E.liveDebut),
           E.liveRef === 'publiee' ? 'même échelle que la carte publiée' : 'échelle propre : NON comparable à la carte publiée'];
-        pastille(l, Math.max(8, xs + 8), 8, C.live, 'left', 'Live · ' + BM.age(now - E.carnetA) + (E.liveRef === 'publiee' ? '' : ' · échelle propre'));
+        const hz = E.horloge.texte();
+        if (hz) l.push(hz);
+        pastille(l, Math.max(8, xs + 8), 8, C.live, 'left', 'Live · ' + BM.age(now - axe(E.carnetA)) + (E.liveRef === 'publiee' ? '' : ' · échelle propre'));
       } else if (E.erreurs.carnet) {
         pastille(['Carnet live indisponible', E.erreurs.carnet], Z.chaleur.w - 8, 8, C.down, 'right', 'Live indisponible');
       }
@@ -569,7 +648,7 @@
   function murs() {
     const n = E.niv;
     if (!n || !n.murs.length || !n.mursA) return;
-    const now = Date.now(), x0 = Math.max(0, X(n.mursA)), tr = n.tranche;
+    const now = maintenant(), x0 = Math.max(0, X(n.mursA)), tr = n.tranche;
     if (x0 >= Z.chaleur.w || !tr) return;
     for (const m of n.murs) {
       const ya = Y(m.p + tr), yb = Y(m.p);
@@ -599,8 +678,8 @@
       texte(g.court + ' ' + BM.prix(g.p), Z.chaleur.w - 6, y - 8, C.gamma, 10, 'right', true);
     }
     ctx.restore();
-    pastille(['Gamma (Deribit) · il y a ' + BM.age(Date.now() - n.gammaA), 'convention : ' + (n.convention || 'non précisée par le fichier')],
-      x0 + 6, 60, C.gamma, 'left', 'Gamma · ' + BM.age(Date.now() - n.gammaA));
+    pastille(['Gamma (Deribit) · il y a ' + BM.age(maintenant() - n.gammaA), 'convention : ' + (n.convention || 'non précisée par le fichier')],
+      x0 + 6, 60, C.gamma, 'left', 'Gamma · ' + BM.age(maintenant() - n.gammaA));
   }
   function bidAsk() {
     if (E.bidask.length < 2) return;
@@ -608,12 +687,14 @@
       ctx.strokeStyle = coul; ctx.lineWidth = 1.2; ctx.globalAlpha = 0.95;
       ctx.beginPath();
       let prevT = null, prevY = 0;
+      const valide = BM.validiteLecture(CADENCE_CARNET[R.niveauxLive]);
       for (const b of E.bidask) {
-        if (b.t < E.vue.t1 - 60e3 || b.t > E.vue.t2) continue;
-        const x = X(b.t), y = Y(b[k]);
+        const t = axe(b.t);
+        if (t < E.vue.t1 - 60e3 || t > E.vue.t2) continue;
+        const x = X(t), y = Y(b[k]);
         // Marches : le prix tient jusqu'à la lecture suivante. Une lecture manquée (onglet
         // caché, panne) coupe la ligne au lieu de relier deux instants éloignés.
-        if (prevT === null || b.t - prevT > 3 * CADENCE_CARNET[R.niveauxLive] + 1000) ctx.moveTo(x, y);
+        if (prevT === null || b.t - prevT > valide) ctx.moveTo(x, y);
         else { ctx.lineTo(x, prevY); ctx.lineTo(x, y); }
         prevT = b.t; prevY = y;
       }
@@ -641,7 +722,7 @@
     let premier = true, fin = 0;
     for (const m of ms) {
       if (m.fin < E.vue.t1 - 60e3 || m.t > E.vue.t2) continue;
-      const t = Math.min(m.fin, E.minutesA || Date.now());   // la bougie en cours vaut ce qu'elle valait à sa lecture
+      const t = Math.min(m.fin, E.minutesA ? axe(E.minutesA) : maintenant());   // la bougie en cours vaut ce qu'elle valait à sa lecture
       const x = X(t), y = Y(m.c);
       if (premier) { ctx.moveTo(x, y); premier = false; } else ctx.lineTo(x, y);
       fin = t;
@@ -687,7 +768,7 @@
   function profilExecutions() {
     if (!E.exec.seaux.size) return;
     const pasP = Math.max(E.exec.dp, (E.vue.p2 - E.vue.p1) / Z.chaleur.h * 3);
-    const prof = E.exec.profil(Math.max(E.vue.t1, E.exec.premier || E.vue.t1), Math.min(E.vue.t2, Date.now() + 1000), pasP);
+    const prof = E.exec.profil(Math.max(E.vue.t1, E.exec.premier || E.vue.t1), Math.min(E.vue.t2, maintenant() + 1000), pasP);
     let max = 0;
     for (const v of prof.values()) max = Math.max(max, v[0] + v[1]);
     if (!max) return;
@@ -830,7 +911,7 @@
     let premier = true, der = 0;
     for (let i = i0; i < ms.length; i++) {
       if (ms[i].t > E.vue.t2) break;
-      const x = X(Math.min(ms[i].fin, Date.now()));
+      const x = X(Math.min(ms[i].fin, maintenant()));
       if (premier) { ctx.moveTo(X(ms[i0].t), y(0)); premier = false; }
       ctx.lineTo(x, y(cvd[i])); der = cvd[i];
     }
@@ -1055,13 +1136,25 @@
       ? 'Encodage publié : intensité = min(' + enc.plafond + ', ent(' + enc.plafond + ' × √(q / ' + enc.ref_btc + ' BTC))), q = ' + enc.q + '.'
       : 'Encodage NON publié par ce fichier : la carte affiche des intensités 0–255, sans conversion en BTC (aucune référence n\'est inventée ici).';
   }
+  /** Le statut dit ce qui ne marche pas ET quand ça repart : une porte fermée (429 / 418) et
+   *  le prochain essai d'une source en échec, décomptés à la seconde. */
   function majStatut() {
     const el = $('statut');
     if (!el) return;
-    const noms = { carte: 'carte publiée', fichier: 'fichier 15 min', bougies: 'bougies', executions: 'exécutions', carnet: 'carnet live' };
-    const ko = Object.entries(E.erreurs).filter(([, v]) => v).map(([k, v]) => noms[k] + ' : ' + v);
-    el.textContent = ko.length ? '⚠ ' + ko.join(' · ') : '';
-    el.hidden = !ko.length;
+    const t = Date.now(), l = [];
+    for (const [nom, p] of [['Binance', E.recul.binance], ['GitHub', E.recul.github]]) {
+      const a = p.attente(t);
+      if (a > 0) l.push(nom + ' : limite de requêtes atteinte (HTTP ' + (p.statut || 429) + ') — lectures suspendues, reprise dans ' + BM.age(a));
+    }
+    const noms = { carte: 'carte publiée', fichier: 'fichier 15 min', bougies: 'bougies', executions: 'exécutions', carnet: 'carnet live', horloge: 'horloge Binance' };
+    for (const [k, v] of Object.entries(E.erreurs)) {
+      if (!v) continue;
+      const b = boucles.find(x => x.nom === k), d = b && b.echecs && b.prochain ? b.prochain - t : 0;
+      l.push((noms[k] || k) + ' : ' + v + (d > 0 ? ' — nouvel essai dans ' + BM.age(d) : ''));
+    }
+    const txt = l.length ? '⚠ ' + l.join(' · ') : '';
+    if (el.textContent !== txt) el.textContent = txt;
+    el.hidden = !l.length;
   }
 
   // Le fichier de 15 min : la carte lit aussi ses descriptions pour les infobulles des calques.
@@ -1082,6 +1175,9 @@
       live: E.live ? { n: E.live.n, dt: E.live.dt, dp: E.live.dp, ref: E.liveRef } : null,
       executions: { seaux: E.exec.seaux.size, premier: E.exec.premier, dernier: E.exec.dernier, total: E.exec.total.slice() },
       minutes: E.minutes.length, niveaux: E.niv ? { murs: E.niv.murs.length, gamma: E.niv.gamma.length } : null,
+      horloge: { ecart: E.horloge.ecart, u: E.horloge.u }, maintenant: maintenant(),
+      recul: { binance: E.recul.binance.attente(Date.now()), github: E.recul.github.attente(Date.now()) },
+      statut: ($('statut') || {}).textContent || '',
       pastilles: posees.map(p => p.texte), reglages: JSON.parse(JSON.stringify(R)),
       mesure: Object.assign({}, MESURE),
     }),

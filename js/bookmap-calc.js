@@ -472,6 +472,84 @@
     };
   };
 
+  // ─── Horloge : l'heure de Binance ──────────────────────────────────────────
+  /** Les exécutions et les bougies sont à l'heure du SERVEUR Binance ; le carnet live, « maintenant »
+   *  et les âges seraient à l'heure locale. Une horloge locale décalée ferait glisser les bulles et
+   *  la ligne de prix par rapport à la chaleur live. On mesure donc l'écart sur /api/v3/time :
+   *  envoi s, réception r (heure locale), heure serveur S → écart = S − (s + r)/2, incertitude
+   *  u = (r − s)/2. On garde les `garde` derniers échantillons et on retient celui dont l'aller-
+   *  retour est le plus court (le moins incertain). */
+  BM.HORLOGE_PERIODE = 5 * 60e3;     // un échantillon toutes les 5 min (poids Binance : 1)
+  BM.Horloge = function (garde) {
+    this.garde = garde || 5;
+    this.echantillons = [];
+    this.ecart = 0; this.u = null; this.a = null;   // u = null : jamais mesurée (écart supposé nul)
+  };
+  /** Ajoute un échantillon ; vrai si l'écart retenu a changé. */
+  BM.Horloge.prototype.echantillon = function (s, r, S) {
+    if (!(r >= s) || !isFinite(S)) return false;
+    this.echantillons.push({ ecart: S - (s + r) / 2, u: (r - s) / 2, a: r });
+    if (this.echantillons.length > this.garde) this.echantillons.shift();
+    let m = this.echantillons[0];
+    for (const e of this.echantillons) if (e.u < m.u) m = e;
+    const avant = this.ecart;
+    this.ecart = m.ecart; this.u = m.u; this.a = m.a;
+    return this.ecart !== avant;
+  };
+  /** Heure Binance d'un instant local (Date.now() par défaut). */
+  BM.Horloge.prototype.maintenant = function (local) { return (local === undefined ? Date.now() : local) + this.ecart; };
+  /** Instant (heure Binance) d'une réponse dont on ne connaît que l'envoi s et la réception r
+   *  (un carnet REST ne porte pas d'heure serveur) : le milieu, ± la demi-durée + l'incertitude. */
+  BM.Horloge.prototype.instant = function (s, r) { return { t: (s + r) / 2 + this.ecart, u: (r - s) / 2 + (this.u || 0) }; };
+  /** Texte de l'écart quand il dépasse `seuil` ms (1 s) ; null sinon. */
+  BM.Horloge.prototype.texte = function (seuil) {
+    if (this.u === null || Math.abs(this.ecart) <= (seuil === undefined ? 1000 : seuil)) return null;
+    const s = v => (v / 1000).toFixed(1).replace('.', ',') + ' s', u = this.u < 1000 ? Math.round(this.u) + ' ms' : s(this.u);
+    return 'horloge locale ' + (this.ecart > 0 ? 'en retard' : 'en avance') + ' de ' + s(Math.abs(this.ecart)) + ' ± ' + u + ' : recalée sur Binance';
+  };
+
+  // ─── Cadence des lectures : pas fixe, recul, délai maximal ─────────────────
+  /** Prochain créneau d'une boucle à pas FIXE (debut + k·période, strictement après `maintenant`) :
+   *  la période ne s'allonge pas de la durée de la requête, et une requête lente fait sauter des
+   *  créneaux au lieu de déclencher une rafale de rattrapage. */
+  BM.prochainCreneau = function (debut, periode, maintenant) {
+    return debut + (Math.floor((maintenant - debut) / periode) + 1) * periode;
+  };
+  /** Après `echecs` échecs consécutifs (réseau, délai dépassé, 5xx) : période × 2^echecs, plafonnée
+   *  à max(période, 60 s). Zéro échec : la période. */
+  BM.delaiReessai = function (periode, echecs) {
+    if (!(echecs > 0)) return periode;
+    return Math.min(Math.max(periode, 60e3), periode * Math.pow(2, echecs));
+  };
+  /** Retry-After (secondes, ou date HTTP) -> secondes ; null s'il est absent ou illisible. */
+  BM.lireRetryAfter = function (v, maintenantMs) {
+    if (v === null || v === undefined || v === '') return null;
+    if (/^\s*\d+(\.\d+)?\s*$/.test(String(v))) return +v;
+    const d = Date.parse(v);
+    return isFinite(d) ? Math.max(0, (d - (maintenantMs === undefined ? Date.now() : maintenantMs)) / 1000) : null;
+  };
+  /** Limites de requêtes d'un HÔTE (429 : trop de requêtes ; 418 : adresse IP bannie). Binance
+   *  bannit (2 min à 3 jours) l'adresse qui ignore ses 429 — et le bannissement touche aussi le
+   *  terminal et tous ceux derrière la même adresse. Sur 429/418, TOUTES les lectures de l'hôte
+   *  s'arrêtent jusqu'à `jusqua` : Retry-After quand il est lisible, sinon un recul exponentiel
+   *  (30 s, 60 s, 120 s… ; 2 min pour un 418), plafonné à 30 min. Un succès remet le compteur à zéro. */
+  BM.RECUL = { base: 30e3, base418: 120e3, max: 30 * 60e3 };
+  BM.Recul = function () { this.jusqua = 0; this.niveau = 0; this.statut = null; };
+  BM.Recul.prototype.echec = function (statut, retryAfterS, maintenant) {
+    const d = retryAfterS > 0 ? retryAfterS * 1000
+      : Math.min(BM.RECUL.max, (statut === 418 ? BM.RECUL.base418 : BM.RECUL.base) * Math.pow(2, this.niveau));
+    this.niveau++;
+    this.statut = statut;
+    this.jusqua = Math.max(this.jusqua, maintenant + d);
+    return d;
+  };
+  BM.Recul.prototype.attente = function (maintenant) { return Math.max(0, this.jusqua - maintenant); };
+  BM.Recul.prototype.succes = function () { this.niveau = 0; this.statut = null; };
+
+  /** Une lecture (carnet, bid / ask) vaut jusqu'à la suivante, mais pas plus de 3 cadences
+   *  (+ 1 s) : au-delà, c'est une vraie absence — non observé, hachuré, ligne coupée. */
+  BM.validiteLecture = function (cadence) { return 3 * cadence + 1000; };
+
   // ─── Âges et formats ───────────────────────────────────────────────────────
   BM.age = function (ms) {
     if (!(ms >= 0)) return '—';

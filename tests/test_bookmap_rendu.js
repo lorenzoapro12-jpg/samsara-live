@@ -29,8 +29,6 @@ const titre = t => console.log(`\n── ${t} ──`);
 
 // ── Binance simulé ───────────────────────────────────────────────────────────
 const MAINTENANT = Date.now();
-let seed = 5;
-const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
 // Le fichier du dépôt est lu À TRAVERS le décodeur de la carte (js/bookmap-calc.js), jamais par
 // ses champs : son format change côté serveur (« colonnes-1 »), et un harnais qui lirait
 // hm.bids deviendrait rouge ce jour-là en accusant la carte.
@@ -52,31 +50,49 @@ for (let c = 0; c < G.W; c++) for (let k = 0; k < G.H; k++) {
 const sansEncodage = () => { const c = Object.assign({}, hm); delete c.encodage; return c; };
 // Prix de référence : la plus basse cellule ask de la dernière colonne qui en a.
 const pMid = (() => { const a = CELLULES.filter(x => x.cote === 'ask'), cMax = Math.max(...a.map(x => x.c)); return Math.min(...a.filter(x => x.c === cMax).map(x => x.pb)) * G.dp; })();
-const MINUTES = [];
-{ let p = pMid; for (let i = 1500; i >= 0; i--) { const t = Math.floor((MAINTENANT - i * 60e3) / 60e3) * 60e3, o = p, c = p + (rnd() - 0.5) * 60; const q = 20 + rnd() * 80;
-  MINUTES.push([t, o.toFixed(2), (Math.max(o, c) + rnd() * 20).toFixed(2), (Math.min(o, c) - rnd() * 20).toFixed(2), c.toFixed(2), String(q), t + 59999, String(q * c), 100, String(q / 2), String(q * c * (0.3 + 0.4 * rnd())), '0']); p = c; } }
-const DERNIER_ID = 5_000_000, PAS_MS = 120;
-const trade = id => { const r = Math.sin(id * 12.9898) * 43758.5453; const f = r - Math.floor(r);
-  return { a: id, p: (+MINUTES[MINUTES.length - 1][4] + (f - 0.5) * 30).toFixed(2), q: (f * f * 3).toFixed(5), f: id, l: id, T: MAINTENANT - (DERNIER_ID - id) * PAS_MS, m: f < 0.47, M: true }; };
-function binance(url) {
-  const u = new URL(url), q = u.searchParams;
-  if (u.pathname.endsWith('/klines')) {
-    const n = +q.get('limit'), fin = q.get('endTime') ? +q.get('endTime') : Infinity;
-    return MINUTES.filter(k => k[0] <= fin).slice(-n);
-  }
-  if (u.pathname.endsWith('/aggTrades')) {
-    const n = +q.get('limit') || 500;
-    let de = q.get('fromId') !== null ? +q.get('fromId') : DERNIER_ID - n + 1;
-    const out = [];
-    for (let id = de; id < de + n && id <= DERNIER_ID; id++) out.push(trade(id));
-    return out;
-  }
-  if (u.pathname.endsWith('/depth')) {
-    const n = +q.get('limit'), m = +MINUTES[MINUTES.length - 1][4];
-    return { lastUpdateId: 1, bids: Array.from({ length: n }, (_, i) => [(m - 0.05 - i * 0.37).toFixed(2), (rnd() * (i % 97 === 0 ? 40 : 1.5)).toFixed(5)]),
-      asks: Array.from({ length: n }, (_, i) => [(m + 0.05 + i * 0.37).toFixed(2), (rnd() * (i % 89 === 0 ? 40 : 1.5)).toFixed(5)]) };
-  }
-  return null;
+// ── Binance simulé, à l'heure de SON serveur ─────────────────────────────────
+// S.now() = Date.now() + S.decalage : l'horloge du serveur peut différer de celle de la page
+// (horloge locale décalée), et avancer d'un coup (veille, onglet caché). Tout est engendré à la
+// demande et cohérent dans le temps : bougies, exécutions (une toutes les 120 ms), carnet.
+function simulateur() {
+  const S = { decalage: 0, compte: {}, log: [], updateId: 1000 };
+  S.now = () => Date.now() + S.decalage;
+  const BASE = Math.floor(MAINTENANT / 60e3) * 60e3 - 30 * 3600e3, PAS = 120;
+  const h = x => { const r = Math.sin(x * 12.9898) * 43758.5453; return r - Math.floor(r); };
+  S.prix = t => pMid + 300 * Math.sin(t / 3.6e6 * 2 * Math.PI) + 40 * Math.sin(t / 7e4);
+  S.kline = (t, now) => {
+    const o = S.prix(t), c = S.prix(Math.min(t + 60e3, now)), frac = Math.min(1, (now - t) / 60e3);
+    const vol = (20 + 60 * h(t / 60e3)) * frac, quote = vol * (o + c) / 2, taker = quote * (0.3 + 0.4 * h(t / 60e3 + 0.5));
+    return [t, o.toFixed(2), (Math.max(o, c) + 5).toFixed(2), (Math.min(o, c) - 5).toFixed(2), c.toFixed(2), String(vol), t + 59999, String(quote), 100, String(vol / 2), String(taker), '0'];
+  };
+  S.trade = id => { const T = BASE + id * PAS, f = h(id); return { a: id, p: (S.prix(T) + (f - 0.5) * 6).toFixed(2), q: (f * f * 3).toFixed(5), f: id, l: id, T, m: f < 0.47, M: true }; };
+  S.dernierId = () => Math.floor((S.now() - BASE) / PAS);
+  S.repondre = url => {
+    const u = new URL(url), q = u.searchParams, now = S.now(), k = u.pathname.split('/').pop();
+    S.compte[k] = (S.compte[k] || 0) + 1;
+    S.log.push([k, Date.now(), u.search]);
+    if (k === 'time') return { serverTime: now };
+    if (k === 'klines') {
+      const n = Math.min(1000, +q.get('limit') || 500), der = Math.floor(Math.min(q.get('endTime') ? +q.get('endTime') : now, now) / 60e3) * 60e3, out = [];
+      if (q.get('startTime') !== null) { for (let t = Math.ceil(+q.get('startTime') / 60e3) * 60e3; t <= der && out.length < n; t += 60e3) out.push(S.kline(t, now)); }
+      else for (let t = der - (n - 1) * 60e3; t <= der; t += 60e3) out.push(S.kline(t, now));
+      return out;
+    }
+    if (k === 'aggTrades') {
+      const n = Math.min(1000, +q.get('limit') || 500), last = S.dernierId();
+      const de = q.get('fromId') !== null ? +q.get('fromId') : last - n + 1, out = [];
+      for (let id = de; id < de + n && id <= last; id++) out.push(S.trade(id));
+      return out;
+    }
+    if (k === 'depth') {
+      const n = +q.get('limit'), m = S.prix(now);
+      const lv = s => Array.from({ length: n }, (_, i) => [(m + s * (0.05 + i * 0.37)).toFixed(2), (h(i + Math.floor(m) + s) * (i % 97 === 0 ? 40 : 1.5) + 0.01).toFixed(5)]);
+      S.updateId += 7;
+      return { lastUpdateId: S.updateId, bids: lv(-1), asks: lv(1) };
+    }
+    return null;
+  };
+  return S;
 }
 const encodage = JSON.parse(execFileSync('python3', ['-c', 'import sys,json;sys.path.insert(0,sys.argv[1]);import heatmap;print(json.dumps(heatmap.encodage()))', REPO]).toString());
 
@@ -89,32 +105,53 @@ const serveur = http.createServer((req, res) => {
   fs.createReadStream(f).pipe(res);
 });
 
+// opts : encodage, colonnes (heatmap.json servi en « colonnes-1 »), vue, S (simulateur),
+// intercept(url, chemin, S) → réponse à servir à la place, 'pendre' (jamais de réponse) ou rien ;
+// latenceHeatmap (ms) ; init (script avant la page) ; horloge (page.clock installée) ;
+// attendre: false (ne pas attendre le chargement complet).
 async function ouvrir(nav, opts) {
   const page = await nav.newPage({ viewport: opts.vue || { width: 1440, height: 860 } });
   const erreurs = [];
   page.on('pageerror', e => erreurs.push(e.message));
-  const hotes = new Set();
-  await page.route('**/*', r => {
+  const hotes = new Set(), S = opts.S || simulateur(), urls = [];
+  const comptes = { heatmap: 0, md: 0 };
+  await page.route('**/*', async r => {
     const u = r.request().url(), h = new URL(u).host;
     if (h.startsWith('127.0.0.1')) return r.continue();
-    hotes.add(h);
-    const cors = { 'access-control-allow-origin': '*' };
-    if (h === 'api.binance.com') { const d = binance(u); return d ? r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(d) }) : r.fulfill({ status: 404 }); }
+    hotes.add(h); urls.push(u);
+    const cors = { 'access-control-allow-origin': '*', 'access-control-expose-headers': 'retry-after' };
+    if (h === 'api.binance.com') {
+      const k = new URL(u).pathname.split('/').pop();
+      if (opts.intercept) {
+        const x = await opts.intercept(u, k, S);
+        if (x === 'pendre') return;
+        if (x) return r.fulfill(Object.assign({ contentType: 'application/json' }, x, { headers: Object.assign({}, cors, x.headers || {}) })).catch(() => {});
+      }
+      const d = S.repondre(u);
+      return (d ? r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(d) }) : r.fulfill({ status: 404, headers: cors })).catch(() => {});
+    }
     if (h === 'raw.githubusercontent.com') {
       if (u.includes('heatmap.json')) {
+        comptes.heatmap++;
         let corps = opts.encodage ? Object.assign({}, hm, { encodage }) : sansEncodage();
         if (opts.colonnes && !Array.isArray(corps.colonnes)) corps = versColonnes(corps);
-        return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(corps) });
+        if (opts.latenceHeatmap) await new Promise(z => setTimeout(z, opts.latenceHeatmap));
+        return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(corps) }).catch(() => {});
       }
-      return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, 'market-data.json')) });
+      comptes.md++;
+      return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, 'market-data.json')) }).catch(() => {});
     }
     return r.abort();
   });
+  if (opts.init) await page.addInitScript(opts.init);
   await page.addInitScript(() => { try { localStorage.clear(); } catch (e) { /* */ } });
+  if (opts.horloge) await page.clock.install({ time: Date.now() });
   await page.goto(`http://127.0.0.1:${serveur.address().port}/bookmap.html`);
-  await page.waitForFunction(() => window.__carte && window.__carte.etat().publiee && window.__carte.etat().live && window.__carte.etat().minutes > 1000, null, { timeout: 15000 }).catch(() => {});
-  await page.waitForTimeout(2500);
-  return { page, erreurs, hotes };
+  if (opts.attendre !== false) {
+    await page.waitForFunction(() => window.__carte && window.__carte.etat().publiee && window.__carte.etat().live && window.__carte.etat().minutes > 1000, null, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(2500);
+  }
+  return { page, erreurs, hotes, S, comptes, urls };
 }
 const etat = page => page.evaluate(() => window.__carte.etat());
 // Le pixel le plus clair d'un voisinage 5 × 5 : une ligne lissée (anticrénelage) n'a pas son
@@ -154,7 +191,7 @@ async function pixel(page, x, y) {
     const v = e.vue, W = await page.evaluate(() => document.getElementById('carte').clientWidth);
     const L = await page.evaluate(() => { const c = document.getElementById('carte'); return { w: c.clientWidth, h: c.clientHeight }; });
     // Une minute ANCIENNE (avant les exécutions) : seule la ligne de prix est dessinée au-dessus de la chaleur.
-    const k = MINUTES[MINUTES.length - 120];
+    const k = simulateur().kline(Math.floor(Date.now() / 60e3) * 60e3 - 120 * 60e3, Date.now());
     const zoneW = L.w - 66 - 112, zoneH = L.h - 20 - 58 - 58;
     const x = (k[6] + 1 - v.t1) / (v.t2 - v.t1) * zoneW, y = (v.p2 - +k[4]) / (v.p2 - v.p1) * zoneH;
     const px = await pixel(page, x, y);
@@ -261,6 +298,72 @@ async function pixel(page, x, y) {
     check('âges présents, en version courte', e.pastilles.length >= 4 && e.pastilles.every(t => t.length <= 40), e.pastilles);
     check('aucune erreur JavaScript', !erreurs.length, erreurs);
     await page.close();
+
+    // ════ Sources live : horloge, cadence, limites, délais ════════════════════
+    titre('8. Démarrage : chaque fichier publié lu UNE fois, sans paramètre anti-cache');
+    {
+      let p8, comptes, urls;
+      ({ page: p8, erreurs, comptes, urls } = await ouvrir(nav, { encodage: true }));
+      check('heatmap.json et market-data.json : une requête chacun à l\'ouverture', comptes.heatmap === 1 && comptes.md === 1, comptes);
+      check('aucun ?t= sur GitHub Raw (le CDN l\'ignore ; il empêchait la revalidation)', urls.filter(u => /raw\.githubusercontent/.test(u)).every(u => !/\?/.test(u)), urls.filter(u => /raw\./.test(u)));
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p8.close();
+    }
+
+    titre('9. Horloge locale décalée : tout est recalé sur l\'heure de Binance');
+    for (const dec of [30000, -30000]) {
+      const S = simulateur(); S.decalage = dec;
+      let p9;
+      ({ page: p9, erreurs } = await ouvrir(nav, { encodage: true, S }));
+      const e9 = await etat(p9);
+      const exe = e9.pastilles.find(t => /^Exécutions · dernière il y a /.test(t)) || '';
+      const age = (m => m ? +m[1].replace(',', '.') : NaN)(exe.match(/il y a ([\d,]+) s/));
+      check(`horloge ${dec > 0 ? 'en retard' : 'en avance'} de 30 s : écart mesuré ${(e9.horloge.ecart / 1000).toFixed(2)} s ± ${e9.horloge.u} ms`, Math.abs(e9.horloge.ecart - dec) < 1000, e9.horloge);
+      check('« maintenant » de la carte = heure Binance', Math.abs(e9.maintenant - S.now()) < 1500, e9.maintenant - S.now());
+      check(`âge des exécutions juste (${exe.replace(/^.* il y a /, '')}) : ni « — », ni gonflé de 30 s`, age >= 0 && age < 8, exe);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p9.close();
+    }
+
+    titre('10. Limite Binance (429) : TOUTES les lectures Binance s\'arrêtent, le statut décompte, puis reprise');
+    {
+      let limite = false;
+      const intercept = () => (limite ? { status: 429, headers: { 'retry-after': '4' }, body: '{"code":-1003,"msg":"Too many requests"}' } : null);
+      let p10, S;
+      ({ page: p10, erreurs, S } = await ouvrir(nav, { encodage: true, intercept }));
+      limite = true;
+      await p10.waitForFunction(() => /limite de requêtes atteinte \(HTTP 429\)/.test(window.__carte.etat().statut), null, { timeout: 5000 }).catch(() => {});
+      const e10 = await etat(p10), t429 = Date.now(), n0 = S.log.length;
+      check('statut : « limite de requêtes atteinte (HTTP 429) — reprise dans … »', /Binance : limite de requêtes atteinte \(HTTP 429\).*reprise dans/.test(e10.statut), e10.statut);
+      await p10.waitForTimeout(2500);
+      const pendant = S.log.slice(n0).length;
+      limite = false;
+      check(`pendant la pause : aucune requête Binance (${pendant})`, pendant === 0, S.log.slice(n0));
+      await p10.waitForFunction(() => !window.__carte.etat().recul.binance, null, { timeout: 8000 }).catch(() => {});
+      await p10.waitForTimeout(2500);
+      const apres = S.log.filter(x => x[1] > t429 + 3500).length, e10b = await etat(p10);
+      check(`reprise après Retry-After (4 s) : ${apres} requêtes, statut effacé`, apres >= 3 && !/429/.test(e10b.statut), { apres, statut: e10b.statut });
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p10.close();
+    }
+
+    titre('11. Requête sans réponse : délai maximal, erreur affichée, la source repart');
+    {
+      let pendre = 0;
+      const intercept = (u, k) => (k === 'depth' && pendre-- > 0 ? 'pendre' : null);
+      let p11;
+      ({ page: p11, erreurs } = await ouvrir(nav, { encodage: true, intercept }));
+      const n1 = (await etat(p11)).live.n;
+      pendre = 1;
+      await p11.waitForFunction(() => /carnet live : pas de réponse en 5 s/.test(window.__carte.etat().statut), null, { timeout: 9000 }).catch(() => {});
+      const st = (await etat(p11)).statut;
+      check('statut : « carnet live : pas de réponse en 5 s — nouvel essai dans … »', /carnet live : pas de réponse en 5 s — nouvel essai dans/.test(st), st);
+      await p11.waitForTimeout(6000);
+      const e11 = await etat(p11);
+      check(`le carnet live repart (${n1} → ${e11.live.n} lectures), erreur effacée`, e11.live.n > n1 + 1 && !/carnet live/.test(e11.statut), { n1, n: e11.live.n, statut: e11.statut });
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p11.close();
+    }
   } finally {
     await nav.close();
     serveur.close();

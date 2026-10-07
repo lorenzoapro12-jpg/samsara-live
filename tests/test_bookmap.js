@@ -229,6 +229,49 @@ check('instant des murs = instant de la lecture du carnet', n.mursA === Date.par
 check('gamma : mur de calls, de puts, zéro gamma', ['CW', 'PW', 'ZG'].every(c => n.gamma.some(x => x.court === c)) || !md.micro.call_wall);
 check('âges lisibles', BM.age(800) === '0,8 s' && BM.age(42000) === '42 s' && BM.age(16 * 60e3) === '16 min' && BM.age(125 * 60e3) === '2 h 05');
 
+// ── 7b. Horloge Binance ──────────────────────────────────────────────────────
+titre('7b. Horloge : l\'heure de Binance, mesurée, avec son incertitude');
+{
+  const hz = new BM.Horloge();
+  // Horloge locale en RETARD de 30 s : le serveur répond S = local + 30 000 au milieu de l'aller-retour.
+  hz.echantillon(1000, 1400, 1200 + 30000);            // aller-retour 400 ms
+  check('écart = S − (s + r)/2 ; incertitude = (r − s)/2', hz.ecart === 30000 && hz.u === 200, { ecart: hz.ecart, u: hz.u });
+  hz.echantillon(5000, 5060, 5030 + 30012);            // aller-retour 60 ms : plus sûr, retenu
+  hz.echantillon(9000, 9900, 9450 + 29000);            // aller-retour 900 ms : écarté
+  check('retenu : l\'échantillon au plus court aller-retour parmi les 5 derniers', hz.ecart === 30012 && hz.u === 30, { ecart: hz.ecart, u: hz.u });
+  for (let i = 0; i < 5; i++) hz.echantillon(20000 + i * 1000, 20000 + i * 1000 + 300, 20000 + i * 1000 + 150 + 31000);
+  check('fenêtre glissante : un vieil échantillon sort (5 gardés)', hz.echantillons.length === 5 && hz.ecart === 31000, hz.ecart);
+  check('maintenant = local + écart', hz.maintenant(1e6) === 1e6 + 31000);
+  const i = hz.instant(100000, 100400);
+  check('instant d\'une lecture sans heure serveur : milieu de [s, r] ± (demi-aller-retour + incertitude)', i.t === 100200 + 31000 && i.u === 200 + 150, i);
+  check('écart > 1 s : écrit (« horloge locale en retard de 31,0 s ± 150 ms »)', /en retard de 31,0 s ± 150 ms/.test(hz.texte() || ''), hz.texte());
+  const h0 = new BM.Horloge(); h0.echantillon(0, 100, 50 + 400);
+  check('écart ≤ 1 s : rien d\'écrit ; jamais mesurée : écart nul', h0.texte() === null && new BM.Horloge().maintenant(5) === 5);
+  check('échantillon absurde refusé (réception avant envoi, heure illisible)', !new BM.Horloge().echantillon(10, 5, 7) && !new BM.Horloge().echantillon(0, 5, NaN));
+}
+
+// ── 7c. Cadence : pas fixe, recul, porte des limites ─────────────────────────
+titre('7c. Lectures : pas fixe, délais, recul sur 429 / 418');
+check('pas fixe : la durée de la requête ne s\'ajoute pas (départ 0, période 2 s, fin à 2,3 s → 4 s)', BM.prochainCreneau(0, 2000, 2300) === 4000);
+check('requête plus longue qu\'une période : on saute les créneaux passés (pas de rafale)', BM.prochainCreneau(0, 2000, 7100) === 8000);
+check('juste à l\'heure : le créneau suivant', BM.prochainCreneau(0, 2000, 4000) === 6000);
+check('échecs : période × 2^n, plafonnée à 60 s (ou à la période si elle est plus longue)',
+  BM.delaiReessai(2000, 0) === 2000 && BM.delaiReessai(2000, 1) === 4000 && BM.delaiReessai(2000, 3) === 16000 && BM.delaiReessai(2000, 9) === 60000 && BM.delaiReessai(300000, 4) === 300000);
+check('Retry-After : secondes ou date HTTP ; absent → null', BM.lireRetryAfter('7', 0) === 7 && BM.lireRetryAfter(new Date(10000).toUTCString(), 4000) === 6 && BM.lireRetryAfter(null) === null && BM.lireRetryAfter('n/a') === null);
+{
+  const p = new BM.Recul();
+  const d1 = p.echec(429, null, 0), d2 = p.echec(429, null, 0), d3 = p.echec(429, null, 0);
+  check('429 sans Retry-After : 30 s, 60 s, 120 s…', d1 === 30000 && d2 === 60000 && d3 === 120000, [d1, d2, d3]);
+  check('la porte reste fermée jusqu\'au bout du recul', p.attente(119000) === 1000 && p.attente(130000) === 0);
+  p.succes();
+  check('un succès remet le recul à zéro', p.echec(429, null, 200000) === 30000);
+  const q = new BM.Recul();
+  check('Retry-After honoré tel quel ; 418 (adresse bannie) : 2 min sans Retry-After', q.echec(429, 7, 0) === 7000 && new BM.Recul().echec(418, null, 0) === 120000);
+  let r = new BM.Recul(), d = 0; for (let k = 0; k < 20; k++) d = r.echec(429, null, 0);
+  check('recul plafonné à 30 min', d === 30 * 60e3);
+}
+check('une lecture vaut jusqu\'à la suivante, au plus 3 cadences + 1 s', BM.validiteLecture(2000) === 7000);
+
 // ── 8. Isolement : la carte ne touche pas au terminal ─────────────────────────
 titre('8. Isolement : une page à côté, qui ne partage aucun code avec le terminal');
 const html = fs.readFileSync(path.join(REPO, 'bookmap.html'), 'utf8');
