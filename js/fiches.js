@@ -296,6 +296,28 @@ const FICHES = {
     lectures: [{ s: 'usuel', t: 'MACD au-dessus de son signal : dynamique haussière qui s’accélère ; croisements en retard sur le prix.' }],
     limites: 'Non borné : pas de niveau « extrême » universel.',
   },
+  // ── Le dessin lui-même ──
+  // La forme d'une bougie est une CONVENTION du thème (jeton --bougie-forme) : la fiche dit celle
+  // du thème courant, lue dans le code du tracé (FORMES_BOUGIE, BOUGIE_DENSE_PX, js/app.js).
+  bougies: {
+    titre: 'Bougies : la forme du thème', page: 'bougies', nature: 'convention',
+    simple: 'Une bougie résume une période : son ouverture, son plus haut, son plus bas et sa clôture. Le thème choisit la forme qui les dessine.',
+    etat: () => {
+      if (typeof FORMES_BOUGIE === 'undefined') return null;
+      const f = typeof COLORS !== 'undefined' && Object.prototype.hasOwnProperty.call(FORMES_BOUGIE, COLORS.bougieForme) ? COLORS.bougieForme : 'pleine';
+      return 'Thème « ' + (typeof themeCourant === 'function' ? themeCourant().nom : '—') + ' » : ' + FORMES_BOUGIE[f]
+        + '. La forme change, jamais la valeur ; en vue dense (corps < ' + BOUGIE_DENSE_PX + ' px), corps pleins'
+        + (f === 'barre' ? ' — pour des barres, le trait seul' : '') + '.';
+    },
+    formule: () => 'Hausse : clôture ≥ ouverture. Le corps va de l’ouverture à la clôture, la mèche du plus bas au plus haut, aux ordonnées exactes de ces prix ; seule la forme suit le thème (jeton --bougie-forme : '
+      + (typeof FORMES_BOUGIE !== 'undefined' ? Object.keys(FORMES_BOUGIE).join(', ') : '—') + ').',
+    lectures: [
+      { s: 'convention', t: 'La forme change, jamais la valeur : les quatre prix sont tracés aux mêmes ordonnées, quelle que soit la forme du thème.' },
+      { s: 'convention', t: 'Corps creux en hausse, plein en baisse : la convention des cotes imprimées d’une seule encre — la hausse se lit à la forme, pas seulement à la couleur.' },
+      { s: 'convention', t: 'Barres OHLC : l’ouverture est le tiret de gauche, la clôture celui de droite.' },
+    ],
+    limites: 'En vue dense, les corps redeviennent pleins (une barre, un simple trait) : un contour de quelques pixels ne se lit plus. La dernière bougie bouge jusqu’à sa clôture.',
+  },
   stoch: {
     titre: 'Stochastique rapide', page: 'stoch',
     simple: 'Où se situe la clôture dans le range récent, de 0 (au plus bas) à 100 (au plus haut).',
@@ -340,11 +362,16 @@ function ficheHtml(id) {
   if (!f) return '';
   const m = f.champ ? metaDe(f.champ) : null;
   const P = typeof PARAM !== 'undefined' ? PARAM : null;
-  const nature = m ? m.nature : (f.page ? 'mesure' : null);
+  // Nature : celle que publie le producteur (champ du fichier), sinon celle que la fiche déclare
+  // (la forme des bougies est une convention), sinon « mesuré » pour un calcul de la page.
+  const nature = m ? m.nature : (f.nature || (f.page ? 'mesure' : null));
   let h = '<div class="fiche-tete"><h3 class="fiche-titre">' + echapF(f.titre) + '</h3>'
     + (nature ? '<span class="fiche-nature nature-' + echapF(nature) + '">' + echapF(NATURES[nature] || nature) + '</span>' : '')
     + '<button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>'
     + '<p class="fiche-simple">' + echapF(f.simple) + '</p>';
+  // État du moment dérivé du code (ex. la forme de bougie du thème courant) : même HTML dans les deux modes.
+  const etat = f.etat ? f.etat() : null;
+  if (etat) h += '<p class="fiche-valeur">' + echapF(etat) + '</p>';
   if (f.champ) {
     const vals = valeursDe(f.champ);
     const md = typeof marketData !== 'undefined' ? marketData : null;
@@ -353,6 +380,9 @@ function ficheHtml(id) {
       + (m && m.unite ? ' <span class="fiche-unite">' + echapF(m.unite) + '</span>' : '')
       + (age !== null ? ' <span class="fiche-age">· publié il y a ' + age + ' min</span>' : '') + '</p>';
     if (m && m.nom_trompeur) h += '<p class="fiche-alerte">Nom trompeur : ' + echapF(m.nom_trompeur) + '</p>';
+    // Les dernières heures de ce champ, publication par publication (js/chronique.js) : même
+    // HTML dans les deux modes ; absent tant qu'aucun historique n'est lu.
+    if (typeof chroniqueFiche === 'function') h += chroniqueFiche(f.champ, id);
   }
   h += '<h4>Comment ça se lit</h4><ul class="fiche-lectures">' + f.lectures.map(l =>
     '<li><span class="statut statut-' + echapF(l.s) + '">' + echapF(STATUTS[l.s] || l.s) + '</span> ' + echapF(l.t) + '</li>').join('') + '</ul>';
@@ -417,6 +447,7 @@ function ouvrirGlossaire(ancre) {
   const groupes = [['Positionnement et dérivés', ['gex', 'ls', 'top_ls', 'taker', 'funding', 'oi', 'cvd', 'prime']],
     ['Macro', ['dxy', 'vix']], ['Carnet', ['carnet', 'murs']],
     ['Indicateurs du fichier', ['rsi_tf', 'ema_tf', 'croisement', 'sr_tf', 'amplitude', 'atr_tf', 'volume_tf']],
+    ['Le dessin du graphique', ['bougies']],
     ['Indicateurs du graphique', ['rsi', 'ema', 'vwap', 'adx', 'atr', 'volume', 'sr', 'bb', 'macd', 'stoch']]];
   p.innerHTML = '<div class="fiche-tete"><h3 class="fiche-titre">Légendes</h3><button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>'
     + '<p class="fiche-simple">Comment chaque chiffre se lit — et ce qu’il ne dit pas. Mode <b>' + (modeCourant() === 'expert' ? 'Expert' : 'Débutant') + '</b> : '

@@ -153,7 +153,20 @@ try {
     // S/R : fenêtre réelle (30 bougies), plus l'ancien « 16 j » faux pour les trois TF.
     ['Fenêtre S/R réelle', /min\/max 5 j/.test(feed.innerHTML) && /min\/max 30 h/.test(feed.innerHTML) && !/16 j/.test(feed.innerHTML)],
     ['Tous blocs ok', new RegExp(Object.keys(D.status).length+'/'+Object.keys(D.status).length+' blocs').test(feed.innerHTML)],
-    ['6 cartes rendues', (feed.innerHTML.match(/demon-card/g)||[]).length === 6],
+    ['8 cartes rendues (dont Horloges et Contre-expertise)', (feed.innerHTML.match(/demon-card/g)||[]).length === 8
+      && /carte-horloges/.test(feed.innerHTML) && /carte-contre/.test(feed.innerHTML)],
+    // Horloges : chaque champ « horodatage » décrit (alias exclus) a sa ligne, sous son libellé.
+    ['Horloges : un horodatage décrit = une ligne', Object.entries(D.meta.champs).filter(([, m]) => m.nature === 'horodatage' && !m.alias_de)
+      .every(([, m]) => feed.innerHTML.includes('<span class="h-nom">' + m.libelle))],
+    // Repère de la publication sur le graphique : à `updated`, au prix publié, jamais sans son âge.
+    ['Repère de la publication (instant, prix, âge)', (() => {
+      const tu = Date.parse(D.updated) / 1000, P = { left: 16, right: 75, W: 900, top: 10, ph: 400, minP: D.btc.price - 500, maxP: D.btc.price + 500, range: 1000, t0: tu - 900 * 10, pas: 900, gap: 8 };
+      vm.runInContext('activeSymbol = "BTCUSDT"', sandbox);
+      const r = sandbox.reperePublication(P);
+      return r && Math.abs(r.x - (16 + 80)) < 1e-6 && Math.abs(r.y - (10 + 200)) < 1e-6
+        && r.texte === 'fichier ' + D.updated.slice(11, 16) + ' UTC · prix publié ' + Math.round(D.btc.price).toLocaleString('fr-FR') + ' (' + vm.runInContext('Horloges', sandbox).texteAge(Date.now() - Date.parse(D.updated)) + ')'
+        && sandbox.reperePublication(Object.assign({}, P, { t0: tu + 900 })) === null;
+    })()],
     ['Aucun motif interdit dans le RENDU', hitsFeed.length === 0],
     ['Aucun motif interdit dans la SOURCE publiée', hitsSrc.length === 0],
   ];
