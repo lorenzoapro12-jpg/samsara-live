@@ -11,7 +11,7 @@ ko=0
 etape() { printf '\n\033[1m── %s ──\033[0m\n' "$1"; }
 
 etape "0. Compilation des scripts Python"
-for f in ../publish.py ../heatmap.py ../samsara_config.py ../options_gex.py ../indicateurs.py ../fonts/fabriquer.py *.py; do   # tout script Python des tests : aucune liste à tenir
+for f in ../publish.py ../heatmap.py ../historique.py ../samsara_config.py ../options_gex.py ../indicateurs.py ../fonts/fabriquer.py *.py; do   # tout script Python des tests : aucune liste à tenir
   if python3 -m py_compile "$f" 2>/dev/null; then
     echo "  ✓ $f"
   else
@@ -24,6 +24,9 @@ python3 test_calculs.py || ko=1
 
 etape "1a. Heatmap publiée : format colonnes-1 sans perte, octets stables d'une publication à l'autre, cadence 15 min — hors ligne"
 python3 test_heatmap_format.py || ko=1
+
+etape "1c. Historique : amorçage depuis les commits, ajout, idempotence, mois clos, index, lecture par fetch partiel — hors ligne"
+python3 test_historique.py || ko=1
 
 etape "1b. Libellés : chaque champ publié décrit, aucun nom ne ment sur sa formule — hors ligne"
 python3 test_meta.py || ko=1

@@ -648,3 +648,92 @@ Budget : ≤ ×1,6 au repos, ≤ ×1,3 en geste.
 - Je n'ai pas corrigé le nom interne de la police instanciée : la table name dit « Overpass Mono Light », héritée de l'instance par défaut. C'est cosmétique (@font-face sert « Overpass Mono ») et ça relève de fabriquer.py, partagé.
 - Je n'ai pas touché aux étiquettes de prix des thèmes existants (contrôle 10 relevé, non exigé) : la décision appartient au propriétaire, thème par thème.
 - Je n'ai pas corrigé l'en-tête de la base à 390 px (le prix passe sous les boutons dans tous les thèmes sans structure) : c'est hors de mon thème. La planche le corrige pour elle-même avec un en-tête sur 2 rangées.
+
+---
+
+## Troisième écrivain : `historique.py` et la branche `historique`
+
+### Le problème
+
+`market-data.json` est un **instantané**. L'historique de ses chiffres n'existait que dans les
+commits de `master` : pour voir une tendance sur 24 h, une session devait relire une centaine
+de commits — et cet historique disparaissait si le dépôt était recréé. Les sessions distantes
+lisent les bougies directement sur le miroir public de Binance, mais n'ont **aucun accès aux
+futures ni à cette machine** : le positionnement devait donc leur être poussé dans git.
+
+### Ce qui a été construit
+
+Une **branche orpheline** `historique`, faite de **données seules** (pas dans `master`, que
+GitHub Pages republie à chaque push) :
+
+```
+index.json                              updated, status, errors, series, meta
+series/positionnement/<année-mois>.csv   1 ligne par publication de market-data.json
+series/funding.csv                       1 ligne par échéance de financement (8 h)
+series/open-interest-1h.csv              1 point par heure
+series/long-short-1h.csv                 comptes, gros traders, taker — 1 point par heure
+```
+
+**Lecture, sans rapatrier le dépôt** — mesurée sur le distant réel, `.git` = 152 Ko :
+
+```bash
+git fetch --depth 1 --filter=blob:none origin historique
+git show FETCH_HEAD:index.json           # 14 263 o, status « ok », âge 16 s
+git show FETCH_HEAD:series/positionnement/2026-10.csv
+```
+
+Le clone partiel est bien partiel (`remote.origin.promisor = true`,
+`partialclonefilter = blob:none`) : les blobs se rapatrient à l'unité, ce qui justifie la
+limite de **1 Mo par fichier**.
+
+### Mesures de l'amorçage (07/10/2026 21:13 UTC)
+
+| série | lignes | octets | trous |
+|---|---|---|---|
+| positionnement | **523** | 74 272 | 0 |
+| funding | 500 | 22 115 | 0 |
+| open-interest-1h | 500 | 23 684 | 0 |
+| long-short-1h | 501 | 30 620 | 0 |
+| `index.json` | — | 14 263 | 31 champs décrits |
+
+Le positionnement couvre le 02/10 11:18 → 07/10 21:03, **523 publications distinctes sur 523
+commits** — aucune perte, aucun doublon. Les trois séries Binance sont bornées par ce que la
+source rend encore (1 000 échéances de funding, 500 points horaires).
+
+Projection de taille : 3 100 lignes d'un mois plein pèsent **moins de 250 Ko** — la limite de
+1 Mo garde un facteur ~4 de marge. Le dépassement, s'il arrivait, **refuse l'écriture et sort
+en code 1** : aucune troncature silencieuse.
+
+### Trois règles, et le défaut qu'elles empêchent
+
+1. **Un mois clos ne se réécrit pas.** Clé = `updated` ; relancer n'ajoute rien. Un fichier
+   dont le contenu ne change pas n'est même pas réécrit sur le disque (`ecrire_si_change`),
+   donc git ne voit aucun delta. Une publication apportée pour un mois antérieur est
+   **refusée et signalée**.
+2. **Un trou se signale, il ne se comble pas.** Le pas nominal vient du producteur (900 s /
+   8 h / 1 h), jamais d'une moyenne des écarts — une cadence déduite des données ne peut pas
+   détecter sa propre dérive. Constat sur les 523 publications : les 12 écarts non-15-min
+   valent 2, 13 ou 14 min, et **aucun ne franchit le seuil d'un créneau manquant** (un écart
+   de 13 min donne `round(13/15) − 1 = 0`). C'est du bruit de planificateur, pas un trou — et
+   le distinguer était le point.
+3. **Une case vide n'est pas un zéro.** Les champs absents des anciens formats restent vides :
+   le CVD et le GEX n'apparaissent que le **04/10 13:50**, la prime hors USDT que le
+   **06/10 12:33**. `meta` porte, colonne par colonne, ce qu'une absence veut dire.
+
+### Isolation de `master`
+
+`historique.py` prend le **même verrou partagé** que les deux autres écrivains, mais travaille
+dans un **`git worktree`** sur sa branche (`hist_dir`, défaut `<state_dir>/historique`) : arbre
+et index séparés, objet-store partagé. Vérifié après l'amorçage : `master` inchangé, aucun
+fichier modifié hors des trois ajouts voulus, `git worktree list` montre les deux arbres.
+
+### Ce qui n'a pas été vérifié
+
+- **Un passage réel du cron**, à l'heure où ce document est écrit : la cadence `5,20,35,50`
+  est posée (juste après `publish.py`, à `3,18,33,48`) et le premier passage automatique est
+  attendu à 21:20 UTC.
+- **Les tests de rendu dans Chromium** (étapes 9 à 9f du harnais) : Playwright n'est pas
+  installé sur cette machine. Le harnais le dit et ne les compte pas comme verts.
+- **La rotation au-delà de 1 Mo** : la limite refuse l'écriture, elle ne découpe pas. Le cas
+  ne se produit pas à la cadence actuelle ; s'il devait arriver, le choix du découpage
+  appartient au propriétaire du dépôt.

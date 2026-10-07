@@ -24,6 +24,10 @@ Clés (toutes optionnelles)
   cvd_database        OBSOLÈTE depuis le 04/10/2026 — plus lue   défaut : None
                       (le CVD vient des bougies Binance) ; acceptée pour ne pas
                       casser une config existante.
+  hist_dir            répertoire de travail de la branche        défaut : <state_dir>/historique
+                      `historique` (historique.py) — un worktree à part,
+                      pour ne jamais toucher l'index ni l'arbre de master
+  hist_branche        branche orpheline des séries historiques   défaut : historique
 
 Les chemins relatifs sont résolus depuis le dossier du dépôt. Une valeur `null` ou absente
 prend le défaut : il n'y a pas de « clé manquante » qui casse le script.
@@ -45,9 +49,11 @@ _DEFAULTS = {
     "git_branch": "master",
     "extra_module_paths": [],
     "cvd_database": None,
+    "hist_dir": None,           # None -> <state_dir>/historique
+    "hist_branche": "historique",
 }
 
-_PATH_KEYS = ("repo_dir", "state_dir", "out_dir", "git_lock", "cvd_database")
+_PATH_KEYS = ("repo_dir", "state_dir", "out_dir", "git_lock", "cvd_database", "hist_dir")
 
 
 def _abs(base, value):
@@ -80,6 +86,12 @@ def load():
     if cfg["git_lock"] is None:
         cfg["git_lock"] = os.path.join(cfg["state_dir"], "git.lock")
     cfg["git_lock"] = _abs(cfg["repo_dir"], cfg["git_lock"])
+    # Répertoire de travail de la branche `historique` : un worktree À PART, sinon le
+    # troisième écrivain toucherait l'index et l'arbre de master. Dérivé du state_dir
+    # comme le reste : un clone nu n'a rien à configurer.
+    if cfg["hist_dir"] is None:
+        cfg["hist_dir"] = os.path.join(cfg["state_dir"], "historique")
+    cfg["hist_dir"] = _abs(cfg["repo_dir"], cfg["hist_dir"])
 
     paths = cfg.get("extra_module_paths") or []
     if not isinstance(paths, list):

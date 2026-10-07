@@ -18,6 +18,10 @@
                                                                                 ▼
                                                                           index.html
                                                                     (le dashboard, autonome)
+
+   market-data.json ──┐
+   git log master ────┤──▶ historique.py ──▶ branche orpheline `historique`
+   fapi.binance.com ──┘                     (index.json + series/*.csv)
 ```
 
 `index.html` ne lit **que** deux fichiers du dépôt — `market-data.json` et `heatmap.json` —
@@ -37,6 +41,7 @@ données locales, il faut rendre ces deux URL relatives.
 | Badge de prix, bougies, panneau ⚡ | **1 à 5 secondes** | `index.html` → Binance, directement |
 | `heatmap.json` | **15 minutes** (publication) | `heatmap.py` (état accumulé toutes les minutes, publié au plus toutes les 15 min) |
 | `market-data.json` | **15 minutes** | `publish.py` |
+| Séries de la branche `historique` | **15 minutes**, juste après `publish.py` | `historique.py` |
 
 **C'est la source de confusion numéro un du projet.** Deux chiffres affichés côte à côte
 peuvent décrire deux instants différents. La règle qui en découle :
@@ -83,11 +88,11 @@ vérifié par `tests/test_meta.py` : une légende ne se rédige plus à côté d
 | ratio bid/ask | BTC / BTC | bande ±0,5 % (ou la plus large couverte) |
 | S / R / amplitude | prix | 30 dernières bougies du TF : 5 j (4h), 30 h (1h), 30 j (1j) |
 
-## Les deux écrivains, un seul dépôt
+## Les trois écrivains, un seul dépôt
 
-`publish.py` et `heatmap.py` écrivent dans le même dépôt git, à des cadences différentes.
-Sans précaution, l'un committe le fichier que l'autre vient de préparer, ou tombe sur un
-`index.lock`.
+`publish.py`, `heatmap.py` et `historique.py` écrivent dans le même dépôt git, à des
+cadences différentes. Sans précaution, l'un committe le fichier que l'autre vient de
+préparer, ou tombe sur un `index.lock`.
 
 ```
 verrou partagé (fcntl.flock sur git_lock)
@@ -103,6 +108,67 @@ verrou partagé (fcntl.flock sur git_lock)
 Le pathspec seul ne suffit pas : `git commit -- <chemin>` committe aussi **tout ce qui est
 déjà indexé** dans l'index partagé. Un autre processus qui a laissé des fichiers indexés les
 fait partir sous le message de l'écrivain — l'historique ment. D'où l'index dédié.
+
+**`historique.py` prend le même verrou, mais travaille ailleurs.** Il publie une branche
+*différente* : il lui faut donc un arbre et un index différents — un `git worktree` sur la
+branche `historique`, dans `hist_dir`. L'objet-store est partagé (rien à cloner) et le
+worktree a son propre index : l'index et l'arbre de `master` ne sont jamais touchés. C'est
+la contrainte « ne jamais toucher l'index ni l'arbre de master » rendue structurelle plutôt
+que promise.
+
+```
+worktree (branche `historique`, hist_dir)
+  ├─ .git  → fichier de renvoi vers <repo>/.git/worktrees/historique
+  ├─ index.json
+  └─ series/*.csv
+```
+
+---
+
+## La branche `historique`
+
+Pourquoi une branche à part : `market-data.json` est un **instantané**. L'historique de ses
+chiffres ne vivait que dans les commits de `master` — une session devait en relire une
+centaine pour voir une tendance sur 24 h, et cet historique disparaissait si le dépôt était
+recréé. Il ne pouvait pas aller dans `master` non plus : **GitHub Pages republie `master` à
+chaque push**.
+
+| Fichier | Contenu |
+|---|---|
+| `index.json` | `updated`, `status`, `errors` (mêmes conventions que `market-data.json`) ; par série : fichiers ordonnés, colonnes, période, lignes, trous détectés ; `meta` décrivant chaque colonne |
+| `series/positionnement/<année-mois>.csv` | une ligne par publication de `market-data.json`, amorcée depuis l'historique des commits |
+| `series/funding.csv` · `series/open-interest-1h.csv` · `series/long-short-1h.csv` | ce que Binance futures conserve encore, rapatrié une fois puis prolongé |
+
+Une session la lit sans rapatrier le dépôt :
+
+```bash
+git fetch --depth 1 --filter=blob:none origin historique
+git show FETCH_HEAD:index.json          # puis seulement les fichiers utiles
+```
+
+D'où deux contraintes de forme, tenues par le script et par `tests/test_historique.py` :
+**l'index doit tout décrire** (une session ne voit que ce qu'il annonce), et **chaque fichier
+reste sous 1 Mo** (un blob se rapatrie à l'unité dans un clone partiel).
+
+Trois règles, chacune née d'un défaut qu'on ne veut pas reproduire :
+
+**Un mois clos ne se réécrit pas.** La clé d'une ligne est son horodatage : relancer
+n'ajoute rien, et un fichier dont le contenu ne change pas n'est pas réécrit sur le disque —
+donc git ne voit aucun delta et ne committe rien. Une publication apportée pour un mois
+antérieur est **refusée et signalée**.
+
+**Un trou se signale, il ne se comble pas.** L'index calcule, sur le pas nominal du
+producteur (900 s pour le positionnement, 8 h pour le funding, 1 h pour les autres), les
+créneaux manquants entre la première et la dernière date. On ne connaît pas la valeur
+qu'aurait portée la ligne absente : l'inventer serait fabriquer une donnée.
+
+**Une case vide n'est pas un zéro.** Les champs qui n'existaient pas dans les anciens
+formats restent vides — le CVD n'est publié que depuis le 04/10/2026, la prime hors USDT
+depuis le 06/10 — et `meta` porte, colonne par colonne, ce qu'une absence veut dire.
+
+`index.json` est **redaté à chaque passage** : c'est ce qui rend son âge lisible par une
+session distante (un index « ok » de moins de 20 minutes). Les séries, elles, ne bougent que
+quand une ligne apparaît.
 
 ---
 

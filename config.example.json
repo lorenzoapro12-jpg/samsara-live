@@ -13,7 +13,7 @@
   "_out_dir": "Où écrire heatmap.json et market-data.json. Défaut : repo_dir.",
 
   "git_lock": null,
-  "_git_lock": "Verrou partagé entre les deux écrivains (heatmap + publish). Défaut : <state_dir>/git.lock.",
+  "_git_lock": "Verrou partagé entre les trois écrivains (heatmap + publish + historique). Défaut : <state_dir>/git.lock.",
 
   "git_remote": "origin",
   "_git_remote": "Nom du remote git à pousser.",
@@ -25,5 +25,11 @@
   "_extra_module_paths": "Chemins ajoutés à sys.path. Depuis le 06/10/2026, aucun bloc n'en a besoin : ils ne servent plus qu'à `publish.py --comparer` (parité avec d'anciens modules). Défaut : [].",
 
   "cvd_database": null,
-  "_cvd_database": "OBSOLÈTE depuis le 04/10/2026 : plus lue par publish.py (le bloc `cvd` se calcule sur les bougies Binance). Acceptée pour ne pas casser une configuration existante. Défaut : null."
+  "_cvd_database": "OBSOLÈTE depuis le 04/10/2026 : plus lue par publish.py (le bloc `cvd` se calcule sur les bougies Binance). Acceptée pour ne pas casser une configuration existante. Défaut : null.",
+
+  "hist_dir": null,
+  "_hist_dir": "Répertoire de travail de la branche `historique` : un git worktree à part, pour que l'historique ne touche jamais l'index ni l'arbre de master. Défaut : <state_dir>/historique.",
+
+  "hist_branche": "historique",
+  "_hist_branche": "Branche orpheline qui porte les séries historiques (données seules)."
 }

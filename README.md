@@ -32,6 +32,10 @@ champ publié est décrit dans `meta` par le code qui le calcule (voir « Les l�
 - **heatmap.json au format « colonnes-1 »** (sans perte) : 6× plus léger à télécharger, l'historique
   du dépôt grossit 190× moins vite. Les pages lisent les deux formats.
 - **Quatre thèmes nouveaux** (six feuilles), chacun avec sa structure, son budget d'image mesuré.
+- **Un troisième écrivain : `historique.py`** — les chiffres de `market-data.json` n'existaient
+  que dans les commits de `master`. Ils sont désormais publiés en séries dans une **branche
+  orpheline `historique`**, faite de données seules (une session distante lit `index.json`, puis
+  seulement les fichiers utiles). Voir « L'historique » plus bas.
 
 ---
 
@@ -72,6 +76,7 @@ sont restreints par certains navigateurs : un serveur local est préférable.
 | `publish.py` | Agrège 8 sources → `market-data.json`. |
 | `options_gex.py` | Calcul du GEX (exposition gamma des options Deribit), sans réseau — testable hors ligne. |
 | `heatmap.py` | Accumule le carnet d'ordres en heatmap glissante → `heatmap.json`. |
+| `historique.py` | Publie les séries (positionnement, funding, open interest, ratios L/S) dans la **branche `historique`**, avec leur index. Ne touche jamais `master`. |
 | `samsara_config.py` | Charge la configuration locale. **Aucun chemin n'est écrit dans le code.** |
 | `config.example.json` | Modèle de configuration, documenté. |
 | `tests/` | Les contrôles. Une seule commande : `bash tests/run-all.sh`. |
@@ -198,6 +203,8 @@ endroit où des chemins de machine ont le droit d'exister.
 | `git_remote` / `git_branch` | `origin` / `master` | où pousser |
 | `extra_module_paths` | `[]` | ne sert plus qu'à `publish.py --comparer` (parité avec d'anciens modules) |
 | `cvd_database` | `null` | **obsolète** (plus lue depuis le 04/10/2026), acceptée pour compatibilité |
+| `hist_dir` | `<state_dir>/historique` | répertoire de travail de la branche `historique` (un *worktree*, pour ne jamais toucher l'index ni l'arbre de `master`) |
+| `hist_branche` | `historique` | nom de la branche orpheline qui porte les séries |
 
 ⚠️ **`state_dir` doit rester stable.** Le changer repart d'un état vide : les 24 h de
 carnet accumulées sont perdues, et la heatmap affichée devient un rectangle vide.
@@ -209,19 +216,67 @@ carnet accumulées sont perdues, et la heatmap affichée devient un rectangle vi
 ```bash
 python3 heatmap.py     # à lancer toutes les minutes : il accumule, il ne recalcule pas
 python3 publish.py     # indépendant de heatmap.py : il lit 8 sources
+python3 historique.py  # après publish.py : ajoute la publication aux séries (--amorcer : depuis les commits)
 ```
 
 `heatmap.py` **accumule**. Une seule exécution ne produit qu'une colonne d'une minute :
 la fenêtre de 24 h se construit en tournant. Le lancer une fois donne une heatmap
 quasi vide — ce n'est pas un bug.
 
-Les deux scripts écrivent de façon **atomique** (`tmp` + `fsync` + `replace`) et
+Les trois scripts écrivent de façon **atomique** (`tmp` + `fsync` + `replace`) et
 publient sous un **verrou partagé**, en ne committant que leur propre fichier : ils
 peuvent tourner en parallèle sans se voler l'index git.
 
 `publish.py` sort en **code 1 si un bloc échoue** — jamais d'erreur silencieuse. Un bloc
 dont la dépendance n'est pas branchée sort en `non configuré` et **ne compte pas** comme
 un échec : un dépôt fraîchement cloné doit pouvoir tourner et dire ce qui lui manque.
+
+---
+
+## L'historique : la branche `historique`
+
+`market-data.json` est un **instantané** : l'historique de ses chiffres n'existait que dans
+les commits de `master`. Une session qui voulait voir une tendance sur 24 h devait relire
+une centaine de commits — et cet historique disparaissait si le dépôt était recréé.
+
+`historique.py` publie donc ces séries dans une **branche orpheline** du même dépôt, faite
+de **données seules**. Pas dans `master` : GitHub Pages republie `master` à chaque push.
+
+```
+historique
+  index.json                              ce que contient la branche, et ce qui manque
+  series/positionnement/<année-mois>.csv   1 ligne par publication de market-data.json
+  series/funding.csv                       une ligne par échéance de financement
+  series/open-interest-1h.csv              un point par heure
+  series/long-short-1h.csv                 comptes, gros traders, taker — un point par heure
+```
+
+**Comment la lire sans rapatrier le dépôt** — un clone partiel ne télécharge que ce qu'on
+demande :
+
+```bash
+git fetch --depth 1 --filter=blob:none origin historique
+git show FETCH_HEAD:index.json                        # status, séries, colonnes, trous, meta
+git show FETCH_HEAD:series/positionnement/2026-10.csv # puis seulement les fichiers utiles
+```
+
+L'index **décrit tout** pour que cela suffise : pour chaque série, la liste ordonnée des
+fichiers, ses colonnes, sa période, son nombre de lignes et **les trous détectés**. Chaque
+fichier reste sous 1 Mo — un blob se rapatrie à l'unité, pas une arborescence.
+
+Trois règles de fond :
+
+- **Un mois clos ne se réécrit pas.** Une publication apportée pour un mois déjà passé est
+  refusée et signalée ; relancer le script ne duplique aucune ligne (la clé est `updated`).
+- **Un trou se signale, il ne se comble pas.** L'index dit combien de créneaux manquent
+  entre deux points, et où. On ne connaît pas la valeur qu'aurait portée la ligne absente.
+- **Une case vide n'est pas un zéro.** Les champs qui n'existaient pas dans les anciens
+  formats restent vides, et `meta` explique pourquoi (le CVD n'est publié que depuis le
+  04/10/2026). L'amorçage lit l'historique des commits de `master` ; les séries Binance
+  (funding, open interest, ratios L/S) sont rapatriées une fois puis prolongées.
+
+Il travaille dans un **répertoire à part** (`git worktree` sur la branche) : l'index et
+l'arbre de `master` ne sont jamais touchés, et l'objet-store est partagé — rien à cloner.
 
 ---
 
