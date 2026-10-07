@@ -49,6 +49,9 @@ node test_horloges.js || ko=1
 etape "2h. Contre-expertise : la publication recalculée sur des réponses Binance enregistrées — hors ligne"
 node test_contre.js || ko=1
 
+etape "2i. Chronique : historique des publications relu dans git (arrêts, trous, cache, tracés) — hors ligne"
+node test_chronique.js || ko=1
+
 etape "3. Extraction du JavaScript inline"
 python3 refresh_harness.py || ko=1
 
