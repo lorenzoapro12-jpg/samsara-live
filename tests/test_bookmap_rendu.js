@@ -549,8 +549,10 @@ async function pixel(page, x, y) {
       const rc = await p20.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(); return { x: r.left, y: r.top }; });
       // Une bulle assez grande, dont le point visé (à 0,6 rayon du centre) n'est dans aucune autre bulle.
       const dans = (z, x, y) => (x - z.x) ** 2 + (y - z.y) ** 2 <= z.r * z.r;
+      const zh = await p20.evaluate(() => document.getElementById('carte').clientHeight - 20 - 58 - 58);
       const cible = bs.map((z, i) => ({ z, i, x: z.x + 0.6 * z.r, y: z.y })).reverse()
-        .find(c => c.z.r >= 8 && c.x > 20 && c.x < 1100 && bs.every((o, j) => j === c.i || !dans(o, c.x, c.y)));
+        .find(c => c.z.r >= 8 && c.x > 20 && c.x < 1100 && c.y > 12 && c.y < zh - 12 && c.z.tb < S.now() - 5000      // seau clos : son volume ne change plus
+          && bs.every((o, j) => j === c.i || !dans(o, c.x, c.y)));
       if (!cible) check('bulle isolée trouvée', false, bs.length);
       else {
         await p20.mouse.move(rc.x + cible.x + 0.5, rc.y + cible.y); await p20.mouse.move(rc.x + cible.x, rc.y + cible.y); await p20.waitForTimeout(300);
