@@ -223,6 +223,7 @@
 
 /* ── Graphique : « Vue A », lettrée dans la marge basse du cadre, jamais sur le tracé ── */
 [data-theme="diazo"] .chart-container { border-radius: 0; }   /* css/app.css l'arrondit à 20 px sous 800 px */
+[data-theme="diazo"] .chart-container canvas { border-radius: 0; }
 /* Le cadre peut rapetisser sous son canvas (le pied grandit quand la publication arrive) : le
    canvas suit sa hauteur (js/structures.js, ResizeObserver). */
 [data-theme="diazo"][data-structure="planche"] .chart-container { padding-bottom: 18px; min-height: 0; }
@@ -276,8 +277,9 @@
 [data-theme="diazo"] .plan-centrage-d { top: calc(50% - 1px); height: 2px; width: calc(var(--gutter) - 3px); }
 [data-theme="diazo"] .plan-centrage-g { left: 0; }
 [data-theme="diazo"] .plan-centrage-d { right: 0; }
-/* La barre des tâches flotte dans la gouttière basse : le contenu s'arrête au-dessus d'elle. */
-[data-theme="diazo"][data-structure="planche"] body { padding-bottom: calc(var(--gutter) + 36px); }
+/* La barre des tâches (30 px) flotte à une gouttière du bas : le contenu s'arrête 3 px au-dessus
+   d'elle, comme dans la base (css/app.css : 46 px pour une gouttière de 13 px). */
+[data-theme="diazo"][data-structure="planche"] body { padding-bottom: calc(var(--gutter) + 33px); }
 
 /* ── Pied de planche : nomenclature des calques (le ruban) et cartouche ── */
 [data-theme="diazo"] .plan-pied {
