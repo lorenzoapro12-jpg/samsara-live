@@ -2,11 +2,36 @@
 
 Dashboard BTC en fichiers statiques, sans build ni dépendance : servi tel quel par GitHub
 Pages, il s'ouvre dans un navigateur et se rafraîchit tout seul depuis des sources publiques.
-Cinq thèmes, choisis à la volée (bouton palette, touche T) — dont deux qui changent aussi la structure de la page.
+Onze thèmes, choisis à la volée (bouton palette, touche T ; D pour le jumeau clair/sombre) — dont six
+structures de page différentes : HUD (Néon), manuscrit (Codex), fenêtres (Bureau 95 et son jumeau
+Contraste), tableau à palettes (Gare), une de journal (Gazette), planche technique (Cyanotype et Diazo).
 
 **Ce dépôt est complet** : la page, les deux producteurs et TOUS leurs calculs. Depuis le
 06/10/2026, aucun bloc de `market-data.json` ne dépend plus d'un module hors dépôt — chaque
 champ publié est décrit dans `meta` par le code qui le calcule (voir « Les légendes »).
+
+---
+
+## Nouveautés du 07/10/2026 (détail : `docs/livraison-2026-10-07.md`)
+
+- **La carte, corrigée et refaite** : environ 35 défauts distincts (68 constats), tous reproduits avant correction (échelle du live figée,
+  fusion qui peignait dans le futur, colonnes live sautées, horloge jamais recalée, lecture au
+  pointeur ≠ pixel, rien au tactile…), un rendu par calques (CPU au repos ÷ 2, plus aucune image
+  perdue pendant un glisser), et trois calques nouveaux, tous mesurés et bornés :
+  **Mémoire du carnet** (combien de temps un niveau ≥ X BTC a tenu dans chaque tranche),
+  **Rafales au marché** (exécutions d'une même milliseconde, avec un nombre d'ordres PROUVÉ minimal),
+  **Destin des murs** (un niveau disparu : mangé par des échanges, ou retiré — borne basse mesurée,
+  jamais une intention prêtée).
+- **Le terminal, deux fois plus sobre** : CPU au repos ≈ ÷ 2 dans chaque thème (l'éclair du prix
+  coûtait 70 % à lui seul), survol d'Aero 85 → 23 ms par image, market-data.json relu en 304.
+- **Vérifié par ton navigateur** (Contre-expertise) : la page recalcule elle-même, depuis Binance,
+  les indicateurs publiés (avec les paramètres lus dans `meta`) et le CVD à la seconde près.
+- **Horloges** : chaque source dit son âge et la raison d'une panne (hors ligne, refus régional,
+  limite, fichier figé) ; l'heure du poste est comparée à celle de Binance.
+- **Chronique** : une trace des 6 dernières heures de chaque chiffre clé, lue dans l'historique git.
+- **heatmap.json au format « colonnes-1 »** (sans perte) : 6× plus léger à télécharger, l'historique
+  du dépôt grossit 190× moins vite. Les pages lisent les deux formats.
+- **Quatre thèmes nouveaux** (six feuilles), chacun avec sa structure, son budget d'image mesuré.
 
 ---
 
