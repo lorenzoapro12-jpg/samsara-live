@@ -185,6 +185,88 @@ check('quantité nulle ignorée', ![...ag.bids.keys()].includes(17198));
 check('bande couverte : du dernier bid au dernier ask reçus', ag.bas === Math.floor(85990 / 5) && ag.haut === Math.floor(86005 / 5));
 check('meilleurs prix', ag.meilleurBid === 86000.1 && ag.meilleurAsk === 86000.2);
 
+// ── 4b. Carnet live : à l'instant réel de chaque lecture, en quantités ────────
+titre('4b. Carnet live : chaque lecture à son instant, quantités gardées, échelle qui suit');
+{
+  // Un carnet synthétique centré sur `m` (prix), niveaux de 1 $ ; q(i) déterministe.
+  const carnet = (m, k) => BM.agregerCarnet({
+    bids: Array.from({ length: 40 }, (_, i) => [String(m - 0.5 - i), String(((i * 7 + k) % 13) / 2 + 0.25)]),
+    asks: Array.from({ length: 40 }, (_, i) => [String(m + 0.5 + i), String(((i * 5 + k) % 11) / 2 + 0.25)]) }, 5);
+  const enc = { ref_btc: 100, plafond: 255 };
+  const L = new BM.CarnetLive(5, 2000);
+  L.fixerEchelle('publiee', q => BM.intensite(q, enc));
+  // Lectures « réelles » : période 2 s + latence variable (2,0 à 2,4 s), comme une boucle qui
+  // relançait APRÈS la réponse ; et une requête de 1,1 s.
+  const lectures = [];
+  let t = 1e6;
+  for (let k = 0; k < 30; k++) { const s = t, r = t + (k === 12 ? 1100 : 80 + (k % 5) * 60); lectures.push([s, r]); L.ajouter(carnet(86000 + k, k), s, r, 100 + k); t = r + 2000; }
+  check('30 lectures, 30 colonnes (aucune perdue, aucune doublée)', L.n === 30);
+  check('instant d\'une lecture = milieu de [envoi, réception]', lectures.every(([s, r], c) => L.deb[c] === (s + r) / 2));
+  let jointif = true;
+  for (let c = 0; c + 1 < L.n; c++) if (L.fin[c] !== L.deb[c + 1]) jointif = false;
+  check('chaque lecture vaut jusqu\'à la suivante : aucune colonne « non observé » entre deux lectures', jointif);
+  // Lecture au pointeur à chaque instant entre la première lecture et « maintenant » : toujours observée.
+  const fin = L.deb[L.n - 1] + 1500;
+  let trous = 0;
+  for (let x = L.deb[0]; x < fin; x += 97) { const r = BM.lirePixel(L, x, x + 97, 17200, 17200); if (!r || !r.nObs) trous++; }
+  check('de la première lecture à « maintenant », aucun instant non observé', trous === 0, trous);
+  // Rien après « maintenant » : un pixel au-delà ne reçoit rien.
+  const w = 200, h = 10, vue = { t1: L.deb[L.n - 1] - 5000, t2: L.deb[L.n - 1] + 15000, p1: 85990, p2: 86070 }, px = new Uint32Array(w * h);
+  const lut = Uint32Array.from({ length: 256 }, (_, v) => v + 1);
+  BM.peindreGrille(px, w, h, L, vue, { lut, maintenant: fin });
+  let futur = 0, present = 0;
+  for (let x = 0; x < w; x++) { const ta = vue.t1 + x * 100; for (let y = 0; y < h; y++) if (px[y * w + x]) { if (ta >= fin) futur++; else present++; } }
+  check('aucune chaleur peinte après « maintenant » (la dernière lecture s\'arrête au présent)', futur === 0 && present > 0, { futur, present });
+  // Absence réelle (plus de 3 cadences + 1 s) : non observé.
+  const L2 = new BM.CarnetLive(5, 2000);
+  L2.ajouter(carnet(86000, 1), 0, 100, 1); L2.ajouter(carnet(86000, 2), 30000, 30100, 2);
+  check('absence de 30 s : la lecture d\'avant s\'arrête à 3 cadences + 1 s, le reste est non observé',
+    L2.fin[0] === 50 + 7000 && !BM.lirePixel(L2, 20000, 20100, 17200, 17200), [L2.fin[0]]);
+  // Identifiant qui ne croît pas : instantané plus ancien, écarté.
+  check('lastUpdateId qui ne croît pas : lecture écartée (« perimee »)', L2.ajouter(carnet(86000, 3), 32000, 32100, 2) === 'perimee' && L2.n === 2);
+  check('instant qui ne croît pas : écarté', L2.ajouter(carnet(86000, 3), 29000, 29100, 9) === 'desordre' && L2.n === 2);
+  // Échelle : propre au départ, puis l'encodage publié arrive — tout est ré-encodé, rien n'est perdu.
+  const L3 = new BM.CarnetLive(5, 2000), a3 = carnet(86000, 4);
+  L3.fixerEchelle('propre:2', q => BM.intensiteRelative(q, 2));
+  L3.ajouter(a3, 0, 100, 1); L3.ajouter(carnet(86001, 5), 2000, 2100, 2);
+  const pb = [...a3.bids.keys()][3], q3 = a3.bids.get(pb);
+  const vPropre = L3.valeur(0, pb, 'b');
+  check('échelle propre : intensité relative au p99', vPropre === BM.intensiteRelative(q3, 2));
+  check('encodage publié arrivé après : ré-encodage (vrai), les DEUX lectures gardées', L3.fixerEchelle('publiee', q => BM.intensite(q, enc)) && L3.n === 2);
+  check('… même quantité → intensité publiée', L3.valeur(0, pb, 'b') === BM.intensite(q3, enc) && L3.quantite(0, pb, 'b') === q3);
+  check('encodage disparu : retour à une échelle propre, rien de nul', L3.fixerEchelle('propre:2', q => BM.intensiteRelative(q, 2)) && L3.valeur(0, pb, 'b') === vPropre && vPropre > 0);
+  check('même échelle redemandée : rien à refaire', !L3.fixerEchelle('propre:2', q => BM.intensiteRelative(q, 2)));
+  // Horloge recalée : les instants (gardés en heure locale) suivent l'écart.
+  L3.recaler(30000);
+  check('nouvel écart d\'horloge : chaque lecture replacée (+30 s)', L3.deb[0] === 50 + 30000 && L3.deb[1] === 2050 + 30000 && L3.fin[0] === L3.deb[1]);
+  // Capacité : la moitié ancienne s'oublie, les valeurs gardées restent justes (tampon compacté).
+  const L4 = new BM.CarnetLive(5, 1000, 10);
+  L4.fixerEchelle('publiee', q => BM.intensite(q, enc));
+  const ref = [];
+  for (let k = 0; k < 11; k++) { const a = carnet(86000 + 3 * k, k); ref.push(a); L4.ajouter(a, k * 1000, k * 1000 + 50, k + 1); }
+  let justes = true;
+  for (let c = 0; c < L4.n; c++) { const a = ref[11 - L4.n + c]; for (const [p, q] of a.bids) if (L4.quantite(c, p, 'b') !== q) justes = false; for (const [p, q] of a.asks) if (L4.quantite(c, p, 'a') !== q) justes = false; }
+  check('pleine (10) : la moitié ancienne oubliée, 6 lectures gardées, quantités intactes', L4.n === 6 && L4.deb[0] === 5025 && justes, { n: L4.n, deb0: L4.deb[0] });
+  let bande = true;
+  for (let c = 0; c < L4.n; c++) if (L4.bas[c] < L4.pbMin || L4.haut[c] > L4.pbMin + L4.H - 1) bande = false;
+  check('bande réunie recalculée après oubli (aucune bande fixe à recentrer)', bande && L4.pbMin === Math.min(...Array.from(L4.bas.subarray(0, L4.n))));
+  const L5 = new BM.CarnetLive(1, 1000, 100, 400);
+  for (let k = 0; k < 20; k++) L5.ajouter(BM.agregerCarnet({ bids: Array.from({ length: 60 }, (_, i) => [String(86000 - i), '1']), asks: Array.from({ length: 60 }, (_, i) => [String(86001 + i), '1']) }, 1), k * 1000, k * 1000 + 10, k + 1);
+  check('tampon borné : la mémoire ne dépasse jamais sa borne', L5.lg <= 400 && L5.n >= 1 && L5.n < 20, { lg: L5.lg, n: L5.n });
+  // Peinture et lecture au pointeur du carnet live : la même valeur, pixel par pixel.
+  const lb = Uint32Array.from({ length: 256 }, (_, v) => 1000 + v), la = Uint32Array.from({ length: 256 }, (_, v) => 2000 + v);
+  const w2 = 160, h2 = 50, v2 = { t1: L.deb[0] - 3000, t2: L.deb[L.n - 1] + 4000, p1: 85940, p2: 86110 }, p2 = new Uint32Array(w2 * h2).fill(7);
+  BM.peindreGrille(p2, w2, h2, L, v2, { lutB: lb, lutA: la, maintenant: fin });
+  let ecarts = 0;
+  const tpp = (v2.t2 - v2.t1) / w2, pp = (v2.p2 - v2.p1) / h2;
+  for (let x = 0; x < w2; x++) for (let y = 0; y < h2; y++) {
+    const ta = v2.t1 + x * tpp, tb = Math.min(ta + tpp, fin), [ja, jb] = BM.tranchesLigne(v2.p2, pp, y, L.dp, [0, 0]);
+    const r = tb > ta ? BM.lirePixel(L, ta, tb, ja, jb) : null;
+    if (p2[y * w2 + x] !== (!r || !r.nObs || r.horsBande ? 7 : (r.cote === 'bid' ? lb[r.v] : la[r.v]))) ecarts++;
+  }
+  check('carnet live : la valeur lue est celle peinte (' + w2 * h2 + ' pixels)', ecarts === 0, ecarts);
+}
+
 // ── 5. Exécutions ────────────────────────────────────────────────────────────
 titre('5. Exécutions : aucun volume perdu ni compté deux fois');
 const ex = new BM.SeauxExecutions(1);

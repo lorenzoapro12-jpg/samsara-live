@@ -346,6 +346,120 @@
     return out;
   };
 
+  /** Le carnet live : une colonne par LECTURE, à son instant réel, avec ses QUANTITÉS.
+   *  · Instant : le milieu de [envoi, réception] (un carnet REST ne porte pas d'heure serveur),
+   *    passé à l'heure Binance par l'écart d'horloge (recaler()). Chaque lecture est peinte de son
+   *    instant jusqu'à la suivante — au plus `validite` (3 cadences + 1 s), jamais au-delà de
+   *    « maintenant » : pas de colonne sautée, pas de faux « non observé » entre deux lectures,
+   *    pas de chaleur dans le futur, quelle que soit la durée des requêtes.
+   *  · Quantités : le plus gros niveau (BTC) par tranche est GARDÉ ; l'intensité affichée est
+   *    encodée avec l'échelle courante (fixerEchelle). Quand l'encodage publié arrive après le
+   *    premier carnet — ou disparaît — tout est ré-encodé : rien n'est perdu, rien ne reste sur une
+   *    échelle périmée, et la lecture au pointeur donne la quantité MESURÉE.
+   *  · Stockage creux : par lecture, une série par côté (du plus bas bid au meilleur bid, du
+   *    meilleur ask au plus haut ask) dans un tampon commun ; aucune bande de prix fixe à
+   *    recentrer. Plein (capacité ou tampon) : on oublie la moitié la plus ancienne.
+   *  Même interface que les grilles pour BM.peindreGrille / BM.lirePixel (n, deb, fin, bas, haut,
+   *  pbMin, H = bande réunie des lectures gardées, dp). */
+  BM.LIVE_CAPACITE = 1800;
+  BM.LIVE_TAMPON_MAX = 1 << 21;      // quantités gardées (16 Mo) : borne la mémoire à 5 000 niveaux / 1 $
+  BM.CarnetLive = function (dp, cadence, capacite, tamponMax) {
+    const W = capacite || BM.LIVE_CAPACITE, I = () => new Int32Array(W), F = () => new Float64Array(W);
+    Object.assign(this, {
+      creux: true, dp, cadence, dt: cadence, W, n: 0, validite: BM.validiteLecture(cadence), ecart: 0,
+      envoi: F(), recu: F(), deb: F(), fin: F(), bas: new Int32Array(W).fill(-1), haut: new Int32Array(W).fill(-1),
+      bB: I(), nB: I(), oB: I(), bA: I(), nA: I(), oA: I(), id: F(),
+      q: new Float64Array(1 << 14), v: new Uint8Array(1 << 14), lg: 0, lgMax: tamponMax || BM.LIVE_TAMPON_MAX,
+      pbMin: 0, H: 0, dernierId: null, echelle: null, encoder: null,
+    });
+  };
+  const CL = BM.CarnetLive.prototype;
+  /** Ajoute une lecture (BM.agregerCarnet) reçue entre s et r (heure LOCALE), d'identifiant `id`
+   *  (lastUpdateId). Rend 'ok', 'perimee' (identifiant qui ne croît pas : un instantané plus
+   *  ancien que le précédent), 'desordre' (instant non croissant) ou 'vide'. */
+  CL.ajouter = function (a, s, r, id) {
+    if (id !== undefined && id !== null && this.dernierId !== null && !(id > this.dernierId)) return 'perimee';
+    const t = (s + r) / 2 + this.ecart;
+    if (this.n && !(t > this.deb[this.n - 1])) return 'desordre';
+    const serie = m => { let lo = Infinity, hi = -Infinity; for (const pb of m.keys()) { if (pb < lo) lo = pb; if (pb > hi) hi = pb; } return lo <= hi ? [lo, hi - lo + 1] : [0, 0]; };
+    const [b0, nb] = serie(a.bids), [a0, na] = serie(a.asks);
+    let bas = a.bas !== null && a.bas !== undefined ? a.bas : (nb ? b0 : a0);
+    let haut = a.haut !== null && a.haut !== undefined ? a.haut : (na ? a0 + na - 1 : b0 + nb - 1);
+    if (!nb && !na) return 'vide';
+    if (nb) bas = Math.min(bas, b0); if (na) haut = Math.max(haut, a0 + na - 1);
+    if (this.n === this.W) this.oublier(Math.ceil(this.W / 2));
+    while (this.n > 1 && this.lg + nb + na > this.lgMax) this.oublier(Math.ceil(this.n / 2));
+    this.reserver(nb + na);
+    const c = this.n;
+    this.envoi[c] = s; this.recu[c] = r; this.id[c] = id === undefined || id === null ? NaN : id;
+    this.deb[c] = t; this.fin[c] = t + this.validite;
+    if (c > 0) this.fin[c - 1] = Math.min(t, this.deb[c - 1] + this.validite);
+    const ecrire = (m, p0, k, o) => { for (let i = 0; i < k; i++) { const x = m.get(p0 + i) || 0; this.q[o + i] = x; this.v[o + i] = x > 0 && this.encoder ? this.encoder(x) : 0; } };
+    this.bB[c] = b0; this.nB[c] = nb; this.oB[c] = this.lg; ecrire(a.bids, b0, nb, this.lg); this.lg += nb;
+    this.bA[c] = a0; this.nA[c] = na; this.oA[c] = this.lg; ecrire(a.asks, a0, na, this.lg); this.lg += na;
+    this.bas[c] = bas; this.haut[c] = haut;
+    if (!this.H) { this.pbMin = bas; this.H = haut - bas + 1; }
+    else { const hi = Math.max(this.pbMin + this.H - 1, haut); this.pbMin = Math.min(this.pbMin, bas); this.H = hi - this.pbMin + 1; }
+    this.n++;
+    if (id !== undefined && id !== null) this.dernierId = id;
+    return 'ok';
+  };
+  CL.reserver = function (k) {
+    if (this.lg + k <= this.q.length) return;
+    let L = this.q.length;
+    while (L < this.lg + k) L *= 2;
+    const q = new Float64Array(L), v = new Uint8Array(L);
+    q.set(this.q.subarray(0, this.lg)); v.set(this.v.subarray(0, this.lg));
+    this.q = q; this.v = v;
+  };
+  /** Oublie les k lectures les plus anciennes (et compacte le tampon). */
+  CL.oublier = function (k) {
+    k = Math.min(k, this.n);
+    if (k <= 0) return;
+    const off = k < this.n ? this.oB[k] : this.lg;
+    this.q.copyWithin(0, off, this.lg); this.v.copyWithin(0, off, this.lg); this.lg -= off;
+    for (const x of ['envoi', 'recu', 'deb', 'fin', 'bas', 'haut', 'bB', 'nB', 'oB', 'bA', 'nA', 'oA', 'id']) this[x].copyWithin(0, k, this.n);
+    this.n -= k;
+    this.bas.fill(-1, this.n); this.haut.fill(-1, this.n);
+    let lo = Infinity, hi = -Infinity;
+    for (let c = 0; c < this.n; c++) { this.oB[c] -= off; this.oA[c] -= off; if (this.bas[c] < lo) lo = this.bas[c]; if (this.haut[c] > hi) hi = this.haut[c]; }
+    if (this.n) { this.pbMin = lo; this.H = hi - lo + 1; } else { this.pbMin = 0; this.H = 0; }
+  };
+  /** Nouvel écart d'horloge : les instants des lectures (gardées en heure locale) sont replacés. */
+  CL.recaler = function (ecart) {
+    this.ecart = ecart;
+    for (let c = 0; c < this.n; c++) this.deb[c] = (this.envoi[c] + this.recu[c]) / 2 + ecart;
+    for (let c = 0; c < this.n; c++) this.fin[c] = c + 1 < this.n ? Math.min(this.deb[c + 1], this.deb[c] + this.validite) : this.deb[c] + this.validite;
+  };
+  /** Échelle courante (clé + quantité → intensité). Nouvelle clé : tout est ré-encodé. Vrai si changé. */
+  CL.fixerEchelle = function (cle, f) {
+    if (this.echelle === cle) return false;
+    this.echelle = cle; this.encoder = f;
+    for (let i = 0; i < this.lg; i++) this.v[i] = this.q[i] > 0 ? f(this.q[i]) : 0;
+    return true;
+  };
+  CL.cellule = function (c, pb, cote, tab) {
+    const b = cote === 'b' ? this.bB[c] : this.bA[c], k = cote === 'b' ? this.nB[c] : this.nA[c], i = pb - b;
+    return i >= 0 && i < k ? tab[(cote === 'b' ? this.oB[c] : this.oA[c]) + i] : 0;
+  };
+  /** Intensité affichée (échelle courante) et quantité MESURÉE (BTC) d'une cellule. */
+  CL.valeur = function (c, pb, cote) { return this.cellule(c, pb, cote, this.v); };
+  CL.quantite = function (c, pb, cote) { return this.cellule(c, pb, cote, this.q); };
+  /** MAX de la lecture c dans colB / colA (indices relatifs à pbMin). */
+  CL.accumuler = function (c, colB, colA) {
+    for (const [b, k, o, col] of [[this.bB[c], this.nB[c], this.oB[c], colB], [this.bA[c], this.nA[c], this.oA[c], colA]]) {
+      const d = b - this.pbMin;
+      for (let i = 0; i < k; i++) { const x = this.v[o + i]; if (x > col[d + i]) col[d + i] = x; }
+    }
+  };
+  /** Quantités non nulles de la dernière lecture (pour une échelle propre). */
+  CL.quantitesDerniere = function () {
+    const c = this.n - 1, out = [];
+    if (c < 0) return out;
+    for (let i = this.oB[c]; i < this.lg; i++) if (this.q[i] > 0) out.push(this.q[i]);
+    return out;
+  };
+
   /** Centile (0..1) d'une liste de nombres. */
   BM.centile = function (xs, p) {
     if (!xs.length) return 0;

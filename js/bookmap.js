@@ -59,7 +59,7 @@
   const E = {
     pub: null, pubF: null, pubCle: '', pubMaj: null, pubLu: null, pubTexte: null,
     md: null, niv: null, mdLu: null, mdTexte: null,
-    live: null, liveRef: null, liveP99: 0, liveDebut: null, carnet: null, carnetA: null,
+    live: null, liveRef: null, liveP99: 0, liveEcartees: 0, carnet: null, carnetA: null,
     exec: new BM.SeauxExecutions(1), execVus: new Set(), execRemplissage: null, execTrous: [],
     minutes: [], minutesA: null,
     bidask: [],
@@ -115,7 +115,7 @@
   async function lireHorloge() {
     try {
       const { corps, s, r } = await binance('time', DELAIS.horloge);
-      if (E.horloge.echantillon(s, r, +corps.serverTime)) sale();
+      if (E.horloge.echantillon(s, r, +corps.serverTime)) { if (E.live) E.live.recaler(E.horloge.ecart); sale(); }
       erreur('horloge', null);
     } catch (e) { erreur('horloge', e); throw e; }
   }
@@ -134,7 +134,7 @@
       E.pub = g; E.pubTexte = maj; E.pubMaj = g.majA;
       E.pubF = null; E.pubCle = '';
       erreur('carte', null);
-      if (E.live && E.pub && E.pub.encodage && !E.liveRef) reinitLive();   // l'échelle commune devient possible
+      appliquerEchelle();          // l'échelle live suit l'encodage, qu'il arrive ou qu'il disparaisse
       majLegende();
       sale();
     } catch (e) { erreur('carte', e); throw e; }
@@ -234,73 +234,47 @@
     } catch (e) { erreur('executions', e); throw e; }
   }
 
-  // Carnet live : une lecture = une colonne de la grille live.
-  function reinitLive() { E.live = null; E.liveRef = null; E.liveP99 = 0; E.bidask = []; E.liveDebut = null; }
+  // Carnet live : une lecture = une colonne, à son instant réel, avec ses quantités (BM.CarnetLive).
+  function reinitLive() { E.live = null; E.liveRef = null; E.liveP99 = 0; E.bidask = []; E.liveEcartees = 0; }
+  /** L'échelle du carnet live : celle de la carte publiée quand le fichier publie son encodage ;
+   *  sinon une échelle PROPRE (99ᵉ centile d'un carnet), non comparable — et la carte le dit. Elle
+   *  suit l'encodage dans les DEUX sens : publié après le premier carnet, ou disparu en cours de
+   *  séance. Les quantités étant gardées, le changement ré-encode tout, sans rien perdre. */
+  function echelleLive(a) {
+    const enc = E.pub && E.pub.encodage;
+    if (enc && enc.ref_btc && enc.plafond) return { ref: 'publiee', cle: 'publiee:' + enc.ref_btc + ':' + enc.plafond, f: q => BM.intensite(q, enc) };
+    if (!(E.liveP99 > 0)) {
+      const qs = a ? [...a.bids.values(), ...a.asks.values()] : (E.live ? E.live.quantitesDerniere() : []);
+      if (qs.length) E.liveP99 = BM.centile(qs, 0.99) || 1;
+    }
+    if (!(E.liveP99 > 0)) return null;
+    const p99 = E.liveP99;
+    return { ref: 'propre', cle: 'propre:' + p99, f: q => BM.intensiteRelative(q, p99) };
+  }
+  function appliquerEchelle(a) {
+    const e = echelleLive(a);
+    if (!E.live || !e) return;
+    if (E.live.fixerEchelle(e.cle, e.f)) chaleurSale = true;
+    E.liveRef = e.ref;
+  }
   async function lireCarnet() {
-    const n = R.niveauxLive;
+    const n = R.niveauxLive, cadence = CADENCE_CARNET[n];
     try {
       const { corps: d, s, r } = await binance('depth?symbol=' + SYMBOLE + '&limit=' + n, DELAIS.carnet);
-      const t = (s + r) / 2;      // instant LOCAL estimé de la lecture (le carnet ne porte pas d'heure)
       const a = BM.agregerCarnet(d, R.dpLive);
+      if (!E.live || E.live.dp !== a.dp || E.live.cadence !== cadence) { reinitLive(); E.live = new BM.CarnetLive(a.dp, cadence); E.live.recaler(E.horloge.ecart); }
+      appliquerEchelle(a);
+      // lastUpdateId doit croître strictement : un instantané plus ancien que le précédent (servi
+      // par un autre nœud de Binance) est écarté, pas peint par-dessus le plus récent.
+      const res = E.live.ajouter(a, s, r, d.lastUpdateId);
+      if (res !== 'ok') { E.liveEcartees++; erreur('carnet', null); return; }
+      const t = (s + r) / 2;      // instant LOCAL estimé de la lecture
       E.carnet = a; E.carnetA = t;
       if (a.meilleurBid && a.meilleurAsk) E.bidask.push({ t, bid: a.meilleurBid, ask: a.meilleurAsk });
       if (E.bidask.length > 20000) E.bidask.splice(0, 5000);
-      poserColonneLive(a, axe(t));
       erreur('carnet', null);
       sale();
     } catch (e) { erreur('carnet', e); throw e; }
-  }
-  const LIVE_CAPACITE = 1800, LIVE_BANDE = 0.015;   // colonnes ; ± bande de prix couverte par la grille
-  function poserColonneLive(a, t) {
-    const enc = E.pub && E.pub.encodage;
-    const dt = CADENCE_CARNET[R.niveauxLive];
-    const mid = (a.meilleurBid + a.meilleurAsk) / 2;
-    if (!E.live || E.live.dp !== a.dp || E.live.dt !== dt) {
-      const dp = a.dp, H = Math.ceil(2 * LIVE_BANDE * mid / dp);
-      E.live = BM.grilleVide(t, dt, LIVE_CAPACITE, dp, Math.floor(mid * (1 - LIVE_BANDE) / dp), H);
-      E.live.n = 0;
-      E.liveDebut = t;
-      E.liveRef = enc ? 'publiee' : 'propre';
-      if (!enc) {
-        const qs = [...a.bids.values(), ...a.asks.values()];
-        E.liveP99 = BM.centile(qs, 0.99) || 1;
-      }
-    }
-    let g = E.live;
-    // Le prix sort de la bande de la grille : on la recentre en recopiant ce qui recouvre.
-    const pbMid = Math.floor(mid / g.dp);
-    if (pbMid < g.pbMin + g.H * 0.15 || pbMid > g.pbMin + g.H * 0.85) g = E.live = recentrer(g, pbMid);
-    let c = Math.round((t - g.t0) / g.dt);
-    if (c < 0) return;
-    if (c >= g.W) {                  // grille pleine : on oublie la moitié la plus ancienne
-      const k = Math.ceil(g.W / 2);
-      g.bids.copyWithin(0, k * g.H); g.asks.copyWithin(0, k * g.H);
-      g.bids.fill(0, (g.W - k) * g.H); g.asks.fill(0, (g.W - k) * g.H);
-      g.bas.copyWithin(0, k); g.haut.copyWithin(0, k); g.bas.fill(-1, g.W - k); g.haut.fill(-1, g.W - k);
-      g.t0 += k * g.dt; c -= k;
-    }
-    const o = c * g.H;
-    g.bids.fill(0, o, o + g.H); g.asks.fill(0, o, o + g.H);
-    const val = q => (E.liveRef === 'publiee' && enc) ? BM.intensite(q, enc) : BM.intensiteRelative(q, E.liveP99);
-    for (const [pb, q] of a.bids) { const h = pb - g.pbMin; if (h >= 0 && h < g.H) g.bids[o + h] = val(q); }
-    for (const [pb, q] of a.asks) { const h = pb - g.pbMin; if (h >= 0 && h < g.H) g.asks[o + h] = val(q); }
-    const bas = a.bas !== null ? a.bas : Math.floor(mid / g.dp), haut = a.haut !== null ? a.haut : Math.floor(mid / g.dp);
-    g.bas[c] = Math.max(bas, g.pbMin); g.haut[c] = Math.min(haut, g.pbMin + g.H - 1);
-    g.n = Math.max(g.n, c + 1);
-  }
-  function recentrer(g, pbMid) {
-    const n = BM.grilleVide(g.t0, g.dt, g.W, g.dp, pbMid - (g.H >> 1), g.H);
-    n.n = g.n;
-    const d = n.pbMin - g.pbMin;
-    for (let c = 0; c < g.W; c++) {
-      const o = c * g.H;
-      for (let h = 0; h < g.H; h++) {
-        const h2 = h - d;
-        if (h2 >= 0 && h2 < g.H) { n.bids[o + h2] = g.bids[o + h]; n.asks[o + h2] = g.asks[o + h]; }
-      }
-      if (g.bas[c] >= 0) { n.bas[c] = Math.max(g.bas[c], n.pbMin); n.haut[c] = Math.min(g.haut[c], n.pbMin + n.H - 1); }
-    }
-    return n;
   }
 
   // ─── Boucles de lecture ──────────────────────────────────────────────────────
@@ -612,11 +586,12 @@
     }
     // Carnet live
     if (R.calques.live) {
-      if (E.live && E.liveDebut) {
-        const xs = X(Math.max(E.liveDebut, E.live.t0));
+      if (E.live && E.live.n) {
+        // « depuis » : la plus ancienne lecture GARDÉE (la moitié ancienne s'oublie quand c'est plein).
+        const debut = E.live.deb[0], xs = X(debut);
         if (xs > 0 && xs < Z.chaleur.w) tirets(xs, C.live);
         const l = ['Carnet live · dernier il y a ' + BM.age(now - axe(E.carnetA)),
-          R.niveauxLive + ' niveaux / ' + CADENCE_CARNET[R.niveauxLive] / 1000 + ' s · ' + R.dpLive + ' $ · depuis ' + BM.heure(E.liveDebut),
+          R.niveauxLive + ' niveaux / ' + CADENCE_CARNET[R.niveauxLive] / 1000 + ' s · ' + R.dpLive + ' $ · depuis ' + BM.heure(debut, true),
           E.liveRef === 'publiee' ? 'même échelle que la carte publiée' : 'échelle propre : NON comparable à la carte publiée'];
         const hz = E.horloge.texte();
         if (hz) l.push(hz);
@@ -627,7 +602,7 @@
     }
     // Trou entre la carte publiée et le carnet live : non observé, et dit.
     if (E.pub) {
-      const fin = BM.finGrille(E.pub), deb = E.live && E.liveDebut ? Math.max(E.liveDebut, E.live.t0) : now;
+      const fin = BM.finGrille(E.pub), deb = E.live && E.live.n ? E.live.deb[0] : now;
       const xa = Math.max(0, X(fin)), xb = Math.min(Z.chaleur.w, X(deb));
       if (xb - xa > 70) {
         texte('non observé', (xa + xb) / 2, Z.chaleur.h - 16, C.ink3, 11, 'center');
@@ -942,13 +917,15 @@
       const tranche = (a, b) => BM.prix(a * g.dp) + '–' + BM.prix((b + 1) * g.dp) + ' $';
       const [d, f] = BM.etendueColonne(g, r.c);
       const quand = g.fusion ? 'colonnes ' + BM.heure(d) + '–' + BM.heure(f) + ' (MAX de ' + Math.round((f - d) / 60e3) + ' min)'
-        : (g === E.live ? 'lu à ' + BM.heure(d, true) : 'minute ' + BM.heure(d));
-      const pixel = r.nObs * r.nT > 1 ? ' · pixel = MAX de ' + r.nObs + ' colonne(s) × ' + r.nT + ' tranche(s)' : '';
+        : (g.creux ? 'lu à ' + BM.heure(d, true) : 'minute ' + BM.heure(d));
+      const pixel = r.nObs * r.nT > 1 ? ' · pixel = MAX de ' + r.nObs + (g.creux ? ' lecture(s)' : ' colonne(s)') + ' × ' + r.nT + ' tranche(s)' : '';
       if (!r.v) { l.push(nom + ' ' + tranche(ja, jb) + ' : rien au-dessus du seuil'); l.push('&nbsp;&nbsp;' + quand + pixel); return; }
       const dec = BM.decoder(r.v, enc);
       l.push(nom + ' ' + tranche(r.pb, r.pb) + ' (' + r.cote + ') : intensité ' + r.v
         + (dec ? (dec.sature ? ' → plus gros niveau ≥ ' + BM.btc(dec.min) + ' BTC (saturé)' : ' → plus gros niveau ' + BM.btc(dec.min) + '–' + BM.btc(dec.max) + ' BTC') : ' (sans unité)'));
-      l.push('&nbsp;&nbsp;' + quand + pixel);
+      // Le carnet live garde ses quantités : la valeur MESURÉE, pas seulement son intervalle.
+      const q = g.creux ? g.quantite(r.c, r.pb, r.cote === 'bid' ? 'b' : 'a') : null;
+      l.push('&nbsp;&nbsp;' + (q ? 'mesuré : ' + BM.btc(q) + ' BTC · ' : '') + quand + pixel);
     };
     const pub = grillePublieeAffichee();
     if (pub) cel(pub, 'Carte', pub.encodage);
@@ -1169,10 +1146,14 @@
   // qu'un geste de l'utilisateur : aucune donnée n'est touchée).
   window.__carte = {
     cadrer: (t1, t2, p1, p2) => { E.vue = { t1, t2, p1, p2 }; E.suivre = false; majBoutonSuivre(); sale(); },
+    lectures: () => (E.live ? { n: E.live.n, deb: Array.from(E.live.deb.subarray(0, E.live.n)), fin: Array.from(E.live.fin.subarray(0, E.live.n)),
+      envoi: Array.from(E.live.envoi.subarray(0, E.live.n)), recu: Array.from(E.live.recu.subarray(0, E.live.n)), validite: E.live.validite } : null),
     etat: () => ({
       vue: E.vue && Object.assign({}, E.vue), suivre: E.suivre, erreurs: Object.assign({}, E.erreurs),
       publiee: E.pub ? { W: E.pub.W, H: E.pub.H, dt: E.pub.dt, dp: E.pub.dp, encodage: !!E.pub.encodage } : null,
-      live: E.live ? { n: E.live.n, dt: E.live.dt, dp: E.live.dp, ref: E.liveRef } : null,
+      live: E.live ? { n: E.live.n, dt: E.live.cadence, dp: E.live.dp, ref: E.liveRef, ecartees: E.liveEcartees,
+        deb0: E.live.n ? E.live.deb[0] : null, derniere: E.live.n ? E.live.deb[E.live.n - 1] : null,
+        nonNuls: E.live.n ? E.live.v.subarray(E.live.oB[E.live.n - 1], E.live.lg).reduce((k, x) => k + (x > 0), 0) : 0 } : null,
       executions: { seaux: E.exec.seaux.size, premier: E.exec.premier, dernier: E.exec.dernier, total: E.exec.total.slice() },
       minutes: E.minutes.length, niveaux: E.niv ? { murs: E.niv.murs.length, gamma: E.niv.gamma.length } : null,
       horloge: { ecart: E.horloge.ecart, u: E.horloge.u }, maintenant: maintenant(),

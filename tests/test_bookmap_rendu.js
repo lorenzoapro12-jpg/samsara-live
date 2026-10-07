@@ -133,7 +133,7 @@ async function ouvrir(nav, opts) {
     if (h === 'raw.githubusercontent.com') {
       if (u.includes('heatmap.json')) {
         comptes.heatmap++;
-        let corps = opts.encodage ? Object.assign({}, hm, { encodage }) : sansEncodage();
+        let corps = opts.heatmap ? opts.heatmap() : (opts.encodage ? Object.assign({}, hm, { encodage }) : sansEncodage());
         if (opts.colonnes && !Array.isArray(corps.colonnes)) corps = versColonnes(corps);
         if (opts.latenceHeatmap) await new Promise(z => setTimeout(z, opts.latenceHeatmap));
         return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(corps) }).catch(() => {});
@@ -145,6 +145,7 @@ async function ouvrir(nav, opts) {
   });
   if (opts.init) await page.addInitScript(opts.init);
   await page.addInitScript(() => { try { localStorage.clear(); } catch (e) { /* */ } });
+  if (opts.reglages) await page.addInitScript(r => { localStorage.setItem('samsara-carte-v1', JSON.stringify(r)); }, opts.reglages);
   if (opts.horloge) await page.clock.install({ time: Date.now() });
   await page.goto(`http://127.0.0.1:${serveur.address().port}/bookmap.html`);
   if (opts.attendre !== false) {
@@ -154,6 +155,13 @@ async function ouvrir(nav, opts) {
   return { page, erreurs, hotes, S, comptes, urls };
 }
 const etat = page => page.evaluate(() => window.__carte.etat());
+// Onglet caché / visible, simulé (document.hidden piloté par le harnais).
+const ONGLET = () => {
+  window.__cache = false;
+  Object.defineProperty(Document.prototype, 'hidden', { configurable: true, get() { return window.__cache; } });
+  Object.defineProperty(Document.prototype, 'visibilityState', { configurable: true, get() { return window.__cache ? 'hidden' : 'visible'; } });
+};
+const montrer = (page, cache) => page.evaluate(c => { window.__cache = c; document.dispatchEvent(new Event('visibilitychange')); }, cache);
 // Le pixel le plus clair d'un voisinage 5 × 5 : une ligne lissée (anticrénelage) n'a pas son
 // centre exactement sur un pixel entier.
 async function pixel(page, x, y) {
@@ -363,6 +371,87 @@ async function pixel(page, x, y) {
       check(`le carnet live repart (${n1} → ${e11.live.n} lectures), erreur effacée`, e11.live.n > n1 + 1 && !/carnet live/.test(e11.statut), { n1, n: e11.live.n, statut: e11.statut });
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p11.close();
+    }
+
+    // ════ Carnet live : échelle, instants, lectures périmées ═══════════════════
+    titre('12. heatmap.json arrive APRÈS le carnet : le live passe à l\'échelle publiée, sans rien perdre');
+    {
+      let p12;
+      ({ page: p12, erreurs } = await ouvrir(nav, { encodage: true, latenceHeatmap: 3000, attendre: false }));
+      await p12.waitForFunction(() => window.__carte && window.__carte.etat().live && window.__carte.etat().live.n >= 2 && !window.__carte.etat().publiee, null, { timeout: 8000 }).catch(() => {});
+      const avant = await etat(p12);
+      check(`avant heatmap.json : ${avant.live && avant.live.n} lectures, échelle propre (annoncée)`, avant.live && avant.live.ref === 'propre' && !avant.publiee, avant.live);
+      await p12.waitForFunction(() => window.__carte.etat().publiee, null, { timeout: 8000 }).catch(() => {});
+      await p12.waitForTimeout(600);
+      const apres = await etat(p12);
+      check(`après : même échelle que la carte publiée, lectures d'avant gardées (${avant.live && avant.live.n} → ${apres.live.n})`,
+        apres.live.ref === 'publiee' && apres.live.deb0 === (avant.live && avant.live.deb0) && apres.pastilles.some(t => /^Carnet live/.test(t)), apres.live);
+      // La lecture au pointeur du live donne des BTC (l'encodage publié), et la valeur MESURÉE.
+      const L = await p12.evaluate(() => window.__carte.lectures());
+      const e = apres, mid = (e.vue.p1 + e.vue.p2) / 2;
+      await p12.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [L.deb[0] - 20e3, L.deb[L.n - 1] + 10e3, mid - 40, mid + 40]);
+      await p12.waitForTimeout(400);
+      const r = await p12.evaluate(() => { const c = document.getElementById('carte').getBoundingClientRect(); return { x: c.left, y: c.top, w: c.width, h: c.height }; });
+      const zw = r.w - 66 - 112, zh = r.h - 20 - 58 - 58, xLu = ((L.deb[0] + L.deb[1]) / 2 - (L.deb[0] - 20e3)) / (L.deb[L.n - 1] + 30e3 - L.deb[0]) * zw;
+      let lu = '';
+      for (const fy of [0.5, 0.45, 0.55, 0.4, 0.6]) {
+        await p12.mouse.move(r.x + xLu + 1, r.y + zh * fy); await p12.mouse.move(r.x + xLu, r.y + zh * fy); await p12.waitForTimeout(250);
+        lu = await p12.evaluate(() => document.getElementById('lecture').innerText);
+        if (/Live [^\n]*intensité/.test(lu)) break;
+      }
+      check('lecture du live (lu avant l\'arrivée de heatmap.json) : en BTC, valeur mesurée', /Live [^\n]*intensité \d+ → plus gros niveau/.test(lu) && /mesuré : [\d,]+ BTC/.test(lu), lu);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p12.close();
+    }
+
+    titre('13. Encodage disparu en cours de séance : le live repasse à une échelle propre — jamais nul');
+    {
+      let sansEnc = false;
+      const heatmap = () => (sansEnc ? Object.assign(sansEncodage(), { updated: new Date().toISOString() }) : Object.assign({}, hm, { encodage }));
+      let p13;
+      ({ page: p13, erreurs } = await ouvrir(nav, { heatmap, init: ONGLET }));
+      const e0 = await etat(p13);
+      check('au départ : échelle publiée', e0.live && e0.live.ref === 'publiee', e0.live);
+      sansEnc = true;
+      await montrer(p13, true); await p13.waitForTimeout(300); await montrer(p13, false);     // retour sur l'onglet : relecture
+      await p13.waitForFunction(() => !window.__carte.etat().publiee.encodage, null, { timeout: 8000 }).catch(() => {});
+      await p13.waitForTimeout(2500);
+      const e1 = await etat(p13);
+      check('heatmap.json republié sans encodage : relu', e1.publiee && !e1.publiee.encodage, e1.publiee);
+      check(`live : échelle propre annoncée, chaleur non nulle (${e1.live.nonNuls} cellules)`, e1.live.ref === 'propre' && e1.live.nonNuls > 10 && e1.pastilles.some(t => /^Carnet live/.test(t)), e1.live);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p13.close();
+    }
+
+    titre('14. Carnet à 1 s : chaque lecture à son instant, aucune colonne sautée');
+    {
+      let p14;
+      // 250 ms de latence par carnet : une boucle qui relancerait APRÈS la réponse lirait toutes les 1,25 s.
+      const intercept = async (u, k) => { if (k === 'depth') await new Promise(z => setTimeout(z, 250)); return null; };
+      ({ page: p14, erreurs } = await ouvrir(nav, { encodage: true, reglages: { niveauxLive: 100 }, intercept }));
+      await p14.waitForTimeout(6000);
+      const L = await p14.evaluate(() => window.__carte.lectures()), e14 = await etat(p14);
+      let jointif = 0, ecarts = [];
+      for (let c = 0; c + 1 < L.n; c++) { if (L.fin[c] === L.deb[c + 1]) jointif++; ecarts.push(L.deb[c + 1] - L.deb[c]); }
+      const moy = ecarts.reduce((a, b) => a + b, 0) / ecarts.length;
+      check(`${L.n} lectures, chacune jusqu'à la suivante (${jointif}/${L.n - 1} jointives)`, L.n >= 8 && jointif === L.n - 1, { n: L.n, jointif });
+      check(`pas fixe : ${Math.round(moy)} ms en moyenne entre deux lectures (cadence 1 000 ms, latence de 250 ms non ajoutée)`, Math.abs(moy - 1000) < 60, ecarts);
+      check('instant de chaque lecture = milieu [envoi, réception] à l\'heure Binance', L.deb.every((d, c) => Math.abs(d - ((L.envoi[c] + L.recu[c]) / 2 + e14.horloge.ecart)) < 1e-6));
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p14.close();
+    }
+
+    titre('15. Carnet plus ancien que le précédent (lastUpdateId) : écarté');
+    {
+      let k = 0;
+      const intercept = (u, ch, S) => { if (ch !== 'depth' || ++k % 3) return null; const d = S.repondre(u); d.lastUpdateId -= 1000; return { status: 200, body: JSON.stringify(d) }; };
+      let p15;
+      ({ page: p15, erreurs } = await ouvrir(nav, { encodage: true, intercept }));
+      await p15.waitForTimeout(4000);
+      const e15 = await etat(p15);
+      check(`${e15.live.ecartees} lecture(s) périmée(s) écartée(s), ${e15.live.n} gardées`, e15.live.ecartees >= 1 && e15.live.n >= 2, e15.live);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p15.close();
     }
   } finally {
     await nav.close();
