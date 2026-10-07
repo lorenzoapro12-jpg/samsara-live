@@ -135,7 +135,7 @@ function reglagesHtml() {
     + '<div class="ligne-reglage">dominant ≥ <input type="number" id="r_live_takerDominant" min="51" max="95" step="1" value="' + R.live.takerDominant + '" onchange="changerReglage(this)">'
     + ' léger ≥ <input type="number" id="r_live_takerLeger" min="50.5" max="95" step="0.5" value="' + R.live.takerLeger + '" onchange="changerReglage(this)"></div></div>'
     // Carnet du fichier
-    + '<h4>Carte « Liquidité » — fichier de 15 min</h4>'
+    + '<h4>Carte « Liquidité » — fichier de ' + CADENCES.attendue_min + ' min</h4>'
     + (pub.length ? '<label class="reglage">Bande du ratio ' + choix('r_carnet_bande', ['auto'].concat(pub), R.carnet.bande === null ? 'auto' : R.carnet.bande,
         v => v === 'auto' ? 'référence publiée (±' + lq.bande_ref_pct + ' %)' : '±' + nf(v) + ' % (publiée)') + '</label>'
       : '<p class="fine">Aucune bande publiée par ce fichier.</p>')

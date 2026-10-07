@@ -101,7 +101,7 @@ STRUCTURES.hud = {
     const c = chantier(), $ = id => document.getElementById(id);
     const tete = document.querySelector('.header'), main = document.querySelector('.main-area');
     const bande = c.conteneur('div', 'hud-bande', tete.parentNode, tete.nextSibling, 'Télémétrie : dernière publication');
-    c.decor('span', 'hud-bande-tag', bande, null, 'TÉLÉMÉTRIE // 15 MIN');
+    c.decor('span', 'hud-bande-tag', bande, null, 'TÉLÉMÉTRIE // ' + CADENCES.attendue_min + ' MIN');   // js/cadences.js
     c.deplacer($('cycle'), bande);
     c.deplacer($('feedPanel'), main, main.firstChild);
     c.deplacer($('indicatorBar'), main.parentNode, main.nextSibling);

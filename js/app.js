@@ -987,7 +987,7 @@ async function fetchKlinesRaw(symbol, last) {
 
 // ============ MULTI-TF S/R ENGINE ============
 const SR_CACHE = {}; // key: 'SYMBOL_INTERVAL' → { levels, candles, ts }
-const SR_REFETCH_MS = 60000;
+const SR_REFETCH_MS = CADENCES.niveaux_sr;   // js/cadences.js
 
 function getRefIntervals(interval) {
   if (['1m','5m','15m','30m'].includes(interval)) return ['1h','4h'];
@@ -1269,7 +1269,7 @@ async function fetchHeatmap() {
   } catch(e) {}
 }
 function toggleDepth(on) {
-  if (on) { fetchHeatmap(); if (!depthTimer) depthTimer = setInterval(fetchHeatmap, 60000); }
+  if (on) { fetchHeatmap(); if (!depthTimer) depthTimer = setInterval(fetchHeatmap, CADENCES.chaleur_lue); }
   else { clearInterval(depthTimer); depthTimer = null; }
 }
 
@@ -3444,12 +3444,12 @@ async function fetchMarket() {
     // Un HTTP 200 ne prouve RIEN sur la fraîcheur : une source morte reste servie
     // indéfiniment et le point restait vert. C'est la panne du 16/08 — un consommateur a lu
     // 13 cycles de données gelées sans qu'aucun voyant ne bronche.
-    // Cadence attendue : 15 min. 20 min = un tick manqué, 32 min = deux.
+    // Seuils de js/cadences.js : au-delà de vieux_min, une publication manquée ; de fige_min, deux.
     const ageMin = marketData.updated
       ? (Date.now() - Date.parse(marketData.updated)) / 60000 : null;
     const etat = ageMin === null ? 'inconnu'
-               : ageMin > 32 ? 'fige'
-               : ageMin > 20 ? 'retard' : 'ok';
+               : ageMin > CADENCES.fige_min ? 'fige'
+               : ageMin > CADENCES.vieux_min ? 'retard' : 'ok';
     const teinte = { ok: 'var(--up)', retard: 'var(--warn)', fige: 'var(--down)',
                      inconnu: 'var(--ink-3)' }[etat];
     const dot = document.getElementById('dot');
@@ -3648,9 +3648,9 @@ async function renderLive() {
     + '<b>Piège mesuré le 02/10 :</b> soustraire le perp du fichier au spot live affichait un basis de '
     + '<b>−207 pts</b> quand le vrai basis valait <b>−45 pts</b>. Deux cadences différentes ne se soustraient '
     + 'jamais — c&#39;est l&#39;erreur exacte que ce panneau existe pour éviter.<br><br>'
-    + 'Ces blocs viennent de market-data.json (cron, 15 min) : cette page n\'interroge que Binance '
+    + 'Ces blocs viennent de market-data.json (cron, ' + CADENCES.attendue_min + ' min) : cette page n\'interroge que Binance '
     + 'en direct, les autres sources (OKX, Deribit, Yahoo) sont agrégées côté serveur et arrivent avec '
-    + 'leurs 15 minutes. Pour comparer honnêtement, ce prix-ci est du <b>spot Binance</b> : compare-le '
+    + 'leurs ' + CADENCES.attendue_min + ' minutes. Pour comparer honnêtement, ce prix-ci est du <b>spot Binance</b> : compare-le '
     + 'à ton <b>spot</b> OKX, jamais à un swap — le basis perp/spot fait 20 à 50 pts et ce n&#39;est pas '
     + 'une panne.</div>');
 
@@ -3785,12 +3785,12 @@ function ageBannerHtml(d) {
     return '<div class="age-banner" style="display:block">Âge de la donnée inconnu — champ <b>updated</b> absent</div>';
   }
   const age = (Date.now() - upd) / 60000;
-  if (age <= 20) return '';
-  const fige = age > 32;
+  if (age <= CADENCES.vieux_min) return '';
+  const fige = age > CADENCES.fige_min;
   return '<div class="age-banner' + (fige ? '' : ' retard') + '" style="display:block">'
     + (fige
         ? 'Données figées depuis ' + Math.round(age) + ' min — le cron de publication ne tourne plus'
-        : 'Dernière publication il y a ' + Math.round(age) + ' min (cadence attendue : 15 min)')
+        : 'Dernière publication il y a ' + Math.round(age) + ' min (cadence attendue : ' + CADENCES.attendue_min + ' min)')
     + '</div>';
 }
 
@@ -3823,7 +3823,8 @@ function renderFeedTo(container) {
       + kpi('DXY', fmtNum(m.dxy_spot, 2))
       + kpi('VIX', fmtNum(m.vix, 1))
       + '<span class="kpi-age" title="Âge de la publication">' + (ageK === null ? '—' : ageK + ' min') + '</span>';
-    cy.classList.toggle('vieux', ageK !== null && ageK > 20);
+    cy.classList.toggle('vieux', ageK !== null && ageK > CADENCES.vieux_min);
+    cy.title = 'Dernière publication (cadence ' + CADENCES.attendue_min + ' min) — cliquer pour le détail';
     ajusterKpis();
   }
   const up = document.getElementById('updated');
@@ -3839,7 +3840,7 @@ function renderFeedTo(container) {
   // de market-data.json, réécrit toutes les 15 min : elle affichait 86 330,1 quand le spot
   // était à 86 423,0, soit −92,9 pts en 4,7 min. Le décalage était réel mais daté — encore
   // fallait-il le calculer. On affiche l'âge en minutes à côté de l'heure de maj pour que le
-  // retard se LISE. Le bandeau d'âge (ageBannerHtml) ne se déclenche qu'au-delà de 20 min,
+  // retard se LISE. Le bandeau d'âge (ageBannerHtml) ne se déclenche qu'au-delà de CADENCES.vieux_min,
   // c'est-à-dire jamais dans le cas normal : d'où deux prix contradictoires à l'écran.
   const ageMin = upd ? Math.max(0, Math.round((Date.now() - upd.getTime()) / 60000)) : null;
   html += mCard('📊','Marché live','Binance spot · maj ' + hhmm + ' UTC'
@@ -4212,7 +4213,7 @@ function startForward() {
     }
     drawChart();
     updateForwardStats();
-  }, 5000);
+  }, CADENCES.bougies);   // au rythme où les bougies arrivent : rien de neuf entre deux lectures
 }
 
 function stopForward() {
@@ -4424,11 +4425,11 @@ async function init() {
   // Onglet caché = aucune requête. La page restait ouverte en arrière-plan toute la journée
   // en interrogeant Binance chaque seconde ; au retour, tout est rafraîchi d'un coup.
   const visible = fn => () => { if (!document.hidden) return fn(); };
-  setInterval(visible(fetchPrice), 1000);
-  setInterval(visible(async () => { await fetchKlines(); drawChart(); }), 5000);
-  setInterval(visible(fetchMarket), 60000);
-  // Refresh S/R ref TFs every 60s
-  setInterval(visible(refreshRefSR), 60000);
+  // Cadences : js/cadences.js (une table, lue aussi par les étiquettes et les seuils d'âge).
+  setInterval(visible(fetchPrice), CADENCES.prix);
+  setInterval(visible(async () => { await fetchKlines(); drawChart(); }), CADENCES.bougies);
+  setInterval(visible(fetchMarket), CADENCES.publication_lue);
+  setInterval(visible(refreshRefSR), CADENCES.niveaux_sr);
   document.addEventListener('visibilitychange', async () => {
     if (document.hidden) return;
     fetchPrice(); fetchMarket();
@@ -4439,6 +4440,6 @@ async function init() {
   setInterval(() => {
     const c = document.getElementById('taskbarClock');
     if (c) c.textContent = new Date().toLocaleTimeString('fr-FR');
-  }, 1000);
+  }, CADENCES.horloge);
 }
 init();

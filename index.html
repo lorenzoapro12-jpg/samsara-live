@@ -44,6 +44,7 @@
   catch (e) { document.documentElement.setAttribute('data-mode', 'debutant'); }
 })();
 </script>
+<script defer src="js/cadences.js"></script>
 <script defer src="js/structures.js"></script>
 <script defer src="js/fiches.js"></script>
 <script defer src="js/reglages.js"></script>
@@ -68,7 +69,7 @@
     </div>
   </div>
   <!-- Chiffres clés de la dernière PUBLICATION (market-data.json, 15 min) — avec leur âge. -->
-  <div class="kpis" id="cycle" onclick="toggleFeed()" title="Dernière publication (cadence 15 min) — cliquer pour le détail"></div>
+  <div class="kpis" id="cycle" onclick="toggleFeed()" title="Dernière publication — cliquer pour le détail"></div>
   <div class="header-right">
     <span id="updated"></span>
     <button class="theme-btn ico-btn" onclick="toggleFeed()" id="feedBtn" title="Marché live (F)" aria-label="Marché live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
