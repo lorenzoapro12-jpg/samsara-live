@@ -46,6 +46,7 @@ globalThis.__T__ = {
   ETIQ, subTitle, ficheHtml, lectureCourte, renderFeedTo, renderLive, modeCourant, FICHE_IND,
   bandeProfil, mursFusionnes, fusionnerCellules, bandeLive, palier, ladderHtml,
   setData(d) { marketData = d; }, el: id => document.getElementById(id),
+  get COLORS() { return COLORS; }, FORMES_BOUGIE, BOUGIE_DENSE_PX,
 };`;
   vm.runInContext(code, sandbox);
   return { T: sandbox.__T__, stockage, appels, element, sandbox };

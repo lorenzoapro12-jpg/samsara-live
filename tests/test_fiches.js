@@ -112,6 +112,20 @@ const appels = [...SRC_APP.matchAll(/infoBtn\('([^']+)'\)|lectureCourte\('([^']+
 const inconnus = [...new Set(appels.concat(Object.values(T.FICHE_IND)))].filter(k => !T.FICHES[k]);
 check(`${new Set(appels).size} fiches appelées depuis les cartes et le menu, toutes définies`, !inconnus.length, inconnus);
 
+// ── 7. La forme des bougies : une convention du thème, dite par une fiche dérivée du tracé ──
+titre('7. Bougies : la fiche dit la forme du thème courant, lue dans le code du tracé');
+const SRC_FICHES = fs.readFileSync(path.join(REPO, 'js/fiches.js'), 'utf8');
+const fb = T.ficheHtml('bougies');
+check('fiche « bougies » : nature « convention » (pas « mesuré »)', /fiche-nature nature-convention/.test(fb), fb.slice(0, 200));
+check('elle dit la forme du thème et le seuil de la vue dense, lus dans FORMES_BOUGIE et BOUGIE_DENSE_PX (js/app.js)',
+  fb.includes(esc(T.FORMES_BOUGIE[T.COLORS.bougieForme])) && fb.includes('corps &lt; ' + T.BOUGIE_DENSE_PX + ' px') && /La forme change, jamais la valeur/.test(fb));
+const formeAvant = T.COLORS.bougieForme;
+const parForme = Object.keys(T.FORMES_BOUGIE).map(f => { T.COLORS.bougieForme = f; return [f, T.ficheHtml('bougies').includes(esc(T.FORMES_BOUGIE[f]))]; });
+T.COLORS.bougieForme = formeAvant;
+check(`la fiche suit la forme du thème (${Object.keys(T.FORMES_BOUGIE).join(', ')})`, parForme.every(([, ok]) => ok), parForme);
+check('aucun seuil en pixels écrit à la main dans js/fiches.js', !/<\s*\d+\s*px/.test(SRC_FICHES.replace(/^\s*\/\/.*$/gm, '')));
+check('la fiche est dans le glossaire', /'bougies'/.test(SRC_FICHES.slice(SRC_FICHES.indexOf('function ouvrirGlossaire'))));
+
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 console.log(ko ? `\n❌ LÉGENDES : ${ko} contrôle(s) en échec` : '\n✅ LÉGENDES : TOUS LES CONTRÔLES PASSENT');
 process.exit(ko ? 1 : 0);

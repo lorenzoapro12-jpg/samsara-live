@@ -1197,24 +1197,41 @@ async function fetchPrice() {
 
 // ============ LIQUIDITÉ (HEATMAP HISTORIQUE) ============
 let histHeatmap = null, depthTimer = null;
-const HEAT_BID = (() => { const a = []; for (let i = 0; i < 256; i++) { const t = i / 255; a.push(`rgba(${10 + 80 * t | 0},${60 + 180 * t | 0},${55 + 165 * t | 0},${0.2 + 0.65 * t})`); } return a; })();
-const HEAT_ASK = (() => { const a = []; for (let i = 0; i < 256; i++) { const t = i / 255; a.push(`rgba(${60 + 195 * t | 0},${15 + 105 * t | 0},${15 + 75 * t | 0},${0.2 + 0.65 * t})`); } return a; })();
+// Rampes de couleur de la chaleur (intensité v de 0 à 255) :
+//  · HISTORIQUE (thème sans --chaleur-*) : teinte ET opacité croissent, base + pente × v/255.
+//    Monotone en contraste sur fond SOMBRE ; pas sur fond CLAIR, où la teinte s'éclaircit vers le
+//    fond : les plus gros murs y étaient les MOINS visibles (mesuré sur Aero et Codex, qui posent
+//    donc leurs jetons --chaleur-*) ;
+//  · ENCRE du thème (--chaleur-bid / --chaleur-ask, hex ou rgb()) : teinte fixe, seule l'opacité
+//    croît, CHALEUR_ALPHA.base + pente × v/255 — monotone sur tout fond.
+// Gardées littérales : tests/test_palette.py les lit ici et vérifie la monotonie, thème par thème.
+const HEAT_RAMPE = { bid: { base: [10, 60, 55, 0.2], pente: [80, 180, 165, 0.65] },
+                     ask: { base: [60, 15, 15, 0.2], pente: [195, 105, 75, 0.65] } };
+const CHALEUR_ALPHA = { base: 0.10, pente: 0.80 };
 // Heatmap : la grille NATIVE (1 px = 1 (colonne minute, bin de prix)) est rastérisée une
 // fois par payload puis composée en UN drawImage, au lieu d'un fillRect par cellule
 // (jusqu'à 128 k appels/frame, ~175 ms mesuré, pour un rendu quasi identique : en 15m les
 // colonnes se tuilent déjà à ~0,93 px). Le coût était le NOMBRE d'appels, pas la surface peinte.
 let heatLayer = null;   // { cv, w, h, P1, dt, dp, cle }
-// Palettes -> Uint32 ABGR (ordre mémoire d'ImageData, little-endian) : un pixel écrit sans
-// reparser une chaîne CSS par cellule.
-const HEAT_U32 = (() => { const u32 = pal => { const a = new Uint32Array(256);
-  for (let i = 0; i < 256; i++) { const m = pal[i].match(/[\d.]+/g);
-    a[i] = ((+m[3] * 255 | 0) << 24 | (+m[2] << 16) | (+m[1] << 8) | +m[0]) >>> 0; }
-  return a; }; return { bid: u32(HEAT_BID), ask: u32(HEAT_ASK) }; })();
+// Rampe -> Uint32 ABGR (ordre mémoire d'ImageData, little-endian) : un pixel écrit sans reparser
+// une chaîne CSS par cellule. Mêmes opérations que l'ancienne table de chaînes rgba() : la rampe
+// historique est identique à l'octet près.
+function rampeU32(base, pente) {
+  const a = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255, c = k => base[k] + pente[k] * t | 0;
+    a[i] = (((base[3] + pente[3] * t) * 255 | 0) << 24 | (c(2) << 16) | (c(1) << 8) | c(0)) >>> 0;
+  }
+  return a;
+}
+// Reconstruites par lireJetons() à chaque changement de thème ; l'id du thème est dans la clé
+// de la couche (buildHeatLayer) : une couche peinte avec la rampe d'un autre thème est refaite.
+let HEAT_U32 = { bid: rampeU32(HEAT_RAMPE.bid.base, HEAT_RAMPE.bid.pente), ask: rampeU32(HEAT_RAMPE.ask.base, HEAT_RAMPE.ask.pente) };
 /** Couche heatmap, FUSIONNÉE par MAX (kt colonnes × kp tranches, js/reglages.js), cellules
  *  sous `seuil` retirées. L'image ne couvre que les tranches présentes (de P0 à P1) : elle
  *  partait du prix 0 $ — 1 441 × 4 333 px pour ~150 lignes utiles. */
 function buildHeatLayer(hm, kt, kp, seuil) {
-  const cle = hm.updated + '|' + kt + '|' + kp + '|' + seuil;
+  const cle = hm.updated + '|' + kt + '|' + kp + '|' + seuil + '|' + themeCourant().id;
   if (heatLayer && heatLayer.cle === cle) return heatLayer;   // payload et réglages inchangés
   const bids = fusionnerCellules(hm.bids, kt, kp, seuil), asks = fusionnerCellules(hm.asks, kt, kp, seuil);
   let W = 0, P0 = Infinity, P1 = -Infinity;
@@ -2114,7 +2131,24 @@ const COLORS = {
   obv: '#ff9800', mfi: '#9c27b0', williamsR: '#00a5bd', cci: '#ff5722', adx: '#d79a00',
   equity_total: '#e0a800',
   candleUp: '#0d9672', candleDown: '#e5484d',
-  grid: 'rgba(127,127,127,0.12)', text: '#45597a'
+  grid: 'rgba(127,127,127,0.12)', text: '#45597a',
+  bougieForme: 'pleine', bougieRayon: 2, grilleTirets: []
+};
+// ─── Crochets du graphique pour les thèmes (lus par lireJetons) ───
+// --bougie-forme : la FORME des bougies — jamais leur valeur : ouverture, plus haut, plus bas et
+// clôture sont tracés aux mêmes ordonnées quelle que soit la forme. Sous BOUGIE_DENSE_PX de
+// largeur de corps, toutes les formes reviennent au corps plein (les barres, au trait seul) : un
+// contour ou un tiret de 2 px ne se lit plus. js/fiches.js (fiche « bougies ») lit ces constantes.
+// --bougie-rayon : rayon des coins des corps et des barres de volume (0 = angles vifs).
+// --grille-tirets : motif de la grille (ex. « 8 3 2 3 », trait mixte) ; « none » = trait plein.
+// --police-graphique : famille du texte du canvas (repli : --font).
+// --chaleur-bid / --chaleur-ask : encre de la couche « Liquidité » (voir HEAT_RAMPE).
+// Sans ces jetons, le graphique est celui d'avant, au pixel près.
+const BOUGIE_DENSE_PX = 4;
+const FORMES_BOUGIE = {
+  pleine: 'corps pleins, à la couleur de la hausse ou de la baisse',
+  'creuse-hausse': 'hausse en corps creux (contour, la mèche s’arrête au corps), baisse en corps plein',
+  barre: 'barres OHLC : un trait du plus haut au plus bas, l’ouverture en tiret à gauche, la clôture à droite',
 };
 // Identité des overlays : chaque ligne porte son étiquette en bout de tracé (et un point dans
 // le ruban) — elle ne repose jamais sur la couleur seule. tests/test_palette.py échoue si un
@@ -2122,9 +2156,17 @@ const COLORS = {
 // L'étiquette EST la clé (ema20 -> EMA20), dont la période est aussi tirée pour le calcul.
 // Gardée littérale : tests/test_palette.py la lit dans la source.
 const ETIQ_OVERLAYS = { ema20: 'EMA20', ema50: 'EMA50', ema100: 'EMA100', ema200: 'EMA200', sma20: 'SMA20', sma50: 'SMA50' };
-// Une seule famille de caractères pour tout le graphique : celle de l'interface (jeton --font).
-let POLICE_UI = "'Segoe UI Variable Text','Segoe UI Variable',-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,'Segoe UI',Roboto,sans-serif";
-function chartFont(px, poids) { return (poids || 500) + ' ' + px + 'px ' + POLICE_UI; }
+// Une seule famille de caractères pour tout le graphique : celle du thème pour le graphique
+// (jeton --police-graphique), à défaut celle de l'interface (--font).
+let POLICE_GRAPHIQUE = "'Segoe UI Variable Text','Segoe UI Variable',-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,'Segoe UI',Roboto,sans-serif";
+function chartFont(px, poids) { return (poids || 500) + ' ' + px + 'px ' + POLICE_GRAPHIQUE; }
+// « #rgb », « #rrggbb » ou « rgb(a)(r, g, b…) » → [r, g, b] ; sinon null.
+function rvb(c) {
+  const h = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec((c || '').trim());
+  if (h) { const x = h[1].length === 3 ? h[1].replace(/./g, d => d + d) : h[1], n = parseInt(x, 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+  const m = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec((c || '').trim());
+  return m ? [+m[1] | 0, +m[2] | 0, +m[3] | 0] : null;
+}
 // Même teinte, autre opacité : « #rrggbb » ou « rgb(a)(…) » → rgba. Sinon, inchangée.
 function avecAlpha(c, a) {
   const h = /^#([0-9a-f]{6})$/i.exec(c || '');
@@ -2168,7 +2210,15 @@ function lireJetons() {
   COLORS.volAlpha = num('--vol-alpha', 0.55);
   COLORS.bandeAlpha = num('--bande-alpha', 0.08);
   COLORS.aura = num('--aura', 0);
-  POLICE_UI = v('--font', POLICE_UI);
+  POLICE_GRAPHIQUE = v('--police-graphique', v('--font', POLICE_GRAPHIQUE));
+  // Crochets du graphique : défauts = le graphique d'avant.
+  const forme = v('--bougie-forme', 'pleine');
+  COLORS.bougieForme = Object.prototype.hasOwnProperty.call(FORMES_BOUGIE, forme) ? forme : 'pleine';
+  COLORS.bougieRayon = Math.max(0, num('--bougie-rayon', 2));
+  const tirets = v('--grille-tirets', 'none');
+  COLORS.grilleTirets = tirets === 'none' ? [] : tirets.split(/[\s,]+/).map(Number).filter(x => isFinite(x) && x >= 0);
+  const encre = (nom, r) => { const c = rvb(v(nom, '')); return c ? rampeU32(c.concat(CHALEUR_ALPHA.base), [0, 0, 0, CHALEUR_ALPHA.pente]) : rampeU32(r.base, r.pente); };
+  HEAT_U32 = { bid: encre('--chaleur-bid', HEAT_RAMPE.bid), ask: encre('--chaleur-ask', HEAT_RAMPE.ask) };
 }
 // Légende dans le ruban : chaque pastille d'overlay porte le point de la couleur de sa ligne.
 const PASTILLES = { ema20: 'ema20', ema50: 'ema50', ema100: 'ema100', ema200: 'ema200', sma20: 'sma20', sma50: 'sma50',
@@ -2180,6 +2230,26 @@ function peindrePastilles() {
   }
 }
 let jetonsLus = false;
+
+// Disposition verticale du canvas : tracé principal, puis sous-graphes empilés, puis le
+// sélecteur de plage (RS_HEIGHT) en bas. Le tracé principal garde MAIN_H_MIN px ; quand le canvas
+// est trop bas pour loger les sous-graphes à leur hauteur (subHeights), ils sont réduits
+// PROPORTIONNELLEMENT. Avant : mainH bridé à 200 px, les sous-graphes s'empilaient dessous et
+// débordaient sur le sélecteur de plage, puis hors du canvas (fenêtre basse). Un sous-graphe
+// réduit sous la hauteur utile de resolveSub n'est pas tracé.
+const MAIN_H_MIN = 200;
+const SUB_ORDRE = ['vol', 'rsi', 'macd', 'stoch', 'atr', 'obv', 'mfi', 'williamsR', 'cci', 'adx', 'ao', 'equity'];
+function dispositionGraphique(H) {
+  const actifs = SUB_ORDRE.filter(k => activeSubs[k]);
+  let total = 0;
+  for (const k of actifs) total += subHeights[k] || 80;
+  const dispo = H - 4 - RS_HEIGHT;
+  const mainH = Math.max(Math.min(MAIN_H_MIN, dispo), dispo - total);
+  const k = total > 0 ? Math.min(1, Math.max(0, dispo - mainH) / total) : 1;
+  let y = mainH + 4;
+  const sous = actifs.map(cle => { const h = (subHeights[cle] || 80) * k, s = { cle, y, h }; y += h; return s; });
+  return { mainH, sous };
+}
 
 function drawChart() {
   scaleSeq++;   // une frame = un calcul d'échelle : invalide le cache de priceWindow()
@@ -2195,12 +2265,8 @@ function drawChart() {
     return;
   }
   
-  let subTotal = 0;
-  for (const [k, active] of Object.entries(activeSubs)) {
-    if (active) subTotal += subHeights[k] || 80;
-  }
-  // Main chart gets remaining height, minus range selector
-  const mainH = Math.max(200, H - subTotal - 4 - RS_HEIGHT);
+  // Tracé principal et sous-graphes : hauteurs calculées en un seul endroit (dispositionGraphique).
+  const dispo = dispositionGraphique(H), mainH = dispo.mainH;
   
   // Filigrane : paire + intervalle, graisse fine, espacé — une signature, pas un tampon.
   ctx.save();
@@ -2244,14 +2310,7 @@ function drawChart() {
   ctx.fillText(pctStr, 22, 30);
   
   // Empiler les sous-graphes
-  let yOff = mainH + 4;
-  const subOrder = ['vol', 'rsi', 'macd', 'stoch', 'atr', 'obv', 'mfi', 'williamsR', 'cci', 'adx', 'ao', 'equity'];
-  for (const key of subOrder) {
-    if (activeSubs[key]) {
-      resolveSub(candles, yOff, subHeights[key] || 80, W, key);
-      yOff += subHeights[key] || 80;
-    }
-  }
+  for (const s of dispo.sous) s.trace = resolveSub(candles, s.y, s.h, W, s.cle) !== false;
 
   // --- Crosshair ---
   if (crossX !== null && crossY !== null && crossY < mainH) {
@@ -2331,10 +2390,8 @@ function drawChart() {
       ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.moveTo(crossX, mainH + 2); ctx.lineTo(crossX, H); ctx.stroke();
 
-      let sY = mainH + 4;
-      for (const key of subOrder) {
-        if (!activeSubs[key]) continue;
-        const sh = subHeights[key] || 80;
+      for (const { cle: key, y: sY, trace } of dispo.sous) {
+        if (!trace) continue;   // trop réduit pour être tracé : pas de badge orphelin
         // Badge valeur dans colonne droite
         const val = getSubIndicatorValue(key, realIdx);
         if (val !== null) {
@@ -2348,7 +2405,6 @@ function drawChart() {
           ctx.fillStyle = COLORS.text; ctx.font = chartFont(9);
           ctx.fillText(txt, tx + 6, ty + 11);
         }
-        sY += sh;
       }
     }
   }
@@ -2536,8 +2592,9 @@ function resolveChart(candles, padL, padR, chartH, W) {
     }
   }
   
-  // Grid
+  // Grid — motif du thème (--grille-tirets), plein par défaut ; rendu au plein après la boucle.
   ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 0.5;
+  ctx.setLineDash(COLORS.grilleTirets);
   const gridN = 6;
   // Ordonnée de l'étiquette de dernier prix : le libellé d'axe qu'elle recouvrirait est omis.
   const yTag = (livePrice && livePrice >= minP && livePrice <= maxP) ? pad.top + ph * (1 - (livePrice - minP) / range) : null;
@@ -2551,6 +2608,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
     const label = '$' + fmtPrix(price);
     ctx.fillText(label, W - pad.right + 3, y + 3);
   }
+  ctx.setLineDash([]);
   
   // Halo sous la courbe des clôtures (jeton --aura, 0 = aucun) : le sens de la vue se lit
   // avant le détail. Teinte = sens de la vue, opacité qui s'éteint vers le bas du tracé.
@@ -2829,27 +2887,11 @@ function resolveChart(candles, padL, padR, chartH, W) {
   // supprime le blanc cumulé qui rend les vues denses lisibles. L'ordre porte l'information.
   for (let i = 0; i < visible.length; i++) {
     const c = visible[i];
-    const x = pad.left + gap * i;
-    const isGreen = c.close >= c.open;
-    const color = isGreen ? COLORS.candleUp : COLORS.candleDown;
     const yO = pad.top + ph * (1 - (c.open - minP) / range);
     const yC = pad.top + ph * (1 - (c.close - minP) / range);
     const yH = pad.top + ph * (1 - (c.high - minP) / range);
     const yL = pad.top + ph * (1 - (c.low - minP) / range);
-    const xm = x + candleW / 2;
-    // Anneau de SURFACE autour de la mèche (pas de blanc) : il sépare les bougies voisines
-    // dans les vues denses sans dessiner de contour sur la donnée.
-    ctx.strokeStyle = COLORS.surface; ctx.lineWidth = 2.6;
-    ctx.beginPath(); ctx.moveTo(xm, yH); ctx.lineTo(xm, yL); ctx.stroke();
-    ctx.strokeStyle = color; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(xm, yH); ctx.lineTo(xm, yL); ctx.stroke();
-    const bodyH = Math.max(1, Math.abs(yC - yO));
-    const bodyW = candleW * 0.7, bodyX = x + candleW*0.15, bodyY = Math.min(yO, yC);
-    ctx.fillStyle = color;
-    // Coins adoucis dès qu'il y a la place ; le liseré blanc d'avant (un contour sur la
-    // donnée) n'a plus lieu d'être : les teintes validées tiennent 3:1 sur ce fond.
-    if (bodyW >= 4 && bodyH >= 3) { ctx.beginPath(); ctx.roundRect(bodyX, bodyY, bodyW, bodyH, Math.min(2, bodyW / 5)); ctx.fill(); }
-    else ctx.fillRect(bodyX, bodyY, bodyW, bodyH);
+    tracerBougie(ctx, pad.left + gap * i, candleW, yO, yC, yH, yL, c.close >= c.open);
   }
   
   // --- Heatmap Liquidité (Bookmap : grille native -> un seul drawImage) ---
@@ -3011,6 +3053,49 @@ function resolveChart(candles, padL, padR, chartH, W) {
   }
 }
 
+/** Une bougie, dans la forme du thème (COLORS.bougieForme). Les ordonnées yO, yC, yH, yL sont
+ *  celles des quatre prix : seule la FORME dépend du thème, jamais la position. */
+function tracerBougie(g, x, candleW, yO, yC, yH, yL, hausse) {
+  const color = hausse ? COLORS.candleUp : COLORS.candleDown, forme = COLORS.bougieForme, rayon = COLORS.bougieRayon;
+  const xm = x + candleW / 2;
+  const bodyH = Math.max(1, Math.abs(yC - yO));
+  const bodyW = candleW * 0.7, bodyX = x + candleW*0.15, bodyY = Math.min(yO, yC);
+  const dense = bodyW < BOUGIE_DENSE_PX;
+  // Anneau de SURFACE autour de la mèche (pas de blanc) : il sépare les bougies voisines
+  // dans les vues denses sans dessiner de contour sur la donnée.
+  g.strokeStyle = COLORS.surface; g.lineWidth = 2.6;
+  g.beginPath(); g.moveTo(xm, yH); g.lineTo(xm, yL); g.stroke();
+  if (forme === 'barre') {
+    // Barre OHLC : le trait du plus haut au plus bas, l'ouverture en tiret à gauche, la clôture
+    // à droite. En vue dense, le trait seul (un tiret de moins d'un pixel ne se lit plus).
+    g.strokeStyle = color; g.lineWidth = dense ? 1 : Math.min(2, Math.max(1, bodyW / 8));
+    g.beginPath(); g.moveTo(xm, yH); g.lineTo(xm, yL);
+    if (!dense) { g.moveTo(bodyX, yO); g.lineTo(xm, yO); g.moveTo(xm, yC); g.lineTo(bodyX + bodyW, yC); }
+    g.stroke();
+    return;
+  }
+  // Corps creux : hausse seulement, et seulement s'il a la place d'un contour et d'un intérieur.
+  const creux = forme === 'creuse-hausse' && hausse && !dense && bodyH >= 3;
+  g.strokeStyle = color; g.lineWidth = 1;
+  g.beginPath();
+  if (creux) { g.moveTo(xm, yH); g.lineTo(xm, bodyY); g.moveTo(xm, bodyY + bodyH); g.lineTo(xm, yL); }   // la mèche s'arrête au corps
+  else { g.moveTo(xm, yH); g.lineTo(xm, yL); }
+  g.stroke();
+  // Coins adoucis dès qu'il y a la place (--bougie-rayon, 0 = angles vifs) ; le liseré blanc
+  // d'avant (un contour sur la donnée) n'a plus lieu d'être : les teintes validées tiennent 3:1.
+  const arrondi = rayon > 0 && !dense && bodyH >= 3;
+  if (creux) {
+    g.fillStyle = COLORS.surface;
+    g.beginPath(); if (arrondi) g.roundRect(bodyX, bodyY, bodyW, bodyH, Math.min(rayon, bodyW / 5)); else g.rect(bodyX, bodyY, bodyW, bodyH); g.fill();
+    g.strokeStyle = color; g.lineWidth = 1.2;
+    g.beginPath(); if (arrondi) g.roundRect(bodyX + 0.6, bodyY + 0.6, bodyW - 1.2, bodyH - 1.2, Math.min(rayon, bodyW / 5)); else g.rect(bodyX + 0.6, bodyY + 0.6, bodyW - 1.2, bodyH - 1.2); g.stroke();
+    return;
+  }
+  g.fillStyle = color;
+  if (arrondi) { g.beginPath(); g.roundRect(bodyX, bodyY, bodyW, bodyH, Math.min(rayon, bodyW / 5)); g.fill(); }
+  else g.fillRect(bodyX, bodyY, bodyW, bodyH);
+}
+
 // Étiquettes d'overlays posées dans la frame courante (remise à zéro par drawChart) :
 // une étiquette qui en chevaucherait une autre est omise — le point du ruban porte la légende.
 let etiquettesPosees = [], etiquettesAFaire = [];
@@ -3063,19 +3148,21 @@ function subTitle(key) {
 // Grille + labels d'échelle pour sous-graphes (o: {levels, min, max | span, f})
 function subGrid(y0, pad, ph, W, o) {
   ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 0.5;
+  ctx.setLineDash(COLORS.grilleTirets);
   o.levels.forEach(l => {
     const y = o.span ? y0 + pad.top + ph/2 - (l / o.span) * ph : y0 + pad.top + ph * (1 - (l - (o.min || 0)) / ((o.max || 100) - (o.min || 0)));
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
     ctx.fillStyle = COLORS.axis || COLORS.text; ctx.font = chartFont(10, 650);
     ctx.textAlign = 'right'; ctx.fillText(o.f ? o.f(l) : l, W - 8, y + 3); ctx.textAlign = 'left';
   });
+  ctx.setLineDash([]);
 }
 
 function resolveSub(candles, y0, subH, W, key) {
   const pad = { left: 16, right: 75, top: 18, bottom: 12 };
   const pw = W - pad.left - pad.right;
   const ph = subH - pad.top - pad.bottom;
-  if (ph < 20) return;
+  if (ph < 20) return false;   // non tracé (canvas trop bas : voir dispositionGraphique)
   
   // Séparateur supérieur : un filet, pas un trait
   ctx.strokeStyle = COLORS.hairline; ctx.lineWidth = 1;
@@ -3113,7 +3200,8 @@ function resolveSub(candles, y0, subH, W, key) {
       // le volume est une DONNÉE, il se lit au même titre que les bougies.
       ctx.fillStyle = c.close >= c.open ? COLORS.candleUp : COLORS.candleDown;
       ctx.globalAlpha = COLORS.volAlpha;
-      if (barW >= 4 && h >= 3) { ctx.beginPath(); ctx.roundRect(x + gap*0.15, y, barW, h, [Math.min(2, barW / 4), Math.min(2, barW / 4), 0, 0]); ctx.fill(); }
+      const rv = Math.min(COLORS.bougieRayon, barW / 4);   // --bougie-rayon : 0 = angles vifs
+      if (rv > 0 && barW >= BOUGIE_DENSE_PX && h >= 3) { ctx.beginPath(); ctx.roundRect(x + gap*0.15, y, barW, h, [rv, rv, 0, 0]); ctx.fill(); }
       else ctx.fillRect(x + gap*0.15, y, barW, h);
       ctx.globalAlpha = 1;
     }

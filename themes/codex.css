@@ -98,6 +98,10 @@
   --chart-creux: inset 0 0 0 1px rgba(120,80,30,0.35), inset 0 0 24px -8px rgba(120,80,30,0.35);
   --chart-surface: #f2e6c8;
   --grille: rgba(110,75,30,0.10);
+  /* Chaleur : encre fixe (le bleu et le vermillon des bougies), seule l'opacité croît. La rampe
+     historique n'était pas monotone sur ce vélin (max 1,74:1 à mi-intensité, 1,13:1 au plus gros
+     mur) ; ici 1,16 → 5,29 et 1,15 → 4,22:1, monotones (tests/test_palette.py). */
+  --chaleur-bid: var(--up); --chaleur-ask: var(--down);
   --reticule: rgba(142,27,18,0.55);
   --bulle: rgba(250,243,224,0.97);
   --filigrane: 0.05;
