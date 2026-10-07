@@ -157,8 +157,11 @@
 [data-theme="gazette"] .strat-section { background: transparent; box-shadow: none; }
 
 /* ── Plaque de titre : oreille | titre | oreille, filet double dessous ── */
+/* Les oreilles ne descendent jamais sous leur contenu (max-content) : sur une ligne, le titre reste
+   centré tant que la place le permet ; en dessous de 1000 px, il passe sur sa propre ligne
+   (mesuré : oreille du cours ≈ 345 px avec un prix à six chiffres, titre ≈ 190 px). */
 [data-theme="gazette"][data-structure="une"] .header {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 18px;
+  display: grid; grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr); align-items: center; gap: 18px;
   padding: 3px 2px 6px; border-bottom: 3px double var(--ink-1);
 }
 [data-theme="gazette"][data-structure="une"] .header-left { justify-self: center; }
@@ -409,6 +412,17 @@
   [data-theme="gazette"] .gazette-legende { font-size: 12px; line-height: 15px; }
 }
 
+/* ── Fenêtre étroite : le titre sur sa ligne, les deux oreilles dessous ── */
+@media (max-width: 1000px) {
+  [data-theme="gazette"][data-structure="une"] .header {
+    grid-template-columns: max-content max-content; grid-template-areas: "titre titre" "og od";
+    justify-content: space-between; row-gap: 3px;
+  }
+  [data-theme="gazette"][data-structure="une"] .header-left { grid-area: titre; }
+  [data-theme="gazette"] .gazette-oreille-g { grid-area: og; }
+  [data-theme="gazette"] .gazette-oreille-d { grid-area: od; }
+  [data-theme="gazette"] .header-left h1 { font-size: 34px; }
+}
 /* ── Tablette ── */
 @media (max-width: 800px) {
   [data-theme="gazette"][data-structure="une"] .header { gap: 10px; padding: 2px 0 5px; }
@@ -424,7 +438,7 @@
 }
 /* ── Téléphone : l'oreille du cours prend la largeur, une seule colonne ── */
 @media (max-width: 600px) {
-  [data-theme="gazette"][data-structure="une"] .header { grid-template-columns: minmax(0, 1fr); }
+  [data-theme="gazette"][data-structure="une"] .header { grid-template-columns: minmax(0, 1fr); grid-template-areas: "og"; }
   [data-theme="gazette"] .header-left,
   [data-theme="gazette"] .gazette-oreille-d,
   [data-theme="gazette"] .gazette-date,

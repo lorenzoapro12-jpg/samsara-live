@@ -133,7 +133,7 @@ async function ouvrir(nav, vue, theme) {
     check('chaque chiffre clé cité (≠ « — ») figure dans la manchette',
       cites.filter(v => v && v !== '—').every(v => lu.valeurs.includes(v)), { cites, valeurs: lu.valeurs });
     check('hors des valeurs citées, aucun nombre (seulement « 24 h » et les libellés de la cote)',
-      !/\d/.test(lu.horsValeurs.replace(/24[\s ]?h/g, '')), lu.horsValeurs);
+      !/\d/.test(lu.horsValeurs.replace(/24[\s\u00a0]?h/g, '')), lu.horsValeurs);
     const oi = lu.cote[lu.cles.interet];
     const attendu = !oi || oi === '—' ? null : oi[0] === '+' ? 'progresse' : oi[0] === '−' ? 'recule' : 'stable';
     check(`le verbe suit le premier caractère du texte affiché (« ${oi} » → ${attendu || 'clause omise'})`,
@@ -158,11 +158,11 @@ async function ouvrir(nav, vue, theme) {
       };
     });
     check('cas complet : valeurs recopiées telles quelles, verbe « recule » pour « −2.6% »',
-      cas.titre === 'Le financement des perpétuels à +0.2% ; l’intérêt ouvert recule : −2.6% en 24 h'
+      cas.titre === 'Le financement des perpétuels à +0.2%\u00a0; l’intérêt ouvert recule\u00a0: −2.6% en\u00a024\u00a0h'
       && JSON.stringify(cas.valeursTitre) === '["+0.2%","−2.6%"]' && JSON.stringify(cas.valeursChapeau) === '["−$98.81M","long γ","13:03"]', cas);
-    check('« +2.6% » → progresse ; « 0.0% » → stable', /progresse : \+2\.6%/.test(cas.hausse) && /stable : 0\.0%/.test(cas.nul), [cas.hausse, cas.nul]);
+    check('« +2.6% » → progresse ; « 0.0% » → stable', /progresse\u00a0: \+2\.6%/.test(cas.hausse) && /stable\u00a0: 0\.0%/.test(cas.nul), [cas.hausse, cas.nul]);
     check('une clause « — » est omise', cas.tiret === 'Le financement des perpétuels à +0.2%', cas.tiret);
-    check('seul le signe moins affiché (U+2212) fait « recule » : un trait d\'union n\'est pas un signe', /stable : -2\.6%/.test(cas.trait), cas.trait);
+    check('seul le signe moins affiché (U+2212) fait « recule » : un trait d\'union n\'est pas un signe', /stable\u00a0: -2\.6%/.test(cas.trait), cas.trait);
     check('sans cote : « Édition en attente » ; cote sans valeur : « La cote de l’édition »', cas.absent === 'Édition en attente' && cas.vide === 'La cote de l’édition', [cas.absent, cas.vide]);
     check('la valeur rendue est la chaîne reçue (aucun reformatage)', cas.identite);
     check('aucune tournure de conseil dans les gabarits', !!CONSEIL && ![cas.titre, cas.chapeau, cas.hausse, cas.nul].some(t => CONSEIL.test(t)));
@@ -237,7 +237,7 @@ async function ouvrir(nav, vue, theme) {
     // ── 5. Mise en page ──
     titre('5. Mise en page : le graphique garde sa place, rien ne se chevauche');
     const PLANCHER = { '1440x900': 480, '1280x720': 380 };
-    for (const [w, h] of [[1440, 900], [1280, 720], [390, 800]]) {
+    for (const [w, h] of [[1440, 900], [1280, 720], [960, 800], [640, 900], [390, 800]]) {
       const x = await ouvrir(nav, { width: w, height: h }, 'gazette');
       const m = await x.page.evaluate(() => {
         const r = s => { const e = document.querySelector(s); if (!e || getComputedStyle(e).display === 'none') return null; const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
@@ -254,9 +254,13 @@ async function ouvrir(nav, vue, theme) {
         m.canvas.b <= m.interieurBas + 1 && Math.abs(m.canvas.h - m.interieurH) <= 2, m);
       check(`${v} : la légende du cliché est sous le canvas, jamais dessus`, !!m.legende && m.legende.t >= m.canvas.b - 1, { legende: m.legende, canvas: m.canvas });
       if (PLANCHER[cle]) check(`${v} : le graphique garde sa place (${Math.round(m.canvas.h)} px ≥ ${PLANCHER[cle]})`, m.canvas.h >= PLANCHER[cle], m.canvas);
-      if (w > 800) {
-        const disjoints = (a, b) => a.r <= b.l + 1 || b.r <= a.l + 1;
-        check(`${v} : plaque — oreille, titre, oreille sans chevauchement`, m.og && m.h1 && m.od && disjoints(m.og, m.h1) && disjoints(m.h1, m.od), { og: m.og, h1: m.h1, od: m.od });
+      if (w > 600) {
+        // Deux boîtes disjointes : séparées en largeur OU en hauteur (sous 1000 px, le titre passe
+        // au-dessus des oreilles). À 640 px, l'oreille du cours débordait sur le titre.
+        const disjoints = (a, b) => a.r <= b.l + 1 || b.r <= a.l + 1 || a.b <= b.t + 1 || b.b <= a.t + 1;
+        const dedans = a => a.l >= -1 && a.r <= w + 1;
+        check(`${v} : plaque — oreille, titre, oreille sans chevauchement, dans l'écran`,
+          m.og && m.h1 && m.od && disjoints(m.og, m.h1) && disjoints(m.h1, m.od) && disjoints(m.og, m.od) && [m.og, m.h1, m.od].every(dedans), { og: m.og, h1: m.h1, od: m.od });
       } else {
         check(`${v} : la cote reste affichée au téléphone (${m.kpis} chiffres clés)`, m.coteAffichee && m.kpis >= 3, m);
         check(`${v} : l'oreille du cours prend la largeur, le titre cède`, !!m.og && !m.h1 && !m.od, m);

@@ -174,7 +174,7 @@ function manchetteGazette(lire, heure) {
   const f = cite('financement'), oi = cite('interet'), cvd = cite('cvd'), gex = cite('gex');
   const titre = [];
   if (f) titre.push(['Le financement des perpétuels à ', 0], [f, 1]);
-  if (oi) titre.push([(titre.length ? '\u00a0; l’' : 'L’') + 'intérêt ouvert ' + verbeGazette(oi) + '\u00a0: ', 0], [oi, 1], [' en 24\u00a0h', 0]);
+  if (oi) titre.push([(titre.length ? '\u00a0; l’' : 'L’') + 'intérêt ouvert ' + verbeGazette(oi) + '\u00a0: ', 0], [oi, 1], [' en\u00a024\u00a0h', 0]);
   const chapeau = [];
   for (const [cle, v] of [['cvd', cvd], ['gex', gex]]) if (v) chapeau.push([(chapeau.length ? ' · ' : '') + GAZETTE_CLES[cle] + '\u00a0', 0], [v, 1]);
   if (heure && /\d/.test(heure)) chapeau.push([(chapeau.length ? ' · ' : '') + 'édition de ', 0], [heure, 1], ['\u00a0UTC', 0]);
