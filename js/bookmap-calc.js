@@ -550,19 +550,53 @@
       vol: +k[7], achat: +k[10], vente: +k[7] - +k[10], delta: 2 * +k[10] - +k[7],
     }));
   };
-  /** Fusionne de nouvelles minutes dans une série triée (la dernière, en cours, est remplacée). */
+  /** Fusionne de nouvelles minutes dans une série triée par t : une minute relue REMPLACE
+   *  l'ancienne (la bougie en cours se complète), une minute nouvelle s'insère à sa place — un
+   *  rattrapage après une absence comble le trou au lieu de s'ajouter à la fin. */
   BM.fusionnerMinutes = function (serie, neuves) {
     if (!neuves.length) return serie;
-    const t0 = neuves[0].t;
-    const garde = serie.filter(m => m.t < t0);
-    return garde.concat(neuves);
-  };
-  /** CVD cumulé à partir de l'indice i0 (0 au bord gauche de la vue). */
-  BM.cvdDepuis = function (serie, i0) {
-    const out = new Float64Array(serie.length);
-    let s = 0;
-    for (let i = 0; i < serie.length; i++) { if (i >= i0) s += serie[i].delta; out[i] = i >= i0 ? s : NaN; }
+    const out = [];
+    let i = 0, j = 0;
+    while (i < serie.length || j < neuves.length) {
+      if (j >= neuves.length || (i < serie.length && serie[i].t < neuves[j].t)) out.push(serie[i++]);
+      else { if (i < serie.length && serie[i].t === neuves[j].t) i++; out.push(neuves[j++]); }
+    }
     return out;
+  };
+  /** Minutes MANQUANTES d'une série (Binance ne les a pas rendues, ou pas encore relues) :
+   *  [[début, fin[, …] en ms. Elles sont « non lues », pas « sans volume ». */
+  BM.trousMinutes = function (serie) {
+    const out = [];
+    for (let i = 1; i < serie.length; i++) if (serie[i].t - serie[i - 1].t > 60e3) out.push([serie[i - 1].t + 60e3, serie[i].t]);
+    return out;
+  };
+  /** CVD cumulé à partir de l'indice i0 (0 au bord gauche de la vue). Après un trou de bougies, le
+   *  cumul REPART de 0 : continuer en sautant les deltas manquants donnerait une valeur fausse pour
+   *  tout le reste de la vue, sans marque. `reprises` = indices où il repart (à dire et hachurer). */
+  BM.cvd = function (serie, i0) {
+    const v = new Float64Array(serie.length).fill(NaN), reprises = [];
+    let s = 0;
+    for (let i = Math.max(0, i0); i < serie.length; i++) {
+      if (i > i0 && serie[i].t - serie[i - 1].t > 60e3) { s = 0; reprises.push(i); }
+      s += serie[i].delta; v[i] = s;
+    }
+    return { v, reprises };
+  };
+  BM.cvdDepuis = function (serie, i0) { return BM.cvd(serie, i0).v; };
+  /** Minutes regroupées par barre de volume : la plus petite valeur d'une échelle « ronde » qui
+   *  donne au moins 2 px par barre. Une échelle fixe (et des groupes ancrés sur l'horloge) : les
+   *  barres ne changent pas quand la vue glisse, et le titre peut dire la vraie durée. */
+  BM.PAS_MINUTES = [1, 2, 3, 5, 10, 15, 30, 60, 120, 180, 360, 720, 1440];
+  BM.pasMinutes = function (pxParMinute) {
+    const brut = Math.ceil(2 / Math.max(1e-9, pxParMinute));
+    return BM.PAS_MINUTES.find(g => g >= brut) || BM.PAS_MINUTES[BM.PAS_MINUTES.length - 1];
+  };
+  BM.texteMinutes = function (g) { return g === 1 ? 'minute' : g < 60 ? g + ' min' : (g / 60) + ' h'; };
+  /** Durée (ms) des intervalles [a, b[ qui tombe dans [ta, tb[. */
+  BM.dureeDans = function (intervalles, ta, tb) {
+    let d = 0;
+    for (const [a, b] of intervalles) d += Math.max(0, Math.min(b, tb) - Math.max(a, ta));
+    return d;
   };
 
   // ─── Lecture du fichier de 15 min : murs et gamma ──────────────────────────

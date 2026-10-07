@@ -366,7 +366,8 @@ async function pixel(page, x, y) {
       await p11.waitForFunction(() => /carnet live : pas de réponse en 5 s/.test(window.__carte.etat().statut), null, { timeout: 9000 }).catch(() => {});
       const st = (await etat(p11)).statut;
       check('statut : « carnet live : pas de réponse en 5 s — nouvel essai dans … »', /carnet live : pas de réponse en 5 s — nouvel essai dans/.test(st), st);
-      await p11.waitForTimeout(6000);
+      // Délai de 5 s, puis nouvel essai après 2 × la cadence (recul), puis la cadence.
+      await p11.waitForFunction(n => window.__carte.etat().live.n >= n + 2, n1, { timeout: 15000 }).catch(() => {});
       const e11 = await etat(p11);
       check(`le carnet live repart (${n1} → ${e11.live.n} lectures), erreur effacée`, e11.live.n > n1 + 1 && !/carnet live/.test(e11.statut), { n1, n: e11.live.n, statut: e11.statut });
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
@@ -452,6 +453,74 @@ async function pixel(page, x, y) {
       check(`${e15.live.ecartees} lecture(s) périmée(s) écartée(s), ${e15.live.n} gardées`, e15.live.ecartees >= 1 && e15.live.n >= 2, e15.live);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p15.close();
+    }
+
+    // ════ Absences : bougies, exécutions — rien de silencieux ══════════════════
+    for (const ABS of [20, 50]) {
+      titre(`${ABS === 20 ? '16' : '17'}. Onglet caché puis veille de ${ABS} min : bougies relues, exécutions ${ABS === 20 ? 'rattrapées' : 'sautées et DITES'}`);
+      let p16, S;
+      ({ page: p16, erreurs, S } = await ouvrir(nav, { encodage: true, init: ONGLET, horloge: true }));
+      const e0 = await etat(p16);
+      await montrer(p16, true);
+      await p16.waitForTimeout(1500);
+      S.decalage += ABS * 60e3;
+      await p16.clock.fastForward(ABS * 60e3);
+      await montrer(p16, false);
+      await p16.waitForFunction(m => window.__carte.etat().bougies.derniere >= m, Math.floor(S.now() / 60e3) * 60e3 - 60e3, { timeout: 15000 }).catch(() => {});
+      await p16.waitForTimeout(ABS === 20 ? 6000 : 3000);
+      const e1 = await etat(p16);
+      const recents = e1.bougies.trous.filter(([a]) => a > e0.bougies.premiere);
+      check(`bougies : ${e0.bougies.n} → ${e1.bougies.n}, aucun trou après l'absence`, !recents.length && e1.bougies.derniere >= Math.floor(S.now() / 60e3) * 60e3 - 60e3, { trous: recents, n: e1.bougies.n });
+      const L = await p16.evaluate(() => window.__carte.lectures());
+      let coupure = 0;
+      for (let c = 0; c + 1 < L.n; c++) if (L.deb[c + 1] - L.deb[c] > 60e3) coupure = c;
+      check('carnet live : l\'absence n\'est pas peinte (la lecture d\'avant s\'arrête à 3 cadences + 1 s)', coupure && L.fin[coupure] - L.deb[coupure] === L.validite, { c: coupure, fin: L.fin[coupure] - L.deb[coupure] });
+      if (ABS === 20) {
+        check('exécutions : rattrapées par identifiant, aucun intervalle non lu', !e1.execNonLues.length && e1.executions.dernier > S.now() - 10e3, { nonLues: e1.execNonLues, retard: S.now() - e1.executions.dernier });
+      } else {
+        const sautees = e1.execNonLues.reduce((d, [a, b]) => d + b - a, 0);
+        check(`exécutions : retard > 30 min → saut au présent, ${Math.round(sautees / 60e3)} min non lues, dites`, e1.execNonLues.length === 1 && Math.abs(sautees - ABS * 60e3) < 3 * 60e3 && e1.executions.dernier > S.now() - 10e3, e1.execNonLues);
+        const [a, b] = e1.execNonLues[0], mid = (e1.vue.p1 + e1.vue.p2) / 2;
+        await p16.evaluate(([x, y, c, d]) => window.__carte.cadrer(x, y, c, d), [a - 20 * 60e3, b + 10 * 60e3, mid - 400, mid + 400]);
+        await p16.waitForTimeout(500);
+        const e2 = await etat(p16);
+        check('profil des exécutions : « incomplet : … non lues »', /incomplet : \d+ min non lues/.test(e2.textes.profil || ''), e2.textes.profil);
+      }
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p16.close();
+    }
+
+    titre('18. Premier chargement des bougies en échec : retenté, l\'historique 24 h arrive');
+    {
+      let rate = 1;
+      const intercept = (u, k) => (k === 'klines' && rate-- > 0 ? { status: 503, body: '{}' } : null);
+      let p18;
+      ({ page: p18, erreurs } = await ouvrir(nav, { encodage: true, intercept, horloge: true, attendre: false }));
+      await p18.waitForFunction(() => window.__carte && /bougies : HTTP 503 — nouvel essai dans/.test(window.__carte.etat().statut), null, { timeout: 8000 }).catch(() => {});
+      const st = (await etat(p18)).statut;
+      check('statut : « bougies : HTTP 503 — nouvel essai dans … »', /bougies : HTTP 503 — nouvel essai dans/.test(st), st);
+      await p18.clock.fastForward(21000);
+      await p18.waitForFunction(() => window.__carte.etat().bougies.n >= 1440, null, { timeout: 10000 }).catch(() => {});
+      const e18 = await etat(p18);
+      check(`historique chargé au nouvel essai : ${e18.bougies.n} minutes, erreur effacée`, e18.bougies.n >= 1440 && !/bougies/.test(e18.statut), { n: e18.bougies.n, statut: e18.statut });
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p18.close();
+    }
+
+    titre('19. Minutes que Binance ne rend pas : un trou montré, le CVD repart de 0 et le dit');
+    {
+      const intercept = (u, k, S) => {
+        if (k !== 'klines') return null;
+        const d = S.repondre(u), t0 = Math.floor(S.now() / 60e3) * 60e3 - 90 * 60e3;
+        return { status: 200, body: JSON.stringify(d.filter(x => x[0] < t0 || x[0] >= t0 + 5 * 60e3)) };
+      };
+      let p19;
+      ({ page: p19, erreurs } = await ouvrir(nav, { encodage: true, intercept }));
+      const e19 = await etat(p19);
+      check('trou de 5 min dans les bougies, vu comme tel', e19.bougies.trous.length === 1 && e19.bougies.trous[0][1] - e19.bougies.trous[0][0] === 5 * 60e3, e19.bougies.trous);
+      check('CVD : « repart de 0 après 5 min de bougies non lues »', /repart de 0 après 5 min de bougies non lues/.test(e19.textes.cvd || ''), e19.textes.cvd);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p19.close();
     }
   } finally {
     await nav.close();

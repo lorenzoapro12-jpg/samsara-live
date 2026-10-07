@@ -60,7 +60,7 @@
     pub: null, pubF: null, pubCle: '', pubMaj: null, pubLu: null, pubTexte: null,
     md: null, niv: null, mdLu: null, mdTexte: null,
     live: null, liveRef: null, liveP99: 0, liveEcartees: 0, carnet: null, carnetA: null,
-    exec: new BM.SeauxExecutions(1), execVus: new Set(), execRemplissage: null, execTrous: [],
+    exec: new BM.SeauxExecutions(1), execVus: new Set(), execArriere: null, execTrous: [], execLu: null,
     minutes: [], minutesA: null,
     bidask: [],
     erreurs: {},
@@ -152,86 +152,101 @@
     } catch (e) { erreur('fichier', e); throw e; }
   }
 
-  // Bougies 1 min : 24 h au démarrage (deux requêtes), puis les 3 dernières toutes les 10 s.
-  async function lireMinutesInitiales() {
+  // Bougies 1 min : toujours relues DEPUIS la dernière minute gardée (startTime, pages de 1 000) —
+  // et depuis 24 h tant que l'historique ne les couvre pas. Une absence (onglet caché, veille,
+  // coupure) est donc comblée au retour, et un premier chargement raté est retenté au tour
+  // suivant. Ce que Binance ne rend pas reste un TROU, montré : ligne de prix coupée, volume et
+  // CVD hachurés, CVD qui repart de 0 et le dit.
+  const FENETRE_BOUGIES = 24 * 3600e3, GARDE_BOUGIES = 26 * 3600e3, PAGES_BOUGIES = 4;
+  async function lireMinutes() {
     try {
-      const a = (await binance('klines?symbol=' + SYMBOLE + '&interval=1m&limit=1000', DELAIS.bougies)).corps;
-      let b = [];
-      if (a.length) b = (await binance('klines?symbol=' + SYMBOLE + '&interval=1m&limit=440&endTime=' + (a[0][0] - 1), DELAIS.bougies)).corps;
-      E.minutes = BM.minutes(b.concat(a));
+      const debut24 = Math.floor((maintenant() - FENETRE_BOUGIES) / 60e3) * 60e3;
+      const couvert = E.minutes.length && E.minutes[0].t <= debut24 + 60e3;
+      let depuis = couvert ? E.minutes[E.minutes.length - 1].t : debut24;
+      for (let p = 0; p < PAGES_BOUGIES; p++) {
+        const k = (await binance('klines?symbol=' + SYMBOLE + '&interval=1m&startTime=' + depuis + '&limit=1000', DELAIS.bougies)).corps;
+        E.minutes = BM.fusionnerMinutes(E.minutes, BM.minutes(k));
+        if (k.length < 1000) break;
+        depuis = +k[k.length - 1][0] + 60e3;
+      }
+      const lim = maintenant() - GARDE_BOUGIES;
+      if (E.minutes.length && E.minutes[0].t < lim) E.minutes = E.minutes.filter(m => m.t >= lim);
       E.minutesA = Date.now();
       erreur('bougies', null);
       if (!E.vue) vueParDefaut();
       sale();
     } catch (e) { erreur('bougies', e); throw e; }
   }
-  async function lireMinutes() {
-    if (!E.minutes.length) return lireMinutesInitiales();
-    try {
-      const k = (await binance('klines?symbol=' + SYMBOLE + '&interval=1m&limit=3', DELAIS.bougies)).corps;
-      E.minutes = BM.fusionnerMinutes(E.minutes, BM.minutes(k));
-      const lim = maintenant() - 26 * 3600e3;
-      if (E.minutes.length && E.minutes[0].t < lim) E.minutes = E.minutes.filter(m => m.t >= lim);
-      E.minutesA = Date.now();
-      erreur('bougies', null);
-      dessiner();
-    } catch (e) { erreur('bougies', e); throw e; }
-  }
 
   // Exécutions : les 1 000 dernières, puis un remplissage ARRIÈRE (pages de 1 000) jusqu'à la
-  // fin de la carte publiée (ou 30 pages), puis la suite par identifiant — sans trou possible :
-  // `fromId` reprend exactement après le dernier identifiant vu.
-  const PAGES_ARRIERE = 30;
+  // fin de la carte publiée (ou 30 pages), puis la suite par identifiant (`fromId` reprend
+  // exactement après le dernier identifiant vu). Une absence est RATTRAPÉE page par page
+  // (5 par tour) ; au-delà de 30 min de retard, on saute au présent et l'intervalle sauté devient
+  // un trou de lecture — hachuré, compté dans le profil, jamais lu comme « aucune exécution ».
+  const PAGES_ARRIERE = 30, PAGES_PAR_TOUR = 5, RATTRAPAGE_MAX = 30 * 60e3, GARDE_EXECUTIONS = 6 * 3600e3;
   let execInit = null;
   function lireExecutionsInitiales() { return execInit || (execInit = lireExecutionsInitiales0().finally(() => { if (E.exec.dernierId === null) execInit = null; })); }
   async function lireExecutionsInitiales0() {
     try {
-      const t = (await binance('aggTrades?symbol=' + SYMBOLE + '&limit=1000', DELAIS.executions)).corps;
+      const { corps: t, s } = await binance('aggTrades?symbol=' + SYMBOLE + '&limit=1000', DELAIS.executions);
       for (const x of t) { E.exec.ajouter(x); E.execVus.add(x.a); }
+      E.execLu = s;
       erreur('executions', null);
       dessiner();
-      remplirArriere(t.length ? t[0].a : null);
+      if (t.length) { E.execArriere = { id: t[0].a, pages: 0, fini: false, enCours: false }; remplirArriere(); }
     } catch (e) { erreur('executions', e); throw e; }
   }
-  async function remplirArriere(premierId) {
-    if (premierId === null) return;
-    E.execRemplissage = { pages: 0, enCours: true };
-    let id = premierId;
+  /** Remplissage arrière ; interrompu (erreur, limite), il reprend au tour suivant. */
+  async function remplirArriere() {
+    const A = E.execArriere;
+    if (!A || A.fini || A.enCours) return;
+    A.enCours = true;
     const objectif = () => (E.pub ? BM.finGrille(E.pub) : maintenant() - 15 * 60e3) - 60e3;
-    while (E.execRemplissage.pages < PAGES_ARRIERE && id > 0 && E.exec.premier > objectif()) {
-      const depuis = Math.max(0, id - 1000);
-      try {
-        const t = (await binance('aggTrades?symbol=' + SYMBOLE + '&fromId=' + depuis + '&limit=' + (id - depuis), DELAIS.executions)).corps;
+    try {
+      while (A.pages < PAGES_ARRIERE && A.id > 0 && E.exec.premier > objectif()) {
+        const depuis = Math.max(0, A.id - 1000);
+        const t = (await binance('aggTrades?symbol=' + SYMBOLE + '&fromId=' + depuis + '&limit=' + (A.id - depuis), DELAIS.executions)).corps;
         for (const x of t) E.exec.ajouterAncien(x, E.execVus);
-        id = depuis;
-        E.execRemplissage.pages++;
+        A.id = depuis; A.pages++;
         dessiner();
-      } catch (e) { erreur('executions', e); break; }
-      await pause(150);
-    }
-    E.execRemplissage.enCours = false;
-    E.execVus = new Set();          // l'unicité arrière n'a plus d'usage ; le direct suit dernierId
-    dessiner();
+        await pause(150);
+      }
+      A.fini = true;
+      E.execVus = new Set();        // l'unicité arrière n'a plus d'usage ; le direct suit dernierId
+    } catch (e) { erreur('executions', e); }
+    finally { A.enCours = false; dessiner(); }
   }
-  let rattrapage = 0;
   async function lireExecutions() {
     if (E.exec.dernierId === null) return lireExecutionsInitiales();
     try {
       let n = 0;
-      for (let tour = 0; tour < 5; tour++) {
-        const t = (await binance('aggTrades?symbol=' + SYMBOLE + '&fromId=' + (E.exec.dernierId + 1) + '&limit=1000', DELAIS.executions)).corps;
-        for (const x of t) if (E.exec.ajouter(x)) n++;
-        if (t.length < 1000) break;
-        if (tour === 4) {           // trop de retard (onglet longtemps caché) : on saute, et on le DIT
-          const avant = E.exec.dernier;
-          const der = (await binance('aggTrades?symbol=' + SYMBOLE + '&limit=1', DELAIS.executions)).corps;
-          if (der.length) { E.execTrous.push([avant, der[0].T]); E.exec.dernierId = der[0].a - 1; rattrapage++; }
-        }
+      // Trop de retard pour rattraper (absence longue) : on saute au présent, et on le DIT.
+      if (maintenant() - execLuJusqua() > RATTRAPAGE_MAX) {
+        const der = (await binance('aggTrades?symbol=' + SYMBOLE + '&limit=1', DELAIS.executions)).corps;
+        if (der.length && der[0].a - 1 > E.exec.dernierId) { E.execTrous.push([E.exec.dernier, der[0].T]); E.exec.dernierId = der[0].a - 1; }
       }
-      E.exec.purger(maintenant() - 6 * 3600e3);
+      for (let p = 0; p < PAGES_PAR_TOUR; p++) {
+        const { corps: t, s } = await binance('aggTrades?symbol=' + SYMBOLE + '&fromId=' + (E.exec.dernierId + 1) + '&limit=1000', DELAIS.executions);
+        for (const x of t) if (E.exec.ajouter(x)) n++;
+        if (t.length < 1000) { E.execLu = s; break; }         // tout est lu jusqu'à l'envoi de cette requête
+      }
+      const lim = maintenant() - GARDE_EXECUTIONS;
+      E.exec.purger(lim);
+      E.execTrous = E.execTrous.filter(([, b]) => b > lim);
       erreur('executions', null);
+      if (E.execArriere && !E.execArriere.fini) remplirArriere();
       if (n) dessiner();
     } catch (e) { erreur('executions', e); throw e; }
+  }
+  /** Jusqu'où les exécutions sont lues sans trou : la dernière requête qui a tout rendu, ou —
+   *  pendant un rattrapage — la dernière exécution reçue. */
+  function execLuJusqua() { return Math.max(E.execLu !== null ? axe(E.execLu) : -Infinity, E.exec.dernier || -Infinity); }
+  /** Intervalles où les exécutions n'ont PAS été lues : trous sautés, et le retard en cours
+   *  (rattrapage, lecture en échec) au-delà de la validité d'une lecture. */
+  function execNonLues() {
+    const out = E.execTrous.slice(), lu = execLuJusqua(), now = maintenant();
+    if (lu > -Infinity && now - lu > BM.validiteLecture(1000)) out.push([lu, now]);
+    return out;
   }
 
   // Carnet live : une lecture = une colonne, à son instant réel, avec ses quantités (BM.CarnetLive).
@@ -302,6 +317,7 @@
       const att = porte ? porte.attente(t) : 0;
       if (att > 0) { suivant = Math.max(suivant, t + att + 250); b.debut = suivant; }
       b.prochain = suivant;
+      if (!ok) majStatut();          // le statut dit tout de suite quand la source repart
       if (document.hidden) { b.endormie = true; return; }
       b.h = setTimeout(b.tour, Math.max(0, suivant - t));
     };
@@ -509,7 +525,7 @@
     if (R.calques.gamma) gamma();
     if (R.calques.bidask) bidAsk();
     if (R.calques.prix) lignePrix();
-    if (R.calques.executions) bulles();
+    if (R.calques.executions) { bulles(); hachuresExecutions(); }
     reperesEtAges();
     dessinerPastilles();
     croix();
@@ -612,14 +628,38 @@
     if (R.calques.executions) {
       if (E.exec.dernier) {
         const l = ['Exécutions · dernière il y a ' + BM.age(now - E.exec.dernier),
-          'depuis ' + BM.heure(E.exec.premier) + (E.execRemplissage && E.execRemplissage.enCours ? ' (remplissage…)' : '')
+          'depuis ' + BM.heure(E.exec.premier) + (E.execArriere && !E.execArriere.fini ? ' (remplissage…)' : '')
           + ' · bulles ≥ ' + BM.btc(R.bulleMin) + ' BTC'];
-        if (E.execTrous.length) l.push(E.execTrous.length + ' trou(s) : onglet caché trop longtemps');
+        const lu = execLuJusqua();
+        if (now - lu > BM.validiteLecture(1000)) l.push('lues jusqu\'à il y a ' + BM.age(now - lu) + (E.erreurs.executions ? ' (lecture en échec)' : ' (rattrapage)'));
+        const sautees = BM.dureeDans(E.execTrous, -Infinity, Infinity);
+        if (sautees) l.push('lecture interrompue : ' + BM.age(sautees) + ' non lues (hachurées)');
         pastille(l, Math.min(xn, Z.chaleur.w) - 8, Z.chaleur.h - 70, C.ink2, 'right', 'Exécutions · ' + BM.age(now - E.exec.dernier));
       } else if (E.erreurs.executions) pastille(['Exécutions indisponibles', E.erreurs.executions], Z.chaleur.w - 8, Z.chaleur.h - 60, C.down, 'right', 'Exécutions indisponibles');
     }
   }
 
+  /** Des hachures sur [x, x + w[ × [y, y + h[ : « non lu », par-dessus ce qui est dessiné. */
+  function hachurer(x, y, w, h, alpha) {
+    if (w < 1 || h < 1) return;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    ctx.strokeStyle = C.ink3; ctx.globalAlpha = alpha; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let d = -h; d < w; d += 7) { ctx.moveTo(x + d, y + h); ctx.lineTo(x + d + h, y); }
+    ctx.stroke();
+    ctx.restore();
+  }
+  /** Intervalles où les exécutions n'ont pas été lues : hachurés (bulles, profil et ligne de prix
+   *  à la seconde n'y disent RIEN — ce n'est pas « aucune exécution »). */
+  function hachuresExecutions() {
+    for (const [a, b] of execNonLues()) {
+      const xa = Math.max(0, X(a)), xb = Math.min(Z.chaleur.w, X(b));
+      if (xb <= xa) continue;
+      hachurer(xa, 0, xb - xa, Z.chaleur.h, 0.35);
+      if (xb - xa > 120) texte('exécutions non lues', (xa + xb) / 2, Z.chaleur.h - 30, C.ink2, 10.5, 'center');
+    }
+  }
   function murs() {
     const n = E.niv;
     if (!n || !n.murs.length || !n.mursA) return;
@@ -694,13 +734,14 @@
     ctx.strokeStyle = C.prix; ctx.lineWidth = 1.6;
     ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 3;
     ctx.beginPath();
-    let premier = true, fin = 0;
+    let premier = true, fin = 0, avant = null;
     for (const m of ms) {
-      if (m.fin < E.vue.t1 - 60e3 || m.t > E.vue.t2) continue;
+      if (m.fin < E.vue.t1 - 60e3 || m.t > E.vue.t2) { avant = m; continue; }
       const t = Math.min(m.fin, E.minutesA ? axe(E.minutesA) : maintenant());   // la bougie en cours vaut ce qu'elle valait à sa lecture
       const x = X(t), y = Y(m.c);
-      if (premier) { ctx.moveTo(x, y); premier = false; } else ctx.lineTo(x, y);
-      fin = t;
+      // Minutes manquantes (non lues) : la ligne est COUPÉE, elle ne traverse pas le trou.
+      if (premier || (avant && m.t - avant.t > 60e3)) { ctx.moveTo(x, y); premier = false; } else ctx.lineTo(x, y);
+      fin = t; avant = m;
     }
     // Après la dernière bougie lue : le prix des exécutions, à la seconde.
     if (E.exec.seaux.size) {
@@ -743,7 +784,8 @@
   function profilExecutions() {
     if (!E.exec.seaux.size) return;
     const pasP = Math.max(E.exec.dp, (E.vue.p2 - E.vue.p1) / Z.chaleur.h * 3);
-    const prof = E.exec.profil(Math.max(E.vue.t1, E.exec.premier || E.vue.t1), Math.min(E.vue.t2, maintenant() + 1000), pasP);
+    const ta = Math.max(E.vue.t1, E.exec.premier || E.vue.t1), tb = Math.min(E.vue.t2, maintenant() + 1000);
+    const prof = E.exec.profil(ta, tb, pasP);
     let max = 0;
     for (const v of prof.values()) max = Math.max(max, v[0] + v[1]);
     if (!max) return;
@@ -756,7 +798,10 @@
       ctx.fillStyle = C.up; ctx.fillRect(lv, ya, la, hh);
     }
     ctx.globalAlpha = 1;
-    texte('Profil des exécutions visibles', 6, 14, C.ink2, 10, 'left', true);
+    // Une fenêtre qui contient des exécutions NON LUES donne un profil incomplet : il le dit.
+    const manque = BM.dureeDans(execNonLues(), ta, tb);
+    TEXTES.profil = 'Profil des exécutions visibles' + (manque > 0 ? ' · incomplet : ' + BM.age(manque) + ' non lues' : '');
+    texte(TEXTES.profil, 6, 14, C.ink2, 10, 'left', true);
   }
   function croix() {
     const s = E.souris;
@@ -845,20 +890,30 @@
   function minutesVisibles() {
     return E.minutes.filter(m => m.fin > E.vue.t1 && m.t < E.vue.t2);
   }
+  /** Minutes non lues (trous des bougies) dans la vue, hachurées sur un panneau. */
+  function hachuresBougies(a) {
+    for (const [ta, tb] of BM.trousMinutes(E.minutes)) {
+      const xa = Math.max(0, X(ta)), xb = Math.min(a.w, X(tb));
+      if (xb > xa) hachurer(xa, a.y + 14, xb - xa, a.h - 14, 0.6);
+    }
+  }
+  const TEXTES = {};             // textes des panneaux (lus par les harnais : ce qui est écrit)
   function panneauVolume() {
     const a = Z.vol;
     ctx.fillStyle = C.panneau; ctx.fillRect(a.x, a.y, Z.w, a.h);
+    // Une barre = g minutes, g pris dans une échelle fixe et les groupes ANCRÉS sur l'horloge
+    // (⌊t / g min⌋) : le titre dit la vraie durée, et les barres ne bougent pas quand la vue glisse.
+    const ppm = a.w / ((E.vue.t2 - E.vue.t1) / 60e3), g = BM.pasMinutes(ppm), pas = g * 60e3;
+    TEXTES.volume = 'Volume (USDT) par ' + BM.texteMinutes(g) + ' · achats ▲ / ventes ▼ au marché';
+    texte(TEXTES.volume, a.x + 6, a.y + 9, C.ink3, 9.5);
     const ms = minutesVisibles();
-    texte('Volume 1 min (USDT) · achats ▲ / ventes ▼ au marché', a.x + 6, a.y + 9, C.ink3, 9.5);
     if (!ms.length) return;
-    const ppm = a.w / ((E.vue.t2 - E.vue.t1) / 60e3);
-    const g = Math.max(1, Math.ceil(2 / ppm));          // minutes regroupées par barre
-    const barres = [];
-    for (let i = 0; i < ms.length; i += g) {
-      const b = { t: ms[i].t, achat: 0, vente: 0 };
-      for (let j = i; j < Math.min(ms.length, i + g); j++) { b.achat += ms[j].achat; b.vente += ms[j].vente; }
-      barres.push(b);
+    const groupes = new Map();
+    for (const m of ms) {
+      const K = Math.floor(m.t / pas), b = groupes.get(K) || { t: K * pas, achat: 0, vente: 0 };
+      b.achat += m.achat; b.vente += m.vente; groupes.set(K, b);
     }
+    const barres = [...groupes.values()];
     // Échelle au 95ᵉ centile : une minute exceptionnelle ne doit pas écraser toutes les
     // autres. Une barre plus haute est écrêtée ET marquée d'un trait blanc.
     const max = (BM.centile(barres.map(b => Math.max(b.achat, b.vente)), 0.95) * 1.15) || 1;
@@ -871,28 +926,33 @@
       if (b.achat > max) ctx.fillRect(x, mid - hh - 1, lw, 1.5);
       if (b.vente > max) ctx.fillRect(x, mid + hh - 0.5, lw, 1.5);
     }
+    hachuresBougies(a);
   }
   function panneauCvd() {
     const a = Z.cvd;
     ctx.fillStyle = C.panneau; ctx.fillRect(a.x, a.y, Z.w, a.h);
     const ms = E.minutes, i0 = ms.findIndex(m => m.fin > E.vue.t1);
-    if (i0 < 0) return;
-    const cvd = BM.cvdDepuis(ms, i0);
-    let lo = 0, hi = 0;
-    for (let i = i0; i < ms.length; i++) { if (ms[i].t > E.vue.t2) break; lo = Math.min(lo, cvd[i]); hi = Math.max(hi, cvd[i]); }
+    if (i0 < 0) { TEXTES.cvd = ''; return; }
+    // Après un trou de bougies, le cumul repart de 0 (BM.cvd) : il est coupé, hachuré, et dit.
+    const { v: cvd, reprises } = BM.cvd(ms, i0), coupe = new Set(reprises);
+    let lo = 0, hi = 0, i1 = i0;
+    for (let i = i0; i < ms.length; i++) { if (ms[i].t > E.vue.t2) break; lo = Math.min(lo, cvd[i]); hi = Math.max(hi, cvd[i]); i1 = i; }
     const pad = (hi - lo) * 0.1 || 1, y = v => a.y + 16 + (a.h - 20) * (1 - (v - lo + pad) / (hi - lo + 2 * pad));
     ctx.strokeStyle = C.grille; ctx.beginPath(); ctx.moveTo(0, y(0)); ctx.lineTo(a.w, y(0)); ctx.stroke();
     ctx.strokeStyle = C.accent; ctx.lineWidth = 1.4; ctx.beginPath();
-    let premier = true, der = 0;
-    for (let i = i0; i < ms.length; i++) {
-      if (ms[i].t > E.vue.t2) break;
+    let der = 0;
+    for (let i = i0; i <= i1; i++) {
       const x = X(Math.min(ms[i].fin, maintenant()));
-      if (premier) { ctx.moveTo(X(ms[i0].t), y(0)); premier = false; }
+      if (i === i0 || coupe.has(i)) ctx.moveTo(X(ms[i].t), y(0));
       ctx.lineTo(x, y(cvd[i])); der = cvd[i];
     }
     ctx.stroke();
-    texte('CVD spot (USDT) cumulé depuis le bord gauche · ' + (der >= 0 ? '+' : '−') + BM.prix(Math.abs(der) / 1e6, 1) + ' M',
-      a.x + 6, a.y + 9, C.ink3, 9.5);
+    hachuresBougies(a);
+    const vues = reprises.filter(i => i <= i1), depuis = vues.length ? ms[vues[vues.length - 1]].t : null;
+    const manque = BM.dureeDans(BM.trousMinutes(ms), E.vue.t1, E.vue.t2);
+    TEXTES.cvd = 'CVD spot (USDT) cumulé depuis ' + (depuis ? BM.heure(depuis) + ' (repart de 0 après ' + BM.age(manque) + ' de bougies non lues, hachurées)' : 'le bord gauche')
+      + ' · ' + (der >= 0 ? '+' : '−') + BM.prix(Math.abs(der) / 1e6, 1) + ' M';
+    texte(TEXTES.cvd, a.x + 6, a.y + 9, C.ink3, 9.5);
   }
 
   // ─── Lecture au pointeur : la VALEUR, quel que soit le réglage ──────────────
@@ -1157,6 +1217,8 @@
       executions: { seaux: E.exec.seaux.size, premier: E.exec.premier, dernier: E.exec.dernier, total: E.exec.total.slice() },
       minutes: E.minutes.length, niveaux: E.niv ? { murs: E.niv.murs.length, gamma: E.niv.gamma.length } : null,
       horloge: { ecart: E.horloge.ecart, u: E.horloge.u }, maintenant: maintenant(),
+      bougies: { n: E.minutes.length, premiere: E.minutes.length ? E.minutes[0].t : null, derniere: E.minutes.length ? E.minutes[E.minutes.length - 1].t : null, trous: BM.trousMinutes(E.minutes) },
+      execNonLues: execNonLues(), textes: Object.assign({}, TEXTES),
       recul: { binance: E.recul.binance.attente(Date.now()), github: E.recul.github.attente(Date.now()) },
       statut: ($('statut') || {}).textContent || '',
       pastilles: posees.map(p => p.texte), reglages: JSON.parse(JSON.stringify(R)),

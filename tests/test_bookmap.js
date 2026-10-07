@@ -301,6 +301,17 @@ const cvd = BM.cvdDepuis(ms, 1);
 check('CVD remis à zéro au bord gauche (indice 1) : −600, −600', isNaN(cvd[0]) && cvd[1] === -600 && cvd[2] === -600);
 const m2 = BM.fusionnerMinutes(ms, BM.minutes([k(120000, 900, 600), k(180000, 10, 5)]));
 check('fusion : la bougie en cours est REMPLACÉE, pas doublée', m2.length === 4 && m2[2].vol === 900);
+// Absence : la série a un trou, le rattrapage (startTime) le comble EN PLACE.
+const avecTrou = BM.minutes([k(0, 10, 2), k(60000, 10, 2), k(300000, 10, 2), k(360000, 10, 2)]);     // delta −6 par minute
+check('trou de bougies détecté : minutes 2 à 4 non lues', JSON.stringify(BM.trousMinutes(avecTrou)) === JSON.stringify([[120000, 300000]]), BM.trousMinutes(avecTrou));
+const comble = BM.fusionnerMinutes(avecTrou, BM.minutes([k(60000, 20, 5), k(120000, 30, 5), k(180000, 30, 5), k(240000, 30, 5), k(300000, 40, 5)]));
+check('rattrapage : les minutes manquantes s\'insèrent à leur place, les relues sont remplacées',
+  comble.map(m => m.t / 60000).join() === '0,1,2,3,4,5,6' && comble[1].vol === 20 && comble[5].vol === 40 && !BM.trousMinutes(comble).length, comble.map(m => m.t / 60000));
+const cv = BM.cvd(avecTrou, 0);
+check('CVD : après un trou, le cumul repart de 0 (et l\'indice de reprise est rendu)', cv.reprises.join() === '2' && [...cv.v].join() === '-6,-12,-6,-12', { v: [...cv.v], r: cv.reprises });
+check('durée non lue dans une fenêtre', BM.dureeDans([[100, 200], [300, 500]], 150, 400) === 150);
+check('volume : minutes par barre dans une échelle fixe (≥ 2 px), ancrable sur l\'horloge',
+  BM.pasMinutes(10) === 1 && BM.pasMinutes(0.9) === 3 && BM.pasMinutes(0.3) === 10 && BM.pasMinutes(0.01) === 360 && BM.texteMinutes(1) === 'minute' && BM.texteMinutes(15) === '15 min' && BM.texteMinutes(120) === '2 h');
 
 // ── 7. Fichier de 15 min : murs et gamma ─────────────────────────────────────
 titre('7. Murs et gamma : lus avec leur instant');
