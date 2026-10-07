@@ -241,37 +241,65 @@
   /** La chaleur, peinte au pixel : pour chaque pixel, le MAX des cellules qu'il recouvre (fusion
    *  comprise). Un pixel qui recouvre plusieurs colonnes ne peut donc jamais cacher un mur — ce
    *  que ferait un simple rééchantillonnage au plus proche.
-   *  px : Uint32Array(w·h), déjà rempli du fond « non observé » ; vue {t1, t2, p1, p2} ;
-   *  o : { lut } ou { lutB, lutA } (Uint32Array(256)), et `maintenant` : rien n'est peint après. */
+   *  px : Uint32Array, déjà rempli du fond (transparent pour un calque) ; vue {t1, t2, p1, p2} ;
+   *  o : { lut } ou { lutB, lutA } (Uint32Array(256)), `maintenant` : rien n'est peint après ;
+   *  `rect` [xa, ya, xb, yb[ facultatif : seul ce rectangle est peint, et px en est le tampon
+   *  ((xb − xa) × (yb − ya)) — la bande découverte d'un glissement. Un pixel ne dépend que de la
+   *  vue et de sa position : peint seul ou avec les autres, il reçoit la même couleur.
+   *
+   *  Coût : les pixels voisins qui recouvrent les MÊMES colonnes (une colonne de 60 s fait ≈ 7 px
+   *  dans la vue de 3 h) forment un groupe : le MAX de chaque ligne y est calculé une fois par
+   *  groupe, puis écrit d'un trait (fill). Un groupe d'un pixel (vue de 24 h) revient à l'ancienne
+   *  boucle, pixel par pixel. Les colonnes d'un pixel viennent de BM.plageColonnes, ses tranches de
+   *  BM.tranchesLigne — les fonctions de la lecture au pointeur (BM.lirePixel). */
   BM.peindreGrille = function (px, w, h, g, vue, o) {
-    if (!nCol(g) || w < 1 || h < 1) return;
-    const tpp = (vue.t2 - vue.t1) / w, pp = (vue.p2 - vue.p1) / h;
+    const n = nCol(g);
+    if (!n || w < 1 || h < 1) return;
+    const rc = o.rect, xa = rc ? rc[0] : 0, ya = rc ? rc[1] : 0, xb = rc ? rc[2] : w, yb = rc ? rc[3] : h, L = xb - xa;
+    if (L <= 0 || yb <= ya) return;
+    const t1 = vue.t1, tpp = (vue.t2 - vue.t1) / w, pp = (vue.p2 - vue.p1) / h;
     const tMax = o.maintenant !== undefined && o.maintenant !== null ? o.maintenant : Infinity;
-    const H = g.H, pbMin = g.pbMin, lut = o.lut, lutB = o.lutB, lutA = o.lutA;
-    const colB = new Uint8Array(H), colA = new Uint8Array(H);
-    const ja = new Int32Array(h), jb = new Int32Array(h);
-    BM.tranchesLignes(vue.p2, pp, h, g.dp, ja, jb);
-    const r = [0, 0], acc = [0, 0, 0];
-    let cle0 = -2, cle1 = -2, lo = 0, hi = -1, obs = false;
-    for (let x = 0; x < w; x++) {
-      const ta = vue.t1 + x * tpp;
+    const H = g.H, pbMin = g.pbMin, lut = o.lut || null, lutB = o.lutB, lutA = o.lutA;
+    // Pixels qui PEUVENT rencontrer la grille (marge de 2 px : hors de là, plageColonnes est fausse).
+    const tDeb = g.deb ? g.deb[0] : g.t0, tFin = Math.min(tMax, g.deb ? g.fin[n - 1] : g.t0 + n * g.dt);
+    const xs = Math.max(xa, Math.floor((tDeb - t1) / tpp) - 2), xe = Math.min(xb, Math.ceil((tFin - t1) / tpp) + 2);
+    if (!(xe > xs)) return;
+    const ja = new Int32Array(h), jb = new Int32Array(h), t = [0, 0];
+    for (let y = ya; y < yb; y++) { BM.tranchesLigne(vue.p2, pp, y, g.dp, t); ja[y] = t[0]; jb[y] = t[1]; }
+    // Colonnes [c0, c1] de chaque pixel (−1 : aucune).
+    const C0 = new Int32Array(xe - xs).fill(-1), C1 = new Int32Array(xe - xs), r = [0, 0];
+    for (let x = xs; x < xe; x++) {
+      const ta = t1 + x * tpp;
       if (ta >= tMax) break;
-      if (!BM.plageColonnes(g, ta, Math.min(ta + tpp, tMax), r)) continue;
-      if (r[0] !== cle0 || r[1] !== cle1) {
+      if (BM.plageColonnes(g, ta, Math.min(ta + tpp, tMax), r)) { C0[x - xs] = r[0]; C1[x - xs] = r[1]; }
+    }
+    const colB = new Uint8Array(H), colA = new Uint8Array(H), acc = [0, 0, 0];
+    let k0 = -2, k1 = -2, lo = 0, hi = -1, obs = false;
+    for (let i = 0, N = xe - xs; i < N;) {
+      const c0 = C0[i];
+      if (c0 < 0) { i++; continue; }
+      const c1 = C1[i];
+      let j = i + 1;
+      while (j < N && C0[j] === c0 && C1[j] === c1) j++;
+      if (c0 !== k0 || c1 !== k1) {
         if (obs) { const a0 = Math.max(0, lo - pbMin), a1 = Math.min(H, hi - pbMin + 1); colB.fill(0, a0, a1); colA.fill(0, a0, a1); }
-        cle0 = r[0]; cle1 = r[1];
-        accumuler(g, cle0, cle1, colB, colA, acc);
+        k0 = c0; k1 = c1;
+        accumuler(g, c0, c1, colB, colA, acc);
         obs = acc[0] === 1; lo = acc[1]; hi = acc[2];
       }
-      if (!obs) continue;
-      for (let y = 0; y < h; y++) {
-        const a = ja[y], b = jb[y];
-        if (b < lo || a > hi) continue;              // hors bande observée : la hachure reste
-        let vb = 0, va = 0;
-        const k0 = Math.max(0, Math.max(lo, a) - pbMin), k1 = Math.min(H - 1, Math.min(hi, b) - pbMin);
-        for (let k = k0; k <= k1; k++) { if (colB[k] > vb) vb = colB[k]; if (colA[k] > va) va = colA[k]; }
-        px[y * w + x] = lut ? lut[vb > va ? vb : va] : (vb >= va ? lutB[vb] : lutA[va]);
+      if (obs) {
+        const x0 = xs + i - xa, x1 = xs + j - xa, un = j - i === 1;
+        for (let y = ya; y < yb; y++) {
+          const a = ja[y], b = jb[y];
+          if (b < lo || a > hi) continue;              // hors bande observée : le fond reste
+          let vb = 0, va = 0;
+          const q0 = Math.max(0, Math.max(lo, a) - pbMin), q1 = Math.min(H - 1, Math.min(hi, b) - pbMin);
+          for (let k = q0; k <= q1; k++) { const u = colB[k], v = colA[k]; if (u > vb) vb = u; if (v > va) va = v; }
+          const c = lut ? lut[vb > va ? vb : va] : (vb >= va ? lutB[vb] : lutA[va]), off = (y - ya) * L;
+          if (un) px[off + x0] = c; else px.fill(c, off + x0, off + x1);
+        }
       }
+      i = j;
     }
   };
 
@@ -492,6 +520,14 @@
    *  `m` (buyer is maker) = le VENDEUR a pris la liquidité : c'est une vente au marché.
    *  Par seconde aussi : Σ prix × quantité et Σ quantité EXACTS (le prix moyen de la seconde ne
    *  se lit pas sur le centre d'une tranche). */
+  //  REGROUPEMENTS GARDÉS (« plis ») : pour un pas de temps et un pas de prix donnés, les seaux
+  //  ancrés (⌊s / pasT⌋, ⌊tranche / m⌋) sont gardés et COMPLÉTÉS seconde par seconde, au lieu de
+  //  rebalayer à chaque image toutes les secondes depuis l'ouverture (6 h : 21 600 secondes). Une
+  //  seconde n'y est versée que CLOSE (une seconde plus récente est arrivée : les exécutions
+  //  arrivent dans l'ordre) ; la seconde ouverte est ajoutée à la lecture, sur une copie. Les
+  //  secondes sont versées dans l'ordre : mêmes sommes, au bit près, qu'un regroupement refait
+  //  de zéro. Une exécution plus ancienne qu'une seconde déjà versée (remplissage arrière) défait
+  //  les plis ; la purge refait le seul seau qu'elle coupe.
   BM.SeauxExecutions = function (dp) {
     this.dp = dp || 1;
     this.seaux = new Map();     // seconde -> Map(tranche -> [achat, vente])
@@ -499,7 +535,12 @@
     this.triees = []; this.trieesOk = true;   // secondes triées (index des fenêtres)
     this.premier = null; this.dernier = null; this.dernierId = null; this.dernierPrix = null;
     this.total = [0, 0];
+    this.sMax = null;           // la seconde la plus récente : la seule encore « ouverte »
+    this.plis = new Map();      // 'pasT:m' -> pli
+    this.version = 0;           // change à chaque exécution versée ou purgée
+    this.servis = 0;
   };
+  BM.PLIS_MAX = 6;
   const SX = BM.SeauxExecutions.prototype;
   SX.verser = function (t) {
     const s = Math.floor(t.T / 1000), p = +t.p, pb = Math.floor(p / this.dp), q = +t.q, cote = t.m ? 1 : 0;
@@ -514,6 +555,53 @@
     const x = this.pxs.get(s); x[0] += p * q; x[1] += q;
     this.total[cote] += q;
     if (this.premier === null || t.T < this.premier) this.premier = t.T;
+    if (this.sMax === null || s > this.sMax) this.sMax = s;
+    else if (s < this.sMax && this.plis.size) this.plis.clear();      // une seconde déjà versée a changé
+    this.version++;
+  };
+  /** Secondes triées (l'index est refait après un ajout dans le désordre). */
+  SX.ordre = function () {
+    if (!this.trieesOk) { this.triees = [...this.seaux.keys()].sort((a, b) => a - b); this.trieesOk = true; }
+    return this.triees;
+  };
+  /** Le pli (pasT, m), complété jusqu'à la seconde ouverte (exclue). */
+  SX.pli = function (pasT, m) {
+    const cle = pasT + ':' + m;
+    let P = this.plis.get(cle);
+    if (!P) {
+      if (this.plis.size >= BM.PLIS_MAX) {           // le moins récemment servi s'en va
+        let vieux = null;
+        for (const [k, x] of this.plis) if (!vieux || x.servi < this.plis.get(vieux).servi) vieux = k;
+        this.plis.delete(vieux);
+      }
+      P = { pasT, m, fin: -Infinity, parT: new Map(), servi: 0 };
+      this.plis.set(cle, P);
+    }
+    P.servi = ++this.servis;
+    if (this.sMax !== null && P.fin < this.sMax) {
+      const T = this.ordre();
+      let lo = 0, hi = T.length;
+      while (lo < hi) { const k = (lo + hi) >> 1; if (T[k] < P.fin) lo = k + 1; else hi = k; }
+      for (let i = lo; i < T.length && T[i] < this.sMax; i++) this.plier(P, T[i]);
+      P.fin = this.sMax;
+    }
+    return P;
+  };
+  /** Verse la seconde s dans le pli P (seaux créés à la demande, complétés en place). */
+  SX.plier = function (P, s, cible) {
+    const Tn = Math.floor(s * 1000 / P.pasT), pasPx = P.m * this.dp;
+    let mp = cible || P.parT.get(Tn);
+    if (!mp) { mp = new Map(); P.parT.set(Tn, mp); }
+    for (const [pb, v] of this.seaux.get(s)) {
+      const Pn = Math.floor(pb / P.m);
+      let e = mp.get(Pn);
+      if (!e) { e = { T: Tn, P: Pn, ta: Tn * P.pasT, tb: (Tn + 1) * P.pasT, pa: Pn * pasPx, pb: (Pn + 1) * pasPx, p: (Pn + 0.5) * pasPx, achat: 0, vente: 0, s0: s, s1: s, t: 0 }; mp.set(Pn, e); }
+      e.achat += v[0]; e.vente += v[1];
+      if (s < e.s0) e.s0 = s;
+      if (s > e.s1) e.s1 = s;
+      e.t = (e.s0 + e.s1 + 1) * 500;
+    }
+    return mp;
   };
   SX.ajouter = function (t) {
     if (this.dernierId !== null && t.a <= this.dernierId) return false;      // déjà compté
@@ -530,16 +618,31 @@
     this.verser(t);
     return true;
   };
+  /** Oublie les secondes avant `avantMs`. Dans chaque pli : les seaux entièrement passés s'en
+   *  vont, et le seul que la limite coupe est refait de ses secondes restantes (dans l'ordre). */
   SX.purger = function (avantMs) {
-    const lim = Math.floor(avantMs / 1000);
-    for (const s of this.seaux.keys()) if (s < lim) { this.seaux.delete(s); this.pxs.delete(s); }
-    if (this.trieesOk) { let i = 0; while (i < this.triees.length && this.triees[i] < lim) i++; if (i) this.triees = this.triees.slice(i); }
+    const lim = Math.floor(avantMs / 1000), T = this.ordre();
+    let k = 0, hi = T.length;
+    while (k < hi) { const m = (k + hi) >> 1; if (T[m] < lim) k = m + 1; else hi = m; }
+    if (k) {
+      for (let i = 0; i < k; i++) { this.seaux.delete(T[i]); this.pxs.delete(T[i]); }
+      this.triees = T.slice(k);
+      for (const P of this.plis.values()) {
+        const Tc = Math.floor(lim * 1000 / P.pasT);
+        for (const Tn of P.parT.keys()) if (Tn < Tc) P.parT.delete(Tn);
+        if (Tc * P.pasT < lim * 1000 && P.parT.has(Tc)) {
+          const mp = new Map(), borne = Math.min((Tc + 1) * P.pasT / 1000, P.fin);
+          for (let i = 0; i < this.triees.length && this.triees[i] < borne; i++) this.plier(P, this.triees[i], mp);
+          if (mp.size) P.parT.set(Tc, mp); else P.parT.delete(Tc);
+        }
+      }
+      this.version++;
+    }
     if (this.premier !== null && this.premier < avantMs) this.premier = avantMs;
   };
   /** Secondes de [ta, tb[ (triées). */
   SX.secondes = function (ta, tb) {
-    if (!this.trieesOk) { this.triees = [...this.seaux.keys()].sort((a, b) => a - b); this.trieesOk = true; }
-    const T = this.triees, s0 = Math.floor(ta / 1000), s1 = Math.ceil(tb / 1000);
+    const T = this.ordre(), s0 = Math.floor(ta / 1000), s1 = Math.ceil(tb / 1000);
     let lo = 0, hi = T.length;
     while (lo < hi) { const m = (lo + hi) >> 1; if (T[m] < s0) lo = m + 1; else hi = m; }
     let i = lo;
@@ -552,33 +655,36 @@
    *  est pris en entier : une bulle ne change pas quand la vue glisse. La SOMME des volumes est
    *  conservée (contrôlé par le harnais). Chaque seau rend ses bornes et le milieu des secondes
    *  qui portent des exécutions (t) : jamais placé là où rien n'a été lu. */
+  //  Les seaux rendus sont ceux du pli (sauf celui de la seconde ouverte, une copie) : on les lit,
+  //  on ne les modifie pas.
   SX.regrouper = function (ta, tb, pasT, pasP) {
-    const out = new Map(), m = Math.max(1, Math.round(pasP / this.dp)), pasPx = m * this.dp;
-    const t0 = Math.floor(ta / pasT) * pasT, t1 = Math.ceil(tb / pasT) * pasT;
-    for (const s of this.secondes(t0, t1)) {
-      const T = Math.floor(s * 1000 / pasT);
-      for (const [pb, v] of this.seaux.get(s)) {
-        const P = Math.floor(pb / m), k = T + ':' + P;
-        let e = out.get(k);
-        if (!e) { e = { T, P, ta: T * pasT, tb: (T + 1) * pasT, pa: P * pasPx, pb: (P + 1) * pasPx, p: (P + 0.5) * pasPx, achat: 0, vente: 0, s0: s, s1: s }; out.set(k, e); }
-        e.achat += v[0]; e.vente += v[1];
-        if (s < e.s0) e.s0 = s;
-        if (s > e.s1) e.s1 = s;
-      }
+    const m = Math.max(1, Math.round(pasP / this.dp)), P = this.pli(pasT, m), out = [];
+    const ouv = this.sMax !== null && this.seaux.has(this.sMax) ? Math.floor(this.sMax * 1000 / pasT) : null;
+    for (let T = Math.floor(ta / pasT), T1 = Math.ceil(tb / pasT); T < T1; T++) {
+      const mp = P.parT.get(T);
+      if (T === ouv) {
+        const c = new Map();
+        if (mp) for (const [k, e] of mp) c.set(k, Object.assign({}, e));
+        this.plier(P, this.sMax, c);
+        for (const e of c.values()) out.push(e);
+      } else if (mp) for (const e of mp.values()) out.push(e);
     }
-    for (const e of out.values()) e.t = (e.s0 + e.s1 + 1) * 500;
-    return [...out.values()];
+    return out;
   };
-  /** Profil des exécutions par tranche de prix sur [ta, tb[ (tranches de pasP $, multiple de dp). */
+  /** Profil des exécutions par tranche de prix sur [ta, tb[ (tranches de pasP $, multiple de dp) :
+   *  les minutes entières viennent du pli d'une minute, les bords seconde par seconde. */
   SX.profil = function (ta, tb, pasP) {
     const out = new Map(), m = Math.max(1, Math.round(pasP / this.dp));
-    for (const s of this.secondes(ta, tb)) {
-      for (const [pb, v] of this.seaux.get(s)) {
-        const P = Math.floor(pb / m);
-        const e = out.get(P) || [0, 0];
-        e[0] += v[0]; e[1] += v[1]; out.set(P, e);
-      }
-    }
+    const ajouter = (P, a, v) => { const e = out.get(P); if (e) { e[0] += a; e[1] += v; } else out.set(P, [a, v]); };
+    const parSeconde = (a, b) => { for (const s of this.secondes(a * 1000, b * 1000)) for (const [pb, v] of this.seaux.get(s)) ajouter(Math.floor(pb / m), v[0], v[1]); };
+    const S0 = Math.floor(ta / 1000), S1 = Math.ceil(tb / 1000), Ma = Math.ceil(S0 / 60), Mb = Math.floor(S1 / 60);
+    if (Mb - Ma < 2) { parSeconde(S0, S1); return out; }
+    const P = this.pli(60e3, m);
+    parSeconde(S0, Ma * 60);
+    for (let M = Ma; M < Mb; M++) { const mp = P.parT.get(M); if (mp) for (const e of mp.values()) ajouter(e.P, e.achat, e.vente); }
+    const o = this.sMax;
+    if (o !== null && o >= Ma * 60 && o < Mb * 60 && this.seaux.has(o)) for (const [pb, v] of this.seaux.get(o)) ajouter(Math.floor(pb / m), v[0], v[1]);
+    parSeconde(Mb * 60, S1);
     return out;
   };
   /** Prix moyen pondéré par le volume (VWAP) de chaque seconde de [ta, tb[ : [[s, prix], …]. */
@@ -806,13 +912,22 @@
     const p = n => String(n).padStart(2, '0');
     return p(d.getHours()) + ':' + p(d.getMinutes()) + (sec ? ':' + p(d.getSeconds()) : '');
   };
+  // Formateurs gardés : toLocaleString(…, options) en construit un à CHAQUE appel (≈ 1 ms par image
+  // pour les graduations et les pastilles). Mêmes chaînes.
+  const FORMATS = new Map();
+  BM.nombre = function (v, min, max) {
+    const k = min * 32 + max;
+    let f = FORMATS.get(k);
+    if (!f) FORMATS.set(k, f = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: min, maximumFractionDigits: max }));
+    return f.format(v);
+  };
   BM.prix = function (p, dec) {
     if (p === null || p === undefined || !isFinite(p)) return '—';
-    return p.toLocaleString('fr-FR', { minimumFractionDigits: dec || 0, maximumFractionDigits: dec || 0 });
+    return BM.nombre(p, dec || 0, dec || 0);
   };
   BM.btc = function (q) {
     if (!isFinite(q)) return '≥ ' + q;
-    if (q >= 100) return Math.round(q).toLocaleString('fr-FR');
+    if (q >= 100) return BM.nombre(Math.round(q), 0, 0);
     if (q >= 10) return q.toFixed(1).replace('.', ',');
     if (q >= 1) return q.toFixed(2).replace('.', ',');
     return q.toFixed(3).replace('.', ',');
@@ -826,7 +941,7 @@
   /** Bulles d'exécutions : surface ∝ volume, ENTRE deux bornes — rayon plancher (lisible) et
    *  plafond (une bulle ne couvre pas la carte). Les bornes en BTC se déduisent de ces constantes ;
    *  la légende les écrit (BM.bornesBulles), elle ne promet pas une proportion qui n'existe pas. */
-  BM.BULLES = { rMin: 2, rMax: 28, k: 3.2 };
+  BM.BULLES = { rMin: 1, rMax: 28, k: 3.2 };
   BM.rayonBulle = function (q, echelle) {
     return Math.min(BM.BULLES.rMax, Math.max(BM.BULLES.rMin, BM.BULLES.k * Math.sqrt(q) * (echelle || 1)));
   };

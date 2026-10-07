@@ -153,6 +153,33 @@ titre('2c. Lecture au pointeur = pixel peint (même MAX, mêmes colonnes, mêmes
   check(`${pixels} pixels : la valeur lue est celle peinte (dont ${multiples} pixels qui recouvrent plusieurs cellules)`, ecarts === 0 && multiples > 1000, { ecarts, multiples });
 }
 
+// ── 2d. Bandes peintes seules = le même endroit d'un repeint complet ──────────
+// La carte garde son calque publié et, quand la vue glisse d'un nombre entier de pixels, ne repeint
+// que les bandes découvertes : chaque pixel d'une bande doit valoir celui d'un repeint complet.
+titre('2d. Peinture par bandes (glissement) : chaque pixel = celui du repeint complet');
+{
+  const a = aleatoire(90, 60, 4200); a.t0 = 120 * MIN;
+  const lut = Uint32Array.from({ length: 256 }, (_, v) => v + 1);
+  const L = new BM.CarnetLive(20, 2000);
+  L.fixerEchelle('x', q => Math.min(255, Math.round(q * 9)));
+  for (let k = 0; k < 40; k++) L.ajouter(BM.agregerCarnet({ bids: Array.from({ length: 30 }, (_, i) => [String(84300 - i * 7), String((k + i) % 9 + 0.5)]), asks: Array.from({ length: 30 }, (_, i) => [String(84310 + i * 7), String((k * 3 + i) % 11 + 0.5)]) }, 20), 150 * MIN + k * 2000, 150 * MIN + k * 2000 + 90, k + 1);
+  let ecarts = 0, pixels = 0;
+  for (const [g, w, h, vue, mt] of [
+    [a, 97, 41, { t1: 110 * MIN, t2: 220 * MIN, p1: 4195 * 20, p2: 4262 * 20 }, Infinity],
+    [BM.fusionMax(a, 15, 2), 90, 50, { t1: 100 * MIN, t2: 230 * MIN, p1: 4190 * 20, p2: 4270 * 20 }, Infinity],
+    [L, 120, 45, { t1: 149 * MIN, t2: 152 * MIN, p1: 84050, p2: 84600 }, 151.2 * MIN],
+  ]) {
+    const plein = new Uint32Array(w * h);
+    BM.peindreGrille(plein, w, h, g, vue, { lut, maintenant: mt });
+    for (const [xa, ya, xb, yb] of [[0, 0, 7, h], [w - 5, 0, w, h], [0, h - 3, w, h], [0, 0, w, 4], [13, 9, 40, 30], [0, 0, w, h]]) {
+      const b = new Uint32Array((xb - xa) * (yb - ya));
+      BM.peindreGrille(b, w, h, g, vue, { lut, maintenant: mt, rect: [xa, ya, xb, yb] });
+      for (let y = ya; y < yb; y++) for (let x = xa; x < xb; x++) { pixels++; if (b[(y - ya) * (xb - xa) + (x - xa)] !== plein[y * w + x]) ecarts++; }
+    }
+  }
+  check(`${pixels} pixels peints par bandes (grille publiée, fusionnée, carnet live) : identiques au repeint complet`, ecarts === 0 && pixels > 15000, ecarts);
+}
+
 // ── 3. Encodage : lu, jamais recopié ─────────────────────────────────────────
 titre('3. Encodage publié : décoder sans inventer');
 const enc = { ref_btc: 100, plafond: 255 };
@@ -321,6 +348,62 @@ check('jamais 2,5 $ sur 1 $, ni 25 $ sur 10 ou 20 $', BM.pasMultiple(2.3, 1) ===
   check('bulles : ancrées sur l\'horloge — une vue qui glisse ne regroupe pas autrement', cle(a1) === cle(a2) && a1.every(b => b.ta % 5000 === 0 && b.pa % 5 === 0));
   check('bulle placée au milieu des secondes qui ont des exécutions (pas au centre d\'un seau à moitié lu)',
     e.regrouper(1.7e12 + 15000, 1.7e12 + 20000, 10000, 5).every(b => b.t >= 1.7e12 + 10000 && b.t <= 1.7e12 + 20000) && e.regrouper(1.7e12 + 15000, 1.7e12 + 20000, 60000, 5)[0].t === 1.7e12 + 10000);
+}
+
+// ── 5d. Plis : regroupements gardés et complétés, identiques à un regroupement refait ──
+// La carte ne rebalaye plus toutes les secondes à chaque image : les seaux d'un (pas de temps, pas
+// de prix) sont gardés, complétés seconde par seconde, coupés par la purge. Ce qu'ils rendent doit
+// être, AU BIT PRÈS, ce qu'un regroupement refait de zéro rend — et ils doivent vraiment éviter de
+// tout rebalayer (sinon ils ne servent à rien).
+titre('5d. Seaux gardés (plis) : complétés au fil des exécutions, identiques à un regroupement refait');
+{
+  const T0 = 1.7e12, flux = [];
+  for (let i = 0; i < 6000; i++) flux.push({ a: 50000 + i, p: (86000 + 40 * Math.sin(i / 300) + rnd() * 9).toFixed(2), q: (rnd() * rnd() * 3).toFixed(5), T: T0 + i * 230, m: rnd() < 0.5 });
+  const neuf = n => { const e = new BM.SeauxExecutions(1); for (const t of flux.slice(0, n)) e.ajouter(t); return e; };
+  const cle = r => r.map(b => [b.T, b.P, b.ta, b.tb, b.pa, b.pb, b.achat, b.vente, b.t].join(',')).sort().join('|');
+  const vues = [[T0, T0 + 6000 * 230, 30000, 5], [T0 + 333e3, T0 + 777e3, 5000, 2], [T0 + 1e6, T0 + 1.2e6, 120000, 10]];
+  const ex = new BM.SeauxExecutions(1);
+  let egal = true, profils = true, ouverte = true;
+  for (let n = 0; n < flux.length; n += 397) {
+    for (const t of flux.slice(n, n + 397)) ex.ajouter(t);
+    const m = Math.min(flux.length, n + 397), ref = neuf(m);
+    for (const [ta, tb, pt, pp] of vues) if (cle(ex.regrouper(ta, tb, pt, pp)) !== cle(ref.regrouper(ta, tb, pt, pp))) egal = false;
+    const p1 = ex.profil(T0 + 7777, T0 + m * 230, 5), p2 = new Map();
+    for (const s of ref.secondes(T0 + 7777, T0 + m * 230)) for (const [pb, v] of ref.seaux.get(s)) { const k = Math.floor(pb / 5), e = p2.get(k) || [0, 0]; e[0] += v[0]; e[1] += v[1]; p2.set(k, e); }
+    for (const [k, v] of p2) { const w = p1.get(k); if (!w || Math.abs(w[0] - v[0]) > 1e-9 || Math.abs(w[1] - v[1]) > 1e-9) profils = false; }
+    if (p1.size !== p2.size) profils = false;
+    // La dernière seconde (encore ouverte) est comptée : le dernier seau contient la dernière exécution.
+    const der = flux[m - 1], r = ex.regrouper(der.T, der.T + 1, 1000, 1);
+    if (!r.some(b => b.ta <= der.T && der.T < b.tb && b.pa <= +der.p && +der.p < b.pb)) ouverte = false;
+  }
+  check('regroupements gardés = regroupements refaits, au bit près (3 vues, 16 étapes de flux)', egal);
+  check('profil par prix (minutes gardées + secondes de bord) = profil refait seconde par seconde', profils);
+  check('la seconde ouverte (encore en cours) est comptée, sans être figée dans le pli', ouverte);
+  // Purge au milieu d'un seau : le seau coupé est refait de ses secondes restantes.
+  const lim = T0 + 3001 * 230 + 7000;
+  ex.purger(lim);
+  const ref = neuf(flux.length); ref.purger(lim);
+  check('purge au milieu d\'un seau : identique à un regroupement refait après la même purge', vues.every(([ta, tb, pt, pp]) => cle(ex.regrouper(ta, tb, pt, pp)) === cle(ref.regrouper(ta, tb, pt, pp))));
+  // Remplissage arrière : une seconde déjà versée change → les plis sont refaits, rien n'est perdu.
+  // (Référence : les MÊMES exécutions versées dans le même ordre, sans regroupement intermédiaire.)
+  const arriere = avant => {
+    const e = new BM.SeauxExecutions(1), vus = new Set();
+    for (const t of flux.slice(3000)) { e.ajouter(t); vus.add(t.a); }
+    if (avant) e.regrouper(T0, T0 + 6000 * 230, 30000, 5);
+    for (const t of flux.slice(0, 3000).reverse()) e.ajouterAncien(t, vus);
+    return e.regrouper(T0, T0 + 6000 * 230, 30000, 5);
+  };
+  check('remplissage arrière après un regroupement : rien de perdu ni de compté deux fois', cle(arriere(true)) === cle(arriere(false)));
+  // Les dents : une exécution de plus ne verse que la seconde close, pas tout l'historique.
+  const e3 = neuf(flux.length);
+  e3.regrouper(T0, T0 + 6000 * 230, 30000, 5);
+  let verses = 0;
+  const plier = e3.plier;
+  e3.plier = function (...x) { verses++; return plier.apply(this, x); };
+  const d = flux[flux.length - 1];
+  e3.ajouter({ a: d.a + 1, p: d.p, q: '1', T: d.T + 2000, m: false });
+  e3.regrouper(T0, T0 + 6000 * 230 + 3000, 30000, 5);
+  check(`une exécution de plus : ${verses} seconde(s) versée(s) — pas les ${e3.seaux.size} secondes de l'historique`, verses > 0 && verses <= 3, verses);
 }
 
 // ── 5c. Ligne de prix : à la seconde, exacte, coupée sur ce qui n'est pas lu ──
