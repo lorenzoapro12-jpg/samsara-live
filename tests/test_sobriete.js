@@ -171,10 +171,23 @@ async function ouvrir(nav, theme, o = {}) {
       const c = document.getElementById('chartCalque'), g = c.getContext('2d'), P = geoPrix;
       const y = Math.round(P.top + P.ph * (1 - (livePrice - P.minP) / P.range));
       const px = Array.from(g.getImageData(c.width - 40, y - 2, 1, 5).data);   // dans l'étiquette, colonne des prix
-      return { d: window.__t.dessins, lp: livePrice, y, etiquette: px.filter((x, i) => i % 4 === 3 && x > 200).length, masque: masqueEtiquettes(livePrice, P.top, P.ph, P.minP, P.maxP, P.range) === P.masque };
+      return { d: window.__t.dessins, lp: livePrice, y, etiquette: px.filter((x, i) => i % 4 === 3 && x > 200).length };
     });
     check(`le prix bouge (${avantPrix.lp} → ${apresPrix.lp}) : l’étiquette du calque est à sa nouvelle ordonnée, le graphique n’est pas redessiné`,
-      apresPrix.lp !== avantPrix.lp && apresPrix.etiquette >= 3 && (apresPrix.d === avantPrix.d || !apresPrix.masque), { avantPrix, apresPrix });
+      apresPrix.lp !== avantPrix.lp && apresPrix.etiquette >= 3 && apresPrix.d === avantPrix.d, { avantPrix, apresPrix });
+    // Le libellé d'axe recouvert par l'étiquette est omis — sur le calque, sans redessiner le graphique.
+    const lib = await k.page.evaluate(() => {
+      const vus = [], f = CanvasRenderingContext2D.prototype.fillText, P = geoPrix, d0 = window.__t.dessins, avant = livePrice;
+      CanvasRenderingContext2D.prototype.fillText = function (t, x, y) { if (this.canvas.id === 'chartCalque') vus.push({ t: String(t), y }); return f.apply(this, arguments); };
+      livePrice = P.maxP - P.range / GRILLE_N * 2;              // pile sur le 3e libellé
+      prixSurGraphique();
+      CanvasRenderingContext2D.prototype.fillText = f;
+      const attendu = '$' + fmtPrix(P.maxP - P.range / GRILLE_N * 2), libelles = vus.filter(v => v.t.startsWith('$'));
+      livePrice = avant; prixSurGraphique();
+      return { omis: !libelles.some(v => v.t === attendu && Math.abs(v.y - (P.top + P.ph / GRILLE_N * 2 + 3)) < 0.5), etiquette: libelles.some(v => v.t === attendu), n: libelles.length, dessins: window.__t.dessins - d0 };
+    });
+    check('prix sur un libellé d’axe : ce libellé est omis du calque (l’étiquette le remplace), les autres restent, sans redessin du graphique',
+      lib.omis && lib.etiquette && lib.n === 7 && lib.dessins === 0, lib);
     const r0 = await k.page.evaluate(() => window.__t.dessins);
     await attendre(11000);   // deux queues de bougies (5 s) inchangées, dix lectures du prix inchangé
     const r1 = await k.page.evaluate(() => window.__t.dessins);

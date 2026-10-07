@@ -2657,6 +2657,14 @@ function dessinerCalque() {
   const P = geoPrix;
   if (P) {
     const { top, ph, left, right, minP, maxP, range } = P;
+    // Libellés de l'axe des prix ; celui que l'étiquette du dernier prix recouvrirait est omis.
+    const masque = masqueEtiquettes(livePrice, top, ph, minP, maxP, range);
+    cx.fillStyle = COLORS.axis || COLORS.text;
+    cx.font = chartFont(11);
+    for (let i = 0; i <= GRILLE_N; i++) {
+      if (masque & (1 << i)) continue;
+      cx.fillText('$' + fmtPrix(maxP - (range / GRILLE_N) * i), W - right + 3, top + (ph / GRILLE_N) * i + 3);
+    }
     // Dernier prix : la ligne (un trait large et pâle sous un pointillé : elle se trouve d'un
     // coup d'œil) et l'étiquette sur l'axe, à la couleur de la bougie EN COURS — l'étiquette dit
     // aussi le sens du moment.
@@ -2673,8 +2681,8 @@ function dessinerCalque() {
       cx.restore();
       // pad.right = 75 px pour un libellé de 76 px : le badge sortait du canvas (« $77085.0(| ») ;
       // on le recale vers la gauche au lieu d'élargir la colonne (13 sites couplés au sélecteur
-      // de plage et au repérage de la souris). Opaque : il recouvre le libellé d'axe de même
-      // ordonnée, omis par le graphique (masqueEtiquettes).
+      // de plage et au repérage de la souris). Opaque, et le libellé d'axe qu'il recouvrirait est
+      // omis (masqueEtiquettes, ci-dessus).
       const triX = W - right + 2, lpStr = '$' + fmtPrix(livePrice);
       cx.font = chartFont(11, 700);
       const lw = cx.measureText(lpStr).width + 12, bx = Math.min(triX + 10, W - 3 - lw);
@@ -2764,14 +2772,8 @@ function scheduleCalque() {
   calqueDemande = true;
   requestAnimationFrame(() => { if (calqueDemande) dessinerCalque(); });
 }
-/** Le prix a changé : l'étiquette du calque le suit. Si elle passe sur un autre libellé d'axe
- *  (celui qu'elle recouvre est omis par le graphique), le graphique est redessiné aussi. */
-function prixSurGraphique() {
-  if (!geoPrix) return;
-  const P = geoPrix;
-  if (masqueEtiquettes(livePrice, P.top, P.ph, P.minP, P.maxP, P.range) !== P.masque) drawChart();
-  else dessinerCalque();
-}
+/** Le prix a changé : l'étiquette du calque le suit — le calque seul est redessiné. */
+function prixSurGraphique() { if (geoPrix) dessinerCalque(); }
 
 // ============ RANGE SELECTOR ============
 function drawRangeSelector(candles, W, H) {
@@ -2954,19 +2956,12 @@ function resolveChart(candles, padL, padR, chartH, W) {
   ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 0.5;
   ctx.setLineDash(COLORS.grilleTirets);
   const gridN = GRILLE_N;
-  // Le libellé d'axe que l'étiquette du dernier prix (calque) recouvrirait est omis ; le calque
-  // redemande ce dessin quand le prix change de libellé recouvert (prixSurGraphique).
-  const masque = masqueEtiquettes(livePrice, pad.top, ph, minP, maxP, range);
-  geoPrix = { top: pad.top, ph, left: pad.left, right: pad.right, W, minP, maxP, range, vs, ve, masque };
+  // Les LIBELLÉS de l'axe sont sur le calque (dessinerCalque) : celui que l'étiquette du dernier
+  // prix recouvrirait y est omis, et le prix bouge chaque seconde — le graphique n'a pas à suivre.
+  geoPrix = { top: pad.top, ph, left: pad.left, right: pad.right, W, minP, maxP, range, vs, ve };
   for (let i = 0; i <= gridN; i++) {
     const y = pad.top + (ph / gridN) * i;
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
-    if (masque & (1 << i)) continue;
-    const price = maxP - (range / gridN) * i;
-    ctx.fillStyle = COLORS.axis || COLORS.text;
-    ctx.font = chartFont(11);
-    const label = '$' + fmtPrix(price);
-    ctx.fillText(label, W - pad.right + 3, y + 3);
   }
   ctx.setLineDash([]);
   
