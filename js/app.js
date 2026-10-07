@@ -1389,9 +1389,14 @@ async function fetchPrice() {
 // un rendu par seconde au lieu de deux (5 à 11 ms/s mesurés), et rien quand l'onglet est caché
 // (la lecture du prix n'y part pas). Avant : sa propre minuterie, jamais suspendue.
 const FMT_HMS = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+let minuteCalque = 0;
 function horloge() {
   const c = document.getElementById('taskbarClock'), t = FMT_HMS.format(new Date());
   if (c && c.textContent !== t) c.textContent = t;
+  // Le calque porte un âge en minutes (couche « Liquidité ») : redessiné à chaque minute
+  // même quand le prix, lui, ne bouge pas.
+  const m = Math.floor(Date.now() / 60000);
+  if (m !== minuteCalque) { minuteCalque = m; if (geo) scheduleCalque(); }
 }
 
 // ============ LIQUIDITÉ (HEATMAP HISTORIQUE) ============
