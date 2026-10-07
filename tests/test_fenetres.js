@@ -38,8 +38,8 @@ const index = fs.readFileSync(path.join(REPO, 'index.html'), 'utf8');
 const THEMES = [...index.matchAll(/<link\b[^>]*data-theme-id="([^"]+)"[^>]*>/g)]
   .filter(m => /data-structure="fenetres"/.test(m[0])).map(m => m[1]);
 
-// Binance simulé (bougies déterministes, prix fixe) ; market-data.json du dépôt, servi tel quel :
-// sa publication est ancienne, donc EN RETARD pour la page (le cas de l'icône d'avertissement).
+// Binance simulé (bougies déterministes, prix fixe) ; market-data.json du dépôt, vieilli de 3 h
+// (publicationVieille) : EN RETARD pour la page, le cas de l'icône d'avertissement.
 function binance(url) {
   const u = new URL(url), q = u.searchParams, now = Date.now();
   if (u.pathname.endsWith('/klines')) {
@@ -60,6 +60,15 @@ const serveur = http.createServer((req, res) => {
   fs.createReadStream(f).pipe(res);
 });
 
+// La publication servie est VIEILLIE de 3 h, construite ici : le fichier du dépôt est réécrit
+// toutes les 15 min par le serveur, et un test qui le servait tel quel passait ou échouait selon
+// l'heure du dernier cron (rouge dès que la publication était fraîche). Un cas « en retard » se
+// fabrique, il ne s'attend pas.
+function publicationVieille() {
+  const md = JSON.parse(fs.readFileSync(path.join(REPO, 'market-data.json'), 'utf8'));
+  md.updated = new Date(Date.now() - 3 * 3600e3).toISOString();
+  return JSON.stringify(md);
+}
 async function ouvrir(nav, theme, vue) {
   const ctx = await nav.newContext({ viewport: vue, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
@@ -69,7 +78,7 @@ async function ouvrir(nav, theme, vue) {
     const u = r.request().url(), h = new URL(u).host, cors = { 'access-control-allow-origin': '*' };
     if (h.startsWith('127.0.0.1')) return r.continue();
     if (h === 'api.binance.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(binance(u)) });
-    if (h === 'raw.githubusercontent.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, u.includes('heatmap') ? 'heatmap.json' : 'market-data.json')) });
+    if (h === 'raw.githubusercontent.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: u.includes('heatmap') ? fs.readFileSync(path.join(REPO, 'heatmap.json')) : publicationVieille() });
     return r.abort();
   });
   await page.addInitScript(t => { try { localStorage.clear(); localStorage.setItem('samsara-theme', t); } catch (e) { /* */ } }, theme);
