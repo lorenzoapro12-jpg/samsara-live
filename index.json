@@ -1,0 +1,436 @@
+{
+ "updated": "2026-10-07T21:13:08+00:00",
+ "generator": "historique.py v1.0 — séries publiées dans la branche orpheline `historique`, décrites par `meta` (07/10/2026)",
+ "source": "binance (futures et spot) · deribit et coinbase via market-data.json · git (master, publications passées)",
+ "branche": "historique",
+ "status": {
+  "worktree": "ok",
+  "amorcage": "ok",
+  "funding": "ok",
+  "open_interest_1h": "ok",
+  "long_short_1h": "ok",
+  "positionnement": "ok",
+  "index": "ok"
+ },
+ "errors": [],
+ "series": {
+  "positionnement": {
+   "libelle": "Positionnement — une ligne par publication de market-data.json",
+   "colonnes": [
+    "updated",
+    "prix_usdt",
+    "funding_pct",
+    "oi_btc",
+    "ls_comptes",
+    "ls_gros_traders",
+    "taker_ratio",
+    "cvd_1h_usd",
+    "cvd_4h_usd",
+    "cvd_24h_usd",
+    "gex_usd_1pct",
+    "gex_7j_usd_1pct",
+    "zero_gamma_usdt",
+    "mur_appel_usdt",
+    "mur_put_usdt",
+    "prime_hors_usdt_pct",
+    "ratio_bid_ask",
+    "dxy",
+    "vix"
+   ],
+   "cadence_s": 900,
+   "fichiers": [
+    "series/positionnement/2026-10.csv"
+   ],
+   "lignes": 523,
+   "octets": 74272,
+   "periode": {
+    "debut": "2026-10-02T11:18:18+00:00",
+    "fin": "2026-10-07T21:03:16+00:00"
+   },
+   "trous": [],
+   "trous_nombre": 0,
+   "trous_tronques": false
+  },
+  "funding": {
+   "libelle": "Funding — une ligne par échéance de financement",
+   "colonnes": [
+    "echeance_utc",
+    "funding_pct",
+    "prix_marque_usdt"
+   ],
+   "cadence_s": 28800,
+   "fichiers": [
+    "series/funding.csv"
+   ],
+   "lignes": 500,
+   "octets": 22115,
+   "periode": {
+    "debut": "2026-04-24T08:00:00+00:00",
+    "fin": "2026-10-07T16:00:00+00:00"
+   },
+   "trous": [],
+   "trous_nombre": 0,
+   "trous_tronques": false
+  },
+  "open_interest_1h": {
+   "libelle": "Open interest — un point par heure",
+   "colonnes": [
+    "heure_utc",
+    "oi_btc",
+    "oi_usd"
+   ],
+   "cadence_s": 3600,
+   "fichiers": [
+    "series/open-interest-1h.csv"
+   ],
+   "lignes": 500,
+   "octets": 23684,
+   "periode": {
+    "debut": "2026-09-17T02:00:00+00:00",
+    "fin": "2026-10-07T21:00:00+00:00"
+   },
+   "trous": [],
+   "trous_nombre": 0,
+   "trous_tronques": false
+  },
+  "long_short_1h": {
+   "libelle": "Positionnement des comptes, des gros traders et du taker — un point par heure",
+   "colonnes": [
+    "heure_utc",
+    "ls_comptes",
+    "comptes_longs_pct",
+    "ls_gros_traders",
+    "gros_longs_pct",
+    "taker_ratio_volume"
+   ],
+   "cadence_s": 3600,
+   "fichiers": [
+    "series/long-short-1h.csv"
+   ],
+   "lignes": 501,
+   "octets": 30620,
+   "periode": {
+    "debut": "2026-09-17T01:00:00+00:00",
+    "fin": "2026-10-07T21:00:00+00:00"
+   },
+   "trous": [],
+   "trous_nombre": 0,
+   "trous_tronques": false
+  }
+ },
+ "meta": {
+  "version": 1,
+  "champs": {
+   "positionnement.updated": {
+    "libelle": "Horodatage de la publication",
+    "unite": "date ISO 8601 (UTC)",
+    "formule": "champ `updated` de market-data.json, recopié tel quel",
+    "fenetre": "instantané",
+    "nature": "horodatage",
+    "source": "publish.py",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "positionnement.prix_usdt": {
+    "libelle": "Prix",
+    "unite": "USDT",
+    "formule": "dernier prix échangé (ticker 24 h)",
+    "fenetre": "instantané",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "positionnement.funding_pct": {
+    "libelle": "Funding",
+    "unite": "% par échéance",
+    "formule": "lastFundingRate de premiumIndex : taux appliqué à la prochaine échéance",
+    "fenetre": "instantané",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "positionnement.oi_btc": {
+    "libelle": "Open interest",
+    "unite": "BTC",
+    "formule": "contrats ouverts",
+    "fenetre": "instantané",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "positionnement.ls_comptes": {
+    "libelle": "Ratio L/S (comptes)",
+    "unite": "ratio",
+    "formule": "comptes nets acheteurs / comptes nets vendeurs — un compte = une voix",
+    "fenetre": "dernier point de la série horaire",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "positionnement.ls_gros_traders": {
+    "libelle": "Ratio L/S (gros traders, positions)",
+    "unite": "ratio",
+    "formule": "positions longues / courtes des « top traders », pondérées par la taille",
+    "fenetre": "dernier point de la série horaire",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "positionnement.taker_ratio": {
+    "libelle": "Ratio acheteurs/vendeurs taker (perp)",
+    "unite": "ratio",
+    "formule": "volume acheté au marché / volume vendu au marché, sur le perpétuel",
+    "fenetre": "dernier point de la série horaire",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "positionnement.cvd_1h_usd": {
+    "libelle": "CVD 1 h",
+    "unite": "USD",
+    "formule": "Σ (achats taker − ventes taker) sur 1 h glissante",
+    "fenetre": "1 h glissante",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT, bougies 5 min",
+    "params": {},
+    "vide": "absent de la publication de l'époque (le CVD n'est publié que depuis le 04/10/2026) : colonne vide, jamais zéro"
+   },
+   "positionnement.cvd_4h_usd": {
+    "libelle": "CVD 4 h",
+    "unite": "USD",
+    "formule": "Σ (achats taker − ventes taker) sur 4 h glissantes",
+    "fenetre": "4 h glissantes",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT, bougies 5 min",
+    "params": {},
+    "vide": "absent de la publication de l'époque : le champ n'existait pas encore dans market-data.json (voir `meta`), ce n'est pas un zéro"
+   },
+   "positionnement.cvd_24h_usd": {
+    "libelle": "CVD 24 h",
+    "unite": "USD",
+    "formule": "Σ (achats taker − ventes taker) sur 24 h glissantes",
+    "fenetre": "24 h glissantes",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT, bougies 5 min",
+    "params": {},
+    "vide": "absent de la publication de l'époque : le champ n'existait pas encore dans market-data.json (voir `meta`), ce n'est pas un zéro"
+   },
+   "positionnement.gex_usd_1pct": {
+    "libelle": "GEX net",
+    "unite": "USD de delta par 1 % de mouvement",
+    "formule": "Σ gamma × OI × prix du sous-jacent, calls + / puts −",
+    "fenetre": "instantané",
+    "nature": "convention",
+    "source": "Deribit (chaîne d'options), calcul dans options_gex.py",
+    "params": {},
+    "vide": "absent de la publication de l'époque : le champ n'existait pas encore dans market-data.json (voir `meta`), ce n'est pas un zéro"
+   },
+   "positionnement.gex_7j_usd_1pct": {
+    "libelle": "GEX à 7 jours",
+    "unite": "USD de delta par 1 % de mouvement",
+    "formule": "GEX des seules échéances à 7 jours ou moins",
+    "fenetre": "instantané",
+    "nature": "convention",
+    "source": "Deribit (chaîne d'options)",
+    "params": {},
+    "vide": "absent de la publication de l'époque : le champ n'existait pas encore dans market-data.json (voir `meta`), ce n'est pas un zéro"
+   },
+   "positionnement.zero_gamma_usdt": {
+    "libelle": "Zéro gamma",
+    "unite": "USDT",
+    "formule": "strike où le gamma agrégé des dealers s'annule",
+    "fenetre": "instantané",
+    "nature": "modèle",
+    "source": "Deribit, options_gex.py",
+    "params": {},
+    "vide": "absent de la publication de l'époque : le champ n'existait pas encore dans market-data.json (voir `meta`), ce n'est pas un zéro"
+   },
+   "positionnement.mur_appel_usdt": {
+    "libelle": "Mur d'appel (call wall)",
+    "unite": "USDT",
+    "formule": "strike de plus forte concentration d'Open Interest en calls",
+    "fenetre": "instantané",
+    "nature": "convention",
+    "source": "Deribit, options_gex.py",
+    "params": {},
+    "vide": "absent de la publication de l'époque : le champ n'existait pas encore dans market-data.json (voir `meta`), ce n'est pas un zéro"
+   },
+   "positionnement.mur_put_usdt": {
+    "libelle": "Mur de put (put wall)",
+    "unite": "USDT",
+    "formule": "strike de plus forte concentration d'Open Interest en puts",
+    "fenetre": "instantané",
+    "nature": "convention",
+    "source": "Deribit, options_gex.py",
+    "params": {},
+    "vide": "absent de la publication de l'époque : le champ n'existait pas encore dans market-data.json (voir `meta`), ce n'est pas un zéro"
+   },
+   "positionnement.prime_hors_usdt_pct": {
+    "libelle": "Prime Coinbase hors USDT",
+    "unite": "%",
+    "formule": "(mid Coinbase / mid Binance − 1) × 100, USDT-USD neutralisé",
+    "fenetre": "instantané",
+    "nature": "mesure",
+    "source": "Coinbase vs Binance, corrigée du taux USDT/USD",
+    "params": {},
+    "vide": "absent de la publication de l'époque (publiée depuis le 06/10/2026)"
+   },
+   "positionnement.ratio_bid_ask": {
+    "libelle": "Ratio bid/ask du carnet",
+    "unite": "BTC / BTC",
+    "formule": "somme des bids / somme des asks dans la bande de référence",
+    "fenetre": "bande ±0,5 % (ou la plus large couverte), instantané",
+    "nature": "mesure",
+    "source": "Binance spot, carnet 5 000 niveaux",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "positionnement.dxy": {
+    "libelle": "DXY",
+    "unite": "indice",
+    "formule": "dernière clôture journalière d'un jour ouvré de l'indice dollar",
+    "fenetre": "barres journalières",
+    "nature": "mesure",
+    "source": "Yahoo Finance (différé)",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "positionnement.vix": {
+    "libelle": "VIX",
+    "unite": "points de volatilité annualisée (%)",
+    "formule": "volatilité implicite à 30 jours du S&P 500",
+    "fenetre": "dernier cours diffusé",
+    "nature": "mesure",
+    "source": "Yahoo Finance (différé)",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "funding.echeance_utc": {
+    "libelle": "Échéance de financement",
+    "unite": "date ISO 8601 (UTC)",
+    "formule": "fundingTime de /fapi/v1/fundingRate",
+    "fenetre": "échéance ponctuelle",
+    "nature": "horodatage",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "funding.funding_pct": {
+    "libelle": "Funding",
+    "unite": "% par échéance",
+    "formule": "fundingRate × 100",
+    "fenetre": "échéance ponctuelle",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "funding.prix_marque_usdt": {
+    "libelle": "Prix de marque",
+    "unite": "USDT",
+    "formule": "markPrice à l'échéance",
+    "fenetre": "échéance ponctuelle",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "open_interest_1h.heure_utc": {
+    "libelle": "Heure du point",
+    "unite": "date ISO 8601 (UTC)",
+    "formule": "timestamp de /futures/data/openInterestHist",
+    "fenetre": "pas horaire",
+    "nature": "horodatage",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "open_interest_1h.oi_btc": {
+    "libelle": "Open interest",
+    "unite": "BTC",
+    "formule": "somme des contrats ouverts",
+    "fenetre": "pas horaire",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "open_interest_1h.oi_usd": {
+    "libelle": "Open interest en dollars",
+    "unite": "USDT",
+    "formule": "somme des contrats ouverts × prix",
+    "fenetre": "pas horaire",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "long_short_1h.heure_utc": {
+    "libelle": "Heure du point",
+    "unite": "date ISO 8601 (UTC)",
+    "formule": "timestamp commun aux trois endpoints de positionnement",
+    "fenetre": "pas horaire",
+    "nature": "horodatage",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "long_short_1h.ls_comptes": {
+    "libelle": "Ratio L/S (comptes)",
+    "unite": "ratio",
+    "formule": "comptes nets acheteurs / comptes nets vendeurs (globalLongShortAccountRatio)",
+    "fenetre": "pas horaire",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "long_short_1h.comptes_longs_pct": {
+    "libelle": "Comptes acheteurs",
+    "unite": "%",
+    "formule": "part des comptes nets acheteurs",
+    "fenetre": "pas horaire",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "long_short_1h.ls_gros_traders": {
+    "libelle": "Ratio L/S (gros traders, positions)",
+    "unite": "ratio",
+    "formule": "positions longues / courtes des « top traders » (topLongShortPositionRatio)",
+    "fenetre": "pas horaire",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "long_short_1h.gros_longs_pct": {
+    "libelle": "Gros traders acheteurs",
+    "unite": "%",
+    "formule": "part longue des top traders",
+    "fenetre": "pas horaire",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   },
+   "long_short_1h.taker_ratio_volume": {
+    "libelle": "Ratio acheteurs/vendeurs taker",
+    "unite": "ratio",
+    "formule": "volume acheté au marché / vendu au marché (takerlongshortRatio)",
+    "fenetre": "pas horaire",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {},
+    "vide": "aucune valeur publiée à cet instant"
+   }
+  }
+ }
+}
