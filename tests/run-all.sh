@@ -43,6 +43,12 @@ node test_chaleur.js || ko=1
 etape "2f. Réseau : ce que la page demande et quand (revalidation, prix MINI, préchargement, bougies) — hors ligne"
 node test_reseau.js || ko=1
 
+etape "2g. Horloges : liste dérivée de meta.champs, pannes nommées, décalage avec Binance — hors ligne"
+node test_horloges.js || ko=1
+
+etape "2h. Contre-expertise : la publication recalculée sur des réponses Binance enregistrées — hors ligne"
+node test_contre.js || ko=1
+
 etape "3. Extraction du JavaScript inline"
 python3 refresh_harness.py || ko=1
 

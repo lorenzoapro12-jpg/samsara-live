@@ -542,6 +542,7 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 .carte-liq { --teinte: #0891b2; }    .carte-flux { --teinte: #64748b; }
 .carte-live { --teinte: #f59e0b; }   .carte-tape { --teinte: #0ea5e9; }
 .carte-temps { --teinte: #7c8db5; }
+.carte-horloges { --teinte: #7c8db5; } .carte-contre { --teinte: #16a37a; }
 .demon-header { display: flex; align-items: center; gap: 11px; margin-bottom: 12px; flex-wrap: nowrap; }
 .demon-titres { min-width: 0; }
 .demon-avatar { font-size: 28px; flex-shrink: 0; }
@@ -697,6 +698,34 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 .etats { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .etat { font-size: 10.5px; font-weight: 650; padding: 2px 9px; border-radius: 999px; background: var(--up-soft); color: var(--up-ink); }
 .etat.ko { background: var(--down-soft); color: var(--down-ink); }
+
+/* Horloges : une ligne par instant affiché — nom, heure UTC, âge ; la panne nommée en clair. */
+.horloge-ligne { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 3px 0; font-size: 11px; border-bottom: 1px solid var(--rail); }
+.horloge-ligne:last-child { border-bottom: 0; }
+.horloge-ligne .h-nom { flex: 1 1 140px; color: var(--ink-2); min-width: 0; }
+.horloge-ligne .h-quand { font-variant-numeric: tabular-nums; color: var(--ink-1); font-weight: 600; }
+.horloge-ligne .h-age { font-variant-numeric: tabular-nums; color: var(--ink-3); min-width: 72px; text-align: right; }
+.horloge-ligne .h-src, .horloge-ligne .h-seuil { flex-basis: 100%; font-size: 10px; color: var(--ink-3); }
+.horloge-ligne .h-panne { flex-basis: 100%; font-size: 10.5px; font-weight: 650; color: var(--down-ink); }
+.horloge-ecart { font-size: 11px; font-weight: 650; color: var(--warn-ink); background: var(--warn-soft); border-radius: 10px; padding: 5px 10px; margin-bottom: 6px; }
+
+/* Contre-expertise : ✓ retrouvé, ≈ cohérent (avec sa borne), ✗ différent (les deux valeurs). */
+.age-banner.verif { color: var(--ink-2); background: var(--rail); }
+.age-banner.verif::before { box-shadow: 0 0 0 4px var(--rail); }
+.contre-compte { font-size: 10.5px; font-weight: 650; color: var(--up-ink); white-space: nowrap; }
+.contre-compte.ko { color: var(--down-ink); }
+.contre-groupe { margin-top: 6px; font-size: 11px; }
+.contre-groupe summary { cursor: pointer; padding: 3px 0; color: var(--ink-1); }
+.contre-ligne { display: flex; flex-wrap: wrap; gap: 1px 8px; padding: 2px 0 2px 4px; }
+.contre-ligne .c-etat { width: 12px; font-weight: 700; color: var(--up-ink); }
+.contre-ligne.e-approx .c-etat { color: var(--ink-2); }
+.contre-ligne.e-diff .c-etat, .contre-ligne.e-source .c-etat, .contre-ligne.e-injoignable .c-etat { color: var(--down-ink); }
+.contre-ligne .c-nom { flex: 1 1 130px; color: var(--ink-2); min-width: 0; }
+.contre-ligne .c-val { font-variant-numeric: tabular-nums; color: var(--ink-1); }
+.contre-ligne .c-note, .contre-raison .c-note { flex-basis: 100%; padding-left: 20px; font-size: 10px; color: var(--ink-3); }
+.contre-raison { padding: 3px 0 3px 4px; color: var(--ink-2); line-height: 1.5; }
+.contre-raison .c-note { display: block; padding-left: 0; font-weight: 650; }
+.c-nature { font-style: normal; font-size: 9.5px; color: var(--ink-3); border: 1px solid var(--rail); border-radius: 6px; padding: 0 4px; }
 
 /* Bandeau d'âge : au-delà de la cadence (15 min), la donnée est vieille et ça doit SE VOIR. */
 .age-banner {

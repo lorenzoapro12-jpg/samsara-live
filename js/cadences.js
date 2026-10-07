@@ -18,6 +18,7 @@ const CADENCES = {
   marge_publication_s: 60, // s — un fichier est dû à updated + attendue_min + cette marge (envoi, CDN)
   relecture_max_min: 5,   // min — relu au plus tard après ce délai, même sans publication attendue
   niveaux_sr: 60000,      // ms — supports / résistances des échelles de temps de référence
+  horloge_binance: 600000, // ms — heure de Binance (/api/v3/time, poids 1) : écart de l'horloge du poste
   attendue_min: 15,       // min — cadence de publication du serveur (cron)
   vieux_min: 20,          // min — au-delà : une publication manquée (« retard »)
   fige_min: 32,           // min — au-delà : deux publications manquées (« figé »)

@@ -263,6 +263,9 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 
 // ============ DATA ============
 const DATA_URL = 'https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/master/market-data.json';
+// L'API Binance de la page : les lectures ajoutées (heure du serveur, contre-expertise) en
+// construisent leurs URL — aucun hôte réécrit ailleurs.
+const API_BINANCE = 'https://api.binance.com/api/v3/';
 let marketData = null, livePrice = null, candles = [], chartInterval = '15m';
 let activeSymbol = 'BTCUSDT';  // BTCUSDT, ETHUSDT, SOLUSDT, XRPUSDT, TAOUSDT, ou BTCSOL (ratio)
 
@@ -1031,7 +1034,7 @@ async function fetchKlines() {
     historiquePlusTard(cacheKey, sym, itv);
     // NE PAS réinitialiser viewStart/viewEnd — respecter le zoom/pan utilisateur
     return true;
-  } catch(e) { console.error('Klines:', e); return false; }
+  } catch(e) { Horloges.noter('bougies', e); console.error('Klines:', e); return false; }
 }
 
 const KLINE_MS = { '1m': 6e4, '5m': 3e5, '15m': 9e5, '30m': 18e5, '1h': 36e5, '4h': 144e5, '1d': 864e5, '1w': 6048e5 };
@@ -1043,9 +1046,9 @@ const urlPremierePage = (symbol, interval) => `https://api.binance.com/api/v3/kl
 // Une page Binance : jusqu'à 1000 bougies dont l'ouverture est ≤ endTime (la dernière sans endTime).
 async function pageKlines(symbol, interval, endTime) {
   const url = endTime ? urlPremierePage(symbol, interval) + `&endTime=${endTime}` : urlPremierePage(symbol, interval);
-  const resp = await (prechargee(url) || fetch(url));
-  if (!resp.ok) throw new Error(`Binance HTTP ${resp.status}`);
+  const resp = Horloges.verifier(await (prechargee(url) || fetch(url)));
   const d = await resp.json();
+  Horloges.noter('bougies');
   return Array.isArray(d) ? d : [];
 }
 // La page la plus récente d'un historique. Une même page demandée deux fois (survol puis clic)
@@ -1153,9 +1156,10 @@ function cols() {
 
 // La queue d'un historique (les `last` dernières bougies) : le rafraîchissement des 5 s.
 async function fetchKlinesRaw(symbol, last) {
-  const resp = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${chartInterval}&limit=${last}`);
-  if (!resp.ok) throw new Error(`Binance HTTP ${resp.status}`);
-  return resp.json();
+  const resp = Horloges.verifier(await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${chartInterval}&limit=${last}`));
+  const d = await resp.json();
+  Horloges.noter('bougies');
+  return d;
 }
 
 // ============ MULTI-TF S/R ENGINE ============
@@ -1348,7 +1352,7 @@ let eclairFin = null;
 async function fetchPrice() {
   const sym = activeSymbol;
   try {
-    const t24 = s => (prechargee(urlTicker(s)) || fetch(urlTicker(s))).then(r => r.json());
+    const t24 = s => (prechargee(urlTicker(s)) || fetch(urlTicker(s))).then(r => Horloges.verifier(r).json());
     let price, var24;
     if (sym === 'BTCSOL') {
       const [b, so] = await Promise.all([t24('BTCUSDT'), t24('SOLUSDT')]);
@@ -1361,7 +1365,9 @@ async function fetchPrice() {
       const d = await t24(sym);
       price = parseFloat(d.lastPrice); var24 = var24De(d);
     }
-    if (sym !== activeSymbol || !isFinite(price)) return;   // la paire a changé pendant l'attente
+    if (sym !== activeSymbol) return;   // la paire a changé pendant l'attente
+    if (!isFinite(price)) throw new SyntaxError('prix illisible');
+    Horloges.noter('prix');
     const el = document.getElementById('price');
     const sens = livePrice ? Math.sign(price - livePrice) : 0;
     let cls = 'price-badge' + (sens > 0 ? ' price-up' : sens < 0 ? ' price-down' : '');
@@ -1382,7 +1388,7 @@ async function fetchPrice() {
     livePrice = price;
     // L'étiquette de prix du graphique suit le prix à la seconde (calque), dans la même image.
     if (price !== avant) prixSurGraphique();
-  } catch(e) {}
+  } catch(e) { if (sym === activeSymbol) Horloges.noter('prix', e); }
   finally { horloge(); }
 }
 // L'horloge de la barre des tâches avance dans la MÊME tâche que le prix, donc la même image :
@@ -1393,6 +1399,7 @@ let minuteCalque = 0;
 function horloge() {
   const c = document.getElementById('taskbarClock'), t = FMT_HMS.format(new Date());
   if (c && c.textContent !== t) c.textContent = t;
+  majHorloges();
   // Le calque porte un âge en minutes (couche « Liquidité ») : redessiné à chaque minute
   // même quand le prix, lui, ne bouge pas.
   const m = Math.floor(Date.now() / 60000);
@@ -1543,10 +1550,10 @@ async function fetchHeatmap(force) {
   if (document.hidden) return;
   if (!force && !lectureDue(histHeatmap && histHeatmap.majA, chaleurLue)) return;
   try {
-    const r = await fetch(HEATMAP_URL, { cache: 'no-cache' });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const r = Horloges.verifier(await fetch(HEATMAP_URL, { cache: 'no-cache' }));
     const h = await lireSiNouveau(r, histHeatmap && histHeatmap.updated);
     chaleurLue = Date.now();
+    Horloges.noter('chaleur');
     if (!h) return;                                   // même publication : rien à refaire
     const grille = grilleChaleur(h);
     // On garde l'en-tête et la grille, pas les 130 000 cellules du fichier.
@@ -1554,7 +1561,7 @@ async function fetchHeatmap(force) {
       t0: grille ? grille.t0 : h.t0, encodage: h.encodage || null, format: h.format || 'cellules', grille };
     heatLayers.length = 0; heatLayer = null;
     if (overlays.liq) drawChart();
-  } catch(e) { chaleurLue = 0; }                    // à retenter au prochain tour
+  } catch(e) { chaleurLue = 0; Horloges.noter('chaleur', e); }   // à retenter au prochain tour
 }
 function toggleDepth(on) {
   if (on) { fetchHeatmap(); if (!depthTimer) depthTimer = setInterval(fetchHeatmap, CADENCES.chaleur_lue); }
@@ -2700,13 +2707,33 @@ function dessinerCalque() {
     }
   }
   // Âge de la couche « Liquidité » (heatmap.json, publiée au quart d'heure) : aucun calque n'est
-  // lu sans son instant. Sur le calque, il avance avec l'horloge du prix, sans redessin.
+  // lu sans son instant — DEUX ici : la dernière colonne (son début : l'instantané a été lu dans
+  // la minute qui suit, l'âge dit n'est jamais plus jeune que le vrai) et la publication.
+  // Sur le calque, il avance avec l'horloge du prix (minuteCalque), sans redessin.
   if (P && overlays.liq && histHeatmap && histHeatmap.grille && histHeatmap.sym === activeSymbol && histHeatmap.majA) {
-    const age = Math.max(0, Math.round((Date.now() - histHeatmap.majA) / 60000));
     cx.save();
     cx.font = chartFont(9, 650); cx.textAlign = 'right';
-    cx.fillStyle = age > CADENCES.vieux_min ? COLORS.warn : COLORS.ink3;
-    cx.fillText('Liquidité publiée il y a ' + age + ' min', W - P.right - 8, 13);
+    cx.fillStyle = texteAgeCouche().vieux ? COLORS.warn : COLORS.ink3;
+    cx.fillText(texteAgeCouche().texte, W - P.right - 8, 13);
+    cx.restore();
+  }
+  // Repère de la publication (market-data.json) : un trait vertical pointillé à `updated`, un
+  // point au prix publié. JAMAIS relié à la ligne de prix : c'est un relevé daté, pas un tracé —
+  // l'écart entre ce point et la bougie dit ce que la publication ne sait pas encore.
+  const rep = P && reperePublication(P);
+  if (rep) {
+    cx.save();
+    cx.strokeStyle = COLORS.ink3; cx.lineWidth = 1; cx.setLineDash([3, 3]);
+    cx.beginPath(); cx.moveTo(rep.x, P.top); cx.lineTo(rep.x, P.top + P.ph); cx.stroke();
+    cx.setLineDash([]);
+    if (rep.y !== null) {
+      cx.fillStyle = COLORS.ink1; cx.strokeStyle = COLORS.surface; cx.lineWidth = 1.5;
+      cx.beginPath(); cx.arc(rep.x, rep.y, 3.5, 0, Math.PI * 2); cx.fill(); cx.stroke();
+    }
+    cx.font = chartFont(9, 650); cx.fillStyle = COLORS.ink3;
+    const lw = cx.measureText(rep.texte).width, aGauche = rep.x + 6 + lw > W - P.right;
+    cx.textAlign = aGauche ? 'right' : 'left';
+    cx.fillText(rep.texte, aGauche ? rep.x - 6 : rep.x + 6, P.top + P.ph - 12);
     cx.restore();
   }
   if (crossX === null || crossY === null) return;
@@ -2779,6 +2806,28 @@ function dessinerCalque() {
       }
     }
   }
+}
+/** Âge de la couche « Liquidité » : « Carte publiée · dernière colonne il y a X · publiée il y a Y ». */
+function texteAgeCouche() {
+  const h = histHeatmap, g = h && h.grille, t = Horloges.maintenant();
+  if (!g || !h.majA) return { texte: '', vieux: false };
+  const derniere = (g.t0 + (g.W - 1) * g.dt) * 1000;
+  return { texte: 'Carte publiée · dernière colonne ' + Horloges.texteAge(t - derniere) + ' · publiée ' + Horloges.texteAge(t - h.majA),
+    vieux: (t - h.majA) / 60000 > CADENCES.vieux_min };
+}
+/** Le repère de la publication dans la géométrie P du dernier dessin : { x, y, texte } ou null
+ *  (autre paire que celle du fichier, ou instant hors de la vue). Le prix publié est celui de
+ *  BTCUSDT : sur une autre paire, il n'a pas de place. */
+function reperePublication(P) {
+  const d = marketData, sym = 'BTCUSDT';
+  if (!d || activeSymbol !== sym || !d.btc || !isNum(d.btc.price) || !(P.pas > 0)) return null;
+  const tu = Date.parse(d.updated);
+  if (!isFinite(tu)) return null;
+  const x = P.left + (tu / 1000 - P.t0) / P.pas * P.gap;
+  if (x < P.left || x > P.W - P.right) return null;
+  const px = d.btc.price, y = px >= P.minP && px <= P.maxP ? P.top + P.ph * (1 - (px - P.minP) / P.range) : null;
+  const hm = new Date(tu).toISOString().slice(11, 16);
+  return { x, y, texte: 'fichier ' + hm + ' UTC · prix publié ' + Math.round(px).toLocaleString('fr-FR') + ' (' + Horloges.texteAge(Horloges.maintenant() - tu) + ')' };
 }
 // Le calque, à la prochaine image (une seule par image, quel que soit le nombre d'événements).
 let calqueDemande = false;
@@ -2973,7 +3022,10 @@ function resolveChart(candles, padL, padR, chartH, W) {
   const gridN = GRILLE_N;
   // Les LIBELLÉS de l'axe sont sur le calque (dessinerCalque) : celui que l'étiquette du dernier
   // prix recouvrirait y est omis, et le prix bouge chaque seconde — le graphique n'a pas à suivre.
-  geoPrix = { top: pad.top, ph, left: pad.left, right: pad.right, W, minP, maxP, range, vs, ve };
+  // t0 / pas / gap : le temps → x des bougies (une bougie couvre [t, t + pas[ sur gap px), relu
+  // par le calque pour y poser le repère de la publication.
+  const pas = candles.length > 1 && candles[1].time > candles[0].time ? candles[1].time - candles[0].time : 900;
+  geoPrix = { top: pad.top, ph, left: pad.left, right: pad.right, W, minP, maxP, range, vs, ve, t0: candles[vs].time, pas, gap };
   for (let i = 0; i <= gridN; i++) {
     const y = pad.top + (ph / gridN) * i;
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
@@ -3774,22 +3826,25 @@ let marcheEnErreur = false;   // les cartes affichent l'erreur d'une relecture m
 async function fetchMarket(force) {
   if (!force && !lectureDue(marketData && Date.parse(marketData.updated), marcheLu)) { majAges(false); return; }
   try {
-    const resp = await (prechargee(DATA_URL, { cache: 'no-cache' }) || fetch(DATA_URL, { cache: 'no-cache' }));
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const resp = Horloges.verifier(await (prechargee(DATA_URL, { cache: 'no-cache' }) || fetch(DATA_URL, { cache: 'no-cache' })));
     const d = await lireSiNouveau(resp, marketData && marketData.updated);
     marcheLu = Date.now();
+    Horloges.noter('marche');
     if (d) marketData = d;
     // Une relecture manquée avait remplacé les cartes par l'erreur : elles reviennent dès la
     // suivante, même si la publication n'a pas changé.
     if (d || marcheEnErreur) { renderFeed(); marcheEnErreur = false; }
+    if (d && geo) scheduleCalque();                 // le repère de la publication se déplace
     majAges(!!d);
   } catch(e) {
     marcheLu = 0; marcheEnErreur = true;            // à retenter au prochain tour
+    Horloges.noter('marche', e);
     document.getElementById('dot').style.background = 'var(--down)';
     const td = document.getElementById('taskbarDot');
     if (td) td.style.background = 'var(--down)';
     const feed = document.getElementById('feed');
-    feed.innerHTML = '<div class="error">⚠️ ' + e.message + '</div>';
+    const c = Horloges.classer({ erreur: e });
+    feed.innerHTML = '<div class="error">⚠️ market-data.json : ' + escHtml(c.libelle || e.message) + '</div>';
   }
 }
 // ─── ÂGE DE LA DONNÉE ────────────────────────────────────────────────
@@ -3918,14 +3973,16 @@ async function renderLive() {
   const t0 = Date.now(), RL = REGLAGES.live;
   try {
     const o = { cache: 'no-store' };
-    const B = 'https://api.binance.com/api/v3/';
+    const B = API_BINANCE, lire = u => fetch(B + u, o).then(r => Horloges.verifier(r).json());
     [t24, depth, trades] = await Promise.all([
-      fetch(B + 'ticker/24hr?symbol=BTCUSDT', o).then(r => r.json()),
-      fetch(B + 'depth?symbol=BTCUSDT&limit=' + RL.niveaux, o).then(r => r.json()),
-      fetch(B + 'trades?symbol=BTCUSDT&limit=' + RL.trades, o).then(r => r.json()),
+      lire('ticker/24hr?symbol=BTCUSDT'),
+      lire('depth?symbol=BTCUSDT&limit=' + RL.niveaux),
+      lire('trades?symbol=BTCUSDT&limit=' + RL.trades),
     ]);
+    Horloges.noter('live');
   } catch (e) {
-    box.innerHTML = '<div class="loading">⚡ Binance injoignable depuis ce poste — ' + escHtml(e && e.message ? e.message : e) + '</div>';
+    const c = Horloges.noter('live', e);
+    box.innerHTML = '<div class="loading">⚡ Binance injoignable depuis ce poste — ' + escHtml(c.libelle || (e && e.message ? e.message : e)) + '</div>';
     return;
   }
   const lat = Date.now() - t0;
@@ -4052,6 +4109,8 @@ const ICONES = {
   '⚡': ['live', '<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/>'],
   '🌊': ['tape', '<path d="M2 9c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 15c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0"/>'],
   '🕐': ['temps', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
+  '⏱': ['horloges', '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M10 2h4M12 2v3"/>'],
+  '🔎': ['contre', '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5M7.8 10.6l1.9 1.9 3.6-3.8"/>'],
 };
 const svgIco = d => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
 // Apparition en fondu au PREMIER rendu d'un conteneur seulement : les cartes sont réécrites
@@ -4380,12 +4439,150 @@ function renderFeedTo(container) {
     + (errs.length ? '<div class="stat-neg" style="margin-top:8px;font-size:11px">' + errs.map(escHtml).join('<br>') + '</div>' : '')
     + '<div class="fine" style="margin-top:8px">' + escHtml(d.generator||'') + '<br>Sources : ' + escHtml(d.source||'—') + '</div>';
   html += mCard('🔌','Flux','Pas d\'erreur silencieuse', '', stBody);
+
+  // ── 7. HORLOGES ── chaque instant que la page affiche, son âge (js/horloges.js)
+  html += mCard('⏱', 'Horloges', 'Chaque instant affiché, son âge · UTC', '', horlogesHtml(d));
+  // ── 8. CONTRE-EXPERTISE ── la publication recalculée ici (js/contre-expertise.js)
+  html += mCard('🔎', 'Contre-expertise', 'Vérifié par ton navigateur · Binance spot', contreDroite(d), contreCorps(d));
   carteEntree = false;
   if (container.dataset) container.dataset.vu = '1';
 
   // Le bandeau d'âge voyage AVEC les cartes : il apparaît donc dans le conteneur
   // réellement affiché, quel qu'il soit.
   container.innerHTML = ageBannerHtml(d) + html;
+  brancherContre(container);
+}
+
+// ═══ HORLOGES (carte) ═══════════════════════════════════════════════════════════
+// La liste vient de js/horloges.js (meta.champs `horodatage` + horloges de la page). Les âges
+// avancent sans refaire la carte : majHorloges() réécrit les [data-horloge-t] / [data-horloge-src]
+// au rythme du prix (même image que l'horloge de la barre), et ne refait le bloc « page » que
+// si l'état d'une source change (panne, retour, écart d'horloge).
+const FMT_UTC = t => new Date(t).toISOString().slice(11, 19);
+function horlogesPageHtml() {
+  const lignes = Horloges.dePage({ marche: marketData, chaleur: histHeatmap }), t = Horloges.maintenant();
+  const ecart = Horloges.texteEcart();
+  return (ecart ? '<div class="horloge-ecart">' + escHtml(ecart) + '</div>' : '')
+    + lignes.map(l => '<div class="horloge-ligne' + (l.classe ? ' ko' : '') + '"><span class="h-nom">' + escHtml(l.libelle) + '</span>'
+      + '<span class="h-quand">' + (l.t ? FMT_UTC(l.t) : '—') + '</span>'
+      + '<span class="h-age" data-horloge-t="' + (l.t || '') + '">' + Horloges.texteAge(l.t ? t - l.t : null) + '</span>'
+      + (l.classe ? '<span class="h-panne">' + escHtml(l.panne) + '</span>' : '')
+      + (l.seuil ? '<span class="h-seuil">' + escHtml(l.seuil) + '</span>' : '') + '</div>').join('');
+}
+function horlogesHtml(d) {
+  const t = Horloges.maintenant();
+  const fichier = Horloges.duFichier(d).map(l => '<div class="horloge-ligne"><span class="h-nom">' + escHtml(l.libelle)
+    // Une date seule (dxy_date) se montre telle quelle : « 00:00:00 » inventerait une heure.
+    + '</span><span class="h-quand">' + (l.t && !/^\d{4}-\d\d-\d\d$/.test(l.valeur) ? FMT_UTC(l.t) : escHtml(String(l.valeur))) + '</span>'
+    + '<span class="h-age" data-horloge-t="' + (l.t || '') + '">' + Horloges.texteAge(l.t ? t - l.t : null) + '</span>'
+    + '<span class="h-src">' + escHtml(l.source || '') + '</span></div>').join('');
+  return '<div class="bloc-titre"><span class="lbl">Cette page</span><span class="fine">dernier succès · panne nommée</span></div>'
+    + '<div class="horloges-page">' + horlogesPageHtml() + '</div>'
+    + '<div class="bloc-titre" style="margin-top:10px"><span class="lbl">Le fichier publié</span><span class="fine">champs « horodatage » de meta.champs</span></div>'
+    + (fichier || '<div class="fine">format antérieur : aucun horodatage décrit</div>');
+}
+let sigHorloges = '';
+function majHorloges() {
+  if (!document.querySelectorAll) return;
+  const sig = Object.entries(Horloges.sources).map(([k, s]) => k + (s.ok ? 1 : 0) + (s.classe || '')).join() + Horloges.texteEcart()
+    + (marketData && marketData.updated) + (histHeatmap && histHeatmap.updated);
+  if (sig !== sigHorloges) {
+    sigHorloges = sig;
+    for (const el of document.querySelectorAll('.horloges-page')) el.innerHTML = horlogesPageHtml();
+    return;
+  }
+  const t = Horloges.maintenant();
+  for (const el of document.querySelectorAll('[data-horloge-t]')) {
+    const v = el.getAttribute('data-horloge-t'), x = Horloges.texteAge(v ? t - +v : null);
+    if (el.textContent !== x) el.textContent = x;
+  }
+}
+
+// ═══ CONTRE-EXPERTISE (carte) ═══════════════════════════════════════════════════
+// Lancée quand la carte est À L'ÉCRAN (IntersectionObserver) et l'onglet visible, UNE fois par
+// publication (clé : updated) ; jamais au tour de 60 s. Le résultat survit aux rendus des cartes.
+const contre = { res: null, pour: null, a: 0, enCours: null, attente: false };
+const ETATS_CONTRE = { ok: ['✓', 'retrouvé'], approx: ['≈', 'cohérent'], diff: ['✗', 'différent'], source: ['✗', 'source différente'],
+  ancien: ['–', 'format antérieur'], injoignable: ['!', 'injoignable'] };
+function contreDroite(d) {
+  if (!d || contre.pour !== d.updated || !contre.res) return '';
+  const c = contre.res.comptes || {};
+  return '<span class="contre-compte' + (c.diff ? ' ko' : '') + '">' + (c.ok || 0) + ' ✓ · ' + (c.approx || 0) + ' ≈ · ' + (c.diff || 0) + ' ✗</span>';
+}
+function valeurContre(v) {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'number') return v.toLocaleString('fr-FR', { maximumFractionDigits: Math.abs(v) >= 1000 ? 2 : 4 });
+  return escHtml(String(v));
+}
+function contreCorps(d) {
+  if (!d) return '';
+  const pub = Date.parse(d.updated), hm = isFinite(pub) ? new Date(pub).toISOString().slice(11, 16) + ' UTC' : '—';
+  if (contre.pour !== d.updated || !contre.res) {
+    return '<div class="age-banner verif" style="display:block">publication ' + hm + ' · ' + (contre.enCours === d.updated ? 'vérification en cours…' : 'pas encore vérifiée') + '</div>'
+      + '<div class="fine">Recalculée ici depuis Binance quand cette carte est à l’écran, une fois par publication.</div>';
+  }
+  const r = contre.res;
+  let html = '<div class="age-banner verif" style="display:block">publication ' + hm + ' · vérifiée à ' + FMT_UTC(contre.a)
+    + ' UTC (<span data-horloge-t="' + contre.a + '">' + Horloges.texteAge(Horloges.maintenant() - contre.a) + '</span>)</div>';
+  if (r.note) html += '<div class="fine">' + escHtml(r.note) + '</div>';
+  const groupes = new Map();
+  for (const l of r.lignes) { if (!groupes.has(l.groupe)) groupes.set(l.groupe, []); groupes.get(l.groupe).push(l); }
+  for (const [g, ls] of groupes) {
+    const n = e => ls.filter(l => l.etat === e).length, ko = n('diff') + n('source') + n('injoignable');
+    html += '<details class="contre-groupe"' + (ko ? ' open' : '') + '><summary><b>' + escHtml(g) + '</b> <span class="fine">'
+      + [['ok', '✓'], ['approx', '≈'], ['diff', '✗'], ['source', '✗'], ['ancien', '–'], ['injoignable', '!']].filter(([e]) => n(e)).map(([e, s]) => n(e) + ' ' + s).join(' · ')
+      + '</span></summary>'
+      + ls.map(l => {
+        const [sym, mot] = ETATS_CONTRE[l.etat] || ['?', l.etat];
+        const valeurs = l.etat === 'diff' || l.etat === 'source'
+          ? ' publié ' + valeurContre(l.publie) + ' · recalculé ' + valeurContre(l.recalcule) + (l.recalculeHaut !== undefined ? ' – ' + valeurContre(l.recalculeHaut) : '')
+          : l.etat === 'approx' && l.recalculeHaut !== undefined ? ' ' + valeurContre(l.publie) + ' dans [' + valeurContre(l.recalcule) + ' ; ' + valeurContre(l.recalculeHaut) + ']'
+          : l.etat === 'ok' ? ' ' + valeurContre(l.publie) : '';
+        return '<div class="contre-ligne e-' + l.etat + '" title="' + escHtml(l.borne || '') + '"><span class="c-etat">' + sym + '</span>'
+          + '<span class="c-nom">' + escHtml(l.libelle) + (l.nature ? ' <i class="c-nature">' + escHtml(l.nature) + '</i>' : '') + '</span>'
+          + '<span class="c-val">' + mot + valeurs + '</span>'
+          + (l.borne && l.etat === 'approx' ? '<span class="c-note">' + escHtml(l.borne) + '</span>' : '')
+          + (l.note ? '<span class="c-note">' + escHtml(l.note) + '</span>' : '') + '</div>';
+      }).join('') + '</details>';
+  }
+  if (r.non && r.non.length) {
+    const par = new Map();
+    for (const x of r.non) { if (!par.has(x.raison)) par.set(x.raison, []); par.get(x.raison).push(x); }
+    html += '<details class="contre-groupe"><summary><b>Non vérifiable ici</b> <span class="fine">' + r.non.length + ' champs</span></summary>'
+      + [...par].map(([raison, xs]) => '<div class="contre-raison"><span class="c-note">' + escHtml(raison) + '</span> '
+        + xs.map(x => escHtml(x.libelle) + ' <i class="c-nature">' + escHtml(x.nature) + '</i>').join(' · ') + '</div>').join('') + '</details>';
+  }
+  return html;
+}
+function majCartesContre() {
+  if (!document.querySelectorAll) return;
+  for (const el of document.querySelectorAll('.carte-contre .demon-body')) el.innerHTML = contreCorps(marketData);
+  for (const el of document.querySelectorAll('.carte-contre .demon-header')) {
+    const droite = contreDroite(marketData);
+    let s = el.querySelector('.demon-right');
+    if (!s && droite) { s = document.createElement('span'); s.className = 'demon-right'; el.appendChild(s); }
+    if (s) s.innerHTML = droite;
+  }
+}
+async function lancerContre() {
+  const d = marketData;
+  if (!d || contre.enCours === d.updated || contre.pour === d.updated) return;
+  if (document.hidden) { contre.attente = true; return; }    // relancée au retour de l'onglet
+  contre.attente = false; contre.enCours = d.updated;
+  majCartesContre();
+  const res = await ContreExpertise.lancer(d, API_BINANCE, { calcRSI, calcEMA, calcATR }, (u, o) => fetch(u, o), Horloges.classer);
+  contre.enCours = null;
+  if (marketData !== d) return;          // une autre publication est arrivée entre-temps
+  contre.res = res; contre.pour = d.updated; contre.a = Date.now();
+  majCartesContre();
+}
+let contreObs = null;
+function brancherContre(container) {
+  if (!marketData || contre.pour === marketData.updated || typeof IntersectionObserver === 'undefined' || !container.querySelector) return;
+  if (!container.querySelector('.carte-contre')) return;
+  if (!contreObs) contreObs = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { contreObs.disconnect(); lancerContre(); } });
+  else contreObs.disconnect();          // les cartes des rendus précédents sont détachées
+  for (const el of document.querySelectorAll('.carte-contre')) contreObs.observe(el);
 }
 
 // ============ STRATEGY PANEL ============
@@ -4815,8 +5012,13 @@ async function init() {
   setInterval(visible(async () => { if (await fetchKlines()) drawChart(); }), CADENCES.bougies);
   setInterval(visible(fetchMarket), CADENCES.publication_lue);
   setInterval(visible(refreshRefSR), CADENCES.niveaux_sr);
+  // Heure de Binance (poids 1) : l'écart de l'horloge de ce poste, pour des âges justes.
+  const heureBinance = visible(() => Horloges.mesurer(API_BINANCE + 'time'));
+  heureBinance();
+  setInterval(heureBinance, CADENCES.horloge_binance);
   document.addEventListener('visibilitychange', async () => {
     if (document.hidden) return;
+    if (contre.attente) lancerContre();
     fetchPrice(); fetchMarket();
     if (overlays.liq) fetchHeatmap();
     if (await fetchKlines()) drawChart();

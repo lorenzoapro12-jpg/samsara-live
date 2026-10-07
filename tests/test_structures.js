@@ -39,7 +39,26 @@ const CIBLES = [
   ['cartes du marché', '#feed .demon-card', 'tous'], ['bandeau d’âge du marché', '#feed .age-banner', 'tous'],
   ['bouton thème', '#themeBtn'], ['bouton ⚡', '#liveBtn'], ['bouton mode', '#modeBtn'], ['bouton réglages', '#reglagesBtn'],
   ['bouton légendes', '#legendesBtn'], ['lien carte', '#carteBtn'], ['horloge', '#taskbarClock'],
+  // Horloges (js/horloges.js) et Contre-expertise (js/contre-expertise.js) : leurs âges aussi.
+  ['carte Horloges', '#feed .carte-horloges'], ['âges des horloges', '#feed .carte-horloges .h-age', 'tous'],
+  ['carte Contre-expertise', '#feed .carte-contre'], ['âge de la contre-expertise', '#feed .carte-contre .age-banner'],
 ];
+/** Les âges écrits sur le CALQUE du graphique (couche « Liquidité », repère de la publication) :
+ *  du texte de canvas, que la visibilité ne voit pas — on relève ce que le calque écrit. */
+async function agesDuCalque(page) {
+  return page.evaluate(async () => {
+    overlays.liq = true;
+    await fetchHeatmap(true);
+    // La publication servie est ancienne : on la date dans la vue pour que son repère y tombe.
+    marketData = Object.assign({}, marketData, { updated: new Date(candles[Math.max(0, viewEnd - 5)].time * 1000).toISOString() });
+    drawChart();
+    const vus = [], f = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (t) { if (this.canvas.id === 'chartCalque') vus.push(String(t)); return f.apply(this, arguments); };
+    dessinerCalque();
+    CanvasRenderingContext2D.prototype.fillText = f;
+    return { couche: vus.some(t => /^Carte publiée · dernière colonne .+ · publiée .+/.test(t)), repere: vus.some(t => /^fichier \d\d:\d\d UTC · prix publié .+ \((il y a .+|< 5 s)\)$/.test(t)), vus };
+  });
+}
 
 function binance(url) {
   const u = new URL(url), q = u.searchParams, now = Date.now();
@@ -50,6 +69,7 @@ function binance(url) {
       return [t, String(c - 20), String(c + 60), String(c - 60), String(c), '80', t + pas - 1, String(80 * c), 50, '40', String(40 * c), '0']; });
   }
   if (u.pathname.endsWith('/ticker/price')) return { price: '86012.5' };
+  if (u.pathname.endsWith('/time')) return { serverTime: now };
   if (u.pathname.endsWith('/ticker/24hr')) return { lastPrice: '86012.5', priceChangePercent: '0.4', highPrice: '87000', lowPrice: '85000', bidPrice: '86012.4', askPrice: '86012.6', quoteVolume: '1e9', count: '100' };
   return {};
 }
@@ -135,6 +155,9 @@ async function squelette(page) {
       titre(`1. Valeurs et âges visibles — ${nomVue} (${vue.width} × ${vue.height})`);
       const base = await ouvrir(nav, BASE, vue);
       const ref = await visibles(base.page);
+      // Sans quoi la comparaison ne prouverait rien : la base les montre, elle.
+      const neuves = ['carte Horloges', 'âges des horloges', 'carte Contre-expertise', 'âge de la contre-expertise'];
+      check(`${BASE} montre les horloges et la contre-expertise (${neuves.map(n => ref[n].visibles).join(' / ')})`, neuves.every(n => ref[n].visibles > 0), neuves.map(n => ref[n]));
       await base.ctx.close();
       for (const t of THEMES) {
         const o = await ouvrir(nav, t.id, vue);
@@ -144,6 +167,8 @@ async function squelette(page) {
         const st = await o.page.evaluate(() => document.documentElement.getAttribute('data-structure'));
         check(`${t.id.padEnd(9)} ${t.structure ? '(structure « ' + t.structure + ' ») ' : ''}: rien de ce que la base montre ne disparaît`
           + (t.structure ? '' : ''), !pertes.length && (st || null) === t.structure, { pertes, structure: st });
+        const cal = await agesDuCalque(o.page);
+        check(`${t.id.padEnd(9)} : le calque porte l’âge de la couche et le repère de la publication`, cal.couche && cal.repere, cal.vus);
         check(`${t.id.padEnd(9)} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
         await o.ctx.close();
       }

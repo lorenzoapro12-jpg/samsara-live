@@ -218,10 +218,11 @@ async function ouvrir(nav, theme, o = {}) {
       CanvasRenderingContext2D.prototype.fillText = function (t) { if (this.canvas.id === 'chartCalque') vus.push(String(t)); return f.apply(this, arguments); };
       dessinerCalque();
       CanvasRenderingContext2D.prototype.fillText = f;
-      const age = Math.round((Date.now() - Date.parse(histHeatmap.updated)) / 60000);
-      return { vus, attendu: 'Liquidité publiée il y a ' + age + ' min' };
+      return { vus, attendu: texteAgeCouche().texte };
     });
-    check(`la couche porte son âge sur le graphique (« ${ageCouche.attendu} »)`, ageCouche.vus.includes(ageCouche.attendu), ageCouche);
+    // Ses DEUX âges : la dernière colonne et la publication (js/horloges.js, texteAge).
+    check(`la couche porte son âge sur le graphique (« ${ageCouche.attendu} »)`, ageCouche.vus.includes(ageCouche.attendu)
+      && /^Carte publiée · dernière colonne (il y a .+|< 5 s) · publiée (il y a .+|< 5 s)$/.test(ageCouche.attendu), ageCouche);
     const z = await k.page.evaluate(() => {
       const cles = [];
       for (const v of [50, 3000, 50, 3000, 50]) { viewStart = Math.max(0, candles.length - v); viewEnd = candles.length; drawChart(); cles.push(heatLayer && heatLayer.cle); }
