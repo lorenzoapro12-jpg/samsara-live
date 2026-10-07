@@ -120,6 +120,10 @@ function verreDuTheme() {
     return;
   }
   if (VERRE.veilles) return;
+  if (force !== 'force') {
+    const v = verdictVerre();
+    if (v.coupee) { VERRE.degrade = true; console.info('Réfraction non chargée : ' + v.motif + ' (?glass=force pour la forcer).'); return; }
+  }
   chargerHyalite().then(ok => {
     if (!ok || !Hyalite.supported() || themeCourant().verre !== 'refraction' || VERRE.veilles) return;
     const LG = { slope: 1.9, dispersion: 1.6, shade: 0.5, rim: 1.8, edge: 0.4 };
@@ -132,9 +136,45 @@ function verreDuTheme() {
     if (force !== 'force') sonderRefraction();
   });
 }
+// Rendu LOGICIEL (pas de GPU : SwiftShader, llvmpipe…) : la réfraction y coûte 33 à 197 ms par
+// image et la sonde ci-dessous finit par la couper — après le chargement de hyalite (51 Ko), la
+// construction de ses cartes (une tâche de 52 ms) et 12 images sondées (~1,5 s de CPU au
+// chargement d'Aero, mesuré). On ne la tente donc plus là : le moteur se lit dans le nom du
+// rendu WebGL (WEBGL_debug_renderer_info), une seule fois ; ce verdict et celui de la sonde sont
+// gardés VERRE_JOURS jours (localStorage) — un poste où la réfraction a été coupée ne recharge
+// plus hyalite à chaque visite. ?glass=force passe outre. Le verre CSS (--verre) reste.
+const VERRE_CLE = 'samsara-verre-v1', VERRE_JOURS = 30;
+const RENDU_LOGICIEL = /swiftshader|llvmpipe|softpipe|software|basic render/i;
+function lireVerdictVerre() {
+  try { const v = JSON.parse(localStorage.getItem(VERRE_CLE) || 'null'); return v && Date.now() - v.t < VERRE_JOURS * 864e5 ? v : null; }
+  catch (e) { return null; }
+}
+function noterVerdictVerre(v) { try { localStorage.setItem(VERRE_CLE, JSON.stringify(Object.assign({}, v, { t: Date.now() }))); } catch (e) { /* navigation privée */ } }
+function moteurGraphique() {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl');
+    if (!gl) return null;
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const nom = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    const perte = gl.getExtension('WEBGL_lose_context');
+    if (perte) perte.loseContext();               // le contexte ne servait qu'à lire ce nom
+    return nom;
+  } catch (e) { return null; }
+}
+function verdictVerre() {
+  let v = lireVerdictVerre();
+  if (!v || v.moteur === undefined) {
+    const m = moteurGraphique();
+    v = Object.assign({}, v, { moteur: m, logiciel: m !== null && RENDU_LOGICIEL.test(m) });
+    noterVerdictVerre(v);
+  }
+  if (v.logiciel) return { coupee: true, motif: 'rendu logiciel (' + v.moteur + ')' };
+  if (v.sonde === 'coupee') return { coupee: true, motif: 'coupée par la sonde le ' + new Date(v.t).toLocaleDateString('fr-FR') + ' (médiane ' + v.ms + ' ms/image)' };
+  return { coupee: false };
+}
 // Garde-fou : médiane de plusieurs images APRÈS stabilisation (un échantillon unique pris au
 // chargement décide au hasard). Au-delà de 22 ms (~45 i/s), la réfraction n'est pas tenable :
-// on la coupe pour la session, le verre CSS reste.
+// on la coupe — et le poste s'en souvient (verdictVerre) —, le verre CSS reste.
 function sonderRefraction() {
   const SEUIL = 22;
   setTimeout(() => {
@@ -145,8 +185,9 @@ function sonderRefraction() {
       if (dt > SEUIL * 2.5 || d.length >= 12) {
         d.sort((a, c) => a - c);
         const ms = d[Math.floor(d.length / 2)] || dt;
-        if (ms > SEUIL) { VERRE.degrade = true; couperRefraction('médiane ' + Math.round(ms) + ' ms/image'); }
-        else console.info('Réfraction conservée : médiane ' + Math.round(ms) + ' ms/image.');
+        const v = lireVerdictVerre() || {};
+        if (ms > SEUIL) { VERRE.degrade = true; couperRefraction('médiane ' + Math.round(ms) + ' ms/image'); noterVerdictVerre(Object.assign(v, { sonde: 'coupee', ms: Math.round(ms) })); }
+        else { console.info('Réfraction conservée : médiane ' + Math.round(ms) + ' ms/image.'); noterVerdictVerre(Object.assign(v, { sonde: 'tenue', ms: Math.round(ms) })); }
       } else requestAnimationFrame(step);
     })(last);
   }, 2500);
