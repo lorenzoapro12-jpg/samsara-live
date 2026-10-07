@@ -6,8 +6,9 @@
    et interroge Binance elle-même — rien d'autre (contrat réseau : tests/test_contrat.py).
 
    ORDRE DES CALQUES — le prix est une ligne SUR la chaleur, pas l'inverse :
-     chaleur (carte publiée, puis carnet live) → « non observé » hachuré → murs → gamma
-     → bid/ask → ligne de prix → exécutions → âges → axes, carnet latéral, profil, volumes.
+     chaleur (carte publiée, puis carnet live) → « non observé » hachuré → mémoire du carnet
+     (bord droit) → murs → gamma → bid/ask → ligne de prix → exécutions → rafales → âges → axes,
+     carnet latéral, profil, volumes.
 
    CADENCES (et pourquoi) — poids Binance par minute, plafond 6 000 par adresse IP :
      carnet 1 000 niveaux / 2 s (poids 50) ≈ 1 500 ; exécutions / 1 s (poids 4) ≈ 240 ;
@@ -1067,7 +1068,7 @@
   // Lue sur la carte publiée BRUTE (E.pub, jamais E.pubF) : la fusion ne change aucune part. Les
   // sommes préfixes (BM.presence) sont refaites à chaque publication ou seuil ; les barres, quand
   // la fenêtre (colonnes visibles), les prix ou la taille changent — pas à chaque battement.
-  const MEM = { prCle: null, pr: null, cle: null, barres: [], plein: null, hach: null, lp: { cle: null, v: null } };
+  const MEM = { prCle: null, pr: null, cle: null, barres: [], lp: { cle: null, v: null }, calque: calque(), peint: null };
   const largeurMemoire = () => (Z.etroit ? 30 : 48);
   function seuilMemoire() { return E.pub ? BM.seuilPresence(R.presenceSeuil, E.pub.encodage) : null; }
   /** Colonnes de la carte publiée dans la vue (jusqu'à « maintenant ») : la fenêtre des comptes. */
@@ -1086,7 +1087,7 @@
     const cle = [MEM.prCle, f[0], f[1], v.p1, v.p2, w, h, L].join('|');
     if (MEM.cle === cle) return;
     const pr = presenceMemoire(s), pp = (v.p2 - v.p1) / h, t = [0, 0], minObs = Math.ceil(BM.PRESENCE.minObserveMin * 60e3 / E.pub.dt);
-    const barres = [], plein = { bid: new Path2D(), ask: new Path2D() }, hach = new Path2D();
+    const barres = [];
     let cour = null;
     for (let y = 0; y < h; y++) {
       BM.tranchesLigne(v.p2, pp, y, E.pub.dp, t);
@@ -1096,31 +1097,39 @@
       cour = b ? { y0: y, y1: y + 1, b } : null;
       if (cour) barres.push(cour);
     }
-    for (const r of barres) {
-      const l = Math.round(L * r.b.part), cote = r.b.presB >= r.b.presA ? 'bid' : 'ask';
-      r.cote = r.b.presB === r.b.presA ? 'égalité' : cote;
-      if (l > 0) plein[cote].rect(w - l, r.y0, l, r.y1 - r.y0);
-      if (r.b.peu) hach.rect(w - L, r.y0, L, r.y1 - r.y0);
+    for (const r of barres) r.cote = r.b.presB === r.b.presA ? 'égalité' : r.b.presB > r.b.presA ? 'bid' : 'ask';
+    Object.assign(MEM, { cle, barres });
+  }
+  /** Le calque des barres (L × h, hors écran) : repeint quand les barres ou les couleurs changent ;
+   *  sinon UN drawImage par rendu. */
+  function peindreMemoire() {
+    const h = Z.chaleur.h, L = largeurMemoire(), M = MEM.calque, cle = MEM.cle + '|' + C.murBid + C.murAsk;
+    if (MEM.peint === cle) return;
+    if (M.c.width !== L || M.c.height !== h) { M.c.width = L; M.c.height = h; } else M.x.clearRect(0, 0, L, h);
+    const x = M.x, hach = new Path2D();
+    // Échelle FIXE : le trait fin marque 100 %, le pointillé 50 % — jamais normalisée sur la vue.
+    x.fillStyle = C.pastille; x.globalAlpha = 0.55; x.fillRect(0, 0, L, h); x.globalAlpha = 1;
+    x.fillStyle = C.ink3; x.fillRect(0, 0, 1, h);
+    x.globalAlpha = 0.85;
+    for (const r of MEM.barres) {
+      const l = Math.round(L * r.b.part);
+      if (l > 0) { x.fillStyle = r.cote === 'ask' ? C.murAsk : C.murBid; x.fillRect(L - l, r.y0, l, r.y1 - r.y0); }
+      if (r.b.peu) hach.rect(0, r.y0, L, r.y1 - r.y0);
     }
-    Object.assign(MEM, { cle, barres, plein, hach });
+    x.globalAlpha = 1;
+    x.save(); x.strokeStyle = C.ink3; x.setLineDash([2, 3]); x.beginPath(); x.moveTo(L / 2 + 0.5, 0); x.lineTo(L / 2 + 0.5, h); x.stroke(); x.restore();
+    // Peu observée (convention) : hachurée, d'un seul tracé découpé sur ses rangées.
+    x.save(); x.clip(hach); x.strokeStyle = C.ink2; x.globalAlpha = 0.6; x.lineWidth = 1; x.beginPath();
+    for (let d = -L; d < h; d += 5) { x.moveTo(0, d + L); x.lineTo(L, d); }
+    x.stroke(); x.restore();
+    MEM.peint = cle;
   }
   function memoire() {
     const s = seuilMemoire(), f = s && fenetreMemoire();
     if (!s || !f) return;
     barresMemoire(s, f);
-    const w = Z.chaleur.w, h = Z.chaleur.h, L = largeurMemoire();
-    // Échelle FIXE : le trait fin marque 100 %, le pointillé 50 % — jamais normalisée sur la vue.
-    ctx.fillStyle = C.pastille; ctx.globalAlpha = 0.55; ctx.fillRect(w - L, 0, L, h); ctx.globalAlpha = 1;
-    ctx.fillStyle = C.ink3; ctx.fillRect(w - L, 0, 1, h);
-    ctx.globalAlpha = 0.85;
-    ctx.fillStyle = C.murBid; ctx.fill(MEM.plein.bid);
-    ctx.fillStyle = C.murAsk; ctx.fill(MEM.plein.ask);
-    ctx.globalAlpha = 1;
-    ctx.save(); ctx.strokeStyle = C.ink3; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(w - L / 2 + 0.5, 0); ctx.lineTo(w - L / 2 + 0.5, h); ctx.stroke(); ctx.restore();
-    // Peu observée (convention) : hachurée, d'un seul tracé découpé sur ses rangées.
-    ctx.save(); ctx.clip(MEM.hach); ctx.strokeStyle = C.ink2; ctx.globalAlpha = 0.6; ctx.lineWidth = 1; ctx.beginPath();
-    for (let d = -L; d < h; d += 5) { ctx.moveTo(w - L, d + L); ctx.lineTo(w, d); }
-    ctx.stroke(); ctx.restore();
+    peindreMemoire();
+    ctx.drawImage(MEM.calque.c, Z.chaleur.w - largeurMemoire(), 0);
   }
   /** La barre sous la ligne de pixels y (celle que le dessin a peinte), ou null. */
   function barreMemoireEn(y) {
@@ -1161,7 +1170,7 @@
       for (const r of E.raf.dans(Math.max(v.t1 - tpp * 4, debut), v.t2, R.rafaleMin)) {
         const x = Math.round(X(r.T)) - 1, ya = Y(r.pMax), yb = Y(r.pMin), h = Math.max(RAF_HAUTEUR, yb - ya), y0 = (ya + yb) / 2 - h / 2;
         if (y0 > Z.chaleur.h || y0 + h < 0) continue;
-        items.push({ x, y0, h, r });
+        items.push({ x, y0, h, r, t: null, tw: 0 });
         (r.achat ? achat : vente).rect(x, y0, RAF_LARGEUR, h);
         fond.rect(x - 1, y0 - 1, RAF_LARGEUR + 2, h + 2);
       }
@@ -1175,8 +1184,10 @@
     let n = 0;
     for (const it of RAF.items) {
       if (n >= 30) break;
-      const r = it.r, t = fleche(r) + ' ' + BM.btc(r.q8 / 1e8) + ' BTC · ' + (r.prix ? r.prix.size : r.nPrix) + ' prix · ' + ordres(r.ordres);
-      const tw = largeurTexte(t, 10, true) + 4, x0 = it.x + RAF_LARGEUR + 3, y0 = it.y0 + it.h / 2 - 7;
+      const r = it.r;
+      // Texte et largeur gardés avec le trait (une mesure de texte par libellé et par recalcul).
+      if (!it.t) { it.t = fleche(r) + ' ' + BM.btc(r.q8 / 1e8) + ' BTC · ' + (r.prix ? r.prix.size : r.nPrix) + ' prix · ' + ordres(r.ordres); it.tw = largeurTexte(it.t, 10, true) + 4; }
+      const t = it.t, tw = it.tw, x0 = it.x + RAF_LARGEUR + 3, y0 = it.y0 + it.h / 2 - 7;
       if (x0 + tw > Z.chaleur.w || y0 < 0 || y0 + 14 > Z.chaleur.h || chevauche(x0, y0, tw, 14)) continue;
       reserver(x0, y0, tw, 14, t);
       texte(t, x0 + 2, y0 + 7, r.achat ? C.up : C.down, 10, 'left', true);
