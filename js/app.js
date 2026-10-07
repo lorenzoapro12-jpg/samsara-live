@@ -1348,12 +1348,32 @@ function calcMACD(data, rapide, lente, sig) {
   return { macdLine, signal: signalAligned, histogram };
 }
 
+// Plus haut (sens = 1) ou plus bas (sens = −1) des `p` valeurs qui finissent en i, pour chaque
+// i ≥ p − 1 (null avant) : une file monotone, O(n). Les calculs faisaient
+// Math.max(...v.slice(i − p + 1, i + 1)) — deux tableaux alloués par bougie et par fenêtre
+// (six pour Ichimoku) : 5,5 ms par appel et l'essentiel du ramasse-miettes. Le maximum d'une
+// fenêtre est le même nombre quel que soit le chemin : valeurs identiques au bit près
+// (tests/test_indicateurs_boucles.js, sur 3 000 bougies réelles). Données finies attendues.
+function extremeGlissant(v, p, sens) {
+  const n = v.length, out = new Array(n).fill(null), file = new Array(n);
+  let tete = 0, queue = 0;
+  for (let i = 0; i < n; i++) {
+    const x = v[i];
+    if (sens > 0) { while (queue > tete && v[file[queue - 1]] <= x) queue--; }
+    else { while (queue > tete && v[file[queue - 1]] >= x) queue--; }
+    file[queue++] = i;
+    if (file[tete] <= i - p) tete++;
+    if (i >= p - 1) out[i] = v[file[tete]];
+  }
+  return out;
+}
+
 function calcStoch(highs, lows, closes, kPeriod, dPeriod) {
   const kOut = new Array(closes.length).fill(null);
   const dOut = new Array(closes.length).fill(null);
+  const hh = extremeGlissant(highs, kPeriod, 1), ll = extremeGlissant(lows, kPeriod, -1);
   for (let i = kPeriod - 1; i < closes.length; i++) {
-    const h = Math.max(...highs.slice(i - kPeriod + 1, i + 1));
-    const l = Math.min(...lows.slice(i - kPeriod + 1, i + 1));
+    const h = hh[i], l = ll[i];
     kOut[i] = ((closes[i] - l) / (h - l || 1)) * 100;
   }
   // SMA of %K for %D
@@ -1401,27 +1421,17 @@ function calcVWAP(highs, lows, closes, volumes, times, interval, ancrageS, ancra
 }
 
 function calcIchimoku(highs, lows, closes) {
-  const tenkan = [], kijun = [], senkouA = [], senkouB = [], chikou = [];
-  for (let i = 0; i < closes.length; i++) {
-    if (i >= 8) {
-      const h9 = Math.max(...highs.slice(i - 8, i + 1));
-      const l9 = Math.min(...lows.slice(i - 8, i + 1));
-      tenkan.push((h9 + l9) / 2);
-    } else tenkan.push(null);
-    if (i >= 25) {
-      const h26 = Math.max(...highs.slice(i - 25, i + 1));
-      const l26 = Math.min(...lows.slice(i - 25, i + 1));
-      kijun.push((h26 + l26) / 2);
-    } else kijun.push(null);
-    senkouA.push(null); senkouB.push(null);
-    if (i >= 25) {
-      senkouA[i] = ((tenkan[i] || 0) + (kijun[i] || 0)) / 2;
-    }
-    if (i >= 51) {
-      const h52 = Math.max(...highs.slice(i - 51, i + 1));
-      const l52 = Math.min(...lows.slice(i - 51, i + 1));
-      senkouB[i] = (h52 + l52) / 2;
-    }
+  const n = closes.length;
+  const tenkan = new Array(n), kijun = new Array(n), senkouA = new Array(n), senkouB = new Array(n), chikou = [];
+  // Fenêtres 9 / 26 / 52 (tenkan / kijun / senkou B) : extrêmes glissants, une passe chacun.
+  const h9 = extremeGlissant(highs, 9, 1), l9 = extremeGlissant(lows, 9, -1);
+  const h26 = extremeGlissant(highs, 26, 1), l26 = extremeGlissant(lows, 26, -1);
+  const h52 = extremeGlissant(highs, 52, 1), l52 = extremeGlissant(lows, 52, -1);
+  for (let i = 0; i < n; i++) {
+    tenkan[i] = i >= 8 ? (h9[i] + l9[i]) / 2 : null;
+    kijun[i] = i >= 25 ? (h26[i] + l26[i]) / 2 : null;
+    senkouA[i] = i >= 25 ? ((tenkan[i] || 0) + (kijun[i] || 0)) / 2 : null;
+    senkouB[i] = i >= 51 ? (h52[i] + l52[i]) / 2 : null;
   }
   // Chikou = cloture COURANTE reportee 26 periodes EN ARRIERE : a l'indice i, la cloture
   // de i+25 (convention TradingView, decalage 26 => offset 25). L'ancienne formule lisait
@@ -1481,8 +1491,8 @@ function calcOBV(closes, volumes) {
 }
 
 function calcMFI(highs, lows, closes, volumes, period) {
-  const tp = closes.map((c, i) => (highs[i] + lows[i] + c) / 3);
-  const mf = tp.map((p, i) => p * volumes[i]);
+  const n = closes.length, tp = new Array(n), mf = new Array(n);
+  for (let i = 0; i < n; i++) { tp[i] = (highs[i] + lows[i] + closes[i]) / 3; mf[i] = tp[i] * volumes[i]; }
   const out = new Array(closes.length).fill(null);
   for (let i = period; i < closes.length; i++) {
     let posFlow = 0, negFlow = 0;
@@ -1497,21 +1507,28 @@ function calcMFI(highs, lows, closes, volumes, period) {
 
 function calcWilliamsR(highs, lows, closes, period) {
   const out = new Array(closes.length).fill(null);
+  const hh = extremeGlissant(highs, period, 1), ll = extremeGlissant(lows, period, -1);
   for (let i = period - 1; i < closes.length; i++) {
-    const h = Math.max(...highs.slice(i - period + 1, i + 1));
-    const l = Math.min(...lows.slice(i - period + 1, i + 1));
+    const h = hh[i], l = ll[i];
     out[i] = ((h - closes[i]) / (h - l || 1)) * -100;
   }
   return out;
 }
 
+// Les sommes de la fenêtre sont refaites à chaque bougie, de gauche à droite, comme le faisait
+// reduce : une somme GLISSANTE (ajouter l'entrant, retirer le sortant) irait plus vite mais
+// changerait les derniers bits — et une valeur affichée ne change pas pour gagner du temps.
 function calcCCI(highs, lows, closes, period) {
-  const tp = closes.map((c, i) => (highs[i] + lows[i] + c) / 3);
+  const n = closes.length, tp = new Array(n);
+  for (let i = 0; i < n; i++) tp[i] = (highs[i] + lows[i] + closes[i]) / 3;
   const out = new Array(closes.length).fill(null);
   for (let i = period - 1; i < closes.length; i++) {
-    const slice = tp.slice(i - period + 1, i + 1);
-    const sma = slice.reduce((a, b) => a + b, 0) / period;
-    const mad = slice.reduce((a, b) => a + Math.abs(b - sma), 0) / period;
+    let s = 0;
+    for (let j = i - period + 1; j <= i; j++) s += tp[j];
+    const sma = s / period;
+    let e = 0;
+    for (let j = i - period + 1; j <= i; j++) e += Math.abs(tp[j] - sma);
+    const mad = e / period;
     out[i] = (tp[i] - sma) / (0.015 * (mad || 1));
   }
   return out;
@@ -1564,7 +1581,8 @@ function calcADX(highs, lows, closes, period) {
 }
 
 function calcAO(highs, lows, rapide, lente) {
-  const mid = highs.map((h, i) => (h + lows[i]) / 2);
+  const mid = new Array(highs.length);
+  for (let i = 0; i < highs.length; i++) mid[i] = (highs[i] + lows[i]) / 2;
   const sma5 = calcSMA(mid, rapide);
   const sma34 = calcSMA(mid, lente);
   const out = new Array(mid.length).fill(null);

@@ -34,6 +34,9 @@ node test_fiches.js || ko=1
 etape "2c. Réglages : le détail change, jamais la valeur ; constantes du fichier lues, jamais recopiées — hors ligne"
 node test_reglages.js || ko=1
 
+etape "2d. Indicateurs réécrits en boucles : les mêmes valeurs qu'avant, au bit près, sur 3 000 bougies réelles — hors ligne"
+node test_indicateurs_boucles.js || ko=1
+
 etape "3. Extraction du JavaScript inline"
 python3 refresh_harness.py || ko=1
 
