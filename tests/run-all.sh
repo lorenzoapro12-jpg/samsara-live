@@ -11,7 +11,7 @@ ko=0
 etape() { printf '\n\033[1m── %s ──\033[0m\n' "$1"; }
 
 etape "0. Compilation des scripts Python"
-for f in ../publish.py ../heatmap.py ../samsara_config.py ../options_gex.py ../indicateurs.py test_meta.py refresh_harness.py scan-public.py test_calculs.py test_palette.py test_contrat.py theme_css.py; do
+for f in ../publish.py ../heatmap.py ../samsara_config.py ../options_gex.py ../indicateurs.py test_meta.py refresh_harness.py scan-public.py test_calculs.py test_palette.py test_contrat.py theme_css.py test_polices.py ../fonts/fabriquer.py; do
   if python3 -m py_compile "$f" 2>/dev/null; then
     echo "  ✓ $f"
   else
@@ -57,6 +57,9 @@ python3 test_palette.py || ko=1
 
 etape "8. Contrat de la page (registre des thèmes, verre, budget mesuré, réseau) — hors ligne"
 python3 test_contrat.py || ko=1
+
+etape "8b. Polices : registre, licences et noms réservés, LISEZMOI dérivé, @font-face servis — hors ligne"
+python3 test_polices.py || ko=1
 
 etape "9. Structures de thème dans Chromium : aucune valeur ni aucun âge perdu, réversibles (non exécuté sans Playwright)"
 node test_structures.js || ko=1
