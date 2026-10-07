@@ -37,6 +37,9 @@ node test_reglages.js || ko=1
 etape "2d. Indicateurs réécrits en boucles : les mêmes valeurs qu'avant, au bit près, sur 3 000 bougies réelles — hors ligne"
 node test_indicateurs_boucles.js || ko=1
 
+etape "2e. Chaleur : les deux formats publiés donnent la même couche ; même publication = aucune analyse — hors ligne"
+node test_chaleur.js || ko=1
+
 etape "3. Extraction du JavaScript inline"
 python3 refresh_harness.py || ko=1
 

@@ -63,20 +63,26 @@ function mursFusionnes(lq, cote, k, n, min) {
   for (const [p, q] of prof) { const P = Math.floor(p / (dp * k)) * dp * k; agg.set(P, (agg.get(P) || 0) + q); }
   return [...agg.entries()].filter(([, q]) => q >= (min || 0)).sort((x, y) => y[1] - x[1]).slice(0, n).map(([p, q]) => [p, Math.round(q * 10) / 10]);
 }
-/** Cellules de heatmap.json fusionnées par MAX (kt colonnes × kp tranches), sous le seuil
- *  d'intensité retirées. Indices absolus : P = ⌊pb / kp⌋, C = ⌊c / kt⌋. */
-function fusionnerCellules(cells, kt, kp, seuil) {
-  kt = Math.max(1, kt | 0); kp = Math.max(1, kp | 0);
-  const m = new Map();
-  for (const [c, pb, v] of cells || []) {
-    if (v < (seuil || 0)) continue;
-    const C = Math.floor(c / kt), P = Math.floor(pb / kp), key = C * 1e6 + P;
-    const o = m.get(key);
-    if (o === undefined || v > o) m.set(key, v);
+/** Grille de heatmap.json (grilleChaleur, js/app.js) fusionnée par MAX : kt colonnes × kp
+ *  tranches → une case, intensités sous le seuil retirées. Indices : C = ⌊c / kt⌋ (colonnes
+ *  comptées depuis t0), tranche fusionnée = ⌊tranche / kp⌋ (absolue). Un facteur < 1 vaut 1 :
+ *  on fusionne, on n'affine jamais. À 1 × 1 sous un seuil ≤ 1, la grille elle-même (rien à
+ *  fusionner ni à retirer : 0 = rien, toute valeur publiée est ≥ 1). */
+function fusionnerGrille(g, kt, kp, seuil) {
+  kt = Math.max(1, kt | 0); kp = Math.max(1, kp | 0); seuil = Math.max(1, seuil || 0);
+  if (kt === 1 && kp === 1 && seuil <= 1) return g;
+  const P0 = Math.floor(g.pbMin / kp), H = Math.floor((g.pbMin + g.H - 1) / kp) - P0 + 1, W = Math.ceil(g.W / kt);
+  const bids = new Uint8Array(W * H), asks = new Uint8Array(W * H), ligne = new Array(g.H);
+  for (let p = 0; p < g.H; p++) ligne[p] = Math.floor((g.pbMin + p) / kp) - P0;
+  for (let c = 0; c < g.W; c++) {
+    const o = c * g.H, O = Math.floor(c / kt) * H;
+    for (let p = 0; p < g.H; p++) {
+      const b = g.bids[o + p], a = g.asks[o + p], i = O + ligne[p];
+      if (b >= seuil && b > bids[i]) bids[i] = b;
+      if (a >= seuil && a > asks[i]) asks[i] = a;
+    }
   }
-  const out = [];
-  for (const [key, v] of m) out.push([Math.floor(key / 1e6), key % 1e6, v]);
-  return out;
+  return { t0: g.t0, dt: g.dt * kt, dp: g.dp * kp, W, H, pbMin: P0, bids, asks };
 }
 /** Bande live ±pct % sur un carnet Binance reçu ; null si le carnet ne la couvre pas. */
 function bandeLive(depth, px, pct) {

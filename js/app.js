@@ -225,6 +225,63 @@ const DATA_URL = 'https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-li
 let marketData = null, livePrice = null, candles = [], chartInterval = '15m';
 let activeSymbol = 'BTCUSDT';  // BTCUSDT, ETHUSDT, SOLUSDT, XRPUSDT, TAOUSDT, ou BTCSOL (ratio)
 
+// ─── Réseau : ce que le script de tête a déjà demandé, et quand relire un fichier publié ───
+// Le script en tête d'index.html lance les lectures du premier écran (première page de bougies,
+// prix, market-data.json) PENDANT le chargement des feuilles et des scripts : lancées d'ici
+// (différé), elles attendaient la fin de son exécution — la première page de bougies partait à
+// ~112 ms (mesuré). Une réponse préchargée est reprise UNE fois, par l'URL exacte que cette page
+// aurait demandée ; une URL qui ne correspond plus est ignorée (tests/test_reseau.js).
+function prechargee(url, options) {
+  const P = window.__precharge, p = P && P[url];
+  if (!p) return null;
+  delete P[url];
+  return p.catch(() => fetch(url, options));  // préchargement échoué : une requête normale
+}
+/** Un fichier publié (market-data.json, heatmap.json) est-il à relire ? Pas avant que la
+ *  publication suivante soit ATTENDUE — sa date (`updated`) + la cadence du serveur + une marge
+ *  (l'envoi, puis le cache du CDN, max-age 300 s) —, ensuite à chaque tour jusqu'à ce qu'elle
+ *  arrive ; et au plus tard toutes les relecture_max_min (publication hors cadence, horloge du
+ *  poste décalée). Avant : relu chaque minute, quinze fois par publication. */
+function lectureDue(majA, derniere, maintenant) {
+  const t = maintenant || Date.now();
+  if (!majA || !derniere) return true;
+  return t >= majA + CADENCES.attendue_min * 60000 + CADENCES.marge_publication_s * 1000
+    || t - derniere >= CADENCES.relecture_max_min * 60000;
+}
+// `updated` est la première clé des deux fichiers publiés : il se lit dans les premiers octets.
+const majDuTexte = t => { const m = /^\s*\{\s*"updated"\s*:\s*"([^"]+)"/.exec(t); return m ? m[1] : null; };
+/** Le corps d'une réponse, analysé SEULEMENT s'il porte une autre publication que `connu`
+ *  (son `updated`). Une revalidation (304) rend quand même le corps entier à la page : on en
+ *  lit le début, et s'il n'a pas changé le reste n'est ni décodé ni analysé. → objet, ou null
+ *  si c'est la même publication. */
+async function lireSiNouveau(r, connu) {
+  if (!r.body || !r.body.getReader || typeof TextDecoder === 'undefined') {
+    if (typeof r.text !== 'function') { const o = await r.json(); return connu && o && o.updated === connu ? null : o; }
+    const t = await r.text();
+    return connu && majDuTexte(t) === connu ? null : JSON.parse(t);
+  }
+  const lecteur = r.body.getReader(), dec = new TextDecoder(), morceaux = [];
+  let tete = '', verifie = !connu;
+  for (;;) {
+    const { value, done } = await lecteur.read();
+    if (done) break;
+    const t = dec.decode(value, { stream: true });
+    morceaux.push(t);
+    if (!verifie) {
+      tete += t;
+      const u = majDuTexte(tete);
+      if (u !== null || tete.length > 512) {
+        verifie = true;
+        if (u === connu) { lecteur.cancel().catch(() => {}); return null; }
+      }
+    }
+  }
+  morceaux.push(dec.decode());
+  const texte = morceaux.join('');
+  if (connu && majDuTexte(texte) === connu) return null;
+  return JSON.parse(texte);
+}
+
 // ============ VIEWPORT (zoom/pan) ============
 let viewStart = 0, viewEnd = 100;  // indices dans candles
 let isPanning = false, panStartX = 0, panStartView = 0;
@@ -1227,46 +1284,130 @@ function rampeU32(base, pente) {
 // Reconstruites par lireJetons() à chaque changement de thème ; l'id du thème est dans la clé
 // de la couche (buildHeatLayer) : une couche peinte avec la rampe d'un autre thème est refaite.
 let HEAT_U32 = { bid: rampeU32(HEAT_RAMPE.bid.base, HEAT_RAMPE.bid.pente), ask: rampeU32(HEAT_RAMPE.ask.base, HEAT_RAMPE.ask.pente) };
+/** heatmap.json → GRILLE, quel que soit son format (les deux se lisent, au bit près la même
+ *  grille pour la même information : tests/test_chaleur.js) :
+ *  · « colonnes-1 » (heatmap.py, depuis le 07/10/2026) : `colonnes` = [minute, bid_bas, [v…],
+ *    ask_bas, [v…]], minute = ⌊t / dt⌋ ABSOLUE, v[i] = intensité de la tranche bas + i
+ *    (prix = tranche × dp), 0 = rien au-dessus du seuil, côté vide = null, [] ; minute absente =
+ *    non observée ;
+ *  · l'ancien format (bids / asks = [c, pb, v], c compté depuis t0), que le serveur publie tant
+ *    qu'il n'est pas passé au nouveau — et qu'une page restée en cache lit encore après.
+ *  Grille : colonne c (depuis t0, en s) de largeur dt, tranches absolues de pbMin à pbMin + H − 1,
+ *  cellule (c, tranche) en c·H + (tranche − pbMin) ; bids / asks : Uint8Array, 0 = rien. Elle
+ *  s'arrête à la dernière colonne et aux tranches extrêmes qui portent une valeur non nulle. */
+function grilleChaleur(h) {
+  if (!h || !(h.dt > 0) || !(h.dp > 0)) return null;
+  const cols = Array.isArray(h.colonnes) ? h.colonnes : null;
+  // Origine des colonnes : t0 publié (début de la première colonne), sinon la première minute.
+  const m0 = isFinite(h.t0) ? Math.round(h.t0 / h.dt) : (cols && cols.length ? cols[0][0] : 0);
+  let cMax = -1, pMin = Infinity, pMax = -Infinity;
+  const borne = (c, pb) => { if (c > cMax) cMax = c; if (pb < pMin) pMin = pb; if (pb > pMax) pMax = pb; };
+  if (cols) {
+    for (const col of cols) {
+      const c = col[0] - m0;
+      if (!(c >= 0)) continue;
+      for (let k = 1; k <= 3; k += 2) {
+        const bas = col[k], v = col[k + 1];
+        if (bas === null || !v) continue;
+        for (let i = 0; i < v.length; i++) if (v[i] > 0) borne(c, bas + i);
+      }
+    }
+  } else {
+    for (const cells of [h.bids, h.asks]) for (const x of cells || []) if (x[2] > 0 && x[0] >= 0) borne(x[0], x[1]);
+  }
+  if (cMax < 0) return null;
+  const W = cMax + 1, H = pMax - pMin + 1;
+  const g = { t0: m0 * h.dt, dt: h.dt, dp: h.dp, W, H, pbMin: pMin, bids: new Uint8Array(W * H), asks: new Uint8Array(W * H) };
+  if (cols) {
+    for (const col of cols) {
+      const c = col[0] - m0;
+      if (!(c >= 0)) continue;
+      for (let k = 1; k <= 3; k += 2) {
+        const bas = col[k], v = col[k + 1], dest = k === 1 ? g.bids : g.asks, o = c * H + bas - pMin;
+        if (bas === null || !v) continue;
+        for (let i = 0; i < v.length; i++) if (v[i] > dest[o + i]) dest[o + i] = v[i];
+      }
+    }
+  } else {
+    for (const [cells, dest] of [[h.bids, g.bids], [h.asks, g.asks]])
+      for (const x of cells || []) { if (!(x[2] > 0) || x[0] < 0) continue; const i = x[0] * H + x[1] - pMin; if (x[2] > dest[i]) dest[i] = x[2]; }
+  }
+  return g;
+}
+/** Pixels de la couche : grille DÉJÀ fusionnée et seuillée (fusionnerGrille, js/reglages.js),
+ *  cadrée sur ses cases non vides — de la colonne 0 à la dernière, de la tranche la plus basse
+ *  à la plus haute ; ligne 0 = la tranche la PLUS HAUTE (drawImage descend, le prix monte).
+ *  Quand bid et ask tombent dans la même case, la plus forte intensité l'emporte (l'ask à
+ *  égalité) — exactement l'ancienne règle, case par case. → { W, H, P1, px } ou null. */
+function pixelsChaleur(g, palB, palA) {
+  let W = 0, lo = Infinity, hi = -Infinity;
+  for (let c = 0; c < g.W; c++) {
+    const o = c * g.H;
+    for (let p = 0; p < g.H; p++) if (g.bids[o + p] || g.asks[o + p]) { W = c + 1; if (p < lo) lo = p; if (p > hi) hi = p; }
+  }
+  if (!W) return null;
+  const H = hi - lo + 1, px = new Uint32Array(W * H);
+  for (let c = 0; c < W; c++) {
+    const o = c * g.H;
+    for (let p = lo; p <= hi; p++) {
+      const b = g.bids[o + p], a = g.asks[o + p];
+      if (a && a >= b) px[(hi - p) * W + c] = palA[a] || palA[255];
+      else if (b) px[(hi - p) * W + c] = palB[b] || palB[255];
+    }
+  }
+  return { W, H, P1: g.pbMin + hi, px };
+}
 /** Couche heatmap, FUSIONNÉE par MAX (kt colonnes × kp tranches, js/reglages.js), cellules
- *  sous `seuil` retirées. L'image ne couvre que les tranches présentes (de P0 à P1) : elle
- *  partait du prix 0 $ — 1 441 × 4 333 px pour ~150 lignes utiles. */
+ *  sous `seuil` retirées. L'image ne couvre que les tranches présentes : elle partait du prix
+ *  0 $ — 1 441 × 4 333 px pour ~150 lignes utiles.
+ *  Les TROIS dernières couches sont gardées (zoom qui passe et repasse un palier de fusion :
+ *  37 ms par reconstruction mesurés quand une seule l'était). Avant, la fusion construisait une
+ *  Map de 131 000 cellules même à 1 × 1 (22,5 ms pour ne rien changer) ; elle se fait maintenant
+ *  sur la grille, en tableaux typés, et pas du tout à 1 × 1. */
+const COUCHES_GARDEES = 3;
+const heatLayers = [];   // la plus récente en tête
 function buildHeatLayer(hm, kt, kp, seuil) {
   const cle = hm.updated + '|' + kt + '|' + kp + '|' + seuil + '|' + themeCourant().id;
-  if (heatLayer && heatLayer.cle === cle) return heatLayer;   // payload et réglages inchangés
-  const bids = fusionnerCellules(hm.bids, kt, kp, seuil), asks = fusionnerCellules(hm.asks, kt, kp, seuil);
-  let W = 0, P0 = Infinity, P1 = -Infinity;
-  for (const side of [bids, asks]) for (const [C, P] of side) { if (C >= W) W = C + 1; if (P < P0) P0 = P; if (P > P1) P1 = P; }
-  if (!W) return null;
-  const H = P1 - P0 + 1;
-  const cv = (heatLayer && heatLayer.cv.width === W && heatLayer.cv.height === H) ? heatLayer.cv : document.createElement('canvas');
-  cv.width = W; cv.height = H;
-  const img = new ImageData(W, H), px = new Uint32Array(img.data.buffer), val = new Uint8Array(W * H);
-  // Ligne 0 en HAUT = tranche la plus haute (drawImage descend, le prix monte). Quand bids et
-  // asks tombent dans la même case fusionnée, la plus forte intensité l'emporte.
-  for (const [cells, pal] of [[bids, HEAT_U32.bid], [asks, HEAT_U32.ask]])
-    for (const [C, P, v] of cells) { const i = (P1 - P) * W + C; if (v >= val[i]) { val[i] = v; px[i] = pal[v] || pal[255]; } }
-  cv.getContext('2d').putImageData(img, 0, 0);
-  return (heatLayer = { cv, w: W, h: H, P1, dt: hm.dt * kt, dp: hm.dp * kp, cle });
+  const k = heatLayers.findIndex(l => l.cle === cle);
+  if (k >= 0) { const l = heatLayers[k]; if (k) { heatLayers.splice(k, 1); heatLayers.unshift(l); } return (heatLayer = l); }
+  const g = hm.grille && fusionnerGrille(hm.grille, kt, kp, seuil), p = g && pixelsChaleur(g, HEAT_U32.bid, HEAT_U32.ask);
+  if (!p) return null;
+  const sortie = heatLayers.length >= COUCHES_GARDEES ? heatLayers.pop() : null;
+  const cv = sortie ? sortie.cv : document.createElement('canvas');
+  cv.width = p.W; cv.height = p.H;
+  cv.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(p.px.buffer), p.W, p.H), 0, 0);
+  const l = { cv, w: p.W, h: p.H, P1: p.P1, dt: g.dt, dp: g.dp, cle };
+  heatLayers.unshift(l);
+  return (heatLayer = l);
 }
 /** Facteur de fusion AUTOMATIQUE : quand une colonne (ou une tranche) fait moins d'un pixel,
  *  on regroupe par MAX jusqu'à l'atteindre, au lieu de laisser le lissage MOYENNER — une
  *  moyenne efface un mur isolé. Puissances de 2 : la couche n'est refaite qu'à chaque palier. */
 const palier = x => x <= 1 ? 1 : Math.pow(2, Math.ceil(Math.log2(x)));
-// heatmap.json pèse ≈ 2 Mo et n'est republié que toutes les 15 min. Avec un `?t=` unique et
-// `no-store`, chaque minute retéléchargeait les 2 Mo (≈ 120 Mo/h, overlay allumé). Sans le
-// paramètre et en `no-cache`, le navigateur REVALIDE par ETag : réponse 304 de quelques
-// centaines d'octets tant que le fichier n'a pas changé (vérifié le 04/10/2026). Contrepartie :
-// le CDN de GitHub garde sa copie jusqu'à 5 min (max-age=300) — sans effet sur une couche
-// de 24 h publiée au quart d'heure.
+// heatmap.json n'est republié que toutes les 15 min. Sans paramètre d'URL et en `no-cache`, le
+// navigateur REVALIDE par ETag : 304 de quelques centaines d'octets tant que le fichier n'a pas
+// changé (vérifié le 04/10/2026). Mais un 304 rend quand même le CORPS ENTIER à la page : elle
+// re-analysait 2,2 Mo chaque minute (31 ms, 5,6 Mo de tas) pour rien, puis redessinait. Désormais :
+// relu seulement quand une publication est attendue (lectureDue), le début du corps lu
+// (`updated`, première clé) et le reste abandonné s'il n'a pas changé ; dessin seulement si nouveau.
 const HEATMAP_URL = 'https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/master/heatmap.json';
-async function fetchHeatmap() {
+let chaleurLue = 0;      // dernière relecture réussie (ms)
+async function fetchHeatmap(force) {
   if (document.hidden) return;
+  if (!force && !lectureDue(histHeatmap && histHeatmap.majA, chaleurLue)) return;
   try {
     const r = await fetch(HEATMAP_URL, { cache: 'no-cache' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    histHeatmap = await r.json();
+    const h = await lireSiNouveau(r, histHeatmap && histHeatmap.updated);
+    chaleurLue = Date.now();
+    if (!h) return;                                   // même publication : rien à refaire
+    const grille = grilleChaleur(h);
+    // On garde l'en-tête et la grille, pas les 130 000 cellules du fichier.
+    histHeatmap = { updated: h.updated, majA: Date.parse(h.updated) || null, sym: h.sym, dt: h.dt, dp: h.dp,
+      t0: grille ? grille.t0 : h.t0, encodage: h.encodage || null, format: h.format || 'cellules', grille };
+    heatLayers.length = 0; heatLayer = null;
     if (overlays.liq) drawChart();
-  } catch(e) {}
+  } catch(e) { chaleurLue = 0; }                    // à retenter au prochain tour
 }
 function toggleDepth(on) {
   if (on) { fetchHeatmap(); if (!depthTimer) depthTimer = setInterval(fetchHeatmap, CADENCES.chaleur_lue); }
@@ -2915,7 +3056,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
   // --- Heatmap Liquidité (Bookmap : grille native -> un seul drawImage) ---
   // `histHeatmap.sym` n'était JAMAIS comparé au symbole affiché : le carnet BTC se
   // dessinait tel quel sur les graphes ETH, SOL, XRP, TAO et sur le ratio BTC/SOL.
-  if (overlays.liq && histHeatmap && histHeatmap.bids && histHeatmap.sym === activeSymbol) {
+  if (overlays.liq && histHeatmap && histHeatmap.grille && histHeatmap.sym === activeSymbol) {
     const hm = histHeatmap;
     const intervalS = (candles.length > 1 && candles[1].time > candles[0].time) ? (candles[1].time - candles[0].time) : 900;
     const winT0 = candles[vs].time;

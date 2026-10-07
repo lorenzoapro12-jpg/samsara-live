@@ -97,14 +97,21 @@ check('aucune liste de bandes du serveur recopiée (0.1, 0.5, 1)', !/\[\s*0\.1\s
 titre('4. Heatmap du graphique : fusion par MAX');
 const cells = [];
 for (let i = 0; i < 3000; i++) cells.push([(rnd() * 120) | 0, 4200 + ((rnd() * 90) | 0), 1 + ((rnd() * 254) | 0)]);
+// La grille de la page (grilleChaleur), puis sa fusion (fusionnerGrille), comparées case par case
+// au MAX calculé ici, cellule par cellule, depuis le fichier.
+const grille = T.grilleChaleur({ t0: 1791205080, dt: 60, dp: 20, bids: cells, asks: [] });
+const lire = (f, C, P) => { const i = C * f.H + (P - f.pbMin); return C < f.W && P >= f.pbMin && P < f.pbMin + f.H ? f.bids[i] : 0; };
 let exact = true;
-for (const [kt, kp, s] of [[1, 1, 1], [5, 2, 1], [15, 5, 32], [60, 10, 128]]) {
-  const f = T.fusionnerCellules(cells, kt, kp, s), m = new Map();
+for (const [kt, kp, s] of [[1, 1, 1], [5, 2, 1], [15, 5, 32], [60, 10, 128], [1, 1, 64]]) {
+  const f = T.fusionnerGrille(grille, kt, kp, s), m = new Map();
   for (const [c, p, v] of cells) if (v >= s) { const k = Math.floor(c / kt) + ':' + Math.floor(p / kp); m.set(k, Math.max(m.get(k) || 0, v)); }
-  if (f.length !== m.size || f.some(([C, P, v]) => m.get(C + ':' + P) !== v)) exact = false;
+  let n = 0;
+  for (let C = 0; C < f.W; C++) for (let P = f.pbMin; P < f.pbMin + f.H; P++) { const v = lire(f, C, P); if (v) n++; if (v !== (m.get(C + ':' + P) || 0)) exact = false; }
+  if (n !== m.size || f.dt !== 60 * kt || f.dp !== 20 * kp) exact = false;
 }
-check('cellule fusionnée = MAX de son bloc, seuil appliqué (4 tailles, vérifié case par case)', exact);
-check('fusion ≥ 1 seulement : un facteur < 1 vaut 1 (on n’affine pas)', T.fusionnerCellules(cells, 0.5, 0, 1).length === T.fusionnerCellules(cells, 1, 1, 1).length);
+check('case fusionnée = MAX de son bloc, seuil appliqué (5 tailles, vérifié case par case)', exact);
+const g05 = T.fusionnerGrille(grille, 0.5, 0, 1);
+check('fusion ≥ 1 seulement : un facteur < 1 vaut 1 (on n’affine pas)', g05.W === grille.W && g05.H === grille.H && g05.dt === grille.dt && g05.dp === grille.dp);
 check('fusion automatique en dézoom : par paliers de 2, jamais sous 1', T.palier(0.3) === 1 && T.palier(1) === 1 && T.palier(1.2) === 2 && T.palier(3) === 4 && T.palier(9) === 16);
 check('le lissage (qui MOYENNE et efface un mur) est coupé', /imageSmoothingEnabled = false;/.test(fs.readFileSync(path.join(REPO, 'js/app.js'), 'utf8')));
 
