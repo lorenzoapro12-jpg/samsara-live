@@ -73,6 +73,17 @@ POLICES = [
          dossier="cinzel", source="Cinzel[wght].ttf", licence="cinzel.OFL.txt", horodatage=3874129693),
     dict(sortie="eb-garamond.woff2", famille="EB Garamond", origine="EB Garamond", theme="Codex",
          dossier="ebgaramond", source="EBGaramond[wght].ttf", licence="ebgaramond.OFL.txt", horodatage=3874129694),
+    # Cyanotype et Diazo : le lettrage de la planche (chasse fixe : chaque glyphe fait 1232 unités,
+    # les chiffres s'alignent en colonne dans le cartouche) ; △ ▲ ▼ pour l'indice de révision.
+    # γ (GEX) n'y est pas : repli sur la chasse fixe du système.
+    dict(sortie="overpass-mono.woff2", famille="Overpass Mono", origine="Overpass Mono", theme="Cyanotype, Diazo",
+         dossier="overpassmono", source="OverpassMono[wght].ttf", licence="overpassmono.OFL.txt",
+         instance={"wght": (400, 700)}, composes=COMPOSES_SAMSARA, plages=PLAGES_LATIN + ",U+25B2-25B3,U+25BC"),
+    # L'écriture du dessinateur : titres SEULEMENT (h1, cartes, « Détail A », « Vue A », cartouche),
+    # jamais un nombre — ses chiffres sont proportionnels.
+    dict(sortie="architects-daughter.woff2", famille="Architects Daughter", origine="Architects Daughter",
+         theme="Cyanotype, Diazo", dossier="architectsdaughter", source="ArchitectsDaughter-Regular.ttf",
+         licence="architectsdaughter.OFL.txt", composes=COMPOSES_SAMSARA),
 ]
 
 
