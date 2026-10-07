@@ -83,6 +83,21 @@ POLICES = [
     dict(sortie="bureau95-titres.woff2", famille="Pixelify Sans", origine="Pixelify Sans", theme="Bureau 95",
          dossier="pixelifysans", source="PixelifySans[wght].ttf", licence="pixelifysans.OFL.txt",
          instance={"wght": 700}, composes=COMPOSES_SAMSARA, plages=PLAGES_LATIN_SANS_CHIFFRES),
+    # Gare : les PALETTES (prix, chiffres clés, heures, axes du graphique). Chasse fixe vérifiée :
+    # chaque glyphe gardé fait 530 unités, espaces et signes compris — une tuile de fond en 1ch
+    # tombe donc sous chaque caractère. Instance condensée (wdth 75), graisses 500 à 700 gardées.
+    # Elle a γ (GEX « long γ ») et ā ṃ Ṃ (le titre) : rien à composer. Overpass Mono, envisagée,
+    # n'a ni γ ni ṃ : la tuile de « long γ » tombait sur la police système, d'une autre chasse.
+    dict(sortie="gare-palettes.woff2", famille="Noto Sans Mono", origine="Noto Sans Mono", theme="Gare",
+         dossier="notosansmono", source="NotoSansMono[wdth,wght].ttf", licence="notosansmono.OFL.txt",
+         instance={"wdth": 75, "wght": (500, 700)}),
+    # Gare : libellés, titres, texte courant. Deux graisses statiques (pas de police variable).
+    dict(sortie="barlow-condensed-500.woff2", famille="Barlow Condensed", origine="Barlow Condensed", theme="Gare",
+         dossier="barlowcondensed", source="BarlowCondensed-Medium.ttf", licence="barlowcondensed.OFL.txt",
+         composes=COMPOSES_SAMSARA),
+    dict(sortie="barlow-condensed-600.woff2", famille="Barlow Condensed", origine="Barlow Condensed", theme="Gare",
+         dossier="barlowcondensed", source="BarlowCondensed-SemiBold.ttf", licence="barlowcondensed.OFL.txt",
+         composes=COMPOSES_SAMSARA),
 ]
 
 

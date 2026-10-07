@@ -208,6 +208,94 @@ STRUCTURES.fenetres = {
   },
 };
 
+// ─── TABLEAU (thème Gare) : le grand tableau d'affichage d'une gare ─────────────
+// Les chiffres clés quittent l'en-tête pour un tableau pleine largeur, avec l'heure de la
+// publication ; chaque bloc dit sa PROVENANCE et sa cadence, lues dans CADENCES (une étiquette
+// recopiée mentirait le jour où le cron change). Les palettes sont du CSS pur, sur les vrais
+// nœuds (themes/gare.css). Une palette « tombe » quand sa valeur CHANGE : un demi-volet se
+// rabat une fois sur le texte déjà juste — aucun faux caractère ne défile.
+const CHUTE_RETRAIT_MS = 400;   // retrait de .gare-chute : après le passage du volet (0,22 s, CSS)
+const CHUTE_PRIX_MS = 5000;     // prix : au plus une chute par intervalle (il change chaque seconde)
+STRUCTURES.tableau = {
+  nom: "Tableau d'affichage",
+  construire() {
+    const c = chantier(), $ = id => document.getElementById(id);
+    const tete = document.querySelector('.header');
+    const tab = c.conteneur('div', 'gare-tableau', tete.parentNode, tete.nextSibling, 'Tableau : dernière publication');
+    c.decor('span', 'gare-titre', tab, null, 'Cotations');
+    c.decor('span', 'gare-provenance', tab, null, 'Provenance serveur · ' + CADENCES.attendue_min + ' min');
+    c.deplacer($('cycle'), tab);
+    const h = c.conteneur('div', 'gare-heure', tab, null, 'Heure de publication');
+    c.decor('span', 'gare-titre', h, null, 'Publié à');
+    c.deplacer($('updated'), h);
+    c.decor('span', 'gare-utc', h, null, 'UTC');
+    const hp = document.querySelector('.hero-prix');
+    c.decor('span', 'gare-provenance', hp, hp.firstChild, 'Binance · ' + CADENCES.prix / 1000 + ' s');
+    const tl = document.querySelector('.taskbar-left');
+    if (tl) c.decor('span', 'gare-info', tl, tl.firstChild, 'Information voyageurs ·');
+    const clk = $('taskbarClock');
+    if (clk) c.decor('span', 'gare-titre', clk.parentNode, clk, 'Heure locale');
+
+    // Chutes : liées à un ÉVÉNEMENT, jamais en boucle (une boucle coûtait ×35 au repos, Néon).
+    // Mouvement réduit : la feuille ne dessine pas le volet ; ici, on ne pose même pas la classe.
+    const minuteries = new Set();
+    const reduit = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+    const chute = el => {
+      if (reduit && reduit.matches) return;
+      el.classList.remove('gare-chute'); void el.offsetWidth; el.classList.add('gare-chute');
+      const t = setTimeout(() => { el.classList.remove('gare-chute'); minuteries.delete(t); }, CHUTE_RETRAIT_MS);
+      minuteries.add(t);
+    };
+    const heure = $('updated'), cycle = $('cycle'), prix = $('price');
+    const age = () => cycle && cycle.querySelector('.kpi-age');
+    // Âge inconnu (« — ») : pas de remarque « À l'heure », qui serait fausse (themes/gare.css).
+    const marquerInconnu = a => { if (a) a.classList.toggle('gare-inconnu', !/\d/.test(a.textContent)); };
+    marquerInconnu(age());
+    let vuHeure = heure ? heure.textContent : '', vuAge = age() ? age().textContent : '', vuPrix = prix ? prix.textContent : '', tPrix = -Infinity;
+    const obs = [];
+    if (typeof MutationObserver !== 'undefined') {
+      // renderFeedTo réécrit le tableau chaque minute, publication nouvelle ou non : on compare
+      // le TEXTE. Heure changée = publication nouvelle → chiffres clés, âge et heure tombent ;
+      // sinon, l'âge seul, quand ses minutes changent.
+      const ot = new MutationObserver(() => {
+        const a = age();
+        marquerInconnu(a);
+        if (heure && heure.textContent !== vuHeure) { vuHeure = heure.textContent; vuAge = a ? a.textContent : ''; chute(tab); }
+        else if (a && a.textContent !== vuAge) { vuAge = a.textContent; chute(a); }
+      });
+      ot.observe(tab, { childList: true, characterData: true, subtree: true });
+      obs.push(ot);
+      // Prix : fetchPrice réécrit sa classe chaque seconde — la chute se pose sur .hero-prix.
+      if (prix) {
+        const op = new MutationObserver(() => {
+          if (prix.textContent === vuPrix) return;
+          vuPrix = prix.textContent;
+          const t = performance.now();
+          if (t - tPrix < CHUTE_PRIX_MS) return;
+          tPrix = t; chute(hp);
+        });
+        op.observe(prix, { childList: true, characterData: true, subtree: true });
+        obs.push(op);
+      }
+    }
+    // Les palettes ont leur police (chasse fixe condensée, lue dans --font-palette) : la bande
+    // des chiffres clés se remesure quand elle est chargée. Mesurée avec la police de repli,
+    // plus large, elle masquait des chiffres qui tiennent.
+    let actif = true;
+    const police = getComputedStyle(document.documentElement).getPropertyValue('--font-palette').trim();
+    if (police && document.fonts && document.fonts.load) {
+      document.fonts.load('500 17px ' + police).then(() => { if (actif && typeof ajusterKpis === 'function') ajusterKpis(); }).catch(() => {});
+    }
+    return () => {
+      actif = false;
+      obs.forEach(o => o.disconnect());
+      minuteries.forEach(clearTimeout);
+      for (const el of [hp, ...(cycle ? cycle.querySelectorAll('.gare-chute, .gare-inconnu') : [])]) el.classList.remove('gare-chute', 'gare-inconnu');
+      c.defaire();
+    };
+  },
+};
+
 // Au chargement : la structure du thème posé par le script de tête. Ce fichier est chargé
 // en `defer` AVANT js/app.js : le DOM est complet, le graphique pas encore dessiné.
 appliquerStructure(structureDuTheme(document.documentElement.getAttribute('data-theme')));
