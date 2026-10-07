@@ -100,7 +100,7 @@
 /* ── En-tête : une barre d'outils ; le prix et sa variation dans des champs enfoncés ── */
 [data-theme="bureau95-contraste"] .header { padding: 5px 8px 5px 10px; gap: 10px; }
 [data-theme="bureau95-contraste"] .header-left { gap: 10px; }
-/* La roue, aux seize couleurs : un secteur par couleur, sans dégradé ni lueur. */
+/* La roue, aux couleurs VGA : un secteur par couleur, sans dégradé ni lueur. */
 [data-theme="bureau95-contraste"] .header-orb {
   width: 24px; height: 24px;
   --orbe:

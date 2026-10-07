@@ -10,8 +10,8 @@
    data-structure="fenetres" data-paire="bureau95-contraste">.
 
    JUMEAU. themes/bureau95-contraste.css (le schéma « contraste élevé », sombre) a les MÊMES règles,
-   au sélecteur de thème près : seuls les jetons diffèrent. Toute couleur passe donc par un jeton,
-   jamais en dur dans une règle ; tests/test_fenetres.py échoue si les deux feuilles divergent.
+   au sélecteur de thème près : seuls les jetons diffèrent. Toute couleur qui change d'un jumeau à
+   l'autre passe donc par un jeton ; tests/test_fenetres.py échoue si les deux feuilles divergent.
 
    COULEURS (mesurées, tests/test_palette.py). Hausse = BLEU VGA, baisse = ROUGE : #ff0000 ne fait
    que 3,64:1 sur la zone client, d'où #e00000. Barre de titre inactive #757575 : le texte blanc y
@@ -19,9 +19,10 @@
    sur le gris, il était illisible au prototype.
 
    POLICES. Le texte et TOUTES les valeurs sont en police système (0 octet, chiffres tabulaires).
-   Pixelify Sans (fonts/bureau95-titres.woff2, une graisse, 8,6 Ko) n'écrit que les barres de
-   titre, « Démarrer », le bandeau du menu et le titre : ses chiffres sont proportionnels, elle
-   n'écrit jamais un nombre.
+   Pixelify Sans (fonts/bureau95-titres.woff2, une graisse, 8,4 Ko) n'écrit que les barres de
+   titre, « Démarrer », le bandeau du menu et le titre ; ses chiffres, proportionnels, sont RETIRÉS
+   du sous-ensemble (fonts/fabriquer.py) : un chiffre de titre vient de la police système. Taille
+   16 px pour les titres, 23 px pour le h1 (deux pixels d'écran par pixel de la police : net).
 
    EFFETS ET BUDGET. Aucun @keyframes, aucune transition : une fenêtre de 1995 s'ouvre d'un coup.
    Le seul mouvement est celui de la base (l'onde du point live, une par publication), rendu ici
@@ -127,7 +128,7 @@
 /* ── En-tête : une barre d'outils ; le prix et sa variation dans des champs enfoncés ── */
 [data-theme="bureau95"] .header { padding: 5px 8px 5px 10px; gap: 10px; }
 [data-theme="bureau95"] .header-left { gap: 10px; }
-/* La roue, aux seize couleurs : un secteur par couleur, sans dégradé ni lueur. */
+/* La roue, aux couleurs VGA : un secteur par couleur, sans dégradé ni lueur. */
 [data-theme="bureau95"] .header-orb {
   width: 24px; height: 24px;
   --orbe:
