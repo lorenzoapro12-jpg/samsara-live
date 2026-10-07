@@ -48,6 +48,10 @@ SOURCE = "https://raw.githubusercontent.com/google/fonts/main/ofl/"
 PLAGES_LATIN = ("U+0020-007E,U+00A0-00FF,U+0100-017F,U+0131,U+0152-0153,U+02BC,U+02C6,U+02DC,U+1E42-1E43,"
                 "U+2000-206F,U+20AC,U+2190-2193,U+2211,U+2212,U+221A,U+2248,U+2264-2265,U+0393,U+0394,"
                 "U+03A3,U+03B3,U+03C3,U+2720,U+2766,U+2767,U+25C6,U+2756")
+# Police de TITRE aux chiffres proportionnels : ses chiffres sont RETIRÉS du sous-ensemble. Un
+# chiffre écrit dans un titre retombe alors sur la police système (chiffres tabulaires et lisibles) :
+# « jamais pour un nombre », par construction et non par discipline.
+PLAGES_LATIN_SANS_CHIFFRES = PLAGES_LATIN.replace("U+0020-007E", "U+0020-002F,U+003A-007E")
 FONCTIONS = "kern,liga,clig,calt,ccmp,locl,mark,mkmk,lnum,tnum,pnum,onum,case,smcp,c2sc"
 
 # « cible=base+marque:position » : Ā ā (macron au-dessus), Ṃ ṃ (point souscrit). Une marque peut
@@ -73,6 +77,12 @@ POLICES = [
          dossier="cinzel", source="Cinzel[wght].ttf", licence="cinzel.OFL.txt", horodatage=3874129693),
     dict(sortie="eb-garamond.woff2", famille="EB Garamond", origine="EB Garamond", theme="Codex",
          dossier="ebgaramond", source="EBGaramond[wght].ttf", licence="ebgaramond.OFL.txt", horodatage=3874129694),
+    # Bureau 95 : barres de titre, « Démarrer », bandeau du menu et titre SEULEMENT. Ses chiffres
+    # sont proportionnels (et son 5 ressemble à son S) : retirés, ils viennent de la police système.
+    # Une seule graisse servie (instance 700).
+    dict(sortie="bureau95-titres.woff2", famille="Pixelify Sans", origine="Pixelify Sans", theme="Bureau 95",
+         dossier="pixelifysans", source="PixelifySans[wght].ttf", licence="pixelifysans.OFL.txt",
+         instance={"wght": 700}, composes=COMPOSES_SAMSARA, plages=PLAGES_LATIN_SANS_CHIFFRES),
 ]
 
 
@@ -124,6 +134,8 @@ def lisezmoi():
             details.append("glyphes composés (là où ils manquent) : " + _composes_lisibles(p["composes"]))
         if p.get("texte"):
             details.append("lettres du titre seulement : « " + p["texte"] + " »")
+        elif p.get("plages") == PLAGES_LATIN_SANS_CHIFFRES:
+            details.append("plages : PLAGES_LATIN sans les chiffres (ils retombent sur la police système)")
         elif p.get("plages", PLAGES_LATIN) != PLAGES_LATIN:
             details.append("plages : PLAGES_LATIN" + (" + " + p["plages"][len(PLAGES_LATIN) + 1:] if p["plages"].startswith(PLAGES_LATIN) else " remplacées"))
         if details:

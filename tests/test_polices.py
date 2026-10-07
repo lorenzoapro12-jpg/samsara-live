@@ -16,7 +16,8 @@ est la seule source, et ce harnais la confronte à ce qui est réellement servi 
 3. LISEZMOI.txt est exactement celui que fabriquer.py écrit (python3 fonts/fabriquer.py --lisezmoi) ;
 4. chaque @font-face servi pointe vers une police déclarée, sous le nom que POLICES lui donne ;
 5. (avec fontTools) dans le fichier lui-même : aucun nom réservé dans les noms de famille,
-   glyphes composés présents, instance statique sans table fvar, plage d'axe respectée.
+   glyphes composés présents, instance statique sans table fvar, plage d'axe respectée, aucun
+   chiffre dans une police déclarée sans chiffres (PLAGES_LATIN_SANS_CHIFFRES).
 
 Sans réseau ; les contrôles 1 à 4 sans fontTools.
 USAGE
@@ -133,6 +134,9 @@ if TTFont:
         pb = [f"nom {i} « {v} » contient « {r} »" for r in fab.noms_reserves(lic) for i, v in noms.items()
               if r.lower().replace(" ", "") in v.lower().replace(" ", "")]
         pb += [f"glyphe composé U+{s.split('=')[0]} absent" for s in p.get("composes", []) if int(s.split("=")[0], 16) not in cmap]
+        # Police de titre déclarée SANS chiffres : aucun ne doit y rester (ils viennent de la police système).
+        if p.get("plages") == fab.PLAGES_LATIN_SANS_CHIFFRES:
+            pb += [f"chiffre « {chr(u)} » présent (police déclarée sans chiffres)" for u in range(0x30, 0x3A) if u in cmap]
         inst = p.get("instance") or {}
         if inst:
             axes = {a.axisTag: (a.minValue, a.maxValue) for a in f["fvar"].axes} if "fvar" in f else {}
