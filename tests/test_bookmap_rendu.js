@@ -108,9 +108,10 @@ const serveur = http.createServer((req, res) => {
 // opts : encodage, colonnes (heatmap.json servi en « colonnes-1 »), vue, S (simulateur),
 // intercept(url, chemin, S) → réponse à servir à la place, 'pendre' (jamais de réponse) ou rien ;
 // latenceHeatmap (ms) ; init (script avant la page) ; horloge (page.clock installée) ;
-// attendre: false (ne pas attendre le chargement complet).
+// attendre: false (ne pas attendre le chargement complet) ; contexte : options du contexte
+// (deviceScaleFactor, hasTouch, isMobile).
 async function ouvrir(nav, opts) {
-  const page = await nav.newPage({ viewport: opts.vue || { width: 1440, height: 860 } });
+  const page = await nav.newPage(Object.assign({ viewport: opts.vue || { width: 1440, height: 860 } }, opts.contexte || {}));
   const erreurs = [];
   page.on('pageerror', e => erreurs.push(e.message));
   const hotes = new Set(), S = opts.S || simulateur(), urls = [];
@@ -671,6 +672,271 @@ async function pixel(page, x, y) {
       check(`légende des bulles : « Surface ∝ volume de ${BM.btc(bb.min)} à ${BM.btc(bb.max)} BTC », tiré du code`, leg.includes('de ' + BM.btc(bb.min) + ' à ' + BM.btc(bb.max) + ' BTC'), leg);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p24.close();
+    }
+
+    // ════ Architecture du rendu : calques gardés, cadence ═════════════════════
+    titre('25. Calques gardés : après glissements, molette, suivi et flèches, la chaleur = un repeint complet');
+    {
+      let p25;
+      ({ page: p25, erreurs } = await ouvrir(nav, { encodage: true }));
+      const v0 = await p25.evaluate(() => window.__carte.verifierChaleur());
+      const rc = await p25.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(); return { x: r.left + r.width * 0.45, y: r.top + r.height * 0.35 }; });
+      await p25.mouse.move(rc.x, rc.y); await p25.mouse.down();
+      for (let i = 1; i <= 25; i++) { await p25.mouse.move(rc.x - i * 6.3, rc.y + Math.round(Math.sin(i / 4) * 20) + 0.37); await p25.waitForTimeout(20); }
+      await p25.mouse.up(); await p25.waitForTimeout(100);
+      const g = await p25.evaluate(() => window.__carte.verifierChaleur());
+      check(`glissement de 25 images : ${g.differents} pixel(s) différent(s) sur ${g.total} ; ${g.decalages - v0.decalages} décalages, ${g.complets - v0.complets} repeint(s) complet(s)`,
+        g.differents === 0 && g.decalages - v0.decalages >= 20 && g.complets - v0.complets <= 1, { v0, g });
+      for (let i = 0; i < 3; i++) { await p25.mouse.wheel(0, 120); await p25.waitForTimeout(40); }
+      const m = await p25.evaluate(() => window.__carte.verifierChaleur());
+      check(`molette (zoom) : ${m.differents} pixel(s) différent(s)`, m.differents === 0, m);
+      await p25.keyboard.press('ArrowLeft'); await p25.keyboard.press('ArrowUp'); await p25.waitForTimeout(100);
+      const f = await p25.evaluate(() => window.__carte.verifierChaleur());
+      check(`flèches (dixième de vue, arrondi au pixel) : ${f.differents} différent(s), décalées sans repeint complet`, f.differents === 0 && f.complets === m.complets, f);
+      // Suivre : la vue avance par pixels entiers ; on attend qu'elle ait avancé au moins une fois.
+      await p25.keyboard.press('r');
+      await p25.evaluate(([a, b]) => { const e = window.__carte.etat(); window.__carte.cadrer(e.maintenant - 10 * 60e3, e.maintenant + 45e3, e.vue.p1, e.vue.p2); }, []);
+      await p25.keyboard.press('f');
+      const s0 = await p25.evaluate(() => window.__carte.verifierChaleur());
+      await p25.waitForTimeout(3500);
+      const s1 = await p25.evaluate(() => window.__carte.verifierChaleur());
+      check(`suivre le présent (vue de 10 min) : avance par décalages (${s1.decalages - s0.decalages}), ${s1.differents} pixel(s) différent(s)`, s1.differents === 0 && s1.decalages > s0.decalages && s1.complets === s0.complets, { s0, s1 });
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p25.close();
+    }
+
+    titre('26. Cadence : au repos, un rendu par seconde au plus ; un geste rend tout de suite');
+    {
+      let p26;
+      ({ page: p26, erreurs } = await ouvrir(nav, { encodage: true }));
+      const a = await etat(p26), t = Date.now();
+      await p26.waitForTimeout(6000);
+      const b = await etat(p26), parS = (b.mesure.rendus - a.mesure.rendus) / ((Date.now() - t) / 1000);
+      check(`repos (carnet / 2 s, exécutions / 1 s) : ${parS.toFixed(2)} rendu(s) par seconde (au plus ~1)`, parS <= 1.25 && parS >= 0.6, parS);
+      check('les données arrivées pendant ce temps sont dessinées (carnet live et âges à jour)', b.live.n > a.live.n && b.chaleurPeinteA > a.chaleurPeinteA, { a: a.live.n, b: b.live.n });
+      const r0 = (await etat(p26)).mesure.rendus;
+      await p26.mouse.move(500, 400);
+      await p26.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+      const r1 = (await etat(p26)).mesure.rendus;
+      check('un mouvement du pointeur : rendu à l\'image suivante', r1 > r0, { r0, r1 });
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p26.close();
+    }
+
+    titre('27. Densité 2 : la lecture au pointeur donne la couleur AFFICHÉE (MAX du pixel), après un glissement');
+    {
+      let p27;
+      ({ page: p27, erreurs } = await ouvrir(nav, { encodage: true, contexte: { deviceScaleFactor: 2 } }));
+      for (const k of ['live', 'executions', 'prix', 'bidask', 'murs', 'gamma', 'profil']) await p27.click(`button[data-calque="${k}"]`);
+      const zw = await p27.evaluate(() => window.__carte.etat().mise.chaleur.w), zh = await p27.evaluate(() => window.__carte.etat().mise.chaleur.h);
+      await p27.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [G.t0, G.t0 + G.W * G.dt, pMid - 900, pMid + 900]);
+      await p27.waitForTimeout(300);
+      const rc = await p27.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(); return { x: r.left, y: r.top }; });
+      await p27.mouse.move(rc.x + zw * 0.6, rc.y + zh * 0.5); await p27.mouse.down();
+      for (let i = 1; i <= 8; i++) { await p27.mouse.move(rc.x + zw * 0.6 - i * 4.6, rc.y + zh * 0.5 + i * 1.3); await p27.waitForTimeout(20); }
+      await p27.mouse.up(); await p27.waitForTimeout(200);
+      const vue = (await etat(p27)).vue, tpp = (vue.t2 - vue.t1) / zw, pp = (vue.p2 - vue.p1) / zh;
+      const pasG = BM.pasRond((vue.p2 - vue.p1) / Math.max(4, zh / 70)), lignes = [];
+      for (let q = Math.ceil(vue.p1 / pasG) * pasG; q <= vue.p2; q += pasG) lignes.push(Math.round((vue.p2 - q) / pp));
+      const lirePx = (x, y) => { const [ja, jb] = BM.tranchesLigne(vue.p2, pp, y, G.dp, [0, 0]); const ta = vue.t1 + x * tpp; return BM.lirePixel(G, ta, ta + tpp, ja, jb); };
+      let cibles = [];
+      for (let x = Math.floor(zw * 0.25); x < zw * 0.75 && cibles.length < 3; x += 7) for (let y = Math.floor(zh * 0.25); y < zh * 0.75 && cibles.length < 3; y += 11) {
+        const r = lirePx(x, y);
+        if (!r || r.nObs < 2 || r.horsBande || !r.v || r.v === 255 || lignes.some(l => Math.abs(l - y) < 3)) continue;
+        cibles.push({ x, y, v: r.v, cote: r.cote });
+      }
+      let ok27 = cibles.length === 3, det = [];
+      for (const c of cibles) {
+        await p27.mouse.move(rc.x + c.x + 0.3, rc.y + c.y + 0.3); await p27.mouse.move(rc.x + c.x + 0.5, rc.y + c.y + 0.5); await p27.waitForTimeout(250);
+        const lu = await p27.evaluate(() => document.getElementById('lecture').innerText);
+        const m = lu.match(/Carte [^\n]*\((bid|ask)\) : intensité (\d+)/);
+        const ecran = await p27.evaluate(([x, y]) => {
+          const cv = document.getElementById('carte'), k = cv.width / cv.clientWidth, d = cv.getContext('2d').getImageData(Math.floor((x + 0.5) * k), Math.floor((y + 0.5) * k), 1, 1).data;
+          return (d[0] | d[1] << 8 | d[2] << 16 | 255 << 24) >>> 0;
+        }, [c.x, c.y]);
+        const attendu = m && await p27.evaluate(([v, cote]) => window.__carte.couleurIntensite(v, cote), [+m[2], m[1]]);
+        det.push({ c, lu: m && m[2], ecran, attendu });
+        if (!m || +m[2] !== c.v || ecran !== attendu) ok27 = false;
+      }
+      check(`${cibles.length} pixels de plusieurs colonnes : intensité lue = MAX du pixel = couleur à l'écran (densité 2, après glissement)`, ok27, det);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p27.close();
+    }
+
+    // ════ Mise en page : en-tête, canevas, densité, pastilles ═══════════════════
+    titre('28. En-tête : jamais plus de deux lignes ; canevas à sa taille réelle (jamais étiré)');
+    for (const [w, h, dpr] of [[800, 900, 1], [1024, 768, 1], [1280, 800, 1], [1440, 860, 1], [740, 360, 2], [568, 320, 2]]) {
+      const pg = await nav.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: dpr });
+      await pg.route('**/*', r => (new URL(r.request().url()).host.startsWith('127.0.0.1') ? r.continue() : r.abort()));
+      await pg.goto(`http://127.0.0.1:${serveur.address().port}/bookmap.html`);
+      await pg.waitForTimeout(1500);          // sans donnée : le battement (1 s) met le canevas à sa taille
+      const d = await pg.evaluate(() => { const c = document.getElementById('carte'), b = document.querySelector('.barre').getBoundingClientRect(); return { barre: b.height, cw: c.clientWidth, ch: c.clientHeight, bw: c.width, bh: c.height, defil: document.documentElement.scrollWidth - innerWidth }; });
+      const etire = Math.abs(d.bw / d.cw - d.bh / d.ch) > 0.02;
+      check(`${w} × ${h} (densité ${dpr}) : en-tête ${Math.round(d.barre)} px, canevas ${d.cw} × ${d.ch} CSS → ${d.bw} × ${d.bh}, ${etire ? 'ÉTIRÉ' : 'non étiré'}`,
+        d.barre <= 82 && !etire && d.defil <= 0 && d.ch >= Math.min(400, h - 120), d);
+      await pg.close();
+    }
+
+    titre('29. Téléphone (390 × 844, densité 3, tactile) : canevas net, pastilles dans la carte, panneaux atteignables');
+    {
+      let p29;
+      ({ page: p29, erreurs } = await ouvrir(nav, { encodage: true, vue: { width: 390, height: 844 }, contexte: { deviceScaleFactor: 3, hasTouch: true, isMobile: true } }));
+      const e29 = await etat(p29), d = await p29.evaluate(() => { const c = document.getElementById('carte'); return { bw: c.width, cw: c.clientWidth, defil: document.documentElement.scrollWidth - innerWidth }; });
+      check(`canevas à la densité de l'écran : ${d.bw} px pour ${d.cw} px CSS (×3, pas ×2)`, d.bw === Math.round(d.cw * 3), d);
+      check('aucun défilement horizontal', d.defil <= 0, d);
+      const dans = p => p.x >= 0 && p.y >= 0 && p.x + p.w <= e29.mise.chaleur.w + 0.5 && p.y + p.h <= e29.mise.chaleur.h + 0.5;
+      const pas = e29.posees.filter(p => p.pastille);
+      check(`${pas.length} pastilles d'âge, toutes DANS la carte`, pas.length >= 5 && pas.every(dans), pas);
+      for (const id of ['legende', 'reglages']) {
+        await p29.click(id === 'legende' ? '#btnLegende' : '#btnReglages');
+        const r = await p29.evaluate(i => { const p = document.getElementById(i); p.scrollTop = p.scrollHeight; const der = [...p.querySelectorAll('p, button, dd, select')].pop().getBoundingClientRect(), b = document.querySelector('.barre').getBoundingClientRect(), pr = p.getBoundingClientRect();
+          return { bas: der.bottom, haut: pr.top, barre: b.bottom, vh: innerHeight }; }, id);
+        check(`panneau « ${id} » : sous la barre (${Math.round(r.haut)} ≥ ${Math.round(r.barre)}), dernier élément visible (${Math.round(r.bas)} ≤ ${r.vh})`, r.haut >= r.barre && r.bas <= r.vh, r);
+        await p29.keyboard.press('Escape');
+      }
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p29.close();
+    }
+
+    titre('30. Carte basse (844 × 390, densité 3) : chaque âge reste DANS la carte');
+    {
+      let p30;
+      ({ page: p30, erreurs } = await ouvrir(nav, { encodage: true, vue: { width: 844, height: 390 }, contexte: { deviceScaleFactor: 3 } }));
+      const e30 = await etat(p30), H = e30.mise.chaleur.h, W = e30.mise.chaleur.w;
+      const pas = e30.posees.filter(p => p.pastille);
+      const noms = ['Carte publiée', 'Live', 'Exécutions', 'Murs', 'Gamma'];
+      check(`carte de ${W} × ${H} px : ${pas.length} pastilles (${pas.map(p => p.texte.split(' ·')[0]).join(', ')}), toutes dans la carte`,
+        noms.every(n => pas.some(p => p.texte.startsWith(n))) && pas.every(p => p.y >= 0 && p.y + p.h <= H + 0.5 && p.x >= 0 && p.x + p.w <= W + 0.5), pas);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p30.close();
+    }
+
+    // ════ Interaction : doigt, clavier, accessibilité ══════════════════════════
+    titre('31. Au doigt : un appui bref épingle la lecture, un appui long la montre, glisser déplace');
+    {
+      let p31;
+      ({ page: p31, erreurs } = await ouvrir(nav, { encodage: true, vue: { width: 390, height: 844 }, contexte: { deviceScaleFactor: 3, hasTouch: true, isMobile: true } }));
+      const cdp = await p31.context().newCDPSession(p31);
+      const touche = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+      const rc = await p31.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(), z = window.__carte.etat().mise.chaleur; return { x: r.left + z.w * 0.4, y: r.top + z.h * 0.45 }; });
+      const visible = () => p31.evaluate(() => !document.getElementById('lecture').hidden && document.getElementById('lecture').innerText);
+      await p31.touchscreen.tap(rc.x, rc.y); await p31.waitForTimeout(300);
+      const lu = await visible();
+      check('appui bref : la lecture s\'affiche (prix, heure, valeur du pixel)', lu && /\$/.test(lu) && /\d\d:\d\d:\d\d/.test(lu), lu);
+      await p31.waitForTimeout(450);
+      await p31.touchscreen.tap(rc.x, rc.y); await p31.waitForTimeout(300);
+      check('le même appui l\'enlève', !(await visible()));
+      const v0 = (await etat(p31)).vue;
+      await touche('touchStart', rc.x, rc.y);
+      for (let i = 1; i <= 8; i++) { await touche('touchMove', rc.x - i * 9, rc.y + i * 2); await p31.waitForTimeout(16); }
+      await touche('touchEnd'); await p31.waitForTimeout(250);
+      const v1 = (await etat(p31)).vue;
+      check('glisser : la carte se déplace (de 72 px), sans lecture', v1.t1 > v0.t1 && !(await visible()), { dt: v1.t1 - v0.t1 });
+      await touche('touchStart', rc.x, rc.y); await p31.waitForTimeout(700);
+      const pendant = await visible();
+      await touche('touchMove', rc.x + 30, rc.y - 20); await p31.waitForTimeout(150);
+      const v2 = (await etat(p31)).vue, sx = (await etat(p31)).souris;
+      await touche('touchEnd'); await p31.waitForTimeout(200);
+      check('appui long : la lecture s\'affiche, suit le doigt, la carte ne bouge pas', pendant && v2.t1 === v1.t1 && sx && Math.abs(sx.x - (rc.x + 30)) < 40 && (await visible()), { pendant: !!pendant, sx });
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p31.close();
+    }
+
+    titre('32. Souris : la croix suit le pointeur PENDANT un glissement ; la lecture revient au lâcher');
+    {
+      let p32;
+      ({ page: p32, erreurs } = await ouvrir(nav, { encodage: true }));
+      const rc = await p32.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(); return { x: r.left, y: r.top }; });
+      await p32.mouse.move(rc.x + 600, rc.y + 300); await p32.mouse.down();
+      for (let i = 1; i <= 10; i++) { await p32.mouse.move(rc.x + 600 + i * 15, rc.y + 300 + i * 6); await p32.waitForTimeout(20); }
+      const e = await etat(p32), cache = await p32.evaluate(() => document.getElementById('lecture').hidden);
+      await p32.mouse.up(); await p32.waitForTimeout(200);
+      const apres = await p32.evaluate(() => !document.getElementById('lecture').hidden);
+      check(`pendant le glissement : croix sous le pointeur (${Math.round(e.souris && e.souris.x)}, ${Math.round(e.souris && e.souris.y)}), lecture masquée`, e.souris && Math.abs(e.souris.x - 750) < 1 && Math.abs(e.souris.y - 360) < 1 && cache, e.souris);
+      check('au lâcher : la lecture revient, là où est le pointeur', apres);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p32.close();
+    }
+
+    titre('33. Clavier : les raccourcis du navigateur restent au navigateur ; Échap ferme un panneau depuis un réglage');
+    {
+      let p33;
+      ({ page: p33, erreurs } = await ouvrir(nav, { encodage: true }));
+      await p33.keyboard.press('r'); await p33.waitForTimeout(200);
+      const a = await etat(p33), leg0 = await p33.evaluate(() => document.getElementById('legende').hidden);
+      for (const k of ['Control+f', 'Meta+f', 'Control+l', 'Control+Equal', 'Control+Minus', 'Alt+ArrowLeft']) await p33.keyboard.press(k);
+      await p33.waitForTimeout(200);
+      const b = await etat(p33), leg1 = await p33.evaluate(() => document.getElementById('legende').hidden);
+      check('Ctrl/Cmd+F, Ctrl+L, Ctrl+=, Ctrl+−, Alt+← : ni suivi, ni légende, ni zoom, ni déplacement', a.suivre === b.suivre && leg0 === leg1 && Math.abs((b.vue.t2 - b.vue.t1) - (a.vue.t2 - a.vue.t1)) < 1, { a: a.vue, b: b.vue, s: [a.suivre, b.suivre] });
+      await p33.keyboard.press('l'); await p33.waitForTimeout(100);
+      check('L (sans modificateur) : la légende s\'ouvre', !(await p33.evaluate(() => document.getElementById('legende').hidden)));
+      await p33.keyboard.press('Escape');
+      await p33.click('#btnReglages'); await p33.focus('#rPalette'); await p33.keyboard.press('Escape'); await p33.waitForTimeout(100);
+      const r = await p33.evaluate(() => ({ cache: document.getElementById('reglages').hidden, focus: document.activeElement && document.activeElement.id }));
+      check('Échap depuis la liste « Palette » : le panneau se ferme, le bouton Réglages reprend la main', r.cache && r.focus === 'btnReglages', r);
+      await p33.click('#btnReglages');
+      const n = await p33.evaluate(() => ({ seuil: document.getElementById('rSeuil').labels.length, sat: document.getElementById('rSaturation').labels.length }));
+      const seuil = await p33.getByRole('slider', { name: /Seuil bas/ }).count(), sat = await p33.getByRole('slider', { name: /Saturation/ }).count();
+      check('curseurs nommés : « Seuil bas » et « Saturation » (rôle slider)', seuil === 1 && sat === 1 && n.seuil === 1 && n.sat === 1, { seuil, sat, n });
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p33.close();
+    }
+
+    titre('34. Légende : chaque libellé sous SA couleur ; deux rampes pour la palette bid / ask');
+    {
+      let p34;
+      ({ page: p34, erreurs } = await ouvrir(nav, { encodage: true }));
+      await p34.click('#btnLegende');
+      const pos = await p34.evaluate(() => {
+        const b = document.querySelector('#barreCouleurs .rampe').getBoundingClientRect();
+        return [...document.querySelectorAll('#gradBarre span')].map(s => { const r = s.getBoundingClientRect(), v = +s.dataset.v;
+          return { v, centre: (r.left + r.right) / 2, gauche: r.left, droite: r.right, attendu: b.left + (v + 0.5) / 256 * b.width, bg: b.left, bd: b.right }; });
+      });
+      const okPos = pos.length === 5 && pos.every(p => (p.v === 0 ? Math.abs(p.gauche - p.bg) < 1.5 : p.v === 255 ? Math.abs(p.droite - p.bd) < 1.5 : Math.abs(p.centre - p.attendu) < 1.5));
+      check('libellés 64 / 128 / 192 centrés sur leur intensité ; 0 et 255 aux bords de la barre', okPos, pos);
+      await p34.evaluate(() => { const s = document.getElementById('rPalette'); s.value = 'cote'; s.dispatchEvent(new Event('input')); });
+      const rampes = await p34.evaluate(() => [...document.querySelectorAll('#barreCouleurs .rampe')].map(r => ({ cote: r.dataset.rampe, img: r.style.backgroundImage.length })));
+      const noms = await p34.evaluate(() => [...document.querySelectorAll('#barreCouleurs .rampe-nom')].map(n => n.textContent));
+      check('palette « bid / ask teintés » : deux rampes nommées (bid, ask)', rampes.length === 2 && rampes[0].cote === 'bid' && rampes[1].cote === 'ask' && rampes.every(r => r.img > 50) && noms.length === 2, { rampes, noms });
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p34.close();
+    }
+
+    titre('35. Volume et CVD : rien sous l\'axe des prix ni sous le carnet latéral, même au zoom fin');
+    {
+      let p35, S;
+      ({ page: p35, erreurs, S } = await ouvrir(nav, { encodage: true }));
+      const now = S.now();
+      // Vue de 110 s finissant dans la minute en cours : une barre de volume fait ~700 px.
+      await p35.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [now - 100e3, now + 10e3, S.prix(now) - 60, S.prix(now) + 60]);
+      await p35.waitForTimeout(400);
+      const r = await p35.evaluate(() => {
+        const e = window.__carte.etat(), z = e.mise, cv = document.getElementById('carte'), k = cv.width / cv.clientWidth, c = cv.getContext('2d');
+        const y0 = z.chaleur.h + 20, y1 = Math.floor(z.h) - 1, x0 = z.chaleur.w + 2;
+        const d = c.getImageData(Math.ceil(x0 * k), Math.ceil(y0 * k), Math.floor((Math.floor(z.w) - x0) * k), Math.floor((y1 - y0) * k)).data;
+        let vifs = 0; for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 200) vifs++;
+        return { vifs, zone: [x0, y0, Math.floor(z.w), y1] };
+      });
+      check(`bande à droite de la carte, sous l'axe du temps : ${r.vifs} pixel(s) vif(s) (barres ou courbe débordantes)`, r.vifs === 0, r);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p35.close();
+    }
+
+    titre('36. Carnet : plus lu quand aucun calque ne s\'en sert ; relu dès qu\'un calque le demande');
+    {
+      let p36, S;
+      ({ page: p36, erreurs, S } = await ouvrir(nav, { encodage: true }));
+      for (const k of ['live', 'dom', 'bidask']) await p36.click(`button[data-calque="${k}"]`);
+      await p36.waitForTimeout(500);
+      const n0 = S.compte.depth;
+      await p36.waitForTimeout(5000);
+      const n1 = S.compte.depth;
+      check(`chaleur live, carnet latéral et bid / ask éteints : ${n1 - n0} lecture(s) du carnet en 5 s`, n1 === n0, { n0, n1 });
+      await p36.click('button[data-calque="dom"]');
+      await p36.waitForTimeout(2500);
+      check('carnet latéral rallumé : le carnet est relu', S.compte.depth > n1, { n1, n2: S.compte.depth });
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p36.close();
     }
   } finally {
     await nav.close();
