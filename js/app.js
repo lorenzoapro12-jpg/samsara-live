@@ -3830,7 +3830,7 @@ async function fetchMarket(force) {
     const d = await lireSiNouveau(resp, marketData && marketData.updated);
     marcheLu = Date.now();
     Horloges.noter('marche');
-    if (d) marketData = d;
+    if (d) { marketData = d; chronique.ajouter(d); }
     // Une relecture manquée avait remplacé les cartes par l'erreur : elles reviennent dès la
     // suivante, même si la publication n'a pas changé.
     if (d || marcheEnErreur) { renderFeed(); marcheEnErreur = false; }
@@ -4198,16 +4198,59 @@ function ladderHtml(asks, bids, mid) {
 const tuile = (lbl, val, sub, fiche, lecture) => '<div class="tuile"><div class="lbl">' + lbl + (fiche ? infoBtn(fiche) : '') + '</div><div class="val">' + val + '</div>'
   + (sub ? '<div class="sub">' + sub + '</div>' : '') + (lecture || '') + '</div>';
 
+// Bande de chiffres clés de l'en-tête : la publication en un coup d'œil, par ordre d'utilité
+// (ce qui ne tient pas en largeur est coupé à droite). TOUTES ces valeurs viennent du même
+// fichier, au même instant ; son âge ferme la bande. Rien n'y est mêlé au prix live.
+// Refaite à chaque publication, et quand la chronique a fini de relire l'historique.
+function renderCycle(d) {
+  const cy = document.getElementById('cycle');
+  if (!cy) return;
+  const x = d.micro || {}, m = d.macro || {}, tf = d.tf || {};
+  const upd = d.updated ? new Date(d.updated) : null;
+  // Signe moins typographique partout (« −2.0% » comme « −$76M »), pas un tiret.
+  // Chaque chiffre porte sa trace des dernières heures (js/chronique.js), sur la ligne de son
+  // libellé : la hauteur de la bande ne change pas. Elle cède la place avant toute valeur
+  // (ajusterKpis). Sans historique, pas de trace (rien d'inventé).
+  const kpi = (lbl, val, cls, chemin) => '<span class="kpi"' + titreKpi(chemin) + '><span class="kpi-t"><i>' + lbl + '</i>' + traceKpi(chemin) + '</span><b' + (cls ? ' class="' + cls + '"' : '') + '>'
+    + String(val).replace(/^-/, '−') + '</b></span>';
+  const t4 = tf['4h'] || {};
+  const oiK = isNum(x.oi_change_24h_pct) ? x.oi_change_24h_pct : x.oi_change_1d_pct;
+  const ageK = upd ? Math.max(0, Math.round((Date.now() - upd.getTime()) / 60000)) : null;
+  cy.innerHTML = kpi('RSI 4h', fmtNum(t4.rsi_14, 1), '', 'tf.4h.rsi_14')
+    + kpi('Funding', pctSigne(x.funding_annual_pct, 1), signCls(x.funding_annual_pct), 'micro.funding_annual_pct')
+    + kpi('OI 24h', pctSigne(oiK, 1), signCls(oiK), 'micro.oi_change_24h_pct')
+    + kpi('CVD 24h', fmtSigned(x.cvd_24h_usd), signCls(x.cvd_24h_usd), 'micro.cvd_24h_usd')
+    + kpi('GEX', isNum(x.gex_usd_1pct) ? (x.gex_usd_1pct > 0 ? 'long γ' : 'short γ') : '—', signCls(x.gex_usd_1pct), 'micro.gex_usd_1pct')
+    + kpi('L/S', fmtNum(x.ls_ratio, 2), '', 'micro.ls_ratio')
+    + kpi('DXY', fmtNum(m.dxy_spot, 2), '', 'macro.dxy_spot')
+    + kpi('VIX', fmtNum(m.vix, 1), '', 'macro.vix')
+    // L'âge avance chaque minute sans refaire la bande : majAges() réécrit les [data-age-de].
+    + '<span class="kpi-age" title="Âge de la publication">' + (ageK === null ? '—' : ageDe(d.updated, ageK) + ' min') + '</span>';
+  cy.classList.toggle('vieux', ageK !== null && ageK > CADENCES.vieux_min);
+  const cad = chronique.cadence();
+  cy.title = 'Dernière publication (cadence ' + (cad ? 'mesurée ' + Math.round(cad / 60000) : 'attendue ' + CADENCES.attendue_min) + ' min) — cliquer pour le détail';
+  ajusterKpis();
+}
 function renderFeed() { renderFeedTo(document.getElementById('feed')); }
 // Un âge en minutes, réécrit sur place à chaque tour par majAges().
 const ageDe = (updated, min) => '<span data-age-de="' + escHtml(updated) + '">' + min + '</span>';
 // Ce qui ne tient pas dans la bande est masqué EN ENTIER, en partant de la fin (ordre d'utilité).
+// Les traces (js/chronique.js) passent APRÈS les valeurs : on place d'abord les valeurs seules,
+// puis on rend leur trace aux premières tant qu'elles tiennent. Une valeur n'est jamais masquée
+// pour faire place à une trace (toutes tracées, 3 chiffres clés sur 5 tenaient à 1440 px en
+// Aero — mesuré).
 function ajusterKpis() {
   const cy = document.getElementById('cycle');
   if (!cy || !cy.querySelectorAll) return;
   const items = Array.from(cy.querySelectorAll('.kpi'));
-  items.forEach(k => { k.hidden = false; });
-  for (let i = items.length - 1; i > 0 && cy.scrollWidth > cy.clientWidth + 1; i--) items[i].hidden = true;
+  items.forEach(k => { k.hidden = false; k.classList.add('sans-trace'); });
+  const deborde = () => cy.scrollWidth > cy.clientWidth + 1;
+  for (let i = items.length - 1; i > 0 && deborde(); i--) items[i].hidden = true;
+  for (const k of items) {
+    if (k.hidden || !k.querySelector('.chron-spark')) continue;
+    k.classList.remove('sans-trace');
+    if (deborde()) { k.classList.add('sans-trace'); break; }
+  }
 }
 // Le ruban défile quand il ne tient pas : le fondu de droite ne s'affiche qu'à ce moment-là.
 function ajusterRuban() {
@@ -4244,33 +4287,11 @@ function renderFeedTo(container) {
   // c'était l'heure locale du poste (Paris, +2 h en été) affichée sous l'étiquette UTC.
   const hhmm = upd ? upd.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'UTC'}) : '—';
 
-  // Bande de chiffres clés de l'en-tête : la publication en un coup d'œil, par ordre d'utilité
-  // (ce qui ne tient pas en largeur est coupé à droite). TOUTES ces valeurs viennent du même
-  // fichier, au même instant ; son âge ferme la bande. Rien n'y est mêlé au prix live.
-  const cy = document.getElementById('cycle');
-  if (cy) {
-    // Signe moins typographique partout (« −2.0% » comme « −$76M »), pas un tiret.
-    const kpi = (lbl, val, cls) => '<span class="kpi"><i>' + lbl + '</i><b' + (cls ? ' class="' + cls + '"' : '') + '>'
-      + String(val).replace(/^-/, '−') + '</b></span>';
-    const t4 = tf['4h'] || {};
-    const oiK = isNum(x.oi_change_24h_pct) ? x.oi_change_24h_pct : x.oi_change_1d_pct;
-    const ageK = upd ? Math.max(0, Math.round((Date.now() - upd.getTime()) / 60000)) : null;
-    cy.innerHTML = kpi('RSI 4h', fmtNum(t4.rsi_14, 1))
-      + kpi('Funding', pctSigne(x.funding_annual_pct, 1), signCls(x.funding_annual_pct))
-      + kpi('OI 24h', pctSigne(oiK, 1), signCls(oiK))
-      + kpi('CVD 24h', fmtSigned(x.cvd_24h_usd), signCls(x.cvd_24h_usd))
-      + kpi('GEX', isNum(x.gex_usd_1pct) ? (x.gex_usd_1pct > 0 ? 'long γ' : 'short γ') : '—', signCls(x.gex_usd_1pct))
-      + kpi('L/S', fmtNum(x.ls_ratio, 2))
-      + kpi('DXY', fmtNum(m.dxy_spot, 2))
-      + kpi('VIX', fmtNum(m.vix, 1))
-      // L'âge avance chaque minute sans refaire la bande : majAges() réécrit les [data-age-de].
-      + '<span class="kpi-age" title="Âge de la publication">' + (ageK === null ? '—' : ageDe(d.updated, ageK) + ' min') + '</span>';
-    cy.classList.toggle('vieux', ageK !== null && ageK > CADENCES.vieux_min);
-    cy.title = 'Dernière publication (cadence ' + CADENCES.attendue_min + ' min) — cliquer pour le détail';
-    ajusterKpis();
-  }
+  // L'heure d'abord : elle élargit la droite de l'en-tête, et la bande se mesure ensuite —
+  // dans l'autre ordre, des chiffres clés restaient « affichés » mais coupés (mesuré à 1440 px).
   const up = document.getElementById('updated');
   if (up) up.textContent = hhmm;
+  renderCycle(d);
 
   let html = '';
   carteEntree = !(container.dataset && container.dataset.vu);
@@ -4453,6 +4474,50 @@ function renderFeedTo(container) {
   brancherContre(container);
 }
 
+// ═══ CHRONIQUE (traces des chiffres clés, courbe des fiches) ══════════════════════
+// L'historique vient de js/chronique.js : publications relues à /master~N/ (même hôte que
+// DATA_URL), puis chaque lecture vivante. Suivis : les chiffres clés de l'en-tête et le champ
+// de chaque fiche (un champ par TF se lit sur le 4h). Rendu à l'arrivée d'une donnée seulement.
+const CHRONIQUE_KPIS = ['tf.4h.rsi_14', 'micro.funding_annual_pct', 'micro.oi_change_24h_pct', 'micro.cvd_24h_usd',
+  'micro.gex_usd_1pct', 'micro.ls_ratio', 'macro.dxy_spot', 'macro.vix'];
+const cheminFiche = champ => champ.replace('.*.', '.4h.');
+const chronique = (function () {
+  let st = null;
+  try { st = localStorage; } catch (e) { /* stockage refusé : la chronique vit en mémoire */ }
+  const fiches = typeof FICHES !== 'undefined' ? Object.values(FICHES).filter(f => f.champ).map(f => cheminFiche(f.champ)) : [];
+  return Chronique.creer({ url: DATA_URL, stockage: st, fetch: u => fetch(u), chemins: [...new Set(CHRONIQUE_KPIS.concat(fiches))] });
+})();
+/** L'entrée de meta.champs d'un chemin suivi (« tf.4h.x » se décrit sous « tf.*.x »). */
+function metaChronique(chemin) {
+  const c = marketData && marketData.meta && marketData.meta.champs;
+  return c ? c[chemin] || c[chemin.replace(/^tf\.[^.]+\./, 'tf.*.')] || null : null;
+}
+const fmtChronique = v => typeof fmtValF === 'function' ? fmtValF(v) : String(v);
+function traceKpi(chemin) {
+  return chemin ? chronique.trace(chemin, { l: 36, h: 10, classe: 'chron-spark', meta: metaChronique(chemin), fmt: fmtChronique }) : '';
+}
+/** Le résumé de la trace en infobulle du chiffre clé : lisible même quand la trace a cédé sa
+ *  place (ajusterKpis). */
+function titreKpi(chemin) {
+  const r = chemin ? chronique.resume(chemin, { meta: metaChronique(chemin), fmt: fmtChronique }) : '';
+  return r ? ' title="' + escHtml(r).replace(/"/g, '&quot;') + '"' : '';
+}
+/** La courbe d'une fiche (js/fiches.js) : trous hachurés, résumé lisible sous la courbe. */
+function chroniqueFiche(champ, id) {
+  const chemin = cheminFiche(champ), o = { l: 300, h: 56, classe: 'chron-fiche', hachures: true, etire: true, id, meta: metaChronique(chemin), fmt: fmtChronique };
+  const svg = chronique.trace(chemin, o);
+  if (!svg) return '';
+  return '<div class="fiche-chronique"><div class="fiche-chronique-tete">Dernières heures de publications'
+    + (chemin !== champ ? ' · 4h' : '') + '</div>' + svg + '<div class="fiche-chronique-pied">' + escHtml(chronique.resume(chemin, o)) + '</div></div>';
+}
+let chroniqueLancee = false;
+/** Une fois par session, après le premier écran, onglet visible : la marche dans git. */
+function lancerChronique() {
+  if (chroniqueLancee || document.hidden) return;
+  chroniqueLancee = true;
+  chronique.parcourir().then(() => { if (marketData) renderCycle(marketData); majHorloges(); });
+}
+
 // ═══ HORLOGES (carte) ═══════════════════════════════════════════════════════════
 // La liste vient de js/horloges.js (meta.champs `horodatage` + horloges de la page). Les âges
 // avancent sans refaire la carte : majHorloges() réécrit les [data-horloge-t] / [data-horloge-src]
@@ -4460,7 +4525,7 @@ function renderFeedTo(container) {
 // si l'état d'une source change (panne, retour, écart d'horloge).
 const FMT_UTC = t => new Date(t).toISOString().slice(11, 19);
 function horlogesPageHtml() {
-  const lignes = Horloges.dePage({ marche: marketData, chaleur: histHeatmap }), t = Horloges.maintenant();
+  const lignes = Horloges.dePage({ marche: marketData, chaleur: histHeatmap, cadenceMesureeMs: chronique.cadence() }), t = Horloges.maintenant();
   const ecart = Horloges.texteEcart();
   return (ecart ? '<div class="horloge-ecart">' + escHtml(ecart) + '</div>' : '')
     + lignes.map(l => '<div class="horloge-ligne' + (l.classe ? ' ko' : '') + '"><span class="h-nom">' + escHtml(l.libelle) + '</span>'
@@ -4485,7 +4550,7 @@ let sigHorloges = '';
 function majHorloges() {
   if (!document.querySelectorAll) return;
   const sig = Object.entries(Horloges.sources).map(([k, s]) => k + (s.ok ? 1 : 0) + (s.classe || '')).join() + Horloges.texteEcart()
-    + (marketData && marketData.updated) + (histHeatmap && histHeatmap.updated);
+    + (marketData && marketData.updated) + (histHeatmap && histHeatmap.updated) + chronique.cadence();
   if (sig !== sigHorloges) {
     sigHorloges = sig;
     for (const el of document.querySelectorAll('.horloges-page')) el.innerHTML = horlogesPageHtml();
@@ -5016,9 +5081,12 @@ async function init() {
   const heureBinance = visible(() => Horloges.mesurer(API_BINANCE + 'time'));
   heureBinance();
   setInterval(heureBinance, CADENCES.horloge_binance);
+  // L'historique des publications : une rafale unique, après que le premier écran est peint.
+  setTimeout(lancerChronique, 1500);
   document.addEventListener('visibilitychange', async () => {
     if (document.hidden) return;
     if (contre.attente) lancerContre();
+    lancerChronique();
     fetchPrice(); fetchMarket();
     if (overlays.liq) fetchHeatmap();
     if (await fetchKlines()) drawChart();

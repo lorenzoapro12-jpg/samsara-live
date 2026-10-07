@@ -380,6 +380,9 @@ function ficheHtml(id) {
       + (m && m.unite ? ' <span class="fiche-unite">' + echapF(m.unite) + '</span>' : '')
       + (age !== null ? ' <span class="fiche-age">· publié il y a ' + age + ' min</span>' : '') + '</p>';
     if (m && m.nom_trompeur) h += '<p class="fiche-alerte">Nom trompeur : ' + echapF(m.nom_trompeur) + '</p>';
+    // Les dernières heures de ce champ, publication par publication (js/chronique.js) : même
+    // HTML dans les deux modes ; absent tant qu'aucun historique n'est lu.
+    if (typeof chroniqueFiche === 'function') h += chroniqueFiche(f.champ, id);
   }
   h += '<h4>Comment ça se lit</h4><ul class="fiche-lectures">' + f.lectures.map(l =>
     '<li><span class="statut statut-' + echapF(l.s) + '">' + echapF(STATUTS[l.s] || l.s) + '</span> ' + echapF(l.t) + '</li>').join('') + '</ul>';

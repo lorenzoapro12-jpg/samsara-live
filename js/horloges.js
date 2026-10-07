@@ -151,7 +151,8 @@ const Horloges = (function () {
     }
     return out;
   }
-  /** Les horloges de la PAGE. ctx = { marche: {updated}, chaleur: {updated}|null, cadenceMesureeMs }.
+  /** Les horloges de la PAGE. ctx = { marche: {updated}, chaleur: {updated}|null, cadenceMesureeMs }
+   *  (cadenceMesureeMs : médiane des écarts entre publications, mesurée par js/chronique.js).
    *  → [{ cle, libelle, source, t, classe, libelle_panne, seuil }] ; t = dernier succès. */
   function dePage(ctx, t) {
     t = t || maintenant();
@@ -163,9 +164,11 @@ const Horloges = (function () {
     src('prix', 'Prix (ticker)', 'Binance spot');
     src('bougies', 'Bougies du graphique', 'Binance spot');
     src('live', 'Lecture ⚡', 'Binance spot');
-    const seuil = seuilFige(ctx && ctx.cadenceMesureeMs);
-    for (const [cle, libelle, f] of [['marche', 'market-data.json (updated)', ctx && ctx.marche], ['chaleur', 'heatmap.json (updated)', ctx && ctx.chaleur]]) {
-      const s = sources[cle] || {}, tu = f ? instant(f.updated) : null;
+    // La cadence mesurée (js/chronique.js) est celle de market-data.json : la carte de chaleur,
+    // publiée par un autre script à un autre rythme, garde la convention.
+    for (const [cle, libelle, f, cad] of [['marche', 'market-data.json (updated)', ctx && ctx.marche, ctx && ctx.cadenceMesureeMs],
+      ['chaleur', 'heatmap.json (updated)', ctx && ctx.chaleur, null]]) {
+      const s = sources[cle] || {}, tu = f ? instant(f.updated) : null, seuil = seuilFige(cad);
       let c = s.classe ? { classe: s.classe, libelle: s.libelle } : classer({ ageMs: tu === null ? null : t - tu, seuilFigeMs: seuil.ms });
       out.push({ cle, libelle, source: 'raw.githubusercontent.com', t: tu, classe: c.classe, panne: c.libelle, seuil: seuil.texte, lu: s.ok || null });
     }

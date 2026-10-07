@@ -201,7 +201,10 @@ async function ouvrir(nav, theme, o = {}) {
     const premier = await k.page.evaluate(() => window.__t.premierDessin);
     const anciennes = R.filter(r => /klines.*endTime=/.test(r.url));
     check('première page de bougies, prix et market-data.json : une requête chacun au démarrage (le préchargement est repris)',
-      n(/klines\?symbol=BTCUSDT&interval=15m&limit=1000$/) === 1 && n(/market-data\.json/) === 1, R.map(r => r.url.replace(/^https?:\/\/[^/]+/, '')).filter(u => !/\.(css|js|woff2|html)$/.test(u)).slice(0, 12));
+      n(/klines\?symbol=BTCUSDT&interval=15m&limit=1000$/) === 1 && n(/\/master\/market-data\.json/) === 1, R.map(r => r.url.replace(/^https?:\/\/[^/]+/, '')).filter(u => !/\.(css|js|woff2|html)$/.test(u)).slice(0, 12));
+    // Chronique (js/chronique.js) : les publications passées (/master~N/) partent après le premier dessin.
+    const chron = k.requetes.filter(r => /\/master~\d+\/market-data\.json/.test(r.url));
+    check(`les ${chron.length} lectures de l’historique des publications partent après le premier dessin`, chron.length > 0 && chron.every(r => r.t >= premier + 1000), { premier, chron: chron.map(r => r.t) });
     check(`les ${anciennes.length} pages anciennes de l’historique partent après le premier dessin`, anciennes.length === 2 && anciennes.every(r => r.t >= premier), { premier, anciennes: anciennes.map(r => r.t) });
 
     // ── 6. Chaleur ──

@@ -42,6 +42,8 @@ const CIBLES = [
   // Horloges (js/horloges.js) et Contre-expertise (js/contre-expertise.js) : leurs âges aussi.
   ['carte Horloges', '#feed .carte-horloges'], ['âges des horloges', '#feed .carte-horloges .h-age', 'tous'],
   ['carte Contre-expertise', '#feed .carte-contre'], ['âge de la contre-expertise', '#feed .carte-contre .age-banner'],
+  // Chronique (js/chronique.js) : la trace de chaque chiffre clé affiché.
+  ['traces des chiffres clés', '#cycle .kpi:not([hidden]):not(.sans-trace) .chron-spark', 'tous'],
 ];
 /** Les âges écrits sur le CALQUE du graphique (couche « Liquidité », repère de la publication) :
  *  du texte de canvas, que la visibilité ne voit pas — on relève ce que le calque écrit. */
@@ -90,6 +92,15 @@ async function ouvrir(nav, theme, vue) {
     const u = r.request().url(), h = new URL(u).host, cors = { 'access-control-allow-origin': '*' };
     if (h.startsWith('127.0.0.1')) return r.continue();
     if (h === 'api.binance.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(binance(u)) });
+    // Historique (js/chronique.js) : la publication d'il y a N commits, datée 7,5 × N min plus tôt
+    // (une publication sur deux commits) — de quoi tracer les chiffres clés.
+    const anc = u.match(/\/master~(\d+)\/market-data\.json/);
+    if (anc) {
+      const md = JSON.parse(fs.readFileSync(path.join(REPO, 'market-data.json'), 'utf8'));
+      md.updated = new Date(Date.parse(md.updated) - anc[1] * 7.5 * 60000).toISOString();
+      if (md.micro) md.micro.cvd_24h_usd = (md.micro.cvd_24h_usd || 0) + Math.sin(+anc[1]) * 1e6;
+      return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(md) });
+    }
     if (h === 'raw.githubusercontent.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, u.includes('heatmap') ? 'heatmap.json' : 'market-data.json')) });
     return r.abort();
   });
@@ -158,6 +169,7 @@ async function squelette(page) {
       // Sans quoi la comparaison ne prouverait rien : la base les montre, elle.
       const neuves = ['carte Horloges', 'âges des horloges', 'carte Contre-expertise', 'âge de la contre-expertise'];
       check(`${BASE} montre les horloges et la contre-expertise (${neuves.map(n => ref[n].visibles).join(' / ')})`, neuves.every(n => ref[n].visibles > 0), neuves.map(n => ref[n]));
+      // Le téléphone n'a pas de bande de chiffres clés (CSS) : les traces se jugent sur bureau.
       await base.ctx.close();
       for (const t of THEMES) {
         const o = await ouvrir(nav, t.id, vue);
@@ -167,6 +179,22 @@ async function squelette(page) {
         const st = await o.page.evaluate(() => document.documentElement.getAttribute('data-structure'));
         check(`${t.id.padEnd(9)} ${t.structure ? '(structure « ' + t.structure + ' ») ' : ''}: rien de ce que la base montre ne disparaît`
           + (t.structure ? '' : ''), !pertes.length && (st || null) === t.structure, { pertes, structure: st });
+        // Chronique : les traces passent APRÈS les valeurs (ajusterKpis) — autant de chiffres
+        // clés qu'en les retirant toutes ; et la bande d'une structure (HUD, Codex) les montre.
+        if (vue.width > 768) {
+          const sans = await o.page.evaluate(() => { const s = document.createElement('style');
+            s.textContent = '#cycle .chron-spark{display:none!important}'; document.head.appendChild(s); ajusterKpis();
+            const n = document.querySelectorAll('#cycle .kpi:not([hidden])').length; s.remove(); ajusterKpis(); return n; });
+          const tr = v['traces des chiffres clés'].visibles, kp = v['chiffres clés'].visibles;
+          check(`${t.id.padEnd(9)} : ${tr} trace(s) sur ${kp} chiffres clés, aucun masqué pour elles (${sans} sans traces)`
+            + (t.structure ? ', la bande de la structure les montre' : ''), kp === sans && (!t.structure || tr > 0), { tr, kp, sans });
+        }
+        // La courbe des dernières heures dans une fiche (trous hachurés) : visible, dans l'écran.
+        const fc = await o.page.evaluate(() => { ouvrirFiche('cvd'); const g = document.querySelector('#fichePop .chron-fiche');
+          const r = g && g.getBoundingClientRect(), x = r && document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          const ok = !!r && r.width > 100 && r.height >= 40 && r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && !!x && g.contains(x);
+          fermerFiche(); return { ok, r: r && [r.left, r.top, r.width, r.height].map(Math.round) }; });
+        check(`${t.id.padEnd(9)} : la fiche porte la courbe des dernières heures, visible`, fc.ok, fc);
         const cal = await agesDuCalque(o.page);
         check(`${t.id.padEnd(9)} : le calque porte l’âge de la couche et le repère de la publication`, cal.couche && cal.repere, cal.vus);
         check(`${t.id.padEnd(9)} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);

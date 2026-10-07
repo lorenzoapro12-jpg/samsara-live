@@ -277,6 +277,15 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   color: var(--ink-3); background: var(--rail);
 }
 .kpis.vieux .kpi-age { color: var(--warn-ink); background: var(--warn-soft); }
+/* Trace des dernières heures (js/chronique.js) : sur la ligne du libellé, dans la hauteur de
+   la bande (36 px) — ni plus haute, ni beaucoup plus large. Statique : rien n'y bouge entre
+   deux publications. Une ligne coupée est un trou de publication, jamais interpolé. */
+.kpi-t { display: flex; align-items: center; gap: 5px; height: 11px; }
+.kpi.sans-trace .chron-spark { display: none; }
+.chron-spark { flex-shrink: 0; display: block; color: var(--ink-3); overflow: visible; }
+.kpis:hover .chron-spark { color: var(--ink-2); }
+.chron-spark .chron-ligne, .chron-fiche .chron-ligne { fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.chron-spark .chron-point, .chron-fiche .chron-point { fill: currentColor; }
 #updated { font-size: 10px; font-weight: 600; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .theme-btn {
   cursor: pointer; font: inherit; font-weight: 600; color: var(--ink-2);
@@ -997,6 +1006,14 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
 .fiche-valeur b { color: var(--ink-1); }
 .fiche-tf { font-size: 10px; font-weight: 700; color: var(--ink-3); }
 .fiche-alerte { margin: 6px 0; padding: 6px 9px; border-radius: 8px; background: var(--warn-soft, var(--rail)); color: var(--ink-1); font-size: 11.5px; }
+/* Courbe des dernières heures de publications : trous hachurés (aucune publication lue, ou
+   champ absent du format d'alors) — un trou se voit, il n'est pas comblé. */
+.fiche-chronique { margin: 8px 0 4px; }
+.fiche-chronique-tete { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--ink-3); }
+.chron-fiche { display: block; width: 100%; height: 56px; margin: 4px 0 2px; color: var(--ink-2); background: var(--rail); border-radius: 6px; }
+.chron-fiche .chron-trou { opacity: 0.55; }
+.chron-fiche .chron-hachure { stroke: var(--ink-3); stroke-width: 1.5; }
+.fiche-chronique-pied { font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .fiche-pop h4 { margin: 12px 0 4px; font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; color: var(--ink-3); }
 .fiche-lectures { margin: 0; padding-left: 0; list-style: none; }
 .fiche-lectures li { margin: 5px 0; color: var(--ink-2); }
