@@ -235,10 +235,14 @@ async function ouvrir(nav, theme, o = {}) {
     const a = await ouvrir(nav, 'aero', { attente: 3000 });
     const ab = await a.page.$eval('#chart', c => { const r = c.getBoundingClientRect(); return { x: r.left, y: r.top }; });
     await a.page.mouse.move(ab.x + 300, ab.y + 200); await a.page.mouse.move(ab.x + 320, ab.y + 210);
-    const pendant = await a.page.evaluate(() => ({ survol: document.documentElement.classList.contains('survol'), flou: getComputedStyle(document.querySelector('.lg-ring')).backdropFilter }));
+    // L'anneau : quatre bandes (pseudo-éléments de .lg-ring et .lg-ring-cotes), toutes suspendues ensemble.
+    const flous = () => [['.lg-ring', '::before'], ['.lg-ring', '::after'], ['.lg-ring-cotes', '::before'], ['.lg-ring-cotes', '::after']]
+      .map(([s, p]) => getComputedStyle(document.querySelector(s), p).backdropFilter);
+    const pendant = await a.page.evaluate(f => ({ survol: document.documentElement.classList.contains('survol'), flou: (0, eval)(f)() }), '(' + flous + ')');
     await attendre(500);
-    const fini = await a.page.evaluate(() => ({ survol: document.documentElement.classList.contains('survol'), flou: getComputedStyle(document.querySelector('.lg-ring')).backdropFilter }));
-    check('Aero : pendant le survol l’anneau ne floute plus, 250 ms après il floute à nouveau', pendant.survol && pendant.flou === 'none' && !fini.survol && fini.flou !== 'none', { pendant, fini });
+    const fini = await a.page.evaluate(f => ({ survol: document.documentElement.classList.contains('survol'), flou: (0, eval)(f)() }), '(' + flous + ')');
+    check('Aero : pendant le survol les quatre bandes de l’anneau ne floutent plus, 250 ms après elles floutent à nouveau',
+      pendant.survol && pendant.flou.every(f => f === 'none') && !fini.survol && fini.flou.length === 4 && fini.flou.every(f => f !== 'none'), { pendant, fini });
     const verre = await a.page.evaluate(() => ({ hyalite: typeof Hyalite !== 'undefined', verdict: JSON.parse(localStorage.getItem('samsara-verre-v1') || 'null') }));
     const hy = a.requetes.filter(r => /hyalite/.test(r.url)).length;
     check(`Chromium sans GPU (${verre.verdict && verre.verdict.moteur}) : rendu logiciel reconnu, hyalite ni demandé ni chargé`, verre.verdict && verre.verdict.logiciel === true && !verre.hyalite && hy === 0, { verre, hy });

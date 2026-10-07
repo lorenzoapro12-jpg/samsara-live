@@ -172,13 +172,15 @@ body::before {
 }
 /* Pendant un geste sur le graphique, le verre se suspend : il serait recalculé à chaque
    image du glissement. Sur un fond lisse, flou ou pas, la différence ne se lit pas. */
-html.geste .header, html.geste .indicator-bar, html.geste .lg-ring,
+html.geste .header, html.geste .indicator-bar, html.geste .lg-ring::before, html.geste .lg-ring::after,
+html.geste .lg-ring-cotes::before, html.geste .lg-ring-cotes::after,
 html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
   -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
 }
 /* Pendant un SURVOL du graphique (réticule redessiné à chaque image), seul l'anneau se
    suspend : c'est lui que chaque image du calque faisait recomposer (js/app.js, survol()). */
-html.survol .lg-ring { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+html.survol .lg-ring::before, html.survol .lg-ring::after,
+html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 
 /* ─── 4. En-tête ────────────────────────────────────────────────────────────── */
 .header {
@@ -433,20 +435,37 @@ html.survol .lg-ring { -webkit-backdrop-filter: none !important; backdrop-filter
 .main-area { display: flex; flex: 1; min-height: 0; gap: var(--gap); overflow: hidden; }
 .chart-container {
   flex: 1; min-width: 0;
-  padding: 16px; border-radius: var(--r-panel);
+  --graphe-marge: 16px; padding: var(--graphe-marge); border-radius: var(--r-panel);
 }
-/* Anneau : même verre que les autres surfaces, masqué à la bande de bord (le padding),
-   SOUS le canvas. Le canvas opaque couvre l'intérieur : seul le bord est flouté. */
-.lg-ring {
-  position: absolute; inset: 0; z-index: 0; pointer-events: none;
-  border-radius: inherit; padding: inherit;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
+/* Anneau : même verre que les autres surfaces, sur la seule bande de bord (le padding), SOUS le
+   canvas — en QUATRE bandes : haut et bas (.lg-ring::before / ::after), gauche et droite
+   (.lg-ring-cotes). Un élément unique masqué à la bande gardait la boîte entière du conteneur :
+   chaque image du canvas (réticule, étiquette du prix chaque seconde, bougies) y faisait
+   recalculer le flou de 1 404 × 632 px — Aero au repos : 129 ms de CPU par seconde, 92 en bandes
+   (page entière, rendu logiciel, mesuré le 07/10/2026). Chaque bande se prolonge de
+   --anneau-fond (48 px ≈ 3 σ du flou) sous le canvas, masquée : le flou y lit le même fond que
+   l'anneau d'un seul tenant (des bandes de 16 px seules floutaient moins, la trame
+   transparaissait). Seuls les quatre coins diffèrent encore, de quelques niveaux sur ~200 px.
+   Le canvas opaque couvre l'intérieur : seul le bord est flouté. */
+.lg-ring, .lg-ring-cotes { position: absolute; inset: 0; z-index: 0; pointer-events: none; border-radius: inherit; --anneau-fond: 48px; }
+.lg-ring::before, .lg-ring::after, .lg-ring-cotes::before, .lg-ring-cotes::after {
+  content: ''; position: absolute;
   -webkit-backdrop-filter: var(--verre); backdrop-filter: var(--verre);
-  box-shadow: var(--hyalite-edge, none);
 }
+.lg-ring::before { left: 0; right: 0; top: 0; height: calc(var(--graphe-marge) + var(--anneau-fond));
+  border-top-left-radius: inherit; border-top-right-radius: inherit;
+  -webkit-mask: linear-gradient(#000 0 0) top / 100% var(--graphe-marge) no-repeat; mask: linear-gradient(#000 0 0) top / 100% var(--graphe-marge) no-repeat; }
+.lg-ring::after { left: 0; right: 0; bottom: 0; height: calc(var(--graphe-marge) + var(--anneau-fond));
+  border-bottom-left-radius: inherit; border-bottom-right-radius: inherit;
+  -webkit-mask: linear-gradient(#000 0 0) bottom / 100% var(--graphe-marge) no-repeat; mask: linear-gradient(#000 0 0) bottom / 100% var(--graphe-marge) no-repeat; }
+.lg-ring-cotes::before { left: 0; top: 0; bottom: 0; width: calc(var(--graphe-marge) + var(--anneau-fond));
+  border-top-left-radius: inherit; border-bottom-left-radius: inherit;
+  -webkit-mask: linear-gradient(#000 0 0) left center / var(--graphe-marge) calc(100% - 2 * var(--graphe-marge)) no-repeat;
+  mask: linear-gradient(#000 0 0) left center / var(--graphe-marge) calc(100% - 2 * var(--graphe-marge)) no-repeat; }
+.lg-ring-cotes::after { right: 0; top: 0; bottom: 0; width: calc(var(--graphe-marge) + var(--anneau-fond));
+  border-top-right-radius: inherit; border-bottom-right-radius: inherit;
+  -webkit-mask: linear-gradient(#000 0 0) right center / var(--graphe-marge) calc(100% - 2 * var(--graphe-marge)) no-repeat;
+  mask: linear-gradient(#000 0 0) right center / var(--graphe-marge) calc(100% - 2 * var(--graphe-marge)) no-repeat; }
 .chart-container canvas {
   position: relative; z-index: 1;
   display: block; width: 100%; height: 100%;
@@ -815,7 +834,7 @@ html.survol .lg-ring { -webkit-backdrop-filter: none !important; backdrop-filter
    placé avant elles, il était neutralisé par la cascade. */
 @media (max-width: 800px) {
   :root { --gutter: 7px; --gap: 6px; }
-  .chart-container { padding: 11px; border-radius: 20px; }
+  .chart-container { --graphe-marge: 11px; border-radius: 20px; }
   .header { padding: 6px 9px; gap: 6px; }
   /* L'orbe est DÉCORATIF, le badge porte de la donnée : c'est l'orbe qui cède. */
   .header-orb { display: none; }
