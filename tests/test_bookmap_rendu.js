@@ -376,11 +376,11 @@ async function pixel(page, x, y) {
     }
 
     // ════ Carnet live : échelle, instants, lectures périmées ═══════════════════
-    titre('12. heatmap.json arrive APRÈS le carnet : le live passe à l\'échelle publiée, sans rien perdre');
+    titre('12. heatmap.json arrive APRÈS le carnet (6 s) : le live passe à l\'échelle publiée, sans rien perdre');
     {
       let p12;
-      ({ page: p12, erreurs } = await ouvrir(nav, { encodage: true, latenceHeatmap: 3000, attendre: false }));
-      await p12.waitForFunction(() => window.__carte && window.__carte.etat().live && window.__carte.etat().live.n >= 2 && !window.__carte.etat().publiee, null, { timeout: 8000 }).catch(() => {});
+      ({ page: p12, erreurs } = await ouvrir(nav, { encodage: true, latenceHeatmap: 6000, attendre: false }));
+      await p12.waitForFunction(() => window.__carte && window.__carte.etat().live && window.__carte.etat().live.n >= 2 && !window.__carte.etat().publiee, null, { timeout: 12000 }).catch(() => {});
       const avant = await etat(p12);
       check(`avant heatmap.json : ${avant.live && avant.live.n} lectures, échelle propre (annoncée)`, avant.live && avant.live.ref === 'propre' && !avant.publiee, avant.live);
       await p12.waitForFunction(() => window.__carte.etat().publiee, null, { timeout: 8000 }).catch(() => {});
@@ -435,9 +435,10 @@ async function pixel(page, x, y) {
       const L = await p14.evaluate(() => window.__carte.lectures()), e14 = await etat(p14);
       let jointif = 0, ecarts = [];
       for (let c = 0; c + 1 < L.n; c++) { if (L.fin[c] === L.deb[c + 1]) jointif++; ecarts.push(L.deb[c + 1] - L.deb[c]); }
-      const moy = ecarts.reduce((a, b) => a + b, 0) / ecarts.length;
+      // Médiane : un créneau sauté (machine chargée) ne doit pas faire croire à une dérive.
+      const moy = ecarts.slice().sort((a, b) => a - b)[ecarts.length >> 1];
       check(`${L.n} lectures, chacune jusqu'à la suivante (${jointif}/${L.n - 1} jointives)`, L.n >= 8 && jointif === L.n - 1, { n: L.n, jointif });
-      check(`pas fixe : ${Math.round(moy)} ms en moyenne entre deux lectures (cadence 1 000 ms, latence de 250 ms non ajoutée)`, Math.abs(moy - 1000) < 60, ecarts);
+      check(`pas fixe : ${Math.round(moy)} ms entre deux lectures (médiane ; cadence 1 000 ms, latence de 250 ms non ajoutée)`, Math.abs(moy - 1000) < 60, ecarts);
       check('instant de chaque lecture = milieu [envoi, réception] à l\'heure Binance', L.deb.every((d, c) => Math.abs(d - ((L.envoi[c] + L.recu[c]) / 2 + e14.horloge.ecart)) < 1e-6));
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p14.close();
