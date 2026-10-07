@@ -1,0 +1,336 @@
+/* Thème « Gare » — le grand tableau à palettes d'une gare (années 1960 à 1980) : noir mat,
+   palettes blanches, jaune signalétique, plaques de voie bleues. STRUCTURE propre : « tableau »
+   (js/structures.js) — les chiffres clés quittent l'en-tête pour un tableau pleine largeur ;
+   chaque bloc dit sa PROVENANCE et sa cadence (lues dans js/cadences.js) ; l'âge devient la
+   remarque du tableau, « À l'heure » ou « Retard » (seuil de la page, CADENCES.vieux_min).
+   Déclaré dans index.html : <link data-theme="gare" data-mode="sombre" data-verre="aucun"
+   data-structure="tableau">.
+
+   PALETTES. Prix, variation, chiffres clés, âge et heures s'écrivent sur des palettes, en CSS
+   pur, sur les VRAIS nœuds : une police à chasse fixe (chaque glyphe gardé fait 530 unités,
+   fonts/fabriquer.py), un fond qui pose une tuile tous les 1ch — la tuile tombe donc sous chaque
+   caractère, quel qu'il soit — et un joint au milieu. Toute valeur non nulle de letter-spacing
+   désaligne les tuiles : elle est remise à 0 partout où la base en met.
+
+   COULEURS. Hausse = bleu, baisse = vermillon : séparés sous les trois daltonismes (mesuré par
+   tests/test_palette.py). L'ema50 est sarcelle (≠ --up) et l'ema100 « craie » (≠ --down) : une
+   ligne d'overlay ne se confond pas avec une bougie.
+
+   EFFETS ET BUDGET. Une palette « tombe » quand sa valeur CHANGE : un demi-volet se rabat une
+   fois (transform seul, 0,22 s), sur le texte déjà juste — aucun faux caractère ne défile. La
+   classe .gare-chute est posée par la structure, à l'événement (nouvelle publication, minute
+   de l'âge) ; au repos, rien ne bouge. Aucune lueur, aucun flou. Coupé sous
+   prefers-reduced-motion. */
+
+/* Noto Sans Mono : instance condensée (wdth 75), graisses 500 à 700 — palettes, titre, axes. */
+@font-face {
+  font-family: 'Noto Sans Mono';
+  src: url('../fonts/gare-palettes.woff2') format('woff2');
+  font-weight: 500 700; font-display: swap;
+}
+/* Barlow Condensed : libellés, titres et texte courant. */
+@font-face {
+  font-family: 'Barlow Condensed';
+  src: url('../fonts/barlow-condensed-500.woff2') format('woff2');
+  font-weight: 500; font-display: swap;
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  src: url('../fonts/barlow-condensed-600.woff2') format('woff2');
+  font-weight: 600; font-display: swap;
+}
+
+[data-theme="gare"] {
+  color-scheme: dark;
+  --font: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-palette: 'Noto Sans Mono', ui-monospace, monospace;
+  --police-graphique: var(--font-palette);       /* axes du canvas alignés comme le tableau */
+  --r-bar: 4px; --r-panel: 4px; --r-card: 3px; --r-tile: 2px;
+
+  --fond: linear-gradient(180deg, #0b0b0b, #101010);
+  --verre: none; --grain: none; --trame: none;
+
+  --surface: #161616; --surface-ombre: inset 0 0 0 1px #262626; --surface-reflet: none;
+  --capsule: #1f1f1f; --capsule-hover: #2a2a2a; --capsule-ombre: inset 0 0 0 1px #2e2e2e;
+  --pill: transparent; --pill-hover: #222222;
+  --pill-actif: #ffd400; --pill-actif-ink: #111111; --pill-actif-ombre: none;
+  --dot-anneau: #161616; --poignee: #141414; --poignee-hover: #1c1c1c;
+
+  --ink-1: #f1f0e8; --ink-2: #c9c8bf; --ink-3: #9c9b93;
+  --up: #5cb8ff; --down: #ff6b3d;
+  --up-ink: #7cc6ff; --down-ink: #ff8a5e;
+  --up-soft: rgba(92,184,255,0.14); --down-soft: rgba(255,107,61,0.14);
+  --warn: #ffd400; --warn-ink: #ffd400; --warn-soft: rgba(255,212,0,0.12);
+  --accent: #ffd400; --accent-2: #5cb8ff;
+  --brand: #ffd400; --brand-fond: #ffd400; --brand-ink: #111111;
+  --accent-glow: rgba(255,212,0,0.22);
+  --hairline: rgba(255,255,255,0.08); --rail: rgba(255,255,255,0.06);
+
+  --card: #161616; --card-solid: #161616; --card-edge: #262626;
+  --card-shadow: none; --card-hi: transparent; --card-reflet: none;
+  /* Bouton « Forward » du Grid Bot : texte blanc — sur le bleu clair des bougies, 2,2:1 ; sur
+     le bleu d'une plaque de voie, lisible. */
+  --forward: linear-gradient(135deg, #1d4f86, #0f2a4a);
+  --modal-fond: #101010; --modal-ombre: none; --ombre-douce: none;
+  --selection: rgba(255,212,0,0.30);
+  --defil: #333333; --defil-hover: #555555;
+  --prix-lueur: none;
+
+  /* Le tableau : palette (tuile), joint, plaque de voie (intervalles), volet qui tombe. */
+  --palette: #2a2a2a; --joint: #000000; --volet: #3a3a3a;
+  --plaque-voie: #0f2a4a; --plaque-filet: #2c5a8c;
+  --tableau: #101010;
+
+  /* Graphique : panneau noir, coutures de modules tous les 64 px (fond CSS du canvas : gratuit
+     pendant le geste), grille à 5 %, réticule jaune. */
+  --chart-1: #0f0f0f; --chart-2: #121212; --chart-3: #151515; --chart-surface: #121212;
+  --chart-lueur: repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 64px);
+  --chart-creux: inset 0 0 0 1px #262626;
+  --grille: rgba(255,255,255,0.05); --reticule: rgba(255,212,0,0.55); --bulle: #1b1b1b;
+  --filigrane: 0.04; --vol-alpha: 0.5; --bande-alpha: 0.08; --aura: 0;
+  --chaleur-bid: #5cb8ff; --chaleur-ask: #ff6b3d;
+  --ov-ema20: #ffd400; --ov-ema50: #38d6c4; --ov-ema100: #e6e2d3;
+  --ov-ema200: #c3a6ff; --ov-sma20: #ff7eb6; --ov-sma50: #8be36a;
+  --ov-bb: #9c9b93;
+  --sess-asie: rgba(255,212,0,0.6); --sess-europe: rgba(92,184,255,0.6); --sess-us: rgba(195,166,255,0.6);
+  --sr-1: #c3a6ff; --sr-2: #38d6c4; --sr-3: #ffd400;
+  --fib: #ffd400; --vp: #8a94a6; --vp-poc: #ffd400;
+}
+
+/* ── Typographie : grotesque condensée pour le texte, chasse fixe pour les palettes ── */
+[data-theme="gare"] body { font-size: 14px; font-variant-numeric: lining-nums tabular-nums; }
+[data-theme="gare"] .header-orb { display: none; }
+/* Le nom de la gare : une plaque jaune, en capitales de la police des palettes (qui a ṃ et ā :
+   le titre ne mélange pas deux polices). */
+[data-theme="gare"] .header-left h1 {
+  font: 700 17px/1 var(--font-palette); letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 6px 7px 6px 9px; border-radius: 2px;
+  background: var(--brand-fond); color: var(--brand-ink); -webkit-text-fill-color: var(--brand-ink);
+}
+[data-theme="gare"] .demon-name,
+[data-theme="gare"] .modal-titre,
+[data-theme="gare"] .fiche-titre,
+[data-theme="gare"] .feed-panel-handle,
+[data-theme="gare"] .strat-handle { font-family: var(--font); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+[data-theme="gare"] .paire-btn { font-size: 14px; font-weight: 600; letter-spacing: 0.06em; border-radius: 2px; }
+[data-theme="gare"] .mode-btn { font-size: 13px; letter-spacing: 0.04em; }
+[data-theme="gare"] .hero-val,
+[data-theme="gare"] .tuile .val { font-family: var(--font-palette); font-weight: 500; letter-spacing: 0; }
+
+/* ── Palettes : sur les vrais nœuds. Tuile centrée dans chaque cellule de 1ch (1 px de jour de
+   chaque côté), joint noir à mi-hauteur. Ni letter-spacing, ni crénage, ni ombre portée.
+   Graisse, taille et marges se posent dans les règles propres à chaque nœud. ── */
+[data-theme="gare"] #price,
+[data-theme="gare"] #var24,
+[data-theme="gare"] #cycle .kpi b,
+[data-theme="gare"] #cycle .kpi-age,
+[data-theme="gare"] #updated,
+[data-theme="gare"] #taskbarClock {
+  position: relative; padding: 0; border-radius: 0;
+  font-family: var(--font-palette); letter-spacing: 0; font-kerning: none;
+  font-variant-numeric: lining-nums tabular-nums; text-shadow: none; white-space: pre;
+  background:
+    linear-gradient(transparent calc(50% - 0.5px), var(--joint) 0 calc(50% + 0.5px), transparent 0),
+    repeating-linear-gradient(90deg, transparent 0 1px, var(--palette) 1px calc(1ch - 1px), transparent 0 1ch);
+  background-origin: content-box; background-clip: content-box;
+}
+[data-theme="gare"] #price { display: inline-flex; font-size: 26px; font-weight: 600; line-height: 1.3; color: var(--ink-1); }
+/* Le triangle de la base (donnée : sens du dernier pas) sort du flux : dans le flux, il
+   décalait toutes les tuiles du prix. Il reste visible, à gauche du chiffre. */
+[data-theme="gare"] .price-badge.price-up::before,
+[data-theme="gare"] .price-badge.price-down::before { position: absolute; left: -14px; top: 50%; margin-top: -4px; }
+[data-theme="gare"] .hero-prix { gap: 20px; }
+[data-theme="gare"] #var24 { font-size: 15px; font-weight: 500; line-height: 1.35; color: var(--ink-2); }
+[data-theme="gare"] #var24.pos { color: var(--up-ink); }
+[data-theme="gare"] #var24.neg { color: var(--down-ink); }
+[data-theme="gare"] #var24:empty { display: none; }
+[data-theme="gare"] #updated { font-size: 17px; line-height: 1.3; font-weight: 500; color: var(--ink-1); }
+[data-theme="gare"] #taskbarClock { font-size: 13px; font-weight: 500; line-height: 1.35; color: var(--ink-1); }
+
+/* Provenance : chaque bloc dit d'où vient sa donnée, et à quelle cadence (décor, cadence lue
+   dans CADENCES par la structure). */
+[data-theme="gare"] .gare-provenance {
+  flex-shrink: 0; font: 600 10.5px/1.15 var(--font); letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-3); white-space: nowrap;
+}
+[data-theme="gare"] .hero-prix > .gare-provenance { order: 9; }
+[data-theme="gare"] .gare-titre {
+  flex-shrink: 0; font: 600 12px/1 var(--font); letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--warn); white-space: nowrap;
+}
+
+/* ── Le tableau : titre et provenance | chiffres clés | heure de publication ── */
+[data-theme="gare"] .gare-tableau {
+  position: relative; flex-shrink: 0;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto;
+  align-items: center; column-gap: 18px; row-gap: 5px;
+  padding: 7px 16px; border-radius: var(--r-bar);
+  background: var(--tableau); box-shadow: var(--surface-ombre);
+}
+[data-theme="gare"] .gare-tableau > .gare-titre { grid-column: 1; grid-row: 1; align-self: end; }
+[data-theme="gare"] .gare-tableau > .gare-provenance { grid-column: 1; grid-row: 2; align-self: start; }
+[data-theme="gare"] .gare-tableau > .kpis { grid-column: 2; grid-row: 1 / 3; height: 46px; }
+[data-theme="gare"] .gare-tableau > .gare-heure { grid-column: 3; grid-row: 1 / 3; }
+[data-theme="gare"][data-structure="tableau"] .kpi { border-left: 0; padding: 0 10px; gap: 4px; }
+[data-theme="gare"][data-structure="tableau"] .kpi:first-child { padding-left: 0; }
+[data-theme="gare"][data-structure="tableau"] .kpi i { font: 600 11px/1 var(--font); letter-spacing: 0.1em; color: var(--warn); }
+[data-theme="gare"][data-structure="tableau"] .kpis:hover .kpi i { color: var(--ink-1); }
+[data-theme="gare"] #cycle .kpi b { align-self: flex-start; font-size: 17px; font-weight: 500; line-height: 1.3; color: var(--ink-1); }
+[data-theme="gare"] #cycle .kpi b.stat-pos { color: var(--up-ink); }
+[data-theme="gare"] #cycle .kpi b.stat-neg { color: var(--down-ink); }
+/* L'âge : la remarque du tableau. « À l'heure » jusqu'au seuil de retard de la page (la base
+   pose .vieux au-delà de CADENCES.vieux_min), puis « Retard ». Les minutes restent affichées.
+   Âge inconnu (« — ») : aucune remarque, la structure pose .gare-inconnu. Posée sur la ligne
+   des valeurs (et non centrée sur la bande), comme une colonne du tableau. */
+[data-theme="gare"] #cycle .kpi-age { align-self: flex-end; margin: 0 0 7px 18px; font-size: 14px; font-weight: 500; line-height: 1.4; text-transform: uppercase; color: var(--ink-1); }
+[data-theme="gare"] #cycle .kpi-age::before { content: 'À l’heure · '; color: var(--warn); }
+/* En retard : toute la remarque passe au jaune, encadrée. (Des palettes jaunes à encre noire
+   ont été essayées : à 14 px, les jours sombres entre les tuiles hachaient la lecture.) */
+[data-theme="gare"] #cycle.vieux .kpi-age { color: var(--warn); outline: 1px solid var(--warn); outline-offset: 2px; }
+[data-theme="gare"] #cycle.vieux .kpi-age::before { content: 'Retard · '; }
+[data-theme="gare"] #cycle .kpi-age.gare-inconnu::before { content: none; }
+[data-theme="gare"] .gare-heure {
+  display: grid; grid-template-columns: auto auto; align-items: baseline; justify-items: end;
+  column-gap: 6px; row-gap: 5px;
+}
+[data-theme="gare"] .gare-heure > .gare-titre { grid-column: 1 / 3; }
+[data-theme="gare"] .gare-utc { font: 600 11px/1 var(--font); letter-spacing: 0.12em; color: var(--ink-3); }
+
+/* ── Chute : un demi-volet sombre se rabat UNE fois sur la palette dont la valeur a changé ──
+   La structure pose .gare-chute (sur le tableau à une publication nouvelle, sur l'âge à chaque
+   minute, sur le prix au plus toutes les CHUTE_PRIX_MS) et la retire après le passage. */
+[data-theme="gare"] .gare-tableau.gare-chute #updated::after,
+[data-theme="gare"] .gare-tableau.gare-chute .kpi b::after,
+[data-theme="gare"] .gare-tableau.gare-chute .kpi-age::after,
+[data-theme="gare"] .kpi-age.gare-chute::after,
+[data-theme="gare"] .hero-prix.gare-chute #price::after {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 50%; pointer-events: none;
+  background: repeating-linear-gradient(90deg, transparent 0 1px, var(--volet) 1px calc(1ch - 1px), transparent 0 1ch);
+  transform-origin: 50% 100%;
+  animation: gare-chute 0.22s cubic-bezier(0.55, 0, 0.9, 0.45) 1 both;
+}
+@keyframes gare-chute { from { transform: scaleY(1); } to { transform: scaleY(0); } }
+
+/* ── Ruban : plaques de voie pour les intervalles, l'actif en jaune ── */
+[data-theme="gare"] .indicator-bar { font-family: var(--font); }
+[data-theme="gare"] .indicator-bar label { border-radius: 2px; font-size: 13px; }
+[data-theme="gare"] .indicator-bar .section-title { font-size: 10px; letter-spacing: 0.16em; }
+[data-theme="gare"] .indicator-bar label[id^="int_"] {
+  min-width: 36px; margin: 0 2px; justify-content: center;
+  background: var(--plaque-voie); color: #ffffff; font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--plaque-filet);
+}
+[data-theme="gare"] .indicator-bar label[id^="int_"]:hover { background: #163a63; }
+[data-theme="gare"] .indicator-bar label[id^="int_"].active { background: var(--pill-actif); color: var(--pill-actif-ink); box-shadow: none; }
+[data-theme="gare"] .ind-dropdown-btn { font-size: 13px; border-radius: 2px; }
+[data-theme="gare"] .theme-menu, [data-theme="gare"] .paire-menu, [data-theme="gare"] .ind-dropdown-menu { border-radius: 4px; }
+[data-theme="gare"] .theme-item, [data-theme="gare"] .paire-menu label, [data-theme="gare"] .ind-dropdown-menu label { border-radius: 2px; }
+
+/* ── Marché live : les départs. Cartes à bandeau jaune, titres en capitales. ── */
+[data-theme="gare"] .feed-panel-handle { color: var(--warn); font-size: 11px; letter-spacing: 0.32em; }
+[data-theme="gare"] .feed-panel-handle::after { background: var(--warn); border-radius: 0; }
+[data-theme="gare"] .demon-card { border: 1px solid #262626; border-top: 3px solid var(--warn); }
+[data-theme="gare"] .demon-card::before,
+[data-theme="gare"] .demon-card::after { display: none; }
+[data-theme="gare"] .demon-name { font-size: 17px; line-height: 1.1; }
+[data-theme="gare"] .demon-role { font-size: 12px; }
+[data-theme="gare"] .avatar-orb {
+  width: 28px; height: 28px; border-radius: 2px; color: var(--warn);
+  background: #1d1d1d; border: 0; box-shadow: inset 0 0 0 1px #333333;
+}
+[data-theme="gare"] .avatar-orb::after { display: none; }
+[data-theme="gare"] .avatar-orb svg { filter: none; }
+[data-theme="gare"] .carte-marche { --teinte: #ffd400; } [data-theme="gare"] .carte-macro { --teinte: #38d6c4; }
+[data-theme="gare"] .carte-ind { --teinte: #5cb8ff; }    [data-theme="gare"] .carte-micro { --teinte: #c3a6ff; }
+[data-theme="gare"] .carte-liq { --teinte: #5cb8ff; }    [data-theme="gare"] .carte-flux { --teinte: #e6e2d3; }
+[data-theme="gare"] .carte-live { --teinte: #ffd400; }   [data-theme="gare"] .carte-tape { --teinte: #38d6c4; }
+[data-theme="gare"] .carte-temps { --teinte: #9c9b93; }
+[data-theme="gare"] .tuile { box-shadow: inset 0 0 0 1px #242424; }
+/* Barlow Condensed est environ 20 % plus étroite que la police de la base : ses petits corps
+   (10 à 11 px) remontent d'un cran — la même chasse, une lecture plus sûre. */
+[data-theme="gare"] .demon-body { font-size: 13px; }
+[data-theme="gare"] .fine,
+[data-theme="gare"] .tuile .sub,
+[data-theme="gare"] .track-legende,
+[data-theme="gare"] .split-legende,
+[data-theme="gare"] .tf-pied,
+[data-theme="gare"] .dv-lbl,
+[data-theme="gare"] .etat,
+[data-theme="gare"] .chip,
+[data-theme="gare"] .lecture-courte { font-size: 12px; }
+[data-theme="gare"] .lad-row,
+[data-theme="gare"] .dv-val,
+[data-theme="gare"] .tf-rsi { font-size: 12.5px; }
+[data-theme="gare"] .demon-right,
+[data-theme="gare"] .axe-pt b,
+[data-theme="gare"] .lad-mid,
+[data-theme="gare"] .tf-nom { font-size: 11.5px; }
+[data-theme="gare"] .lbl,
+[data-theme="gare"] .badge { font-size: 11px; letter-spacing: 0.08em; }
+
+/* Le grand tableau des départs SOUS le graphique — seulement sur un écran haut et large : à
+   900 px de haut, la version en colonne écrasait le graphique (prototype). #feedPanel suit
+   déjà .chart-container dans le DOM : c'est du CSS pur. En dessous de ce seuil, il reste le
+   panneau latéral. */
+@media (min-height: 1000px) and (min-width: 1200px) {
+  [data-theme="gare"][data-structure="tableau"] .main-area { flex-direction: column; }
+  [data-theme="gare"][data-structure="tableau"] .feed-panel {
+    width: auto; height: clamp(170px, 26vh, 280px); flex-direction: column;
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  [data-theme="gare"][data-structure="tableau"] .feed-panel.collapsed { width: auto; height: 30px; }
+  [data-theme="gare"][data-structure="tableau"] .feed-panel-handle {
+    writing-mode: horizontal-tb; width: auto; height: 30px; padding: 0 14px; justify-content: flex-start;
+    border-right: 0; border-bottom: 1px solid #262626; font-size: 13px;
+  }
+  [data-theme="gare"][data-structure="tableau"] .feed-panel-handle::after { display: none; }
+  [data-theme="gare"][data-structure="tableau"] .feed-panel-body { overflow-x: auto; overflow-y: hidden; }
+  [data-theme="gare"][data-structure="tableau"] .feed { flex-direction: row; align-items: stretch; height: 100%; padding: 10px; }
+  [data-theme="gare"][data-structure="tableau"] .feed > * { flex: 0 0 330px; max-height: 100%; overflow-y: auto; }
+  [data-theme="gare"][data-structure="tableau"] .feed > .age-banner { flex: 0 0 220px; margin: 0; }
+}
+
+/* ── Barre des tâches : l'information voyageurs, l'heure locale ── */
+[data-theme="gare"] .aero-taskbar { background: #0e0e0e; font-size: 12px; }
+[data-theme="gare"] .gare-info { font: 600 12px/1 var(--font); letter-spacing: 0.12em; text-transform: uppercase; color: var(--warn); }
+[data-theme="gare"] .taskbar-right > .gare-titre { font-size: 10.5px; color: var(--ink-3); }
+[data-theme="gare"] .refresh-dot { box-shadow: none; }
+[data-theme="gare"] .strat-btn,
+[data-theme="gare"] .strat-section .strat-row select,
+[data-theme="gare"] .strat-section .strat-row input,
+[data-theme="gare"] .strat-section .strat-stats { border-radius: 2px; }
+[data-theme="gare"] .age-banner, [data-theme="gare"] .lecture-courte { border-radius: 3px; }
+
+/* Mouvement réduit : la chute est coupée, la valeur change sans volet. */
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="gare"] .gare-tableau.gare-chute #updated::after,
+  [data-theme="gare"] .gare-tableau.gare-chute .kpi b::after,
+  [data-theme="gare"] .gare-tableau.gare-chute .kpi-age::after,
+  [data-theme="gare"] .kpi-age.gare-chute::after,
+  [data-theme="gare"] .hero-prix.gare-chute #price::after { animation: none; display: none; }
+}
+/* Téléphone : le tableau garde les chiffres clés (la base les masque dans l'en-tête, ≤ 800 px)
+   et leur âge ; titres, provenance et heure cèdent la place (la base masque déjà #updated). */
+@media (max-width: 800px) {
+  [data-theme="gare"] .gare-tableau { display: flex; align-items: center; padding: 3px 8px; }
+  [data-theme="gare"] .gare-tableau > .gare-titre,
+  [data-theme="gare"] .gare-tableau > .gare-provenance,
+  [data-theme="gare"] .gare-heure,
+  [data-theme="gare"] .hero-prix > .gare-provenance,
+  [data-theme="gare"] .taskbar-right > .gare-titre { display: none; }
+  [data-theme="gare"] .gare-tableau .kpis { display: flex; height: 42px; }
+  [data-theme="gare"] #cycle .kpi b { font-size: 15px; }
+  [data-theme="gare"] #cycle .kpi-age { font-size: 12px; }
+  [data-theme="gare"] #price { font-size: 17px; }
+  [data-theme="gare"] .hero-prix { gap: 16px; }
+  [data-theme="gare"] .header-left h1 { font-size: 13px; padding: 5px 5px 5px 7px; }
+}
+/* Sous 480 px, les neuf boutons de l'en-tête ne laissent plus de place au prix (la base les
+   faisait passer PAR-DESSUS) : l'en-tête passe sur deux lignes — le prix et sa variation (que la
+   base masquait, faute de place) sur la première, les boutons sur la seconde. */
+@media (max-width: 480px) {
+  [data-theme="gare"] .header { flex-wrap: wrap; row-gap: 6px; padding: 6px 8px; }
+  [data-theme="gare"] .header-left { flex: 1 1 100%; }
+  [data-theme="gare"] .header-right { flex: 1 1 100%; justify-content: space-between; }
+  [data-theme="gare"] #var24:not(:empty) { display: block; font-size: 13px; }
+}
