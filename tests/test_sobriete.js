@@ -213,6 +213,15 @@ async function ouvrir(nav, theme, o = {}) {
       return { couche: !!couche, meme: heatLayer === couche, dessins: window.__t.dessins - d, grille: !!(histHeatmap && histHeatmap.grille), format: histHeatmap && histHeatmap.format };
     });
     check(`couche construite (${ch.format}) ; deux relectures de la même publication : ni dessin, ni couche refaite`, ch.couche && ch.grille && ch.meme && ch.dessins === 0, ch);
+    const ageCouche = await k.page.evaluate(() => {
+      const vus = [], f = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function (t) { if (this.canvas.id === 'chartCalque') vus.push(String(t)); return f.apply(this, arguments); };
+      dessinerCalque();
+      CanvasRenderingContext2D.prototype.fillText = f;
+      const age = Math.round((Date.now() - Date.parse(histHeatmap.updated)) / 60000);
+      return { vus, attendu: 'Liquidité publiée il y a ' + age + ' min' };
+    });
+    check(`la couche porte son âge sur le graphique (« ${ageCouche.attendu} »)`, ageCouche.vus.includes(ageCouche.attendu), ageCouche);
     const z = await k.page.evaluate(() => {
       const cles = [];
       for (const v of [50, 3000, 50, 3000, 50]) { viewStart = Math.max(0, candles.length - v); viewEnd = candles.length; drawChart(); cles.push(heatLayer && heatLayer.cle); }

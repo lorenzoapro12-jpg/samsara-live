@@ -2694,6 +2694,16 @@ function dessinerCalque() {
       cx.fillText(lpStr, bx + 6, y + 4);
     }
   }
+  // Âge de la couche « Liquidité » (heatmap.json, publiée au quart d'heure) : aucun calque n'est
+  // lu sans son instant. Sur le calque, il avance avec l'horloge du prix, sans redessin.
+  if (P && overlays.liq && histHeatmap && histHeatmap.grille && histHeatmap.sym === activeSymbol && histHeatmap.majA) {
+    const age = Math.max(0, Math.round((Date.now() - histHeatmap.majA) / 60000));
+    cx.save();
+    cx.font = chartFont(9, 650); cx.textAlign = 'right';
+    cx.fillStyle = age > CADENCES.vieux_min ? COLORS.warn : COLORS.ink3;
+    cx.fillText('Liquidité publiée il y a ' + age + ' min', W - P.right - 8, 13);
+    cx.restore();
+  }
   if (crossX === null || crossY === null) return;
   const n = geo.ve - geo.vs, chartPw = W - 16 - 75;
   const idx = n > 0 ? Math.round((crossX - 16) / (chartPw / n)) : -1;
