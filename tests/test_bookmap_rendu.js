@@ -735,7 +735,9 @@ async function pixel(page, x, y) {
     {
       let p27;
       ({ page: p27, erreurs } = await ouvrir(nav, { encodage: true, contexte: { deviceScaleFactor: 2 } }));
-      for (const k of ['live', 'executions', 'prix', 'bidask', 'murs', 'gamma', 'profil']) await p27.click(`button[data-calque="${k}"]`);
+      // Tout ce qui se peint PAR-DESSUS la chaleur est éteint, calques ajoutés depuis compris
+      // (mémoire, rafales, destin) : le pixel comparé doit être celui de la chaleur seule.
+      for (const k of ['live', 'executions', 'prix', 'bidask', 'murs', 'gamma', 'profil', 'memoire', 'rafales', 'destin']) await p27.click(`button[data-calque="${k}"]`);
       const zw = await p27.evaluate(() => window.__carte.etat().mise.chaleur.w), zh = await p27.evaluate(() => window.__carte.etat().mise.chaleur.h);
       await p27.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [G.t0, G.t0 + G.W * G.dt, pMid - 900, pMid + 900]);
       await p27.waitForTimeout(300);
@@ -1017,7 +1019,9 @@ async function pixel(page, x, y) {
       let p38;
       ({ page: p38, erreurs } = await ouvrir(nav, { encodage: true, S }));
       await p38.waitForFunction(() => window.__carte.etat().rafales.arriereFini, null, { timeout: 60000 }).catch(() => {});
-      await p38.waitForTimeout(1500);
+      // La pastille est réécrite au rendu suivant (cadence 1 s) : sous charge (suite complète), 1,5 s
+      // fixes ne suffisaient pas toujours. On attend l'état, pas une durée.
+      await p38.waitForFunction(() => window.__carte.etat().pastillesCompletes.some(t => /^Rafales ≥ 2 BTC · depuis \d\d:\d\d · dernière il y a /.test(t)), null, { timeout: 20000 }).catch(() => {});
       const e = await etat(p38), L = await p38.evaluate(() => window.__carte.rafalesListe());
       const interieures = L.slice(1, -1), q8 = L.reduce((a, r) => a + Math.round(r.q * 1e8), 0), tot = Math.round((e.executions.total[0] + e.executions.total[1]) * 1e8);
       check(`remplissage arrière fini : ${L.length} rafales`, e.rafales.arriereFini && L.length > 1000, [e.rafales.arriereFini, L.length]);
