@@ -36,10 +36,19 @@
   }
   BM.grilleVide = grilleVide;
 
-  /** heatmap.json -> grille. La couverture de chaque colonne est DÉDUITE de ses cellules :
-   *  de la plus basse cellule bid à la plus haute cellule ask (les niveaux sous le seuil
-   *  d'affichage ne laissent pas de cellule ; la bande réelle est donc un peu plus large). */
+  /** heatmap.json -> grille. Deux formats, qui donnent la MÊME grille pour la même information
+   *  (contrôlé case par case par tests/test_bookmap.js) :
+   *   · « colonnes-1 » : colonnes = [[minute, bid_bas, [v…], ask_bas, [v…]], …], minute = ⌊t/dt⌋
+   *     ABSOLUE ; v[i] = tranche bas+i ; côté vide = null, [] ; minute absente = non observée ;
+   *   · l'ancien : bids / asks = [[c, pb, v], …], c relatif à t0.
+   *  La page doit lire les deux : le format change côté serveur APRÈS la livraison des pages.
+   *  La couverture de chaque colonne est DÉDUITE de ses cellules : de la plus basse cellule bid
+   *  à la plus haute cellule ask (les niveaux sous le seuil d'affichage ne laissent pas de
+   *  cellule ; la bande réelle est donc un peu plus large). */
+  BM.FORMATS_HEATMAP = ['colonnes-1'];
   BM.grillePubliee = function (h) {
+    if (!h) return null;
+    if (Array.isArray(h.colonnes)) return grilleColonnes(h);
     const cells = [].concat(h.bids || [], h.asks || []);
     if (!cells.length) return null;
     let cMax = 0, pMin = Infinity, pMax = -Infinity;
@@ -63,6 +72,46 @@
     g.encodage = h.encodage || null;
     g.majA = Date.parse(h.updated) || null;
     return g;
+  };
+  /** « colonnes-1 ». Un format annoncé mais inconnu n'est pas deviné : null (la page le dit). */
+  function grilleColonnes(h) {
+    if (h.format !== undefined && !BM.FORMATS_HEATMAP.includes(h.format)) return null;
+    const cols = h.colonnes, n = x => (Array.isArray(x) ? x.length : 0);
+    let pMin = Infinity, pMax = -Infinity, mFin = -Infinity;
+    for (const [m, bl, bs, al, as] of cols) {
+      const nb = n(bs), na = n(as);
+      if (nb) { if (bl < pMin) pMin = bl; if (bl + nb - 1 > pMax) pMax = bl + nb - 1; }
+      if (na) { if (al < pMin) pMin = al; if (al + na - 1 > pMax) pMax = al + na - 1; }
+      if ((nb || na) && m > mFin) mFin = m;
+    }
+    if (!cols.length || mFin === -Infinity) return null;      // aucune cellule : comme l'ancien format
+    // Le temps vient des minutes ABSOLUES des colonnes (t0 du fichier = la première).
+    const m0 = cols[0][0], W = mFin - m0 + 1, H = pMax - pMin + 1, dt = h.dt * 1000;
+    const g = grilleVide(m0 * dt, dt, W, h.dp, pMin, H);
+    for (const [m, bl, bs, al, as] of cols) {
+      const c = m - m0;
+      if (c < 0 || c >= W) continue;
+      const o = c * H, nb = n(bs), na = n(as);
+      let lo = Infinity, hi = -Infinity;
+      // MAX comme l'ancien décodeur (une cellule livrée deux fois ne s'additionne pas).
+      for (let i = 0; i < nb; i++) { const k = o + bl - pMin + i; if (bs[i] > g.bids[k]) g.bids[k] = bs[i]; }
+      for (let i = 0; i < na; i++) { const k = o + al - pMin + i; if (as[i] > g.asks[k]) g.asks[k] = as[i]; }
+      if (nb) { lo = Math.min(lo, bl); hi = Math.max(hi, bl + nb - 1); }
+      if (na) { lo = Math.min(lo, al); hi = Math.max(hi, al + na - 1); }
+      if (hi > -Infinity) {
+        if (g.bas[c] < 0 || lo < g.bas[c]) g.bas[c] = lo;
+        if (hi > g.haut[c]) g.haut[c] = hi;
+      }
+    }
+    g.encodage = h.encodage || null;
+    g.majA = Date.parse(h.updated) || null;
+    return g;
+  }
+  /** La date de publication lue au DÉBUT du texte, sans l'analyser en entier : "updated" est la
+   *  première clé des deux fichiers publiés. null si elle n'y est pas (on analysera tout). */
+  BM.majEnTete = function (txt) {
+    const m = /^\s*\{\s*"updated"\s*:\s*"([^"]{1,64})"/.exec(String(txt).slice(0, 200));
+    return m ? m[1] : null;
   };
 
   /** Fusion par MAX : kt colonnes × kp tranches -> une cellule. Exact (√ croissante). */

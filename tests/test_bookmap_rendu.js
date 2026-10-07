@@ -31,14 +31,27 @@ const titre = t => console.log(`\n── ${t} ──`);
 const MAINTENANT = Date.now();
 let seed = 5;
 const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+// Le fichier du dépôt est lu À TRAVERS le décodeur de la carte (js/bookmap-calc.js), jamais par
+// ses champs : son format change côté serveur (« colonnes-1 »), et un harnais qui lirait
+// hm.bids deviendrait rouge ce jour-là en accusant la carte.
+const BM = require('../js/bookmap-calc.js');
+const { versColonnes } = require('./heatmap_colonnes.js');
 const hm = JSON.parse(fs.readFileSync(path.join(REPO, 'heatmap.json'), 'utf8'));
+const G = BM.grillePubliee(hm);
+if (!G) { console.error('heatmap.json du dépôt illisible par la carte'); process.exit(1); }
+// Les cellules publiées, telles que la carte les décode : { c, pb, val } côté bid puis ask.
+const CELLULES = [];
+for (let c = 0; c < G.W; c++) for (let k = 0; k < G.H; k++) {
+  for (const [cote, t] of [['bid', G.bids], ['ask', G.asks]]) { const v = t[c * G.H + k]; if (v) CELLULES.push({ c, pb: G.pbMin + k, val: v, cote }); }
+}
 // Le fichier du dépôt PEUT porter un `encodage` : le producteur en publie un depuis le
 // 06/10/2026. Quand le harnais veut le cas « encodage NON publié », il doit donc le RETIRER de
 // la réponse simulée — sinon il devient rouge tout seul, quinze minutes après la livraison du
 // producteur qui l'introduit, en accusant la carte d'un défaut qui n'existe pas. Un faux rouge
 // qui dépend de la donnée vivante ne vaut pas mieux qu'un faux vert.
 const sansEncodage = () => { const c = Object.assign({}, hm); delete c.encodage; return c; };
-const pMid = (() => { const a = hm.asks.filter(c => c[0] === Math.max(...hm.asks.map(x => x[0]))); return Math.min(...a.map(c => c[1])) * hm.dp; })();
+// Prix de référence : la plus basse cellule ask de la dernière colonne qui en a.
+const pMid = (() => { const a = CELLULES.filter(x => x.cote === 'ask'), cMax = Math.max(...a.map(x => x.c)); return Math.min(...a.filter(x => x.c === cMax).map(x => x.pb)) * G.dp; })();
 const MINUTES = [];
 { let p = pMid; for (let i = 1500; i >= 0; i--) { const t = Math.floor((MAINTENANT - i * 60e3) / 60e3) * 60e3, o = p, c = p + (rnd() - 0.5) * 60; const q = 20 + rnd() * 80;
   MINUTES.push([t, o.toFixed(2), (Math.max(o, c) + rnd() * 20).toFixed(2), (Math.min(o, c) - rnd() * 20).toFixed(2), c.toFixed(2), String(q), t + 59999, String(q * c), 100, String(q / 2), String(q * c * (0.3 + 0.4 * rnd())), '0']); p = c; } }
@@ -88,7 +101,11 @@ async function ouvrir(nav, opts) {
     const cors = { 'access-control-allow-origin': '*' };
     if (h === 'api.binance.com') { const d = binance(u); return d ? r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(d) }) : r.fulfill({ status: 404 }); }
     if (h === 'raw.githubusercontent.com') {
-      if (u.includes('heatmap.json')) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(opts.encodage ? Object.assign({}, hm, { encodage }) : sansEncodage()) });
+      if (u.includes('heatmap.json')) {
+        let corps = opts.encodage ? Object.assign({}, hm, { encodage }) : sansEncodage();
+        if (opts.colonnes && !Array.isArray(corps.colonnes)) corps = versColonnes(corps);
+        return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(corps) });
+      }
       return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, 'market-data.json')) });
     }
     return r.abort();
@@ -148,13 +165,13 @@ async function pixel(page, x, y) {
     // Cadrage sur le milieu de la carte publiée (le fichier du dépôt peut dater de plusieurs
     // jours : la vue par défaut, sur le présent, ne la montrerait pas).
     {
-      const tm = (hm.t0 + hm.dt * 720) * 1000;
+      const tm = G.t0 + G.dt * 720;
       await page.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [tm - 3600e3, tm + 3600e3, pMid - 600, pMid + 600]);
       await page.waitForTimeout(400);
       Object.assign(v, (await etat(page)).vue);
     }
     // Une cellule publiée réelle, bien visible : on vise son centre.
-    const cible = hm.bids.concat(hm.asks).map(([c, pb, val]) => ({ t: (hm.t0 + (c + 0.5) * hm.dt) * 1000, p: (pb + 0.5) * hm.dp, val, pb }))
+    const cible = CELLULES.map(({ c, pb, val }) => ({ t: G.t0 + (c + 0.5) * G.dt, p: (pb + 0.5) * G.dp, val, pb }))
       .filter(z => z.t > v.t1 + (v.t2 - v.t1) * 0.15 && z.t < v.t1 + (v.t2 - v.t1) * 0.6 && z.p > v.p1 + (v.p2 - v.p1) * 0.1 && z.p < v.p2 - (v.p2 - v.p1) * 0.1 && z.val >= 40 && z.val < 255)
       .sort((a, b) => b.val - a.val)[0];
     const cx = (cible.t - v.t1) / (v.t2 - v.t1) * zoneW, cy = (v.p2 - cible.p) / (v.p2 - v.p1) * zoneH;
@@ -179,6 +196,23 @@ async function pixel(page, x, y) {
     check(`chaleur repeinte en ${e.mesure.chaleur.toFixed(1)} ms (budget 50 ms à 1440 × 860)`, e.mesure.chaleur < 50, e.mesure);
     check(`calques et axes en ${e.mesure.rendu.toFixed(1)} ms (budget 30 ms)`, e.mesure.rendu < 30, e.mesure);
     await page.close();
+
+    titre('5b. heatmap.json en « colonnes-1 » : la même carte, la même lecture');
+    {
+      let p2;
+      ({ page: p2, erreurs } = await ouvrir(nav, { encodage: true, colonnes: true }));
+      const e2 = await etat(p2);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      check('même grille publiée (colonnes, tranches, encodage)', e2.publiee && e2.publiee.W === G.W && e2.publiee.H === G.H && e2.publiee.encodage, e2.publiee);
+      await p2.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [v.t1, v.t2, v.p1, v.p2]);
+      await p2.waitForTimeout(400);
+      const rc2 = await p2.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(); return { x: r.left, y: r.top }; });
+      await p2.mouse.move(rc2.x + cx + 1, rc2.y + cy); await p2.mouse.move(rc2.x + cx, rc2.y + cy); await p2.waitForTimeout(300);
+      const luC = await p2.evaluate(() => document.getElementById('lecture').innerText);
+      const ligne = t => (t.split('\n').find(l => /^Carte /.test(l)) || '');
+      check('lecture au même point : identique à l\'ancien format', ligne(luC) && ligne(luC) === ligne(lu1), [ligne(lu1), ligne(luC)]);
+      await p2.close();
+    }
 
     titre('6. Sans encodage publié : des intensités, et la carte le dit');
     ({ page, erreurs } = await ouvrir(nav, { encodage: false }));

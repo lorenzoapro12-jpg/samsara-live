@@ -29,6 +29,34 @@ check('couverture DÉDUITE : colonne 0 de 4289 à 4296', g.bas[0] === 4289 && g.
 check('colonne 2 (bids seuls) : bornée par ses bids', g.bas[2] === 4285 && g.haut[2] === 4285);
 check('encodage absent → null (rien d\'inventé)', g.encodage === null);
 
+// ── 1b. Deux formats publiés, une seule grille ───────────────────────────────
+// Le serveur passe à « colonnes-1 » APRÈS la livraison des pages : elles doivent lire les deux et
+// en tirer EXACTEMENT la même grille. Contrôlé sur le fichier du dépôt converti ici (quel que soit
+// son format : déjà converti, il est relu tel quel), et sur des cas limites.
+titre('1b. heatmap.json : ancien format et « colonnes-1 » → grilles identiques');
+const { versColonnes } = require('./heatmap_colonnes.js');
+const memeGrille = (a, b) => !!a && !!b && ['t0', 'dt', 'W', 'dp', 'pbMin', 'H'].every(k => a[k] === b[k]) &&
+  ['bids', 'asks', 'bas', 'haut'].every(k => a[k].length === b[k].length && a[k].every((x, i) => x === b[k][i])) &&
+  JSON.stringify(a.encodage) === JSON.stringify(b.encodage) && a.majA === b.majA;
+const hmDepot = JSON.parse(fs.readFileSync(path.join(REPO, 'heatmap.json'), 'utf8'));
+const hmAncien = Array.isArray(hmDepot.colonnes) ? null : hmDepot;
+if (hmAncien) {
+  const gA = BM.grillePubliee(hmAncien), gC = BM.grillePubliee(versColonnes(hmAncien));
+  check(`fichier du dépôt (${gA.W} colonnes × ${gA.H} tranches) : grille identique case par case`, memeGrille(gA, gC), { W: [gA.W, gC && gC.W], H: [gA.H, gC && gC.H] });
+} else check('fichier du dépôt déjà en « colonnes-1 » : décodé', !!BM.grillePubliee(hmDepot));
+// (Le serveur écrit t0 = minute × dt : un t0 hors minute n'existe que dans ce test.)
+const hAligne = Object.assign({}, h, { t0: 17 * 60 });
+check('petit fichier : identique, colonnes à un seul côté comprises', memeGrille(BM.grillePubliee(hAligne), BM.grillePubliee(versColonnes(hAligne))));
+check('« colonnes-1 » : minute ABSOLUE → t0 = minute × dt', BM.grillePubliee(versColonnes(h)).t0 === Math.round(h.t0 / h.dt) * h.dt * 1000);
+const trou = { updated: h.updated, t0: 60 * 100, dt: 60, dp: 20, format: 'colonnes-1',
+  colonnes: [[100, 50, [3, 0, 7], 53, [9]], [102, null, [], 60, [1, 2]], [103, null, [], null, []]] };
+const gT = BM.grillePubliee(trou);
+check('minute absente (101) = non observée ; côté vide accepté ; colonne vide finale ignorée (comme l\'ancien)',
+  gT.W === 3 && gT.bas[1] === -1 && gT.bas[0] === 50 && gT.haut[0] === 53 && gT.bas[2] === 60 && gT.haut[2] === 61, { W: gT.W, bas: [...gT.bas], haut: [...gT.haut] });
+check('« 0 » dans une série : rien au-dessus du seuil, la couverture reste celle de la série', gT.bids[0 * gT.H + 1] === 0 && gT.bids[0 * gT.H + 2] === 7);
+check('format annoncé inconnu : refusé (null), jamais deviné', BM.grillePubliee(Object.assign({}, trou, { format: 'colonnes-9' })) === null);
+check('date de publication lue en tête, sans analyse complète', BM.majEnTete(JSON.stringify(h)) === h.updated && BM.majEnTete('{"x":1,"updated":"a"}') === null);
+
 // ── 2. Fusion par MAX ────────────────────────────────────────────────────────
 titre('2. Fusion : le MAX, exact, et jamais d\'affinage');
 function aleatoire(W, H, pbMin) {
