@@ -142,9 +142,11 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       const o = await ouvrir(nav, t.id, { width: 1440, height: 900 });
       const d = await o.page.evaluate(() => {
         const cs = getComputedStyle(document.documentElement), tok = n => cs.getPropertyValue(n).trim();
+        // Couleur CSS → « #rrggbb » par le canvas lui-même (indépendant du code testé).
+        const hex = c => { if (!c) return ''; const t = document.createElement('canvas').getContext('2d'); t.fillStyle = '#000'; t.fillStyle = c; return /^#/.test(t.fillStyle) ? t.fillStyle : ''; };
         return { forme: COLORS.bougieForme, rayon: COLORS.bougieRayon, tirets: COLORS.grilleTirets.join(' '), police: chartFont(10),
           font: tok('--font'), polGraph: tok('--police-graphique'), bid: Array.from(HEAT_U32.bid), ask: Array.from(HEAT_U32.ask),
-          chaleur: [tok('--chaleur-bid'), tok('--chaleur-ask')], formeTok: tok('--bougie-forme'), rayonTok: tok('--bougie-rayon'), tiretsTok: tok('--grille-tirets') };
+          chaleur: [tok('--chaleur-bid'), tok('--chaleur-ask')], chaleurHex: [hex(tok('--chaleur-bid')), hex(tok('--chaleur-ask'))], formeTok: tok('--bougie-forme'), rayonTok: tok('--bougie-rayon'), tiretsTok: tok('--grille-tirets') };
       });
       // Les jetons déclarés par la feuille du thème (sinon les défauts).
       const attenduForme = d.formeTok || 'pleine', attenduRayon = d.rayonTok === '' ? 2 : +d.rayonTok;
@@ -157,7 +159,7 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
           const ok = d[cote].every((x, k) => x === LEG[cote][k]);
           check(`${t.id.padEnd(9)} · chaleur ${cote} : sans jeton, rampe historique à l'octet près`, ok);
         } else {
-          const h = /^#([0-9a-f]{6})$/i.exec(d.chaleur[i]), n = h ? parseInt(h[1], 16) : null;
+          const h = /^#([0-9a-f]{6})$/i.exec(d.chaleurHex[i]), n = h ? parseInt(h[1], 16) : null;
           const enc = a => (((0.10 + 0.80 * a / 255) * 255 | 0) << 24 | ((n & 255) << 16) | (((n >> 8) & 255) << 8) | (n >> 16)) >>> 0;
           check(`${t.id.padEnd(9)} · chaleur ${cote} : encre ${d.chaleur[i]}, opacité 0,10 → 0,90`, n !== null && [0, 128, 255].every(a => d[cote][a] === enc(a)),
             { jeton: d.chaleur[i], u32: [d[cote][0], d[cote][255]] });
