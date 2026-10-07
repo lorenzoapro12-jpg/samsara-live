@@ -32,6 +32,14 @@ CE QU'IL MESURE (par thème)
    CHAQUE borne du dégradé (AA texte ≥ 4,5:1). Une borne translucide est composée sur la
    carte opaque (plancher). C'est le cas exact d'un thème noir / néon : texte sombre sur un
    néon clair passe, texte sombre sur un fond sombre ne passe pas.
+8. Texte du CANVAS (07/10/2026) : le graphique écrit ses axes, ses dates et ses titres de
+   sous-graphes en --ink-2 (et --ink-1) directement sur son fond — mesuré sur CHAQUE borne
+   --chart-1/2/3 (AA texte ≥ 4,5:1). --ink-3 (compteur, titres de sous-graphes) est relevé.
+9. Rampe de CHALEUR (couche « Liquidité ») sur --chart-2 : le contraste doit CROÎTRE avec
+   l'intensité (le plus gros mur est le plus visible) et atteindre 3:1 (WCAG 1.4.11) au plus
+   fort. Rampe d'encre du thème (--chaleur-bid / --chaleur-ask) ou, sans ces jetons, rampe
+   historique — les deux tables et l'opacité sont LUES dans js/app.js (HEAT_RAMPE,
+   CHALEUR_ALPHA), jamais recopiées ici. Sur fond clair, la rampe historique ne l'était pas.
 
 USAGE
     python3 tests/test_palette.py     # code de sortie 0 = tout tient
@@ -58,6 +66,10 @@ def titre(t):
 
 def ok(libelle, detail, seuil=None, valeur=None):
     lignes.append(f"  ✓ {libelle:<44} {detail}")
+
+
+def info(libelle, detail):
+    lignes.append(f"  ⓘ {libelle:<44} {detail}")
 
 
 def echec(libelle, detail):
@@ -204,6 +216,33 @@ SRC_JS = "\n".join((REPO / src).read_text(encoding="utf-8")
 _m = re.search(r"const ETIQ_OVERLAYS\s*=\s*\{([^}]*)\}", SRC_JS)
 ETIQ = set(re.findall(r"(\w+)\s*:\s*'", _m.group(1))) if _m else set()
 NOMS_OV = ["ema20", "ema50", "ema100", "ema200", "sma20", "sma50"]
+SEUIL_CHALEUR_MAX = SEUIL_NON_TEXTE
+
+
+def _nombres(txt):
+    return [float(x) for x in re.findall(r"-?[\d.]+", txt)]
+
+
+# Les rampes de chaleur, telles que js/app.js les calcule (tables littérales lues dans la source).
+_mr = re.search(r"const HEAT_RAMPE\s*=\s*\{(.*?)\};", SRC_JS, re.S)
+_ma = re.search(r"const CHALEUR_ALPHA\s*=\s*\{\s*base:\s*([\d.]+),\s*pente:\s*([\d.]+)\s*\}", SRC_JS)
+HEAT_RAMPE = {}
+if _mr:
+    for cote in ("bid", "ask"):
+        m = re.search(cote + r":\s*\{\s*base:\s*\[([^\]]*)\],\s*pente:\s*\[([^\]]*)\]", _mr.group(1))
+        if m:
+            HEAT_RAMPE[cote] = (_nombres(m.group(1)), _nombres(m.group(2)))
+CHALEUR_ALPHA = (float(_ma.group(1)), float(_ma.group(2))) if _ma else None
+
+
+def rampe_chaleur(base, pente):
+    """[(rgb 0..1, alpha 0..1)] pour v = 0..255, avec les troncatures de js/app.js (rampeU32)."""
+    out = []
+    for v in range(256):
+        t = v / 255
+        r, g, b = (int(base[k] + pente[k] * t) for k in range(3))
+        out.append(((r / 255, g / 255, b / 255), int((base[3] + pente[3] * t) * 255) / 255))
+    return out
 
 for t in THEMES:
     th = t["id"]
@@ -267,6 +306,38 @@ for t in THEMES:
                    key=lambda x: x[0])
         (ok if pire[0] >= SEUIL_AA_TEXTE else echec)(
             f"{th} · {encre} sur {fond_tok} ({len(bornes)} borne(s))", f"{pire[0]:.2f}:1 (pire borne {hexa(pire[1])}, AA ≥ {SEUIL_AA_TEXTE})")
+
+    # 8. texte du canvas : sur chaque borne du fond du graphique
+    for nom in ("--ink-1", "--ink-2", "--ink-3"):
+        pire = min(((contraste(rgb(J, nom, f), f), f) for f in fonds_canvas), key=lambda x: x[0])
+        lib, det = f"{th} · {nom} (texte du canvas)", f"{pire[0]:.2f}:1 (pire borne {hexa(pire[1])}, AA ≥ {SEUIL_AA_TEXTE})"
+        if nom == "--ink-3":
+            (info if pire[0] < SEUIL_AA_TEXTE else ok)(lib, det + (" — relevé, non exigé" if pire[0] < SEUIL_AA_TEXTE else ""))
+        else:
+            (ok if pire[0] >= SEUIL_AA_TEXTE else echec)(lib, det)
+
+    # 9. rampe de chaleur : monotone en contraste sur --chart-2, et visible au plus fort
+    if not HEAT_RAMPE or len(HEAT_RAMPE) != 2 or not CHALEUR_ALPHA:
+        echec(f"{th} · rampes de chaleur", "HEAT_RAMPE / CHALEUR_ALPHA introuvables dans js/app.js")
+    else:
+        fond2 = fonds_canvas[1]
+        for cote in ("bid", "ask"):
+            jeton = "--chaleur-" + cote
+            if jeton in J:
+                encre = couleur(resout(J, J[jeton]))[:3]      # l'alpha du jeton est ignoré, comme dans js/app.js
+                rampe = rampe_chaleur(list(encre[:3]) + [CHALEUR_ALPHA[0]], [0, 0, 0, CHALEUR_ALPHA[1]])
+                rampe = [((encre[0], encre[1], encre[2]), a) for _, a in rampe]
+                quoi = f"encre {resout(J, J[jeton])}"
+            else:
+                rampe = [((c[0], c[1], c[2]), a) for c, a in rampe_chaleur(*HEAT_RAMPE[cote])]
+                quoi = "rampe historique"
+            cs = [contraste(compose(c + (a,), fond2), fond2) for c, a in rampe]
+            descentes = [v for v in range(1, 256) if cs[v] < cs[v - 1] - 1e-9]
+            pic = max(range(256), key=lambda v: cs[v])
+            det = (f"{quoi} : {cs[0]:.2f} → {cs[-1]:.2f}:1"
+                   + (f" — DÉCROÎT {len(descentes)} fois (max {cs[pic]:.2f}:1 à v={pic})" if descentes else ", monotone")
+                   + (f", plus gros mur sous {SEUIL_CHALEUR_MAX}:1" if cs[-1] < SEUIL_CHALEUR_MAX else ""))
+            (ok if not descentes and cs[-1] >= SEUIL_CHALEUR_MAX else echec)(f"{th} · chaleur {cote} sur --chart-2", det)
 
     # 6. exceptions sous 3:1 : étiquetées, pas silencieuses
     sous = [(n, min(contraste(c, f) for f in fonds_canvas)) for n, c in zip(NOMS_OV, ovs)]
