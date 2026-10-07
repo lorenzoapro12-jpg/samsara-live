@@ -19,7 +19,8 @@ Pour chaque police de POLICES (Google Fonts, toutes sous SIL OFL 1.1) :
   4. sous-ensemble (pyftsubset, woff2, sans hinting) : les `plages` de la police (par défaut
      PLAGES_LATIN), ou, pour une police de TITRE, les seules lettres de `texte` (--text) ;
   5. RENOMME la police si sa licence déclare un nom réservé (Reserved Font Name) : une version
-     modifiée ne peut pas le porter (OFL, condition 3) ;
+     modifiée ne peut pas le porter (OFL, condition 3). Seuls ses NOMS changent : la mention de
+     copyright, la marque et la licence restent celles de l'original (NOMS_D_ORIGINE) ;
   6. date de fabrication FIXE (head.modified) : `horodatage` s'il est consigné, sinon celle de la
      source. Avant, chaque fabrication y inscrivait l'heure : deux fabrications identiques
      différaient de quelques octets (l'en-tête et sa somme de contrôle). Les cinq polices de Néon
@@ -98,6 +99,22 @@ POLICES = [
     dict(sortie="barlow-condensed-600.woff2", famille="Barlow Condensed", origine="Barlow Condensed", theme="Gare",
          dossier="barlowcondensed", source="BarlowCondensed-SemiBold.ttf", licence="barlowcondensed.OFL.txt",
          composes=COMPOSES_SAMSARA),
+    # Gazette — le texte et TOUTES les valeurs : ses dix chiffres ont la même chasse (580 unités),
+    # tabulaires sans fonction OpenType. Les deux graisses statiques publiées, rien d'instancié.
+    dict(sortie="old-standard-400.woff2", famille="Old Standard TT", origine="Old Standard TT", theme="Gazette",
+         dossier="oldstandardtt", source="OldStandard-Regular.ttf", licence="oldstandardtt.OFL.txt"),
+    dict(sortie="old-standard-700.woff2", famille="Old Standard TT", origine="Old Standard TT", theme="Gazette",
+         dossier="oldstandardtt", source="OldStandard-Bold.ttf", licence="oldstandardtt.OFL.txt"),
+    # Gazette — manchette, rubriques, titres de colonnes. Chiffres PROPORTIONNELS : jamais pour une
+    # valeur qui bouge (la manchette n'est réécrite qu'à une édition). Chasse normale (wdth=100).
+    dict(sortie="league-gothic.woff2", famille="League Gothic", origine="League Gothic", theme="Gazette",
+         dossier="leaguegothic", source="LeagueGothic[wdth].ttf", licence="leaguegothic.OFL.txt",
+         instance={"wdth": 100}, composes=COMPOSES_SAMSARA),
+    # Gazette — la plaque de titre seulement (« Saṃsāra », graisse 800). Nom réservé « Playfair
+    # Display » : la version modifiée (instance, ṃ composé, sous-ensemble) est RENOMMÉE.
+    dict(sortie="gazette-titre.woff2", famille="Samsara Gazette Titre", origine="Playfair Display", theme="Gazette",
+         dossier="playfairdisplay", source="PlayfairDisplay[wght].ttf", licence="playfairdisplay.OFL.txt",
+         renommer="Playfair Display", instance={"wght": 800}, composes=["1E43=006D+002E:bas"], texte="Saṃsāra"),
 ]
 
 
@@ -224,8 +241,17 @@ def composer(f, specs):
                 t.cmap[u] = nom
 
 
+# Enregistrements de la table « name » qui DÉCRIVENT l'origine — copyright (0), marque (7), fonderie
+# (8), dessinateur (9), description (10), adresses (11, 12), licence (13, 14) : ils restent tels
+# quels. Les réécrire faisait dire à la mention de copyright « The Samsara … Project Authors, with
+# Reserved Font Name "Samsara …" » : une attribution fausse, et un nom réservé que nul n'a déclaré.
+NOMS_D_ORIGINE = {0, 7, 8, 9, 10, 11, 12, 13, 14}
+
+
 def renommer(f, ancien, neuf):
     for rec in f["name"].names:
+        if rec.nameID in NOMS_D_ORIGINE:
+            continue
         try:
             s = rec.toUnicode()
         except Exception:

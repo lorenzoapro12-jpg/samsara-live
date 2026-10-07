@@ -1,0 +1,459 @@
+/* Thème « Gazette » — la une d'un quotidien financier. Papier journal, deux encres (le noir et
+   un rouge), une plaque de titre en Didone, des rubriques en grotesque condensée, le texte et
+   les chiffres en romain d'imprimerie. STRUCTURE propre : « une » (js/structures.js) — plaque
+   de titre à deux oreilles (le cours à la seconde, l'heure de l'édition), folio, manchette
+   composée par le code (elle RECOPIE la cote, voir js/structures.js), « la cote », légende du
+   cliché, téléscripteur.
+   Déclaré dans index.html : <link data-theme="gazette" data-mode="clair" data-verre="aucun"
+   data-structure="une">.
+
+   COULEURS. La hausse est NOIRE et la baisse ROUGE, comme les cotes monochromes : la hausse se
+   lit à la FORME (bougie creuse, --bougie-forme: creuse-hausse) et au signe, la baisse à la
+   forme pleine et à la couleur — double codage, qui tient sous les trois daltonismes. Mesuré
+   par tests/test_palette.py.
+
+   POLICES (fonts/fabriquer.py) : Old Standard TT pour le texte et TOUTES les valeurs (dix
+   chiffres de même chasse) ; League Gothic pour les rubriques et la manchette (chiffres
+   proportionnels : jamais une valeur qui bat) ; « Samsara Gazette Titre » (Playfair Display
+   renommée, nom réservé) pour la plaque seulement.
+
+   EFFETS ET BUDGET. Aucune animation : la manchette se réécrit et le tampon « Dernière heure »
+   s'allume par un changement de classe, à une édition nouvelle. Le grain du papier est DANS
+   --fond (une image fixe, peinte une fois avec le fond), pas dans un calque posé sur la page
+   (--grain: none). Mesuré par tests/test_budget.js. */
+
+@font-face {
+  font-family: 'Old Standard TT';
+  src: url('../fonts/old-standard-400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Old Standard TT';
+  src: url('../fonts/old-standard-700.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'League Gothic';
+  src: url('../fonts/league-gothic.woff2') format('woff2');
+  font-weight: 400; font-display: swap;
+}
+@font-face {
+  font-family: 'Samsara Gazette Titre';
+  src: url('../fonts/gazette-titre.woff2') format('woff2');
+  font-weight: 800; font-display: swap;
+}
+
+[data-theme="gazette"] {
+  color-scheme: light;
+  --font: 'Old Standard TT', 'Times New Roman', Times, serif;
+  --police-rubrique: 'League Gothic', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+  --police-plaque: 'Samsara Gazette Titre', Didot, 'Bodoni 72', 'Times New Roman', serif;
+  --r-bar: 0; --r-panel: 0; --r-card: 0; --r-tile: 0;
+
+  /* Papier journal : un grain fixe (bruit SVG, 3 % d'encre en moyenne) DANS le fond. */
+  --fond:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.07 0 0 0 0 0.07 0 0 0 0 0.06 0 0 0 0.07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, #efebe0 0%, #ebe6d8 100%);
+  --grain: none; --verre: none; --trame: none;
+
+  --surface: #f3efe5;
+  --surface-ombre: inset 0 0 0 1px rgba(18,18,18,0.55);
+  --surface-reflet: none;
+  --capsule: transparent;
+  --capsule-hover: rgba(18,18,18,0.07);
+  --capsule-ombre: inset 0 0 0 1px #121212;
+  --pill: transparent;
+  --pill-hover: rgba(18,18,18,0.07);
+  --pill-actif: #121212;
+  --pill-actif-ink: #f7f4ec;
+  --pill-actif-ombre: none;
+  --dot-anneau: #f3efe5;
+  --poignee: transparent;
+  --poignee-hover: rgba(18,18,18,0.05);
+
+  --ink-1: #121212; --ink-2: #37342f; --ink-3: #5b574f;
+  --up: #161616; --down: #c0261b;
+  --up-ink: #161616; --down-ink: #a51d14;
+  --up-soft: transparent; --down-soft: rgba(192,38,27,0.08);
+  --warn: #8a6400; --warn-ink: #7a5300; --warn-soft: #f3ecd2;
+  --accent: #c0261b; --accent-2: #121212;
+  --brand: linear-gradient(180deg, #121212, #2c2a26);
+  --brand-fond: var(--brand);
+  --brand-ink: #f7f4ec;
+  --accent-glow: rgba(18,18,18,0.18);
+  --hairline: rgba(18,18,18,0.55);
+  --rail: rgba(18,18,18,0.07);
+  --teletype: #f3ecd2;
+  --tampon: #c0261b; --tampon-ink: #ffffff;
+
+  --card: #f7f4ec;
+  --card-solid: #f7f4ec;
+  --card-edge: transparent;
+  --card-shadow: none;
+  --card-hi: transparent;
+  --card-reflet: none;
+  --forward: linear-gradient(135deg, #c0261b, #8e1b12);
+  --modal-fond: #f3efe5;
+  --modal-ombre: 0 1px 0 #121212;
+  --ombre-douce: none;
+  --selection: rgba(192,38,27,0.20);
+  --defil: rgba(18,18,18,0.30);
+  --defil-hover: rgba(18,18,18,0.50);
+  --prix-lueur: none;
+
+  /* Graphique : le cliché, sur papier, encadré d'un filet noir. */
+  --chart-1: #f5f1e6; --chart-2: #f1ece0; --chart-3: #ece6d8;
+  --chart-surface: #f5f1e6;
+  --chart-lueur: none;
+  --chart-creux: inset 0 0 0 1px #121212;
+  --grille: rgba(18,18,18,0.10);
+  --reticule: rgba(192,38,27,0.6);
+  --bulle: #f7f4ec;
+  --filigrane: 0.05;
+  --vol-alpha: 0.45;
+  --bande-alpha: 0.06;
+  --aura: 0;
+  --bougie-forme: creuse-hausse;
+  --bougie-rayon: 0;
+  /* Chaleur : les deux encres du journal, seule l'opacité croît (monotone, tests/test_palette.py). */
+  --chaleur-bid: #161616; --chaleur-ask: #c0261b;
+  /* Overlays : l'EMA100 n'est pas orange (#b8561a : ΔE 13 avec la baisse rouge). */
+  --ov-ema20: #8a6400; --ov-ema50: #1f4e8c; --ov-ema100: #0f7a7a;
+  --ov-ema200: #5b2a86; --ov-sma20: #b0175a; --ov-sma50: #2e6b34;
+  --ov-bb: #5b574f; --ov-sar: var(--ov-ema200);
+  --sess-asie: rgba(138,100,0,0.60);
+  --sess-europe: rgba(31,78,140,0.60);
+  --sess-us: rgba(91,42,134,0.60);
+  --sr-1: #5b2a86; --sr-2: #1f4e8c; --sr-3: #8a6400;
+  --fib: #8a6400; --vp: #1f4e8c; --vp-poc: #c0261b;
+}
+
+/* ── Typographie : romain pour le texte et les chiffres, grotesque condensée pour les rubriques ── */
+[data-theme="gazette"] body { font-size: 13.5px; font-variant-numeric: lining-nums tabular-nums; }
+[data-theme="gazette"] .demon-name,
+[data-theme="gazette"] .modal-titre,
+[data-theme="gazette"] .fiche-titre,
+[data-theme="gazette"] .feed-panel-handle,
+[data-theme="gazette"] .strat-handle,
+[data-theme="gazette"] .lbl,
+[data-theme="gazette"] .kpi i,
+[data-theme="gazette"] .section-title,
+[data-theme="gazette"] .gazette-tag,
+[data-theme="gazette"] .gazette-date,
+[data-theme="gazette"] .gazette-titre {
+  font-family: var(--police-rubrique); font-weight: 400; text-transform: uppercase;
+}
+[data-theme="gazette"] .price-badge,
+[data-theme="gazette"] .kpi b,
+[data-theme="gazette"] .tuile .val,
+[data-theme="gazette"] .hero-val,
+[data-theme="gazette"] #updated { font-family: var(--font); font-variant-numeric: lining-nums tabular-nums; letter-spacing: 0; }
+
+/* ── Les surfaces deviennent la page : des filets, pas des boîtes ── */
+[data-theme="gazette"] .header,
+[data-theme="gazette"] .indicator-bar,
+[data-theme="gazette"] .chart-container,
+[data-theme="gazette"] .feed-panel,
+[data-theme="gazette"] .strat-section { background: transparent; box-shadow: none; }
+
+/* ── Plaque de titre : oreille | titre | oreille, filet double dessous ── */
+/* Les oreilles ne descendent jamais sous leur contenu (max-content) : sur une ligne, le titre reste
+   centré tant que la place le permet ; en dessous de 1000 px, il passe sur sa propre ligne
+   (mesuré : oreille du cours ≈ 345 px avec un prix à six chiffres, titre ≈ 190 px). */
+[data-theme="gazette"][data-structure="une"] .header {
+  display: grid; grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr); align-items: center; gap: 18px;
+  padding: 3px 2px 6px; border-bottom: 3px double var(--ink-1);
+}
+[data-theme="gazette"][data-structure="une"] .header-left { justify-self: center; }
+[data-theme="gazette"] .header-orb { display: none; }
+[data-theme="gazette"] .header-left h1 {
+  font-family: var(--police-plaque); font-weight: 800; font-size: 46px; line-height: 1; letter-spacing: 0.005em;
+  background: none; -webkit-text-fill-color: currentColor; color: var(--ink-1);
+}
+[data-theme="gazette"] .gazette-oreille-g,
+[data-theme="gazette"] .gazette-oreille-d {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+  padding: 3px 10px 4px; border: 3px double var(--ink-1);
+}
+[data-theme="gazette"] .gazette-oreille-g { justify-self: start; }
+/* Oreille droite : « Édition de 13:03 UTC », puis la ligne d'alertes, centrées l'une sur l'autre. */
+[data-theme="gazette"] .gazette-oreille-d { justify-self: end; align-items: center; }
+[data-theme="gazette"] .gazette-edition { display: flex; align-items: baseline; gap: 6px; }
+[data-theme="gazette"] .gazette-tag { font-size: 13px; line-height: 1; letter-spacing: 0.1em; color: var(--ink-2); white-space: nowrap; }
+[data-theme="gazette"] .gazette-oreille-d #updated { display: inline; font-size: 21px; font-weight: 700; line-height: 1.05; color: var(--ink-1); }
+/* Seconde ligne de l'oreille, hauteur fixe : la cadence attendue, ou « Édition périmée », ou le tampon. */
+[data-theme="gazette"] .gazette-alertes {
+  height: 15px; display: flex; align-items: center; justify-content: center; gap: 6px;
+  font: 400 12px/1 var(--police-rubrique); letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap;
+}
+[data-theme="gazette"] .gazette-cadence { color: var(--ink-3); }
+[data-theme="gazette"] .gazette-perimee,
+[data-theme="gazette"] .gazette-tampon { display: none; }
+[data-theme="gazette"] .gazette-perimee { color: var(--down-ink); }
+[data-theme="gazette"] .gazette-tampon { padding: 2px 5px 1px; color: var(--tampon-ink); background: var(--tampon); }
+/* La cote est vieille (seuil de la page, CADENCES.vieux_min) : dit EN PLUS de l'âge. */
+[data-theme="gazette"]:has(#cycle.vieux) .gazette-perimee { display: inline; }
+[data-theme="gazette"]:has(#cycle.vieux) .gazette-cadence,
+[data-theme="gazette"] .gazette-alertes.tampon .gazette-cadence { display: none; }
+[data-theme="gazette"] .gazette-alertes.tampon .gazette-tampon { display: inline; }
+
+/* Le cours à la seconde, dans l'oreille gauche. */
+[data-theme="gazette"] .hero-prix { gap: 9px; }
+[data-theme="gazette"] .paire-btn {
+  padding: 2px 4px 2px 7px; font: 400 15px/1.1 var(--police-rubrique); letter-spacing: 0.06em; text-transform: uppercase;
+}
+[data-theme="gazette"] .price-badge { font-weight: 700; font-size: 24px; }
+[data-theme="gazette"] .var24 { padding: 0; background: none !important; font-size: 14px; font-weight: 700; border-radius: 0; }
+/* Le signe se double d'un triangle (dessiné : la police n'a pas ▲▼) ; le texte est intact. */
+[data-theme="gazette"] .var24.pos::before,
+[data-theme="gazette"] .var24.neg::before {
+  content: ''; display: inline-block; margin-right: 4px; vertical-align: 1px;
+  border-left: 4px solid transparent; border-right: 4px solid transparent;
+}
+[data-theme="gazette"] .var24.pos::before { border-bottom: 7px solid currentColor; }
+[data-theme="gazette"] .var24.neg::before { border-top: 7px solid currentColor; }
+
+/* ── Folio : la date du poste, les outils ── */
+[data-theme="gazette"] .gazette-folio {
+  flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: calc(-1 * var(--gap) + 3px); padding: 0 2px 3px; border-bottom: 1px solid var(--ink-1);
+}
+[data-theme="gazette"] .gazette-date { font-size: 15px; line-height: 1; letter-spacing: 0.14em; color: var(--ink-1); white-space: nowrap; }
+[data-theme="gazette"] .header-right { gap: 6px; }
+[data-theme="gazette"] .theme-btn.ico-btn { width: 28px; height: 28px; }
+[data-theme="gazette"] .theme-btn.ico-btn svg { width: 15px; height: 15px; }
+[data-theme="gazette"] .mode-btn { height: 28px; font: 400 14px/1 var(--police-rubrique); letter-spacing: 0.08em; text-transform: uppercase; }
+[data-theme="gazette"] .theme-btn.ico-btn.on { box-shadow: none; }
+[data-theme="gazette"] .refresh-dot { box-shadow: none; }
+
+/* ── Manchette : composée par le code, recopiée de la cote ── */
+[data-theme="gazette"] .gazette-manchette {
+  flex-shrink: 0; margin-top: calc(-1 * var(--gap) + 5px); padding: 0 8px 5px; text-align: center;
+  border-bottom: 1px solid var(--ink-1);
+}
+[data-theme="gazette"] .gazette-titre { font-size: 34px; line-height: 1.02; letter-spacing: 0.01em; color: var(--ink-1); }
+[data-theme="gazette"] .gazette-chapeau { margin-top: 2px; font: 400 14px/1.3 var(--font); color: var(--ink-2); }
+[data-theme="gazette"] .gazette-chapeau:empty { display: none; }
+/* La valeur citée garde la casse du texte de la cote (« long γ » ne devient pas « LONG Γ ») et son
+   encre : rouge si elle commence par « − », comme la cote. */
+[data-theme="gazette"] .gazette-valeur { text-transform: none; color: var(--ink-1); }
+[data-theme="gazette"] .gazette-valeur.neg { color: var(--down-ink); }
+[data-theme="gazette"] .gazette-chapeau .gazette-valeur { font-weight: 700; }
+
+/* ── La cote ── */
+[data-theme="gazette"] .gazette-cote {
+  flex-shrink: 0; display: flex; align-items: center; gap: 12px;
+  margin-top: calc(-1 * var(--gap)); padding: 1px 2px; border-bottom: 3px double var(--ink-1);
+}
+[data-theme="gazette"] .gazette-cote > .gazette-tag {
+  flex-shrink: 0; padding-right: 12px; border-right: 1px solid var(--ink-1);
+  font-size: 22px; letter-spacing: 0.04em; color: var(--ink-1);
+}
+[data-theme="gazette"] .gazette-cote .kpis { flex: 1; height: 38px; }
+[data-theme="gazette"] .kpi { border-left-color: rgba(18,18,18,0.30); }
+[data-theme="gazette"] .kpi i { font-size: 12.5px; letter-spacing: 0.08em; color: var(--ink-2); }
+[data-theme="gazette"] .kpi b { font-size: 16px; font-weight: 700; }
+[data-theme="gazette"] .kpi-age {
+  border-radius: 0; background: transparent; border: 1px solid var(--ink-3); color: var(--ink-2);
+  font-size: 12px; font-weight: 700; padding: 1px 7px;
+}
+[data-theme="gazette"] .kpis.vieux .kpi-age { color: var(--warn-ink); background: var(--warn-soft); border-color: var(--warn-ink); }
+
+/* ── Sommaire (le ruban) : rubriques en capitales, l'actif en noir inversé ── */
+[data-theme="gazette"] .indicator-bar {
+  margin-top: calc(-1 * var(--gap)); padding: 3px 2px; gap: 1px; border-bottom: 1px solid var(--ink-1);
+}
+[data-theme="gazette"] .indicator-bar .section-title { font-size: 14px; letter-spacing: 0.06em; color: var(--ink-1); margin: 0 3px 0 2px; }
+[data-theme="gazette"] .indicator-bar .sep { width: 1px; height: 16px; background: var(--ink-1); }
+[data-theme="gazette"] .indicator-bar label { padding: 3px 6px; font-size: 12.5px; font-weight: 400; }
+[data-theme="gazette"] .indicator-bar label.active { font-weight: 700; }
+[data-theme="gazette"] .ind-dropdown-btn { padding: 3px 10px 3px 8px; font-size: 13px; }
+
+/* ── Le cliché et sa légende ── */
+[data-theme="gazette"] .chart-container { padding: 3px 0 22px; }
+[data-theme="gazette"] .chart-container canvas { border-radius: 0; }
+[data-theme="gazette"] .gazette-legende {
+  position: absolute; left: 0; right: 0; bottom: 2px; z-index: 2;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font: 400 12.5px/17px var(--font); color: var(--ink-2);
+}
+
+/* ── Le marché en colonnes ── */
+[data-theme="gazette"] .feed-panel { border-left: 1px solid var(--ink-1); }
+[data-theme="gazette"][data-structure="une"] .feed-panel:not(.collapsed) { width: clamp(390px, 36vw, 600px); }
+[data-theme="gazette"] .feed-panel-handle {
+  font-size: 16px; letter-spacing: 0.22em; color: var(--ink-1); background: transparent; border-right: 1px solid var(--ink-1);
+}
+[data-theme="gazette"] .feed-panel-handle::after { display: none; }
+[data-theme="gazette"] .feed-panel-body { container-type: inline-size; }
+[data-theme="gazette"] .feed { gap: 16px; padding: 8px 14px; }
+/* Deux colonnes seulement quand le panneau a la largeur de deux (> 560 px) : en dessous, les
+   colonnes étroites font des rivières. */
+@container (min-width: 560px) {
+  [data-theme="gazette"] .feed { display: block; column-count: 2; column-gap: 24px; column-rule: 1px solid var(--hairline); }
+  [data-theme="gazette"] .feed > * { break-inside: avoid; margin-bottom: 16px; }
+}
+[data-theme="gazette"] .demon-card {
+  --teinte: var(--ink-1);
+  padding: 5px 0 4px; background: transparent; border: 0; border-top: 3px solid var(--ink-1); box-shadow: none; overflow: visible;
+}
+[data-theme="gazette"] .demon-card::before,
+[data-theme="gazette"] .demon-card::after,
+[data-theme="gazette"] .demon-avatar { display: none; }
+[data-theme="gazette"] .demon-header { margin-bottom: 8px; gap: 8px; align-items: flex-start; }
+[data-theme="gazette"] .demon-name { font-size: 26px; line-height: 1.02; letter-spacing: 0.01em; color: var(--ink-1); }
+[data-theme="gazette"] .demon-role { font-size: 12px; color: var(--ink-3); }
+[data-theme="gazette"] .demon-right { font-size: 12px; }
+[data-theme="gazette"] .demon-body { font-size: 13.5px; }
+[data-theme="gazette"] .fine { font-size: 12px; text-align: justify; -webkit-hyphens: auto; hyphens: auto; }
+[data-theme="gazette"] .lbl { font-size: 13px; letter-spacing: 0.08em; color: var(--ink-2); }
+[data-theme="gazette"] .hero-val { font-weight: 700; font-size: 28px; letter-spacing: 0; }
+[data-theme="gazette"] .tuiles { gap: 8px 16px; }
+[data-theme="gazette"] .tuile { padding: 5px 0 6px; background: transparent; border-top: 1px solid var(--hairline); }
+[data-theme="gazette"] .tuile .val { font-weight: 700; }
+[data-theme="gazette"] .tuile .sub,
+[data-theme="gazette"] .track-legende,
+[data-theme="gazette"] .split-legende,
+[data-theme="gazette"] .tf-pied { font-size: 12px; }
+[data-theme="gazette"] .badge,
+[data-theme="gazette"] .chip,
+[data-theme="gazette"] .etat { border-radius: 0; box-shadow: inset 0 0 0 1px currentColor; }
+[data-theme="gazette"] .tf-nom { border-radius: 0; color: var(--card-solid); background: var(--ink-1); }
+/* Rails et jauges à l'encre : un filet, un point carré. */
+[data-theme="gazette"] .track-rail,
+[data-theme="gazette"] .rsi-meter,
+[data-theme="gazette"] .split,
+[data-theme="gazette"] .dv-bar { border-radius: 0; }
+[data-theme="gazette"] .track-rail { height: 4px; }
+[data-theme="gazette"] .track-fill { border-radius: 0; opacity: 0.35; background: var(--ink-1); }
+[data-theme="gazette"] .track-dot,
+[data-theme="gazette"] .rsi-dot,
+[data-theme="gazette"] .axe-pt i { border-radius: 0; box-shadow: 0 0 0 2px var(--card-solid); }
+[data-theme="gazette"] .rsi-zone.bas,
+[data-theme="gazette"] .rsi-zone.haut { border-radius: 0; }
+[data-theme="gazette"] .rsi-zone.bas { background: rgba(18,18,18,0.10); }
+[data-theme="gazette"] .dv-fill.pos,
+[data-theme="gazette"] .dv-fill.neg,
+[data-theme="gazette"] .lad-bar span { border-radius: 0; }
+[data-theme="gazette"] .age-banner {
+  border-radius: 0; box-shadow: inset 0 0 0 1px currentColor; font-weight: 700; font-size: 13px;
+}
+[data-theme="gazette"] .age-banner::before { border-radius: 0; box-shadow: none; }
+[data-theme="gazette"] .lecture-courte { border-radius: 0; font-size: 12px; }
+
+/* ── Grid Bot : un supplément ── */
+[data-theme="gazette"] .strat-section { border-top: 1px solid var(--ink-1); border-bottom: 1px solid var(--ink-1); }
+[data-theme="gazette"] .strat-handle { font-size: 17px; letter-spacing: 0.08em; border-bottom-color: var(--hairline); }
+[data-theme="gazette"] .strat-section .strat-row select,
+[data-theme="gazette"] .strat-section .strat-row input[type="number"],
+[data-theme="gazette"] .strat-section input[type="datetime-local"],
+[data-theme="gazette"] .strat-section .strat-stats,
+[data-theme="gazette"] .strat-btn { border-radius: 0; }
+
+/* ── Téléscripteur (la barre des tâches) ── */
+[data-theme="gazette"] .aero-taskbar {
+  background: var(--teletype); box-shadow: none; color: var(--ink-1);
+  border-top: 1px dashed rgba(18,18,18,0.5); border-bottom: 1px dashed rgba(18,18,18,0.5);
+  font-size: 12px; font-weight: 700;
+}
+[data-theme="gazette"] .aero-taskbar .gazette-tag { font-size: 14px; color: var(--ink-1); }
+[data-theme="gazette"] .aero-taskbar .taskbar-dot { box-shadow: none; }
+
+/* ── Menus, légendes, réglages, fenêtres : des coupures de papier, à angles vifs ── */
+[data-theme="gazette"] .theme-menu,
+[data-theme="gazette"] .paire-menu,
+[data-theme="gazette"] .ind-dropdown-menu,
+[data-theme="gazette"] .fiche-pop {
+  border-radius: 0; border-color: var(--ink-1); box-shadow: 3px 3px 0 rgba(18,18,18,0.18);
+}
+[data-theme="gazette"] .theme-item,
+[data-theme="gazette"] .paire-menu label,
+[data-theme="gazette"] .ind-dropdown-menu label,
+[data-theme="gazette"] .theme-apercu,
+[data-theme="gazette"] .glossaire-item,
+[data-theme="gazette"] .fiche-pop .lien,
+[data-theme="gazette"] .puce-case,
+[data-theme="gazette"] .reglage select,
+[data-theme="gazette"] .ligne-reglage input,
+[data-theme="gazette"] .fiche-nature,
+[data-theme="gazette"] .statut,
+[data-theme="gazette"] .fiche-alerte,
+[data-theme="gazette"] .fiche-debat,
+[data-theme="gazette"] .modal-fermer { border-radius: 0; }
+[data-theme="gazette"] .fiche-titre { font-size: 22px; line-height: 1.05; letter-spacing: 0.02em; }
+[data-theme="gazette"] .modal-titre {
+  font-size: 24px; letter-spacing: 0.04em;
+  background: none; -webkit-text-fill-color: currentColor; color: var(--ink-1);
+}
+[data-theme="gazette"] .modal-titre span { -webkit-text-fill-color: currentColor; color: var(--ink-3); font-family: var(--font); text-transform: none; letter-spacing: 0; }
+[data-theme="gazette"] .modal-tete { background: var(--modal-fond); border-bottom: 3px double var(--ink-1); }
+
+/* ── Fenêtre basse (1280 × 720) : la une se resserre, le graphique garde sa place. Le chapeau
+   cède (ses valeurs sont dans la cote, juste dessous). ── */
+@media (min-width: 801px) and (max-height: 800px) {
+  [data-theme="gazette"][data-structure="une"] .header { padding: 1px 2px 4px; }
+  [data-theme="gazette"] .header-left h1 { font-size: 36px; }
+  [data-theme="gazette"] .gazette-oreille-g,
+  [data-theme="gazette"] .gazette-oreille-d { padding: 2px 9px 2px; row-gap: 2px; }
+  [data-theme="gazette"] .price-badge { font-size: 21px; }
+  [data-theme="gazette"] .gazette-oreille-d #updated { font-size: 19px; }
+  [data-theme="gazette"] .gazette-alertes { height: 13px; font-size: 11px; }
+  [data-theme="gazette"] .gazette-folio { padding-bottom: 2px; }
+  [data-theme="gazette"] .theme-btn.ico-btn,
+  [data-theme="gazette"] .mode-btn { width: 26px; height: 26px; }
+  [data-theme="gazette"] .mode-btn { width: auto; }
+  [data-theme="gazette"] .gazette-manchette { margin-top: calc(-1 * var(--gap) + 3px); padding-bottom: 3px; }
+  [data-theme="gazette"] .gazette-titre { font-size: 25px; }
+  [data-theme="gazette"] .gazette-chapeau { display: none; }
+  [data-theme="gazette"] .gazette-cote .kpis { height: 34px; }
+  [data-theme="gazette"] .gazette-cote > .gazette-tag { font-size: 20px; }
+  [data-theme="gazette"] .indicator-bar { padding: 2px; }
+  [data-theme="gazette"] .chart-container { padding-bottom: 19px; }
+  [data-theme="gazette"] .gazette-legende { font-size: 12px; line-height: 15px; }
+}
+
+/* ── Fenêtre étroite : le titre sur sa ligne, les deux oreilles dessous ── */
+@media (max-width: 1000px) {
+  [data-theme="gazette"][data-structure="une"] .header {
+    grid-template-columns: max-content max-content; grid-template-areas: "titre titre" "og od";
+    justify-content: space-between; row-gap: 3px;
+  }
+  [data-theme="gazette"][data-structure="une"] .header-left { grid-area: titre; }
+  [data-theme="gazette"] .gazette-oreille-g { grid-area: og; }
+  [data-theme="gazette"] .gazette-oreille-d { grid-area: od; }
+  [data-theme="gazette"] .header-left h1 { font-size: 34px; }
+}
+/* ── Tablette ── */
+@media (max-width: 800px) {
+  [data-theme="gazette"][data-structure="une"] .header { gap: 10px; padding: 2px 0 5px; }
+  [data-theme="gazette"] .header-left h1 { font-size: 30px; }
+  /* La base masque l'heure de publication sur petit écran ; l'oreille droite la garde tant
+     qu'elle est affichée. */
+  [data-theme="gazette"] .gazette-oreille-d #updated { display: inline; font-size: 18px; }
+  [data-theme="gazette"] .price-badge { font-size: 19px; }
+  [data-theme="gazette"] .gazette-titre { font-size: 24px; }
+  [data-theme="gazette"] .gazette-cote .kpis { display: flex; height: 34px; }
+  [data-theme="gazette"] .chart-container { padding: 3px 0 20px; }
+  [data-theme="gazette"] .gazette-legende { font-size: 11.5px; }
+}
+/* ── Téléphone : l'oreille du cours prend la largeur, une seule colonne ── */
+@media (max-width: 600px) {
+  [data-theme="gazette"][data-structure="une"] .header { grid-template-columns: minmax(0, 1fr); grid-template-areas: "og"; }
+  [data-theme="gazette"] .header-left,
+  [data-theme="gazette"] .gazette-oreille-d,
+  [data-theme="gazette"] .gazette-date,
+  [data-theme="gazette"] .gazette-chapeau,
+  [data-theme="gazette"] .gazette-cote > .gazette-tag { display: none; }
+  [data-theme="gazette"] .gazette-oreille-g { justify-self: stretch; flex-direction: row; align-items: center; justify-content: space-between; }
+  [data-theme="gazette"] .gazette-oreille-g > .gazette-tag { white-space: normal; max-width: 4.5em; font-size: 11px; line-height: 1.05; }
+  /* Sous 480 px, la base cède la variation 24 h au prix ; ici l'oreille a toute la largeur. */
+  [data-theme="gazette"] .gazette-oreille-g .var24:not(:empty) { display: inline-block; font-size: 13px; }
+  [data-theme="gazette"] .price-badge { font-size: 18px; }
+  [data-theme="gazette"] .gazette-folio { justify-content: flex-end; padding-bottom: 4px; }
+  [data-theme="gazette"] .theme-btn.ico-btn { width: 30px; height: 30px; }
+  [data-theme="gazette"] .gazette-manchette { padding: 1px 2px 4px; }
+  [data-theme="gazette"] .gazette-titre { font-size: 20px; line-height: 1.05; }
+  [data-theme="gazette"] .gazette-cote .kpis { height: 32px; }
+  [data-theme="gazette"] .kpi b { font-size: 15px; }
+  [data-theme="gazette"] .aero-taskbar .gazette-tag { display: none; }
+}

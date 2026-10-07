@@ -146,6 +146,12 @@ if TTFont:
                         pb.append(f"axe {a} : {axes.get(a)} au lieu de {tuple(v)}")
                 elif a in axes:
                     pb.append(f"axe {a} non figé à {v}")
+        # Renommée : seuls ses NOMS changent. La mention de copyright reste celle de l'original —
+        # réécrite, elle attribuait la police à « The Samsara … Project Authors » et lui déclarait
+        # un nom réservé « Samsara … » (fabriquer.NOMS_D_ORIGINE).
+        if p.get("renommer"):
+            pb += [f"mention {r.nameID} réécrite : « {r.toUnicode()[:60]} »" for r in f["name"].names
+                   if r.nameID in fab.NOMS_D_ORIGINE and p["famille"].lower().replace(" ", "") in r.toUnicode().lower().replace(" ", "")]
         (echec if pb else ok)(f"{p['sortie']}", "; ".join(pb) or f"{len(cmap)} caractères, nom servi « {noms.get(16, noms.get(1))} »")
 
 lignes.append("")
