@@ -886,6 +886,10 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
    le script de tête). Évite d'afficher un instant la structure de base. */
 html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hidden; }
 .theme-structure { font-size: 10px; font-weight: 600; color: var(--ink-3); }
+/* Décor d'une structure (chantier().decor, js/structures.js) : muet ET inerte. Un titre de
+   décor posé sur un vrai bouton ou une vraie valeur ne doit jamais intercepter le pointeur
+   (tests/test_structures.js l'exige de tout [data-decor]). */
+[data-decor] { pointer-events: none; }
 
 /* ─── Légendes (js/fiches.js) ───────────────────────────────────────────────────
    Le MODE de lecture n'est qu'une classe sur <html> : le HTML est le même dans les deux

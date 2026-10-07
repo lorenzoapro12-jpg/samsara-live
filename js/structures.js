@@ -10,7 +10,8 @@
 //   1. aucune VALEUR ni aucun ÂGE affiché par la structure de base ne disparaît : prix,
 //      variation, chiffres clés et leur âge, heure de publication, cartes du marché, graphique ;
 //   2. tout est RÉVERSIBLE : quitter le thème rend la page nœud pour nœud ;
-//   3. le décor ajouté est muet pour les lecteurs d'écran (aria-hidden) et n'intercepte rien ;
+//   3. le décor ajouté (chantier().decor, marqué data-decor) est muet pour les lecteurs d'écran
+//      (aria-hidden) et n'intercepte rien (pointer-events: none) ;
 //   4. le coût d'image tient le budget mesuré du thème (tests/test_budget.js).
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -26,11 +27,14 @@ function chantier() {
       journal.push({ type: 'deplace', noeud, parent: noeud.parentNode, suivant: noeud.nextSibling });
       parent.insertBefore(noeud, avant || null);
     },
-    /** Élément de DÉCOR : aria-hidden, sans interaction. */
+    /** Élément de DÉCOR : aria-hidden, sans interaction. Marqué `data-decor` : css/app.css le
+     *  rend inerte au pointeur, tests/test_structures.js contrôle TOUT décor par ce marqueur,
+     *  quel que soit le préfixe de classe du thème. */
     decor(tag, classe, parent, avant, texte) {
       const e = document.createElement(tag);
       e.className = classe;
       e.setAttribute('aria-hidden', 'true');
+      e.setAttribute('data-decor', '');
       if (texte) e.textContent = texte;
       parent.insertBefore(e, avant || null);
       journal.push({ type: 'cree', noeud: e });

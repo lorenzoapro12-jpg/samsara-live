@@ -6,7 +6,8 @@
 //      variation, chiffres clés, âge de la publication, heure, cartes du marché, graphique,
 //      boutons d'accès) — l'est encore : présent, non masqué, non recouvert, de taille non nulle ;
 //   2. la structure est RÉVERSIBLE : revenir au thème de base rend la page nœud pour nœud ;
-//   3. le décor ajouté est muet (aria-hidden) et n'intercepte pas le pointeur ;
+//   3. le décor ajouté — tout [data-decor], posé par chantier().decor — est muet (aria-hidden) et
+//      n'intercepte pas le pointeur (pointer-events: none), qu'il porte du texte ou non ;
 //   4. aucune erreur JavaScript.
 //
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
@@ -156,10 +157,18 @@ async function squelette(page) {
       await o.page.waitForTimeout(300);
       const pendant = await squelette(o.page);
       check(`${t.id} : la structure change vraiment la page`, pendant !== avant);
-      const decor = await o.page.evaluate(() => [...document.querySelectorAll('[class^="hud-"],[class*=" hud-"],[class^="codex-"],[class*=" codex-"]')]
-        .filter(e => !e.querySelector('[id]')).filter(e => e.getAttribute('aria-hidden') !== 'true' || getComputedStyle(e).pointerEvents !== 'none' && !/tag|titre|fleuron|invite|colophon/.test(e.className))
-        .map(e => e.className));
-      check(`${t.id} : décor muet (aria-hidden) et sans interaction`, !decor.length, decor);
+      // Tout décor, quel que soit le préfixe de classe du thème : chantier().decor le marque
+      // data-decor. Muet (aria-hidden) ; inerte au pointeur — exigé en premier lieu du décor qui
+      // porte du TEXTE (titres, étiquettes posés près d'une vraie valeur ou d'un vrai bouton),
+      // et de tout le reste. Il ne contient aucun vrai nœud (un conteneur n'est pas un décor).
+      const decor = await o.page.evaluate(() => {
+        const els = [...document.querySelectorAll('[data-decor]')];
+        return { n: els.length, texte: els.filter(e => e.textContent.trim()).length,
+          fautifs: els.filter(e => e.getAttribute('aria-hidden') !== 'true' || getComputedStyle(e).pointerEvents !== 'none' || e.querySelector('[id]'))
+            .map(e => (e.textContent.trim() ? 'texte « ' + e.textContent.trim().slice(0, 20) + ' » ' : '') + e.className + ' aria-hidden=' + e.getAttribute('aria-hidden') + ' pointer-events=' + getComputedStyle(e).pointerEvents) };
+      });
+      check(`${t.id} : ${decor.n} élément(s) de décor [data-decor] (dont ${decor.texte} à texte), muets (aria-hidden) et inertes (pointer-events: none)`,
+        decor.n > 0 && !decor.fautifs.length, decor);
       await o.page.evaluate(id => appliquerTheme(id), BASE);
       await o.page.waitForTimeout(300);
       const apres = await squelette(o.page);
