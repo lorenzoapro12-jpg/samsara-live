@@ -4,6 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Saṃsāra — Marché live</title>
+<script>
+/* Les lectures du premier écran partent ICI, avant les feuilles et les scripts : lancées par
+   js/app.js (différé), elles attendaient la fin de son exécution (première page de bougies
+   demandée à ~112 ms, mesuré). Mêmes hôtes et mêmes URL que js/app.js, qui reprend ces réponses
+   au lieu de les redemander (prechargee) — paire et intervalle par défaut. */
+(function () {
+  try {
+    var B = 'https://api.binance.com/api/v3/', P = window.__precharge = {};
+    var lire = function (u, o) { P[u] = fetch(u, o); P[u].catch(function () {}); };
+    lire(B + 'klines?symbol=BTCUSDT&interval=15m&limit=1000');
+    lire(B + 'ticker/24hr?symbol=BTCUSDT&type=MINI');
+    lire('https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/master/market-data.json', { cache: 'no-cache' });
+  } catch (e) {}
+})();
+</script>
 <link rel="stylesheet" href="css/app.css">
 <!-- THÈMES — un fichier par thème, tous chargés (quelques Ko chacun) : changer de thème ne
      coûte aucune requête. Pour en ajouter un : créer themes/<id>.css (jetons sous
@@ -127,7 +142,7 @@
 <div class="theme-menu" id="themeMenu" role="menu" aria-label="Thèmes" onclick="event.stopPropagation()"></div>
 
 <div class="main-area">
-<div class="chart-container"><div class="gloss-bubble"></div><div class="lg-ring"></div><canvas id="chart"></canvas></div>
+<div class="chart-container"><div class="gloss-bubble"></div><div class="lg-ring"></div><canvas id="chart"></canvas><canvas id="chartCalque" class="calque" aria-hidden="true"></canvas></div>
 
 <div class="feed-panel collapsed" id="feedPanel">
   <div class="feed-panel-handle" onclick="toggleFeed()" id="feedHandle">Marché live</div>

@@ -40,6 +40,9 @@ node test_indicateurs_boucles.js || ko=1
 etape "2e. Chaleur : les deux formats publiés donnent la même couche ; même publication = aucune analyse — hors ligne"
 node test_chaleur.js || ko=1
 
+etape "2f. Réseau : ce que la page demande et quand (revalidation, prix MINI, préchargement, bougies) — hors ligne"
+node test_reseau.js || ko=1
+
 etape "3. Extraction du JavaScript inline"
 python3 refresh_harness.py || ko=1
 
@@ -75,6 +78,9 @@ node test_structures.js || ko=1
 
 etape "9b. Interface dans Chromium : menus dans l'écran, crochets du graphique, sous-graphes sans débordement (non exécuté sans Playwright)"
 node test_interface.js || ko=1
+
+etape "9c. Sobriété dans Chromium : éclair, horloge, onde, calque, verre, chargement, chaleur (non exécuté sans Playwright)"
+node test_sobriete.js || ko=1
 
 # Le budget d'image (≈ 30 min : mesures entrelacées, prix en mouvement) ne tourne pas ici : il
 # se relance quand une feuille de thème change — node tests/test_budget.js --enregistrer — et le

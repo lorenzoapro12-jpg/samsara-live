@@ -528,7 +528,7 @@ async function afficherSerie() {
   const cle = getKlineCacheKey(activeSymbol, chartInterval);
   const c = klineCache[cle];
   if (c && c.data.length) {
-    candles = c.data;
+    candles = c.data; c.ts = Date.now();
     viewStart = Math.max(0, candles.length - 50); viewEnd = candles.length;
   } else {
     candles = []; viewStart = 0; viewEnd = 50;   // jamais les bougies d'un autre intervalle sous ce titre
@@ -545,6 +545,9 @@ async function afficherSerie() {
 // ============ CANVAS ============
 const canvas = document.getElementById('chart');
 const ctx = canvas.getContext('2d');
+// Le calque posé sur le graphique (voir dessinerCalque) : même taille, transparent au pointeur.
+const calque = document.getElementById('chartCalque');
+const cx = calque && calque.getContext ? calque.getContext('2d') : null;
 let hasSubChart = true; // volume or indicator
 
 // --- Une frame = un dessin ---
@@ -563,6 +566,26 @@ function geste(actif) {
   clearTimeout(gesteFin);
   if (actif) { if (!h.classList.contains('geste')) h.classList.add('geste'); }
   else gesteFin = setTimeout(() => h.classList.remove('geste'), 200);
+}
+// Survol sur un thème à verre : l'anneau de verre du graphique (.lg-ring) suspend son flou le
+// temps du survol (html.survol, retirée SURVOL_MS après le dernier mouvement), comme geste() le
+// fait pendant un glissement. Chaque image du réticule faisait recomposer le flou de l'anneau :
+// 82 à 86 ms de CPU par image de survol sur Aero, 30 sans (mesuré, rendu logiciel). Une seule
+// minuterie, réarmée tant que la souris bouge (pas un setTimeout par mouvement).
+const SURVOL_MS = 250;
+let survolDernier = 0, survolMinuterie = null;
+function survol() {
+  if (themeCourant().verre === 'aucun') return;
+  survolDernier = performance.now();
+  if (survolMinuterie) return;
+  const h = document.documentElement;
+  h.classList.add('survol');
+  const verifier = () => {
+    const reste = survolDernier + SURVOL_MS - performance.now();
+    if (reste > 0) survolMinuterie = setTimeout(verifier, reste);
+    else { survolMinuterie = null; h.classList.remove('survol'); }
+  };
+  survolMinuterie = setTimeout(verifier, SURVOL_MS);
 }
 let rafPending = false;
 function scheduleDraw() {
@@ -597,9 +620,11 @@ canvas.addEventListener('mousemove', (e) => {
   } else if (!isPanning && !isPriceDrag) {
     canvas.style.cursor = 'crosshair';
   }
-  if (!rafPending) scheduleDraw();
+  // Le réticule est sur le calque : le graphique lui-même n'est pas redessiné au survol.
+  survol();
+  scheduleCalque();
 });
-canvas.addEventListener('mouseleave', () => { crossX = null; crossY = null; rafPending = false; drawChart(); });
+canvas.addEventListener('mouseleave', () => { crossX = null; crossY = null; dessinerCalque(); });
 
 // --- Zoom molette ---
 canvas.addEventListener('wheel', (e) => {
@@ -759,7 +784,7 @@ canvas.addEventListener('click', (e) => {
   } else {
     crossX = tx; crossY = ty;
   }
-  drawChart();
+  dessinerCalque();
 });
 
 // ============ TOUCH (Mobile) ============
@@ -862,6 +887,14 @@ function resizeCanvas() {
   ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
   canvas.style.width = innerW + 'px';
   canvas.style.height = innerH + 'px';
+  // Le calque épouse le graphique : même taille, posé à l'origine de la boîte de contenu.
+  if (cx) {
+    calque.width = canvas.width; calque.height = canvas.height;
+    cx.setTransform(1, 0, 0, 1, 0, 0);
+    cx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    calque.style.width = innerW + 'px'; calque.style.height = innerH + 'px';
+    calque.style.left = cs.paddingLeft; calque.style.top = cs.paddingTop;
+  }
 }
 let resizeRaf = 0;
 window.addEventListener('resize', () => {
@@ -914,13 +947,24 @@ function mergeTail(arr, tail) {
   }
   return true;
 }
-
+// La queue reçue est-elle déjà dans l'historique, à l'identique (mêmes heures, mêmes prix, même
+// volume) ? Alors ni le mémo des indicateurs ni le graphique n'ont à changer : rien n'a bougé.
+function queueConnue(arr, tail) {
+  for (const c of tail) {
+    let j = arr.length - 1;
+    while (j >= 0 && arr[j].time > c.time) j--;
+    const a = arr[j];
+    if (!a || a.time !== c.time || a.open !== c.open || a.high !== c.high || a.low !== c.low || a.close !== c.close || a.volume !== c.volume) return false;
+  }
+  return tail.length > 0;
+}
 // RAFRAÎCHISSEMENT INCRÉMENTAL. L'historique n'est chargé qu'une fois par symbole/intervalle ;
 // ensuite, toutes les 5 s, on ne demande que les 2 dernières bougies (≈ 300 octets).
 //
 // CHARGEMENT EN DEUX TEMPS. La page la plus récente (1000 bougies) est dessinée dès qu'elle
 // arrive ; les deux pages plus anciennes partent ensuite EN PARALLÈLE et se raccrochent à
 // gauche sans bouger la vue. Avant : trois requêtes l'une après l'autre avant le moindre dessin.
+// Renvoie true si les bougies affichées ont changé (l'appelant redessine), false sinon.
 async function fetchKlines() {
   const cacheKey = getKlineCacheKey(activeSymbol, chartInterval);
   const sym = activeSymbol, itv = chartInterval;
@@ -943,19 +987,22 @@ async function fetchKlines() {
       const tail = sym === 'BTCSOL'
         ? ratioCandles(...await Promise.all([fetchKlinesRaw('BTCUSDT', 2), fetchKlinesRaw('SOLUSDT', 2)]))
         : (await fetchKlinesRaw(sym, 2)).map(toCandle);
-      if (!encore()) return;            // symbole/intervalle changé pendant l'attente
+      if (!encore()) return false;      // symbole/intervalle changé pendant l'attente
+      cached.ts = Date.now();
+      // Rien n'a bougé depuis la dernière lecture : le mémo des indicateurs reste juste (sa clé
+      // porte la dernière clôture et le dernier volume), et il n'y a rien à redessiner.
+      if (queueConnue(cached.data, tail)) return false;
       if (mergeTail(cached.data, tail)) {
         candles = cached.data;
-        cached.ts = Date.now();
         memoCache.clear();              // la bougie en cours a changé : indicateurs à refaire
         suivre();
-        if (cached.partiel) completerHistorique(cacheKey, sym, itv);
-        return;
+        if (cached.partiel) historiquePlusTard(cacheKey, sym, itv);
+        return true;
       }
     }
 
     const fresh = await premierePage(sym, itv);
-    if (!encore()) return;
+    if (!encore()) return false;
     // Rechargement (première visite, ou queue qui ne se raccorde plus : onglet longtemps en
     // veille). Si l'historique en cache chevauche la page fraîche, on le GARDE jusqu'à elle :
     // les indices de la vue restent valables. Sinon on repart de la page fraîche, vue à droite.
@@ -980,16 +1027,23 @@ async function fetchKlines() {
     memoCache.clear();
     // `partiel` : il reste de l'historique à aller chercher (une page pleine en appelle d'autres).
     klineCache[cacheKey] = { data: candles, ts: Date.now(), symbol: sym, interval: itv, partiel };
-    completerHistorique(cacheKey, sym, itv);
+    limiterCacheBougies(cacheKey);
+    historiquePlusTard(cacheKey, sym, itv);
     // NE PAS réinitialiser viewStart/viewEnd — respecter le zoom/pan utilisateur
-  } catch(e) { console.error('Klines:', e); }
+    return true;
+  } catch(e) { console.error('Klines:', e); return false; }
 }
 
 const KLINE_MS = { '1m': 6e4, '5m': 3e5, '15m': 9e5, '30m': 18e5, '1h': 36e5, '4h': 144e5, '1d': 864e5, '1w': 6048e5 };
 const PAGES_HISTORIQUE = 3;   // 3 × 1000 bougies, comme avant
-// Une page Binance : jusqu'à 1000 bougies dont l'ouverture est ≤ endTime.
+// La page la plus RÉCENTE se demande sans endTime (les 1000 dernières bougies, comme avec
+// endTime = maintenant) : son URL est fixe, c'est celle que le script de tête d'index.html a
+// déjà lancée pour la paire et l'intervalle par défaut (prechargee).
+const urlPremierePage = (symbol, interval) => `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=1000`;
+// Une page Binance : jusqu'à 1000 bougies dont l'ouverture est ≤ endTime (la dernière sans endTime).
 async function pageKlines(symbol, interval, endTime) {
-  const resp = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=1000&endTime=${endTime}`);
+  const url = endTime ? urlPremierePage(symbol, interval) + `&endTime=${endTime}` : urlPremierePage(symbol, interval);
+  const resp = await (prechargee(url) || fetch(url));
   if (!resp.ok) throw new Error(`Binance HTTP ${resp.status}`);
   const d = await resp.json();
   return Array.isArray(d) ? d : [];
@@ -1000,13 +1054,34 @@ const pagesEnVol = new Map();
 function premierePage(sym, itv) {
   const cle = sym + '_' + itv;
   if (pagesEnVol.has(cle)) return pagesEnVol.get(cle);
-  const fin = Date.now();
   const p = (sym === 'BTCSOL'
-    ? Promise.all([pageKlines('BTCUSDT', itv, fin), pageKlines('SOLUSDT', itv, fin)]).then(([b, s]) => ratioCandles(b, s))
-    : pageKlines(sym, itv, fin).then(d => d.map(toCandle)))
+    ? Promise.all([pageKlines('BTCUSDT', itv), pageKlines('SOLUSDT', itv)]).then(([b, s]) => ratioCandles(b, s))
+    : pageKlines(sym, itv).then(d => d.map(toCandle)))
     .finally(() => pagesEnVol.delete(cle));
   pagesEnVol.set(cle, p);
   return p;
+}
+// Les deux pages plus anciennes ne servent pas au premier écran (50 bougies affichées sur les
+// 1000 de la première) : elles partent quand la page est au calme (requestIdleCallback, 3 s au
+// plus), ou dès que la vue approche du début de l'historique (dézoom, glissement, sélecteur de
+// plage — drawChart). Avant : en même temps que tout le reste du chargement (110 Ko).
+const HISTORIQUE_BORD = 100;  // bougies : la vue commence à moins de ça du début -> on complète
+const historiqueAttendu = new Set();
+function historiquePlusTard(cacheKey, sym, itv) {
+  const c = klineCache[cacheKey];
+  if (!c || !c.partiel || historiqueAttendu.has(cacheKey)) return;
+  historiqueAttendu.add(cacheKey);
+  const go = () => { historiqueAttendu.delete(cacheKey); completerHistorique(cacheKey, sym, itv); };
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(go, { timeout: 3000 }); else setTimeout(go, 1500);
+}
+// Bougies gardées en mémoire : au plus BOUGIES_GARDEES historiques (≈ 0,3 Mo chacun pour 3000
+// bougies) ; au-delà, le moins récemment lu part — jamais celui qu'on affiche. Sans borne, tous
+// les couples paire × intervalle visités restaient (jusqu'à ~9 Mo).
+const BOUGIES_GARDEES = 6;
+function limiterCacheBougies(garder) {
+  const cles = Object.keys(klineCache).filter(k => k !== garder && k !== getKlineCacheKey(activeSymbol, chartInterval));
+  cles.sort((a, b) => klineCache[a].ts - klineCache[b].ts);
+  while (cles.length && Object.keys(klineCache).length > BOUGIES_GARDEES) delete klineCache[cles.shift()];
 }
 // Les pages plus anciennes, en parallèle (leurs bornes se calculent : 1000 × la durée d'une
 // bougie). Elles se raccrochent à gauche de l'historique ; la vue est décalée d'autant, l'œil ne
@@ -1046,7 +1121,7 @@ function precharger(sym, itv) {
   const cle = getKlineCacheKey(sym, itv);
   if (klineCache[cle]) return;
   premierePage(sym, itv).then(d => {
-    if (!klineCache[cle] && d.length) klineCache[cle] = { data: d, ts: Date.now(), symbol: sym, interval: itv, partiel: d.length >= 990 };
+    if (!klineCache[cle] && d.length) { klineCache[cle] = { data: d, ts: Date.now(), symbol: sym, interval: itv, partiel: d.length >= 990 }; limiterCacheBougies(cle); }
   }).catch(() => {});
 }
 
@@ -1253,11 +1328,27 @@ function pxDec(v) { const a = Math.abs(v); return a >= 10 ? 2 : a >= 1 ? 4 : 6; 
 function fmtPrix(v) { return v.toFixed(pxDec(v)); }
 
 // Prix ET variation 24 h dans la MÊME requête (ticker/24hr) : les deux chiffres du bloc héros
-// ont donc toujours le même horodatage — rien à soustraire entre deux cadences.
+// ont donc toujours le même horodatage — rien à soustraire entre deux cadences. Format MINI :
+// 305 octets au lieu de 559 (mesuré le 07/10/2026), même poids d'API, et tous les champs lus ici
+// (lastPrice, openPrice) ; la variation se calcule sur l'ouverture de la MÊME réponse — la
+// définition de Binance, (dernier − ouverture) / ouverture sur 24 h glissantes —, au lieu de son
+// priceChangePercent arrondi à 3 décimales (absent du format MINI).
+const urlTicker = s => 'https://api.binance.com/api/v3/ticker/24hr?symbol=' + s + '&type=MINI';
+function var24De(d) {
+  const o = parseFloat(d.openPrice), l = parseFloat(d.lastPrice);
+  return o > 0 ? (l - o) / o * 100 : parseFloat(d.priceChangePercent);   // repli : réponse complète
+}
+// Éclair bref de la COULEUR du chiffre à chaque changement : une classe posée, retirée
+// ECLAIR_MS plus tard — DEUX images par changement. L'éclair précédent animait la couleur
+// (el.animate, 450 ms) : ~27 images par changement, soit 70 % du CPU de la page au repos, dans
+// tous les thèmes (mesuré : Aero 209 → 58 ms/s sans lui, Kāla 128 → 34).
+const ECLAIR_MS = 450;
+const MQ_MOUVEMENT = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+let eclairFin = null;
 async function fetchPrice() {
   const sym = activeSymbol;
   try {
-    const t24 = s => fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=' + s).then(r => r.json());
+    const t24 = s => (prechargee(urlTicker(s)) || fetch(urlTicker(s))).then(r => r.json());
     let price, var24;
     if (sym === 'BTCSOL') {
       const [b, so] = await Promise.all([t24('BTCUSDT'), t24('SOLUSDT')]);
@@ -1268,20 +1359,18 @@ async function fetchPrice() {
       var24 = ouv > 0 ? (price / ouv - 1) * 100 : NaN;
     } else {
       const d = await t24(sym);
-      price = parseFloat(d.lastPrice); var24 = parseFloat(d.priceChangePercent);
+      price = parseFloat(d.lastPrice); var24 = var24De(d);
     }
     if (sym !== activeSymbol || !isFinite(price)) return;   // la paire a changé pendant l'attente
     const el = document.getElementById('price');
-    if (livePrice && price > livePrice) el.className = 'price-badge price-up';
-    else if (livePrice && price < livePrice) el.className = 'price-badge price-down';
-    else el.className = 'price-badge';
-    // Éclair bref de la COULEUR du chiffre à chaque changement (450 ms, peinture du seul texte).
-    // L'ancien éclair animait un `filter` 900 ms sur ~1 s : l'en-tête ne cessait jamais d'animer.
-    if (livePrice && price !== livePrice && el.animate
-        && !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
-      el.animate([{ color: price > livePrice ? COLORS.upInk : COLORS.downInk }, { color: COLORS.ink1 }],
-                 { duration: 450, easing: 'ease-out' });
+    const sens = livePrice ? Math.sign(price - livePrice) : 0;
+    let cls = 'price-badge' + (sens > 0 ? ' price-up' : sens < 0 ? ' price-down' : '');
+    if (sens && !(MQ_MOUVEMENT && MQ_MOUVEMENT.matches)) {
+      cls += sens > 0 ? ' eclair-hausse' : ' eclair-baisse';
+      clearTimeout(eclairFin);
+      eclairFin = setTimeout(() => el.classList.remove('eclair-hausse', 'eclair-baisse'), ECLAIR_MS);
     }
+    if (el.className !== cls) el.className = cls;
     const dec = pxDec(price);
     el.textContent = '$' + price.toLocaleString('en-US', {minimumFractionDigits: dec, maximumFractionDigits: dec});
     const v = document.getElementById('var24');
@@ -1289,8 +1378,20 @@ async function fetchPrice() {
       v.textContent = isFinite(var24) ? (var24 > 0 ? '+' : var24 < 0 ? '−' : '') + Math.abs(var24).toFixed(2) + ' %' : '';
       v.className = 'var24' + (var24 > 0 ? ' pos' : var24 < 0 ? ' neg' : '');
     }
+    const avant = livePrice;
     livePrice = price;
+    // L'étiquette de prix du graphique suit le prix à la seconde (calque), dans la même image.
+    if (price !== avant) prixSurGraphique();
   } catch(e) {}
+  finally { horloge(); }
+}
+// L'horloge de la barre des tâches avance dans la MÊME tâche que le prix, donc la même image :
+// un rendu par seconde au lieu de deux (5 à 11 ms/s mesurés), et rien quand l'onglet est caché
+// (la lecture du prix n'y part pas). Avant : sa propre minuterie, jamais suspendue.
+const FMT_HMS = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+function horloge() {
+  const c = document.getElementById('taskbarClock'), t = FMT_HMS.format(new Date());
+  if (c && c.textContent !== t) c.textContent = t;
 }
 
 // ============ LIQUIDITÉ (HEATMAP HISTORIQUE) ============
@@ -2451,18 +2552,42 @@ function dispositionGraphique(H) {
   return { mainH, sous };
 }
 
+// ─── Deux canvas : le GRAPHIQUE et son CALQUE ───────────────────────────────
+// Le graphique (#chart) ne se redessine que quand la donnée ou la vue change ; le calque
+// (#chartCalque, transparent au pointeur, posé dessus) porte ce qui bouge sans elles : réticule,
+// infobulle, badges des sous-graphes, et l'étiquette + la ligne du DERNIER PRIX. Avant, chaque
+// mouvement de souris redessinait tout le graphique (9,8 ms de thread principal par image,
+// 4,1 avec un calque, mesuré), et l'étiquette de prix ne suivait le prix qu'au redessin des
+// bougies : jusqu'à 5 s de retard sur l'en-tête. Elle suit maintenant le prix à la seconde.
+const GRILLE_N = 6;          // lignes de grille du tracé principal (et libellés d'axe)
+let geo = null, geoPrix = null;   // géométrie du dernier dessin du graphique, relue par le calque
+/** Libellés d'axe recouverts par l'étiquette du prix `prix` (masque de bits, 0 = aucun). */
+function masqueEtiquettes(prix, top, ph, minP, maxP, range) {
+  if (!prix || prix < minP || prix > maxP) return 0;
+  const yTag = top + ph * (1 - (prix - minP) / range);
+  let m = 0;
+  for (let i = 0; i <= GRILLE_N; i++) if (Math.abs(top + (ph / GRILLE_N) * i - yTag) < 15) m |= 1 << i;
+  return m;
+}
 function drawChart() {
   scaleSeq++;   // une frame = un calcul d'échelle : invalide le cache de priceWindow()
   const W = canvas.width / window.devicePixelRatio;
   const H = canvas.height / window.devicePixelRatio;
   // Palette : jetons du thème, lus UNE fois (lireJetons) — pas un getComputedStyle par image.
   if (!jetonsLus) { lireJetons(); jetonsLus = true; }
+  geo = null; geoPrix = null;
   
   ctx.clearRect(0, 0, W, H);
   if (candles.length < 2) {
     ctx.save(); ctx.fillStyle = COLORS.ink3 || '#5f6e8c'; ctx.font = chartFont(12, 600); ctx.textAlign = 'center';
     ctx.fillText('Chargement ' + activeSymbol + ' · ' + chartInterval + '…', (W - 50) / 2, H / 2); ctx.restore();
+    dessinerCalque();
     return;
+  }
+  // La vue approche du début de l'historique chargé : les pages plus anciennes, maintenant.
+  if (viewStart < HISTORIQUE_BORD) {
+    const k = getKlineCacheKey(activeSymbol, chartInterval);
+    if (klineCache[k] && klineCache[k].partiel) completerHistorique(k, activeSymbol, chartInterval);
   }
   
   // Tracé principal et sous-graphes : hauteurs calculées en un seul endroit (dispositionGraphique).
@@ -2512,107 +2637,140 @@ function drawChart() {
   // Empiler les sous-graphes
   for (const s of dispo.sous) s.trace = resolveSub(candles, s.y, s.h, W, s.cle) !== false;
 
-  // --- Crosshair ---
-  if (crossX !== null && crossY !== null && crossY < mainH) {
-    // Vertical line
-    ctx.strokeStyle = COLORS.reticule;
-    ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
-    ctx.beginPath(); ctx.moveTo(crossX, 0); ctx.lineTo(crossX, mainH); ctx.stroke();
-    
-    // Horizontal line (stops before price column)
-    ctx.beginPath(); ctx.moveTo(16, crossY); ctx.lineTo(W - 75, crossY); ctx.stroke();
-    ctx.setLineDash([]);
-    
-    // Price at crosshair Y — échelle RELUE de priceWindow() (même frame que resolveChart),
-    // au lieu de recopier la formule : slice + 2 spreads de 2×N éléments + un calcBollinger
-    // par frame de survol, pour un résultat identique.
-    const pad = { left: 16, right: 75, top: 10, bottom: 20 };
-    const ph = mainH - pad.top - pad.bottom;
-    const vs2 = Math.max(0, viewStart);
-    const ve2 = Math.min(candles.length, viewEnd);
-    const vis = candles.slice(vs2, ve2);
-    const sc = priceWindow(vs2, ve2);
-    const priceAtCursor = sc.maxP - ((crossY - pad.top) / ph) * sc.range;
-    
-    // Badge prix crosshair — dans colonne droite, collé au prix
-    const priceStr = '$' + fmtPrix(priceAtCursor);
-    ctx.font = chartFont(11, 650);
-    const bw = ctx.measureText(priceStr).width + 14;
-    const bX = W - 75 + (75 - bw)/2;
-    const bY = Math.max(2, Math.min(mainH - 20, crossY - 9));
-    ctx.fillStyle = COLORS.ink1;
-    ctx.beginPath(); ctx.roundRect(bX, bY, bw, 18, 9); ctx.fill();
-    ctx.fillStyle = COLORS.surface;
-    ctx.fillText(priceStr, bX + 7, bY + 13);
-
-    // OHLCV tooltip — 2 colonnes, semi-transparent
-    const chartPw = W - 16 - 75;
-    const candleIdx = Math.round((crossX - 16) / (chartPw / vis.length));
-    if (candleIdx >= 0 && candleIdx < vis.length) {
-      const candle = vis[candleIdx];
-      const isUp = candle.close >= candle.open;
-      const cColor = isUp ? COLORS.candleUp : COLORS.candleDown;
-      const onRight = crossX > W / 2;
-      const tX = onRight ? Math.max(16, crossX - 145) : Math.min(W - 160, crossX + 12);
-      const tY = Math.max(30, Math.min(mainH - 85, crossY - 65));
-      
-      ctx.save();
-      ctx.fillStyle = COLORS.bulle;
-      ctx.shadowColor = 'rgba(16,35,61,0.18)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 4;
-      ctx.beginPath(); ctx.roundRect(tX, tY, 135, 72, 10); ctx.fill();
-      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-      // Filet de la couleur de la bougie à gauche : la direction se lit sans encadrer la donnée.
-      ctx.fillStyle = cColor; ctx.beginPath(); ctx.roundRect(tX + 6, tY + 10, 3, 52, 1.5); ctx.fill();
-      
-      ctx.fillStyle = COLORS.ink1; ctx.font = chartFont(10, 600);
-      ctx.fillText('O ' + fmtPrix(candle.open), tX + 16, tY + 20);
-      ctx.fillText('H ' + fmtPrix(candle.high), tX + 76, tY + 20);
-      ctx.fillText('L ' + fmtPrix(candle.low), tX + 16, tY + 38);
-      ctx.fillText('C ' + fmtPrix(candle.close), tX + 76, tY + 38);
-      
-      const volStr = candle.volume >= 1000 ? (candle.volume / 1000).toFixed(1) + 'K' : candle.volume.toFixed(0);
-      ctx.fillStyle = COLORS.ink3;
-      ctx.fillText('Volume ' + volStr, tX + 16, tY + 57);
-      ctx.restore();
-    }
-  }
-
-  // --- Crosshair sous-graphes ---
-  if (crossX !== null && crossY !== null && crossY > mainH) {
-    const vs3 = Math.max(0, viewStart);
-    const ve3 = Math.min(candles.length, viewEnd);
-    const vis3 = candles.slice(vs3, ve3);
-    const cIdx = Math.round((crossX - 16) / ((W - 16 - 75) / vis3.length));
-    if (cIdx >= 0 && cIdx < vis3.length) {
-      const realIdx = vs3 + cIdx;
-      // Ligne verticale à travers tous les sous-graphes
-      ctx.strokeStyle = COLORS.reticule;
-      ctx.lineWidth = 0.5;
-      ctx.beginPath(); ctx.moveTo(crossX, mainH + 2); ctx.lineTo(crossX, H); ctx.stroke();
-
-      for (const { cle: key, y: sY, trace } of dispo.sous) {
-        if (!trace) continue;   // trop réduit pour être tracé : pas de badge orphelin
-        // Badge valeur dans colonne droite
-        const val = getSubIndicatorValue(key, realIdx);
-        if (val !== null) {
-          const txt = subLabel(key) + ' ' + val;
-          const tw = ctx.measureText(txt).width + 12;
-          const tx = W - 75 + (75 - tw)/2;
-          const ty = sY + 4;
-          ctx.fillStyle = COLORS.bulle;
-          ctx.strokeStyle = subColor(key); ctx.lineWidth = 0.8;
-          ctx.beginPath(); ctx.roundRect(tx, ty, tw, 15, 3); ctx.fill(); ctx.stroke();
-          ctx.fillStyle = COLORS.text; ctx.font = chartFont(9);
-          ctx.fillText(txt, tx + 6, ty + 11);
-        }
-      }
-    }
-  }
-  
   // Range Selector — mini timeline en bas
   if (candles.length > 5) {
     drawRangeSelector(candles, W, H);
   }
+  geo = { W, H, mainH, sous: dispo.sous, vs: vsC, ve: veC };
+  dessinerCalque();
+}
+
+/** Le calque : étiquette et ligne du dernier prix, réticule et infobulles. Relit la géométrie
+ *  du dernier dessin du graphique (geo, geoPrix) : il ne recalcule ni échelle ni indicateur. */
+function dessinerCalque() {
+  calqueDemande = false;
+  if (!cx) return;
+  const dpr = window.devicePixelRatio;
+  cx.clearRect(0, 0, calque.width / dpr, calque.height / dpr);
+  if (!geo) return;
+  const { W, H, mainH } = geo;
+  const P = geoPrix;
+  if (P) {
+    const { top, ph, left, right, minP, maxP, range } = P;
+    // Dernier prix : la ligne (un trait large et pâle sous un pointillé : elle se trouve d'un
+    // coup d'œil) et l'étiquette sur l'axe, à la couleur de la bougie EN COURS — l'étiquette dit
+    // aussi le sens du moment.
+    if (livePrice && livePrice >= minP && livePrice <= maxP) {
+      const y = top + ph * (1 - (livePrice - minP) / range);
+      const enCours = candles[candles.length - 1];
+      const tagC = (enCours && livePrice < enCours.open) ? COLORS.candleDown : COLORS.candleUp;
+      cx.save();
+      cx.strokeStyle = tagC;
+      cx.globalAlpha = 0.14; cx.lineWidth = 4;
+      cx.beginPath(); cx.moveTo(left, y); cx.lineTo(W - right, y); cx.stroke();
+      cx.globalAlpha = 0.75; cx.lineWidth = 1; cx.setLineDash([2, 4]);
+      cx.beginPath(); cx.moveTo(left, y); cx.lineTo(W - right, y); cx.stroke();
+      cx.restore();
+      // pad.right = 75 px pour un libellé de 76 px : le badge sortait du canvas (« $77085.0(| ») ;
+      // on le recale vers la gauche au lieu d'élargir la colonne (13 sites couplés au sélecteur
+      // de plage et au repérage de la souris). Opaque : il recouvre le libellé d'axe de même
+      // ordonnée, omis par le graphique (masqueEtiquettes).
+      const triX = W - right + 2, lpStr = '$' + fmtPrix(livePrice);
+      cx.font = chartFont(11, 700);
+      const lw = cx.measureText(lpStr).width + 12, bx = Math.min(triX + 10, W - 3 - lw);
+      cx.fillStyle = tagC;
+      cx.beginPath(); cx.roundRect(bx, y - 11, lw, 22, 11); cx.fill();
+      // Pointe vers le tracé : elle reste visible si le badge a reculé
+      cx.beginPath(); cx.moveTo(triX, y - 4); cx.lineTo(triX + 8, y); cx.lineTo(triX, y + 4); cx.closePath(); cx.fill();
+      cx.fillStyle = '#ffffff';
+      cx.fillText(lpStr, bx + 6, y + 4);
+    }
+  }
+  if (crossX === null || crossY === null) return;
+  const n = geo.ve - geo.vs, chartPw = W - 16 - 75;
+  const idx = n > 0 ? Math.round((crossX - 16) / (chartPw / n)) : -1;
+  // --- Réticule du tracé principal ---
+  if (crossY < mainH && P) {
+    cx.strokeStyle = COLORS.reticule;
+    cx.lineWidth = 1; cx.setLineDash([3, 3]);
+    cx.beginPath(); cx.moveTo(crossX, 0); cx.lineTo(crossX, mainH); cx.stroke();
+    // Horizontale : s'arrête avant la colonne des prix
+    cx.beginPath(); cx.moveTo(16, crossY); cx.lineTo(W - 75, crossY); cx.stroke();
+    cx.setLineDash([]);
+    // Prix sous le curseur : l'échelle du dernier dessin (geoPrix), pas une formule recopiée.
+    const priceAtCursor = P.maxP - ((crossY - P.top) / P.ph) * P.range;
+    const priceStr = '$' + fmtPrix(priceAtCursor);
+    cx.font = chartFont(11, 650);
+    const bw = cx.measureText(priceStr).width + 14;
+    const bX = W - 75 + (75 - bw) / 2;
+    const bY = Math.max(2, Math.min(mainH - 20, crossY - 9));
+    cx.fillStyle = COLORS.ink1;
+    cx.beginPath(); cx.roundRect(bX, bY, bw, 18, 9); cx.fill();
+    cx.fillStyle = COLORS.surface;
+    cx.fillText(priceStr, bX + 7, bY + 13);
+    // Infobulle OHLCV — 2 colonnes
+    if (idx >= 0 && idx < n) {
+      const candle = candles[geo.vs + idx];
+      const cColor = candle.close >= candle.open ? COLORS.candleUp : COLORS.candleDown;
+      const onRight = crossX > W / 2;
+      const tX = onRight ? Math.max(16, crossX - 145) : Math.min(W - 160, crossX + 12);
+      const tY = Math.max(30, Math.min(mainH - 85, crossY - 65));
+      cx.save();
+      cx.fillStyle = COLORS.bulle;
+      cx.shadowColor = 'rgba(16,35,61,0.18)'; cx.shadowBlur = 14; cx.shadowOffsetY = 4;
+      cx.beginPath(); cx.roundRect(tX, tY, 135, 72, 10); cx.fill();
+      cx.shadowColor = 'transparent'; cx.shadowBlur = 0; cx.shadowOffsetY = 0;
+      // Filet de la couleur de la bougie à gauche : la direction se lit sans encadrer la donnée.
+      cx.fillStyle = cColor; cx.beginPath(); cx.roundRect(tX + 6, tY + 10, 3, 52, 1.5); cx.fill();
+      cx.fillStyle = COLORS.ink1; cx.font = chartFont(10, 600);
+      cx.fillText('O ' + fmtPrix(candle.open), tX + 16, tY + 20);
+      cx.fillText('H ' + fmtPrix(candle.high), tX + 76, tY + 20);
+      cx.fillText('L ' + fmtPrix(candle.low), tX + 16, tY + 38);
+      cx.fillText('C ' + fmtPrix(candle.close), tX + 76, tY + 38);
+      const volStr = candle.volume >= 1000 ? (candle.volume / 1000).toFixed(1) + 'K' : candle.volume.toFixed(0);
+      cx.fillStyle = COLORS.ink3;
+      cx.fillText('Volume ' + volStr, tX + 16, tY + 57);
+      cx.restore();
+    }
+  }
+  // --- Réticule des sous-graphes : une verticale à travers eux, la valeur de chacun ---
+  if (crossY > mainH && idx >= 0 && idx < n) {
+    const realIdx = geo.vs + idx;
+    cx.strokeStyle = COLORS.reticule;
+    cx.lineWidth = 0.5;
+    cx.beginPath(); cx.moveTo(crossX, mainH + 2); cx.lineTo(crossX, H - RS_HEIGHT); cx.stroke();
+    for (const { cle: key, y: sY, trace } of geo.sous) {
+      if (!trace) continue;   // trop réduit pour être tracé : pas de badge orphelin
+      const val = getSubIndicatorValue(key, realIdx);
+      if (val !== null) {
+        const txt = subLabel(key) + ' ' + val;
+        cx.font = chartFont(9);
+        const tw = cx.measureText(txt).width + 12;
+        const tx = W - 75 + (75 - tw) / 2;
+        const ty = sY + 4;
+        cx.fillStyle = COLORS.bulle;
+        cx.strokeStyle = subColor(key); cx.lineWidth = 0.8;
+        cx.beginPath(); cx.roundRect(tx, ty, tw, 15, 3); cx.fill(); cx.stroke();
+        cx.fillStyle = COLORS.text;
+        cx.fillText(txt, tx + 6, ty + 11);
+      }
+    }
+  }
+}
+// Le calque, à la prochaine image (une seule par image, quel que soit le nombre d'événements).
+let calqueDemande = false;
+function scheduleCalque() {
+  if (calqueDemande) return;
+  calqueDemande = true;
+  requestAnimationFrame(() => { if (calqueDemande) dessinerCalque(); });
+}
+/** Le prix a changé : l'étiquette du calque le suit. Si elle passe sur un autre libellé d'axe
+ *  (celui qu'elle recouvre est omis par le graphique), le graphique est redessiné aussi. */
+function prixSurGraphique() {
+  if (!geoPrix) return;
+  const P = geoPrix;
+  if (masqueEtiquettes(livePrice, P.top, P.ph, P.minP, P.maxP, P.range) !== P.masque) drawChart();
+  else dessinerCalque();
 }
 
 // ============ RANGE SELECTOR ============
@@ -2795,13 +2953,15 @@ function resolveChart(candles, padL, padR, chartH, W) {
   // Grid — motif du thème (--grille-tirets), plein par défaut ; rendu au plein après la boucle.
   ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 0.5;
   ctx.setLineDash(COLORS.grilleTirets);
-  const gridN = 6;
-  // Ordonnée de l'étiquette de dernier prix : le libellé d'axe qu'elle recouvrirait est omis.
-  const yTag = (livePrice && livePrice >= minP && livePrice <= maxP) ? pad.top + ph * (1 - (livePrice - minP) / range) : null;
+  const gridN = GRILLE_N;
+  // Le libellé d'axe que l'étiquette du dernier prix (calque) recouvrirait est omis ; le calque
+  // redemande ce dessin quand le prix change de libellé recouvert (prixSurGraphique).
+  const masque = masqueEtiquettes(livePrice, pad.top, ph, minP, maxP, range);
+  geoPrix = { top: pad.top, ph, left: pad.left, right: pad.right, W, minP, maxP, range, vs, ve, masque };
   for (let i = 0; i <= gridN; i++) {
     const y = pad.top + (ph / gridN) * i;
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
-    if (yTag !== null && Math.abs(y - yTag) < 15) continue;
+    if (masque & (1 << i)) continue;
     const price = maxP - (range / gridN) * i;
     ctx.fillStyle = COLORS.axis || COLORS.text;
     ctx.font = chartFont(11);
@@ -2829,34 +2989,6 @@ function resolveChart(candles, padL, padR, chartH, W) {
     ctx.restore();
   }
 
-  // Marqueur prix live sur axe Y — triangle + badge couleur
-  if (livePrice && livePrice >= minP && livePrice <= maxP) {
-    const yLP = pad.top + ph * (1 - (livePrice - minP) / range);
-    // Triangle pointant vers la gauche
-    const triX = W - pad.right + 2, triY = yLP;
-    // Couleur de la bougie EN COURS : l'étiquette dit aussi le sens du moment.
-    const enCours = candles[candles.length - 1];
-    const tagC = (enCours && livePrice < enCours.open) ? COLORS.candleDown : COLORS.candleUp;
-    // Badge prix — désormais l'unique pastille de prix (l'axe Y).
-    // pad.right = 75 px pour un libellé 3 décimales de 76 px : le badge sortait
-    // du canvas de ~13 px (« $77085.0(| ») à toutes les largeurs. On le recale
-    // vers la gauche au lieu d'élargir pad.right (13 sites couplés au
-    // Range Selector et au hit-test souris).
-    const lpStr = '$' + fmtPrix(livePrice);
-    ctx.font = chartFont(11, 700);
-    const lw = ctx.measureText(lpStr).width + 12;
-    const bx = Math.min(triX + 10, W - 3 - lw);
-    // Opaque : le badge recule sur le libellé de grille de même ordonnée quand
-    // la colonne est étroite, et le laissait transparaître en transparence.
-    ctx.fillStyle = tagC;
-    ctx.beginPath(); ctx.roundRect(bx, triY - 11, lw, 22, 11); ctx.fill();
-    // Pointe vers le tracé : elle reste visible si le badge a reculé
-    ctx.beginPath(); ctx.moveTo(triX, triY - 4); ctx.lineTo(triX + 8, triY); ctx.lineTo(triX, triY + 4);
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(lpStr, bx + 6, triY + 4);
-  }
-  
   // Bollinger
   if (overlays.bb && candles.length >= 20) {
     const bb = memoized('bb', calcBollinger, closes, PARAM.bb.periode, PARAM.bb.ecarts);
@@ -3016,8 +3148,8 @@ function resolveChart(candles, padL, padR, chartH, W) {
   
   // --- Fibonacci Retracement ---
   if (overlays.fib && visible.length >= 10) {
-    const fibHigh = Math.max(...visible.map(c => c.high));
-    const fibLow = Math.min(...visible.map(c => c.low));
+    let fibHigh = -Infinity, fibLow = Infinity;
+    for (const c of visible) { if (c.high > fibHigh) fibHigh = c.high; if (c.low < fibLow) fibLow = c.low; }
     const fibRange = fibHigh - fibLow;
     const isUpTrend = visible[visible.length - 1].close > visible[0].close;
     const fibLevels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
@@ -3154,22 +3286,6 @@ function resolveChart(candles, padL, padR, chartH, W) {
     ctx.fillText(label, tx, chartH - 3);
   }
   
-  // Price line (live) — la pastille de prix est sur l'axe Y (voir plus bas) :
-  // elle y était dupliquée ici, créant deux badges identiques côte à côte.
-  if (livePrice) {
-    const yP = pad.top + ph * (1 - (livePrice - minP) / range);
-    const enCours2 = candles[candles.length - 1];
-    ctx.save();
-    ctx.strokeStyle = (enCours2 && livePrice < enCours2.open) ? COLORS.candleDown : COLORS.candleUp;
-    // Un trait large et pâle sous le pointillé : la ligne du dernier prix se trouve d'un coup d'œil.
-    ctx.globalAlpha = 0.14; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.moveTo(pad.left, yP); ctx.lineTo(W - pad.right, yP); ctx.stroke();
-    ctx.globalAlpha = 0.75;
-    ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
-    ctx.beginPath(); ctx.moveTo(pad.left, yP); ctx.lineTo(W - pad.right, yP); ctx.stroke();
-    ctx.setLineDash([]); ctx.restore();
-  }
-
   // ─── Trade markers (backtest) ───
   if (btResult && btResult.trades && btResult.trades.length > 0) {
     for (const trade of btResult.trades) {
@@ -3376,11 +3492,10 @@ function resolveSub(candles, y0, subH, W, key) {
   ctx.fillText(subTitle(key), pad.left + 17, y0 + 13.5);
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
   
-  // Utiliser le range visible pour les subs aussi
+  // Utiliser le range visible pour les subs aussi (des indices : aucune copie par image)
   const vs = Math.max(0, viewStart);
   const ve = Math.min(candles.length, viewEnd);
-  const visible = candles.slice(vs, ve);
-  const gap = pw / visible.length;
+  const gap = pw / (ve - vs);
   
   if (key === 'vol') {
     let maxV = 0;
@@ -3427,9 +3542,7 @@ function resolveSub(candles, y0, subH, W, key) {
     const macd = memoized('sub_macd', calcMACD, closes, PARAM.macd.rapide, PARAM.macd.lente, PARAM.macd.signal);
     // Échelle sur la FENÊTRE VISIBLE : calculée sur les 3 000 bougies, un extrême d'il y a
     // des semaines écrasait la vue courante en une ligne plate (±900 d'échelle pour ±40 de signal).
-    const fen = a => a.slice(vs, ve).filter(v => v !== null);
-    const allVals = [...fen(macd.macdLine), ...fen(macd.signal), ...fen(macd.histogram)];
-    const absMax = Math.max(Math.abs(Math.min(...allVals)), Math.abs(Math.max(...allVals))) || 1;
+    const absMax = absMaxFenetre([macd.macdLine, macd.signal, macd.histogram], vs, ve) || 1;
     const scale = (ph / 2) / absMax;
     const midY = y0 + pad.top + ph / 2;
     subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: v => v.toFixed(2) });
@@ -3454,15 +3567,15 @@ function resolveSub(candles, y0, subH, W, key) {
   } else if (key === 'atr') {
     const highs = cols().high, lows = cols().low, closes = cols().close;
     const atr = memoized('sub_atr', calcATR, highs, lows, closes, PARAM.atr.periode);
-    const maxA = Math.max(...atr.filter(v => v !== null)) || 1;
+    // Échelle sur TOUT l'historique (comme avant) : calculée une fois par état des données.
+    const maxA = memoized('sub_atr_max', a => { let m = -Infinity; for (const v of a) if (v !== null && v > m) m = v; return m; }, atr) || 1;
     const scale = ph / maxA;
     subGrid(y0, pad, ph, W, { levels: [0, maxA/2, maxA], min: 0, max: maxA, f: v => '$' + v.toFixed(1) });
     drawLineAt(atr, y0 + pad.top + ph, scale, pad, gap, COLORS.atr, [], 1.5, vs);
   } else if (key === 'obv') {
     const closes = cols().close, volumes = cols().vol;
     const obv = memoized('sub_obv', calcOBV, closes, volumes);
-    const visObv = obv.slice(vs, ve);
-    const absMax = Math.max(Math.abs(Math.min(...visObv)), Math.abs(Math.max(...visObv))) || 1;
+    const absMax = absMaxFenetre([obv], vs, ve) || 1;
     const scale = (ph / 2) / absMax;
     const midY = y0 + pad.top + ph / 2;
     const fmtOBV = v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : v.toFixed(0);
@@ -3491,8 +3604,8 @@ function resolveSub(candles, y0, subH, W, key) {
   } else if (key === 'ao') {
     const highs = cols().high, lows = cols().low;
     const ao = memoized('sub_ao', calcAO, highs, lows, PARAM.ao.rapide, PARAM.ao.lente);
-    const allV = ao.filter(v => v !== null);
-    const absMax = Math.max(Math.abs(Math.min(...allV)), Math.abs(Math.max(...allV))) || 1;
+    // Échelle sur TOUT l'historique (comme avant) : calculée une fois par état des données.
+    const absMax = memoized('sub_ao_max', a => absMaxFenetre([a], 0, a.length), ao) || 1;
     const scale = (ph / 2) / absMax;
     const midY = y0 + pad.top + ph / 2;
     subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: v => v.toFixed(2) });
@@ -3569,6 +3682,13 @@ function resolveSub(candles, y0, subH, W, key) {
   }
 }
 
+// Plus grande valeur absolue des séries sur [vs, ve), null ignorés — en une boucle : l'échelle
+// des sous-graphes se prenait par slice + filter + spread, à chaque image.
+function absMaxFenetre(series, vs, ve) {
+  let m = 0;
+  for (const a of series) for (let i = vs; i < ve && i < a.length; i++) { const v = a[i]; if (v !== null && Math.abs(v) > m) m = Math.abs(v); }
+  return m;
+}
 function drawLineAt(data, baseY, scale, pad, gap, color, dash, width, dataOffset) {
   ctx.strokeStyle = color; ctx.lineWidth = width;
   if (dash.length > 0) ctx.setLineDash(dash);
@@ -3634,37 +3754,23 @@ function getSubIndicatorValue(key, idx) {
 }
 
 // ═══════════════ MARCHÉ LIVE (market-data.json) ═══════════════
-async function fetchMarket() {
+// Un tour par CADENCES.publication_lue : le fichier n'est relu que s'il est dû (lectureDue), en
+// revalidation (`no-cache` : 304 tant qu'il n'a pas changé). Le `?t=` d'avant n'apportait rien
+// — le CDN ignore la requête (même copie, même âge, vérifié) — et forçait 8,6 Ko par minute.
+// Entre deux publications, seuls les âges affichés avancent (majAges) : ni analyse, ni cartes
+// refaites, ni onde du voyant.
+let marcheLu = 0;          // dernière relecture réussie (ms)
+async function fetchMarket(force) {
+  if (!force && !lectureDue(marketData && Date.parse(marketData.updated), marcheLu)) { majAges(false); return; }
   try {
-    const resp = await fetch(DATA_URL + '?t=' + Date.now(), { cache: 'no-store' });
+    const resp = await (prechargee(DATA_URL, { cache: 'no-cache' }) || fetch(DATA_URL, { cache: 'no-cache' }));
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    marketData = await resp.json();
-    renderFeed();
-    // ─── ÂGE DE LA DONNÉE ────────────────────────────────────────────────
-    // Un HTTP 200 ne prouve RIEN sur la fraîcheur : une source morte reste servie
-    // indéfiniment et le point restait vert. C'est la panne du 16/08 — un consommateur a lu
-    // 13 cycles de données gelées sans qu'aucun voyant ne bronche.
-    // Seuils de js/cadences.js : au-delà de vieux_min, une publication manquée ; de fige_min, deux.
-    const ageMin = marketData.updated
-      ? (Date.now() - Date.parse(marketData.updated)) / 60000 : null;
-    const etat = ageMin === null ? 'inconnu'
-               : ageMin > CADENCES.fige_min ? 'fige'
-               : ageMin > CADENCES.vieux_min ? 'retard' : 'ok';
-    const teinte = { ok: 'var(--up)', retard: 'var(--warn)', fige: 'var(--down)',
-                     inconnu: 'var(--ink-3)' }[etat];
-    const dot = document.getElementById('dot');
-    if (dot) {
-      dot.style.background = teinte;
-      dot.classList.toggle('calme', etat !== 'ok');        // ne pas onduler sur du figé
-      // Une onde par publication reçue (deux passages), puis le calme : pas d'animation infinie.
-      if (etat === 'ok') { dot.classList.remove('ping'); void dot.offsetWidth; dot.classList.add('ping'); }
-      dot.title = ageMin === null
-        ? 'Âge de la donnée inconnu (champ updated absent)'
-        : `Dernière publication il y a ${Math.round(ageMin)} min`;
-    }
-    const td = document.getElementById('taskbarDot');
-    if (td) td.style.background = teinte;
+    const d = await lireSiNouveau(resp, marketData && marketData.updated);
+    marcheLu = Date.now();
+    if (d) { marketData = d; renderFeed(); }
+    majAges(!!d);
   } catch(e) {
+    marcheLu = 0;                                   // à retenter au prochain tour
     document.getElementById('dot').style.background = 'var(--down)';
     const td = document.getElementById('taskbarDot');
     if (td) td.style.background = 'var(--down)';
@@ -3672,6 +3778,66 @@ async function fetchMarket() {
     feed.innerHTML = '<div class="error">⚠️ ' + e.message + '</div>';
   }
 }
+// ─── ÂGE DE LA DONNÉE ────────────────────────────────────────────────
+// Un HTTP 200 ne prouve RIEN sur la fraîcheur : une source morte reste servie indéfiniment et
+// le point restait vert. C'est la panne du 16/08 — un consommateur a lu 13 cycles de données
+// gelées sans qu'aucun voyant ne bronche. Seuils de js/cadences.js : au-delà de vieux_min, une
+// publication manquée ; de fige_min, deux.
+function etatPublication(updated) {
+  const ageMin = updated ? (Date.now() - Date.parse(updated)) / 60000 : null;
+  const etat = ageMin === null || !isFinite(ageMin) ? 'inconnu'
+             : ageMin > CADENCES.fige_min ? 'fige'
+             : ageMin > CADENCES.vieux_min ? 'retard' : 'ok';
+  return { ageMin: etat === 'inconnu' ? null : ageMin, etat };
+}
+let etatAffiche = null;
+/** Âge de la publication affichée, à chaque tour : voyant (teinte, titre), barre des tâches,
+ *  âges écrits dans la page ([data-age-de], posés par renderFeedTo), teinte « vieux » des
+ *  chiffres clés. Un seuil franchi change le bandeau d'âge des cartes : elles sont refaites.
+ *  `nouvelle` : une publication vient d'arriver — une onde du voyant, une seule. */
+function majAges(nouvelle) {
+  if (!marketData) return;
+  const { ageMin, etat } = etatPublication(marketData.updated);
+  if (!nouvelle && etatAffiche !== null && etat !== etatAffiche) renderFeed();
+  etatAffiche = etat;
+  const teinte = { ok: 'var(--up)', retard: 'var(--warn)', fige: 'var(--down)', inconnu: 'var(--ink-3)' }[etat];
+  const dot = document.getElementById('dot');
+  if (dot) {
+    dot.style.background = teinte;
+    dot.classList.toggle('calme', etat !== 'ok');        // ne pas onduler sur du figé
+    if (nouvelle && etat === 'ok') onde(dot);
+    dot.title = ageMin === null
+      ? 'Âge de la donnée inconnu (champ updated absent)'
+      : `Dernière publication il y a ${Math.round(ageMin)} min`;
+  }
+  const td = document.getElementById('taskbarDot');
+  if (td) td.style.background = teinte;
+  if (ageMin !== null && document.querySelectorAll) {
+    const n = String(Math.max(0, Math.round(ageMin)));
+    for (const el of document.querySelectorAll('[data-age-de]')) if (el.textContent !== n) el.textContent = n;
+    const cy = document.getElementById('cycle');
+    if (cy) cy.classList.toggle('vieux', Math.round(ageMin) > CADENCES.vieux_min);
+  }
+}
+// L'onde du voyant : UNE par publication NOUVELLE, deux passages puis le calme. Avant : à chaque
+// relecture (chaque minute, 14 fois sur 15 pour une donnée qui n'avait pas changé, ≥ 8 ms/s de
+// CPU sur Kāla, ≥ 27 sur Aero), relancée par `void dot.offsetWidth` — une mise en page forcée.
+// Maintenant : la classe est retirée à la fin de l'animation (le thème peut animer le point ou
+// son ::after), une onde encore en cours est rembobinée par l'API Web Animations.
+function onde(dot) {
+  if (!dot.classList.contains('ping')) { dot.classList.add('ping'); return; }
+  const en = dot.getAnimations ? dot.getAnimations({ subtree: true }) : [];
+  if (en.length) { for (const a of en) { a.currentTime = 0; a.play(); } return; }
+  // Classe restée sans animation en cours (mouvement réduit, onglet caché à la fin) : retirée,
+  // puis reposée deux images plus tard — le style aura vu l'état sans elle.
+  dot.classList.remove('ping');
+  requestAnimationFrame(() => requestAnimationFrame(() => dot.classList.add('ping')));
+}
+(function () {
+  const dot = document.getElementById('dot');
+  const fin = e => { if (e.target === dot) dot.classList.remove('ping'); };
+  if (dot) { dot.addEventListener('animationend', fin); dot.addEventListener('animationcancel', fin); }
+})();
 
 function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 const isNum = v => (v !== null && v !== undefined && !isNaN(v));
@@ -3960,6 +4126,8 @@ const tuile = (lbl, val, sub, fiche, lecture) => '<div class="tuile"><div class=
   + (sub ? '<div class="sub">' + sub + '</div>' : '') + (lecture || '') + '</div>';
 
 function renderFeed() { renderFeedTo(document.getElementById('feed')); }
+// Un âge en minutes, réécrit sur place à chaque tour par majAges().
+const ageDe = (updated, min) => '<span data-age-de="' + escHtml(updated) + '">' + min + '</span>';
 // Ce qui ne tient pas dans la bande est masqué EN ENTIER, en partant de la fin (ordre d'utilité).
 function ajusterKpis() {
   const cy = document.getElementById('cycle');
@@ -4022,7 +4190,8 @@ function renderFeedTo(container) {
       + kpi('L/S', fmtNum(x.ls_ratio, 2))
       + kpi('DXY', fmtNum(m.dxy_spot, 2))
       + kpi('VIX', fmtNum(m.vix, 1))
-      + '<span class="kpi-age" title="Âge de la publication">' + (ageK === null ? '—' : ageK + ' min') + '</span>';
+      // L'âge avance chaque minute sans refaire la bande : majAges() réécrit les [data-age-de].
+      + '<span class="kpi-age" title="Âge de la publication">' + (ageK === null ? '—' : ageDe(d.updated, ageK) + ' min') + '</span>';
     cy.classList.toggle('vieux', ageK !== null && ageK > CADENCES.vieux_min);
     cy.title = 'Dernière publication (cadence ' + CADENCES.attendue_min + ' min) — cliquer pour le détail';
     ajusterKpis();
@@ -4044,7 +4213,7 @@ function renderFeedTo(container) {
   // c'est-à-dire jamais dans le cas normal : d'où deux prix contradictoires à l'écran.
   const ageMin = upd ? Math.max(0, Math.round((Date.now() - upd.getTime()) / 60000)) : null;
   html += mCard('📊','Marché live','Binance spot · maj ' + hhmm + ' UTC'
-      + (ageMin !== null ? ' (+' + ageMin + ' min — le badge du haut est live)' : ''), '',
+      + (ageMin !== null ? ' (+' + ageDe(d.updated, ageMin) + ' min — le badge du haut est live)' : ''), '',
     '<div class="hero"><span class="hero-val">' + fmtUsd(b.price) + '</span>'
     + '<span class="' + chipCls(b.change_24h_pct) + '">' + pctSigne(b.change_24h_pct) + ' 24h</span></div>'
     + trackHtml(b.price, b.low_24h, b.high_24h, 'Bas&nbsp;<b>' + fmtUsd(b.low_24h) + '</b>', 'Haut&nbsp;<b>' + fmtUsd(b.high_24h) + '</b>')
@@ -4602,10 +4771,11 @@ async function init() {
   peindrePastilles();
   resizeCanvas();
   drawChart();             // « Chargement… » plutôt qu'un cadre vide
-  // Tout part EN MÊME TEMPS : prix, bougies, publication. Avant, le prix était attendu avant
-  // les bougies, et les bougies avant les cartes (premier dessin à 1,55 s, mesuré en local).
-  const prix = fetchPrice().then(() => scheduleDraw());
-  const marche = fetchMarket();
+  // Tout part EN MÊME TEMPS : prix, bougies, publication — et les trois sont déjà en vol depuis
+  // le script de tête d'index.html (prechargee). Avant, le prix était attendu avant les bougies,
+  // et les bougies avant les cartes (premier dessin à 1,55 s, mesuré en local).
+  const prix = fetchPrice();
+  const marche = fetchMarket(true);
   await fetchKlines();
   viewStart = Math.max(0, candles.length - 50);
   viewEnd = candles.length;
@@ -4627,19 +4797,15 @@ async function init() {
   const visible = fn => () => { if (!document.hidden) return fn(); };
   // Cadences : js/cadences.js (une table, lue aussi par les étiquettes et les seuils d'âge).
   setInterval(visible(fetchPrice), CADENCES.prix);
-  setInterval(visible(async () => { await fetchKlines(); drawChart(); }), CADENCES.bougies);
+  // Les bougies : redessinées seulement si la queue reçue a changé (fetchKlines).
+  setInterval(visible(async () => { if (await fetchKlines()) drawChart(); }), CADENCES.bougies);
   setInterval(visible(fetchMarket), CADENCES.publication_lue);
   setInterval(visible(refreshRefSR), CADENCES.niveaux_sr);
   document.addEventListener('visibilitychange', async () => {
     if (document.hidden) return;
     fetchPrice(); fetchMarket();
     if (overlays.liq) fetchHeatmap();
-    await fetchKlines(); drawChart();
+    if (await fetchKlines()) drawChart();
   });
-  // Taskbar clock
-  setInterval(() => {
-    const c = document.getElementById('taskbarClock');
-    if (c) c.textContent = new Date().toLocaleTimeString('fr-FR');
-  }, CADENCES.horloge);
 }
 init();

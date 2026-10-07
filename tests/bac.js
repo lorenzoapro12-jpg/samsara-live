@@ -49,7 +49,9 @@ globalThis.__T__ = {
   bandeProfil, mursFusionnes, fusionnerGrille, grilleChaleur, bandeLive, palier, ladderHtml,
   setData(d) { marketData = d; }, el: id => document.getElementById(id),
   get COLORS() { return COLORS; }, FORMES_BOUGIE, BOUGIE_DENSE_PX, CADENCES, ageBannerHtml,
-  pixelsChaleur, rampeU32, HEAT_RAMPE, lireSiNouveau, lectureDue,
+  pixelsChaleur, rampeU32, HEAT_RAMPE, lireSiNouveau, lectureDue, etatPublication, majAges, fetchMarket, fetchPrice, fetchHeatmap,
+  get marketData() { return marketData; }, get histHeatmap() { return histHeatmap; }, get livePrice() { return livePrice; },
+  urlTicker, var24De, urlPremierePage, prechargee, DATA_URL, HEATMAP_URL, queueConnue, limiterCacheBougies, klineCache, BOUGIES_GARDEES,
 };`;
   vm.runInContext(code, sandbox);
   return { T: sandbox.__T__, stockage, appels, element, sandbox };

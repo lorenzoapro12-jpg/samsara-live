@@ -145,11 +145,12 @@ const enDur = t => minuteries(t).filter(m => /,\s*\d[\d_]*\s*\)$/.test(m));
 const initC = corps(SRC_APP, 'init');
 check(`init() : ${minuteries(initC).length} minuteries, aucune à cadence écrite en dur`, minuteries(initC).length >= 4 && !enDur(initC).length, enDur(initC));
 check('toggleDepth() : relecture de la chaleur à CADENCES.chaleur_lue', /CADENCES\.chaleur_lue/.test(corps(SRC_APP, 'toggleDepth')) && !enDur(corps(SRC_APP, 'toggleDepth')).length);
-const ab = corps(SRC_APP, 'ageBannerHtml'), rf = corps(SRC_APP, 'renderFeedTo'), fm = corps(SRC_APP, 'fetchMarket');
+// Le voyant se décide dans etatPublication() (appelée par majAges() à chaque tour de fetchMarket).
+const ab = corps(SRC_APP, 'ageBannerHtml'), rf = corps(SRC_APP, 'renderFeedTo'), fm = corps(SRC_APP, 'etatPublication');
 check('ageBannerHtml() : seuils et cadence lus dans CADENCES (plus de 20, 32, « 15 min »)',
   /CADENCES\.vieux_min/.test(ab) && /CADENCES\.fige_min/.test(ab) && /CADENCES\.attendue_min/.test(ab) && !/[<>]=?\s*\d+\b/.test(ab) && !/\b\d+ min\)/.test(ab));
 check('renderFeedTo() : la bande des chiffres clés vieillit à CADENCES.vieux_min', /ageK\s*>\s*CADENCES\.vieux_min/.test(rf) && !/ageK\s*>\s*\d/.test(rf));
-check('fetchMarket() : le voyant passe au retard / au figé aux seuils de CADENCES', /CADENCES\.fige_min/.test(fm) && /CADENCES\.vieux_min/.test(fm) && !/ageMin\s*>\s*\d/.test(fm));
+check('etatPublication() : le voyant passe au retard / au figé aux seuils de CADENCES', /CADENCES\.fige_min/.test(fm) && /CADENCES\.vieux_min/.test(fm) && !/ageMin\s*>\s*\d/.test(fm));
 // Aucune étiquette ne recopie une cadence de la table : chaînes de code, commentaires exclus.
 const valeurs = [C.attendue_min, C.vieux_min, C.fige_min].join('|');
 const recopies = Object.entries(SRC).flatMap(([f, t]) => (code(t).match(new RegExp("(['\"\x60])[^'\"\x60\\n]*\\b(?:" + valeurs + ")\\s*(?:min|MIN|minutes)\\b[^'\"\x60\\n]*\\1", 'g')) || []).map(m => f + ' : ' + m));

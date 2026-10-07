@@ -176,6 +176,9 @@ html.geste .header, html.geste .indicator-bar, html.geste .lg-ring,
 html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
   -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
 }
+/* Pendant un SURVOL du graphique (réticule redessiné à chaque image), seul l'anneau se
+   suspend : c'est lui que chaque image du calque faisait recomposer (js/app.js, survol()). */
+html.survol .lg-ring { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 
 /* ─── 4. En-tête ────────────────────────────────────────────────────────────── */
 .header {
@@ -229,6 +232,11 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
 }
 .price-badge.price-up::before { border-bottom: 8px solid var(--up); }
 .price-badge.price-down::before { border-top: 8px solid var(--down); }
+/* Éclair du prix : la couleur du sens, posée par une classe et retirée 450 ms plus tard (deux
+   images par changement), sans transition — une animation de couleur repeignait le chiffre à
+   chaque image : 70 % du CPU de la page au repos. */
+.price-badge.eclair-hausse { color: var(--up-ink); }
+.price-badge.eclair-baisse { color: var(--down-ink); }
 .var24 {
   flex-shrink: 0; padding: 3px 9px; border-radius: 999px; white-space: nowrap;
   font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
@@ -448,6 +456,13 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
   /* Le graphique gère lui-même pan et pincement : sans ceci le navigateur mobile lance son
      propre défilement en concurrence (pan saccadé, double-tap qui zoome la page). */
   touch-action: none;
+}
+/* Le calque (réticule, infobulles, étiquette du dernier prix) : posé sur le graphique, à la même
+   taille (js/app.js, resizeCanvas), transparent et inerte au pointeur — les gestes restent au
+   graphique. */
+.chart-container canvas.calque {
+  position: absolute; z-index: 2; pointer-events: none;
+  background: none; box-shadow: none; border-radius: 0;
 }
 
 /* ─── 7. Panneau « Marché live » ───────────────────────────────────────────── */
