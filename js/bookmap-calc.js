@@ -258,7 +258,7 @@
       if (ta >= tMax) break;
       if (!BM.plageColonnes(g, ta, Math.min(ta + tpp, tMax), r)) continue;
       if (r[0] !== cle0 || r[1] !== cle1) {
-        if (obs) { colB.fill(0, lo - pbMin, hi - pbMin + 1); colA.fill(0, lo - pbMin, hi - pbMin + 1); }
+        if (obs) { const a0 = Math.max(0, lo - pbMin), a1 = Math.min(H, hi - pbMin + 1); colB.fill(0, a0, a1); colA.fill(0, a0, a1); }
         cle0 = r[0]; cle1 = r[1];
         accumuler(g, cle0, cle1, colB, colA, acc);
         obs = acc[0] === 1; lo = acc[1]; hi = acc[2];
