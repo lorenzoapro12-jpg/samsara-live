@@ -543,6 +543,152 @@ check('Retry-After : secondes ou date HTTP ; absent → null', BM.lireRetryAfter
 }
 check('une lecture vaut jusqu\'à la suivante, au plus 3 cadences + 1 s', BM.validiteLecture(2000) === 7000);
 
+// ── 7d. Mémoire du carnet : seuil exact, comptes, sommes préfixes ─────────────
+titre('7d. Mémoire du carnet : seuil EXACT en BTC, comptes par rangée, fenêtres');
+{
+  const enc = { ref_btc: 100, plafond: 255 };
+  const s10 = BM.seuilPresence(10, enc);
+  check('X = 10 BTC → intensité ≥ 81, soit ≥ 10,09 BTC (le cran publié, pas X)', s10.vS === 81 && BM.nombre(s10.qS, 2, 2) === '10,09', s10);
+  check('sans encodage publié : aucun seuil (null), rien d\'inventé', BM.seuilPresence(10, null) === null && BM.seuilPresence(10, {}) === null);
+  check('seuils bornés au cran 1 et au plafond', BM.seuilPresence(1e-9, enc).vS === 1 && BM.seuilPresence(1e6, enc).vS === 255);
+  // Pour CHAQUE cran et autour de chaque frontière : intensite(q) ≥ vS ⇔ q ≥ qS, au double près.
+  let faux = [];
+  for (const e of [enc, { ref_btc: 37.5, plafond: 255 }, { ref_btc: 100, plafond: 100 }]) {
+    for (let v = 1; v <= e.plafond; v++) {
+      const X = e.ref_btc * (v / e.plafond) ** 2 * (0.9999 + 0.0002 * rnd());
+      const s = BM.seuilPresence(X, e);
+      if (!s) { faux.push(['null', v]); continue; }
+      const qs = [s.qS, s.qS * (1 + 1e-15), s.qS * (1 - 1e-15), s.qS * (1 + 1e-9 * rnd()), s.qS * (1 - 1e-9 * rnd()), s.qS * (0.98 + 0.04 * rnd())];
+      let F = new Float64Array(1), I = new BigInt64Array(F.buffer);
+      F[0] = s.qS; I[0] -= 1n; qs.push(F[0]); F[0] = s.qS; I[0] += 1n; qs.push(F[0]);
+      for (const q of qs) if ((BM.intensite(q, e) >= s.vS) !== (q >= s.qS)) faux.push([e.ref_btc, v, q, s]);
+    }
+  }
+  check('intensité ≥ vS ⇔ q ≥ qS (tous les crans, frontières au double près, trois encodages)', !faux.length, faux.slice(0, 3));
+
+  // Grille fixe : 5 colonnes, rangées 100..105 ; colonne 2 non observée ; colonne 4 : bande 102..103.
+  const G = BM.grilleVide(0, 60e3, 5, 20, 100, 6), H = 6, set = (t, c, pb, v) => { G[t][c * H + pb - 100] = v; };
+  for (const c of [0, 1, 3]) { G.bas[c] = 100; G.haut[c] = 105; }
+  G.bas[4] = 102; G.haut[4] = 103;
+  set('bids', 0, 101, 90); set('bids', 1, 101, 81); set('bids', 3, 101, 80); set('asks', 3, 101, 200);
+  set('asks', 0, 104, 81); set('asks', 1, 104, 81); set('asks', 3, 104, 81);
+  set('bids', 4, 103, 255); set('asks', 4, 103, 100);
+  set('bids', 4, 104, 255);         // hors de la bande de sa colonne (incohérent) : ni observé, ni présent
+  const pr = BM.presence(G, 81), f = (pb, a, b) => BM.presenceFenetre(pr, pb, a, b);
+  check('rangée 101 : 3 minutes observées sur 4 colonnes (2 non observée, 4 hors bande), 3 présentes, bid 2 / ask 1',
+    JSON.stringify(f(101, 0, 4)) === JSON.stringify({ obs: 3, pres: 3, presB: 2, presA: 1 }), f(101, 0, 4));
+  check('rangée 103 : 4 observées (bande étroite de la colonne 4 comprise), 1 présente des deux côtés',
+    JSON.stringify(f(103, 0, 4)) === JSON.stringify({ obs: 4, pres: 1, presB: 1, presA: 1 }), f(103, 0, 4));
+  check('rangée 104 : la colonne 4 ne la couvre pas → 3 observées, 3 présentes (ask)', JSON.stringify(f(104, 0, 4)) === JSON.stringify({ obs: 3, pres: 3, presB: 0, presA: 3 }), f(104, 0, 4));
+  check('fenêtre [1, 3] de la rangée 101 : 2 observées, 2 présentes', f(101, 1, 3).obs === 2 && f(101, 1, 3).pres === 2);
+  check('rangée hors grille : rien', f(99, 0, 4).obs === 0 && f(200, 0, 4).obs === 0);
+  const lp = BM.plusLonguePresence(G, 81, 101, 0, 4);
+  check('plus longue présence (rangée 101) : 2 colonnes (0–1) — la colonne non observée COUPE la série', lp.n === 2 && lp.c === 0, lp);
+  check('plus longue présence (rangée 104) : 2 — coupée par la colonne non observée', BM.plusLonguePresence(G, 81, 104, 0, 4).n === 2);
+  const br = BM.barrePresence(pr, 101, 104, 0, 4, 1);
+  check('un pixel sur plusieurs rangées : la PLUS GRANDE part (rangée 101 ou 104, 100 %)', br && br.part === 1, br);
+  const brPeu = BM.barrePresence(pr, 101, 104, 0, 4, 30);
+  check('rangées observées moins que le minimum : barre marquée « peu observée »', brPeu && brPeu.peu === true);
+
+  // Sommes préfixes = comptage brut, sur des grilles aléatoires et des fenêtres aléatoires.
+  let ecarts = 0, essais = 0;
+  for (let k = 0; k < 20; k++) {
+    const W = 5 + Math.floor(rnd() * 60), Hh = 3 + Math.floor(rnd() * 30), g2 = BM.grilleVide(0, 60e3, W, 20, 500, Hh), vS = 1 + Math.floor(rnd() * 200);
+    for (let c = 0; c < W; c++) {
+      if (rnd() < 0.15) continue;
+      const a = 500 + Math.floor(rnd() * Hh), b = 500 + Math.floor(rnd() * Hh);
+      g2.bas[c] = Math.min(a, b); g2.haut[c] = Math.max(a, b);
+      for (let r = 0; r < Hh; r++) { g2.bids[c * Hh + r] = Math.floor(rnd() * 256); g2.asks[c * Hh + r] = rnd() < 0.5 ? 0 : Math.floor(rnd() * 256); }
+    }
+    const p2 = BM.presence(g2, vS);
+    for (let e = 0; e < 30; e++) {
+      const c0 = Math.floor(rnd() * W), c1 = c0 + Math.floor(rnd() * (W - c0)), pb = 500 + Math.floor(rnd() * Hh), r = pb - 500;
+      const brut = { obs: 0, pres: 0, presB: 0, presA: 0 };
+      for (let c = c0; c <= c1; c++) {
+        if (!(g2.bas[c] >= 0 && g2.bas[c] <= pb && pb <= g2.haut[c])) continue;
+        brut.obs++;
+        const b = g2.bids[c * Hh + r] >= vS, a = g2.asks[c * Hh + r] >= vS;
+        if (a || b) brut.pres++; if (b) brut.presB++; if (a) brut.presA++;
+      }
+      essais++;
+      if (JSON.stringify(brut) !== JSON.stringify(BM.presenceFenetre(p2, pb, c0, c1))) ecarts++;
+    }
+  }
+  check(`sommes préfixes = comptage brut (${essais} fenêtres, 20 grilles aléatoires)`, ecarts === 0, ecarts);
+  // La présence se lit sur la grille BRUTE : la fusion (réglage) n'y touche pas.
+  const avant = JSON.stringify([...BM.presence(G, 81).pres]);
+  for (const kt of [1, 5, 15, 60]) for (const kp of [1, 2, 5, 10]) BM.fusionMax(G, kt, kp);
+  check('fusionner la grille (tout réglage) ne change pas la présence calculée', JSON.stringify([...BM.presence(G, 81).pres]) === avant);
+}
+
+// ── 7e. Rafales au marché ────────────────────────────────────────────────────
+titre('7e. Rafales : même ms, même côté, identifiants consécutifs ; borne basse d\'ordres PROUVÉE');
+{
+  const tr = (a, T, p, q, m) => ({ a, T, p: String(p), q: String(q), m: !!m });
+  // 1. Balayage acheteur de 45 prix croissants : une rafale, ≥ 1 ordre, 45 prix.
+  const balai = Array.from({ length: 45 }, (_, i) => tr(1000 + i, 5000, 80000 + i * 0.5, '0.10000000', false));
+  const R1 = BM.grouperRafales(balai).map(BM.lireRafale);
+  check('45 exécutions à prix croissants (achat) : 1 rafale, ≥ 1 ordre, 45 prix, séquence = tout', R1.length === 1 && R1[0].ordresMin === 1 && R1[0].nPrix === 45 && R1[0].n === 45 && Math.abs(R1[0].plusLongueSequence - 4.5) < 1e-12, R1[0]);
+  check('côté : m = false → achat ; pMin / pMax / vwap', R1[0].achat === true && R1[0].pMin === 80000 && R1[0].pMax === 80022 && Math.abs(R1[0].vwap - 80011) < 1e-6);
+  // 2. Prix répété, prix qui recule.
+  const rep = BM.lireRafale(BM.grouperRafales([tr(1, 9, 100, 1), tr(2, 9, 101, 1), tr(3, 9, 101, 2), tr(4, 9, 102, 1)])[0]);
+  check('prix répété (achat) : ≥ 2 ordres, 3 prix, plus longue séquence 3 BTC (101 → 102 après la reprise)', rep.ordresMin === 2 && rep.nPrix === 3 && rep.repetes === 1 && rep.reculs === 0 && rep.plusLongueSequence === 3, rep);
+  const rec = BM.lireRafale(BM.grouperRafales([tr(1, 9, 100, 1, true), tr(2, 9, 99, 1, true), tr(3, 9, 99.5, 1, true)])[0]);
+  check('prix qui revient en arrière (vente) : ≥ 2 ordres', rec.ordresMin === 2 && rec.reculs === 1 && rec.achat === false, rec);
+  const desc = BM.lireRafale(BM.grouperRafales([tr(1, 9, 100, 1), tr(2, 9, 99, 1), tr(3, 9, 98, 1)])[0]);
+  check('achat à prix décroissants : chaque pas prouve un ordre de plus (≥ 3)', desc.ordresMin === 3, desc);
+  // 3. Côtés entrelacés dans la même milliseconde.
+  const ent = BM.grouperRafales([tr(1, 9, 100, 1), tr(2, 9, 100, 1, true), tr(3, 9, 101, 1)]);
+  check('côtés entrelacés dans la même ms : 3 rafales', ent.length === 3);
+  // 4. Identifiants non consécutifs, ou ms différente.
+  check('identifiants non consécutifs : coupé', BM.grouperRafales([tr(1, 9, 100, 1), tr(3, 9, 101, 1)]).length === 2);
+  check('milliseconde différente : coupé', BM.grouperRafales([tr(1, 9, 100, 1), tr(2, 10, 101, 1)]).length === 2);
+  // 5. Limite de page du remplissage arrière : la rafale coupée est recousue, à l'identique.
+  const fx = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'aggtrades-300.json'), 'utf8')).trades;
+  const ref = BM.grouperRafales(fx).map(BM.lireRafale);
+  const multiples = ref.filter(r => r.n > 1);
+  check(`fixture (300 exécutions réelles) : ${ref.length} rafales, dont ${multiples.length} de plusieurs exécutions`, ref.length < 300 && multiples.length >= 5, ref.length);
+  // Une coupure EN PLEIN milieu de la plus grosse rafale de plusieurs exécutions.
+  const grosse = multiples.slice().sort((a, b) => b.n - a.n)[0], iCoupe = fx.findIndex(t => t.a === grosse.aDeb) + 1;
+  const serie = (rs, coupes, avantDirect) => {
+    const R = new BM.Rafales(0);
+    const fin = coupes[coupes.length - 1];
+    for (const t of fx.slice(fin)) R.ajouter(t);                     // le direct : la fin
+    for (let k = coupes.length - 1; k >= 0; k--) R.ajouterAncien(fx.slice(k ? coupes[k - 1] : 0, coupes[k]));
+    R.finArriere();
+    return R.liste.map(BM.lireRafale);
+  };
+  const neutre = r => JSON.stringify(r, (k, v) => (k === 'quote' || k === 'vwap' ? Math.round(v * 1e6) : v));
+  const recousu = serie(fx, [iCoupe]);
+  check(`page coupée DANS une rafale (${grosse.n} exécutions) : recousue, rafales identiques au groupement d'un seul tenant`,
+    recousu.length === ref.length && recousu.every((r, i) => neutre(r) === neutre(ref[i])), [recousu.length, ref.length]);
+  const pages = [7, 50, 51, 120, iCoupe, 200, 260].sort((a, b) => a - b);
+  const multi = serie(fx, pages);
+  check('sept pages arrière + direct : mêmes rafales', multi.length === ref.length && multi.every((r, i) => neutre(r) === neutre(ref[i])), [multi.length, ref.length]);
+  // Coupure au milieu d'une séquence qui avance : borne et séquences recousues exactement.
+  const av = [tr(1, 9, 100, 1), tr(2, 9, 101, 1), tr(3, 9, 102, 1), tr(4, 9, 102, 1), tr(5, 9, 103, 1)];
+  const coupes = [];
+  for (let c = 1; c < 5; c++) {
+    const R = new BM.Rafales(0); for (const t of av.slice(c)) R.ajouter(t); R.ajouterAncien(av.slice(0, c)); R.finArriere();
+    const r = BM.lireRafale(R.liste[0]);
+    if (!(R.liste.length === 1 && r.ordresMin === 2 && r.plusLongueSequence === 3 && r.nPrix === 4)) coupes.push([c, R.liste.length, r]);
+  }
+  check('coupures 1 à 4 d\'une rafale à prix répété : ≥ 2 ordres, séquence 3 BTC, 4 prix, à chaque fois', !coupes.length, coupes);
+  // 6. Conservation EXACTE du volume (entiers de 1e-8 BTC), garde à 0.
+  const R0 = new BM.Rafales(0); for (const t of fx) R0.ajouter(t);
+  const sT = fx.reduce((s, t) => s + Math.round(+t.q * 1e8), 0), sR = R0.liste.reduce((s, r) => s + r.q8, 0), sG = BM.grouperRafales(fx).reduce((s, r) => s + r.q8, 0);
+  check('Σ rafales = Σ exécutions, au 1e-8 BTC près (direct et groupement)', sT === sR && sT === sG, [sT, sR, sG]);
+  // Garde : une rafale CLOSE sous 0,5 BTC s'en va, un bord ouvert reste.
+  const Rg = new BM.Rafales(); for (const t of fx) Rg.ajouter(t);
+  Rg.finArriere();
+  check('garde 0,5 BTC : seules les rafales closes ≥ 0,5 BTC restent (et le bord ouvert)', Rg.liste.slice(0, -1).every(r => r.q8 >= 0.5e8 && r.prix === null), Rg.liste.length);
+  check('liste des 20 dernières ≥ seuil, la plus récente d\'abord', (() => { const d = R0.dernieres(20, 0); return d.length === 20 && d[0] === R0.liste[R0.liste.length - 1] && d.every((r, i) => !i || r.aDeb < d[i - 1].aDeb); })());
+  const Rp = new BM.Rafales(0); for (const t of fx) Rp.ajouter(t);
+  Rp.purger(fx[150].T);
+  check('purge : plus rien avant la limite', Rp.liste.every(r => r.T >= fx[150].T));
+  check('libellé de la borne : jamais « un ordre de »', !/un ordre de/i.test(BM.TEXTE_RAFALES) && /≥ k est prouvé/.test(BM.TEXTE_RAFALES));
+}
+
 // ── 8. Isolement : la carte ne touche pas au terminal ─────────────────────────
 titre('8. Isolement : une page à côté, qui ne partage aucun code avec le terminal');
 const html = fs.readFileSync(path.join(REPO, 'bookmap.html'), 'utf8');

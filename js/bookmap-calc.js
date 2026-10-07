@@ -887,6 +887,229 @@
   BM.Recul.prototype.attente = function (maintenant) { return Math.max(0, this.jusqua - maintenant); };
   BM.Recul.prototype.succes = function () { this.niveau = 0; this.statut = null; };
 
+  // ─── Mémoire du carnet : la présence passée d'un niveau, rangée par rangée ───
+  /** Ce que la carte publiée dit d'une rangée de 20 $ sur une fenêtre : pendant combien de ses
+   *  minutes OBSERVÉES un niveau d'au moins qS BTC s'y trouvait (bid ou ask). Toujours lu sur la
+   *  grille BRUTE publiée (jamais la grille fusionnée : un réglage ne change pas une valeur).
+   *  « Un niveau » : rien ne dit que c'est le même ordre d'une minute à l'autre. Présence passée,
+   *  ni support ni résistance. Conventions (écrites dans la légende) : une minute est observée
+   *  pour une rangée si la rangée est dans la bande DÉDUITE des cellules de la colonne (un peu
+   *  plus étroite que la bande réellement lue) ; une rangée observée moins de `minObserveMin`
+   *  minutes est hachurée (trop peu vue pour qu'une part veuille dire grand-chose). */
+  BM.PRESENCE = { seuilsBtc: [1, 2, 5, 10, 25, 50], defautBtc: 10, minObserveMin: 30 };
+  // Pas d'un double : le suivant / le précédent (seuil EXACT, au bit près, en flottants).
+  const F64 = new Float64Array(1), I64 = new BigInt64Array(F64.buffer);
+  const pasDouble = (x, s) => { F64[0] = x; I64[0] += BigInt(s); return F64[0]; };
+  /** Seuil demandé X (BTC) -> le cran publié qui le porte : vS = clamp(⌈P·√(X/ref)⌉, 1, P) et
+   *  qS = ref·(vS/P)². Comme v = min(P, ⌊P·√(q/ref)⌋) ne décroît jamais quand q croît,
+   *  v ≥ vS ⇔ q ≥ qS : le seuil en BTC est EXACT, pas une approximation de X. qS est ajusté au
+   *  double près pour que l'équivalence tienne aussi en flottants (BM.intensite).
+   *  null sans encodage publié : aucun seuil en BTC n'est inventé. */
+  BM.seuilPresence = function (X, enc) {
+    if (!enc || !enc.ref_btc || !enc.plafond || !(X > 0)) return null;
+    const P = enc.plafond, ref = enc.ref_btc;
+    const vS = Math.min(P, Math.max(1, Math.ceil(P * Math.sqrt(X / ref))));
+    let qS = ref * (vS / P) ** 2;
+    while (BM.intensite(qS, enc) < vS) qS = pasDouble(qS, 1);
+    while (qS > 0 && BM.intensite(pasDouble(qS, -1), enc) >= vS) qS = pasDouble(qS, -1);
+    return { X, vS, qS };
+  };
+  /** Sommes préfixes par rangée : obs (minute observée), pres (max(bid, ask) ≥ vS), presB, presA.
+   *  Rangée r (relative à g.pbMin), colonnes [0, c[ : tableau[r·(W+1) + c]. Une fenêtre [c0, c1]
+   *  coûte donc O(1) par rangée. */
+  BM.presence = function (g, vS) {
+    const W = g.W, H = g.H, L = W + 1;
+    const obs = new Uint16Array(L * H), pres = new Uint16Array(L * H), presB = new Uint16Array(L * H), presA = new Uint16Array(L * H);
+    for (let r = 0; r < H; r++) {
+      const pb = g.pbMin + r, o = r * L;
+      let no = 0, np = 0, nb = 0, na = 0;
+      for (let c = 0; c < W; c++) {
+        if (g.bas[c] >= 0 && g.bas[c] <= pb && pb <= g.haut[c]) {
+          no++;
+          const b = g.bids[c * H + r] >= vS, a = g.asks[c * H + r] >= vS;
+          if (b || a) np++;
+          if (b) nb++;
+          if (a) na++;
+        }
+        obs[o + c + 1] = no; pres[o + c + 1] = np; presB[o + c + 1] = nb; presA[o + c + 1] = na;
+      }
+    }
+    return { W, H, pbMin: g.pbMin, dp: g.dp, t0: g.t0, dt: g.dt, vS, obs, pres, presB, presA };
+  };
+  /** Comptes de la rangée ABSOLUE pb sur les colonnes [c0, c1] (bornées à la grille). */
+  BM.presenceFenetre = function (pr, pb, c0, c1) {
+    const r = pb - pr.pbMin;
+    c0 = Math.max(0, c0); c1 = Math.min(pr.W - 1, c1);
+    if (r < 0 || r >= pr.H || c1 < c0) return { obs: 0, pres: 0, presB: 0, presA: 0 };
+    const o = r * (pr.W + 1), d = t => t[o + c1 + 1] - t[o + c0];
+    return { obs: d(pr.obs), pres: d(pr.pres), presB: d(pr.presB), presA: d(pr.presA) };
+  };
+  /** Plus longue présence ININTERROMPUE de la rangée pb sur [c0, c1] : colonnes consécutives où un
+   *  niveau ≥ vS y est. Une colonne non observée (ou absente) COUPE la série : on ne sait pas.
+   *  Calculée au survol seulement (une rangée, une fenêtre). Rend { n, c } (n colonnes dès c). */
+  BM.plusLonguePresence = function (g, vS, pb, c0, c1) {
+    const r = pb - g.pbMin, H = g.H;
+    let n = 0, c = -1, k = 0;
+    if (r < 0 || r >= H) return { n, c };
+    c0 = Math.max(0, c0); c1 = Math.min(g.W - 1, c1);
+    for (let j = c0; j <= c1; j++) {
+      const ok = g.bas[j] >= 0 && g.bas[j] <= pb && pb <= g.haut[j] && (g.bids[j * H + r] >= vS || g.asks[j * H + r] >= vS);
+      if (ok) { k++; if (k > n) { n = k; c = j - k + 1; } } else k = 0;
+    }
+    return { n, c };
+  };
+  /** La barre d'une ligne de pixels qui couvre les rangées [ja, jb] : la PLUS GRANDE part parmi
+   *  elles (la règle de la chaleur : rien ne disparaît entre deux pixels). Les rangées assez
+   *  observées (≥ minObs colonnes) passent d'abord ; sinon la plus grande part des autres, hachurée.
+   *  null si aucune rangée n'est observée. */
+  BM.barrePresence = function (pr, ja, jb, c0, c1, minObs) {
+    let best = null, bestPeu = null;
+    for (let pb = ja; pb <= jb; pb++) {
+      const f = BM.presenceFenetre(pr, pb, c0, c1);
+      if (!f.obs) continue;
+      const part = f.pres / f.obs, x = { pb, part, obs: f.obs, pres: f.pres, presB: f.presB, presA: f.presA };
+      if (f.obs >= minObs) { if (!best || part > best.part) best = x; } else if (!bestPeu || part > bestPeu.part) bestPeu = x;
+    }
+    if (best) { best.peu = false; return best; }
+    if (bestPeu) { bestPeu.peu = true; return bestPeu; }
+    return null;
+  };
+
+  // ─── Rafales au marché : exécutions d'une même milliseconde, d'un même côté ───
+  /** Une RAFALE : la plus longue suite d'exécutions (aggTrades) d'identifiants `a` consécutifs, de
+   *  même instant `T` (ms) et de même côté `m` (m = false : achat au marché). MESURÉ.
+   *  Ce n'est PAS « un ordre » : une exécution agrégée est le remplissage d'UN ordre preneur à UN
+   *  prix, et un ordre ne parcourt les prix que dans un sens (vers le haut pour un achat). Donc
+   *  ordresMin = 1 + le nombre de pas où le prix N'AVANCE PAS strictement dans le sens du preneur
+   *  est une borne basse PROUVÉE ; deux ordres qui avancent l'un après l'autre sont, eux,
+   *  indiscernables d'un seul : le nombre exact n'est pas publié.
+   *  q8 : la quantité en unités de 1e-8 BTC (entier exact) — la conservation se contrôle au bit. */
+  BM.RAFALES = { seuilsBtc: [1, 2, 5, 10, 25], defautBtc: 2, gardeBtc: 0.5, gardeMs: 6 * 3600e3, liste: 20 };
+  BM.TEXTE_RAFALES = 'une rafale peut réunir plusieurs ordres ; ≥ k est prouvé, le nombre exact n\'est pas publié';
+  const q8De = s => Math.round(+s * 1e8);
+  /** Une exécution seule, comme rafale. */
+  BM.rafaleUnitaire = function (t) {
+    const p = +t.p, q8 = q8De(t.q), q = q8 / 1e8;
+    return { aDeb: t.a, aFin: t.a, T: t.T, achat: !t.m, q8, quote: p * q, pMin: p, pMax: p, prix: new Set([p]), n: 1,
+      pDeb: p, pFin: p, ordres: 1, repetes: 0, reculs: 0, seqDeb: q8, seqFin: q8, seqMax: q8 };
+  };
+  /** Les deux rafales se suivent-elles (A juste avant B) ? */
+  BM.rafalesContigues = (A, B) => A.aFin + 1 === B.aDeb && A.T === B.T && A.achat === B.achat;
+  /** A (plus ancienne) + B (contiguës) -> une rafale ; A est modifiée et rendue. Le pas A.pFin ->
+   *  B.pDeb décide si la séquence qui finit A continue dans B. */
+  BM.fusionnerRafales = function (A, B) {
+    const avance = A.achat ? B.pDeb > A.pFin : B.pDeb < A.pFin;
+    if (!avance) { if (B.pDeb === A.pFin) A.repetes++; else A.reculs++; }
+    const pont = avance ? A.seqFin + B.seqDeb : 0;
+    const seqDeb = avance && A.ordres === 1 ? A.q8 + B.seqDeb : A.seqDeb;
+    const seqFin = avance && B.ordres === 1 ? A.seqFin + B.q8 : B.seqFin;
+    A.seqMax = Math.max(A.seqMax, B.seqMax, pont);
+    A.seqDeb = seqDeb; A.seqFin = seqFin;
+    A.ordres = A.ordres + B.ordres - (avance ? 1 : 0);
+    A.repetes += B.repetes; A.reculs += B.reculs;
+    A.aFin = B.aFin; A.q8 += B.q8; A.quote += B.quote; A.n += B.n; A.pFin = B.pFin;
+    if (B.pMin < A.pMin) A.pMin = B.pMin;
+    if (B.pMax > A.pMax) A.pMax = B.pMax;
+    for (const p of B.prix) A.prix.add(p);
+    return A;
+  };
+  /** Rafales d'une suite d'exécutions triées par identifiant. */
+  BM.grouperRafales = function (trades) {
+    const out = [];
+    for (const t of trades) {
+      const u = BM.rafaleUnitaire(t), d = out[out.length - 1];
+      if (d && BM.rafalesContigues(d, u)) BM.fusionnerRafales(d, u); else out.push(u);
+    }
+    return out;
+  };
+  /** Ce qu'une rafale rend lisible (q en BTC, vwap, nombre de prix). */
+  BM.lireRafale = function (r) {
+    return { T: r.T, achat: r.achat, q: r.q8 / 1e8, quote: r.quote, vwap: r.quote / (r.q8 / 1e8), pMin: r.pMin, pMax: r.pMax,
+      nPrix: r.prix ? r.prix.size : r.nPrix, n: r.n, ordresMin: r.ordres, repetes: r.repetes, reculs: r.reculs, plusLongueSequence: r.seqMax / 1e8, aDeb: r.aDeb, aFin: r.aFin };
+  };
+  /** Les rafales d'une séance : alimentées vers l'avant (le direct) et vers l'arrière (pages du
+   *  remplissage arrière, chacune triée mais plus ancienne que tout ce qui est déjà là). Les deux
+   *  bords restent OUVERTS (une page suivante peut les prolonger, même petits) ; une rafale close
+   *  sous `gardeBtc` est oubliée, comme les exécutions après `gardeMs`. */
+  BM.Rafales = function (garde) {
+    this.garde8 = Math.round((garde === undefined ? BM.RAFALES.gardeBtc : garde) * 1e8);
+    this.liste = [];            // triée par identifiant (donc par instant)
+    this.arriereFini = false;
+    this.version = 0;
+  };
+  const RF = BM.Rafales.prototype;
+  /** Une rafale close sous le seuil de garde s'en va ; un bord ouvert reste (même petit). */
+  RF.fermer = function (i) {
+    const r = this.liste[i];
+    if (!r) return;
+    r.nPrix = r.prix.size; r.prix = null;          // la liste des prix ne sert qu'aux fusions
+    if (r.q8 < this.garde8) this.liste.splice(i, 1);
+  };
+  /** Direct : une exécution PLUS RÉCENTE que toutes les autres. */
+  RF.ajouter = function (t) {
+    const u = BM.rafaleUnitaire(t), L = this.liste, d = L[L.length - 1];
+    if (d && d.prix && BM.rafalesContigues(d, u)) BM.fusionnerRafales(d, u);
+    else {
+      if (d && t.a <= d.aFin) return false;          // déjà vue
+      if (d && d.prix && (L.length > 1 || this.arriereFini)) this.fermer(L.length - 1);
+      L.push(u);
+    }
+    this.version++;
+    return true;
+  };
+  /** Remplissage arrière : une page (triée) plus ANCIENNE que la plus ancienne gardée. Sa dernière
+   *  rafale est fusionnée avec la première gardée quand les identifiants se suivent et que T et m
+   *  sont égaux : une rafale coupée par la limite d'une page n'est pas comptée deux fois. */
+  RF.ajouterAncien = function (trades) {
+    const L = this.liste, p0 = L[0];
+    const page = BM.grouperRafales(p0 ? trades.filter(t => t.a < p0.aDeb) : trades);
+    if (!page.length) return;
+    if (p0 && p0.prix && BM.rafalesContigues(page[page.length - 1], p0)) {
+      BM.fusionnerRafales(page[page.length - 1], p0);
+      L.shift();
+    } else if (p0 && p0.prix && L.length > 1) this.fermer(0);
+    // Les rafales de la page sont closes, sauf la plus ancienne (bord arrière) ; la dernière est
+    // close aussi quand elle n'est pas le bord avant.
+    const n = page.length;
+    this.liste = page.concat(this.liste);
+    for (let i = n - 1; i >= 1; i--) if (this.liste[i] !== this.liste[this.liste.length - 1]) this.fermer(i);
+    this.version++;
+  };
+  /** Le remplissage arrière est fini : le bord arrière est clos. */
+  RF.finArriere = function () {
+    this.arriereFini = true;
+    if (this.liste.length > 1 && this.liste[0].prix) { this.fermer(0); this.version++; }
+  };
+  /** Oublie les rafales d'avant `avantMs`. */
+  RF.purger = function (avantMs) {
+    let k = 0;
+    while (k < this.liste.length - 1 && this.liste[k].T < avantMs) k++;
+    if (k) {
+      this.liste.splice(0, k); this.arriereFini = true;
+      if (this.liste.length > 1 && this.liste[0].prix) this.fermer(0);
+      this.version++;
+    }
+  };
+  /** Indice de la première rafale d'instant ≥ t. */
+  RF.depuis = function (t) {
+    const L = this.liste;
+    let lo = 0, hi = L.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (L[m].T < t) lo = m + 1; else hi = m; }
+    return lo;
+  };
+  /** Rafales d'instant dans [ta, tb[ et de taille ≥ minBtc. */
+  RF.dans = function (ta, tb, minBtc) {
+    const L = this.liste, m8 = Math.round(minBtc * 1e8), out = [];
+    for (let i = this.depuis(ta); i < L.length && L[i].T < tb; i++) if (L[i].q8 >= m8) out.push(L[i]);
+    return out;
+  };
+  /** Les k dernières rafales ≥ minBtc (la plus récente d'abord). */
+  RF.dernieres = function (k, minBtc) {
+    const L = this.liste, m8 = Math.round(minBtc * 1e8), out = [];
+    for (let i = L.length - 1; i >= 0 && out.length < k; i--) if (L[i].q8 >= m8) out.push(L[i]);
+    return out;
+  };
+
   /** Une lecture (carnet, bid / ask) vaut jusqu'à la suivante, mais pas plus de 3 cadences
    *  (+ 1 s) : au-delà, c'est une vraie absence — non observé, hachuré, ligne coupée. */
   BM.VALIDITE = { cadences: 3, margeMs: 1000 };
