@@ -716,6 +716,7 @@
       ctx.stroke(); ctx.globalAlpha = 1;
     }
   }
+  const SECONDE_DES_PPM = 6;     // px par minute à partir desquels la ligne suit les exécutions à la seconde
   function lignePrix() {
     const ms = E.minutes;
     ctx.save();
@@ -734,40 +735,32 @@
     ctx.strokeStyle = C.prix; ctx.lineWidth = 1.6;
     ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 3;
     ctx.beginPath();
-    let premier = true, fin = 0, avant = null;
-    for (const m of ms) {
-      if (m.fin < E.vue.t1 - 60e3 || m.t > E.vue.t2) { avant = m; continue; }
-      const t = Math.min(m.fin, E.minutesA ? axe(E.minutesA) : maintenant());   // la bougie en cours vaut ce qu'elle valait à sa lecture
-      const x = X(t), y = Y(m.c);
-      // Minutes manquantes (non lues) : la ligne est COUPÉE, elle ne traverse pas le trou.
-      if (premier || (avant && m.t - avant.t > 60e3)) { ctx.moveTo(x, y); premier = false; } else ctx.lineTo(x, y);
-      fin = t; avant = m;
-    }
-    // Après la dernière bougie lue : le prix des exécutions, à la seconde.
-    if (E.exec.seaux.size) {
-      const secs = [...E.exec.seaux.keys()].filter(s => s * 1000 > fin).sort((a, b) => a - b);
-      for (const s of secs) {
-        const m = E.exec.seaux.get(s);
-        let pv = 0, q = 0;
-        for (const [pb, v] of m) { pv += (pb + 0.5) * E.exec.dp * (v[0] + v[1]); q += v[0] + v[1]; }
-        if (!q) continue;
-        const x = X(s * 1000 + 500), y = Y(pv / q);
-        if (premier) { ctx.moveTo(x, y); premier = false; } else ctx.lineTo(x, y);
-      }
-    }
+    // Les points viennent de BM.lignePrix : clôtures 1 min, puis VWAP à la seconde — partout où les
+    // exécutions sont lues dès qu'une minute fait au moins 6 px —, coupée sur ce qui n'est pas lu.
+    const segs = BM.lignePrix(ms, E.exec, { t1: E.vue.t1, t2: E.vue.t2, parSeconde: ppm >= SECONDE_DES_PPM,
+      minutesA: E.minutesA ? axe(E.minutesA) : null, nonLues: execNonLues(), maintenant: maintenant() });
+    for (const seg of segs) seg.forEach(([t, p], i) => { if (i) ctx.lineTo(X(t), Y(p)); else ctx.moveTo(X(t), Y(p)); });
     ctx.stroke();
     ctx.restore();
   }
+  /** Seaux des bulles : pas de temps dans une échelle fixe et pas de prix multiple de la tranche
+   *  des exécutions, ancrés sur l'horloge et le prix (BM.SeauxExecutions.regrouper). Les bulles
+   *  dessinées sont gardées : la lecture au pointeur décrit celle qu'on survole. */
+  function pasBulles() {
+    return { pasT: BM.pasTemps((E.vue.t2 - E.vue.t1) / Z.chaleur.w * 9), pasP: BM.pasMultiple((E.vue.p2 - E.vue.p1) / Z.chaleur.h * 9, E.exec.dp) };
+  }
+  let BULLES = [];
   function bulles() {
+    BULLES = [];
     if (!E.exec.seaux.size) return;
-    const pasT = Math.max(1000, (E.vue.t2 - E.vue.t1) / Z.chaleur.w * 9);
-    const pasP = Math.max(E.exec.dp, (E.vue.p2 - E.vue.p1) / Z.chaleur.h * 9);
+    const { pasT, pasP } = pasBulles();
     const g = E.exec.regrouper(E.vue.t1, E.vue.t2, pasT, pasP)
       .filter(b => b.achat + b.vente >= R.bulleMin)
       .sort((a, b) => (a.achat + a.vente) - (b.achat + b.vente));
     for (const b of g) {
-      const q = b.achat + b.vente, r = Math.min(28, Math.max(2, 3.2 * Math.sqrt(q) * R.bulleEchelle));
+      const q = b.achat + b.vente, r = BM.rayonBulle(q, R.bulleEchelle);
       const x = X(b.t), y = Y(b.p);
+      BULLES.push({ x, y, r, b });
       const coul = b.achat >= b.vente ? C.up : C.down;
       ctx.globalAlpha = 0.55; ctx.fillStyle = coul;
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
@@ -783,7 +776,7 @@
   }
   function profilExecutions() {
     if (!E.exec.seaux.size) return;
-    const pasP = Math.max(E.exec.dp, (E.vue.p2 - E.vue.p1) / Z.chaleur.h * 3);
+    const pasP = BM.pasMultiple((E.vue.p2 - E.vue.p1) / Z.chaleur.h * 3, E.exec.dp);     // multiple de la tranche
     const ta = Math.max(E.vue.t1, E.exec.premier || E.vue.t1), tb = Math.min(E.vue.t2, maintenant() + 1000);
     const prof = E.exec.profil(ta, tb, pasP);
     let max = 0;
@@ -867,9 +860,11 @@
     texte('Carnet live', a.x + 6, 10, C.ink2, 10, 'left', true);
     const k = E.carnet;
     if (!k) { texte(E.erreurs.carnet ? 'indisponible' : '…', a.x + 6, 26, C.ink3, 10); return; }
-    texte('Σ BTC par ' + Math.max(k.dp, BM.pasRond((E.vue.p2 - E.vue.p1) / a.h * 4)) + ' $', a.x + 6, 24, C.ink3, 9.5);
-    const pas = Math.max(k.dp, BM.pasRond((E.vue.p2 - E.vue.p1) / a.h * 4));
-    const agg = (m) => { const o = new Map(); for (const [pb, q] of m) { const P = Math.floor(pb * k.dp / pas); o.set(P, (o.get(P) || 0) + q); } return o; };
+    // Un pas MULTIPLE de la tranche du carnet live : chaque barre réunit le même nombre de
+    // tranches entières (sinon 2 puis 3 tranches par barre : un peigne, et des Σ faux).
+    const pas = BM.pasMultiple((E.vue.p2 - E.vue.p1) / a.h * 4, k.dp), mult = Math.round(pas / k.dp);
+    texte('Σ BTC par ' + BM.prix(pas, BM.decimales(pas)) + ' $', a.x + 6, 24, C.ink3, 9.5);
+    const agg = (m) => { const o = new Map(); for (const [pb, q] of m) { const P = Math.floor(pb / mult); o.set(P, (o.get(P) || 0) + q); } return o; };
     const sb = agg(k.sb), sa = agg(k.sa);
     let max = 0;
     for (const m of [sb, sa]) for (const [P, q] of m) { const y = Y(P * pas); if (y >= 0 && y <= a.h) max = Math.max(max, q); }
@@ -991,10 +986,18 @@
     if (pub) cel(pub, 'Carte', pub.encodage);
     if (R.calques.live) cel(E.live, 'Live', E.liveRef === 'publiee' ? E.pub && E.pub.encodage : null);
     if (R.calques.executions && E.exec.seaux.size) {
-      const pasT = Math.max(1000, (E.vue.t2 - E.vue.t1) / Z.chaleur.w * 9), pasP = Math.max(E.exec.dp, (E.vue.p2 - E.vue.p1) / Z.chaleur.h * 9);
-      const b = E.exec.regrouper(t - pasT / 2, t + pasT / 2, pasT, pasP).filter(x => Math.abs(x.p - p) <= pasP / 2);
-      const ach = b.reduce((s, x) => s + x.achat, 0), ven = b.reduce((s, x) => s + x.vente, 0);
-      if (ach + ven > 0) l.push('Exécutions : ' + BM.btc(ach) + ' BTC achetés / ' + BM.btc(ven) + ' vendus au marché');
+      // La bulle SURVOLÉE (la plus haute qui contient le pointeur), sinon le seau sous le pointeur :
+      // la même grille de seaux que le dessin, jamais une fenêtre centrée sur le pointeur.
+      let b = null;
+      for (let i = BULLES.length - 1; i >= 0 && !b; i--) { const z = BULLES[i]; if ((s.x - z.x) ** 2 + (s.y - z.y) ** 2 <= z.r * z.r) b = z.b; }
+      if (!b) {
+        const { pasT, pasP } = pasBulles(), T0 = Math.floor(t / pasT) * pasT;
+        b = E.exec.regrouper(T0, T0 + pasT, pasT, pasP).find(x => p >= x.pa && p < x.pb) || null;
+      }
+      if (b && b.achat + b.vente > 0) {
+        l.push('Exécutions ' + BM.heure(b.ta, true) + '–' + BM.heure(b.tb, true) + ' · ' + BM.prix(b.pa) + '–' + BM.prix(b.pb) + ' $ : '
+          + BM.btc(b.achat) + ' BTC achetés / ' + BM.btc(b.vente) + ' vendus au marché');
+      }
     }
     bulleInfo.innerHTML = l.join('<br>');
     bulleInfo.hidden = false;
@@ -1206,6 +1209,7 @@
   // qu'un geste de l'utilisateur : aucune donnée n'est touchée).
   window.__carte = {
     cadrer: (t1, t2, p1, p2) => { E.vue = { t1, t2, p1, p2 }; E.suivre = false; majBoutonSuivre(); sale(); },
+    bulles: () => BULLES.map(z => ({ x: z.x, y: z.y, r: z.r, achat: z.b.achat, vente: z.b.vente, ta: z.b.ta, tb: z.b.tb, pa: z.b.pa, pb: z.b.pb })),
     lectures: () => (E.live ? { n: E.live.n, deb: Array.from(E.live.deb.subarray(0, E.live.n)), fin: Array.from(E.live.fin.subarray(0, E.live.n)),
       envoi: Array.from(E.live.envoi.subarray(0, E.live.n)), recu: Array.from(E.live.recu.subarray(0, E.live.n)), validite: E.live.validite } : null),
     etat: () => ({

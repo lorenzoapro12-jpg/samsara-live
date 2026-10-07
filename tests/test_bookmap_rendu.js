@@ -522,6 +522,62 @@ async function pixel(page, x, y) {
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p19.close();
     }
+
+    // ════ Exécutions : bulles survolées, prix à la seconde ═════════════════════
+    titre('20. Bulle survolée hors de son centre : la lecture décrit CETTE bulle');
+    {
+      let p20, S;
+      ({ page: p20, erreurs, S } = await ouvrir(nav, { encodage: true }));
+      const now = S.now(), pm = S.prix(now - 120e3);
+      await p20.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [now - 4 * 60e3, now + 20e3, pm - 60, pm + 60]);
+      await p20.waitForTimeout(500);
+      const bs = await p20.evaluate(() => window.__carte.bulles());
+      const rc = await p20.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(); return { x: r.left, y: r.top }; });
+      // Une bulle assez grande, dont le point visé (à 0,6 rayon du centre) n'est dans aucune autre bulle.
+      const dans = (z, x, y) => (x - z.x) ** 2 + (y - z.y) ** 2 <= z.r * z.r;
+      const cible = bs.map((z, i) => ({ z, i, x: z.x + 0.6 * z.r, y: z.y })).reverse()
+        .find(c => c.z.r >= 8 && c.x > 20 && c.x < 1100 && bs.every((o, j) => j === c.i || !dans(o, c.x, c.y)));
+      if (!cible) check('bulle isolée trouvée', false, bs.length);
+      else {
+        await p20.mouse.move(rc.x + cible.x + 0.5, rc.y + cible.y); await p20.mouse.move(rc.x + cible.x, rc.y + cible.y); await p20.waitForTimeout(300);
+        const lu = await p20.evaluate(() => document.getElementById('lecture').innerText);
+        const attendu = BM.btc(cible.z.achat) + ' BTC achetés / ' + BM.btc(cible.z.vente) + ' vendus';
+        check(`lecture à 0,6 rayon du centre : ${attendu}`, lu.includes(attendu) && /Exécutions \d\d:\d\d:\d\d–\d\d:\d\d:\d\d/.test(lu), lu);
+      }
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p20.close();
+    }
+
+    titre('21. Au zoom, la ligne de prix suit les exécutions à la seconde (VWAP), pas une droite entre deux clôtures');
+    {
+      let p21, S;
+      ({ page: p21, erreurs, S } = await ouvrir(nav, { encodage: true }));
+      // Seuls la ligne de prix et le fond restent : le blanc de la ligne ne se confond avec rien.
+      for (const k of ['publiee', 'live', 'executions', 'bidask', 'profil', 'murs', 'gamma']) await p21.click(`button[data-calque="${k}"]`);
+      const now = S.now(), t1 = now - 3 * 60e3, t2 = now + 10e3, PAS = 120, BASE = Math.floor(MAINTENANT / 60e3) * 60e3 - 30 * 3600e3;
+      const vwap = s => { let pq = 0, q = 0; for (let id = Math.ceil((s * 1000 - BASE) / PAS); BASE + id * PAS < (s + 1) * 1000; id++) { const x = S.trade(id); pq += +x.p * +x.q; q += +x.q; } return pq / q; };
+      const close = m => +S.kline(m, now)[4];
+      // La seconde où la droite entre deux clôtures s'écarte le plus du VWAP.
+      let best = null;
+      for (let s = Math.floor((now - 150e3) / 1000); s < Math.floor((now - 70e3) / 1000); s++) {
+        const m = Math.floor(s * 1000 / 60e3) * 60e3, a = m, b = m + 60e3, f = (s * 1000 + 500 - a) / 60e3;
+        const interp = close(a - 60e3) + (close(a) - close(a - 60e3)) * f;     // clôtures aux fins de minute a et b
+        const v = vwap(s); void b;
+        if (!best || Math.abs(interp - v) > Math.abs(best.interp - best.v)) best = { s, interp, v };
+      }
+      const p1 = Math.min(best.v, best.interp) - 15, p2 = Math.max(best.v, best.interp) + 15;
+      await p21.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [t1, t2, p1, p2]);
+      await p21.waitForTimeout(500);
+      const L = await p21.evaluate(() => { const c = document.getElementById('carte'); return { w: c.clientWidth, h: c.clientHeight }; });
+      const zw = L.w - 66 - 112, zh = L.h - 20 - 58 - 58;
+      const x = (best.s * 1000 + 500 - t1) / (t2 - t1) * zw, yV = (p2 - best.v) / (p2 - p1) * zh, yI = (p2 - best.interp) / (p2 - p1) * zh;
+      const blanc = c => c.every(v => v > 225);
+      const pxV = await pixel(p21, x, yV), pxI = await pixel(p21, x, yI);
+      check(`seconde ${new Date(best.s * 1000).toISOString().slice(14, 19)} : ligne au VWAP ${best.v.toFixed(2)} (blanc), pas à la droite entre clôtures ${best.interp.toFixed(2)} (${Math.abs(yV - yI).toFixed(0)} px plus loin)`,
+        blanc(pxV) && !blanc(pxI) && Math.abs(yV - yI) > 8, { pxV, pxI, ecart: yV - yI });
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p21.close();
+    }
   } finally {
     await nav.close();
     serveur.close();

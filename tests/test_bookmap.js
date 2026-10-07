@@ -292,6 +292,65 @@ const sp = [...pr.values()].reduce((x, v) => [x[0] + v[0], x[1] + v[1]], [0, 0])
 check('profil par prix : volume conservé', Math.abs(sp[0] - vrai[0]) < 1e-6 && Math.abs(sp[1] - vrai[1]) < 1e-6);
 check('dernier prix = prix de la dernière exécution', ex.dernierPrix === +trades[2999].p);
 
+// ── 5b. Seaux ancrés, pas multiples de la tranche ─────────────────────────────
+titre('5b. Seaux : ancrés sur l\'horloge et le prix, pas de prix multiples de la tranche');
+let multiples = true;
+for (let i = 0; i < 3000; i++) {
+  const dp = [1, 5, 10, 20][i % 4], brut = Math.exp(rnd() * 9 - 1), p = BM.pasMultiple(brut, dp), k = p / dp, e = Math.pow(10, Math.floor(Math.log10(k)));
+  if (!(Number.isInteger(k) && p >= brut - 1e-9 && [1, 2, 5].includes(Math.round(k / e)))) { multiples = false; break; }
+}
+check('pas de prix = tranche × (1, 2, 5) × 10ⁿ ≥ brut, toujours un multiple ENTIER (3 000 tirages)', multiples);
+check('jamais 2,5 $ sur 1 $, ni 25 $ sur 10 ou 20 $', BM.pasMultiple(2.3, 1) === 5 && BM.pasMultiple(22, 10) === 50 && BM.pasMultiple(22, 20) === 40 && BM.pasMultiple(12, 5) === 25);
+// Un carnet UNIFORME (1 BTC par tranche de 10 $) agrégé au pas choisi : toutes les barres égales.
+{
+  const dp = 10, sb = new Map(); for (let pb = 8000; pb < 8200; pb++) sb.set(pb, 1);
+  const pas = BM.pasMultiple(22, dp), m = pas / dp, o = new Map();
+  for (const [pb, q] of sb) { const P = Math.floor(pb / m); o.set(P, (o.get(P) || 0) + q); }
+  const vals = [...o.values()];
+  check(`carnet latéral uniforme, Σ par ${pas} $ : toutes les barres pleines égales (aucun peigne)`, vals.slice(1, -1).every(v => v === m), vals.slice(0, 8));
+}
+{
+  // Flux uniforme : 1 BTC par seconde dans chaque tranche de 1 $ ; profil au pas choisi pour 1,5 $ brut.
+  const e = new BM.SeauxExecutions(1); let id = 1;
+  for (let s = 0; s < 20; s++) for (let pb = 86000; pb < 86040; pb++) e.ajouter({ a: id++, p: String(pb + 0.5), q: '1', T: 1.7e12 + s * 1000, m: false });
+  const pas = BM.pasMultiple(1.5, 1), pr = [...e.profil(1.7e12, 1.7e12 + 20000, pas).values()].map(v => v[0]);
+  check(`profil d'un flux uniforme, tranches de ${pas} $ : toutes égales (aucun nœud inventé)`, pr.every(v => v === pr[0]) && pr[0] === 20 * pas, pr.slice(0, 6));
+  // Ancrage : deux vues décalées d'un nombre quelconque de ms → les mêmes seaux (mêmes volumes, mêmes bornes).
+  const cle = r => r.map(b => [b.ta, b.pa, b.achat].join()).sort().join('|');
+  const a1 = e.regrouper(1.7e12 + 3000, 1.7e12 + 17000, 5000, 5), a2 = e.regrouper(1.7e12 + 3777, 1.7e12 + 16123, 5000, 5);
+  check('bulles : ancrées sur l\'horloge — une vue qui glisse ne regroupe pas autrement', cle(a1) === cle(a2) && a1.every(b => b.ta % 5000 === 0 && b.pa % 5 === 0));
+  check('bulle placée au milieu des secondes qui ont des exécutions (pas au centre d\'un seau à moitié lu)',
+    e.regrouper(1.7e12 + 15000, 1.7e12 + 20000, 10000, 5).every(b => b.t >= 1.7e12 + 10000 && b.t <= 1.7e12 + 20000) && e.regrouper(1.7e12 + 15000, 1.7e12 + 20000, 60000, 5)[0].t === 1.7e12 + 10000);
+}
+
+// ── 5c. Ligne de prix : à la seconde, exacte, coupée sur ce qui n'est pas lu ──
+titre('5c. Ligne de prix : VWAP exact à la seconde au zoom, clôtures ailleurs, coupée sur les trous');
+{
+  const T0 = 1.7e12, e = new BM.SeauxExecutions(1); let id = 1;
+  // Exécutions de T0 + 120 s à T0 + 300 s : deux par seconde, à des prix qui ne sont pas des centres de tranche.
+  const vrai = new Map();
+  for (let s = 120; s < 300; s++) {
+    if (s >= 200 && s < 230) continue;                         // 30 s non lues
+    const p1 = 86000 + Math.sin(s / 9) * 20 + 0.13, p2 = p1 + 0.71, q1 = 0.4, q2 = 1.1;
+    e.ajouter({ a: id++, p: p1.toFixed(2), q: String(q1), T: T0 + s * 1000 + 100, m: false });
+    e.ajouter({ a: id++, p: p2.toFixed(2), q: String(q2), T: T0 + s * 1000 + 600, m: true });
+    vrai.set(s, (+p1.toFixed(2) * q1 + +p2.toFixed(2) * q2) / (q1 + q2));
+  }
+  const kl = (t, c) => [t, '1', '1', '1', String(c), '1', t + 59999, '1', 1, '1', '1', '0'];
+  const ms = BM.minutes([0, 1, 2, 3, 4].map(i => kl(T0 + i * 60000, 86000 + i)));
+  const nonLues = [[T0 + 200000, T0 + 230000]];
+  const z = BM.lignePrix(ms, e, { t1: T0, t2: T0 + 300000, parSeconde: true, minutesA: T0 + 300000, nonLues, maintenant: T0 + 300000 });
+  const pts = z.flat(), sec = pts.filter(([t]) => t > T0 + 120000);
+  check('au zoom : avant les exécutions, les clôtures 1 min', pts[0][0] === T0 + 60000 && pts[0][1] === 86000 && pts.filter(([t]) => t <= T0 + 120000).length === 2, pts.slice(0, 3));
+  check('au zoom : ensuite, chaque seconde lue à son VWAP EXACT (pas au centre d\'une tranche de 1 $)',
+    sec.length === 150 && sec.every(([t, p]) => Math.abs(p - vrai.get(Math.floor(t / 1000) - T0 / 1000)) < 1e-9 && (t - 500) % 1000 === 0), sec.length);
+  check('coupée sur les 30 s d\'exécutions non lues (deux segments à la seconde)', z.length === 2 && z[1][0][0] === T0 + 230500, z.map(x => x.length));
+  const d = BM.lignePrix(ms, e, { t1: T0, t2: T0 + 300000, parSeconde: false, minutesA: T0 + 300000, nonLues: [], maintenant: T0 + 300000 });
+  check('vue large : les clôtures 1 min (aucune seconde avant la dernière clôture)', d.flat().filter(([t]) => t < T0 + 300000).every(([t]) => (t - T0) % 60000 === 0));
+  const trou = BM.minutes([kl(T0, 1), kl(T0 + 60000, 2), kl(T0 + 240000, 3)]);
+  check('minutes manquantes : la ligne des clôtures est coupée', BM.lignePrix(trou, new BM.SeauxExecutions(1), { t1: T0, t2: T0 + 300000, parSeconde: false, minutesA: T0 + 1e6 }).length === 2);
+}
+
 // ── 6. Bougies 1 min : volume et CVD ─────────────────────────────────────────
 titre('6. Bougies 1 min : delta exact, CVD cumulé');
 const k = (t, q, tb) => [t, '1', '2', '0.5', '1.5', '10', t + 59999, String(q), 5, '5', String(tb), '0'];

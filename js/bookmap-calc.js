@@ -467,78 +467,152 @@
     return s[Math.min(s.length - 1, Math.max(0, Math.round(p * (s.length - 1))))];
   };
 
+  // ─── Pas « ronds » compatibles avec la donnée ──────────────────────────────
+  /** Pas de prix pour regrouper des tranches de `dp` $ : un MULTIPLE ENTIER de dp (dp × 1, 2, 5,
+   *  10, 20, 50…) ≥ brut. Un pas non multiple (2,5 $ sur des tranches de 1 $, 25 $ sur 10 ou 20 $)
+   *  verse tour à tour 2 et 3 tranches par barre : un peigne qui n'existe pas dans la donnée, et
+   *  des sommes fausses. On fusionne, on n'affine jamais. */
+  BM.pasMultiple = function (brut, dp) {
+    if (!(brut > dp)) return dp;
+    const r = brut / dp, e = Math.pow(10, Math.floor(Math.log10(r)));
+    for (const m of [1, 2, 5, 10]) if (m * e >= r - 1e-9) return dp * Math.round(m * e);
+    return dp * Math.round(10 * e);
+  };
+  /** Pas de temps pour regrouper des secondes : une échelle FIXE (1, 2, 5, 10, 15, 30 s, 1, 2, 5,
+   *  10, 15, 30 min, 1, 2, 3, 6, 12 h, 1 j) ≥ brut. Avec des seaux ancrés sur l'horloge, une bulle
+   *  ne bouge pas quand la vue glisse. */
+  BM.PAS_TEMPS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400].map(s => s * 1000);
+  BM.pasTemps = function (brutMs) { return BM.PAS_TEMPS.find(p => p >= brutMs) || BM.PAS_TEMPS[BM.PAS_TEMPS.length - 1]; };
+
   // ─── Exécutions ────────────────────────────────────────────────────────────
   /** aggTrades -> seaux (seconde, tranche de dp $) : volumes achetés / vendus au marché.
-   *  `m` (buyer is maker) = le VENDEUR a pris la liquidité : c'est une vente au marché. */
+   *  `m` (buyer is maker) = le VENDEUR a pris la liquidité : c'est une vente au marché.
+   *  Par seconde aussi : Σ prix × quantité et Σ quantité EXACTS (le prix moyen de la seconde ne
+   *  se lit pas sur le centre d'une tranche). */
   BM.SeauxExecutions = function (dp) {
     this.dp = dp || 1;
     this.seaux = new Map();     // seconde -> Map(tranche -> [achat, vente])
+    this.pxs = new Map();       // seconde -> [Σ p·q, Σ q]
+    this.triees = []; this.trieesOk = true;   // secondes triées (index des fenêtres)
     this.premier = null; this.dernier = null; this.dernierId = null; this.dernierPrix = null;
     this.total = [0, 0];
   };
-  BM.SeauxExecutions.prototype.ajouter = function (t) {
-    if (this.dernierId !== null && t.a <= this.dernierId) return false;      // déjà compté
-    const s = Math.floor(t.T / 1000), pb = Math.floor(+t.p / this.dp), q = +t.q, cote = t.m ? 1 : 0;
+  const SX = BM.SeauxExecutions.prototype;
+  SX.verser = function (t) {
+    const s = Math.floor(t.T / 1000), p = +t.p, pb = Math.floor(p / this.dp), q = +t.q, cote = t.m ? 1 : 0;
     let m = this.seaux.get(s);
-    if (!m) { m = new Map(); this.seaux.set(s, m); }
+    if (!m) {
+      m = new Map(); this.seaux.set(s, m); this.pxs.set(s, [0, 0]);
+      const T = this.triees;
+      if (this.trieesOk && (!T.length || s > T[T.length - 1])) T.push(s); else this.trieesOk = false;
+    }
     const v = m.get(pb) || [0, 0];
     v[cote] += q; m.set(pb, v);
+    const x = this.pxs.get(s); x[0] += p * q; x[1] += q;
     this.total[cote] += q;
     if (this.premier === null || t.T < this.premier) this.premier = t.T;
+  };
+  SX.ajouter = function (t) {
+    if (this.dernierId !== null && t.a <= this.dernierId) return false;      // déjà compté
+    this.verser(t);
     if (this.dernier === null || t.T >= this.dernier) { this.dernier = t.T; this.dernierPrix = +t.p; }
     if (this.dernierId === null || t.a > this.dernierId) this.dernierId = t.a;
     return true;
   };
   /** Ajout de trades plus ANCIENS que le premier (remplissage arrière) : on ne dépend pas
    *  de `dernierId`, on vérifie l'unicité par identifiant. */
-  BM.SeauxExecutions.prototype.ajouterAncien = function (t, vus) {
+  SX.ajouterAncien = function (t, vus) {
     if (vus.has(t.a)) return false;
     vus.add(t.a);
-    const s = Math.floor(t.T / 1000), pb = Math.floor(+t.p / this.dp), q = +t.q, cote = t.m ? 1 : 0;
-    let m = this.seaux.get(s);
-    if (!m) { m = new Map(); this.seaux.set(s, m); }
-    const v = m.get(pb) || [0, 0];
-    v[cote] += q; m.set(pb, v);
-    this.total[cote] += q;
-    if (this.premier === null || t.T < this.premier) this.premier = t.T;
+    this.verser(t);
     return true;
   };
-  BM.SeauxExecutions.prototype.purger = function (avantMs) {
+  SX.purger = function (avantMs) {
     const lim = Math.floor(avantMs / 1000);
-    for (const s of this.seaux.keys()) if (s < lim) this.seaux.delete(s);
+    for (const s of this.seaux.keys()) if (s < lim) { this.seaux.delete(s); this.pxs.delete(s); }
+    if (this.trieesOk) { let i = 0; while (i < this.triees.length && this.triees[i] < lim) i++; if (i) this.triees = this.triees.slice(i); }
     if (this.premier !== null && this.premier < avantMs) this.premier = avantMs;
   };
-  /** Regroupe les seaux d'un intervalle [ta, tb[ par pas de temps (ms) et de prix ($).
-   *  La SOMME des volumes est conservée (contrôlé par le harnais). */
-  BM.SeauxExecutions.prototype.regrouper = function (ta, tb, pasT, pasP) {
-    const out = new Map();
-    const s0 = Math.floor(ta / 1000), s1 = Math.ceil(tb / 1000);
-    for (const [s, m] of this.seaux) {
-      if (s < s0 || s >= s1) continue;
-      const T = Math.floor((s * 1000 - ta) / pasT);
-      for (const [pb, v] of m) {
-        const P = Math.floor((pb * this.dp) / pasP);
-        const k = T + ':' + P;
-        const e = out.get(k);
-        if (e) { e.achat += v[0]; e.vente += v[1]; }
-        else out.set(k, { t: ta + (T + 0.5) * pasT, p: (P + 0.5) * pasP, achat: v[0], vente: v[1] });
+  /** Secondes de [ta, tb[ (triées). */
+  SX.secondes = function (ta, tb) {
+    if (!this.trieesOk) { this.triees = [...this.seaux.keys()].sort((a, b) => a - b); this.trieesOk = true; }
+    const T = this.triees, s0 = Math.floor(ta / 1000), s1 = Math.ceil(tb / 1000);
+    let lo = 0, hi = T.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (T[m] < s0) lo = m + 1; else hi = m; }
+    let i = lo;
+    const out = [];
+    for (; i < T.length && T[i] < s1; i++) out.push(T[i]);
+    return out;
+  };
+  /** Regroupe les seaux par pas de temps (ms) et de prix ($), ANCRÉS sur l'horloge et sur le prix
+   *  0 : seau (⌊s / pasT⌋, ⌊tranche / m⌋), m = pasP / dp ENTIER. Tout seau qui rencontre [ta, tb[
+   *  est pris en entier : une bulle ne change pas quand la vue glisse. La SOMME des volumes est
+   *  conservée (contrôlé par le harnais). Chaque seau rend ses bornes et le milieu des secondes
+   *  qui portent des exécutions (t) : jamais placé là où rien n'a été lu. */
+  SX.regrouper = function (ta, tb, pasT, pasP) {
+    const out = new Map(), m = Math.max(1, Math.round(pasP / this.dp)), pasPx = m * this.dp;
+    const t0 = Math.floor(ta / pasT) * pasT, t1 = Math.ceil(tb / pasT) * pasT;
+    for (const s of this.secondes(t0, t1)) {
+      const T = Math.floor(s * 1000 / pasT);
+      for (const [pb, v] of this.seaux.get(s)) {
+        const P = Math.floor(pb / m), k = T + ':' + P;
+        let e = out.get(k);
+        if (!e) { e = { T, P, ta: T * pasT, tb: (T + 1) * pasT, pa: P * pasPx, pb: (P + 1) * pasPx, p: (P + 0.5) * pasPx, achat: 0, vente: 0, s0: s, s1: s }; out.set(k, e); }
+        e.achat += v[0]; e.vente += v[1];
+        if (s < e.s0) e.s0 = s;
+        if (s > e.s1) e.s1 = s;
       }
     }
+    for (const e of out.values()) e.t = (e.s0 + e.s1 + 1) * 500;
     return [...out.values()];
   };
-  /** Profil des exécutions par tranche de prix sur [ta, tb[. */
-  BM.SeauxExecutions.prototype.profil = function (ta, tb, pasP) {
-    const out = new Map();
-    const s0 = Math.floor(ta / 1000), s1 = Math.ceil(tb / 1000);
-    for (const [s, m] of this.seaux) {
-      if (s < s0 || s >= s1) continue;
-      for (const [pb, v] of m) {
-        const P = Math.floor((pb * this.dp) / pasP);
+  /** Profil des exécutions par tranche de prix sur [ta, tb[ (tranches de pasP $, multiple de dp). */
+  SX.profil = function (ta, tb, pasP) {
+    const out = new Map(), m = Math.max(1, Math.round(pasP / this.dp));
+    for (const s of this.secondes(ta, tb)) {
+      for (const [pb, v] of this.seaux.get(s)) {
+        const P = Math.floor(pb / m);
         const e = out.get(P) || [0, 0];
         e[0] += v[0]; e[1] += v[1]; out.set(P, e);
       }
     }
     return out;
+  };
+  /** Prix moyen pondéré par le volume (VWAP) de chaque seconde de [ta, tb[ : [[s, prix], …]. */
+  SX.prixSecondes = function (ta, tb) {
+    return this.secondes(ta, tb).map(s => { const x = this.pxs.get(s); return [s, x[0] / x[1]]; }).filter(x => isFinite(x[1]));
+  };
+
+  /** La ligne de prix, en segments [[t, prix], …] (une coupure = un nouveau segment) :
+   *  · les clôtures 1 min (la bougie en cours vaut ce qu'elle valait à sa lecture, minutesA) ;
+   *  · puis, à la seconde, le VWAP des exécutions : après la dernière clôture, et — quand on
+   *    zoome (`parSeconde`) — partout où les exécutions sont lues, au lieu d'interpoler entre deux
+   *    clôtures (une droite entre deux minutes traverse des prix jamais traités) ;
+   *  · coupée sur les minutes manquantes et sur les exécutions non lues (`nonLues`). */
+  BM.lignePrix = function (minutes, ex, o) {
+    const segs = [];
+    let cur = [];
+    const couper = () => { if (cur.length) segs.push(cur); cur = []; };
+    const limite = o.parSeconde && ex.premier !== null ? ex.premier : Infinity;
+    let fin = -Infinity, avant = null;
+    for (const m of minutes) {
+      if (m.fin < o.t1 - 60e3 || m.t > o.t2) { avant = m; continue; }
+      if (m.fin > limite) break;
+      const t = Math.min(m.fin, o.minutesA === undefined || o.minutesA === null ? Infinity : o.minutesA);
+      if (avant && m.t - avant.t > 60e3) couper();
+      cur.push([t, m.c]); fin = t; avant = m;
+    }
+    const debut = limite < Infinity ? Math.max(fin, ex.premier, o.t1 - 60e3) : Math.max(fin, o.t1 - 60e3);
+    const trous = o.nonLues || [];
+    let sAvant = null;
+    for (const [s, p] of ex.prixSecondes(debut, Math.min(o.t2, o.maintenant === undefined ? Infinity : o.maintenant) + 1000)) {
+      const t = s * 1000 + 500;
+      if (t <= fin) continue;
+      if (sAvant !== null && trous.some(([a, b]) => a < s * 1000 && b > (sAvant + 1) * 1000)) couper();
+      cur.push([t, p]); sAvant = s;
+    }
+    couper();
+    return segs;
   };
 
   // ─── Bougies 1 min : volume et CVD ─────────────────────────────────────────
@@ -723,6 +797,24 @@
     if (q >= 10) return q.toFixed(1).replace('.', ',');
     if (q >= 1) return q.toFixed(2).replace('.', ',');
     return q.toFixed(3).replace('.', ',');
+  };
+  /** Décimales qu'il faut pour écrire un pas EXACTEMENT (2,5 → 1 ; 0,25 → 2 ; 20 → 0) : une
+   *  graduation de 2,5 $ écrite sans décimale montre un prix qui n'est pas le sien. */
+  BM.decimales = function (pas) {
+    for (let d = 0; d < 6; d++) { const x = pas * Math.pow(10, d); if (Math.abs(x - Math.round(x)) < 1e-6 * Math.max(1, x)) return d; }
+    return 6;
+  };
+  /** Bulles d'exécutions : surface ∝ volume, ENTRE deux bornes — rayon plancher (lisible) et
+   *  plafond (une bulle ne couvre pas la carte). Les bornes en BTC se déduisent de ces constantes ;
+   *  la légende les écrit (BM.bornesBulles), elle ne promet pas une proportion qui n'existe pas. */
+  BM.BULLES = { rMin: 2, rMax: 28, k: 3.2 };
+  BM.rayonBulle = function (q, echelle) {
+    return Math.min(BM.BULLES.rMax, Math.max(BM.BULLES.rMin, BM.BULLES.k * Math.sqrt(q) * (echelle || 1)));
+  };
+  /** Volumes (BTC) entre lesquels la surface d'une bulle est proportionnelle à son volume. */
+  BM.bornesBulles = function (echelle) {
+    const k = BM.BULLES.k * (echelle || 1);
+    return { min: Math.pow(BM.BULLES.rMin / k, 2), max: Math.pow(BM.BULLES.rMax / k, 2) };
   };
   /** Un pas « rond » pour les graduations : 1, 2, 5 × 10ⁿ ≥ brut. */
   BM.pasRond = function (brut) {
