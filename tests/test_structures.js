@@ -5,7 +5,8 @@
 //   1. tout ce qui est VISIBLE dans la structure de base — chaque VALEUR et chaque ÂGE (prix,
 //      variation, chiffres clés, âge de la publication, heure, cartes du marché, graphique,
 //      boutons d'accès) — l'est encore : présent, non masqué, non recouvert, de taille non nulle ;
-//   2. la structure est RÉVERSIBLE : revenir au thème de base rend la page nœud pour nœud ;
+//   2. la structure est RÉVERSIBLE : revenir au thème de base rend la page nœud pour nœud, et tout
+//      observateur (MutationObserver, ResizeObserver) né avec elle est débranché ;
 //   3. le décor ajouté — tout [data-decor], posé par chantier().decor — est muet (aria-hidden) et
 //      n'intercepte pas le pointeur (pointer-events: none), qu'il porte du texte ou non ;
 //   4. aucune erreur JavaScript.
@@ -105,6 +106,21 @@ async function ouvrir(nav, theme, vue) {
     return r.abort();
   });
   await page.addInitScript(t => { try { localStorage.clear(); localStorage.setItem('samsara-theme', t); } catch (e) { /* */ } }, theme);
+  // Observateurs (MutationObserver, ResizeObserver) : chaque instance est notée, avec son état
+  // (branché par observe(), débranché par disconnect()). Une structure qui en laisse un branché
+  // en partant garde ses nœuds, ses calculs — et ses effets — sur la page d'un autre thème.
+  await page.addInitScript(() => {
+    window.__observateurs = [];
+    for (const nom of ['MutationObserver', 'ResizeObserver']) {
+      const Orig = window[nom];
+      if (!Orig) continue;
+      window[nom] = class extends Orig {
+        constructor(...a) { super(...a); this.__fiche = { nom, branche: false }; window.__observateurs.push(this.__fiche); }
+        observe(...a) { this.__fiche.branche = true; return super.observe(...a); }
+        disconnect() { this.__fiche.branche = false; return super.disconnect(); }
+      };
+    }
+  });
   await page.goto(`http://127.0.0.1:${serveur.address().port}/index.html`);
   await page.waitForTimeout(2200);
   await page.keyboard.press('f');            // bureau : panneau ouvert ; téléphone : la fenêtre du marché
@@ -206,8 +222,11 @@ async function squelette(page) {
     const o = await ouvrir(nav, BASE, { width: 1440, height: 900 });
     const avant = await squelette(o.page);
     for (const t of THEMES.filter(x => x.structure)) {
+      const n0 = await o.page.evaluate(() => window.__observateurs.length);
       await o.page.evaluate(id => appliquerTheme(id), t.id);
       await o.page.waitForTimeout(300);
+      // Les observateurs nés pendant la construction de la structure : ceux qu'elle doit débrancher.
+      const nes = await o.page.evaluate(n0 => window.__observateurs.slice(n0).map((f, i) => n0 + i), n0);
       const pendant = await squelette(o.page);
       check(`${t.id} : la structure change vraiment la page`, pendant !== avant);
       // Tout décor, quel que soit le préfixe de classe du thème : chantier().decor le marque
@@ -226,6 +245,8 @@ async function squelette(page) {
       await o.page.waitForTimeout(300);
       const apres = await squelette(o.page);
       check(`${t.id} → ${BASE} : page identique à l'origine`, apres === avant, { avant: avant.length, apres: apres.length });
+      const restes = await o.page.evaluate(nes => nes.map(i => window.__observateurs[i]).filter(f => f.branche).map(f => f.nom), nes);
+      check(`${t.id} → ${BASE} : ${nes.length} observateur(s) né(s) avec la structure, tous débranchés`, !restes.length, restes);
     }
     check('aucune erreur JavaScript pendant les bascules', !o.erreurs.length, o.erreurs);
     await o.ctx.close();

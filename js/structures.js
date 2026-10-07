@@ -150,6 +150,64 @@ STRUCTURES.codex = {
   },
 };
 
+// ─── FENÊTRES (thèmes Bureau 95 et Bureau 95 contraste) : un bureau d'ordinateur personnel ───
+// La page a déjà une barre des tâches et son horloge : la structure en révèle les fenêtres. Le
+// graphique devient une fenêtre — barre de titre, barre d'outils (le ruban), zone client, barre
+// d'état (les chiffres clés de la publication et leur âge) — et le marché live une seconde ; la
+// barre des tâches reçoit « Démarrer » (le menu des thèmes), un lancement rapide (les boutons
+// d'accès de l'en-tête, qui libèrent la place du prix au téléphone), la tâche active et une zone
+// de notification où l'heure de publication (UTC) côtoie l'horloge du poste : deux heures, deux
+// cadences, chacune nommée.
+STRUCTURES.fenetres = {
+  nom: 'Fenêtres',
+  construire() {
+    const c = chantier(), $ = id => document.getElementById(id);
+    const cc = document.querySelector('.chart-container'), fp = $('feedPanel');
+    const tl = document.querySelector('.taskbar-left'), tr = document.querySelector('.taskbar-right');
+    // 1. Fenêtre « Graphique ». Les boutons de la barre de titre sont dessinés gravés (inactifs) :
+    //    décor, comme le titre.
+    c.decor('div', 'f95-titre', cc, cc.firstChild, 'Graphique');
+    c.deplacer($('indicatorBar'), cc, $('chart'));
+    const etat = c.conteneur('div', 'f95-etat', cc, null, "Barre d'état : dernière publication");
+    c.deplacer($('cycle'), etat);
+    // 2. Fenêtre « Marché live »
+    c.decor('div', 'f95-titre', fp, fp.firstChild, 'Marché live');
+    // 3. Barre des tâches. La tâche active regroupe les deux étiquettes de la base (nom, paire).
+    const etiquettes = [...tl.children];
+    c.deplacer($('themeBtn'), tl, tl.firstChild);
+    const lr = c.conteneur('div', 'f95-lancement', tl, $('themeBtn').nextSibling, 'Lancement rapide');
+    for (const el of [$('feedBtn'), $('liveBtn'), document.querySelector('.header-right [onclick="resetView()"]'),
+                      $('carteBtn'), $('reglagesBtn'), $('legendesBtn')]) c.deplacer(el, lr);
+    const tache = c.conteneur('div', 'f95-tache', tl, null, 'Tâche active');
+    for (const el of etiquettes) c.deplacer(el, tache);
+    const zone = c.conteneur('div', 'f95-zone', tr, tr.firstChild, 'Zone de notification');
+    c.deplacer($('dot'), zone);
+    c.decor('span', 'f95-pub', zone, null, 'Pub.');
+    c.deplacer($('updated'), zone);
+    c.decor('span', 'f95-pub', zone, null, 'UTC');
+    c.deplacer($('taskbarClock'), zone);
+    // La barre d'état suit la LARGEUR de la fenêtre, qui change quand le marché live s'ouvre ou se
+    // replie : les chiffres clés y sont réajustés (masqués en entier depuis la fin, ajusterKpis),
+    // et le canvas redimensionné sans attendre. Dans l'en-tête de la base, la bande ne dépendait
+    // pas du panneau. Une image d'animation au plus par changement ; rien au repos ni pendant un
+    // geste (la taille ne change pas).
+    let raf = 0, vue = '';
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const taille = cc.clientWidth + 'x' + cc.clientHeight;
+        if (taille === vue) return;
+        vue = taille;
+        try { if (typeof resizeCanvas === 'function') { resizeCanvas(); drawChart(); } } catch (e) { /* avant init */ }
+        try { if (typeof ajusterKpis === 'function') ajusterKpis(); } catch (e) { /* avant init */ }
+      });
+    }) : null;
+    if (ro) ro.observe(cc);
+    return () => { if (ro) ro.disconnect(); if (raf) cancelAnimationFrame(raf); c.defaire(); };
+  },
+};
+
 // Au chargement : la structure du thème posé par le script de tête. Ce fichier est chargé
 // en `defer` AVANT js/app.js : le DOM est complet, le graphique pas encore dessiné.
 appliquerStructure(structureDuTheme(document.documentElement.getAttribute('data-theme')));

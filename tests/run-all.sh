@@ -11,7 +11,7 @@ ko=0
 etape() { printf '\n\033[1m── %s ──\033[0m\n' "$1"; }
 
 etape "0. Compilation des scripts Python"
-for f in ../publish.py ../heatmap.py ../samsara_config.py ../options_gex.py ../indicateurs.py test_meta.py refresh_harness.py scan-public.py test_calculs.py test_heatmap_format.py test_palette.py test_contrat.py theme_css.py test_polices.py ../fonts/fabriquer.py; do
+for f in ../publish.py ../heatmap.py ../samsara_config.py ../options_gex.py ../indicateurs.py ../fonts/fabriquer.py *.py; do   # tout script Python des tests : aucune liste à tenir
   if python3 -m py_compile "$f" 2>/dev/null; then
     echo "  ✓ $f"
   else
@@ -85,8 +85,14 @@ node test_budget.js --controle || ko=1
 etape "8b. Polices : registre, licences et noms réservés, LISEZMOI dérivé, @font-face servis — hors ligne"
 python3 test_polices.py || ko=1
 
+etape "8c. Structure « fenêtres » : jumeaux identiques hors jetons, contrastes de ses fonds — hors ligne"
+python3 test_fenetres.py || ko=1
+
 etape "9. Structures de thème dans Chromium : aucune valeur ni aucun âge perdu, réversibles (non exécuté sans Playwright)"
 node test_structures.js || ko=1
+
+etape "9a. Structure « fenêtres » dans Chromium : barre des tâches, fenêtre du graphique, barre d'état réajustée, téléphone (non exécuté sans Playwright)"
+node test_fenetres.js || ko=1
 
 etape "9b. Interface dans Chromium : menus dans l'écran, crochets du graphique, sous-graphes sans débordement (non exécuté sans Playwright)"
 node test_interface.js || ko=1

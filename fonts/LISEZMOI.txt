@@ -13,6 +13,8 @@ noms réservés (Reserved Font Name), les polices qui en déclarent un ont été
                             glyphes composés (là où ils manquent) : ā ṃ
   cinzel.woff2             « Cinzel » ← Cinzel (aucun nom réservé) — cinzel.OFL.txt — thème Codex
   eb-garamond.woff2        « EB Garamond » ← EB Garamond (aucun nom réservé) — ebgaramond.OFL.txt — thème Codex
+  bureau95-titres.woff2    « Pixelify Sans » ← Pixelify Sans (aucun nom réservé) — pixelifysans.OFL.txt — thème Bureau 95
+                            instance wght=700 ; glyphes composés (là où ils manquent) : Ā ā Ṃ ṃ ; plages : PLAGES_LATIN sans les chiffres (ils retombent sur la police système)
 
 Glyphes AJOUTÉS par composition (base + diacritique) pour écrire « Saṃsāra » d'une seule
 police : ā / Ā (a + macron) et ṃ / Ṃ (m + point souscrit), seulement là où la police ne les a pas.
