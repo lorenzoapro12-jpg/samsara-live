@@ -32,7 +32,7 @@
   const CLE = 'samsara-carte-v1';
   const DEFAUTS = {
     calques: { publiee: true, live: true, executions: true, prix: true, bidask: true, murs: true,
-      gamma: true, profil: true, dom: true, volume: true, cvd: true },
+      gamma: true, profil: true, dom: true, volume: true, cvd: true, memoire: true, rafales: true },
     palette: 'classique',
     seuilBas: 2,          // intensité sous laquelle rien n'est peint
     saturation: 200,      // intensité à partir de laquelle la couleur est au maximum
@@ -42,9 +42,19 @@
     dpLive: 5,            // tranche du carnet live, en $
     bulleMin: 0.1,        // BTC
     bulleEchelle: 1,
+    presenceSeuil: BM.PRESENCE.defautBtc,   // BTC demandés : la carte écrit le cran publié qui les porte
+    rafaleMin: BM.RAFALES.defautBtc,        // BTC
   };
   const CADENCE_CARNET = { 100: 1000, 500: 1000, 1000: 2000, 5000: 10000 };
   const POIDS_CARNET = { 100: 5, 500: 25, 1000: 50, 5000: 250 };
+  // Les choix de la mémoire et des rafales viennent des constantes du calcul (BM.PRESENCE,
+  // BM.RAFALES) : écrits dans les <select> AVANT la lecture des réglages, qui les valide contre eux.
+  function remplirChoix() {
+    const remplir = (id, vals, txt) => { const el = document.getElementById(id); if (el && !el.options.length) el.innerHTML = vals.map(v => '<option value="' + v + '">' + txt(v) + '</option>').join(''); };
+    remplir('rPresence', BM.PRESENCE.seuilsBtc, v => '≥ ' + BM.nombre(v, 0, 2) + ' BTC');
+    remplir('rRafaleMin', BM.RAFALES.seuilsBtc, v => BM.nombre(v, 0, 2) + ' BTC');
+  }
+  remplirChoix();
   const R = charger();
 
   /** Les réglages stockés, VALIDÉS contre ce que la page permet — les listes viennent des
@@ -59,6 +69,7 @@
       palette: liste('rPalette', false), fusionT: liste('rFusionT', true), fusionP: liste('rFusionP', true),
       niveauxLive: liste('rNiveaux', true), dpLive: liste('rDpLive', true), bulleMin: liste('rBulleMin', true),
       bulleEchelle: liste('rBulleEchelle', true), seuilBas: plage('rSeuil'), saturation: plage('rSaturation'),
+      presenceSeuil: liste('rPresence', true), rafaleMin: liste('rRafaleMin', true),
     };
     const { reglages, rejets } = BM.validerReglages(r, DEFAUTS, regles);
     if (!CADENCE_CARNET[reglages.niveauxLive]) reglages.niveauxLive = DEFAUTS.niveauxLive;
@@ -76,6 +87,7 @@
     md: null, niv: null, mdLu: null, mdTexte: null,
     live: null, liveRef: null, liveP99: 0, liveEcartees: 0, carnet: null, carnetA: null, liveV: 0,
     exec: new BM.SeauxExecutions(1), execVus: new Set(), execArriere: null, execTrous: [], execLu: null,
+    raf: new BM.Rafales(),     // rafales au marché : alimentées par les MÊMES exécutions acceptées
     minutes: [], minutesA: null,
     bidask: [],
     erreurs: {},
@@ -205,7 +217,7 @@
   async function lireExecutionsInitiales0() {
     try {
       const { corps: t, s } = await binance('aggTrades?symbol=' + SYMBOLE + '&limit=1000', DELAIS.executions);
-      for (const x of t) { E.exec.ajouter(x); E.execVus.add(x.a); }
+      for (const x of t) { if (E.exec.ajouter(x)) E.raf.ajouter(x); E.execVus.add(x.a); }
       E.execLu = s;
       erreur('executions', null);
       bientot();
@@ -223,12 +235,14 @@
         if (document.hidden) return;              // repris par lireExecutions au retour sur l'onglet
         const depuis = Math.max(0, A.id - 1000);
         const t = (await binance('aggTrades?symbol=' + SYMBOLE + '&fromId=' + depuis + '&limit=' + (A.id - depuis), DELAIS.executions)).corps;
-        for (const x of t) E.exec.ajouterAncien(x, E.execVus);
+        // Les rafales recousent la limite de page (identifiants contigus, même ms, même côté).
+        E.raf.ajouterAncien(t.filter(x => E.exec.ajouterAncien(x, E.execVus)));
         A.id = depuis; A.pages++;
         bientot();
         await pause(150);
       }
       A.fini = true;
+      E.raf.finArriere();
       E.execVus = new Set();        // l'unicité arrière n'a plus d'usage ; le direct suit dernierId
     } catch (e) { erreur('executions', e); }
     finally { A.enCours = false; bientot(); }
@@ -244,11 +258,12 @@
       }
       for (let p = 0; p < PAGES_PAR_TOUR; p++) {
         const { corps: t, s } = await binance('aggTrades?symbol=' + SYMBOLE + '&fromId=' + (E.exec.dernierId + 1) + '&limit=1000', DELAIS.executions);
-        for (const x of t) if (E.exec.ajouter(x)) n++;
+        for (const x of t) if (E.exec.ajouter(x)) { n++; E.raf.ajouter(x); }
         if (t.length < 1000) { E.execLu = s; break; }         // tout est lu jusqu'à l'envoi de cette requête
       }
       const lim = maintenant() - GARDE_EXECUTIONS;
       E.exec.purger(lim);
+      E.raf.purger(lim);
       E.execTrous = E.execTrous.filter(([, b]) => b > lim);
       erreur('executions', null);
       if (E.execArriere && !E.execArriere.fini) remplirArriere();
@@ -659,12 +674,15 @@
     ctx.beginPath(); ctx.rect(Z.chaleur.x, Z.chaleur.y, Z.chaleur.w, Z.chaleur.h); ctx.clip();
     posees = []; fileP = [];
     grille();
+    if (R.calques.memoire) memoire();       // sous les murs et le gamma : leurs libellés restent lisibles
     if (R.calques.profil) profilExecutions();
     if (R.calques.murs) murs();
     if (R.calques.gamma) gamma();
     if (R.calques.bidask) bidAsk();
     if (R.calques.prix) lignePrix();
-    if (R.calques.executions) { bulles(); hachuresExecutions(); }
+    if (R.calques.executions) bulles();
+    if (R.calques.rafales) rafales(); else RAF.items = [];
+    if (R.calques.executions || R.calques.rafales) hachuresExecutions();
     reperesEtAges();
     dessinerPastilles();
     croix();
@@ -675,6 +693,7 @@
     if (Z.vol.h) panneauVolume();
     if (Z.cvd.h) panneauCvd();
     lectureSouris();
+    majPanneauRafales();
     MESURE.rendu = performance.now() - debutRendu;
   }
 
@@ -798,6 +817,24 @@
     }
     // Panneaux qui n'ont pas la place d'être dessinés : dit, jamais en silence.
     if (Z.masques.length) pastille(['Masqués faute de place : ' + Z.masques.join(', ')], 8, Z.chaleur.h - 30, C.ink3, 'left', 'Masqués : ' + Z.masques.join(', '));
+    // Mémoire du carnet : la carte publiée dont elle vient, sa fenêtre et son seuil.
+    if (R.calques.memoire && E.pub) {
+      const s = seuilMemoire(), f = s && fenetreMemoire(), xm = Z.chaleur.w - largeurMemoire() - 6;
+      if (!s) pastille(['Mémoire du carnet · éteinte', 'encodage non publié : aucun seuil en BTC'], xm, 120, C.ink3, 'right', 'Mémoire · encodage non publié');
+      else {
+        const fen = f ? BM.heure(E.pub.t0 + f[0] * E.pub.dt) + '–' + BM.heure(Math.min(E.pub.t0 + (f[1] + 1) * E.pub.dt, now)) : 'hors de la carte publiée';
+        pastille(['Mémoire du carnet · carte publiée il y a ' + BM.age(now - E.pubMaj),
+          'fenêtre ' + fen + ' · seuil ≥ ' + BM.nombre(s.qS, 2, 2) + ' BTC (intensité ≥ ' + s.vS + ')'],
+        xm, 120, C.murBid, 'right', 'Mémoire · ' + BM.age(now - E.pubMaj));
+      }
+    }
+    // Rafales au marché : depuis quand elles sont lues, et la dernière.
+    if (R.calques.rafales && E.exec.premier !== null) {
+      const d = E.raf.dernieres(1, R.rafaleMin)[0];
+      pastille(['Rafales ≥ ' + BM.nombre(R.rafaleMin, 0, 2) + ' BTC · depuis ' + BM.heure(E.exec.premier) + ' · ' + (d ? 'dernière il y a ' + BM.age(now - d.T) : 'aucune encore'),
+        '≥ k ordres : borne basse prouvée, le nombre exact n\'est pas publié'],
+      Math.min(xn, Z.chaleur.w) - 8, Z.chaleur.h - 130, C.ink2, 'right', 'Rafales · ' + (d ? BM.age(now - d.T) : 'aucune'));
+    }
     // Exécutions
     if (R.calques.executions) {
       if (E.exec.dernier) {
@@ -1026,6 +1063,154 @@
     texte(TEXTES.profil, 6, 14, C.ink2, 10, 'left', true);
     reserver(2, 6, largeurTexte(TEXTES.profil, 10, true) + 8, 16, TEXTES.profil);     // les pastilles l'évitent
   }
+  // ─── Mémoire du carnet : barres au bord droit de la chaleur ─────────────────
+  // Lue sur la carte publiée BRUTE (E.pub, jamais E.pubF) : la fusion ne change aucune part. Les
+  // sommes préfixes (BM.presence) sont refaites à chaque publication ou seuil ; les barres, quand
+  // la fenêtre (colonnes visibles), les prix ou la taille changent — pas à chaque battement.
+  const MEM = { prCle: null, pr: null, cle: null, barres: [], plein: null, hach: null, lp: { cle: null, v: null } };
+  const largeurMemoire = () => (Z.etroit ? 30 : 48);
+  function seuilMemoire() { return E.pub ? BM.seuilPresence(R.presenceSeuil, E.pub.encodage) : null; }
+  /** Colonnes de la carte publiée dans la vue (jusqu'à « maintenant ») : la fenêtre des comptes. */
+  function fenetreMemoire() {
+    const r = [0, 0];
+    return E.pub && BM.plageColonnes(E.pub, E.vue.t1, Math.min(E.vue.t2, maintenant()), r) ? r : null;
+  }
+  function presenceMemoire(s) {
+    const k = E.pubN + ':' + s.vS;
+    if (MEM.prCle !== k) { MEM.pr = BM.presence(E.pub, s.vS); MEM.prCle = k; }
+    return MEM.pr;
+  }
+  /** Barres par lignes de pixels (fusionnées quand elles décrivent la même rangée) ; gardées. */
+  function barresMemoire(s, f) {
+    const h = Z.chaleur.h, w = Z.chaleur.w, L = largeurMemoire(), v = E.vue;
+    const cle = [MEM.prCle, f[0], f[1], v.p1, v.p2, w, h, L].join('|');
+    if (MEM.cle === cle) return;
+    const pr = presenceMemoire(s), pp = (v.p2 - v.p1) / h, t = [0, 0], minObs = Math.ceil(BM.PRESENCE.minObserveMin * 60e3 / E.pub.dt);
+    const barres = [], plein = { bid: new Path2D(), ask: new Path2D() }, hach = new Path2D();
+    let cour = null;
+    for (let y = 0; y < h; y++) {
+      BM.tranchesLigne(v.p2, pp, y, E.pub.dp, t);
+      const b = BM.barrePresence(pr, t[0], t[1], f[0], f[1], minObs);
+      if (b) b.nT = t[1] - t[0] + 1;
+      if (cour && b && cour.b.pb === b.pb && cour.b.part === b.part && cour.b.nT === b.nT) { cour.y1 = y + 1; continue; }
+      cour = b ? { y0: y, y1: y + 1, b } : null;
+      if (cour) barres.push(cour);
+    }
+    for (const r of barres) {
+      const l = Math.round(L * r.b.part), cote = r.b.presB >= r.b.presA ? 'bid' : 'ask';
+      r.cote = r.b.presB === r.b.presA ? 'égalité' : cote;
+      if (l > 0) plein[cote].rect(w - l, r.y0, l, r.y1 - r.y0);
+      if (r.b.peu) hach.rect(w - L, r.y0, L, r.y1 - r.y0);
+    }
+    Object.assign(MEM, { cle, barres, plein, hach });
+  }
+  function memoire() {
+    const s = seuilMemoire(), f = s && fenetreMemoire();
+    if (!s || !f) return;
+    barresMemoire(s, f);
+    const w = Z.chaleur.w, h = Z.chaleur.h, L = largeurMemoire();
+    // Échelle FIXE : le trait fin marque 100 %, le pointillé 50 % — jamais normalisée sur la vue.
+    ctx.fillStyle = C.pastille; ctx.globalAlpha = 0.55; ctx.fillRect(w - L, 0, L, h); ctx.globalAlpha = 1;
+    ctx.fillStyle = C.ink3; ctx.fillRect(w - L, 0, 1, h);
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = C.murBid; ctx.fill(MEM.plein.bid);
+    ctx.fillStyle = C.murAsk; ctx.fill(MEM.plein.ask);
+    ctx.globalAlpha = 1;
+    ctx.save(); ctx.strokeStyle = C.ink3; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(w - L / 2 + 0.5, 0); ctx.lineTo(w - L / 2 + 0.5, h); ctx.stroke(); ctx.restore();
+    // Peu observée (convention) : hachurée, d'un seul tracé découpé sur ses rangées.
+    ctx.save(); ctx.clip(MEM.hach); ctx.strokeStyle = C.ink2; ctx.globalAlpha = 0.6; ctx.lineWidth = 1; ctx.beginPath();
+    for (let d = -L; d < h; d += 5) { ctx.moveTo(w - L, d + L); ctx.lineTo(w, d); }
+    ctx.stroke(); ctx.restore();
+  }
+  /** La barre sous la ligne de pixels y (celle que le dessin a peinte), ou null. */
+  function barreMemoireEn(y) {
+    for (const r of MEM.barres) if (y >= r.y0 && y < r.y1) return r;
+    return null;
+  }
+  function texteMemoire(y) {
+    const s = seuilMemoire(), f = s && fenetreMemoire();
+    if (!s || !f) return null;
+    barresMemoire(s, f);
+    const r = barreMemoireEn(Math.floor(y));
+    if (!r) return 'Mémoire : rangée non observée dans la fenêtre';
+    const b = r.b, dtMin = E.pub.dt / 60e3, dp = E.pub.dp;
+    // La plus longue présence : au survol seulement, pour CETTE rangée et cette fenêtre (gardée).
+    const k = [MEM.prCle, b.pb, f[0], f[1]].join('|');
+    if (MEM.lp.cle !== k) MEM.lp = { cle: k, v: BM.plusLonguePresence(E.pub, s.vS, b.pb, f[0], f[1]) };
+    const lp = MEM.lp.v, n = x => BM.nombre(x * dtMin, 0, 0);
+    return 'Mémoire ' + BM.prix(b.pb * dp) + '–' + BM.prix((b.pb + 1) * dp) + ' $ : un niveau ≥ ' + BM.nombre(s.qS, 2, 2) + ' BTC dans la tranche pendant '
+      + n(b.pres) + ' des ' + n(b.obs) + ' min observées (' + Math.round(100 * b.part) + ' %) · plus longue présence ' + (lp.n ? BM.age(lp.n * E.pub.dt) : '—')
+      + ' · côté ' + (r.cote === 'égalité' ? 'bid et ask à égalité' : r.cote)
+      + (b.peu ? ' · observée moins de ' + BM.PRESENCE.minObserveMin + ' min (hachurée)' : '')
+      + (b.nT > 1 ? ' · pixel = plus grande part de ' + b.nT + ' tranches' : '');
+  }
+
+  // ─── Rafales au marché : un trait vertical par rafale ──────────────────────
+  // Rien avant le début des exécutions lues (E.exec.premier) ; les intervalles non lus sont hachurés
+  // (hachuresExecutions). Les traits sont gardés tant que ni les rafales ni la vue ne changent.
+  let RAF = { cle: null, items: [], achat: null, vente: null, fond: null };
+  const RAF_LARGEUR = 2, RAF_HAUTEUR = 3;
+  const fleche = r => (r.achat ? '▲' : '▼');
+  const ordres = k => '≥ ' + k + ' ordre' + (k > 1 ? 's' : '');
+  function rafales() {
+    const debut = E.exec.premier;
+    if (debut === null || !E.raf.liste.length) { RAF.items = []; return; }
+    const v = E.vue, cle = [E.raf.version, v.t1, v.t2, v.p1, v.p2, Z.chaleur.w, Z.chaleur.h, R.rafaleMin, debut].join('|');
+    if (RAF.cle !== cle) {
+      const tpp = (v.t2 - v.t1) / Z.chaleur.w, items = [], achat = new Path2D(), vente = new Path2D(), fond = new Path2D();
+      for (const r of E.raf.dans(Math.max(v.t1 - tpp * 4, debut), v.t2, R.rafaleMin)) {
+        const x = Math.round(X(r.T)) - 1, ya = Y(r.pMax), yb = Y(r.pMin), h = Math.max(RAF_HAUTEUR, yb - ya), y0 = (ya + yb) / 2 - h / 2;
+        if (y0 > Z.chaleur.h || y0 + h < 0) continue;
+        items.push({ x, y0, h, r });
+        (r.achat ? achat : vente).rect(x, y0, RAF_LARGEUR, h);
+        fond.rect(x - 1, y0 - 1, RAF_LARGEUR + 2, h + 2);
+      }
+      items.sort((a, b) => b.r.q8 - a.r.q8);
+      RAF = { cle, items, achat, vente, fond };
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fill(RAF.fond);
+    ctx.fillStyle = C.up; ctx.fill(RAF.achat);
+    ctx.fillStyle = C.down; ctx.fill(RAF.vente);
+    // Libellés là où il y a la place, les plus grosses d'abord ; jamais sur un autre texte.
+    let n = 0;
+    for (const it of RAF.items) {
+      if (n >= 30) break;
+      const r = it.r, t = fleche(r) + ' ' + BM.btc(r.q8 / 1e8) + ' BTC · ' + (r.prix ? r.prix.size : r.nPrix) + ' prix · ' + ordres(r.ordres);
+      const tw = largeurTexte(t, 10, true) + 4, x0 = it.x + RAF_LARGEUR + 3, y0 = it.y0 + it.h / 2 - 7;
+      if (x0 + tw > Z.chaleur.w || y0 < 0 || y0 + 14 > Z.chaleur.h || chevauche(x0, y0, tw, 14)) continue;
+      reserver(x0, y0, tw, 14, t);
+      texte(t, x0 + 2, y0 + 7, r.achat ? C.up : C.down, 10, 'left', true);
+      n++;
+    }
+  }
+  /** La rafale sous le pointeur (la plus grosse dont le trait, élargi de 3 px, le contient). */
+  function rafaleEn(x, y) {
+    for (const it of RAF.items) if (Math.abs(x - (it.x + RAF_LARGEUR / 2)) <= 3 && y >= it.y0 - 3 && y <= it.y0 + it.h + 3) return it.r;
+    return null;
+  }
+  const usdt = v => (v >= 1e6 ? BM.nombre(v / 1e6, 0, 2) + ' M USDT' : BM.nombre(v, 0, 0) + ' USDT');
+  function texteRafale(raf, court) {
+    const r = BM.lireRafale(raf), ms = String(raf.T % 1000).padStart(3, '0');
+    const raison = r.ordresMin === 1 ? 'aucun prix répété ni recul' : [r.repetes ? 'prix répété' : '', r.reculs ? 'prix revenu en arrière' : ''].filter(Boolean).join(', ');
+    const tete = BM.heure(r.T, true) + ',' + ms + ' · ' + (r.achat ? 'achat' : 'vente') + ' au marché · ' + BM.btc(r.q) + ' BTC (≈ ' + usdt(r.quote) + ')';
+    if (court) return tete + ' · ' + r.nPrix + ' prix · ' + ordres(r.ordresMin);
+    return tete + ' · prix moyen ' + BM.prix(r.vwap, 2) + ' · de ' + BM.prix(r.pMin, 2) + ' à ' + BM.prix(r.pMax, 2) + ' (' + r.nPrix + ' prix, ' + r.n + ' exécutions)'
+      + ' · ' + ordres(r.ordresMin) + ' (' + raison + ') · plus longue séquence ' + BM.btc(r.plusLongueSequence) + ' BTC';
+  }
+  /** Le panneau des dernières rafales : réécrit seulement s'il est ouvert et que la liste a changé. */
+  let LISTE_RAF = null;
+  function majPanneauRafales() {
+    const p = document.getElementById('rafalesPanneau');
+    if (!p || p.hidden) return;
+    const cle = E.raf.version + '|' + R.rafaleMin;
+    if (LISTE_RAF === cle) return;
+    LISTE_RAF = cle;
+    const l = E.raf.dernieres(BM.RAFALES.liste, R.rafaleMin);
+    document.getElementById('listeRafales').innerHTML = l.length
+      ? l.map(r => '<li><span class="' + (r.achat ? 'achat' : 'vente') + '">' + fleche(r) + '</span> ' + texteRafale(r, true).replace(/ · (\S+ BTC) /, ' · <b>$1</b> ') + '</li>').join('')
+      : '<li>Aucune rafale ≥ ' + BM.nombre(R.rafaleMin, 0, 2) + ' BTC depuis ' + (E.exec.premier ? BM.heure(E.exec.premier) : 'l\'ouverture') + '.</li>';
+  }
+
   function croix() {
     const s = E.souris;
     if (!s || s.zone !== 'chaleur') return;
@@ -1271,6 +1456,8 @@
           + BM.btc(b.achat) + ' BTC achetés / ' + BM.btc(b.vente) + ' vendus au marché');
       }
     }
+    if (R.calques.rafales) { const rf = rafaleEn(s.x, s.y); if (rf) l.push('Rafale ' + texteRafale(rf)); }
+    if (R.calques.memoire && E.pub) { const tm = texteMemoire(s.y); if (tm) l.push(tm); }
     // Le texte n'est réécrit que s'il a changé ; à la souris, la bulle se place sans être MESURÉE
     // (une mesure après innerHTML force une mise en page à chaque mouvement) : elle bascule à gauche
     // ou au-dessus du pointeur par un translate(-100 %) quand sa largeur maximale (LECTURE_MAX) ou
@@ -1473,7 +1660,7 @@
   }
   const NOMS_CALQUES = [['publiee', 'Carte publiée'], ['live', 'Carnet live'], ['executions', 'Exécutions'], ['prix', 'Prix'],
     ['bidask', 'Bid / ask'], ['murs', 'Murs'], ['gamma', 'Gamma'], ['profil', 'Profil'], ['dom', 'Carnet latéral'],
-    ['volume', 'Volume'], ['cvd', 'CVD']];
+    ['volume', 'Volume'], ['cvd', 'CVD'], ['memoire', 'Mémoire'], ['rafales', 'Rafales']];
   function construireBarre() {
     const z = $('calques');
     // Une ligne de puces qui défile : la molette verticale la fait défiler (sans Maj).
@@ -1496,6 +1683,7 @@
     $('btnSuivre').addEventListener('click', basculerSuivre);
     $('btnReglages').addEventListener('click', () => basculerPanneau('reglages'));
     $('btnLegende').addEventListener('click', () => basculerPanneau('legende'));
+    $('btnRafales').addEventListener('click', () => { LISTE_RAF = null; basculerPanneau('rafalesPanneau'); majPanneauRafales(); });
     for (const b of document.querySelectorAll('[data-fermer]')) b.addEventListener('click', fermerPanneaux);
     majBoutonSuivre();
     // Réglages
@@ -1513,6 +1701,8 @@
     lier('rDpLive', 'dpLive', Number, () => { reinitLive(); });
     lier('rBulleMin', 'bulleMin', Number);
     lier('rBulleEchelle', 'bulleEchelle', Number);
+    lier('rPresence', 'presenceSeuil', Number);
+    lier('rRafaleMin', 'rafaleMin', Number);
     $('rDefauts').addEventListener('click', () => {
       const c = R.calques; Object.assign(R, JSON.parse(JSON.stringify(DEFAUTS))); R.calques = c;
       sauver(); location.reload();
@@ -1554,6 +1744,21 @@
     tx('legPrixSeconde', String(SECONDE_DES_PPM));
     tx('legValidite', BM.VALIDITE.cadences + ' cadences + ' + BM.VALIDITE.margeMs / 1000 + ' s');
     tx('legVolume', BM.PAS_MINUTES.slice(0, 5).join(', ') + '…');
+    // Mémoire du carnet et rafales : chaque nombre vient de BM.PRESENCE / BM.RAFALES / l'encodage publié.
+    const P = BM.PRESENCE, RF = BM.RAFALES, sp = BM.seuilPresence(R.presenceSeuil, enc), lst = a => a.map(v => BM.nombre(v, 0, 2)).join(', ');
+    const seuilTxt = sp ? '≥ ' + BM.nombre(sp.qS, 2, 2) + ' BTC (intensité ≥ ' + sp.vS + ' : le cran publié qui porte le seuil choisi, ' + BM.nombre(R.presenceSeuil, 0, 2) + ' BTC)' : null;
+    tx('legMemoire', 'Pour chaque tranche de la carte publiée, la part des minutes OBSERVÉES de la fenêtre visible pendant lesquelles un niveau '
+      + (seuilTxt || 'au-dessus du seuil choisi') + ' s\'y trouvait — bid ou ask (mesuré, lu sur la carte publiée brute : la fusion n\'y change rien). '
+      + 'Échelle FIXE de 0 à 100 % (le pointillé marque 50 %) ; couleur du côté le plus souvent présent. Un pixel qui couvre plusieurs tranches montre la plus grande part. '
+      + 'Conventions : « observée » = dans la bande déduite des cellules de la minute (un peu plus étroite que la bande lue) ; une tranche observée moins de '
+      + P.minObserveMin + ' min est hachurée. Seuils proposés : ' + lst(P.seuilsBtc) + ' BTC. « Un niveau » : rien ne dit que c\'est le même ordre d\'une minute à l\'autre. '
+      + 'Présence passée, ni support ni résistance.' + (sp ? '' : ' Encodage non publié : aucun seuil en BTC, le calque est éteint.'));
+    tx('rPresenceNote', sp ? 'Seuil appliqué : ' + seuilTxt + '.' : 'Encodage non publié par la carte : aucun seuil en BTC.');
+    tx('legRafales', 'Exécutions d\'une même milliseconde, d\'un même côté, aux identifiants consécutifs (mesuré) : un trait du prix le plus bas au plus haut, ▲ achat / ▼ vente au marché. '
+      + 'Affichées à partir du seuil choisi (' + lst(RF.seuilsBtc) + ' BTC) ; gardées à partir de ' + BM.nombre(RF.gardeBtc, 0, 2) + ' BTC pendant ' + RF.gardeMs / 3600e3 + ' h, comme les exécutions. '
+      + '« ≥ k ordres » : chaque exécution est un ordre preneur rempli à un prix, et un ordre ne parcourt les prix que dans un sens ; chaque prix répété ou recul en prouve donc un de plus. '
+      + 'Mais ' + BM.TEXTE_RAFALES + '. Une rafale ne dit pas qui a acheté. Le panneau « Rafales » liste les ' + RF.liste + ' dernières.');
+    tx('rafalesNote', 'Les ' + RF.liste + ' dernières rafales ≥ ' + BM.nombre(R.rafaleMin, 0, 2) + ' BTC, la plus récente d\'abord. ' + BM.TEXTE_RAFALES[0].toUpperCase() + BM.TEXTE_RAFALES.slice(1) + '.');
     const e = $('encodageEtat');
     if (e) e.textContent = enc
       ? 'Encodage publié : intensité = min(' + enc.plafond + ', ent(' + enc.plafond + ' × √(q / ' + enc.ref_btc + ' BTC))), q = ' + enc.q + '.'
@@ -1619,6 +1824,10 @@
       mesure: Object.assign({}, MESURE), chaleurPeinteA: LIVE.coupe, carnetLu: carnetUtile(), souris: E.souris && Object.assign({}, E.souris),
       mise: Z && { w: Z.w, h: Z.h, dpr: Z.dpr, sx: Z.sx, sy: Z.sy, chaleur: Object.assign({}, Z.chaleur), masques: Z.masques.slice(), court: Z.court },
       posees: posees.map(p => ({ x: p.x, y: p.y, w: p.w, h: p.h, texte: p.texte, pastille: !!p.pastille })),
+      memoire: { barres: MEM.barres.map(r => ({ y0: r.y0, y1: r.y1, pb: r.b.pb, part: r.b.part, obs: r.b.obs, pres: r.b.pres, peu: r.b.peu, cote: r.cote })), largeur: Z ? largeurMemoire() : 0, seuil: seuilMemoire(), fenetre: E.vue && fenetreMemoire() },
+      rafales: { n: E.raf.liste.length, version: E.raf.version, arriereFini: !!(E.execArriere && E.execArriere.fini), dessinees: RAF.items.map(it => ({ x: it.x, y0: it.y0, h: it.h, q: it.r.q8 / 1e8, T: it.r.T, achat: it.r.achat, ordres: it.r.ordres })) },
     }),
+    /** Les rafales gardées (lecture seule) et la Σ des exécutions vues (contrôle de conservation). */
+    rafalesListe: () => E.raf.liste.map(BM.lireRafale),
   };
 })();

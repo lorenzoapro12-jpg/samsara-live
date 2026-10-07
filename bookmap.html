@@ -21,6 +21,7 @@
   <div class="barre-droite">
     <button type="button" class="bouton" id="btnSuivre" aria-pressed="true" title="Suivre le présent (F) — double-clic sur la carte : vue par défaut">Suivre</button>
     <button type="button" class="bouton" id="btnReglages" aria-controls="reglages" aria-expanded="false" title="Réglages d'affichage">Réglages</button>
+    <button type="button" class="bouton" id="btnRafales" aria-controls="rafalesPanneau" aria-expanded="false" title="Les dernières rafales au marché">Rafales</button>
     <button type="button" class="bouton" id="btnLegende" aria-controls="legende" aria-expanded="false" title="Ce que montre la carte (L)">Légende</button>
   </div>
 </header>
@@ -88,7 +89,27 @@
       <select id="rBulleEchelle"><option value="0.6">petite</option><option value="1">normale</option><option value="1.6">grande</option></select>
     </label>
   </fieldset>
+  <fieldset>
+    <legend>Mémoire du carnet (carte publiée)</legend>
+    <!-- Les choix viennent de BM.PRESENCE (js/bookmap-calc.js) : écrits par la page, jamais recopiés ici. -->
+    <label>Un niveau d'au moins
+      <select id="rPresence"></select>
+    </label>
+    <p class="note" id="rPresenceNote"></p>
+  </fieldset>
+  <fieldset>
+    <legend>Rafales au marché</legend>
+    <label>Afficher à partir de
+      <select id="rRafaleMin"></select>
+    </label>
+  </fieldset>
   <button type="button" class="bouton" id="rDefauts">Réglages par défaut</button>
+</section>
+
+<section class="panneau-flottant" id="rafalesPanneau" hidden aria-label="Rafales au marché">
+  <div class="panneau-tete"><h2>Rafales au marché</h2><button type="button" class="fermer" data-fermer aria-label="Fermer">×</button></div>
+  <p class="note" id="rafalesNote"></p>
+  <ol class="liste-rafales" id="listeRafales"></ol>
 </section>
 
 <section class="panneau-flottant large" id="legende" hidden aria-label="Légende">
@@ -108,6 +129,10 @@
     <dd>La ligne blanche : clôtures 1 min (Binance), puis le prix moyen pondéré par le volume (VWAP) des exécutions de chaque seconde — après la dernière clôture, et partout où les exécutions sont lues dès qu'une minute fait au moins <span id="legPrixSeconde">6</span> px. Coupée là où rien n'est lu. Les traits fins verticaux sont les plus hauts / plus bas de chaque minute. Les marches vertes et rouges sont le meilleur bid et le meilleur ask, à chaque lecture du carnet live.</dd>
     <dt>Exécutions (bulles)</dt>
     <dd>Volumes échangés <b>au marché</b>, regroupés par seconde et par tranche de prix : vert si les achats au marché dominent, rouge si ce sont les ventes ; l'arc blanc intérieur est la part achetée. Seaux ancrés sur l'horloge et sur le prix. <span id="legBulles">Surface ∝ volume, entre deux bornes.</span> Les intervalles non lus sont hachurés : ce n'est pas « aucune exécution ».</dd>
+    <dt>Rafales au marché (traits verticaux)</dt>
+    <dd id="legRafales"></dd>
+    <dt>Mémoire du carnet (barres au bord droit)</dt>
+    <dd id="legMemoire"></dd>
     <dt>Murs (rectangles)</dt>
     <dd>Fichier de 15 min : les tranches de 20 $ où la <b>somme</b> des ordres posés est la plus grande, au moment de la lecture. Ils partent de l'instant de lecture : avant, on ne sait pas.</dd>
     <dt>Gamma (tirets violets)</dt>

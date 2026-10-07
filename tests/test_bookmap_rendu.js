@@ -946,6 +946,128 @@ async function pixel(page, x, y) {
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p36.close();
     }
+
+    // ════ Mémoire du carnet, rafales au marché ══════════════════════════════
+    titre('37. Mémoire du carnet : lue sur la carte publiée BRUTE, seuil exact, âge, la fusion n\'y change rien');
+    {
+      let p37;
+      ({ page: p37, erreurs } = await ouvrir(nav, { encodage: true }));
+      const tm = G.t0 + G.dt * Math.floor(G.W / 2);
+      await p37.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [tm - 4 * 3600e3, tm + 3600e3, pMid - 700, pMid + 700]);
+      await p37.waitForTimeout(600);
+      let e = await etat(p37);
+      const s = BM.seuilPresence(10, encodage);
+      check(`seuil par défaut : 10 BTC → intensité ≥ ${s.vS}, ≥ ${BM.nombre(s.qS, 2, 2)} BTC (cran publié)`, e.memoire.seuil && e.memoire.seuil.vS === s.vS && e.memoire.seuil.qS === s.qS, e.memoire.seuil);
+      check('pastille d\'âge : carte publiée, fenêtre et seuil', e.pastillesCompletes.some(t => /^Mémoire du carnet · carte publiée il y a .+ \| fenêtre \d\d:\d\d–\d\d:\d\d · seuil ≥ [\d,]+ BTC \(intensité ≥ \d+\)$/.test(t)), e.pastillesCompletes);
+      // Chaque barre = la part calculée ICI, sur la grille brute du fichier et la fenêtre de la vue.
+      const pr = BM.presence(G, s.vS), [f0, f1] = e.memoire.fenetre || [0, -1];
+      const fausses = e.memoire.barres.filter(b => { const f = BM.presenceFenetre(pr, b.pb, f0, f1); return f.obs !== b.obs || f.pres !== b.pres; });
+      check(`${e.memoire.barres.length} barres : comptes = ceux de la grille brute sur la fenêtre [${f0}, ${f1}]`, e.memoire.barres.length > 20 && !fausses.length, fausses.slice(0, 2));
+      check('échelle fixe : au moins une barre sous 100 % et aucune au-delà', e.memoire.barres.some(b => b.part < 1) && e.memoire.barres.every(b => b.part >= 0 && b.part <= 1));
+      const rc = await p37.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(); return { x: r.left, y: r.top }; });
+      const cible = e.memoire.barres.filter(b => !b.peu && b.part > 0.2 && b.part < 1 && b.y1 - b.y0 >= 3).sort((a, b) => b.pres - a.pres)[0];
+      const lire = async () => {
+        await p37.mouse.move(rc.x + e.mise.chaleur.w - 6, rc.y + (cible.y0 + cible.y1) / 2 + 0.5); await p37.mouse.move(rc.x + e.mise.chaleur.w - 5, rc.y + (cible.y0 + cible.y1) / 2);
+        await p37.waitForTimeout(300);
+        return (await p37.evaluate(() => document.getElementById('lecture').innerText)).split('\n').find(l => /^Mémoire /.test(l)) || '';
+      };
+      if (!cible) check('une barre partielle à survoler', false, e.memoire.barres.length);
+      else {
+        const lu1 = await lire();
+        const lp = BM.plusLonguePresence(G, s.vS, cible.pb, f0, f1);
+        const attendu = 'un niveau ≥ ' + BM.nombre(s.qS, 2, 2) + ' BTC dans la tranche pendant ' + BM.nombre(cible.pres, 0, 0) + ' des ' + BM.nombre(cible.obs, 0, 0) + ' min observées';
+        check(`survol : « ${attendu} … plus longue présence ${BM.age(lp.n * G.dt)} »`, lu1.includes(attendu) && lu1.includes('plus longue présence ' + (lp.n ? BM.age(lp.n * G.dt) : '—')) && / · côté (bid|ask|bid et ask)/.test(lu1), lu1);
+        for (const [id, v] of [['rFusionT', '15'], ['rFusionP', '5'], ['rPalette', 'cote'], ['rSaturation', '60']]) await p37.evaluate(([i, x]) => { const el = document.getElementById(i); el.value = x; el.dispatchEvent(new Event('input')); }, [id, v]);
+        await p37.waitForTimeout(400);
+        const lu2 = await lire(), e2 = await etat(p37);
+        check('fusion 15 min × 100 $, palette, saturation : même lecture, mêmes barres', lu1 === lu2 && JSON.stringify(e2.memoire.barres) === JSON.stringify(e.memoire.barres), [lu1, lu2]);
+      }
+      // Le seuil change le cran, et la légende l'écrit (tiré de BM.seuilPresence).
+      await p37.evaluate(() => { const el = document.getElementById('rPresence'); el.value = '25'; el.dispatchEvent(new Event('input')); });
+      await p37.waitForTimeout(400);
+      e = await etat(p37);
+      const s25 = BM.seuilPresence(25, encodage), leg = await p37.evaluate(() => document.getElementById('legMemoire').textContent);
+      check(`seuil 25 BTC → intensité ≥ ${s25.vS} ; la légende écrit ≥ ${BM.nombre(s25.qS, 2, 2)} BTC, « ${BM.PRESENCE.minObserveMin} min », « ni support ni résistance »`,
+        e.memoire.seuil.vS === s25.vS && leg.includes('≥ ' + BM.nombre(s25.qS, 2, 2) + ' BTC') && leg.includes(BM.PRESENCE.minObserveMin + ' min') && /ni support ni résistance/.test(leg) && /un niveau/i.test(leg), leg);
+      const opts = await p37.evaluate(() => [...document.querySelectorAll('#rPresence option')].map(o => +o.value));
+      check('choix du seuil = BM.PRESENCE.seuilsBtc (écrits par la page)', JSON.stringify(opts) === JSON.stringify(BM.PRESENCE.seuilsBtc), opts);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p37.close();
+      // Sans encodage publié : éteinte, et dit.
+      let p37b;
+      ({ page: p37b, erreurs } = await ouvrir(nav, {}));
+      await p37b.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [tm - 4 * 3600e3, tm + 3600e3, pMid - 700, pMid + 700]);
+      await p37b.waitForTimeout(600);
+      const eb = await etat(p37b);
+      check('encodage non publié : aucune barre, « encodage non publié : aucun seuil en BTC » sur la carte',
+        !eb.memoire.barres.length && eb.memoire.seuil === null && eb.pastillesCompletes.some(t => /Mémoire du carnet · éteinte \| encodage non publié : aucun seuil en BTC/.test(t)), eb.pastillesCompletes);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p37b.close();
+    }
+
+    titre('38. Rafales au marché : recousues aux pages du remplissage arrière, volume conservé, borne d\'ordres');
+    {
+      // Exécutions groupées par 4 (même ms, même côté, prix croissants pour un achat) ; un groupe sur
+      // trois répète un prix (≥ 2 ordres prouvés). Les pages arrière (1 000) coupent des groupes.
+      const S = simulateur(), base = S.trade.bind(S);
+      S.trade = id => {
+        const t0 = base(id - (id % 4)), k = id % 4, rep = Math.floor(id / 4) % 3 === 0 && k === 3, pas = t0.m ? -0.5 : 0.5;
+        return Object.assign({}, t0, { a: id, f: id, l: id, p: (+t0.p + pas * (rep ? 2 : k)).toFixed(2), q: '0.80000000' });
+      };
+      let p38;
+      ({ page: p38, erreurs } = await ouvrir(nav, { encodage: true, S }));
+      await p38.waitForFunction(() => window.__carte.etat().rafales.arriereFini, null, { timeout: 60000 }).catch(() => {});
+      await p38.waitForTimeout(1500);
+      const e = await etat(p38), L = await p38.evaluate(() => window.__carte.rafalesListe());
+      const interieures = L.slice(1, -1), q8 = L.reduce((a, r) => a + Math.round(r.q * 1e8), 0), tot = Math.round((e.executions.total[0] + e.executions.total[1]) * 1e8);
+      check(`remplissage arrière fini : ${L.length} rafales`, e.rafales.arriereFini && L.length > 1000, [e.rafales.arriereFini, L.length]);
+      check('chaque rafale intérieure = 4 exécutions, 3,2 BTC (aucune coupée par une page)', interieures.every(r => r.n === 4 && Math.abs(r.q - 3.2) < 1e-9), interieures.filter(r => r.n !== 4).slice(0, 3));
+      check('Σ rafales = Σ exécutions (au 1e-8 BTC près, toutes ≥ 0,5 BTC)', Math.abs(q8 - tot) <= 2, [q8, tot]);
+      check('borne d\'ordres : ≥ 2 sur les groupes à prix répété, ≥ 1 ailleurs', interieures.every(r => r.ordresMin === (Math.floor(r.aDeb / 4) % 3 === 0 ? 2 : 1)), interieures.slice(0, 4).map(r => [r.aDeb, r.ordresMin]));
+      check('pastille d\'âge : « Rafales ≥ 2 BTC · depuis HH:MM · dernière il y a … »', e.pastillesCompletes.some(t => /^Rafales ≥ 2 BTC · depuis \d\d:\d\d · dernière il y a /.test(t)), e.pastillesCompletes);
+      // Une vue courte : les traits, et la lecture d'un trait à prix répété.
+      const now = S.now(), pm = S.prix(now - 60e3);
+      await p38.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [now - 40e3, now + 5e3, pm - 40, pm + 40]);
+      await p38.waitForTimeout(600);
+      const d = (await etat(p38)).rafales.dessinees, prem = (await etat(p38)).executions.premier;
+      check(`${d.length} traits dessinés, aucun avant le début des exécutions lues`, d.length > 10 && d.every(x => x.T >= prem && x.h >= 3), d.length);
+      const rc = await p38.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(); return { x: r.left, y: r.top }; });
+      const cible = d.find(x => x.ordres === 2 && x.x > 30 && x.x < 1000 && x.y0 > 20 && d.every(o => o === x || Math.abs(o.x - x.x) > 8));
+      if (!cible) check('un trait isolé à prix répété', false, d.slice(0, 3));
+      else {
+        await p38.mouse.move(rc.x + cible.x + 1.5, rc.y + cible.y0 + cible.h / 2 + 0.5); await p38.mouse.move(rc.x + cible.x + 1, rc.y + cible.y0 + cible.h / 2);
+        await p38.waitForTimeout(300);
+        const lu = await p38.evaluate(() => document.getElementById('lecture').innerText);
+        check('survol : « … 3,20 BTC (≈ … USDT) · prix moyen … · ≥ 2 ordres (prix répété) · plus longue séquence … »',
+          /Rafale \d\d:\d\d:\d\d,\d{3} · (achat|vente) au marché · 3,20 BTC \(≈ [\d\s  ]+ USDT\) · prix moyen [\d\s  ]+,\d\d · de .+ à .+ \(3 prix, 4 exécutions\) · ≥ 2 ordres \(prix répété\) · plus longue séquence 2,40 BTC/.test(lu), lu);
+      }
+      await p38.click('#btnRafales');
+      await p38.waitForTimeout(1200);
+      const items = await p38.evaluate(() => [...document.querySelectorAll('#listeRafales li')].map(li => li.textContent));
+      check(`panneau : les ${BM.RAFALES.liste} dernières`, items.length === BM.RAFALES.liste && items.every(t => /BTC .* prix · ≥ \d ordres?/.test(t)), items.slice(0, 2));
+      await p38.evaluate(() => { const el = document.getElementById('rRafaleMin'); el.value = '5'; el.dispatchEvent(new Event('input')); });
+      await p38.waitForTimeout(1300);
+      const e5 = await etat(p38), items5 = await p38.evaluate(() => [...document.querySelectorAll('#listeRafales li')].map(li => li.textContent));
+      check('seuil 5 BTC : aucun trait, la liste le dit', !e5.rafales.dessinees.length && items5.length === 1 && /^Aucune rafale ≥ 5 BTC/.test(items5[0]), items5);
+      const opts = await p38.evaluate(() => [...document.querySelectorAll('#rRafaleMin option')].map(o => +o.value));
+      check('choix = BM.RAFALES.seuilsBtc', JSON.stringify(opts) === JSON.stringify(BM.RAFALES.seuilsBtc), opts);
+      const texte = await p38.evaluate(() => document.body.innerText + ' ' + window.__carte.etat().pastillesCompletes.join(' '));
+      check('jamais « un ordre de … BTC » ; la légende dit que le nombre exact n\'est pas publié',
+        !/un ordre de/i.test(texte) && (await p38.evaluate(() => document.getElementById('legRafales').textContent)).includes(BM.TEXTE_RAFALES), null);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p38.close();
+    }
+
+    titre('39. Réglages stockés hors liste (mémoire, rafales) : remplacés par les défauts');
+    {
+      let p39;
+      ({ page: p39, erreurs } = await ouvrir(nav, { encodage: true, reglages: { presenceSeuil: 7, rafaleMin: 'abc', calques: { memoire: 'oui', rafales: false } } }));
+      const r = (await etat(p39)).reglages;
+      check('presenceSeuil 7 → 10, rafaleMin « abc » → 2, calque mémoire « oui » → allumé ; rafales éteint (valide) gardé',
+        r.presenceSeuil === BM.PRESENCE.defautBtc && r.rafaleMin === BM.RAFALES.defautBtc && r.calques.memoire === true && r.calques.rafales === false && (r.rejets || []).includes('presenceSeuil'), r);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p39.close();
+    }
   } finally {
     await nav.close();
     serveur.close();
