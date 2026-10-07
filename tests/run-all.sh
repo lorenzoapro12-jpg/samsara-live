@@ -103,6 +103,8 @@ etape "9d. Thème Gare dans Chromium : palettes à 1ch, provenance lue dans CADE
 node test_gare.js || ko=1
 etape "9e. Structure « une » (Gazette) dans Chromium : manchette recopiée de la cote, tampon à l'édition nouvelle, cadences lues, démontage, mise en page (non exécuté sans Playwright)"
 node test_gazette.js || ko=1
+etape "9d. Structure « planche » (Cyanotype, Diazo) : jumeaux identiques hors jetons, pied de planche, cartouche, nuage de révision, canvas suivi, démontage (Chromium ; jumeaux hors ligne)"
+node test_planche.js || ko=1
 
 # Le budget d'image (≈ 30 min : mesures entrelacées, prix en mouvement) ne tourne pas ici : il
 # se relance quand une feuille de thème change — node tests/test_budget.js --enregistrer — et le

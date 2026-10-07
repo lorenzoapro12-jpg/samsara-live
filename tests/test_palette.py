@@ -41,6 +41,11 @@ CE QU'IL MESURE (par thème)
    historique — les deux tables et l'opacité sont LUES dans js/app.js (HEAT_RAMPE,
    CHALEUR_ALPHA), jamais recopiées ici. Sur fond clair, la rampe historique ne l'était pas.
 
+10. Texte posé SUR une marque (07/10/2026) : l'étiquette du dernier prix est remplie de --up ou
+   de --down, son texte est --up-sur / --down-sur (blanc par défaut) — AA texte ≥ 4,5:1, exigé du
+   thème qui déclare ces jetons ; relevé pour les autres (le blanc par défaut). Cyanotype, dont la
+   hausse est blanche, y écrivait du blanc sur du blanc (1,07:1).
+
 USAGE
     python3 tests/test_palette.py     # code de sortie 0 = tout tient
 """
@@ -190,7 +195,7 @@ def simule(rgb, matrice):
 
 
 # ─────────────────────────── lecture des thèmes ───────────────────────────
-from theme_css import themes_declares, tous_jetons, resout, couleur, compose, REPO
+from theme_css import themes_declares, tous_jetons, jetons_du_theme, resout, couleur, compose, REPO
 
 
 def rgb(jetons, nom, fond=None):
@@ -338,6 +343,19 @@ for t in THEMES:
                    + (f" — DÉCROÎT {len(descentes)} fois (max {cs[pic]:.2f}:1 à v={pic})" if descentes else ", monotone")
                    + (f", plus gros mur sous {SEUIL_CHALEUR_MAX}:1" if cs[-1] < SEUIL_CHALEUR_MAX else ""))
             (ok if not descentes and cs[-1] >= SEUIL_CHALEUR_MAX else echec)(f"{th} · chaleur {cote} sur --chart-2", det)
+
+    # 10. texte posé sur une marque (étiquette du dernier prix) : exigé si le thème le déclare
+    propres = set(jetons_du_theme(t))
+    for marque, sur in (("--up", "--up-sur"), ("--down", "--down-sur")):
+        fond_m = rgb(J, marque, fonds_canvas[1])
+        encre = rgb(J, sur, fond_m) if sur in J else (1.0, 1.0, 1.0)
+        r = contraste(encre, fond_m)
+        lib = f"{th} · {sur} sur {marque} (étiquette du prix)"
+        det = f"{r:.2f}:1 ({hexa(encre)} sur {hexa(fond_m)}, AA ≥ {SEUIL_AA_TEXTE})"
+        if sur in propres:
+            (ok if r >= SEUIL_AA_TEXTE else echec)(lib, det)
+        else:
+            (ok if r >= SEUIL_AA_TEXTE else info)(lib, det + ("" if r >= SEUIL_AA_TEXTE else " — blanc par défaut, relevé, non exigé"))
 
     # 6. exceptions sous 3:1 : étiquetées, pas silencieuses
     sous = [(n, min(contraste(c, f) for f in fonds_canvas)) for n, c in zip(NOMS_OV, ovs)]

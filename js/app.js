@@ -2443,7 +2443,7 @@ const COLORS = {
   stoch_k: '#d79a00', stoch_d: '#ff6b35', atr: '#00a693',
   obv: '#ff9800', mfi: '#9c27b0', williamsR: '#00a5bd', cci: '#ff5722', adx: '#d79a00',
   equity_total: '#e0a800',
-  candleUp: '#0d9672', candleDown: '#e5484d',
+  candleUp: '#0d9672', candleDown: '#e5484d', surUp: '#ffffff', surDown: '#ffffff',
   grid: 'rgba(127,127,127,0.12)', text: '#45597a',
   bougieForme: 'pleine', bougieRayon: 2, grilleTirets: []
 };
@@ -2456,6 +2456,9 @@ const COLORS = {
 // --grille-tirets : motif de la grille (ex. « 8 3 2 3 », trait mixte) ; « none » = trait plein.
 // --police-graphique : famille du texte du canvas (repli : --font).
 // --chaleur-bid / --chaleur-ask : encre de la couche « Liquidité » (voir HEAT_RAMPE).
+// --up-sur / --down-sur : encre du texte posé SUR une marque de hausse / de baisse (l'étiquette du
+// dernier prix) ; blanc par défaut. Un thème dont la hausse est claire (Cyanotype : traits blancs)
+// y écrivait du blanc sur du blanc — tests/test_palette.py mesure ce couple.
 // Sans ces jetons, le graphique est celui d'avant, au pixel près.
 const BOUGIE_DENSE_PX = 4;
 const FORMES_BOUGIE = {
@@ -2508,6 +2511,7 @@ function lireJetons() {
   COLORS.ink1 = v('--ink-1', '#10233d'); COLORS.text = v('--ink-2', '#45597a'); COLORS.ink3 = v('--ink-3', '#5f6e8c');
   COLORS.axis = COLORS.text;
   COLORS.upInk = v('--up-ink', up); COLORS.downInk = v('--down-ink', down);
+  COLORS.surUp = v('--up-sur', '#ffffff'); COLORS.surDown = v('--down-sur', '#ffffff');
   COLORS.accent2 = v('--accent-2', '#4f5fe0');
   COLORS.surface = v('--chart-surface', '#f4f6fe');
   COLORS.grid = v('--grille', COLORS.grid);
@@ -2683,7 +2687,8 @@ function dessinerCalque() {
     if (livePrice && livePrice >= minP && livePrice <= maxP) {
       const y = top + ph * (1 - (livePrice - minP) / range);
       const enCours = candles[candles.length - 1];
-      const tagC = (enCours && livePrice < enCours.open) ? COLORS.candleDown : COLORS.candleUp;
+      const baisse = !!enCours && livePrice < enCours.open;
+      const tagC = baisse ? COLORS.candleDown : COLORS.candleUp;
       cx.save();
       cx.strokeStyle = tagC;
       cx.globalAlpha = 0.14; cx.lineWidth = 4;
@@ -2702,7 +2707,7 @@ function dessinerCalque() {
       cx.beginPath(); cx.roundRect(bx, y - 11, lw, 22, 11); cx.fill();
       // Pointe vers le tracé : elle reste visible si le badge a reculé
       cx.beginPath(); cx.moveTo(triX, y - 4); cx.lineTo(triX + 8, y); cx.lineTo(triX, y + 4); cx.closePath(); cx.fill();
-      cx.fillStyle = '#ffffff';
+      cx.fillStyle = baisse ? COLORS.surDown : COLORS.surUp;   // --up-sur / --down-sur
       cx.fillText(lpStr, bx + 6, y + 4);
     }
   }

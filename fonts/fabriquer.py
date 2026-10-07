@@ -115,6 +115,17 @@ POLICES = [
     dict(sortie="gazette-titre.woff2", famille="Samsara Gazette Titre", origine="Playfair Display", theme="Gazette",
          dossier="playfairdisplay", source="PlayfairDisplay[wght].ttf", licence="playfairdisplay.OFL.txt",
          renommer="Playfair Display", instance={"wght": 800}, composes=["1E43=006D+002E:bas"], texte="Saṃsāra"),
+    # Cyanotype et Diazo : le lettrage de la planche (chasse fixe : chaque glyphe fait 1232 unités,
+    # les chiffres s'alignent en colonne dans le cartouche) ; △ ▲ ▼ pour l'indice de révision.
+    # γ (GEX) n'y est pas : repli sur la chasse fixe du système.
+    dict(sortie="overpass-mono.woff2", famille="Overpass Mono", origine="Overpass Mono", theme="Cyanotype, Diazo",
+         dossier="overpassmono", source="OverpassMono[wght].ttf", licence="overpassmono.OFL.txt",
+         instance={"wght": (400, 700)}, composes=COMPOSES_SAMSARA, plages=PLAGES_LATIN + ",U+25B2-25B3,U+25BC"),
+    # L'écriture du dessinateur : titres SEULEMENT (h1, cartes, « Détail A », « Vue A », cartouche),
+    # jamais un nombre — ses chiffres sont proportionnels.
+    dict(sortie="architects-daughter.woff2", famille="Architects Daughter", origine="Architects Daughter",
+         theme="Cyanotype, Diazo", dossier="architectsdaughter", source="ArchitectsDaughter-Regular.ttf",
+         licence="architectsdaughter.OFL.txt", composes=COMPOSES_SAMSARA),
 ]
 
 
