@@ -19,7 +19,8 @@ Pour chaque police de POLICES (Google Fonts, toutes sous SIL OFL 1.1) :
   4. sous-ensemble (pyftsubset, woff2, sans hinting) : les `plages` de la police (par défaut
      PLAGES_LATIN), ou, pour une police de TITRE, les seules lettres de `texte` (--text) ;
   5. RENOMME la police si sa licence déclare un nom réservé (Reserved Font Name) : une version
-     modifiée ne peut pas le porter (OFL, condition 3) ;
+     modifiée ne peut pas le porter (OFL, condition 3). Seuls ses NOMS changent : la mention de
+     copyright, la marque et la licence restent celles de l'original (NOMS_D_ORIGINE) ;
   6. date de fabrication FIXE (head.modified) : `horodatage` s'il est consigné, sinon celle de la
      source. Avant, chaque fabrication y inscrivait l'heure : deux fabrications identiques
      différaient de quelques octets (l'en-tête et sa somme de contrôle). Les cinq polices de Néon
@@ -197,8 +198,17 @@ def composer(f, specs):
                 t.cmap[u] = nom
 
 
+# Enregistrements de la table « name » qui DÉCRIVENT l'origine — copyright (0), marque (7), fonderie
+# (8), dessinateur (9), description (10), adresses (11, 12), licence (13, 14) : ils restent tels
+# quels. Les réécrire faisait dire à la mention de copyright « The Samsara … Project Authors, with
+# Reserved Font Name "Samsara …" » : une attribution fausse, et un nom réservé que nul n'a déclaré.
+NOMS_D_ORIGINE = {0, 7, 8, 9, 10, 11, 12, 13, 14}
+
+
 def renommer(f, ancien, neuf):
     for rec in f["name"].names:
+        if rec.nameID in NOMS_D_ORIGINE:
+            continue
         try:
             s = rec.toUnicode()
         except Exception:
