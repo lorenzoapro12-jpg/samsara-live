@@ -1,0 +1,467 @@
+/* Thème « Bureau 95 » — un bureau d'ordinateur personnel du milieu des années 1990. La page EST
+   déjà un bureau (une barre des tâches, son horloge) : la structure en révèle les fenêtres. Gris
+   VGA, sarcelle du bureau, barres de titre marine, relief à quatre filets d'un pixel ; tout est
+   OPAQUE, plat et net. STRUCTURE propre : « fenetres » (js/structures.js) — le graphique est une
+   fenêtre (barre de titre, barre d'outils = le ruban, zone client blanche, barre d'état = les
+   chiffres clés de la publication et leur âge), le marché live une seconde fenêtre ; la barre des
+   tâches reçoit « Démarrer » (le menu des thèmes), un lancement rapide (les boutons d'accès de
+   l'en-tête) et une zone de notification (point live, heure de publication UTC, horloge locale).
+   Déclaré dans index.html : <link data-theme="bureau95" data-mode="clair" data-verre="aucun"
+   data-structure="fenetres" data-paire="bureau95-contraste">.
+
+   JUMEAU. themes/bureau95-contraste.css (le schéma « contraste élevé », sombre) a les MÊMES règles,
+   au sélecteur de thème près : seuls les jetons diffèrent. Toute couleur passe donc par un jeton,
+   jamais en dur dans une règle ; tests/test_fenetres.py échoue si les deux feuilles divergent.
+
+   COULEURS (mesurées, tests/test_palette.py). Hausse = BLEU VGA, baisse = ROUGE : #ff0000 ne fait
+   que 3,64:1 sur la zone client, d'où #e00000. Barre de titre inactive #757575 : le texte blanc y
+   fait 4,61:1 (#808080, l'original, 3,95). L'âge vieilli en --warn-ink SOMBRE (#5c4800) : en clair
+   sur le gris, il était illisible au prototype.
+
+   POLICES. Le texte et TOUTES les valeurs sont en police système (0 octet, chiffres tabulaires).
+   Pixelify Sans (fonts/bureau95-titres.woff2, une graisse, 8,6 Ko) n'écrit que les barres de
+   titre, « Démarrer », le bandeau du menu et le titre : ses chiffres sont proportionnels, elle
+   n'écrit jamais un nombre.
+
+   EFFETS ET BUDGET. Aucun @keyframes, aucune transition : une fenêtre de 1995 s'ouvre d'un coup.
+   Le seul mouvement est celui de la base (l'onde du point live, une par publication), rendu ici
+   par paliers. Les décors (boutons de titre gravés, icônes, alerte) sont des images SVG fixes. */
+
+@font-face {
+  font-family: 'Pixelify Sans';
+  src: url('../fonts/bureau95-titres.woff2') format('woff2');
+  font-weight: 700; font-display: swap;
+}
+
+[data-theme="bureau95"] {
+  color-scheme: light;
+  --font: Tahoma, 'MS Sans Serif', 'Microsoft Sans Serif', Verdana, 'DejaVu Sans', sans-serif;
+  --police-titre: 'Pixelify Sans', Tahoma, 'DejaVu Sans', sans-serif;
+  /* Le canvas place ses textes à des abscisses FIXES (info-bulle O / H / L / C) : sans Tahoma, une
+     police étroite plutôt que DejaVu Sans, plus large, dont les colonnes se chevauchaient. */
+  --police-graphique: Tahoma, Arial, 'Liberation Sans', 'Helvetica Neue', Helvetica, sans-serif;
+  --r-bar: 0; --r-panel: 0; --r-card: 0; --r-tile: 0;
+
+  /* Le bureau : sarcelle VGA, uni. Opaque partout : ni verre, ni grain, ni trame. */
+  --fond: #008080; --verre: none; --grain: none; --trame: none;
+
+  /* Le RELIEF : quatre filets d'un pixel — clair extérieur (1), clair intérieur (2), ombre
+     intérieure (3), ombre extérieure (4). Relevé : bouton, fenêtre ; appuyé : bouton enfoncé ;
+     enfoncé : champ, zone client ; minces : volets de la barre d'état, barre d'outils. */
+  --relief-1: #ffffff; --relief-2: #dfdfdf; --relief-3: #808080; --relief-4: #0a0a0a;
+  --releve: inset -1px -1px var(--relief-4), inset 1px 1px var(--relief-1), inset -2px -2px var(--relief-3), inset 2px 2px var(--relief-2);
+  --appuye: inset 1px 1px var(--relief-4), inset -1px -1px var(--relief-1), inset 2px 2px var(--relief-3), inset -2px -2px var(--relief-2);
+  --enfonce: inset 1px 1px var(--relief-3), inset -1px -1px var(--relief-1), inset 2px 2px var(--relief-4), inset -2px -2px var(--relief-2);
+  --releve-mince: inset 1px 1px var(--relief-1), inset -1px -1px var(--relief-3);
+  --enfonce-mince: inset 1px 1px var(--relief-3), inset -1px -1px var(--relief-1);
+
+  --surface: #c0c0c0; --surface-ombre: var(--releve); --surface-reflet: none;
+  --card: #c0c0c0; --card-solid: #c0c0c0; --card-edge: #808080; --card-shadow: none; --card-hi: transparent; --card-reflet: none;
+  --capsule: #c0c0c0; --capsule-hover: #c0c0c0; --capsule-ombre: var(--releve);
+  --pill: transparent; --pill-hover: transparent;
+  /* Bouton bascule enfoncé : le tramé d'un pixel, texte noir (11,5 à 21:1 sur ses deux bornes). */
+  --pill-actif: repeating-conic-gradient(#c0c0c0 0 25%, #ffffff 0 50%) 0 0/2px 2px;
+  --pill-actif-ink: #000000; --pill-actif-ombre: var(--enfonce-mince);
+  --trame-95: repeating-conic-gradient(#c0c0c0 0 25%, #ffffff 0 50%) 0 0/2px 2px;   /* tâche active */
+  --piste-95: repeating-conic-gradient(#c0c0c0 0 25%, #ffffff 0 50%) 0 0/2px 2px;   /* piste de défilement */
+  --champ: #ffffff;                                                                  /* champ de saisie, zone client */
+  --titre-actif: var(--brand); --titre-inactif: #757575; --titre-ink: #ffffff;
+  --surbrillance: #000080; --surbrillance-ink: #ffffff;                              /* article de menu survolé */
+  --dot-anneau: #000000; --poignee: #c0c0c0; --poignee-hover: #c0c0c0;
+
+  --ink-1: #000000; --ink-2: #1a1a1a; --ink-3: #3a3a3a;
+  --up: #0000ff; --down: #e00000;
+  --up-ink: #000080; --down-ink: #800000;
+  --up-soft: #ffffff; --down-soft: #ffffff;
+  --warn: #808000; --warn-ink: #5c4800; --warn-soft: #ffffe1;
+  --accent: #000080; --accent-2: #000080; --accent-glow: transparent;
+  --brand: linear-gradient(90deg, #000080, #1060b0); --brand-fond: var(--brand); --brand-ink: #ffffff;
+  --hairline: #808080; --rail: #ffffff;
+  --modal-fond: #c0c0c0; --modal-ombre: none; --ombre-douce: none;
+  --selection: #000080; --defil: #c0c0c0; --defil-hover: #c0c0c0;
+  --prix-lueur: none;
+
+  /* Graphique : la zone client blanche d'une fenêtre, enfoncée ; grille en pointillés d'un pixel,
+     bougies pleines à angles vifs, info-bulle jaune pâle. */
+  --chart-1: #ffffff; --chart-2: #ffffff; --chart-3: #f4f4f4; --chart-surface: #ffffff;
+  --chart-lueur: none; --chart-creux: var(--enfonce);
+  --grille: rgba(0,0,0,0.12); --grille-tirets: 1 1; --reticule: rgba(0,0,0,0.6); --bulle: #ffffe1;
+  --filigrane: 0.05; --vol-alpha: 0.5; --bande-alpha: 0.08; --aura: 0; --bougie-rayon: 0;
+  /* Chaleur : encre fixe, seule l'opacité croît — 1,25 → 13,4 et 1,20 → 4,74:1, monotones. */
+  --chaleur-bid: #000080; --chaleur-ask: #e00000;
+  /* Overlays VGA : ΔE min 19,2 ; EMA100 #ff00ff à 2,85:1, rattrapé par son étiquette (ETIQ_OVERLAYS). */
+  --ov-ema20: #808000; --ov-ema50: #008080; --ov-ema100: #ff00ff;
+  --ov-ema200: #800080; --ov-sma20: #008000; --ov-sma50: #606060;
+  --sess-asie: rgba(128,128,0,0.75); --sess-europe: rgba(0,128,128,0.75); --sess-us: rgba(128,0,128,0.75);
+  --sr-1: #800080; --sr-2: #008080; --sr-3: #808000;
+  --fib: #808000; --vp: #008080; --vp-poc: #800080;
+
+  /* Images fixes du décor (SVG au pixel) : boutons de titre gravés, flèches de défilement. */
+  --f95-boutons-titre: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='14' shape-rendering='crispEdges'%3E%3Cpath fill='%23c0c0c0' d='M0 0h16v14h-16z'/%3E%3Cpath fill='%23ffffff' d='M0 0h15v1h-15zM0 0h1v13h-1z'/%3E%3Cpath fill='%23dfdfdf' d='M1 1h13v1h-13zM1 1h1v11h-1z'/%3E%3Cpath fill='%23808080' d='M1 12h14v1h-14zM14 1h1v12h-1z'/%3E%3Cpath fill='%230a0a0a' d='M0 13h16v1h-16zM15 0h1v14h-1z'/%3E%3Cpath fill='%23c0c0c0' d='M16 0h16v14h-16z'/%3E%3Cpath fill='%23ffffff' d='M16 0h15v1h-15zM16 0h1v13h-1z'/%3E%3Cpath fill='%23dfdfdf' d='M17 1h13v1h-13zM17 1h1v11h-1z'/%3E%3Cpath fill='%23808080' d='M17 12h14v1h-14zM30 1h1v12h-1z'/%3E%3Cpath fill='%230a0a0a' d='M16 13h16v1h-16zM31 0h1v14h-1z'/%3E%3Cpath fill='%23c0c0c0' d='M34 0h16v14h-16z'/%3E%3Cpath fill='%23ffffff' d='M34 0h15v1h-15zM34 0h1v13h-1z'/%3E%3Cpath fill='%23dfdfdf' d='M35 1h13v1h-13zM35 1h1v11h-1z'/%3E%3Cpath fill='%23808080' d='M35 12h14v1h-14zM48 1h1v12h-1z'/%3E%3Cpath fill='%230a0a0a' d='M34 13h16v1h-16zM49 0h1v14h-1z'/%3E%3Cpath fill='%23ffffff' d='M5 10h6v2h-6zM20 3h9v2h-9zM20 3h1v9h-1zM28 3h1v9h-1zM20 11h9v1h-9zM39 4h2v1h-2zM45 4h2v1h-2zM40 5h2v1h-2zM44 5h2v1h-2zM41 6h4v1h-4zM42 7h2v1h-2zM41 8h4v1h-4zM40 9h2v1h-2zM44 9h2v1h-2zM39 10h2v1h-2zM45 10h2v1h-2z'/%3E%3Cpath fill='%23808080' d='M4 9h6v2h-6zM19 2h9v2h-9zM19 2h1v9h-1zM27 2h1v9h-1zM19 10h9v1h-9zM38 3h2v1h-2zM44 3h2v1h-2zM39 4h2v1h-2zM43 4h2v1h-2zM40 5h4v1h-4zM41 6h2v1h-2zM40 7h4v1h-4zM39 8h2v1h-2zM43 8h2v1h-2zM38 9h2v1h-2zM44 9h2v1h-2z'/%3E%3C/svg%3E");
+  --f95-fleche-haut: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' shape-rendering='crispEdges'%3E%3Cpath fill='%23000000' d='M3 2h1v1h-1zM2 3h3v1h-3zM1 4h5v1h-5zM0 5h7v1h-7z'/%3E%3C/svg%3E");
+  --f95-fleche-bas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' shape-rendering='crispEdges'%3E%3Cpath fill='%23000000' d='M0 2h7v1h-7zM1 3h5v1h-5zM2 4h3v1h-3zM3 5h1v1h-1z'/%3E%3C/svg%3E");
+  --f95-fleche-gauche: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' shape-rendering='crispEdges'%3E%3Cpath fill='%23000000' d='M2 3h1v1h-1zM3 2h1v3h-1zM4 1h1v5h-1zM5 0h1v7h-1z'/%3E%3C/svg%3E");
+  --f95-fleche-droite: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' shape-rendering='crispEdges'%3E%3Cpath fill='%23000000' d='M2 0h1v7h-1zM3 1h1v5h-1zM4 2h1v3h-1zM5 3h1v1h-1z'/%3E%3C/svg%3E");
+}
+
+/* ── Base : police système, sélection et focus de l'époque ── */
+[data-theme="bureau95"] body { font-size: 12px; padding-bottom: calc(30px + var(--gutter)); }
+[data-theme="bureau95"] ::selection { background: var(--selection); color: var(--surbrillance-ink); }
+[data-theme="bureau95"] :focus-visible { outline: 1px dotted var(--ink-1); outline-offset: -4px; }
+/* Pendant le chargement du marché : le sablier (curseur « progress »). */
+[data-theme="bureau95"]:has(#feed .loading) { cursor: progress; }
+
+/* Barres de défilement : piste tramée, ascenseur en relief, flèches aux deux bouts. */
+[data-theme="bureau95"] ::-webkit-scrollbar { width: 16px; height: 16px; }
+[data-theme="bureau95"] ::-webkit-scrollbar-track { background: var(--piste-95); }
+[data-theme="bureau95"] ::-webkit-scrollbar-thumb { border-radius: 0; background: var(--surface); box-shadow: var(--releve); }
+[data-theme="bureau95"] ::-webkit-scrollbar-thumb:hover { background: var(--surface); }
+[data-theme="bureau95"] ::-webkit-scrollbar-corner { background: var(--surface); }
+[data-theme="bureau95"] ::-webkit-scrollbar-button:single-button { display: block; width: 16px; height: 16px; background: var(--surface) no-repeat center; box-shadow: var(--releve); }
+[data-theme="bureau95"] ::-webkit-scrollbar-button:single-button:active { box-shadow: var(--enfonce-mince); }
+[data-theme="bureau95"] ::-webkit-scrollbar-button:single-button:vertical:decrement { background-image: var(--f95-fleche-haut); }
+[data-theme="bureau95"] ::-webkit-scrollbar-button:single-button:vertical:increment { background-image: var(--f95-fleche-bas); }
+[data-theme="bureau95"] ::-webkit-scrollbar-button:single-button:horizontal:decrement { background-image: var(--f95-fleche-gauche); }
+[data-theme="bureau95"] ::-webkit-scrollbar-button:single-button:horizontal:increment { background-image: var(--f95-fleche-droite); }
+
+/* ── En-tête : une barre d'outils ; le prix et sa variation dans des champs enfoncés ── */
+[data-theme="bureau95"] .header { padding: 5px 8px 5px 10px; gap: 10px; }
+[data-theme="bureau95"] .header-left { gap: 10px; }
+/* La roue, aux seize couleurs : un secteur par couleur, sans dégradé ni lueur. */
+[data-theme="bureau95"] .header-orb {
+  width: 24px; height: 24px;
+  --orbe:
+    radial-gradient(circle, #c0c0c0 0 20%, #000000 21% 27%, transparent 28%),
+    conic-gradient(#ff0000 0 12.5%, #ffff00 0 25%, #00ff00 0 37.5%, #00ffff 0 50%, #0000ff 0 62.5%, #ff00ff 0 75%, #800080 0 87.5%, #000080 0);
+  --orbe-ombre: 0 0 0 1px var(--relief-4);
+}
+[data-theme="bureau95"] .header-left h1 {
+  font: 700 23px/1 var(--police-titre); letter-spacing: 0; -webkit-font-smoothing: none;
+  background: none; color: var(--ink-1); -webkit-text-fill-color: currentColor;
+}
+[data-theme="bureau95"] .price-badge { padding: 4px 8px 4px 7px; background: var(--champ); box-shadow: var(--enfonce); font-size: 21px; letter-spacing: 0; }
+[data-theme="bureau95"] .var24 { padding: 5px 7px 4px; border-radius: 0; background: var(--champ); box-shadow: var(--enfonce); font-size: 12px; }
+/* Le sélecteur de paire : une liste déroulante — un champ blanc et son bouton flèche. */
+[data-theme="bureau95"] .paire-btn { padding: 2px 2px 2px 6px; gap: 6px; border: 0; background: var(--champ); box-shadow: var(--enfonce); font-size: 12px; letter-spacing: 0; }
+[data-theme="bureau95"] .paire-btn:hover { background: var(--champ); }
+[data-theme="bureau95"] .paire-btn svg { width: 17px; height: 17px; padding: 3px; color: var(--ink-1); background: var(--surface); box-shadow: var(--releve); }
+[data-theme="bureau95"] .paire-btn:active svg { box-shadow: var(--appuye); }
+
+/* ── Boutons : relevés ; appuyés, le relief s'inverse et le contenu descend d'un pixel ── */
+[data-theme="bureau95"] .theme-btn { color: var(--ink-1); border: 0; transition: none; }
+[data-theme="bureau95"] .theme-btn:hover { color: var(--ink-1); background: var(--capsule); }
+[data-theme="bureau95"] .theme-btn:active { transform: none; box-shadow: var(--appuye); }
+[data-theme="bureau95"] .theme-btn:active > svg { transform: translate(1px, 1px); }
+[data-theme="bureau95"] .theme-btn.ico-btn.on { color: var(--pill-actif-ink); background: var(--pill-actif); box-shadow: var(--appuye); }
+[data-theme="bureau95"] .mode-btn { height: 24px; }
+[data-theme="bureau95"] .mode-btn[aria-pressed="true"] { color: var(--pill-actif-ink); background: var(--pill-actif); box-shadow: var(--appuye); }
+[data-theme="bureau95"] .info-btn { border: 0; border-radius: 0; background: var(--surface); color: var(--ink-1); box-shadow: var(--releve-mince); }
+[data-theme="bureau95"] .info-btn:hover { color: var(--ink-1); }
+[data-theme="bureau95"] .info-btn:active { box-shadow: var(--enfonce-mince); }
+
+/* ── Fenêtres : barre de titre (décor : icône, titre, boutons GRAVÉS donc inactifs) ── */
+[data-theme="bureau95"] .f95-titre {
+  position: absolute; z-index: 5; left: 3px; right: 3px; top: 3px; height: 20px;
+  display: flex; align-items: center; gap: 3px; padding: 0 2px; overflow: hidden; white-space: nowrap;
+  background: var(--titre-inactif); color: var(--titre-ink);
+  font: 700 16px/1 var(--police-titre); -webkit-font-smoothing: none;
+}
+[data-theme="bureau95"] .f95-titre::before {
+  content: ''; flex: 0 0 16px; height: 16px; background: no-repeat center;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'%3E%3Cpath fill='%23000000' d='M0 0h16v16h-16z'/%3E%3Cpath fill='%23ffffff' d='M1 1h14v14h-14z'/%3E%3Cpath fill='%230000ff' d='M4 4h1v9h-1zM3 6h3v5h-3z'/%3E%3Cpath fill='%23e00000' d='M8 3h1v8h-1zM7 4h3v5h-3z'/%3E%3Cpath fill='%230000ff' d='M12 3h1v10h-1zM11 5h3v6h-3z'/%3E%3C/svg%3E");
+}
+[data-theme="bureau95"] .feed-panel > .f95-titre::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' shape-rendering='crispEdges'%3E%3Cpath fill='%23000000' d='M2 0h10v1h-10zM2 0h1v16h-1zM2 15h12v1h-12zM13 4h1v12h-1zM11 0h1v4h-1zM11 3h3v1h-3zM12 1h1v1h-1z'/%3E%3Cpath fill='%23ffffff' d='M3 1h8v14h-8zM11 4h2v11h-2z'/%3E%3Cpath fill='%23000080' d='M4 5h7v1h-7zM4 8h8v1h-8zM4 11h6v1h-6z'/%3E%3Cpath fill='%23e00000' d='M4 2h4v1h-4z'/%3E%3C/svg%3E"); }
+[data-theme="bureau95"] .f95-titre::after { content: ''; flex: 0 0 50px; height: 14px; margin-left: auto; background: var(--f95-boutons-titre) no-repeat; }
+/* Fenêtre active : le graphique l'est toujours (son canvas ne prend pas le focus) ; le marché
+   live l'est au survol ou quand un de ses contrôles a le focus. */
+[data-theme="bureau95"] .chart-container > .f95-titre { background: var(--titre-actif); }
+[data-theme="bureau95"] .feed-panel:hover > .f95-titre { background: var(--titre-actif); }
+[data-theme="bureau95"] .feed-panel:focus-within > .f95-titre { background: var(--titre-actif); }
+
+/* ── Fenêtre « Graphique » : titre, barre d'outils (le ruban), zone client, barre d'état ──
+   resizeCanvas soustrait le padding : le canvas occupe exactement la zone client. */
+[data-theme="bureau95"] .chart-container { padding: 60px 6px 30px; }
+[data-theme="bureau95"] .chart-container canvas { border-radius: 0; }
+[data-theme="bureau95"] .chart-container > .indicator-bar {
+  position: absolute; z-index: 4; left: 3px; right: 3px; top: 24px; height: 33px;
+  padding: 3px 4px 5px; gap: 1px; border-radius: 0; background: var(--surface);
+  box-shadow: inset 0 -1px var(--relief-1), inset 0 -2px var(--relief-3);
+}
+[data-theme="bureau95"] .indicator-bar .section-title { padding: 0 3px 0 4px; color: var(--ink-3); letter-spacing: 0.6px; }
+[data-theme="bureau95"] .indicator-bar .sep { width: 2px; height: 20px; margin: 0 3px; background: linear-gradient(90deg, var(--relief-3) 0 1px, var(--relief-1) 1px 2px); }
+[data-theme="bureau95"] .indicator-bar label { padding: 3px 7px; border: 0; border-radius: 0; font-weight: 400; transition: none; }
+[data-theme="bureau95"] .indicator-bar label:hover { background: transparent; box-shadow: var(--releve-mince); }
+[data-theme="bureau95"] .indicator-bar label:active { box-shadow: var(--enfonce-mince); }
+[data-theme="bureau95"] .indicator-bar label.active { font-weight: 700; }
+[data-theme="bureau95"] .indicator-bar label.active:hover { background: var(--pill-actif); box-shadow: var(--pill-actif-ombre); }
+/* La couleur d'un overlay : une pastille carrée cerclée de noir, la couleur exacte du tracé. */
+[data-theme="bureau95"] .indicator-bar label[style*="--dot"] .ind-label::before { width: 8px; height: 8px; border-radius: 0; box-shadow: 0 0 0 1px var(--dot-anneau); }
+[data-theme="bureau95"] .ind-dropdown-btn { padding: 3px 8px 3px 6px; border: 0; }
+[data-theme="bureau95"] .ind-dropdown-btn:hover { background: var(--capsule); }
+[data-theme="bureau95"] .ind-dropdown-btn:active { box-shadow: var(--appuye); }
+
+/* La barre d'état : les chiffres clés de la publication en volets enfoncés, l'âge dans le volet
+   de droite. Ce qui ne tient pas est masqué EN ENTIER depuis la fin (ajusterKpis), comme dans
+   l'en-tête de la base ; la structure le relance quand la fenêtre change de largeur. */
+[data-theme="bureau95"] .f95-etat { position: absolute; z-index: 4; left: 3px; right: 3px; bottom: 3px; height: 22px; display: flex; padding-right: 15px; }
+[data-theme="bureau95"] .f95-etat::after {
+  content: ''; position: absolute; right: 1px; bottom: 1px; width: 12px; height: 12px;
+  background: repeating-linear-gradient(135deg, transparent 0 2px, var(--relief-1) 2px 3px, var(--relief-3) 3px 5px, transparent 5px 6px);
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+/* display: flex — la base masque .kpis sous 800 px (place de l'en-tête) ; la barre d'état les garde. */
+[data-theme="bureau95"] .f95-etat .kpis { display: flex; flex: 1 1 auto; height: 22px; gap: 2px; align-items: stretch; }
+[data-theme="bureau95"] .f95-etat .kpi { flex-direction: row; align-items: center; gap: 5px; padding: 0 7px; border-left: 0; line-height: 1; box-shadow: var(--enfonce-mince); }
+[data-theme="bureau95"] .f95-etat .kpi:first-child { padding-left: 7px; }
+[data-theme="bureau95"] .f95-etat .kpi i { font-size: 11px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--ink-3); }
+[data-theme="bureau95"] .f95-etat .kpi b { font-size: 11.5px; letter-spacing: 0; }
+[data-theme="bureau95"] .f95-etat .kpi-age {
+  display: flex; align-items: center; gap: 4px; margin-left: auto; padding: 0 8px; border-radius: 0;
+  font-size: 11px; font-weight: 400; color: var(--ink-1); background: transparent; box-shadow: var(--enfonce-mince);
+}
+/* Publication en retard (seuil de la base, CADENCES.vieux_min) : le volet d'âge porte l'icône
+   d'avertissement, en plus des minutes qui restent affichées. */
+[data-theme="bureau95"] .f95-etat .kpis.vieux .kpi-age { font-weight: 700; color: var(--warn-ink); background: var(--warn-soft); }
+[data-theme="bureau95"] .f95-etat .kpis.vieux .kpi-age::before {
+  content: ''; flex: 0 0 13px; height: 12px; background: no-repeat center;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='12'%3E%3Cpath d='M6.5 .5 12.5 11.5H.5Z' fill='%23ffff00' stroke='%23000000' stroke-linejoin='round'/%3E%3Crect x='6' y='4' width='1' height='4' fill='%23000000'/%3E%3Crect x='6' y='9' width='1' height='1' fill='%23000000'/%3E%3C/svg%3E");
+}
+
+/* ── Fenêtre « Marché live » ── */
+[data-theme="bureau95"] .feed-panel { padding: 24px 3px 3px; transition: none; }
+[data-theme="bureau95"] .feed-panel.collapsed { padding: 3px; }
+[data-theme="bureau95"] .feed-panel.collapsed > .f95-titre { display: none; }
+[data-theme="bureau95"] .feed-panel-handle {
+  width: 18px; margin-right: 2px; padding: 8px 0; border-right: 0; letter-spacing: 2px;
+  color: var(--ink-1); background: var(--surface); box-shadow: var(--releve); transition: none;
+}
+[data-theme="bureau95"] .feed-panel-handle::after { display: none; }
+[data-theme="bureau95"] .feed-panel-handle:hover { color: var(--ink-1); background: var(--surface); }
+[data-theme="bureau95"] .feed-panel-handle:active { box-shadow: var(--appuye); }
+/* Repliée, la fenêtre n'est plus que sa barre de titre, debout. */
+[data-theme="bureau95"] .feed-panel.collapsed .feed-panel-handle {
+  width: 100%; margin: 0; letter-spacing: 1px; text-transform: none; box-shadow: none;
+  color: var(--titre-ink); background: var(--titre-inactif); font: 700 16px/1 var(--police-titre); -webkit-font-smoothing: none;
+}
+[data-theme="bureau95"] .feed-panel.collapsed .feed-panel-handle:hover { color: var(--titre-ink); background: var(--titre-actif); }
+[data-theme="bureau95"] .feed { padding: 12px 8px 10px 10px; gap: 14px; }
+
+/* Les cartes deviennent des ZONES DE GROUPE : un cadre gravé, le titre posé sur le filet. */
+[data-theme="bureau95"] .demon-card {
+  overflow: visible; margin-top: 7px; padding: 13px 10px 10px; background: transparent;
+  border: 1px solid var(--relief-3); box-shadow: inset 1px 1px var(--relief-1), 1px 1px var(--relief-1);
+}
+[data-theme="bureau95"] .demon-card::before { display: none; }
+[data-theme="bureau95"] .demon-card::after { display: none; }
+[data-theme="bureau95"] .demon-card.entree { animation: none; }
+[data-theme="bureau95"] .demon-header { align-items: flex-start; gap: 0; margin: -21px 0 10px; }
+[data-theme="bureau95"] .demon-avatar { padding: 0 3px 0 4px; font-size: 0; line-height: 0; background: var(--surface); }
+[data-theme="bureau95"] .avatar-orb { width: 16px; height: 16px; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--accent); }
+[data-theme="bureau95"] .avatar-orb::after { display: none; }
+[data-theme="bureau95"] .avatar-orb svg { width: 16px; height: 16px; filter: none; }
+[data-theme="bureau95"] .demon-titres { padding-top: 1px; }
+[data-theme="bureau95"] .demon-name { display: inline-block; padding: 0 4px 0 1px; font-size: 12px; line-height: 14px; letter-spacing: 0; background: var(--surface); }
+[data-theme="bureau95"] .demon-role { margin-top: 3px; }
+[data-theme="bureau95"] .demon-right { align-self: flex-end; }
+/* Valeurs : des champs enfoncés blancs ; jauges en barre de progression et curseur relevé. */
+[data-theme="bureau95"] .tuile { background: var(--champ); box-shadow: var(--enfonce); padding: 7px 10px 8px; }
+[data-theme="bureau95"] .tuile .val { letter-spacing: 0; }
+[data-theme="bureau95"] .hero-val { letter-spacing: 0; }
+[data-theme="bureau95"] .chip { border-radius: 0; background: var(--champ); box-shadow: var(--enfonce-mince); }
+[data-theme="bureau95"] .badge { border-radius: 0; box-shadow: var(--enfonce-mince); }
+[data-theme="bureau95"] .etat { border-radius: 0; box-shadow: var(--enfonce-mince); }
+[data-theme="bureau95"] .tf-nom { border-radius: 0; background: var(--champ); box-shadow: var(--enfonce-mince); }
+[data-theme="bureau95"] .track-rail { height: 10px; border-radius: 0; background: var(--champ); box-shadow: var(--enfonce-mince); }
+[data-theme="bureau95"] .track-fill {
+  top: 2px; bottom: 2px; left: 2px; max-width: calc(100% - 4px); border-radius: 0; opacity: 1;
+  background: repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 8px);
+}
+[data-theme="bureau95"] .track-dot { width: 7px; height: 16px; margin: -8px 0 0 -3px; border-radius: 0; background: var(--surface); box-shadow: var(--releve); }
+[data-theme="bureau95"] .rsi-meter { height: 8px; border-radius: 0; background: var(--champ); box-shadow: var(--enfonce-mince); }
+[data-theme="bureau95"] .rsi-zone.bas { border-radius: 0; background: color-mix(in srgb, var(--up) 22%, var(--champ)); }
+[data-theme="bureau95"] .rsi-zone.haut { border-radius: 0; background: color-mix(in srgb, var(--down) 22%, var(--champ)); }
+[data-theme="bureau95"] .rsi-dot { width: 7px; height: 14px; margin: -7px 0 0 -3px; border-radius: 0; box-shadow: 0 0 0 1px var(--relief-4); }
+[data-theme="bureau95"] .split { border-radius: 0; height: 10px; }
+[data-theme="bureau95"] .dv-bar { border-radius: 0; background: var(--champ); box-shadow: var(--enfonce-mince); }
+[data-theme="bureau95"] .dv-fill.pos { border-radius: 0; }
+[data-theme="bureau95"] .dv-fill.neg { border-radius: 0; }
+[data-theme="bureau95"] .lad-bar span { border-radius: 0; }
+[data-theme="bureau95"] .axe-rail { border-radius: 0; }
+[data-theme="bureau95"] .lecture-courte { border-left: 0; border-radius: 0; color: var(--ink-1); background: var(--bulle); box-shadow: inset 0 0 0 1px var(--relief-4); }
+[data-theme="bureau95"] .error { border-radius: 0; background: var(--surface); box-shadow: var(--releve); }
+/* Le bandeau d'âge devient une BOÎTE DE MESSAGE, texte inchangé : l'icône d'erreur quand la
+   publication est figée, l'avertissement quand elle est en retard. */
+[data-theme="bureau95"] .age-banner { gap: 10px; padding: 9px 11px; border-radius: 0; font-weight: 400; color: var(--ink-1); background: var(--surface); box-shadow: var(--releve); }
+[data-theme="bureau95"] .age-banner::before {
+  width: 16px; height: 16px; border-radius: 0; box-shadow: none; background: no-repeat center;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Ccircle cx='8' cy='8' r='7.5' fill='%23ff0000' stroke='%23800000'/%3E%3Cpath d='M5 5 11 11M11 5 5 11' stroke='%23ffffff' stroke-width='2'/%3E%3C/svg%3E");
+}
+[data-theme="bureau95"] .age-banner.retard { color: var(--ink-1); background: var(--surface); }
+[data-theme="bureau95"] .age-banner.retard::before { box-shadow: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='12'%3E%3Cpath d='M6.5 .5 12.5 11.5H.5Z' fill='%23ffff00' stroke='%23000000' stroke-linejoin='round'/%3E%3Crect x='6' y='4' width='1' height='4' fill='%23000000'/%3E%3Crect x='6' y='9' width='1' height='1' fill='%23000000'/%3E%3C/svg%3E"); }
+
+/* ── Menus : Démarrer (les thèmes), la paire, les indicateurs ── */
+[data-theme="bureau95"] .theme-menu { min-width: 270px; padding: 3px 3px 3px 27px; border: 0; border-radius: 0; background: var(--surface); box-shadow: var(--releve); }
+/* Le bandeau vertical du menu Démarrer : en ::before, il survit à remplirMenuThemes (qui ne
+   réécrit que le contenu du menu). Muet pour les lecteurs d'écran (texte de remplacement vide). */
+[data-theme="bureau95"] .theme-menu::before {
+  content: 'Saṃsāra 95' / ''; position: absolute; left: 3px; top: 3px; bottom: 3px; width: 21px;
+  padding-top: 8px; overflow: hidden; white-space: nowrap; writing-mode: vertical-rl; transform: rotate(180deg);
+  font: 700 18px/21px var(--police-titre); -webkit-font-smoothing: none; color: var(--titre-ink); background: var(--titre-actif);
+}
+[data-theme="bureau95"] .theme-menu .cat-title { padding: 3px 6px 5px; }
+[data-theme="bureau95"] .theme-item { gap: 10px; padding: 4px 6px; border-radius: 0; }
+[data-theme="bureau95"] .theme-item:hover { color: var(--surbrillance-ink); background: var(--surbrillance); }
+[data-theme="bureau95"] .theme-item[aria-checked="true"] { background: transparent; }
+[data-theme="bureau95"] .theme-item[aria-checked="true"]:hover { background: var(--surbrillance); }
+[data-theme="bureau95"] .theme-item[aria-checked="true"] .theme-nom { font-weight: 700; }
+[data-theme="bureau95"] .theme-item[aria-checked="true"] .theme-nom::after { color: inherit; }
+[data-theme="bureau95"] .theme-item:hover .theme-mode { color: inherit; }
+[data-theme="bureau95"] .theme-item:hover .theme-structure { color: inherit; }
+[data-theme="bureau95"] .theme-nom { font-size: 12px; font-weight: 400; }
+[data-theme="bureau95"] .theme-apercu { border-radius: 0; box-shadow: inset 0 0 0 1px var(--relief-3); }
+[data-theme="bureau95"] .paire-menu { padding: 3px; border: 0; border-radius: 0; background: var(--surface); box-shadow: var(--releve); }
+[data-theme="bureau95"] .paire-menu label { padding: 4px 10px; border-radius: 0; }
+[data-theme="bureau95"] .paire-menu label:hover { color: var(--surbrillance-ink); background: var(--surbrillance); }
+[data-theme="bureau95"] .paire-menu label.active { color: var(--ink-1); background: transparent; font-weight: 700; }
+[data-theme="bureau95"] .paire-menu label.active:hover { color: var(--surbrillance-ink); background: var(--surbrillance); }
+[data-theme="bureau95"] .ind-dropdown-menu { padding: 3px 0; border: 0; border-radius: 0; background: var(--surface); box-shadow: var(--releve); }
+[data-theme="bureau95"] .ind-dropdown-menu label { margin: 0 3px; padding: 3px 10px; border-radius: 0; }
+[data-theme="bureau95"] .ind-dropdown-menu label:hover { color: var(--surbrillance-ink); background: var(--surbrillance); }
+[data-theme="bureau95"] .ind-dropdown-menu label .tag { border-radius: 0; background: var(--champ); box-shadow: var(--enfonce-mince); }
+
+/* ── Boîtes de dialogue : légendes, réglages ── */
+[data-theme="bureau95"] .fiche-pop { padding: 3px 12px 12px; border: 0; border-radius: 0; background: var(--surface); box-shadow: var(--releve); }
+[data-theme="bureau95"] .fiche-tete { height: 22px; margin: 0 -9px 8px; padding: 0 2px 0 5px; gap: 6px; color: var(--titre-ink); background: var(--titre-actif); }
+[data-theme="bureau95"] .fiche-titre { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--titre-ink); font: 700 16px/1 var(--police-titre); -webkit-font-smoothing: none; }
+[data-theme="bureau95"] .fiche-nature { padding: 1px 5px; border-radius: 0; }
+[data-theme="bureau95"] .fiche-fermer { flex: 0 0 16px; width: 16px; height: 14px; padding: 0; border-radius: 0; color: var(--ink-1); background: var(--surface); box-shadow: var(--releve); font: 700 12px/13px var(--font); }
+[data-theme="bureau95"] .fiche-fermer:hover { color: var(--ink-1); background: var(--surface); }
+[data-theme="bureau95"] .fiche-fermer:active { box-shadow: var(--appuye); }
+[data-theme="bureau95"] .fiche-alerte { border-radius: 0; }
+[data-theme="bureau95"] .fiche-debat { border-radius: 0; }
+[data-theme="bureau95"] .statut { border-radius: 0; }
+[data-theme="bureau95"] .glossaire-item { border: 0; border-radius: 0; background: var(--surface); box-shadow: var(--releve); }
+[data-theme="bureau95"] .glossaire-item:active { box-shadow: var(--appuye); }
+[data-theme="bureau95"] .fiche-pop .lien { border: 0; border-radius: 0; background: var(--surface); box-shadow: var(--releve); }
+[data-theme="bureau95"] .reglage select { border: 0; border-radius: 0; background: var(--champ); box-shadow: var(--enfonce); }
+[data-theme="bureau95"] .ligne-reglage input { border: 0; border-radius: 0; background: var(--champ); box-shadow: var(--enfonce); }
+[data-theme="bureau95"] .puce-case { border: 0; border-radius: 0; background: transparent; }
+
+/* ── Fenêtres plein écran (téléphone : marché live ; ⚡ partout) ── */
+[data-theme="bureau95"] .modal { padding: 3px; box-shadow: var(--releve); }
+[data-theme="bureau95"] .modal-tete { min-height: 24px; padding: 2px 3px 2px 6px; border-bottom: 0; box-shadow: none; background: var(--titre-actif); }
+[data-theme="bureau95"] .modal-titre { font: 700 16px/1.1 var(--police-titre); letter-spacing: 0; -webkit-font-smoothing: none; background: none; color: var(--titre-ink); -webkit-text-fill-color: currentColor; }
+[data-theme="bureau95"] .modal-titre span { font-family: var(--font); color: var(--titre-ink); -webkit-text-fill-color: currentColor; }
+/* L'heure de la lecture live, sur la même ligne que le titre (une barre de titre n'a qu'une ligne). */
+[data-theme="bureau95"] .modal-titre #liveClock { display: inline; margin: 0 0 0 6px; }
+[data-theme="bureau95"] .modal-fermer { width: 22px; height: 20px; border: 0; border-radius: 0; color: var(--ink-1); background: var(--surface); box-shadow: var(--releve); }
+[data-theme="bureau95"] .modal-fermer:active { box-shadow: var(--appuye); }
+/* Le bas de la liste remonte au-dessus de la barre des tâches (fixe, devant la fenêtre). */
+[data-theme="bureau95"] .modal-corps { gap: 14px; padding: 12px 10px 48px; }
+
+/* ── Grid Bot : une fenêtre dont la barre de titre est la poignée (marine, ouverte) ── */
+[data-theme="bureau95"] .strat-section { transition: none; }
+[data-theme="bureau95"] .strat-handle {
+  height: 28px; padding: 0 3px 0 6px; border: 3px solid transparent; letter-spacing: 0;
+  color: var(--titre-ink); background: var(--titre-inactif) padding-box;
+  font: 700 16px/1 var(--police-titre); -webkit-font-smoothing: none;
+}
+[data-theme="bureau95"] .strat-handle:hover { color: var(--titre-ink); }
+[data-theme="bureau95"] .strat-section:not(.collapsed) .strat-handle { background: var(--titre-actif) padding-box; }
+[data-theme="bureau95"] .strat-handle-arrow {
+  display: flex; align-items: center; justify-content: center; width: 16px; height: 14px; font-size: 0;
+  color: var(--ink-1); background: var(--surface); box-shadow: var(--releve); transition: none;
+}
+[data-theme="bureau95"] .strat-handle-arrow::after { content: '▸' / ''; font: 700 10px/1 var(--font); }
+[data-theme="bureau95"] .strat-section:not(.collapsed) .strat-handle-arrow { transform: none; }
+[data-theme="bureau95"] .strat-section:not(.collapsed) .strat-handle-arrow::after { content: '▾' / ''; }
+[data-theme="bureau95"] .strat-handle:active .strat-handle-arrow { box-shadow: var(--appuye); }
+[data-theme="bureau95"] .strat-body { height: calc(100% - 28px); }
+[data-theme="bureau95"] .strat-section .strat-row select { border: 0; border-radius: 0; background: var(--champ); box-shadow: var(--enfonce); }
+[data-theme="bureau95"] .strat-section .strat-row input[type="number"] { border: 0; border-radius: 0; background: var(--champ); box-shadow: var(--enfonce); }
+[data-theme="bureau95"] .strat-section input[type="datetime-local"] { border: 0; border-radius: 0; background: var(--champ); box-shadow: var(--enfonce); }
+[data-theme="bureau95"] .strat-section .strat-row select:focus { box-shadow: var(--enfonce); outline: 1px dotted var(--ink-1); outline-offset: -4px; }
+[data-theme="bureau95"] .strat-section .strat-row input:focus { box-shadow: var(--enfonce); outline: 1px dotted var(--ink-1); outline-offset: -4px; }
+[data-theme="bureau95"] .strat-btn { border: 0; border-radius: 0; color: var(--ink-1); background: var(--surface); box-shadow: var(--releve); transition: none; }
+/* Le bouton par défaut d'une boîte de dialogue : un filet noir de plus. */
+[data-theme="bureau95"] .strat-btn:not(.secondary):not(.forward) { box-shadow: 0 0 0 1px var(--relief-4), var(--releve); }
+[data-theme="bureau95"] .strat-btn:hover { box-shadow: var(--releve); }
+[data-theme="bureau95"] .strat-btn:active { transform: none; box-shadow: var(--appuye); }
+[data-theme="bureau95"] .strat-btn.secondary { color: var(--ink-1); background: var(--surface); }
+[data-theme="bureau95"] .strat-btn.forward { color: var(--ink-1); background: var(--surface); }
+[data-theme="bureau95"] .strat-section .strat-stats { border: 0; border-radius: 0; background: var(--champ); box-shadow: var(--enfonce); }
+
+/* ── Barre des tâches : Démarrer, lancement rapide, la tâche active, zone de notification ── */
+[data-theme="bureau95"] .aero-taskbar {
+  left: 0; right: 0; bottom: 0; height: 30px; padding: 3px 2px 1px; gap: 4px; border-radius: 0;
+  font-size: 11px; font-weight: 400; color: var(--ink-1);
+  box-shadow: inset 0 1px var(--relief-2), inset 0 2px var(--relief-1);
+}
+[data-theme="bureau95"] .aero-taskbar .taskbar-left { gap: 3px; min-width: 0; height: 100%; }
+[data-theme="bureau95"] .aero-taskbar .taskbar-right { gap: 4px; flex-shrink: 0; height: 100%; }
+/* Le voyant de la barre (même état que le point live, déplacé dans la zone) : un seul voyant. */
+[data-theme="bureau95"] .taskbar-dot { display: none; }
+[data-theme="bureau95"] #themeBtn {
+  width: auto; height: 24px; gap: 4px; padding: 0 6px 0 4px;
+  font: 700 16px/1 var(--police-titre); -webkit-font-smoothing: none; color: var(--ink-1);
+}
+[data-theme="bureau95"] #themeBtn svg { width: 16px; height: 16px; }
+[data-theme="bureau95"] #themeBtn::after { content: 'Démarrer' / ''; }
+/* Démarrer reste enfoncé tant que son menu est ouvert. */
+[data-theme="bureau95"]:has(#themeMenu.open) #themeBtn { padding: 1px 5px 0 5px; box-shadow: var(--appuye); }
+[data-theme="bureau95"] .f95-lancement { position: relative; display: flex; align-items: center; height: 24px; padding: 0 9px 0 9px; }
+[data-theme="bureau95"] .f95-lancement::before { content: ''; position: absolute; left: 3px; top: 2px; bottom: 2px; width: 3px; box-shadow: var(--releve-mince); }
+[data-theme="bureau95"] .f95-lancement::after { content: ''; position: absolute; right: 3px; top: 2px; bottom: 2px; width: 3px; box-shadow: var(--releve-mince); }
+[data-theme="bureau95"] .f95-lancement .theme-btn.ico-btn { width: 24px; height: 22px; background: transparent; box-shadow: none; }
+[data-theme="bureau95"] .f95-lancement .theme-btn.ico-btn:hover { box-shadow: var(--releve-mince); }
+[data-theme="bureau95"] .f95-lancement .theme-btn.ico-btn:active { box-shadow: var(--enfonce-mince); }
+[data-theme="bureau95"] .f95-lancement .theme-btn.ico-btn.on { color: var(--pill-actif-ink); background: var(--pill-actif); box-shadow: var(--enfonce-mince); }
+[data-theme="bureau95"] .f95-lancement .theme-btn.ico-btn svg { width: 16px; height: 16px; }
+[data-theme="bureau95"] .f95-tache {
+  display: flex; align-items: center; gap: 5px; height: 24px; min-width: 0; max-width: 220px; padding: 0 9px 0 7px;
+  overflow: hidden; white-space: nowrap; font-weight: 700; background: var(--trame-95); box-shadow: var(--appuye);
+}
+[data-theme="bureau95"] .f95-tache #taskbarPair::before { content: '– ' / ''; }
+[data-theme="bureau95"] .f95-zone { display: flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px 0 7px; white-space: nowrap; box-shadow: var(--enfonce-mince); }
+[data-theme="bureau95"] .f95-pub { color: var(--ink-3); }
+[data-theme="bureau95"] .f95-zone #updated { font-size: 11px; font-weight: 400; color: var(--ink-1); }
+[data-theme="bureau95"] .f95-zone #taskbarClock { margin-left: 2px; padding-left: 7px; border-left: 1px solid var(--relief-3); box-shadow: inset 1px 0 var(--relief-1); }
+/* Le point live : un voyant carré ; son onde (une par publication, base) passe par paliers. */
+[data-theme="bureau95"] .refresh-dot { width: 10px; height: 10px; border-radius: 0; box-shadow: 0 0 0 1px var(--relief-3); }
+[data-theme="bureau95"] .refresh-dot.calme { box-shadow: 0 0 0 1px var(--relief-3); }
+[data-theme="bureau95"] .refresh-dot::after { border-radius: 0; }
+[data-theme="bureau95"] .refresh-dot.ping::after { animation-timing-function: steps(4, end); }
+
+/* ── Sous 800 px, la base masque l'heure de publication (#updated) : son étiquette suit. ── */
+@media (max-width: 800px) {
+  [data-theme="bureau95"] .f95-pub { display: none; }
+  [data-theme="bureau95"] .f95-zone #taskbarClock { margin-left: 0; padding-left: 0; border-left: 0; box-shadow: none; }
+}
+/* ── Téléphone : barre des tâches de 40 px, boutons de 34 px de haut ; la tâche active cède sa
+   place (le nom de la paire est dans l'en-tête). Sous 385 px, « Démarrer » n'est plus que son
+   icône : l'horloge et le dernier bouton ne se chevauchent jamais. ── */
+@media (max-width: 768px) {
+  [data-theme="bureau95"] body { padding-bottom: calc(40px + var(--gutter)); }
+  [data-theme="bureau95"] .aero-taskbar { height: 40px; padding: 3px 2px 1px; gap: 2px; }
+  [data-theme="bureau95"] #themeBtn { height: 34px; padding: 0 5px 0 4px; font-size: 13px; }
+  [data-theme="bureau95"]:has(#themeMenu.open) #themeBtn { padding: 1px 4px 0 5px; }
+  [data-theme="bureau95"] .f95-lancement { height: 34px; padding: 0 3px 0 8px; }
+  [data-theme="bureau95"] .f95-lancement::after { display: none; }
+  [data-theme="bureau95"] .f95-lancement .theme-btn.ico-btn { width: 32px; height: 34px; }
+  [data-theme="bureau95"] .f95-tache { display: none; }
+  [data-theme="bureau95"] .f95-zone { height: 34px; padding: 0 6px; }
+  [data-theme="bureau95"] .price-badge { padding: 3px 6px; font-size: 17px; }
+  [data-theme="bureau95"] .chart-container { padding: 64px 4px 29px; }
+  [data-theme="bureau95"] .chart-container > .indicator-bar { height: 37px; padding: 3px 3px 5px; }
+  [data-theme="bureau95"] .strat-section.collapsed { height: 36px; }
+  [data-theme="bureau95"] .strat-handle { height: 36px; }
+  [data-theme="bureau95"] .strat-body { height: calc(100% - 36px); }
+  [data-theme="bureau95"] .modal-fermer { width: 30px; height: 26px; }
+  [data-theme="bureau95"] .modal-titre #liveClock { display: block; margin: 1px 0 0; }
+}
+@media (max-width: 384px) {
+  [data-theme="bureau95"] #themeBtn { width: 34px; padding: 0; justify-content: center; }
+  [data-theme="bureau95"] #themeBtn::after { display: none; }
+  [data-theme="bureau95"]:has(#themeMenu.open) #themeBtn { padding: 1px 0 0 1px; }
+  [data-theme="bureau95"] .price-badge { font-size: 15px; }
+}
