@@ -693,6 +693,14 @@ async function pixel(page, x, y) {
       await p25.keyboard.press('ArrowLeft'); await p25.keyboard.press('ArrowUp'); await p25.waitForTimeout(100);
       const f = await p25.evaluate(() => window.__carte.verifierChaleur());
       check(`flèches (dixième de vue, arrondi au pixel) : ${f.differents} différent(s), décalées sans repeint complet`, f.differents === 0 && f.complets === m.complets, f);
+      // Un calque éteint puis rallumé : la chaleur composée (gardée) suit.
+      let bascule = true;
+      for (const k of ['publiee', 'live', 'publiee', 'live']) {
+        await p25.click(`button[data-calque="${k}"]`); await p25.waitForTimeout(80);
+        const r = await p25.evaluate(() => window.__carte.verifierChaleur());
+        if (r.differents) bascule = false;
+      }
+      check('carte publiée puis carnet live éteints et rallumés : la chaleur affichée suit (aucun reste)', bascule);
       // Suivre : la vue avance par pixels entiers ; on attend qu'elle ait avancé au moins une fois.
       await p25.keyboard.press('r');
       await p25.evaluate(([a, b]) => { const e = window.__carte.etat(); window.__carte.cadrer(e.maintenant - 10 * 60e3, e.maintenant + 45e3, e.vue.p1, e.vue.p2); }, []);

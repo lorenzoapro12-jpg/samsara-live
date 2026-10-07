@@ -554,7 +554,7 @@
   }
   function peindrePubliee(w, h) {
     const g = grillePublieeAffichee();
-    if (!g) { PUB.vide = true; PUB.cle = null; return false; }
+    if (!g) { const etait = !PUB.vide; PUB.vide = true; PUB.cle = null; return etait; }   // éteinte : la composition change
     const v = E.vue, tpp = (v.t2 - v.t1) / w, pp = (v.p2 - v.p1) / h, fin = BM.finGrille(g), now = maintenant();
     // La carte publiée s'arrête avant « maintenant » ; sinon (horloge du serveur en avance), on la coupe.
     const coupe = fin !== null && fin > now ? now : Infinity;
@@ -583,7 +583,7 @@
   }
   function peindreLive(w, h) {
     const g = R.calques.live && E.live && E.live.n ? E.live : null;
-    if (!g) { if (!LIVE.vide) LIVE.x.clearRect(0, 0, w, h); LIVE.vide = true; LIVE.cle = null; return false; }
+    if (!g) { const etait = !LIVE.vide; if (etait) LIVE.x.clearRect(0, 0, w, h); LIVE.vide = true; LIVE.cle = null; return etait; }
     const v = E.vue, cle = [w, h, E.liveV, LUTV, v.t1, v.t2, v.p1, v.p2].join('|'), finD = g.fin[g.n - 1];
     // La dernière lecture vaut jusqu'à « maintenant » : quand il a avancé d'un pixel depuis la dernière
     // peinture, on repeint — sinon une bande « non observé » s'ouvrirait entre deux lectures.
@@ -1049,7 +1049,8 @@
         // Le libellé TIENT dans l'axe (54 px sur un téléphone) : strike entier, sinon en milliers.
         if (y > 6 && y < a.h - 6) {
           ctx.fillStyle = C.gamma; ctx.fillRect(a.x, y - 7, a.w, 14);
-          texte(ajuster([g.court + ' ' + BM.prix(g.p), g.court + ' ' + kilo(g.p), g.court], a.w - 6, 10, true), a.x + 4, y, '#0b0b12', 10, 'left', true); reserve.push(y);
+          const t = ajuster([g.court + ' ' + BM.prix(g.p), g.court + ' ' + kilo(g.p), g.court + ' ' + kiloCourt(g.p)], a.w - 6, 10, true);
+          texte(t, a.x + 4, y, '#0b0b12', largeurTexte(t, 10, true) <= a.w - 6 ? 10 : 8.5, 'left', true); reserve.push(y);
         } else if ((y <= 6 && haut < 3) || (y >= a.h - 6 && bas < 3)) {
           // Hors champ : fléché, en milliers ; la valeur reste écrite (corps réduit s'il le faut).
           const f = y <= 6 ? '↑' : '↓', yy = y <= 6 ? 9 + 13 * haut++ : a.h - 9 - 13 * bas++;
@@ -1217,7 +1218,9 @@
 
   // ─── Lecture au pointeur : la VALEUR, quel que soit le réglage ──────────────
   const bulleInfo = document.getElementById('lecture');
-  let lectureHtml = null, lectureTaille = [0, 0];
+  let lectureHtml = null, lectureTaille = null;
+  // Largeur maximale de la bulle de lecture : lue dans la feuille (--lecture-max), pas recopiée.
+  const LECTURE_MAX = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lecture-max')) || 440;
   function cacherLecture() { if (!bulleInfo.hidden) bulleInfo.hidden = true; lectureHtml = null; }
   function lectureSouris() {
     const s = E.souris;
@@ -1268,28 +1271,34 @@
           + BM.btc(b.achat) + ' BTC achetés / ' + BM.btc(b.vente) + ' vendus au marché');
       }
     }
-    // Le texte n'est réécrit (et mesuré) que s'il a changé : un battement sans mouvement ne force
-    // aucune mise en page.
+    // Le texte n'est réécrit que s'il a changé ; à la souris, la bulle se place sans être MESURÉE
+    // (une mesure après innerHTML force une mise en page à chaque mouvement) : elle bascule à gauche
+    // ou au-dessus du pointeur par un translate(-100 %) quand sa largeur maximale (LECTURE_MAX) ou
+    // une hauteur prudente ne tiendraient pas. Au doigt (un appui, rare), elle est mesurée.
     const html = l.join('<br>');
-    if (html !== lectureHtml) {
-      bulleInfo.innerHTML = html; bulleInfo.hidden = false; lectureHtml = html;
-      lectureTaille = [bulleInfo.offsetWidth, bulleInfo.offsetHeight];
+    if (html !== lectureHtml) { bulleInfo.innerHTML = html; bulleInfo.hidden = false; lectureHtml = html; lectureTaille = null; }
+    const r = rect(), vw = window.innerWidth, vh = window.innerHeight, px = r.left + s.x, py = r.top + s.y;
+    if (s.tactile || vw < 2 * LECTURE_MAX) {
+      if (!lectureTaille) lectureTaille = [bulleInfo.offsetWidth, bulleInfo.offsetHeight];
+      const [bw, bh] = lectureTaille;
+      let x, y;
+      if (s.tactile) {
+        // Au doigt : au-dessus du point touché (le doigt ne la cache pas), centrée et dans l'écran.
+        x = Math.max(8, Math.min(vw - bw - 8, px - bw / 2));
+        y = py - bh - 28;
+        if (y < 8) y = py + 28;
+      } else {
+        x = px + 16; y = py + 16;
+        if (x + bw > vw - 8) x = Math.max(8, px - bw - 16);
+        if (y + bh > vh - 8) y = Math.max(8, py - bh - 16);
+      }
+      bulleInfo.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+      return;
     }
-    const r = rect(), [bw, bh] = lectureTaille, vw = window.innerWidth, vh = window.innerHeight;
-    let x, y;
-    if (s.tactile) {
-      // Au doigt : au-dessus du point touché (le doigt ne la cache pas), centrée et dans l'écran.
-      x = Math.max(8, Math.min(vw - bw - 8, r.left + s.x - bw / 2));
-      y = r.top + s.y - bh - 28;
-      if (y < 8) y = r.top + s.y + 28;
-    } else {
-      x = r.left + s.x + 16; y = r.top + s.y + 16;
-      if (x + bw > vw - 8) x = Math.max(8, r.left + s.x - bw - 16);
-      if (y + bh > vh - 8) y = Math.max(8, r.top + s.y - bh - 16);
-    }
-    bulleInfo.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+    const gauche = px + 16 + LECTURE_MAX > vw - 8, haut = py + 16 + 170 > vh - 8;
+    bulleInfo.style.transform = 'translate(' + Math.round(px + (gauche ? -16 : 16)) + 'px,' + Math.round(py + (haut ? -16 : 16)) + 'px)'
+      + (gauche || haut ? ' translate(' + (gauche ? '-100%' : '0') + ',' + (haut ? '-100%' : '0') + ')' : '');
   }
-
   // ─── Interactions ──────────────────────────────────────────────────────────
   function zoneDe(x, y) {
     if (!Z) return null;
