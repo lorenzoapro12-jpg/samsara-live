@@ -72,9 +72,9 @@
   // instants de lecture notés par la page (…A, …Lu, bid / ask) sont LOCAUX (Date.now()) et passent
   // sur l'axe par axe(), avec l'écart mesuré par E.horloge. L'axe du temps est à l'heure Binance.
   const E = {
-    pub: null, pubF: null, pubCle: '', pubMaj: null, pubLu: null, pubTexte: null,
+    pub: null, pubF: null, pubCle: '', pubMaj: null, pubLu: null, pubTexte: null, pubN: 0,
     md: null, niv: null, mdLu: null, mdTexte: null,
-    live: null, liveRef: null, liveP99: 0, liveEcartees: 0, carnet: null, carnetA: null,
+    live: null, liveRef: null, liveP99: 0, liveEcartees: 0, carnet: null, carnetA: null, liveV: 0,
     exec: new BM.SeauxExecutions(1), execVus: new Set(), execArriere: null, execTrous: [], execLu: null,
     minutes: [], minutesA: null,
     bidask: [],
@@ -131,7 +131,7 @@
   async function lireHorloge() {
     try {
       const { corps, s, r } = await binance('time', DELAIS.horloge);
-      if (E.horloge.echantillon(s, r, +corps.serverTime)) { if (E.live) E.live.recaler(E.horloge.ecart); sale(); }
+      if (E.horloge.echantillon(s, r, +corps.serverTime)) { if (E.live) E.live.recaler(E.horloge.ecart); liveChange(); bientot(); }
       erreur('horloge', null);
     } catch (e) { erreur('horloge', e); throw e; }
   }
@@ -147,12 +147,12 @@
       if (E.pub && maj !== null && maj === E.pubTexte) { erreur('carte', null); return; }
       const g = BM.grillePubliee(JSON.parse(txt));
       if (!g) throw new Error('format non reconnu par cette page');
-      E.pub = g; E.pubTexte = maj; E.pubMaj = g.majA;
+      E.pub = g; E.pubTexte = maj; E.pubMaj = g.majA; E.pubN++;
       E.pubF = null; E.pubCle = '';
       erreur('carte', null);
       appliquerEchelle();          // l'échelle live suit l'encodage, qu'il arrive ou qu'il disparaisse
       majLegende();
-      sale();
+      bientot();
     } catch (e) { erreur('carte', e); throw e; }
   }
   async function lireMarketData() {
@@ -164,7 +164,7 @@
       const md = JSON.parse(txt);
       E.md = md; E.mdTexte = maj; E.niv = BM.niveauxPublies(md);
       erreur('fichier', null);
-      dessiner();
+      bientot();
     } catch (e) { erreur('fichier', e); throw e; }
   }
 
@@ -190,7 +190,7 @@
       E.minutesA = Date.now();
       erreur('bougies', null);
       if (!E.vue) vueParDefaut();
-      sale();
+      bientot();
     } catch (e) { erreur('bougies', e); throw e; }
   }
 
@@ -208,7 +208,7 @@
       for (const x of t) { E.exec.ajouter(x); E.execVus.add(x.a); }
       E.execLu = s;
       erreur('executions', null);
-      dessiner();
+      bientot();
       if (t.length) { E.execArriere = { id: t[0].a, pages: 0, fini: false, enCours: false }; remplirArriere(); }
     } catch (e) { erreur('executions', e); throw e; }
   }
@@ -225,13 +225,13 @@
         const t = (await binance('aggTrades?symbol=' + SYMBOLE + '&fromId=' + depuis + '&limit=' + (A.id - depuis), DELAIS.executions)).corps;
         for (const x of t) E.exec.ajouterAncien(x, E.execVus);
         A.id = depuis; A.pages++;
-        dessiner();
+        bientot();
         await pause(150);
       }
       A.fini = true;
       E.execVus = new Set();        // l'unicité arrière n'a plus d'usage ; le direct suit dernierId
     } catch (e) { erreur('executions', e); }
-    finally { A.enCours = false; dessiner(); }
+    finally { A.enCours = false; bientot(); }
   }
   async function lireExecutions() {
     if (E.exec.dernierId === null) return lireExecutionsInitiales();
@@ -252,7 +252,7 @@
       E.execTrous = E.execTrous.filter(([, b]) => b > lim);
       erreur('executions', null);
       if (E.execArriere && !E.execArriere.fini) remplirArriere();
-      if (n) dessiner();
+      if (n) bientot();
     } catch (e) { erreur('executions', e); throw e; }
   }
   /** Jusqu'où les exécutions sont lues sans trou : la dernière requête qui a tout rendu, ou —
@@ -267,7 +267,9 @@
   }
 
   // Carnet live : une lecture = une colonne, à son instant réel, avec ses quantités (BM.CarnetLive).
-  function reinitLive() { E.live = null; E.liveRef = null; E.liveP99 = 0; E.bidask = []; E.liveEcartees = 0; }
+  function reinitLive() { E.live = null; E.liveRef = null; E.liveP99 = 0; E.bidask = []; E.liveEcartees = 0; liveChange(); }
+  /** Le calque live est à repeindre (lecture, échelle, horloge) : sa version change. */
+  function liveChange() { E.liveV++; }
   /** L'échelle du carnet live : celle de la carte publiée quand le fichier publie son encodage ;
    *  sinon une échelle PROPRE (99ᵉ centile d'un carnet), non comparable — et la carte le dit. Elle
    *  suit l'encodage dans les DEUX sens : publié après le premier carnet, ou disparu en cours de
@@ -286,11 +288,15 @@
   function appliquerEchelle(a) {
     const e = echelleLive(a);
     if (!E.live || !e) return;
-    if (E.live.fixerEchelle(e.cle, e.f)) chaleurSale = true;
+    if (E.live.fixerEchelle(e.cle, e.f)) liveChange();
     E.liveRef = e.ref;
   }
+  /** Le carnet n'est lu que si un calque s'en sert (chaleur live, carnet latéral, bid / ask) :
+   *  1 000 niveaux toutes les 2 s, c'est ≈ 1 500 de poids Binance par minute et ≈ 19 Mo par heure. */
+  const carnetUtile = () => R.calques.live || R.calques.dom || R.calques.bidask;
   async function lireCarnet() {
     const n = R.niveauxLive, cadence = CADENCE_CARNET[n];
+    if (!carnetUtile()) { erreur('carnet', null); return; }
     try {
       const { corps: d, s, r } = await binance('depth?symbol=' + SYMBOLE + '&limit=' + n, DELAIS.carnet);
       const a = BM.agregerCarnet(d, R.dpLive);
@@ -305,7 +311,8 @@
       if (a.meilleurBid && a.meilleurAsk) E.bidask.push({ t, bid: a.meilleurBid, ask: a.meilleurAsk });
       if (E.bidask.length > 20000) E.bidask.splice(0, 5000);
       erreur('carnet', null);
-      sale();
+      liveChange();
+      bientot();
     } catch (e) { erreur('carnet', e); throw e; }
   }
 
@@ -357,10 +364,11 @@
     boucle('bougies', lireMinutes, 10e3, E.recul.binance);
     boucle('executions', lireExecutions, 1000, E.recul.binance);
     boucleCarnet = boucle('carnet', lireCarnet, () => CADENCE_CARNET[R.niveauxLive], E.recul.binance);
-    // Les âges vieillissent même sans donnée neuve ; le statut décompte les reprises.
+    // Le BATTEMENT : un rendu par seconde au repos — les âges vieillissent, et les données arrivées
+    // depuis (marquées, pas rendues) apparaissent. Le statut décompte les reprises.
     setInterval(() => { dessiner(); majStatut(); }, 1000);
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) { for (const b of boucles) b.reveiller(); sale(); }
+      if (!document.hidden) { for (const b of boucles) b.reveiller(); dessiner(); }
     });
   }
 
@@ -377,27 +385,41 @@
     E.vue = { t1: now - largeur * 0.93, t2: now + largeur * 0.07, p1: p * (1 - 0.009), p2: p * (1 + 0.009) };
     E.suivre = true;
     majBoutonSuivre();
-    sale();
+    dessiner();
   }
+  /** Suivre le présent : la vue avance par PIXELS ENTIERS (et se recentre sur le prix par pixels
+   *  entiers) — le calque publié se décale alors sur lui-même au lieu d'être repeint. */
   function suivreMaintenant() {
-    if (!E.suivre || !E.vue) return;
-    const now = maintenant(), L = E.vue.t2 - E.vue.t1, t2 = now + L * 0.07;
-    // La vue avance par pas d'un pixel au plus : la chaleur n'est repeinte que si elle a bougé.
-    if (Math.abs(t2 - E.vue.t2) >= L / Math.max(1, Z ? Z.chaleur.w : 1000)) { E.vue.t2 = t2; E.vue.t1 = t2 - L; chaleurSale = true; }
+    if (!E.suivre || !E.vue || !Z) return;
+    const v = E.vue, L = v.t2 - v.t1, tpp = L / Math.max(1, Z.chaleur.w), k = Math.trunc((maintenant() + L * 0.07 - v.t2) / tpp);
+    if (k) { v.t1 += k * tpp; v.t2 += k * tpp; }
     const p = dernierPrix();
     if (p) {
-      const H = E.vue.p2 - E.vue.p1, bas = E.vue.p1 + H * 0.25, haut = E.vue.p2 - H * 0.25;
-      if (p < bas || p > haut) { E.vue.p1 = p - H / 2; E.vue.p2 = p + H / 2; chaleurSale = true; }
+      const H = v.p2 - v.p1, pp = H / Math.max(1, Z.chaleur.h), bas = v.p1 + H * 0.25, haut = v.p2 - H * 0.25;
+      if (p < bas || p > haut) { const d = Math.round((p - (v.p1 + v.p2) / 2) / pp) * pp; v.p1 += d; v.p2 += d; }
     }
   }
 
   // ─── Rendu ─────────────────────────────────────────────────────────────────
+  // CADENCE — au repos, UN rendu par seconde (le battement : les âges vieillissent) ; une donnée qui
+  //   arrive (carnet, exécutions, fichiers) change sa version et attend le battement — elle apparaît
+  //   avec au plus 1 s de retard ; un geste rend tout de suite (requestAnimationFrame).
+  // CALQUES GARDÉS — la chaleur est composée de canevas hors écran, à la résolution CSS de la zone :
+  //   · le fond « non observé » : un motif (createPattern) ;
+  //   · la carte PUBLIÉE : repeinte seulement quand sa clé change (taille, publication, fusion,
+  //     palette, ms par pixel, $ par pixel). Un glissement d'un nombre ENTIER de pixels la décale
+  //     (drawImage) et ne repeint que les bandes découvertes : un pixel ne dépend que de la vue et de
+  //     sa position, le résultat est celui d'un repeint complet (contrôlé : __carte.verifierChaleur) ;
+  //   · le carnet LIVE : repeint quand une lecture arrive, quand la vue change, ou quand « maintenant »
+  //     a avancé d'un pixel tant que la dernière lecture vaut — sur sa seule bande de temps.
+  //   Composition par drawImage, sans lissage ; puis les calques vectoriels, redessinés à chaque rendu.
   const cv = document.getElementById('carte');
-  const ctx = cv.getContext('2d');
-  const tamponChaleur = document.createElement('canvas');
-  const ctxChaleur = tamponChaleur.getContext('2d');
-  let chaleurSale = true, chaleurA = 0, rafDemande = false, IMG = null, PX = null, HACH = null;
-  const MESURE = { chaleur: 0, rendu: 0 };
+  const ctx = cv.getContext('2d', { alpha: false });     // opaque : tout est repeint à chaque rendu
+  function calque() { const c = document.createElement('canvas'); c.width = c.height = 1; return { c, x: c.getContext('2d'), cle: null, t1: 0, p2: 0, coupe: Infinity, vide: true }; }
+  const PUB = calque(), LIVE = calque();
+  let RESERVE = calque();          // second tampon du calque publié (décalage sans recouvrement)
+  let rafDemande = false, premierComplet = false, LUTV = 0;
+  const MESURE = { chaleur: 0, rendu: 0, rendus: 0, complets: 0, decalages: 0, live: 0 };
   let Z = null;           // zones de la mise en page (px CSS)
   const C = {};           // couleurs, lues dans le CSS
   function lireCouleurs() {
@@ -450,67 +472,70 @@
   function majLuts() {
     if (R.palette === 'cote') { LUTB = lut('bid'); LUTA = lut('ask'); LUT = null; }
     else { LUT = lut(R.palette); LUTB = LUTA = null; }
+    LUTV++;                      // les calques gardés sont à repeindre
+  }
+  /** Le motif « non observé » (hachure d'un pixel toutes les 6 diagonales), un par contexte. */
+  function motif(c) {
+    if (c.__motif) return c.__motif;
+    const t = document.createElement('canvas'); t.width = t.height = 6;
+    const x = t.getContext('2d'), fond = C.nonObs, hach = C.hachure;
+    for (let y = 0; y < 6; y++) for (let i = 0; i < 6; i++) { x.fillStyle = (i + y) % 6 < 1 ? hach : fond; x.fillRect(i, y, 1, 1); }
+    return (c.__motif = c.createPattern(t, 'repeat'));
   }
 
+  // La position du canevas, gardée (lue par chaque événement du pointeur) : mise à jour quand sa
+  // taille ou celle de la barre change — pas de mise en page forcée à chaque mouvement.
+  let RECT = null;
+  const rect = () => RECT || (RECT = cv.getBoundingClientRect());
+  // Densité de pixels : celle de l'écran (3 sur un téléphone récent), plafonnée par un BUDGET de
+  // pixels réels (un écran 4K) plutôt qu'à 2 — le texte du canevas est aussi net que celui de la
+  // page. La chaleur reste à la résolution CSS (agrandie sans lissage) : son coût n'en dépend pas.
+  const BUDGET_PIXELS = 3840 * 2160;
+  // Hauteur minimale de la chaleur : en dessous, les panneaux (volume, CVD) s'effacent — et la carte
+  // le dit. Le canevas n'est jamais dessiné plus grand que sa place (le pointeur y serait décalé).
+  const MIN_CHALEUR = 140, MIN_LARGEUR = 160;
   function mettreEnPage() {
-    const r = cv.getBoundingClientRect();
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const w = Math.max(320, Math.floor(r.width)), h = Math.max(260, Math.floor(r.height));
-    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
-      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
-    }
-    const etroit = w < 640;
-    const axeP = etroit ? 54 : 66, dom = R.calques.dom ? (etroit ? 64 : 112) : 0, axeT = 20;
-    const vol = R.calques.volume ? (etroit ? 44 : 58) : 0, cvd = R.calques.cvd ? (etroit ? 44 : 58) : 0;
-    const chH = h - axeT - vol - cvd;
+    const r = rect(), wf = r.width, hf = r.height;
+    if (!(wf >= 40 && hf >= 40)) { Z = null; return; }
+    const dpr = Math.max(0.5, Math.min(window.devicePixelRatio || 1, Math.sqrt(BUDGET_PIXELS / (wf * hf))));
+    const bw = Math.max(1, Math.round(wf * dpr)), bh = Math.max(1, Math.round(hf * dpr));
+    if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; }
+    const w = Math.floor(wf), h = Math.floor(hf), etroit = w < 640, masques = [];
+    const axeP = etroit ? 54 : 66, axeT = 20;
+    let dom = R.calques.dom ? (etroit ? 64 : 112) : 0;
+    let vol = R.calques.volume ? (etroit ? 44 : 58) : 0, cvd = R.calques.cvd ? (etroit ? 44 : 58) : 0;
+    if (h - axeT - vol - cvd < MIN_CHALEUR) { vol = Math.min(vol, 34); cvd = Math.min(cvd, 34); }
+    if (h - axeT - vol - cvd < MIN_CHALEUR && cvd) { cvd = 0; masques.push('CVD'); }
+    if (h - axeT - vol - cvd < MIN_CHALEUR && vol) { vol = 0; masques.push('volume'); }
+    if (w - axeP - dom < MIN_LARGEUR && dom) { dom = 0; masques.push('carnet latéral'); }
+    const chW = Math.max(1, w - axeP - dom), chH = Math.max(1, h - axeT - vol - cvd);
     Z = {
-      w, h, dpr, etroit,
-      chaleur: { x: 0, y: 0, w: w - axeP - dom, h: chH },
-      axeP: { x: w - axeP - dom, y: 0, w: axeP, h: chH },
+      w: wf, h: hf, dpr, sx: bw / wf, sy: bh / hf, etroit, masques,
+      // Une carte basse ou étroite : les pastilles prennent leur version courte.
+      court: etroit || chH < 300,
+      chaleur: { x: 0, y: 0, w: chW, h: chH },
+      axeP: { x: chW, y: 0, w: axeP, h: chH },
       dom: { x: w - dom, y: 0, w: dom, h: chH },
-      axeT: { x: 0, y: chH, w: w - axeP - dom, h: axeT },
-      vol: { x: 0, y: chH + axeT, w: w - axeP - dom, h: vol },
-      cvd: { x: 0, y: chH + axeT + vol, w: w - axeP - dom, h: cvd },
+      axeT: { x: 0, y: chH, w: chW, h: axeT },
+      vol: { x: 0, y: chH + axeT, w: chW, h: vol },
+      cvd: { x: 0, y: chH + axeT + vol, w: chW, h: cvd },
     };
-    if (tamponChaleur.width !== Z.chaleur.w || tamponChaleur.height !== Z.chaleur.h) {
-      tamponChaleur.width = Math.max(1, Z.chaleur.w); tamponChaleur.height = Math.max(1, Z.chaleur.h);
-      chaleurSale = true;
-    }
   }
   const X = t => (t - E.vue.t1) / (E.vue.t2 - E.vue.t1) * Z.chaleur.w;
   const Y = p => (E.vue.p2 - p) / (E.vue.p2 - E.vue.p1) * Z.chaleur.h;
   const T = x => E.vue.t1 + x / Z.chaleur.w * (E.vue.t2 - E.vue.t1);
   const Pr = y => E.vue.p2 - y / Z.chaleur.h * (E.vue.p2 - E.vue.p1);
 
-  function sale() { chaleurSale = true; dessiner(); }
+  /** Un rendu à la prochaine image (geste, réglage, retour sur l'onglet). */
   function dessiner() {
     if (rafDemande) return;
     rafDemande = true;
     requestAnimationFrame(() => { rafDemande = false; rendre(); });
   }
+  /** Une donnée est arrivée : le battement la rendra (au plus 1 s). Avant le premier rendu complet,
+   *  tout de suite — l'ouverture ne gagne rien à attendre. */
+  function bientot() { if (!premierComplet) dessiner(); }
 
-  /** La chaleur : la carte publiée (fusionnée selon le réglage), puis le carnet live par-dessus.
-   *  Le calcul au pixel (MAX des cellules recouvertes) est BM.peindreGrille, partagé avec la lecture
-   *  au pointeur. Rien n'est peint après « maintenant ». */
-  function peindreChaleur() {
-    const w = Z.chaleur.w, h = Z.chaleur.h;
-    if (w < 2 || h < 2) return;
-    if (!IMG || IMG.width !== w || IMG.height !== h) {
-      IMG = ctxChaleur.createImageData(w, h);
-      PX = new Uint32Array(IMG.data.buffer);
-      const fond = rgb(C.nonObs), hach = rgb(C.hachure);
-      const cNon = u32(fond[0], fond[1], fond[2], 255), cHach = u32(hach[0], hach[1], hach[2], 255);
-      HACH = new Uint32Array(w * h);
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) HACH[y * w + x] = ((x + y) % 6 < 1) ? cHach : cNon;
-    }
-    const img = IMG, px = PX;
-    px.set(HACH);
-    const o = { lut: LUT, lutB: LUTB, lutA: LUTA, maintenant: chaleurA || maintenant() };
-    const pub = grillePublieeAffichee();
-    if (pub) BM.peindreGrille(px, w, h, pub, E.vue, o);
-    if (R.calques.live && E.live) BM.peindreGrille(px, w, h, E.live, E.vue, o);
-    ctxChaleur.putImageData(img, 0, 0);
-  }
   /** La carte publiée telle qu'affichée : fusionnée (MAX) selon le réglage, calculée une fois. */
   function grillePublieeAffichee() {
     if (!R.calques.publiee || !E.pub) return null;
@@ -519,25 +544,112 @@
     }
     return E.pubF;
   }
+  const couleurs = coupe => ({ lut: LUT, lutB: LUTB, lutA: LUTA, maintenant: coupe });
+  /** Peint le rectangle [xa, ya, xb, yb[ de la grille g dans le calque L (le reste n'est pas touché). */
+  function peindreRect(L, g, w, h, coupe, xa, ya, xb, yb) {
+    if (xb <= xa || yb <= ya) return;
+    const buf = new Uint32Array((xb - xa) * (yb - ya));
+    BM.peindreGrille(buf, w, h, g, E.vue, Object.assign(couleurs(coupe), { rect: [xa, ya, xb, yb] }));
+    L.x.putImageData(new ImageData(new Uint8ClampedArray(buf.buffer), xb - xa, yb - ya), xa, ya);
+  }
+  function peindrePubliee(w, h) {
+    const g = grillePublieeAffichee();
+    if (!g) { PUB.vide = true; PUB.cle = null; return false; }
+    const v = E.vue, tpp = (v.t2 - v.t1) / w, pp = (v.p2 - v.p1) / h, fin = BM.finGrille(g), now = maintenant();
+    // La carte publiée s'arrête avant « maintenant » ; sinon (horloge du serveur en avance), on la coupe.
+    const coupe = fin !== null && fin > now ? now : Infinity;
+    const cle = [w, h, E.pubN, E.pubCle, LUTV, Math.round(tpp * 1e6), Math.round(pp * 1e9), coupe].join('|');
+    PUB.vide = false;
+    if (PUB.cle === cle) {
+      const sx = (v.t1 - PUB.t1) / tpp, sy = (PUB.p2 - v.p2) / pp, rx = Math.round(sx), ry = Math.round(sy);
+      if (Math.abs(sx - rx) < 1e-3 && Math.abs(sy - ry) < 1e-3 && Math.abs(rx) < w && Math.abs(ry) < h) {
+        if (!rx && !ry) return false;
+        // Le pixel x montre maintenant ce que montrait x + rx : copie décalée dans le second tampon.
+        const D = RESERVE;
+        if (D.c.width !== w || D.c.height !== h) { D.c.width = w; D.c.height = h; } else D.x.clearRect(0, 0, w, h);
+        D.x.drawImage(PUB.c, -rx, -ry);
+        RESERVE = { c: PUB.c, x: PUB.x };
+        PUB.c = D.c; PUB.x = D.x;
+        if (rx > 0) peindreRect(PUB, g, w, h, coupe, w - rx, 0, w, h); else if (rx < 0) peindreRect(PUB, g, w, h, coupe, 0, 0, -rx, h);
+        if (ry > 0) peindreRect(PUB, g, w, h, coupe, 0, h - ry, w, h); else if (ry < 0) peindreRect(PUB, g, w, h, coupe, 0, 0, w, -ry);
+        PUB.t1 = v.t1; PUB.p2 = v.p2; MESURE.decalages++;
+        return true;
+      }
+    }
+    PUB.x.clearRect(0, 0, w, h);
+    peindreRect(PUB, g, w, h, coupe, 0, 0, w, h);
+    PUB.cle = cle; PUB.t1 = v.t1; PUB.p2 = v.p2; PUB.coupe = coupe; MESURE.complets++;
+    return true;
+  }
+  function peindreLive(w, h) {
+    const g = R.calques.live && E.live && E.live.n ? E.live : null;
+    if (!g) { if (!LIVE.vide) LIVE.x.clearRect(0, 0, w, h); LIVE.vide = true; LIVE.cle = null; return false; }
+    const v = E.vue, cle = [w, h, E.liveV, LUTV, v.t1, v.t2, v.p1, v.p2].join('|'), finD = g.fin[g.n - 1];
+    // La dernière lecture vaut jusqu'à « maintenant » : quand il a avancé d'un pixel depuis la dernière
+    // peinture, on repeint — sinon une bande « non observé » s'ouvrirait entre deux lectures.
+    const avance = finD > LIVE.coupe && X(Math.min(maintenant(), finD)) - X(LIVE.coupe) >= 1;
+    if (cle === LIVE.cle && !avance) return false;
+    const coupe = maintenant(), tpp = (v.t2 - v.t1) / w;
+    const xa = Math.max(0, Math.floor((g.deb[0] - v.t1) / tpp) - 2), xb = Math.min(w, Math.ceil((Math.min(finD, coupe) - v.t1) / tpp) + 2);
+    LIVE.x.clearRect(0, 0, w, h);
+    peindreRect(LIVE, g, w, h, coupe, xa, 0, xb, h);
+    LIVE.cle = cle; LIVE.coupe = coupe; LIVE.vide = false; MESURE.live++;
+    return true;
+  }
+  /** Met les calques gardés à jour ; vrai si l'un d'eux a été (re)peint. */
+  function peindreCalques() {
+    const w = Z.chaleur.w, h = Z.chaleur.h;
+    for (const L of [PUB, LIVE]) if (L.c.width !== w || L.c.height !== h) { L.c.width = w; L.c.height = h; L.cle = null; L.vide = true; }
+    const a = peindrePubliee(w, h), b = peindreLive(w, h);
+    return a || b;
+  }
+  /** La chaleur composée : fond hachuré, carte publiée, carnet live — dans le contexte c, en (x0, y0). */
+  function composerChaleur(c, x0, y0) {
+    const w = Z.chaleur.w, h = Z.chaleur.h;
+    c.imageSmoothingEnabled = false;
+    c.fillStyle = motif(c); c.fillRect(x0, y0, w, h);
+    if (!PUB.vide) c.drawImage(PUB.c, x0, y0);
+    if (!LIVE.vide) c.drawImage(LIVE.c, x0, y0);
+  }
+  /** Contrôle (harnais) : la chaleur affichée == un repeint COMPLET, sans calque gardé ni décalage,
+   *  avec les mêmes « maintenant ». Rend le nombre de pixels qui diffèrent. */
+  function verifierChaleur() {
+    rendre();
+    const w = Z.chaleur.w, h = Z.chaleur.h, a = document.createElement('canvas');
+    a.width = w; a.height = h;
+    const ax = a.getContext('2d');
+    composerChaleur(ax, 0, 0);
+    const vu = new Uint32Array(ax.getImageData(0, 0, w, h).data.buffer.slice(0));
+    const ref = new Uint32Array(w * h), f = rgb(C.nonObs), k = rgb(C.hachure);
+    const cNon = u32(f[0], f[1], f[2], 255), cHach = u32(k[0], k[1], k[2], 255);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) ref[y * w + x] = (x + y) % 6 < 1 ? cHach : cNon;
+    const g = grillePublieeAffichee();
+    if (g) BM.peindreGrille(ref, w, h, g, E.vue, couleurs(PUB.coupe));
+    if (!LIVE.vide) BM.peindreGrille(ref, w, h, E.live, E.vue, couleurs(LIVE.coupe));
+    let d = 0;
+    for (let i = 0; i < ref.length; i++) if (ref[i] !== vu[i]) d++;
+    return { differents: d, total: ref.length, complets: MESURE.complets, decalages: MESURE.decalages };
+  }
 
   function rendre() {
     const debutRendu = performance.now();
-    if (!E.vue) { if (dernierPrix()) vueParDefaut(); else return; }
     mettreEnPage();
+    if (!Z) return;
+    if (!E.vue && dernierPrix()) vueParDefaut();
+    if (!E.vue) {                  // rien à montrer encore : le canevas a déjà sa taille et son fond
+      ctx.setTransform(Z.sx, 0, 0, Z.sy, 0, 0); ctx.fillStyle = C.panneau; ctx.fillRect(0, 0, Z.w, Z.h);
+      return;
+    }
+    MESURE.rendus++;
     suivreMaintenant();
     if (!LUT && !LUTB) majLuts();
-    // La dernière lecture live vaut jusqu'à « maintenant » : quand « maintenant » a avancé d'un
-    // pixel depuis la dernière peinture, on repeint — sinon une bande hachurée (« non observé »)
-    // s'ouvrirait entre deux lectures aux vues fines.
-    if (!chaleurSale && R.calques.live && E.live && E.live.n && E.live.fin[E.live.n - 1] > chaleurA
-      && X(Math.min(maintenant(), E.live.fin[E.live.n - 1])) - X(chaleurA) >= 1) chaleurSale = true;
-    if (chaleurSale) { const t0 = performance.now(); chaleurA = maintenant(); peindreChaleur(); chaleurSale = false; MESURE.chaleur = performance.now() - t0; }
-    const d = Z.dpr;
-    ctx.setTransform(d, 0, 0, d, 0, 0);
+    const t0 = performance.now();
+    if (peindreCalques()) MESURE.chaleur = performance.now() - t0;
+    if (!premierComplet && E.pub && E.live && E.live.n && E.exec.dernier && E.minutes.length) premierComplet = true;
+    ctx.setTransform(Z.sx, 0, 0, Z.sy, 0, 0);
     ctx.fillStyle = C.panneau;
     ctx.fillRect(0, 0, Z.w, Z.h);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(tamponChaleur, Z.chaleur.x, Z.chaleur.y);
+    composerChaleur(ctx, Z.chaleur.x, Z.chaleur.y);
     ctx.save();
     ctx.beginPath(); ctx.rect(Z.chaleur.x, Z.chaleur.y, Z.chaleur.w, Z.chaleur.h); ctx.clip();
     posees = []; fileP = [];
@@ -554,9 +666,9 @@
     ctx.restore();
     axePrix();
     axeTemps();
-    if (R.calques.dom) carnetLateral();
-    if (R.calques.volume) panneauVolume();
-    if (R.calques.cvd) panneauCvd();
+    if (Z.dom.w) carnetLateral();
+    if (Z.vol.h) panneauVolume();
+    if (Z.cvd.h) panneauCvd();
     lectureSouris();
     MESURE.rendu = performance.now() - debutRendu;
   }
@@ -577,24 +689,58 @@
     ctx.fillText(t, x, y);
   }
   const POLICE = getComputedStyle(document.documentElement).getPropertyValue('--police-carte').trim() || 'system-ui, sans-serif';
+  const largeurTexte = (t, taille, gras) => { ctx.font = (gras ? '600 ' : '') + (taille || 11) + 'px ' + POLICE; return ctx.measureText(t).width; };
+  /** Le premier texte de la liste qui tient dans `largeur` (sinon le dernier, le plus court). */
+  function ajuster(textes, largeur, taille, gras) {
+    for (const t of textes) if (largeurTexte(t, taille, gras) <= largeur) return t;
+    return textes[textes.length - 1];
+  }
+  // ÉTIQUETTES SUR LA CARTE — tout ce qui est écrit sur la chaleur réserve sa place (posees) :
+  // titres, libellés des murs, pastilles d'âge. Un texte ne se pose pas sur un autre.
+  let posees = [], fileP = [];
+  const chevauche = (x, y, w, h) => posees.some(r => x < r.x + r.w && x + w > r.x && y < r.y + r.h && y + h > r.y);
+  function reserver(x, y, w, h, texte) { posees.push({ x, y, w, h, texte, lignes: [texte], etiquette: true }); }
+  /** Un texte centré en (x, y), écrit seulement s'il ne recouvre rien (et réservé). */
+  function texteLibre(t, x, y, coul, taille) {
+    const w = largeurTexte(t, taille) + 4, h = (taille || 11) + 4, x0 = x - w / 2, y0 = y - h / 2;
+    if (x0 < 0 || x0 + w > Z.chaleur.w || chevauche(x0, y0, w, h)) return false;
+    reserver(x0, y0, w, h, t);
+    texte(t, x, y, coul, taille, 'center');
+    return true;
+  }
   /** Une pastille d'âge, posée SUR la carte. Mise en file pendant le dessin des calques, puis
    *  dessinée en dernier — au-dessus du prix et des bulles — sans recouvrir les autres. */
-  let posees = [], fileP = [];
-  function pastille(lignes, x, y, coul, align, court) { fileP.push([Z.etroit && court ? [court] : lignes, x, y, coul, align]); }
+  function pastille(lignes, x, y, coul, align, court) { fileP.push([lignes, x, y, coul, align, court]); }
   function dessinerPastilles() { for (const a of fileP) poserPastille(...a); fileP = []; }
-  function poserPastille(lignes, x, y, coul, align) {
-    ctx.font = '600 11px ' + POLICE;
-    const w = Math.max(...lignes.map((l, i) => { ctx.font = (i ? '' : '600 ') + '11px ' + POLICE; return ctx.measureText(l).width; })) + 14;
-    const h = 8 + lignes.length * 14;
-    let x0 = align === 'right' ? x - w : (align === 'center' ? x - w / 2 : x);
-    x0 = Math.max(4, Math.min(Z.chaleur.w - w - 4, x0));
-    let y0 = Math.max(4, Math.min(Z.chaleur.h - h - 4, y));
-    for (let n = 0; n < 12 && posees.some(r => x0 < r.x + r.w && x0 + w > r.x && y0 < r.y + r.h && y0 + h > r.y); n++) y0 += h + 4;
-    posees.push({ x: x0, y: y0, w, h, texte: lignes[0], lignes });
+  /** Une pastille est TOUJOURS dans la carte (aucun âge ne disparaît) : à l'endroit voulu, sinon
+   *  plus bas, plus haut, en version courte, ailleurs dans la carte ; en dernier recours, posée
+   *  dans la carte sur une autre. */
+  function poserPastille(lignes, x, y, coul, align, court) {
+    const W = Z.chaleur.w, H = Z.chaleur.h;
+    const taille = ls => ({ w: Math.max(...ls.map((l, i) => largeurTexte(l, 11, i === 0))) + 14, h: 8 + ls.length * 14 });
+    const placer = (ls, xs) => {
+      const { w, h } = taille(ls);
+      for (const xv of xs) {
+        const x0 = Math.max(4, Math.min(W - w - 4, xv(w))), y1 = Math.max(4, Math.min(H - h - 4, y));
+        for (let y0 = y1; y0 + h <= H - 4 + 1e-9; y0 += h + 4) if (!chevauche(x0, y0, w, h)) return { x0, y0, w, h, ls };
+        for (let y0 = y1 - h - 4; y0 >= 4; y0 -= h + 4) if (!chevauche(x0, y0, w, h)) return { x0, y0, w, h, ls };
+        for (let y0 = 4; y0 + h <= H - 4; y0 += 4) if (!chevauche(x0, y0, w, h)) return { x0, y0, w, h, ls };
+      }
+      return null;
+    };
+    const ici = [w => (align === 'right' ? x - w : (align === 'center' ? x - w / 2 : x))], ailleurs = [w => W - w - 4, () => 4, w => (W - w) / 2];
+    const courtes = court ? [court] : null, longues = Z.court && courtes ? courtes : lignes;
+    let p = placer(longues, ici) || (courtes && placer(courtes, ici)) || placer(courtes || longues, ailleurs);
+    if (!p) {
+      const ls = courtes || longues, { w, h } = taille(ls);
+      p = { x0: Math.max(4, Math.min(W - w - 4, ici[0](w))), y0: Math.max(0, Math.min(H - h, y)), w, h, ls };
+    }
+    const { x0, y0, w, h, ls } = p;
+    posees.push({ x: x0, y: y0, w, h, texte: ls[0], lignes: ls, pastille: true });
     ctx.fillStyle = C.pastille;
     arrondi(x0, y0, w, h, 6); ctx.fill();
     ctx.fillStyle = coul; ctx.fillRect(x0, y0 + 4, 3, h - 8);
-    lignes.forEach((l, i) => texte(l, x0 + 9, y0 + 11 + i * 14, i ? C.ink2 : C.ink1, 11, 'left', i === 0));
+    ls.forEach((l, i) => texte(l, x0 + 9, y0 + 11 + i * 14, i ? C.ink2 : C.ink1, 11, 'left', i === 0));
     return { x: x0, y: y0, w, h };
   }
   function arrondi(x, y, w, h, r) {
@@ -643,10 +789,10 @@
     if (E.pub) {
       const fin = BM.finGrille(E.pub), deb = E.live && E.live.n ? E.live.deb[0] : now;
       const xa = Math.max(0, X(fin)), xb = Math.min(Z.chaleur.w, X(deb));
-      if (xb - xa > 70) {
-        texte('non observé', (xa + xb) / 2, Z.chaleur.h - 16, C.ink3, 11, 'center');
-      }
+      if (xb - xa > 70) texteLibre('non observé', (xa + xb) / 2, Z.chaleur.h - 16, C.ink3, 11);
     }
+    // Panneaux qui n'ont pas la place d'être dessinés : dit, jamais en silence.
+    if (Z.masques.length) pastille(['Masqués faute de place : ' + Z.masques.join(', ')], 8, Z.chaleur.h - 30, C.ink3, 'left', 'Masqués : ' + Z.masques.join(', '));
     // Exécutions
     if (R.calques.executions) {
       if (E.exec.dernier) {
@@ -681,7 +827,7 @@
       const xa = Math.max(0, X(a)), xb = Math.min(Z.chaleur.w, X(b));
       if (xb <= xa) continue;
       hachurer(xa, 0, xb - xa, Z.chaleur.h, 0.35);
-      if (xb - xa > 120) texte('exécutions non lues', (xa + xb) / 2, Z.chaleur.h - 30, C.ink2, 10.5, 'center');
+      if (xb - xa > 120) texteLibre('exécutions non lues', (xa + xb) / 2, Z.chaleur.h - 30, C.ink2, 10.5);
     }
   }
   function murs() {
@@ -698,7 +844,13 @@
       ctx.globalAlpha = 0.9; ctx.strokeStyle = coul; ctx.lineWidth = 1;
       ctx.strokeRect(Math.round(x0) + 0.5, Math.round(ya) + 0.5, Z.chaleur.w - x0, Math.max(2, Math.round(yb - ya)));
       ctx.globalAlpha = 1;
-      texte('Σ ' + BM.btc(m.q) + ' BTC', x0 + 4, (ya + yb) / 2, coul, 10, 'left', true);
+      // Le libellé tient dans la carte (un mur posé près du bord droit l'écrit à sa gauche), et ne se
+      // pose pas sur un autre : deux murs voisins écrivent leurs Σ côte à côte le long de leur trait.
+      const t = 'Σ ' + BM.btc(m.q) + ' BTC', tw = largeurTexte(t, 10, true), ty = (ya + yb) / 2, W = Z.chaleur.w;
+      let tx = Math.max(2, Math.min(x0 + 4, W - tw - 4));
+      for (let x = tx; x + tw <= W - 4; x += tw + 10) if (!chevauche(x - 1, ty - 7, tw + 2, 14)) { tx = x; break; }
+      texte(t, tx, ty, coul, 10, 'left', true);
+      reserver(tx - 1, ty - 7, tw + 2, 14, t);
     }
     pastille(['Murs du carnet · lus il y a ' + BM.age(now - n.mursA), 'Σ par tranche de ' + tr + ' $ · fichier de 15 min'],
       x0 + 6, 60, C.murBid, 'left', 'Murs · ' + BM.age(now - n.mursA));
@@ -719,31 +871,65 @@
     ctx.restore();
     const cv = n.conversion;
     pastille(['Gamma (Deribit) · il y a ' + BM.age(maintenant() - n.gammaA), 'convention : ' + (n.convention || 'non précisée par le fichier'),
-      cv ? 'strikes en ' + n.uniteGamma + ', placés en USDT : ÷ ' + cv.taux.toLocaleString('fr-FR', { maximumFractionDigits: 6 }) + ' (USDT/USD' + (cv.a ? ', il y a ' + BM.age(maintenant() - cv.a) : '') + ')'
+      cv ? 'strikes en ' + n.uniteGamma + ', placés en USDT : ÷ ' + BM.nombre(cv.taux, 0, 6) + ' (USDT/USD' + (cv.a ? ', il y a ' + BM.age(maintenant() - cv.a) : '') + ')'
         : 'strikes en ' + n.uniteGamma + ', NON convertis en USDT (cours USDT/USD non publié)'],
       x0 + 6, 60, C.gamma, 'left', 'Gamma · ' + BM.age(maintenant() - n.gammaA) + (cv ? '' : ' · non converti'));
   }
+  /** Meilleur bid / meilleur ask, en marches (le prix tient jusqu'à la lecture suivante). Trait
+   *  d'UN pixel (le chemin rapide du canevas), lectures cherchées par dichotomie à partir du bord
+   *  gauche, et au plus une marche par colonne de pixels : les lectures d'une même colonne y
+   *  deviennent un trait vertical de leur étendue. Après 6 h (10 000 lectures), le tracé ne coûte
+   *  pas plus que la largeur de la carte. */
   function bidAsk() {
-    if (E.bidask.length < 2) return;
+    const ba = E.bidask;
+    if (ba.length < 2) return;
+    const valide = BM.validiteLecture(CADENCE_CARNET[R.niveauxLive]), ecart = E.horloge.ecart;
+    const tmin = E.vue.t1 - 60e3 - ecart, tmax = E.vue.t2 - ecart;     // en heure LOCALE (b.t)
+    let lo = 0, hi = ba.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (ba[m].t < tmin) lo = m + 1; else hi = m; }
     for (const [k, coul] of [['bid', C.up], ['ask', C.down]]) {
-      ctx.strokeStyle = coul; ctx.lineWidth = 1.2; ctx.globalAlpha = 0.95;
+      ctx.strokeStyle = coul; ctx.fillStyle = coul; ctx.lineWidth = 1; ctx.globalAlpha = 0.95;
       ctx.beginPath();
-      let prevT = null, prevY = 0;
-      const valide = BM.validiteLecture(CADENCE_CARNET[R.niveauxLive]);
-      for (const b of E.bidask) {
-        const t = axe(b.t);
-        if (t < E.vue.t1 - 60e3 || t > E.vue.t2) continue;
-        const x = X(t), y = Y(b[k]);
-        // Marches : le prix tient jusqu'à la lecture suivante. Une lecture manquée (onglet
-        // caché, panne) coupe la ligne au lieu de relier deux instants éloignés.
-        if (prevT === null || b.t - prevT > valide) ctx.moveTo(x, y);
-        else { ctx.lineTo(x, prevY); ctx.lineTo(x, y); }
+      const spans = [];
+      let prevT = null, prevY = 0, col = null, cmin = 0, cmax = 0;
+      for (let i = lo; i < ba.length; i++) {
+        const b = ba[i];
+        if (b.t > tmax) break;
+        const x = X(b.t + ecart), y = Y(b[k]), xc = Math.floor(x);
+        // Une lecture manquée (onglet caché, panne) coupe la ligne au lieu de relier deux instants éloignés.
+        if (prevT === null || b.t - prevT > valide) { if (col !== null) spans.push(col, cmin, cmax); ctx.moveTo(x, y); col = xc; cmin = cmax = y; }
+        else if (xc === col) { cmin = Math.min(cmin, y, prevY); cmax = Math.max(cmax, y, prevY); }
+        else { spans.push(col, cmin, cmax); ctx.lineTo(x, prevY); ctx.lineTo(x, y); col = xc; cmin = Math.min(y, prevY); cmax = Math.max(y, prevY); }
         prevT = b.t; prevY = y;
       }
-      ctx.stroke(); ctx.globalAlpha = 1;
+      if (col !== null) spans.push(col, cmin, cmax);
+      ctx.stroke();
+      for (let j = 0; j < spans.length; j += 3) if (spans[j + 2] - spans[j + 1] >= 1) ctx.fillRect(spans[j], spans[j + 1], 1, spans[j + 2] - spans[j + 1]);
+      ctx.globalAlpha = 1;
     }
   }
   const SECONDE_DES_PPM = 6;     // px par minute à partir desquels la ligne suit les exécutions à la seconde
+  /** M4 : par colonne de pixels, le premier point, le plus bas, le plus haut et le dernier, dans leur
+   *  ordre. Le tracé d'une ligne fine est celui de tous les points, pour au plus 4 points par colonne
+   *  (vue de 3 h, prix à la seconde : 10 800 points → ≤ 4 × 1 262). */
+  function tracerM4(ch, seg) {
+    let col = null, pr = null, bas = null, haut = null, der = null, n = 0;
+    const vider = () => {
+      if (col === null) return;
+      for (const q of [pr, bas, haut, der].filter((q, i, a) => a.indexOf(q) === i).sort((a, b) => a.i - b.i)) {
+        if (n++) ch.lineTo(q.x, q.y); else ch.moveTo(q.x, q.y);
+      }
+    };
+    seg.forEach(([t, p], i) => {
+      const x = X(t), y = Y(p), c = Math.floor(x), q = { x, y, i };
+      if (c !== col) { vider(); col = c; pr = bas = haut = q; }
+      if (y < bas.y) bas = q;
+      if (y > haut.y) haut = q;
+      der = q;
+    });
+    vider();
+  }
+  let LIGNE = { cle: null, chemin: null };
   function lignePrix() {
     const ms = E.minutes;
     ctx.save();
@@ -759,15 +945,22 @@
       }
       ctx.stroke(); ctx.globalAlpha = 1;
     }
-    ctx.strokeStyle = C.prix; ctx.lineWidth = 1.6;
-    ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 3;
-    ctx.beginPath();
     // Les points viennent de BM.lignePrix : clôtures 1 min, puis VWAP à la seconde — partout où les
-    // exécutions sont lues dès qu'une minute fait au moins 6 px —, coupée sur ce qui n'est pas lu.
-    const segs = BM.lignePrix(ms, E.exec, { t1: E.vue.t1, t2: E.vue.t2, parSeconde: ppm >= SECONDE_DES_PPM,
-      minutesA: E.minutesA ? axe(E.minutesA) : null, nonLues: execNonLues(), maintenant: maintenant() });
-    for (const seg of segs) seg.forEach(([t, p], i) => { if (i) ctx.lineTo(X(t), Y(p)); else ctx.moveTo(X(t), Y(p)); });
-    ctx.stroke();
+    // exécutions sont lues dès qu'une minute fait au moins 6 px —, coupée sur ce qui n'est pas lu. Le
+    // tracé est gardé tant que ni les données ni la vue ne changent (le survol ne le refait pas).
+    const nonLues = execNonLues(), parSeconde = ppm >= SECONDE_DES_PPM, der = ms.length ? ms[ms.length - 1] : null;
+    const cle = [E.exec.version, ms.length, der ? der.t + ':' + der.c : '', E.minutesA, E.horloge.ecart, E.vue.t1, E.vue.t2, E.vue.p1, E.vue.p2,
+      Z.chaleur.w, Z.chaleur.h, parSeconde, nonLues.map(x => x.join(':')).join(',')].join('|');
+    if (LIGNE.cle !== cle) {
+      const segs = BM.lignePrix(ms, E.exec, { t1: E.vue.t1, t2: E.vue.t2, parSeconde, minutesA: E.minutesA ? axe(E.minutesA) : null, nonLues, maintenant: maintenant() });
+      const ch = new Path2D();
+      for (const seg of segs) tracerM4(ch, seg);
+      LIGNE = { cle, chemin: ch };
+    }
+    // Un trait sombre plus large SOUS la ligne la détache de la chaleur (une ombre floue coûtait
+    // ≈ 1,5 ms par image au navigateur).
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 3.6; ctx.stroke(LIGNE.chemin);
+    ctx.strokeStyle = C.prix; ctx.lineWidth = 1.6; ctx.stroke(LIGNE.chemin);
     ctx.restore();
   }
   /** Seaux des bulles : pas de temps dans une échelle fixe et pas de prix multiple de la tranche
@@ -776,14 +969,18 @@
   function pasBulles() {
     return { pasT: BM.pasTemps((E.vue.t2 - E.vue.t1) / Z.chaleur.w * 9), pasP: BM.pasMultiple((E.vue.p2 - E.vue.p1) / Z.chaleur.h * 9, E.exec.dp) };
   }
-  let BULLES = [];
+  let BULLES = [], TRI = { cle: null, g: [] };
   function bulles() {
     BULLES = [];
     if (!E.exec.seaux.size) return;
     const { pasT, pasP } = pasBulles();
-    const g = E.exec.regrouper(E.vue.t1, E.vue.t2, pasT, pasP)
-      .filter(b => b.achat + b.vente >= R.bulleMin)
-      .sort((a, b) => (a.achat + a.vente) - (b.achat + b.vente));
+    // Les seaux viennent des plis gardés (BM.SeauxExecutions) ; le tri par volume est gardé tant que
+    // ni les exécutions, ni la fenêtre, ni le seuil ne changent.
+    const cle = [E.exec.version, E.vue.t1, E.vue.t2, pasT, pasP, R.bulleMin].join('|');
+    if (TRI.cle !== cle) {
+      TRI = { cle, g: E.exec.regrouper(E.vue.t1, E.vue.t2, pasT, pasP).filter(b => b.achat + b.vente >= R.bulleMin).sort((a, b) => (a.achat + a.vente) - (b.achat + b.vente)) };
+    }
+    const g = TRI.g;
     for (const b of g) {
       const q = b.achat + b.vente, r = BM.rayonBulle(q, R.bulleEchelle);
       const x = X(b.t), y = Y(b.p);
@@ -820,8 +1017,9 @@
     ctx.globalAlpha = 1;
     // Une fenêtre qui contient des exécutions NON LUES donne un profil incomplet : il le dit.
     const manque = BM.dureeDans(execNonLues(), ta, tb);
-    TEXTES.profil = 'Profil des exécutions visibles' + (manque > 0 ? ' · incomplet : ' + BM.age(manque) + ' non lues' : '');
+    TEXTES.profil = (Z.etroit ? 'Profil' : 'Profil des exécutions visibles') + (manque > 0 ? ' · incomplet : ' + BM.age(manque) + ' non lues' : '');
     texte(TEXTES.profil, 6, 14, C.ink2, 10, 'left', true);
+    reserver(2, 6, largeurTexte(TEXTES.profil, 10, true) + 8, 16, TEXTES.profil);     // les pastilles l'évitent
   }
   function croix() {
     const s = E.souris;
@@ -843,13 +1041,16 @@
       const centre = (E.vue.p1 + E.vue.p2) / 2;
       for (const g of [...E.niv.gamma].sort((u, v) => Math.abs(u.pAxe - centre) - Math.abs(v.pAxe - centre))) {
         const y = Y(g.pAxe);
+        // Le libellé TIENT dans l'axe (54 px sur un téléphone) : strike entier, sinon en milliers.
         if (y > 6 && y < a.h - 6) {
           ctx.fillStyle = C.gamma; ctx.fillRect(a.x, y - 7, a.w, 14);
-          texte(g.court + ' ' + BM.prix(g.p), a.x + 4, y, '#0b0b12', 10, 'left', true); reserve.push(y);
-        } else if (y <= 6 && haut < 3) {
-          const yy = 9 + 13 * haut++; texte('↑' + g.court + ' ' + kilo(g.p), a.x + 3, yy, C.gamma, 9.5, 'left', true); reserve.push(yy);
-        } else if (y >= a.h - 6 && bas < 3) {
-          const yy = a.h - 9 - 13 * bas++; texte('↓' + g.court + ' ' + kilo(g.p), a.x + 3, yy, C.gamma, 9.5, 'left', true); reserve.push(yy);
+          texte(ajuster([g.court + ' ' + BM.prix(g.p), g.court + ' ' + kilo(g.p), g.court], a.w - 6, 10, true), a.x + 4, y, '#0b0b12', 10, 'left', true); reserve.push(y);
+        } else if ((y <= 6 && haut < 3) || (y >= a.h - 6 && bas < 3)) {
+          // Hors champ : fléché, en milliers ; la valeur reste écrite (corps réduit s'il le faut).
+          const f = y <= 6 ? '↑' : '↓', yy = y <= 6 ? 9 + 13 * haut++ : a.h - 9 - 13 * bas++;
+          const t = ajuster([f + g.court + ' ' + kilo(g.p), f + g.court + ' ' + kiloCourt(g.p), f + g.court + kiloCourt(g.p)], a.w - 5, 9.5, true);
+          const corps = largeurTexte(t, 9.5, true) <= a.w - 5 ? 9.5 : 8;
+          texte(t, a.x + 3, yy, C.gamma, corps, 'left', true); reserve.push(yy);
         }
       }
     }
@@ -866,10 +1067,16 @@
     }
     if (p) {
       ctx.fillStyle = C.prix; arrondi(a.x + 1, yPrix - 9, a.w - 2, 18, 4); ctx.fill();
-      texte(BM.prix(p, 1), a.x + 5, yPrix, '#0b0b12', 11, 'left', true);
+      texte(ajuster([BM.prix(p, 1), BM.prix(p, 0)], a.w - 7, 11, true), a.x + 5, yPrix, '#0b0b12', 11, 'left', true);
     }
   }
-  const kilo = p => (p / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' k';
+  const kilo = p => BM.nombre(p / 1000, 0, 1) + ' k';
+  const kiloCourt = p => BM.nombre(p / 1000, 0, 0) + 'k';
+  /** Le fuseau de l'axe du temps (l'heure LOCALE de l'appareil), écrit dans l'angle : « UTC+2 ». */
+  function fuseau(t) {
+    const m = -new Date(t).getTimezoneOffset(), a = Math.abs(m);
+    return 'UTC' + (m < 0 ? '−' : '+') + Math.floor(a / 60) + (a % 60 ? ':' + String(a % 60).padStart(2, '0') : '');
+  }
   function axeTemps() {
     const a = Z.axeT;
     ctx.fillStyle = C.panneau; ctx.fillRect(a.x, a.y, Z.w, a.h);
@@ -890,6 +1097,9 @@
     });
     TEXTES.axeTemps = ticks.map((t, i) => (jours && (i === 0 || BM.jour(t) !== BM.jour(ticks[i - 1])) ? BM.jour(t) + ' ' : '') + BM.heure(t, sec));
     TEXTES.pasTemps = pas;
+    // Les heures sont LOCALES (celles de l'appareil) : le fuseau est écrit dans l'angle, sous l'axe des prix.
+    TEXTES.fuseau = fuseau(E.vue.t2);
+    texte(TEXTES.fuseau, Z.axeP.x + Z.axeP.w / 2, a.y + a.h / 2 + 1, C.ink3, 9.5, 'center');
   }
   function carnetLateral() {
     const a = Z.dom;
@@ -899,21 +1109,25 @@
     if (!k) { texte(E.erreurs.carnet ? 'indisponible' : '…', a.x + 6, 26, C.ink3, 10); return; }
     // Un pas MULTIPLE de la tranche du carnet live : chaque barre réunit le même nombre de
     // tranches entières (sinon 2 puis 3 tranches par barre : un peigne, et des Σ faux).
-    const pas = BM.pasMultiple((E.vue.p2 - E.vue.p1) / a.h * 4, k.dp), mult = Math.round(pas / k.dp);
-    texte('Σ BTC par ' + BM.prix(pas, BM.decimales(pas)) + ' $', a.x + 6, 24, C.ink3, 9.5);
+    const pas = BM.pasMultiple((E.vue.p2 - E.vue.p1) / a.h * 4, k.dp), mult = Math.round(pas / k.dp), tp = BM.prix(pas, BM.decimales(pas));
+    TEXTES.carnet = ajuster(['Σ BTC par ' + tp + ' $', 'Σ BTC / ' + tp + ' $', 'Σ / ' + tp + ' $'], a.w - 8, 9.5);
+    texte(TEXTES.carnet, a.x + 6, 24, C.ink3, 9.5);
     const agg = (m) => { const o = new Map(); for (const [pb, q] of m) { const P = Math.floor(pb / mult); o.set(P, (o.get(P) || 0) + q); } return o; };
     const sb = agg(k.sb), sa = agg(k.sa);
     let max = 0;
     for (const m of [sb, sa]) for (const [P, q] of m) { const y = Y(P * pas); if (y >= 0 && y <= a.h) max = Math.max(max, q); }
     if (!max) return;
     const L = a.w - 34;
+    // Les barres restent entre l'en-tête (34 px) et la ligne de l'écart (20 px du bas) : aucun texte dessous.
+    ctx.save(); ctx.beginPath(); ctx.rect(a.x, 34, a.w, a.h - 54); ctx.clip();
     for (const [m, coul] of [[sb, C.up], [sa, C.down]]) for (const [P, q] of m) {
       const ya = Y((P + 1) * pas), yb = Y(P * pas);
-      if (yb < 34 || ya > a.h) continue;
+      if (yb < 34 || ya > a.h - 20) continue;
       const l = L * q / max;
       ctx.globalAlpha = 0.75; ctx.fillStyle = coul; ctx.fillRect(a.x + 2, ya, l, Math.max(1, yb - ya - 0.5)); ctx.globalAlpha = 1;
       if (yb - ya >= 11 && q >= max * 0.35) texte(BM.btc(q), a.x + 4 + l, (ya + yb) / 2, C.ink1, 9.5);
     }
+    ctx.restore();
     if (k.meilleurBid && k.meilleurAsk) {
       const sp = k.meilleurAsk - k.meilleurBid;
       texte('écart ' + BM.prix(sp, 2) + ' $', a.x + 6, a.h - 10, C.ink3, 9.5);
@@ -942,6 +1156,8 @@
     texte(TEXTES.volume, a.x + 6, a.y + 9, C.ink3, 9.5);
     const ms = minutesVisibles();
     if (!ms.length) return;
+    // Les barres restent SOUS le titre et dans la largeur de la carte (jamais sous l'axe des prix).
+    ctx.save(); ctx.beginPath(); ctx.rect(a.x, a.y + 16, a.w, a.h - 16); ctx.clip();
     const groupes = new Map();
     for (const m of ms) {
       const K = Math.floor(m.t / pas), b = groupes.get(K) || { t: K * pas, achat: 0, vente: 0 };
@@ -951,7 +1167,7 @@
     // Échelle au 95ᵉ centile : une minute exceptionnelle ne doit pas écraser toutes les
     // autres. Une barre plus haute est écrêtée ET marquée d'un trait blanc.
     const max = (BM.centile(barres.map(b => Math.max(b.achat, b.vente)), 0.95) * 1.15) || 1;
-    const mid = a.y + a.h / 2 + 4, hh = a.h / 2 - 7, lw = Math.max(1, ppm * g - 1);
+    const haut = a.y + 18, basZ = a.y + a.h - 2, mid = (haut + basZ) / 2, hh = (basZ - haut) / 2 - 1, lw = Math.max(1, ppm * g - 1);
     for (const b of barres) {
       const x = X(b.t), ha = hh * Math.min(1, b.achat / max), hv = hh * Math.min(1, b.vente / max);
       ctx.fillStyle = C.up; ctx.fillRect(x, mid - ha, lw, ha);
@@ -960,6 +1176,7 @@
       if (b.achat > max) ctx.fillRect(x, mid - hh - 1, lw, 1.5);
       if (b.vente > max) ctx.fillRect(x, mid + hh - 0.5, lw, 1.5);
     }
+    ctx.restore();
     hachuresBougies(a);
   }
   function panneauCvd() {
@@ -972,6 +1189,8 @@
     let lo = 0, hi = 0, i1 = i0;
     for (let i = i0; i < ms.length; i++) { if (ms[i].t > E.vue.t2) break; lo = Math.min(lo, cvd[i]); hi = Math.max(hi, cvd[i]); i1 = i; }
     const pad = (hi - lo) * 0.1 || 1, y = v => a.y + 16 + (a.h - 20) * (1 - (v - lo + pad) / (hi - lo + 2 * pad));
+    // La courbe reste dans la largeur de la carte (jamais sous l'axe des prix ni le carnet latéral).
+    ctx.save(); ctx.beginPath(); ctx.rect(a.x, a.y, a.w, a.h); ctx.clip();
     ctx.strokeStyle = C.grille; ctx.beginPath(); ctx.moveTo(0, y(0)); ctx.lineTo(a.w, y(0)); ctx.stroke();
     ctx.strokeStyle = C.accent; ctx.lineWidth = 1.4; ctx.beginPath();
     let der = 0;
@@ -981,6 +1200,7 @@
       ctx.lineTo(x, y(cvd[i])); der = cvd[i];
     }
     ctx.stroke();
+    ctx.restore();
     hachuresBougies(a);
     const vues = reprises.filter(i => i <= i1), depuis = vues.length ? ms[vues[vues.length - 1]].t : null;
     const manque = BM.dureeDans(BM.trousMinutes(ms), E.vue.t1, E.vue.t2);
@@ -992,17 +1212,21 @@
 
   // ─── Lecture au pointeur : la VALEUR, quel que soit le réglage ──────────────
   const bulleInfo = document.getElementById('lecture');
+  let lectureHtml = null, lectureTaille = [0, 0];
+  function cacherLecture() { if (!bulleInfo.hidden) bulleInfo.hidden = true; lectureHtml = null; }
   function lectureSouris() {
     const s = E.souris;
-    if (!s || s.zone !== 'chaleur') { bulleInfo.hidden = true; return; }
+    // Pendant un glissement à la souris, la croix suit le pointeur et la lecture attend le lâcher.
+    if (!s || s.zone !== 'chaleur' || s.geste) { cacherLecture(); return; }
     const t = T(s.x), p = Pr(s.y), l = [];
     l.push('<b>' + BM.prix(p, 1) + ' $</b> · ' + BM.heure(t, true));
     // Le PIXEL sous le pointeur, tel que la peinture le calcule : mêmes colonnes, mêmes tranches,
-    // même MAX (BM.lirePixel). La valeur lue est celle de la couleur vue, à tout niveau de zoom.
+    // même MAX (BM.lirePixel), même « maintenant » que la peinture de SON calque. La valeur lue est
+    // celle de la couleur vue, à tout niveau de zoom.
     const tpp = (E.vue.t2 - E.vue.t1) / Z.chaleur.w, pp = (E.vue.p2 - E.vue.p1) / Z.chaleur.h;
-    const ix = Math.floor(s.x), iy = Math.floor(s.y);
-    const ta = E.vue.t1 + ix * tpp, tb = Math.min(ta + tpp, chaleurA || maintenant());   // le « maintenant » de la peinture
-    const cel = (g, nom, enc) => {
+    const ix = Math.floor(s.x), iy = Math.floor(s.y), ta = E.vue.t1 + ix * tpp;
+    const cel = (g, nom, enc, coupe) => {
+      const tb = Math.min(ta + tpp, coupe);
       if (!g || !(tb > ta)) return;
       const [ja, jb] = BM.tranchesLigne(E.vue.p2, pp, iy, g.dp, [0, 0]);
       const r = BM.lirePixel(g, ta, tb, ja, jb);
@@ -1023,8 +1247,8 @@
       l.push('&nbsp;&nbsp;' + (q ? 'mesuré : ' + BM.btc(q) + ' BTC · ' : '') + quand + pixel);
     };
     const pub = grillePublieeAffichee();
-    if (pub) cel(pub, 'Carte', pub.encodage);
-    if (R.calques.live) cel(E.live, 'Live', E.liveRef === 'publiee' ? E.pub && E.pub.encodage : null);
+    if (pub) cel(pub, 'Carte', pub.encodage, PUB.coupe);
+    if (R.calques.live && !LIVE.vide) cel(E.live, 'Live', E.liveRef === 'publiee' ? E.pub && E.pub.encodage : null, LIVE.coupe);
     if (R.calques.executions && E.exec.seaux.size) {
       // La bulle SURVOLÉE (la plus haute qui contient le pointeur), sinon le seau sous le pointeur :
       // la même grille de seaux que le dessin, jamais une fenêtre centrée sur le pointeur.
@@ -1039,13 +1263,25 @@
           + BM.btc(b.achat) + ' BTC achetés / ' + BM.btc(b.vente) + ' vendus au marché');
       }
     }
-    bulleInfo.innerHTML = l.join('<br>');
-    bulleInfo.hidden = false;
-    const r = cv.getBoundingClientRect();
-    const bw = bulleInfo.offsetWidth, bh = bulleInfo.offsetHeight;
-    let x = r.left + s.x + 16, y = r.top + s.y + 16;
-    if (x + bw > window.innerWidth - 8) x = r.left + s.x - bw - 16;
-    if (y + bh > window.innerHeight - 8) y = r.top + s.y - bh - 16;
+    // Le texte n'est réécrit (et mesuré) que s'il a changé : un battement sans mouvement ne force
+    // aucune mise en page.
+    const html = l.join('<br>');
+    if (html !== lectureHtml) {
+      bulleInfo.innerHTML = html; bulleInfo.hidden = false; lectureHtml = html;
+      lectureTaille = [bulleInfo.offsetWidth, bulleInfo.offsetHeight];
+    }
+    const r = rect(), [bw, bh] = lectureTaille, vw = window.innerWidth, vh = window.innerHeight;
+    let x, y;
+    if (s.tactile) {
+      // Au doigt : au-dessus du point touché (le doigt ne la cache pas), centrée et dans l'écran.
+      x = Math.max(8, Math.min(vw - bw - 8, r.left + s.x - bw / 2));
+      y = r.top + s.y - bh - 28;
+      if (y < 8) y = r.top + s.y + 28;
+    } else {
+      x = r.left + s.x + 16; y = r.top + s.y + 16;
+      if (x + bw > vw - 8) x = Math.max(8, r.left + s.x - bw - 16);
+      if (y + bh > vh - 8) y = Math.max(8, r.top + s.y - bh - 16);
+    }
     bulleInfo.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
   }
 
@@ -1069,21 +1305,42 @@
     v.p2 = p + (v.p2 - p) / (v.p2 - v.p1) * L; v.p1 = v.p2 - L;
   }
   function lacher() { if (E.suivre) { E.suivre = false; majBoutonSuivre(); } }
+  // GESTES
+  //   Souris : glisser déplace la carte (par pixels entiers : le calque publié se décale au lieu
+  //   d'être repeint) ; la croix suit le pointeur pendant le geste, la lecture revient au lâcher.
+  //   Doigt : un appui bref ÉPINGLE la lecture là où il tombe (un autre appui la déplace, un appui
+  //   au même endroit l'enlève) ; un appui long (APPUI_LONG) l'affiche et la fait suivre le doigt
+  //   sans déplacer la carte ; glisser déplace la carte ; deux doigts zooment.
+  const APPUI_LONG = 450, TAP_PX = 8;
   const pointeurs = new Map();
-  let geste = null;
+  let geste = null, minuteurAppui = null;
+  const position = e => { const r = rect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
   cv.addEventListener('pointerdown', e => {
-    cv.setPointerCapture(e.pointerId);
-    const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    try { cv.setPointerCapture(e.pointerId); } catch (x) { /* pointeur synthétique */ }
+    const { x, y } = position(e), tactile = e.pointerType === 'touch';
     pointeurs.set(e.pointerId, { x, y });
+    clearTimeout(minuteurAppui);
     if (pointeurs.size === 2) {
       const [a, b] = [...pointeurs.values()];
       geste = { pince: true, dx: Math.abs(a.x - b.x) || 1, dy: Math.abs(a.y - b.y) || 1, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, vue: Object.assign({}, E.vue) };
-    } else geste = { x, y, zone: zoneDe(x, y), vue: Object.assign({}, E.vue) };
+      return;
+    }
+    geste = { x, y, zone: zoneDe(x, y), vue: Object.assign({}, E.vue), tactile, bouge: false, lecture: false };
+    if (tactile) {
+      minuteurAppui = setTimeout(() => {
+        if (!geste || geste.pince || geste.bouge) return;
+        geste.lecture = true;
+        E.souris = { x: geste.x, y: geste.y, zone: zoneDe(geste.x, geste.y), tactile: true };
+        dessiner();
+      }, APPUI_LONG);
+    }
   });
   cv.addEventListener('pointermove', e => {
-    const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    const { x, y } = position(e), tactile = e.pointerType === 'touch';
     if (pointeurs.has(e.pointerId)) pointeurs.set(e.pointerId, { x, y });
-    if (geste && E.vue) {
+    // La souris : la croix suit TOUJOURS le pointeur, geste ou non.
+    if (!tactile) E.souris = { x, y, zone: zoneDe(x, y), geste: !!(geste && geste.bouge) };
+    if (geste && E.vue && Z) {
       const v0 = geste.vue;
       if (geste.pince && pointeurs.size === 2) {
         const [a, b] = [...pointeurs.values()];
@@ -1091,60 +1348,108 @@
         Object.assign(E.vue, v0);
         if (geste.dx > 30) zoomTemps(fx, geste.cx);
         if (geste.dy > 30) zoomPrix(fy, geste.cy);
-        lacher(); sale(); return;
+        lacher(); dessiner(); return;
       }
       if (!geste.pince) {
-        const dx = x - geste.x, dy = y - geste.y;
+        if (geste.lecture) { E.souris = { x, y, zone: zoneDe(x, y), tactile: true }; dessiner(); return; }
+        const dx = Math.round(x - geste.x), dy = Math.round(y - geste.y);
+        if (!geste.bouge) {
+          if (Math.abs(dx) + Math.abs(dy) < (tactile ? TAP_PX : 1)) return;     // pas encore un glissement
+          geste.bouge = true; clearTimeout(minuteurAppui);
+          if (tactile && E.souris) E.souris = null;                            // la lecture épinglée s'en va
+          if (!tactile) E.souris.geste = true;
+        }
         if (geste.zone === 'axeP') {
           Object.assign(E.vue, v0); zoomPrix(Math.exp(dy / 160), Z.chaleur.h / 2);
         } else if (geste.zone === 'axeT') {
           Object.assign(E.vue, v0); zoomTemps(Math.exp(-dx / 200), Z.chaleur.w / 2);
         } else {
-          const dt = dx / Z.chaleur.w * (v0.t2 - v0.t1), dp = dy / Z.chaleur.h * (v0.p2 - v0.p1);
+          // Un nombre ENTIER de pixels (invisible) : la chaleur gardée se décale exactement.
+          const dt = dx * (v0.t2 - v0.t1) / Z.chaleur.w, dp = dy * (v0.p2 - v0.p1) / Z.chaleur.h;
           E.vue.t1 = v0.t1 - dt; E.vue.t2 = v0.t2 - dt; E.vue.p1 = v0.p1 + dp; E.vue.p2 = v0.p2 + dp;
         }
         if (Math.abs(dx) + Math.abs(dy) > 3) lacher();
-        sale(); return;
+        dessiner(); return;
       }
     }
-    E.souris = { x, y, zone: zoneDe(x, y) };
-    dessiner();
+    if (!tactile) dessiner();
   });
-  const fin = e => { pointeurs.delete(e.pointerId); if (pointeurs.size < 2 && geste && geste.pince) geste = null; if (!pointeurs.size) geste = null; };
+  const fin = e => {
+    clearTimeout(minuteurAppui);
+    const tactile = e.pointerType === 'touch';
+    // Un appui bref au doigt, sans glisser : la lecture est épinglée là (ou enlevée si on retouche le même point).
+    if (tactile && e.type === 'pointerup' && geste && !geste.pince && !geste.bouge && !geste.lecture && pointeurs.size === 1) {
+      const { x, y } = position(e), s = E.souris;
+      E.souris = s && s.tactile && Math.hypot(s.x - x, s.y - y) < 16 ? null : { x, y, zone: zoneDe(x, y), tactile: true };
+    }
+    pointeurs.delete(e.pointerId);
+    if (pointeurs.size < 2 && geste && geste.pince) geste = null;
+    if (!pointeurs.size) { geste = null; if (E.souris && E.souris.geste) E.souris.geste = false; }
+    dessiner();
+  };
   cv.addEventListener('pointerup', fin);
   cv.addEventListener('pointercancel', fin);
-  cv.addEventListener('pointerleave', () => { E.souris = null; dessiner(); });
+  // Le doigt « quitte » la carte à chaque lever : la lecture épinglée reste.
+  cv.addEventListener('pointerleave', e => { if (e.pointerType === 'touch' || geste) return; E.souris = null; dessiner(); });
   cv.addEventListener('wheel', e => {
-    if (!E.vue) return;
+    if (!E.vue || !Z) return;
     e.preventDefault();
-    const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, zone = zoneDe(x, y);
+    const { x, y } = position(e), zone = zoneDe(x, y);
     const f = Math.exp((e.deltaY || e.deltaX) * (e.deltaMode === 1 ? 0.05 : 0.0015));
     if (zone === 'axeP' || e.shiftKey) zoomPrix(f, Math.min(y, Z.chaleur.h));
     else if (e.ctrlKey) { zoomTemps(f, x); zoomPrix(f, y); }
     else zoomTemps(f, Math.min(x, Z.chaleur.w));
-    lacher(); sale();
+    lacher(); dessiner();
   }, { passive: false });
   cv.addEventListener('dblclick', () => vueParDefaut());
   window.addEventListener('keydown', e => {
+    // Échap ferme un panneau ouvert, même depuis un de ses réglages, et rend la main au bouton.
+    if (e.key === 'Escape') {
+      if (document.querySelector('.panneau-flottant:not([hidden])')) { fermerPanneaux(true); e.preventDefault(); }
+      else if (E.souris && E.souris.tactile) { E.souris = null; dessiner(); }
+      return;
+    }
+    // Ctrl / Cmd / Alt + touche : un raccourci du navigateur (chercher, zoom, historique), pas de la carte.
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.target && /input|select|textarea/i.test(e.target.tagName)) return;
-    if (!E.vue) return;
-    const k = e.key.toLowerCase();
+    if (!E.vue || !Z) return;
+    const k = e.key.toLowerCase(), v = E.vue;
+    // Flèches : un dixième de la vue, arrondi au pixel (le calque publié se décale).
+    const pasX = Math.round(Z.chaleur.w * 0.1) * (v.t2 - v.t1) / Z.chaleur.w, pasY = Math.round(Z.chaleur.h * 0.1) * (v.p2 - v.p1) / Z.chaleur.h;
     if (k === 'f') basculerSuivre();
     else if (k === 'r') vueParDefaut();
-    else if (k === '+' || k === '=') { zoomTemps(0.8, Z.chaleur.w * 0.9); lacher(); sale(); }
-    else if (k === '-') { zoomTemps(1.25, Z.chaleur.w * 0.9); lacher(); sale(); }
-    else if (k === 'arrowup' || k === 'arrowdown') { const d = (E.vue.p2 - E.vue.p1) * 0.1 * (k === 'arrowup' ? 1 : -1); E.vue.p1 += d; E.vue.p2 += d; lacher(); sale(); }
-    else if (k === 'arrowleft' || k === 'arrowright') { const d = (E.vue.t2 - E.vue.t1) * 0.1 * (k === 'arrowright' ? 1 : -1); E.vue.t1 += d; E.vue.t2 += d; lacher(); sale(); }
+    else if (k === '+' || k === '=') { zoomTemps(0.8, Z.chaleur.w * 0.9); lacher(); }
+    else if (k === '-') { zoomTemps(1.25, Z.chaleur.w * 0.9); lacher(); }
+    else if (k === 'arrowup' || k === 'arrowdown') { const d = pasY * (k === 'arrowup' ? 1 : -1); v.p1 += d; v.p2 += d; lacher(); }
+    else if (k === 'arrowleft' || k === 'arrowright') { const d = pasX * (k === 'arrowright' ? 1 : -1); v.t1 += d; v.t2 += d; lacher(); }
     else if (k === 'l') basculerPanneau('legende');
-    else if (k === 'escape') { fermerPanneaux(); }
+    else return;
+    e.preventDefault();
+    dessiner();
   });
-  window.addEventListener('resize', () => sale());
+  // Taille du canevas ou de la barre changée : position et mise en page relues (la barre peut passer
+  // sur deux lignes ; les panneaux s'ouvrent sous sa hauteur RÉELLE).
+  const barre = document.querySelector('.barre');
+  function majHauteurBarre() { if (barre) document.documentElement.style.setProperty('--haut-barre', Math.ceil(barre.getBoundingClientRect().bottom) + 'px'); }
+  const surTaille = () => { RECT = null; majHauteurBarre(); dessiner(); };
+  if (window.ResizeObserver) { const ro = new ResizeObserver(surTaille); ro.observe(cv); if (barre) ro.observe(barre); }
+  window.addEventListener('resize', surTaille);
+  majHauteurBarre();
 
   // ─── Barre, réglages, légende ──────────────────────────────────────────────
   const $ = id => document.getElementById(id);
-  function basculerSuivre() { E.suivre = !E.suivre; if (E.suivre) suivreMaintenant(); majBoutonSuivre(); sale(); }
+  function basculerSuivre() { E.suivre = !E.suivre; if (E.suivre) suivreMaintenant(); majBoutonSuivre(); dessiner(); }
   function majBoutonSuivre() { const b = $('btnSuivre'); if (b) b.setAttribute('aria-pressed', E.suivre ? 'true' : 'false'); }
-  function fermerPanneaux() { for (const p of document.querySelectorAll('.panneau-flottant')) p.hidden = true; for (const b of document.querySelectorAll('[aria-controls]')) b.setAttribute('aria-expanded', 'false'); }
+  /** Ferme les panneaux ; `rendreFocus` : le bouton qui avait ouvert le panneau reprend la main. */
+  function fermerPanneaux(rendreFocus) {
+    let ouvreur = null;
+    for (const p of document.querySelectorAll('.panneau-flottant')) {
+      if (!p.hidden) ouvreur = document.querySelector('[aria-controls="' + p.id + '"]');
+      p.hidden = true;
+    }
+    for (const b of document.querySelectorAll('[aria-controls]')) b.setAttribute('aria-expanded', 'false');
+    if (rendreFocus && ouvreur) ouvreur.focus();
+  }
   function basculerPanneau(id) {
     const p = $(id), ouvert = p.hidden;
     fermerPanneaux();
@@ -1157,13 +1462,20 @@
     ['volume', 'Volume'], ['cvd', 'CVD']];
   function construireBarre() {
     const z = $('calques');
+    // Une ligne de puces qui défile : la molette verticale la fait défiler (sans Maj).
+    z.addEventListener('wheel', e => {
+      if (z.scrollWidth > z.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { z.scrollLeft += e.deltaY; e.preventDefault(); }
+    }, { passive: false });
     for (const [k, nom] of NOMS_CALQUES) {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'puce'; b.textContent = nom; b.dataset.calque = k;
       b.setAttribute('aria-pressed', R.calques[k] ? 'true' : 'false');
       b.addEventListener('click', () => {
         R.calques[k] = !R.calques[k]; b.setAttribute('aria-pressed', R.calques[k] ? 'true' : 'false');
-        sauver(); sale();
+        sauver();
+        // Le carnet n'est lu que pour ses calques : rallumé, il repart tout de suite.
+        if (boucleCarnet && ['live', 'dom', 'bidask'].includes(k) && R.calques[k]) boucleCarnet.reveiller();
+        dessiner();
       });
       z.appendChild(b);
     }
@@ -1176,7 +1488,7 @@
     const lier = (id, cle, conv, apres) => {
       const el = $(id);
       el.value = String(R[cle]);
-      el.addEventListener('input', () => { R[cle] = conv(el.value); sauver(); if (apres) apres(); majLegende(); sale(); });
+      el.addEventListener('input', () => { R[cle] = conv(el.value); sauver(); if (apres) apres(); majLegende(); dessiner(); });
     };
     lier('rPalette', 'palette', String, majLuts);
     lier('rSeuil', 'seuilBas', Number, majLuts);
@@ -1198,17 +1510,26 @@
     if (!C.fond) return;
     majLuts();
     const enc = E.pub && E.pub.encodage;
-    const barre = $('barreCouleurs');
-    if (barre) {
-      const c = document.createElement('canvas'); c.width = 256; c.height = 1;
-      const x = c.getContext('2d'), im = x.createImageData(256, 1), v32 = new Uint32Array(im.data.buffer);
-      for (let i = 0; i < 256; i++) v32[i] = LUT ? LUT[i] : LUTA[i];
-      x.putImageData(im, 0, 0);
-      barre.style.backgroundImage = 'url(' + c.toDataURL() + ')';
+    // Une barre par rampe peinte : la palette « bid / ask teintés » en a DEUX (bid et ask), chacune
+    // avec sa couleur ; les graduations valent pour les deux (même échelle).
+    const zone = $('barreCouleurs');
+    if (zone) {
+      const rampes = LUT ? [[null, LUT]] : [['Bid (achats posés)', LUTB], ['Ask (ventes posées)', LUTA]];
+      zone.innerHTML = rampes.map(([nom]) => (nom ? '<span class="rampe-nom">' + nom + '</span>' : '') + '<div class="rampe"></div>').join('');
+      zone.querySelectorAll('.rampe').forEach((el, k) => {
+        const c = document.createElement('canvas'); c.width = 256; c.height = 1;
+        const x = c.getContext('2d'), im = x.createImageData(256, 1), v32 = new Uint32Array(im.data.buffer);
+        v32.set(rampes[k][1]);
+        x.putImageData(im, 0, 0);
+        el.style.backgroundImage = 'url(' + c.toDataURL() + ')';
+        el.dataset.rampe = rampes[k][0] ? (k ? 'ask' : 'bid') : 'unique';
+      });
     }
     const fmt = v => { const d = BM.decoder(v, enc); return d ? (d.sature ? '≥ ' + BM.btc(d.min) : BM.btc(d.min)) + ' BTC' : 'intensité ' + v; };
+    // Chaque libellé est posé SOUS sa couleur : au centre de la case de son intensité (v + ½) / 256,
+    // les deux extrêmes alignés sur les bords de la barre.
     const g = $('gradBarre');
-    if (g) g.innerHTML = [0, 64, 128, 192, 255].map(v => '<span>' + (v ? fmt(v) : '0') + '</span>').join('');
+    if (g) g.innerHTML = [0, 64, 128, 192, 255].map(v => '<span data-v="' + v + '" class="' + (v === 0 ? 'debut' : v === 255 ? 'fin' : '') + '" style="left:' + ((v + 0.5) / 256 * 100).toFixed(3) + '%">' + (v ? fmt(v) : '0') + '</span>').join('');
     // Les valeurs APPLIQUÉES (BM.bornesContraste) : une saturation sous le seuil n'est pas appliquée.
     const ct = BM.bornesContraste(R.seuilBas, R.saturation);
     const s = $('rSeuilVal'); if (s) s.textContent = ct.bas ? fmt(ct.bas) : 'aucun';
@@ -1256,7 +1577,14 @@
   // Pour les harnais : un regard en lecture seule sur l'état, et un cadrage (la même chose
   // qu'un geste de l'utilisateur : aucune donnée n'est touchée).
   window.__carte = {
-    cadrer: (t1, t2, p1, p2) => { E.vue = { t1, t2, p1, p2 }; E.suivre = false; majBoutonSuivre(); sale(); },
+    verifierChaleur,
+    // La couleur de chaleur affichée au pixel CSS (x, y) de la zone, et celle d'une intensité.
+    couleurChaleur: (x, y) => {
+      for (const L of [LIVE, PUB]) { if (L.vide) continue; const d = L.x.getImageData(x, y, 1, 1).data; if (d[3]) return (d[0] | d[1] << 8 | d[2] << 16 | d[3] << 24) >>> 0; }
+      return null;
+    },
+    couleurIntensite: (v, cote) => (LUT ? LUT[v] : (cote === 'ask' ? LUTA[v] : LUTB[v])),
+    cadrer: (t1, t2, p1, p2) => { E.vue = { t1, t2, p1, p2 }; E.suivre = false; majBoutonSuivre(); dessiner(); },
     bulles: () => BULLES.map(z => ({ x: z.x, y: z.y, r: z.r, achat: z.b.achat, vente: z.b.vente, ta: z.b.ta, tb: z.b.tb, pa: z.b.pa, pb: z.b.pb })),
     lectures: () => (E.live ? { n: E.live.n, deb: Array.from(E.live.deb.subarray(0, E.live.n)), fin: Array.from(E.live.fin.subarray(0, E.live.n)),
       envoi: Array.from(E.live.envoi.subarray(0, E.live.n)), recu: Array.from(E.live.recu.subarray(0, E.live.n)), validite: E.live.validite } : null),
@@ -1274,7 +1602,9 @@
       recul: { binance: E.recul.binance.attente(Date.now()), github: E.recul.github.attente(Date.now()) },
       statut: ($('statut') || {}).textContent || '',
       pastilles: posees.map(p => p.texte), pastillesCompletes: posees.map(p => p.lignes.join(' | ')), reglages: JSON.parse(JSON.stringify(R)),
-      mesure: Object.assign({}, MESURE), chaleurPeinteA: chaleurA,
+      mesure: Object.assign({}, MESURE), chaleurPeinteA: LIVE.coupe, carnetLu: carnetUtile(), souris: E.souris && Object.assign({}, E.souris),
+      mise: Z && { w: Z.w, h: Z.h, dpr: Z.dpr, sx: Z.sx, sy: Z.sy, chaleur: Object.assign({}, Z.chaleur), masques: Z.masques.slice(), court: Z.court },
+      posees: posees.map(p => ({ x: p.x, y: p.y, w: p.w, h: p.h, texte: p.texte, pastille: !!p.pastille })),
     }),
   };
 })();

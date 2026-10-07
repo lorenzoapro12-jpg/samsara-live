@@ -44,12 +44,15 @@
         <option value="cote">Bid / ask teintés</option>
       </select>
     </label>
-    <label>Seuil bas <output id="rSeuilVal"></output>
-      <input type="range" id="rSeuil" min="0" max="120" step="1">
-    </label>
-    <label>Saturation <output id="rSaturationVal"></output>
-      <input type="range" id="rSaturation" min="20" max="255" step="1">
-    </label>
+    <!-- Un curseur a SON libellé (for) : dans <label>, l'<output> placé avant lui prenait le nom. -->
+    <div class="champ">
+      <label for="rSeuil">Seuil bas</label> <output id="rSeuilVal" for="rSeuil"></output>
+      <input type="range" id="rSeuil" min="0" max="120" step="1" aria-describedby="rSeuilVal">
+    </div>
+    <div class="champ">
+      <label for="rSaturation">Saturation</label> <output id="rSaturationVal" for="rSaturation"></output>
+      <input type="range" id="rSaturation" min="20" max="255" step="1" aria-describedby="rSaturationVal">
+    </div>
   </fieldset>
   <fieldset>
     <legend>Carte publiée — fusionner, jamais affiner</legend>
@@ -113,7 +116,9 @@
     <dd>À droite, la <b>somme</b> des ordres du dernier carnet live par tranche. À gauche, le profil des exécutions visibles. En bas, le volume (achats au-dessus, ventes au-dessous), regroupé par <span id="legVolume">1, 2, 3, 5, 10…</span> min selon le zoom — le titre du panneau dit la durée — et le CVD : achats au marché moins ventes au marché, cumulés depuis le bord gauche de la vue ; après des bougies non lues (hachurées), il repart de 0 et le dit.</dd>
   </dl>
   <h3>Gestes</h3>
-  <p>Glisser : déplacer. Molette : zoom dans le temps (sur l'axe des prix, ou avec Maj : zoom des prix). Pincer à deux doigts. Glisser sur un axe : l'étirer. Double-clic ou R : vue par défaut. F : suivre le présent. Flèches : se déplacer.</p>
+  <p>Glisser : déplacer. Molette : zoom dans le temps (sur l'axe des prix, ou avec Maj : zoom des prix). Pincer à deux doigts. Glisser sur un axe : l'étirer. Double-clic ou R : vue par défaut. F : suivre le présent. Flèches : se déplacer. Échap : fermer un panneau.</p>
+  <p>Au doigt : un appui bref épingle la lecture là où il tombe (le même appui l'enlève) ; un appui long l'affiche et la fait suivre le doigt sans déplacer la carte.</p>
+  <p class="note">Les heures de l'axe sont celles de l'appareil (le fuseau est écrit dans l'angle, sous l'axe des prix) ; « maintenant » est l'heure de Binance, recalée.</p>
   <p class="note">Ce que la carte montre est une lecture du carnet, pas une recommandation : un mur peut être retiré avant d'être touché, et une bulle ne dit pas qui a acheté.</p>
 </section>
 
