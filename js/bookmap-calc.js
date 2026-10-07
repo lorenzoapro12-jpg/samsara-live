@@ -687,9 +687,19 @@
     if (mi.put_wall) gamma.push({ nom: 'Mur de puts', court: 'PW', p: mi.put_wall });
     if (mi.zero_gamma) gamma.push({ nom: 'Zéro gamma', court: 'ZG', p: mi.zero_gamma });
     for (const p of mi.gamma_walls || []) if (!gamma.some(x => x.p === p)) gamma.push({ nom: 'Mur de gamma', court: 'GW', p });
+    // Les strikes (Deribit) sont dans l'unité que meta.champs déclare — en USD — et l'axe de la
+    // carte est en USDT. Quand le fichier publie le cours USDT/USD (micro.usdt_usd : 1 USDT = x USD),
+    // chaque niveau est PLACÉ à p / x USDT ; son libellé reste le strike publié. Sinon il est posé
+    // tel quel, et la carte écrit « non converti ».
+    const champs = (md.meta && md.meta.champs) || {};
+    const unite = (champs['micro.call_wall'] && champs['micro.call_wall'].unite) || 'USD';
+    const taux = +mi.usdt_usd;
+    const conversion = unite === 'USD' && taux > 0 && isFinite(taux) ? { taux, a: Date.parse(mi.premium_at || md.updated) || null } : null;
+    for (const x of gamma) x.pAxe = conversion ? x.p / conversion.taux : x.p;
     return {
       murs, mursA: at, tranche: lq.wall_bin_usd || null, unite: lq.unit || null,
       gamma, gammaA: g, regime: mi.gex_state || null, convention: mi.gex_convention || null,
+      uniteGamma: unite, conversion,
       meta: (md.meta && md.meta.champs) || null,
     };
   };
@@ -770,7 +780,8 @@
 
   /** Une lecture (carnet, bid / ask) vaut jusqu'à la suivante, mais pas plus de 3 cadences
    *  (+ 1 s) : au-delà, c'est une vraie absence — non observé, hachuré, ligne coupée. */
-  BM.validiteLecture = function (cadence) { return 3 * cadence + 1000; };
+  BM.VALIDITE = { cadences: 3, margeMs: 1000 };
+  BM.validiteLecture = function (cadence) { return BM.VALIDITE.cadences * cadence + BM.VALIDITE.margeMs; };
 
   // ─── Âges et formats ───────────────────────────────────────────────────────
   BM.age = function (ms) {
@@ -781,6 +792,11 @@
     if (m < 60) return m + ' min';
     const h = Math.floor(m / 60), r = m % 60;
     return h + ' h ' + String(r).padStart(2, '0');
+  };
+  /** Jour court (« lun. 06 »), pour les graduations d'une vue qui passe minuit. */
+  BM.jour = function (ms) {
+    const d = new Date(ms);
+    return ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'][d.getDay()] + ' ' + String(d.getDate()).padStart(2, '0');
   };
   BM.heure = function (ms, sec) {
     const d = new Date(ms);
@@ -815,6 +831,34 @@
   BM.bornesBulles = function (echelle) {
     const k = BM.BULLES.k * (echelle || 1);
     return { min: Math.pow(BM.BULLES.rMin / k, 2), max: Math.pow(BM.BULLES.rMax / k, 2) };
+  };
+  /** Contraste de la palette : seuil bas et saturation APPLIQUÉS (la saturation ne peut pas
+   *  descendre sous le seuil + 1). La légende écrit ces valeurs-là, pas celles des curseurs. */
+  BM.bornesContraste = function (seuilBas, saturation) { return { bas: seuilBas, haut: Math.max(seuilBas + 1, saturation) }; };
+  /** Réglages lus du stockage local, VALIDÉS : une valeur hors des listes permises (palette
+   *  renommée, fusion 3, tranche 0, « abc »…) est remplacée par le défaut — elle n'est ni
+   *  appliquée en silence, ni fatale à la page. regles : { clé: { liste, nombre } | { min, max,
+   *  entier } } ; les clés inconnues sont ignorées. Rend { reglages, rejets }. */
+  BM.validerReglages = function (stocke, defauts, regles) {
+    const o = JSON.parse(JSON.stringify(defauts)), r = stocke && typeof stocke === 'object' && !Array.isArray(stocke) ? stocke : {}, rejets = [];
+    for (const [k, regle] of Object.entries(regles)) {
+      if (!(k in r) || !regle) continue;
+      const v = r[k];
+      if (regle.liste) {
+        const x = regle.nombre ? Number(v) : v;
+        if ((typeof v === 'string' || typeof v === 'number') && (!regle.nombre || isFinite(x)) && regle.liste.includes(String(x))) o[k] = x; else rejets.push(k);
+      } else {
+        const x = typeof v === 'number' ? v : NaN;
+        if (isFinite(x) && x >= regle.min && x <= regle.max && (!regle.entier || Number.isInteger(x))) o[k] = x; else rejets.push(k);
+      }
+    }
+    if (r.calques && typeof r.calques === 'object') {
+      for (const k of Object.keys(defauts.calques || {})) {
+        if (!(k in r.calques)) continue;
+        if (typeof r.calques[k] === 'boolean') o.calques[k] = r.calques[k]; else rejets.push('calques.' + k);
+      }
+    }
+    return { reglages: o, rejets };
   };
   /** Un pas « rond » pour les graduations : 1, 2, 5 × 10ⁿ ≥ brut. */
   BM.pasRond = function (brut) {

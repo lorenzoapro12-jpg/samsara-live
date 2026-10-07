@@ -578,6 +578,81 @@ async function pixel(page, x, y) {
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p21.close();
     }
+
+    // ════ Réglages, gamma, libellés ═══════════════════════════════════════════
+    titre('22. Réglages stockés invalides : la page s\'ouvre, les défauts remplacent les valeurs hors liste');
+    {
+      let p22;
+      ({ page: p22, erreurs } = await ouvrir(nav, { encodage: true, reglages: { palette: 'disparue', fusionT: 3, fusionP: 7, dpLive: 0, bulleMin: 'abc', seuilBas: 500, saturation: 'x', calques: { live: 'oui' } } }));
+      const e22 = await etat(p22), r = e22.reglages;
+      check('aucune erreur JavaScript (une palette inconnue tuait la page)', !erreurs.length, erreurs);
+      check('défauts appliqués : palette, fusions, tranche live, bulles, contraste, calques', r.palette === 'classique' && r.fusionT === 1 && r.fusionP === 1 && r.dpLive === 5 && r.bulleMin === 0.1 && r.seuilBas === 2 && r.saturation === 200 && r.calques.live === true, r);
+      const vals = await p22.evaluate(() => ['rPalette', 'rFusionT', 'rFusionP', 'rDpLive', 'rBulleMin'].map(id => document.getElementById(id).value));
+      check('aucune liste de réglages vide', vals.every(v => v !== ''), vals);
+      check('carte et carnet live affichés', e22.publiee && e22.live && e22.live.n >= 1, e22.live);
+      await p22.close();
+    }
+
+    titre('23. Gamma : strikes en USD placés sur l\'axe en USDT au cours publié — ou dits « non convertis »');
+    {
+      const md = JSON.parse(fs.readFileSync(path.join(REPO, 'market-data.json'), 'utf8'));
+      let p23;
+      ({ page: p23, erreurs } = await ouvrir(nav, { encodage: true }));
+      // Vue large autour des niveaux gamma, après leur instant de lecture.
+      const e0 = await etat(p23), gs = e0.niveaux.gammaAxe;
+      await p23.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [e0.maintenant - 3600e3, e0.maintenant + 600e3, Math.min(...gs.map(g => g[1])) - 500, Math.max(...gs.map(g => g[1])) + 500]);
+      await p23.waitForTimeout(500);
+      const e23 = await etat(p23), lg = (e23.pastillesCompletes.find(t => /^Gamma \(Deribit\)/.test(t)) || '');
+      if (md.micro && md.micro.usdt_usd) {
+        check(`converti : ÷ ${md.micro.usdt_usd}, chaque niveau placé à strike / taux`, e23.niveaux.conversion && e23.niveaux.gammaAxe.every(([p, a]) => Math.abs(a - p / md.micro.usdt_usd) < 1e-6) && /placés en USDT/.test(lg), { conv: e23.niveaux.conversion, lg });
+      }
+      await p23.close();
+      const sans = JSON.parse(JSON.stringify(md)); delete sans.micro.usdt_usd;
+      const page2 = await nav.newPage({ viewport: { width: 1440, height: 860 } });
+      await page2.route('**/*', r => {
+        const u = r.request().url(), h = new URL(u).host, cors = { 'access-control-allow-origin': '*' };
+        if (h.startsWith('127.0.0.1')) return r.continue();
+        if (h === 'raw.githubusercontent.com') return r.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: u.includes('heatmap') ? JSON.stringify(Object.assign({}, hm, { encodage })) : JSON.stringify(sans) });
+        if (h === 'api.binance.com') { const d = simulateur().repondre(u); return r.fulfill({ status: d ? 200 : 404, headers: cors, contentType: 'application/json', body: JSON.stringify(d) }); }
+        return r.abort();
+      });
+      await page2.goto(`http://127.0.0.1:${serveur.address().port}/bookmap.html`);
+      await page2.waitForFunction(() => window.__carte && window.__carte.etat().niveaux, null, { timeout: 10000 }).catch(() => {});
+      const e2 = await etat(page2);
+      await page2.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [e2.maintenant - 3600e3, e2.maintenant + 600e3, Math.min(...e2.niveaux.gammaAxe.map(g => g[1])) - 500, Math.max(...e2.niveaux.gammaAxe.map(g => g[1])) + 500]);
+      await page2.waitForTimeout(500);
+      const e3 = await etat(page2), lg2 = (e3.pastillesCompletes.find(t => /^Gamma \(Deribit\)/.test(t)) || '');
+      check('sans cours USDT/USD : posés tels quels, « NON convertis en USDT » écrit', e3.niveaux.conversion === null && /NON convertis en USDT/.test(lg2), lg2);
+      await page2.close();
+    }
+
+    titre('24. Libellés : graduations exactes, contraste appliqué, bornes des bulles');
+    {
+      let p24;
+      ({ page: p24, erreurs } = await ouvrir(nav, { encodage: true }));
+      const e0 = await etat(p24), pm = Math.round((e0.vue.p1 + e0.vue.p2) / 2);
+      await p24.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [e0.vue.t1, e0.vue.t2, pm - 10.3, pm + 10.3]);
+      await p24.waitForTimeout(400);
+      const gp = (await etat(p24)).textes.axePrix, nums = gp.map(t => +t.replace(/\s/g, '').replace(',', '.'));
+      const pasP = nums.length > 1 ? Math.round((nums[1] - nums[0]) * 100) / 100 : null;
+      check(`axe des prix au pas de ${pasP} $ : chaque graduation écrite à sa valeur (${gp.slice(0, 3).join(' · ')}…)`, pasP === 2.5 && gp.some(t => /,5$/.test(t)) && nums.every((v, i) => !i || Math.abs(v - nums[i - 1] - 2.5) < 1e-9), gp);
+      await p24.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [e0.maintenant - 10.5 * 60e3, e0.maintenant, e0.vue.p1, e0.vue.p2]);
+      await p24.waitForTimeout(400);
+      const t1 = await etat(p24);
+      check(`axe du temps (vue de 10,5 min) : pas de ${t1.textes.pasTemps / 1000} s, libellés justes`, t1.textes.pasTemps !== 100000 && (t1.textes.pasTemps % 60e3 === 0 || t1.textes.axeTemps.every(x => /\d\d:\d\d:\d\d$/.test(x))), t1.textes);
+      await p24.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [e0.maintenant - 26 * 3600e3, e0.maintenant, e0.vue.p1, e0.vue.p2]);
+      await p24.waitForTimeout(400);
+      const t2 = await etat(p24);
+      check('vue de 26 h : le jour est écrit sur la première graduation et après minuit', /^(dim|lun|mar|mer|jeu|ven|sam)\. \d\d /.test(t2.textes.axeTemps[0]) && t2.textes.axeTemps.filter(x => /\. \d\d /.test(x)).length >= 2, t2.textes.axeTemps);
+      await p24.evaluate(() => { for (const [id, v] of [['rSeuil', '100'], ['rSaturation', '60']]) { const s = document.getElementById(id); s.value = v; s.dispatchEvent(new Event('input')); } });
+      const sat = await p24.evaluate(() => document.getElementById('rSaturationVal').textContent);
+      const dec = BM.decoder(101, encodage);
+      check(`saturation sous le seuil : le libellé dit la valeur APPLIQUÉE (${sat})`, sat.startsWith(BM.btc(dec.min) + ' BTC') && /seuil bas \+ 1/.test(sat), sat);
+      const bb = BM.bornesBulles(1), leg = await p24.evaluate(() => document.getElementById('legBulles').textContent);
+      check(`légende des bulles : « Surface ∝ volume de ${BM.btc(bb.min)} à ${BM.btc(bb.max)} BTC », tiré du code`, leg.includes('de ' + BM.btc(bb.min) + ' à ' + BM.btc(bb.max) + ' BTC'), leg);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p24.close();
+    }
   } finally {
     await nav.close();
     serveur.close();

@@ -379,7 +379,43 @@ const n = BM.niveauxPublies(md);
 check('murs lus des deux côtés, avec leur tranche', n.murs.length === (md.liquidity.bid_walls || []).length + (md.liquidity.ask_walls || []).length && n.tranche === md.liquidity.wall_bin_usd);
 check('instant des murs = instant de la lecture du carnet', n.mursA === Date.parse(md.liquidity.snapshot_at));
 check('gamma : mur de calls, de puts, zéro gamma', ['CW', 'PW', 'ZG'].every(c => n.gamma.some(x => x.court === c)) || !md.micro.call_wall);
+{
+  const usdt = md.micro && md.micro.usdt_usd;
+  const unite = md.meta && md.meta.champs && md.meta.champs['micro.call_wall'] && md.meta.champs['micro.call_wall'].unite;
+  if (usdt && unite === 'USD') check(`gamma : strikes en USD placés en USDT au cours publié (÷ ${usdt})`, n.conversion && n.conversion.taux === usdt && n.gamma.every(g => Math.abs(g.pAxe - g.p / usdt) < 1e-9), n.gamma);
+  const sans = JSON.parse(JSON.stringify(md)); delete sans.micro.usdt_usd;
+  const n2 = BM.niveauxPublies(sans);
+  check('gamma sans cours USDT/USD publié : posé tel quel, « non converti » (conversion = null)', n2.conversion === null && n2.gamma.every(g => g.pAxe === g.p));
+  const enUsdt = JSON.parse(JSON.stringify(md)); if (enUsdt.meta && enUsdt.meta.champs && enUsdt.meta.champs['micro.call_wall']) enUsdt.meta.champs['micro.call_wall'].unite = 'USDT';
+  check('strikes déclarés en USDT par meta.champs : aucune conversion (l\'unité vient du fichier)', !enUsdt.meta || BM.niveauxPublies(enUsdt).conversion === null);
+}
 check('âges lisibles', BM.age(800) === '0,8 s' && BM.age(42000) === '42 s' && BM.age(16 * 60e3) === '16 min' && BM.age(125 * 60e3) === '2 h 05');
+
+// ── 7a. Libellés : ce qu'ils disent est ce que le code fait ────────────────────
+titre('7a. Libellés justes : graduations, contraste, bulles, réglages');
+check('décimales du pas : 2,5 → 1 ; 0,25 → 2 ; 20 → 0 ; 0,5 → 1', BM.decimales(2.5) === 1 && BM.decimales(0.25) === 2 && BM.decimales(20) === 0 && BM.decimales(0.5) === 1 && BM.decimales(25) === 0);
+check('graduation de 2,5 $ écrite avec sa décimale (86 002,5, pas 86 003)', BM.prix(86002.5, BM.decimales(2.5)).replace(/\s/g, ' ') === '86 002,5');
+check('pas de temps : jamais 100 s (échelle fixe) ; 15 s, 30 s, 1 min…', !BM.PAS_TEMPS.includes(100000) && BM.pasTemps(55000) === 60000 && BM.pasTemps(12000) === 15000 && BM.pasTemps(16 * 60e3) === 30 * 60e3);
+check('jour court pour une vue qui passe minuit', /^(dim|lun|mar|mer|jeu|ven|sam)\. \d\d$/.test(BM.jour(Date.UTC(2026, 9, 6, 12))));
+check('contraste appliqué : saturation ≤ seuil → seuil + 1 (c\'est cette valeur que la légende écrit)', BM.bornesContraste(100, 60).haut === 101 && BM.bornesContraste(2, 200).haut === 200);
+{
+  const b = BM.bornesBulles(1), b6 = BM.bornesBulles(0.6);
+  check(`bulles : surface ∝ volume de ${BM.btc(b.min)} à ${BM.btc(b.max)} BTC (normale), bornes tirées du rayon`,
+    Math.abs(BM.rayonBulle(b.min, 1) - BM.BULLES.rMin) < 1e-9 && Math.abs(BM.rayonBulle(b.max, 1) - BM.BULLES.rMax) < 1e-9
+    && BM.rayonBulle(b.min / 2, 1) === BM.BULLES.rMin && BM.rayonBulle(b.max * 3, 1) === BM.BULLES.rMax && b6.min > b.min);
+}
+{
+  const D = { calques: { a: true, b: false }, palette: 'classique', fusionT: 1, seuilBas: 2, bulleMin: 0.1 };
+  const regles = { palette: { liste: ['classique', 'cividis', 'cote'] }, fusionT: { liste: ['1', '5', '15', '60'], nombre: true },
+    bulleMin: { liste: ['0', '0.1', '0.5'], nombre: true }, seuilBas: { min: 0, max: 120, entier: true } };
+  const v = BM.validerReglages({ palette: 'disparue', fusionT: 3, bulleMin: 'abc', seuilBas: 500, calques: { a: 'oui', b: true }, inconnu: 1 }, D, regles);
+  check('réglages stockés invalides : remplacés par les défauts, jamais appliqués en silence',
+    v.reglages.palette === 'classique' && v.reglages.fusionT === 1 && v.reglages.bulleMin === 0.1 && v.reglages.seuilBas === 2 && v.reglages.calques.a === true && v.reglages.calques.b === true && !('inconnu' in v.reglages), v);
+  check('… et listés (palette, fusionT, bulleMin, seuilBas, calques.a)', ['palette', 'fusionT', 'bulleMin', 'seuilBas', 'calques.a'].every(k => v.rejets.includes(k)), v.rejets);
+  const ok = BM.validerReglages({ palette: 'cote', fusionT: '15', bulleMin: 0.5, seuilBas: 40 }, D, regles);
+  check('réglages valides : gardés (nombres normalisés)', ok.reglages.palette === 'cote' && ok.reglages.fusionT === 15 && ok.reglages.bulleMin === 0.5 && ok.reglages.seuilBas === 40 && !ok.rejets.length, ok);
+  check('stockage illisible (tableau, null) : les défauts', BM.validerReglages([1, 2], D, regles).reglages.palette === 'classique' && BM.validerReglages(null, D, regles).reglages.fusionT === 1);
+}
 
 // ── 7b. Horloge Binance ──────────────────────────────────────────────────────
 titre('7b. Horloge : l\'heure de Binance, mesurée, avec son incertitude');

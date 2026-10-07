@@ -98,19 +98,19 @@
     <dt>Carte publiée</dt>
     <dd>Fichier du serveur, une colonne par minute, une tranche par 20 $, publié toutes les 15 min : la colonne la plus récente a donc jusqu'à ~16 min. La chaleur d'une case est la taille du <b>plus gros niveau de prix</b> de la tranche (pas la somme du carnet). Les cases saturées valent « au moins » la référence publiée.</dd>
     <dt>Carnet live</dt>
-    <dd>Lu par la page sur Binance (100 à 5 000 niveaux, toutes les 1 à 10 s), à la tranche choisie. Il commence à l'ouverture de la page. Sa chaleur suit la même formule que la carte publiée quand le fichier publie son encodage ; sinon elle a sa propre échelle, et la carte le dit.</dd>
+    <dd>Lu par la page sur Binance (100 à 5 000 niveaux, toutes les 1 à 10 s), à la tranche choisie. Il commence à l'ouverture de la page. Chaque lecture est placée à son instant (heure de Binance) et vaut jusqu'à la suivante — au plus <span id="legValidite">3 cadences + 1 s</span> ; au-delà, non observé. Sa chaleur suit la même formule que la carte publiée quand le fichier publie son encodage ; sinon elle a sa propre échelle, et la carte le dit. La lecture au pointeur donne la quantité mesurée.</dd>
     <dt>Non observé (hachures)</dt>
     <dd>Aucun carnet lu à cet endroit : hors de la bande que le carnet couvre (≈ ±1 % pour 5 000 niveaux, bien moins pour 1 000), ou entre la fin de la carte publiée et l'ouverture de la page. Ce n'est pas « aucun ordre ».</dd>
     <dt>Prix</dt>
-    <dd>La ligne blanche : clôtures 1 min (Binance), puis prix moyen des exécutions seconde par seconde. Les traits fins verticaux sont les plus hauts / plus bas de chaque minute. Les marches vertes et rouges sont le meilleur bid et le meilleur ask, à chaque lecture du carnet live.</dd>
+    <dd>La ligne blanche : clôtures 1 min (Binance), puis le prix moyen pondéré par le volume (VWAP) des exécutions de chaque seconde — après la dernière clôture, et partout où les exécutions sont lues dès qu'une minute fait au moins <span id="legPrixSeconde">6</span> px. Coupée là où rien n'est lu. Les traits fins verticaux sont les plus hauts / plus bas de chaque minute. Les marches vertes et rouges sont le meilleur bid et le meilleur ask, à chaque lecture du carnet live.</dd>
     <dt>Exécutions (bulles)</dt>
-    <dd>Volumes échangés <b>au marché</b>, regroupés par seconde et par tranche de prix : vert si les achats au marché dominent, rouge si ce sont les ventes ; l'arc blanc intérieur est la part achetée. Surface ∝ volume.</dd>
+    <dd>Volumes échangés <b>au marché</b>, regroupés par seconde et par tranche de prix : vert si les achats au marché dominent, rouge si ce sont les ventes ; l'arc blanc intérieur est la part achetée. Seaux ancrés sur l'horloge et sur le prix. <span id="legBulles">Surface ∝ volume, entre deux bornes.</span> Les intervalles non lus sont hachurés : ce n'est pas « aucune exécution ».</dd>
     <dt>Murs (rectangles)</dt>
     <dd>Fichier de 15 min : les tranches de 20 $ où la <b>somme</b> des ordres posés est la plus grande, au moment de la lecture. Ils partent de l'instant de lecture : avant, on ne sait pas.</dd>
     <dt>Gamma (tirets violets)</dt>
-    <dd>Fichier de 15 min (options Deribit) : CW mur de calls, PW mur de puts, ZG zéro gamma, GW autres murs. Le signe repose sur une <b>convention</b> (dealers acheteurs des calls, vendeurs des puts) : le positionnement réel n'est pas observable.</dd>
+    <dd>Fichier de 15 min (options Deribit) : CW mur de calls, PW mur de puts, ZG zéro gamma, GW autres murs. Les strikes sont en USD : placés en USDT au cours USDT/USD publié par le fichier, ou dits « non convertis ». Le signe repose sur une <b>convention</b> (dealers acheteurs des calls, vendeurs des puts) : le positionnement réel n'est pas observable.</dd>
     <dt>Carnet latéral, profil, volume, CVD</dt>
-    <dd>À droite, la <b>somme</b> des ordres du dernier carnet live par tranche. À gauche, le profil des exécutions visibles. En bas, le volume par minute (achats au-dessus, ventes au-dessous) et le CVD — achats au marché moins ventes au marché, cumulés depuis le bord gauche de la vue.</dd>
+    <dd>À droite, la <b>somme</b> des ordres du dernier carnet live par tranche. À gauche, le profil des exécutions visibles. En bas, le volume (achats au-dessus, ventes au-dessous), regroupé par <span id="legVolume">1, 2, 3, 5, 10…</span> min selon le zoom — le titre du panneau dit la durée — et le CVD : achats au marché moins ventes au marché, cumulés depuis le bord gauche de la vue ; après des bougies non lues (hachurées), il repart de 0 et le dit.</dd>
   </dl>
   <h3>Gestes</h3>
   <p>Glisser : déplacer. Molette : zoom dans le temps (sur l'axe des prix, ou avec Maj : zoom des prix). Pincer à deux doigts. Glisser sur un axe : l'étirer. Double-clic ou R : vue par défaut. F : suivre le présent. Flèches : se déplacer.</p>

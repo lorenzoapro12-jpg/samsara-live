@@ -42,15 +42,25 @@
   const POIDS_CARNET = { 100: 5, 500: 25, 1000: 50, 5000: 250 };
   const R = charger();
 
+  /** Les réglages stockés, VALIDÉS contre ce que la page permet — les listes viennent des
+   *  <option> et des bornes des curseurs de bookmap.html : elles ne peuvent pas diverger. */
   function charger() {
     let r = {};
     try { r = JSON.parse(localStorage.getItem(CLE) || '{}') || {}; } catch (e) { r = {}; }
-    const o = Object.assign({}, DEFAUTS, r);
-    o.calques = Object.assign({}, DEFAUTS.calques, r.calques || {});
-    if (!CADENCE_CARNET[o.niveauxLive]) o.niveauxLive = DEFAUTS.niveauxLive;
-    return o;
+    const el = id => document.getElementById(id);
+    const liste = (id, nombre) => ({ liste: [...document.querySelectorAll('#' + id + ' option')].map(o => o.value), nombre });
+    const plage = id => (el(id) ? { min: +el(id).min, max: +el(id).max, entier: true } : null);
+    const regles = {
+      palette: liste('rPalette', false), fusionT: liste('rFusionT', true), fusionP: liste('rFusionP', true),
+      niveauxLive: liste('rNiveaux', true), dpLive: liste('rDpLive', true), bulleMin: liste('rBulleMin', true),
+      bulleEchelle: liste('rBulleEchelle', true), seuilBas: plage('rSeuil'), saturation: plage('rSaturation'),
+    };
+    const { reglages, rejets } = BM.validerReglages(r, DEFAUTS, regles);
+    if (!CADENCE_CARNET[reglages.niveauxLive]) reglages.niveauxLive = DEFAUTS.niveauxLive;
+    reglages.rejets = rejets.length ? rejets : undefined;
+    return reglages;
   }
-  function sauver() { try { localStorage.setItem(CLE, JSON.stringify(R)); } catch (e) { /* navigation privée */ } }
+  function sauver() { try { const r = Object.assign({}, R); delete r.rejets; localStorage.setItem(CLE, JSON.stringify(r)); } catch (e) { /* navigation privée */ } }
 
   // ─── État ──────────────────────────────────────────────────────────────────
   // Instants : ce qui vient de Binance (exécutions T, bougies) est à l'heure du SERVEUR ; les
@@ -417,7 +427,7 @@
   const u32 = (r, g, b, a) => ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
   function lut(nom) {
     const pts = PALETTES[nom], out = new Uint32Array(256), fond = rgb(C.fond);
-    const bas = R.seuilBas, haut = Math.max(bas + 1, R.saturation);
+    const { bas, haut } = BM.bornesContraste(R.seuilBas, R.saturation);
     for (let v = 0; v < 256; v++) {
       if (v === 0 || v < bas) { out[v] = u32(fond[0], fond[1], fond[2], 255); continue; }
       const x = Math.min(1, Math.max(0, (v - bas) / (haut - bas)));
@@ -568,7 +578,7 @@
     x0 = Math.max(4, Math.min(Z.chaleur.w - w - 4, x0));
     let y0 = Math.max(4, Math.min(Z.chaleur.h - h - 4, y));
     for (let n = 0; n < 12 && posees.some(r => x0 < r.x + r.w && x0 + w > r.x && y0 < r.y + r.h && y0 + h > r.y); n++) y0 += h + 4;
-    posees.push({ x: x0, y: y0, w, h, texte: lignes[0] });
+    posees.push({ x: x0, y: y0, w, h, texte: lignes[0], lignes });
     ctx.fillStyle = C.pastille;
     arrondi(x0, y0, w, h, 6); ctx.fill();
     ctx.fillStyle = coul; ctx.fillRect(x0, y0 + 4, 3, h - 8);
@@ -686,15 +696,18 @@
     if (x0 >= Z.chaleur.w) return;
     ctx.save();
     for (const g of n.gamma) {
-      const y = Math.round(Y(g.p)) + 0.5;
+      const y = Math.round(Y(g.pAxe)) + 0.5;       // placé en USDT (converti), libellé au strike publié
       if (y < 0 || y > Z.chaleur.h) continue;
       ctx.strokeStyle = C.gamma; ctx.setLineDash(g.court === 'ZG' ? [2, 3] : [7, 4]); ctx.lineWidth = g.court === 'ZG' ? 1.5 : 1.2;
       ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(Z.chaleur.w, y); ctx.stroke();
       texte(g.court + ' ' + BM.prix(g.p), Z.chaleur.w - 6, y - 8, C.gamma, 10, 'right', true);
     }
     ctx.restore();
-    pastille(['Gamma (Deribit) · il y a ' + BM.age(maintenant() - n.gammaA), 'convention : ' + (n.convention || 'non précisée par le fichier')],
-      x0 + 6, 60, C.gamma, 'left', 'Gamma · ' + BM.age(maintenant() - n.gammaA));
+    const cv = n.conversion;
+    pastille(['Gamma (Deribit) · il y a ' + BM.age(maintenant() - n.gammaA), 'convention : ' + (n.convention || 'non précisée par le fichier'),
+      cv ? 'strikes en ' + n.uniteGamma + ', placés en USDT : ÷ ' + cv.taux.toLocaleString('fr-FR', { maximumFractionDigits: 6 }) + ' (USDT/USD' + (cv.a ? ', il y a ' + BM.age(maintenant() - cv.a) : '') + ')'
+        : 'strikes en ' + n.uniteGamma + ', NON convertis en USDT (cours USDT/USD non publié)'],
+      x0 + 6, 60, C.gamma, 'left', 'Gamma · ' + BM.age(maintenant() - n.gammaA) + (cv ? '' : ' · non converti'));
   }
   function bidAsk() {
     if (E.bidask.length < 2) return;
@@ -814,8 +827,8 @@
     if (R.calques.gamma && E.niv) {
       let haut = 0, bas = 0;
       const centre = (E.vue.p1 + E.vue.p2) / 2;
-      for (const g of [...E.niv.gamma].sort((u, v) => Math.abs(u.p - centre) - Math.abs(v.p - centre))) {
-        const y = Y(g.p);
+      for (const g of [...E.niv.gamma].sort((u, v) => Math.abs(u.pAxe - centre) - Math.abs(v.pAxe - centre))) {
+        const y = Y(g.pAxe);
         if (y > 6 && y < a.h - 6) {
           ctx.fillStyle = C.gamma; ctx.fillRect(a.x, y - 7, a.w, 14);
           texte(g.court + ' ' + BM.prix(g.p), a.x + 4, y, '#0b0b12', 10, 'left', true); reserve.push(y);
@@ -829,10 +842,12 @@
     const p = dernierPrix(), yPrix = p ? Math.max(8, Math.min(a.h - 8, Y(p))) : -99;
     reserve.push(yPrix);
     const pas = BM.pasRond((E.vue.p2 - E.vue.p1) / Math.max(4, a.h / 70));
-    const dec = pas < 1 ? 2 : 0;
+    const dec = BM.decimales(pas);          // 2,5 $ s'écrit 2,5 — pas « 3 »
+    const graduations = TEXTES.axePrix = [];
     for (let q = Math.ceil(E.vue.p1 / pas) * pas; q <= E.vue.p2; q += pas) {
       const y = Y(q);
       if (reserve.some(r => Math.abs(r - y) < 13)) continue;
+      graduations.push(BM.prix(q, dec));
       texte(BM.prix(q, dec), a.x + 6, y, C.ink3, 10.5);
     }
     if (p) {
@@ -845,14 +860,22 @@
     const a = Z.axeT;
     ctx.fillStyle = C.panneau; ctx.fillRect(a.x, a.y, Z.w, a.h);
     const L = E.vue.t2 - E.vue.t1, brut = L / Math.max(3, a.w / 110);
-    const pasMin = [1, 2, 5, 10, 15, 30, 60, 120, 180, 360, 720].map(m => m * 60e3).find(x => x >= brut) || 1440 * 60e3;
-    const pas = brut < 60e3 ? BM.pasRond(brut / 1000) * 1000 : pasMin;
-    const off = new Date().getTimezoneOffset() * 60e3;
-    for (let t = Math.ceil((E.vue.t1 - off) / pas) * pas + off; t <= E.vue.t2; t += pas) {
+    // Une échelle fixe (BM.PAS_TEMPS) ; les secondes sont écrites dès que le pas n'est pas un
+    // nombre entier de minutes (un pas de 100 s n'existe plus, et 15 s s'écrit avec ses secondes).
+    const pas = BM.pasTemps(brut), sec = pas % 60e3 !== 0;
+    const off = new Date().getTimezoneOffset() * 60e3, ticks = [];
+    for (let t = Math.ceil((E.vue.t1 - off) / pas) * pas + off; t <= E.vue.t2; t += pas) ticks.push(t);
+    // Une vue qui passe minuit (ou dépasse 24 h) : le jour sur la première graduation et après
+    // chaque minuit — sinon « 18:00 » aux deux bouts de l'axe ne dit pas lequel est hier.
+    const jours = ticks.length && BM.jour(ticks[0]) !== BM.jour(ticks[ticks.length - 1]);
+    ticks.forEach((t, i) => {
       const x = X(t);
       ctx.fillStyle = C.grille; ctx.fillRect(Math.round(x), a.y, 1, 4);
-      texte(BM.heure(t, pas < 60e3), x, a.y + a.h / 2 + 1, C.ink3, 10.5, 'center');
-    }
+      const j = jours && (i === 0 || BM.jour(t) !== BM.jour(ticks[i - 1])) ? BM.jour(t) + ' ' : '';
+      texte(j + BM.heure(t, sec), x, a.y + a.h / 2 + 1, j ? C.ink2 : C.ink3, 10.5, 'center');
+    });
+    TEXTES.axeTemps = ticks.map((t, i) => (jours && (i === 0 || BM.jour(t) !== BM.jour(ticks[i - 1])) ? BM.jour(t) + ' ' : '') + BM.heure(t, sec));
+    TEXTES.pasTemps = pas;
   }
   function carnetLateral() {
     const a = Z.dom;
@@ -1169,8 +1192,16 @@
     const fmt = v => { const d = BM.decoder(v, enc); return d ? (d.sature ? '≥ ' + BM.btc(d.min) : BM.btc(d.min)) + ' BTC' : 'intensité ' + v; };
     const g = $('gradBarre');
     if (g) g.innerHTML = [0, 64, 128, 192, 255].map(v => '<span>' + (v ? fmt(v) : '0') + '</span>').join('');
-    const s = $('rSeuilVal'); if (s) s.textContent = R.seuilBas ? fmt(R.seuilBas) : 'aucun';
-    const t = $('rSaturationVal'); if (t) t.textContent = fmt(R.saturation);
+    // Les valeurs APPLIQUÉES (BM.bornesContraste) : une saturation sous le seuil n'est pas appliquée.
+    const ct = BM.bornesContraste(R.seuilBas, R.saturation);
+    const s = $('rSeuilVal'); if (s) s.textContent = ct.bas ? fmt(ct.bas) : 'aucun';
+    const t = $('rSaturationVal'); if (t) t.textContent = fmt(ct.haut) + (ct.haut !== R.saturation ? ' (seuil bas + 1)' : '');
+    // Textes de la légende tirés des constantes du code qui dessine.
+    const bb = BM.bornesBulles(R.bulleEchelle), tx = (id, v) => { const x = $(id); if (x) x.textContent = v; };
+    tx('legBulles', 'Surface ∝ volume de ' + BM.btc(bb.min) + ' à ' + BM.btc(bb.max) + ' BTC (taille choisie) ; en dessous, le rayon reste au minimum ; au-delà, la bulle est plafonnée et son volume écrit.');
+    tx('legPrixSeconde', String(SECONDE_DES_PPM));
+    tx('legValidite', BM.VALIDITE.cadences + ' cadences + ' + BM.VALIDITE.margeMs / 1000 + ' s');
+    tx('legVolume', BM.PAS_MINUTES.slice(0, 5).join(', ') + '…');
     const e = $('encodageEtat');
     if (e) e.textContent = enc
       ? 'Encodage publié : intensité = min(' + enc.plafond + ', ent(' + enc.plafond + ' × √(q / ' + enc.ref_btc + ' BTC))), q = ' + enc.q + '.'
@@ -1219,13 +1250,13 @@
         deb0: E.live.n ? E.live.deb[0] : null, derniere: E.live.n ? E.live.deb[E.live.n - 1] : null,
         nonNuls: E.live.n ? E.live.v.subarray(E.live.oB[E.live.n - 1], E.live.lg).reduce((k, x) => k + (x > 0), 0) : 0 } : null,
       executions: { seaux: E.exec.seaux.size, premier: E.exec.premier, dernier: E.exec.dernier, total: E.exec.total.slice() },
-      minutes: E.minutes.length, niveaux: E.niv ? { murs: E.niv.murs.length, gamma: E.niv.gamma.length } : null,
+      minutes: E.minutes.length, niveaux: E.niv ? { murs: E.niv.murs.length, gamma: E.niv.gamma.length, conversion: E.niv.conversion, gammaAxe: E.niv.gamma.map(g => [g.p, g.pAxe]) } : null,
       horloge: { ecart: E.horloge.ecart, u: E.horloge.u }, maintenant: maintenant(),
       bougies: { n: E.minutes.length, premiere: E.minutes.length ? E.minutes[0].t : null, derniere: E.minutes.length ? E.minutes[E.minutes.length - 1].t : null, trous: BM.trousMinutes(E.minutes) },
       execNonLues: execNonLues(), textes: Object.assign({}, TEXTES),
       recul: { binance: E.recul.binance.attente(Date.now()), github: E.recul.github.attente(Date.now()) },
       statut: ($('statut') || {}).textContent || '',
-      pastilles: posees.map(p => p.texte), reglages: JSON.parse(JSON.stringify(R)),
+      pastilles: posees.map(p => p.texte), pastillesCompletes: posees.map(p => p.lignes.join(' | ')), reglages: JSON.parse(JSON.stringify(R)),
       mesure: Object.assign({}, MESURE),
     }),
   };
