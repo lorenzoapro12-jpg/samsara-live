@@ -330,6 +330,32 @@ def main():
         check("la série reste triée",
               [l["echeance_utc"] for l in lignes] == sorted(l["echeance_utc"] for l in lignes))
 
+        # ── La garde de 1 Mo : elle REFUSE, elle ne tronque pas ────────────
+        # On abaisse la limite au lieu de fabriquer un million d'octets : le chemin de
+        # refus est le même, et il est ainsi réellement exercé. 100 o est en dessous de
+        # toute ligne réelle (≈ 150 o pour le positionnement, ≈ 44 o pour le funding).
+        limite = H.MAX_OCTETS
+        H.MAX_OCTETS = 100
+        try:
+            H.ERRORS.clear()
+            refuse = H.ajouter_positionnement(
+                cfg, doc("2026-09-01T01:35:00+00:00", 85200.0, MICRO_COMPLET,
+                         liquidity=LIQ, macro=MACRO), "2026-09")
+            check("au-delà de la limite : l'écriture est REFUSÉE", refuse is False)
+            check("le refus est bruyant (anomalie consignée)",
+                  any("octets" in e for e in H.ERRORS), str(H.ERRORS))
+            check("le refus ne tronque pas le fichier déjà écrit",
+                  len(lire_csv_dicts(f_sept)) == 4, f"{len(lire_csv_dicts(f_sept))} lignes")
+            H.fusionner_serie(cfg, "funding", [{"echeance_utc": "2026-09-01T16:00:00+00:00",
+                                                "funding_pct": "0.011000",
+                                                "prix_marque_usdt": "85200.00"}])
+            check("la même garde protège les séries rapatriées",
+                  len(lire_csv_dicts(chemin_funding)) == 2
+                  and H.STATUS["funding"].startswith("error"),
+                  f"{len(lire_csv_dicts(chemin_funding))} lignes, statut {H.STATUS['funding']}")
+        finally:
+            H.MAX_OCTETS = limite
+
         # ─── 8. LECTURE PAR UNE SESSION DISTANTE ────────────────────────────
         print("\n8. Lecture depuis un clone neuf (fetch --depth 1 --filter=blob:none)")
         H.publier(cfg, "Historique test")
