@@ -8,7 +8,10 @@
      toutes les 15 min — elle a donc jusqu'à ~16 min de retard sur le présent ;
    · les MURS et le GAMMA (market-data.json) : un instantané par quart d'heure ;
    · le carnet LIVE et les EXÉCUTIONS, lus par la page elle-même sur Binance, à la seconde.
-   Chaque calque porte son âge SUR la carte : aucun chiffre n'y est lu sans son instant.
+   Chaque calque porte son âge SUR la carte : aucun chiffre n'y est lu sans son instant. L'axe du
+   temps est à l'heure de BINANCE (BM.Horloge) ; chaque lecture est placée à son instant réel.
+   Ce qui n'a pas été lu (minutes, exécutions, carnet) est « non lu » — hachuré et dit —, jamais
+   « vide ».
 
    RÈGLES QUI NE SE DISCUTENT PAS (06/10/2026)
    · Une cellule publiée n'est PAS une quantité : c'est min(255, ent(255·√(q/ref))), q = le
@@ -860,7 +863,8 @@
     }
     return { reglages: o, rejets };
   };
-  /** Un pas « rond » pour les graduations : 1, 2, 5 × 10ⁿ ≥ brut. */
+  /** Un pas « rond » pour les graduations d'axe : 1, 2, 2,5, 5 × 10ⁿ ≥ brut (décimales : BM.decimales).
+   *  Pour REGROUPER des tranches, c'est BM.pasMultiple (jamais 2,5 sur 1 $). */
   BM.pasRond = function (brut) {
     const e = Math.pow(10, Math.floor(Math.log10(brut)));
     for (const m of [1, 2, 2.5, 5, 10]) if (m * e >= brut) return m * e;

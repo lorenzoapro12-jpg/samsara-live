@@ -194,6 +194,7 @@ async function pixel(page, x, y) {
       // Les murs et le gamma partent de leur instant de lecture : on élargit la vue si besoin.
       check(`pastille d'âge : ${nom}`, e.pastilles.some(t => motif.test(t)), e.pastilles);
     }
+    check('bougies (volume, CVD, ligne de prix) : leur âge est écrit', /bougies lues il y a [\d,]+ s/.test(e.textes.volume || ''), e.textes.volume);
 
     titre('3. Le prix est une ligne SUR la chaleur');
     const v = e.vue, W = await page.evaluate(() => document.getElementById('carte').clientWidth);
@@ -442,6 +443,19 @@ async function pixel(page, x, y) {
       await p14.close();
     }
 
+    titre('14b. Carnet à 10 s, vue fine : la dernière lecture est peinte jusqu\'à « maintenant », pas seulement à chaque lecture');
+    {
+      let p14b;
+      ({ page: p14b, erreurs } = await ouvrir(nav, { encodage: true, reglages: { niveauxLive: 5000 } }));
+      const e0 = await etat(p14b), mid = (e0.vue.p1 + e0.vue.p2) / 2;
+      await p14b.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [e0.maintenant - 50e3, e0.maintenant + 10e3, mid - 50, mid + 50]);
+      const retards = [];
+      for (let i = 0; i < 4; i++) { await p14b.waitForTimeout(1300); const e = await etat(p14b); retards.push(e.maintenant - e.chaleurPeinteA); }
+      check(`peinte il y a au plus ~1 s à chaque instant (${retards.map(r => (r / 1000).toFixed(1)).join(' · ')} s) — jamais une bande « non observé » de 10 s`, retards.every(r => r < 2200), retards);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p14b.close();
+    }
+
     titre('15. Carnet plus ancien que le précédent (lastUpdateId) : écarté');
     {
       let k = 0;
@@ -634,8 +648,10 @@ async function pixel(page, x, y) {
       await p24.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [e0.vue.t1, e0.vue.t2, pm - 10.3, pm + 10.3]);
       await p24.waitForTimeout(400);
       const gp = (await etat(p24)).textes.axePrix, nums = gp.map(t => +t.replace(/\s/g, '').replace(',', '.'));
-      const pasP = nums.length > 1 ? Math.round((nums[1] - nums[0]) * 100) / 100 : null;
-      check(`axe des prix au pas de ${pasP} $ : chaque graduation écrite à sa valeur (${gp.slice(0, 3).join(' · ')}…)`, pasP === 2.5 && gp.some(t => /,5$/.test(t)) && nums.every((v, i) => !i || Math.abs(v - nums[i - 1] - 2.5) < 1e-9), gp);
+      // (Une graduation trop près du prix ou d'un niveau gamma s'efface : on ne compare pas deux voisines.)
+      const pasP = Math.min(...nums.slice(1).map((v, i) => Math.round((v - nums[i]) * 100) / 100));
+      check(`axe des prix au pas de ${pasP} $ : chaque graduation écrite à sa valeur (${gp.slice(0, 3).join(' · ')}…)`,
+        pasP === 2.5 && gp.some(t => /,5$/.test(t)) && nums.every(v => Math.abs(v / 2.5 - Math.round(v / 2.5)) < 1e-9), gp);
       await p24.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [e0.maintenant - 10.5 * 60e3, e0.maintenant, e0.vue.p1, e0.vue.p2]);
       await p24.waitForTimeout(400);
       const t1 = await etat(p24);

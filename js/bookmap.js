@@ -11,8 +11,13 @@
 
    CADENCES (et pourquoi) — poids Binance par minute, plafond 6 000 par adresse IP :
      carnet 1 000 niveaux / 2 s (poids 50) ≈ 1 500 ; exécutions / 1 s (poids 4) ≈ 240 ;
-     bougies 1 min / 10 s (poids 2) ≈ 12. Les lectures s'arrêtent quand l'onglet est caché.
+     bougies 1 min / 10 s (poids 2) ≈ 12 ; heure du serveur / 5 min (poids 1).
+     Lectures à pas FIXE, avec un délai maximal ; arrêtées quand l'onglet est caché, reprises
+     au retour (rattrapage). Sur 429 / 418, TOUTES les lectures Binance attendent (recul).
      Le temps réel (flux à 100 ms) n'est pas construit ici : il dépend d'une sonde réseau.
+
+   HORLOGES — l'axe du temps est à l'heure de BINANCE (BM.Horloge) : exécutions et bougies y sont
+     nativement ; les instants notés par la page y sont recalés par l'écart mesuré.
    ══════════════════════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -117,6 +122,7 @@
   }
   const binance = (chemin, delai) => lire(API + chemin, { delai, porte: E.recul.binance });
   function erreur(src, e) {
+    if (e && e.pause) return;      // porte fermée : le statut le dit déjà (et garde la cause, 429 / 418)
     E.erreurs[src] = e ? (e.message || String(e)) : null;
     majStatut();
   }
@@ -214,6 +220,7 @@
     const objectif = () => (E.pub ? BM.finGrille(E.pub) : maintenant() - 15 * 60e3) - 60e3;
     try {
       while (A.pages < PAGES_ARRIERE && A.id > 0 && E.exec.premier > objectif()) {
+        if (document.hidden) return;              // repris par lireExecutions au retour sur l'onglet
         const depuis = Math.max(0, A.id - 1000);
         const t = (await binance('aggTrades?symbol=' + SYMBOLE + '&fromId=' + depuis + '&limit=' + (A.id - depuis), DELAIS.executions)).corps;
         for (const x of t) E.exec.ajouterAncien(x, E.execVus);
@@ -389,7 +396,7 @@
   const ctx = cv.getContext('2d');
   const tamponChaleur = document.createElement('canvas');
   const ctxChaleur = tamponChaleur.getContext('2d');
-  let chaleurSale = true, rafDemande = false, IMG = null, PX = null, HACH = null;
+  let chaleurSale = true, chaleurA = 0, rafDemande = false, IMG = null, PX = null, HACH = null;
   const MESURE = { chaleur: 0, rendu: 0 };
   let Z = null;           // zones de la mise en page (px CSS)
   const C = {};           // couleurs, lues dans le CSS
@@ -498,7 +505,7 @@
     }
     const img = IMG, px = PX;
     px.set(HACH);
-    const o = { lut: LUT, lutB: LUTB, lutA: LUTA, maintenant: maintenant() };
+    const o = { lut: LUT, lutB: LUTB, lutA: LUTA, maintenant: chaleurA || maintenant() };
     const pub = grillePublieeAffichee();
     if (pub) BM.peindreGrille(px, w, h, pub, E.vue, o);
     if (R.calques.live && E.live) BM.peindreGrille(px, w, h, E.live, E.vue, o);
@@ -519,7 +526,12 @@
     mettreEnPage();
     suivreMaintenant();
     if (!LUT && !LUTB) majLuts();
-    if (chaleurSale) { const t0 = performance.now(); peindreChaleur(); chaleurSale = false; MESURE.chaleur = performance.now() - t0; }
+    // La dernière lecture live vaut jusqu'à « maintenant » : quand « maintenant » a avancé d'un
+    // pixel depuis la dernière peinture, on repeint — sinon une bande hachurée (« non observé »)
+    // s'ouvrirait entre deux lectures aux vues fines.
+    if (!chaleurSale && R.calques.live && E.live && E.live.n && E.live.fin[E.live.n - 1] > chaleurA
+      && X(Math.min(maintenant(), E.live.fin[E.live.n - 1])) - X(chaleurA) >= 1) chaleurSale = true;
+    if (chaleurSale) { const t0 = performance.now(); chaleurA = maintenant(); peindreChaleur(); chaleurSale = false; MESURE.chaleur = performance.now() - t0; }
     const d = Z.dpr;
     ctx.setTransform(d, 0, 0, d, 0, 0);
     ctx.fillStyle = C.panneau;
@@ -596,6 +608,8 @@
 
   function reperesEtAges() {
     const now = maintenant();
+    // L'écart d'horloge (> 1 s) est écrit dans la pastille du live, sinon dans celle des exécutions.
+    let horlogeTexte = E.horloge.texte();
     // Maintenant
     const xn = X(now);
     ctx.fillStyle = C.accent; ctx.globalAlpha = 0.8; ctx.fillRect(Math.round(xn), 0, 1, Z.chaleur.h); ctx.globalAlpha = 1;
@@ -619,8 +633,7 @@
         const l = ['Carnet live · dernier il y a ' + BM.age(now - axe(E.carnetA)),
           R.niveauxLive + ' niveaux / ' + CADENCE_CARNET[R.niveauxLive] / 1000 + ' s · ' + R.dpLive + ' $ · depuis ' + BM.heure(debut, true),
           E.liveRef === 'publiee' ? 'même échelle que la carte publiée' : 'échelle propre : NON comparable à la carte publiée'];
-        const hz = E.horloge.texte();
-        if (hz) l.push(hz);
+        if (horlogeTexte) { l.push(horlogeTexte); horlogeTexte = null; }
         pastille(l, Math.max(8, xs + 8), 8, C.live, 'left', 'Live · ' + BM.age(now - axe(E.carnetA)) + (E.liveRef === 'publiee' ? '' : ' · échelle propre'));
       } else if (E.erreurs.carnet) {
         pastille(['Carnet live indisponible', E.erreurs.carnet], Z.chaleur.w - 8, 8, C.down, 'right', 'Live indisponible');
@@ -644,6 +657,7 @@
         if (now - lu > BM.validiteLecture(1000)) l.push('lues jusqu\'à il y a ' + BM.age(now - lu) + (E.erreurs.executions ? ' (lecture en échec)' : ' (rattrapage)'));
         const sautees = BM.dureeDans(E.execTrous, -Infinity, Infinity);
         if (sautees) l.push('lecture interrompue : ' + BM.age(sautees) + ' non lues (hachurées)');
+        if (horlogeTexte) { l.push(horlogeTexte); horlogeTexte = null; }
         pastille(l, Math.min(xn, Z.chaleur.w) - 8, Z.chaleur.h - 70, C.ink2, 'right', 'Exécutions · ' + BM.age(now - E.exec.dernier));
       } else if (E.erreurs.executions) pastille(['Exécutions indisponibles', E.erreurs.executions], Z.chaleur.w - 8, Z.chaleur.h - 60, C.down, 'right', 'Exécutions indisponibles');
     }
@@ -922,7 +936,9 @@
     // Une barre = g minutes, g pris dans une échelle fixe et les groupes ANCRÉS sur l'horloge
     // (⌊t / g min⌋) : le titre dit la vraie durée, et les barres ne bougent pas quand la vue glisse.
     const ppm = a.w / ((E.vue.t2 - E.vue.t1) / 60e3), g = BM.pasMinutes(ppm), pas = g * 60e3;
-    TEXTES.volume = 'Volume (USDT) par ' + BM.texteMinutes(g) + ' · achats ▲ / ventes ▼ au marché';
+    // Les bougies (volume, CVD, ligne de prix) portent aussi leur âge : une lecture arrêtée se voit.
+    const age = E.minutesA ? ' · bougies lues il y a ' + BM.age(Date.now() - E.minutesA) : '';
+    TEXTES.volume = Z.etroit ? 'Volume / ' + BM.texteMinutes(g) + age : 'Volume (USDT) par ' + BM.texteMinutes(g) + ' · achats ▲ / ventes ▼ au marché' + age;
     texte(TEXTES.volume, a.x + 6, a.y + 9, C.ink3, 9.5);
     const ms = minutesVisibles();
     if (!ms.length) return;
@@ -968,8 +984,9 @@
     hachuresBougies(a);
     const vues = reprises.filter(i => i <= i1), depuis = vues.length ? ms[vues[vues.length - 1]].t : null;
     const manque = BM.dureeDans(BM.trousMinutes(ms), E.vue.t1, E.vue.t2);
-    TEXTES.cvd = 'CVD spot (USDT) cumulé depuis ' + (depuis ? BM.heure(depuis) + ' (repart de 0 après ' + BM.age(manque) + ' de bougies non lues, hachurées)' : 'le bord gauche')
-      + ' · ' + (der >= 0 ? '+' : '−') + BM.prix(Math.abs(der) / 1e6, 1) + ' M';
+    const val = ' · ' + (der >= 0 ? '+' : '−') + BM.prix(Math.abs(der) / 1e6, 1) + ' M';
+    TEXTES.cvd = Z.etroit ? 'CVD depuis ' + (depuis ? BM.heure(depuis) + ' (après ' + BM.age(manque) + ' non lues)' : 'le bord') + val
+      : 'CVD spot (USDT) cumulé depuis ' + (depuis ? BM.heure(depuis) + ' (repart de 0 après ' + BM.age(manque) + ' de bougies non lues, hachurées)' : 'le bord gauche') + val;
     texte(TEXTES.cvd, a.x + 6, a.y + 9, C.ink3, 9.5);
   }
 
@@ -984,7 +1001,7 @@
     // même MAX (BM.lirePixel). La valeur lue est celle de la couleur vue, à tout niveau de zoom.
     const tpp = (E.vue.t2 - E.vue.t1) / Z.chaleur.w, pp = (E.vue.p2 - E.vue.p1) / Z.chaleur.h;
     const ix = Math.floor(s.x), iy = Math.floor(s.y);
-    const ta = E.vue.t1 + ix * tpp, tb = Math.min(ta + tpp, maintenant());
+    const ta = E.vue.t1 + ix * tpp, tb = Math.min(ta + tpp, chaleurA || maintenant());   // le « maintenant » de la peinture
     const cel = (g, nom, enc) => {
       if (!g || !(tb > ta)) return;
       const [ja, jb] = BM.tranchesLigne(E.vue.p2, pp, iy, g.dp, [0, 0]);
@@ -1257,7 +1274,7 @@
       recul: { binance: E.recul.binance.attente(Date.now()), github: E.recul.github.attente(Date.now()) },
       statut: ($('statut') || {}).textContent || '',
       pastilles: posees.map(p => p.texte), pastillesCompletes: posees.map(p => p.lignes.join(' | ')), reglages: JSON.parse(JSON.stringify(R)),
-      mesure: Object.assign({}, MESURE),
+      mesure: Object.assign({}, MESURE), chaleurPeinteA: chaleurA,
     }),
   };
 })();
