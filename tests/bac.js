@@ -6,7 +6,8 @@
 //
 // `stockage` simule localStorage (lu au chargement ET à chaque appel) ; `fetch` reçoit l'URL
 // et rend un objet { ok, status, json() }. Les éléments sont des objets plats : innerHTML est
-// une chaîne qu'on inspecte.
+// une chaîne qu'on inspecte. `globaux` ajoute ou remplace des globales du bac (horloge,
+// minuteries, requestAnimationFrame, flux…) pour les harnais qui pilotent le temps.
 const vm = require('vm');
 const { scriptsApp } = require('./sources');
 
@@ -36,6 +37,7 @@ function chargerPage(opts = {}) {
     ResizeObserver: function () { this.observe = () => {}; }, Image: function () {}, CanvasRenderingContext2D: function () {},
     history: { pushState() {}, replaceState() {} }, location: { href: 'file:///', search: '', hash: '' },
   };
+  Object.assign(sandbox, opts.globaux || {});
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   let code = scriptsApp().map(s => s.texte).join('\n;\n').replace(/\ninit\(\);\s*$/, '\n');
@@ -44,8 +46,12 @@ globalThis.__T__ = {
   get FICHES() { return FICHES; }, get PARAM() { return PARAM; }, get INDICATORS() { return INDICATORS; },
   get REGLAGES() { return REGLAGES; }, set REGLAGES(v) { REGLAGES = v; }, REGLAGES_DEFAUT, lireReglages,
   ETIQ, subTitle, ficheHtml, lectureCourte, renderFeedTo, renderLive, modeCourant, FICHE_IND,
-  bandeProfil, mursFusionnes, fusionnerCellules, bandeLive, palier, ladderHtml,
+  bandeProfil, mursFusionnes, fusionnerGrille, grilleChaleur, bandeLive, palier, ladderHtml,
   setData(d) { marketData = d; }, el: id => document.getElementById(id),
+  get COLORS() { return COLORS; }, FORMES_BOUGIE, BOUGIE_DENSE_PX, CADENCES, ageBannerHtml,
+  pixelsChaleur, rampeU32, HEAT_RAMPE, lireSiNouveau, lectureDue, etatPublication, majAges, fetchMarket, fetchPrice, fetchHeatmap,
+  get marketData() { return marketData; }, get histHeatmap() { return histHeatmap; }, get livePrice() { return livePrice; },
+  urlTicker, var24De, urlPremierePage, prechargee, DATA_URL, HEATMAP_URL, queueConnue, limiterCacheBougies, klineCache, BOUGIES_GARDEES,
 };`;
   vm.runInContext(code, sandbox);
   return { T: sandbox.__T__, stockage, appels, element, sandbox };

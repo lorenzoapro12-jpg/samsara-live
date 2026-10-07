@@ -1,19 +1,42 @@
-Polices des thèmes Néon et Codex — toutes sous SIL Open Font License 1.1 (licences jointes).
+Polices des thèmes — toutes sous SIL Open Font License 1.1 (licences jointes).
+Ce fichier est ÉCRIT par fonts/fabriquer.py depuis sa table POLICES : ne pas le modifier à la main.
 
-Ce sont des VERSIONS MODIFIÉES au sens de l'OFL : sous-ensembles latins (pyftsubset,
-woff2, sans hinting) servis depuis ce dépôt, chargées par le navigateur uniquement quand le
-thème qui les utilise est actif. Conformément à la clause des noms réservés (Reserved Font
-Name), les polices qui en déclarent un ont été RENOMMÉES :
+Ce sont des VERSIONS MODIFIÉES au sens de l'OFL : sous-ensembles (pyftsubset, woff2, sans
+hinting), parfois instances d'une police variable, servis depuis ce dépôt et chargés par le
+navigateur uniquement quand le thème qui les utilise est actif. Conformément à la clause des
+noms réservés (Reserved Font Name), les polices qui en déclarent un ont été RENOMMÉES.
 
-  neon-titre.woff2       « Samsara Neon Titre »      ← Orbitron (RFN « Orbitron ») — orbitron.OFL.txt
-  neon-chiffres.woff2    « Samsara Neon Chiffres »   ← Share Tech Mono (RFN « Share ») — sharetechmono.OFL.txt
-  codex-lettrine.woff2   « Samsara Codex Lettrine »  ← UnifrakturMaguntia (RFN « UnifrakturMaguntia ») — unifraktur.OFL.txt
-  cinzel.woff2           Cinzel (aucun nom réservé)  — cinzel.OFL.txt
-  eb-garamond.woff2      EB Garamond (aucun nom réservé) — ebgaramond.OFL.txt
+  neon-titre.woff2         « Samsara Neon Titre » ← Orbitron (nom réservé « Orbitron ») — orbitron.OFL.txt — thème Néon
+                            glyphes composés (là où ils manquent) : Ā ā Ṃ ṃ
+  neon-chiffres.woff2      « Samsara Neon Chiffres » ← Share Tech Mono (nom réservé « Share ») — sharetechmono.OFL.txt — thème Néon
+  codex-lettrine.woff2     « Samsara Codex Lettrine » ← UnifrakturMaguntia (nom réservé « UnifrakturMaguntia ») — unifraktur.OFL.txt — thème Codex
+                            glyphes composés (là où ils manquent) : ā ṃ
+  cinzel.woff2             « Cinzel » ← Cinzel (aucun nom réservé) — cinzel.OFL.txt — thème Codex
+  eb-garamond.woff2        « EB Garamond » ← EB Garamond (aucun nom réservé) — ebgaramond.OFL.txt — thème Codex
+  bureau95-titres.woff2    « Pixelify Sans » ← Pixelify Sans (aucun nom réservé) — pixelifysans.OFL.txt — thème Bureau 95
+                            instance wght=700 ; glyphes composés (là où ils manquent) : Ā ā Ṃ ṃ ; plages : PLAGES_LATIN sans les chiffres (ils retombent sur la police système)
+  gare-palettes.woff2      « Noto Sans Mono » ← Noto Sans Mono (aucun nom réservé) — notosansmono.OFL.txt — thème Gare
+                            instance wdth=75, wght 500–700
+  barlow-condensed-500.woff2 « Barlow Condensed » ← Barlow Condensed (aucun nom réservé) — barlowcondensed.OFL.txt — thème Gare
+                            glyphes composés (là où ils manquent) : Ā ā Ṃ ṃ
+  barlow-condensed-600.woff2 « Barlow Condensed » ← Barlow Condensed (aucun nom réservé) — barlowcondensed.OFL.txt — thème Gare
+                            glyphes composés (là où ils manquent) : Ā ā Ṃ ṃ
+  old-standard-400.woff2   « Old Standard TT » ← Old Standard TT (aucun nom réservé) — oldstandardtt.OFL.txt — thème Gazette
+  old-standard-700.woff2   « Old Standard TT » ← Old Standard TT (aucun nom réservé) — oldstandardtt.OFL.txt — thème Gazette
+  league-gothic.woff2      « League Gothic » ← League Gothic (aucun nom réservé) — leaguegothic.OFL.txt — thème Gazette
+                            instance wdth=100 ; glyphes composés (là où ils manquent) : Ā ā Ṃ ṃ
+  gazette-titre.woff2      « Samsara Gazette Titre » ← Playfair Display (nom réservé « Playfair Display ») — playfairdisplay.OFL.txt — thème Gazette
+                            instance wght=800 ; glyphes composés (là où ils manquent) : ṃ ; lettres du titre seulement : « Saṃsāra »
+  overpass-mono.woff2      « Overpass Mono » ← Overpass Mono (aucun nom réservé) — overpassmono.OFL.txt — thème Cyanotype, Diazo
+                            instance wght 400–700 ; glyphes composés (là où ils manquent) : Ā ā Ṃ ṃ ; plages : PLAGES_LATIN + U+25B2-25B3,U+25BC
+  architects-daughter.woff2 « Architects Daughter » ← Architects Daughter (aucun nom réservé) — architectsdaughter.OFL.txt — thème Cyanotype, Diazo
+                            glyphes composés (là où ils manquent) : Ā ā Ṃ ṃ
 
 Glyphes AJOUTÉS par composition (base + diacritique) pour écrire « Saṃsāra » d'une seule
-police : ā / Ā (a + macron) et ṃ / Ṃ (m + point souscrit) dans « Samsara Neon Titre », ā et ṃ
-dans « Samsara Codex Lettrine ». Tout se refait avec : python3 fonts/fabriquer.py (fonttools).
+police : ā / Ā (a + macron) et ṃ / Ṃ (m + point souscrit), seulement là où la police ne les a pas.
 
-Plages conservées : latin de base, Latin-1, Latin étendu A, ponctuation générale, flèches,
-quelques signes mathématiques et grecs. Un glyphe absent retombe sur la police système.
+Plages conservées par défaut : latin de base, Latin-1, Latin étendu A, ponctuation générale,
+flèches, quelques signes mathématiques et grecs ; une police de titre ne garde que ses lettres.
+Un glyphe absent retombe sur la police système.
+
+Tout se refait avec : python3 fonts/fabriquer.py (fonttools, brotli).

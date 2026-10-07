@@ -222,3 +222,19 @@ sortir du budget : c'est la preuve que la mesure voit ce que l'ancienne règle i
 - **Plus aucun calcul hors dépôt** (06/10/2026) : indicateurs, DXY / VIX et prime sont
   calculés ici. `publish.py --comparer` vérifie la parité avec les anciens modules sur la
   machine qui les a encore.
+
+---
+
+## Livraison du 07/10/2026
+
+Le détail de chaque chantier (ce qui a changé, pourquoi, les mesures avant/après, ce qui n'a pas
+été fait et pourquoi) est dans `docs/livraison-2026-10-07.md`. Points d'architecture à retenir :
+
+- **heatmap.json « colonnes-1 »** : minute ABSOLUE par colonne (les deltas git fonctionnent), les
+  deux pages lisent les deux formats ; retour arrière en une ligne dans `heatmap.py` (`FORMAT = ANCIEN`).
+- **Carte** : `BM.Horloge` (écart à l'horloge Binance ± incertitude), boucle à pas fixe avec recul
+  sur 429/418, rendu par calques gardés (la chaleur publiée n'est repeinte que si elle change).
+- **Terminal** : `js/cadences.js` (CADENCES, chargé avant les structures), calque `chartCalque` pour
+  le réticule et l'étiquette du prix, `js/horloges.js`, `js/contre-expertise.js`, `js/chronique.js`.
+- **Thèmes** : crochets du graphique (`--bougie-forme`, `--grille-tirets`, `--police-graphique`,
+  `--chaleur-*`, `--up-sur`) ; tout décor porte `data-decor` ; le banc de budget fait bouger le prix.

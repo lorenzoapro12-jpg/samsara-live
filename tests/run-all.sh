@@ -11,7 +11,7 @@ ko=0
 etape() { printf '\n\033[1m── %s ──\033[0m\n' "$1"; }
 
 etape "0. Compilation des scripts Python"
-for f in ../publish.py ../heatmap.py ../samsara_config.py ../options_gex.py ../indicateurs.py test_meta.py refresh_harness.py scan-public.py test_calculs.py test_palette.py test_contrat.py theme_css.py; do
+for f in ../publish.py ../heatmap.py ../samsara_config.py ../options_gex.py ../indicateurs.py ../fonts/fabriquer.py *.py; do   # tout script Python des tests : aucune liste à tenir
   if python3 -m py_compile "$f" 2>/dev/null; then
     echo "  ✓ $f"
   else
@@ -21,6 +21,9 @@ done
 
 etape "1. Calculs serveur (CVD, carnet, GEX, indicateurs, prime, heatmap) — hors ligne"
 python3 test_calculs.py || ko=1
+
+etape "1a. Heatmap publiée : format colonnes-1 sans perte, octets stables d'une publication à l'autre, cadence 15 min — hors ligne"
+python3 test_heatmap_format.py || ko=1
 
 etape "1b. Libellés : chaque champ publié décrit, aucun nom ne ment sur sa formule — hors ligne"
 python3 test_meta.py || ko=1
@@ -33,6 +36,24 @@ node test_fiches.js || ko=1
 
 etape "2c. Réglages : le détail change, jamais la valeur ; constantes du fichier lues, jamais recopiées — hors ligne"
 node test_reglages.js || ko=1
+
+etape "2d. Indicateurs réécrits en boucles : les mêmes valeurs qu'avant, au bit près, sur 3 000 bougies réelles — hors ligne"
+node test_indicateurs_boucles.js || ko=1
+
+etape "2e. Chaleur : les deux formats publiés donnent la même couche ; même publication = aucune analyse — hors ligne"
+node test_chaleur.js || ko=1
+
+etape "2f. Réseau : ce que la page demande et quand (revalidation, prix MINI, préchargement, bougies) — hors ligne"
+node test_reseau.js || ko=1
+
+etape "2g. Horloges : liste dérivée de meta.champs, pannes nommées, décalage avec Binance — hors ligne"
+node test_horloges.js || ko=1
+
+etape "2h. Contre-expertise : la publication recalculée sur des réponses Binance enregistrées — hors ligne"
+node test_contre.js || ko=1
+
+etape "2i. Chronique : historique des publications relu dans git (arrêts, trous, cache, tracés) — hors ligne"
+node test_chronique.js || ko=1
 
 etape "3. Extraction du JavaScript inline"
 python3 refresh_harness.py || ko=1
@@ -58,12 +79,36 @@ python3 test_palette.py || ko=1
 etape "8. Contrat de la page (registre des thèmes, verre, budget mesuré, réseau) — hors ligne"
 python3 test_contrat.py || ko=1
 
+etape "8a. Protocole du banc de budget (prix vivant, mesures entrelacées) — hors ligne, sans navigateur"
+node test_budget.js --controle || ko=1
+
+etape "8b. Polices : registre, licences et noms réservés, LISEZMOI dérivé, @font-face servis — hors ligne"
+python3 test_polices.py || ko=1
+
+etape "8c. Structure « fenêtres » : jumeaux identiques hors jetons, contrastes de ses fonds — hors ligne"
+python3 test_fenetres.py || ko=1
+
 etape "9. Structures de thème dans Chromium : aucune valeur ni aucun âge perdu, réversibles (non exécuté sans Playwright)"
 node test_structures.js || ko=1
 
-# Le budget d'image (≈ 15 min) ne tourne pas ici : il se relance quand une feuille de thème
-# change — node tests/test_budget.js --enregistrer — et le contrat (étape 8) refuse une feuille
-# dont la mesure n'est plus à jour.
+etape "9a. Structure « fenêtres » dans Chromium : barre des tâches, fenêtre du graphique, barre d'état réajustée, téléphone (non exécuté sans Playwright)"
+node test_fenetres.js || ko=1
+
+etape "9b. Interface dans Chromium : menus dans l'écran, crochets du graphique, sous-graphes sans débordement (non exécuté sans Playwright)"
+node test_interface.js || ko=1
+
+etape "9c. Sobriété dans Chromium : éclair, horloge, onde, calque, verre, chargement, chaleur (non exécuté sans Playwright)"
+node test_sobriete.js || ko=1
+etape "9d. Thème Gare dans Chromium : palettes à 1ch, provenance lue dans CADENCES, remarque d'âge, chutes à l'événement, démontage (non exécuté sans Playwright)"
+node test_gare.js || ko=1
+etape "9e. Structure « une » (Gazette) dans Chromium : manchette recopiée de la cote, tampon à l'édition nouvelle, cadences lues, démontage, mise en page (non exécuté sans Playwright)"
+node test_gazette.js || ko=1
+etape "9f. Structure « planche » (Cyanotype, Diazo) : jumeaux identiques hors jetons, pied de planche, cartouche, nuage de révision, canvas suivi, démontage (Chromium ; jumeaux hors ligne)"
+node test_planche.js || ko=1
+
+# Le budget d'image (≈ 30 min : mesures entrelacées, prix en mouvement) ne tourne pas ici : il
+# se relance quand une feuille de thème change — node tests/test_budget.js --enregistrer — et le
+# contrat (étape 8) refuse une feuille dont la mesure n'est plus à jour.
 
 printf '\n\033[1m════════════════════════════════════════\033[0m\n'
 if [ "$ko" -eq 0 ]; then

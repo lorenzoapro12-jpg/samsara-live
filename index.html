@@ -4,6 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Saṃsāra — Marché live</title>
+<script>
+/* Les lectures du premier écran partent ICI, avant les feuilles et les scripts : lancées par
+   js/app.js (différé), elles attendaient la fin de son exécution (première page de bougies
+   demandée à ~112 ms, mesuré). Mêmes hôtes et mêmes URL que js/app.js, qui reprend ces réponses
+   au lieu de les redemander (prechargee) — paire et intervalle par défaut. */
+(function () {
+  try {
+    var B = 'https://api.binance.com/api/v3/', P = window.__precharge = {};
+    var lire = function (u, o) { P[u] = fetch(u, o); P[u].catch(function () {}); };
+    lire(B + 'klines?symbol=BTCUSDT&interval=15m&limit=1000');
+    lire(B + 'ticker/24hr?symbol=BTCUSDT&type=MINI');
+    lire('https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/master/market-data.json', { cache: 'no-cache' });
+  } catch (e) {}
+})();
+</script>
 <link rel="stylesheet" href="css/app.css">
 <!-- THÈMES — un fichier par thème, tous chargés (quelques Ko chacun) : changer de thème ne
      coûte aucune requête. Pour en ajouter un : créer themes/<id>.css (jetons sous
@@ -16,6 +31,12 @@
 <!-- data-structure : le thème change aussi la STRUCTURE de la page (js/structures.js). -->
 <link rel="stylesheet" href="themes/neon.css" data-theme-id="neon" data-nom="Néon" data-mode="sombre" data-verre="aucun" data-structure="hud">
 <link rel="stylesheet" href="themes/codex.css" data-theme-id="codex" data-nom="Codex" data-mode="clair" data-verre="aucun" data-structure="codex">
+<link rel="stylesheet" href="themes/bureau95.css" data-theme-id="bureau95" data-nom="Bureau 95" data-mode="clair" data-verre="aucun" data-structure="fenetres" data-paire="bureau95-contraste">
+<link rel="stylesheet" href="themes/bureau95-contraste.css" data-theme-id="bureau95-contraste" data-nom="Bureau 95 contraste" data-mode="sombre" data-verre="aucun" data-structure="fenetres" data-paire="bureau95">
+<link rel="stylesheet" href="themes/gare.css" data-theme-id="gare" data-nom="Gare" data-mode="sombre" data-verre="aucun" data-structure="tableau">
+<link rel="stylesheet" href="themes/gazette.css" data-theme-id="gazette" data-nom="Gazette" data-mode="clair" data-verre="aucun" data-structure="une">
+<link rel="stylesheet" href="themes/cyanotype.css" data-theme-id="cyanotype" data-nom="Cyanotype" data-mode="sombre" data-verre="aucun" data-structure="planche" data-paire="diazo">
+<link rel="stylesheet" href="themes/diazo.css" data-theme-id="diazo" data-nom="Diazo" data-mode="clair" data-verre="aucun" data-structure="planche" data-paire="cyanotype">
 <script>
 /* Le thème est posé AVANT le premier rendu : posé par app.js (différé), la page s'afficherait
    un instant dans le thème par défaut. */
@@ -44,9 +65,15 @@
   catch (e) { document.documentElement.setAttribute('data-mode', 'debutant'); }
 })();
 </script>
+<script defer src="js/cadences.js"></script>
 <script defer src="js/structures.js"></script>
 <script defer src="js/fiches.js"></script>
 <script defer src="js/reglages.js"></script>
+<!-- Chronique, horloges et contre-expertise : des cœurs purs, appelés par js/app.js — chargés AVANT lui,
+     qui reste le dernier script (les harnais node retirent son init() final). -->
+<script defer src="js/chronique.js"></script>
+<script defer src="js/horloges.js"></script>
+<script defer src="js/contre-expertise.js"></script>
 <script defer src="js/app.js"></script>
 </head>
 <body>
@@ -68,7 +95,7 @@
     </div>
   </div>
   <!-- Chiffres clés de la dernière PUBLICATION (market-data.json, 15 min) — avec leur âge. -->
-  <div class="kpis" id="cycle" onclick="toggleFeed()" title="Dernière publication (cadence 15 min) — cliquer pour le détail"></div>
+  <div class="kpis" id="cycle" onclick="toggleFeed()" title="Dernière publication — cliquer pour le détail"></div>
   <div class="header-right">
     <span id="updated"></span>
     <button class="theme-btn ico-btn" onclick="toggleFeed()" id="feedBtn" title="Marché live (F)" aria-label="Marché live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
@@ -126,7 +153,7 @@
 <div class="theme-menu" id="themeMenu" role="menu" aria-label="Thèmes" onclick="event.stopPropagation()"></div>
 
 <div class="main-area">
-<div class="chart-container"><div class="gloss-bubble"></div><div class="lg-ring"></div><canvas id="chart"></canvas></div>
+<div class="chart-container"><div class="gloss-bubble"></div><div class="lg-ring"></div><div class="lg-ring-cotes"></div><canvas id="chart"></canvas><canvas id="chartCalque" class="calque" aria-hidden="true"></canvas></div>
 
 <div class="feed-panel collapsed" id="feedPanel">
   <div class="feed-panel-handle" onclick="toggleFeed()" id="feedHandle">Marché live</div>

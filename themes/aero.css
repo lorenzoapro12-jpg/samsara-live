@@ -85,6 +85,11 @@
   --chart-creux: inset 0 0 20px rgba(58,78,140,0.075), inset 0 1px 0 rgba(255,255,255,0.6);
   --chart-surface: #f4f6fe;
   --grille: rgba(36,56,110,0.08);
+  /* Chaleur (couche « Liquidité ») : encre fixe, seule l'opacité croît. La rampe historique
+     s'éclaircit vers ce fond clair : elle n'y était pas monotone (contraste max 1,79:1 à
+     mi-intensité, 1,23:1 au plus gros mur). Encres signées : 1,14 → 3,86 et 1,15 → 4,14:1,
+     monotones (tests/test_palette.py). */
+  --chaleur-bid: var(--up-ink); --chaleur-ask: var(--down-ink);
   --reticule: rgba(16,35,61,0.28);
   --bulle: rgba(255,255,255,0.94);
   --filigrane: 0.045;

@@ -112,6 +112,59 @@ const appels = [...SRC_APP.matchAll(/infoBtn\('([^']+)'\)|lectureCourte\('([^']+
 const inconnus = [...new Set(appels.concat(Object.values(T.FICHE_IND)))].filter(k => !T.FICHES[k]);
 check(`${new Set(appels).size} fiches appelées depuis les cartes et le menu, toutes définies`, !inconnus.length, inconnus);
 
+// ── 7. La forme des bougies : une convention du thème, dite par une fiche dérivée du tracé ──
+titre('7. Bougies : la fiche dit la forme du thème courant, lue dans le code du tracé');
+const SRC_FICHES = fs.readFileSync(path.join(REPO, 'js/fiches.js'), 'utf8');
+const fb = T.ficheHtml('bougies');
+check('fiche « bougies » : nature « convention » (pas « mesuré »)', /fiche-nature nature-convention/.test(fb), fb.slice(0, 200));
+check('elle dit la forme du thème et le seuil de la vue dense, lus dans FORMES_BOUGIE et BOUGIE_DENSE_PX (js/app.js)',
+  fb.includes(esc(T.FORMES_BOUGIE[T.COLORS.bougieForme])) && fb.includes('corps &lt; ' + T.BOUGIE_DENSE_PX + ' px') && /La forme change, jamais la valeur/.test(fb));
+const formeAvant = T.COLORS.bougieForme;
+const parForme = Object.keys(T.FORMES_BOUGIE).map(f => { T.COLORS.bougieForme = f; return [f, T.ficheHtml('bougies').includes(esc(T.FORMES_BOUGIE[f]))]; });
+T.COLORS.bougieForme = formeAvant;
+check(`la fiche suit la forme du thème (${Object.keys(T.FORMES_BOUGIE).join(', ')})`, parForme.every(([, ok]) => ok), parForme);
+check('aucun seuil en pixels écrit à la main dans js/fiches.js', !/<\s*\d+\s*px/.test(SRC_FICHES.replace(/^\s*\/\/.*$/gm, '')));
+check('la fiche est dans le glossaire', /'bougies'/.test(SRC_FICHES.slice(SRC_FICHES.indexOf('function ouvrirGlossaire'))));
+
+// ── 8. Cadences : une table (js/cadences.js), lue par les minuteries, les seuils et les étiquettes ──
+titre('8. Cadences : une table, lue partout — aucun nombre recopié');
+const C = T.CADENCES;
+const CLES = ['prix', 'bougies', 'publication_lue', 'attendue_min', 'vieux_min', 'fige_min'];
+check('CADENCES déclare ' + CLES.join(', '), C && CLES.every(k => typeof C[k] === 'number' && C[k] > 0), C);
+check('ordre des seuils : attendue < vieux < figé', C.attendue_min < C.vieux_min && C.vieux_min < C.fige_min, C);
+const SRC = { 'js/app.js': SRC_APP, 'js/reglages.js': fs.readFileSync(path.join(REPO, 'js/reglages.js'), 'utf8'),
+  'js/structures.js': fs.readFileSync(path.join(REPO, 'js/structures.js'), 'utf8') };
+const code = t => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '');
+const corps = (src, nom) => { const i = src.indexOf('function ' + nom + '('); if (i < 0) return ''; let p = src.indexOf('{', i), n = 1, k = p + 1;
+  while (n && k < src.length) { n += { '{': 1, '}': -1 }[src[k]] || 0; k++; } return code(src.slice(i, k)); };
+// Chaque appel setInterval(…), parenthèses équilibrées ; son DERNIER argument est la cadence.
+const minuteries = t => { const out = []; let i = -1;
+  while ((i = t.indexOf('setInterval(', i + 1)) >= 0) { let n = 0, k = i + 11; do { n += { '(': 1, ')': -1 }[t[k]] || 0; k++; } while (n && k < t.length); out.push(t.slice(i, k)); }
+  return out; };
+const enDur = t => minuteries(t).filter(m => /,\s*\d[\d_]*\s*\)$/.test(m));
+const initC = corps(SRC_APP, 'init');
+check(`init() : ${minuteries(initC).length} minuteries, aucune à cadence écrite en dur`, minuteries(initC).length >= 4 && !enDur(initC).length, enDur(initC));
+check('toggleDepth() : relecture de la chaleur à CADENCES.chaleur_lue', /CADENCES\.chaleur_lue/.test(corps(SRC_APP, 'toggleDepth')) && !enDur(corps(SRC_APP, 'toggleDepth')).length);
+// Le voyant se décide dans etatPublication() (appelée par majAges() à chaque tour de fetchMarket).
+const ab = corps(SRC_APP, 'ageBannerHtml'), rf = corps(SRC_APP, 'renderFeedTo') + corps(SRC_APP, 'renderCycle'), fm = corps(SRC_APP, 'etatPublication');
+check('ageBannerHtml() : seuils et cadence lus dans CADENCES (plus de 20, 32, « 15 min »)',
+  /CADENCES\.vieux_min/.test(ab) && /CADENCES\.fige_min/.test(ab) && /CADENCES\.attendue_min/.test(ab) && !/[<>]=?\s*\d+\b/.test(ab) && !/\b\d+ min\)/.test(ab));
+check('renderFeedTo() / renderCycle() : la bande des chiffres clés vieillit à CADENCES.vieux_min', /ageK\s*>\s*CADENCES\.vieux_min/.test(rf) && !/ageK\s*>\s*\d/.test(rf));
+check('etatPublication() : le voyant passe au retard / au figé aux seuils de CADENCES', /CADENCES\.fige_min/.test(fm) && /CADENCES\.vieux_min/.test(fm) && !/ageMin\s*>\s*\d/.test(fm));
+// Aucune étiquette ne recopie une cadence de la table : chaînes de code, commentaires exclus.
+const valeurs = [C.attendue_min, C.vieux_min, C.fige_min].join('|');
+const recopies = Object.entries(SRC).flatMap(([f, t]) => (code(t).match(new RegExp("(['\"\x60])[^'\"\x60\\n]*\\b(?:" + valeurs + ")\\s*(?:min|MIN|minutes)\\b[^'\"\x60\\n]*\\1", 'g')) || []).map(m => f + ' : ' + m));
+check('aucune étiquette ne recopie « ' + C.attendue_min + ' / ' + C.vieux_min + ' / ' + C.fige_min + ' min » (app.js, reglages.js, structures.js)', !recopies.length, recopies);
+// Les dents : la table change, les seuils et les étiquettes suivent.
+const sauveC = Object.assign({}, C), ilYa = m => ({ updated: new Date(Date.now() - m * 60000).toISOString() });
+check(`publication de ${C.vieux_min - 1} min : aucun bandeau ; de ${C.vieux_min + 1} min : bandeau de retard qui dit « cadence attendue : ${C.attendue_min} min »`,
+  T.ageBannerHtml(ilYa(C.vieux_min - 1)) === '' && /retard/.test(T.ageBannerHtml(ilYa(C.vieux_min + 1))) && T.ageBannerHtml(ilYa(C.vieux_min + 1)).includes('cadence attendue : ' + C.attendue_min + ' min'));
+Object.assign(C, { attendue_min: 3, vieux_min: 5, fige_min: 8 });
+const b6 = T.ageBannerHtml(ilYa(6)), b9 = T.ageBannerHtml(ilYa(9)), b4 = T.ageBannerHtml(ilYa(4));
+Object.assign(C, sauveC);
+check('CADENCES = 3 / 5 / 8 min → bandeau à 6 min (« cadence attendue : 3 min »), figé à 9 min, rien à 4 min',
+  /cadence attendue : 3 min/.test(b6) && /figées/.test(b9) && b4 === '', { b4, b6, b9 });
+
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 console.log(ko ? `\n❌ LÉGENDES : ${ko} contrôle(s) en échec` : '\n✅ LÉGENDES : TOUS LES CONTRÔLES PASSENT');
 process.exit(ko ? 1 : 0);

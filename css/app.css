@@ -172,10 +172,15 @@ body::before {
 }
 /* Pendant un geste sur le graphique, le verre se suspend : il serait recalculé à chaque
    image du glissement. Sur un fond lisse, flou ou pas, la différence ne se lit pas. */
-html.geste .header, html.geste .indicator-bar, html.geste .lg-ring,
+html.geste .header, html.geste .indicator-bar, html.geste .lg-ring::before, html.geste .lg-ring::after,
+html.geste .lg-ring-cotes::before, html.geste .lg-ring-cotes::after,
 html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
   -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
 }
+/* Pendant un SURVOL du graphique (réticule redessiné à chaque image), seul l'anneau se
+   suspend : c'est lui que chaque image du calque faisait recomposer (js/app.js, survol()). */
+html.survol .lg-ring::before, html.survol .lg-ring::after,
+html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 
 /* ─── 4. En-tête ────────────────────────────────────────────────────────────── */
 .header {
@@ -229,6 +234,11 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
 }
 .price-badge.price-up::before { border-bottom: 8px solid var(--up); }
 .price-badge.price-down::before { border-top: 8px solid var(--down); }
+/* Éclair du prix : la couleur du sens, posée par une classe et retirée 450 ms plus tard (deux
+   images par changement), sans transition — une animation de couleur repeignait le chiffre à
+   chaque image : 70 % du CPU de la page au repos. */
+.price-badge.eclair-hausse { color: var(--up-ink); }
+.price-badge.eclair-baisse { color: var(--down-ink); }
 .var24 {
   flex-shrink: 0; padding: 3px 9px; border-radius: 999px; white-space: nowrap;
   font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
@@ -267,6 +277,15 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
   color: var(--ink-3); background: var(--rail);
 }
 .kpis.vieux .kpi-age { color: var(--warn-ink); background: var(--warn-soft); }
+/* Trace des dernières heures (js/chronique.js) : sur la ligne du libellé, dans la hauteur de
+   la bande (36 px) — ni plus haute, ni beaucoup plus large. Statique : rien n'y bouge entre
+   deux publications. Une ligne coupée est un trou de publication, jamais interpolé. */
+.kpi-t { display: flex; align-items: center; gap: 5px; height: 11px; }
+.kpi.sans-trace .chron-spark { display: none; }
+.chron-spark { flex-shrink: 0; display: block; color: var(--ink-3); overflow: visible; }
+.kpis:hover .chron-spark { color: var(--ink-2); }
+.chron-spark .chron-ligne, .chron-fiche .chron-ligne { fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.chron-spark .chron-point, .chron-fiche .chron-point { fill: currentColor; }
 #updated { font-size: 10px; font-weight: 600; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .theme-btn {
   cursor: pointer; font: inherit; font-weight: 600; color: var(--ink-2);
@@ -425,20 +444,37 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
 .main-area { display: flex; flex: 1; min-height: 0; gap: var(--gap); overflow: hidden; }
 .chart-container {
   flex: 1; min-width: 0;
-  padding: 16px; border-radius: var(--r-panel);
+  --graphe-marge: 16px; padding: var(--graphe-marge); border-radius: var(--r-panel);
 }
-/* Anneau : même verre que les autres surfaces, masqué à la bande de bord (le padding),
-   SOUS le canvas. Le canvas opaque couvre l'intérieur : seul le bord est flouté. */
-.lg-ring {
-  position: absolute; inset: 0; z-index: 0; pointer-events: none;
-  border-radius: inherit; padding: inherit;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
+/* Anneau : même verre que les autres surfaces, sur la seule bande de bord (le padding), SOUS le
+   canvas — en QUATRE bandes : haut et bas (.lg-ring::before / ::after), gauche et droite
+   (.lg-ring-cotes). Un élément unique masqué à la bande gardait la boîte entière du conteneur :
+   chaque image du canvas (réticule, étiquette du prix chaque seconde, bougies) y faisait
+   recalculer le flou de 1 404 × 632 px — Aero au repos : 129 ms de CPU par seconde, 92 en bandes
+   (page entière, rendu logiciel, mesuré le 07/10/2026). Chaque bande se prolonge de
+   --anneau-fond (48 px ≈ 3 σ du flou) sous le canvas, masquée : le flou y lit le même fond que
+   l'anneau d'un seul tenant (des bandes de 16 px seules floutaient moins, la trame
+   transparaissait). Seuls les quatre coins diffèrent encore, de quelques niveaux sur ~200 px.
+   Le canvas opaque couvre l'intérieur : seul le bord est flouté. */
+.lg-ring, .lg-ring-cotes { position: absolute; inset: 0; z-index: 0; pointer-events: none; border-radius: inherit; --anneau-fond: 48px; }
+.lg-ring::before, .lg-ring::after, .lg-ring-cotes::before, .lg-ring-cotes::after {
+  content: ''; position: absolute;
   -webkit-backdrop-filter: var(--verre); backdrop-filter: var(--verre);
-  box-shadow: var(--hyalite-edge, none);
 }
+.lg-ring::before { left: 0; right: 0; top: 0; height: calc(var(--graphe-marge) + var(--anneau-fond));
+  border-top-left-radius: inherit; border-top-right-radius: inherit;
+  -webkit-mask: linear-gradient(#000 0 0) top / 100% var(--graphe-marge) no-repeat; mask: linear-gradient(#000 0 0) top / 100% var(--graphe-marge) no-repeat; }
+.lg-ring::after { left: 0; right: 0; bottom: 0; height: calc(var(--graphe-marge) + var(--anneau-fond));
+  border-bottom-left-radius: inherit; border-bottom-right-radius: inherit;
+  -webkit-mask: linear-gradient(#000 0 0) bottom / 100% var(--graphe-marge) no-repeat; mask: linear-gradient(#000 0 0) bottom / 100% var(--graphe-marge) no-repeat; }
+.lg-ring-cotes::before { left: 0; top: 0; bottom: 0; width: calc(var(--graphe-marge) + var(--anneau-fond));
+  border-top-left-radius: inherit; border-bottom-left-radius: inherit;
+  -webkit-mask: linear-gradient(#000 0 0) left center / var(--graphe-marge) calc(100% - 2 * var(--graphe-marge)) no-repeat;
+  mask: linear-gradient(#000 0 0) left center / var(--graphe-marge) calc(100% - 2 * var(--graphe-marge)) no-repeat; }
+.lg-ring-cotes::after { right: 0; top: 0; bottom: 0; width: calc(var(--graphe-marge) + var(--anneau-fond));
+  border-top-right-radius: inherit; border-bottom-right-radius: inherit;
+  -webkit-mask: linear-gradient(#000 0 0) right center / var(--graphe-marge) calc(100% - 2 * var(--graphe-marge)) no-repeat;
+  mask: linear-gradient(#000 0 0) right center / var(--graphe-marge) calc(100% - 2 * var(--graphe-marge)) no-repeat; }
 .chart-container canvas {
   position: relative; z-index: 1;
   display: block; width: 100%; height: 100%;
@@ -448,6 +484,13 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
   /* Le graphique gère lui-même pan et pincement : sans ceci le navigateur mobile lance son
      propre défilement en concurrence (pan saccadé, double-tap qui zoome la page). */
   touch-action: none;
+}
+/* Le calque (réticule, infobulles, étiquette du dernier prix) : posé sur le graphique, à la même
+   taille (js/app.js, resizeCanvas), transparent et inerte au pointeur — les gestes restent au
+   graphique. */
+.chart-container canvas.calque {
+  position: absolute; z-index: 2; pointer-events: none;
+  background: none; box-shadow: none; border-radius: 0;
 }
 
 /* ─── 7. Panneau « Marché live » ───────────────────────────────────────────── */
@@ -508,6 +551,7 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
 .carte-liq { --teinte: #0891b2; }    .carte-flux { --teinte: #64748b; }
 .carte-live { --teinte: #f59e0b; }   .carte-tape { --teinte: #0ea5e9; }
 .carte-temps { --teinte: #7c8db5; }
+.carte-horloges { --teinte: #7c8db5; } .carte-contre { --teinte: #16a37a; }
 .demon-header { display: flex; align-items: center; gap: 11px; margin-bottom: 12px; flex-wrap: nowrap; }
 .demon-titres { min-width: 0; }
 .demon-avatar { font-size: 28px; flex-shrink: 0; }
@@ -664,6 +708,34 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
 .etat { font-size: 10.5px; font-weight: 650; padding: 2px 9px; border-radius: 999px; background: var(--up-soft); color: var(--up-ink); }
 .etat.ko { background: var(--down-soft); color: var(--down-ink); }
 
+/* Horloges : une ligne par instant affiché — nom, heure UTC, âge ; la panne nommée en clair. */
+.horloge-ligne { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 3px 0; font-size: 11px; border-bottom: 1px solid var(--rail); }
+.horloge-ligne:last-child { border-bottom: 0; }
+.horloge-ligne .h-nom { flex: 1 1 140px; color: var(--ink-2); min-width: 0; }
+.horloge-ligne .h-quand { font-variant-numeric: tabular-nums; color: var(--ink-1); font-weight: 600; }
+.horloge-ligne .h-age { font-variant-numeric: tabular-nums; color: var(--ink-3); min-width: 72px; text-align: right; }
+.horloge-ligne .h-src, .horloge-ligne .h-seuil { flex-basis: 100%; font-size: 10px; color: var(--ink-3); }
+.horloge-ligne .h-panne { flex-basis: 100%; font-size: 10.5px; font-weight: 650; color: var(--down-ink); }
+.horloge-ecart { font-size: 11px; font-weight: 650; color: var(--warn-ink); background: var(--warn-soft); border-radius: 10px; padding: 5px 10px; margin-bottom: 6px; }
+
+/* Contre-expertise : ✓ retrouvé, ≈ cohérent (avec sa borne), ✗ différent (les deux valeurs). */
+.age-banner.verif { color: var(--ink-2); background: var(--rail); }
+.age-banner.verif::before { box-shadow: 0 0 0 4px var(--rail); }
+.contre-compte { font-size: 10.5px; font-weight: 650; color: var(--up-ink); white-space: nowrap; }
+.contre-compte.ko { color: var(--down-ink); }
+.contre-groupe { margin-top: 6px; font-size: 11px; }
+.contre-groupe summary { cursor: pointer; padding: 3px 0; color: var(--ink-1); }
+.contre-ligne { display: flex; flex-wrap: wrap; gap: 1px 8px; padding: 2px 0 2px 4px; }
+.contre-ligne .c-etat { width: 12px; font-weight: 700; color: var(--up-ink); }
+.contre-ligne.e-approx .c-etat { color: var(--ink-2); }
+.contre-ligne.e-diff .c-etat, .contre-ligne.e-source .c-etat, .contre-ligne.e-injoignable .c-etat { color: var(--down-ink); }
+.contre-ligne .c-nom { flex: 1 1 130px; color: var(--ink-2); min-width: 0; }
+.contre-ligne .c-val { font-variant-numeric: tabular-nums; color: var(--ink-1); }
+.contre-ligne .c-note, .contre-raison .c-note { flex-basis: 100%; padding-left: 20px; font-size: 10px; color: var(--ink-3); }
+.contre-raison { padding: 3px 0 3px 4px; color: var(--ink-2); line-height: 1.5; }
+.contre-raison .c-note { display: block; padding-left: 0; font-weight: 650; }
+.c-nature { font-style: normal; font-size: 9.5px; color: var(--ink-3); border: 1px solid var(--rail); border-radius: 6px; padding: 0 4px; }
+
 /* Bandeau d'âge : au-delà de la cadence (15 min), la donnée est vieille et ça doit SE VOIR. */
 .age-banner {
   display: flex !important; align-items: center; gap: 9px; margin: 0 0 8px;
@@ -800,7 +872,7 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
    placé avant elles, il était neutralisé par la cascade. */
 @media (max-width: 800px) {
   :root { --gutter: 7px; --gap: 6px; }
-  .chart-container { padding: 11px; border-radius: 20px; }
+  .chart-container { --graphe-marge: 11px; border-radius: 20px; }
   .header { padding: 6px 9px; gap: 6px; }
   /* L'orbe est DÉCORATIF, le badge porte de la donnée : c'est l'orbe qui cède. */
   .header-orb { display: none; }
@@ -886,6 +958,10 @@ html.geste .feed-panel, html.geste .strat-section, html.geste .aero-taskbar {
    le script de tête). Évite d'afficher un instant la structure de base. */
 html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hidden; }
 .theme-structure { font-size: 10px; font-weight: 600; color: var(--ink-3); }
+/* Décor d'une structure (chantier().decor, js/structures.js) : muet ET inerte. Un titre de
+   décor posé sur un vrai bouton ou une vraie valeur ne doit jamais intercepter le pointeur
+   (tests/test_structures.js l'exige de tout [data-decor]). */
+[data-decor] { pointer-events: none; }
 
 /* ─── Légendes (js/fiches.js) ───────────────────────────────────────────────────
    Le MODE de lecture n'est qu'une classe sur <html> : le HTML est le même dans les deux
@@ -930,6 +1006,14 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
 .fiche-valeur b { color: var(--ink-1); }
 .fiche-tf { font-size: 10px; font-weight: 700; color: var(--ink-3); }
 .fiche-alerte { margin: 6px 0; padding: 6px 9px; border-radius: 8px; background: var(--warn-soft, var(--rail)); color: var(--ink-1); font-size: 11.5px; }
+/* Courbe des dernières heures de publications : trous hachurés (aucune publication lue, ou
+   champ absent du format d'alors) — un trou se voit, il n'est pas comblé. */
+.fiche-chronique { margin: 8px 0 4px; }
+.fiche-chronique-tete { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--ink-3); }
+.chron-fiche { display: block; width: 100%; height: 56px; margin: 4px 0 2px; color: var(--ink-2); background: var(--rail); border-radius: 6px; }
+.chron-fiche .chron-trou { opacity: 0.55; }
+.chron-fiche .chron-hachure { stroke: var(--ink-3); stroke-width: 1.5; }
+.fiche-chronique-pied { font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .fiche-pop h4 { margin: 12px 0 4px; font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; color: var(--ink-3); }
 .fiche-lectures { margin: 0; padding-left: 0; list-style: none; }
 .fiche-lectures li { margin: 5px 0; color: var(--ink-2); }

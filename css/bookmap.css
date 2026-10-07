@@ -32,6 +32,7 @@
   --surface-2: #161b29;
   --actif: rgba(124, 196, 255, 0.16);
   --actif-ink: #bfe2ff;
+  --lecture-max: 440px;    /* largeur maximale de la lecture au pointeur (lue aussi par js/bookmap.js) */
 }
 
 * { box-sizing: border-box; }
@@ -48,18 +49,23 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
-/* ─── Barre ─── */
+/* ─── Barre ───
+   Les puces des calques tiennent sur UNE ligne qui défile horizontalement : sur la ligne du titre
+   quand il y a la place (≥ 1280 px), sinon sur leur propre ligne. Elles ne s'empilent jamais en
+   colonne (entre 641 et ~1900 px, l'en-tête montait à 332 px et écrasait la carte). */
 .barre {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  padding: 8px 12px; border-bottom: 1px solid var(--bord); background: var(--carte-panneau);
+  display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap;
+  padding: 6px 12px; border-bottom: 1px solid var(--bord); background: var(--carte-panneau);
 }
-.barre-gauche { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+.barre-gauche { display: flex; align-items: baseline; gap: 12px; min-width: 0; flex: 0 1 auto; }
 .barre h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: 0.2px; white-space: nowrap; }
 .barre .sous { font-weight: 400; color: var(--ink-3); font-size: 12px; margin-left: 6px; }
 .retour { color: var(--ink-2); text-decoration: none; font-size: 12.5px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--bord); }
 .retour:hover, .retour:focus-visible { color: var(--ink-1); background: var(--surface-2); }
-.calques { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; min-width: 0; }
-.barre-droite { display: flex; gap: 6px; }
+.calques { display: flex; flex-wrap: nowrap; gap: 4px; flex: 1 1 0; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+.barre-droite { display: flex; gap: 6px; flex: 0 0 auto; margin-left: auto; }
+@media (max-width: 1599px) { .barre .sous { display: none; } }
+@media (max-width: 1279px) { .calques { order: 3; flex: 1 1 100%; } }
 .puce, .bouton {
   font: inherit; font-size: 12px; color: var(--ink-2); background: transparent;
   border: 1px solid var(--bord); border-radius: 999px; padding: 4px 10px; cursor: pointer;
@@ -75,7 +81,7 @@ body {
 }
 
 /* ─── Scène ─── */
-.scene { position: relative; flex: 1; min-height: 0; }
+.scene { position: relative; flex: 1; min-height: 160px; }
 #carte { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
 .statut {
   position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px);
@@ -87,15 +93,18 @@ body {
 .lecture {
   position: fixed; left: 0; top: 0; z-index: 20; pointer-events: none;
   background: var(--carte-pastille); border: 1px solid var(--bord); border-radius: 8px;
-  padding: 6px 9px; font-size: 12px; line-height: 1.45; color: var(--ink-2); max-width: min(440px, 92vw);
+  padding: 6px 9px; font-size: 12px; line-height: 1.45; color: var(--ink-2); max-width: min(var(--lecture-max), 92vw);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 .lecture b { color: var(--ink-1); }
 
 /* ─── Panneaux ─── */
+/* Sous la barre RÉELLE (--haut-barre : son bas, mesuré par la page) et jamais plus bas que l'écran
+   visible (dvh : sans les barres du navigateur mobile) — le bas d'un panneau reste atteignable. */
 .panneau-flottant {
-  position: fixed; z-index: 30; top: 52px; right: 12px; width: min(360px, calc(100vw - 24px));
-  max-height: calc(100vh - 70px); overflow: auto;
+  position: fixed; z-index: 30; top: calc(var(--haut-barre, 52px) + 6px); right: 12px; width: min(360px, calc(100vw - 24px));
+  max-height: calc(100vh - var(--haut-barre, 52px) - 14px); max-height: calc(100dvh - var(--haut-barre, 52px) - 14px);
+  overflow: auto; overscroll-behavior: contain;
   background: var(--surface); border: 1px solid var(--bord); border-radius: 12px;
   padding: 10px 14px 14px; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
 }
@@ -107,12 +116,21 @@ body {
 .panneau-flottant dt { color: var(--ink-1); font-weight: 600; margin-top: 8px; }
 .panneau-flottant dd { margin-left: 0; }
 .note { font-size: 12px; color: var(--ink-3) !important; }
+/* Les dernières rafales : une par ligne, chiffres alignés (la lecture compare des tailles). */
+.liste-rafales { margin: 6px 0 0; padding-left: 0; list-style: none; font-size: 12px; font-variant-numeric: tabular-nums; }
+.liste-rafales li { padding: 3px 0; border-bottom: 1px solid var(--bord); color: var(--ink-2); }
+.liste-rafales li b { color: var(--ink-1); font-weight: 600; }
+.liste-rafales .achat { color: var(--up); }
+.liste-rafales .vente { color: var(--down); }
 .fermer { font: inherit; font-size: 18px; line-height: 1; background: none; border: 0; color: var(--ink-2); cursor: pointer; padding: 4px 6px; border-radius: 6px; }
 .fermer:hover { color: var(--ink-1); background: var(--surface-2); }
 fieldset { border: 1px solid var(--bord); border-radius: 10px; margin: 10px 0; padding: 6px 10px 10px; }
 legend { color: var(--ink-2); font-size: 12px; padding: 0 4px; }
 label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-2); margin-top: 8px; }
-label output { color: var(--ink-1); font-weight: 600; }
+label output, .champ output { color: var(--ink-1); font-weight: 600; }
+.champ { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; font-size: 12px; color: var(--ink-2); margin-top: 8px; }
+.champ label { display: inline; margin: 0; }
+.champ input[type="range"] { flex: 1 1 100%; }
 select, input[type="range"] { width: 100%; }
 select {
   font: inherit; font-size: 12.5px; color: var(--ink-1); background: var(--surface-2);
@@ -120,8 +138,14 @@ select {
 }
 input[type="range"] { accent-color: var(--carte-live); }
 .barre-couleurs { margin: 6px 0 2px; }
-#barreCouleurs { height: 12px; border-radius: 4px; background-size: 100% 100%; image-rendering: pixelated; border: 1px solid var(--bord); }
-.grad { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); margin-top: 3px; }
+/* Une rampe par côté peint (deux pour « bid / ask teintés ») ; le contour ne prend pas de place,
+   pour que chaque libellé de .grad tombe sous SA couleur. */
+#barreCouleurs .rampe { height: 12px; border-radius: 3px; background-size: 100% 100%; image-rendering: pixelated; outline: 1px solid var(--bord); }
+.rampe-nom { display: block; font-size: 11px; color: var(--ink-3); margin: 6px 0 2px; }
+.grad { position: relative; height: 15px; font-size: 11px; color: var(--ink-3); margin-top: 4px; }
+.grad span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+.grad span.debut { left: 0 !important; transform: none; }
+.grad span.fin { left: 100% !important; transform: translateX(-100%); }
 
 @media (max-width: 640px) {
   .barre { padding: 6px 8px; gap: 6px; }
@@ -130,7 +154,7 @@ input[type="range"] { accent-color: var(--carte-live); }
   .calques { order: 3; flex-basis: 100%; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
   .barre h1 { font-size: 14px; }
   .bouton { padding: 4px 8px; }
-  .panneau-flottant { top: 96px; right: 8px; }
+  .panneau-flottant { right: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }

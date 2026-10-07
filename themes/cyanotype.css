@@ -1,0 +1,449 @@
+/* Thème « Cyanotype » — une planche de dessin technique, tirée en bleu de Prusse : traits
+   blancs, corrections au crayon rouge, surlignage jaune ; lettrage à chasse fixe (Overpass Mono),
+   titres à la main du dessinateur (Architects Daughter, jamais pour un nombre). Le seul thème
+   sombre qui ne soit pas noir. STRUCTURE propre : « planche » (js/structures.js) — un cadre à
+   repères de zone sous le contenu, un PIED DE PLANCHE sous le graphique : la nomenclature des
+   calques (le ruban d'outils) et le cartouche, registre de la dernière publication (chiffres
+   clés, indice de révision = âge, date de révision = heure). Le nuage de révision entoure le
+   cartouche quand une NOUVELLE publication arrive.
+   Jumeau clair : themes/diazo.css (le tirage diazo, traits bleu-violet sur papier). MÊMES règles
+   au sélecteur de thème près — seuls les jetons diffèrent ; tests/test_planche.js le vérifie.
+   Déclaré dans index.html : <link data-theme="cyanotype" data-mode="sombre" data-verre="aucun"
+   data-structure="planche" data-paire="diazo">.
+
+   COULEURS — mesurées par tests/test_palette.py. Hausse = BLANC (le trait du tirage), baisse =
+   CRAYON ROUGE : ΔE 32 sous les trois daltonismes. Les overlays n'ont plus d'orange (il se
+   confondait avec les barres de baisse) : ΔE ≥ 18 deux à deux et avec les barres.
+
+   GRAPHIQUE — barres OHLC au trait (--bougie-forme: barre), grille de prix en trait mixte
+   (8 3 2 3), papier millimétré en FOND CSS du canvas (--chart-lueur) : peint une fois, gratuit
+   pendant un geste. Aucune cote calculée sur le graphique : ce serait une valeur inventée.
+
+   EFFETS — aucune animation. Le grain du tirage est dans --fond (peint une fois). Le cadre et
+   ses repères sont SOUS le contenu (z-index −1, <html> n'a pas de fond). Le nuage de révision
+   est un dessin statique posé 90 s (classe .revise, js/structures.js). */
+
+@font-face {
+  font-family: 'Overpass Mono';
+  src: url('../fonts/overpass-mono.woff2') format('woff2');
+  font-weight: 400 700; font-display: swap;
+}
+@font-face {
+  font-family: 'Architects Daughter';
+  src: url('../fonts/architects-daughter.woff2') format('woff2');
+  font-weight: 400; font-display: swap;
+}
+
+[data-theme="cyanotype"] {
+  color-scheme: dark;
+  --font: 'Overpass Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  --police-titre: 'Architects Daughter', 'Comic Neue', 'Segoe Print', cursive;
+  --police-graphique: 'Overpass Mono', ui-monospace, Menlo, Consolas, monospace;
+  --gutter: 20px;
+  --r-bar: 0; --r-panel: 0; --r-card: 0; --r-tile: 0;
+
+  /* Fond : le tirage — un grain de papier (bruit SVG, statique), des bords plus sombres là où
+     le bain a plus agi, un voile plus clair en haut à gauche. Peint une fois. */
+  --fond:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .85 0 0 0 0 .92 0 0 0 0 1 0 0 0 .10 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E") 0 0 / 240px 240px,
+    radial-gradient(130% 100% at 50% 40%, rgba(8,34,72,0) 55%, rgba(6,26,58,0.65) 100%),
+    radial-gradient(55% 45% at 18% 12%, rgba(52,104,168,0.30) 0%, rgba(52,104,168,0) 70%),
+    #0e3566;
+  --grain: none; --verre: none; --trame: none;
+
+  --surface: rgba(11,47,92,0.94);
+  --surface-ombre: inset 0 0 0 1px rgba(244,248,255,0.35);
+  --surface-reflet: none;
+  --capsule: transparent;
+  --capsule-hover: rgba(244,248,255,0.10);
+  --capsule-ombre: inset 0 0 0 1px rgba(244,248,255,0.40);
+  --pill: transparent;
+  --pill-hover: rgba(244,248,255,0.10);
+  --pill-actif: #f4f8ff;
+  --pill-actif-ink: #0b2f5c;
+  --pill-actif-ombre: none;
+  --dot-anneau: #0b2f5c;
+  --poignee: transparent;
+  --poignee-hover: rgba(244,248,255,0.08);
+
+  --ink-1: #f4f8ff; --ink-2: #cfe0f5; --ink-3: #a9c4e6;
+  --up: #f4f8ff; --down: #ff7a5c;
+  --up-ink: #ffffff; --down-ink: #ff9e85;
+  --up-soft: rgba(244,248,255,0.12); --down-soft: rgba(255,122,92,0.16);
+  --warn: #ffd84a; --warn-ink: #ffd84a; --warn-soft: rgba(255,216,74,0.12);
+  --accent: #7fe3ff; --accent-2: #ffd84a;
+  --brand: #ffd84a; --brand-fond: #ffd84a; --brand-ink: #0b2f5c;
+  --accent-glow: rgba(127,227,255,0.22);
+  --hairline: rgba(244,248,255,0.28);
+  --rail: rgba(244,248,255,0.08);
+
+  --card: #0b2f5c;
+  --card-solid: #0b2f5c;
+  --card-edge: rgba(244,248,255,0.42);
+  --card-shadow: none;
+  --card-hi: transparent;
+  --card-reflet: none;
+  --forward: linear-gradient(135deg, #b8321a, #8f2612);
+  --modal-fond: #0e3566;
+  --modal-ombre: 0 1px 0 rgba(244,248,255,0.35);
+  --ombre-douce: none;
+  --selection: rgba(255,216,74,0.35);
+  --defil: rgba(244,248,255,0.28);
+  --defil-hover: rgba(244,248,255,0.50);
+  --prix-lueur: none;
+
+  /* Graphique : bleu de Prusse, papier millimétré (cm et mm) en fond CSS du canvas. */
+  --chart-1: #0f3a6e; --chart-2: #103d73; --chart-3: #124178;
+  --chart-surface: #103d73;
+  --chart-lueur:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.08) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.08) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 8px);
+  --chart-creux: inset 0 0 0 1px rgba(244,248,255,0.45);
+  --grille: rgba(244,248,255,0.18);
+  --grille-tirets: 8 3 2 3;
+  --reticule: rgba(244,248,255,0.6);
+  --bulle: #0b2f5c;
+  --filigrane: 0.05;
+  --vol-alpha: 0.45;
+  --bande-alpha: 0.08;
+  --aura: 0;
+  --bougie-forme: barre;
+  --bougie-rayon: 0;
+  /* Étiquette du dernier prix, posée SUR la couleur de la barre : bleu de Prusse sur le blanc et le crayon rouge. */
+  --up-sur: #0b2f5c; --down-sur: #0b2f5c;
+  /* Chaleur : encre fixe (le blanc et le crayon rouge des barres), seule l'opacité croît. */
+  --chaleur-bid: #f4f8ff; --chaleur-ask: #ff7a5c;
+  --ov-ema20: #ffd84a; --ov-ema50: #7fe3ff; --ov-ema100: #b8f27a;
+  --ov-ema200: #c9b3ff; --ov-sma20: #ff9ecb; --ov-sma50: #5fd0a0;
+  --ov-bb: #a9c4e6; --ov-vwap: #ffd84a; --ov-sar: #7fe3ff;
+  --ov-ichi-t: #7fe3ff; --ov-ichi-k: #ff9ecb;
+  --s-rsi: #c9b3ff; --s-macd: #ffd84a; --s-signal: #ff9ecb;
+  --s-stoch-k: #ffd84a; --s-stoch-d: #7fe3ff; --s-atr: #b8f27a;
+  --s-obv: #7fe3ff; --s-mfi: #c9b3ff; --s-wr: #7fe3ff; --s-cci: #ff9ecb;
+  --s-adx: #ffd84a; --s-equity: #b8f27a;
+  --sess-asie: rgba(255,216,74,0.70);
+  --sess-europe: rgba(127,227,255,0.70);
+  --sess-us: rgba(255,158,203,0.70);
+  --sr-1: #c9b3ff; --sr-2: #7fe3ff; --sr-3: #ffd84a;
+  --fib: #ffd84a; --vp: #7fe3ff; --vp-poc: #ffd84a;
+
+  /* Jetons PROPRES à la planche (lus par les règles ci-dessous, identiques dans diazo.css). */
+  --plan-trait: rgba(244,248,255,0.55);          /* traits du cadre, du cartouche */
+  --plan-trait-fin: rgba(244,248,255,0.28);      /* traits intérieurs, graduations */
+  --plan-case: #0b2f5c;                          /* fond opaque d'une case du cartouche */
+  --plan-repere: #cfe0f5;                        /* lettres et chiffres des zones */
+  --plan-titre: #f4f8ff;                         /* écriture du dessinateur */
+  --plan-crayon: #ff7a5c;                        /* corrections : nuage, indice périmé, note */
+  --plan-crayon-ink: #ff9e85;
+  --plan-detail: #ffd84a;                        /* « Détail A » : le surligneur jaune */
+  /* Symbole d'origine des coordonnées (CAO) : deux axes, X et Y, le carré de l'origine. */
+  --plan-origine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 34' fill='none' stroke-width='1.6' stroke-linecap='square'%3E%3Cpath stroke='%23f4f8ff' d='M8 26V5M8 26h21M5 9l3-4 3 4M25 23l4 3-4 3'/%3E%3Cpath stroke='%23ffd84a' d='M6 24h4v4H6z'/%3E%3Cpath stroke='%23cfe0f5' stroke-width='1.3' d='M12 5l2 3 2-3M14 8v3M23 13l4 5M27 13l-4 5'/%3E%3C/svg%3E");
+}
+
+/* ── Typographie : lettrage à chasse fixe ; l'écriture du dessinateur pour les TITRES ── */
+[data-theme="cyanotype"] body { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+[data-theme="cyanotype"] .header-left h1 {
+  font-family: var(--police-titre); font-weight: 400; font-size: 23px; letter-spacing: 0.02em;
+  background: none; -webkit-text-fill-color: currentColor; color: var(--plan-titre);
+}
+[data-theme="cyanotype"] .demon-name,
+[data-theme="cyanotype"] .modal-titre,
+[data-theme="cyanotype"] .fiche-titre { font-family: var(--police-titre); font-weight: 400; letter-spacing: 0.02em; }
+[data-theme="cyanotype"] .demon-name { font-size: 15px; color: var(--plan-titre); }
+[data-theme="cyanotype"] .modal-titre { background: none; -webkit-text-fill-color: currentColor; color: var(--plan-titre); }
+[data-theme="cyanotype"] .price-badge { font-weight: 700; letter-spacing: -0.02em; }
+[data-theme="cyanotype"] .lbl,
+[data-theme="cyanotype"] .kpi i,
+[data-theme="cyanotype"] .section-title,
+[data-theme="cyanotype"] .feed-panel-handle,
+[data-theme="cyanotype"] .strat-handle { letter-spacing: 0.12em; }
+[data-theme="cyanotype"] .var24 { border-radius: 0; box-shadow: inset 0 0 0 1px currentColor; background: transparent; }
+
+/* Symbole d'origine (CAO) à la place de l'orbe. */
+[data-theme="cyanotype"] .header-orb {
+  width: 30px; height: 30px; border-radius: 0;
+  --orbe: var(--plan-origine) center / contain no-repeat;
+  --orbe-ombre: none;
+}
+
+/* ── Menus, bulles : angles vifs, filet du tirage ── */
+[data-theme="cyanotype"] .theme-menu,
+[data-theme="cyanotype"] .paire-menu,
+[data-theme="cyanotype"] .ind-dropdown-menu,
+[data-theme="cyanotype"] .fiche-pop { border-radius: 0; border-color: var(--plan-trait); }
+[data-theme="cyanotype"] .theme-item,
+[data-theme="cyanotype"] .paire-menu label,
+[data-theme="cyanotype"] .ind-dropdown-menu label,
+[data-theme="cyanotype"] .theme-apercu { border-radius: 0; }
+
+/* ── Cartes : des DÉTAILS de la planche (Détail A, B…), cadre au trait ── */
+[data-theme="cyanotype"] #feed,
+[data-theme="cyanotype"] #marketModalBody { counter-reset: detail; }
+[data-theme="cyanotype"] .demon-card { counter-increment: detail; border-color: var(--card-edge); }
+[data-theme="cyanotype"] .demon-name::before {
+  content: 'Détail ' counter(detail, upper-alpha) ' · '; color: var(--plan-detail);
+}
+/* Le filet de tête devient une ligne de cote, deux traits d'attache à ses bouts. */
+[data-theme="cyanotype"] .demon-card::after {
+  left: 14px; right: 14px; top: 5px; height: 5px; opacity: 1; border-radius: 0;
+  background: linear-gradient(var(--plan-trait-fin), var(--plan-trait-fin)) center / 100% 1px no-repeat;
+  border-left: 1px solid var(--plan-trait); border-right: 1px solid var(--plan-trait);
+}
+[data-theme="cyanotype"] .avatar-orb {
+  width: 30px; height: 30px; border-radius: 0; color: var(--teinte);
+  background: transparent; border: 1px solid var(--teinte); box-shadow: none;
+}
+[data-theme="cyanotype"] .avatar-orb::after { display: none; }
+[data-theme="cyanotype"] .avatar-orb svg { filter: none; }
+[data-theme="cyanotype"] .carte-marche { --teinte: var(--accent); }  [data-theme="cyanotype"] .carte-macro { --teinte: var(--ov-ema100); }
+[data-theme="cyanotype"] .carte-ind { --teinte: var(--ov-ema200); }   [data-theme="cyanotype"] .carte-micro { --teinte: var(--ov-sma20); }
+[data-theme="cyanotype"] .carte-liq { --teinte: var(--accent); }     [data-theme="cyanotype"] .carte-flux { --teinte: var(--ink-3); }
+[data-theme="cyanotype"] .carte-live { --teinte: var(--accent-2); }  [data-theme="cyanotype"] .carte-tape { --teinte: var(--accent); }
+[data-theme="cyanotype"] .carte-temps { --teinte: var(--ink-3); }
+[data-theme="cyanotype"] .badge,
+[data-theme="cyanotype"] .chip,
+[data-theme="cyanotype"] .etat,
+[data-theme="cyanotype"] .tf-nom,
+[data-theme="cyanotype"] .lecture-courte,
+[data-theme="cyanotype"] .error,
+[data-theme="cyanotype"] .modal-fermer,
+[data-theme="cyanotype"] .fiche-nature,
+[data-theme="cyanotype"] .fiche-alerte,
+[data-theme="cyanotype"] .fiche-debat,
+[data-theme="cyanotype"] .statut,
+[data-theme="cyanotype"] .glossaire-item,
+[data-theme="cyanotype"] .fiche-pop .lien,
+[data-theme="cyanotype"] .fiche-fermer,
+[data-theme="cyanotype"] .puce-case,
+[data-theme="cyanotype"] .reglage select,
+[data-theme="cyanotype"] .ligne-reglage input,
+[data-theme="cyanotype"] .strat-section .strat-row select,
+[data-theme="cyanotype"] .strat-section .strat-row input { border-radius: 0; }
+
+/* Bandeau d'âge : une NOTE encadrée au crayon rouge — son texte est inchangé. */
+[data-theme="cyanotype"] .age-banner {
+  border-radius: 0; background: transparent; box-shadow: inset 0 0 0 1.5px var(--plan-crayon);
+}
+[data-theme="cyanotype"] .age-banner::before {
+  content: 'NOTE'; width: auto; height: auto; border-radius: 0; background: none;
+  padding: 2px 5px; box-shadow: inset 0 0 0 1px currentColor;
+  font: 700 9.5px/1.2 var(--font); letter-spacing: 0.14em;
+}
+[data-theme="cyanotype"] .age-banner.retard { box-shadow: inset 0 0 0 1.5px var(--warn); }
+[data-theme="cyanotype"] .age-banner.retard::before { box-shadow: inset 0 0 0 1px currentColor; }
+
+/* ── Graphique : « Vue A », lettrée dans la marge basse du cadre, jamais sur le tracé ── */
+[data-theme="cyanotype"] .chart-container { border-radius: 0; }   /* css/app.css l'arrondit à 20 px sous 800 px */
+[data-theme="cyanotype"] .chart-container canvas { border-radius: 0; }
+/* Le cadre peut rapetisser sous son canvas (le pied grandit quand la publication arrive) : le
+   canvas suit sa hauteur (js/structures.js, ResizeObserver). */
+[data-theme="cyanotype"][data-structure="planche"] .chart-container { padding-bottom: 18px; min-height: 0; }
+[data-theme="cyanotype"] .plan-vue {
+  position: absolute; z-index: 2; left: 16px; bottom: 1px;
+  font: 400 11.5px/16px var(--police-titre); color: var(--ink-2);
+  text-decoration: underline; text-underline-offset: 2px; white-space: nowrap;
+}
+
+/* ── Cadre de la planche et repères de zone (fixe, SOUS le contenu) ── */
+[data-theme="cyanotype"] .plan-cadre {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  /* Graduations des zones : 8 en largeur, 4 en hauteur, dans la bande entre les deux traits. */
+  background:
+    repeating-linear-gradient(90deg, transparent 0 calc(12.5% - 1px), var(--plan-trait-fin) calc(12.5% - 1px) 12.5%) 4px 4px / calc(100% - 8px) calc(var(--gutter) - 9px) no-repeat,
+    repeating-linear-gradient(90deg, transparent 0 calc(12.5% - 1px), var(--plan-trait-fin) calc(12.5% - 1px) 12.5%) 4px calc(100% - 4px) / calc(100% - 8px) calc(var(--gutter) - 9px) no-repeat,
+    repeating-linear-gradient(180deg, transparent 0 calc(25% - 1px), var(--plan-trait-fin) calc(25% - 1px) 25%) 4px 4px / calc(var(--gutter) - 9px) calc(100% - 8px) no-repeat,
+    repeating-linear-gradient(180deg, transparent 0 calc(25% - 1px), var(--plan-trait-fin) calc(25% - 1px) 25%) calc(100% - 4px) 4px / calc(var(--gutter) - 9px) calc(100% - 8px) no-repeat;
+}
+[data-theme="cyanotype"] .plan-cadre::before,
+[data-theme="cyanotype"] .plan-cadre::after { content: ''; position: absolute; pointer-events: none; }
+[data-theme="cyanotype"] .plan-cadre::before { inset: 4px; border: 1px solid var(--plan-trait-fin); }
+[data-theme="cyanotype"] .plan-cadre::after { inset: calc(var(--gutter) - 5px); border: 1.5px solid var(--plan-trait); }
+[data-theme="cyanotype"] .plan-repere {
+  position: absolute; width: 12px; margin-left: -6px; text-align: center;
+  font: 700 8px/1 var(--font); font-style: normal; color: var(--plan-repere);
+}
+[data-theme="cyanotype"] .plan-haut { top: calc(var(--gutter) / 2 - 3px); }
+[data-theme="cyanotype"] .plan-bas { bottom: calc(var(--gutter) / 2 - 5px); }
+[data-theme="cyanotype"] .plan-gauche { left: calc(var(--gutter) / 2); margin-top: -4px; }
+[data-theme="cyanotype"] .plan-droite { right: calc(var(--gutter) / 2 - 12px); margin-top: -4px; }
+[data-theme="cyanotype"] .plan-z1 { left: calc(4px + (100% - 8px) * 0.0625); }
+[data-theme="cyanotype"] .plan-z2 { left: calc(4px + (100% - 8px) * 0.1875); }
+[data-theme="cyanotype"] .plan-z3 { left: calc(4px + (100% - 8px) * 0.3125); }
+[data-theme="cyanotype"] .plan-z4 { left: calc(4px + (100% - 8px) * 0.4375); }
+[data-theme="cyanotype"] .plan-z5 { left: calc(4px + (100% - 8px) * 0.5625); }
+[data-theme="cyanotype"] .plan-z6 { left: calc(4px + (100% - 8px) * 0.6875); }
+[data-theme="cyanotype"] .plan-z7 { left: calc(4px + (100% - 8px) * 0.8125); }
+[data-theme="cyanotype"] .plan-z8 { left: calc(4px + (100% - 8px) * 0.9375); }
+[data-theme="cyanotype"] .plan-zA { top: calc(4px + (100% - 8px) * 0.125); }
+[data-theme="cyanotype"] .plan-zB { top: calc(4px + (100% - 8px) * 0.375); }
+[data-theme="cyanotype"] .plan-zC { top: calc(4px + (100% - 8px) * 0.625); }
+[data-theme="cyanotype"] .plan-zD { top: calc(4px + (100% - 8px) * 0.875); }
+/* Repères de centrage : un trait fort au milieu de chaque bord, du bord de la feuille au cadre. */
+[data-theme="cyanotype"] .plan-centrage { position: absolute; background: var(--plan-trait); }
+[data-theme="cyanotype"] .plan-centrage-h,
+[data-theme="cyanotype"] .plan-centrage-b { left: calc(50% - 1px); width: 2px; height: calc(var(--gutter) - 3px); }
+[data-theme="cyanotype"] .plan-centrage-h { top: 0; }
+[data-theme="cyanotype"] .plan-centrage-b { bottom: 0; }
+[data-theme="cyanotype"] .plan-centrage-g,
+[data-theme="cyanotype"] .plan-centrage-d { top: calc(50% - 1px); height: 2px; width: calc(var(--gutter) - 3px); }
+[data-theme="cyanotype"] .plan-centrage-g { left: 0; }
+[data-theme="cyanotype"] .plan-centrage-d { right: 0; }
+/* La barre des tâches (30 px) flotte à une gouttière du bas : le contenu s'arrête 3 px au-dessus
+   d'elle, comme dans la base (css/app.css : 46 px pour une gouttière de 13 px). */
+[data-theme="cyanotype"][data-structure="planche"] body { padding-bottom: calc(var(--gutter) + 33px); }
+
+/* ── Pied de planche : nomenclature des calques (le ruban) et cartouche ── */
+[data-theme="cyanotype"] .plan-pied {
+  flex-shrink: 0; display: grid; position: relative;
+  grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto 1fr;
+  column-gap: var(--gap);
+}
+[data-theme="cyanotype"] .plan-pied > .plan-titre {
+  grid-column: 1; grid-row: 1; align-self: end;
+  padding: 3px 10px 2px; margin-bottom: -1px; background: var(--surface); box-shadow: var(--surface-ombre);
+  font: 700 8.5px/1.3 var(--font); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3);
+}
+[data-theme="cyanotype"] .plan-pied .indicator-bar { grid-column: 1; grid-row: 2; }
+/* Bureau : deux rangées de calques — les overlays (et le menu « Indicateurs », poussé à droite),
+   puis les sous-graphes et l'intervalle. Le `sep` après les overlays prend 100 % : c'est le saut
+   de ligne ; `order` ne déplace que le bouton. Les titres des deux rangées s'alignent en colonne.
+   Il faut ≈ 690 px à la nomenclature à côté du cartouche : au-dessous de 1280 px, voir plus bas. */
+@media (min-width: 1280px) {
+  [data-theme="cyanotype"] .plan-pied .indicator-bar { flex-wrap: wrap; align-content: center; row-gap: 3px; padding: 5px 10px; overflow: visible; }
+  [data-theme="cyanotype"] .plan-pied .indicator-bar.deborde { -webkit-mask-image: none; mask-image: none; }
+  [data-theme="cyanotype"] .plan-pied .indicator-bar > * { order: 2; }
+  [data-theme="cyanotype"] .plan-pied .indicator-bar > .sep:nth-of-type(2) { order: 1; flex-basis: 100%; height: 0; margin: 0; }
+  [data-theme="cyanotype"] .plan-pied .indicator-bar > .section-title:nth-of-type(1),
+  [data-theme="cyanotype"] .plan-pied .indicator-bar > label[id^="lbl_"]:nth-of-type(-n+7),
+  [data-theme="cyanotype"] .plan-pied .indicator-bar > .ind-dropdown { order: 0; }
+  [data-theme="cyanotype"] .plan-pied .indicator-bar > .ind-dropdown { margin-left: auto; }
+  [data-theme="cyanotype"] .plan-pied .indicator-bar label { padding: 3px 6px; }
+  [data-theme="cyanotype"] .plan-pied .indicator-bar > .section-title:nth-of-type(1),
+  [data-theme="cyanotype"] .plan-pied .indicator-bar > .section-title:nth-of-type(3) { min-width: 9em; }
+}
+
+/* Le cartouche : un tableau de cases, traits de 1 px (l'espace entre les cases EST le trait).
+   Rangée de titre : nom de la planche, unité, sources, « date de rév. » ; dessous, les chiffres
+   clés (5 cases par rangée) et l'heure de la publication. */
+[data-theme="cyanotype"] .plan-cartouche {
+  grid-column: 2; grid-row: 1 / 3; position: relative;
+  display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-rows: auto 1fr;
+  grid-template-areas: "nom unite sources date" "kpis kpis kpis maj";
+  gap: 1px; padding: 1px; background: var(--plan-trait);
+}
+[data-theme="cyanotype"] .plan-cartouche > * { background: var(--plan-case); min-width: 0; }
+[data-theme="cyanotype"] .plan-cartouche > .plan-titre {
+  display: flex; align-items: center; padding: 2px 8px;
+  font: 700 8px/1.25 var(--font); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3);
+}
+[data-theme="cyanotype"] .plan-cartouche > .plan-nom {
+  grid-area: nom; padding: 1px 9px 0;
+  font: 400 14px/1.3 var(--police-titre); letter-spacing: 0.02em; text-transform: none; color: var(--plan-titre); white-space: nowrap;
+}
+[data-theme="cyanotype"] .plan-cartouche > .plan-unite { grid-area: unite; white-space: nowrap; }
+/* Les sources ne dictent pas la largeur du cartouche (contain) : elles passent à la ligne. */
+[data-theme="cyanotype"] .plan-cartouche > .plan-sources { grid-area: sources; contain: inline-size; text-transform: none; letter-spacing: 0.03em; }
+[data-theme="cyanotype"] .plan-cartouche > .plan-date { grid-area: date; white-space: nowrap; }
+[data-theme="cyanotype"] .plan-cartouche > #updated {
+  grid-area: maj; display: flex; align-items: center; justify-content: center; padding: 0 10px;
+  font-size: 14px; font-weight: 700; color: var(--ink-1);
+}
+[data-theme="cyanotype"] .plan-cartouche > #updated:not(:empty)::after { content: 'UTC'; margin-left: 5px; font-size: 8.5px; font-weight: 700; letter-spacing: 0.1em; color: var(--ink-3); }
+/* Les chiffres clés : 5 cases par rangée, l'indice de révision ferme la seconde (2 cases). */
+[data-theme="cyanotype"] .plan-cartouche > .kpis {
+  grid-area: kpis; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: stretch;
+  grid-template-rows: repeat(2, minmax(31px, auto));   /* réservées avant la première publication */
+  gap: 1px; height: auto; overflow: visible; background: var(--plan-trait-fin);
+}
+[data-theme="cyanotype"] .plan-cartouche .kpi {
+  position: relative; padding: 2px 9px 3px; border-left: 0; background: var(--plan-case);
+}
+[data-theme="cyanotype"] .plan-cartouche .kpi:first-child { padding-left: 9px; }
+[data-theme="cyanotype"] .plan-cartouche .kpi i { font-size: 8px; letter-spacing: 0.1em; }
+[data-theme="cyanotype"] .plan-cartouche .kpi b { font-size: 13.5px; letter-spacing: 0; }
+[data-theme="cyanotype"] .plan-cartouche .kpi-age {
+  grid-column: span 2; position: relative; display: block; white-space: nowrap; /* bloc, pas grille : l'âge est « <span>n</span> min », deux nœuds (js/app.js ageDe) */
+  margin: 0; padding: 2px 9px 3px; border-radius: 0; background: var(--plan-case);
+  font-size: 13.5px; font-weight: 700; line-height: 1.2; color: var(--ink-1);
+}
+[data-theme="cyanotype"] .plan-cartouche .kpi-age::before {
+  display: block; content: 'Ind. de révision'; font-size: 8px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3);
+}
+/* Publication en retard (seuil de la page) : l'indice passe au crayon rouge, sous un triangle. */
+[data-theme="cyanotype"] .plan-cartouche .kpis.vieux .kpi-age {
+  color: var(--plan-crayon-ink); background: var(--plan-case); box-shadow: inset 0 0 0 1.5px var(--plan-crayon);
+}
+[data-theme="cyanotype"] .plan-cartouche .kpis.vieux .kpi-age::after {
+  content: '△'; position: absolute; right: 9px; top: 50%; transform: translateY(-40%); font-size: 16px; font-weight: 400; line-height: 1; color: var(--plan-crayon);
+}
+/* Nuage de révision : une NOUVELLE publication (js/structures.js pose .revise 90 s). Dessin
+   statique — des arcs en crayon rouge sur les quatre bords —, aucune animation. */
+[data-theme="cyanotype"] .plan-cartouche.revise::after {
+  content: ''; position: absolute; inset: -7px; pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 100%, transparent 4.5px, var(--plan-crayon) 4.5px 6px, transparent 6.5px) 0 0 / 13px 7px repeat-x,
+    radial-gradient(circle at 50% 0, transparent 4.5px, var(--plan-crayon) 4.5px 6px, transparent 6.5px) 0 100% / 13px 7px repeat-x,
+    radial-gradient(circle at 100% 50%, transparent 4.5px, var(--plan-crayon) 4.5px 6px, transparent 6.5px) 0 0 / 7px 13px repeat-y,
+    radial-gradient(circle at 0 50%, transparent 4.5px, var(--plan-crayon) 4.5px 6px, transparent 6.5px) 100% 0 / 7px 13px repeat-y;
+}
+
+/* Marge : le format de la planche, avant le nom de la page dans la barre des tâches. */
+[data-theme="cyanotype"] .aero-taskbar .plan-titre {
+  font: 700 9px/1 var(--font); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3);
+  padding-right: 12px; box-shadow: 1px 0 0 var(--plan-trait-fin);
+}
+
+/* ── Écrans moyens : gouttière de 13 px, repères plus fins ── */
+@media (max-width: 1100px) {
+  [data-theme="cyanotype"] { --gutter: 13px; }
+  [data-theme="cyanotype"] .plan-repere { font-size: 7px; }
+}
+/* ── Écrans moyens : la nomenclature sur une rangée qui défile (comme la base), le cartouche
+   dessous, sur toute la largeur ── */
+@media (min-width: 769px) and (max-width: 1279px) {
+  [data-theme="cyanotype"] .plan-pied { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; }
+  [data-theme="cyanotype"] .plan-cartouche { grid-column: 1; grid-row: 3; margin-top: var(--gap); }
+}
+/* Les neuf cases sur UNE rangée quand elles y tiennent (≈ 91 px chacune) ; plus étroites, une
+   case ferait masquer un chiffre clé par ajusterKpis : on garde alors 5 + 4 sur deux rangées. */
+@media (min-width: 940px) and (max-width: 1279px) {
+  [data-theme="cyanotype"] .plan-cartouche > .kpis { grid-template-columns: repeat(9, minmax(0, 1fr)); grid-template-rows: minmax(31px, auto); }
+  [data-theme="cyanotype"] .plan-cartouche .kpi-age { grid-column: span 1; }
+}
+
+/* ── Téléphone : ni cadre ni repères ; le pied en colonne sous le graphique ── */
+@media (max-width: 768px) {
+  [data-theme="cyanotype"] { --gutter: 7px; }
+  [data-theme="cyanotype"] .plan-cadre,
+  [data-theme="cyanotype"] .plan-vue { display: none; }
+  [data-theme="cyanotype"][data-structure="planche"] .chart-container { padding-bottom: 11px; }
+  [data-theme="cyanotype"][data-structure="planche"] body { padding-bottom: 34px; }
+  /* En-tête sur deux rangées : la paire, le prix et sa variation ; dessous, les boutons. En
+     chasse fixe, les huit boutons et le prix ne tiennent pas sur une ligne de 390 px. */
+  [data-theme="cyanotype"] .header { flex-wrap: wrap; row-gap: 5px; }
+  [data-theme="cyanotype"] .header-left { flex: 1 1 100%; }
+  [data-theme="cyanotype"] .header-right { flex: 1 1 100%; justify-content: space-between; }
+  [data-theme="cyanotype"] .var24:not(:empty) { display: inline-block; }   /* css/app.css la masque sous 480 px */
+  [data-theme="cyanotype"] .plan-cartouche.revise::after { inset: -6px -5px; }
+  [data-theme="cyanotype"] .plan-pied { display: flex; flex-direction: column; gap: var(--gap); }
+  [data-theme="cyanotype"] .plan-pied > .plan-titre { display: none; }
+  /* Cartouche : une rangée de titre (nom, date de révision et heure), puis les cases. */
+  [data-theme="cyanotype"] .plan-cartouche { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "nom date maj" "kpis kpis kpis"; }
+  [data-theme="cyanotype"] .plan-cartouche > .plan-unite,
+  [data-theme="cyanotype"] .plan-cartouche > .plan-sources { display: none; }
+  [data-theme="cyanotype"] .plan-cartouche > .plan-nom { font-size: 13px; padding: 1px 8px 0; }
+  [data-theme="cyanotype"] .plan-cartouche > #updated { display: flex; font-size: 12px; }
+  [data-theme="cyanotype"] .plan-cartouche > .kpis { display: grid; }
+  [data-theme="cyanotype"] .plan-cartouche .kpi { padding: 2px 5px 3px; }
+  [data-theme="cyanotype"] .plan-cartouche .kpi:first-child { padding-left: 5px; }
+  [data-theme="cyanotype"] .plan-cartouche .kpi b,
+  [data-theme="cyanotype"] .plan-cartouche .kpi-age { font-size: 12px; }
+  [data-theme="cyanotype"] .plan-cartouche .kpi-age { padding: 2px 5px 3px; }
+}
+
+/* Cartouche : ses cases sont normalisées (5 colonnes, lettrage). Sous 1400 px, les traces de la
+   chronique (js/chronique.js) élargissaient chaque case et repoussaient la nomenclature sur trois
+   rangées : elles y restent dans l'infobulle de la case et dans la fiche. Au-dessus, elles ont la place. */
+@media (max-width: 1399px) { [data-theme="cyanotype"] .plan-cartouche .chron-spark { display: none; } }
