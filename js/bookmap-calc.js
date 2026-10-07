@@ -114,15 +114,24 @@
     return m ? m[1] : null;
   };
 
-  /** Fusion par MAX : kt colonnes × kp tranches -> une cellule. Exact (√ croissante). */
+  /** Fusion par MAX : kt colonnes × kp tranches -> une cellule. Exact (√ croissante).
+   *  Les blocs sont ancrés sur le temps ABSOLU (⌊t / (kt·dt)⌋), comme les tranches le sont sur
+   *  le prix (⌊pb / kp⌋) : un bloc « 1 h » va de hh:00 à hh+1:00, et le MAX d'une heure passée ne
+   *  change pas quand la fenêtre de 24 h glisse d'une publication à l'autre.
+   *  Chaque bloc porte son étendue RÉELLE [deb, fin[ : de la première à la dernière colonne
+   *  OBSERVÉE qu'il contient. Le dernier bloc, incomplet, n'est donc jamais peint au-delà de la
+   *  fin des données (ni dans le futur). */
   BM.fusionMax = function (g, kt, kp) {
     kt = Math.max(1, kt | 0); kp = Math.max(1, kp | 0);
     if (kt === 1 && kp === 1) return g;
     const P0 = Math.floor(g.pbMin / kp), P1 = Math.floor((g.pbMin + g.H - 1) / kp);
-    const W2 = Math.ceil(g.W / kt), H2 = P1 - P0 + 1;
-    const f = grilleVide(g.t0, g.dt * kt, W2, g.dp * kp, P0, H2);
+    const pas = g.dt * kt, K0 = Math.floor(g.t0 / pas), K1 = Math.floor((g.t0 + (g.W - 1) * g.dt) / pas);
+    const W2 = K1 - K0 + 1, H2 = P1 - P0 + 1;
+    const f = grilleVide(K0 * pas, pas, W2, g.dp * kp, P0, H2);
+    f.deb = new Float64Array(W2); f.fin = new Float64Array(W2);
+    for (let C = 0; C < W2; C++) f.deb[C] = f.fin[C] = (K0 + C) * pas;    // vide : aucune colonne observée
     for (let c = 0; c < g.W; c++) {
-      const C = (c / kt) | 0, o = c * g.H, O = C * H2;
+      const tc = g.t0 + c * g.dt, C = Math.floor(tc / pas) - K0, o = c * g.H, O = C * H2;
       for (let h = 0; h < g.H; h++) {
         const J = Math.floor((g.pbMin + h) / kp) - P0;
         const vb = g.bids[o + h], va = g.asks[o + h];
@@ -131,12 +140,167 @@
       }
       if (g.bas[c] >= 0) {
         const b = Math.floor(g.bas[c] / kp), t = Math.floor(g.haut[c] / kp);
-        if (f.bas[C] < 0 || b < f.bas[C]) f.bas[C] = b;
+        if (f.bas[C] < 0) { f.bas[C] = b; f.deb[C] = tc; } else if (b < f.bas[C]) f.bas[C] = b;
         if (t > f.haut[C]) f.haut[C] = t;
+        f.fin[C] = tc + g.dt;
       }
     }
-    f.encodage = g.encodage; f.majA = g.majA;
+    f.encodage = g.encodage; f.majA = g.majA; f.fusion = { kt, kp };
     return f;
+  };
+
+  // ─── Où tombe un pixel : colonnes et tranches qu'il recouvre ────────────────
+  /** Nombre de colonnes utiles : une grille live n'est remplie que jusqu'à `n`. */
+  const nCol = g => (g.n !== undefined ? g.n : g.W);
+  /** Étendue [début, fin[ de la colonne c. Grille régulière : [t0 + c·dt, t0 + (c+1)·dt[ ;
+   *  sinon (fusion, carnet live) l'étendue RÉELLE, portée par la grille (deb / fin, triées). */
+  BM.etendueColonne = function (g, c) {
+    return g.deb ? [g.deb[c], g.fin[c]] : [g.t0 + c * g.dt, g.t0 + (c + 1) * g.dt];
+  };
+  /** Instant où s'arrêtent les données de la grille. */
+  BM.finGrille = function (g) {
+    const n = nCol(g);
+    if (!n) return null;
+    if (!g.deb) return g.t0 + n * g.dt;
+    let f = -Infinity;
+    for (let c = 0; c < n; c++) if (g.bas[c] >= 0 && g.fin[c] > f) f = g.fin[c];
+    return f > -Infinity ? f : null;
+  };
+  /** Instant dont date la dernière colonne publiée : le carnet de cette colonne a été lu AVANT la
+   *  publication (heatmap.py lit puis publie dans le même tour), et au plus tard à la fin de sa
+   *  minute. Mesurer l'âge depuis la fin de la minute le sous-estimerait. */
+  BM.instantDerniereColonne = function (g) {
+    const f = BM.finGrille(g);
+    if (f === null) return null;
+    return g.majA ? Math.min(f, g.majA) : f;
+  };
+  /** Colonnes dont l'étendue rencontre [ta, tb[ : écrit [c0, c1] dans `out` ; faux si aucune.
+   *  UNE seule fonction pour la peinture et la lecture au pointeur : elles ne peuvent diverger. */
+  BM.plageColonnes = function (g, ta, tb, out) {
+    const n = nCol(g);
+    if (!(tb > ta) || !(n > 0)) return false;
+    let c0, c1;
+    if (g.deb) {
+      let lo = 0, hi = n;                               // premier c tel que deb[c] ≥ tb
+      while (lo < hi) { const m = (lo + hi) >> 1; if (g.deb[m] < tb) lo = m + 1; else hi = m; }
+      c1 = lo - 1;
+      lo = 0; hi = n;                                   // premier c tel que fin[c] > ta
+      while (lo < hi) { const m = (lo + hi) >> 1; if (g.fin[m] > ta) hi = m; else lo = m + 1; }
+      c0 = lo;
+    } else {
+      c0 = Math.max(0, Math.floor((ta - g.t0) / g.dt));
+      c1 = Math.min(n - 1, Math.ceil((tb - g.t0) / g.dt) - 1);
+    }
+    if (c0 > c1) return false;
+    out[0] = c0; out[1] = c1;
+    return true;
+  };
+  /** Tranches ABSOLUES [ja, jb] que recouvre la ligne de pixels y (haut de vue p2, pp $/px). */
+  BM.tranchesLigne = function (p2, pp, y, dp, out) {
+    const haut = p2 - y * pp, bas = haut - pp;
+    out[0] = Math.floor(bas / dp); out[1] = Math.max(out[0], Math.ceil(haut / dp) - 1);
+    return out;
+  };
+  BM.tranchesLignes = function (p2, pp, h, dp, ja, jb) {
+    const t = [0, 0];
+    for (let y = 0; y < h; y++) { BM.tranchesLigne(p2, pp, y, dp, t); ja[y] = t[0]; jb[y] = t[1]; }
+  };
+  /** Intensité d'une cellule (c, tranche absolue pb), côté 'b' ou 'a' ; 0 hors de la grille. */
+  BM.valeurCellule = function (g, c, pb, cote) {
+    if (g.creux) return g.valeur(c, pb, cote);
+    const k = pb - g.pbMin;
+    if (k < 0 || k >= g.H) return 0;
+    return (cote === 'b' ? g.bids : g.asks)[c * g.H + k];
+  };
+  /** MAX des colonnes c0..c1 dans colB / colA (indices relatifs à g.pbMin), sur la bande de chaque
+   *  colonne. acc ← [observée ?, plus basse tranche, plus haute tranche] (union des bandes). */
+  function accumuler(g, c0, c1, colB, colA, acc) {
+    let obs = 0, lo = Infinity, hi = -Infinity;
+    const H = g.H, pbMin = g.pbMin;
+    for (let c = c0; c <= c1; c++) {
+      const b = g.bas[c];
+      if (b < 0) continue;
+      obs = 1;
+      const t = g.haut[c];
+      if (b < lo) lo = b;
+      if (t > hi) hi = t;
+      if (g.creux) { g.accumuler(c, colB, colA); continue; }
+      const o = c * H, k1 = Math.min(H - 1, t - pbMin);
+      for (let k = Math.max(0, b - pbMin); k <= k1; k++) {
+        const vb = g.bids[o + k], va = g.asks[o + k];
+        if (vb > colB[k]) colB[k] = vb;
+        if (va > colA[k]) colA[k] = va;
+      }
+    }
+    acc[0] = obs; acc[1] = lo; acc[2] = hi;
+  }
+
+  /** La chaleur, peinte au pixel : pour chaque pixel, le MAX des cellules qu'il recouvre (fusion
+   *  comprise). Un pixel qui recouvre plusieurs colonnes ne peut donc jamais cacher un mur — ce
+   *  que ferait un simple rééchantillonnage au plus proche.
+   *  px : Uint32Array(w·h), déjà rempli du fond « non observé » ; vue {t1, t2, p1, p2} ;
+   *  o : { lut } ou { lutB, lutA } (Uint32Array(256)), et `maintenant` : rien n'est peint après. */
+  BM.peindreGrille = function (px, w, h, g, vue, o) {
+    if (!nCol(g) || w < 1 || h < 1) return;
+    const tpp = (vue.t2 - vue.t1) / w, pp = (vue.p2 - vue.p1) / h;
+    const tMax = o.maintenant !== undefined && o.maintenant !== null ? o.maintenant : Infinity;
+    const H = g.H, pbMin = g.pbMin, lut = o.lut, lutB = o.lutB, lutA = o.lutA;
+    const colB = new Uint8Array(H), colA = new Uint8Array(H);
+    const ja = new Int32Array(h), jb = new Int32Array(h);
+    BM.tranchesLignes(vue.p2, pp, h, g.dp, ja, jb);
+    const r = [0, 0], acc = [0, 0, 0];
+    let cle0 = -2, cle1 = -2, lo = 0, hi = -1, obs = false;
+    for (let x = 0; x < w; x++) {
+      const ta = vue.t1 + x * tpp;
+      if (ta >= tMax) break;
+      if (!BM.plageColonnes(g, ta, Math.min(ta + tpp, tMax), r)) continue;
+      if (r[0] !== cle0 || r[1] !== cle1) {
+        if (obs) { colB.fill(0, lo - pbMin, hi - pbMin + 1); colA.fill(0, lo - pbMin, hi - pbMin + 1); }
+        cle0 = r[0]; cle1 = r[1];
+        accumuler(g, cle0, cle1, colB, colA, acc);
+        obs = acc[0] === 1; lo = acc[1]; hi = acc[2];
+      }
+      if (!obs) continue;
+      for (let y = 0; y < h; y++) {
+        const a = ja[y], b = jb[y];
+        if (b < lo || a > hi) continue;              // hors bande observée : la hachure reste
+        let vb = 0, va = 0;
+        const k0 = Math.max(0, Math.max(lo, a) - pbMin), k1 = Math.min(H - 1, Math.min(hi, b) - pbMin);
+        for (let k = k0; k <= k1; k++) { if (colB[k] > vb) vb = colB[k]; if (colA[k] > va) va = colA[k]; }
+        px[y * w + x] = lut ? lut[vb > va ? vb : va] : (vb >= va ? lutB[vb] : lutA[va]);
+      }
+    }
+  };
+
+  /** Ce que montre UN pixel — colonnes qui rencontrent [ta, tb[, tranches [ja, jb] : le MAX que la
+   *  peinture y met, et la cellule qui le porte. Mêmes colonnes, mêmes tranches, même règle
+   *  qu'en peinture : la lecture au pointeur décrit la couleur qu'on voit.
+   *  null : hors de la grille. nObs = 0 : non observé. horsBande : hors de la bande couverte. */
+  BM.lirePixel = function (g, ta, tb, ja, jb) {
+    const r = [0, 0];
+    if (!BM.plageColonnes(g, ta, tb, r)) return null;
+    const res = { c0: r[0], c1: r[1], nObs: 0, nT: jb - ja + 1, horsBande: false, v: 0, cote: 'bid',
+      vb: 0, va: 0, cb: -1, pbB: -1, ca: -1, pbA: -1, c: -1, pb: -1 };
+    let lo = Infinity, hi = -Infinity;
+    for (let c = r[0]; c <= r[1]; c++) {
+      const b = g.bas[c], t = g.haut[c];
+      if (b < 0) continue;
+      res.nObs++;
+      if (b < lo) lo = b;
+      if (t > hi) hi = t;
+      for (let pb = Math.max(ja, b); pb <= Math.min(jb, t); pb++) {
+        const vb = BM.valeurCellule(g, c, pb, 'b'), va = BM.valeurCellule(g, c, pb, 'a');
+        if (vb > res.vb) { res.vb = vb; res.cb = c; res.pbB = pb; }
+        if (va > res.va) { res.va = va; res.ca = c; res.pbA = pb; }
+      }
+    }
+    if (!res.nObs) return res;
+    if (jb < lo || ja > hi) { res.horsBande = true; return res; }
+    // Même départage qu'en peinture : à égalité, le bid.
+    if (res.vb >= res.va) { res.v = res.vb; res.cote = 'bid'; res.c = res.cb; res.pb = res.pbB; }
+    else { res.v = res.va; res.cote = 'ask'; res.c = res.ca; res.pb = res.pbA; }
+    if (res.c < 0) { res.c = r[0]; res.pb = Math.max(ja, lo); }     // tout à 0 : rien au-dessus du seuil
+    return res;
   };
 
   // ─── Encodage : ce qu'une intensité veut dire ──────────────────────────────

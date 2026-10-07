@@ -66,6 +66,9 @@
     session: Date.now(),
   };
 
+  /** L'instant présent sur l'axe du temps. */
+  const maintenant = () => Date.now();
+
   // ─── Réseau ────────────────────────────────────────────────────────────────
   async function json(url, opts) {
     const r = await fetch(url, opts || {});
@@ -144,7 +147,7 @@
     if (premierId === null) return;
     E.execRemplissage = { pages: 0, enCours: true };
     let id = premierId;
-    const objectif = () => (E.pub ? E.pub.t0 + E.pub.W * E.pub.dt : Date.now() - 15 * 60e3) - 60e3;
+    const objectif = () => (E.pub ? BM.finGrille(E.pub) : maintenant() - 15 * 60e3) - 60e3;
     while (E.execRemplissage.pages < PAGES_ARRIERE && id > 0 && E.exec.premier > objectif()) {
       const depuis = Math.max(0, id - 1000);
       try {
@@ -402,9 +405,9 @@
     requestAnimationFrame(() => { rafDemande = false; rendre(); });
   }
 
-  /** La chaleur, peinte au pixel : pour chaque pixel, le MAX des cellules qu'il recouvre
-   *  (fusion comprise). Un pixel qui recouvre plusieurs colonnes ne peut donc jamais cacher
-   *  un mur — ce que ferait un simple rééchantillonnage au plus proche. */
+  /** La chaleur : la carte publiée (fusionnée selon le réglage), puis le carnet live par-dessus.
+   *  Le calcul au pixel (MAX des cellules recouvertes) est BM.peindreGrille, partagé avec la lecture
+   *  au pointeur. Rien n'est peint après « maintenant ». */
   function peindreChaleur() {
     const w = Z.chaleur.w, h = Z.chaleur.h;
     if (w < 2 || h < 2) return;
@@ -418,59 +421,19 @@
     }
     const img = IMG, px = PX;
     px.set(HACH);
-    const pp = (E.vue.p2 - E.vue.p1) / h;
-    if (R.calques.publiee && E.pub) {
-      if (!E.pubF || E.pubCle !== R.fusionT + 'x' + R.fusionP) {
-        E.pubF = BM.fusionMax(E.pub, R.fusionT, R.fusionP); E.pubCle = R.fusionT + 'x' + R.fusionP;
-      }
-      peindreGrille(px, w, h, E.pubF, pp, 0);
-    }
-    if (R.calques.live && E.live) peindreGrille(px, w, h, E.live, pp, E.live.n);
+    const o = { lut: LUT, lutB: LUTB, lutA: LUTA, maintenant: maintenant() };
+    const pub = grillePublieeAffichee();
+    if (pub) BM.peindreGrille(px, w, h, pub, E.vue, o);
+    if (R.calques.live && E.live) BM.peindreGrille(px, w, h, E.live, E.vue, o);
     ctxChaleur.putImageData(img, 0, 0);
   }
-  function peindreGrille(px, w, h, g, pp, nMax) {
-    const W = nMax || g.W, tpp = (E.vue.t2 - E.vue.t1) / w;
-    const colB = new Uint8Array(g.H), colA = new Uint8Array(g.H);
-    // Lignes : indices absolus [ja, jb] des tranches que chaque pixel recouvre.
-    const ja = new Int32Array(h), jb = new Int32Array(h);
-    for (let y = 0; y < h; y++) {
-      const haut = E.vue.p2 - y * pp, bas = haut - pp;
-      ja[y] = Math.floor(bas / g.dp); jb[y] = Math.max(ja[y], Math.ceil(haut / g.dp) - 1);
+  /** La carte publiée telle qu'affichée : fusionnée (MAX) selon le réglage, calculée une fois. */
+  function grillePublieeAffichee() {
+    if (!R.calques.publiee || !E.pub) return null;
+    if (!E.pubF || E.pubCle !== R.fusionT + 'x' + R.fusionP) {
+      E.pubF = BM.fusionMax(E.pub, R.fusionT, R.fusionP); E.pubCle = R.fusionT + 'x' + R.fusionP;
     }
-    let cle0 = -2, cle1 = -2, lo = 0, hi = -1, obs = false;
-    for (let x = 0; x < w; x++) {
-      const ta = E.vue.t1 + x * tpp, tb = ta + tpp;
-      let c0 = Math.floor((ta - g.t0) / g.dt), c1 = Math.floor((tb - 1 - g.t0) / g.dt);
-      if (c1 < 0 || c0 >= W) continue;
-      c0 = Math.max(0, c0); c1 = Math.min(W - 1, c1);
-      if (c0 !== cle0 || c1 !== cle1) {
-        cle0 = c0; cle1 = c1; colB.fill(0); colA.fill(0); lo = Infinity; hi = -Infinity; obs = false;
-        for (let c = c0; c <= c1; c++) {
-          if (g.bas[c] < 0) continue;
-          obs = true;
-          if (g.bas[c] < lo) lo = g.bas[c];
-          if (g.haut[c] > hi) hi = g.haut[c];
-          const o = c * g.H;
-          for (let k = 0; k < g.H; k++) {
-            const vb = g.bids[o + k], va = g.asks[o + k];
-            if (vb > colB[k]) colB[k] = vb;
-            if (va > colA[k]) colA[k] = va;
-          }
-        }
-      }
-      if (!obs) continue;
-      for (let y = 0; y < h; y++) {
-        const a = ja[y], b = jb[y];
-        if (b < lo || a > hi) continue;              // hors bande observée : la hachure reste
-        let vb = 0, va = 0;
-        const k0 = Math.max(0, a - g.pbMin), k1 = Math.min(g.H - 1, b - g.pbMin);
-        for (let k = k0; k <= k1; k++) { if (colB[k] > vb) vb = colB[k]; if (colA[k] > va) va = colA[k]; }
-        let c;
-        if (LUT) c = LUT[vb > va ? vb : va];
-        else c = vb >= va ? LUTB[vb] : LUTA[va];
-        px[y * w + x] = c;
-      }
-    }
+    return E.pubF;
   }
 
   function rendre() {
@@ -555,20 +518,20 @@
   }
 
   function reperesEtAges() {
-    const now = Date.now();
+    const now = maintenant();
     // Maintenant
     const xn = X(now);
     ctx.fillStyle = C.accent; ctx.globalAlpha = 0.8; ctx.fillRect(Math.round(xn), 0, 1, Z.chaleur.h); ctx.globalAlpha = 1;
     // Carte publiée : jusqu'où elle va, et de quand elle date.
     if (R.calques.publiee && E.pub) {
-      const fin = E.pub.t0 + E.pub.W * E.pub.dt;
+      const fin = BM.finGrille(E.pub), lue = BM.instantDerniereColonne(E.pub);
       const xf = X(fin);
       if (xf > 0 && xf < Z.chaleur.w) tirets(xf, C.publie);
-      const l = ['Carte publiée · dernière colonne il y a ' + BM.age(now - fin),
-        (E.pub.dt / 1000) + ' s × ' + (E.pub.dp) + ' $' + (E.pubF && E.pubF !== E.pub ? ' (affichée : ' + E.pubF.dt / 1000 + ' s × ' + E.pubF.dp + ' $, MAX)' : '')
+      const l = ['Carte publiée · dernière colonne il y a ' + BM.age(now - lue),
+        (E.pub.dt / 1000) + ' s × ' + (E.pub.dp) + ' $' + (E.pubF && E.pubF !== E.pub ? ' (affichée : ' + E.pubF.dt / 1000 + ' s × ' + E.pubF.dp + ' $, MAX, blocs alignés sur l\'horloge)' : '')
         + ' · publiée il y a ' + BM.age(now - E.pubMaj)];
       if (!E.pub.encodage) l.push('échelle en intensités : encodage non publié');
-      pastille(l, Math.min(xf, Z.chaleur.w) - 8, 8, C.publie, 'right', 'Carte publiée · ' + BM.age(now - fin));
+      pastille(l, Math.min(xf, Z.chaleur.w) - 8, 8, C.publie, 'right', 'Carte publiée · ' + BM.age(now - lue));
     }
     // Carnet live
     if (R.calques.live) {
@@ -585,7 +548,7 @@
     }
     // Trou entre la carte publiée et le carnet live : non observé, et dit.
     if (E.pub) {
-      const fin = E.pub.t0 + E.pub.W * E.pub.dt, deb = E.live && E.liveDebut ? Math.max(E.liveDebut, E.live.t0) : now;
+      const fin = BM.finGrille(E.pub), deb = E.live && E.liveDebut ? Math.max(E.liveDebut, E.live.t0) : now;
       const xa = Math.max(0, X(fin)), xb = Math.min(Z.chaleur.w, X(deb));
       if (xb - xa > 70) {
         texte('non observé', (xa + xb) / 2, Z.chaleur.h - 16, C.ink3, 11, 'center');
@@ -883,25 +846,32 @@
     if (!s || s.zone !== 'chaleur') { bulleInfo.hidden = true; return; }
     const t = T(s.x), p = Pr(s.y), l = [];
     l.push('<b>' + BM.prix(p, 1) + ' $</b> · ' + BM.heure(t, true));
-    const cel = (g, nom) => {
-      if (!g) return;
-      const c = Math.floor((t - g.t0) / g.dt);
-      const W = g.n || g.W;
-      if (c < 0 || c >= W) return;
-      if (g.bas[c] < 0) { l.push(nom + ' : non observé'); return; }
-      const pb = Math.floor(p / g.dp), h = pb - g.pbMin;
-      if (pb < g.bas[c] || pb > g.haut[c]) { l.push(nom + ' : hors de la bande couverte'); return; }
-      const vb = h >= 0 && h < g.H ? g.bids[c * g.H + h] : 0, va = h >= 0 && h < g.H ? g.asks[c * g.H + h] : 0;
-      const v = Math.max(vb, va), cote = vb >= va ? 'bid' : 'ask';
-      const tranche = BM.prix(pb * g.dp) + '–' + BM.prix((pb + 1) * g.dp) + ' $';
-      if (!v) { l.push(nom + ' ' + tranche + ' : rien au-dessus du seuil'); return; }
-      const enc = g === E.live ? (E.liveRef === 'publiee' ? E.pub && E.pub.encodage : null) : g.encodage;
-      const d = BM.decoder(v, enc);
-      l.push(nom + ' ' + tranche + ' (' + cote + ') : intensité ' + v
-        + (d ? (d.sature ? ' → plus gros niveau ≥ ' + BM.btc(d.min) + ' BTC (saturé)' : ' → plus gros niveau ' + BM.btc(d.min) + '–' + BM.btc(d.max) + ' BTC') : ' (sans unité)'));
+    // Le PIXEL sous le pointeur, tel que la peinture le calcule : mêmes colonnes, mêmes tranches,
+    // même MAX (BM.lirePixel). La valeur lue est celle de la couleur vue, à tout niveau de zoom.
+    const tpp = (E.vue.t2 - E.vue.t1) / Z.chaleur.w, pp = (E.vue.p2 - E.vue.p1) / Z.chaleur.h;
+    const ix = Math.floor(s.x), iy = Math.floor(s.y);
+    const ta = E.vue.t1 + ix * tpp, tb = Math.min(ta + tpp, maintenant());
+    const cel = (g, nom, enc) => {
+      if (!g || !(tb > ta)) return;
+      const [ja, jb] = BM.tranchesLigne(E.vue.p2, pp, iy, g.dp, [0, 0]);
+      const r = BM.lirePixel(g, ta, tb, ja, jb);
+      if (!r) return;
+      if (!r.nObs) { l.push(nom + ' : non observé'); return; }
+      if (r.horsBande) { l.push(nom + ' : hors de la bande couverte'); return; }
+      const tranche = (a, b) => BM.prix(a * g.dp) + '–' + BM.prix((b + 1) * g.dp) + ' $';
+      const [d, f] = BM.etendueColonne(g, r.c);
+      const quand = g.fusion ? 'colonnes ' + BM.heure(d) + '–' + BM.heure(f) + ' (MAX de ' + Math.round((f - d) / 60e3) + ' min)'
+        : (g === E.live ? 'lu à ' + BM.heure(d, true) : 'minute ' + BM.heure(d));
+      const pixel = r.nObs * r.nT > 1 ? ' · pixel = MAX de ' + r.nObs + ' colonne(s) × ' + r.nT + ' tranche(s)' : '';
+      if (!r.v) { l.push(nom + ' ' + tranche(ja, jb) + ' : rien au-dessus du seuil'); l.push('&nbsp;&nbsp;' + quand + pixel); return; }
+      const dec = BM.decoder(r.v, enc);
+      l.push(nom + ' ' + tranche(r.pb, r.pb) + ' (' + r.cote + ') : intensité ' + r.v
+        + (dec ? (dec.sature ? ' → plus gros niveau ≥ ' + BM.btc(dec.min) + ' BTC (saturé)' : ' → plus gros niveau ' + BM.btc(dec.min) + '–' + BM.btc(dec.max) + ' BTC') : ' (sans unité)'));
+      l.push('&nbsp;&nbsp;' + quand + pixel);
     };
-    if (R.calques.publiee) cel(E.pubF || E.pub, 'Carte');
-    if (R.calques.live) cel(E.live, 'Live');
+    const pub = grillePublieeAffichee();
+    if (pub) cel(pub, 'Carte', pub.encodage);
+    if (R.calques.live) cel(E.live, 'Live', E.liveRef === 'publiee' ? E.pub && E.pub.encodage : null);
     if (R.calques.executions && E.exec.seaux.size) {
       const pasT = Math.max(1000, (E.vue.t2 - E.vue.t1) / Z.chaleur.w * 9), pasP = Math.max(E.exec.dp, (E.vue.p2 - E.vue.p1) / Z.chaleur.h * 9);
       const b = E.exec.regrouper(t - pasT / 2, t + pasT / 2, pasT, pasP).filter(x => Math.abs(x.p - p) <= pasP / 2);

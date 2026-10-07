@@ -91,6 +91,68 @@ check('facteur < 1 refusé : on ne peut pas AFFINER (0,5 → 1)', BM.fusionMax(a
 const f2 = BM.fusionMax(BM.grillePubliee(h), 1, 2);
 check('tranches fusionnées : 40 $, indices absolus alignés (4285 → 2142)', f2.dp === 40 && f2.pbMin === 2142, { dp: f2.dp, pbMin: f2.pbMin });
 
+// ── 2b. Fusion : blocs ancrés sur l'HORLOGE, bornés à leurs données ────────────
+titre('2b. Fusion dans le temps : blocs à l\'heure de l\'horloge, jamais au-delà des données');
+const MIN = 60000;
+{
+  // Fenêtre publiée qui commence à hh:07 et finit à hh:18 (11 minutes) : blocs de 5 min.
+  const a = aleatoire(11, 30, 4200); a.t0 = 7 * MIN; for (let c = 0; c < 11; c++) { a.bas[c] = 4202; a.haut[c] = 4225; }
+  const f = BM.fusionMax(a, 5, 1);
+  check('blocs ancrés sur l\'horloge : le premier commence à :05 (pas à :07, début de la fenêtre)', f.t0 === 5 * MIN && f.W === 3, { t0: f.t0 / MIN, W: f.W });
+  check('premier bloc partiel : étendue réelle :07 → :10', f.deb[0] === 7 * MIN && f.fin[0] === 10 * MIN, [f.deb[0] / MIN, f.fin[0] / MIN]);
+  check('dernier bloc partiel : étendue réelle :15 → :18 (pas :20)', f.deb[2] === 15 * MIN && f.fin[2] === 18 * MIN, [f.deb[2] / MIN, f.fin[2] / MIN]);
+  check('fin des données inchangée par la fusion', BM.finGrille(f) === BM.finGrille(a) && BM.finGrille(a) === 18 * MIN);
+  // La même heure passée, vue par deux publications décalées de 15 min : le même MAX.
+  const b = aleatoire(240, 20, 4300); b.t0 = 600 * MIN;
+  const p1 = Object.assign({}, b), p2 = BM.grilleVide(b.t0 + 15 * MIN, MIN, 225, 20, 4300, 20);
+  for (let c = 15; c < 240; c++) { p2.bids.set(b.bids.subarray(c * 20, c * 20 + 20), (c - 15) * 20); p2.asks.set(b.asks.subarray(c * 20, c * 20 + 20), (c - 15) * 20); p2.bas[c - 15] = b.bas[c]; p2.haut[c - 15] = b.haut[c]; }
+  const F1 = BM.fusionMax(p1, 60, 1), F2 = BM.fusionMax(p2, 60, 1);
+  const bloc = (F, debut) => { const C = Math.round((debut - F.t0) / F.dt); return [...F.bids.subarray(C * F.H, C * F.H + F.H)].join(); };
+  check('fenêtre glissée de 15 min : le MAX de l\'heure 11:00–12:00 ne change pas', bloc(F1, 660 * MIN) === bloc(F2, 660 * MIN));
+  // Rien n'est peint après la fin des données, même quand le bloc est large.
+  const w = 120, h = 30, vue = { t1: 5 * MIN, t2: 25 * MIN, p1: 4200 * 20, p2: 4230 * 20 };
+  const px = new Uint32Array(w * h).fill(0xffffffff), lut = Uint32Array.from({ length: 256 }, (_, v) => v + 1);
+  BM.peindreGrille(px, w, h, f, vue, { lut, maintenant: Infinity });
+  let apres = 0, avant = 0;
+  for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) {
+    const t = vue.t1 + x * (vue.t2 - vue.t1) / w, peint = px[y * w + x] !== 0xffffffff;
+    if (peint && t >= 18 * MIN) apres++;
+    if (peint && t + (vue.t2 - vue.t1) / w <= 7 * MIN) avant++;
+  }
+  check('aucun pixel peint après la fin des données (:18) ni avant leur début (:07)', !apres && !avant, { apres, avant });
+}
+check('âge de la dernière colonne : depuis la publication quand elle précède la fin de la minute',
+  BM.instantDerniereColonne(Object.assign(BM.grilleVide(0, MIN, 3, 20, 0, 1), { majA: 2.5 * MIN })) === 2.5 * MIN &&
+  BM.instantDerniereColonne(Object.assign(BM.grilleVide(0, MIN, 3, 20, 0, 1), { majA: 9 * MIN })) === 3 * MIN);
+
+// ── 2c. La lecture au pointeur décrit le pixel peint ───────────────────────────
+// Un pixel peint le MAX de toutes les cellules qu'il recouvre ; la lecture doit donner CE
+// maximum, pas la cellule exacte sous le pointeur (contrôlé pixel par pixel, à plusieurs zooms,
+// grille régulière et fusionnée, palette unique et palette par côté).
+titre('2c. Lecture au pointeur = pixel peint (même MAX, mêmes colonnes, mêmes tranches)');
+{
+  const a = aleatoire(90, 60, 4200); a.t0 = 120 * MIN;
+  const lutB = Uint32Array.from({ length: 256 }, (_, v) => 1000 + v), lutA = Uint32Array.from({ length: 256 }, (_, v) => 2000 + v);
+  const lut = Uint32Array.from({ length: 256 }, (_, v) => v + 1);
+  let ecarts = 0, pixels = 0, multiples = 0;
+  for (const [g, w, h, vue, mt] of [
+    [a, 70, 40, { t1: 110 * MIN, t2: 220 * MIN, p1: 4195 * 20, p2: 4262 * 20 }, Infinity],          // ~1,6 colonne et ~1,7 tranche par pixel
+    [a, 300, 200, { t1: 150 * MIN, t2: 170 * MIN, p1: 4210 * 20, p2: 4230 * 20 }, 165.5 * MIN],     // zoom fin, « maintenant » au milieu
+    [BM.fusionMax(a, 15, 2), 90, 50, { t1: 100 * MIN, t2: 230 * MIN, p1: 4190 * 20, p2: 4270 * 20 }, Infinity],
+  ]) for (const o of [{ lut }, { lutB, lutA }]) {
+    const px = new Uint32Array(w * h).fill(7), tpp = (vue.t2 - vue.t1) / w, pp = (vue.p2 - vue.p1) / h;
+    BM.peindreGrille(px, w, h, g, vue, Object.assign({ maintenant: mt }, o));
+    for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) {
+      const ta = vue.t1 + x * tpp, tb = Math.min(ta + tpp, mt), [ja, jb] = BM.tranchesLigne(vue.p2, pp, y, g.dp, [0, 0]);
+      const r = tb > ta ? BM.lirePixel(g, ta, tb, ja, jb) : null;
+      const attendu = !r || !r.nObs || r.horsBande ? 7 : (o.lut ? lut[r.v] : (r.cote === 'bid' ? lutB[r.v] : lutA[r.v]));
+      pixels++; if (r && r.nObs * r.nT > 1) multiples++;
+      if (px[y * w + x] !== attendu) ecarts++;
+    }
+  }
+  check(`${pixels} pixels : la valeur lue est celle peinte (dont ${multiples} pixels qui recouvrent plusieurs cellules)`, ecarts === 0 && multiples > 1000, { ecarts, multiples });
+}
+
 // ── 3. Encodage : lu, jamais recopié ─────────────────────────────────────────
 titre('3. Encodage publié : décoder sans inventer');
 const enc = { ref_btc: 100, plafond: 255 };
