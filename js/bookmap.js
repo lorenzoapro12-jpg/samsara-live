@@ -33,7 +33,7 @@
   const CLE = 'samsara-carte-v1';
   const DEFAUTS = {
     calques: { publiee: true, live: true, executions: true, prix: true, bidask: true, murs: true,
-      gamma: true, profil: true, dom: true, volume: true, cvd: true, memoire: true, rafales: true },
+      gamma: true, profil: true, dom: true, volume: true, cvd: true, memoire: true, rafales: true, destin: true },
     palette: 'classique',
     seuilBas: 2,          // intensité sous laquelle rien n'est peint
     saturation: 200,      // intensité à partir de laquelle la couleur est au maximum
@@ -45,6 +45,7 @@
     bulleEchelle: 1,
     presenceSeuil: BM.PRESENCE.defautBtc,   // BTC demandés : la carte écrit le cran publié qui les porte
     rafaleMin: BM.RAFALES.defautBtc,        // BTC
+    mursSeuil: BM.MURS.defautBtc,           // BTC : niveaux suivis par le destin des murs
   };
   const CADENCE_CARNET = { 100: 1000, 500: 1000, 1000: 2000, 5000: 10000 };
   const POIDS_CARNET = { 100: 5, 500: 25, 1000: 50, 5000: 250 };
@@ -54,6 +55,7 @@
     const remplir = (id, vals, txt) => { const el = document.getElementById(id); if (el && !el.options.length) el.innerHTML = vals.map(v => '<option value="' + v + '">' + txt(v) + '</option>').join(''); };
     remplir('rPresence', BM.PRESENCE.seuilsBtc, v => '≥ ' + BM.nombre(v, 0, 2) + ' BTC');
     remplir('rRafaleMin', BM.RAFALES.seuilsBtc, v => BM.nombre(v, 0, 2) + ' BTC');
+    remplir('rMurs', BM.MURS.seuilsBtc, v => '≥ ' + BM.nombre(v, 0, 2) + ' BTC');
   }
   remplirChoix();
   const R = charger();
@@ -71,6 +73,7 @@
       niveauxLive: liste('rNiveaux', true), dpLive: liste('rDpLive', true), bulleMin: liste('rBulleMin', true),
       bulleEchelle: liste('rBulleEchelle', true), seuilBas: plage('rSeuil'), saturation: plage('rSaturation'),
       presenceSeuil: liste('rPresence', true), rafaleMin: liste('rRafaleMin', true),
+      mursSeuil: liste('rMurs', true),
     };
     const { reglages, rejets } = BM.validerReglages(r, DEFAUTS, regles);
     if (!CADENCE_CARNET[reglages.niveauxLive]) reglages.niveauxLive = DEFAUTS.niveauxLive;
@@ -89,6 +92,7 @@
     live: null, liveRef: null, liveP99: 0, liveEcartees: 0, carnet: null, carnetA: null, liveV: 0,
     exec: new BM.SeauxExecutions(1), execVus: new Set(), execArriere: null, execTrous: [], execLu: null,
     raf: new BM.Rafales(),     // rafales au marché : alimentées par les MÊMES exécutions acceptées
+    murs: null,                // destin des murs (BM.SuiviMurs) : carnet BRUT + mêmes exécutions
     minutes: [], minutesA: null,
     bidask: [],
     erreurs: {},
@@ -102,6 +106,15 @@
   const maintenant = () => E.horloge.maintenant();
   /** Un instant LOCAL noté par la page, placé sur l'axe (heure Binance). */
   const axe = local => local + E.horloge.ecart;
+  /** Destin des murs : un suivi neuf (cadence changée). TOUS les seuils proposés sont suivis à la
+   *  fois : le réglage choisit lequel montrer, sans rien remettre à zéro. Les exécutions déjà lues et
+   *  leur couverture passent au nouveau suivi : il n'attend pas la prochaine page pour classer. */
+  function reinitMurs() {
+    const v = E.murs, n = new BM.SuiviMurs(BM.MURS.seuilsBtc, CADENCE_CARNET[R.niveauxLive]);
+    if (v) { n.trades = v.trades; n.couvert = v.couvert; n.complet = v.complet; }
+    E.murs = n;
+  }
+  reinitMurs();
 
   // ─── Réseau ────────────────────────────────────────────────────────────────
   // Délai maximal par source (≈ 2 à 3 cadences) : une requête qui ne répond pas (bascule Wi-Fi /
@@ -218,8 +231,9 @@
   async function lireExecutionsInitiales0() {
     try {
       const { corps: t, s } = await binance('aggTrades?symbol=' + SYMBOLE + '&limit=1000', DELAIS.executions);
-      for (const x of t) { if (E.exec.ajouter(x)) E.raf.ajouter(x); E.execVus.add(x.a); }
+      for (const x of t) { if (E.exec.ajouter(x)) { E.raf.ajouter(x); E.murs.execution(x); } E.execVus.add(x.a); }
       E.execLu = s;
+      E.murs.completes(s);       // les plus récentes : rien ne manque jusqu'à l'envoi
       erreur('executions', null);
       bientot();
       if (t.length) { E.execArriere = { id: t[0].a, pages: 0, fini: false, enCours: false }; remplirArriere(); }
@@ -255,13 +269,15 @@
       // Trop de retard pour rattraper (absence longue) : on saute au présent, et on le DIT.
       if (maintenant() - execLuJusqua() > RATTRAPAGE_MAX) {
         const der = (await binance('aggTrades?symbol=' + SYMBOLE + '&limit=1', DELAIS.executions)).corps;
-        if (der.length && der[0].a - 1 > E.exec.dernierId) { E.execTrous.push([E.exec.dernier, der[0].T]); E.exec.dernierId = der[0].a - 1; }
+        if (der.length && der[0].a - 1 > E.exec.dernierId) { E.execTrous.push([E.exec.dernier, der[0].T]); E.exec.dernierId = der[0].a - 1; E.murs.trou(der[0].T); }
       }
       for (let p = 0; p < PAGES_PAR_TOUR; p++) {
         const { corps: t, s } = await binance('aggTrades?symbol=' + SYMBOLE + '&fromId=' + (E.exec.dernierId + 1) + '&limit=1000', DELAIS.executions);
-        for (const x of t) if (E.exec.ajouter(x)) { n++; E.raf.ajouter(x); }
-        if (t.length < 1000) { E.execLu = s; break; }         // tout est lu jusqu'à l'envoi de cette requête
+        for (const x of t) if (E.exec.ajouter(x)) { n++; E.raf.ajouter(x); E.murs.execution(x); }
+        if (t.length < 1000) { E.execLu = s; E.murs.completes(s); break; }         // tout est lu jusqu'à l'envoi de cette requête
       }
+      // Destin des murs : les transitions dont les exécutions sont maintenant complètes sont classées.
+      if (E.murs.avancer(E.horloge, Date.now())) n++;
       const lim = maintenant() - GARDE_EXECUTIONS;
       E.exec.purger(lim);
       E.raf.purger(lim);
@@ -309,12 +325,15 @@
   }
   /** Le carnet n'est lu que si un calque s'en sert (chaleur live, carnet latéral, bid / ask) :
    *  1 000 niveaux toutes les 2 s, c'est ≈ 1 500 de poids Binance par minute et ≈ 19 Mo par heure. */
-  const carnetUtile = () => R.calques.live || R.calques.dom || R.calques.bidask;
+  const carnetUtile = () => R.calques.live || R.calques.dom || R.calques.bidask || R.calques.destin;
   async function lireCarnet() {
     const n = R.niveauxLive, cadence = CADENCE_CARNET[n];
     if (!carnetUtile()) { erreur('carnet', null); return; }
     try {
       const { corps: d, s, r } = await binance('depth?symbol=' + SYMBOLE + '&limit=' + n, DELAIS.carnet);
+      // Destin des murs : le carnet BRUT, au prix exact (avant toute tranche). Éteint, il n'est pas
+      // suivi : à la reprise, l'écart entre deux lectures le dit « interrompu ».
+      if (R.calques.destin) E.murs.lecture(d, s, r, E.horloge);
       const a = BM.agregerCarnet(d, R.dpLive);
       if (!E.live || E.live.dp !== a.dp || E.live.cadence !== cadence) { reinitLive(); E.live = new BM.CarnetLive(a.dp, cadence); E.live.recaler(E.horloge.ecart); }
       appliquerEchelle(a);
@@ -677,6 +696,7 @@
     grille();
     if (R.calques.memoire) memoire();       // sous les murs et le gamma : leurs libellés restent lisibles
     if (R.calques.profil) profilExecutions();
+    if (R.calques.destin) destin(); else DM.items = [];
     if (R.calques.murs) murs();
     if (R.calques.gamma) gamma();
     if (R.calques.bidask) bidAsk();
@@ -836,6 +856,7 @@
         '≥ k ordres : borne basse prouvée, le nombre exact n\'est pas publié'],
       Math.min(xn, Z.chaleur.w) - 8, Z.chaleur.h - 130, C.ink2, 'right', 'Rafales · ' + (d ? BM.age(now - d.T) : 'aucune'));
     }
+    if (R.calques.destin) pastilleDestin(now);
     // Exécutions
     if (R.calques.executions) {
       if (E.exec.dernier) {
@@ -1154,6 +1175,67 @@
       + (b.nT > 1 ? ' · pixel = plus grande part de ' + b.nT + ' tranches' : '');
   }
 
+  // ─── Destin des murs : un trait par niveau suivi, sa marque de fin ───────────
+  // Traits et marques gardés tant que ni le suivi (version) ni la vue ni l'horloge ne changent : au
+  // repos, un rendu ne fait que deux tracés et quelques textes.
+  let DM = { cle: null, items: [], traits: 0, bid: null, ask: null, marques: [], ks: 0 };
+  function destin() {
+    const S = E.murs, v = E.vue;
+    if (!S.niveaux.length) { DM.items = []; DM.marques = []; DM.traits = 0; return; }
+    const ks = S.indice(R.mursSeuil), cle = [S.version, ks, v.t1, v.t2, v.p1, v.p2, Z.chaleur.w, Z.chaleur.h, E.horloge.ecart].join('|');
+    if (DM.cle !== cle) {
+      const bid = new Path2D(), ask = new Path2D(), items = [], cases = new Map(), W = Z.chaleur.w, H = Z.chaleur.h;
+      let traits = 0;
+      for (const n of S.niveaux) {
+        if (n.t0s[ks] === null) continue;          // jamais au seuil choisi
+        const x0 = X(axe(n.t0s[ks])), x1 = X(axe(n.tFin)), y = Math.round(Y(n.c / 100)) + 0.5;
+        if (x1 < -8 || x0 > W + 8 || y < 0 || y > H) continue;
+        items.push({ x0, x1, y, n });
+        // Vue large : seuls les traits d'au moins 2 px ; la fin, elle, est toujours comptée.
+        if (x1 - x0 >= BM.MURS.pxMin) { const P = n.cote === 'b' ? bid : ask; P.moveTo(Math.max(-1, x0), y); P.lineTo(Math.min(W + 1, x1), y); traits++; }
+        const mq = BM.SuiviMurs.prototype.marque(n), k = Math.round(x1) + ':' + y;
+        let c = cases.get(k);
+        if (!c) cases.set(k, c = { x: x1, y, n: 0, m: {}, cote: n.cote });
+        c.n++; c.m[mq] = (c.m[mq] || 0) + 1;
+      }
+      const marques = [];
+      for (const c of cases.values()) {
+        if (c.x < 0 || c.x > W) continue;
+        const k = Object.keys(c.m).sort((a, b) => c.m[b] - c.m[a])[0];
+        marques.push({ x: c.x, y: c.y, cote: c.cote, t: BM.FINS_MURS[k].s + (c.n > 1 ? '×' + c.n : '') });
+      }
+      DM = { cle, items, traits, bid, ask, marques, ks };
+    }
+    ctx.save();
+    ctx.lineWidth = 1.5; ctx.globalAlpha = 0.85;
+    ctx.strokeStyle = C.murBid; ctx.stroke(DM.bid);
+    ctx.strokeStyle = C.murAsk; ctx.stroke(DM.ask);
+    ctx.restore();
+    for (const m of DM.marques) texte(m.t, m.x + 2, m.y, m.cote === 'b' ? C.murBid : C.murAsk, 10, 'left', true);
+  }
+  /** Le niveau suivi sous le pointeur (trait élargi de 3 px), le plus récent d'abord. */
+  function destinEn(x, y) {
+    for (let i = DM.items.length - 1; i >= 0; i--) { const it = DM.items[i]; if (Math.abs(y - it.y) <= 3 && x >= it.x0 - 3 && x <= it.x1 + 12) return it.n; }
+    return null;
+  }
+  function texteDestin(n) {
+    const f = BM.FINS_MURS[BM.SuiviMurs.prototype.marque(n)], ks = E.murs.indice(R.mursSeuil), o = n.par[ks];
+    return 'Destin ' + BM.prix(n.c / 100, 2) + ' $ (' + (n.cote === 'b' ? 'bid' : 'ask') + ') : ≥ ' + BM.nombre(E.murs.seuils[ks], 0, 2) + ' BTC de ' + BM.heure(axe(n.t0s[ks]), true) + ' à ' + BM.heure(axe(n.tFin), true)
+      + ' · jusqu\'à ' + BM.btc(n.qMax) + ' BTC · au moins ' + BM.btc(o.retire) + ' BTC retirés sans échange · ' + BM.btc(o.echange) + ' BTC échangés à ce prix · '
+      + BM.btc(o.incertain) + ' incertains · ' + f.s + ' ' + f.t + ' (' + f.d + ')';
+  }
+  /** L'âge du suivi, l'incertitude de l'horloge et les totaux depuis le début du suivi. */
+  function pastilleDestin(now) {
+    const S = E.murs, h = E.horloge, cad = CADENCE_CARNET[R.niveauxLive];
+    const uTxt = h.u === null ? 'horloge Binance pas encore mesurée : rien n\'est classé' : 'horloge Binance ± ' + Math.round(h.u) + ' ms';
+    const l = ['Destin des murs · ' + (S.derniere !== null ? 'dernière lecture il y a ' + BM.age(now - axe(S.derniere)) : 'aucune lecture encore') + ' · ' + uTxt + ' · ' + R.niveauxLive + ' niveaux / ' + cad / 1000 + ' s'];
+    const ks = S.indice(R.mursSeuil), t = S.totaux[ks], nb = BM.nombre(S.seuils[ks], 0, 2);
+    if (t.depuis !== null) l.push('Depuis ' + BM.heure(axe(t.depuis)) + ' · niveaux ≥ ' + nb + ' BTC : au moins ' + BM.btc(t.retire) + ' BTC retirés sans échange · ' + BM.btc(t.echange) + ' BTC échangés à ces prix · ' + BM.btc(t.incertain) + ' BTC incertains');
+    if (S.attente.length) l.push(S.attente.length + ' intervalle(s) en attente des exécutions complètes');
+    if (h.u !== null && h.u > BM.MURS.uAlerteMs) l.push('⚠ horloge incertaine (± ' + Math.round(h.u) + ' ms > ' + BM.MURS.uAlerteMs + ' ms) : fenêtres larges, davantage d\'« incertain »');
+    pastille(l, 8, 180, h.u !== null && h.u > BM.MURS.uAlerteMs ? C.down : C.murAsk, 'left', 'Destin · ' + (S.derniere !== null ? BM.age(now - axe(S.derniere)) : '—') + (h.u !== null && h.u > BM.MURS.uAlerteMs ? ' · ⚠ horloge' : ''));
+  }
+
   // ─── Rafales au marché : un trait vertical par rafale ──────────────────────
   // Rien avant le début des exécutions lues (E.exec.premier) ; les intervalles non lus sont hachurés
   // (hachuresExecutions). Les traits sont gardés tant que ni les rafales ni la vue ne changent.
@@ -1469,6 +1551,7 @@
     }
     if (R.calques.rafales) { const rf = rafaleEn(s.x, s.y); if (rf) l.push('Rafale ' + texteRafale(rf)); }
     if (R.calques.memoire && E.pub) { const tm = texteMemoire(s.y); if (tm) l.push(tm); }
+    if (R.calques.destin) { const dn = destinEn(s.x, s.y); if (dn) l.push(texteDestin(dn)); }
     // Le texte n'est réécrit que s'il a changé ; à la souris, la bulle se place sans être MESURÉE
     // (une mesure après innerHTML force une mise en page à chaque mouvement) : elle bascule à gauche
     // ou au-dessus du pointeur par un translate(-100 %) quand sa largeur maximale (LECTURE_MAX) ou
@@ -1671,7 +1754,7 @@
   }
   const NOMS_CALQUES = [['publiee', 'Carte publiée'], ['live', 'Carnet live'], ['executions', 'Exécutions'], ['prix', 'Prix'],
     ['bidask', 'Bid / ask'], ['murs', 'Murs'], ['gamma', 'Gamma'], ['profil', 'Profil'], ['dom', 'Carnet latéral'],
-    ['volume', 'Volume'], ['cvd', 'CVD'], ['memoire', 'Mémoire'], ['rafales', 'Rafales']];
+    ['volume', 'Volume'], ['cvd', 'CVD'], ['memoire', 'Mémoire'], ['rafales', 'Rafales'], ['destin', 'Destin des murs']];
   function construireBarre() {
     const z = $('calques');
     // Une ligne de puces qui défile : la molette verticale la fait défiler (sans Maj).
@@ -1686,7 +1769,7 @@
         R.calques[k] = !R.calques[k]; b.setAttribute('aria-pressed', R.calques[k] ? 'true' : 'false');
         sauver();
         // Le carnet n'est lu que pour ses calques : rallumé, il repart tout de suite.
-        if (boucleCarnet && ['live', 'dom', 'bidask'].includes(k) && R.calques[k]) boucleCarnet.reveiller();
+        if (boucleCarnet && ['live', 'dom', 'bidask', 'destin'].includes(k) && R.calques[k]) boucleCarnet.reveiller();
         dessiner();
       });
       z.appendChild(b);
@@ -1708,12 +1791,13 @@
     lier('rSaturation', 'saturation', Number, majLuts);
     lier('rFusionT', 'fusionT', Number);
     lier('rFusionP', 'fusionP', Number);
-    lier('rNiveaux', 'niveauxLive', Number, () => { reinitLive(); });
+    lier('rNiveaux', 'niveauxLive', Number, () => { reinitLive(); reinitMurs(); });
     lier('rDpLive', 'dpLive', Number, () => { reinitLive(); });
     lier('rBulleMin', 'bulleMin', Number);
     lier('rBulleEchelle', 'bulleEchelle', Number);
     lier('rPresence', 'presenceSeuil', Number);
     lier('rRafaleMin', 'rafaleMin', Number);
+    lier('rMurs', 'mursSeuil', Number);
     $('rDefauts').addEventListener('click', () => {
       const c = R.calques; Object.assign(R, JSON.parse(JSON.stringify(DEFAUTS))); R.calques = c;
       sauver(); location.reload();
@@ -1770,6 +1854,16 @@
       + '« ≥ k ordres » : chaque exécution est un ordre preneur rempli à un prix, et un ordre ne parcourt les prix que dans un sens ; chaque prix répété ou recul en prouve donc un de plus. '
       + 'Mais ' + BM.TEXTE_RAFALES + '. Une rafale ne dit pas qui a acheté. Le panneau « Rafales » liste les ' + RF.liste + ' dernières.');
     tx('rafalesNote', 'Les ' + RF.liste + ' dernières rafales ≥ ' + BM.nombre(R.rafaleMin, 0, 2) + ' BTC, la plus récente d\'abord. ' + BM.TEXTE_RAFALES[0].toUpperCase() + BM.TEXTE_RAFALES.slice(1) + '.');
+    // Destin des murs : seuils, marques, attente et limites tirés de BM.MURS / BM.FINS_MURS.
+    const MU = BM.MURS, FM = BM.FINS_MURS;
+    tx('legDestin', 'Chaque niveau de prix EXACT du carnet live brut qui atteint le seuil choisi (' + lst(MU.seuilsBtc) + ' BTC) est suivi de lecture en lecture : un trait à son prix, de la première lecture où il atteint ce seuil à sa fin. Tous les seuils sont suivis ensemble : en changer ne remet rien à zéro. '
+      + 'Entre deux lectures, on compte les exécutions à ce prix et du côté qui le touche (un bid par une vente au marché, un ask par un achat) dans deux fenêtres tirées des instants d\'envoi et de réception des lectures et de l\'horloge Binance ± u : '
+      + 'la fenêtre étroite (exécutions certainement entre les deux lectures, X_N) et la fenêtre large (toutes celles qui ont pu y être, X_W). '
+      + 'Mesuré : « au moins … retirés » = baisse de la taille moins X_W, une borne basse de ce qui a été annulé ou réduit ; X_N est échangé à coup sûr, X_W − X_N est incertain. '
+      + 'Fins : ' + ['retire', 'echange', 'partiel', 'incertain', 'bande', 'interrompu', 'la'].map(k => FM[k].s + ' ' + FM[k].t + ' (' + FM[k].d + ')').join(' ; ') + '. '
+      + 'Une transition n\'est classée qu\'une fois les exécutions lues jusqu\'au bout de la fenêtre large (au plus ' + MU.attenteMaxMs / 1000 + ' s, sinon interrompu) ; deux lectures distantes de plus de ' + MU.ecartCadences + ' cadences : interrompu. '
+      + 'Vue large : un trait de moins de ' + MU.pxMin + ' px n\'est pas dessiné et les fins d\'un même pixel sont comptées (×n). '
+      + 'Limites : ' + BM.TEXTE_MURS + ' ; la carte ne dit pas qui a posé ni pourquoi un ordre est retiré. Une horloge incertaine (± u > ' + MU.uAlerteMs + ' ms) élargit les fenêtres, et la pastille le signale.');
     const e = $('encodageEtat');
     if (e) e.textContent = enc
       ? 'Encodage publié : intensité = min(' + enc.plafond + ', ent(' + enc.plafond + ' × √(q / ' + enc.ref_btc + ' BTC))), q = ' + enc.q + '.'
@@ -1836,6 +1930,7 @@
       mise: Z && { w: Z.w, h: Z.h, dpr: Z.dpr, sx: Z.sx, sy: Z.sy, chaleur: Object.assign({}, Z.chaleur), masques: Z.masques.slice(), court: Z.court },
       posees: posees.map(p => ({ x: p.x, y: p.y, w: p.w, h: p.h, texte: p.texte, pastille: !!p.pastille })),
       memoire: { barres: MEM.barres.map(r => ({ y0: r.y0, y1: r.y1, pb: r.b.pb, part: r.b.part, obs: r.b.obs, pres: r.b.pres, peu: r.b.peu, cote: r.cote })), largeur: Z ? largeurMemoire() : 0, seuil: seuilMemoire(), fenetre: E.vue && fenetreMemoire() },
+      destin: { niveaux: E.murs.niveaux.length, actifs: E.murs.actifs.size, attente: E.murs.attente.length, total: Object.assign({}, E.murs.totaux[E.murs.indice(R.mursSeuil)]), totaux: E.murs.totaux.map(x => Object.assign({}, x)), seuil: E.murs.seuils[E.murs.indice(R.mursSeuil)], dessines: DM.items.length, traits: DM.traits, marques: DM.marques.map(m => m.t), items: DM.items.slice(-200).map(it => ({ x0: it.x0, x1: it.x1, y: it.y, fin: it.n.fin })) },
       rafales: { n: E.raf.liste.length, version: E.raf.version, arriereFini: !!(E.execArriere && E.execArriere.fini), dessinees: RAF.items.map(it => ({ x: it.x, y0: it.y0, h: it.h, q: it.r.q8 / 1e8, T: it.r.T, achat: it.r.achat, ordres: it.r.ordres })) },
     }),
     /** Les rafales gardées (lecture seule) et la Σ des exécutions vues (contrôle de conservation). */

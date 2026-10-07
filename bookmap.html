@@ -103,6 +103,12 @@
       <select id="rRafaleMin"></select>
     </label>
   </fieldset>
+  <fieldset>
+    <legend>Destin des murs (carnet live)</legend>
+    <label>Suivre les niveaux d'au moins
+      <select id="rMurs"></select>
+    </label>
+  </fieldset>
   <button type="button" class="bouton" id="rDefauts">Réglages par défaut</button>
 </section>
 
@@ -131,6 +137,8 @@
     <dd>Volumes échangés <b>au marché</b>, regroupés par seconde et par tranche de prix : vert si les achats au marché dominent, rouge si ce sont les ventes ; l'arc blanc intérieur est la part achetée. Seaux ancrés sur l'horloge et sur le prix. <span id="legBulles">Surface ∝ volume, entre deux bornes.</span> Les intervalles non lus sont hachurés : ce n'est pas « aucune exécution ».</dd>
     <dt>Rafales au marché (traits verticaux)</dt>
     <dd id="legRafales"></dd>
+    <dt>Destin des murs (traits horizontaux, ✕ ● ◐ ?)</dt>
+    <dd id="legDestin"></dd>
     <dt>Mémoire du carnet (barres au bord droit)</dt>
     <dd id="legMemoire"></dd>
     <dt>Murs (rectangles)</dt>

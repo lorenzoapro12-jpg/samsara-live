@@ -1170,7 +1170,7 @@
       const dehors = n.cote === 'b' ? cur.bas === null || n.c < cur.bas : cur.haut === null || n.c > cur.haut;
       const q1 = dehors ? null : ((n.cote === 'b' ? cur.b : cur.a).get(n.c) || 0);
       idx.set(cle(n.cote, n.c), k);
-      return { cote: n.cote, c: n.c, q0: n.q, q1, dehors, xN: 0, xW: 0, xU: 0, aMax: n.aT === undefined ? -Infinity : n.aT, aT: n.aT === undefined ? -Infinity : n.aT };
+      return { cote: n.cote, c: n.c, q0: n.q, q1, dehors, xN: 0, xW: 0, xU: 0, aMax: n.aT === undefined ? -Infinity : n.aT, aT: n.aT === undefined ? -Infinity : n.aT, horsN: [], wMax: -Infinity };
     });
     if (trades) {
       for (let i = premiereDes(trades, F.W[0]); i < trades.length && trades[i].T <= F.W[1]; i++) {
@@ -1179,8 +1179,9 @@
         const e = ent[k];
         e.xW += t.q;
         if (t.T > F.N[0] && t.T < F.N[1]) e.xN += t.q;
-        else if (t.a > e.aT) e.xU += t.q;       // hors N : compté une seule fois, même si deux W se recouvrent
+        else { e.horsN.push(t); if (t.a > e.aT) e.xU += t.q; }     // hors N : compté une seule fois, même si deux W se recouvrent
         if (t.a > e.aMax) e.aMax = t.a;
+        if (t.a > e.wMax) e.wMax = t.a;
       }
     }
     const eps = (opts && opts.eps) || 1e-9;
@@ -1205,11 +1206,17 @@
    *  l'horloge du moment). Une transition n'est classée qu'une fois les exécutions COMPLÈTES jusqu'à
    *  rⱼ + 2u (heure locale d'envoi d'une requête d'exécutions qui a rendu moins d'une page) : sans
    *  cette attente, une exécution pas encore lue gonflerait le retrait et la borne ne tiendrait plus. */
-  BM.SuiviMurs = function (seuil, cadence) {
+  // Plusieurs seuils À LA FOIS (`seuils`, liste ou nombre) : un niveau compte pour le seuil X à partir
+  // de la première lecture où il atteint X — exactement ce qu'un suivi au seuil X seul compterait. Le
+  // réglage choisit donc lequel MONTRER, sans rien remettre à zéro ni changer une valeur.
+  BM.SuiviMurs = function (seuils, cadence) {
+    seuils = [].concat(seuils).slice().sort((a, b) => a - b);
+    const tot = () => ({ retire: 0, echange: 0, incertain: 0, depuis: null });
+    const totaux = seuils.map(tot);
     Object.assign(this, {
-      seuil, cadence, prec: null, dernierId: null, actifs: new Map(), niveaux: [], attente: [],
+      seuils, seuil: seuils[0], cadence, prec: null, dernierId: null, actifs: new Map(), niveaux: [], attente: [],
       trades: [], couvert: Infinity, complet: -Infinity,
-      total: { retire: 0, echange: 0, incertain: 0, depuis: null }, derniere: null, version: 0, surTransition: null,
+      totaux, total: totaux[0], derniere: null, version: 0, surTransition: null,
     });
   };
   const SM = BM.SuiviMurs.prototype;
@@ -1238,7 +1245,7 @@
     cur.s = s; cur.r = r;
     let res = 'ok';
     if (this.prec && s - this.prec.r > BM.MURS.ecartCadences * this.cadence) { this.interrompre(); res = 'interrompu'; }
-    if (this.total.depuis === null) this.total.depuis = t;
+    if (this.total.depuis === null) for (const x of this.totaux) x.depuis = t;
     if (this.prec && this.actifs.size) {
       const niv = [...this.actifs.values()];
       const { ent } = BM.bilanNiveaux({ s: this.prec.s, r: this.prec.r, niveaux: niv }, cur, null, horloge);
@@ -1246,9 +1253,9 @@
       ent.forEach((e, k) => {
         const n = niv[k];
         if (e.dehors) { finir(n, 'bande', t); this.actifs.delete(n.k); return; }       // q₁ inconnu : ni classé ni compté
-        items.push({ n, q0: e.q0, q1: e.q1 });
+        items.push({ n, q0: e.q0, q1: e.q1, qMax: n.qMax });     // qMax AVANT : les seuils déjà atteints
         n.tFin = t;
-        if (e.q1 > 0) { n.q = e.q1; if (e.q1 > n.qMax) n.qMax = e.q1; }
+        if (e.q1 > 0) { n.q = e.q1; if (e.q1 > n.qMax) { n.qMax = e.q1; this.atteints(n, t); } }
         else { n.fin = 'attente'; this.actifs.delete(n.k); }
       });
       if (items.length) this.attente.push({ s: this.prec.s, r: this.prec.r, sj: s, rj: r, items, b: cur.b, a: cur.a, bas: cur.bas, haut: cur.haut });
@@ -1256,7 +1263,9 @@
     for (const g of cur.gros) {
       const k = g.cote + g.c;
       if (this.actifs.has(k)) continue;
-      const n = { k, cote: g.cote, c: g.c, t0: t, tFin: t, q: g.q, qMax: g.q, retire: 0, echange: 0, incertain: 0, aT: -Infinity, fin: null };
+      const n = { k, cote: g.cote, c: g.c, t0: t, tFin: t, q: g.q, qMax: g.q, retire: 0, echange: 0, incertain: 0, aT: -Infinity, fin: null,
+        t0s: this.seuils.map(() => null), par: this.seuils.map(() => ({ retire: 0, echange: 0, incertain: 0 })), aTs: this.seuils.map(() => -Infinity) };
+      this.atteints(n, t);
       this.actifs.set(k, n); this.niveaux.push(n);
     }
     this.prec = { s, r };
@@ -1266,6 +1275,10 @@
     this.version++;
     return res;
   };
+  /** Premier instant où le niveau atteint chaque seuil. */
+  SM.atteints = function (n, t) { this.seuils.forEach((x, k) => { if (n.t0s[k] === null && n.qMax >= x) n.t0s[k] = t; }); };
+  /** Indice du seuil x (le plus grand ≤ x). */
+  SM.indice = function (x) { let k = 0; this.seuils.forEach((v, i) => { if (v <= x) k = i; }); return k; };
   /** Classe les transitions dont les exécutions sont complètes ; une attente de plus de 30 s
    *  interrompt tout (les exécutions manquent). */
   SM.avancer = function (horloge, maintenantLocal) {
@@ -1290,7 +1303,14 @@
     ent.forEach((e, k) => {
       const n = p.items[k].n;
       n.retire += e.retireMin; n.echange += e.xN; n.incertain += e.xU; n.aT = e.aMax;
-      this.total.retire += e.retireMin; this.total.echange += e.xN; this.total.incertain += e.xU;
+      this.seuils.forEach((x, i) => {
+        if (p.items[k].qMax < x) return;
+        // « Incertain » dédoublonné par seuil : un suivi au seuil x seul n'aurait rien compté avant.
+        let xU = 0;
+        for (const t of e.horsN) if (t.a > n.aTs[i]) xU += t.q;
+        if (e.wMax > n.aTs[i]) n.aTs[i] = e.wMax;
+        for (const o of [this.totaux[i], n.par[i]]) { o.retire += e.retireMin; o.echange += e.xN; o.incertain += xU; }
+      });
       if (e.q1 === 0 && n.fin === 'attente') n.fin = e.fin;
       if (this.surTransition) this.surTransition(e, F, p);
     });

@@ -934,12 +934,12 @@ async function pixel(page, x, y) {
     {
       let p36, S;
       ({ page: p36, erreurs, S } = await ouvrir(nav, { encodage: true }));
-      for (const k of ['live', 'dom', 'bidask']) await p36.click(`button[data-calque="${k}"]`);
+      for (const k of ['live', 'dom', 'bidask', 'destin']) await p36.click(`button[data-calque="${k}"]`);
       await p36.waitForTimeout(500);
       const n0 = S.compte.depth;
       await p36.waitForTimeout(5000);
       const n1 = S.compte.depth;
-      check(`chaleur live, carnet latéral et bid / ask éteints : ${n1 - n0} lecture(s) du carnet en 5 s`, n1 === n0, { n0, n1 });
+      check(`chaleur live, carnet latéral, bid / ask et destin des murs éteints : ${n1 - n0} lecture(s) du carnet en 5 s`, n1 === n0, { n0, n1 });
       await p36.click('button[data-calque="dom"]');
       await p36.waitForTimeout(2500);
       check('carnet latéral rallumé : le carnet est relu', S.compte.depth > n1, { n1, n2: S.compte.depth });
@@ -1067,6 +1067,61 @@ async function pixel(page, x, y) {
         r.presenceSeuil === BM.PRESENCE.defautBtc && r.rafaleMin === BM.RAFALES.defautBtc && r.calques.memoire === true && r.calques.rafales === false && (r.rejets || []).includes('presenceSeuil'), r);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p39.close();
+    }
+
+    titre('40. Destin des murs : traits, marques, âge, totaux ; le seuil ne remet rien à zéro ; horloge incertaine signalée');
+    {
+      let p40;
+      // Un niveau fixe de 30 BTC (prix rond sous le marché) : un trait qui dure, à survoler.
+      let fixe = null;
+      const mur = (u, k, S) => {
+        if (k !== 'depth') return null;
+        const d = S.repondre(u), b = d.bids;
+        if (fixe === null) fixe = (Math.floor(+b[0][0]) - 3).toFixed(2);
+        const i = b.findIndex(x => +x[0] < +fixe);
+        if (i > 0) b.splice(i, 0, [fixe, '30.00000']);
+        return { status: 200, body: JSON.stringify(d) };
+      };
+      ({ page: p40, erreurs } = await ouvrir(nav, { encodage: true, intercept: mur }));
+      await p40.waitForTimeout(6000);
+      // Vue fine sur la dernière minute : les traits y font plus de 2 px.
+      await p40.evaluate(() => { const e = window.__carte.etat(), n = e.maintenant; window.__carte.cadrer(n - 60e3, n + 5e3, e.vue.p1, e.vue.p2); });
+      await p40.waitForFunction(() => { const d = window.__carte.etat().destin; return d.marques.length > 0 && d.traits > 0; }, null, { timeout: 30000 }).catch(() => {});
+      const e = await etat(p40), d = e.destin, P = e.pastillesCompletes.find(t => t.startsWith('Destin des murs')) || '';
+      check(`niveaux suivis (${d.niveaux}), traits (${d.traits}) et marques (${d.marques.length}) dessinés`, d.niveaux > 0 && d.traits > 0 && d.marques.length > 0, d);
+      const symboles = Object.values(BM.FINS_MURS).map(f => f.s);
+      check('chaque marque est une marque du code (×n quand plusieurs fins tombent sur un pixel)', d.marques.every(m => symboles.includes(m.replace(/×\d+$/, ''))), d.marques.slice(0, 10));
+      check('pastille : âge de la dernière lecture, horloge Binance ± u, niveaux / cadence', /^Destin des murs · dernière lecture il y a .+ · horloge Binance ± \d+ ms · 1000 niveaux \/ 2 s/.test(P), P);
+      check('pastille : totaux depuis le début du suivi, au seuil choisi', /Depuis \d\d:\d\d · niveaux ≥ 5 BTC : au moins .+ BTC retirés sans échange · .+ BTC échangés à ces prix · .+ BTC incertains/.test(P), P);
+      const leg = await p40.evaluate(() => document.getElementById('legDestin').textContent);
+      check('légende : la limite (variations nettes, invisible entre deux lectures) tirée du code', leg.includes(BM.TEXTE_MURS) && leg.includes(BM.MURS.attenteMaxMs / 1000 + ' s'), leg.slice(0, 120));
+      // Survol d'un trait : la lecture décrit CE niveau.
+      const it = d.items.filter(i => i.x1 - i.x0 > 12 && i.y > 30 && i.y < e.mise.chaleur.h - 30).pop();
+      if (it) {
+        const rc = await p40.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(); return { x: r.left, y: r.top }; });
+        const cx = e.mise.chaleur.x + (it.x0 + it.x1) / 2, cy = e.mise.chaleur.y + it.y;
+        await p40.mouse.move(rc.x + cx + 1, rc.y + cy); await p40.mouse.move(rc.x + cx, rc.y + cy); await p40.waitForTimeout(400);
+        const lu = await p40.evaluate(() => document.getElementById('lecture').innerText);
+        check('survol d\'un trait : « Destin <prix> $ … au moins … retirés sans échange … »', /Destin [\d\s\u202f]+,\d\d \$ \((bid|ask)\) : ≥ 5 BTC de .+ au moins .+ retirés sans échange/.test(lu), lu.slice(0, 300));
+      } else check('un trait assez long pour être survolé', false, d.items.slice(-5));
+      // Le seuil choisit ce qui est MONTRÉ : rien n'est remis à zéro.
+      const avant = (await etat(p40)).destin;
+      await p40.evaluate(() => { const s = document.getElementById('rMurs'); s.value = '2'; s.dispatchEvent(new Event('input')); });
+      const apres = (await etat(p40)).destin;
+      check('seuil 5 → 2 BTC : le total montré est celui du seuil 2, depuis le même instant, rien de remis à zéro',
+        apres.seuil === 2 && apres.total.depuis === avant.total.depuis && apres.totaux[1].retire >= avant.totaux[1].retire && apres.total.retire >= apres.totaux[1].retire, [avant.totaux, apres.totaux]);
+      const marquesTxt = await p40.evaluate(() => [...document.querySelectorAll('body *')].map(x => x.textContent).join(' '));
+      check('aucun mot d\'intention ni d\'accusation sur la page', !/spoof|manipul|leurre/i.test(marquesTxt + JSON.stringify(await etat(p40))));
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p40.close();
+      // Horloge incertaine (aller-retour de /api/v3/time ≈ 1,4 s → ± ≈ 700 ms) : signalée.
+      let p40b;
+      ({ page: p40b, erreurs } = await ouvrir(nav, { encodage: true, intercept: async (u, k) => { if (k === 'time') await new Promise(z => setTimeout(z, 1400)); return null; } }));
+      await p40b.waitForTimeout(2000);
+      const Pb = (await etat(p40b)).pastillesCompletes.find(t => t.startsWith('Destin des murs')) || '';
+      check(`± u > ${BM.MURS.uAlerteMs} ms : la pastille le signale`, /⚠ horloge incertaine \(± \d+ ms > 500 ms\)/.test(Pb), Pb);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p40b.close();
     }
   } finally {
     await nav.close();

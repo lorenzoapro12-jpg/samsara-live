@@ -779,11 +779,11 @@ titre('7f. Destin des murs : bornes mesurées entre deux lectures, attente des e
   // serveur = locale + écart vrai, que l'horloge ne connaît qu'à ± u près), des instantanés qui
   // coupent une milliseconde au hasard. Sur CHAQUE transition classée :
   //   retireMin ≤ annulations réelles   et   X_N ≤ échangé réel ≤ X_W.
-  const simuler = graine => {
+  const simuler = (graine, seuils) => {
     seed = graine;
     const off = Math.round((rnd() - 0.5) * 6000), H = new BM.Horloge();
     for (let k = 0; k < 4; k++) { const s = k * 1000, rtt = 2 + rnd() * 400, r = s + rtt; H.echantillon(s, r, s + rnd() * rtt + off); }
-    const S = new BM.SuiviMurs(1, 2000), journal = [];
+    const S = new BM.SuiviMurs(seuils || 1, 2000), journal = [];
     S.surTransition = (e, Fn, p) => journal.push({ e, p });
     const C0 = 1000000, livre = new Map(), ev = [];
     let T = 4000 + off, a = 0;
@@ -830,7 +830,7 @@ titre('7f. Destin des murs : bornes mesurées entre deux lectures, attente des e
       if (!(e.retireMin <= an + 1e-9) || !(e.xN <= ex + 1e-9) || !(ex <= e.xW + 1e-9)) fautes.push({ e, an, ex });
       if (e.q0 - e.q1 - e.xN > an + 1e-9) naif++;       // Δ − X_N : la borne « naïve » n'en est pas une
     }
-    return { n: journal.length, fautes, naif, retire: S.total.retire, u: H.u, fins: S.niveaux.reduce((o, x) => (o[x.fin] = (o[x.fin] || 0) + 1, o), {}) };
+    return { n: journal.length, fautes, naif, retire: S.total.retire, totaux: S.totaux, niveaux: S.seuils.map((x, k) => S.niveaux.filter(v => v.t0s[k] !== null).length), u: H.u, fins: S.niveaux.reduce((o, x) => (o[x.fin] = (o[x.fin] || 0) + 1, o), {}) };
   };
   let n = 0, naif = 0, retire = 0;
   const fautes = [], fins = {};
@@ -841,6 +841,19 @@ titre('7f. Destin des murs : bornes mesurées entre deux lectures, attente des e
   }
   check(`solidité : ${n} transitions simulées (60 flux), retireMin ≤ annulé et X_N ≤ échangé ≤ X_W à chaque fois`, n > 10000 && !fautes.length, fautes.slice(0, 2));
   check(`la propriété a des dents : Δ − X_N dépasse l'annulé réel ${naif} fois ; borne totale mesurée ${BM.nombre(retire, 0, 0)} BTC`, naif > 0 && retire > 0, naif);
+  // Le réglage du seuil ne change aucune valeur : un suivi à plusieurs seuils compte, pour chacun,
+  // exactement ce qu'un suivi à ce seuil seul compterait (même flux).
+  {
+    const ecarts = [], SE = [1, 2.5, 5];
+    for (let g = 1; g <= 12; g++) {
+      const multi = simuler(500 + g * 104729, SE);
+      SE.forEach((x, k) => {
+        const seul = simuler(500 + g * 104729, x), a = multi.totaux[k], b = seul.totaux[0];
+        if (['retire', 'echange', 'incertain'].some(c => Math.abs(a[c] - b[c]) > 1e-6) || multi.niveaux[k] !== seul.niveaux[0]) ecarts.push({ g, x, a, b, n: [multi.niveaux[k], seul.niveaux[0]] });
+      });
+    }
+    check('seuils 1 / 2,5 / 5 BTC suivis ensemble = chacun suivi seul (totaux et niveaux, 12 flux)', !ecarts.length, ecarts.slice(0, 2));
+  }
   check('toutes les marques de fin apparaissent dans la simulation', ['retire', 'echange', 'partiel', 'incertain', 'bande'].every(k => fins[k] > 0), fins);
 
   // Textes : décrire, jamais accuser ni conseiller.
