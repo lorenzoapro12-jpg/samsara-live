@@ -3765,6 +3765,7 @@ function getSubIndicatorValue(key, idx) {
 // Entre deux publications, seuls les âges affichés avancent (majAges) : ni analyse, ni cartes
 // refaites, ni onde du voyant.
 let marcheLu = 0;          // dernière relecture réussie (ms)
+let marcheEnErreur = false;   // les cartes affichent l'erreur d'une relecture manquée
 async function fetchMarket(force) {
   if (!force && !lectureDue(marketData && Date.parse(marketData.updated), marcheLu)) { majAges(false); return; }
   try {
@@ -3772,10 +3773,13 @@ async function fetchMarket(force) {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const d = await lireSiNouveau(resp, marketData && marketData.updated);
     marcheLu = Date.now();
-    if (d) { marketData = d; renderFeed(); }
+    if (d) marketData = d;
+    // Une relecture manquée avait remplacé les cartes par l'erreur : elles reviennent dès la
+    // suivante, même si la publication n'a pas changé.
+    if (d || marcheEnErreur) { renderFeed(); marcheEnErreur = false; }
     majAges(!!d);
   } catch(e) {
-    marcheLu = 0;                                   // à retenter au prochain tour
+    marcheLu = 0; marcheEnErreur = true;            // à retenter au prochain tour
     document.getElementById('dot').style.background = 'var(--down)';
     const td = document.getElementById('taskbarDot');
     if (td) td.style.background = 'var(--down)';

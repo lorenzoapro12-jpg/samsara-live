@@ -93,8 +93,10 @@ Object.defineProperty(feed, 'innerHTML', { get: () => html, set: v => { rendus++
   await T.fetchMarket();
   check(`au plus tard ${T.CADENCES.relecture_max_min} min après la dernière lecture : relue (publication hors cadence)`, lectures.filter(x => /market-data/.test(x.url)).length === 4);
   panne = true; maintenant += T.CADENCES.relecture_max_min * MIN; await T.fetchMarket(); panne = false;
+  check('un échec : l’erreur est dite à la place des cartes', /class="error"/.test(html));
   maintenant += MIN; await T.fetchMarket();
   check('un échec se retente au tour suivant', lectures.filter(x => /market-data/.test(x.url)).length === 6);
+  check('… et les cartes reviennent, même si la publication n’a pas changé', !/class="error"/.test(html) && /demon-card/.test(html));
   // Âge qui franchit le seuil « retard » sans nouvelle publication : le bandeau apparaît.
   const r0 = rendus;
   maintenant = Date.parse(publication.updated) + (T.CADENCES.vieux_min + 1) * MIN;
