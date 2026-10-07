@@ -416,7 +416,7 @@
   const cv = document.getElementById('carte');
   const ctx = cv.getContext('2d', { alpha: false });     // opaque : tout est repeint à chaque rendu
   function calque() { const c = document.createElement('canvas'); c.width = c.height = 1; return { c, x: c.getContext('2d'), cle: null, t1: 0, p2: 0, coupe: Infinity, vide: true }; }
-  const PUB = calque(), LIVE = calque();
+  const PUB = calque(), LIVE = calque(), COMP = calque();   // COMP : la chaleur composée, gardée
   let RESERVE = calque();          // second tampon du calque publié (décalage sans recouvrement)
   let rafDemande = false, premierComplet = false, LUTV = 0;
   const MESURE = { chaleur: 0, rendu: 0, rendus: 0, complets: 0, decalages: 0, live: 0 };
@@ -615,11 +615,8 @@
    *  avec les mêmes « maintenant ». Rend le nombre de pixels qui diffèrent. */
   function verifierChaleur() {
     rendre();
-    const w = Z.chaleur.w, h = Z.chaleur.h, a = document.createElement('canvas');
-    a.width = w; a.height = h;
-    const ax = a.getContext('2d');
-    composerChaleur(ax, 0, 0);
-    const vu = new Uint32Array(ax.getImageData(0, 0, w, h).data.buffer.slice(0));
+    const w = Z.chaleur.w, h = Z.chaleur.h;
+    const vu = new Uint32Array(COMP.x.getImageData(0, 0, w, h).data.buffer.slice(0));     // ce qui est affiché
     const ref = new Uint32Array(w * h), f = rgb(C.nonObs), k = rgb(C.hachure);
     const cNon = u32(f[0], f[1], f[2], 255), cHach = u32(k[0], k[1], k[2], 255);
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) ref[y * w + x] = (x + y) % 6 < 1 ? cHach : cNon;
@@ -644,12 +641,20 @@
     suivreMaintenant();
     if (!LUT && !LUTB) majLuts();
     const t0 = performance.now();
-    if (peindreCalques()) MESURE.chaleur = performance.now() - t0;
+    // La chaleur est composée à la résolution CSS, puis agrandie d'UN seul drawImage : à la densité 3,
+    // le motif et les deux calques ne sont pas chacun agrandis (≈ 3 × 1,6 million de pixels par image).
+    if (peindreCalques() || COMP.cle !== LUTV + '|' + Z.chaleur.w + '|' + Z.chaleur.h) {
+      if (COMP.c.width !== Z.chaleur.w || COMP.c.height !== Z.chaleur.h) { COMP.c.width = Z.chaleur.w; COMP.c.height = Z.chaleur.h; COMP.x.__motif = null; }
+      composerChaleur(COMP.x, 0, 0);
+      COMP.cle = LUTV + '|' + Z.chaleur.w + '|' + Z.chaleur.h;
+      MESURE.chaleur = performance.now() - t0;
+    }
     if (!premierComplet && E.pub && E.live && E.live.n && E.exec.dernier && E.minutes.length) premierComplet = true;
     ctx.setTransform(Z.sx, 0, 0, Z.sy, 0, 0);
     ctx.fillStyle = C.panneau;
     ctx.fillRect(0, 0, Z.w, Z.h);
-    composerChaleur(ctx, Z.chaleur.x, Z.chaleur.y);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(COMP.c, Z.chaleur.x, Z.chaleur.y);
     ctx.save();
     ctx.beginPath(); ctx.rect(Z.chaleur.x, Z.chaleur.y, Z.chaleur.w, Z.chaleur.h); ctx.clip();
     posees = []; fileP = [];
