@@ -61,6 +61,9 @@ python3 test_contrat.py || ko=1
 etape "9. Structures de thème dans Chromium : aucune valeur ni aucun âge perdu, réversibles (non exécuté sans Playwright)"
 node test_structures.js || ko=1
 
+etape "9b. Interface dans Chromium : menus dans l'écran (non exécuté sans Playwright)"
+node test_interface.js || ko=1
+
 # Le budget d'image (≈ 15 min) ne tourne pas ici : il se relance quand une feuille de thème
 # change — node tests/test_budget.js --enregistrer — et le contrat (étape 8) refuse une feuille
 # dont la mesure n'est plus à jour.

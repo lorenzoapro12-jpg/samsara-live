@@ -58,9 +58,29 @@ function ouvrirThemes(e) {
   if (m.classList.contains('open')) { m.classList.remove('open'); return; }
   remplirMenuThemes();
   m.classList.add('open');
-  const r = b.getBoundingClientRect();
-  m.style.top = (r.bottom + 8) + 'px';
-  m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, r.right - m.offsetWidth)) + 'px';
+  placerMenu(m, b, false);
+}
+// Un menu s'ouvre SOUS son bouton, ou AU-DESSUS quand la place manque en dessous (bouton dans
+// une barre basse : Néon met le ruban sous le graphique, et son menu « Indicateurs » sortait de
+// l'écran — 87 px visibles sur 540). S'il ne tient d'aucun côté, il prend le plus grand et y
+// défile, sans recouvrir son bouton ; tout est borné à 8 px des bords. `gauche` : aligné sur le
+// bord gauche du bouton, sinon sur son bord droit. `ecart` : distance au bouton (8 px).
+function placerMenu(menu, ancre, gauche, ecart) {
+  const M = 8, e = ecart === undefined ? 8 : ecart, H = window.innerHeight, L = window.innerWidth;
+  const r = ancre.getBoundingClientRect();
+  menu.style.maxHeight = ''; menu.style.overflowY = '';
+  let h = menu.offsetHeight, top;
+  const dessous = H - M - (r.bottom + e), dessus = r.top - e - M;
+  const borner = max => { menu.style.maxHeight = Math.max(0, max) + 'px'; menu.style.overflowY = 'auto'; h = menu.offsetHeight; };
+  if (h <= dessous) top = r.bottom + e;
+  else if (h <= dessus) top = r.top - e - h;
+  else if (Math.max(dessous, dessus) >= 120) {
+    if (dessous >= dessus) { borner(dessous); top = r.bottom + e; } else { borner(dessus); top = r.top - e - h; }
+  } else { if (h > H - 2 * M) borner(H - 2 * M); top = r.bottom + e; }   // écran minuscule : il recouvre le bouton
+  menu.style.top = Math.max(M, Math.min(H - M - h, top)) + 'px';
+  const w = menu.offsetWidth;
+  menu.style.left = Math.max(M, Math.min(L - w - M, gauche ? r.left : r.right - w)) + 'px';
+  menu.style.right = 'auto';
 }
 
 // ============ VERRE (selon le thème) ============
@@ -341,20 +361,10 @@ function toggleDropdown(e) {
     return;
   }
   
-  const rect = btn.getBoundingClientRect();
-  menu.style.top = (rect.bottom + 4) + 'px';
-  // Éviter le débordement à droite
-  const menuWidth = 260;
-  if (rect.left + menuWidth > window.innerWidth) {
-    menu.style.left = 'auto';
-    menu.style.right = '10px';
-  } else {
-    menu.style.left = rect.left + 'px';
-    menu.style.right = 'auto';
-  }
-  
-  menu.classList.add('open');
+  // Rempli PUIS ouvert PUIS placé : sa hauteur décide s'il s'ouvre au-dessus du bouton.
   buildDropdown();
+  menu.classList.add('open');
+  placerMenu(menu, btn, true, 4);
 }
 document.addEventListener('click', (e) => {
   for (const id of ['indMenu', 'themeMenu', 'paireMenu']) {
@@ -395,9 +405,7 @@ function ouvrirPaires(e) {
   for (const id of ['indMenu', 'themeMenu']) document.getElementById(id).classList.remove('open');
   if (m.classList.contains('open')) { m.classList.remove('open'); return; }
   m.classList.add('open');
-  const r = b.getBoundingClientRect();
-  m.style.top = (r.bottom + 8) + 'px';
-  m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, r.left)) + 'px';
+  placerMenu(m, b, true);
 }
 async function changeSymbol(symbol, label) {
   document.querySelectorAll('label[id^="sym_"]').forEach(l => l.classList.remove('active'));
