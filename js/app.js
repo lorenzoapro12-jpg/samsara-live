@@ -2130,7 +2130,7 @@ const COLORS = {
   stoch_k: '#d79a00', stoch_d: '#ff6b35', atr: '#00a693',
   obv: '#ff9800', mfi: '#9c27b0', williamsR: '#00a5bd', cci: '#ff5722', adx: '#d79a00',
   equity_total: '#e0a800',
-  candleUp: '#0d9672', candleDown: '#e5484d',
+  candleUp: '#0d9672', candleDown: '#e5484d', surUp: '#ffffff', surDown: '#ffffff',
   grid: 'rgba(127,127,127,0.12)', text: '#45597a',
   bougieForme: 'pleine', bougieRayon: 2, grilleTirets: []
 };
@@ -2143,6 +2143,9 @@ const COLORS = {
 // --grille-tirets : motif de la grille (ex. « 8 3 2 3 », trait mixte) ; « none » = trait plein.
 // --police-graphique : famille du texte du canvas (repli : --font).
 // --chaleur-bid / --chaleur-ask : encre de la couche « Liquidité » (voir HEAT_RAMPE).
+// --up-sur / --down-sur : encre du texte posé SUR une marque de hausse / de baisse (l'étiquette du
+// dernier prix) ; blanc par défaut. Un thème dont la hausse est claire (Cyanotype : traits blancs)
+// y écrivait du blanc sur du blanc — tests/test_palette.py mesure ce couple.
 // Sans ces jetons, le graphique est celui d'avant, au pixel près.
 const BOUGIE_DENSE_PX = 4;
 const FORMES_BOUGIE = {
@@ -2195,6 +2198,7 @@ function lireJetons() {
   COLORS.ink1 = v('--ink-1', '#10233d'); COLORS.text = v('--ink-2', '#45597a'); COLORS.ink3 = v('--ink-3', '#5f6e8c');
   COLORS.axis = COLORS.text;
   COLORS.upInk = v('--up-ink', up); COLORS.downInk = v('--down-ink', down);
+  COLORS.surUp = v('--up-sur', '#ffffff'); COLORS.surDown = v('--down-sur', '#ffffff');
   COLORS.accent2 = v('--accent-2', '#4f5fe0');
   COLORS.surface = v('--chart-surface', '#f4f6fe');
   COLORS.grid = v('--grille', COLORS.grid);
@@ -2636,7 +2640,8 @@ function resolveChart(candles, padL, padR, chartH, W) {
     const triX = W - pad.right + 2, triY = yLP;
     // Couleur de la bougie EN COURS : l'étiquette dit aussi le sens du moment.
     const enCours = candles[candles.length - 1];
-    const tagC = (enCours && livePrice < enCours.open) ? COLORS.candleDown : COLORS.candleUp;
+    const baisse = !!enCours && livePrice < enCours.open;
+    const tagC = baisse ? COLORS.candleDown : COLORS.candleUp;
     // Badge prix — désormais l'unique pastille de prix (l'axe Y).
     // pad.right = 75 px pour un libellé 3 décimales de 76 px : le badge sortait
     // du canvas de ~13 px (« $77085.0(| ») à toutes les largeurs. On le recale
@@ -2653,7 +2658,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
     // Pointe vers le tracé : elle reste visible si le badge a reculé
     ctx.beginPath(); ctx.moveTo(triX, triY - 4); ctx.lineTo(triX + 8, triY); ctx.lineTo(triX, triY + 4);
     ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = baisse ? COLORS.surDown : COLORS.surUp;
     ctx.fillText(lpStr, bx + 6, triY + 4);
   }
   
