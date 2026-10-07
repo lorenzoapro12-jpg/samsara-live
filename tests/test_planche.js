@@ -118,7 +118,7 @@ async function ouvrir(nav, theme, vue, retardPublication) {
     }
     const P = CanvasRenderingContext2D.prototype, fillText = P.fillText;
     window.__textes = [];
-    P.fillText = function (t, x, y, ...a) { if (this.canvas.id === 'chart' && window.__textes.length < 20000) window.__textes.push({ t: String(t), s: String(this.fillStyle) }); return fillText.call(this, t, x, y, ...a); };
+    P.fillText = function (t, x, y, ...a) { if ((this.canvas.id === 'chart' || this.canvas.id === 'chartCalque') && window.__textes.length < 20000) window.__textes.push({ t: String(t), s: String(this.fillStyle) }); return fillText.call(this, t, x, y, ...a); };
   });
   await page.goto(`http://127.0.0.1:${serveur.address().port}/index.html`);
   await page.waitForTimeout(2000 + (retardPublication || 0));
@@ -208,7 +208,7 @@ const MESURES = () => {
     // ─── 7. Étiquette du dernier prix ───
     const tag = await o.page.evaluate(() => {
       const cs = getComputedStyle(document.documentElement), norm = c => { const x = document.createElement('canvas').getContext('2d'); x.fillStyle = c; return x.fillStyle; };
-      window.__textes.length = 0; drawChart();
+      window.__textes.length = 0; drawChart(); dessinerCalque();   // l'étiquette du prix vit sur le calque (chartCalque)
       const t = window.__textes.filter(e => /^\$86012\.5/.test(e.t));
       return { styles: [...new Set(t.map(e => e.s))], surUp: norm(cs.getPropertyValue('--up-sur').trim()), surDown: norm(cs.getPropertyValue('--down-sur').trim()), up: norm(cs.getPropertyValue('--up').trim()) };
     });

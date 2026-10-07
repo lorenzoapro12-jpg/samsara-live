@@ -364,19 +364,19 @@
 [data-theme="cyanotype"] .plan-cartouche .kpi i { font-size: 8px; letter-spacing: 0.1em; }
 [data-theme="cyanotype"] .plan-cartouche .kpi b { font-size: 13.5px; letter-spacing: 0; }
 [data-theme="cyanotype"] .plan-cartouche .kpi-age {
-  grid-column: span 2; position: relative; display: grid; grid-template-columns: auto 1fr; align-content: center; column-gap: 6px;
+  grid-column: span 2; position: relative; display: block; white-space: nowrap; /* bloc, pas grille : l'âge est « <span>n</span> min », deux nœuds (js/app.js ageDe) */
   margin: 0; padding: 2px 9px 3px; border-radius: 0; background: var(--plan-case);
   font-size: 13.5px; font-weight: 700; line-height: 1.2; color: var(--ink-1);
 }
 [data-theme="cyanotype"] .plan-cartouche .kpi-age::before {
-  grid-column: 1 / -1; content: 'Ind. de révision'; font-size: 8px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3);
+  display: block; content: 'Ind. de révision'; font-size: 8px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3);
 }
 /* Publication en retard (seuil de la page) : l'indice passe au crayon rouge, sous un triangle. */
 [data-theme="cyanotype"] .plan-cartouche .kpis.vieux .kpi-age {
   color: var(--plan-crayon-ink); background: var(--plan-case); box-shadow: inset 0 0 0 1.5px var(--plan-crayon);
 }
 [data-theme="cyanotype"] .plan-cartouche .kpis.vieux .kpi-age::after {
-  content: '△'; align-self: center; font-size: 16px; font-weight: 400; line-height: 1; color: var(--plan-crayon);
+  content: '△'; position: absolute; right: 9px; top: 50%; transform: translateY(-40%); font-size: 16px; font-weight: 400; line-height: 1; color: var(--plan-crayon);
 }
 /* Nuage de révision : une NOUVELLE publication (js/structures.js pose .revise 90 s). Dessin
    statique — des arcs en crayon rouge sur les quatre bords —, aucune animation. */
@@ -442,3 +442,8 @@
   [data-theme="cyanotype"] .plan-cartouche .kpi-age { font-size: 12px; }
   [data-theme="cyanotype"] .plan-cartouche .kpi-age { padding: 2px 5px 3px; }
 }
+
+/* Cartouche : ses cases sont normalisées (5 colonnes, lettrage). Sous 1400 px, les traces de la
+   chronique (js/chronique.js) élargissaient chaque case et repoussaient la nomenclature sur trois
+   rangées : elles y restent dans l'infobulle de la case et dans la fiche. Au-dessus, elles ont la place. */
+@media (max-width: 1399px) { [data-theme="cyanotype"] .plan-cartouche .chron-spark { display: none; } }
