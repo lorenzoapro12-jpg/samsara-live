@@ -70,6 +70,9 @@ node test_structures.js || ko=1
 etape "9b. Interface dans Chromium : menus dans l'écran, crochets du graphique, sous-graphes sans débordement (non exécuté sans Playwright)"
 node test_interface.js || ko=1
 
+etape "9c. Thème Gare dans Chromium : palettes à 1ch, provenance lue dans CADENCES, remarque d'âge, chutes à l'événement, démontage (non exécuté sans Playwright)"
+node test_gare.js || ko=1
+
 # Le budget d'image (≈ 30 min : mesures entrelacées, prix en mouvement) ne tourne pas ici : il
 # se relance quand une feuille de thème change — node tests/test_budget.js --enregistrer — et le
 # contrat (étape 8) refuse une feuille dont la mesure n'est plus à jour.
