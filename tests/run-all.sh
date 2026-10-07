@@ -58,6 +58,9 @@ python3 test_palette.py || ko=1
 etape "8. Contrat de la page (registre des thèmes, verre, budget mesuré, réseau) — hors ligne"
 python3 test_contrat.py || ko=1
 
+etape "8a. Protocole du banc de budget (prix vivant, mesures entrelacées) — hors ligne, sans navigateur"
+node test_budget.js --controle || ko=1
+
 etape "8b. Polices : registre, licences et noms réservés, LISEZMOI dérivé, @font-face servis — hors ligne"
 python3 test_polices.py || ko=1
 
@@ -67,9 +70,9 @@ node test_structures.js || ko=1
 etape "9b. Interface dans Chromium : menus dans l'écran, crochets du graphique, sous-graphes sans débordement (non exécuté sans Playwright)"
 node test_interface.js || ko=1
 
-# Le budget d'image (≈ 15 min) ne tourne pas ici : il se relance quand une feuille de thème
-# change — node tests/test_budget.js --enregistrer — et le contrat (étape 8) refuse une feuille
-# dont la mesure n'est plus à jour.
+# Le budget d'image (≈ 30 min : mesures entrelacées, prix en mouvement) ne tourne pas ici : il
+# se relance quand une feuille de thème change — node tests/test_budget.js --enregistrer — et le
+# contrat (étape 8) refuse une feuille dont la mesure n'est plus à jour.
 
 printf '\n\033[1m════════════════════════════════════════\033[0m\n'
 if [ "$ko" -eq 0 ]; then
