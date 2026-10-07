@@ -689,6 +689,170 @@ titre('7e. Rafales : même ms, même côté, identifiants consécutifs ; borne b
   check('libellé de la borne : jamais « un ordre de »', !/un ordre de/i.test(BM.TEXTE_RAFALES) && /≥ k est prouvé/.test(BM.TEXTE_RAFALES));
 }
 
+// ── 7f. Destin des murs ──────────────────────────────────────────────────────
+titre('7f. Destin des murs : bornes mesurées entre deux lectures, attente des exécutions complètes');
+{
+  const M = BM.MURS, F = BM.FINS_MURS;
+  const dep = (bids, asks, id) => ({ lastUpdateId: id, bids: bids.map(([p, q]) => [p.toFixed(2), String(q)]), asks: asks.map(([p, q]) => [p.toFixed(2), String(q)]) });
+  const hz = { ecart: 0, u: 10 };          // N = ]110, 1990[ , W = [−10, 2110] pour les lectures [0, 100] et [2000, 2100]
+  const tr = (a, T, p, q, m) => ({ a, T, p: p.toFixed(2), q: String(q), m });
+  // Lecture 1 : bid 100,00 × 6 (suivi, seuil 5) ; lecture 2 selon le cas ; exécutions ; complètes.
+  const cas = (bids2, trades, o) => {
+    o = o || {};
+    const S = new BM.SuiviMurs(5, 2000), log = [];
+    S.surTransition = (e, Fn) => log.push({ e, F: Fn });
+    S.execution(tr(1, -5000, 50, 0.1, true));                    // le début lu est bien avant
+    S.lecture(dep([[100, 6], [99, 1]], [[101, 1]], 10), 0, 100, hz);
+    for (const t of trades) S.execution(t);
+    const res = S.lecture(dep(bids2, [[101, 1]], o.id2 || 11), o.s2 || 2000, (o.s2 || 2000) + 100, hz);
+    if (!o.sansCompletes) { S.completes((o.s2 || 2000) + 100 + 20); S.avancer(hz, (o.s2 || 2000) + 200); }
+    const n = S.niveaux.find(x => x.c === 10000 && x.cote === 'b');
+    return { S, n, res, log, m: n && BM.SuiviMurs.prototype.marque(n) };
+  };
+  // 1. Les cinq marques.
+  const r1 = cas([[99, 1]], []);
+  check('✕ retiré : disparu, aucune exécution même dans W → borne = 6 BTC', r1.m === 'retire' && r1.S.total.retire === 6 && F[r1.m].s === '✕', [r1.m, r1.S.total]);
+  const r2 = cas([[99, 1]], [tr(2, 1000, 100, 6, true)]);
+  check('● échangé : X_N = 6 ≥ q₀ → rien de retiré', r2.m === 'echange' && r2.S.total.retire === 0 && r2.S.total.echange === 6, [r2.m, r2.S.total]);
+  const r3 = cas([[99, 1]], [tr(2, 1000, 100, 2, true)]);
+  check('◐ en partie : 0 < X_N = 2 < 6 → au moins 4 retirés', r3.m === 'partiel' && r3.S.total.retire === 4, [r3.m, r3.S.total]);
+  const r4 = cas([[99, 1]], [tr(2, 50, 100, 2, true)]);
+  check('? incertain : exécution dans W seulement (T = 50, avant la réception de la lecture 1) → 4 retirés, 2 incertains', r4.m === 'incertain' && r4.S.total.retire === 4 && r4.S.total.incertain === 2 && r4.S.total.echange === 0, [r4.m, r4.S.total]);
+  const r5 = cas([[100, 7], [99, 1]], []);
+  check('→ toujours là : taille suivie, rien de classé en fin', r5.m === 'la' && r5.n.q === 7 && r5.n.qMax === 7, [r5.m, r5.n]);
+  check('fenêtres : N = ]r₁+off+u, s₂+off−u[, W = [s₁+off−u, r₂+off+u]', r1.log.length === 1 && r1.log[0].F.N[0] === 110 && r1.log[0].F.N[1] === 1990 && r1.log[0].F.W[0] === -10 && r1.log[0].F.W[1] === 2110, r1.log[0] && r1.log[0].F);
+  // 2. Mauvais côté, prix voisin.
+  const r6 = cas([[99, 1]], [tr(2, 1000, 100, 6, false)]);
+  check('exécution du mauvais côté (acheteur au marché, m = false) ignorée pour un bid → ✕', r6.m === 'retire' && r6.S.total.retire === 6, [r6.m, r6.S.total]);
+  const r7 = cas([[99, 1]], [tr(2, 1000, 100.01, 6, true), tr(3, 1000, 99.99, 6, true)]);
+  check('exécutions à p ± 0,01 ignorées → ✕', r7.m === 'retire' && r7.S.total.retire === 6, [r7.m, r7.S.total]);
+  // 3. Sortie de la bande.
+  const r8 = cas([[100.5, 1]], [tr(2, 1000, 100, 6, true)]);
+  check('sortie de la bande : plus bas bid de la lecture 2 au-dessus du prix → ni classé ni compté', r8.m === 'bande' && r8.S.total.retire === 0 && r8.S.total.echange === 0 && !r8.log.length, [r8.m, r8.S.total]);
+  // 4. Lecture périmée.
+  const r9 = cas([[99, 1]], [], { id2: 10 });
+  check('lastUpdateId qui ne croît pas : lecture ignorée, niveau toujours suivi', r9.res === 'perimee' && r9.m === 'la' && !r9.S.attente.length && !r9.log.length, [r9.res, r9.m]);
+  // 5. Trou de lecture.
+  const r10 = cas([[99, 1]], [], { s2: 100 + 2 * 2000 + 1 });
+  check('envoi j − réception i > 2 cadences : « interrompu », rien de compté', r10.res === 'interrompu' && r10.m === 'interrompu' && r10.S.total.retire === 0 && !r10.log.length, [r10.res, r10.m, r10.S.total]);
+  const r10b = cas([[99, 1]], [], { s2: 100 + 2 * 2000 });
+  check('… à 2 cadences tout juste : classé', r10b.m === 'retire', r10b.m);
+  // 6. Attente des exécutions complètes.
+  const r11 = cas([[99, 1]], [], { sansCompletes: true });
+  check('sans exécutions complètes : en attente, rien de compté', r11.m === 'attente' && r11.S.total.retire === 0 && r11.S.attente.length === 1, [r11.m, r11.S.total]);
+  r11.S.completes(2100 + 19); r11.S.avancer(hz, 2200);
+  check('requête envoyée avant r₂ + 2u : toujours en attente', r11.m === 'attente' && BM.SuiviMurs.prototype.marque(r11.n) === 'attente');
+  r11.S.execution(tr(2, 1500, 100, 6, true));     // arrivée tardive : sans l'attente, « ✕ 6 BTC retirés » aurait été FAUX
+  r11.S.completes(2100 + 20); r11.S.avancer(hz, 2200);
+  check('requête envoyée à r₂ + 2u : classé avec l\'exécution tardive → ● (et non ✕)', BM.SuiviMurs.prototype.marque(r11.n) === 'echange' && r11.S.total.retire === 0, [BM.SuiviMurs.prototype.marque(r11.n), r11.S.total]);
+  const r12 = cas([[99, 1]], [], { sansCompletes: true });
+  r12.S.avancer(hz, 2100 + M.attenteMaxMs - 1);
+  const avant = BM.SuiviMurs.prototype.marque(r12.n);
+  r12.S.avancer(hz, 2100 + M.attenteMaxMs + 1);
+  check('attente de plus de ' + M.attenteMaxMs / 1000 + ' s : « interrompu »', avant === 'attente' && BM.SuiviMurs.prototype.marque(r12.n) === 'interrompu' && r12.S.total.retire === 0 && !r12.S.attente.length, [avant, r12.n.fin]);
+  const r13 = cas([[99, 1]], [], { sansCompletes: true });
+  r13.S.completes(1e9); r13.S.avancer({ ecart: 0, u: null }, 2200);
+  check('horloge jamais mesurée : rien de classé', BM.SuiviMurs.prototype.marque(r13.n) === 'attente');
+  // Exécution dans le recouvrement de deux W : incertaine, comptée UNE fois au total.
+  {
+    const S = new BM.SuiviMurs(5, 2000);
+    S.execution(tr(1, -5000, 50, 0.1, true));
+    S.lecture(dep([[100, 6], [99, 1]], [[101, 1]], 10), 0, 100, hz);
+    S.execution(tr(2, 2050, 100, 1, true));      // dans W(1→2) et W(2→3), hors des deux N
+    S.lecture(dep([[100, 5], [99, 1]], [[101, 1]], 11), 2000, 2100, hz);
+    S.lecture(dep([[100, 5], [99, 1]], [[101, 1]], 12), 4000, 4100, hz);
+    S.completes(5000); S.avancer(hz, 5000);
+    check('exécution dans deux fenêtres larges : 1 BTC incertain au total (pas 2)', S.total.incertain === 1 && S.total.retire === 0, S.total);
+  }
+  // Exécutions d'avant le début lu : non classé.
+  {
+    const S = new BM.SuiviMurs(5, 2000);
+    S.execution(tr(1, 500, 50, 0.1, true));      // première exécution lue après le début de W
+    S.lecture(dep([[100, 6], [99, 1]], [[101, 1]], 10), 0, 100, hz);
+    S.lecture(dep([[99, 1]], [[101, 1]], 11), 2000, 2100, hz);
+    S.completes(5000); S.avancer(hz, 5000);
+    check('fenêtre qui commence avant la première exécution lue : « interrompu »', S.niveaux[0].fin === 'interrompu' && S.total.retire === 0, S.niveaux[0].fin);
+  }
+
+  // 7. PROPRIÉTÉ DE SOLIDITÉ : un flux simulé d'ajouts, d'annulations (totales ou partielles) et
+  // d'exécutions horodatées ; des lectures prises à un instant au hasard DANS [s, r] (heure du
+  // serveur = locale + écart vrai, que l'horloge ne connaît qu'à ± u près), des instantanés qui
+  // coupent une milliseconde au hasard. Sur CHAQUE transition classée :
+  //   retireMin ≤ annulations réelles   et   X_N ≤ échangé réel ≤ X_W.
+  const simuler = graine => {
+    seed = graine;
+    const off = Math.round((rnd() - 0.5) * 6000), H = new BM.Horloge();
+    for (let k = 0; k < 4; k++) { const s = k * 1000, rtt = 2 + rnd() * 400, r = s + rtt; H.echantillon(s, r, s + rnd() * rtt + off); }
+    const S = new BM.SuiviMurs(1, 2000), journal = [];
+    S.surTransition = (e, Fn, p) => journal.push({ e, p });
+    const C0 = 1000000, livre = new Map(), ev = [];
+    let T = 4000 + off, a = 0;
+    const cle = (cote, c) => cote + c;
+    for (let k = 0; k < 4000; k++) {
+      T += Math.floor(rnd() * rnd() * 40);         // souvent la même milliseconde
+      const cote = rnd() < 0.5 ? 'b' : 'a', c = cote === 'b' ? C0 - 1 - Math.floor(rnd() * 12) : C0 + Math.floor(rnd() * 12), q = livre.get(cle(cote, c)) || 0, x = rnd();
+      if (x < 0.45 || q === 0) { const d = 1 + Math.floor(rnd() * (rnd() < 0.2 ? 9000 : 2500)); livre.set(cle(cote, c), q + d); ev.push({ T, k: 'aj', cote, c, q: d }); }
+      else if (x < 0.75) { const d = rnd() < 0.4 ? q : 1 + Math.floor(rnd() * q); livre.set(cle(cote, c), q - d); ev.push({ T, k: 'an', cote, c, q: d }); }
+      else { const d = 1 + Math.floor(rnd() * Math.min(q, 3000)); livre.set(cle(cote, c), q - d); ev.push({ T, k: 'ex', cote, c, q: d, a: ++a }); }
+    }
+    // Lectures : envoi à pas ~2 s (+ dérive), réception après 2 à 900 ms ; instantané à un instant
+    // entier de [s + off, r + off], qui coupe la milliseconde au hasard.
+    const coupes = new Map(), etat = new Map(), qty = x => (x / 1000).toFixed(3);
+    let iEv = 0, iEx = 0, s = 5000, id = 0;
+    const exec = ev.filter(e => e.k === 'ex');
+    while (s + off < T - 2000) {
+      const r = s + 2 + rnd() * 900, t0 = Math.ceil(s + off), t1 = Math.floor(r + off);
+      if (t1 < t0) { s += 2000; continue; }
+      const t = t0 + Math.floor(rnd() * (t1 - t0 + 1));
+      while (iEv < ev.length && ev[iEv].T < t) { const e = ev[iEv++]; etat.set(cle(e.cote, e.c), (etat.get(cle(e.cote, e.c)) || 0) + (e.k === 'aj' ? e.q : -e.q)); }
+      while (iEv < ev.length && ev[iEv].T === t && rnd() < 0.5) { const e = ev[iEv++]; etat.set(cle(e.cote, e.c), (etat.get(cle(e.cote, e.c)) || 0) + (e.k === 'aj' ? e.q : -e.q)); }
+      if (iEv > id) {
+        id = iEv;
+        const bids = [], asks = [];
+        for (const [k, v] of etat) if (v > 0) (k[0] === 'b' ? bids : asks).push([(+k.slice(1) / 100).toFixed(2), qty(v)]);
+        bids.sort((x, y) => y[0] - x[0]); asks.sort((x, y) => x[0] - y[0]);
+        if (S.lecture({ lastUpdateId: id, bids, asks }, s, r, H) !== 'perimee') coupes.set(s, iEv);
+      }
+      // Une requête d'exécutions envoyée après la réception, servie à l'heure du serveur ≥ envoi.
+      const sc = r + rnd() * 1500, ts = sc + off + rnd() * 200;
+      while (iEx < exec.length && exec[iEx].T <= ts) { const e = exec[iEx++]; S.execution({ a: e.a, T: e.T, p: (e.c / 100).toFixed(2), q: qty(e.q), m: e.cote === 'b' }); }
+      S.completes(sc); S.avancer(H, sc);
+      s += 1700 + rnd() * 600;
+    }
+    // Vérité de chaque transition classée.
+    const fautes = [];
+    let naif = 0;
+    for (const { e, p } of journal) {
+      const i0 = coupes.get(p.s), i1 = coupes.get(p.sj);
+      let an = 0, ex = 0;
+      for (let i = i0; i < i1; i++) { const x = ev[i]; if (x.cote !== e.cote || x.c !== e.c) continue; if (x.k === 'an') an += x.q; if (x.k === 'ex') ex += x.q; }
+      an /= 1000; ex /= 1000;
+      if (!(e.retireMin <= an + 1e-9) || !(e.xN <= ex + 1e-9) || !(ex <= e.xW + 1e-9)) fautes.push({ e, an, ex });
+      if (e.q0 - e.q1 - e.xN > an + 1e-9) naif++;       // Δ − X_N : la borne « naïve » n'en est pas une
+    }
+    return { n: journal.length, fautes, naif, retire: S.total.retire, u: H.u, fins: S.niveaux.reduce((o, x) => (o[x.fin] = (o[x.fin] || 0) + 1, o), {}) };
+  };
+  let n = 0, naif = 0, retire = 0;
+  const fautes = [], fins = {};
+  for (let g = 1; g <= 60; g++) {
+    const r = simuler(1000 + g * 7919);
+    n += r.n; naif += r.naif; retire += r.retire; fautes.push(...r.fautes.slice(0, 2));
+    for (const k in r.fins) fins[k] = (fins[k] || 0) + r.fins[k];
+  }
+  check(`solidité : ${n} transitions simulées (60 flux), retireMin ≤ annulé et X_N ≤ échangé ≤ X_W à chaque fois`, n > 10000 && !fautes.length, fautes.slice(0, 2));
+  check(`la propriété a des dents : Δ − X_N dépasse l'annulé réel ${naif} fois ; borne totale mesurée ${BM.nombre(retire, 0, 0)} BTC`, naif > 0 && retire > 0, naif);
+  check('toutes les marques de fin apparaissent dans la simulation', ['retire', 'echange', 'partiel', 'incertain', 'bande'].every(k => fins[k] > 0), fins);
+
+  // Textes : décrire, jamais accuser ni conseiller.
+  const pub = ['bookmap.html', 'js/bookmap.js', 'js/bookmap-calc.js', 'css/bookmap.css'].map(f => [f, fs.readFileSync(path.join(REPO, f), 'utf8')]);
+  const ACCUSE = /spoof|manipul|leurre|tromper|tromperie|faux (?:mur|ordre)s?|fake|bluff|pi[eè]ge/i;
+  const CONSEIL = /\b(achetez|vendez|il faut (?:acheter|vendre)|entrez|sortez|prenez position|signal d['’]achat|signal de vente|recommand(?:e|ons))/i;
+  check('carte : aucun mot d\'intention ni d\'accusation (« spoof »…) dans les fichiers publiés', pub.every(([, t]) => !ACCUSE.test(t)), pub.filter(([, t]) => ACCUSE.test(t)).map(([f, t]) => f + ' : ' + t.match(ACCUSE)[0]));
+  check('carte : aucun conseil', pub.every(([, t]) => !CONSEIL.test(t)), pub.filter(([, t]) => CONSEIL.test(t)).map(([f, t]) => f + ' : ' + t.match(CONSEIL)[0]));
+  const textes = Object.values(F).map(f => f.t + ' ' + f.d).join(' ') + BM.TEXTE_MURS;
+  check('marques et limite tirées du code : nettes, invisible entre deux lectures', /NETTES/.test(BM.TEXTE_MURS) && /invisible/.test(BM.TEXTE_MURS) && !ACCUSE.test(textes));
+}
+
 // ── 8. Isolement : la carte ne touche pas au terminal ─────────────────────────
 titre('8. Isolement : une page à côté, qui ne partage aucun code avec le terminal');
 const html = fs.readFileSync(path.join(REPO, 'bookmap.html'), 'utf8');

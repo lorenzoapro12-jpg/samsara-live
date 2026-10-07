@@ -1110,6 +1110,212 @@
     return out;
   };
 
+  // ─── Destin des murs : ce que deviennent les gros niveaux du carnet ──────────
+  // Un carnet REST ne porte pas d'heure : la lecture i décrit un instant tᵢ quelque part dans
+  // [sᵢ, rᵢ] (envoi, réception, heure LOCALE), placé à l'heure Binance par l'écart ± u de
+  // BM.Horloge. Entre deux lectures i et j, à un prix p exact et d'un côté :
+  //   q₁ = q₀ + ajouté − annulé − échangé, et échangé ≤ X_W  ⇒  annulé ≥ q₀ − q₁ − X_W.
+  // retireMin = max(0, Δ − X_W) est donc une borne BASSE MESURÉE de ce qui a été retiré (annulé
+  // ou réduit) ; X_N est échangé à coup sûr, X_W − X_N est « incertain ». Ce ne sont que des
+  // variations NETTES : un ordre posé puis annulé entre deux lectures ne se voit pas. Rien ne dit
+  // POURQUOI un ordre est retiré : le calque décrit, il n'attribue aucune intention.
+  BM.MURS = {
+    seuilsBtc: [2, 5, 10, 25], defautBtc: 5,
+    ecartCadences: 2,          // envoi j − réception i > 2 cadences : « interrompu »
+    attenteMaxMs: 30e3,        // transition qui attend encore ses exécutions après 30 s : « interrompu »
+    uAlerteMs: 500,            // horloge plus incertaine : la pastille le signale
+    anneauMs: 120e3,           // exécutions gardées pour les bilans
+    gardeMs: 6 * 3600e3, gardeNiveaux: 20000,
+    pxMin: 2,                  // vue large : un trait plus court n'est pas dessiné (sa fin est comptée)
+  };
+  BM.FINS_MURS = {
+    retire: { s: '✕', t: 'retiré', d: 'disparu sans aucune exécution à ce prix, même dans la fenêtre large' },
+    echange: { s: '●', t: 'échangé', d: 'exécutions certaines à ce prix ≥ la taille lue' },
+    partiel: { s: '◐', t: 'en partie', d: 'exécutions certaines à ce prix, moins que la taille lue' },
+    incertain: { s: '?', t: 'incertain', d: 'exécutions à ce prix seulement dans la fenêtre large (horloge, durée des requêtes)' },
+    bande: { s: '↕', t: 'sortie de la bande', d: 'le prix n\'est plus dans les niveaux lus : on ne sait pas' },
+    interrompu: { s: '⋯', t: 'interrompu', d: 'lectures ou exécutions manquantes : rien n\'est classé ni compté' },
+    la: { s: '→', t: 'toujours là', d: 'présent à la dernière lecture' },
+    attente: { s: '…', t: 'en attente', d: 'attend que les exécutions de l\'intervalle soient toutes lues' },
+  };
+  BM.TEXTE_MURS = 'variations NETTES entre deux lectures : un ordre posé puis annulé entre deux lectures est invisible';
+  BM.cents = p => Math.round(+p * 100);
+
+  /** Une lecture brute (`depth` de Binance) en niveaux au prix EXACT (cents) : quantités par côté,
+   *  bande lue (plus bas bid, plus haut ask) et niveaux ≥ seuil. */
+  BM.niveauxSuivis = function (depth, seuil) {
+    const b = new Map(), a = new Map(), gros = [];
+    let bas = null, haut = null;
+    for (const [p, q] of depth.bids || []) { const c = BM.cents(p), x = +q; if (!(x > 0)) continue; b.set(c, x); if (bas === null || c < bas) bas = c; if (x >= seuil) gros.push({ cote: 'b', c, q: x }); }
+    for (const [p, q] of depth.asks || []) { const c = BM.cents(p), x = +q; if (!(x > 0)) continue; a.set(c, x); if (haut === null || c > haut) haut = c; if (x >= seuil) gros.push({ cote: 'a', c, q: x }); }
+    return { b, a, bas, haut, gros, id: depth.lastUpdateId };
+  };
+  /** Fenêtres (heure Binance) entre la lecture i et la lecture j. N : ouverte des deux côtés (une
+   *  exécution de la même milliseconde que l'instantané peut être d'un côté ou de l'autre) ; W :
+   *  fermée. N peut être vide. */
+  BM.fenetresMurs = function (si, ri, sj, rj, off, u) {
+    return { N: [ri + off + u, sj + off - u], W: [si + off - u, rj + off + u] };
+  };
+  /** Indice de la première exécution d'instant ≥ T (exécutions triées par identifiant, donc par T). */
+  const premiereDes = (tr, T) => { let lo = 0, hi = tr.length; while (lo < hi) { const m = (lo + hi) >> 1; if (tr[m].T < T) lo = m + 1; else hi = m; } return lo; };
+  /** Le bilan d'une transition i → j. `prev` = { s, r, niveaux: [{ cote, c, q, aT }] } (q = taille
+   *  lue en i, aT = dernier identifiant déjà compté pour ce niveau) ; `cur` = BM.niveauxSuivis + { s, r } ;
+   *  `trades` = [{ a, T, c, q, m }] triées. Un bid n'est touché que par m === true (vendeur au
+   *  marché), un ask que par m === false ; au prix EXACT seulement. Rend la fenêtre et, par niveau :
+   *  q₁, dehors (hors de la bande de j), xN, xW, xU (part de W hors N pas encore comptée), retireMin, fin. */
+  BM.bilanNiveaux = function (prev, cur, trades, horloge, opts) {
+    const off = horloge.ecart, u = horloge.u || 0, F = BM.fenetresMurs(prev.s, prev.r, cur.s, cur.r, off, u);
+    const cle = (cote, c) => cote + c, idx = new Map();
+    const ent = prev.niveaux.map((n, k) => {
+      const dehors = n.cote === 'b' ? cur.bas === null || n.c < cur.bas : cur.haut === null || n.c > cur.haut;
+      const q1 = dehors ? null : ((n.cote === 'b' ? cur.b : cur.a).get(n.c) || 0);
+      idx.set(cle(n.cote, n.c), k);
+      return { cote: n.cote, c: n.c, q0: n.q, q1, dehors, xN: 0, xW: 0, xU: 0, aMax: n.aT === undefined ? -Infinity : n.aT, aT: n.aT === undefined ? -Infinity : n.aT };
+    });
+    if (trades) {
+      for (let i = premiereDes(trades, F.W[0]); i < trades.length && trades[i].T <= F.W[1]; i++) {
+        const t = trades[i], k = idx.get(cle(t.m ? 'b' : 'a', t.c));
+        if (k === undefined) continue;
+        const e = ent[k];
+        e.xW += t.q;
+        if (t.T > F.N[0] && t.T < F.N[1]) e.xN += t.q;
+        else if (t.a > e.aT) e.xU += t.q;       // hors N : compté une seule fois, même si deux W se recouvrent
+        if (t.a > e.aMax) e.aMax = t.a;
+      }
+    }
+    const eps = (opts && opts.eps) || 1e-9;
+    for (const e of ent) {
+      if (e.dehors) { e.fin = 'bande'; e.retireMin = 0; continue; }
+      e.retireMin = Math.max(0, e.q0 - e.q1 - e.xW);
+      if (e.retireMin < eps) e.retireMin = 0;
+      e.fin = e.q1 > 0 ? null : BM.finMur(e.q0, e.xN, e.xW, eps);
+    }
+    return { F, ent };
+  };
+  /** La marque de fin d'un niveau disparu (q₁ = 0), de sa taille q₀ et des exécutions X_N ⊂ X_W. */
+  BM.finMur = function (q0, xN, xW, eps) {
+    eps = eps || 1e-9;
+    if (!(xW > eps)) return 'retire';
+    if (xN >= q0 - eps) return 'echange';
+    if (xN > eps) return 'partiel';
+    return 'incertain';
+  };
+
+  /** Le suivi, lecture après lecture. Heures LOCALES pour s / r (l'écart est appliqué au bilan, avec
+   *  l'horloge du moment). Une transition n'est classée qu'une fois les exécutions COMPLÈTES jusqu'à
+   *  rⱼ + 2u (heure locale d'envoi d'une requête d'exécutions qui a rendu moins d'une page) : sans
+   *  cette attente, une exécution pas encore lue gonflerait le retrait et la borne ne tiendrait plus. */
+  BM.SuiviMurs = function (seuil, cadence) {
+    Object.assign(this, {
+      seuil, cadence, prec: null, dernierId: null, actifs: new Map(), niveaux: [], attente: [],
+      trades: [], couvert: Infinity, complet: -Infinity,
+      total: { retire: 0, echange: 0, incertain: 0, depuis: null }, derniere: null, version: 0, surTransition: null,
+    });
+  };
+  const SM = BM.SuiviMurs.prototype;
+  /** Une exécution (aggTrade de Binance), dans l'ordre des identifiants. */
+  SM.execution = function (x) {
+    const T = +x.T;
+    if (this.couvert === Infinity) this.couvert = T;      // rien n'est lu avant la première
+    this.trades.push({ a: +x.a, T, c: BM.cents(x.p), q: +x.q, m: !!x.m });
+    if (this.trades.length > 4096 && this.trades[0].T < T - BM.MURS.anneauMs) {
+      const k = premiereDes(this.trades, T - BM.MURS.anneauMs);
+      this.trades.splice(0, k);
+      this.couvert = Math.max(this.couvert, this.trades[0].T);
+    }
+  };
+  /** Exécutions lues sans trou jusqu'à l'envoi `sLocal` d'une requête qui a rendu moins d'une page. */
+  SM.completes = function (sLocal) { if (sLocal > this.complet) this.complet = sLocal; };
+  /** Exécutions sautées jusqu'à T (heure Binance) : rien avant n'est classé. */
+  SM.trou = function (T) { this.couvert = Math.max(this.couvert === Infinity ? T : this.couvert, T); };
+  const finir = (n, f, t) => { n.fin = f; if (t !== undefined) n.tFin = t; };
+  /** Lecture `depth` (brute) reçue entre s et r. Rend 'ok', 'perimee' ou 'interrompu' (écart). */
+  SM.lecture = function (depth, s, r, horloge) {
+    const id = depth.lastUpdateId;
+    if (id !== undefined && id !== null && this.dernierId !== null && !(id > this.dernierId)) return 'perimee';
+    if (id !== undefined && id !== null) this.dernierId = id;
+    const cur = BM.niveauxSuivis(depth, this.seuil), t = (s + r) / 2;
+    cur.s = s; cur.r = r;
+    let res = 'ok';
+    if (this.prec && s - this.prec.r > BM.MURS.ecartCadences * this.cadence) { this.interrompre(); res = 'interrompu'; }
+    if (this.total.depuis === null) this.total.depuis = t;
+    if (this.prec && this.actifs.size) {
+      const niv = [...this.actifs.values()];
+      const { ent } = BM.bilanNiveaux({ s: this.prec.s, r: this.prec.r, niveaux: niv }, cur, null, horloge);
+      const items = [];
+      ent.forEach((e, k) => {
+        const n = niv[k];
+        if (e.dehors) { finir(n, 'bande', t); this.actifs.delete(n.k); return; }       // q₁ inconnu : ni classé ni compté
+        items.push({ n, q0: e.q0, q1: e.q1 });
+        n.tFin = t;
+        if (e.q1 > 0) { n.q = e.q1; if (e.q1 > n.qMax) n.qMax = e.q1; }
+        else { n.fin = 'attente'; this.actifs.delete(n.k); }
+      });
+      if (items.length) this.attente.push({ s: this.prec.s, r: this.prec.r, sj: s, rj: r, items, b: cur.b, a: cur.a, bas: cur.bas, haut: cur.haut });
+    }
+    for (const g of cur.gros) {
+      const k = g.cote + g.c;
+      if (this.actifs.has(k)) continue;
+      const n = { k, cote: g.cote, c: g.c, t0: t, tFin: t, q: g.q, qMax: g.q, retire: 0, echange: 0, incertain: 0, aT: -Infinity, fin: null };
+      this.actifs.set(k, n); this.niveaux.push(n);
+    }
+    this.prec = { s, r };
+    this.derniere = r;
+    this.avancer(horloge, r);
+    this.purger(t);
+    this.version++;
+    return res;
+  };
+  /** Classe les transitions dont les exécutions sont complètes ; une attente de plus de 30 s
+   *  interrompt tout (les exécutions manquent). */
+  SM.avancer = function (horloge, maintenantLocal) {
+    let change = false;
+    while (this.attente.length) {
+      const p = this.attente[0], u = horloge.u;
+      if (u !== null && u !== undefined && this.complet >= p.rj + 2 * u) {
+        this.attente.shift(); change = true;
+        if (p.s + horloge.ecart - u < this.couvert) { this.interrompre(p); continue; }   // exécutions d'avant le début lu
+        this.classer(p, horloge);
+        continue;
+      }
+      if (maintenantLocal - p.rj > BM.MURS.attenteMaxMs) { this.interrompre(p); change = true; }
+      break;
+    }
+    if (change) this.version++;
+    return change;
+  };
+  SM.classer = function (p, horloge) {
+    const niveaux = p.items.map(it => ({ cote: it.n.cote, c: it.n.c, q: it.q0, aT: it.n.aT }));
+    const { F, ent } = BM.bilanNiveaux({ s: p.s, r: p.r, niveaux }, { s: p.sj, r: p.rj, b: p.b, a: p.a, bas: p.bas, haut: p.haut }, this.trades, horloge);
+    ent.forEach((e, k) => {
+      const n = p.items[k].n;
+      n.retire += e.retireMin; n.echange += e.xN; n.incertain += e.xU; n.aT = e.aMax;
+      this.total.retire += e.retireMin; this.total.echange += e.xN; this.total.incertain += e.xU;
+      if (e.q1 === 0 && n.fin === 'attente') n.fin = e.fin;
+      if (this.surTransition) this.surTransition(e, F, p);
+    });
+  };
+  /** Ferme tout ce qui est suivi comme « interrompu » (rien n'est classé ni compté) ; avec `p`,
+   *  aussi les transitions en attente (leurs exécutions manquent). */
+  SM.interrompre = function (p) {
+    for (const n of this.actifs.values()) finir(n, 'interrompu');
+    this.actifs.clear();
+    this.prec = null;
+    if (p) {
+      for (const q of [p, ...this.attente]) for (const it of q.items) if (it.n.fin === 'attente') it.n.fin = 'interrompu';
+      this.attente = [];
+    }
+    this.version++;
+  };
+  SM.purger = function (t) {
+    const lim = t - BM.MURS.gardeMs, L = this.niveaux;
+    let k = 0;
+    while (k < L.length && (L[k].fin !== null && L[k].fin !== 'attente' && L[k].tFin < lim || L.length - k > BM.MURS.gardeNiveaux && L[k].fin !== null && L[k].fin !== 'attente')) k++;
+    if (k) L.splice(0, k);
+  };
+  /** Marque d'un niveau : sa fin, ou « toujours là ». */
+  SM.marque = n => (n.fin === null ? 'la' : n.fin);
+
   /** Une lecture (carnet, bid / ask) vaut jusqu'à la suivante, mais pas plus de 3 cadences
    *  (+ 1 s) : au-delà, c'est une vraie absence — non observé, hachuré, ligne coupée. */
   BM.VALIDITE = { cadences: 3, margeMs: 1000 };
