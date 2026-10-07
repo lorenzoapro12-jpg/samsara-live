@@ -74,6 +74,22 @@ POLICES = [
          dossier="cinzel", source="Cinzel[wght].ttf", licence="cinzel.OFL.txt", horodatage=3874129693),
     dict(sortie="eb-garamond.woff2", famille="EB Garamond", origine="EB Garamond", theme="Codex",
          dossier="ebgaramond", source="EBGaramond[wght].ttf", licence="ebgaramond.OFL.txt", horodatage=3874129694),
+    # Gazette — le texte et TOUTES les valeurs : ses dix chiffres ont la même chasse (580 unités),
+    # tabulaires sans fonction OpenType. Les deux graisses statiques publiées, rien d'instancié.
+    dict(sortie="old-standard-400.woff2", famille="Old Standard TT", origine="Old Standard TT", theme="Gazette",
+         dossier="oldstandardtt", source="OldStandard-Regular.ttf", licence="oldstandardtt.OFL.txt"),
+    dict(sortie="old-standard-700.woff2", famille="Old Standard TT", origine="Old Standard TT", theme="Gazette",
+         dossier="oldstandardtt", source="OldStandard-Bold.ttf", licence="oldstandardtt.OFL.txt"),
+    # Gazette — manchette, rubriques, titres de colonnes. Chiffres PROPORTIONNELS : jamais pour une
+    # valeur qui bouge (la manchette n'est réécrite qu'à une édition). Chasse normale (wdth=100).
+    dict(sortie="league-gothic.woff2", famille="League Gothic", origine="League Gothic", theme="Gazette",
+         dossier="leaguegothic", source="LeagueGothic[wdth].ttf", licence="leaguegothic.OFL.txt",
+         instance={"wdth": 100}, composes=COMPOSES_SAMSARA),
+    # Gazette — la plaque de titre seulement (« Saṃsāra », graisse 800). Nom réservé « Playfair
+    # Display » : la version modifiée (instance, ṃ composé, sous-ensemble) est RENOMMÉE.
+    dict(sortie="gazette-titre.woff2", famille="Samsara Gazette Titre", origine="Playfair Display", theme="Gazette",
+         dossier="playfairdisplay", source="PlayfairDisplay[wght].ttf", licence="playfairdisplay.OFL.txt",
+         renommer="Playfair Display", instance={"wght": 800}, composes=["1E43=006D+002E:bas"], texte="Saṃsāra"),
 ]
 
 

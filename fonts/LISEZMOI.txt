@@ -13,6 +13,12 @@ noms réservés (Reserved Font Name), les polices qui en déclarent un ont été
                             glyphes composés (là où ils manquent) : ā ṃ
   cinzel.woff2             « Cinzel » ← Cinzel (aucun nom réservé) — cinzel.OFL.txt — thème Codex
   eb-garamond.woff2        « EB Garamond » ← EB Garamond (aucun nom réservé) — ebgaramond.OFL.txt — thème Codex
+  old-standard-400.woff2   « Old Standard TT » ← Old Standard TT (aucun nom réservé) — oldstandardtt.OFL.txt — thème Gazette
+  old-standard-700.woff2   « Old Standard TT » ← Old Standard TT (aucun nom réservé) — oldstandardtt.OFL.txt — thème Gazette
+  league-gothic.woff2      « League Gothic » ← League Gothic (aucun nom réservé) — leaguegothic.OFL.txt — thème Gazette
+                            instance wdth=100 ; glyphes composés (là où ils manquent) : Ā ā Ṃ ṃ
+  gazette-titre.woff2      « Samsara Gazette Titre » ← Playfair Display (nom réservé « Playfair Display ») — playfairdisplay.OFL.txt — thème Gazette
+                            instance wght=800 ; glyphes composés (là où ils manquent) : ṃ ; lettres du titre seulement : « Saṃsāra »
 
 Glyphes AJOUTÉS par composition (base + diacritique) pour écrire « Saṃsāra » d'une seule
 police : ā / Ā (a + macron) et ṃ / Ṃ (m + point souscrit), seulement là où la police ne les a pas.
