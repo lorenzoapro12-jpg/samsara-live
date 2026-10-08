@@ -15,7 +15,7 @@
                                                                                 ▼
                                                                     raw.githubusercontent
                                                                                 │
-   data-api.binance.vision (ticker, klines, trades, carnet) ────────────────────┤
+   api.binance.com (ticker, klines, trades) ────────────────────────────────────┤
                                                                                 ▼
                                                                           index.html
                                                                     (le dashboard, autonome)
@@ -24,11 +24,6 @@
    git log master ────┤──▶ historique.py ──▶ branche orpheline `historique`
    fapi.binance.com ──┘                     (index.json + series/*.csv)
 ```
-
-Côté navigateur, la page et la carte appellent le miroir public de Binance,
-`data-api.binance.vision`, et jamais `api.binance.com` : mêmes réponses (données de marché
-spot), CORS ouvert, et il répond là où l'adresse principale renvoie 451 (refus régional).
-La page n'utilise ni les contrats à terme (`fapi`, sans miroir) ni de websocket.
 
 `index.html` ne lit **que** deux fichiers du dépôt — `market-data.json` et `heatmap.json` —
 **et il les lit sur GitHub Raw, par URL absolue**, pas dans le dossier qui sert la page. Tout

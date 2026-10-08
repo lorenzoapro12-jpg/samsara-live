@@ -104,7 +104,7 @@ Object.defineProperty(feed, 'innerHTML', { get: () => html, set: v => { rendus++
   check(`seuil « retard » (${T.CADENCES.vieux_min} min) franchi : cartes refaites (bandeau d’âge), voyant au calme`, rendus > r0 && /age-banner/.test(html) && dot.classList.contains('calme'));
 
   titre('2. Le prix : ticker MINI, variation sur l’ouverture de la même réponse');
-  check('URL du prix : ticker/24hr au format MINI', T.urlTicker('BTCUSDT') === 'https://data-api.binance.vision/api/v3/ticker/24hr?symbol=BTCUSDT&type=MINI');
+  check('URL du prix : ticker/24hr au format MINI', T.urlTicker('BTCUSDT') === 'https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT&type=MINI');
   const v = T.var24De({ openPrice: '86144.01000000', lastPrice: '83512.51000000' });
   check(`variation = (dernier − ouverture) / ouverture : ${v.toFixed(4)} % ; Binance publie −3.055 (arrondi à 3 décimales)`, Math.abs(v - (-3.055)) < 0.0005 && v.toFixed(2) === '-3.05', v);
   check('réponse complète (sans openPrice) : priceChangePercent en repli', T.var24De({ lastPrice: '1', priceChangePercent: '0.4' }) === 0.4);
@@ -117,7 +117,7 @@ Object.defineProperty(feed, 'innerHTML', { get: () => html, set: v => { rendus++
 
   titre('3. Le préchargement du script de tête : les URL exactes du démarrage');
   const tete = scriptsApp()[0];
-  const prech = [...tete.texte.matchAll(/lire\((B \+ )?'([^']+)'/g)].map(m => (m[1] ? 'https://data-api.binance.vision/api/v3/' : '') + m[2]);
+  const prech = [...tete.texte.matchAll(/lire\((B \+ )?'([^']+)'/g)].map(m => (m[1] ? 'https://api.binance.com/api/v3/' : '') + m[2]);
   const attendues = [T.urlPremierePage('BTCUSDT', '15m'), T.urlTicker('BTCUSDT'), T.DATA_URL].sort();
   check('le premier script d’index.html précharge la première page de bougies, le prix et market-data.json — mêmes URL que js/app.js',
     tete.fichier === 'index.html (inline)' && JSON.stringify(prech.slice().sort()) === JSON.stringify(attendues), { prech, attendues });

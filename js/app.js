@@ -265,7 +265,7 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 const DATA_URL = 'https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/master/market-data.json';
 // L'API Binance de la page : les lectures ajoutées (heure du serveur, contre-expertise) en
 // construisent leurs URL — aucun hôte réécrit ailleurs.
-const API_BINANCE = 'https://data-api.binance.vision/api/v3/';
+const API_BINANCE = 'https://api.binance.com/api/v3/';
 let marketData = null, livePrice = null, candles = [], chartInterval = '15m';
 let activeSymbol = 'BTCUSDT';  // BTCUSDT, ETHUSDT, SOLUSDT, XRPUSDT, TAOUSDT, ou BTCSOL (ratio)
 
@@ -1042,7 +1042,7 @@ const PAGES_HISTORIQUE = 3;   // 3 × 1000 bougies, comme avant
 // La page la plus RÉCENTE se demande sans endTime (les 1000 dernières bougies, comme avec
 // endTime = maintenant) : son URL est fixe, c'est celle que le script de tête d'index.html a
 // déjà lancée pour la paire et l'intervalle par défaut (prechargee).
-const urlPremierePage = (symbol, interval) => `https://data-api.binance.vision/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=1000`;
+const urlPremierePage = (symbol, interval) => `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=1000`;
 // Une page Binance : jusqu'à 1000 bougies dont l'ouverture est ≤ endTime (la dernière sans endTime).
 async function pageKlines(symbol, interval, endTime) {
   const url = endTime ? urlPremierePage(symbol, interval) + `&endTime=${endTime}` : urlPremierePage(symbol, interval);
@@ -1156,7 +1156,7 @@ function cols() {
 
 // La queue d'un historique (les `last` dernières bougies) : le rafraîchissement des 5 s.
 async function fetchKlinesRaw(symbol, last) {
-  const resp = Horloges.verifier(await fetch(`https://data-api.binance.vision/api/v3/klines?symbol=${symbol}&interval=${chartInterval}&limit=${last}`));
+  const resp = Horloges.verifier(await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${chartInterval}&limit=${last}`));
   const d = await resp.json();
   Horloges.noter('bougies');
   return d;
@@ -1267,7 +1267,7 @@ async function fetchSRKlines(symbol, interval) {
   const now = Date.now();
   if (cached && (now - cached.ts < SR_REFETCH_MS)) return cached;
   try {
-    const resp = await fetch(`https://data-api.binance.vision/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${PARAM.sr.bougies}`);
+    const resp = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${PARAM.sr.bougies}`);
     if (!resp.ok) throw new Error(`Binance ${resp.status}`);
     const raw = await resp.json();
     const data = raw.map(k => ({
@@ -1337,7 +1337,7 @@ function fmtPrix(v) { return v.toFixed(pxDec(v)); }
 // (lastPrice, openPrice) ; la variation se calcule sur l'ouverture de la MÊME réponse — la
 // définition de Binance, (dernier − ouverture) / ouverture sur 24 h glissantes —, au lieu de son
 // priceChangePercent arrondi à 3 décimales (absent du format MINI).
-const urlTicker = s => 'https://data-api.binance.vision/api/v3/ticker/24hr?symbol=' + s + '&type=MINI';
+const urlTicker = s => 'https://api.binance.com/api/v3/ticker/24hr?symbol=' + s + '&type=MINI';
 function var24De(d) {
   const o = parseFloat(d.openPrice), l = parseFloat(d.lastPrice);
   return o > 0 ? (l - o) / o * 100 : parseFloat(d.priceChangePercent);   // repli : réponse complète
@@ -3926,7 +3926,7 @@ const pctSpan = v => { if(!isNum(v)) return '—'; const c = v>0?'stat-pos':(v<0
 // LECTURE LIVE — bouton ⚡ (ajouté le 02/10/2026)
 // ─────────────────────────────────────────────────────────────────────────────
 // POURQUOI CETTE VUE EXISTE. Le dashboard a DEUX cadences, et ça a été pris pour une panne :
-//   · le badge de prix en haut -> data-api.binance.vision ticker/price, rafraîchi à la SECONDE ;
+//   · le badge de prix en haut -> api.binance.com ticker/price, rafraîchi à la SECONDE ;
 //   · les cartes « Marché live » -> market-data.json, fichier réécrit toutes les 15 MINUTES.
 // L'utilisateur a signalé deux fois un « écart entre le prix réel OKX et ce qu'affiche le dashboard ».
 // Mesuré le 02/10 à 11:07 UTC : badge 86 422,0 contre OKX spot 86 423,0 — soit 1,0 pt, pas
