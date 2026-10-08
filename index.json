@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-08T05:35:28+00:00",
+ "updated": "2026-10-08T05:42:45+00:00",
  "generator": "historique.py v1.0 — séries publiées dans la branche orpheline `historique`, décrites par `meta` (07/10/2026)",
  "source": "binance (futures et spot) · deribit et coinbase via market-data.json · git (master, publications passées)",
  "branche": "historique",
@@ -10,6 +10,7 @@
   "open_interest_1h": "ok",
   "long_short_1h": "ok",
   "positionnement": "ok",
+  "long_short_1h_controle": "ok",
   "index": "ok"
  },
  "errors": [],
@@ -108,14 +109,19 @@
     "series/long-short-1h.csv"
    ],
    "lignes": 509,
-   "octets": 30916,
+   "octets": 29916,
    "periode": {
     "debut": "2026-09-17T01:00:00+00:00",
     "fin": "2026-10-08T05:00:00+00:00"
    },
    "trous": [],
    "trous_nombre": 0,
-   "trous_tronques": false
+   "trous_tronques": false,
+   "controle": {
+    "identite": "100 × ratio / (1 + ratio)",
+    "tolerance_pct": 0.01,
+    "desaccords": []
+   }
   }
  },
  "meta": {
@@ -394,7 +400,7 @@
    "long_short_1h.comptes_longs_pct": {
     "libelle": "Comptes acheteurs",
     "unite": "%",
-    "formule": "part des comptes nets acheteurs",
+    "formule": "longAccount × 100 — la source donne cette part en FRACTION (4 décimales) ; publiée en pourcentage, donc égale à 100 × ratio / (1 + ratio)",
     "fenetre": "pas horaire",
     "nature": "mesure",
     "source": "Binance futures USDⓈ-M BTCUSDT",
@@ -414,7 +420,7 @@
    "long_short_1h.gros_longs_pct": {
     "libelle": "Gros traders acheteurs",
     "unite": "%",
-    "formule": "part longue des top traders",
+    "formule": "top_longAccount × 100 — la source donne cette part en FRACTION (4 décimales) ; publiée en pourcentage, donc égale à 100 × ratio / (1 + ratio)",
     "fenetre": "pas horaire",
     "nature": "mesure",
     "source": "Binance futures USDⓈ-M BTCUSDT",
