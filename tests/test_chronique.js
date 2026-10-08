@@ -123,6 +123,11 @@ const CH = ['micro.cvd_24h_usd', 'micro.oi_change_24h_pct', 'tf.4h.rsi_14'];
     check('429 : le titre du tracé dit « historique partiel »', /historique partiel/.test(c.trace('micro.cvd_24h_usd', { l: 48, h: 14, classe: 'x' })));
     const f2 = faux(depot(alterne(40, 15)), n => (n === 4 ? 403 : 0));
     const c2 = K.creer({ url: URL0, chemins: CH, stockage: memoire(), fetch: f2 });
+    // Sans publication connue, `plusRecent` retombe sur l'horloge du poste : les rangs du
+    // jeu d'essai sont datés et tombent alors hors de l'horizon de 6 h, et la marche
+    // s'arrête sur « horizon » AVANT d'atteindre le rang 4 — le 403 n'est jamais exécuté.
+    // Le cas 429 ci-dessus ajoute `pub(T0)` ; celui-ci doit partir du même état.
+    c2.ajouter(pub(T0));
     check('403 : même arrêt', (await c2.parcourir()) === 'limite');
   }
   {

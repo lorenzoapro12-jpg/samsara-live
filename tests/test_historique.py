@@ -356,8 +356,142 @@ def main():
         finally:
             H.MAX_OCTETS = limite
 
-        # ─── 8. LECTURE PAR UNE SESSION DISTANTE ────────────────────────────
-        print("\n8. Lecture depuis un clone neuf (fetch --depth 1 --filter=blob:none)")
+        # ─── 8. UNITÉ DE LA PART LONGUE ─────────────────────────────────────
+        # Le contrôle tient une IDENTITÉ : la part publiée vaut 100 × ratio / (1 + ratio).
+        # Le défaut qui l'a fait naître est fourni tel quel — une série écrite en FRACTION —
+        # et le harnais exige qu'il soit ATTRAPÉ avant migration, puis plus après. Un
+        # contrôle qu'on n'a jamais vu échouer ne prouve rien.
+        print("\n8. Unité de la part longue : le contrôle attrape une fraction")
+        ratio_c, ratio_g = 1.7233, 1.5798
+        part_source_c = 0.6328                    # ce que Binance rend : une FRACTION
+        attendu_c = H.part_attendue_pct(ratio_c)
+        check("l'identité reconstruit la part de la source (ratio 1,7233 → 63,28 %)",
+              abs(attendu_c - 63.28) <= H.TOLERANCE_PCT, f"{attendu_c}")
+        check("l'arrondi de la source est dans la tolérance du contrôle",
+              abs(part_source_c * 100 - attendu_c) <= H.TOLERANCE_PCT,
+              f"source {part_source_c * 100} contre {attendu_c}")
+
+        # (a) LE PRODUCTEUR. Binance rend longAccount en fraction ; la colonne publiée est
+        #     en pourcentage, et ses décimales viennent de la spécification.
+        def faux_api(url, timeout=25):
+            if "globalLongShortAccountRatio" in url:
+                return [{"timestamp": 1791435600000, "longShortRatio": "1.7233",
+                         "longAccount": "0.6328"}]
+            if "topLongShortPositionRatio" in url:
+                return [{"timestamp": 1791435600000, "longShortRatio": "1.5798",
+                         "longAccount": "0.6124"}]
+            if "takerlongshortRatio" in url:
+                return [{"timestamp": 1791435600000, "buySellRatio": "0.9477"}]
+            raise RuntimeError("URL non simulée : " + url)
+
+        vraie_api = H.api_json
+        H.api_json = faux_api
+        try:
+            point = H.points_long_short()[0]
+        finally:
+            H.api_json = vraie_api
+        check("la part est publiée × 100, pas en fraction",
+              point["comptes_longs_pct"] == "63.28" and point["gros_longs_pct"] == "61.24",
+              str(point))
+        check("les décimales publiées sont celles de la spécification (dec de COLS_LS)",
+              len(point["comptes_longs_pct"].split(".")[1])
+              == H.dec_de(H.COLS_LS, "comptes_longs_pct"), point["comptes_longs_pct"])
+
+        # (b) LE CONTRÔLE, sur un fichier fabriqué.
+        chemin_ls = os.path.join(hist, "series", "long-short-1h.csv")
+
+        def ligne_ls(heure, rc, rg):
+            """Ligne CONFORME : la part vaut l'identité appliquée au ratio de la même ligne."""
+            return {"heure_utc": heure, "ls_comptes": f"{rc:.4f}",
+                    "comptes_longs_pct": H.nombre(H.part_attendue_pct(rc), 2),
+                    "ls_gros_traders": f"{rg:.4f}",
+                    "gros_longs_pct": H.nombre(H.part_attendue_pct(rg), 2),
+                    "taker_ratio_volume": "0.9477"}
+
+        def ecrire_ls(lignes):
+            with open(chemin_ls, "w", encoding="utf-8") as f:
+                f.write(H.texte_csv(H.COLS_LS, lignes))
+
+        conformes = [ligne_ls("2026-10-08T03:00:00+00:00", 1.7442, 1.5608),
+                     ligne_ls("2026-10-08T04:00:00+00:00", 1.7427, 1.5273)]
+        ecrire_ls(conformes)
+        check("un fichier conforme ne déclenche rien",
+              H.controler_part_longue(chemin_ls) == [], str(H.controler_part_longue(chemin_ls)))
+
+        # Le défaut historique, à l'identique : les deux cellules en FRACTION.
+        fautives = [dict(l, comptes_longs_pct="0.6356", gros_longs_pct="0.6095")
+                    for l in conformes]
+        ecrire_ls(fautives)
+        ecarts = H.controler_part_longue(chemin_ls)
+        check("une série en FRACTION est REFUSÉE (2 lignes × 2 colonnes)",
+              len(ecarts) == 4, str(ecarts))
+        check("le désaccord est chiffré et nomme la colonne",
+              any("comptes_longs_pct=0.6356" in e and "63.56" in e for e in ecarts), str(ecarts))
+
+        # Sensibilité : la tolérance laisse passer l'arrondi, pas une erreur d'un point.
+        un_point = [dict(l, comptes_longs_pct=H.nombre(H.part_attendue_pct(1.7442) + 1, 2))
+                    for l in conformes]
+        ecrire_ls(un_point)
+        check("un écart d'un point de pourcentage est attrapé",
+              len(H.controler_part_longue(chemin_ls)) == 2,
+              str(H.controler_part_longue(chemin_ls)))
+
+        # Une ligne sans valeur n'est pas un désaccord : la case vide est un état légitime.
+        vides = [{"heure_utc": "2026-10-08T05:00:00+00:00", "ls_comptes": "",
+                  "comptes_longs_pct": "", "ls_gros_traders": "", "gros_longs_pct": "",
+                  "taker_ratio_volume": "0.9477"}]
+        ecrire_ls(vides)
+        check("les lignes vides ne produisent pas de faux positif",
+              H.controler_part_longue(chemin_ls) == [], str(H.controler_part_longue(chemin_ls)))
+
+        # (c) LA MIGRATION : elle recalcule depuis le ratio, donc relancer ne double rien.
+        ecrire_ls(fautives)
+        corrigees = H.migrer_part_longue(cfg)
+        apres = lire_csv_dicts(chemin_ls)
+        check("la migration remet les 4 cellules en pourcentage", corrigees == 4, str(corrigees))
+        check("la valeur relue est celle que `meta` annonce",
+              apres[0]["comptes_longs_pct"] == "63.56" and apres[0]["gros_longs_pct"] == "60.95",
+              str(apres[0]))
+        check("la migration rend le fichier conforme au contrôle",
+              H.controler_part_longue(chemin_ls) == [], str(H.controler_part_longue(chemin_ls)))
+        octets_avant = open(chemin_ls, encoding="utf-8").read()
+        H.migrer_part_longue(cfg)                      # rejouée
+        check("rejouer la migration ne change pas un octet (elle RECALCULE, elle ne × 100 pas)",
+              open(chemin_ls, encoding="utf-8").read() == octets_avant
+              and lire_csv_dicts(chemin_ls)[0]["comptes_longs_pct"] == "63.56",
+              lire_csv_dicts(chemin_ls)[0]["comptes_longs_pct"])
+        # Une ligne sans ratio reste vide : la migration n'invente pas de valeur.
+        ecrire_ls(vides)
+        H.migrer_part_longue(cfg)
+        check("une ligne sans ratio reste VIDE après migration",
+              lire_csv_dicts(chemin_ls)[0]["comptes_longs_pct"] == "",
+              str(lire_csv_dicts(chemin_ls)[0]))
+
+        # (d) L'INDEX PUBLIE LE VERDICT : un désaccord doit se voir à distance, et faire
+        #     échouer le passage.
+        ecrire_ls(fautives)
+        H.reinitialiser()
+        index = H.construire_index(cfg, "2026-10-08T05:40:00+00:00")
+        controle = index["series"]["long_short_1h"]["controle"]
+        check("l'index porte l'identité et sa tolérance",
+              controle["identite"] == "100 × ratio / (1 + ratio)"
+              and controle["tolerance_pct"] == H.TOLERANCE_PCT, str(controle))
+        check("l'index porte les désaccords (4)", len(controle["desaccords"]) == 4,
+              str(controle["desaccords"]))
+        check("l'état du passage est en erreur",
+              H.STATUS["long_short_1h_controle"].startswith("error"),
+              H.STATUS["long_short_1h_controle"])
+        check("l'anomalie est bruyante (code 1 à la sortie du script)",
+              any("ratio / (1 + ratio)" in e for e in H.ERRORS), str(H.ERRORS))
+        H.migrer_part_longue(cfg)                      # on rend le fichier conforme
+        H.reinitialiser()
+        index = H.construire_index(cfg, "2026-10-08T05:40:00+00:00")
+        check("fichier conforme : contrôle ok, aucune anomalie",
+              index["series"]["long_short_1h"]["controle"]["desaccords"] == []
+              and H.STATUS["long_short_1h_controle"] == "ok" and H.ERRORS == [], str(H.ERRORS))
+
+        # ─── 9. LECTURE PAR UNE SESSION DISTANTE ────────────────────────────
+        print("\n9. Lecture depuis un clone neuf (fetch --depth 1 --filter=blob:none)")
         H.publier(cfg, "Historique test")
         pousse = git(["rev-parse", cfg["hist_branche"]], nu, check_=False)
         check("la branche `historique` est bien sur le dépôt distant",
@@ -385,8 +519,8 @@ def main():
                   len(ser.stdout.strip().splitlines()) == 5,   # en-tête + 4
                   f"{len(ser.stdout.strip().splitlines())} lignes")
 
-        # ─── 9. LIGNE DE COMMANDE ───────────────────────────────────────────
-        print("\n9. Ligne de commande (code de sortie)")
+        # ─── 10. LIGNE DE COMMANDE ──────────────────────────────────────────
+        print("\n10. Ligne de commande (code de sortie)")
         base2 = tempfile.mkdtemp(prefix="hist-cli-")
         try:
             cfg2, _ = fabriquer_depot(base2)

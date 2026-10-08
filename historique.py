@@ -38,6 +38,16 @@ Trois invariants repris d'ARCHITECTURE.md
     fichiers, pas l'installation. `nettoie()` retire les chemins connus de tout message
     qui part dans l'index : une trace d'exception git en contient toujours un.
 
+Unité de la part longue — et le contrôle qui la tient
+-----------------------------------------------------
+`longAccount` n'est pas une mesure indépendante : c'est `ratio / (1 + ratio)`. Les deux
+colonnes de part (`comptes_longs_pct`, `gros_longs_pct`) sont donc DÉDUCTIBLES du ratio de
+la même ligne, et l'index porte le contrôle `100 × ratio / (1 + ratio)` — un désaccord sort
+en code 1. Ce contrôle existe parce que la série a publié des FRACTIONS (0,6328) alors que
+`meta` annonçait « % » : un fichier de données seules, lu à distance, ne le montrait pas.
+La migration `--migrer-part-longue` remet l'historique déjà écrit dans la bonne unité en
+RECALCULANT la part depuis le ratio (idempotent — relancer ne double rien).
+
 Répertoire de travail
 ---------------------
 Un **worktree** à part (branche `historique`), pour ne jamais toucher l'index ni l'arbre
@@ -217,14 +227,18 @@ COLS_LS = [
      "formule": "comptes nets acheteurs / comptes nets vendeurs (globalLongShortAccountRatio)",
      "fenetre": "pas horaire", "source": "Binance futures USDⓈ-M BTCUSDT"},
     {"nom": "comptes_longs_pct", "libelle": "Comptes acheteurs", "chemin": "longAccount",
-     "unite": "%", "dec": 4, "nature": "mesure", "formule": "part des comptes nets acheteurs",
+     "unite": "%", "dec": 2, "nature": "mesure",
+     "formule": "longAccount × 100 — la source donne cette part en FRACTION (4 décimales) ; "
+                "publiée en pourcentage, donc égale à 100 × ratio / (1 + ratio)",
      "fenetre": "pas horaire", "source": "Binance futures USDⓈ-M BTCUSDT"},
     {"nom": "ls_gros_traders", "libelle": "Ratio L/S (gros traders, positions)",
      "chemin": "top_longShortRatio", "unite": "ratio", "dec": 4, "nature": "mesure",
      "formule": "positions longues / courtes des « top traders » (topLongShortPositionRatio)",
      "fenetre": "pas horaire", "source": "Binance futures USDⓈ-M BTCUSDT"},
     {"nom": "gros_longs_pct", "libelle": "Gros traders acheteurs", "chemin": "top_longAccount",
-     "unite": "%", "dec": 4, "nature": "mesure", "formule": "part longue des top traders",
+     "unite": "%", "dec": 2, "nature": "mesure",
+     "formule": "top_longAccount × 100 — la source donne cette part en FRACTION (4 décimales) ; "
+                "publiée en pourcentage, donc égale à 100 × ratio / (1 + ratio)",
      "fenetre": "pas horaire", "source": "Binance futures USDⓈ-M BTCUSDT"},
     {"nom": "taker_ratio_volume", "libelle": "Ratio acheteurs/vendeurs taker",
      "chemin": "taker_buySellRatio", "unite": "ratio", "dec": 4, "nature": "mesure",
@@ -281,6 +295,75 @@ class NonConfigure(RuntimeError):
     """Dépendance absente de CET environnement — pas une panne."""
 
 
+# ─── CONTRÔLE D'UNITÉ DE LA PART LONGUE ──────────────────────────────────────
+# `longAccount` n'est pas une mesure indépendante du ratio : c'est la MÊME donnée écrite
+# autrement — Binance le calcule comme ratio / (1 + ratio). Ne pas confronter la part
+# publiée à cette identité laisse passer une erreur d'UNITÉ, et c'est arrivé : la série a
+# publié des FRACTIONS (0,6328) jusqu'au 08/10/2026 alors que `meta` annonçait « % ». Un
+# fichier de données seules, lu à distance, ne permettait pas de le voir.
+#
+# Tolérance. `longShortRatio` est publié à 4 décimales : la part qu'on en reconstruit est
+# donc exacte à 1,4e-5 près, soit 0,0014 point de pourcentage, et la colonne en ajoute
+# 0,005 (son propre arrondi d'écriture). 0,01 point couvre les deux — et attrape une
+# valeur restée en FRACTION, dont l'écart se compte en dizaines de points.
+TOLERANCE_PCT = 0.01
+
+# (colonne publiée en pourcentage, ratio dont elle est déductible) — le seul couple du
+# schéma où une valeur est ENTIÈREMENT déductible d'une autre colonne de la même ligne ;
+# c'est précisément ce qui rend le contrôle possible sans source extérieure.
+COUPLES_PART_RATIO = (("comptes_longs_pct", "ls_comptes"),
+                      ("gros_longs_pct", "ls_gros_traders"))
+
+
+def part_attendue_pct(ratio):
+    """Part longue, en pourcentage, déduite du ratio L/S publié sur la MÊME ligne."""
+    try:
+        r = float(ratio)
+    except (TypeError, ValueError):
+        return None
+    if r <= 0:
+        return None
+    return 100.0 * r / (1.0 + r)
+
+
+def dec_de(cols, nom):
+    """Décimales d'une colonne, LUES dans la spécification au lieu d'être recopiées."""
+    return next(c["dec"] for c in cols if c["nom"] == nom)
+
+
+def controler_part_longue(chemin, limite=TROUS_MAX):
+    """Confronte la part publiée à son identité `100 × ratio / (1 + ratio)`.
+
+    Lit le FICHIER publié, jamais les points qui viennent d'arriver : c'est ce qui attrape
+    une ligne ancienne que Binance ne rendra plus et qu'aucun passage ne réécrira — donc
+    exactement le cas qui a produit le fichier mixte.
+
+    Renvoie les désaccords, ne corrige rien : une valeur qui ne vaut pas ce que `meta`
+    annonce se SIGNALE. La corriger en silence remplacerait une donnée fausse par une
+    donnée qu'on n'a pas vérifiée.
+    """
+    if not os.path.exists(chemin):
+        return []
+    ecarts = []
+    for l in lire_csv(chemin, COLS_LS):
+        for col_pct, col_ratio in COUPLES_PART_RATIO:
+            attendu = part_attendue_pct(l.get(col_ratio))
+            publie = l.get(col_pct)
+            if attendu is None or publie in (None, ""):
+                continue
+            try:
+                ecart = abs(float(publie) - attendu)
+            except (TypeError, ValueError):
+                ecarts.append(f"{l.get('heure_utc')} {col_pct} illisible « {publie} »")
+                continue
+            if ecart > TOLERANCE_PCT:
+                ecarts.append(f"{l.get('heure_utc')} {col_pct}={publie} contre "
+                              f"{attendu:.2f} attendu (écart {ecart:.2f} pt)")
+    if len(ecarts) > limite:
+        ecarts = ecarts[:limite] + [f"… et {len(ecarts) - limite} autre(s)"]
+    return ecarts
+
+
 # ─── OUTILS ──────────────────────────────────────────────────────────────────
 def nettoie(msg, cfg=CFG) -> str:
     """Retire tout chemin de machine d'un message publié.
@@ -334,6 +417,14 @@ def nombre(valeur, dec) -> str:
     except (TypeError, ValueError):
         return str(valeur)
     return f"{f:.{dec}f}" if dec else f"{f:.0f}"
+
+
+def centieme(valeur):
+    """Fraction -> pourcentage. `None`/illisible -> `None`, donc une case VIDE, jamais 0."""
+    try:
+        return float(valeur) * 100.0
+    except (TypeError, ValueError):
+        return None
 
 
 def lire_chemin(doc, chemin):
@@ -611,6 +702,52 @@ def fusionner_serie(cfg, nom, points):
     return change
 
 
+# ─── MIGRATION D'UNITÉ ───────────────────────────────────────────────────────
+def migrer_part_longue(cfg) -> int:
+    """Ramène une série publiée en FRACTION à l'unité que `meta` annonce (le pourcentage).
+
+    Pourquoi une migration, et pas seulement un correctif du producteur : `fusionner_serie`
+    ne réécrit que les points que Binance rend encore (500 points horaires, ≈ 21 jours).
+    Les lignes plus anciennes sont CONSERVÉES telles quelles — c'est voulu, elles ne se
+    refabriquent pas. Corriger le seul producteur aurait donc laissé le HAUT du fichier en
+    fraction et le bas en pourcentage : un fichier MIXTE, où la même colonne veut dire deux
+    choses selon la ligne, soit pire que l'erreur d'origine.
+
+    Elle RECALCULE la part depuis le ratio de la même ligne, `100 × ratio / (1 + ratio)`.
+    C'est idempotent par construction — recalculer rend le même résultat — donc la relancer
+    ne peut pas doubler la valeur, ce qui est le piège d'une migration qui multiplierait
+    par 100. Une ligne sans ratio reste VIDE : on ne l'invente pas.
+    """
+    nom = "long_short_1h"
+    chemin = chemin_serie(cfg, nom, None)
+    cols = SERIES[nom]["cols"]
+    if not os.path.exists(chemin):
+        STATUS["migration"] = "non exécutée : la série est absente"
+        return 0
+    lignes = lire_csv(chemin, cols)
+    corrigees = 0
+    for l in lignes:
+        for col_pct, col_ratio in COUPLES_PART_RATIO:
+            attendu = part_attendue_pct(l.get(col_ratio))
+            if attendu is None:
+                continue
+            valeur = nombre(attendu, dec_de(cols, col_pct))
+            if l.get(col_pct) != valeur:
+                l[col_pct] = valeur
+                corrigees += 1
+    texte = texte_csv(cols, lignes)
+    if len(texte.encode("utf-8")) > MAX_OCTETS:
+        STATUS["migration"] = f"error: fichier au-delà de {MAX_OCTETS} octets"
+        ERRORS.append(f"migration: {nom} dépasserait {MAX_OCTETS} octets — écriture refusée")
+        return 0
+    change = ecrire_si_change(texte, chemin)
+    STATUS["migration"] = "ok"
+    rapport["migration"] = (f"{corrigees} cellule(s) remise(s) en pourcentage sur "
+                            f"{len(lignes)} ligne(s)"
+                            + ("" if change else " — déjà conformes, rien réécrit"))
+    return corrigees
+
+
 # Ce que Binance futures conserve encore. Au-delà, la source ne rend rien — et un trou
 # de la SOURCE n'est pas un trou de notre collecte : l'index les distingue.
 API_FAPI = "https://fapi.binance.com"
@@ -646,17 +783,23 @@ def points_long_short():
     comptes = api_json(f"{base}/globalLongShortAccountRatio?symbol=BTCUSDT&period=1h&limit=500")
     gros = api_json(f"{base}/topLongShortPositionRatio?symbol=BTCUSDT&period=1h&limit=500")
     taker = api_json(f"{base}/takerlongshortRatio?symbol=BTCUSDT&period=1h&limit=500")
+    # `longAccount` arrive en FRACTION (0,6328) et `meta` annonce « % » : la colonne est
+    # publiée × 100 (63,28). Les décimales viennent de la spécification, pas d'un littéral
+    # recopié ici — sinon les deux peuvent diverger.
+    dec_pct = dec_de(COLS_LS, "comptes_longs_pct")
     par_heure = {}
     for x in comptes:
         h = depuis_ms(x["timestamp"])
         par_heure.setdefault(h, {})["heure_utc"] = h
         par_heure[h].update({"ls_comptes": nombre(x.get("longShortRatio"), 4),
-                             "comptes_longs_pct": nombre(x.get("longAccount"), 4)})
+                             "comptes_longs_pct": nombre(centieme(x.get("longAccount")),
+                                                         dec_pct)})
     for x in gros:
         h = depuis_ms(x["timestamp"])
         par_heure.setdefault(h, {})["heure_utc"] = h
         par_heure[h].update({"ls_gros_traders": nombre(x.get("longShortRatio"), 4),
-                             "gros_longs_pct": nombre(x.get("longAccount"), 4)})
+                             "gros_longs_pct": nombre(centieme(x.get("longAccount")),
+                                                      dec_pct)})
     for x in taker:
         h = depuis_ms(x["timestamp"])
         par_heure.setdefault(h, {})["heure_utc"] = h
@@ -729,6 +872,25 @@ def construire_index(cfg, ts):
             ERRORS.append(f"{nom}: fichier(s) au-delà de {MAX_OCTETS} octets : "
                           + ", ".join(os.path.basename(x) for x in trop_gros))
         index["series"][nom] = entree
+
+    # ── contrôle d'unité, sur le fichier PUBLIÉ ─────────────────────────────
+    # Il vient après la boucle parce qu'il porte sur ce qui est sur le disque, pas sur ce
+    # qu'on vient d'écrire. Une anomalie ici sort en code 1 : le passage est déclaré en
+    # échec, et l'index publié porte le détail — une session distante voit la même chose
+    # que la machine qui produit.
+    ecarts = controler_part_longue(chemin_serie(cfg, "long_short_1h", None))
+    index["series"]["long_short_1h"]["controle"] = {
+        "identite": "100 × ratio / (1 + ratio)",
+        "tolerance_pct": TOLERANCE_PCT,
+        "desaccords": ecarts,
+    }
+    if ecarts:
+        STATUS["long_short_1h_controle"] = f"error: {len(ecarts)} désaccord(s) d'unité"
+        ERRORS.append("long_short_1h: la part longue publiée ne vaut pas "
+                      "100 × ratio / (1 + ratio) — " + " · ".join(ecarts))
+    else:
+        STATUS["long_short_1h_controle"] = "ok"
+
     if not index["series"]["positionnement"]["lignes"]:
         ERRORS.append("positionnement: aucune ligne — la série n'a pas été amorcée")
     return index
@@ -833,6 +995,9 @@ def principale(cfg=None, argv=None) -> int:
     p.add_argument("--sans-reseau", action="store_true",
                    help="n'interroge pas Binance (les séries existantes sont conservées)")
     p.add_argument("--sans-pousser", action="store_true", help="commit local seulement")
+    p.add_argument("--migrer-part-longue", action="store_true",
+                   help="réécrit la part longue de la série publiée de fraction vers "
+                        "pourcentage (recalcul depuis le ratio de chaque ligne ; idempotent)")
     args = p.parse_args(argv)
 
     ts = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
@@ -855,6 +1020,9 @@ def principale(cfg=None, argv=None) -> int:
         STATUS["amorcage"] = "non exécuté : les séries existent déjà"
 
     collecter_binance(cfg, args.sans_reseau)
+
+    if args.migrer_part_longue:
+        migrer_part_longue(cfg)
 
     # ── la publication du jour ──
     try:
@@ -891,6 +1059,8 @@ def principale(cfg=None, argv=None) -> int:
     for nom in ("funding", "open_interest_1h", "long_short_1h"):
         e = index["series"][nom]
         print(f"  {nom:<16}: {e['lignes']} lignes · {e['octets']} o · {e['trous_nombre']} trou(s)")
+    if "migration" in rapport:
+        print(f"  migration : {rapport['migration']}")
     print(f"  état : {STATUS}")
     if ERRORS:
         print(f"  ⚠️  {len(ERRORS)} anomalie(s) : {ERRORS}")
