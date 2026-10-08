@@ -4,6 +4,8 @@
    La page est AUTONOME : elle ne partage aucun code avec le terminal (index.html, js/app.js),
    qu'elle ne modifie pas. Elle lit deux fichiers publiés (heatmap.json, market-data.json)
    et interroge Binance elle-même — rien d'autre (contrat réseau : tests/test_contrat.py).
+   Depuis le 08/10/2026, un troisième fichier publié, executions.json (executions.py, service
+   permanent du VPS), porte 24 h d'exécutions : la carte les montre AVANT ce que la page a lu.
 
    ORDRE DES CALQUES — le prix est une ligne SUR la chaleur, pas l'inverse :
      chaleur (carte publiée, puis carnet live) → « non observé » hachuré → mémoire du carnet
@@ -26,6 +28,7 @@
   const RAW = 'https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/master/';
   const HEATMAP_URL = RAW + 'heatmap.json';
   const DATA_URL = RAW + 'market-data.json';
+  const EXEC_URL = RAW + 'executions.json';
   const API = 'https://api.binance.com/api/v3/';
   const SYMBOLE = 'BTCUSDT';
 
@@ -42,7 +45,7 @@
     fusionT: 1,           // carte publiée : colonnes fusionnées (MAX)
     fusionP: 1,           // carte publiée : tranches fusionnées (MAX)
     niveauxLive: 1000,
-    dpLive: 5,            // tranche du carnet live, en $
+    dpLive: 20,           // tranche du carnet live, en $ : celle de la carte publiée (même image des deux côtés)
     bulleMin: 0.1,        // BTC
     bulleEchelle: 1,
     presenceSeuil: BM.PRESENCE.defautBtc,   // BTC demandés : la carte écrit le cran publié qui les porte
@@ -93,6 +96,9 @@
     md: null, niv: null, mdLu: null, mdTexte: null,
     live: null, liveRef: null, liveP99: 0, liveEcartees: 0, carnet: null, carnetA: null, liveV: 0,
     exec: new BM.SeauxExecutions(1), execVus: new Set(), execArriere: null, execTrous: [], execLu: null,
+    // Exécutions publiées (executions.json) : `frontiere` (ms) = avant elle, les seaux publiés ;
+    // après, ce que la page lit elle-même. Fixée à la première lecture, jamais déplacée.
+    execPub: null,
     raf: new BM.Rafales(),     // rafales au marché : alimentées par les MÊMES exécutions acceptées
     murs: null,                // destin des murs (BM.SuiviMurs) : carnet BRUT + mêmes exécutions
     minutes: [], minutesA: null,
@@ -227,7 +233,7 @@
   // exactement après le dernier identifiant vu). Une absence est RATTRAPÉE page par page
   // (5 par tour) ; au-delà de 30 min de retard, on saute au présent et l'intervalle sauté devient
   // un trou de lecture — hachuré, compté dans le profil, jamais lu comme « aucune exécution ».
-  const PAGES_ARRIERE = 30, PAGES_PAR_TOUR = 5, RATTRAPAGE_MAX = 30 * 60e3, GARDE_EXECUTIONS = 6 * 3600e3;
+  const PAGES_ARRIERE = 30, PAGES_PAR_TOUR = 5, RATTRAPAGE_MAX = 30 * 60e3, GARDE_EXECUTIONS = 24 * 3600e3;
   let execInit = null;
   function lireExecutionsInitiales() { return execInit || (execInit = lireExecutionsInitiales0().finally(() => { if (E.exec.dernierId === null) execInit = null; })); }
   async function lireExecutionsInitiales0() {
@@ -238,7 +244,7 @@
       E.murs.completes(s);       // les plus récentes : rien ne manque jusqu'à l'envoi
       erreur('executions', null);
       bientot();
-      if (t.length) { E.execArriere = { id: t[0].a, pages: 0, fini: false, enCours: false }; remplirArriere(); }
+      if (t.length) { E.execArriere = { id: t[0].a, T: t[0].T, pages: 0, fini: false, enCours: false }; remplirArriere(); }
     } catch (e) { erreur('executions', e); throw e; }
   }
   /** Remplissage arrière ; interrompu (erreur, limite), il reprend au tour suivant. */
@@ -246,15 +252,19 @@
     const A = E.execArriere;
     if (!A || A.fini || A.enCours) return;
     A.enCours = true;
-    const objectif = () => (E.pub ? BM.finGrille(E.pub) : maintenant() - 15 * 60e3) - 60e3;
+    // Avec les exécutions publiées, le remplissage s'arrête à leur frontière : avant, elles y sont.
+    const objectif = () => (E.execPub ? E.execPub.frontiere : (E.pub ? BM.finGrille(E.pub) : maintenant() - 15 * 60e3) - 60e3);
     try {
-      while (A.pages < PAGES_ARRIERE && A.id > 0 && E.exec.premier > objectif()) {
+      // A.T, pas E.exec.premier : les seaux publiés reculent `premier` sans rien lire ici.
+      while (A.pages < PAGES_ARRIERE && A.id > 0 && A.T > objectif()) {
         if (document.hidden) return;              // repris par lireExecutions au retour sur l'onglet
         const depuis = Math.max(0, A.id - 1000);
         const t = (await binance('aggTrades?symbol=' + SYMBOLE + '&fromId=' + depuis + '&limit=' + (A.id - depuis), DELAIS.executions)).corps;
         // Les rafales recousent la limite de page (identifiants contigus, même ms, même côté).
-        E.raf.ajouterAncien(t.filter(x => E.exec.ajouterAncien(x, E.execVus)));
+        const F = E.execPub ? E.execPub.frontiere : -Infinity;      // avant : déjà versé depuis le fichier
+        E.raf.ajouterAncien(t.filter(x => x.T >= F && E.exec.ajouterAncien(x, E.execVus)));
         A.id = depuis; A.pages++;
+        if (t.length) A.T = t[0].T;
         bientot();
         await pause(150);
       }
@@ -292,10 +302,56 @@
   /** Jusqu'où les exécutions sont lues sans trou : la dernière requête qui a tout rendu, ou —
    *  pendant un rattrapage — la dernière exécution reçue. */
   function execLuJusqua() { return Math.max(E.execLu !== null ? axe(E.execLu) : -Infinity, E.exec.dernier || -Infinity); }
+  /** executions.json : 24 h de seaux (dt s × dp $, achats / ventes au marché) lus par le VPS.
+   *  Versés dans les MÊMES seaux que les exécutions lues ici, à l'instant du milieu de leur seau et
+   *  au milieu de leur tranche, sans jamais compter deux fois une exécution :
+   *   · avant la frontière (fixée à la première lecture : la fin de ce que le fichier a lu, ou plus
+   *     tôt si la page a déjà remonté plus loin), seuls les seaux ENTIERS avant elle ;
+   *   · dans un trou de lecture de la page (onglet caché, coupure), les seaux entièrement dedans,
+   *     et le trou est refermé quand le fichier le couvre.
+   *  Les rafales et le destin des murs n'en reçoivent rien : il leur faut chaque exécution. */
+  async function lireExecutionsPubliees() {
+    try {
+      const { corps: txt } = await lire(EXEC_URL, { delai: DELAIS.carte, cache: 'no-cache', texte: true, porte: E.recul.github });
+      const maj = BM.majEnTete(txt);
+      if (E.execPub && maj !== null && maj === E.execPub.maj) { erreur('historique', null); return; }
+      const d = JSON.parse(txt);
+      if (d.format !== 'seaux-1' || !Array.isArray(d.seaux)) throw new Error('format non reconnu par cette page');
+      const dtMs = d.dt * 1000, lu = (d.lu_jusqua || 0) * 1000;
+      if (!E.execPub) {
+        let F = Math.floor(lu / dtMs) * dtMs;
+        if (E.exec.premier !== null) F = Math.min(F, Math.floor(E.exec.premier / dtMs) * dtMs);
+        E.execPub = { frontiere: F, vus: new Set(), maj: null, depuis: null, trous: [] };
+      }
+      const P = E.execPub, F = P.frontiere, ouverts = d.trous.map(([a, b]) => [a * 1000, b * 1000]);
+      const dedans = (a, b) => E.execTrous.some(([x, y]) => a >= x && b <= y);
+      let n = 0;
+      for (const [k, bas, ach, ven] of d.seaux) {
+        const a = k * dtMs, b = a + dtMs;
+        if (P.vus.has(k) || !(b <= F || dedans(a, b))) continue;
+        P.vus.add(k);
+        const T = a + dtMs / 2;
+        for (let i = 0; i < ach.length; i++) {
+          const p = (bas + i + 0.5) * d.dp;
+          if (ach[i]) { E.exec.verser({ T, p, q: ach[i] * d.unite_btc, m: false }); n++; }
+          if (ven[i]) { E.exec.verser({ T, p, q: ven[i] * d.unite_btc, m: true }); n++; }
+        }
+      }
+      // Les trous de la page que le fichier couvre en entier sont refermés (lus par le VPS).
+      E.execTrous = E.execTrous.filter(([x, y]) => !(x >= (d.lu_depuis || Infinity) * 1000 && y <= lu && !ouverts.some(([a, b]) => a < y && b > x)));
+      P.maj = maj; P.depuis = d.lu_depuis ? d.lu_depuis * 1000 : null; P.trous = ouverts.filter(([, b]) => b <= F);
+      erreur('historique', null);
+      if (n) bientot();
+    } catch (e) {
+      // Pas encore publié (service du VPS non installé) : rien à dire, la page lit seule comme avant.
+      if (e && e.message === 'HTTP 404') { erreur('historique', null); return; }
+      erreur('historique', e); throw e;
+    }
+  }
   /** Intervalles où les exécutions n'ont PAS été lues : trous sautés, et le retard en cours
    *  (rattrapage, lecture en échec) au-delà de la validité d'une lecture. */
   function execNonLues() {
-    const out = E.execTrous.slice(), lu = execLuJusqua(), now = maintenant();
+    const out = E.execTrous.concat(E.execPub ? E.execPub.trous : []), lu = execLuJusqua(), now = maintenant();
     if (lu > -Infinity && now - lu > BM.validiteLecture(1000)) out.push([lu, now]);
     return out;
   }
@@ -325,6 +381,17 @@
     if (E.live.fixerEchelle(e.cle, e.f)) liveChange();
     E.liveRef = e.ref;
   }
+  /** La carte publiée agrège-t-elle ses tranches en somme ? (encodage publié) */
+  const sommePubliee = () => !!(E.pub && E.pub.encodage && E.pub.encodage.agregation_tranche === 'somme');
+  /** Ce que dit une case : la somme de sa tranche, ou son plus gros niveau (colonnes publiées avant
+   *  le passage à la somme, ou fichier qui ne le dit pas). */
+  function natureCase(g, debutColonne) {
+    if (g.creux) return g.somme ? 'somme de la tranche' : 'plus gros niveau';
+    const enc = g.encodage || (E.pub && E.pub.encodage);
+    if (!enc || enc.agregation_tranche !== 'somme') return 'plus gros niveau';
+    const depuis = enc.agregation_depuis;
+    return depuis === null || depuis === undefined || debutColonne >= depuis * 60e3 ? 'somme de la tranche' : 'plus gros niveau';
+  }
   /** Le carnet n'est lu que si un calque s'en sert (chaleur live, carnet latéral, bid / ask) :
    *  1 000 niveaux toutes les 2 s, c'est ≈ 1 500 de poids Binance par minute et ≈ 19 Mo par heure. */
   const carnetUtile = () => R.calques.live || R.calques.dom || R.calques.bidask || R.calques.destin;
@@ -337,7 +404,10 @@
       // suivi : à la reprise, l'écart entre deux lectures le dit « interrompu ».
       if (R.calques.destin) E.murs.lecture(d, s, r, E.horloge);
       const a = BM.agregerCarnet(d, R.dpLive);
-      if (!E.live || E.live.dp !== a.dp || E.live.cadence !== cadence) { reinitLive(); E.live = new BM.CarnetLive(a.dp, cadence); E.live.recaler(E.horloge.ecart); }
+      // La carte publiée compte la SOMME d'une tranche (heatmap.py, 08/10/2026) : le live aussi.
+      if (sommePubliee()) { a.bids = a.sb; a.asks = a.sa; }
+      a.somme = sommePubliee();
+      if (!E.live || E.live.dp !== a.dp || E.live.cadence !== cadence || E.live.somme !== a.somme) { reinitLive(); E.live = new BM.CarnetLive(a.dp, cadence); E.live.somme = a.somme; E.live.recaler(E.horloge.ecart); }
       appliquerEchelle(a);
       // lastUpdateId doit croître strictement : un instantané plus ancien que le précédent (servi
       // par un autre nœud de Binance) est écarté, pas peint par-dessus le plus récent.
@@ -398,6 +468,7 @@
     boucle('horloge', lireHorloge, BM.HORLOGE_PERIODE, E.recul.binance);
     boucle('carte', lireHeatmap, 5 * 60e3, E.recul.github);
     boucle('fichier', lireMarketData, 60e3, E.recul.github);
+    boucle('historique', lireExecutionsPubliees, 5 * 60e3, E.recul.github);
     boucle('bougies', lireMinutes, 10e3, E.recul.binance);
     boucle('executions', lireExecutions, 1000, E.recul.binance);
     boucleCarnet = boucle('carnet', lireCarnet, () => CADENCE_CARNET[R.niveauxLive], E.recul.binance);
@@ -1170,7 +1241,7 @@
     const k = [MEM.prCle, b.pb, f[0], f[1]].join('|');
     if (MEM.lp.cle !== k) MEM.lp = { cle: k, v: BM.plusLonguePresence(E.pub, s.vS, b.pb, f[0], f[1]) };
     const lp = MEM.lp.v, n = x => BM.nombre(x * dtMin, 0, 0);
-    return 'Mémoire ' + BM.prix(b.pb * dp) + '–' + BM.prix((b.pb + 1) * dp) + ' $ : un niveau ≥ ' + BM.nombre(s.qS, 2, 2) + ' BTC dans la tranche pendant '
+    return 'Mémoire ' + BM.prix(b.pb * dp) + '–' + BM.prix((b.pb + 1) * dp) + ' $ : ' + (sommePubliee() ? 'la tranche porte Σ ≥ ' : 'un niveau ≥ ') + BM.nombre(s.qS, 2, 2) + ' BTC' + (sommePubliee() ? '' : ' dans la tranche') + ' pendant '
       + n(b.pres) + ' des ' + n(b.obs) + ' min observées (' + Math.round(100 * b.part) + ' %) · plus longue présence ' + (lp.n ? BM.age(lp.n * E.pub.dt) : '—')
       + ' · côté ' + (r.cote === 'égalité' ? 'bid et ask à égalité' : r.cote)
       + (b.peu ? ' · observée moins de ' + BM.PRESENCE.minObserveMin + ' min (hachurée)' : '')
@@ -1529,7 +1600,7 @@
       if (!r.v) { l.push(nom + ' ' + tranche(ja, jb) + ' : rien au-dessus du seuil'); l.push('&nbsp;&nbsp;' + quand + pixel); return; }
       const dec = BM.decoder(r.v, enc);
       l.push(nom + ' ' + tranche(r.pb, r.pb) + ' (' + r.cote + ') : intensité ' + r.v
-        + (dec ? (dec.sature ? ' → plus gros niveau ≥ ' + BM.btc(dec.min) + ' BTC (saturé)' : ' → plus gros niveau ' + BM.btc(dec.min) + '–' + BM.btc(dec.max) + ' BTC') : ' (sans unité)'));
+        + (dec ? (dec.sature ? ' → ' + natureCase(g, d) + ' ≥ ' + BM.btc(dec.min) + ' BTC (saturé)' : ' → ' + natureCase(g, d) + ' ' + BM.btc(dec.min) + '–' + BM.btc(dec.max) + ' BTC') : ' (sans unité)'));
       // Le carnet live garde ses quantités : la valeur MESURÉE, pas seulement son intervalle.
       const q = g.creux ? g.quantite(r.c, r.pb, r.cote === 'bid' ? 'b' : 'a') : null;
       l.push('&nbsp;&nbsp;' + (q ? 'mesuré : ' + BM.btc(q) + ' BTC · ' : '') + quand + pixel);
@@ -1921,6 +1992,8 @@
         deb0: E.live.n ? E.live.deb[0] : null, derniere: E.live.n ? E.live.deb[E.live.n - 1] : null,
         nonNuls: E.live.n ? E.live.v.subarray(E.live.oB[E.live.n - 1], E.live.lg).reduce((k, x) => k + (x > 0), 0) : 0 } : null,
       executions: { seaux: E.exec.seaux.size, premier: E.exec.premier, dernier: E.exec.dernier, total: E.exec.total.slice() },
+      executionsPubliees: E.execPub ? { frontiere: E.execPub.frontiere, seaux: E.execPub.vus.size, depuis: E.execPub.depuis } : null,
+      erreurs: Object.assign({}, E.erreurs),
       minutes: E.minutes.length, niveaux: E.niv ? { murs: E.niv.murs.length, gamma: E.niv.gamma.length, conversion: E.niv.conversion, gammaAxe: E.niv.gamma.map(g => [g.p, g.pAxe]) } : null,
       horloge: { ecart: E.horloge.ecart, u: E.horloge.u }, maintenant: maintenant(),
       bougies: { n: E.minutes.length, premiere: E.minutes.length ? E.minutes[0].t : null, derniere: E.minutes.length ? E.minutes[E.minutes.length - 1].t : null, trous: BM.trousMinutes(E.minutes) },

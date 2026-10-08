@@ -160,7 +160,7 @@ function reglagesHtml() {
     + '<label class="reglage">Tranches de prix ' + choix('r_heat_fusionP', [1, 2, 5, 10], R.heat.fusionP, k => histHeatmapDp(k)) + '</label>'
     + '<label class="reglage">Colonnes ' + choix('r_heat_fusionT', [1, 5, 15, 60], R.heat.fusionT, k => k === 1 ? '1 min (publiée)' : k + ' min') + '</label>'
     + '<label class="reglage">Masquer sous l’intensité ' + choix('r_heat_seuil', [1, 16, 32, 64, 128], R.heat.seuil, v => v + btcDe(v)) + '</label>'
-    + '<p class="fine">Fusion par MAXIMUM : une case fusionnée montre le plus gros niveau de son bloc. En dézoom, le graphique fusionne de lui-même au pixel (par MAX) : un mur ne disparaît plus entre deux pixels.</p>'
+    + '<p class="fine">Fusion par MAXIMUM : une case fusionnée montre la plus forte case de son bloc. En dézoom, le graphique fusionne de lui-même au pixel (par MAX) : un mur ne disparaît plus entre deux pixels.</p>'
     + '<button type="button" class="glossaire-item" onclick="reinitReglages()">Réglages par défaut</button>';
 }
 function histHeatmapDp(k) {
