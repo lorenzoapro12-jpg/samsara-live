@@ -46,6 +46,7 @@ données locales, il faut rendre ces deux URL relatives.
 |---|---|---|
 | Badge de prix, bougies, panneau ⚡ | **1 à 5 secondes** | `index.html` → Binance, directement |
 | `heatmap.json` | **15 minutes** (publication) | `heatmap.py` (état accumulé toutes les minutes, publié au plus toutes les 15 min) |
+| Branche `direct` : `heatmap.json` et `executions.json` des 30 dernières minutes | **1 minute** (un seul commit sans parent, remplacé) ; la page le relit chaque minute, raw.githubusercontent le garde jusqu'à 5 min | `heatmap.py`, à chaque tour |
 | `executions.json` | **15 minutes** (publié dans le commit de `heatmap.json`) | `executions.py`, service permanent : aggTrades lus par identifiant, seaux 10 s × 10 $, 24 h |
 | `market-data.json` | **15 minutes** | `publish.py` |
 | Séries de la branche `historique` | **15 minutes**, juste après `publish.py` | `historique.py` |

@@ -28,6 +28,8 @@ Clés (toutes optionnelles)
                       `historique` (historique.py) — un worktree à part,
                       pour ne jamais toucher l'index ni l'arbre de master
   hist_branche        branche orpheline des séries historiques   défaut : historique
+  direct_branche      branche orpheline des 30 dernières minutes  défaut : direct
+                      (heatmap.py, une fois par minute, un seul commit remplacé)
 
 Les chemins relatifs sont résolus depuis le dossier du dépôt. Une valeur `null` ou absente
 prend le défaut : il n'y a pas de « clé manquante » qui casse le script.
@@ -51,6 +53,7 @@ _DEFAULTS = {
     "cvd_database": None,
     "hist_dir": None,           # None -> <state_dir>/historique
     "hist_branche": "historique",
+    "direct_branche": "direct",
 }
 
 _PATH_KEYS = ("repo_dir", "state_dir", "out_dir", "git_lock", "cvd_database", "hist_dir")
