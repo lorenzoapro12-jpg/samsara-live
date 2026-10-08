@@ -33,7 +33,8 @@
   <canvas id="carte" role="img" aria-label="Carte de liquidité : axe horizontal le temps, axe vertical le prix en dollars, la chaleur est la taille du plus gros niveau du carnet par tranche ; le prix, les exécutions, les murs et les niveaux de gamma sont dessinés par-dessus, chacun avec son âge."></canvas>
   <div class="statut" id="statut" role="status" hidden></div>
   <!-- Première visite : comment lire la carte. Les repères numérotés sont posés SUR la carte (canevas) ;
-       la carte reste utilisable dessous (seuls les boutons prennent le pointeur). -->
+       sur un grand écran la carte reste utilisable dessous (seuls les boutons prennent le pointeur) ;
+       sur un téléphone, ou quand elle cache plus de la moitié de la carte, elle prend le pointeur. -->
   <section class="guide-intro" id="guideIntro" hidden aria-labelledby="guideIntroTitre">
     <div class="panneau-tete"><h2 id="guideIntroTitre">Comment lire cette carte</h2><button type="button" class="fermer" id="guideIntroFermer" aria-label="Fermer">×</button></div>
     <ol class="intro-liste" id="guideIntroListe"></ol>

@@ -1458,6 +1458,8 @@
     trancheUsd: 20,          // tranche des murs « en mots » : celle de la carte publiée et des murs du fichier
     murMinBtc: 10,           // une tranche n'est « mur » qu'à 10 BTC au moins…
     murFacteur: 2,           // … ET 2 fois la tranche médiane de la bande lue : le carnet ordinaire n'est pas un mur
+    murSortiePart: 0.8,      // un mur déjà nommé le reste jusqu'à 80 % de ce seuil (il ne clignote pas d'une lecture à l'autre)
+    seuilLectures: 15,       // la médiane du seuil est celle des 15 dernières lectures contiguës (≈ 30 s) : elle ne saute pas à chaque lecture
     margeTranches: 1,        // la tranche du prix et sa voisine de chaque côté ne sont jamais nommées (le carnet s'y reforme sans cesse)
     parCote: 2,              // murs nommés de chaque côté du prix (1 sur un écran étroit en mode débutant)
     procheMaxPct: 1,         // cherchés à ±1 % du prix au plus, et seulement dans la bande que le carnet lu couvre
@@ -1469,7 +1471,8 @@
     trouMaxMs: 5 * 60e3,     // carte publiée → carnet live : au-delà de 5 min non observées, pas de raccord
     zoneTranches: 3,         // zone chargée : 3 tranches de 20 $ consécutives, sommées
     zoneMinBtc: 30, zoneFacteur: 1.5,  // au moins 30 BTC ET 1,5 fois la zone médiane de la bande lue
-    zoneGarde: 3,            // une zone qui repasse sous les seuils reste encore 3 lectures (elle ne clignote pas)
+    zoneSortiePart: 0.75,    // une zone dessinée le reste tant qu'elle porte au moins 30 BTC et 75 % du seuil d'entrée du moment…
+    zoneGarde: 3,            // … repassée en dessous, elle reste encore 3 lectures (elle ne clignote pas), puis s'efface
     vieMinMs: 10e3,          // un niveau vu moins de 10 s n'est ni « apparu » ni « retiré » au journal
     journalMurBtc: 10,       // journal : gros ordres d'au moins 10 BTC à un même prix (ou le seuil du destin s'il est plus haut)
     absorbePart: 0.5,        // « absorbé » / « en partie échangé » : seulement si les échanges font la moitié de la plus grande taille lue
@@ -1483,6 +1486,7 @@
     journalFenetreMs: 30 * 60e3,   // à l'ouverture : les rafales des 30 dernières minutes
     fusionMs: 60e3,          // un même évènement au même prix dans la minute : compté (×n), pas répété
     marquePx: 9,             // marques du journal d'une même case de 9 px : une seule (×n au survol)
+    textesDebutant: 3,       // mode débutant : 3 boîtes de texte du guide au plus sur la carte (zones, murs, fins)
   };
   // Les symboles du journal qui ne sont pas ceux des fins de murs (BM.FINS_MURS) : la légende et la
   // carte les lisent ici.
@@ -1553,28 +1557,37 @@
     const kP = Math.floor(C.mid / C.pas);
     return cote === 'bid' ? k <= kP - 1 - o.margeTranches && k * C.pas > lo : k >= kP + 1 + o.margeTranches && (k + 1) * C.pas < hi;
   };
-  /** Le seuil « mur » d'UNE lecture : max(murMinBtc, murFacteur × la tranche médiane de la bande lue,
-   *  achat et vente ensemble, tranches vides comprises, hors tranche du prix). { seuil, mediane, n }. */
+  /** Le seuil « mur » : max(murMinBtc, murFacteur × la tranche médiane de la bande lue, achat et
+   *  vente ensemble, tranches vides comprises, hors tranche du prix). Cette médiane, sur ≈ 20 tranches,
+   *  saute d'une lecture à l'autre : `o.medianes` (celles des lectures contiguës d'avant) la lisse —
+   *  la médiane de ces médianes et de celle de la lecture. `sortie` : le seuil sous lequel un mur
+   *  déjà nommé cesse de l'être (murSortiePart × seuil). { seuil, sortie, mediane (lissée),
+   *  medianeLue (de cette lecture seule), n }. */
   BM.seuilMur = function (C, o) {
     o = Object.assign({}, BM.GUIDE, o);
-    if (!C || C.bas === null || C.haut === null) return { seuil: o.murMinBtc, mediane: null, n: 0 };
+    const vide = { seuil: o.murMinBtc, sortie: o.murMinBtc * o.murSortiePart, mediane: null, medianeLue: null, n: 0 };
+    if (!C || C.bas === null || C.haut === null) return vide;
     const P = C.pas, kP = Math.floor(C.mid / P), xs = [];
     for (let k = Math.ceil(C.bas / P); k < kP; k++) xs.push(C.b.get(k) || 0);
     for (let k = kP + 1; (k + 1) * P <= C.haut; k++) xs.push(C.a.get(k) || 0);
-    if (!xs.length) return { seuil: o.murMinBtc, mediane: null, n: 0 };
+    if (!xs.length) return vide;
     xs.sort((a, b) => a - b);
-    const med = xs[xs.length >> 1];
-    return { seuil: Math.max(o.murMinBtc, o.murFacteur * med), mediane: med, n: xs.length };
+    const lue = xs[xs.length >> 1], ms = (o.medianes || []).filter(x => x !== null && x !== undefined).concat(lue).sort((a, b) => a - b);
+    const med = ms[ms.length >> 1], seuil = Math.max(o.murMinBtc, o.murFacteur * med);
+    return { seuil, sortie: seuil * o.murSortiePart, mediane: med, medianeLue: lue, n: xs.length };
   };
-  /** Les `parCote` tranches les plus chargées de chaque côté (au moins le seuil « mur » de la
-   *  lecture), à ±procheMaxPct du prix ET dans la bande lue, hors de la tranche du prix et de ses
+  /** Le seuil d'une tranche : celui d'entrée, ou celui de sortie si elle est déjà nommée
+   *  (o.garder : clés « bid4999 » / « ask5002 » des murs nommés à la lecture d'avant). */
+  const seuilTranche = (o, seuil, cote, k) => (o.garder && o.garder.has(cote + k) && o.sortie !== undefined ? Math.min(seuil, o.sortie) : seuil);
+  /** Les `parCote` tranches les plus chargées de chaque côté (au moins le seuil « mur » ; un mur déjà
+   *  nommé, o.garder : au moins le seuil de sortie o.sortie), à ±procheMaxPct du prix ET dans la bande lue, hors de la tranche du prix et de ses
    *  voisines : [{ cote: 'bid'|'ask', k, p (bas de la tranche), q }]. */
   BM.mursProches = function (C, o) {
     o = Object.assign({}, BM.GUIDE, o);
     if (!C) return [];
     const seuil = o.seuil !== undefined ? o.seuil : BM.seuilMur(C, o).seuil;
     const lo = Math.max(borne(C.bas, -Infinity), C.mid * (1 - o.procheMaxPct / 100)), hi = Math.min(borne(C.haut, Infinity), C.mid * (1 + o.procheMaxPct / 100));
-    const choisir = (m, cote) => [...m].filter(([k, q]) => q >= seuil && nommable(C, cote, k, lo, hi, o))
+    const choisir = (m, cote) => [...m].filter(([k, q]) => q >= seuilTranche(o, seuil, cote, k) && nommable(C, cote, k, lo, hi, o))
       .sort((x, y) => y[1] - x[1] || x[0] - y[0]).slice(0, o.parCote).map(([k, q]) => ({ cote, k, p: k * C.pas, q }));
     return choisir(C.b, 'bid').concat(choisir(C.a, 'ask'));
   };
@@ -1588,7 +1601,7 @@
     const lo = borne(C.bas, -Infinity), hi = borne(C.haut, Infinity);
     let best = null;
     for (const [k, q] of (cote === 'bid' ? C.b : C.a)) {
-      if (!(q >= seuil) || !nommable(C, cote, k, lo, hi, o)) continue;
+      if (!(q >= seuilTranche(o, seuil, cote, k)) || !nommable(C, cote, k, lo, hi, o)) continue;
       if (!best || (cote === 'bid' ? k > best.k : k < best.k)) best = { cote, k, p: k * C.pas, pas: C.pas, q };
     }
     // Écart du bord de la tranche le plus proche du prix de référence.
@@ -1618,7 +1631,8 @@
   const ecartMots = x => (Math.abs(x) < 0.005 ? 'à moins de 0,01 % du prix' : BM.nombre(Math.abs(x), 2, 2) + ' % ' + (x < 0 ? 'sous le prix' : 'au-dessus du prix'));
   /** La phrase du résumé (débutant) ou ses seuls chiffres (expert). `murs` = { bid, ask } de
    *  BM.murPlusProche, + seuil (BTC) ; `age` = âge de la lecture, déjà écrit. Une seule cadence : le
-   *  carnet live. o.court : la version pour écran étroit. Toujours : « photo de l'instant, pas une
+   *  carnet live. o.court : la version courte (écran étroit, ou phrase entière qui ne tient pas),
+   *  qui dit « photo, pas une prévision » dès le début. Toujours : « photo de l'instant, pas une
    *  prévision » (une majorité d'ordres d'un côté ne dit pas où ira le prix). */
   BM.phraseResume = function (r, murs, mode, age, o) {
     o = Object.assign({}, BM.GUIDE, o);
@@ -1632,8 +1646,9 @@
       ].join(' · ');
     }
     if (o.court) {
-      return 'Carnet lu ' + age + ' : achat ' + BM.btc(r.qB) + ' BTC / vente ' + BM.btc(r.qA) + ' BTC à ±' + usd + DOL + '. Murs proches : '
-        + (mb ? BM.prix(mb.p) + DOL + ' (achat)' : 'aucun côté achat') + ' · ' + (ma ? BM.prix(ma.p) + DOL + ' (vente)' : 'aucun côté vente') + '. Photo, pas une prévision.';
+      // « Photo, pas une prévision » tout de suite après l'âge : une ligne coupée les garde tous deux.
+      return 'Carnet lu ' + age + ' (photo, pas une prévision) : achat ' + BM.btc(r.qB) + ' BTC / vente ' + BM.btc(r.qA) + ' BTC à ±' + usd + DOL + '. Murs proches : '
+        + (mb ? BM.prix(mb.p) + DOL + ' (achat)' : 'aucun côté achat') + ' · ' + (ma ? BM.prix(ma.p) + DOL + ' (vente)' : 'aucun côté vente') + '.';
     }
     const x = v => BM.nombre(v, 1, 1);
     const compare = r.qB === 0 && r.qA === 0 ? 'aucun ordre lu'
@@ -1658,6 +1673,7 @@
    *  · depuis : première lecture de la série ININTERROMPUE de lectures ≥ `seuil` qui finit à la
    *    dernière ; auMoins si la série n'a pas été vue commencer (raison = la coupe, ou 'debut' : la
    *    plus ancienne lecture gardée) ; raison 'seuil' : vue commencer.
+   *  · qAvant : la taille à la lecture juste avant la série, quand elle a été vue commencer (sinon null).
    *  · qF, tF : la taille à la lecture la plus récente d'il y a au moins `fenetreMs`, si la remontée
    *    l'atteint ; sinon qO, tO : la plus ancienne lecture remontée.
    *  Instants : ceux de la carte (heure Binance). null sans lecture. */
@@ -1674,22 +1690,22 @@
       return k0 <= L.bA[c] ? 'prix' : 'ok';
     };
     const qN = q(c1), t = L.deb[c1], e1 = etat(c1);
-    if (e1 !== 'ok') return { q: qN, t, depuis: null, auMoins: false, raison: e1, depuisDebut: false, coupe: e1, qF: null, tF: null, qO: null, tO: null };
+    if (e1 !== 'ok') return { q: qN, t, depuis: null, auMoins: false, raison: e1, depuisDebut: false, coupe: e1, qF: null, tF: null, qO: null, tO: null, qAvant: null };
     const tFen = t - fenetreMs;
-    let c0 = c1, enCours = qN >= seuil, qF = null, tF = null, qO = qN, tO = t, coupe = null, c = c1 - 1;
+    let c0 = c1, enCours = qN >= seuil, qF = null, tF = null, qO = qN, tO = t, coupe = null, c = c1 - 1, qAvant = null;
     for (; c >= 0; c--) {
       if (L.fin[c] < L.deb[c + 1]) { coupe = 'trou'; break; }        // une lecture manquée : on ne sait pas
       const e = etat(c);
       if (e !== 'ok') { coupe = e; break; }
       const x = q(c);
-      if (enCours) { if (x >= seuil) c0 = c; else enCours = false; }
+      if (enCours) { if (x >= seuil) c0 = c; else { enCours = false; qAvant = x; } }
       if (qF === null && L.deb[c] <= tFen) { qF = x; tF = L.deb[c]; }
       qO = x; tO = L.deb[c];
       if (!enCours && qF !== null) break;
     }
     const vue = qN >= seuil;
     const raison = !vue ? null : !enCours ? 'seuil' : coupe || 'debut';
-    return { q: qN, t, depuis: vue ? L.deb[c0] : null, auMoins: vue && enCours, raison, depuisDebut: vue && enCours && !coupe && c0 === 0, coupe, qF, tF, qO, tO };
+    return { q: qN, t, depuis: vue ? L.deb[c0] : null, auMoins: vue && enCours, raison, depuisDebut: vue && enCours && !coupe && c0 === 0, coupe, qF, tF, qO, tO, qAvant: raison === 'seuil' ? qAvant : null };
   };
   /** Carte publiée : la série ININTERROMPUE de colonnes où la rangée pb porte au moins vS d'un côté
    *  ('b' ou 'a') et qui FINIT à la colonne c1 ; rend sa première colonne, ou null si c1 n'en est pas.
@@ -1755,6 +1771,54 @@
     return { lignes: l, court: nom + ' ' + q + quandC };
   };
 
+  /** Les murs NOMMÉS d'une lecture à la suivante (lectures contiguës seulement) : ce qui fait un
+   *  évènement au journal. prec = { nommes, approches } (Maps « bid4999 » → { cote, k, p, pas, n
+   *  (lectures nommé de suite), q, t (dernière lecture), t0, loin, qAvant }) ; murs = ceux de CETTE
+   *  lecture (BM.mursProches, plus leur histoire : raison, depuis, qAvant). Rend { nommes,
+   *  approches, apparus: [m], traverses: [a], fondus: [{ a, q1 }] }.
+   *  · Apparu : nommé nommeLectures lectures de suite, sa série vue commencer il y a moins de
+   *    apparuMaxMs, ET la tranche elle-même a grossi (d'au moins varMinBtc et varMinPart de sa
+   *    taille juste avant) : un seuil qui baisse sous une tranche immobile ne fait pas un « apparu ».
+   *  · Approché : un mur nommé et stable dont le prix vient toucher la tranche ou sa voisine n'est
+   *    plus nommable ; il est gardé à part, et le passage est guetté à chaque lecture, jusqu'à ce
+   *    que le prix le passe ou s'en éloigne.
+   *  · Passé : le prix de référence de CETTE lecture est au-delà de la tranche.
+   *  · Fondu : plus nommé, sa tranche encore lue loin du prix, sous fondPart de sa taille ET sous le
+   *    seuil de sortie. */
+  BM.suivreNommes = function (prec, murs, C, t, contigu, o) {
+    o = Object.assign({}, BM.GUIDE, o);
+    const P = contigu && prec ? prec : { nommes: new Map(), approches: new Map() };
+    const nommes = new Map(), approches = new Map(), out = { nommes, approches, apparus: [], traverses: [], fondus: [] };
+    const kP = Math.floor(C.mid / C.pas), sortie = o.sortie !== undefined ? o.sortie : BM.seuilMur(C, o).sortie;
+    const passe = a => (a.cote === 'bid' ? C.mid < a.p : C.mid > a.p + a.pas);
+    const proche = a => (a.cote === 'bid' ? a.k > kP - 1 - o.margeTranches : a.k < kP + 1 + o.margeTranches);
+    const qLue = a => (a.cote === 'bid' ? C.b : C.a).get(a.k) || 0;
+    for (const m of murs) {
+      const cle = m.cote + m.k, a = P.nommes.get(cle) || P.approches.get(cle);
+      const loin = m.cote === 'bid' ? C.mid - m.p > 2 * C.pas : m.p + C.pas - C.mid > 2 * C.pas;
+      const x = a && a.pas === C.pas ? Object.assign({}, a, { n: a.n + 1, q: m.q, t, qAvant: null })
+        : { cote: m.cote, k: m.k, p: m.p, pas: C.pas, n: 1, q: m.q, t, t0: t, loin, qAvant: null };
+      nommes.set(cle, x);
+      const grossi = m.qAvant !== null && m.qAvant !== undefined && m.q - m.qAvant >= o.varMinBtc && m.q - m.qAvant >= o.varMinPart * m.qAvant;
+      if (x.n === o.nommeLectures && m.raison === 'seuil' && m.depuis !== null && m.depuis !== undefined && t - m.depuis <= o.apparuMaxMs && grossi) out.apparus.push(m);
+    }
+    for (const [cle, a] of P.nommes) {
+      if (a.pas !== C.pas || a.n < o.nommeLectures) continue;
+      if (a.loin && passe(a)) { out.traverses.push(a); nommes.delete(cle); continue; }
+      if (nommes.has(cle)) continue;
+      if (proche(a)) { approches.set(cle, Object.assign({}, a, { qAvant: qLue(a) })); continue; }
+      const lue = a.cote === 'bid' ? a.p > C.bas : a.p + a.pas < C.haut, q1 = qLue(a);
+      if (lue && q1 < o.fondPart * a.q && q1 < sortie) out.fondus.push({ a, q1 });
+    }
+    for (const [cle, a] of P.approches) {
+      if (nommes.has(cle) || a.pas !== C.pas) continue;
+      if (passe(a)) { out.traverses.push(a); continue; }
+      if (proche(a)) approches.set(cle, Object.assign({}, a, { qAvant: qLue(a) }));
+      // Sinon le prix s'en est éloigné sans le passer : plus guetté.
+    }
+    return out;
+  };
+
   // Évènements du journal : { t (instant, heure de la carte), type, cote ('b'|'a'|null), p, q, s
   // (symbole), texte (journal, sans heure), carte (libellé sur la carte, avec l'heure UTC), court
   // (≤ 40 signes), cle (dédoublonnage) }.
@@ -1766,20 +1830,24 @@
   const coteMot = cote => (cote === 'b' ? 'achat' : 'vente');
   /** La fin d'un gros ordre suivi (BM.SuiviMurs), en mots, d'après TOUTE sa vie : x = { fin, cote,
    *  p, q0 (taille à la dernière lecture où il était là), qMax (la plus grande lue), xN (échangé
-   *  à coup sûr à la fin), echange (échangé sur toute sa vie, avec la fin), retire (retiré mesuré
-   *  sur toute sa vie), t }. Seules les fins classées font un évènement. « Absorbé » ou « en partie
-   *  échangé » seulement si les échanges font au moins absorbePart de la plus grande taille lue :
-   *  sinon il a été « retiré pour l'essentiel », et les deux quantités sont dites. */
+   *  à coup sûr à la fin), echange (échangé sur toute sa vie, avec la fin), retire (au moins
+   *  retiré, mesuré sur toute sa vie), t }. Seules les fins classées font un évènement. La phrase
+   *  commence par la plus grande taille lue (pas par ce qui restait à la fin). « Absorbé » ou « en
+   *  partie échangé » seulement si les échanges font au moins absorbePart de la plus grande taille
+   *  lue : sinon il a été « retiré pour l'essentiel », et les deux quantités sont dites. */
   BM.evenementFinMur = function (x, o) {
     o = Object.assign({}, BM.GUIDE, o);
     if (!['retire', 'echange', 'partiel', 'incertain'].includes(x.fin)) return null;
     const nom = nomOrdre(x.cote), mot = coteMot(x.cote), hc = BM.heureUtc(x.t) + ' UTC', px = BM.prixExact(x.p) + DOL;
     const qMax = Math.max(x.qMax || 0, x.q0 || 0), ech = x.echange !== undefined && x.echange !== null ? x.echange : (x.xN || 0), ret = x.retire || 0;
-    const max = qMax > x.q0 + 0.0005 ? ' (jusqu\'à ' + BM.btc(qMax) + ' BTC plus tôt)' : '';
+    const plus = qMax > x.q0 + 0.0005, taille = nom + ' de ' + BM.btc(qMax) + ' BTC' + (plus ? ' (sa plus grande taille lue)' : '');
+    // Sa vie avant la fin : ce qui en a été retiré (au moins) et échangé, quand il y en a.
+    const vie = [ret > 0.0005 ? 'au moins ' + BM.btc(ret) + ' BTC retirés' : '', ech > 0.0005 ? BM.btc(ech) + ' BTC échangés' : ''].filter(Boolean).join(', ');
     let type = x.fin;
     if ((type === 'echange' || type === 'partiel') && ech < o.absorbePart * qMax) type = 'essentiel';
     const T = {
-      retire: [nom + ' retiré sans échange : ' + BM.btc(x.q0) + ' BTC à ' + px + max + (ech > 0.0005 ? ', après ' + BM.btc(ech) + ' BTC échangés plus tôt' : '') + ' (un seul prix)',
+      retire: [!plus && !(ech > 0.0005) ? taille + ' retiré sans échange à ' + px + ' (un seul prix)'
+        : taille + ' à ' + px + ' retiré' + (vie ? ' (' + vie + ' au cours de sa vie)' : '') + ' : ses derniers ' + BM.btc(x.q0) + ' BTC partis sans échange (un seul prix)',
         nom + ' retiré à ' + hc + ', sans échange', '✕ ' + mot + ' retiré ' + hc],
       echange: [nom + ' absorbé (entièrement échangé) : ' + BM.btc(ech) + ' BTC échangés à ' + px + ' (un seul prix)',
         nom + ' absorbé à ' + hc + ' : ' + BM.btc(ech) + ' BTC échangés', '● ' + mot + ' absorbé ' + hc],
@@ -1787,7 +1855,7 @@
         nom + ' disparu à ' + hc + ' (' + BM.btc(ech) + ' sur ' + BM.btc(qMax) + ' BTC échangés)', '◐ ' + mot + ' en partie échangé ' + hc],
       essentiel: [nom + ' retiré pour l\'essentiel : ' + BM.btc(ret) + ' BTC retirés, ' + BM.btc(ech) + ' BTC échangés à ' + px + ' (jusqu\'à ' + BM.btc(qMax) + ' BTC, un seul prix)',
         nom + ' retiré pour l\'essentiel à ' + hc, '◐ ' + mot + ' surtout retiré ' + hc],
-      incertain: [nom + ' disparu, échanges incertains : ' + BM.btc(x.q0) + ' BTC à ' + px + max + ' (un seul prix)',
+      incertain: [taille + ' disparu à ' + px + ', échanges incertains' + (vie ? ' : ' + vie + ' au cours de sa vie' : '') + (plus ? ' ; on ne sait pas si ses derniers ' + BM.btc(x.q0) + ' BTC ont été échangés' : '') + ' (un seul prix)',
         nom + ' disparu à ' + hc + ' (échanges incertains)', '? ' + mot + ' : échanges incertains ' + hc],
     }[type];
     return { t: x.t, type, cote: x.cote, p: x.p, q: type === 'echange' ? ech : qMax, s: BM.FINS_MURS[type === 'essentiel' ? 'partiel' : type].s, texte: T[0], carte: T[1],
@@ -1825,13 +1893,15 @@
       texte: 'Rafale ' + mot + ' au marché : ' + q + ' d\'un seul coup (même milliseconde), ' + (r.pMax > r.pMin ? 'de ' + BM.prix(r.pMin) + ' à ' + BM.prix(r.pMax) : 'à ' + BM.prix(r.pMin)) + DOL,
       carte: 'Rafale ' + mot + ' à ' + BM.heureUtc(r.T, true) + ' UTC : ' + q, court: S + ' rafale ' + mot + ' ' + q, cle: 'rafale' + r.aDeb };
   };
-  /** Le prix (live) passe un mur nommé. x = { cote: 'b'|'a', p (bas de la tranche), pas, q, t }.
+  /** Le prix (live) passe un mur nommé. x = { cote: 'b'|'a', p (bas de la tranche), pas, q (taille
+   *  quand il était nommé), qAvant (taille à la lecture d'avant s'il n'était plus nommé : le prix
+   *  l'approchait), t }.
    *  Règle de travail du propriétaire (non mesurée) : cassé après deux clôtures au-delà, ou une
    *  clôture puis un retour testé ; seulement traversé par une mèche : « percé en mèche ». */
   BM.evenementTraverse = function (x) {
     const sous = x.cote === 'b', lieu = sous ? 'sous le mur d\'achat' : 'au-dessus du mur de vente', S = BM.SYMBOLES_GUIDE[sous ? 'sous' : 'sur'].s;
     return { t: x.t, type: 'traverse', cote: x.cote, p: sous ? x.p : x.p + x.pas, q: x.q, s: S,
-      texte: 'Le prix (live) passe ' + lieu + ' ' + tranche(x.p, x.pas) + ' (' + BM.btc(x.q) + ' BTC à la lecture d\'avant). Percé, pas «' + NB + 'cassé' + NB + '» : il faudrait deux clôtures 1 min '
+      texte: 'Le prix (live) passe ' + lieu + ' ' + tranche(x.p, x.pas) + ' (' + BM.btc(x.q) + ' BTC ' + (x.qAvant !== null && x.qAvant !== undefined ? 'quand il était nommé, ' + BM.btc(x.qAvant) + ' BTC à la lecture d\'avant' : 'à la lecture d\'avant') + '). Percé, pas «' + NB + 'cassé' + NB + '» : il faudrait deux clôtures 1 min '
         + (sous ? 'sous' : 'au-dessus de') + ' ce niveau, ou une clôture puis un retour testé (règle de travail, non mesurée).',
       carte: 'Prix passé ' + lieu + ' à ' + BM.heureUtc(x.t) + ' UTC', court: S + (sous ? ' sous mur achat ' : ' sur mur vente ') + BM.prix(x.p) + ' ' + BM.heureUtc(x.t), cle: 'traverse' + x.cote + Math.round(x.p) };
   };
@@ -1908,8 +1978,9 @@
    *  vente) : `zoneTranches` tranches consécutives sommées, entièrement dans la bande lue, hors de la
    *  tranche du prix et de ses voisines, d'au moins zoneMinBtc ET zoneFacteur × la zone médiane du
    *  même côté. Une zone d'avant (`prec`) reste tant qu'elle est chargée et que le prix y entre (ou
-   *  qu'aucune autre ne la remplace) : on voit alors si elle est échangée ou retirée ; repassée sous
-   *  les seuils, elle reste encore zoneGarde lectures (pas de clignotement). Rend { bid, ask } :
+   *  qu'aucune autre ne la remplace) et qu'elle porte au moins max(zoneMinBtc, zoneSortiePart × le
+   *  seuil d'entrée du moment) : on voit alors si elle est échangée ou retirée ; repassée en dessous,
+   *  elle reste encore zoneGarde lectures (pas de clignotement), puis s'efface. Rend { bid, ask } :
    *  { cote, k0, pBas, pHaut, q, garde } ou null. */
   BM.zonesChargees = function (C, prec, o) {
     o = Object.assign({}, BM.GUIDE, o);
@@ -1933,7 +2004,9 @@
       if (p0 && dansBande(p0.k0)) {
         const q = somme(p0.k0), dedans = cote === 'bid' ? C.mid < p0.pHaut : C.mid > p0.pBas;
         const recouvre = frais && Math.abs(frais.k0 - p0.k0) < n;
-        if (q >= Math.min(seuil, Math.max(o.zoneMinBtc, p0.q * 0.5)) && (dedans || !frais || recouvre)) { out[cote] = zone(p0.k0, q); continue; }
+        // Seuil de sortie FIXE (pas la taille d'avant : sinon il descend lecture après lecture et la
+        // zone ne s'efface jamais).
+        if (q >= Math.max(o.zoneMinBtc, o.zoneSortiePart * seuil) && (dedans || !frais || recouvre)) { out[cote] = zone(p0.k0, q); continue; }
         if (!frais && (p0.garde || 0) < o.zoneGarde && q >= o.zoneMinBtc / 2) { out[cote] = zone(p0.k0, q, (p0.garde || 0) + 1); continue; }
       }
       out[cote] = frais;

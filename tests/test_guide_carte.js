@@ -103,7 +103,7 @@ const sp = x => x.replace(/[\u202f\u00a0]/g, ' ');
 check('débutant : l\'âge d\'abord, la bande en % ET en dollars, les deux quantités en BTC', /^Carnet lu il y a 2,0 s, à ±0,27 % du prix \(≈ ±275 \$ : tout ce que le carnet lu couvre\) : 100 BTC d'ordres d'achat, 87,0 BTC d'ordres de vente — 1,1 fois plus côté achat\./.test(sp(deb)), deb);
 check('débutant : le mur le plus proche, sa tranche, « x % sous le prix » / « au-dessus du prix »', sp(deb).includes('99 940–99 960 $ (0,05 % sous le prix)') && sp(deb).includes('100 100–100 120 $ (0,08 % au-dessus du prix)'), deb);
 check('débutant : « Photo de l\'instant, pas une prévision. »', /Photo de l'instant, pas une prévision\.$/.test(deb), deb);
-check('court (écran étroit) : achat / vente en BTC, murs proches, « pas une prévision », bien plus court', /^Carnet lu il y a 2,0 s : achat 100 BTC \/ vente 87,0 BTC à ±275 \$\. Murs proches : 99 940 \$ \(achat\) · 100 100 \$ \(vente\)\. Photo, pas une prévision\.$/.test(sp(crt)) && crt.length < deb.length * 0.6, crt);
+check('court (écran étroit, ou phrase qui ne tient pas) : « photo, pas une prévision » juste après l\'âge, achat / vente en BTC, murs proches, bien plus court', /^Carnet lu il y a 2,0 s \(photo, pas une prévision\) : achat 100 BTC \/ vente 87,0 BTC à ±275 \$\. Murs proches : 99 940 \$ \(achat\) · 100 100 \$ \(vente\)\.$/.test(sp(crt)) && crt.length < deb.length * 0.6, crt);
 check('expert : les chiffres seuls (pas de phrase)', !/ordres d'achat/.test(exp) && /×/.test(exp) && exp.split(' · ').length === 4 && /^carnet live il y a 2,0 s · /.test(exp), exp);
 check('aucune direction annoncée (pas de « va monter / baisser », pas de probabilité)', !/monter|baisser|hausse|baisse|probab|chance/i.test(deb + exp + crt), deb);
 const r0 = BM.resumeCarnet(Object.assign({}, C, { b: new Map(), a: C.a }));
@@ -222,7 +222,14 @@ for (const ev of evs) {
   check(`${ev.type} ${ev.cote || ''} : court ≤ 40 signes, heure UTC sur la carte, symbole`, ev.court.length <= 40 && !/^\$/.test(ev.court) && /\d\d:\d\d(?::\d\d)? UTC/.test(ev.carte) && ev.s && ev.cle, ev);
 }
 check('fin hors classement (« toujours là », « interrompu ») : pas d\'évènement', BM.evenementFinMur({ fin: 'la', cote: 'b', p: 1, q0: 1, t: 1 }) === null && BM.evenementFinMur({ fin: 'interrompu', cote: 'b', p: 1, q0: 1, t: 1 }) === null);
-check('retiré : la taille la plus grande lue est dite (pas seulement le reste)', /jusqu'à 12,5 BTC plus tôt/.test(evs[0].texte) && !/plus tôt/.test(evs[4].texte), [evs[0].texte, evs[4].texte]);
+check('retiré : la phrase COMMENCE par la plus grande taille lue, puis le reste à la fin', /^Gros ordre d'achat de 12,5 BTC \(sa plus grande taille lue\) à 99 987,50 \$ retiré : ses derniers 0,340 BTC partis sans échange/.test(sp(evs[0].texte)) && /^Gros ordre de vente de 12,5 BTC retiré sans échange à 100 100 \$ \(un seul prix\)$/.test(sp(evs[4].texte)), [evs[0].texte, evs[4].texte]);
+{
+  // Disparu, échanges incertains (relevé réel : « 0,035 BTC … jusqu'à 15,6 BTC plus tôt ») : la
+  // plus grande taille d'abord, puis ce qui en a été retiré et échangé au cours de sa vie.
+  const ei = BM.evenementFinMur({ fin: 'incertain', cote: 'b', p: 81798, q0: 0.035, qMax: 15.6, echange: 3.5, retire: 12, t: t0 });
+  garder(ei);
+  check('disparu, échanges incertains : « de 15,6 BTC (sa plus grande taille lue) », retiré / échangé au cours de sa vie, le reste dit en dernier', /^Gros ordre d'achat de 15,6 BTC \(sa plus grande taille lue\) disparu à 81 798 \$, échanges incertains : au moins 12,0 BTC retirés, 3,50 BTC échangés au cours de sa vie ; on ne sait pas si ses derniers 0,035 BTC ont été échangés/.test(sp(ei.texte)) && ei.q === 15.6, ei);
+}
 check('absorbé : les BTC ÉCHANGÉS, « entièrement échangé »', /absorbé \(entièrement échangé\) : 13,0 BTC échangés/.test(evs[1].texte) && evs[1].q === 13, evs[1]);
 check('« gros ordre » au prix exact : « (un seul prix) » ; « mur » : une tranche', evs.slice(0, 6).every(e => /^Gros ordre d/.test(e.texte) && /un seul prix/.test(e.texte)) && /^Mur de vente apparu : 31,0 BTC entre 100 100 et 100 120.\$/.test(sp(evs[10].texte)), evs.map(e => e.texte));
 check('rafale : « d\'un seul coup (même milliseconde) », un seul prix s\'il n\'y en a qu\'un', /d'un seul coup \(même milliseconde\), de 80 936 à 80 943 \$/.test(sp(evs[6].texte)) && /, à 80.998 \$/.test(sp(evs[7].texte)), [evs[6].texte, evs[7].texte]);
@@ -332,6 +339,88 @@ for (let i = 0; i < 5; i++) { zg = BM.zonesChargees(C4, zg); gardes.push(zg.bid 
 check(`zone repassée sous les seuils (27 BTC) : gardée ${G.zoneGarde} lectures, puis oubliée (pas de clignotement)`, gardes.join() === [1, 2, 3, null, null].slice(0, G.zoneGarde + 2).join(), gardes);
 check('carnet sans bande : rien', BM.zonesChargees({ pas: 20, b: new Map(), a: new Map(), mid: 1, bas: null, haut: null }, null).bid === null);
 check('fuseau de l\'appareil en mots : UTC+2, UTC−3:30, UTC', BM.fuseau(-120) === 'UTC+2' && BM.fuseau(210) === 'UTC−3:30' && BM.fuseau(0) === 'UTC');
+
+// ── 11b. Murs nommés d'une lecture à l'autre ─────────────────────────────────
+titre('11b. suivreNommes + seuil lissé : un passage progressif est vu, un seuil qui bouge ne fait ni « apparu » ni clignotement ; une zone finit par s\'effacer');
+{
+  // La boucle de majGuide (js/bookmap.js), lecture après lecture : seuil lissé, hystérésis, suivi.
+  const rejouer = (carnets, o) => {
+    let etat = { nommes: new Map(), approches: new Map() }, meds = [], tr = [], noms = [];
+    carnets.forEach((K, i) => {
+      const C = BM.carnetGuide(K, 20), t = i * 2000, S = BM.seuilMur(C, { medianes: meds });
+      meds = meds.concat(S.medianeLue === null ? [] : [S.medianeLue]).slice(-(G.seuilLectures - 1));
+      const garder = new Set([...etat.nommes.keys(), ...etat.approches.keys()]);
+      const murs = BM.mursProches(C, { seuil: S.seuil, sortie: S.sortie, garder }).map(m => Object.assign({ raison: null, depuis: null, qAvant: null }, m, (o && o.histoire) ? o.histoire(m, i) : {}));
+      const r = BM.suivreNommes(etat, murs, C, t, true, { sortie: S.sortie });
+      tr.push(...r.traverses.map(a => Object.assign({ i, mid: C.mid }, a)));
+      noms.push(murs.map(m => m.cote + m.p));
+      etat = { nommes: r.nommes, approches: r.approches };
+    });
+    return { tr, noms };
+  };
+  // Un mur d'achat de 60 BTC à 99 900–99 920 (0,3 BTC tous les 2 $ ailleurs) ; le prix descend.
+  const livre = mid => {
+    const bids = [], asks = [];
+    for (let p = Math.floor(mid - 0.5); p > mid - 400; p -= 2) bids.push([p.toFixed(2), String(p >= 99900 && p < 99920 ? 6 : 0.3)]);
+    for (let p = Math.ceil(mid + 0.5); p < mid + 400; p += 2) asks.push([p.toFixed(2), '0.3']);
+    return BM.agregerCarnet({ bids, asks }, 20);
+  };
+  for (const pas of [10, 30]) {
+    const n = Math.ceil(240 / pas) + 3, r = rejouer(Array.from({ length: n }, (_, i) => livre(100000 - i * pas)));
+    check(`prix qui descend de ${pas} $ par lecture à travers un mur nommé : UN passage, au bon niveau, une fois le prix sous le mur`, r.tr.length === 1 && r.tr[0].p === 99900 && r.tr[0].mid < 99900, r.tr);
+    const ev = r.tr[0] && BM.evenementTraverse({ cote: 'b', p: r.tr[0].p, pas: 20, q: r.tr[0].q, qAvant: r.tr[0].qAvant, t: t0 });
+    if (ev) garder(ev);
+    check('le passage d\'un mur approché dit sa taille quand il était nommé ET à la lecture d\'avant', !ev || r.tr[0].qAvant === null || /BTC quand il était nommé, .+ BTC à la lecture d'avant\)/.test(ev.texte), ev && ev.texte);
+  }
+  // Le prix approche le mur puis repart : aucun passage.
+  const allerRetour = [0, 10, 20, 30, 40, 50, 60, 70, 60, 50, 40, 30, 20, 10, 0].map(d => livre(100000 - d));
+  check('le prix approche un mur puis repart : aucun passage inventé', rejouer(allerRetour).tr.length === 0);
+  // Seuil qui saute (médiane de ≈ 20 tranches) : une tranche immobile à 22,5 BTC, au-dessus puis au-dessous du seuil brut.
+  const cg = (med, q) => {
+    const b = new Map(), a = new Map();
+    for (let kk = 4990; kk < 5000; kk++) b.set(kk, med);
+    for (let kk = 5001; kk < 5011; kk++) a.set(kk, med);
+    b.set(4993, q);
+    return { mid: 100010, b, a, bas: 4990 * 20, haut: 5011 * 20, pas: 20 };
+  };
+  const brut = [], lisse = [];
+  let meds = [], nommes = new Set();
+  for (let i = 0; i < 24; i++) {
+    const C = cg(i % 2 ? 13.1 : 10.9, 22.5), S0b = BM.seuilMur(C), S = BM.seuilMur(C, { medianes: meds });
+    meds = meds.concat(S.medianeLue).slice(-(G.seuilLectures - 1));
+    brut.push(BM.mursProches(C, { seuil: S0b.seuil }).some(m => m.k === 4993) ? 'X' : '.');
+    const M = BM.mursProches(C, { seuil: S.seuil, sortie: S.sortie, garder: nommes });
+    nommes = new Set(M.map(m => m.cote + m.k));
+    lisse.push(M.some(m => m.k === 4993) ? 'X' : '.');
+  }
+  check('seuil brut d\'une lecture : la tranche immobile clignote (le défaut corrigé)', /X\./.test(brut.join('')) && /\.X/.test(brut.join('')), brut.join(''));
+  check(`seuil lissé (${G.seuilLectures} lectures) + sortie à ${G.murSortiePart * 100} % : nommée sans clignoter`, /^X+$/.test(lisse.join('')), lisse.join(''));
+  check('seuil de sortie = murSortiePart × seuil', Math.abs(BM.seuilMur(cg(11, 30)).sortie - G.murSortiePart * BM.seuilMur(cg(11, 30)).seuil) < 1e-9);
+  // « Apparu » : seulement si la tranche a grossi, pas si le seuil est passé sous elle.
+  const Ca = cg(5, 30), mur = { cote: 'bid', k: 4993, p: 4993 * 20, q: 30, raison: 'seuil' };
+  let etat = { nommes: new Map(), approches: new Map() }, app = [[], []];
+  [29, 8].forEach((qAvant, j) => {
+    etat = { nommes: new Map(), approches: new Map() };
+    for (let i = 0; i < G.nommeLectures; i++) {
+      const r = BM.suivreNommes(etat, [Object.assign({}, mur, { depuis: 0, qAvant })], Ca, 2000 + i * 2000, true, { sortie: 8 });
+      app[j].push(...r.apparus); etat = { nommes: r.nommes, approches: r.approches };
+    }
+  });
+  check('tranche déjà à 29 BTC, nommée quand le seuil baisse : pas « apparu »', app[0].length === 0, app[0]);
+  check(`tranche passée de 8 à 30 BTC : « apparu » une fois (après ${G.nommeLectures} lectures)`, app[1].length === 1, app[1]);
+  // Zone qui retombe entre 30 BTC et le seuil d'entrée (carnet ordinaire de 10 BTC par tranche).
+  const zb = (z, mid) => {
+    const b = new Map(), a = new Map();
+    for (let kk = 4900; kk < 5000; kk++) b.set(kk, 10);
+    for (let kk = 5000; kk < 5100; kk++) a.set(kk, 10);
+    for (const [kk, q] of z) b.set(kk, q);
+    return { pas: 20, b, a, mid, bas: 4900 * 20, haut: 5100 * 20 };
+  };
+  let zz = BM.zonesChargees(zb([[4980, 20], [4981, 20], [4982, 20]], 100000), null);
+  const z0 = zz.bid, suite = [];
+  for (let i = 0; i < 8; i++) { zz = BM.zonesChargees(zb([[4980, 11], [4981, 11], [4982, 11]], 100000), zz); suite.push(zz.bid ? zz.bid.garde : null); }
+  check(`zone de 60 BTC retombée à 33 BTC (le carnet ordinaire en a 30 partout) : gardée ${G.zoneGarde} lectures, puis effacée`, z0 && z0.q === 60 && suite.join() === [1, 2, 3, null, null, null, null, null].join(), { z0, suite });
+}
 
 // ── 12. Constantes et mots ───────────────────────────────────────────────────
 titre('12. Constantes et mots');

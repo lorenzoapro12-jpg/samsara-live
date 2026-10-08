@@ -110,6 +110,19 @@ const serveur = http.createServer((req, res) => {
 // latenceHeatmap (ms) ; init (script avant la page) ; horloge (page.clock installée) ;
 // attendre: false (ne pas attendre le chargement complet) ; contexte : options du contexte
 // (deviceScaleFactor, hasTouch, isMobile).
+/** « pas une prévision » est-il dans la partie VISIBLE de la bande du résumé (ni sous la 2e ligne,
+ *  ni au-delà du bord droit d'une ligne seule) ? */
+async function avertissementVisible(pg) {
+  return pg.evaluate(() => {
+    const r = document.getElementById('resumeCarte'), n = r.firstChild, mot = 'pas une prévision';
+    const i = r.textContent.indexOf(mot);
+    if (!n || i < 0) return { trouve: false, texte: r.textContent };
+    const g = document.createRange(); g.setStart(n, i); g.setEnd(n, i + mot.length);
+    const b = r.getBoundingClientRect(), rs = [...g.getClientRects()];
+    return { trouve: true, dedans: rs.length > 0 && rs.every(q => q.left >= b.left - 0.5 && q.right <= b.right + 0.5 && q.top >= b.top - 0.5 && q.bottom <= b.bottom + 0.5),
+      mots: rs.map(q => [q.left, q.top, q.right, q.bottom].map(Math.round)), bande: [b.left, b.top, b.right, b.bottom].map(Math.round), texte: r.textContent };
+  });
+}
 async function ouvrir(nav, opts) {
   const page = await nav.newPage(Object.assign({ viewport: opts.vue || { width: 1440, height: 860 } }, opts.contexte || {}));
   const erreurs = [];
@@ -815,6 +828,16 @@ async function pixel(page, x, y) {
       const dans = p => p.x >= 0 && p.y >= 0 && p.x + p.w <= e29.mise.chaleur.w + 0.5 && p.y + p.h <= e29.mise.chaleur.h + 0.5;
       const pas = e29.posees.filter(p => p.pastille);
       check(`${pas.length} pastilles d'âge, toutes DANS la carte`, pas.length >= 5 && pas.every(dans), pas);
+      // L'explication (première visite) cache la plus grande part de la carte : un appui ou un
+      // glissement sur ce qu'on lit ne doit pas toucher la carte cachée dessous.
+      const pe = await p29.evaluate(() => { const i = document.getElementById('guideIntro'); return { ouverte: !i.hidden, pe: getComputedStyle(i).pointerEvents }; });
+      check('téléphone, explication ouverte : elle prend le pointeur (la carte cachée dessous ne bouge pas)', pe.ouverte && pe.pe === 'auto', pe);
+      if (pe.ouverte) {
+        const b = await p29.locator('#guideIntroListe li:nth-child(3)').boundingBox();
+        await p29.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2); await p29.waitForTimeout(400);
+        const lu = await p29.evaluate(() => ({ visible: !document.getElementById('lecture').hidden, texte: document.getElementById('lecture').innerText.slice(0, 120) }));
+        check('un appui sur le texte de l\'explication : aucune lecture de la carte épinglée dessus', !lu.visible, lu);
+      }
       for (const id of ['legende', 'reglages']) {
         await p29.click(id === 'legende' ? '#btnLegende' : '#btnReglages');
         const r = await p29.evaluate(i => { const p = document.getElementById(i); p.scrollTop = p.scrollHeight; const der = [...p.querySelectorAll('p, button, dd, select')].pop().getBoundingClientRect(), b = document.querySelector('.barre').getBoundingClientRect(), pr = p.getBoundingClientRect();
@@ -835,6 +858,11 @@ async function pixel(page, x, y) {
       const noms = ['Carte publiée', 'Live', 'Exécutions', 'Murs', 'Gamma'];
       check(`carte de ${W} × ${H} px : ${pas.length} pastilles (${pas.map(p => p.texte.split(' ·')[0]).join(', ')}), toutes dans la carte`,
         noms.every(n => pas.some(p => p.texte.startsWith(n))) && pas.every(p => p.y >= 0 && p.y + p.h <= H + 0.5 && p.x >= 0 && p.x + p.w <= W + 0.5), pas);
+      // Première visite : l'explication couvre presque toute la carte basse. Les pastilles passent
+      // dessous plutôt que l'une sur l'autre (lisibles dès qu'elle se ferme).
+      const sur = [];
+      for (let i = 0; i < pas.length; i++) for (let j = i + 1; j < pas.length; j++) { const a = pas[i], b = pas[j]; if (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y) sur.push(a.texte + ' / ' + b.texte); }
+      check('explication ouverte : aucune pastille d\'âge posée sur une autre', e30.guide.intro === true && !sur.length, { intro: e30.guide.intro, sur });
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p30.close();
     }
@@ -843,7 +871,9 @@ async function pixel(page, x, y) {
     titre('31. Au doigt : un appui bref épingle la lecture, un appui long la montre, glisser déplace');
     {
       let p31;
-      ({ page: p31, erreurs } = await ouvrir(nav, { encodage: true, vue: { width: 390, height: 844 }, contexte: { deviceScaleFactor: 3, hasTouch: true, isMobile: true } }));
+      // L'explication de première visite déjà refermée : sur un téléphone elle prend le pointeur
+      // (section 29), et ces gestes visent la carte.
+      ({ page: p31, erreurs } = await ouvrir(nav, { encodage: true, vue: { width: 390, height: 844 }, contexte: { deviceScaleFactor: 3, hasTouch: true, isMobile: true }, stockage: { 'samsara-carte-intro-v1': 'vue' } }));
       const cdp = await p31.context().newCDPSession(p31);
       const touche = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
       const rc = await p31.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(), z = window.__carte.etat().mise.chaleur; return { x: r.left + z.w * 0.4, y: r.top + z.h * 0.45 }; });
@@ -1235,9 +1265,10 @@ async function pixel(page, x, y) {
       const e0 = await etat(p44);
       check('guide allumé par défaut, destin des murs éteint, mode débutant (terminal sans mode)', e0.guide.allume && !e0.reglages.calques.destin && e0.guide.mode === 'debutant', e0.guide);
       debutMur = Date.now();
-      await p44.waitForFunction(() => window.__carte.etat().guide.journal.some(j => /^Gros ordre d'achat (retiré|disparu)/.test(j.texte)), null, { timeout: 40000 }).catch(() => {});
+      // La phrase commence par la plus grande taille lue (« Gros ordre d'achat de 30,0 BTC … retiré »).
+      await p44.waitForFunction(() => window.__carte.etat().guide.journal.some(j => /^Gros ordre d'achat de .+ BTC.* (retiré|disparu)/.test(j.texte)), null, { timeout: 40000 }).catch(() => {});
       const j44 = (await etat(p44)).guide.journal;
-      check('gros ordre posé puis retiré, « Destin » éteint : au journal du guide (« Gros ordre d\'achat retiré… (un seul prix) »)', j44.some(j => /^Gros ordre d'achat (retiré|disparu).+30,0 BTC.+un seul prix/.test(j.texte) || /^Gros ordre d'achat retiré.+un seul prix/.test(j.texte)), j44);
+      check('gros ordre posé puis retiré, « Destin » éteint : au journal du guide (« Gros ordre d\'achat de 30,0 BTC … retiré … (un seul prix) »)', j44.some(j => /^Gros ordre d'achat de 30,0 BTC.* (retiré|disparu).+un seul prix/.test(j.texte) || /^Gros ordre d'achat de .+ BTC.* retiré.+un seul prix/.test(j.texte)), j44);
       await p44.click('#btnJournal'); await p44.waitForTimeout(300);
       const lj = await p44.evaluate(() => document.getElementById('listeJournal').innerText);
       check('panneau « Ce qui vient de se passer » : heure UTC et phrase', /\d\d:\d\d:\d\d .+Gros ordre d'achat/.test(lj), lj.slice(0, 200));
@@ -1281,6 +1312,18 @@ async function pixel(page, x, y) {
         const d = await pg.evaluate(() => { const c = document.getElementById('carte'), r = document.getElementById('resumeCarte'); return { ch: c.clientHeight, barre: document.querySelector('.barre').getBoundingClientRect().height, bande: r.getBoundingClientRect().height, visible: !r.hidden, texte: r.textContent, defil: document.documentElement.scrollWidth - innerWidth }; });
         check(`${w} × ${h} : résumé affiché (${Math.round(d.bande)} px) sans changer la taille de la carte (${avant} → ${d.ch} px ≥ ${Math.min(400, h - 120)}), en-tête ${Math.round(d.barre)} px ≤ 82, aucun défilement`,
           d.visible && /^Carnet lu il y a/.test(d.texte) && /pas une prévision/.test(d.texte) && d.ch === avant && d.ch >= Math.min(400, h - 120) && d.barre <= 82 && d.defil <= 0, d);
+        const v = await avertissementVisible(pg);
+        check(`${w} × ${h} : « pas une prévision » est DANS la bande visible (pas coupé par les deux lignes)`, v && v.dedans, v);
+        check('aucune erreur JavaScript', !erreurs.length, erreurs);
+        await pg.close();
+      }
+      // f. Téléphone couché (844 × 390) : une seule ligne ; l'avertissement reste visible.
+      {
+        let pg;
+        ({ page: pg, erreurs } = await ouvrir(nav, { encodage: true, vue: { width: 844, height: 390 } }));
+        await pg.waitForFunction(() => window.__carte && /^Carnet lu il y a/.test(window.__carte.etat().guide.resume), null, { timeout: 15000 }).catch(() => {});
+        const v = await avertissementVisible(pg);
+        check('844 × 390 : « pas une prévision » est DANS la ligne visible du résumé', v && v.dedans, v);
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
         await pg.close();
       }

@@ -193,8 +193,11 @@ input[type="range"] { accent-color: var(--carte-live); }
   .guide-intro .detail:not(.garde) { display: none; }
   .guide-intro .note { margin: 4px 0 6px; }
 }
-/* Écran bas : elle peut dépasser — elle prend alors le pointeur pour défiler jusqu'à « J'ai compris ». */
-@media (max-height: 560px) { .guide-intro { pointer-events: auto; } }
+/* Écran bas ou étroit (téléphone), ou explication qui couvre plus de la moitié de la carte (classe
+   .couvre, posée par la page) : elle prend le pointeur — un appui ou un glissement sur ce qu'on lit
+   ne touche pas la carte cachée dessous, et l'explication défile jusqu'à « J'ai compris ». */
+@media (max-width: 640px), (max-height: 560px) { .guide-intro { pointer-events: auto; } }
+.guide-intro.couvre { pointer-events: auto; }
 
 @media (max-width: 640px) {
   .guide-intro { font-size: 12px; padding: 4px 10px 8px; }
