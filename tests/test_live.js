@@ -1,5 +1,5 @@
 // Harnais DÉDIÉ au panneau ⚡ (lecture live). Contrairement à test_render.js, le `fetch`
-// du sandbox est le fetch RÉSEAU de node : ce test tape vraiment api.binance.com et
+// du sandbox est le fetch RÉSEAU de node : ce test tape vraiment api.binance.com (ou son miroir, si le poste est refusé) et
 // vérifie donc la chaîne complète, pas un simulacre.
 const fs = require('fs'), vm = require('vm'), os = require('os'), path = require('path');
 const REPO = path.resolve(__dirname, '..');
@@ -112,7 +112,7 @@ const usd = v => Math.round(v).toLocaleString('en-US');
   console.log('── FIN ──\n');
 
   const called = sandbox.__files;
-  const apiOk = called.every(u => /api\.binance\.com\/api\/v3\//.test(u));
+  const apiOk = called.every(u => /^https:\/\/(api\.binance\.com|data-api\.binance\.vision)\/api\/v3\//.test(u));
   const fbList = fb.load();
   const hits = fb.find(html, fbList.terms).concat(fb.find(SRC, fbList.terms));
 

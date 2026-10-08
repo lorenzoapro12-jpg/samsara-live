@@ -52,7 +52,7 @@ NOYAU = ["color-scheme", "--fond", "--surface", "--ink-1", "--ink-2", "--ink-3",
          "--card", "--card-solid", "--card-edge", "--card-shadow",
          "--chart-1", "--chart-2", "--chart-3",
          "--ov-ema20", "--ov-ema50", "--ov-ema100", "--ov-ema200", "--ov-sma20", "--ov-sma50"]
-HOTES_APPELES = {"api.binance.com", "raw.githubusercontent.com"}
+HOTES_APPELES = {"api.binance.com", "data-api.binance.vision", "raw.githubusercontent.com"}
 # Espaces de noms XML (SVG) : écrits dans le code, jamais téléchargés.
 ESPACES_DE_NOMS = {"www.w3.org"}
 
