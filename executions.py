@@ -35,7 +35,10 @@ import samsara_config as SC
 CFG = SC.load()
 STATE = SC.state(CFG, "executions-state.json")
 RUN_LOCK = SC.state(CFG, "executions.lock")
-OUT = SC.out(CFG, "executions.json")
+# Écrit HORS de l'arbre de travail (08/10/2026) : réécrit chaque minute dans le dépôt, ce fichier
+# suivi laissait l'arbre « sale » et faisait échouer le `pull --rebase` de publish.py et de
+# heatmap.py. heatmap.py le recopie dans le dépôt, sous verrou, au moment de son commit.
+OUT = SC.state(CFG, "executions.json")
 
 # L'hôte se change par l'environnement (contrôle depuis une machine que api.binance.com refuse :
 # SAMSARA_BINANCE=https://data-api.binance.vision, le miroir public, mêmes réponses).

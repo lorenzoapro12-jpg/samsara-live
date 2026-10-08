@@ -90,7 +90,7 @@ def bac_a_sable(**remplacer):
     with tempfile.TemporaryDirectory() as tmp:
         noms = dict(STATE=os.path.join(tmp, "state.json"), LAST_PUSH=os.path.join(tmp, "last-push.txt"),
                     RUN_LOCK=os.path.join(tmp, "run.lock"), OUT=os.path.join(tmp, "heatmap.json"), AGREG_DEPUIS=os.path.join(tmp, "agregation-depuis.txt"),
-                    git_publish_heatmap=lambda updated: True, publier_direct=lambda state, t: True)
+                    git_publish_heatmap=lambda updated: True, publier_direct=lambda state, t: True, lire_profondeur=lambda: None)
         noms.update(remplacer)
         avant = {k: getattr(H, k) for k in noms}
         for k, v in noms.items():

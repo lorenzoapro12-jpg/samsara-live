@@ -26,6 +26,8 @@ Livraison du 07/10/2026 (à valider par un passage réel du cron) :
   · CADENCE — 15 min au lieu de 16 (voir main()).
 
 Livraison du 08/10/2026 :
+  · PROFONDEUR — chaque tour appelle profondeur.tour() (carnet complet de Coinbase sur ±10 %, une
+    colonne toutes les 5 min) ; profondeur.json part dans le commit de 15 min, comme executions.json.
   · DIRECT — chaque tour (une fois par minute) publie aussi les 30 dernières minutes (carnet et
     exécutions) sur la branche orpheline `direct`, en UN commit sans parent, remplacé à chaque
     tour : master garde sa cadence de 15 min (déploiements Pages), la carte n'a plus que le cache
@@ -62,7 +64,15 @@ GIT_LOCK = CFG["git_lock"]
 GIT_REMOTE = CFG["git_remote"]
 GIT_BRANCH = CFG["git_branch"]
 DIRECT_BRANCH = CFG.get("direct_branche") or "direct"
-EXEC_OUT = SC.out(CFG, "executions.json")
+# Fichiers des autres écrivains, gardés HORS de l'arbre de travail (dossier d'état) : recopiés dans
+# le dépôt sous verrou, juste avant le commit de 15 min, l'arbre reste propre entre deux commits.
+# (Écrit dans le dépôt chaque minute, executions.json faisait échouer le `pull --rebase` de
+# publish.py une passe sur deux ou trois — constaté sur le VPS le 08/10/2026 à 09:33 et 09:48.)
+EXEC_OUT = SC.state(CFG, "executions.json")
+AUTRES = {"executions.json": EXEC_OUT, "profondeur.json": SC.state(CFG, "profondeur.json")}
+# Interrupteur de la branche `direct` : ce fichier présent, plus rien n'y est poussé (retour arrière :
+# le créer, puis supprimer la branche distante).
+DIRECT_OFF = SC.state(CFG, "direct.off")
 RECENT_MIN = 30   # minutes publiées sur la branche `direct`
 
 DT = 60           # secondes par colonne (1 min)
@@ -163,10 +173,18 @@ def git_publish_heatmap(updated_iso):
     """
     os.makedirs(os.path.dirname(GIT_LOCK) or ".", exist_ok=True)
     P = "heatmap.json"
-    # executions.json (executions.py) part dans le même commit quand il existe.
-    autres = [f for f in ("executions.json",) if os.path.exists(os.path.join(REPO, f))]
     with open(GIT_LOCK, "w") as lk:
         fcntl.flock(lk, fcntl.LOCK_EX)
+        # executions.json et profondeur.json partent dans le même commit quand ils existent :
+        # recopiés depuis le dossier d'état SOUS VERROU, l'arbre égale HEAD dès le commit fait.
+        autres = []
+        for nom, source in AUTRES.items():
+            try:
+                with open(source) as f:
+                    write_atomic(f.read(), os.path.join(REPO, nom))
+                autres.append(nom)
+            except FileNotFoundError:
+                pass
 
         def shared(*a, **k):
             return subprocess.run(["git", "-C", REPO, *a], **k)
@@ -360,6 +378,12 @@ def publier_direct(state, maintenant):
     return True
 
 
+def lire_profondeur():
+    """Carnet Coinbase ±10 %, une colonne toutes les 5 min (profondeur.py ; remplacé par les tests)."""
+    import profondeur
+    profondeur.tour()
+
+
 def texte(data):
     """Compact pour colonnes-1 : les espaces de « , » et « : » pesaient 25 % du fichier brut.
     L'ancien format garde l'écriture d'avant (json.dump par défaut) : le retour arrière
@@ -433,7 +457,13 @@ def main():
     dump_atomic(state, STATE)
 
     try:
-        publier_direct(state, time.time())
+        lire_profondeur()
+    except Exception as e:
+        print(f"⚠️ profondeur Coinbase non lue : {type(e).__name__}: {e}")
+
+    try:
+        if not os.path.exists(DIRECT_OFF):
+            publier_direct(state, time.time())
     except Exception as e:
         print(f"⚠️ direct non publié : {type(e).__name__}: {e}")
 

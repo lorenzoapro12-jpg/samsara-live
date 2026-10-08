@@ -29,6 +29,7 @@
   const HEATMAP_URL = RAW + 'heatmap.json';
   const DATA_URL = RAW + 'market-data.json';
   const EXEC_URL = RAW + 'executions.json';
+  const LOIN_URL = RAW + 'profondeur.json';     // carnet Coinbase ±10 % (profondeur.py), 5 min × 100 $
   // Branche `direct` (heatmap.py, 08/10/2026) : les 30 dernières minutes, publiées chaque minute.
   // Elle comble le retard de master (15 min) : il ne reste que le cache de raw.githubusercontent.
   const DIRECT = 'https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/direct/';
@@ -41,7 +42,7 @@
   // ensemble, leurs libellés et leurs pastilles se chevauchaient sur la chaleur.
   const DEFAUTS = {
     calques: { publiee: true, live: true, executions: true, prix: true, bidask: true, murs: true,
-      gamma: true, profil: true, dom: true, volume: true, cvd: true, memoire: false, rafales: false, destin: false },
+      gamma: true, profil: true, dom: true, volume: true, cvd: true, memoire: false, rafales: false, destin: false, loin: true },
     palette: 'classique',
     seuilBas: 2,          // intensité sous laquelle rien n'est peint
     saturation: 200,      // intensité à partir de laquelle la couleur est au maximum
@@ -96,7 +97,8 @@
   // sur l'axe par axe(), avec l'écart mesuré par E.horloge. L'axe du temps est à l'heure Binance.
   const E = {
     pub: null, pubF: null, pubCle: '', pubMaj: null, pubLu: null, pubTexte: null, pubN: 0,
-    pubBrut: null, directBrut: null, directTexte: null,      // heatmap.json de master et de `direct`, analysés
+    pubBrut: null, directBrut: null, directTexte: null,
+    loin: null, loinN: 0, loinTexte: null,      // profondeur lointaine (Coinbase), peinte SOUS la carte      // heatmap.json de master et de `direct`, analysés
     md: null, niv: null, mdLu: null, mdTexte: null,
     live: null, liveRef: null, liveP99: 0, liveEcartees: 0, carnet: null, carnetA: null, liveV: 0,
     exec: new BM.SeauxExecutions(1), execVus: new Set(), execArriere: null, execTrous: [], execLu: null,
@@ -208,6 +210,23 @@
     appliquerEchelle();          // l'échelle live suit l'encodage, qu'il arrive ou qu'il disparaisse
     majLegende();
     bientot();
+  }
+  /** profondeur.json : le carnet complet de Coinbase sur ±10 %, peint sous la carte de Binance (qui
+   *  ne voit que ≈ ±1 %). Absent (404) : rien ne change. */
+  async function lireProfondeur() {
+    try {
+      const { corps: txt } = await lire(LOIN_URL, { delai: DELAIS.carte, cache: 'no-cache', texte: true, porte: E.recul.github });
+      const maj = BM.majEnTete(txt);
+      if (E.loin && maj !== null && maj === E.loinTexte) { erreur('profondeur', null); return; }
+      const g = BM.grillePubliee(JSON.parse(txt));
+      if (!g) throw new Error('format non reconnu par cette page');
+      E.loin = g; E.loinTexte = maj; E.loinN++;
+      erreur('profondeur', null);
+      bientot();
+    } catch (e) {
+      if (e && e.message === 'HTTP 404') { erreur('profondeur', null); return; }
+      erreur('profondeur', e); throw e;
+    }
   }
   /** Branche `direct` : carnet et exécutions des 30 dernières minutes, relus chaque minute. Absente
    *  (404 : VPS pas encore à jour) : rien ne change. */
@@ -444,10 +463,10 @@
       // suivi : à la reprise, l'écart entre deux lectures le dit « interrompu ».
       if (R.calques.destin) E.murs.lecture(d, s, r, E.horloge);
       const a = BM.agregerCarnet(d, R.dpLive);
-      // La carte publiée compte la SOMME d'une tranche (heatmap.py, 08/10/2026) : le live aussi.
-      if (sommePubliee()) { a.bids = a.sb; a.asks = a.sa; }
-      a.somme = sommePubliee();
-      if (!E.live || E.live.dp !== a.dp || E.live.cadence !== cadence || E.live.somme !== a.somme) { reinitLive(); E.live = new BM.CarnetLive(a.dp, cadence); E.live.somme = a.somme; E.live.recaler(E.horloge.ecart); }
+      // Le live compte TOUJOURS la somme d'une tranche, comme la carte publiée depuis le 08/10/2026 :
+      // décidé avant de connaître heatmap.json, il n'a pas à repartir de zéro quand celui-ci arrive.
+      a.bids = a.sb; a.asks = a.sa; a.somme = true;
+      if (!E.live || E.live.dp !== a.dp || E.live.cadence !== cadence) { reinitLive(); E.live = new BM.CarnetLive(a.dp, cadence); E.live.somme = a.somme; E.live.recaler(E.horloge.ecart); }
       appliquerEchelle(a);
       // lastUpdateId doit croître strictement : un instantané plus ancien que le précédent (servi
       // par un autre nœud de Binance) est écarté, pas peint par-dessus le plus récent.
@@ -510,6 +529,7 @@
     boucle('fichier', lireMarketData, 60e3, E.recul.github);
     boucle('historique', () => lireExecutionsPubliees(), 5 * 60e3, E.recul.github);
     boucle('direct', lireDirect, 60e3, E.recul.github);
+    boucle('profondeur', lireProfondeur, 5 * 60e3, E.recul.github);
     boucle('bougies', lireMinutes, 10e3, E.recul.binance);
     boucle('executions', lireExecutions, 1000, E.recul.binance);
     boucleCarnet = boucle('carnet', lireCarnet, () => CADENCE_CARNET[R.niveauxLive], E.recul.binance);
@@ -565,7 +585,7 @@
   const cv = document.getElementById('carte');
   const ctx = cv.getContext('2d', { alpha: false });     // opaque : tout est repeint à chaque rendu
   function calque() { const c = document.createElement('canvas'); c.width = c.height = 1; return { c, x: c.getContext('2d'), cle: null, t1: 0, p2: 0, coupe: Infinity, vide: true }; }
-  const PUB = calque(), LIVE = calque(), COMP = calque();   // COMP : la chaleur composée, gardée
+  const PUB = calque(), LIVE = calque(), COMP = calque(), LOIN = calque();   // COMP : la chaleur composée, gardée
   let RESERVE = calque();          // second tampon du calque publié (décalage sans recouvrement)
   let rafDemande = false, premierComplet = false, LUTV = 0;
   const MESURE = { chaleur: 0, rendu: 0, rendus: 0, complets: 0, decalages: 0, live: 0 };
@@ -730,6 +750,17 @@
     PUB.cle = cle; PUB.t1 = v.t1; PUB.p2 = v.p2; PUB.coupe = coupe; MESURE.complets++;
     return true;
   }
+  /** Profondeur Coinbase : repeinte entière quand la vue ou le fichier change (288 colonnes au plus). */
+  function peindreLoin(w, h) {
+    const g = R.calques.loin && E.loin ? E.loin : null;
+    if (!g) { const etait = !LOIN.vide; if (etait) LOIN.x.clearRect(0, 0, w, h); LOIN.vide = true; LOIN.cle = null; return etait; }
+    const v = E.vue, cle = [w, h, E.loinN, LUTV, v.t1, v.t2, v.p1, v.p2].join('|');
+    if (cle === LOIN.cle) return false;
+    LOIN.x.clearRect(0, 0, w, h);
+    peindreRect(LOIN, g, w, h, maintenant(), 0, 0, w, h);
+    LOIN.cle = cle; LOIN.coupe = maintenant(); LOIN.vide = false;
+    return true;
+  }
   function peindreLive(w, h) {
     const g = R.calques.live && E.live && E.live.n ? E.live : null;
     if (!g) { const etait = !LIVE.vide; if (etait) LIVE.x.clearRect(0, 0, w, h); LIVE.vide = true; LIVE.cle = null; return etait; }
@@ -748,15 +779,16 @@
   /** Met les calques gardés à jour ; vrai si l'un d'eux a été (re)peint. */
   function peindreCalques() {
     const w = Z.chaleur.w, h = Z.chaleur.h;
-    for (const L of [PUB, LIVE]) if (L.c.width !== w || L.c.height !== h) { L.c.width = w; L.c.height = h; L.cle = null; L.vide = true; }
-    const a = peindrePubliee(w, h), b = peindreLive(w, h);
-    return a || b;
+    for (const L of [PUB, LIVE, LOIN]) if (L.c.width !== w || L.c.height !== h) { L.c.width = w; L.c.height = h; L.cle = null; L.vide = true; }
+    const a = peindrePubliee(w, h), b = peindreLive(w, h), c = peindreLoin(w, h);
+    return a || b || c;
   }
   /** La chaleur composée : fond hachuré, carte publiée, carnet live — dans le contexte c, en (x0, y0). */
   function composerChaleur(c, x0, y0) {
     const w = Z.chaleur.w, h = Z.chaleur.h;
     c.imageSmoothingEnabled = false;
     c.fillStyle = motif(c); c.fillRect(x0, y0, w, h);
+    if (!LOIN.vide) c.drawImage(LOIN.c, x0, y0);      // sous la carte : visible seulement là où Binance ne voit rien
     if (!PUB.vide) c.drawImage(PUB.c, x0, y0);
     if (!LIVE.vide) c.drawImage(LIVE.c, x0, y0);
   }
@@ -770,6 +802,7 @@
     const cNon = u32(f[0], f[1], f[2], 255), cHach = u32(k[0], k[1], k[2], 255);
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) ref[y * w + x] = (x + y) % 6 < 1 ? cHach : cNon;
     const g = grillePublieeAffichee();
+    if (!LOIN.vide) BM.peindreGrille(ref, w, h, E.loin, E.vue, couleurs(LOIN.coupe));
     if (g) BM.peindreGrille(ref, w, h, g, E.vue, couleurs(PUB.coupe));
     if (!LIVE.vide) BM.peindreGrille(ref, w, h, E.live, E.vue, couleurs(LIVE.coupe));
     let d = 0;
@@ -927,6 +960,7 @@
         (E.pub.dt / 1000) + ' s × ' + (E.pub.dp) + ' $' + (E.pubF && E.pubF !== E.pub ? ' (affichée : ' + E.pubF.dt / 1000 + ' s × ' + E.pubF.dp + ' $, MAX, blocs alignés sur l\'horloge)' : '')
         + ' · publiée il y a ' + BM.age(now - E.pubMaj)];
       if (!E.pub.encodage) l.push('échelle en intensités : encodage non publié');
+      if (R.calques.loin && E.loin) l.push('au-delà : carnet Coinbase ±10 %, ' + E.loin.dt / 60e3 + ' min × ' + E.loin.dp + ' $, échelle propre · il y a ' + BM.age(now - BM.instantDerniereColonne(E.loin)));
       pastille(l, Math.min(xf, Z.chaleur.w) - 8, 8, C.publie, 'right', 'Carte publiée · ' + BM.age(now - lue));
     }
     // Carnet live
@@ -1647,6 +1681,7 @@
       l.push('&nbsp;&nbsp;' + (q ? 'mesuré : ' + BM.btc(q) + ' BTC · ' : '') + quand + pixel);
     };
     const pub = grillePublieeAffichee();
+    if (R.calques.loin && E.loin) cel(E.loin, 'Coinbase', E.loin.encodage, LOIN.coupe);
     if (pub) cel(pub, 'Carte', pub.encodage, PUB.coupe);
     if (R.calques.live && !LIVE.vide) cel(E.live, 'Live', E.liveRef === 'publiee' ? E.pub && E.pub.encodage : null, LIVE.coupe);
     if (R.calques.executions && E.exec.seaux.size) {
@@ -1868,7 +1903,8 @@
   }
   const NOMS_CALQUES = [['publiee', 'Carte publiée'], ['live', 'Carnet live'], ['executions', 'Exécutions'], ['prix', 'Prix'],
     ['bidask', 'Bid / ask'], ['murs', 'Murs'], ['gamma', 'Gamma'], ['profil', 'Profil'], ['dom', 'Carnet latéral'],
-    ['volume', 'Volume'], ['cvd', 'CVD'], ['memoire', 'Mémoire'], ['rafales', 'Rafales'], ['destin', 'Destin des murs']];
+    ['volume', 'Volume'], ['cvd', 'CVD'], ['memoire', 'Mémoire'], ['rafales', 'Rafales'], ['destin', 'Destin des murs'],
+    ['loin', 'Profondeur Coinbase']];
   function construireBarre() {
     const z = $('calques');
     // Une ligne de puces qui défile : la molette verticale la fait défiler (sans Maj).
@@ -2030,6 +2066,7 @@
       vue: E.vue && Object.assign({}, E.vue), suivre: E.suivre, erreurs: Object.assign({}, E.erreurs),
       publiee: E.pub ? { W: E.pub.W, H: E.pub.H, dt: E.pub.dt, dp: E.pub.dp, encodage: !!E.pub.encodage } : null,
       finCarte: E.pub ? BM.finGrille(E.pub) : null,
+      loin: E.loin ? { n: E.loinN, dt: E.loin.dt, dp: E.loin.dp, peinte: !LOIN.vide } : null,
       live: E.live ? { n: E.live.n, dt: E.live.cadence, dp: E.live.dp, ref: E.liveRef, ecartees: E.liveEcartees,
         deb0: E.live.n ? E.live.deb[0] : null, derniere: E.live.n ? E.live.deb[E.live.n - 1] : null,
         nonNuls: E.live.n ? E.live.v.subarray(E.live.oB[E.live.n - 1], E.live.lg).reduce((k, x) => k + (x > 0), 0) : 0 } : null,
