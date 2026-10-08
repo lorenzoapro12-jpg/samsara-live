@@ -302,6 +302,62 @@ for nom, duree, gig, ech in (
     iv = simuler(duree, gig, ech)
     check(f"{nom} : intervalles de 15 min", len(iv) >= 12 and set(iv) == {15}, iv)
 
+# ── 7. Branche direct : un commit sans parent, carnet, exécutions et profondeur récents ──
+print("7. Branche « direct » — vrai git, dépôt distant jetable")
+
+
+def direct_publie(avec_profondeur):
+    import subprocess
+    with tempfile.TemporaryDirectory() as tmp:
+        depot, distant = os.path.join(tmp, "depot"), os.path.join(tmp, "distant.git")
+        for a in (["init", "-q", depot], ["init", "-q", "--bare", distant]):
+            subprocess.run(["git", *a], check=True)
+        t = 1_800_000_000                         # multiple de 300 et de 60
+        m = t // H.DT
+        state = {str(m - k): {"b": {"4100": 9}, "a": {"4101": 7}} for k in range(40)}
+        ex = os.path.join(tmp, "executions.json")
+        with open(ex, "w") as f:
+            json.dump({"dt": 10, "lu_depuis": t - 86400, "lu_jusqua": t, "trous": [],
+                       "seaux": [[t // 10 - k, 8200, [1], [0]] for k in (5, 400)]}, f)
+        pr = os.path.join(tmp, "profondeur.json")
+        if avec_profondeur:
+            # colonnes de 5 min : 1 h en arrière ; la fenêtre direct commence à t − 30 min
+            with open(pr, "w") as f:
+                json.dump({"updated": "x", "dt": 300, "dp": 100.0, "t0": 0, "format": "colonnes-1",
+                           "colonnes": [[t // 300 - k, 740, [5], 830, [6]] for k in range(12, 0, -1)]}, f)
+        avant = (H.REPO, H.GIT_REMOTE, H.EXEC_OUT, dict(H.AUTRES))
+        H.REPO, H.GIT_REMOTE, H.EXEC_OUT = depot, distant, ex
+        H.AUTRES["profondeur.json"] = pr
+        try:
+            ok = H.publier_direct(state, t)
+        finally:
+            H.REPO, H.GIT_REMOTE, H.EXEC_OUT, _ = avant
+            H.AUTRES.clear(); H.AUTRES.update(avant[3])
+
+        def g(*a):
+            return subprocess.run(["git", "--git-dir", distant, *a], capture_output=True, text=True, check=True).stdout
+        noms = g("ls-tree", "--name-only", H.DIRECT_BRANCH).split()
+        parents = g("rev-list", "--parents", "-n", "1", H.DIRECT_BRANCH).split()[1:]
+        prof = json.loads(g("show", f"{H.DIRECT_BRANCH}:profondeur.json")) if "profondeur.json" in noms else None
+        return ok, noms, parents, prof, t
+
+
+r = essai("publier_direct avec profondeur", lambda: direct_publie(True))
+if r:
+    ok, noms, parents, prof, t = r
+    check("poussé, un seul commit sans parent", ok and parents == [], parents)
+    check("trois fichiers : heatmap.json, executions.json, profondeur.json",
+          noms == ["executions.json", "heatmap.json", "profondeur.json"], noms)
+    debut = t - H.RECENT_MIN * 60
+    cs = [c[0] for c in prof["colonnes"]] if prof else []
+    check("profondeur : seulement les colonnes qui finissent après le début de la fenêtre (6 sur 12)",
+          cs == [t // 300 - k for k in range(6, 0, -1)] and all((c + 1) * 300 > debut for c in cs), cs)
+    check("profondeur : t0 = première colonne gardée × dt", prof and prof["t0"] == cs[0] * 300, prof and prof["t0"])
+r = essai("publier_direct sans profondeur", lambda: direct_publie(False))
+if r:
+    check("profondeur.json absent du dossier d'état : la branche porte les deux autres, sans erreur",
+          r[0] and r[1] == ["executions.json", "heatmap.json"], r[1])
+
 ko = CHECKS.count(False)
 print(f"\n{'✅ HEATMAP PUBLIÉE : TOUS LES CONTRÔLES PASSENT' if not ko else f'❌ {ko} contrôle(s) en échec'}")
 sys.exit(1 if ko else 0)
