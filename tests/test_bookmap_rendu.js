@@ -121,7 +121,7 @@ async function ouvrir(nav, opts) {
     if (h.startsWith('127.0.0.1')) return r.continue();
     hotes.add(h); urls.push(u);
     const cors = { 'access-control-allow-origin': '*', 'access-control-expose-headers': 'retry-after' };
-    if (h === 'api.binance.com') {
+    if (h === 'data-api.binance.vision') {
       const k = new URL(u).pathname.split('/').pop();
       if (opts.intercept) {
         const x = await opts.intercept(u, k, S);
@@ -199,7 +199,7 @@ async function pixel(page, x, y) {
     let { page, erreurs, hotes } = await ouvrir(nav, { encodage: true });
     let e = await etat(page);
     check('aucune erreur JavaScript', !erreurs.length, erreurs);
-    check('seuls Binance et GitHub Raw sont appelés', [...hotes].every(h => ['api.binance.com', 'raw.githubusercontent.com'].includes(h)), [...hotes]);
+    check('seuls Binance et GitHub Raw sont appelés', [...hotes].every(h => ['data-api.binance.vision', 'raw.githubusercontent.com'].includes(h)), [...hotes]);
     check('carte publiée chargée, encodage lu', e.publiee && e.publiee.W > 1000 && e.publiee.encodage, e.publiee);
     check('carnet live : au moins une colonne, même échelle que la carte publiée', e.live && e.live.n >= 1 && e.live.ref === 'publiee', e.live);
     check('exécutions et bougies 24 h chargées', e.executions.seaux > 0 && e.minutes >= 1440, { ex: e.executions.seaux, minutes: e.minutes });
@@ -647,7 +647,7 @@ async function pixel(page, x, y) {
         const u = r.request().url(), h = new URL(u).host, cors = { 'access-control-allow-origin': '*' };
         if (h.startsWith('127.0.0.1')) return r.continue();
         if (h === 'raw.githubusercontent.com') return r.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: u.includes('heatmap') ? JSON.stringify(Object.assign({}, hm, { encodage })) : JSON.stringify(sans) });
-        if (h === 'api.binance.com') { const d = simulateur().repondre(u); return r.fulfill({ status: d ? 200 : 404, headers: cors, contentType: 'application/json', body: JSON.stringify(d) }); }
+        if (h === 'data-api.binance.vision') { const d = simulateur().repondre(u); return r.fulfill({ status: d ? 200 : 404, headers: cors, contentType: 'application/json', body: JSON.stringify(d) }); }
         return r.abort();
       });
       await page2.goto(`http://127.0.0.1:${serveur.address().port}/bookmap.html`);
