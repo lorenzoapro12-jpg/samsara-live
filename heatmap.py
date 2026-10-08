@@ -352,9 +352,27 @@ def recentes_executions(path, depuis_s):
     return d
 
 
+def recente_profondeur(path, depuis_s):
+    """profondeur.json réduit aux colonnes qui finissent après `depuis_s` (None si absent ou vide).
+    Une colonne Coinbase dure 5 min : celle qui chevauche `depuis_s` est gardée, pour que la page
+    raccorde `direct` à master sans trou."""
+    try:
+        with open(path) as f:
+            d = json.load(f)
+    except Exception:
+        return None
+    dt = d.get("dt") or 300
+    d["colonnes"] = [c for c in d.get("colonnes", []) if (c[0] + 1) * dt > depuis_s]
+    if not d["colonnes"]:
+        return None
+    d["t0"] = d["colonnes"][0][0] * dt
+    return d
+
+
 def publier_direct(state, maintenant):
-    """Les RECENT_MIN dernières minutes sur la branche orpheline DIRECT_BRANCH, en un commit
-    sans parent poussé en force : la branche ne grossit pas, master n'est pas touchée.
+    """Les RECENT_MIN dernières minutes (carnet, exécutions, profondeur Coinbase) sur la branche
+    orpheline DIRECT_BRANCH, en un commit sans parent poussé en force : la branche ne grossit
+    pas, master n'est pas touchée.
     Rend True si poussé. Un échec n'arrête rien : master reste la source complète."""
     depuis_m = int(maintenant) // DT - RECENT_MIN
     data = donnees({k: v for k, v in state.items() if int(k) >= depuis_m}, datetime.now(timezone.utc).isoformat())
@@ -364,6 +382,9 @@ def publier_direct(state, maintenant):
     ex = recentes_executions(EXEC_OUT, depuis_m * DT)
     if ex is not None:
         fichiers["executions.json"] = json.dumps(ex, separators=(",", ":"))
+    pr = recente_profondeur(AUTRES["profondeur.json"], depuis_m * DT)
+    if pr is not None:
+        fichiers["profondeur.json"] = json.dumps(pr, separators=(",", ":"))
 
     def g(*a, entree=None):
         r = subprocess.run(["git", "-C", REPO, *a], input=entree, capture_output=True, text=True, timeout=60)

@@ -1199,6 +1199,20 @@ async function pixel(page, x, y) {
       check('la pastille de la carte dit la source et l\'échelle propre', /au-delà : carnet Coinbase ±10 %.+échelle propre/.test(P43), P43);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p43.close();
+      // La branche « direct » porte aussi les 30 dernières minutes de profondeur : elles prolongent
+      // celle de master (publiée toutes les 15 min) sans rien remplacer avant.
+      const plus = [2, 1, 0].map(k => [t - k, 747, new Array(83).fill(60), 830, new Array(83).fill(60)]);
+      const direct = u => (u.endsWith('profondeur.json') ? Object.assign(loin(), { colonnes: plus, t0: plus[0][0] * 300 })
+        : u.endsWith('heatmap.json') ? Object.assign({}, hm, { encodage }) : null);
+      let p43b;
+      ({ page: p43b, erreurs } = await ouvrir(nav, { encodage: true, profondeur: loin, direct }));
+      await p43b.waitForTimeout(1500);
+      const l43 = (await etat(p43b)).loin;
+      check('profondeur prolongée par « direct » : elle va jusqu\'à sa dernière colonne (1 de plus que master)', l43 && l43.fin === (t + 1) * 300e3, [l43 && l43.fin, (t + 1) * 300e3]);
+      const v43b = await p43b.evaluate(() => window.__carte.verifierChaleur());
+      check('chaleur affichée = repeint complet (profondeur prolongée)', v43b.differents === 0, v43b);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p43b.close();
     }
   } finally {
     await nav.close();

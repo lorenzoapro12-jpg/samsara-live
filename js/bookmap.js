@@ -97,8 +97,8 @@
   // sur l'axe par axe(), avec l'écart mesuré par E.horloge. L'axe du temps est à l'heure Binance.
   const E = {
     pub: null, pubF: null, pubCle: '', pubMaj: null, pubLu: null, pubTexte: null, pubN: 0,
-    pubBrut: null, directBrut: null, directTexte: null,
-    loin: null, loinN: 0, loinTexte: null,      // profondeur lointaine (Coinbase), peinte SOUS la carte      // heatmap.json de master et de `direct`, analysés
+    pubBrut: null, directBrut: null, directTexte: null,      // heatmap.json de master et de `direct`, analysés
+    loin: null, loinN: 0, loinBrut: {}, loinTexte: {},       // profondeur lointaine (Coinbase), peinte SOUS la carte ; brut et dates par source
     md: null, niv: null, mdLu: null, mdTexte: null,
     live: null, liveRef: null, liveP99: 0, liveEcartees: 0, carnet: null, carnetA: null, liveV: 0,
     exec: new BM.SeauxExecutions(1), execVus: new Set(), execArriere: null, execTrous: [], execLu: null,
@@ -192,17 +192,17 @@
       erreur('carte', null);
     } catch (e) { erreur('carte', e); throw e; }
   }
-  /** La carte affichée = master (24 h) prolongée par `direct` (30 dernières minutes) : une minute
-   *  présente dans les deux est prise dans `direct`, plus récente. Seulement si les deux sont en
-   *  « colonnes-1 » avec le même pas et le même encodage ; sinon master seule. */
+  /** Un fichier de master (24 h) prolongé par son double de `direct` (30 dernières minutes) : une
+   *  colonne présente dans les deux est prise dans `direct`, plus récente. Seulement si les deux
+   *  sont en « colonnes-1 » avec le même pas et le même encodage ; sinon master seule. */
+  function prolonger(h, d) {
+    if (!(h && d && Array.isArray(h.colonnes) && Array.isArray(d.colonnes) && d.colonnes.length && h.dt === d.dt && h.dp === d.dp
+      && JSON.stringify(h.encodage || null) === JSON.stringify(d.encodage || null))) return h;
+    const m0 = d.colonnes[0][0], cols = h.colonnes.filter(c => c[0] < m0).concat(d.colonnes);
+    return Object.assign({}, h, { colonnes: cols, t0: cols[0][0] * h.dt, updated: d.updated > h.updated ? d.updated : h.updated });
+  }
   function composerCarte() {
-    const h = E.pubBrut, d = E.directBrut;
-    let src = h;
-    if (h && d && Array.isArray(h.colonnes) && Array.isArray(d.colonnes) && d.colonnes.length && h.dt === d.dt && h.dp === d.dp
-      && JSON.stringify(h.encodage || null) === JSON.stringify(d.encodage || null)) {
-      const m0 = d.colonnes[0][0], cols = h.colonnes.filter(c => c[0] < m0).concat(d.colonnes);
-      src = Object.assign({}, h, { colonnes: cols, t0: cols[0][0] * h.dt, updated: d.updated > h.updated ? d.updated : h.updated });
-    }
+    const src = prolonger(E.pubBrut, E.directBrut);
     const g = src && BM.grillePubliee(src);
     if (!g) return;
     E.pub = g; E.pubMaj = g.majA; E.pubN++;
@@ -212,24 +212,33 @@
     bientot();
   }
   /** profondeur.json : le carnet complet de Coinbase sur ±10 %, peint sous la carte de Binance (qui
-   *  ne voit que ≈ ±1 %). Absent (404) : rien ne change. */
-  async function lireProfondeur() {
+   *  ne voit que ≈ ±1 %). Celui de master (24 h, toutes les 5 min) prolongé par celui de `direct`
+   *  (lu chaque minute avec la branche), comme la carte. Absent (404) : rien ne change. */
+  async function lireProfondeur(url, cle) {
+    url = url || LOIN_URL; cle = cle || 'master';
     try {
-      const { corps: txt } = await lire(LOIN_URL, { delai: DELAIS.carte, cache: 'no-cache', texte: true, porte: E.recul.github });
+      const { corps: txt } = await lire(url, { delai: DELAIS.carte, cache: 'no-cache', texte: true, porte: E.recul.github });
       const maj = BM.majEnTete(txt);
-      if (E.loin && maj !== null && maj === E.loinTexte) { erreur('profondeur', null); return; }
-      const g = BM.grillePubliee(JSON.parse(txt));
-      if (!g) throw new Error('format non reconnu par cette page');
-      E.loin = g; E.loinTexte = maj; E.loinN++;
+      if (E.loinBrut[cle] && maj !== null && maj === E.loinTexte[cle]) { erreur('profondeur', null); return; }
+      const d = JSON.parse(txt);
+      if (!BM.grillePubliee(d)) throw new Error('format non reconnu par cette page');
+      E.loinBrut[cle] = d; E.loinTexte[cle] = maj;
+      composerLoin();
       erreur('profondeur', null);
-      bientot();
     } catch (e) {
       if (e && e.message === 'HTTP 404') { erreur('profondeur', null); return; }
       erreur('profondeur', e); throw e;
     }
   }
-  /** Branche `direct` : carnet et exécutions des 30 dernières minutes, relus chaque minute. Absente
-   *  (404 : VPS pas encore à jour) : rien ne change. */
+  function composerLoin() {
+    const src = prolonger(E.loinBrut.master, E.loinBrut.direct);
+    const g = src && BM.grillePubliee(src);
+    if (!g) return;
+    E.loin = g; E.loinN++;
+    bientot();
+  }
+  /** Branche `direct` : carnet, exécutions et profondeur Coinbase des 30 dernières minutes, relus
+   *  chaque minute. Absente (404 : VPS pas encore à jour) : rien ne change. */
   async function lireDirect() {
     try {
       const { corps: txt } = await lire(DIRECT + 'heatmap.json', { delai: DELAIS.carte, cache: 'no-cache', texte: true, porte: E.recul.github });
@@ -239,6 +248,7 @@
         if (E.pubBrut) composerCarte();
       }
       await lireExecutionsPubliees(DIRECT + 'executions.json', 'direct');
+      await lireProfondeur(DIRECT + 'profondeur.json', 'direct');
       erreur('direct', null);
     } catch (e) {
       if (e && e.message === 'HTTP 404') { erreur('direct', null); return; }
@@ -529,7 +539,7 @@
     boucle('fichier', lireMarketData, 60e3, E.recul.github);
     boucle('historique', () => lireExecutionsPubliees(), 5 * 60e3, E.recul.github);
     boucle('direct', lireDirect, 60e3, E.recul.github);
-    boucle('profondeur', lireProfondeur, 5 * 60e3, E.recul.github);
+    boucle('profondeur', () => lireProfondeur(), 5 * 60e3, E.recul.github);
     boucle('bougies', lireMinutes, 10e3, E.recul.binance);
     boucle('executions', lireExecutions, 1000, E.recul.binance);
     boucleCarnet = boucle('carnet', lireCarnet, () => CADENCE_CARNET[R.niveauxLive], E.recul.binance);
@@ -2066,7 +2076,7 @@
       vue: E.vue && Object.assign({}, E.vue), suivre: E.suivre, erreurs: Object.assign({}, E.erreurs),
       publiee: E.pub ? { W: E.pub.W, H: E.pub.H, dt: E.pub.dt, dp: E.pub.dp, encodage: !!E.pub.encodage } : null,
       finCarte: E.pub ? BM.finGrille(E.pub) : null,
-      loin: E.loin ? { n: E.loinN, dt: E.loin.dt, dp: E.loin.dp, peinte: !LOIN.vide } : null,
+      loin: E.loin ? { n: E.loinN, dt: E.loin.dt, dp: E.loin.dp, peinte: !LOIN.vide, fin: BM.finGrille(E.loin) } : null,
       live: E.live ? { n: E.live.n, dt: E.live.cadence, dp: E.live.dp, ref: E.liveRef, ecartees: E.liveEcartees,
         deb0: E.live.n ? E.live.deb[0] : null, derniere: E.live.n ? E.live.deb[E.live.n - 1] : null,
         nonNuls: E.live.n ? E.live.v.subarray(E.live.oB[E.live.n - 1], E.live.lg).reduce((k, x) => k + (x > 0), 0) : 0 } : null,
