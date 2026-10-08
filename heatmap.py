@@ -24,6 +24,10 @@ Livraison du 07/10/2026 (à valider par un passage réel du cron) :
   · FORMAT « colonnes-1 » — mêmes cellules, sans perte, en colonnes à minute absolue
     (voir FORMAT, DISPOSITION) ; les pages lisent les deux formats.
   · CADENCE — 15 min au lieu de 16 (voir main()).
+
+Livraison du 08/10/2026 :
+  · EXÉCUTIONS — executions.py (service permanent) écrit executions.json ; il part dans le
+    MÊME commit que heatmap.json, s'il existe : pas un commit ni un déploiement de plus.
 """
 import fcntl
 import json
@@ -141,6 +145,8 @@ def git_publish_heatmap(updated_iso):
     """
     os.makedirs(os.path.dirname(GIT_LOCK) or ".", exist_ok=True)
     P = "heatmap.json"
+    # executions.json (executions.py) part dans le même commit quand il existe.
+    autres = [f for f in ("executions.json",) if os.path.exists(os.path.join(REPO, f))]
     with open(GIT_LOCK, "w") as lk:
         fcntl.flock(lk, fcntl.LOCK_EX)
 
@@ -154,13 +160,13 @@ def git_publish_heatmap(updated_iso):
             return subprocess.run(["git", "-C", REPO, *a], **k)
 
         g("read-tree", "HEAD", check=True)       # base = HEAD, JAMAIS l'index partagé
-        g("add", "--", P, check=True)
-        if g("diff", "--cached", "--quiet", "--", P).returncode == 0:
+        g("add", "--", P, *autres, check=True)
+        if g("diff", "--cached", "--quiet", "--", P, *autres).returncode == 0:
             print("no change")
             return True
         g("commit", "-q", "-m", f"Heatmap {updated_iso[:16]}", check=True)
 
-        shared("reset", "-q", "HEAD", "--", P)   # l'index partagé rejoint HEAD
+        shared("reset", "-q", "HEAD", "--", P, *autres)   # l'index partagé rejoint HEAD
         for _ in range(3):
             if shared("push", "-q", GIT_REMOTE, GIT_BRANCH, timeout=90).returncode == 0:
                 return True
