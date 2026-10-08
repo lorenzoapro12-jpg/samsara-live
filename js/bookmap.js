@@ -29,6 +29,9 @@
   const HEATMAP_URL = RAW + 'heatmap.json';
   const DATA_URL = RAW + 'market-data.json';
   const EXEC_URL = RAW + 'executions.json';
+  // Branche `direct` (heatmap.py, 08/10/2026) : les 30 dernières minutes, publiées chaque minute.
+  // Elle comble le retard de master (15 min) : il ne reste que le cache de raw.githubusercontent.
+  const DIRECT = 'https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/direct/';
   const API = 'https://api.binance.com/api/v3/';
   const SYMBOLE = 'BTCUSDT';
 
@@ -93,6 +96,7 @@
   // sur l'axe par axe(), avec l'écart mesuré par E.horloge. L'axe du temps est à l'heure Binance.
   const E = {
     pub: null, pubF: null, pubCle: '', pubMaj: null, pubLu: null, pubTexte: null, pubN: 0,
+    pubBrut: null, directBrut: null, directTexte: null,      // heatmap.json de master et de `direct`, analysés
     md: null, niv: null, mdLu: null, mdTexte: null,
     live: null, liveRef: null, liveP99: 0, liveEcartees: 0, carnet: null, carnetA: null, liveV: 0,
     exec: new BM.SeauxExecutions(1), execVus: new Set(), execArriere: null, execTrous: [], execLu: null,
@@ -179,15 +183,48 @@
       E.pubLu = Date.now();
       const maj = BM.majEnTete(txt);
       if (E.pub && maj !== null && maj === E.pubTexte) { erreur('carte', null); return; }
-      const g = BM.grillePubliee(JSON.parse(txt));
-      if (!g) throw new Error('format non reconnu par cette page');
-      E.pub = g; E.pubTexte = maj; E.pubMaj = g.majA; E.pubN++;
-      E.pubF = null; E.pubCle = '';
+      const h = JSON.parse(txt);
+      if (!BM.grillePubliee(h)) throw new Error('format non reconnu par cette page');
+      E.pubBrut = h; E.pubTexte = maj;
+      composerCarte();
       erreur('carte', null);
-      appliquerEchelle();          // l'échelle live suit l'encodage, qu'il arrive ou qu'il disparaisse
-      majLegende();
-      bientot();
     } catch (e) { erreur('carte', e); throw e; }
+  }
+  /** La carte affichée = master (24 h) prolongée par `direct` (30 dernières minutes) : une minute
+   *  présente dans les deux est prise dans `direct`, plus récente. Seulement si les deux sont en
+   *  « colonnes-1 » avec le même pas et le même encodage ; sinon master seule. */
+  function composerCarte() {
+    const h = E.pubBrut, d = E.directBrut;
+    let src = h;
+    if (h && d && Array.isArray(h.colonnes) && Array.isArray(d.colonnes) && d.colonnes.length && h.dt === d.dt && h.dp === d.dp
+      && JSON.stringify(h.encodage || null) === JSON.stringify(d.encodage || null)) {
+      const m0 = d.colonnes[0][0], cols = h.colonnes.filter(c => c[0] < m0).concat(d.colonnes);
+      src = Object.assign({}, h, { colonnes: cols, t0: cols[0][0] * h.dt, updated: d.updated > h.updated ? d.updated : h.updated });
+    }
+    const g = src && BM.grillePubliee(src);
+    if (!g) return;
+    E.pub = g; E.pubMaj = g.majA; E.pubN++;
+    E.pubF = null; E.pubCle = '';
+    appliquerEchelle();          // l'échelle live suit l'encodage, qu'il arrive ou qu'il disparaisse
+    majLegende();
+    bientot();
+  }
+  /** Branche `direct` : carnet et exécutions des 30 dernières minutes, relus chaque minute. Absente
+   *  (404 : VPS pas encore à jour) : rien ne change. */
+  async function lireDirect() {
+    try {
+      const { corps: txt } = await lire(DIRECT + 'heatmap.json', { delai: DELAIS.carte, cache: 'no-cache', texte: true, porte: E.recul.github });
+      const maj = BM.majEnTete(txt);
+      if (maj === null || maj !== E.directTexte) {
+        E.directBrut = JSON.parse(txt); E.directTexte = maj;
+        if (E.pubBrut) composerCarte();
+      }
+      await lireExecutionsPubliees(DIRECT + 'executions.json', 'direct');
+      erreur('direct', null);
+    } catch (e) {
+      if (e && e.message === 'HTTP 404') { erreur('direct', null); return; }
+      erreur('direct', e); throw e;
+    }
   }
   async function lireMarketData() {
     try {
@@ -310,18 +347,19 @@
    *   · dans un trou de lecture de la page (onglet caché, coupure), les seaux entièrement dedans,
    *     et le trou est refermé quand le fichier le couvre.
    *  Les rafales et le destin des murs n'en reçoivent rien : il leur faut chaque exécution. */
-  async function lireExecutionsPubliees() {
+  async function lireExecutionsPubliees(url, cle) {
+    url = url || EXEC_URL; cle = cle || 'master';
     try {
-      const { corps: txt } = await lire(EXEC_URL, { delai: DELAIS.carte, cache: 'no-cache', texte: true, porte: E.recul.github });
+      const { corps: txt } = await lire(url, { delai: DELAIS.carte, cache: 'no-cache', texte: true, porte: E.recul.github });
       const maj = BM.majEnTete(txt);
-      if (E.execPub && maj !== null && maj === E.execPub.maj) { erreur('historique', null); return; }
+      if (E.execPub && maj !== null && maj === E.execPub.maj[cle]) { erreur('historique', null); return; }
       const d = JSON.parse(txt);
       if (d.format !== 'seaux-1' || !Array.isArray(d.seaux)) throw new Error('format non reconnu par cette page');
       const dtMs = d.dt * 1000, lu = (d.lu_jusqua || 0) * 1000;
       if (!E.execPub) {
         let F = Math.floor(lu / dtMs) * dtMs;
         if (E.exec.premier !== null) F = Math.min(F, Math.floor(E.exec.premier / dtMs) * dtMs);
-        E.execPub = { frontiere: F, vus: new Set(), maj: null, depuis: null, trous: [] };
+        E.execPub = { frontiere: F, vus: new Set(), maj: {}, depuis: null, trous: [] };
       }
       const P = E.execPub, F = P.frontiere, ouverts = d.trous.map(([a, b]) => [a * 1000, b * 1000]);
       const dedans = (a, b) => E.execTrous.some(([x, y]) => a >= x && b <= y);
@@ -339,7 +377,9 @@
       }
       // Les trous de la page que le fichier couvre en entier sont refermés (lus par le VPS).
       E.execTrous = E.execTrous.filter(([x, y]) => !(x >= (d.lu_depuis || Infinity) * 1000 && y <= lu && !ouverts.some(([a, b]) => a < y && b > x)));
-      P.maj = maj; P.depuis = d.lu_depuis ? d.lu_depuis * 1000 : null; P.trous = ouverts.filter(([, b]) => b <= F);
+      // `depuis` et les trous : ceux du fichier de 24 h (celui de `direct` ne couvre que 30 min).
+      P.maj[cle] = maj;
+      if (cle === 'master' || P.depuis === null) { P.depuis = d.lu_depuis ? d.lu_depuis * 1000 : null; P.trous = ouverts.filter(([, b]) => b <= F); }
       erreur('historique', null);
       if (n) bientot();
     } catch (e) {
@@ -468,7 +508,8 @@
     boucle('horloge', lireHorloge, BM.HORLOGE_PERIODE, E.recul.binance);
     boucle('carte', lireHeatmap, 5 * 60e3, E.recul.github);
     boucle('fichier', lireMarketData, 60e3, E.recul.github);
-    boucle('historique', lireExecutionsPubliees, 5 * 60e3, E.recul.github);
+    boucle('historique', () => lireExecutionsPubliees(), 5 * 60e3, E.recul.github);
+    boucle('direct', lireDirect, 60e3, E.recul.github);
     boucle('bougies', lireMinutes, 10e3, E.recul.binance);
     boucle('executions', lireExecutions, 1000, E.recul.binance);
     boucleCarnet = boucle('carnet', lireCarnet, () => CADENCE_CARNET[R.niveauxLive], E.recul.binance);
@@ -1988,6 +2029,7 @@
     etat: () => ({
       vue: E.vue && Object.assign({}, E.vue), suivre: E.suivre, erreurs: Object.assign({}, E.erreurs),
       publiee: E.pub ? { W: E.pub.W, H: E.pub.H, dt: E.pub.dt, dp: E.pub.dp, encodage: !!E.pub.encodage } : null,
+      finCarte: E.pub ? BM.finGrille(E.pub) : null,
       live: E.live ? { n: E.live.n, dt: E.live.cadence, dp: E.live.dp, ref: E.liveRef, ecartees: E.liveEcartees,
         deb0: E.live.n ? E.live.deb[0] : null, derniere: E.live.n ? E.live.deb[E.live.n - 1] : null,
         nonNuls: E.live.n ? E.live.v.subarray(E.live.oB[E.live.n - 1], E.live.lg).reduce((k, x) => k + (x > 0), 0) : 0 } : null,
