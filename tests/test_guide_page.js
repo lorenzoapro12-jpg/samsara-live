@@ -11,11 +11,13 @@
 //   4. DOIGT : un tap sur le libellé d'une bande montre son explication ; un 2e tap la retire.
 //
 // Binance simulé (bougies déterministes) ; fichier publié recopié avec des murs et des niveaux
-// d'options posés près du prix simulé, lu « maintenant ».
+// d'options posés près du prix simulé, lu « maintenant » ; scénarios du matin présents
+// (tests/fixtures/previsions.json) : le Guide reste lisible avec eux.
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
 // USAGE   node tests/test_guide_page.js
 const fs = require('fs'), path = require('path'), http = require('http');
 const REPO = path.resolve(__dirname, '..');
+const { previsionsFixture, estPrevisions } = require('./previsions-fixture');
 
 let playwright = null;
 for (const p of ['playwright', '/opt/node22/lib/node_modules/playwright', process.env.PLAYWRIGHT_MODULE].filter(Boolean)) {
@@ -68,6 +70,8 @@ async function ouvrir(nav, vue, mode, tactile) {
     if (h.startsWith('127.0.0.1')) return r.continue();
     if (h === 'api.binance.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(binance(u)) });
     if (h === 'raw.githubusercontent.com') {
+      // Les scénarios du matin aussi : le Guide doit rester lisible avec eux.
+      if (estPrevisions(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: previsionsFixture() });
       if (u.includes('heatmap')) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, 'heatmap.json')) });
       if (/\/master\/market-data\.json/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: MD });
       return r.fulfill({ status: 404, headers: cors, body: '' });

@@ -62,6 +62,7 @@
 //         node tests/test_budget.js --controle         # le PROTOCOLE seul, sans navigateur (≈ 0 s) :
 //                                                      # prix vivant, rapports entrelacés, options — run-all.sh
 const fs = require('fs'), path = require('path'), http = require('http'), crypto = require('crypto');
+const { previsionsFixture, estPrevisions } = require('./previsions-fixture');   // scénarios du matin (branche previsions)
 const REPO = path.resolve(__dirname, '..');
 const FICHIER = path.join(__dirname, 'budget-themes.json');
 const BUDGET = { reposRapport: 1.6, gesteRapport: 1.3 };
@@ -160,6 +161,7 @@ async function mesurer(nav, theme, injection, bc) {
       if (TICKS && p.endsWith('/ticker/price')) corps = Object.assign({}, corps, { price: vivant.pas().toFixed(2) });
       return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(corps) });
     }
+    if (estPrevisions(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: previsionsFixture() });
     if (h === 'raw.githubusercontent.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors,
       body: fs.readFileSync(path.join(REPO, u.includes('heatmap') ? 'heatmap.json' : 'market-data.json')) });
     return r.abort();

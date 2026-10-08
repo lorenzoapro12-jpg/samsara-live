@@ -365,6 +365,21 @@ const FICHES = {
     ],
     limites: 'Une condition n’est pas une prévision. La marge à droite des bougies ne sert qu’à dessiner ces chemins ; elle disparaît quand le Guide est masqué, et se referme d’un pas de bougie par bougie quand la vue quitte la dernière bougie. Les deux chemins sont écrits dans la même forme, la plus complète qui tient pour les deux ; même la plus courte garde la condition (« si > X → Y »). Sans place pour les deux, ils sont réunis dans une seule boîte ; jamais un seul des deux.',
   },
+  // ── Les scénarios du matin (js/scenarios.js) : fichier previsions.json, branche « previsions » ──
+  scenarios: {
+    titre: 'Scénarios du matin', page: 'scenarios', nature: 'convention',
+    simple: 'Chaque matin, Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ, à partir de son analyse du marché, et les classe du plus au moins probable, SANS pourcentage. Chaque niveau a une origine nommée (plus haut d’hier, mur d’options…) et se lit comme une zone : le niveau plus ou moins une marge. Le graphique les dessine et suit en direct ce que les bougies en font. Une description, jamais un conseil.',
+    formule: P => 'Point du matin : ' + P.scenarios.point + ' (heure de Paris), BTCUSDT seulement. Zone : niveau × (1 ± marge du fichier). Une bougie touche une zone si son plus bas est sous le haut de la zone et son plus haut au-dessus du bas. Chemin : chaque cible dans une bougie plus tardive que la précédente ; invalidation touchée d’abord = invalidé. Range : sorti si une bougie dépasse une borne de plus de la marge. « Échantillon faible » sous '
+      + P.scenarios.echantillonFaible + ' matins notés. Fichier relu toutes les ' + (typeof CADENCES !== 'undefined' ? Math.round(CADENCES.previsions_lue / 60000) : '?') + ' minutes, onglet visible. Choix gardé dans ce navigateur (clé samsara-scenarios-v1).',
+    lectures: [
+      { s: 'convention', t: 'Le rang (1, 2, 3) est un CLASSEMENT : le 1 est jugé plus probable que le 2, le 2 plus que le 3. Aucun pourcentage n’est montré. Le scénario de la semaine court sur plusieurs matins et ne compte pas dans la mesure.' },
+      { s: 'mesuré', t: 'Avant cette méthode, les paris de direction du propriétaire, annoncés à 55-60 %, se sont révélés faux 4 fois sur 5. D’où des niveaux nommés, un ordre et une invalidation, plutôt qu’une probabilité de hausse ou de baisse.' },
+      { s: 'mesuré', t: 'Le seul chiffre de réussite montré : « Ordre du premier mouvement juste N fois sur M matins », tiré du journal. Il dit si, dans le chemin le mieux classé, la première zone a été touchée avant l’invalidation. C’est lui qui mesure le savoir-faire ; sous quelques dizaines de matins, il reste un échantillon faible.' },
+      { s: 'convention', t: 'Les états de l’encadré (« 1re cible touchée à… », « invalidation touchée d’abord à… », « même bougie, ordre inconnu ») sont un SUIVI EN DIRECT sur les bougies de l’intervalle affiché : un affichage. La note officielle est celle du journal, faite mécaniquement le lendemain matin sur des bougies d’une minute ; quand elle existe, c’est elle qui s’affiche.' },
+      { s: 'débattu', t: 'Les niveaux venus d’un modèle (murs d’options, zéro gamma) gardent la mention « modèle » : ils reposent sur une hypothèse sur la position des teneurs de marché.' },
+    ],
+    limites: 'Ce n’est pas une prévision garantie ni une indication de quoi faire : trois scénarios sont montrés ensemble, avec leur rang et leur invalidation. Une bougie qui touche deux zones à la fois ne dit pas laquelle a été touchée la première : l’état le dit (« ordre inconnu »). Sans fichier lisible, rien n’est dessiné et l’encadré le dit en une ligne. Masquable dans « + Indicateurs » (catégorie Guide).',
+  },
   // ── Le dessin lui-même ──
   // La forme d'une bougie est une CONVENTION du thème (jeton --bougie-forme) : la fiche dit celle
   // du thème courant, lue dans le code du tracé (FORMES_BOUGIE, BOUGIE_DENSE_PX, js/app.js).
@@ -520,7 +535,7 @@ function ouvrirGlossaire(ancre) {
     ['Macro', ['dxy', 'vix']], ['Carnet', ['carnet', 'murs']],
     ['Indicateurs du fichier', ['rsi_tf', 'ema_tf', 'croisement', 'sr_tf', 'amplitude', 'atr_tf', 'volume_tf']],
     ['Le dessin du graphique', ['bougies']],
-    ['Guide du graphique', ['guide', 'guide_niveaux', 'guide_regime', 'guide_formes', 'guide_suite']],
+    ['Guide du graphique', ['guide', 'guide_niveaux', 'guide_regime', 'guide_formes', 'guide_suite', 'scenarios']],
     ['Indicateurs du graphique', ['rsi', 'ema', 'vwap', 'adx', 'atr', 'volume', 'sr', 'bb', 'macd', 'stoch']]];
   p.innerHTML = '<div class="fiche-tete"><h3 class="fiche-titre">Légendes</h3><button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>'
     + '<p class="fiche-simple">Comment chaque chiffre se lit — et ce qu’il ne dit pas. Mode <b>' + (modeCourant() === 'expert' ? 'Expert' : 'Débutant') + '</b> : '
