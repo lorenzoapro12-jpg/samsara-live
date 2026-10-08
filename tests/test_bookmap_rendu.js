@@ -163,6 +163,8 @@ async function ouvrir(nav, opts) {
   if (opts.init) await page.addInitScript(opts.init);
   await page.addInitScript(() => { try { localStorage.clear(); } catch (e) { /* */ } });
   if (opts.reglages) await page.addInitScript(r => { localStorage.setItem('samsara-carte-v1', JSON.stringify(r)); }, opts.reglages);
+  // stockage : clés posées APRÈS le nettoyage (mode du terminal, explication déjà vue…).
+  if (opts.stockage) await page.addInitScript(o => { for (const [k, v] of Object.entries(o)) localStorage.setItem(k, v); }, opts.stockage);
   if (opts.horloge) await page.clock.install({ time: Date.now() });
   await page.goto(`http://127.0.0.1:${serveur.address().port}/bookmap.html`);
   if (opts.attendre !== false) {
@@ -1214,6 +1216,74 @@ async function pixel(page, x, y) {
       check('chaleur affichée = repeint complet (profondeur prolongée)', v43b.differents === 0, v43b);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p43b.close();
+    }
+
+    // ════ Guide : la carte dite en mots ══════════════════════════════════════
+    titre('44. Guide : nourri sans « Destin », lit le carnet seul, explication refermée pour de bon, résumé sans saut, rien du présent sur une vue passée');
+    {
+      // a. Un gros ordre d'achat de 30 BTC posé 14 s puis retiré, « Destin des murs » ÉTEINT : le
+      //    journal du guide le dit (le crochet surTransition du suivi est branché).
+      let fixe = null, debutMur = null, p44, S;
+      const mur = (u, k, S) => {
+        if (k !== 'depth' || debutMur === null) return null;
+        const d = S.repondre(u), b = d.bids;
+        if (fixe === null) fixe = (Math.floor(+b[0][0]) - 15).toFixed(2);
+        if (Date.now() - debutMur < 14000) { const i = b.findIndex(x => +x[0] < +fixe); if (i > 0) b.splice(i, 0, [fixe, '30.00000']); }
+        return { status: 200, body: JSON.stringify(d) };
+      };
+      ({ page: p44, erreurs, S } = await ouvrir(nav, { encodage: true, intercept: mur }));
+      const e0 = await etat(p44);
+      check('guide allumé par défaut, destin des murs éteint, mode débutant (terminal sans mode)', e0.guide.allume && !e0.reglages.calques.destin && e0.guide.mode === 'debutant', e0.guide);
+      debutMur = Date.now();
+      await p44.waitForFunction(() => window.__carte.etat().guide.journal.some(j => /^Gros ordre d'achat (retiré|disparu)/.test(j.texte)), null, { timeout: 40000 }).catch(() => {});
+      const j44 = (await etat(p44)).guide.journal;
+      check('gros ordre posé puis retiré, « Destin » éteint : au journal du guide (« Gros ordre d\'achat retiré… (un seul prix) »)', j44.some(j => /^Gros ordre d'achat (retiré|disparu).+30,0 BTC.+un seul prix/.test(j.texte) || /^Gros ordre d'achat retiré.+un seul prix/.test(j.texte)), j44);
+      await p44.click('#btnJournal'); await p44.waitForTimeout(300);
+      const lj = await p44.evaluate(() => document.getElementById('listeJournal').innerText);
+      check('panneau « Ce qui vient de se passer » : heure UTC et phrase', /\d\d:\d\d:\d\d .+Gros ordre d'achat/.test(lj), lj.slice(0, 200));
+      await p44.keyboard.press('Escape');
+      // b. Le guide seul lit le carnet (chaleur live, carnet latéral, bid / ask et destin éteints).
+      for (const k of ['live', 'dom', 'bidask']) await p44.click(`button[data-calque="${k}"]`);
+      await p44.waitForTimeout(500);
+      const n0 = S.compte.depth;
+      await p44.waitForTimeout(5000);
+      check(`guide seul allumé : le carnet est lu (${S.compte.depth - n0} lecture(s) en 5 s)`, S.compte.depth - n0 >= 1, { n0, n1: S.compte.depth });
+      for (const k of ['live', 'dom', 'bidask']) await p44.click(`button[data-calque="${k}"]`);
+      // c. Vue passée (6 h plus tôt) : ni mur, ni zone, ni trait du présent.
+      await p44.evaluate(() => { const e = window.__carte.etat(); window.__carte.cadrer(e.vue.t1 - 6 * 3600e3, e.vue.t2 - 6 * 3600e3, e.vue.p1, e.vue.p2); });
+      await p44.waitForTimeout(1300);
+      const g44 = (await etat(p44)).guide;
+      check('vue passée : aucune étiquette de mur ni de zone (elles décrivent le présent)', g44.present === false && !g44.etiquettes.some(t => /^(Mur|À surveiller|Ordres|Le prix est|Zone|Bid|Ask)/.test(t)), g44);
+      // d. Explication : ouverte à la première visite ; « J'ai compris » la referme et s'en souvient.
+      check('« Comment lire cette carte » : ouverte à la première visite', e0.guide.intro === true);
+      await p44.click('#guideIntroOk'); await p44.waitForTimeout(300);
+      const vue = await p44.evaluate(() => ({ intro: window.__carte.etat().guide.intro, cle: localStorage.getItem('samsara-carte-intro-v1') }));
+      check('« J\'ai compris » : refermée, et retenue (samsara-carte-intro-v1 = vue)', !vue.intro && vue.cle === 'vue', vue);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p44.close();
+      let p44b;
+      ({ page: p44b, erreurs } = await ouvrir(nav, { encodage: true, stockage: { 'samsara-carte-intro-v1': 'vue', 'samsara-mode': 'expert' } }));
+      const e44b = await etat(p44b);
+      check('rechargée après « J\'ai compris » : l\'explication ne revient pas', e44b.guide.intro === false, e44b.guide.intro);
+      check('mode expert (lu dans samsara-mode du terminal) : le résumé en chiffres seuls', e44b.guide.mode === 'expert' && /^carnet live il y a /.test(e44b.guide.resume), e44b.guide.resume);
+      await p44b.keyboard.press('?'); await p44b.waitForTimeout(400);
+      check('touche ? : l\'explication revient sur demande', (await etat(p44b)).guide.intro === true);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p44b.close();
+      // e. Le bandeau du résumé est là dès l'ouverture : la carte ne change pas de taille à la
+      //    première lecture, et garde sa place (800 et 1024 de large).
+      for (const [w, h] of [[800, 900], [1024, 768]]) {
+        let pg;
+        ({ page: pg, erreurs } = await ouvrir(nav, { encodage: true, vue: { width: w, height: h }, attendre: false }));
+        await pg.waitForTimeout(400);
+        const avant = await pg.evaluate(() => document.getElementById('carte').clientHeight);
+        await pg.waitForFunction(() => window.__carte && /^Carnet lu il y a/.test(window.__carte.etat().guide.resume), null, { timeout: 15000 }).catch(() => {});
+        const d = await pg.evaluate(() => { const c = document.getElementById('carte'), r = document.getElementById('resumeCarte'); return { ch: c.clientHeight, barre: document.querySelector('.barre').getBoundingClientRect().height, bande: r.getBoundingClientRect().height, visible: !r.hidden, texte: r.textContent, defil: document.documentElement.scrollWidth - innerWidth }; });
+        check(`${w} × ${h} : résumé affiché (${Math.round(d.bande)} px) sans changer la taille de la carte (${avant} → ${d.ch} px ≥ ${Math.min(400, h - 120)}), en-tête ${Math.round(d.barre)} px ≤ 82, aucun défilement`,
+          d.visible && /^Carnet lu il y a/.test(d.texte) && /pas une prévision/.test(d.texte) && d.ch === avant && d.ch >= Math.min(400, h - 120) && d.barre <= 82 && d.defil <= 0, d);
+        check('aucune erreur JavaScript', !erreurs.length, erreurs);
+        await pg.close();
+      }
     }
   } finally {
     await nav.close();

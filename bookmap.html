@@ -27,7 +27,7 @@
   </div>
 </header>
 <!-- Le résumé du guide : une phrase (débutant) ou ses chiffres (expert), tirés du DERNIER carnet live seul. -->
-<div class="resume-carte" id="resumeCarte" hidden></div>
+<div class="resume-carte" id="resumeCarte" role="status" title="Un appui : la phrase entière">Carnet live : lecture…</div>
 
 <main class="scene">
   <canvas id="carte" role="img" aria-label="Carte de liquidité : axe horizontal le temps, axe vertical le prix en dollars, la chaleur est la taille du plus gros niveau du carnet par tranche ; le prix, les exécutions, les murs et les niveaux de gamma sont dessinés par-dessus, chacun avec son âge."></canvas>
@@ -166,11 +166,19 @@
     <dd>À droite, la <b>somme</b> des ordres du dernier carnet live par tranche. À gauche, le profil des exécutions visibles. En bas, le volume (achats au-dessus, ventes au-dessous), regroupé par <span id="legVolume">1, 2, 3, 5, 10…</span> min selon le zoom — le titre du panneau dit la durée — et le CVD : achats au marché moins ventes au marché, cumulés depuis le bord gauche de la vue ; après des bougies non lues (hachurées), il repart de 0 et le dit.</dd>
   </dl>
   <h3>Guide : la carte en mots</h3>
-  <p id="legGuide"></p>
-  <p class="note" id="legGuideLimites"></p>
-  <p><button type="button" class="bouton" id="btnIntro">Comment lire cette carte (?)</button></p>
+  <p><button type="button" class="bouton" id="btnIntro">Comment lire cette carte (?)</button> <button type="button" class="bouton" id="btnMode">Mode</button></p>
+  <p class="note" id="legGuideMode"></p>
+  <dl class="leg-guide">
+    <dt>Le guide</dt><dd id="legGuide"></dd>
+    <dt>Murs en mots</dt><dd id="legGuideMurs"></dd>
+    <dt>Zones à surveiller</dt><dd id="legGuideZones"></dd>
+    <dt>Résumé (bandeau du haut)</dt><dd id="legGuideResume"></dd>
+    <dt>Journal</dt><dd id="legGuideJournal"></dd>
+    <dt>Marques sur la carte</dt><dd id="legGuideSymboles"></dd>
+    <dt>Limites</dt><dd id="legGuideLimites"></dd>
+  </dl>
   <h3>Gestes</h3>
-  <p>Glisser : déplacer. Molette : zoom dans le temps (sur l'axe des prix, ou avec Maj : zoom des prix). Pincer à deux doigts. Glisser sur un axe : l'étirer. Double-clic ou R : vue par défaut. F : suivre le présent. Flèches : se déplacer. Échap : fermer un panneau. ? : comment lire cette carte. G : le guide sur la carte. J : le journal. M : mode débutant / expert (le même que le terminal).</p>
+  <p>Glisser : déplacer. Molette : zoom dans le temps (sur l'axe des prix, ou avec Maj : zoom des prix). Pincer à deux doigts. Glisser sur un axe : l'étirer. Double-clic ou R : vue par défaut. F : suivre le présent. Flèches : se déplacer. Échap : fermer un panneau. ? : comment lire cette carte. G : le guide sur la carte. J : le journal. M : mode débutant / expert (le même que le terminal : le changer ici le change aussi là-bas).</p>
   <p>Au doigt : un appui bref épingle la lecture là où il tombe (le même appui l'enlève) ; un appui long l'affiche et la fait suivre le doigt sans déplacer la carte.</p>
   <p class="note">Les heures de l'axe sont celles de l'appareil (le fuseau est écrit dans l'angle, sous l'axe des prix) ; « maintenant » est l'heure de Binance, recalée.</p>
   <p class="note">Ce que la carte montre est une lecture du carnet, pas une recommandation : un mur peut être retiré avant d'être touché, et une bulle ne dit pas qui a acheté.</p>

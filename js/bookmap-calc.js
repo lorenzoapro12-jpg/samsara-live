@@ -374,8 +374,9 @@
     };
     side(depth.bids || [], out.bids, out.sb);
     side(depth.asks || [], out.asks, out.sa);
-    if (depth.bids && depth.bids.length) { out.meilleurBid = +depth.bids[0][0]; out.bas = Math.floor(+depth.bids[depth.bids.length - 1][0] / dp); }
-    if (depth.asks && depth.asks.length) { out.meilleurAsk = +depth.asks[0][0]; out.haut = Math.floor(+depth.asks[depth.asks.length - 1][0] / dp); }
+    // prixBas / prixHaut : le plus bas bid et le plus haut ask LUS (la bande exacte, pas le bord de leur tranche).
+    if (depth.bids && depth.bids.length) { out.meilleurBid = +depth.bids[0][0]; out.prixBas = +depth.bids[depth.bids.length - 1][0]; out.bas = Math.floor(out.prixBas / dp); }
+    if (depth.asks && depth.asks.length) { out.meilleurAsk = +depth.asks[0][0]; out.prixHaut = +depth.asks[depth.asks.length - 1][0]; out.haut = Math.floor(out.prixHaut / dp); }
     return out;
   };
 
@@ -1265,12 +1266,15 @@
     for (const g of cur.gros) {
       const k = g.cote + g.c;
       if (this.actifs.has(k)) continue;
-      const n = { k, cote: g.cote, c: g.c, t0: t, tFin: t, q: g.q, qMax: g.q, retire: 0, echange: 0, incertain: 0, aT: -Infinity, fin: null,
+      // Entré dans la bande lue (hors de celle de la lecture d'avant, ou à un cent de son bord) : il était
+      // peut-être déjà là, hors de vue — « vu en entrant », jamais « apparu ».
+      const p0 = this.prec, entre = !!p0 && (g.cote === 'b' ? p0.bas === null || g.c <= p0.bas + 1 : p0.haut === null || g.c >= p0.haut - 1);
+      const n = { k, cote: g.cote, c: g.c, t0: t, tFin: t, q: g.q, qMax: g.q, retire: 0, echange: 0, incertain: 0, aT: -Infinity, fin: null, entre,
         t0s: this.seuils.map(() => null), par: this.seuils.map(() => ({ retire: 0, echange: 0, incertain: 0 })), aTs: this.seuils.map(() => -Infinity) };
       this.atteints(n, t);
       this.actifs.set(k, n); this.niveaux.push(n);
     }
-    this.prec = { s, r };
+    this.prec = { s, r, bas: cur.bas, haut: cur.haut };
     this.derniere = r;
     this.avancer(horloge, r);
     this.purger(t);
@@ -1446,34 +1450,66 @@
   //  · Une phrase ne lit qu'UNE cadence : le résumé ne lit que le dernier carnet live (son prix de
   //    référence est le milieu meilleur bid / meilleur ask de CETTE lecture) ; un mur du fichier de
   //    15 min écrit son heure de lecture.
+  //  · Ce qui n'a pas été observé (hors de la bande lue, lecture manquée) n'est jamais compté 0 :
+  //    la série s'arrête et le texte dit « au moins », ou « rien à comparer ».
   //  · Chaque seuil ci-dessous est une CONVENTION de ce code : la légende l'écrit (tirée d'ici).
   //  · Les heures du guide sont en UTC, et le disent.
   BM.GUIDE = {
     trancheUsd: 20,          // tranche des murs « en mots » : celle de la carte publiée et des murs du fichier
-    murMinBtc: 10,           // une tranche de 20 $ qui porte au moins 10 BTC est appelée « mur »
-    parCote: 2,              // murs nommés de chaque côté du prix
+    murMinBtc: 10,           // une tranche n'est « mur » qu'à 10 BTC au moins…
+    murFacteur: 2,           // … ET 2 fois la tranche médiane de la bande lue : le carnet ordinaire n'est pas un mur
+    margeTranches: 1,        // la tranche du prix et sa voisine de chaque côté ne sont jamais nommées (le carnet s'y reforme sans cesse)
+    parCote: 2,              // murs nommés de chaque côté du prix (1 sur un écran étroit en mode débutant)
     procheMaxPct: 1,         // cherchés à ±1 % du prix au plus, et seulement dans la bande que le carnet lu couvre
     bandePct: 0.5,           // résumé : ordres comptés à ±0,5 % du prix (moins si le carnet lu ne va pas si loin)
     rapportNet: 1.1,         // en dessous de 1,1 fois, « à peu près autant » d'un côté que de l'autre
-    fenetreMs: 10 * 60e3,    // « grossit » / « fond » : variation sur 10 min
+    fenetreMs: 10 * 60e3,    // « grossit » / « diminue » : variation sur 10 min
     varMinBtc: 3, varMinPart: 0.25,   // variation dite au-delà de 3 BTC ET de 25 % de la taille d'avant
-    presencePart: 0.5,       // « là depuis » : la tranche porte au moins la moitié de sa taille actuelle
-    presenceMinBtc: 2,
+    histoireMinMs: 10 * 60e3,         // un mur sans variation n'a une 2e ligne qu'au-delà de 10 min de présence
     trouMaxMs: 5 * 60e3,     // carte publiée → carnet live : au-delà de 5 min non observées, pas de raccord
     zoneTranches: 3,         // zone chargée : 3 tranches de 20 $ consécutives, sommées
     zoneMinBtc: 30, zoneFacteur: 1.5,  // au moins 30 BTC ET 1,5 fois la zone médiane de la bande lue
+    zoneGarde: 3,            // une zone qui repasse sous les seuils reste encore 3 lectures (elle ne clignote pas)
     vieMinMs: 10e3,          // un niveau vu moins de 10 s n'est ni « apparu » ni « retiré » au journal
-    journalMurBtc: 10,       // journal : niveaux d'au moins 10 BTC au prix exact (ou le seuil du destin s'il est plus haut)
+    journalMurBtc: 10,       // journal : gros ordres d'au moins 10 BTC à un même prix (ou le seuil du destin s'il est plus haut)
+    absorbePart: 0.5,        // « absorbé » / « en partie échangé » : seulement si les échanges font la moitié de la plus grande taille lue
+    nommeLectures: 3,        // un mur nommé 3 lectures de suite peut faire un évènement (traversé, fondu, apparu)
+    fondPart: 0.5,           // mur nommé qui « fond » : sous la moitié de sa taille ET sous le seuil
+    apparuMaxMs: 2 * 60e3,   // mur nommé « apparu » : passé au-dessus du seuil depuis moins de 2 min, sous les yeux de la page
     rafaleBtc: 10,           // journal : rafales d'au moins 10 BTC (ou le seuil des rafales s'il est plus haut)
+    suiteMaxMs: 5 * 60e3,    // prix passé un mur : les deux clôtures 1 min qui suivent sont attendues 5 min au plus
     journalMax: 12,          // lignes du panneau « Ce qui vient de se passer »
     journalGarde: 400,       // évènements gardés (marques sur la carte)
     journalFenetreMs: 30 * 60e3,   // à l'ouverture : les rafales des 30 dernières minutes
     fusionMs: 60e3,          // un même évènement au même prix dans la minute : compté (×n), pas répété
+    marquePx: 9,             // marques du journal d'une même case de 9 px : une seule (×n au survol)
   };
+  // Les symboles du journal qui ne sont pas ceux des fins de murs (BM.FINS_MURS) : la légende et la
+  // carte les lisent ici.
+  BM.SYMBOLES_GUIDE = {
+    apparu: { s: '+', t: 'apparu' },
+    fondu: { s: '−', t: 'mur nommé qui a fondu' },
+    rafaleAchat: { s: '▲', t: 'rafale d\'achats au marché' },
+    rafaleVente: { s: '▼', t: 'rafale de ventes au marché' },
+    sous: { s: '↓', t: 'prix passé sous un mur d\'achat' },
+    sur: { s: '↑', t: 'prix passé au-dessus d\'un mur de vente' },
+    meche: { s: '↺', t: 'percé en mèche : la bougie a clôturé de l\'autre côté' },
+    casse: { s: '‼', t: 'cassé selon la règle de travail : deux clôtures 1 min au-delà' },
+    options: { s: '◇', t: 'niveau d\'options touché (modèle)' },
+  };
+  const NB = ' ';       // espace insécable : « 81 000 $ » ne se coupe pas avant le $
+  const DOL = NB + '$';
   /** Heure UTC « 14:05 » (ou « 14:05:12 ») : le guide écrit ses heures en UTC. */
   BM.heureUtc = function (ms, sec) {
     const d = new Date(ms), p = n => String(n).padStart(2, '0');
     return p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + (sec ? ':' + p(d.getUTCSeconds()) : '');
+  };
+  /** Le décalage de l'appareil sur UTC, en mots (« UTC+2 », « UTC−3:30 », « UTC »). */
+  BM.fuseau = function (decalageMin) {
+    const m = -decalageMin;
+    if (!m) return 'UTC';
+    const a = Math.abs(m);
+    return 'UTC' + (m < 0 ? '−' : '+') + Math.floor(a / 60) + (a % 60 ? ':' + String(a % 60).padStart(2, '0') : '');
   };
   /** Un écart signé : « −0,20 % », « +0,12 % ». */
   BM.pourcent = function (x, dec) {
@@ -1486,6 +1522,12 @@
   BM.duree = ms => (ms === null || ms === undefined || !(ms >= 0) ? '—' : ms < 60e3 ? 'moins d\'une minute' : BM.age(ms));
   /** Un prix exact (2 décimales seulement s'il en a). */
   BM.prixExact = p => BM.prix(p, Math.abs(p - Math.round(p)) > 1e-6 ? 2 : 0);
+  /** « 81 340–81 360 $ » : une tranche, le $ attaché. */
+  const tranche = (p, pas) => BM.prix(p) + '–' + BM.prix(p + pas) + DOL;
+  /** Deux lectures du carnet live se suivent-elles sans trou ? (la précédente reçue au plus une
+   *  validité avant, aucune interruption dite par le suivi des murs) : sinon le guide ne compare
+   *  rien entre elles (un passage serait daté de maintenant alors qu'il a eu lieu pendant le trou). */
+  BM.lecturesContigues = (luAvant, lu, cadence, resMurs) => luAvant !== null && luAvant !== undefined && lu - luAvant <= BM.validiteLecture(cadence) && resMurs !== 'interrompu';
   /** Sommes d'un carnet (Map tranche de dp $ → Σ BTC) regroupées par tranches de f·dp $. */
   BM.regrouperTranches = function (m, f) {
     const out = new Map();
@@ -1494,46 +1536,70 @@
   };
   /** Une lecture du carnet (BM.agregerCarnet : sb / sa = Σ par tranche de dp $) vue par le guide :
    *  tranches de `tr` $ (multiple de dp), prix de référence = milieu meilleur bid / meilleur ask de
-   *  CETTE lecture, bande couverte [bas, haut[ en $. null sans les deux côtés. */
+   *  CETTE lecture, bande couverte [bas, haut] en $ = le plus bas bid et le plus haut ask LUS (pas le
+   *  bord de leur tranche : une tranche à moitié lue n'est pas lue). null sans les deux côtés. */
   BM.carnetGuide = function (k, tr) {
     if (!k || !k.meilleurBid || !k.meilleurAsk || !k.sb || !k.sa) return null;
     const f = Math.max(1, Math.round((tr || BM.GUIDE.trancheUsd) / k.dp)), pas = f * k.dp;
+    const bas = k.prixBas !== undefined && k.prixBas !== null ? k.prixBas : k.bas !== null && k.bas !== undefined ? k.bas * k.dp : null;
+    const haut = k.prixHaut !== undefined && k.prixHaut !== null ? k.prixHaut : k.haut !== null && k.haut !== undefined ? (k.haut + 1) * k.dp : null;
     return { pas, dp: k.dp, sb: k.sb, sa: k.sa, b: BM.regrouperTranches(k.sb, f), a: BM.regrouperTranches(k.sa, f),
-      mid: (k.meilleurBid + k.meilleurAsk) / 2,
-      bas: k.bas !== null && k.bas !== undefined ? k.bas * k.dp : null, haut: k.haut !== null && k.haut !== undefined ? (k.haut + 1) * k.dp : null };
+      mid: (k.meilleurBid + k.meilleurAsk) / 2, bas, haut };
   };
   const borne = (x, d) => (x === null || x === undefined ? d : x);
-  /** Tranche k du bon côté du prix et dans la bande lue ? (bid : son bas est sous le prix ; ask :
-   *  son haut est au-dessus ; entièrement dans [lo, hi]). */
-  const duCote = (C, cote, k, lo, hi) => (cote === 'bid' ? k * C.pas < C.mid && k * C.pas >= lo : (k + 1) * C.pas > C.mid && (k + 1) * C.pas <= hi);
-  /** Les `parCote` tranches les plus chargées de chaque côté (au moins murMinBtc), à ±procheMaxPct
-   *  du prix ET dans la bande lue : [{ cote: 'bid'|'ask', k, p (bas de la tranche), q }]. */
+  /** Tranche k nommable ? Du bon côté, hors de la tranche du prix et de ses `margeTranches` voisines,
+   *  et ENTIÈREMENT dans [lo, hi] (la bande lue, bornée à ±procheMaxPct). */
+  const nommable = (C, cote, k, lo, hi, o) => {
+    const kP = Math.floor(C.mid / C.pas);
+    return cote === 'bid' ? k <= kP - 1 - o.margeTranches && k * C.pas > lo : k >= kP + 1 + o.margeTranches && (k + 1) * C.pas < hi;
+  };
+  /** Le seuil « mur » d'UNE lecture : max(murMinBtc, murFacteur × la tranche médiane de la bande lue,
+   *  achat et vente ensemble, tranches vides comprises, hors tranche du prix). { seuil, mediane, n }. */
+  BM.seuilMur = function (C, o) {
+    o = Object.assign({}, BM.GUIDE, o);
+    if (!C || C.bas === null || C.haut === null) return { seuil: o.murMinBtc, mediane: null, n: 0 };
+    const P = C.pas, kP = Math.floor(C.mid / P), xs = [];
+    for (let k = Math.ceil(C.bas / P); k < kP; k++) xs.push(C.b.get(k) || 0);
+    for (let k = kP + 1; (k + 1) * P <= C.haut; k++) xs.push(C.a.get(k) || 0);
+    if (!xs.length) return { seuil: o.murMinBtc, mediane: null, n: 0 };
+    xs.sort((a, b) => a - b);
+    const med = xs[xs.length >> 1];
+    return { seuil: Math.max(o.murMinBtc, o.murFacteur * med), mediane: med, n: xs.length };
+  };
+  /** Les `parCote` tranches les plus chargées de chaque côté (au moins le seuil « mur » de la
+   *  lecture), à ±procheMaxPct du prix ET dans la bande lue, hors de la tranche du prix et de ses
+   *  voisines : [{ cote: 'bid'|'ask', k, p (bas de la tranche), q }]. */
   BM.mursProches = function (C, o) {
     o = Object.assign({}, BM.GUIDE, o);
     if (!C) return [];
+    const seuil = o.seuil !== undefined ? o.seuil : BM.seuilMur(C, o).seuil;
     const lo = Math.max(borne(C.bas, -Infinity), C.mid * (1 - o.procheMaxPct / 100)), hi = Math.min(borne(C.haut, Infinity), C.mid * (1 + o.procheMaxPct / 100));
-    const choisir = (m, cote) => [...m].filter(([k, q]) => q >= o.murMinBtc && duCote(C, cote, k, lo, hi))
+    const choisir = (m, cote) => [...m].filter(([k, q]) => q >= seuil && nommable(C, cote, k, lo, hi, o))
       .sort((x, y) => y[1] - x[1] || x[0] - y[0]).slice(0, o.parCote).map(([k, q]) => ({ cote, k, p: k * C.pas, q }));
     return choisir(C.b, 'bid').concat(choisir(C.a, 'ask'));
   };
-  /** Le mur (≥ murMinBtc) le plus proche du prix d'un côté, dans la bande lue ; écart au prix de
-   *  référence de la même lecture, en %. null s'il n'y en a pas. */
+  /** Le mur (au moins le seuil « mur ») le plus proche du prix d'un côté, dans la bande lue, hors de
+   *  la tranche du prix et de ses voisines ; écart au prix de référence de la même lecture, en %
+   *  (négatif sous le prix). null s'il n'y en a pas. */
   BM.murPlusProche = function (C, cote, o) {
     o = Object.assign({}, BM.GUIDE, o);
     if (!C) return null;
+    const seuil = o.seuil !== undefined ? o.seuil : BM.seuilMur(C, o).seuil;
     const lo = borne(C.bas, -Infinity), hi = borne(C.haut, Infinity);
     let best = null;
     for (const [k, q] of (cote === 'bid' ? C.b : C.a)) {
-      if (!(q >= o.murMinBtc) || !duCote(C, cote, k, lo, hi)) continue;
+      if (!(q >= seuil) || !nommable(C, cote, k, lo, hi, o)) continue;
       if (!best || (cote === 'bid' ? k > best.k : k < best.k)) best = { cote, k, p: k * C.pas, pas: C.pas, q };
     }
-    // Écart du bord de la tranche le plus proche du prix de référence (0 : le prix est dans la tranche).
-    if (best) best.ecartPct = cote === 'bid' ? Math.min(0, (best.p + C.pas - C.mid) / C.mid * 100) : Math.max(0, (best.p - C.mid) / C.mid * 100);
+    // Écart du bord de la tranche le plus proche du prix de référence.
+    if (best) best.ecartPct = cote === 'bid' ? (best.p + C.pas - C.mid) / C.mid * 100 : (best.p - C.mid) / C.mid * 100;
     return best;
   };
   /** Le résumé d'UNE lecture du carnet live : Σ des ordres d'achat et de vente posés à ±bande % du
    *  prix — la bande est réduite à ce que le carnet lu couvre des DEUX côtés (1 000 niveaux ne vont
-   *  souvent pas à ±0,5 %), et le résumé le dit. Une tranche compte si son milieu est dans la bande. */
+   *  souvent pas à ±0,5 %), et le résumé le dit. Une tranche compte si son milieu est dans la bande
+   *  (les bids sont sous le prix et les asks au-dessus par construction : la tranche du prix compte
+   *  ses bids ET ses asks). */
   BM.resumeCarnet = function (C, o) {
     o = Object.assign({}, BM.GUIDE, o);
     if (!C || C.bas === null || C.haut === null) return null;
@@ -1542,55 +1608,88 @@
     if (!(bande > 0)) return null;
     const lo = C.mid * (1 - bande / 100), hi = C.mid * (1 + bande / 100);
     let qB = 0, qA = 0;
-    for (const [pb, q] of C.sb) { const m = (pb + 0.5) * C.dp; if (m >= lo && m <= C.mid) qB += q; }
-    for (const [pb, q] of C.sa) { const m = (pb + 0.5) * C.dp; if (m <= hi && m >= C.mid) qA += q; }
+    for (const [pb, q] of C.sb) if ((pb + 0.5) * C.dp >= lo) qB += q;
+    for (const [pb, q] of C.sa) if ((pb + 0.5) * C.dp <= hi) qA += q;
     const rapport = qA > 0 ? qB / qA : null;
     const sens = rapport === null ? (qB > 0 ? 'achat' : 'egal') : rapport >= o.rapportNet ? 'achat' : rapport <= 1 / o.rapportNet ? 'vente' : 'egal';
-    return { bande, reduite: bande < o.bandePct, couvert, qB, qA, rapport, sens, mid: C.mid };
+    return { bande, usd: C.mid * bande / 100, reduite: bande < o.bandePct, couvert, qB, qA, rapport, sens, mid: C.mid };
   };
+  /** Écart au prix en mots : « 0,05 % sous le prix », « 0,03 % au-dessus du prix ». */
+  const ecartMots = x => (Math.abs(x) < 0.005 ? 'à moins de 0,01 % du prix' : BM.nombre(Math.abs(x), 2, 2) + ' % ' + (x < 0 ? 'sous le prix' : 'au-dessus du prix'));
   /** La phrase du résumé (débutant) ou ses seuls chiffres (expert). `murs` = { bid, ask } de
-   *  BM.murPlusProche ; `age` = âge de la lecture, déjà écrit. Une seule cadence : le carnet live. */
+   *  BM.murPlusProche, + seuil (BTC) ; `age` = âge de la lecture, déjà écrit. Une seule cadence : le
+   *  carnet live. o.court : la version pour écran étroit. Toujours : « photo de l'instant, pas une
+   *  prévision » (une majorité d'ordres d'un côté ne dit pas où ira le prix). */
   BM.phraseResume = function (r, murs, mode, age, o) {
     o = Object.assign({}, BM.GUIDE, o);
     if (!r) return '';
-    const b = '±' + BM.nombre(r.bande, 0, 2) + ' %', mb = murs && murs.bid, ma = murs && murs.ask, px = m => BM.prix(m.p) + (m.pas ? '–' + BM.prix(m.p + m.pas) : '') + ' $';
-    const ecart = m => (Math.abs(m.ecartPct) < 0.005 ? 'au prix' : BM.pourcent(m.ecartPct));
+    const mb = murs && murs.bid, ma = murs && murs.ask, seuil = murs && murs.seuil;
+    const pct = BM.nombre(r.bande, 0, 2) + ' %', usd = BM.prix(r.usd);
     if (mode === 'expert') {
-      return ['carnet live ' + age, b + (r.reduite ? ' (bande lue)' : '') + ' : achat / vente ' + (r.rapport === null ? '—' : '×' + BM.nombre(r.rapport, 2, 2)) + ' (' + BM.btc(r.qB) + ' / ' + BM.btc(r.qA) + ' BTC)',
-        'mur achat ' + (mb ? px(mb) + ' (' + ecart(mb) + ')' : '—'), 'mur vente ' + (ma ? px(ma) + ' (' + ecart(ma) + ')' : '—'),
+      const ec = m => BM.pourcent(m.ecartPct);
+      return ['carnet live ' + age, '±' + pct + (r.reduite ? ' (bande lue)' : '') + ' : achat / vente ' + (r.rapport === null ? '—' : '×' + BM.nombre(r.rapport, 2, 2)) + ' (' + BM.btc(r.qB) + ' / ' + BM.btc(r.qA) + ' BTC)',
+        'mur achat ' + (mb ? tranche(mb.p, mb.pas) + ' (' + ec(mb) + ')' : '—'), 'mur vente ' + (ma ? tranche(ma.p, ma.pas) + ' (' + ec(ma) + ')' : '—'),
       ].join(' · ');
     }
-    const ou = 'à ' + b, tout = r.reduite ? ' ; tout le carnet lu' : '';
-    let s;
-    if (r.sens === 'achat') s = 'Plus d\'ordres d\'achat que de vente ' + ou + (r.rapport === null ? ' (aucun ordre de vente lu' + tout + ').' : ' (' + BM.nombre(r.rapport, 1, 1) + ' fois plus' + tout + ').');
-    else if (r.sens === 'vente') s = 'Plus d\'ordres de vente que d\'achat ' + ou + ' (' + BM.nombre(1 / r.rapport, 1, 1) + ' fois plus' + tout + ').';
-    else s = 'À peu près autant d\'ordres d\'achat que de vente ' + ou + (r.rapport === null ? (tout ? ' (' + tout.slice(3) + ').' : '.') : ' (rapport ' + BM.nombre(r.rapport, 2, 2) + tout + ').');
-    s += mb ? ' Mur d\'achat le plus proche : ' + px(mb) + ' (' + ecart(mb) + (Math.abs(mb.ecartPct) >= 0.005 ? ' du milieu du carnet' : '') + ')' : ' Aucun mur d\'achat d\'au moins ' + BM.nombre(o.murMinBtc, 0, 2) + ' BTC dans le carnet lu';
-    s += ma ? ' ; de vente : ' + px(ma) + ' (' + ecart(ma) + ').' : ' ; aucun mur de vente d\'au moins ' + BM.nombre(o.murMinBtc, 0, 2) + ' BTC.';
+    if (o.court) {
+      return 'Carnet lu ' + age + ' : achat ' + BM.btc(r.qB) + ' BTC / vente ' + BM.btc(r.qA) + ' BTC à ±' + usd + DOL + '. Murs proches : '
+        + (mb ? BM.prix(mb.p) + DOL + ' (achat)' : 'aucun côté achat') + ' · ' + (ma ? BM.prix(ma.p) + DOL + ' (vente)' : 'aucun côté vente') + '. Photo, pas une prévision.';
+    }
+    const x = v => BM.nombre(v, 1, 1);
+    const compare = r.qB === 0 && r.qA === 0 ? 'aucun ordre lu'
+      : r.rapport === null ? 'aucun ordre de vente lu'
+        : { egal: 'à peu près autant de chaque côté', achat: x(r.rapport) + ' fois plus côté achat', vente: x(1 / r.rapport) + ' fois plus côté vente' }[r.sens];
+    let s = 'Carnet lu ' + age + ', à ±' + pct + ' du prix (≈ ±' + usd + DOL + (r.reduite ? ' : tout ce que le carnet lu couvre' : '') + ') : '
+      + BM.btc(r.qB) + ' BTC d\'ordres d\'achat, ' + BM.btc(r.qA) + ' BTC d\'ordres de vente — ' + compare + '. ';
+    const aucun = c => 'aucune tranche nettement plus chargée que les autres côté ' + c;
+    if (mb || ma) s += (mb ? 'Mur d\'achat le plus proche : ' + tranche(mb.p, mb.pas) + ' (' + ecartMots(mb.ecartPct) + ')' : aucun('achat').replace(/^a/, 'A'))
+      + ' ; ' + (ma ? 'de vente : ' + tranche(ma.p, ma.pas) + ' (' + ecartMots(ma.ecartPct) + ')' : aucun('vente')) + '. ';
+    else s += 'Pas de tranche nettement plus chargée que les autres' + (seuil ? ' (au moins ' + BM.btc(seuil) + ' BTC)' : '') + ' dans le carnet lu. ';
     // L'âge D'ABORD : une phrase coupée (écran étroit) le garde.
-    return 'Carnet lu ' + age + ' : ' + s.charAt(0).toLowerCase() + s.slice(1);
+    return s + 'Photo de l\'instant, pas une prévision.';
   };
-  /** L'histoire d'une tranche (k, de `pas` $) dans le carnet live gardé (BM.CarnetLive) :
-   *  · depuis : première lecture d'une série ININTERROMPUE (aucune lecture manquée) qui finit à la
-   *    dernière, où la tranche porte au moins `seuil` BTC ; depuisDebut : la série remonte jusqu'à la
-   *    plus ancienne lecture gardée (elle peut être plus vieille : la carte publiée le dira) ;
-   *  · qF, tF : la taille à la lecture la plus récente d'il y a au moins `fenetreMs` (ou, faute de
-   *    lectures assez anciennes, la plus ancienne lecture contiguë : qO, tO).
+  /** L'histoire d'une tranche (k, de `pas` $, côté 'b' ou 'a') dans le carnet live gardé
+   *  (BM.CarnetLive), en remontant depuis la dernière lecture. Une lecture où la tranche n'est pas
+   *  OBSERVÉE n'est jamais lue comme 0 : elle arrête la remontée (coupe) —
+   *    'trou'  : une lecture manquée ;
+   *    'bande' : la tranche n'est pas entièrement dans ce que la lecture couvre (hors de la bande) ;
+   *    'prix'  : le prix était dans la tranche ou de l'autre côté (meilleur bid / ask) : la taille
+   *              y est celle du carnet qui se reforme, pas celle d'un mur.
+   *  · depuis : première lecture de la série ININTERROMPUE de lectures ≥ `seuil` qui finit à la
+   *    dernière ; auMoins si la série n'a pas été vue commencer (raison = la coupe, ou 'debut' : la
+   *    plus ancienne lecture gardée) ; raison 'seuil' : vue commencer.
+   *  · qF, tF : la taille à la lecture la plus récente d'il y a au moins `fenetreMs`, si la remontée
+   *    l'atteint ; sinon qO, tO : la plus ancienne lecture remontée.
    *  Instants : ceux de la carte (heure Binance). null sans lecture. */
   BM.histoireLive = function (L, k, pas, cote, seuil, fenetreMs) {
     if (!L || !L.n) return null;
-    const f = Math.max(1, Math.round(pas / L.dp)), c1 = L.n - 1;
-    const q = c => { let s = 0; for (let i = 0; i < f; i++) s += L.quantite(c, k * f + i, cote); return s; };
-    const qN = q(c1), tFen = L.deb[c1] - fenetreMs;
-    let c0 = c1, enCours = qN >= seuil, qF = null, tF = null, qO = qN, tO = L.deb[c1], continu = true;
-    for (let c = c1 - 1; c >= 0 && (enCours || qF === null); c--) {
-      if (L.fin[c] < L.deb[c + 1]) { continu = false; break; }        // une lecture manquée : on ne sait pas
+    const f = Math.max(1, Math.round(pas / L.dp)), c1 = L.n - 1, k0 = k * f, k1 = k * f + f - 1;
+    const q = c => { let s = 0; for (let i = 0; i < f; i++) s += L.quantite(c, k0 + i, cote); return s; };
+    const etat = c => {
+      if (cote === 'b') {
+        if (!L.nB[c] || !(k0 > L.bas[c])) return 'bande';
+        return k1 >= L.bB[c] + L.nB[c] - 1 ? 'prix' : 'ok';
+      }
+      if (!L.nA[c] || !(k1 < L.haut[c])) return 'bande';
+      return k0 <= L.bA[c] ? 'prix' : 'ok';
+    };
+    const qN = q(c1), t = L.deb[c1], e1 = etat(c1);
+    if (e1 !== 'ok') return { q: qN, t, depuis: null, auMoins: false, raison: e1, depuisDebut: false, coupe: e1, qF: null, tF: null, qO: null, tO: null };
+    const tFen = t - fenetreMs;
+    let c0 = c1, enCours = qN >= seuil, qF = null, tF = null, qO = qN, tO = t, coupe = null, c = c1 - 1;
+    for (; c >= 0; c--) {
+      if (L.fin[c] < L.deb[c + 1]) { coupe = 'trou'; break; }        // une lecture manquée : on ne sait pas
+      const e = etat(c);
+      if (e !== 'ok') { coupe = e; break; }
       const x = q(c);
       if (enCours) { if (x >= seuil) c0 = c; else enCours = false; }
       if (qF === null && L.deb[c] <= tFen) { qF = x; tF = L.deb[c]; }
       qO = x; tO = L.deb[c];
+      if (!enCours && qF !== null) break;
     }
-    return { q: qN, t: L.deb[c1], depuis: qN >= seuil ? L.deb[c0] : null, depuisDebut: qN >= seuil && enCours && continu && c0 === 0, qF, tF, qO, tO };
+    const vue = qN >= seuil;
+    const raison = !vue ? null : !enCours ? 'seuil' : coupe || 'debut';
+    return { q: qN, t, depuis: vue ? L.deb[c0] : null, auMoins: vue && enCours, raison, depuisDebut: vue && enCours && !coupe && c0 === 0, coupe, qF, tF, qO, tO };
   };
   /** Carte publiée : la série ININTERROMPUE de colonnes où la rangée pb porte au moins vS d'un côté
    *  ('b' ou 'a') et qui FINIT à la colonne c1 ; rend sa première colonne, ou null si c1 n'en est pas.
@@ -1607,88 +1706,169 @@
     }
     return c0;
   };
-  /** La variation d'un mur : « grossit », « fond » ou « à peu près stable », d'après sa taille q,
+  /** La variation d'un mur : « grossit », « diminue » ou « à peu près stable », d'après sa taille q,
    *  celle d'avant (qAvant, il y a dureeMs) et ce qui a été échangé à ces prix pendant ce temps.
    *  null quand rien n'est mesurable. */
   BM.variationMur = function (q, qAvant, dureeMs, echange, o) {
     o = Object.assign({}, BM.GUIDE, o);
     if (qAvant === null || qAvant === undefined || !(dureeMs >= 60e3)) return null;
     const d = q - qAvant, fen = BM.age(dureeMs), net = Math.abs(d) >= o.varMinBtc && Math.abs(d) >= o.varMinPart * qAvant;
-    // Exécutions non lues pendant la fenêtre : on ne dit rien des échanges (null), plutôt que « aucun ».
-    const ech = echange === null || echange === undefined ? 'exécutions non lues' : echange > 0.0005 ? BM.btc(echange) + ' BTC échangés à ces prix' : 'aucun échange à ces prix';
-    if (!net) return { sens: 'stable', d, texte: 'peu changé sur ' + fen + ' (' + BM.pourcentBtc(d) + (qAvant > 0 ? ', ' + BM.pourcent(100 * d / qAvant, 0) : '') + ')', court: '≈ ' + fen };
+    // Échanges non lus pendant la fenêtre : on ne dit rien des échanges, plutôt que « aucun ».
+    const ech = echange === null || echange === undefined ? 'échanges non lus' : echange > 0.0005 ? BM.btc(echange) + ' BTC échangés à ces prix' : 'aucun échange à ces prix';
+    if (!net) return { sens: 'stable', d, texte: 'à peu près stable depuis ' + fen + ' (' + BM.pourcentBtc(d) + ')', court: '≈ ' + fen };
     if (d > 0) return { sens: 'grossit', d, texte: 'grossit (+' + BM.btc(d) + ' BTC en ' + fen + ')', court: '+' + BM.btc(d) + ' / ' + fen };
-    return { sens: 'fond', d, texte: 'fond (−' + BM.btc(-d) + ' BTC en ' + fen + ' ; ' + ech + ')', court: '−' + BM.btc(-d) + ' / ' + fen };
+    return { sens: 'fond', d, texte: 'diminue (−' + BM.btc(-d) + ' BTC en ' + fen + ' ; ' + ech + ')', court: '−' + BM.btc(-d) + ' / ' + fen };
   };
   BM.pourcentBtc = d => (d < 0 ? '−' : '+') + BM.btc(Math.abs(d)) + ' BTC';
   /** Le libellé d'un mur en mots : lignes (débutant ou expert) et version courte (≤ 40 signes).
-   *  m = { cote: 'bid'|'ask', p, q, depuis (instant), auMoins, variation (BM.variationMur),
-   *  source: 'live'|'publie', luA (instant de lecture du fichier) }. */
-  BM.texteMur = function (m, mode, maintenant) {
-    const achat = m.cote === 'bid', nom = achat ? 'Mur d\'achat' : 'Mur de vente', q = BM.btc(m.q) + ' BTC', cote = achat ? 'Achat' : 'Vente';
+   *  m = { cote: 'bid'|'ask', p, pas, q, depuis (instant), auMoins, raison, publiee, variation
+   *  (BM.variationMur), note ('prix' | 'bande' | null : rien à comparer, et pourquoi), source:
+   *  'live'|'publie', luA (instant de lecture du fichier), periment (carnet live pas lu en ce moment) }.
+   *  Débutant : une ligne ; la 2e seulement quand le mur a une histoire (il grossit, diminue, est là
+   *  depuis longtemps, ou n'a rien à quoi se comparer). */
+  BM.texteMur = function (m, mode, maintenant, o) {
+    o = Object.assign({}, BM.GUIDE, o);
+    const achat = m.cote === 'bid', nom = achat ? 'Mur d\'achat' : 'Mur de vente', q = BM.btc(m.q) + ' BTC', ba = achat ? 'Bid' : 'Ask';
     if (m.source === 'publie') {
       const lu = 'lu à ' + BM.heureUtc(m.luA) + ' UTC';
-      return mode === 'expert' ? { lignes: [(achat ? 'Bid' : 'Ask') + ' publié ' + q + ' · ' + lu], court: cote + ' publié ' + q }
-        : { lignes: [nom + ' publié · ' + q + ' · ' + lu, 'fichier de 15 min : carnet live pas encore lu'], court: cote + ' publié ' + q };
+      return mode === 'expert' ? { lignes: [ba + ' publié ' + q + ' · ' + lu], court: ba + ' publié · ' + q }
+        : { lignes: [nom + ' publié · ' + q + ' · ' + lu, 'fichier de 15 min (' + (m.periment ? 'carnet live pas lu en ce moment' : 'carnet live pas encore lu') + ')'], court: nom + ' publié · ' + q };
     }
     const ms = m.depuis !== null && m.depuis !== undefined ? Math.max(0, maintenant - m.depuis) : null;
-    const duree = ms === null ? null : mode === 'expert' || ms >= 60e3 ? BM.age(ms) : BM.duree(ms);
-    const v = m.variation || null;
-    if (mode === 'expert') return { lignes: [(achat ? 'Bid' : 'Ask') + ' ' + q + (duree ? ' · ' + (m.auMoins ? '≥ ' : '') + duree : '') + (v ? ' · ' + v.court : '')], court: cote + ' ' + q + (duree ? ' · ' + duree : '') };
-    if (ms !== null && ms < 60e3) return { lignes: [nom + ' · ' + q + ' · ' + (m.auMoins ? 'là dès la première lecture, il y a ' : 'là sans interruption depuis ') + duree, v ? v.texte : 'beaucoup d\'ordres ' + (achat ? 'd\'achat' : 'de vente') + ' en attente ici'], court: cote + ' ' + q + ' · < 1 min' };
-    const l = [nom + ' · ' + q + (duree ? ' · là depuis ' + (m.auMoins ? 'au moins ' : '') + duree : '')];
-    l.push(v ? v.texte : 'beaucoup d\'ordres ' + (achat ? 'd\'achat' : 'de vente') + ' en attente ici');
-    return { lignes: l, court: cote + ' ' + q + (ms !== null ? ' · ' + (ms < 60e3 ? '< 1 min' : BM.age(ms)) : '') };
+    const v = m.variation || null, fen = BM.age(o.fenetreMs);
+    if (mode === 'expert') {
+      const d = ms === null ? '' : ' · ' + (m.auMoins ? '≥ ' : '') + BM.age(ms);
+      return { lignes: [ba + ' ' + q + d + (v ? ' · ' + v.court : '') + (m.note === 'prix' ? ' · prix passé ici' : m.note === 'bande' ? ' · entre dans la bande' : '')], court: ba + ' ' + q + d };
+    }
+    let quand = '', quandC = '';
+    if (m.note === 'prix') { quandC = ' · prix passé ici'; }
+    else if (ms !== null) {
+      if (m.auMoins && m.raison === 'debut' && !m.publiee && ms < 60e3) { quand = ' · déjà là à la première lecture'; quandC = ' · depuis ≥ ' + BM.age(ms); }
+      else if (m.auMoins) { quand = ' · là depuis au moins ' + BM.age(ms); quandC = ' · depuis ≥ ' + BM.age(ms); }
+      else if (ms < 60e3) { quand = ' · apparu il y a moins d\'une minute'; quandC = ' · < 1 min'; }
+      else { quand = ' · là depuis ' + BM.age(ms); quandC = ' · depuis ' + BM.age(ms); }
+    }
+    const l = [nom + ' · ' + q + quand];
+    if (m.note === 'prix') l.push('le prix était à ce niveau il y a moins de ' + fen + ' : rien à comparer');
+    else if (m.note === 'bande') l.push('vient d\'entrer dans la bande que le carnet lu couvre : rien à comparer');
+    else if (v && (v.sens !== 'stable' || (ms !== null && ms >= o.histoireMinMs))) l.push(v.texte);
+    return { lignes: l, court: nom + ' ' + q + quandC };
   };
 
   // Évènements du journal : { t (instant, heure de la carte), type, cote ('b'|'a'|null), p, q, s
   // (symbole), texte (journal, sans heure), carte (libellé sur la carte, avec l'heure UTC), court
   // (≤ 40 signes), cle (dédoublonnage) }.
+  // Deux sortes de « gros » : un GROS ORDRE est un niveau au prix exact (un seul prix) suivi par
+  // BM.SuiviMurs ; un MUR est une tranche de 20 $ du carnet live nommée sur la carte. Les mots
+  // les distinguent toujours.
+  const nomOrdre = cote => (cote === 'b' ? 'Gros ordre d\'achat' : 'Gros ordre de vente');
   const nomMur = cote => (cote === 'b' ? 'Mur d\'achat' : 'Mur de vente');
   const coteMot = cote => (cote === 'b' ? 'achat' : 'vente');
-  /** La fin d'un niveau suivi (BM.SuiviMurs), en mots. x = { fin, cote, p, q0 (taille à la
-   *  dernière lecture où il était là), qMax (la plus grande lue), xN, t }. Seules les fins classées
-   *  (retiré, échangé, en partie, incertain) font un évènement. */
-  BM.evenementFinMur = function (x) {
+  /** La fin d'un gros ordre suivi (BM.SuiviMurs), en mots, d'après TOUTE sa vie : x = { fin, cote,
+   *  p, q0 (taille à la dernière lecture où il était là), qMax (la plus grande lue), xN (échangé
+   *  à coup sûr à la fin), echange (échangé sur toute sa vie, avec la fin), retire (retiré mesuré
+   *  sur toute sa vie), t }. Seules les fins classées font un évènement. « Absorbé » ou « en partie
+   *  échangé » seulement si les échanges font au moins absorbePart de la plus grande taille lue :
+   *  sinon il a été « retiré pour l'essentiel », et les deux quantités sont dites. */
+  BM.evenementFinMur = function (x, o) {
+    o = Object.assign({}, BM.GUIDE, o);
     if (!['retire', 'echange', 'partiel', 'incertain'].includes(x.fin)) return null;
-    const F = BM.FINS_MURS[x.fin], nom = nomMur(x.cote), h = BM.heureUtc(x.t) + ' UTC', px = BM.prixExact(x.p) + ' $', q = BM.btc(x.q0) + ' BTC', xn = BM.btc(x.xN || 0) + ' BTC';
-    const max = x.qMax > x.q0 + 0.0005 ? ' (jusqu\'à ' + BM.btc(x.qMax) + ' BTC plus tôt)' : '';
+    const nom = nomOrdre(x.cote), mot = coteMot(x.cote), hc = BM.heureUtc(x.t) + ' UTC', px = BM.prixExact(x.p) + DOL;
+    const qMax = Math.max(x.qMax || 0, x.q0 || 0), ech = x.echange !== undefined && x.echange !== null ? x.echange : (x.xN || 0), ret = x.retire || 0;
+    const max = qMax > x.q0 + 0.0005 ? ' (jusqu\'à ' + BM.btc(qMax) + ' BTC plus tôt)' : '';
+    let type = x.fin;
+    if ((type === 'echange' || type === 'partiel') && ech < o.absorbePart * qMax) type = 'essentiel';
     const T = {
-      retire: [nom + ' retiré, sans échange : ' + q + ' à ' + px + max, nom + ' retiré à ' + h + ' (sans échange)'],
-      echange: [nom + ' absorbé : ' + xn + ' échangés à ' + px, nom + ' absorbé à ' + h + ' : ' + xn + ' échangés'],
-      partiel: [nom + ' disparu après ' + xn + ' échangés sur ' + q + ' à ' + px + max, nom + ' disparu à ' + h + ' (' + BM.btc(x.xN || 0) + ' sur ' + q + ' échangés)'],
-      incertain: [nom + ' disparu, échanges incertains : ' + q + ' à ' + px + max, nom + ' disparu à ' + h + ' (échanges incertains)'],
-    }[x.fin];
-    return { t: x.t, type: x.fin, cote: x.cote, p: x.p, q: x.fin === 'echange' ? x.xN : x.q0, s: F.s, texte: T[0], carte: T[1],
-      court: F.s + ' ' + coteMot(x.cote) + ' ' + F.t + ' ' + BM.heureUtc(x.t) + ' UTC', cle: x.fin + x.cote + Math.round(x.p * 100) };
+      retire: [nom + ' retiré sans échange : ' + BM.btc(x.q0) + ' BTC à ' + px + max + (ech > 0.0005 ? ', après ' + BM.btc(ech) + ' BTC échangés plus tôt' : '') + ' (un seul prix)',
+        nom + ' retiré à ' + hc + ', sans échange', '✕ ' + mot + ' retiré ' + hc],
+      echange: [nom + ' absorbé (entièrement échangé) : ' + BM.btc(ech) + ' BTC échangés à ' + px + ' (un seul prix)',
+        nom + ' absorbé à ' + hc + ' : ' + BM.btc(ech) + ' BTC échangés', '● ' + mot + ' absorbé ' + hc],
+      partiel: [nom + ' en partie échangé, puis disparu : ' + BM.btc(ech) + ' BTC échangés sur ' + BM.btc(qMax) + ' BTC à ' + px + ' (un seul prix)',
+        nom + ' disparu à ' + hc + ' (' + BM.btc(ech) + ' sur ' + BM.btc(qMax) + ' BTC échangés)', '◐ ' + mot + ' en partie échangé ' + hc],
+      essentiel: [nom + ' retiré pour l\'essentiel : ' + BM.btc(ret) + ' BTC retirés, ' + BM.btc(ech) + ' BTC échangés à ' + px + ' (jusqu\'à ' + BM.btc(qMax) + ' BTC, un seul prix)',
+        nom + ' retiré pour l\'essentiel à ' + hc, '◐ ' + mot + ' surtout retiré ' + hc],
+      incertain: [nom + ' disparu, échanges incertains : ' + BM.btc(x.q0) + ' BTC à ' + px + max + ' (un seul prix)',
+        nom + ' disparu à ' + hc + ' (échanges incertains)', '? ' + mot + ' : échanges incertains ' + hc],
+    }[type];
+    return { t: x.t, type, cote: x.cote, p: x.p, q: type === 'echange' ? ech : qMax, s: BM.FINS_MURS[type === 'essentiel' ? 'partiel' : type].s, texte: T[0], carte: T[1],
+      court: T[2], cle: type + x.cote + Math.round(x.p * 100) };
   };
-  /** Un niveau qui atteint le seuil suivi. x = { cote, p, q, t }. */
+  /** Un gros ordre qui atteint le seuil du journal. x = { cote, p, q, t, grossi (il était là avant,
+   *  plus petit) }. */
   BM.evenementApparu = function (x) {
-    const nom = nomMur(x.cote), q = BM.btc(x.q) + ' BTC';
-    return { t: x.t, type: 'apparu', cote: x.cote, p: x.p, q: x.q, s: '+', texte: nom + ' apparu : ' + q + ' à ' + BM.prixExact(x.p) + ' $',
-      carte: nom + ' apparu à ' + BM.heureUtc(x.t) + ' UTC (' + q + ')', court: '+ ' + coteMot(x.cote) + ' ' + q + ' ' + BM.heureUtc(x.t) + ' UTC', cle: 'apparu' + x.cote + Math.round(x.p * 100) };
+    const nom = nomOrdre(x.cote), q = BM.btc(x.q) + ' BTC', hc = BM.heureUtc(x.t) + ' UTC';
+    return { t: x.t, type: 'apparu', cote: x.cote, p: x.p, q: x.q, s: BM.SYMBOLES_GUIDE.apparu.s,
+      texte: x.grossi ? nom + ' : ' + q + ' à ' + BM.prixExact(x.p) + DOL + ' (un seul prix ; il y en avait moins avant)' : nom + ' apparu : ' + q + ' à ' + BM.prixExact(x.p) + DOL + ' (un seul prix)',
+      carte: nom + ' apparu à ' + hc + ' (' + q + ')', court: '+ ' + coteMot(x.cote) + ' ' + q + ' ' + hc, cle: 'apparu' + x.cote + Math.round(x.p * 100) };
+  };
+  /** Un mur NOMMÉ (tranche du carnet live) passé au-dessus du seuil sous les yeux de la page.
+   *  x = { cote: 'b'|'a', p, pas, q, t }. */
+  BM.evenementMurApparu = function (x) {
+    const nom = nomMur(x.cote), q = BM.btc(x.q) + ' BTC', hc = BM.heureUtc(x.t) + ' UTC';
+    return { t: x.t, type: 'murApparu', cote: x.cote, p: x.p + x.pas / 2, q: x.q, s: BM.SYMBOLES_GUIDE.apparu.s,
+      texte: nom + ' apparu : ' + q + ' entre ' + BM.prix(x.p) + ' et ' + BM.prix(x.p + x.pas) + DOL + ' (tranche de ' + x.pas + DOL + ', carnet live)',
+      carte: nom + ' apparu à ' + hc + ' (' + q + ')', court: '+ mur ' + coteMot(x.cote) + ' ' + q + ' ' + hc, cle: 'murApparu' + x.cote + Math.round(x.p) };
+  };
+  /** Un mur NOMMÉ qui fond sans que le prix l'atteigne. x = { cote, p, pas, q0, q1, dureeMs,
+   *  echange (BTC échangés dans la tranche, null si non lus), t }. */
+  BM.evenementMurFondu = function (x) {
+    const nom = nomMur(x.cote), hc = BM.heureUtc(x.t) + ' UTC';
+    const ech = x.echange === null || x.echange === undefined ? 'échanges non lus' : x.echange > 0.0005 ? BM.btc(x.echange) + ' BTC échangés à ces prix' : 'aucun échange à ces prix';
+    return { t: x.t, type: 'fondu', cote: x.cote, p: x.p + x.pas / 2, q: x.q0, s: BM.SYMBOLES_GUIDE.fondu.s,
+      texte: nom + ' ' + tranche(x.p, x.pas) + ' : de ' + BM.btc(x.q0) + ' à ' + BM.btc(x.q1) + ' BTC en ' + (x.dureeMs < 60e3 ? 'moins d\'une minute' : BM.age(x.dureeMs)) + ' (' + ech + ' ; le prix n\'y est pas allé)',
+      carte: nom + ' fondu à ' + hc + ' (' + BM.btc(x.q0) + ' → ' + BM.btc(x.q1) + ' BTC)', court: '− mur ' + coteMot(x.cote) + ' fondu ' + hc, cle: 'fondu' + x.cote + Math.round(x.p) };
   };
   /** Une rafale au marché (BM.lireRafale). */
   BM.evenementRafale = function (r) {
-    const mot = r.achat ? 'd\'achats' : 'de ventes', q = BM.btc(r.q) + ' BTC';
-    return { t: r.T, type: 'rafale', cote: null, achat: r.achat, p: r.vwap, q: r.q, s: r.achat ? '▲' : '▼',
-      texte: 'Rafale ' + mot + ' au marché : ' + q + ' dans la même milliseconde, ' + (r.pMax > r.pMin ? 'de ' + BM.prix(r.pMin) + ' à ' + BM.prix(r.pMax) : 'à ' + BM.prix(r.pMin)) + ' $',
-      carte: 'Rafale ' + mot + ' à ' + BM.heureUtc(r.T, true) + ' UTC : ' + q, court: (r.achat ? '▲' : '▼') + ' rafale ' + mot + ' ' + q, cle: 'rafale' + r.aDeb };
+    const mot = r.achat ? 'd\'achats' : 'de ventes', q = BM.btc(r.q) + ' BTC', S = BM.SYMBOLES_GUIDE[r.achat ? 'rafaleAchat' : 'rafaleVente'].s;
+    return { t: r.T, type: 'rafale', cote: null, achat: r.achat, p: r.vwap, q: r.q, s: S,
+      texte: 'Rafale ' + mot + ' au marché : ' + q + ' d\'un seul coup (même milliseconde), ' + (r.pMax > r.pMin ? 'de ' + BM.prix(r.pMin) + ' à ' + BM.prix(r.pMax) : 'à ' + BM.prix(r.pMin)) + DOL,
+      carte: 'Rafale ' + mot + ' à ' + BM.heureUtc(r.T, true) + ' UTC : ' + q, court: S + ' rafale ' + mot + ' ' + q, cle: 'rafale' + r.aDeb };
   };
-  /** Le prix passe un mur nommé par le guide. x = { cote: 'b'|'a', p (bas de la tranche), pas, q, t }. */
+  /** Le prix (live) passe un mur nommé. x = { cote: 'b'|'a', p (bas de la tranche), pas, q, t }.
+   *  Règle de travail du propriétaire (non mesurée) : cassé après deux clôtures au-delà, ou une
+   *  clôture puis un retour testé ; seulement traversé par une mèche : « percé en mèche ». */
   BM.evenementTraverse = function (x) {
-    const sous = x.cote === 'b', lieu = sous ? 'sous le mur d\'achat' : 'au-dessus du mur de vente', px = BM.prix(x.p) + '–' + BM.prix(x.p + x.pas) + ' $';
-    return { t: x.t, type: 'traverse', cote: x.cote, p: x.p + x.pas / 2, q: x.q, s: sous ? '↓' : '↑',
-      texte: 'Le prix passe ' + lieu + ' de ' + px + ' (' + BM.btc(x.q) + ' BTC à la lecture d\'avant ; prix live, pas une clôture : ce n\'est pas une cassure confirmée)',
-      carte: 'Prix passé ' + lieu + ' à ' + BM.heureUtc(x.t) + ' UTC', court: (sous ? '↓ sous achat ' : '↑ sur vente ') + BM.prix(x.p) + ' ' + BM.heureUtc(x.t), cle: 'traverse' + x.cote + Math.round(x.p) };
+    const sous = x.cote === 'b', lieu = sous ? 'sous le mur d\'achat' : 'au-dessus du mur de vente', S = BM.SYMBOLES_GUIDE[sous ? 'sous' : 'sur'].s;
+    return { t: x.t, type: 'traverse', cote: x.cote, p: sous ? x.p : x.p + x.pas, q: x.q, s: S,
+      texte: 'Le prix (live) passe ' + lieu + ' ' + tranche(x.p, x.pas) + ' (' + BM.btc(x.q) + ' BTC à la lecture d\'avant). Percé, pas «' + NB + 'cassé' + NB + '» : il faudrait deux clôtures 1 min '
+        + (sous ? 'sous' : 'au-dessus de') + ' ce niveau, ou une clôture puis un retour testé (règle de travail, non mesurée).',
+      carte: 'Prix passé ' + lieu + ' à ' + BM.heureUtc(x.t) + ' UTC', court: S + (sous ? ' sous mur achat ' : ' sur mur vente ') + BM.prix(x.p) + ' ' + BM.heureUtc(x.t), cle: 'traverse' + x.cote + Math.round(x.p) };
+  };
+  /** La suite d'un passage (BM.evenementTraverse) d'après les bougies 1 min CLOSES : 'meche' (la
+   *  bougie du passage a clôturé en deçà du niveau), 'casse' (elle et la suivante ont clôturé
+   *  au-delà), 'repasse' (une clôture au-delà, puis retour), 'inconnu' (bougies manquantes) ou null
+   *  (pas encore closes). tr = { cote, p, pas, t } ; minutes = [{ t, fin, c }] triées. */
+  BM.suiteTraverse = function (tr, minutes, maintenant, o) {
+    o = Object.assign({}, BM.GUIDE, o);
+    const niv = tr.cote === 'b' ? tr.p : tr.p + tr.pas, au = c => (tr.cote === 'b' ? c < niv : c > niv);
+    const t1 = Math.floor(tr.t / 60e3) * 60e3, m1 = minutes.find(m => m.t === t1), m2 = minutes.find(m => m.t === t1 + 60e3);
+    const clos = m => m && m.fin <= maintenant;
+    if (!clos(m1)) return maintenant - tr.t > o.suiteMaxMs ? { verdict: 'inconnu' } : null;
+    if (!au(m1.c)) return { verdict: 'meche', m1 };
+    if (!clos(m2)) return maintenant - tr.t > o.suiteMaxMs ? { verdict: 'inconnu' } : null;
+    return { verdict: au(m2.c) ? 'casse' : 'repasse', m1, m2 };
+  };
+  /** L'évènement de la suite d'un passage. x = { cote, p, pas, verdict, m1, m2 }. */
+  BM.evenementSuite = function (x) {
+    if (!x || !['meche', 'casse', 'repasse'].includes(x.verdict)) return null;
+    const b = x.cote === 'b', nom = nomMur(x.cote) + ' ' + tranche(x.p, x.pas), h1 = BM.heureUtc(x.m1.t), h2 = x.m2 ? BM.heureUtc(x.m2.t) : '';
+    const dela = b ? 'sous' : 'au-dessus de', deca = b ? 'au-dessus' : 'en dessous', SG = BM.SYMBOLES_GUIDE;
+    const T = {
+      meche: [nom + ' percé en mèche : la bougie de ' + h1 + ' UTC a clôturé ' + deca + ' (règle de travail, non mesurée)', 'Percé en mèche (bougie de ' + h1 + ' UTC)', SG.meche.s + ' mèche ' + coteMot(x.cote) + ' ' + BM.prix(x.p) + ' ' + h1],
+      casse: [nom + ' cassé selon la règle de travail : deux clôtures 1 min ' + dela + ' le niveau (' + h1 + ' et ' + h2 + ' UTC ; règle non mesurée)', 'Cassé selon la règle (' + h1 + ', ' + h2 + ' UTC)', SG.casse.s + ' cassé ' + coteMot(x.cote) + ' ' + BM.prix(x.p) + ' ' + h2],
+      repasse: [nom + ' : une clôture 1 min ' + dela + ' le niveau (' + h1 + ' UTC), puis retour ' + deca + ' à ' + h2 + ' UTC — pas «' + NB + 'cassé' + NB + '» selon la règle de travail', 'Clôture au-delà puis retour (' + h2 + ' UTC)', SG.meche.s + ' retour ' + coteMot(x.cote) + ' ' + BM.prix(x.p) + ' ' + h2],
+    }[x.verdict];
+    const t = (x.verdict === 'meche' ? x.m1 : x.m2).fin;
+    return { t, type: x.verdict, cote: x.cote, p: b ? x.p : x.p + x.pas, q: null, s: x.verdict === 'casse' ? SG.casse.s : SG.meche.s, texte: T[0], carte: T[1], court: T[2], cle: x.verdict + x.cote + Math.round(x.p) };
   };
   /** Le prix (bougie 1 min) touche un niveau d'options du fichier de 15 min (MODÈLE).
-   *  x = { nom, court, p (strike publié), pAxe, t (minute), luA (lecture du fichier) }. */
+   *  x = { nom, court, p (strike publié), pAxe, t (début de la minute), luA (lecture du fichier) }. */
   BM.evenementOptions = function (x) {
-    const nom = x.nom.charAt(0).toLowerCase() + x.nom.slice(1);
-    return { t: x.t, type: 'options', cote: null, p: x.pAxe, q: null, s: '◇',
-      texte: 'Le prix atteint le ' + nom + ' ' + BM.prix(x.p) + ' $ (niveau d\'options : modèle ; fichier lu à ' + BM.heureUtc(x.luA) + ' UTC)',
-      carte: 'Prix au ' + nom + ' à ' + BM.heureUtc(x.t) + ' UTC (modèle)', court: '◇ ' + x.court + ' ' + BM.prix(x.p) + ' ' + BM.heureUtc(x.t) + ' UTC', cle: 'options' + x.court + x.p };
+    const nom = x.nom.charAt(0).toLowerCase() + x.nom.slice(1), S = BM.SYMBOLES_GUIDE.options.s;
+    return { t: x.t + 30e3, type: 'options', cote: null, p: x.pAxe, q: null, s: S,
+      texte: 'Le prix atteint le niveau d\'options «' + NB + nom + NB + '» ' + BM.prix(x.p) + DOL + ' (modèle ; fichier lu à ' + BM.heureUtc(x.luA) + ' UTC)',
+      carte: 'Prix au niveau d\'options ' + x.court + ' (bougie de ' + BM.heureUtc(x.t) + ' UTC, modèle)', court: S + ' ' + x.court + ' ' + BM.prix(x.p) + ' ' + BM.heureUtc(x.t) + ' UTC', cle: 'options' + x.court + x.p };
   };
   /** Le journal : évènements triés par instant ; un même évènement (même clé) dans la minute est
    *  compté (×n) au lieu d'être répété ; les plus anciens s'oublient au-delà de `garde`. */
@@ -1712,24 +1892,38 @@
   JO.derniers = function (k) { return this.liste.slice(-k).reverse(); };
   /** Ceux d'instant dans [ta, tb]. */
   JO.dans = function (ta, tb) { return this.liste.filter(e => e.t >= ta && e.t <= tb); };
+  /** Marques du journal regroupées par case de `px` pixels : une par case (la plus grosse, sinon la
+   *  plus récente), avec le nombre d'évènements de la case. pts = [{ x, y, ev }]. */
+  BM.regrouperMarques = function (pts, px) {
+    const cases = new Map();
+    for (const m of pts) {
+      const k = Math.floor(m.x / px) + ':' + Math.floor(m.y / px), c = cases.get(k);
+      if (!c) { cases.set(k, { x: m.x, y: m.y, ev: m.ev, evs: [m.ev] }); continue; }
+      c.evs.push(m.ev);
+      if ((m.ev.q || 0) > (c.ev.q || 0) || ((m.ev.q || 0) === (c.ev.q || 0) && m.ev.t > c.ev.t)) { c.ev = m.ev; c.x = m.x; c.y = m.y; }
+    }
+    return [...cases.values()];
+  };
   /** Les zones chargées les plus proches du prix, sous lui (ordres d'achat) et au-dessus (ordres de
-   *  vente) : `zoneTranches` tranches consécutives sommées, entièrement dans la bande lue, d'au moins
-   *  zoneMinBtc ET zoneFacteur × la zone médiane du même côté. Une zone d'avant (`prec`) reste tant
-   *  qu'elle est chargée et que le prix y entre (ou qu'aucune autre ne la remplace) : on voit alors
-   *  si elle est échangée ou retirée. Rend { bid, ask } : { cote, k0, pBas, pHaut, q } ou null. */
+   *  vente) : `zoneTranches` tranches consécutives sommées, entièrement dans la bande lue, hors de la
+   *  tranche du prix et de ses voisines, d'au moins zoneMinBtc ET zoneFacteur × la zone médiane du
+   *  même côté. Une zone d'avant (`prec`) reste tant qu'elle est chargée et que le prix y entre (ou
+   *  qu'aucune autre ne la remplace) : on voit alors si elle est échangée ou retirée ; repassée sous
+   *  les seuils, elle reste encore zoneGarde lectures (pas de clignotement). Rend { bid, ask } :
+   *  { cote, k0, pBas, pHaut, q, garde } ou null. */
   BM.zonesChargees = function (C, prec, o) {
     o = Object.assign({}, BM.GUIDE, o);
     const out = { bid: null, ask: null };
     if (!C || C.bas === null || C.haut === null) return out;
-    const n = o.zoneTranches, P = C.pas;
+    const n = o.zoneTranches, P = C.pas, kP = Math.floor(C.mid / P);
     for (const cote of ['bid', 'ask']) {
       const m = cote === 'bid' ? C.b : C.a;
       const somme = k0 => { let s = 0; for (let i = 0; i < n; i++) s += m.get(k0 + i) || 0; return s; };
-      const zone = (k0, q) => ({ cote, k0, pBas: k0 * P, pHaut: (k0 + n) * P, q });
+      const zone = (k0, q, garde) => ({ cote, k0, pBas: k0 * P, pHaut: (k0 + n) * P, q, garde: garde || 0 });
       const dansBande = k0 => k0 * P >= C.bas && (k0 + n) * P <= C.haut;
       const fen = [];
-      if (cote === 'bid') { const kH = Math.ceil(C.mid / P) - 1; for (let k0 = kH - n + 1; k0 * P >= C.bas; k0--) fen.push([k0, somme(k0)]); }
-      else { const kB = Math.floor(C.mid / P); for (let k0 = kB; (k0 + n) * P <= C.haut; k0++) fen.push([k0, somme(k0)]); }
+      if (cote === 'bid') { const kH = kP - 1 - o.margeTranches; for (let k0 = kH - n + 1; k0 * P >= C.bas; k0--) fen.push([k0, somme(k0)]); }
+      else { const kB = kP + 1 + o.margeTranches; for (let k0 = kB; (k0 + n) * P <= C.haut; k0++) fen.push([k0, somme(k0)]); }
       const tri = fen.map(x => x[1]).sort((a, b) => a - b), med = tri.length ? tri[tri.length >> 1] : 0;
       const seuil = Math.max(o.zoneMinBtc, o.zoneFacteur * med);
       let frais = null;
@@ -1740,6 +1934,7 @@
         const q = somme(p0.k0), dedans = cote === 'bid' ? C.mid < p0.pHaut : C.mid > p0.pBas;
         const recouvre = frais && Math.abs(frais.k0 - p0.k0) < n;
         if (q >= Math.min(seuil, Math.max(o.zoneMinBtc, p0.q * 0.5)) && (dedans || !frais || recouvre)) { out[cote] = zone(p0.k0, q); continue; }
+        if (!frais && (p0.garde || 0) < o.zoneGarde && q >= o.zoneMinBtc / 2) { out[cote] = zone(p0.k0, q, (p0.garde || 0) + 1); continue; }
       }
       out[cote] = frais;
     }
