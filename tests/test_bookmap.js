@@ -870,8 +870,8 @@ titre('7f. Destin des murs : bornes mesurées entre deux lectures, attente des e
 titre('8. Isolement : une page à côté, qui ne partage aucun code avec le terminal');
 const html = fs.readFileSync(path.join(REPO, 'bookmap.html'), 'utf8');
 const charges = [...html.matchAll(/\b(?:src|href)="([^"#]+)"/g)].map(m => m[1]).filter(u => !/^https?:/.test(u));
-check('bookmap.html ne charge que ses fichiers (+ le lien retour vers le terminal)',
-  charges.every(u => ['css/bookmap.css', 'js/bookmap-calc.js', 'js/bookmap.js', 'index.html'].includes(u)), charges);
+check('bookmap.html ne charge que ses fichiers (+ le repli Binance commun et le lien retour vers le terminal)',
+  charges.every(u => ['css/bookmap.css', 'js/binance-repli.js', 'js/bookmap-calc.js', 'js/bookmap.js', 'index.html'].includes(u)), charges);
 check('aucun script du terminal chargé', !/js\/app\.js/.test(html) && !/themes\//.test(html));
 const index = fs.readFileSync(path.join(REPO, 'index.html'), 'utf8');
 check('le terminal ne charge aucun fichier de la carte', !/bookmap/.test(index.replace(/<a [^>]*href="bookmap\.html"[^>]*>/g, '')));

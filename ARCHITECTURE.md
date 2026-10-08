@@ -25,6 +25,12 @@
    fapi.binance.com ──┘                     (index.json + series/*.csv)
 ```
 
+Côté navigateur, la page et la carte appellent `api.binance.com`. `js/binance-repli.js`,
+chargé avant tout autre script, rejoue une requête refusée (451, 403) ou injoignable sur le
+miroir public `data-api.binance.vision` (mêmes réponses spot, CORS ouvert), puis reste sur le
+miroir pour la visite. Le miroir n'est jamais l'hôte par défaut : un navigateur qui ne
+l'atteint pas a perdu le graphique le 08/10/2026 (PR #8, retirée par #11).
+
 `index.html` ne lit **que** deux fichiers du dépôt — `market-data.json` et `heatmap.json` —
 **et il les lit sur GitHub Raw, par URL absolue**, pas dans le dossier qui sert la page. Tout
 le reste est agrégé côté serveur et arrive déjà digéré.

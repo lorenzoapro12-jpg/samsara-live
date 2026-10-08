@@ -116,10 +116,11 @@ Object.defineProperty(feed, 'innerHTML', { get: () => html, set: v => { rendus++
   check('prix et variation affichés depuis la réponse MINI', el('price').textContent === '$83,512.51' && el('var24').textContent === '−' + Math.abs(v).toFixed(2) + ' %', [el('price').textContent, el('var24').textContent]);
 
   titre('3. Le préchargement du script de tête : les URL exactes du démarrage');
-  const tete = scriptsApp()[0];
+  const scripts = scriptsApp(), tete = scripts.find(s => s.fichier === 'index.html (inline)');
+  check('le repli Binance est installé avant tout autre script (préchargement compris)', scripts[0].fichier === 'js/binance-repli.js', scripts.map(s => s.fichier));
   const prech = [...tete.texte.matchAll(/lire\((B \+ )?'([^']+)'/g)].map(m => (m[1] ? 'https://api.binance.com/api/v3/' : '') + m[2]);
   const attendues = [T.urlPremierePage('BTCUSDT', '15m'), T.urlTicker('BTCUSDT'), T.DATA_URL].sort();
-  check('le premier script d’index.html précharge la première page de bougies, le prix et market-data.json — mêmes URL que js/app.js',
+  check('le premier script en ligne d’index.html précharge la première page de bougies, le prix et market-data.json — mêmes URL que js/app.js',
     tete.fichier === 'index.html (inline)' && JSON.stringify(prech.slice().sort()) === JSON.stringify(attendues), { prech, attendues });
   check('… pour la paire et l’intervalle par défaut de la page', /let marketData = null, livePrice = null, candles = \[\], chartInterval = '15m';/.test(fs.readFileSync(path.join(REPO, 'js/app.js'), 'utf8'))
     && /let activeSymbol = 'BTCUSDT';/.test(fs.readFileSync(path.join(REPO, 'js/app.js'), 'utf8')));

@@ -55,6 +55,9 @@ node test_chaleur.js || ko=1
 etape "2f. Réseau : ce que la page demande et quand (revalidation, prix MINI, préchargement, bougies) — hors ligne"
 node test_reseau.js || ko=1
 
+etape "2f'. Repli Binance : api.binance.com d'abord, miroir data-api.binance.vision si refusé ou injoignable — hors ligne"
+node test_binance_repli.js || ko=1
+
 etape "2g. Horloges : liste dérivée de meta.champs, pannes nommées, décalage avec Binance — hors ligne"
 node test_horloges.js || ko=1
 
