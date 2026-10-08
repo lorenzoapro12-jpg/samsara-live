@@ -735,9 +735,9 @@ async function pixel(page, x, y) {
     {
       let p27;
       ({ page: p27, erreurs } = await ouvrir(nav, { encodage: true, contexte: { deviceScaleFactor: 2 } }));
-      // Tout ce qui se peint PAR-DESSUS la chaleur est éteint, calques ajoutés depuis compris
-      // (mémoire, rafales, destin) : le pixel comparé doit être celui de la chaleur seule.
-      for (const k of ['live', 'executions', 'prix', 'bidask', 'murs', 'gamma', 'profil', 'memoire', 'rafales', 'destin']) await p27.click(`button[data-calque="${k}"]`);
+      // Tout ce qui se peint PAR-DESSUS la chaleur est éteint (mémoire, rafales et destin le sont
+      // par défaut) : le pixel comparé doit être celui de la chaleur seule.
+      for (const k of ['live', 'executions', 'prix', 'bidask', 'murs', 'gamma', 'profil']) await p27.click(`button[data-calque="${k}"]`);
       const zw = await p27.evaluate(() => window.__carte.etat().mise.chaleur.w), zh = await p27.evaluate(() => window.__carte.etat().mise.chaleur.h);
       await p27.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [G.t0, G.t0 + G.W * G.dt, pMid - 900, pMid + 900]);
       await p27.waitForTimeout(300);
@@ -936,7 +936,8 @@ async function pixel(page, x, y) {
     {
       let p36, S;
       ({ page: p36, erreurs, S } = await ouvrir(nav, { encodage: true }));
-      for (const k of ['live', 'dom', 'bidask', 'destin']) await p36.click(`button[data-calque="${k}"]`);
+      // Le destin des murs est éteint par défaut : il suffit d'éteindre les trois autres.
+      for (const k of ['live', 'dom', 'bidask']) await p36.click(`button[data-calque="${k}"]`);
       await p36.waitForTimeout(500);
       const n0 = S.compte.depth;
       await p36.waitForTimeout(5000);
@@ -953,7 +954,7 @@ async function pixel(page, x, y) {
     titre('37. Mémoire du carnet : lue sur la carte publiée BRUTE, seuil exact, âge, la fusion n\'y change rien');
     {
       let p37;
-      ({ page: p37, erreurs } = await ouvrir(nav, { encodage: true }));
+      ({ page: p37, erreurs } = await ouvrir(nav, { encodage: true, reglages: { calques: { memoire: true } } }));
       const tm = G.t0 + G.dt * Math.floor(G.W / 2);
       await p37.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [tm - 4 * 3600e3, tm + 3600e3, pMid - 700, pMid + 700]);
       await p37.waitForTimeout(600);
@@ -997,7 +998,7 @@ async function pixel(page, x, y) {
       await p37.close();
       // Sans encodage publié : éteinte, et dit.
       let p37b;
-      ({ page: p37b, erreurs } = await ouvrir(nav, {}));
+      ({ page: p37b, erreurs } = await ouvrir(nav, { reglages: { calques: { memoire: true } } }));
       await p37b.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [tm - 4 * 3600e3, tm + 3600e3, pMid - 700, pMid + 700]);
       await p37b.waitForTimeout(600);
       const eb = await etat(p37b);
@@ -1017,7 +1018,7 @@ async function pixel(page, x, y) {
         return Object.assign({}, t0, { a: id, f: id, l: id, p: (+t0.p + pas * (rep ? 2 : k)).toFixed(2), q: '0.80000000' });
       };
       let p38;
-      ({ page: p38, erreurs } = await ouvrir(nav, { encodage: true, S }));
+      ({ page: p38, erreurs } = await ouvrir(nav, { encodage: true, S, reglages: { calques: { rafales: true } } }));
       await p38.waitForFunction(() => window.__carte.etat().rafales.arriereFini, null, { timeout: 60000 }).catch(() => {});
       // La pastille est réécrite au rendu suivant (cadence 1 s) : sous charge (suite complète), 1,5 s
       // fixes ne suffisaient pas toujours. On attend l'état, pas une durée.
@@ -1065,10 +1066,10 @@ async function pixel(page, x, y) {
     titre('39. Réglages stockés hors liste (mémoire, rafales) : remplacés par les défauts');
     {
       let p39;
-      ({ page: p39, erreurs } = await ouvrir(nav, { encodage: true, reglages: { presenceSeuil: 7, rafaleMin: 'abc', calques: { memoire: 'oui', rafales: false } } }));
+      ({ page: p39, erreurs } = await ouvrir(nav, { encodage: true, reglages: { presenceSeuil: 7, rafaleMin: 'abc', calques: { memoire: 'oui', rafales: true } } }));
       const r = (await etat(p39)).reglages;
-      check('presenceSeuil 7 → 10, rafaleMin « abc » → 2, calque mémoire « oui » → allumé ; rafales éteint (valide) gardé',
-        r.presenceSeuil === BM.PRESENCE.defautBtc && r.rafaleMin === BM.RAFALES.defautBtc && r.calques.memoire === true && r.calques.rafales === false && (r.rejets || []).includes('presenceSeuil'), r);
+      check('presenceSeuil 7 → 10, rafaleMin « abc » → 2, calque mémoire « oui » → éteint (défaut) ; rafales allumé (valide) gardé',
+        r.presenceSeuil === BM.PRESENCE.defautBtc && r.rafaleMin === BM.RAFALES.defautBtc && r.calques.memoire === false && r.calques.rafales === true && (r.rejets || []).includes('presenceSeuil'), r);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p39.close();
     }
@@ -1086,7 +1087,7 @@ async function pixel(page, x, y) {
         if (i > 0) b.splice(i, 0, [fixe, '30.00000']);
         return { status: 200, body: JSON.stringify(d) };
       };
-      ({ page: p40, erreurs } = await ouvrir(nav, { encodage: true, intercept: mur }));
+      ({ page: p40, erreurs } = await ouvrir(nav, { encodage: true, intercept: mur, reglages: { calques: { destin: true } } }));
       await p40.waitForTimeout(6000);
       // Vue fine sur la dernière minute : les traits y font plus de 2 px.
       await p40.evaluate(() => { const e = window.__carte.etat(), n = e.maintenant; window.__carte.cadrer(n - 60e3, n + 5e3, e.vue.p1, e.vue.p2); });
@@ -1120,7 +1121,7 @@ async function pixel(page, x, y) {
       await p40.close();
       // Horloge incertaine (aller-retour de /api/v3/time ≈ 1,4 s → ± ≈ 700 ms) : signalée.
       let p40b;
-      ({ page: p40b, erreurs } = await ouvrir(nav, { encodage: true, intercept: async (u, k) => { if (k === 'time') await new Promise(z => setTimeout(z, 1400)); return null; } }));
+      ({ page: p40b, erreurs } = await ouvrir(nav, { encodage: true, reglages: { calques: { destin: true } }, intercept: async (u, k) => { if (k === 'time') await new Promise(z => setTimeout(z, 1400)); return null; } }));
       await p40b.waitForTimeout(2000);
       const Pb = (await etat(p40b)).pastillesCompletes.find(t => t.startsWith('Destin des murs')) || '';
       check(`± u > ${BM.MURS.uAlerteMs} ms : la pastille le signale`, /⚠ horloge incertaine \(± \d+ ms > 500 ms\)/.test(Pb), Pb);

@@ -31,9 +31,11 @@
 
   // ─── Réglages : changent le DÉTAIL, jamais une valeur affichée ──────────────
   const CLE = 'samsara-carte-v1';
+  // Mémoire, Rafales et Destin des murs s'allument à la demande (boutons du ruban) : allumés
+  // ensemble, leurs libellés et leurs pastilles se chevauchaient sur la chaleur.
   const DEFAUTS = {
     calques: { publiee: true, live: true, executions: true, prix: true, bidask: true, murs: true,
-      gamma: true, profil: true, dom: true, volume: true, cvd: true, memoire: true, rafales: true, destin: true },
+      gamma: true, profil: true, dom: true, volume: true, cvd: true, memoire: false, rafales: false, destin: false },
     palette: 'classique',
     seuilBas: 2,          // intensité sous laquelle rien n'est peint
     saturation: 200,      // intensité à partir de laquelle la couleur est au maximum
