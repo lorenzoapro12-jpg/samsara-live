@@ -67,6 +67,9 @@ node test_contre.js || ko=1
 etape "2i. Chronique : historique des publications relu dans git (arrêts, trous, cache, tracés) — hors ligne"
 node test_chronique.js || ko=1
 
+etape "2j. Guide du graphique : niveaux nommés, règle de cassure, régime, formes rejouées sans regarder l'avenir, mots sans conseil — hors ligne"
+node test_guide.js || ko=1
+
 etape "3. Extraction du JavaScript inline"
 python3 refresh_harness.py || ko=1
 

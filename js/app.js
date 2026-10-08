@@ -345,7 +345,11 @@ let rsDragStartEnd = 0;
 let crossX = null, crossY = null;  // coordonnées canvas du curseur
 
 // ============ INDICATOR STATE ============
-const overlays = { ema20: false, ema50: false, ema100: false, ema200: false, sma20: false, sma50: false, bb: false, vwap: false, ichimoku: false, sar: false, sr: false, fib: false, vp: false, liq: false };
+const overlays = { ema20: false, ema50: false, ema100: false, ema200: false, sma20: false, sma50: false, bb: false, vwap: false, ichimoku: false, sar: false, sr: false, fib: false, vp: false, liq: false, guide: guideMemorise() };
+// Le Guide (niveaux nommés, régime, formes, suite, lecture) est affiché par défaut ; le choix de
+// le masquer est gardé d'une visite à l'autre (navigation privée : affiché).
+function guideMemorise() { try { return localStorage.getItem('samsara-guide-v1') !== '0'; } catch (e) { return true; } }
+function guideNoter(on) { try { localStorage.setItem('samsara-guide-v1', on ? '1' : '0'); } catch (e) { /* navigation privée */ } }
 const activeSubs = { vol: true, rsi: false, macd: false, stoch: false, atr: false, obv: false, mfi: false, williamsR: false, cci: false, adx: false, ao: false, equity: false };
 const subHeights = { vol: 110, rsi: 120, macd: 120, stoch: 120, atr: 110, obv: 110, mfi: 120, williamsR: 120, cci: 120, adx: 120, ao: 110, equity: 140 };
 
@@ -372,6 +376,30 @@ const PARAM = {
   sr: { bougies: 500, atrPeriode: 14, tolMin: 0.002, tolMax: 0.01, tolAtr: 0.6, niveauxTf: 5, niveauxRef: 4, fusionTf: 0.005,
         pivot: { '1m': 5, '5m': 5, '15m': 4, '30m': 4, '1h': 4, '4h': 3, '1d': 2, '1w': 2 },
         demiVie: { '1m': 240, '5m': 120, '15m': 60, '30m': 40, '1h': 40, '4h': 20, '1d': 10, '1w': 5 } },
+  // Guide (js/guide.js) : chaque nombre de ses libellés, de ses règles et de ses fiches est ICI.
+  guide: {
+    // Niveaux nommés : au plus `niveauxParCote` au-dessus et au-dessous du prix, à moins de
+    // `distanceMax` (fraction du prix) ; deux niveaux à moins de `fusion` = une seule bande.
+    niveauxParCote: 2, distanceMax: 0.06, fusion: 0.003, touchesMin: 2,
+    atrPeriode: 14, bandeAtr: 0.15,          // demi-hauteur de la bande : 0,15 × ATR
+    proche: 0.005,                            // « proche » : à moins de 0,5 % du prix live
+    // Règle de cassure (règle de travail, pas une mesure) : 2 clôtures successives au-delà de
+    // la bande, relues sur les `regardCassure` dernières bougies closes ; une mèche au-delà sur
+    // les `mecheBougies` dernières = « percé en mèche ».
+    regardCassure: 10, mecheBougies: 3,
+    // Régime (convention) : ADX ≥ 25 tendance, ≤ 20 sans tendance ; compression = largeur de
+    // Bollinger au plus à son 20e centile des 100 dernières bougies.
+    adxTendance: 25, adxSans: 20, bbPercentile: 20, bbFenetre: 100, emaCourte: 20, emaLongue: 50,
+    // Formes : pivots fractals de `pivot` bougies de chaque côté ; tolérance = tolAtr × ATR.
+    pivot: 3, tolAtr: 0.5, hauteurMinAtr: 1.5,
+    ecartMin: 5, ecartMax: 60,                 // doubles sommets / creux : 5 à 60 bougies entre les deux
+    rangeMin: 20, rangeFenetre: 80, rangeHauteurAtr: 6,
+    triPivots: 3, triFenetre: 80, triConvergence: 0.3,
+    expiration: 60, horizon: 60, garderFini: 20, formesMax: 2, echantillonFaible: 20,
+    // Marge de « futur » à droite de la dernière bougie (chemins conditionnels) : une fraction
+    // de la largeur du tracé, bornée en pixels. Seulement quand le Guide est affiché.
+    futur: 0.18, futurMinPx: 56, futurMaxPx: 250,
+  },
 };
 const periodeDe = cle => +String(cle).replace(/\D/g, '');     // 'ema20' -> 20
 const ETIQ = {
@@ -414,6 +442,9 @@ const INDICATORS = [
     { key: 'fib', label: 'Fibonacci Retracement', tag: 'ch' },
     { key: 'vp', label: 'Volume Profile', tag: 'ch' },
     { key: 'liq', label: 'Liquidité (Depth)', tag: 'ch' }
+  ]},
+  { cat: 'Guide', items: [
+    { key: 'guide', label: 'Guide : niveaux nommés, régime, formes, suite', tag: 'gd' },
   ]}
 ];
 
@@ -423,6 +454,7 @@ function toggleAny(key) {
   if (isOverlay(key)) {
     overlays[key] = !overlays[key];
     if (key === 'liq') toggleDepth(overlays.liq);
+    if (key === 'guide') guideNoter(overlays.guide);
     // S/R : dessiner tout de suite, puis redessiner quand les TF de reference sont arrives.
     if (key === 'sr' && overlays.sr) { drawChart(); refreshRefSR().then(drawChart); }
     else drawChart();
@@ -435,7 +467,7 @@ function toggleAny(key) {
 
 // Indicateur du menu -> sa fiche de lecture (js/fiches.js).
 const FICHE_IND = { ema20: 'ema', ema50: 'ema', ema100: 'ema', ema200: 'ema', sma20: 'ema', sma50: 'ema', bb: 'bb', vwap: 'vwap',
-  vol: 'volume', rsi: 'rsi', macd: 'macd', stoch: 'stoch', atr: 'atr', adx: 'adx', sr: 'sr' };
+  vol: 'volume', rsi: 'rsi', macd: 'macd', stoch: 'stoch', atr: 'atr', adx: 'adx', sr: 'sr', guide: 'guide' };
 function buildDropdown() {
   const menu = document.getElementById('indMenu');
   let html = '';
@@ -2591,7 +2623,7 @@ function drawChart() {
   const H = canvas.height / window.devicePixelRatio;
   // Palette : jetons du thème, lus UNE fois (lireJetons) — pas un getComputedStyle par image.
   if (!jetonsLus) { lireJetons(); jetonsLus = true; }
-  geo = null; geoPrix = null;
+  geo = null; geoPrix = null; guideEtat = null;
   
   ctx.clearRect(0, 0, W, H);
   if (candles.length < 2) {
@@ -2649,6 +2681,8 @@ function drawChart() {
   ctx.beginPath(); ctx.roundRect(16, 19, pw0, 15, 7.5); ctx.fill(); ctx.restore();
   ctx.fillStyle = pctColor;
   ctx.fillText(pctStr, 22, 30);
+  // Guide : le régime du marché, à droite de la pastille (rangée du haut).
+  if (guideEtat) guideRegimeBadge(guideEtat, 16 + pw0 + 8, W);
   
   // Empiler les sous-graphes
   for (const s of dispo.sous) s.trace = resolveSub(candles, s.y, s.h, W, s.cle) !== false;
@@ -2741,10 +2775,15 @@ function dessinerCalque() {
     cx.fillText(rep.texte, aGauche ? rep.x - 6 : rep.x + 6, P.top + P.ph - 12);
     cx.restore();
   }
+  // Guide : état de chaque niveau au prix LIVE, lecture du moment (relus, pas recalculés).
+  if (guideEtat) guideCalque();
   if (crossX === null || crossY === null) return;
-  const n = geo.ve - geo.vs, chartPw = W - 16 - 75;
-  const idx = n > 0 ? Math.round((crossX - 16) / (chartPw / n)) : -1;
+  // x → indice : le pas des bougies (pasBougie), et la bougie dont le CRÉNEAU contient le
+  // curseur [x, x + pas[ — l'arrondi d'avant désignait la voisine sur la moitié droite du créneau.
+  const n = geo.ve - geo.vs, pasC = pasBougie(W - 16 - 75, n);
+  const idx = n > 0 && crossX >= 16 ? Math.floor((crossX - 16) / pasC) : -1;
   // --- Réticule du tracé principal ---
+  let bulleOHLCV = null;
   if (crossY < mainH && P) {
     cx.strokeStyle = COLORS.reticule;
     cx.lineWidth = 1; cx.setLineDash([3, 3]);
@@ -2786,7 +2825,10 @@ function dessinerCalque() {
       cx.fillStyle = COLORS.ink3;
       cx.fillText('Volume ' + volStr, tX + 16, tY + 57);
       cx.restore();
+      bulleOHLCV = { x: tX, y: tY, w: 135, h: 72 };
     }
+    // Guide : ce que désigne le curseur (bande, forme, chemin, régime), expliqué sur le calque.
+    if (guideEtat) guideSurvol(W, mainH, bulleOHLCV);
   }
   // --- Réticule des sous-graphes : une verticale à travers eux, la valeur de chacun ---
   if (crossY > mainH && idx >= 0 && idx < n) {
@@ -2941,6 +2983,18 @@ const FMT_HM = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-di
 // de 2×N éléments et un calcBollinger de plus par frame de survol). Le cache porte le
 // numéro de frame : priceScale / pricePan / Bollinger ne peuvent pas le périmer.
 let scaleSeq = 0, lastScale = null;
+// ─── Marge de « futur » (Guide) : la SEULE conversion indice → x quand le Guide est affiché ───
+// Les bougies n'occupent plus toute la largeur du tracé : à droite de la dernière, une marge
+// (PARAM.guide.futur, bornée en px) reçoit les chemins conditionnels du Guide. Le tracé
+// principal, les sous-graphes, la couche de chaleur, le réticule et l'infobulle lisent TOUS
+// leur pas ici — une seule formule, donc des bougies, un réticule et une chaleur alignés.
+// Guide masqué : marge nulle, le pas d'avant (pw / n) au pixel près.
+function margeFutur(pw) {
+  if (!overlays.guide) return 0;
+  const g = PARAM.guide;
+  return Math.min(pw * 0.4, Math.max(g.futurMinPx, Math.min(g.futurMaxPx, pw * g.futur)));
+}
+function pasBougie(pw, n) { return (pw - margeFutur(pw)) / Math.max(1, n); }
 function priceWindow(vs, ve) {
   const s = lastScale;
   if (s && s.seq === scaleSeq && s.vs === vs && s.ve === ve) return s;
@@ -2967,7 +3021,9 @@ function priceWindow(vs, ve) {
 }
 
 function resolveChart(candles, padL, padR, chartH, W) {
-  const pad = { left: padL, right: padR, top: 10, bottom: 20 };
+  // Guide affiché : le haut du tracé est réservé à ses rangées (badge du régime, lecture du
+  // moment) — les bougies ne passent plus dessous. Toutes les conversions lisent pad.top (geoPrix).
+  const pad = { left: padL, right: padR, top: 10 + (overlays.guide ? guideHaut(W, padL, padR) : 0), bottom: 20 };
   const pw = W - pad.left - pad.right;
   const ph = chartH - pad.top - pad.bottom;
   if (ph < 30) return;
@@ -2984,7 +3040,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
   // les seuls lecteurs sont bb, ema/sma, vwap, ichimoku et sar, tous sous ces drapeaux.
   const closes = cols().close;   // mémorisé : gratuit d'une image à l'autre
   
-  const gap = pw / visible.length;
+  const gap = pasBougie(pw, visible.length);
   const candleW = Math.max(1, Math.min(40, gap * 0.8));
   
   // Sessions (UTC) : voile imperceptible + BANDEAU FIN de 6 px (règle temporelle).
@@ -3013,11 +3069,12 @@ function resolveChart(candles, padL, padR, chartH, W) {
       }
     }
     if (blockStart !== -1) {
-      const x1 = pad.left + gap * (blockStart - vs);
+      // Jusqu'à la fin de la dernière bougie : la marge du Guide (futur) n'a pas de session.
+      const x1 = pad.left + gap * (blockStart - vs), x2 = Math.min(W - pad.right, pad.left + gap * visible.length);
       ctx.fillStyle = s.veil;
-      ctx.fillRect(x1, pad.top, W - pad.right - x1, ph);
+      ctx.fillRect(x1, pad.top, x2 - x1, ph);
       ctx.fillStyle = s.bar;
-      ctx.fillRect(x1, pad.top + ph - SESS_H, W - pad.right - x1, SESS_H);
+      ctx.fillRect(x1, pad.top + ph - SESS_H, x2 - x1, SESS_H);
     }
   }
   
@@ -3278,6 +3335,11 @@ function resolveChart(candles, padL, padR, chartH, W) {
     ctx.fillText('POC $' + (minP + (pocBin + 0.5) * binH).toFixed(0), W - pad.right + 4, pad.top + 9);
   }
 
+  // Guide : bandes des niveaux nommés, SOUS les bougies (le reste du Guide est tracé après elles).
+  const guide = overlays.guide ? guidePreparer({ pad, pw, ph, W, minP, maxP, range, vs, ve, gap, n: visible.length }) : null;
+  guideEtat = guide;
+  if (guide) guideBandes(guide);
+
   // Candles
   // Bougies. NE PAS batcher les tracés par style (« 2 strokes par bougie » semble coûteux) :
   // mesuré sur 3000 bougies, grouper les halos + les corps → ~0 ms gagnée, et deux défauts :
@@ -3301,7 +3363,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
     const intervalS = (candles.length > 1 && candles[1].time > candles[0].time) ? (candles[1].time - candles[0].time) : 900;
     const winT0 = candles[vs].time;
     const winT1 = candles[Math.min(candles.length - 1, ve - 1)].time + intervalS;
-    const gap = pw / Math.max(1, ve - vs);
+    const gap = pasBougie(pw, ve - vs);
     const RH = REGLAGES.heat;
     const kt = Math.max(RH.fusionT, palier(1 / (hm.dt / intervalS * gap)));
     const kp = Math.max(RH.fusionP, palier(1 / (ph * hm.dp / range)));
@@ -3328,6 +3390,9 @@ function resolveChart(candles, padL, padR, chartH, W) {
     }
   }
   
+  // Guide : formes, chemins conditionnels, libellés (au-dessus des bougies et de la chaleur).
+  if (guide) guideTracer(guide);
+
   // Time labels (X axis) — densité ET format déduits de la largeur réellement
   // disponible. Avec 6 libellés fixes, sur téléphone (299 px de tracé) ils se
   // chevauchaient (« 15/09 01:0015/09 03:30 ») ; et le décalage fixe `tx - 25`
@@ -3479,6 +3544,415 @@ function tracerBougie(g, x, candleW, yO, yC, yH, yL, hausse) {
   else g.fillRect(bodyX, bodyY, bodyW, bodyH);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// GUIDE — le dessin (le cœur pur est js/guide.js ; ses nombres sont PARAM.guide)
+// ─────────────────────────────────────────────────────────────────────────────
+// Sur le GRAPHIQUE (redessiné quand la donnée ou la vue change) : les bandes des niveaux nommés
+// et leurs libellés, les formes et leur objectif théorique, les deux chemins conditionnels dans
+// la marge de futur, le badge du régime. Sur le CALQUE (chaque seconde, au prix live) : l'état de
+// chaque niveau (distance au prix LIVE, « en test », « cassé (1/2 clôtures) »…), la lecture du
+// moment et l'explication au survol. Le calque ne recalcule rien : il relit guideEtat.
+// Rien ici ne tourne sur une minuterie ; le survol ne redessine pas le graphique.
+let guideEtat = null;
+const GUIDE_FORMES = { cle: null, val: null };   // formes et bilan : mémorisés sur les bougies CLOSES
+const guideUnite = () => (activeSymbol === 'BTCSOL' ? 'SOL' : '$');
+const frN = v => v.toLocaleString('fr-FR');                     // 0.5 → « 0,5 »
+const guideMode = () => (typeof modeCourant === 'function' ? modeCourant() : 'debutant');
+
+/** Les données du Guide pour l'état courant des bougies. Indicateurs, niveaux et régime sont
+ *  mémorisés avec les autres (memoized : vidé quand les bougies changent) ; les formes, rejouées
+ *  sur tout l'historique, ne sont refaites que quand une bougie SE FERME (GUIDE_FORMES). */
+function guideDonnees() {
+  const n = candles.length, G = PARAM.guide;
+  if (n < 2 * G.atrPeriode + 2) return null;
+  const K = cols(), iF = n - 2;
+  const atr = memoized('guide_atr_' + G.atrPeriode, calcATR, K.high, K.low, K.close, G.atrPeriode);
+  if (!isNum(atr[iF]) || !(atr[iF] > 0)) return null;
+  const cleF = activeSymbol + '|' + chartInterval + '|' + (n - 1) + '|' + candles[0].time + '|' + candles[iF].time + '|' + candles[iF].close;
+  if (GUIDE_FORMES.cle !== cleF) { GUIDE_FORMES.cle = cleF; GUIDE_FORMES.val = Guide.detecter({ h: K.high, l: K.low, c: K.close, atr, n: n - 1 }, G); }
+  // Les niveaux du fichier publié (BTCUSDT seulement) et ceux des TF de référence déjà lus
+  // entrent dans la clé : une publication nouvelle refait les niveaux, rien d'autre.
+  const md = activeSymbol === 'BTCUSDT' ? marketData : null;
+  const srSig = getRefIntervals(chartInterval).map(i => (SR_CACHE['SR_' + activeSymbol + '_' + i] || {}).ts || 0).join(',');
+  return memoized('guide_' + activeSymbol + '_' + chartInterval + '_' + (md ? md.updated : '-') + '_' + srSig, () => {
+    const pas = candles[1].time > candles[0].time ? candles[1].time - candles[0].time : 0;
+    const raisons = Guide.niveauxDuJour(K.time, K.high, K.low, n, pas).concat(Guide.niveauxSR(getMultiTFLevels(), G), Guide.niveauxPublies(md));
+    const ref = K.close[n - 1], demi = atr[iF] * G.bandeAtr;
+    const choix = Guide.choisirNiveaux(raisons, ref, G);
+    for (const niv of choix.dessus.concat(choix.dessous)) { niv.demi = demi; niv.ferme = Guide.etatFerme(K.close, K.high, K.low, n - 1, niv.p, demi, G); }
+    const adx = memoized('sub_adx', calcADX, K.high, K.low, K.close, PARAM.adx.periode);
+    const emaC = memoized('guide_ema_' + G.emaCourte, calcEMA, K.close, G.emaCourte);
+    const emaL = memoized('guide_ema_' + G.emaLongue, calcEMA, K.close, G.emaLongue);
+    const bb = memoized('bb', calcBollinger, K.close, PARAM.bb.periode, PARAM.bb.ecarts);
+    const largeur = bb.sma.map((m, i) => (m && bb.upper[i] !== null ? (bb.upper[i] - bb.lower[i]) / m : null));
+    const regime = Guide.regime({ adx: adx.adx, plusDI: adx.plusDI, minusDI: adx.minusDI, emaC, emaL, largeur }, iF, G);
+    return { choix, demi, regime, suite: Guide.suite(choix), atr: atr[iF], ref };
+  });
+}
+
+/** Une étiquette du Guide : pastille à la bulle du thème, encre 1, un trait de couleur à gauche. */
+function guidePastille(g, x, y, w, h, texte, coul) {
+  g.fillStyle = COLORS.bulle;
+  g.beginPath(); g.roundRect(x, y, w, h, 4); g.fill();
+  if (coul) { g.fillStyle = coul; g.fillRect(x + 2, y + 3, 2.5, h - 6); }
+  g.fillStyle = COLORS.ink1;
+  g.fillText(texte, x + (coul ? 8 : 5), y + h - 4.5);
+}
+/** Coupe `texte` pour tenir dans `w` px (police déjà posée sur g) : « … » en fin. */
+function guideCouper(g, texte, w) {
+  if (g.measureText(texte).width <= w) return texte;
+  let lo = 0, hi = texte.length;
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (g.measureText(texte.slice(0, m) + '…').width <= w) lo = m; else hi = m - 1; }
+  return lo ? texte.slice(0, lo).trimEnd() + '…' : '';
+}
+/** Découpe en lignes de largeur ≤ w (mots entiers ; un mot trop long est coupé). */
+function guideLignes(g, texte, w, max) {
+  const mots = String(texte).split(' '), out = [];
+  let l = '';
+  for (const m of mots) {
+    const t = l ? l + ' ' + m : m;
+    if (g.measureText(t).width <= w || !l) l = t;
+    else { out.push(l); l = m; }
+  }
+  if (l) out.push(l);
+  if (max && out.length > max) { const reste = out.slice(max - 1).join(' '); out.length = max - 1; out.push(guideCouper(g, reste, w)); }
+  return out.map(x => guideCouper(g, x, w));
+}
+const guideLibre = (rects, r) => !rects.some(q => r.x < q.x + q.w && r.x + r.w > q.x && r.y < q.y + q.h && r.y + r.h > q.y);
+/** La première place libre parmi `essais` (ordonnées du haut), puis en glissant depuis la
+ *  première, par demi-hauteur, vers `vers` (−1 vers le haut, +1 vers le bas) ; dans [top, bas].
+ *  Réservée et rendue, ou null : une étiquette sans place n'en recouvre pas une autre. */
+function guidePlacer(rects, x, w, h, essais, top, bas, vers, wReserve) {
+  const libre = y => { const r = { x, y, w: wReserve || w, h }; return y >= top && y + h <= bas && guideLibre(rects, r) ? r : null; };
+  let r = null;
+  for (const y of essais) if ((r = libre(y))) break;
+  for (let k = 1; !r && k <= 8; k++) r = libre(essais[0] + vers * k * h / 2);
+  if (!r) return null;
+  rects.push(r);
+  return { x, y: r.y, w, h };
+}
+
+/** La hauteur réservée en haut du tracé : la rangée du compteur et du régime, puis la lecture
+ *  du moment (débutant : une à trois lignes, selon la largeur). Mémorisée par texte et largeur. */
+let guideHautMemo = null;
+function guideHaut(W, padL, padR) {
+  const D = guideDonnees();
+  if (!D) return 0;
+  const mode = guideMode(), lectureY = overlays.sr ? 46 : 38;
+  if (mode === 'expert') return lectureY - 10;
+  const o = { prix: D.ref, unite: guideUnite(), choix: D.choix, enTest: null, regime: D.regime, forme: Guide.formesAffichees(GUIDE_FORMES.val, PARAM.guide)[0] || null };
+  const texte = Guide.lecture(o);
+  const cle = texte + '|' + W + '|' + lectureY;
+  if (!guideHautMemo || guideHautMemo.cle !== cle) {
+    // Au plus 3 lignes : au-delà (téléphone), la phrase perd le régime, que le badge dit déjà.
+    ctx.font = chartFont(10, 600);
+    const larg = W - padL - padR - 16, n = t => guideLignes(ctx, t + ' 00', larg).length;
+    let lignes = n(texte), court = false;
+    if (lignes > 2) { const nc = n(Guide.lecture(Object.assign({}, o, { court: true }))); if (nc < lignes) { lignes = nc; court = true; } }
+    lignes = Math.min(3, lignes);
+    guideHautMemo = { cle, lignes, court, lectureY, h: lectureY + lignes * 14 + 4 + 6 - 10 };
+  }
+  return guideHautMemo.h;
+}
+/** Prépare ce que le Guide pose sur le graphique (géométrie de resolveChart) → guideEtat. */
+function guidePreparer(g) {
+  const D = guideDonnees();
+  if (!D) return null;
+  const G = PARAM.guide, mode = guideMode(), unite = guideUnite(), exp = mode === 'expert';
+  const yDe = p => g.pad.top + g.ph * (1 - (p - g.minP) / g.range);
+  const xDe = i => g.pad.left + g.gap * (i - g.vs) + g.gap / 2;
+  const xFin = g.pad.left + g.gap * g.n, xMax = g.W - g.pad.right;
+  const itv = Guide.nomIntervalle(chartInterval);
+  const E = { g, D, mode, unite, exp, yDe, xDe, xFin, xMax, itv, niveaux: [], cibles: [], rects: [], formes: [],
+    demiPx: Math.max(2, D.demi / g.range * g.ph), finVue: g.ve === candles.length };
+  // Le haut du tracé (compteur, régime, lecture du moment) est hors de pad.top (guideHaut) :
+  // aucune étiquette n'y monte. La lecture se pose sur le calque, à la rangée prévue.
+  E.lectureY = overlays.sr ? 46 : 38;
+  // Le texte du repère de publication (posé par le calque, en bas du tracé) : sa place est gardée.
+  const rep = geoPrix && reperePublication(geoPrix);
+  if (rep) {
+    ctx.font = chartFont(9, 650);
+    const lw = ctx.measureText(rep.texte).width + 8, aGauche = rep.x + 6 + lw > xMax;
+    E.rects.push({ x: aGauche ? rep.x - 6 - lw : rep.x + 2, y: g.pad.top + g.ph - 22, w: lw + 4, h: 14 });
+  }
+  E.lectureLignes = exp || !guideHautMemo ? 0 : guideHautMemo.lignes;
+  // Niveaux : y de la bande, libellé, et l'explication au survol.
+  for (const niv of D.choix.dessus.concat(D.choix.dessous)) {
+    const y = yDe(niv.p), visible = niv.p >= g.minP && niv.p <= g.maxP;
+    E.niveaux.push({ niv, y, visible, libelle: Guide.libelleNiveau(niv, mode, unite) });
+  }
+  E.formes = Guide.formesAffichees(GUIDE_FORMES.val, G);
+  return E;
+}
+
+/** Bandes des niveaux : sous les bougies, translucides, jusqu'au bout de la marge de futur. */
+function guideBandes(E) {
+  const { g, demiPx, xMax } = E;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(g.pad.left, g.pad.top, xMax - g.pad.left, g.ph); ctx.clip();
+  for (const L of E.niveaux) {
+    if (!L.visible) continue;
+    ctx.fillStyle = avecAlpha(COLORS.accent2, 0.11);
+    ctx.fillRect(g.pad.left, L.y - demiPx, xMax - g.pad.left, demiPx * 2);
+    ctx.strokeStyle = avecAlpha(COLORS.accent2, 0.6); ctx.lineWidth = 1; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(g.pad.left, L.y); ctx.lineTo(xMax, L.y); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+/** Formes, chemins et libellés : au-dessus des bougies et de la chaleur. */
+function guideTracer(E) {
+  const { g, D, exp, unite, yDe, xDe, xFin, xMax, itv } = E, G = PARAM.guide;
+  const top = g.pad.top, bas = g.pad.top + g.ph, borne = y => Math.max(top + 2, Math.min(bas - 2, y));
+  const encre = avecAlpha(COLORS.ink1, 0.75), H = 15;
+  ctx.font = chartFont(9, 600);
+  // ── Chemins conditionnels « Et ensuite ? » (la dernière bougie doit être à l'écran) ──
+  if (E.finVue && xMax - xFin > 20) {
+    const der = candles[candles.length - 1], x0 = xDe(candles.length - 1), y0 = yDe(der.close);
+    const marge = xMax - xFin;
+    for (const ch of [D.suite.haut, D.suite.bas]) {
+      if (!ch) continue;
+      const coul = ch.sens > 0 ? COLORS.candleUp : COLORS.candleDown;
+      const ys = borne(yDe(ch.seuil.p)), yc = ch.cible ? borne(yDe(ch.cible.p)) : null;
+      const x1 = xFin + marge * 0.3, x2 = xFin + marge * 0.85;
+      ctx.save();
+      ctx.strokeStyle = coul; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, ys);
+      if (yc !== null) ctx.lineTo(x2, yc);
+      ctx.stroke(); ctx.setLineDash([]);
+      // Pointe de flèche au bout, un point sur le seuil.
+      const xe = yc !== null ? x2 : x1, ye = yc !== null ? yc : ys, ang = yc !== null ? Math.atan2(yc - ys, x2 - x1) : Math.atan2(ys - y0, x1 - x0);
+      ctx.fillStyle = coul;
+      ctx.beginPath(); ctx.moveTo(xe, ye); ctx.lineTo(xe - 7 * Math.cos(ang - 0.45), ye - 7 * Math.sin(ang - 0.45)); ctx.lineTo(xe - 7 * Math.cos(ang + 0.45), ye - 7 * Math.sin(ang + 0.45)); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.arc(x1, ys, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      // Texte : les mots du mode s'ils tiennent dans la marge, sinon l'abrégé, sinon rien (le survol le dit).
+      let lignes = Guide.texteSuite(ch, E.mode, unite);
+      const larg = l => Math.max(...l.map(t => ctx.measureText(t).width)) + 10;
+      if (larg(lignes) > marge - 6) lignes = Guide.texteSuite(ch, 'expert', unite);
+      // Place : au-delà du bout du chemin, sinon en deçà, sinon de part et d'autre du seuil.
+      const yb = yc === null ? ys : yc, bh = lignes.length * 12 + 5, bw = larg(lignes);
+      const bx = Math.max(xFin + 2, xMax - bw - 2);
+      const essais = ch.sens > 0 ? [yb - bh - 6, yb + 6, ys + 6] : [yb + 6, yb - bh - 6, ys - bh - 6];
+      const r = bw <= marge - 4 ? guidePlacer(E.rects, bx, bw, bh, essais, top, bas, ch.sens > 0 ? 1 : -1) : null;
+      if (r) {
+        const by = r.y;
+        etiquettesAFaire.push(() => {
+          ctx.font = chartFont(9, 600);
+          ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 4); ctx.fill();
+          ctx.fillStyle = coul; ctx.fillRect(bx + 2, by + 3, 2.5, bh - 6);
+          ctx.fillStyle = COLORS.ink1;
+          lignes.forEach((t, k) => ctx.fillText(t, bx + 7, by + 12 + k * 12));
+        });
+      }
+      const noms = niv => niv.raisons.map(x => x.art).join(' + ');
+      const ry = r ? [r.y, r.y + r.h] : [ys, ys];
+      E.cibles.push({ x0: Math.min(x0, xFin), y0: Math.min(y0, ys, yc === null ? ys : yc, ry[0]) - 4, x1: xMax, y1: Math.max(y0, ys, yc === null ? ys : yc, ry[1]) + 4, prio: 1,
+        titre: 'Et ensuite ? ' + Guide.texteSuite(ch, 'debutant', unite).join(' '),
+        texte: exp ? ['Conditionnel, pas une prévision. Seuil : ' + noms(ch.seuil) + '. ' + (ch.cible ? 'Niveau suivant : ' + noms(ch.cible) + '.' : 'Aucun autre niveau nommé à moins de ' + Guide.nombre(G.distanceMax * 100, 0) + ' %.') + ' Aucune probabilité calculée.']
+          : ['Un chemin CONDITIONNEL, pas une prévision : si une bougie ' + itv + ' clôture ' + (ch.sens > 0 ? 'au-dessus de ' : 'sous ') + Guide.prix(ch.seuil.p, unite) + ' (' + noms(ch.seuil) + '), '
+            + (ch.cible ? 'le prochain niveau nommé est ' + Guide.prix(ch.cible.p, unite) + ' (' + noms(ch.cible) + ').' : 'aucun autre niveau nommé n’est proche.'),
+          'Les deux chemins sont montrés côte à côte : aucun n’est privilégié, aucune probabilité n’est calculée.'] });
+    }
+  }
+  // ── Formes ──
+  // Une forme terminée (objectif atteint, invalidée) reste visible un moment, en plus pâle.
+  for (const f of E.formes) guideForme(E, f, f.fin ? avecAlpha(COLORS.ink1, 0.35) : encre, borne);
+  // ── Libellés des niveaux (différés : posés après les bougies et les étiquettes d'overlays) ──
+  ctx.font = chartFont(9, 600);
+  const etatMax = ctx.measureText(exp ? '−10,00 % live · ' + Guide.MOTS.franchi : 'à −10,00 % du prix live · ' + Guide.MOTS.valide).width + 16;
+  for (const L of E.niveaux) {
+    const hors = !L.visible, yb = hors ? (L.niv.p > g.maxP ? top + 2 : bas - H - 2) : L.y;
+    const texte = (hors ? (L.niv.p > g.maxP ? '↑ ' : '↓ ') : '') + L.libelle;
+    const w = Math.min(ctx.measureText(texte).width + 14, xMax - g.pad.left - 12), x = g.pad.left + 6;
+    // Au-dessus de la bande, sinon dessous, sinon dessus ; puis en glissant vers le milieu du tracé.
+    const essais = hors ? [yb] : [yb - E.demiPx - H - 1, yb + E.demiPx + 1, yb - H / 2];
+    const pose = guidePlacer(E.rects, x, w, H, essais, top, bas, yb > (top + bas) / 2 ? -1 : 1, Math.min(w + etatMax, xMax - x));
+    if (!pose) continue;
+    L.etiq = pose;
+    const t = guideCouper(ctx, texte, w - 12);
+    etiquettesAFaire.push(() => { ctx.font = chartFont(9, 600); guidePastille(ctx, pose.x, pose.y, pose.w, pose.h, t, COLORS.accent2); });
+    const R = L.niv.raisons, G2 = PARAM.guide;
+    const cible = { x0: g.pad.left, y0: (hors ? pose.y : Math.min(pose.y, L.y - E.demiPx)) - 2, x1: xMax, y1: (hors ? pose.y + H : Math.max(pose.y + H, L.y + E.demiPx)) + 2, prio: 3, niveau: L,
+      titre: Guide.libelleNiveau(L.niv, 'debutant', unite),
+      texte: (exp ? R.map(r => r.court + ' — ' + r.nature) : R.map(r => r.nom + ' : ' + r.origine + ' (' + r.nature + ').'))
+        .concat([exp ? 'Bande ± ' + frN(G2.bandeAtr) + ' × ATR ' + G2.atrPeriode + ' (' + Guide.prix(L.niv.demi, unite) + '). Cassure : 2 clôtures ' + itv + ' hors bande.'
+          : 'La bande couvre ± ' + Guide.nombre(G2.bandeAtr, 2) + ' ATR ' + G2.atrPeriode + ' autour du niveau (± ' + Guide.prix(L.niv.demi, unite) + ').',
+          exp ? '' : 'État lu sur les bougies ' + itv + ' closes (règle de travail) : « cassé » demande 2 clôtures successives au-delà de la bande, ou 1 clôture puis un retour réussi ; une mèche seule = « percé en mèche ».'].filter(Boolean)) };
+    E.cibles.push(cible);
+  }
+}
+
+/** Une forme : tracé, ligne de cou ou bornes, objectif théorique en tirets, libellé, survol. */
+function guideForme(E, f, encre, borne) {
+  const { g, exp, unite, yDe, xDe, xFin, xMax, itv } = E, G = PARAM.guide;
+  const iFin = f.fin ? f.jFin : candles.length - 2;
+  // Montrée seulement si elle COMMENCE dans la vue : une figure coupée à gauche se lirait mal.
+  if (f.debut < g.vs || f.debut >= g.ve) return;
+  const X = xDe;
+  const etat = Guide.etatForme(f), nom = Guide.NOMS_FORMES[f.type][0];
+  const ys = [];
+  ctx.save();
+  ctx.beginPath(); ctx.rect(g.pad.left, g.pad.top, xMax - g.pad.left, g.ph); ctx.clip();
+  ctx.strokeStyle = encre; ctx.lineWidth = 1.6;
+  if (f.type === 'double_sommet' || f.type === 'double_creux') {
+    ctx.beginPath(); ctx.moveTo(X(f.a.i), yDe(f.a.p)); ctx.lineTo(X(f.cou.i), yDe(f.cou.p)); ctx.lineTo(X(f.b.i), yDe(f.b.p)); ctx.stroke();
+    for (const q of [f.a, f.b]) { ctx.beginPath(); ctx.arc(X(q.i), yDe(q.p), 3, 0, Math.PI * 2); ctx.fillStyle = encre; ctx.fill(); }
+    ctx.setLineDash([3, 3]); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(X(f.a.i), yDe(f.niveau)); ctx.lineTo(X(iFin) + g.gap, yDe(f.niveau)); ctx.stroke();
+    ys.push(yDe(f.a.p), yDe(f.b.p), yDe(f.niveau));
+  } else if (f.type === 'range') {
+    ctx.setLineDash([6, 3]);
+    ctx.strokeRect(X(f.debut), yDe(f.haut), X(iFin) + g.gap / 2 - X(f.debut), yDe(f.bas) - yDe(f.haut));
+    ys.push(yDe(f.haut), yDe(f.bas));
+  } else {
+    const iB = Math.min(iFin, Math.floor(f.apex));
+    for (const l of [f.hautL, f.basL]) { ctx.beginPath(); ctx.moveTo(X(f.debut), yDe(l.a + l.b * f.debut)); ctx.lineTo(X(iB), yDe(l.a + l.b * iB)); ctx.stroke(); ys.push(yDe(l.a + l.b * f.debut), yDe(l.a + l.b * iB)); }
+  }
+  ctx.setLineDash([]);
+  // Objectif théorique : connu dès la formation pour un double ; pour une sortie, dès la 1re clôture dehors.
+  let obj = null;
+  if (f.type === 'double_sommet' || f.type === 'double_creux') obj = f.objectif;
+  else if (f.phase === 'confirme') obj = f.objectif;
+  else if (f.demi) { const b0 = Guide.bornes(f, f.jDemi), niv = f.demiSens > 0 ? b0.u : b0.d; obj = niv + f.demiSens * f.hauteur; }
+  let yObj = null;
+  if (obj !== null && isFinite(obj)) {
+    yObj = yDe(obj);
+    const iObj = f.jConf !== null ? f.jConf : f.demi ? f.jDemi : f.b ? f.b.i : f.t;
+    const xa = X(iObj), xb = Math.max(xa + 30, Math.min(xMax, xFin + (xMax - xFin) * 0.5));
+    if (yObj > g.pad.top && yObj < g.pad.top + g.ph) {
+      ctx.strokeStyle = avecAlpha(COLORS.ink1, 0.55); ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
+      ctx.beginPath(); ctx.moveTo(xa, yObj); ctx.lineTo(xb, yObj); ctx.stroke(); ctx.setLineDash([]);
+      const t = exp ? 'obj. théorique ' + Guide.prix(obj, unite) : 'objectif théorique (convention, non garanti) · ' + Guide.prix(obj, unite);
+      ctx.font = chartFont(8.5, 600);
+      const w = ctx.measureText(t).width + 10, r = { x: Math.max(g.pad.left + 2, xb - w), y: yObj + (f.sens < 0 || f.demiSens < 0 ? 3 : -15), w, h: 13 };
+      if (guideLibre(E.rects, r)) { E.rects.push(r); etiquettesAFaire.push(() => { ctx.font = chartFont(8.5, 600); ctx.globalAlpha = 0.92; guidePastille(ctx, r.x, r.y, r.w, r.h, t, null); ctx.globalAlpha = 1; }); }
+    }
+  }
+  ctx.restore();
+  // Libellé : nom + état (+ bilan mesuré en expert), au-dessus (ou au-dessous) de la figure.
+  const b = GUIDE_FORMES.val.bilan[f.type];
+  const ctxB = { n: GUIDE_FORMES.val.n, intervalle: chartInterval, duree: candles[candles.length - 2].time - candles[0].time };
+  const texte = nom + ' · ' + (exp ? etat.court + ' · ' + Guide.texteBilan(b, ctxB, G, 'expert') : etat.texte);
+  ctx.font = chartFont(9, 650);
+  const yH = Math.min(...ys), yB = Math.max(...ys), x0 = Math.max(g.pad.left + 2, X(f.debut));
+  const w = Math.min(ctx.measureText(texte).width + 14, xMax - x0 - 2);
+  let pose = null;
+  for (const y of f.sens > 0 && f.type === 'double_creux' ? [yB + 6, yH - 21] : [yH - 21, yB + 6]) {
+    const r = { x: x0, y, w, h: 15 };
+    if (y >= g.pad.top && y + 15 <= g.pad.top + g.ph && guideLibre(E.rects, r)) { pose = r; E.rects.push(r); break; }
+  }
+  if (pose) { const t = guideCouper(ctx, texte, w - 12); etiquettesAFaire.push(() => { ctx.font = chartFont(9, 650); guidePastille(ctx, pose.x, pose.y, pose.w, pose.h, t, encre); }); }
+  const def = {
+    double_sommet: 'Deux sommets à moins de ' + frN(G.tolAtr) + ' ATR l’un de l’autre, séparés de ' + G.ecartMin + ' à ' + G.ecartMax + ' bougies, avec entre eux un creux (la ligne de cou, ' + Guide.prix(f.niveau, unite) + ') au moins ' + frN(G.hauteurMinAtr) + ' ATR plus bas.',
+    double_creux: 'Deux creux à moins de ' + frN(G.tolAtr) + ' ATR l’un de l’autre, séparés de ' + G.ecartMin + ' à ' + G.ecartMax + ' bougies, avec entre eux un sommet (la ligne de cou, ' + Guide.prix(f.niveau, unite) + ') au moins ' + frN(G.hauteurMinAtr) + ' ATR plus haut.',
+    range: 'Au moins 2 contacts en haut et 2 en bas (à ' + frN(G.tolAtr) + ' ATR près), sur au moins ' + G.rangeMin + ' bougies, hauteur au plus ' + frN(G.rangeHauteurAtr) + ' ATR : bornes ' + Guide.prix(f.bas, unite) + ' – ' + Guide.prix(f.haut, unite) + '.',
+    triangle: 'Deux droites ajustées sur les ' + G.triPivots + ' derniers sommets et les ' + G.triPivots + ' derniers creux, qui se resserrent d’au moins ' + Guide.nombre(G.triConvergence * 100, 0) + ' % : la volatilité se comprime.',
+  }[f.type];
+  const xa = X(f.debut), xb = Math.max(X(iFin) + g.gap, yObj !== null ? xa : 0);
+  E.cibles.push({ x0: xa - 4, y0: Math.min(yH, yObj === null ? yH : yObj) - 22, x1: xb + 4, y1: Math.max(yB, yObj === null ? yB : yObj) + 22, prio: 2,
+    titre: nom + ' — ' + etat.texte,
+    texte: [def + ' Détection mécanique sur les bougies ' + Guide.nomIntervalle(chartInterval) + ' closes (pivots de ' + G.pivot + ' bougies de chaque côté).',
+      obj !== null && isFinite(obj) ? 'Objectif théorique (convention de la hauteur reportée, non garanti) : ' + Guide.prix(obj, unite) + '.' : 'Objectif : connu à la première clôture hors de la figure.',
+      Guide.texteBilan(b, ctxB, G, exp ? 'expert' : 'debutant'),
+      'Lecture des formes : débattue dans la littérature ; une description, pas une recommandation.'] });
+}
+
+/** Badge du régime (graphique) : à droite de la pastille de variation, rangée du haut. */
+function guideRegimeBadge(E, x, W) {
+  const t = Guide.texteRegime(E.D.regime, E.mode, PARAM.guide);
+  ctx.font = chartFont(9.5, 650);
+  const max = W - 75 - 8 - x;
+  if (max < 40) return;
+  const tt = guideCouper(ctx, t, max - 14), w = Math.min(max, ctx.measureText(tt).width + 14);
+  const r = E.D.regime, coul = r.cle === 'hausse' ? COLORS.candleUp : r.cle === 'baisse' ? COLORS.candleDown : COLORS.ink3;
+  guidePastille(ctx, x, 19, w, 15, tt, coul);
+  const G = PARAM.guide;
+  E.cibles.push({ x0: x, y0: 17, x1: x + w, y1: 36, prio: 0, titre: Guide.texteRegime(r, 'debutant', G),
+    texte: [(r.cle === 'inconnu' ? 'Pas assez de bougies pour l’ADX.' : 'Valeurs sur la dernière bougie ' + Guide.nomIntervalle(chartInterval) + ' close : ADX ' + Math.round(r.adx) + ', +DI ' + Math.round(r.pdi) + ', −DI ' + Math.round(r.mdi)
+      + (r.emaHaut === null ? '.' : ', EMA ' + G.emaCourte + (r.emaHaut ? ' au-dessus de' : ' sous') + ' l’EMA ' + G.emaLongue + '.')),
+      'Règle (convention) : ADX ≥ ' + G.adxTendance + ' = tendance, dont le sens se lit sur +DI/−DI et l’EMA ' + G.emaCourte + '/' + G.emaLongue + ' (s’ils divergent : « sens incertain ») ; ADX ≤ ' + G.adxSans + ' = sans tendance nette ; entre les deux = tendance faible.',
+      'Compression : largeur des bandes de Bollinger au plus à son ' + G.bbPercentile + 'e centile des ' + G.bbFenetre + ' dernières bougies. Un régime décrit le passé récent, il ne prédit pas la suite.'] });
+}
+
+/** Calque : état de chaque niveau au prix LIVE, lecture du moment. Ne recalcule rien. */
+function guideCalque() {
+  const E = guideEtat;
+  if (!E || !overlays.guide) return;
+  const G = PARAM.guide, cur = candles[candles.length - 1], { g } = E;
+  cx.save();
+  cx.font = chartFont(9, 600);
+  let enTest = null;
+  for (const L of E.niveaux) {
+    const e = Guide.etatLive(L.niv, livePrice, cur, G);
+    L.live = e;
+    if (e.mot === 'test' && !enTest) enTest = L.niv;
+    if (!L.etiq) continue;
+    const x = L.etiq.x + L.etiq.w + 3;
+    let t = Guide.texteEtatLive(e, E.mode);
+    if (cx.measureText(t).width + 14 > E.xMax - x) t = Guide.texteEtatLive(e, 'expert');   // écran étroit : l'abrégé
+    const w = Math.min(cx.measureText(t).width + 14, E.xMax - x);
+    if (w < 30) continue;
+    const coul = e.mot === 'valide' || e.mot === 'demi' ? (L.niv.ferme.sens > 0 ? COLORS.candleUp : COLORS.candleDown)
+      : e.mot === 'test' || e.mot === 'proche' || e.mot === 'meche' || e.mot === 'franchi' ? COLORS.warn : COLORS.ink3;
+    guidePastille(cx, x, L.etiq.y, w, L.etiq.h, guideCouper(cx, t, w - 12), coul);
+  }
+  E.enTest = enTest;
+  if (!E.exp && E.lectureLignes) {
+    const forme = E.formes[0] || null;
+    const txt = Guide.lecture({ prix: isNum(livePrice) ? livePrice : null, unite: E.unite, choix: E.D.choix, enTest, regime: E.D.regime, forme, court: guideHautMemo && guideHautMemo.court });
+    cx.font = chartFont(10, 600);
+    const wMax = E.xMax - g.pad.left - 16;
+    if (!E.lectureCache || E.lectureCache.t !== txt) E.lectureCache = { t: txt, l: guideLignes(cx, txt, wMax, E.lectureLignes) };
+    const lignes = E.lectureCache.l, h = lignes.length * 14 + 4;
+    const w = Math.max(...lignes.map(l => cx.measureText(l).width)) + 14;
+    cx.globalAlpha = 0.94; cx.fillStyle = COLORS.bulle;
+    cx.beginPath(); cx.roundRect(g.pad.left + 2, E.lectureY, w, h, 5); cx.fill(); cx.globalAlpha = 1;
+    cx.fillStyle = COLORS.accent2; cx.fillRect(g.pad.left + 4, E.lectureY + 3, 2.5, h - 6);
+    cx.fillStyle = COLORS.ink1;
+    lignes.forEach((l, k) => cx.fillText(l, g.pad.left + 11, E.lectureY + 13 + k * 14));
+  }
+  cx.restore();
+}
+
+/** Survol : la cible du Guide sous le curseur, expliquée dans une bulle du calque. */
+function guideSurvol(W, mainH, evite) {
+  const E = guideEtat;
+  if (!E || !overlays.guide || crossX === null || crossY === null || crossY > mainH) return;
+  // La plus PETITE zone sous le curseur : une bande fine l'emporte sur la boîte d'une forme qui la contient.
+  const aire = q => (q.x1 - q.x0) * (q.y1 - q.y0);
+  const c = E.cibles.filter(q => crossX >= q.x0 && crossX <= q.x1 && crossY >= q.y0 && crossY <= q.y1).sort((a, b) => aire(a) - aire(b))[0];
+  if (!c) return;
+  const texte = c.texte.slice();
+  if (c.niveau && c.niveau.live) texte.unshift('Maintenant : ' + Guide.texteEtatLive(c.niveau.live, 'debutant') + '.');
+  const bw = Math.min(330, W - 32);
+  cx.save();
+  cx.font = chartFont(10, 700);
+  const tl = guideLignes(cx, c.titre, bw - 20, 2);
+  cx.font = chartFont(9.5, 500);
+  const corps = [];
+  for (const t of texte) corps.push(...guideLignes(cx, t, bw - 20), '');
+  corps.pop();
+  const bh = tl.length * 14 + corps.length * 12.5 + 16;
+  // Sous le curseur, et sous l'infobulle OHLCV si elle est là ; au-dessus quand la place manque.
+  let bx = crossX + 16, by = Math.max(crossY + 18, evite ? evite.y + evite.h + 6 : 0);
+  if (bx + bw > W - 75) bx = Math.max(16, crossX - bw - 16);
+  if (by + bh > mainH - 4) by = Math.max(4, Math.min(crossY, evite ? evite.y : crossY) - bh - 8);
+  // Fond du tracé d'abord : une bulle translucide laisserait lire la lecture et les étiquettes à travers.
+  cx.fillStyle = COLORS.surface;
+  cx.shadowColor = 'rgba(16,35,61,0.18)'; cx.shadowBlur = 14; cx.shadowOffsetY = 4;
+  cx.beginPath(); cx.roundRect(bx, by, bw, bh, 8); cx.fill();
+  cx.shadowColor = 'transparent'; cx.shadowBlur = 0; cx.shadowOffsetY = 0;
+  cx.fillStyle = COLORS.bulle; cx.fill();
+  cx.fillStyle = COLORS.accent2; cx.fillRect(bx + 5, by + 8, 3, bh - 16);
+  cx.fillStyle = COLORS.ink1; cx.font = chartFont(10, 700);
+  tl.forEach((l, k) => cx.fillText(l, bx + 14, by + 16 + k * 14));
+  cx.font = chartFont(9.5, 500); cx.fillStyle = COLORS.text;
+  corps.forEach((l, k) => { if (l) cx.fillText(l, bx + 14, by + 16 + tl.length * 14 + 2 + k * 12.5); });
+  cx.restore();
+}
+
 // Étiquettes d'overlays posées dans la frame courante (remise à zéro par drawChart) :
 // une étiquette qui en chevaucherait une autre est omise — le point du ruban porte la légende.
 let etiquettesPosees = [], etiquettesAFaire = [];
@@ -3562,7 +4036,7 @@ function resolveSub(candles, y0, subH, W, key) {
   // Utiliser le range visible pour les subs aussi (des indices : aucune copie par image)
   const vs = Math.max(0, viewStart);
   const ve = Math.min(candles.length, viewEnd);
-  const gap = pw / (ve - vs);
+  const gap = pasBougie(pw, ve - vs);
   
   if (key === 'vol') {
     let maxV = 0;
@@ -3840,6 +4314,8 @@ async function fetchMarket(force) {
     // suivante, même si la publication n'a pas changé.
     if (d || marcheEnErreur) { renderFeed(); marcheEnErreur = false; }
     if (d && geo) scheduleCalque();                 // le repère de la publication se déplace
+    // Publication NOUVELLE et Guide affiché : ses niveaux du fichier (murs, options) ont changé.
+    if (d && geo && overlays.guide && activeSymbol === 'BTCUSDT') scheduleDraw();
     majAges(!!d);
   } catch(e) {
     marcheLu = 0; marcheEnErreur = true;            // à retenter au prochain tour

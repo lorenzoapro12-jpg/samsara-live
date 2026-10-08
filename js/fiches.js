@@ -28,6 +28,9 @@ function appliquerMode(m) {
   try { localStorage.setItem(MODE_CLE, m); } catch (e) { /* navigation privée */ }
   const b = document.getElementById('modeBtn');
   if (b) { b.textContent = m === 'expert' ? 'Expert' : 'Débutant'; b.setAttribute('aria-pressed', m === 'expert' ? 'true' : 'false'); }
+  // Le Guide du graphique écrit ses mots selon le mode (le canvas n'a pas de classes) : un
+  // dessin à la prochaine image — mêmes valeurs, autres mots.
+  try { if (typeof scheduleDraw === 'function' && candles.length) scheduleDraw(); } catch (e) { /* page pas encore chargée */ }
 }
 function basculerMode() { appliquerMode(modeCourant() === 'expert' ? 'debutant' : 'expert'); }
 
@@ -296,6 +299,71 @@ const FICHES = {
     lectures: [{ s: 'usuel', t: 'MACD au-dessus de son signal : dynamique haussière qui s’accélère ; croisements en retard sur le prix.' }],
     limites: 'Non borné : pas de niveau « extrême » universel.',
   },
+  // ── Le Guide du graphique (js/guide.js) : ses nombres viennent de PARAM.guide ──
+  guide: {
+    titre: 'Guide du graphique', page: 'guide', nature: 'convention',
+    simple: 'Une couche qui DÉCRIT ce que montre le graphique : les niveaux de prix proches et d’où ils viennent, le régime du marché, les formes chartistes en cours avec leur bilan mesuré, deux chemins conditionnels et une phrase de résumé. Elle ne dit jamais quoi faire.',
+    formule: P => 'Niveaux : au plus ' + P.guide.niveauxParCote + ' au-dessus et ' + P.guide.niveauxParCote + ' au-dessous du prix, à moins de ' + pcF(P.guide.distanceMax) + ' %. Régime : ADX ' + P.adx.periode
+      + ', EMA ' + P.guide.emaCourte + '/' + P.guide.emaLongue + ', Bollinger ' + P.bb.periode + '. Formes : au plus ' + P.guide.formesMax + ' à la fois. Choix gardé dans ce navigateur (clé samsara-guide-v1).',
+    lectures: [
+      { s: 'mesuré', t: 'Les niveaux (plus haut d’hier, plus bas des 24 h, zones touchées plusieurs fois, murs du carnet) sont lus dans les données ; chaque libellé dit son origine et, pour un chiffre publié, son heure de lecture.' },
+      { s: 'convention', t: 'Le régime, les états « cassé » / « percé en mèche » et l’objectif d’une forme reposent sur des seuils et des règles usuels, nommés dans leur fiche.' },
+      { s: 'débattu', t: 'Les murs d’options et le zéro gamma reposent sur un modèle (une hypothèse sur la position des teneurs de marché) : ils sont marqués « modèle ».' },
+      { s: 'mesuré', t: 'Sur l’historique de ce projet, aucun indicateur technique n’a prédit le rendement à 5 jours ; des règles posées sur des niveaux ont mieux tenu que les paris de direction. Le Guide montre donc des niveaux et des conditions, jamais une probabilité de hausse ou de baisse.' },
+    ],
+    limites: 'Ce n’est pas une prévision : aucun chemin n’est privilégié, aucune probabilité n’est calculée. Tout se lit sur l’intervalle affiché ; un autre intervalle peut dire autre chose. Masquable dans « + Indicateurs ».',
+  },
+  guide_niveaux: {
+    titre: 'Guide — niveaux nommés', page: 'guide', nature: 'mesure',
+    simple: 'Les niveaux de prix les plus proches, au-dessus et au-dessous du prix, chacun dans une bande fine avec son ORIGINE en mots. Deux niveaux très proches ne font qu’une bande, qui dit ses deux raisons.',
+    formule: P => 'Bande : ± ' + nbF(P.guide.bandeAtr) + ' × ATR ' + P.guide.atrPeriode + '. Fusion sous ' + pcF(P.guide.fusion) + ' % d’écart. Niveaux à moins de ' + pcF(P.guide.distanceMax) + ' % du prix, au plus '
+      + P.guide.niveauxParCote + ' de chaque côté. Zones S/R : au moins ' + P.guide.touchesMin + ' touches (méthode S/R de la page). Cassure : 2 clôtures successives hors de la bande parmi les '
+      + P.guide.regardCassure + ' dernières bougies closes ; mèche : sur les ' + P.guide.mecheBougies + ' dernières. « Proche » : à moins de ' + pcF(P.guide.proche) + ' % du prix live.',
+    lectures: [
+      { s: 'mesuré', t: 'Plus haut / plus bas d’hier (journée UTC) et des 24 h glissantes : lus sur les bougies du graphique. Un niveau dont la période n’est pas entièrement chargée n’est pas affiché.' },
+      { s: 'usuel', t: '« Zone touchée N fois (TF) » : un prix où le marché a fait demi-tour plusieurs fois ; souvent regardé comme un support ou une résistance.' },
+      { s: 'mesuré', t: 'Mur du carnet : la tranche où le plus de BTC étaient posés au moment de la publication (« lu à HH:MM ») ; un ordre posé peut être retiré à tout moment.' },
+      { s: 'convention', t: 'État au prix live : « loin », « proche », « en test » (prix dans la bande), « percé en mèche » (seule une mèche a dépassé), « cassé (1/2 clôtures) » puis « cassé (2/2 clôtures, validé) » — deux clôtures successives au-delà de la bande, ou une clôture suivie d’un retour réussi. C’est la règle de travail du propriétaire, pas une mesure.' },
+      { s: 'débattu', t: 'Un niveau cassé « change de rôle » (un support devient résistance) : lecture répandue, rarement vérifiée.' },
+    ],
+    limites: 'La distance affichée est celle au prix LIVE, dite comme telle ; les murs et les niveaux d’options datent de leur publication (heure indiquée) et ne sont jamais soustraits du prix live dans un même chiffre. Un niveau sans donnée n’est pas affiché — jamais remplacé par 0.',
+  },
+  guide_regime: {
+    titre: 'Guide — régime du marché', page: 'guide', nature: 'convention',
+    simple: 'Un badge en haut du graphique : marché en tendance (et dans quel sens), sans tendance nette, ou en compression (volatilité au plus bas depuis un certain nombre de bougies).',
+    formule: P => 'ADX ' + P.adx.periode + ' ≥ ' + P.guide.adxTendance + ' : tendance (haussière si +DI > −DI et EMA ' + P.guide.emaCourte + ' > EMA ' + P.guide.emaLongue + ', baissière si les deux disent l’inverse, sinon sens incertain) ; ADX ≤ '
+      + P.guide.adxSans + ' : sans tendance nette ; entre les deux : tendance faible. Compression : largeur de Bollinger (' + P.bb.periode + ', ' + P.bb.ecarts + ' σ) au plus à son ' + P.guide.bbPercentile + 'e centile des ' + P.guide.bbFenetre + ' dernières bougies.',
+    lectures: [
+      { s: 'convention', t: 'Les seuils de l’ADX sont ceux de l’usage (Wilder) : une convention, pas une loi. Le sens d’une tendance n’est dit que si deux mesures s’accordent.' },
+      { s: 'usuel', t: 'Compression : les bandes de Bollinger sont plus serrées que d’habitude. Elle précède souvent un mouvement, sans en dire le sens.' },
+      { s: 'mesuré', t: 'Un régime décrit le passé récent, pas la suite : sur l’historique de ce projet, aucun indicateur technique n’a prédit le rendement à 5 jours.' },
+    ],
+    limites: 'Lu sur la dernière bougie CLOSE de l’intervalle affiché ; un autre intervalle peut dire autre chose.',
+  },
+  guide_formes: {
+    titre: 'Guide — formes chartistes', page: 'guide', nature: 'convention',
+    simple: 'Double sommet, double creux, range (rectangle) et triangle, détectés MÉCANIQUEMENT sur les bougies closes. Chaque forme a un état qui évolue : en formation, confirmée, objectif théorique atteint, ou invalidée.',
+    formule: P => 'Pivots : ' + P.guide.pivot + ' bougies de chaque côté ; tolérance : ' + nbF(P.guide.tolAtr) + ' × ATR ' + P.guide.atrPeriode + '. Doubles : deux pivots à moins de la tolérance, séparés de ' + P.guide.ecartMin + ' à ' + P.guide.ecartMax
+      + ' bougies, ligne de cou à au moins ' + nbF(P.guide.hauteurMinAtr) + ' ATR. Range : ≥ 2 contacts par côté sur ≥ ' + P.guide.rangeMin + ' bougies (fenêtre ' + P.guide.rangeFenetre + '), hauteur ≤ ' + nbF(P.guide.rangeHauteurAtr) + ' ATR. Triangle : régressions sur les '
+      + P.guide.triPivots + ' derniers sommets et creux (fenêtre ' + P.guide.triFenetre + '), resserrement ≥ ' + pcF(P.guide.triConvergence) + ' %. Confirmation : 2 clôtures au-delà. Invalidation : clôture au-delà des sommets / creux (doubles), retour au milieu de la figure (range, triangle). Délais : '
+      + P.guide.expiration + ' bougies pour confirmer, ' + P.guide.horizon + ' pour atteindre l’objectif. « Échantillon faible » sous ' + P.guide.echantillonFaible + ' confirmations.',
+    lectures: [
+      { s: 'débattu', t: 'Les formes chartistes sont subjectives dans la littérature : deux analystes ne tracent pas la même. Ici la détection suit des règles fixes, donc reproductibles — mais une règle fixe n’est pas une preuve d’efficacité.' },
+      { s: 'convention', t: 'Objectif théorique : la hauteur de la figure reportée depuis la cassure (« mesure de la hauteur »). Une convention classique, non garantie.' },
+      { s: 'mesuré', t: 'Bilan : le même détecteur est rejoué sur tout l’historique chargé, sans regarder l’avenir — une forme compte depuis la clôture où son dernier pivot devient connu. On compte les confirmations, les objectifs atteints avant invalidation, les invalidations, les formes encore ouvertes.' },
+    ],
+    limites: 'Le bilan ne porte que sur l’historique CHARGÉ (quelques semaines au plus) et sur l’intervalle affiché : ce n’est ni une probabilité, ni une règle générale. Seules les formes récentes sont montrées.',
+  },
+  guide_suite: {
+    titre: 'Guide — et ensuite ?', page: 'guide', nature: 'convention',
+    simple: 'Deux chemins conditionnels à droite de la dernière bougie : « si clôture au-dessus de X, prochain niveau Y » et « si clôture sous Z, prochain niveau W ».',
+    formule: P => 'X et Z : le premier niveau nommé au-dessus et au-dessous du prix ; Y et W : le suivant de chaque côté. Marge de dessin : ' + pcF(P.guide.futur) + ' % de la largeur du tracé, entre ' + P.guide.futurMinPx + ' et ' + P.guide.futurMaxPx + ' pixels.',
+    lectures: [
+      { s: 'convention', t: 'X, Y, Z et W sont des niveaux nommés du Guide, jamais des prix inventés.' },
+      { s: 'mesuré', t: 'Les deux chemins sont montrés côte à côte, sans rang ni probabilité : sur l’historique de ce projet, les paris de direction n’ont pas tenu.' },
+    ],
+    limites: 'Une condition n’est pas une prévision. La marge à droite des bougies ne sert qu’à dessiner ces chemins ; elle disparaît quand le Guide est masqué.',
+  },
   // ── Le dessin lui-même ──
   // La forme d'une bougie est une CONVENTION du thème (jeton --bougie-forme) : la fiche dit celle
   // du thème courant, lue dans le code du tracé (FORMES_BOUGIE, BOUGIE_DENSE_PX, js/app.js).
@@ -331,6 +399,9 @@ const FICHES = {
 // ─── Valeurs et métadonnées ───────────────────────────────────────────────────
 const NATURES = { mesure: 'Mesuré', 'modèle': 'Modèle', convention: 'Convention', seuil: 'Seuil de ce code', horodatage: 'Horodatage' };
 const STATUTS = { usuel: 'Usuel', convention: 'Convention', 'débattu': 'Débattu', 'mesuré': 'Mesuré' };
+/** Une fraction en pourcentage, à la française (0.003 → « 0,3 ») : pour les formules des fiches du Guide. */
+const pcF = x => (x * 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+const nbF = x => x.toLocaleString('fr-FR');
 const echapF = s => String(s === undefined || s === null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 function metaDe(cle) {
   const md = typeof marketData !== 'undefined' ? marketData : null;
@@ -448,6 +519,7 @@ function ouvrirGlossaire(ancre) {
     ['Macro', ['dxy', 'vix']], ['Carnet', ['carnet', 'murs']],
     ['Indicateurs du fichier', ['rsi_tf', 'ema_tf', 'croisement', 'sr_tf', 'amplitude', 'atr_tf', 'volume_tf']],
     ['Le dessin du graphique', ['bougies']],
+    ['Guide du graphique', ['guide', 'guide_niveaux', 'guide_regime', 'guide_formes', 'guide_suite']],
     ['Indicateurs du graphique', ['rsi', 'ema', 'vwap', 'adx', 'atr', 'volume', 'sr', 'bb', 'macd', 'stoch']]];
   p.innerHTML = '<div class="fiche-tete"><h3 class="fiche-titre">Légendes</h3><button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>'
     + '<p class="fiche-simple">Comment chaque chiffre se lit — et ce qu’il ne dit pas. Mode <b>' + (modeCourant() === 'expert' ? 'Expert' : 'Débutant') + '</b> : '
