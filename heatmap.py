@@ -26,6 +26,11 @@ Livraison du 07/10/2026 (à valider par un passage réel du cron) :
   · CADENCE — 15 min au lieu de 16 (voir main()).
 
 Livraison du 08/10/2026 :
+  · DIRECT — chaque tour (une fois par minute) publie aussi les 30 dernières minutes (carnet et
+    exécutions) sur la branche orpheline `direct`, en UN commit sans parent, remplacé à chaque
+    tour : master garde sa cadence de 15 min (déploiements Pages), la carte n'a plus que le cache
+    de raw.githubusercontent (5 min) de retard au lieu de 15 à 25 min. Sans index ni arbre de
+    travail (git hash-object / mktree / commit-tree) : rien ne touche à master.
   · SOMME PAR TRANCHE — une case porte la somme des BTC de sa tranche de 20 $, comme les murs
     de market-data.json et comme Bookmap. Le MAX d'un seul niveau rendait presque invisible un
     mur fait de nombreux ordres (mesuré le 08/10 à 08:33 : Σ 26,9 BTC à 82 820 $, case ≈ 3 BTC).
@@ -56,6 +61,9 @@ REPO = CFG["repo_dir"]
 GIT_LOCK = CFG["git_lock"]
 GIT_REMOTE = CFG["git_remote"]
 GIT_BRANCH = CFG["git_branch"]
+DIRECT_BRANCH = CFG.get("direct_branche") or "direct"
+EXEC_OUT = SC.out(CFG, "executions.json")
+RECENT_MIN = 30   # minutes publiées sur la branche `direct`
 
 DT = 60           # secondes par colonne (1 min)
 DP = 20.0         # $ par bin de prix
@@ -311,6 +319,47 @@ def donnees(state, updated, fmt=None):
     }
 
 
+def recentes_executions(path, depuis_s):
+    """executions.json réduit aux seaux qui commencent à `depuis_s` ou après (None si absent)."""
+    try:
+        with open(path) as f:
+            d = json.load(f)
+    except Exception:
+        return None
+    dt = d.get("dt") or 10
+    d["seaux"] = [x for x in d.get("seaux", []) if x[0] * dt >= depuis_s]
+    if d.get("lu_depuis") is not None:
+        d["lu_depuis"] = max(d["lu_depuis"], depuis_s)
+    d["trous"] = [[a, b] for a, b in d.get("trous", []) if b > depuis_s]
+    return d
+
+
+def publier_direct(state, maintenant):
+    """Les RECENT_MIN dernières minutes sur la branche orpheline DIRECT_BRANCH, en un commit
+    sans parent poussé en force : la branche ne grossit pas, master n'est pas touchée.
+    Rend True si poussé. Un échec n'arrête rien : master reste la source complète."""
+    depuis_m = int(maintenant) // DT - RECENT_MIN
+    data = donnees({k: v for k, v in state.items() if int(k) >= depuis_m}, datetime.now(timezone.utc).isoformat())
+    if data is None:
+        return False
+    fichiers = {"heatmap.json": texte(data)}
+    ex = recentes_executions(EXEC_OUT, depuis_m * DT)
+    if ex is not None:
+        fichiers["executions.json"] = json.dumps(ex, separators=(",", ":"))
+
+    def g(*a, entree=None):
+        r = subprocess.run(["git", "-C", REPO, *a], input=entree, capture_output=True, text=True, timeout=60)
+        if r.returncode != 0:
+            raise RuntimeError(f"git {a[0]} : {r.stderr.strip()[:200]}")
+        return r.stdout.strip()
+
+    arbre = "".join(f"100644 blob {g('hash-object', '-w', '--stdin', entree=t)}\t{nom}\n"
+                    for nom, t in sorted(fichiers.items()))
+    commit = g("commit-tree", g("mktree", entree=arbre), "-m", f"Direct {data['updated'][:16]}")
+    g("push", "-q", "--force", GIT_REMOTE, f"{commit}:refs/heads/{DIRECT_BRANCH}")
+    return True
+
+
 def texte(data):
     """Compact pour colonnes-1 : les espaces de « , » et « : » pesaient 25 % du fichier brut.
     L'ancien format garde l'écriture d'avant (json.dump par défaut) : le retour arrière
@@ -382,6 +431,11 @@ def main():
     state = {k: v for k, v in state.items() if int(k) >= cutoff}
     os.makedirs(os.path.dirname(STATE), exist_ok=True)
     dump_atomic(state, STATE)
+
+    try:
+        publier_direct(state, time.time())
+    except Exception as e:
+        print(f"⚠️ direct non publié : {type(e).__name__}: {e}")
 
     try:
         last = float(open(LAST_PUSH).read().strip())

@@ -115,7 +115,7 @@ async function ouvrir(nav, opts) {
   const erreurs = [];
   page.on('pageerror', e => erreurs.push(e.message));
   const hotes = new Set(), S = opts.S || simulateur(), urls = [];
-  const comptes = { heatmap: 0, md: 0, exec: 0 };
+  const comptes = { heatmap: 0, md: 0, exec: 0, direct: 0 };
   await page.route('**/*', async r => {
     const u = r.request().url(), h = new URL(u).host;
     if (h.startsWith('127.0.0.1')) return r.continue();
@@ -132,6 +132,12 @@ async function ouvrir(nav, opts) {
       return (d ? r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(d) }) : r.fulfill({ status: 404, headers: cors })).catch(() => {});
     }
     if (h === 'raw.githubusercontent.com') {
+      if (u.includes('/direct/')) {
+        comptes.direct++;
+        const corps = opts.direct && opts.direct(u);
+        if (!corps) return r.fulfill({ status: 404, headers: cors }).catch(() => {});
+        return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(corps) }).catch(() => {});
+      }
       if (u.includes('executions.json')) {
         comptes.exec++;
         if (!opts.executions) return r.fulfill({ status: 404, headers: cors }).catch(() => {});
@@ -1155,6 +1161,20 @@ async function pixel(page, x, y) {
       check('fichier absent (404) : ni erreur affichée, ni seau publié', !e41b.erreurs.historique && e41b.executionsPubliees === null, e41b.erreurs);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p41b.close();
+    }
+    {
+      titre('42. Branche « direct » : les 30 dernières minutes prolongent la carte de master, sans rien remplacer avant');
+      const b0 = Object.assign({}, hm, { encodage }), base = Array.isArray(b0.colonnes) ? b0 : versColonnes(b0);
+      const der = base.colonnes[base.colonnes.length - 1];
+      const plus = [1, 2, 3].map(k => [der[0] + k, der[1], der[2], der[3], der[4]]);
+      const direct = u => (u.endsWith('heatmap.json') ? Object.assign({}, base, { updated: new Date(Date.now()).toISOString(), colonnes: [der].concat(plus) }) : null);
+      let p42;
+      ({ page: p42, erreurs } = await ouvrir(nav, { encodage: true, colonnes: true, heatmap: () => base, direct }));
+      await p42.waitForTimeout(1500);
+      const fin = await p42.evaluate(() => window.__carte.etat().finCarte);
+      check('la carte va jusqu\'à la dernière minute de « direct » (3 de plus que master)', fin === (der[0] + 4) * 60e3, [fin, (der[0] + 4) * 60e3]);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p42.close();
     }
   } finally {
     await nav.close();
