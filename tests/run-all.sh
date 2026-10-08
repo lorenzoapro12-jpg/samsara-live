@@ -112,6 +112,9 @@ node test_fenetres.js || ko=1
 etape "9b. Interface dans Chromium : menus dans l'écran, crochets du graphique, sous-graphes sans débordement (non exécuté sans Playwright)"
 node test_interface.js || ko=1
 
+etape "9b'. Guide du graphique dans Chromium : chaque bande nommée, heures gardées à 390 px, deux chemins ensemble, survol et tap (non exécuté sans Playwright)"
+node test_guide_page.js || ko=1
+
 etape "9c. Sobriété dans Chromium : éclair, horloge, onde, calque, verre, chargement, chaleur (non exécuté sans Playwright)"
 node test_sobriete.js || ko=1
 etape "9d. Thème Gare dans Chromium : palettes à 1ch, provenance lue dans CADENCES, remarque d'âge, chutes à l'événement, démontage (non exécuté sans Playwright)"

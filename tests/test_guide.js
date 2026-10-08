@@ -96,6 +96,21 @@ titre('2. Niveaux nommés : leur origine en mots');
     && /4 sommets ou creux locaux/.test(t(sr[0].origine)) && /500 dernières bougies 4 h/.test(sr[0].origine), sr);
   const lp = G.libelleNiveau({ p: put.p, pMin: put.p, pMax: put.p, raisons: [put] }, 'debutant');
   check('mur d’options : le libellé dit le strike PUBLIÉ (80 000 $), pas sa conversion en USDT', t(lp).startsWith('Mur d’options (puts) · 80 000 $ · modèle · lu à ') && !lp.includes(G.chiffres(put.p)), lp);
+  // Formes étroites (téléphone) : l'heure d'un chiffre publié collée à CE chiffre, et l'origine de
+  // chaque raison (un mot au moins) — une bande de deux raisons ne se réduit jamais à une plage.
+  const zgR = pub.find(x => x.cle === 'zero_gamma'), h24 = { cle: 'h24_bas', p: put.p + 30, nom: 'Plus bas des 24 h', court: 'B 24 h', mot: 'bas 24 h', art: 'le plus bas des 24 h', nature: 'mesuré' };
+  const deux = { p: put.p, pMin: put.p, pMax: put.p + 30, raisons: [put, h24] }, seul = { p: achat.p, pMin: achat.p, pMax: achat.p, raisons: [achat] };
+  const etroits = ['debutant', 'expert'].flatMap(m => ['mini', 'micro', true].flatMap(v => [G.libelleNiveau(deux, m, '$', v), G.libelleNiveau(seul, m, '$', v)]));
+  etroits.forEach(t);
+  check('formes étroites des libellés (mini, micro, courte ; deux modes) : chaque chiffre publié garde son heure', etroits.every(x => x.includes(hm) || x.includes(G.heureUTC(Date.parse(md.updated)))), etroits);
+  check('… et chaque raison son origine (mur, bas 24 h) : « 2 raisons » seul ne suffit plus', etroits.every(x => /mur|Mur|put|Put/i.test(x)) && etroits.filter(x => x.includes('–')).every(x => /24 h/.test(x)), etroits);
+  const micro = G.libelleNiveau(seul, 'debutant', '$', 'micro');
+  check('forme micro : l’heure juste après le prix publié (« ' + micro + ' »)', new RegExp('^' + G.prix(achat.p).replace(/[$]/g, '\\$') + ' ' + hm + ' ').test(micro), micro);
+  void zgR;
+  // Deux zones de demi-tours dans une bande : chacune dit son prix (sinon deux fois le même nom).
+  const z1 = G.niveauxSR([{ price: 720.01, touches: 2, tf: '15m' }, { price: 721.61, touches: 2, tf: '15m' }], P, {});
+  const bz = { p: 720.01, pMin: 720.01, pMax: 721.61, raisons: z1 }, lz = t(G.libelleNiveau(bz, 'debutant', 'SOL', true)), dz = t(G.decrire(bz, 'SOL'));
+  check('deux raisons du même nom dans une bande : chacune avec son prix (« … à 720,01, … à 721,61 »)', /à 720,01/.test(lz) && /à 721,61/.test(lz) && /à 720,01/.test(dz), [lz, dz]);
   // Murs du mauvais côté du prix : plus dans le carnet tel quel ; un mur d'achat et un de vente ne partagent pas une bande.
   const vente = pub.find(x => x.cle === 'mur_vente');
   const ch2 = G.choisirNiveaux([achat, vente], (achat.p + vente.p) / 2, P);
@@ -170,6 +185,14 @@ titre('3. Cassure : deux clôtures au-delà de la bande, une mèche n’est pas 
   check('prix live absent : dit absent, aucune distance inventée', G.etatLive(niv, null, null, P).mot === null && /absent/.test(G.texteEtatLive(G.etatLive(niv, null, null, P), 'debutant')));
   const cv = G.etatLive({ p, demi, dessus: false, ferme: v }, 101.3, null, P);
   check('cassure validée : son sens est dit (« cassé vers le haut (2/2 clôtures, validé) »)', t(cv.texte) === 'cassé vers le haut (2/2 clôtures, validé)', cv);
+  // Niveau PUBLIÉ (lu à 20:18) : la bougie en cours, ouverte à 00:00, a fait son plus haut AVANT la
+  // lecture — sa mèche ne dit rien du niveau ; seule une bougie ouverte après la lecture compte.
+  const lu = Date.UTC(2026, 9, 8, 20, 18), pub = { p, demi, dessus: true, ferme: etat(C), lu };
+  const avantLu = G.etatLive(pub, 99.4, { time: Date.UTC(2026, 9, 8, 0, 0) / 1000, high: 100.8, low: 99 }, P);
+  const apresLu = G.etatLive(pub, 99.4, { time: Date.UTC(2026, 9, 8, 20, 30) / 1000, high: 100.8, low: 99 }, P);
+  check('niveau publié, mèche de la bougie en cours ouverte AVANT la lecture : pas « percé en mèche » (« ' + avantLu.mot + ' »)', avantLu.mot !== 'mecheCours' && avantLu.mot !== 'meche', avantLu);
+  check('… ouverte APRÈS la lecture : « percé en mèche (bougie en cours) » ; prix live au-delà : « au-delà » quoi qu’il en soit', apresLu.mot === 'mecheCours'
+    && G.etatLive(pub, 101, { time: Date.UTC(2026, 9, 8, 0, 0) / 1000, high: 101.2, low: 99 }, P).mot === 'franchi', apresLu);
 }
 
 // ── 4. Régime ──
@@ -191,6 +214,8 @@ titre('4. Régime : seuils de convention lus dans PARAM.guide');
   const zz2 = Array.from({ length: n }, (_, i) => (i === n - 1 ? 0.01 : i < 5 ? 0.005 : 0.03));
   const c3 = r(17, 20, 18, 1, 1, zz2);
   check('« au plus bas depuis N bougies » : N = les bougies précédentes TOUTES plus larges (≥ ' + P.compressionDepuisMin + ')', c3.depuis === n - 1 - 5 && /au plus bas depuis 54 bougies/.test(t(G.texteRegime(c3, 'debutant', P))), [c3.depuis, G.texteRegime(c3, 'debutant', P)]);
+  const cc = t(G.texteRegime(c, 'debutant', P, true));
+  check('forme courte du badge (écran étroit) : le régime, l’ADX ET la compression (« … · compression »)', /ADX \d+/.test(cc) && /compression$/.test(cc) && cc.length < 40, cc);
   check('ADX absent (historique court) : dit, pas inventé', r(null, 1, 1, 1, 1).cle === 'inconnu' && /historique/.test(G.texteRegime(r(null, 1, 1, 1, 1), 'debutant', P)));
 }
 
@@ -287,7 +312,7 @@ const d = 0.4;
   check('au plus ' + P.formesMax + ' formes montrées à la fois', G.formesAffichees(tout, P).length <= P.formesMax);
   const vue = [C.length - 50, C.length];
   const aff = G.formesAffichees(tout, P, vue[0], vue[1]);
-  check('formes montrées : toutes commencent dans la vue, aucune candidate tombée avant confirmation, aucun recouvrement', aff.every(f => f.debut >= vue[0] && f.fin !== 'invalide_avant')
+  check('formes montrées : leur DERNIER pivot est dans la vue (le début peut en sortir à gauche), aucune candidate tombée avant confirmation, aucun recouvrement', aff.every(f => f.t - P.pivot >= vue[0] && f.debut < vue[1] && f.fin !== 'invalide_avant')
     && aff.every((f, k) => aff.every((g, m) => m === k || f.debut > (g.fin ? g.jFin : tout.n - 1) || g.debut > (f.fin ? f.jFin : tout.n - 1))), aff.map(f => [f.type, f.debut, f.fin]));
   check('aucune forme comptée n’est confirmée avant d’être repérable (jConf > t)', tout.formes.every(f => f.jConf === null || f.jConf > f.t));
   check('repère sans forme calculé pour chaque type confirmé (mêmes distances, même sens)', G.TYPES.every(k => !b[k].confirmes || b[k].temoin.departs > 0), G.TYPES.map(k => [k, b[k].confirmes, b[k].temoin]));
@@ -295,7 +320,22 @@ const d = 0.4;
   t(exp); t(deb);
   check('bilan : mêmes comptes en débutant et en expert, « mesuré » dit dans les deux', exp.includes(b.triangle.confirmes + ' conf.') && deb.includes(String(b.triangle.confirmes)) && /Mesuré sur l’historique chargé/.test(deb) && /^Mesuré · /.test(exp), { exp, deb });
   const td = G.texteBilan(b.double_creux, { n: C.length, intervalle: '15m', duree: C.length * 900 }, P, 'debutant');
-  check('bilan débutant : formes repérées, issues, et le repère sans forme en comptes (aucun %)', /repérés/.test(t(td)) && (!b.double_creux.confirmes || /Repère sans forme/.test(td)) && !/%/.test(td), td);
+  check('bilan débutant : formes repérées, issues, et le repère sans forme en comptes (aucun %)', /repérés?/.test(t(td)) && (!b.double_creux.confirmes || /Repère sans forme/.test(td)) && !/%/.test(td), td);
+  // Débutant : la phrase du cahier des charges d'abord, courte (une bulle de téléphone la lit).
+  const bx = { type: 'double_sommet', formes: 31, confirmes: 14, atteints: 6, invalides: 7, expires: 1, ouverts: 0, temoin: { departs: 4614, atteints: 2335 } };
+  const tb = t(G.texteBilan(bx, { n: 2980, intervalle: '15m', duree: 31 * 86400 }, P, 'debutant'));
+  check('bilan débutant : « Sur les 2 980 dernières bougies 15 min (31 j) : 14 … confirmés …, objectif théorique atteint 6 fois avant invalidation … Échantillon faible. » — court', /sur les 2 980 dernières bougies 15 min \(31 j\) : 14 doubles sommets confirmés/.test(tb)
+    && /objectif théorique atteint 6 fois avant invalidation/.test(tb) && /2 335 fois sur 4 614/.test(tb) && /Échantillon faible\.$/.test(tb) && tb.split(' ').length <= 60, [tb.split(' ').length, tb]);
+  const ec = t(G.texteBilan(bx, { n: 2980, intervalle: '15m', duree: 31 * 86400 }, P, 'expertCourt'));
+  check('étiquette expert : les comptes et « éch. faible » d’abord (une coupure en bout de ligne n’ôte que la durée)', /^14 conf\. · éch\. faible · obj\. 6 · inval\. 7/.test(ec), ec);
+  // Une forme dont le début est sorti à gauche de la vue, mais dont le dernier pivot est dedans : montrée.
+  const vive = tout.formes.find(f => !f.doublon && f.t - P.pivot - f.debut >= 2);
+  if (vive) {
+    const res1 = { formes: [Object.assign({}, vive, { fin: null, jFin: null })], n: vive.t + 5 };
+    const vs1 = vive.debut + 1;
+    check('forme dont le début est hors de la vue mais le dernier pivot dedans : montrée ; dernier pivot hors de la vue : non', G.formesAffichees(res1, P, vs1, vs1 + 50).length === 1
+      && G.formesAffichees(res1, P, vive.t - P.pivot + 1, vive.t + 50).length === 0);
+  }
   const t0 = Date.now(); for (let k = 0; k < 5; k++) G.detecter({ h: H, l: L, c: C, atr, n: C.length }, P);
   check(`rejeu rapide (${((Date.now() - t0) / 5).toFixed(1)} ms pour ${C.length} bougies)`, (Date.now() - t0) / 5 < 200);
 }
@@ -337,6 +377,35 @@ titre('6. Et ensuite ? et lecture du moment : des niveaux nommés, aucune direct
   ts.forEach(t);
   check('chemins : un niveau publié garde son heure dans toutes les variantes (débutant, expert, court, minimal)', ts.every(x => /\d\d:\d\d/.test(x)), ts);
   check('chemin vers un mur d’options : le strike publié (80 000), « modèle »', /80 000/.test(ts[0]) && /modèle/.test(ts[0]), ts[0]);
+
+  // Prix DANS une bande de deux raisons : les deux chemins partent de ses deux bords (même bande,
+  // même distance), pas du bord haut d'un côté et d'un niveau lointain de l'autre.
+  const RR = (p, nom, lu) => ({ cle: 'x' + p, p, nom, court: nom, mot: nom, art: 'le ' + nom, nature: 'mesuré', lu });
+  const bande = { p: 81670, pMin: 81670, pMax: 81891, lo: 81640, hi: 81921, demi: 30, raisons: [RR(81670, 'Mur d’achat du carnet', Date.UTC(2026, 9, 8, 21, 3)), RR(81891, 'Zone de 2 demi-tours')] };
+  const choixDans = { dessus: [bande, { p: 82130, pMin: 82130, pMax: 82130, raisons: [RR(82130, 'Mur de vente')] }], dessous: [{ p: 80394, pMin: 80394, pMax: 80394, raisons: [RR(80394, 'Plus bas des 24 h')] }] };
+  const sd = G.suite(choixDans, 81686);
+  check('prix dans une bande (« en test ») : seuils = SES deux bords (81 891 vers le haut, 81 670 vers le bas), cibles = la bande suivante de chaque côté', sd.haut.rx.p === 81891 && sd.bas.rx.p === 81670
+    && sd.haut.ry.p === 82130 && sd.bas.ry.p === 80394 && sd.dans === bande, { haut: [sd.haut.rx.p, sd.haut.ry && sd.haut.ry.p], bas: [sd.bas.rx.p, sd.bas.ry && sd.bas.ry.p] });
+  const sh = G.suite(choixDans, 81500);
+  check('prix hors de toute bande : seuil = premier niveau de chaque côté (inchangé)', sh.haut.rx.p === 81891 && sh.bas.rx.p === 80394 && sh.dans === null);
+  // Toutes les variantes gardent la condition ; le mini colle l'heure à SON nombre.
+  const vs = ['debutant', 'expert'].flatMap(m => G.VARIANTES_SUITE[m].map(v => [m, v, G.texteSuite(sd.bas, m, '$', '15m', P, v), G.texteSuite(sd.haut, m, '$', '15m', P, v)]));
+  vs.forEach(x => { t(x[2].join(' ')); t(x[3].join(' ')); });
+  check('chaque variante d’un chemin garde la condition (« Si clôture … », « si > … », « si < … »)', vs.every(x => /^(Si clôt|si [<>])/.test(x[2][0]) && /^(Si clôt|si [<>])/.test(x[3][0])), vs.map(x => x[2][0]));
+  const mini = G.texteSuite(sd.bas, 'debutant', '$', '15m', P, 'mini');
+  check('variante mini : l’heure d’un chiffre publié collée à CE chiffre (« si < 81 670 (21:03) → 80 394 »), pas au niveau suivant', mini[0] === 'si < 81 670 (21:03)' && mini[1] === '→ 80 394', mini);
+  const aucun = ['plein', 'court', 'mini'].map(v => G.texteSuite(null, 'debutant', '$', '15m', P, v, -1).join(' '));
+  aucun.forEach(t);
+  check('côté sans niveau nommé : dit dans chaque variante', aucun.every(x => /aucun niveau/.test(x)), aucun);
+  check('un pourcentage de PARAM n’est jamais arrondi à 0 (« 0,4 % »)', G.pctParam(0.004) === '0,4' && G.pctParam(0.06) === '6');
+  // L'issue d'une forme est datée : « vient d'être » ne se dit que pour la dernière bougie close.
+  const fi = { type: 'double_sommet', fin: 'invalide', sens: -1 };
+  const p17 = t(G.phraseForme(fi, '$', { bougies: 17, itv: '1d', date: '21/09' })), p1 = G.phraseForme(fi, '$', { bougies: 1, itv: '1d', date: '07/10' });
+  check('forme invalidée il y a 17 bougies 1 jour : « a été invalidé il y a 17 bougies 1 jour (21/09) » ; la veille : « vient d’être invalidé »', p17 === 'un double sommet a été invalidé il y a 17 bougies 1 jour (21/09)' && /vient d’être invalidé/.test(p1), [p17, p1]);
+  // Lecture compacte (téléphone) : les prix et leurs heures, la compression dite.
+  const lc = t(G.lecture({ prix: 81686, unite: '$', choix: choixDans, enTest: bande, regime: { cle: 'baisse', compression: true }, forme: null, court: true, compact: true }));
+  check('lecture compacte : « Prix 81 686 $ dans la bande 81 670 (lu à 21:03) – 81 891 $. Volatilité comprimée. »', lc === 'Prix 81 686 $ dans la bande 81 670 (lu à 21:03) – 81 891 $. Volatilité comprimée.', lc);
+  check('lecture courte (sans le sens du régime) : la compression reste dite', /volatilité comprimée/i.test(G.lecture({ prix: 81500, unite: '$', choix: choixDans, regime: { cle: 'baisse', compression: true }, court: true })));
 }
 
 // ── 7. Dans la page ──
@@ -348,7 +417,7 @@ titre('7. Dans la page : paramètres, menu, fiche, choix gardé, marge de futur'
   const html = fs.readFileSync(path.join(REPO, 'index.html'), 'utf8');
   check('js/guide.js chargé (defer) AVANT js/app.js, qui reste le dernier', /<script defer src="js\/guide\.js"><\/script>[\s\S]*<script defer src="js\/app\.js"><\/script>\s*<\/head>/.test(html));
   const T = page.T, cat = T.INDICATORS.find(c => c.cat === 'Guide');
-  check('menu « + Indicateurs » : catégorie « Guide », avec sa fiche', cat && cat.items.some(i => i.key === 'guide') && T.FICHE_IND.guide === 'guide');
+  check('menu « + Indicateurs » : catégorie « Guide », avec sa fiche — EN TÊTE du menu (interrupteur d’une couche affichée par défaut, visible sans défiler)', cat && cat.items.some(i => i.key === 'guide') && T.FICHE_IND.guide === 'guide' && T.INDICATORS[0] === cat);
   const fiches = ['guide', 'guide_niveaux', 'guide_regime', 'guide_formes', 'guide_suite'];
   check('fiches du Guide définies, chacune « pas une recommandation »', fiches.every(k => T.FICHES[k] && /pas une recommandation/.test(T.ficheHtml(k))));
   check('la fiche des formes dit « débattu » et « mesuré » (sa lecture est discutée, son bilan compté)', T.FICHES.guide_formes.lectures.some(l => l.s === 'débattu') && T.FICHES.guide_formes.lectures.some(l => l.s === 'mesuré'));
@@ -359,9 +428,26 @@ titre('7. Dans la page : paramètres, menu, fiche, choix gardé, marge de futur'
   const masque = chargerPage({ stockage: { 'samsara-guide-v1': '0' } });
   check('masqué une fois, il le reste (samsara-guide-v1)', vm.runInContext('overlays.guide', masque.sandbox) === false);
   const marge = dansPage('candles = Array.from({ length: 60 }, (_, i) => ({ time: i * 900, open: 1, high: 2, low: 0.5, close: 1, volume: 1 })); viewStart = 10; viewEnd = 60;'
-    + '[pasBougie(1000, 50) * 50 + margeFutur(1000), margeFutur(1000), (overlays.guide = false, pasBougie(1000, 50) * 50), margeFutur(1000), (overlays.guide = true, viewEnd = 40, margeFutur(1000))]');
-  dansPage('candles = []; viewEnd = 0;');
-  check('marge de futur : bougies + marge = largeur du tracé ; Guide masqué, ou vue qui ne montre plus la dernière bougie : marge nulle, le pas d’avant', Math.abs(marge[0] - 1000) < 1e-9 && marge[1] > 0 && marge[2] === 1000 && marge[3] === 0 && marge[4] === 0, marge);
+    + '[pasBougie(1000, 50) * 50 + margeFutur(1000, 50), margeFutur(1000, 50), (overlays.guide = false, pasBougie(1000, 50) * 50), margeFutur(1000, 50), (overlays.guide = true, viewStart = 0, viewEnd = 30, margeFutur(1000, 30))]');
+  // Glissement d'une bougie à la fois depuis la fin : le pas change d'au plus 1/n par bougie (la
+  // marge se referme d'un pas par bougie quittée), jamais d'un coup.
+  const pas = dansPage('(() => { const n = 50, out = []; for (let k = 0; k <= 12; k++) { viewEnd = 60 - k; viewStart = viewEnd - n; out.push(pasBougie(1000, n)); } return out; })()');
+  const sauts = pas.slice(1).map((p, k) => p / pas[k] - 1);
+  dansPage('candles = []; viewEnd = 0; viewStart = 0;');
+  check('marge de futur : bougies + marge = largeur du tracé ; Guide masqué, ou vue loin de la dernière bougie : marge nulle, le pas d’avant', Math.abs(marge[0] - 1000) < 1e-9 && marge[1] > 0 && marge[2] === 1000 && marge[3] === 0 && marge[4] === 0, marge);
+  check('glisser d’une bougie hors de la fin : le pas des bougies varie de ≤ 1/n à chaque cran (avant : +22 % d’un coup) et rejoint le pas sans marge', sauts.every(x => x >= -1e-9 && x <= 1 / 50 + 1e-9) && Math.abs(pas[pas.length - 1] - 1000 / 50) < 1e-9, { pas, sauts });
+  check('plafond de la marge dans PARAM.guide (futurMaxFraction), dit par la fiche « et ensuite ? »', P.futurMaxFraction > 0 && T.ficheHtml('guide_suite').includes(String(P.futurMaxFraction * 100).replace('.', ',') + ' %'));
+  check('fiche des formes : plus de « 3 000 bougies » écrit à la main (la taille de l’historique est dite par le bilan)', !/3 000 bougies/.test(T.ficheHtml('guide_formes')));
+  // Zéro gamma : un prix calculé par le modèle, pas un prix d'exercice ; le taux à 4 décimales.
+  const mdP = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'contre', 'publication.json'), 'utf8'));
+  if (!(mdP.micro.usdt_usd > 0)) mdP.micro.usdt_usd = 0.9992;
+  const pubP = G.niveauxPublies(mdP);
+  vm.runInContext('__pubP = ' + JSON.stringify(pubP), page.sandbox);
+  const tz = dansPage('(() => { const z = __pubP.find(r => r.cle === "zero_gamma"), w = __pubP.find(r => r.cle === "put_wall"); return [guideTexteNiveau({ niv: { raisons: [z], demi: 10 } }, false)[0], guideTexteNiveau({ niv: { raisons: [w], demi: 10 } }, false)[0]]; })()');
+  tz.forEach(t);
+  const taux = mdP.micro.usdt_usd.toLocaleString('fr-FR', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+  check('zéro gamma : « prix calculé par le modèle », jamais « prix d’exercice » ; mur de puts : « prix d’exercice » ; taux à 4 décimales (« ' + taux + ' »)', !/exercice/.test(tz[0].replace('pas un prix d’exercice', '')) && /Prix calculé par le modèle/.test(tz[0])
+    && /Prix d’exercice/.test(tz[1]) && tz[1].includes('1 USDT = ' + taux + ' $'), tz);
   const appSrc = fs.readFileSync(path.join(REPO, 'js/app.js'), 'utf8');
   check('une seule formule du pas : plus aucun « pw / » dans le calcul des bougies, du réticule, de la chaleur, des sous-graphes', !/const gap = pw \//.test(appSrc) && !/chartPw \/ n/.test(appSrc), (appSrc.match(/const gap = [^;]+;/g) || []));
   // Les points d'une forme et le départ des chemins sont au CENTRE des bougies, au pixel près de
