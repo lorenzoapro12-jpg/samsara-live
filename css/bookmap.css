@@ -147,7 +147,45 @@ input[type="range"] { accent-color: var(--carte-live); }
 .grad span.debut { left: 0 !important; transform: none; }
 .grad span.fin { left: 100% !important; transform: translateX(-100%); }
 
+/* ─── Guide ───
+   Le résumé : une bande de hauteur FIXE sous la barre (le canevas ne change pas de taille quand la
+   phrase change) ; la phrase entière est aussi dans son title. */
+.resume-carte {
+  flex: 0 0 auto; height: 26px; padding: 4px 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: 12.5px; line-height: 18px; color: var(--ink-1); background: var(--surface); border-bottom: 1px solid var(--bord);
+}
+/* Plus étroit : 2 puis 3 lignes au plus (la phrase commence par son âge : coupée, elle le garde ; entière au survol). */
+/* Hauteur = lignes entières (haut + lignes + 1 px + bord) : aucune ligne coupée à moitié. */
+@media (max-width: 1279px) { .resume-carte { height: 42px; padding-bottom: 0; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; } }
+@media (max-width: 640px) { .resume-carte { height: 56px; font-size: 12px; line-height: 17px; padding: 3px 8px 0; -webkit-line-clamp: 3; } }
+/* Écran bas (téléphone couché) : une ligne, la carte garde sa hauteur. */
+@media (max-height: 420px) { .resume-carte { height: 24px; display: block; white-space: nowrap; line-height: 17px; padding: 3px 8px; } }
+.resume-carte[hidden] { display: none; }
+/* « Comment lire cette carte » : posée sur la carte, sans prendre le pointeur (hors de ses boutons). */
+.guide-intro {
+  position: absolute; left: 8px; bottom: 8px; z-index: 5; width: min(410px, calc(100% - 16px)); max-height: calc(100% - 16px); overflow: hidden;
+  background: var(--surface); border: 1px solid rgba(255, 209, 102, 0.5); border-radius: 12px; padding: 6px 12px 10px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5); pointer-events: none; font-size: 12.5px; color: var(--ink-2);
+}
+.guide-intro h2 { font-size: 14px; margin: 4px 0; color: var(--ink-1); }
+.guide-intro button { pointer-events: auto; }
+.guide-intro .note { margin: 6px 0 8px; line-height: 1.45; }
+.statut { z-index: 6; }
+.intro-liste { margin: 4px 0 0; padding: 0; list-style: none; }
+.intro-liste li { display: grid; grid-template-columns: 22px 1fr; gap: 6px; margin: 5px 0; line-height: 1.4; }
+.intro-liste b { color: var(--ink-1); font-weight: 600; }
+.intro-liste i { color: var(--ink-3); }
+.intro-liste .num {
+  width: 19px; height: 19px; border-radius: 50%; background: var(--accent); color: #0b0b12; font-weight: 700; font-size: 11px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.pastille-couleur { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; }
+.liste-journal time { color: var(--ink-3); }
+.liste-journal .sym { display: inline-block; min-width: 1.1em; text-align: center; font-weight: 700; }
+
 @media (max-width: 640px) {
+  .guide-intro { font-size: 12px; padding: 4px 10px 8px; }
+  .intro-liste li { margin: 3px 0; }
   .barre { padding: 6px 8px; gap: 6px; }
   .barre .sous { display: none; }
   .puce { padding: 3px 8px; font-size: 11.5px; }

@@ -587,7 +587,7 @@ async function pixel(page, x, y) {
       let p21, S;
       ({ page: p21, erreurs, S } = await ouvrir(nav, { encodage: true }));
       // Seuls la ligne de prix et le fond restent : le blanc de la ligne ne se confond avec rien.
-      for (const k of ['publiee', 'live', 'executions', 'bidask', 'profil', 'murs', 'gamma']) await p21.click(`button[data-calque="${k}"]`);
+      for (const k of ['guide', 'publiee', 'live', 'executions', 'bidask', 'profil', 'murs', 'gamma']) await p21.click(`button[data-calque="${k}"]`);
       const now = S.now(), t1 = now - 3 * 60e3, t2 = now + 10e3, PAS = 120, BASE = Math.floor(MAINTENANT / 60e3) * 60e3 - 30 * 3600e3;
       const vwap = s => { let pq = 0, q = 0; for (let id = Math.ceil((s * 1000 - BASE) / PAS); BASE + id * PAS < (s + 1) * 1000; id++) { const x = S.trade(id); pq += +x.p * +x.q; q += +x.q; } return pq / q; };
       const close = m => +S.kline(m, now)[4];
@@ -752,8 +752,8 @@ async function pixel(page, x, y) {
       let p27;
       ({ page: p27, erreurs } = await ouvrir(nav, { encodage: true, contexte: { deviceScaleFactor: 2 } }));
       // Tout ce qui se peint PAR-DESSUS la chaleur est éteint (mémoire, rafales et destin le sont
-      // par défaut) : le pixel comparé doit être celui de la chaleur seule.
-      for (const k of ['live', 'executions', 'prix', 'bidask', 'murs', 'gamma', 'profil']) await p27.click(`button[data-calque="${k}"]`);
+      // par défaut ; le guide, allumé par défaut, aussi) : le pixel comparé doit être celui de la chaleur seule.
+      for (const k of ['guide', 'live', 'executions', 'prix', 'bidask', 'murs', 'gamma', 'profil']) await p27.click(`button[data-calque="${k}"]`);
       const zw = await p27.evaluate(() => window.__carte.etat().mise.chaleur.w), zh = await p27.evaluate(() => window.__carte.etat().mise.chaleur.h);
       await p27.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [G.t0, G.t0 + G.W * G.dt, pMid - 900, pMid + 900]);
       await p27.waitForTimeout(300);
@@ -952,13 +952,14 @@ async function pixel(page, x, y) {
     {
       let p36, S;
       ({ page: p36, erreurs, S } = await ouvrir(nav, { encodage: true }));
-      // Le destin des murs est éteint par défaut : il suffit d'éteindre les trois autres.
-      for (const k of ['live', 'dom', 'bidask']) await p36.click(`button[data-calque="${k}"]`);
+      // Le destin des murs est éteint par défaut : il suffit d'éteindre les quatre autres (le guide lit
+      // aussi le carnet : murs en mots, résumé, zones).
+      for (const k of ['guide', 'live', 'dom', 'bidask']) await p36.click(`button[data-calque="${k}"]`);
       await p36.waitForTimeout(500);
       const n0 = S.compte.depth;
       await p36.waitForTimeout(5000);
       const n1 = S.compte.depth;
-      check(`chaleur live, carnet latéral, bid / ask et destin des murs éteints : ${n1 - n0} lecture(s) du carnet en 5 s`, n1 === n0, { n0, n1 });
+      check(`guide, chaleur live, carnet latéral, bid / ask et destin des murs éteints : ${n1 - n0} lecture(s) du carnet en 5 s`, n1 === n0, { n0, n1 });
       await p36.click('button[data-calque="dom"]');
       await p36.waitForTimeout(2500);
       check('carnet latéral rallumé : le carnet est relu', S.compte.depth > n1, { n1, n2: S.compte.depth });
