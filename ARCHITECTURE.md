@@ -150,7 +150,7 @@ D'où deux contraintes de forme, tenues par le script et par `tests/test_histori
 **l'index doit tout décrire** (une session ne voit que ce qu'il annonce), et **chaque fichier
 reste sous 1 Mo** (un blob se rapatrie à l'unité dans un clone partiel).
 
-Trois règles, chacune née d'un défaut qu'on ne veut pas reproduire :
+Quatre règles, chacune née d'un défaut qu'on ne veut pas reproduire :
 
 **Un mois clos ne se réécrit pas.** La clé d'une ligne est son horodatage : relancer
 n'ajoute rien, et un fichier dont le contenu ne change pas n'est pas réécrit sur le disque —
@@ -165,6 +165,17 @@ qu'aurait portée la ligne absente : l'inventer serait fabriquer une donnée.
 **Une case vide n'est pas un zéro.** Les champs qui n'existaient pas dans les anciens
 formats restent vides — le CVD n'est publié que depuis le 04/10/2026, la prime hors USDT
 depuis le 06/10 — et `meta` porte, colonne par colonne, ce qu'une absence veut dire.
+
+**Une unité publiée se contrôle.** `longAccount` n'est pas une mesure indépendante du ratio :
+c'est la même donnée écrite autrement, `ratio / (1 + ratio)`. Les deux colonnes de part de
+`series/long-short-1h.csv` sont donc **déductibles** du ratio de la même ligne, et l'index
+porte le contrôle `100 × ratio / (1 + ratio)` — un désaccord sort en code 1 et s'écrit dans
+`series.long_short_1h.controle`. Ce contrôle vient d'un défaut réel : la série a publié des
+**fractions** (0,6328) sous une unité annoncée « % » jusqu'au 08/10/2026, et un fichier de
+données seules, lu à distance, ne le montrait pas. La migration `--migrer-part-longue`
+remet l'historique déjà écrit dans la bonne unité en **recalculant** la part depuis le ratio
+de chaque ligne — idempotente par construction, là où un × 100 doublerait la valeur au
+deuxième passage.
 
 `index.json` est **redaté à chaque passage** : c'est ce qui rend son âge lisible par une
 session distante (un index « ok » de moins de 20 minutes). Les séries, elles, ne bougent que

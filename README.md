@@ -264,7 +264,7 @@ L'index **décrit tout** pour que cela suffise : pour chaque série, la liste or
 fichiers, ses colonnes, sa période, son nombre de lignes et **les trous détectés**. Chaque
 fichier reste sous 1 Mo — un blob se rapatrie à l'unité, pas une arborescence.
 
-Trois règles de fond :
+Quatre règles de fond :
 
 - **Un mois clos ne se réécrit pas.** Une publication apportée pour un mois déjà passé est
   refusée et signalée ; relancer le script ne duplique aucune ligne (la clé est `updated`).
@@ -274,6 +274,11 @@ Trois règles de fond :
   formats restent vides, et `meta` explique pourquoi (le CVD n'est publié que depuis le
   04/10/2026). L'amorçage lit l'historique des commits de `master` ; les séries Binance
   (funding, open interest, ratios L/S) sont rapatriées une fois puis prolongées.
+- **Une unité publiée se contrôle.** `longAccount` vaut `ratio / (1 + ratio)` : la part longue
+  est donc déductible du ratio de la même ligne, et l'index publie le contrôle
+  `100 × ratio / (1 + ratio)` (un désaccord sort en code 1). La série a publié des fractions
+  sous une unité annoncée « % » jusqu'au 08/10/2026 ; `--migrer-part-longue` recalcule
+  l'historique déjà écrit depuis le ratio de chaque ligne — relancer ne double rien.
 
 Il travaille dans un **répertoire à part** (`git worktree` sur la branche) : l'index et
 l'arbre de `master` ne sont jamais touchés, et l'objet-store est partagé — rien à cloner.
