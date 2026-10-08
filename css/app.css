@@ -940,6 +940,12 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   .header-left { gap: 4px; }
   .var24 { display: none; }
   .paire-btn { font-size: 10.5px; padding: 3px 5px 3px 8px; }
+  /* Le prix et les huit boutons ne tiennent pas sur une ligne (à 390 px, les boutons se
+     dessinaient sur le prix) : l'en-tête passe sur deux rangées, le prix d'abord. Bureau 95
+     range ses boutons dans la barre des tâches : son en-tête tient sur une ligne. */
+  html:not([data-structure="fenetres"]) .header { flex-wrap: wrap; row-gap: 6px; }
+  html:not([data-structure="fenetres"]) .header-left { flex: 1 1 100%; }
+  html:not([data-structure="fenetres"]) .header-right { flex: 1 1 100%; justify-content: space-between; }
 }
 @media (max-width: 400px) {
   .price-badge { font-size: 15px; }

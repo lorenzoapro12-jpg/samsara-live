@@ -12,6 +12,17 @@ champ publié est décrit dans `meta` par le code qui le calcule (voir « Les l�
 
 ---
 
+## Retouches du 08/10/2026
+
+- **La carte s'ouvre allégée** : Mémoire du carnet, Rafales et Destin des murs sont éteints par
+  défaut (un clic sur leur bouton les allume). Allumés ensemble, leurs libellés se chevauchaient.
+- **Téléphone (< 480 px)** : l'en-tête passe sur deux rangées, le prix au-dessus des boutons
+  (ils se dessinaient sur le prix en Kāla, Néon, Aero et Codex).
+- **Bureau 95 et Contraste** : « + Indicateurs » reste collé au bord droit du ruban au lieu
+  d'être coupé quand la fenêtre est trop étroite.
+
+---
+
 ## Nouveautés du 07/10/2026 (détail : `docs/livraison-2026-10-07.md`)
 
 - **La carte, corrigée et refaite** : environ 35 défauts distincts (68 constats), tous reproduits avant correction (échelle du live figée,
