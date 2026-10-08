@@ -439,6 +439,7 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 .tag-ov { color: var(--accent); }
 .tag-sg { color: var(--warn-ink); }
 .tag-ch { color: var(--accent-2); }
+.tag-gd { color: var(--ink-2); }
 
 /* ─── 6. Graphique ──────────────────────────────────────────────────────────── */
 .main-area { display: flex; flex: 1; min-height: 0; gap: var(--gap); overflow: hidden; }
