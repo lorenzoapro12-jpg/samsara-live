@@ -82,6 +82,9 @@ node test_live.js || ko=1
 etape "5b. Carte (bookmap) : fusion, décodage, exécutions, isolement — hors ligne"
 node test_bookmap.js || ko=1
 
+etape "5b2. Carte (bookmap) : le Guide — murs en mots, résumé, journal, zones, mots interdits — hors ligne"
+node test_guide_carte.js || ko=1
+
 etape "5c. Carte (bookmap) rendue dans Chromium — Binance simulé (non exécuté sans Playwright)"
 node test_bookmap_rendu.js || ko=1
 
