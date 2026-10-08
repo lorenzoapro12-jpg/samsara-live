@@ -1,373 +1,144 @@
 {
- "updated": "2026-10-08T16:48:44+00:00",
+ "updated": "2026-10-08T17:03:44+00:00",
  "generator": "publish.py v4.0 — calculs dans le dépôt, champs décrits par `meta` (06/10/2026)",
  "source": "binance · deribit · coinbase · yahoo",
  "btc": {
-  "price": 81145.65,
-  "change_24h_pct": -2.694,
-  "high_24h": 83630.02,
-  "low_24h": 80800.95,
-  "quote_volume_24h_usd": 1599682097.4692254
+  "price": 80864.25,
+  "change_24h_pct": -3.219,
+  "high_24h": 83618.01,
+  "low_24h": 80760.0,
+  "quote_volume_24h_usd": 1637143380.6834898
  },
  "macro": {
-  "dxy_spot": 102.3219985961914,
+  "dxy_spot": 102.25399780273438,
   "dxy_date": "2026-10-08",
   "dxy_is_weekend": false,
-  "vix": 15.3,
-  "vix_at": "2026-10-08T16:34+00:00"
+  "vix": 15.54,
+  "vix_at": "2026-10-08T16:49+00:00"
  },
- "tf": {
-  "4h": {
-   "rsi_14": 23.3,
-   "ema20_4h": 83620.23,
-   "ema50_4h": 84204.34,
-   "death_cross_4h": true,
-   "ema_gap_pct": 0.69,
-   "support_30": 80800.95,
-   "resistance_30": 86999.11,
-   "last_close": 81136.01,
-   "avg_volume_10": 3318.69,
-   "last_5_candles": [
-    {
-     "open": 83321.81,
-     "high": 83521.15,
-     "low": 82650.0,
-     "close": 82757.0,
-     "body": 0.68,
-     "direction": "🔴",
-     "wick_top": 0.24,
-     "wick_bottom": 0.13
-    },
-    {
-     "open": 82757.0,
-     "high": 83283.28,
-     "low": 82227.56,
-     "close": 82998.75,
-     "body": 0.29,
-     "direction": "🟢",
-     "wick_top": 0.34,
-     "wick_bottom": 0.64
-    },
-    {
-     "open": 82998.75,
-     "high": 83170.0,
-     "low": 82318.0,
-     "close": 82506.01,
-     "body": 0.59,
-     "direction": "🔴",
-     "wick_top": 0.21,
-     "wick_bottom": 0.23
-    },
-    {
-     "open": 82506.0,
-     "high": 82776.01,
-     "low": 80914.23,
-     "close": 81037.99,
-     "body": 1.78,
-     "direction": "🔴",
-     "wick_top": 0.33,
-     "wick_bottom": 0.15
-    },
-    {
-     "open": 81037.99,
-     "high": 81456.6,
-     "low": 80800.95,
-     "close": 81136.01,
-     "body": 0.12,
-     "direction": "🟢",
-     "wick_top": 0.4,
-     "wick_bottom": 0.29
-    }
-   ],
-   "range_24h_pct": 7.67,
-   "sr_window_h": 120,
-   "ema20": 83620.23,
-   "ema50": 84204.34,
-   "ema_ecart_pct": -0.69,
-   "ema20_sous_ema50": true,
-   "amplitude_30_pct": 7.67,
-   "volume_moyen_10_btc": 3318.69,
-   "atr_14": 850.24,
-   "atr_14_pct": 1.05,
-   "bougies_lues": 200,
-   "bougie_en_cours": true,
-   "derniere_cloture_a": "2026-10-08T19:59:59.999000+00:00"
-  },
-  "1h": {
-   "rsi_14": 27.6,
-   "ema20_4h": 82592.3,
-   "ema50_4h": 83473.05,
-   "death_cross_4h": true,
-   "ema_gap_pct": 1.06,
-   "support_30": 80800.95,
-   "resistance_30": 83837.77,
-   "last_close": 81118.01,
-   "avg_volume_10": 1120.99,
-   "last_5_candles": [
-    {
-     "open": 82506.0,
-     "high": 82509.46,
-     "low": 81989.44,
-     "close": 82310.0,
-     "body": 0.24,
-     "direction": "🔴",
-     "wick_top": 0.0,
-     "wick_bottom": 0.39
-    },
-    {
-     "open": 82310.01,
-     "high": 82631.74,
-     "low": 81773.43,
-     "close": 82182.01,
-     "body": 0.16,
-     "direction": "🔴",
-     "wick_top": 0.39,
-     "wick_bottom": 0.5
-    },
-    {
-     "open": 82182.01,
-     "high": 82776.01,
-     "low": 82132.0,
-     "close": 82704.0,
-     "body": 0.64,
-     "direction": "🟢",
-     "wick_top": 0.09,
-     "wick_bottom": 0.06
-    },
-    {
-     "open": 82704.0,
-     "high": 82704.0,
-     "low": 80914.23,
-     "close": 81037.99,
-     "body": 2.01,
-     "direction": "🔴",
-     "wick_top": 0.0,
-     "wick_bottom": 0.15
-    },
-    {
-     "open": 81037.99,
-     "high": 81456.6,
-     "low": 80800.95,
-     "close": 81118.01,
-     "body": 0.1,
-     "direction": "🟢",
-     "wick_top": 0.42,
-     "wick_bottom": 0.29
-    }
-   ],
-   "range_24h_pct": 3.76,
-   "sr_window_h": 30,
-   "ema20": 82592.3,
-   "ema50": 83473.05,
-   "ema_ecart_pct": -1.06,
-   "ema20_sous_ema50": true,
-   "amplitude_30_pct": 3.76,
-   "volume_moyen_10_btc": 1120.99,
-   "atr_14": 568.0,
-   "atr_14_pct": 0.7,
-   "bougies_lues": 200,
-   "bougie_en_cours": true,
-   "derniere_cloture_a": "2026-10-08T16:59:59.999000+00:00"
-  },
-  "1d": {
-   "rsi_14": 45.0,
-   "ema20_4h": 83278.58,
-   "ema50_4h": 79627.78,
-   "death_cross_4h": false,
-   "ema_gap_pct": 4.58,
-   "support_30": 74967.97,
-   "resistance_30": 87395.67,
-   "last_close": 81098.41,
-   "avg_volume_10": 15624.51,
-   "last_5_candles": [
-    {
-     "open": 84753.57,
-     "high": 86800.0,
-     "low": 84719.99,
-     "close": 86530.0,
-     "body": 2.1,
-     "direction": "🟢",
-     "wick_top": 0.32,
-     "wick_bottom": 0.04
-    },
-    {
-     "open": 86530.0,
-     "high": 86999.11,
-     "low": 84972.01,
-     "close": 85766.87,
-     "body": 0.88,
-     "direction": "🔴",
-     "wick_top": 0.54,
-     "wick_bottom": 0.92
-    },
-    {
-     "open": 85766.87,
-     "high": 86698.99,
-     "low": 85136.11,
-     "close": 85549.93,
-     "body": 0.25,
-     "direction": "🔴",
-     "wick_top": 1.09,
-     "wick_bottom": 0.48
-    },
-    {
-     "open": 85549.94,
-     "high": 85598.22,
-     "low": 82787.25,
-     "close": 83321.81,
-     "body": 2.6,
-     "direction": "🔴",
-     "wick_top": 0.06,
-     "wick_bottom": 0.62
-    },
-    {
-     "open": 83321.81,
-     "high": 83521.15,
-     "low": 80800.95,
-     "close": 81098.41,
-     "body": 2.67,
-     "direction": "🔴",
-     "wick_top": 0.24,
-     "wick_bottom": 0.36
-    }
-   ],
-   "range_24h_pct": 16.58,
-   "sr_window_h": 720,
-   "ema20": 83278.58,
-   "ema50": 79627.78,
-   "ema_ecart_pct": 4.58,
-   "ema20_sous_ema50": false,
-   "amplitude_30_pct": 16.58,
-   "volume_moyen_10_btc": 15624.51,
-   "atr_14": 2225.3,
-   "atr_14_pct": 2.74,
-   "bougies_lues": 200,
-   "bougie_en_cours": true,
-   "derniere_cloture_a": "2026-10-08T23:59:59.999000+00:00"
-  }
- },
+ "tf": {},
  "micro": {
-  "funding_rate_pct": 0.00277,
-  "funding_annual_pct": 3.04,
+  "funding_rate_pct": 0.0024,
+  "funding_annual_pct": 2.62,
   "funding_prochain_at": "2026-10-09T00:00+00:00",
-  "mark_price": 81040.5,
-  "oi_btc": 94914.791,
-  "oi_usd": 7691942120,
-  "oi_change_24h_pct": -1.7,
-  "oi_change_1d_pct": -1.7,
-  "oi_hist_at": "2026-10-08T16:00+00:00",
-  "oi_change_5d_pct": -3.7,
-  "ls_ratio": 1.8185,
-  "long_pct": 64.5,
-  "short_pct": 35.5,
-  "top_ls_ratio": 1.6438,
-  "taker_ratio": 0.876,
-  "cvd_1h_usd": -29845252,
-  "taker_buy_1h_pct": 41.9,
-  "cvd_4h_usd": -53350518,
+  "mark_price": 80779.0,
+  "oi_btc": 94160.652,
+  "oi_usd": 7606203308,
+  "oi_change_24h_pct": -0.96,
+  "oi_change_1d_pct": -0.96,
+  "oi_hist_at": "2026-10-08T17:00+00:00",
+  "oi_change_5d_pct": -2.53,
+  "ls_ratio": 1.8563,
+  "long_pct": 65.0,
+  "short_pct": 35.0,
+  "top_ls_ratio": 1.6555,
+  "taker_ratio": 0.9087,
+  "cvd_1h_usd": -18315820,
+  "taker_buy_1h_pct": 43.9,
+  "cvd_4h_usd": -52267312,
   "taker_buy_4h_pct": 45.7,
-  "cvd_24h_usd": -81564712,
-  "taker_buy_24h_pct": 47.5,
-  "cvd_window_end": "2026-10-08T16:49:21+00:00",
-  "cvd": -81564712,
-  "cvd_updated_at": "2026-10-08T16:49:21+00:00",
-  "gex_usd_1pct": 36255004,
-  "gex_calls_usd_1pct": 293467772,
-  "gex_puts_usd_1pct": -257212769,
-  "gex_0_7j_usd_1pct": -57313683,
+  "cvd_24h_usd": -96153356,
+  "taker_buy_24h_pct": 47.1,
+  "cvd_window_end": "2026-10-08T17:04:52+00:00",
+  "cvd": -96153356,
+  "cvd_updated_at": "2026-10-08T17:04:52+00:00",
+  "gex_usd_1pct": 25083073,
+  "gex_calls_usd_1pct": 286684974,
+  "gex_puts_usd_1pct": -261601901,
+  "gex_0_7j_usd_1pct": -59270193,
   "gex_state": "LONG_GAMMA",
-  "zero_gamma": 79809,
-  "spot_vs_zero_gamma_pct": 1.53,
+  "zero_gamma": 79885,
+  "spot_vs_zero_gamma_pct": 1.09,
   "call_wall": 90000.0,
   "put_wall": 80000.0,
   "gamma_walls": [
    90000.0,
    95000.0,
-   81000.0
+   80000.0
   ],
   "num_strikes": 93,
-  "num_options": 805,
+  "num_options": 808,
   "gex_convention": "dealers acheteurs des calls, vendeurs des puts (hypothèse standard, non observable)",
-  "spot_deribit": 81028.62,
-  "dealer_gamma": 36255004,
-  "premium_pct": -0.0146,
-  "premium_state": "NEUTRAL",
+  "spot_deribit": 80751.99,
+  "dealer_gamma": 25083073,
+  "premium_pct": -0.095,
+  "premium_state": "NEGATIVE",
   "us_demand": false,
-  "coinbase_mid": 81030.61,
-  "binance_mid": 81042.43,
-  "usdt_usd": 0.99927,
-  "premium_hors_usdt_pct": 0.0579,
-  "premium_at": "2026-10-08T16:49:43+00:00"
+  "coinbase_mid": 80733.26,
+  "binance_mid": 80809.99,
+  "usdt_usd": 0.99913,
+  "premium_hors_usdt_pct": -0.0075,
+  "premium_at": "2026-10-08T17:05:04+00:00"
  },
  "liquidity": {
-  "mid": 81056.01,
-  "couverture_pct": 0.898,
+  "mid": 80783.64,
+  "couverture_pct": 0.76,
   "bandes": {
    "0.1": {
-    "bid_btc": 125.79,
-    "ask_btc": 80.45,
-    "ratio": 1.56
+    "bid_btc": 89.0,
+    "ask_btc": 87.83,
+    "ratio": 1.01
    },
    "0.5": {
-    "bid_btc": 341.65,
-    "ask_btc": 162.44,
-    "ratio": 2.1
+    "bid_btc": 340.27,
+    "ask_btc": 197.7,
+    "ratio": 1.72
    }
   },
   "bande_ref_pct": 0.5,
-  "ratio_bid_ask": 2.1,
-  "total_bid": 341.65,
-  "total_ask": 162.44,
+  "ratio_bid_ask": 1.72,
+  "total_bid": 340.27,
+  "total_ask": 197.7,
   "bid_walls": [
    [
-    81020,
-    78.1
-   ],
-   [
-    80940,
-    69.0
-   ],
-   [
     80500,
-    51.5
+    54.0
    ],
    [
     80640,
-    31.4
+    46.4
    ],
    [
-    81000,
-    26.4
+    80480,
+    26.9
+   ],
+   [
+    80740,
+    24.0
    ],
    [
     80720,
-    26.1
+    23.9
+   ],
+   [
+    80700,
+    23.3
    ]
   ],
   "ask_walls": [
    [
+    80800,
+    31.6
+   ],
+   [
     81080,
-    21.5
+    26.6
    ],
    [
-    81060,
-    21.5
-   ],
-   [
-    81120,
+    80840,
     19.5
    ],
    [
-    81140,
-    18.1
+    80820,
+    19.3
    ],
    [
-    81100,
-    16.6
+    80860,
+    17.7
    ],
    [
-    81720,
-    12.4
+    80880,
+    13.4
    ]
   ],
   "wall_bin_usd": 20,
@@ -383,317 +154,269 @@
    "bids": 5000,
    "asks": 5000
   },
-  "meilleur_bid": 81056.0,
-  "meilleur_ask": 81056.01,
+  "meilleur_bid": 80783.63,
+  "meilleur_ask": 80783.64,
   "profil_bids": [
    [
+    80160,
+    10.189
+   ],
+   [
+    80180,
+    16.605
+   ],
+   [
+    80200,
+    11.023
+   ],
+   [
+    80220,
+    6.837
+   ],
+   [
+    80240,
+    15.052
+   ],
+   [
+    80260,
+    1.271
+   ],
+   [
+    80280,
+    1.813
+   ],
+   [
+    80300,
+    7.654
+   ],
+   [
     80320,
-    2.467
+    3.126
    ],
    [
     80340,
-    2.797
+    2.917
    ],
    [
     80360,
-    1.459
+    1.593
    ],
    [
     80380,
-    2.31
+    4.039
    ],
    [
     80400,
-    6.327
+    5.975
    ],
    [
     80420,
-    1.06
+    1.167
    ],
    [
     80440,
-    1.733
+    1.99
    ],
    [
     80460,
-    0.553
+    5.632
    ],
    [
     80480,
-    5.195
+    26.881
    ],
    [
     80500,
-    51.471
+    54.004
    ],
    [
     80520,
-    1.944
+    11.802
    ],
    [
     80540,
-    2.869
+    3.826
    ],
    [
     80560,
-    2.404
+    3.615
    ],
    [
     80580,
-    5.815
+    6.681
    ],
    [
     80600,
-    11.818
+    20.29
    ],
    [
     80620,
-    2.359
+    12.408
    ],
    [
     80640,
-    31.369
+    46.387
    ],
    [
     80660,
-    7.575
+    19.521
    ],
    [
     80680,
-    2.37
+    17.957
    ],
    [
     80700,
-    5.03
+    23.309
    ],
    [
     80720,
-    26.077
+    23.894
    ],
    [
     80740,
-    6.05
+    23.972
    ],
    [
     80760,
-    22.218
+    21.662
    ],
    [
     80780,
-    4.759
-   ],
-   [
-    80800,
-    17.805
-   ],
-   [
-    80820,
-    1.447
-   ],
-   [
-    80840,
-    5.247
-   ],
-   [
-    80860,
-    14.512
-   ],
-   [
-    80880,
-    8.188
-   ],
-   [
-    80900,
-    7.289
-   ],
-   [
-    80920,
-    11.726
-   ],
-   [
-    80940,
-    68.953
-   ],
-   [
-    80960,
-    11.779
-   ],
-   [
-    80980,
-    11.878
-   ],
-   [
-    81000,
-    26.363
-   ],
-   [
-    81020,
-    78.096
-   ],
-   [
-    81040,
-    3.781
+    5.258
    ]
   ],
   "profil_asks": [
    [
+    80780,
+    12.04
+   ],
+   [
+    80800,
+    31.559
+   ],
+   [
+    80820,
+    19.32
+   ],
+   [
+    80840,
+    19.538
+   ],
+   [
+    80860,
+    17.725
+   ],
+   [
+    80880,
+    13.405
+   ],
+   [
+    80900,
+    7.873
+   ],
+   [
+    80920,
+    7.916
+   ],
+   [
+    80940,
+    1.387
+   ],
+   [
+    80960,
+    4.711
+   ],
+   [
+    80980,
+    1.006
+   ],
+   [
+    81000,
+    8.364
+   ],
+   [
+    81020,
+    0.641
+   ],
+   [
     81040,
-    3.409
+    1.222
    ],
    [
     81060,
-    21.458
+    6.308
    ],
    [
     81080,
-    21.48
+    26.557
    ],
    [
     81100,
-    16.631
+    4.134
    ],
    [
     81120,
-    19.54
+    11.534
    ],
    [
     81140,
-    18.146
+    1.321
    ],
    [
     81160,
-    3.814
+    0.997
    ],
    [
     81180,
-    1.773
+    0.903
    ],
    [
     81200,
-    8.223
+    0.389
    ],
    [
     81220,
-    5.152
+    0.104
    ],
    [
     81240,
-    10.159
+    0.117
    ],
    [
     81260,
-    0.659
+    0.048
    ],
    [
     81280,
-    4.119
+    0.203
    ],
    [
     81300,
-    0.344
+    1.703
    ],
    [
     81320,
-    8.203
+    1.111
    ],
    [
     81340,
-    0.487
+    0.33
    ],
    [
     81360,
-    11.046
+    0.806
    ],
    [
     81380,
-    3.406
-   ],
-   [
-    81400,
-    3.46
-   ],
-   [
-    81420,
-    0.586
-   ],
-   [
-    81440,
-    0.341
-   ],
-   [
-    81460,
-    0.072
-   ],
-   [
-    81480,
-    0.626
-   ],
-   [
-    81500,
-    4.562
-   ],
-   [
-    81520,
-    0.142
-   ],
-   [
-    81540,
-    0.406
-   ],
-   [
-    81560,
-    0.065
-   ],
-   [
-    81580,
-    1.265
-   ],
-   [
-    81600,
-    4.043
-   ],
-   [
-    81620,
-    0.316
-   ],
-   [
-    81640,
-    0.321
-   ],
-   [
-    81660,
-    0.23
-   ],
-   [
-    81680,
-    0.148
-   ],
-   [
-    81700,
-    1.632
-   ],
-   [
-    81720,
-    12.367
-   ],
-   [
-    81740,
-    0.288
-   ],
-   [
-    81760,
-    0.153
-   ],
-   [
-    81780,
-    0.007
+    0.054
    ]
   ],
-  "snapshot_at": "2026-10-08T16:49:45+00:00"
+  "snapshot_at": "2026-10-08T17:05:09+00:00"
  },
  "status": {
   "btc_spot": "ok",
-  "indicators": "ok",
+  "indicators": "error: URLError: <urlopen error [Errno -3] Temporary failure in name resolution>",
   "macro": "ok",
   "micro_futures": "ok",
   "cvd": "ok",
@@ -701,7 +424,9 @@
   "premium": "ok",
   "liquidity": "ok"
  },
- "errors": [],
+ "errors": [
+  "indicators: URLError: <urlopen error [Errno -3] Temporary failure in name resolution>"
+ ],
  "meta": {
   "version": 1,
   "champs": {
