@@ -152,7 +152,7 @@ async function mesurer(nav, theme, injection, bc) {
   await page.route('**/*', r => {
     const u = r.request().url(), h = new URL(u).host, cors = { 'access-control-allow-origin': '*' };
     if (h.startsWith('127.0.0.1')) return r.continue();
-    if (h === 'data-api.binance.vision') {
+    if (h === 'api.binance.com') {
       let corps = binance(u);
       const p = new URL(u).pathname;
       if (TICKS && p.endsWith('/klines') && Array.isArray(corps) && corps.length) vivant.base(+corps[corps.length - 1][4]);

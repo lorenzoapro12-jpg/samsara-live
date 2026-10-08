@@ -33,7 +33,7 @@
   // Branche `direct` (heatmap.py, 08/10/2026) : les 30 dernières minutes, publiées chaque minute.
   // Elle comble le retard de master (15 min) : il ne reste que le cache de raw.githubusercontent.
   const DIRECT = 'https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/direct/';
-  const API = 'https://data-api.binance.vision/api/v3/';
+  const API = 'https://api.binance.com/api/v3/';
   const SYMBOLE = 'BTCUSDT';
 
   // ─── Réglages : changent le DÉTAIL, jamais une valeur affichée ──────────────
