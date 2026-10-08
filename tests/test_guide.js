@@ -91,8 +91,18 @@ titre('2. Niveaux nommés : leur origine en mots');
   const pub2 = G.niveauxPublies(sans);
   check('champ absent → niveau absent (jamais un niveau à 0)', !pub2.some(x => x.cle === 'zero_gamma' || x.cle === 'mur_vente') && pub2.every(x => x.p > 0));
   check('aucune publication (autre paire que BTCUSDT) → aucun niveau publié', G.niveauxPublies(null).length === 0);
-  const sr = G.niveauxSR([{ price: 83000, touches: 4, tf: '4h' }, { price: 82000, touches: 1, tf: '1h' }], P);
-  check('S/R : « Zone touchée 4 fois (4h) » ; une touche unique ne fait pas un niveau du Guide', sr.length === 1 && t(sr[0].nom) === 'Zone touchée 4 fois (4h)', sr);
+  const sr = G.niveauxSR([{ price: 83000, touches: 4, tf: '4h' }, { price: 82000, touches: 1, tf: '1h' }], P, { bougies: 500, pivot: 3, tolMin: 0.002, tolMax: 0.01 });
+  check('S/R : « Zone de 4 demi-tours (bougies 4 h) » (intervalle en mots) ; un pivot isolé ne fait pas un niveau du Guide', sr.length === 1 && t(sr[0].nom) === 'Zone de 4 demi-tours (bougies 4 h)'
+    && /4 sommets ou creux locaux/.test(t(sr[0].origine)) && /500 dernières bougies 4 h/.test(sr[0].origine), sr);
+  const lp = G.libelleNiveau({ p: put.p, pMin: put.p, pMax: put.p, raisons: [put] }, 'debutant');
+  check('mur d’options : le libellé dit le strike PUBLIÉ (80 000 $), pas sa conversion en USDT', t(lp).startsWith('Mur d’options (puts) · 80 000 $ · modèle · lu à ') && !lp.includes(G.chiffres(put.p)), lp);
+  // Murs du mauvais côté du prix : plus dans le carnet tel quel ; un mur d'achat et un de vente ne partagent pas une bande.
+  const vente = pub.find(x => x.cle === 'mur_vente');
+  const ch2 = G.choisirNiveaux([achat, vente], (achat.p + vente.p) / 2, P);
+  const tous2 = [...ch2.dessus, ...ch2.dessous];
+  check('mur d’achat SOUS le prix et mur de vente AU-DESSUS : gardés, chacun sa bande', achat.p < vente.p && tous2.length === 2 && tous2.every(n => n.raisons.length === 1), tous2.map(n => n.raisons.map(r => r.cle)));
+  const ch3 = G.choisirNiveaux([achat, vente], achat.p - 50, P);
+  check('mur d’achat publié AU-DESSUS du prix actuel : écarté (il n’est plus dans le carnet tel quel)', ![...ch3.dessus, ...ch3.dessous].some(n => n.raisons.some(r => r.cle === 'mur_achat')) && ch3.ecartes.some(r => r.cle === 'mur_achat'));
 }
 {
   const R = (cle, p, nom) => ({ cle, p, nom, court: nom, art: 'le ' + nom, origine: '', nature: 'mesuré', detail: '', detailCourt: '' });
@@ -102,7 +112,17 @@ titre('2. Niveaux nommés : leur origine en mots');
   check('au plus ' + P.niveauxParCote + ' niveaux de chaque côté, les plus proches', choix.dessus.length === P.niveauxParCote && choix.dessous.length === P.niveauxParCote
     && choix.dessus[0].p === 83000 && choix.dessous[0].p === 81900, choix);
   const fus = choix.dessus[1];
-  check('deux niveaux à moins de ' + P.fusion * 100 + ' % → UNE bande qui dit ses deux raisons', fus.raisons.length === 2 && /^2 raisons · /.test(t(G.libelleNiveau(fus, 'debutant'))), G.libelleNiveau(fus, 'debutant'));
+  const lf = G.libelleNiveau(fus, 'debutant');
+  check('deux niveaux à moins de ' + P.fusion * 100 + ' % → UNE bande qui dit ses deux raisons, CHACUNE avec son prix', fus.raisons.length === 2 && /^84 120 – 84 200 \$ · 2 raisons : /.test(t(lf)) && lf.includes('84 120 $') && lf.includes('84 200 $'), lf);
+  check('la bande couvre tous ses prix (pMin, pMax) ; son prix de référence est l’un d’eux, jamais une moyenne', fus.pMin === 84120 && fus.pMax === 84200 && fus.raisons.some(r => r.p === fus.p));
+  // Pas de fusion en chaîne : trois niveaux espacés de 0,2 % ne font pas UNE bande de 0,4 %.
+  const ch = G.choisirNiveaux([R('x', 100000, 'A'), R('y', 100200, 'B'), R('z', 100400, 'C')], 99000, P);
+  check('fusion à lien complet : l’écart total d’une bande reste sous ' + P.fusion * 100 + ' % (pas de chaîne qui s’étire)', ch.dessus.every(n => (n.pMax - n.pMin) / n.pMin < P.fusion) && ch.dessus.length === 2, ch.dessus.map(n => [n.pMin, n.pMax]));
+  // Tout prix écrit dans un libellé, dans les deux modes, est le prix d'une raison réelle.
+  const sources = new Set([84120, 84200, 83000, 81900, 80000].map(v => G.chiffres(v)));
+  const ecrits = [...choix.dessus, ...choix.dessous].flatMap(n => ['debutant', 'expert'].flatMap(m => [G.libelleNiveau(n, m), G.libelleNiveau(n, m, '$', true)]))
+    .flatMap(x => x.match(/\d{1,3}(?: \d{3})+(?:,\d+)?|\d+,\d+/g) || []);
+  check('chaque prix affiché (libellés, deux modes) est celui d’un niveau source — aucune moyenne', ecrits.length > 0 && ecrits.every(v => sources.has(v)), ecrits.filter(v => !sources.has(v)));
   check('niveau au-delà de ' + P.distanceMax * 100 + ' % du prix : écarté', ![...choix.dessus, ...choix.dessous].some(x => x.p === 95000));
   check('libellé débutant « Plus haut d’hier · 84 120 $ » ; expert abrégé, même prix', G.libelleNiveau({ p: 84120, raisons: [R('a', 84120, 'Plus haut d’hier')] }, 'debutant') === 'Plus haut d’hier · 84 120 $'
     && G.libelleNiveau({ p: 84120, raisons: [R('a', 84120, 'Plus haut d’hier')] }, 'expert').includes('84 120'));
@@ -113,14 +133,27 @@ titre('3. Cassure : deux clôtures au-delà de la bande, une mèche n’est pas 
 {
   const p = 100, demi = 0.5;
   const C = [99, 99, 99, 99, 99], H = C.map(c => c + 0.3), L = C.map(c => c - 0.3);
-  const etat = (c, h, l) => G.etatFerme(c, h || c.map(x => x + 0.3), l || c.map(x => x - 0.3), c.length, p, demi, P);
+  const etat = (c, h, l) => G.etatFerme(c, h || c.map(x => x + 0.3), l || c.map(x => x - 0.3), c.length, p - demi, p + demi, P);
   check('aucune clôture au-delà : pas de cassure', etat(C).cassure === null);
   check('une clôture au-dessus de la bande : « cassé (1/2 clôtures) », vers le haut', etat([99, 99, 99, 99, 101]).cassure === 'demi' && etat([99, 99, 99, 99, 101]).sens === 1);
   const v = etat([99, 99, 99, 101, 101.2]);
   check('deux clôtures successives au-dessus : « cassé (2/2 clôtures, validé) »', v.cassure === 'valide' && v.sens === 1, v);
   const rt = etat([99, 99, 99, 101, 101.2], [99.3, 99.3, 99.3, 101.3, 101.5], [98.7, 98.7, 98.7, 100.7, 100.4]);
   check('la 2e clôture dont la mèche revient sur la bande : retour réussi (retest) noté', rt.cassure === 'valide' && rt.retest === true, rt);
-  check('une clôture au-delà PUIS retour dans la bande : la cassure ne compte plus', etat([99, 99, 101, 99.8]).cassure === null);
+  const ret = etat([99, 99, 101, 99.8]);
+  check('une clôture au-delà PUIS retour dans la bande : « cassé (1 clôture), revenu sur la bande »', ret.cassure === 'demi' && ret.enRetour === true, ret);
+  const rr = etat([99, 99, 99, 101, 100.3, 101.2]);
+  check('règle du propriétaire : 1 clôture au-delà, retour dans la bande, clôture au-delà → validé par un retour réussi', rr.cassure === 'valide' && rr.retest === true && rr.sens === 1, rr);
+  check('… et dit ainsi : « cassé vers le haut (validé par un retour réussi) »', t(G.etatLive({ p, demi, dessus: false, ferme: rr }, 101.3, null, P).texte) === 'cassé vers le haut (validé par un retour réussi)');
+  const rm = etat([99, 99, 99, 101, 101.2], [99.3, 99.3, 99.3, 101.3, 101.5], [98.7, 98.7, 98.7, 100.7, 100.4]);
+  const rw = etat([99, 99, 99, 101, 101.6, 101.2], [99.3, 99.3, 99.3, 101.3, 101.9, 101.5], [98.7, 98.7, 98.7, 100.7, 101.3, 100.3]);
+  check('… ou 1 clôture au-delà puis une mèche revenue sur la bande et une clôture au-delà', rm.cassure === 'valide' && rm.retest && rw.cassure === 'valide', [rm, rw]);
+  const vr = etat([98, 98, 98, 101, 101, 100.2, 101.5, 102]);
+  check('une cassure validée suivie d’un retour puis d’une reprise reste validée (le retour ne l’efface pas)', vr.cassure === 'valide' && vr.sens === 1, vr);
+  const mf = etat([99, 99, 99, 99, 100.3], [99.3, 99.3, 99.3, 99.3, 101], null);
+  check('mèche au-delà, clôture dans la moitié haute de la bande : « percé en mèche » aussi', mf.cassure === null && mf.meche === true, mf);
+  const avant = G.etatFerme([98, 98, 98, 101, 101], [98.3, 98.3, 98.3, 101.3, 101.3], [97.7, 97.7, 97.7, 100.7, 100.7], 5, p - demi, p + demi, P, 4);
+  check('niveau publié : les clôtures d’avant sa lecture ne comptent pas (aucune cassure « vue » avant le mur)', avant.cassure === null, avant);
   check('au-dessus puis deux clôtures sous la bande : cassure validée VERS LE BAS', etat([101, 101, 101, 99, 99]).cassure === 'valide' && etat([101, 101, 101, 99, 99]).sens === -1);
   const m = etat([99, 99, 99, 99, 99.4], [99.3, 99.3, 99.3, 99.3, 101], null);
   check('mèche au-delà, clôture en deçà : « percé en mèche », pas « cassé »', m.cassure === null && m.meche === true, m);
@@ -129,10 +162,11 @@ titre('3. Cassure : deux clôtures au-delà de la bande, une mèche n’est pas 
   check('prix live dans la bande : « en test »', G.etatLive(niv, 100.2, null, P).mot === 'test');
   const fin = { p, demi: 0.1, dessus: true, ferme: etat(C) };
   check('prix live à moins de ' + P.proche * 100 + ' % : « proche » ; au-delà : « loin »', G.etatLive(fin, 99.7, null, P).mot === 'proche' && G.etatLive(fin, 90, null, P).mot === 'loin');
-  check('prix live au-delà de la bande sans clôture : « franchi en séance (clôture à venir) »', G.etatLive(niv, 101, null, P).mot === 'franchi');
-  check('mèche de la bougie en cours au-delà, prix revenu : « percé en mèche »', G.etatLive(niv, 99.4, { high: 100.8, low: 99 }, P).mot === 'meche');
+  check('prix live au-delà de la bande sans clôture : « au-delà (bougie pas encore close) »', G.etatLive(niv, 101, null, P).mot === 'franchi' && t(G.etatLive(niv, 101, null, P).texte) === 'au-delà (bougie pas encore close)');
+  check('mèche de la bougie en cours au-delà, prix revenu : percé en mèche', G.etatLive(niv, 99.4, { high: 100.8, low: 99 }, P).mot === 'mecheCours');
   const e = G.etatLive(niv, 99, null, P);
-  check('distance au prix LIVE, dite comme telle : « à +1,01 % du prix live »', t(G.texteEtatLive(e, 'debutant')).startsWith('à +1,01 % du prix live'), G.texteEtatLive(e, 'debutant'));
+  check('distance au prix LIVE, dite comme telle, le MOT d’abord : « loin · à +1,01 % du prix live »', t(G.texteEtatLive(e, 'debutant')) === 'loin · à +1,01 % du prix live', G.texteEtatLive(e, 'debutant'));
+  check('mèche de la bougie en cours : « percé en mèche (bougie en cours) »', t(G.etatLive(niv, 99.4, { high: 100.8, low: 99 }, P).texte) === 'percé en mèche (bougie en cours)');
   check('prix live absent : dit absent, aucune distance inventée', G.etatLive(niv, null, null, P).mot === null && /absent/.test(G.texteEtatLive(G.etatLive(niv, null, null, P), 'debutant')));
   const cv = G.etatLive({ p, demi, dessus: false, ferme: v }, 101.3, null, P);
   check('cassure validée : son sens est dit (« cassé vers le haut (2/2 clôtures, validé) »)', t(cv.texte) === 'cassé vers le haut (2/2 clôtures, validé)', cv);
@@ -149,7 +183,14 @@ titre('4. Régime : seuils de convention lus dans PARAM.guide');
   check('ADX ≤ ' + P.adxSans + ' : « Sans tendance nette » ; entre les deux : « Tendance faible »', r(17, 20, 18, 1, 1).cle === 'sans' && r(22, 20, 18, 1, 1).cle === 'faible');
   const larg = Array.from({ length: n }, (_, i) => 0.05 - i * 0.0005);
   const c = r(17, 20, 18, 1, 1, larg);
-  check('largeur de Bollinger au plus bas : « Compression : volatilité au plus bas depuis … »', c.compression && c.depuis === null && /Compression : volatilité au plus bas/.test(t(G.texteRegime(c, 'debutant', P))), c);
+  check('largeur de Bollinger au plus bas de tout l’historique : « Compression : volatilité basse … la plus basse de l’historique chargé »', c.compression && c.depuisDebut && /Compression : volatilité basse/.test(t(G.texteRegime(c, 'debutant', P))) && /la plus basse de l’historique chargé/.test(G.texteRegime(c, 'debutant', P)), c);
+  // Largeur non monotone : la bougie d'avant était plus ÉTROITE → pas de « au plus bas depuis 1 bougies ».
+  const zz = Array.from({ length: n }, (_, i) => 0.05 - Math.min(i, n - 2) * 0.0005 + (i === n - 1 ? 0.0001 : 0));
+  const c2 = r(17, 20, 18, 1, 1, zz), t2 = t(G.texteRegime(c2, 'debutant', P));
+  check('largeur non monotone (la précédente plus étroite) : compression dite, sans « au plus bas depuis N »', c2.compression && c2.depuis === null && !/depuis/.test(t2) && !/1 bougies/.test(t2), [c2, t2]);
+  const zz2 = Array.from({ length: n }, (_, i) => (i === n - 1 ? 0.01 : i < 5 ? 0.005 : 0.03));
+  const c3 = r(17, 20, 18, 1, 1, zz2);
+  check('« au plus bas depuis N bougies » : N = les bougies précédentes TOUTES plus larges (≥ ' + P.compressionDepuisMin + ')', c3.depuis === n - 1 - 5 && /au plus bas depuis 54 bougies/.test(t(G.texteRegime(c3, 'debutant', P))), [c3.depuis, G.texteRegime(c3, 'debutant', P)]);
   check('ADX absent (historique court) : dit, pas inventé', r(null, 1, 1, 1, 1).cle === 'inconnu' && /historique/.test(G.texteRegime(r(null, 1, 1, 1, 1), 'debutant', P)));
 }
 
@@ -172,6 +213,12 @@ const d = 0.4;
   check('… puis le prix touche l’objectif : « objectif théorique atteint »', f3 && f3.fin === 'atteint', f3 && G.etatForme(f3));
   const f4 = run([...lin(106, 102.5, 2), 102, ...lin(102, 112, 6)]).formes.find(f => f.type === 'double_sommet');
   check('… ou clôture au-dessus des sommets : « invalidé »', f4 && f4.fin === 'invalide' && G.etatForme(f4).cle === 'invalide', f4 && G.etatForme(f4));
+  // Objectif jugé en CLÔTURE, comme l'invalidation : une mèche qui le touche ne suffit pas.
+  const s5 = serie(base.concat([...lin(106, 102.5, 2), 102]), d);
+  const ob = run([...lin(106, 102.5, 2), 102]).formes.find(f => f.type === 'double_sommet').objectif;
+  const C5 = s5.C.concat([ob + 1.5]), H5 = s5.H.concat([ob + 2]), L5 = s5.L.concat([ob - 0.5]);
+  const f5 = G.detecter({ h: H5, l: L5, c: C5, atr: atrDe(H5, L5, C5, P.atrPeriode), n: C5.length }, P).formes.find(f => f.type === 'double_sommet');
+  check('objectif touché par une MÈCHE seule : pas « atteint » (même base que l’invalidation : la clôture)', f5 && f5.fin !== 'atteint', f5 && f5.fin);
   const r3 = run([...lin(106, 102.5, 2), 102, ...lin(102, 95, 6)]);
   check('bilan : 1 confirmé, objectif atteint 1 fois, « Échantillon faible. », aucun pourcentage',
     r3.bilan.double_sommet.confirmes >= 1 && r3.bilan.double_sommet.atteints >= 1 && /Échantillon faible\.$/.test(t(G.texteBilan(r3.bilan.double_sommet, { n: r3.n, intervalle: '15m', duree: r3.n * 900 }, P, 'debutant')))
@@ -183,6 +230,22 @@ const d = 0.4;
   const s = serie(base, d), r = G.detecter({ h: s.H, l: s.L, c: s.C, atr: atrDe(s.H, s.L, s.C, P.atrPeriode), n: s.C.length }, P);
   const f = r.formes.find(x => x.type === 'double_creux');
   check('double creux détecté et confirmé (2 clôtures au-dessus de la ligne de cou)', f && G.etatForme(f).cle === 'confirme' && /au-dessus de la ligne de cou/.test(G.etatForme(f).texte), f && G.etatForme(f));
+}
+{
+  // Ligne de cou cassée ENTRE le 2e sommet et la clôture qui le rend repérable (b.i + pivot) :
+  // la forme n'était visible qu'après coup — ni montrée, ni comptée.
+  const k = P.pivot;
+  const base = [...lin(100, 100, 20), ...lin(100, 110, 10), ...lin(110, 104, 8), ...lin(104, 110.1, 8), ...lin(110.1, 100, k), 99.5, 99];
+  const s = serie(base, d), r = G.detecter({ h: s.H, l: s.L, c: s.C, atr: atrDe(s.H, s.L, s.C, P.atrPeriode), n: s.C.length }, P);
+  check('ligne de cou confirmée avant que la forme soit repérable : non comptée (aucun « atteint » connu d’avance)', !r.formes.some(f => f.type === 'double_sommet' && f.jConf !== null && f.jConf <= f.t)
+    && r.bilan.double_sommet.confirmes === 0, r.formes.filter(f => f.type === 'double_sommet').map(f => ({ t: f.t, jConf: f.jConf, fin: f.fin })));
+}
+{
+  // Triple sommet : (a, b) puis (b, c) — le même mouvement, un seul cas dans le bilan.
+  const base = [...lin(100, 100, 20), ...lin(100, 110, 10), ...lin(110, 104, 8), ...lin(104, 110.1, 8), ...lin(110.1, 104.2, 8), ...lin(104.2, 110.05, 8), ...lin(110.05, 102.5, 4), 102, 101.5];
+  const s = serie(base, d), r = G.detecter({ h: s.H, l: s.L, c: s.C, atr: atrDe(s.H, s.L, s.C, P.atrPeriode), n: s.C.length }, P);
+  const conf = r.formes.filter(f => f.type === 'double_sommet' && f.jConf !== null && !f.doublon);
+  check('triple sommet : une seule confirmation comptée (pas deux doubles sur la même cassure)', conf.length === 1 && r.bilan.double_sommet.confirmes === 1, r.formes.filter(f => f.type === 'double_sommet').map(f => ({ a: f.a.i, b: f.b.i, jConf: f.jConf, doublon: f.doublon })));
 }
 {
   // Range : 60 bougies entre 98 et 102, puis deux clôtures au-dessus.
@@ -222,9 +285,17 @@ const d = 0.4;
   const b = tout.bilan;
   check('bilan : confirmés = atteints + invalidés + délai + ouverts, pour chaque type', G.TYPES.every(k => b[k].confirmes === b[k].atteints + b[k].invalides + b[k].expires + b[k].ouverts), b);
   check('au plus ' + P.formesMax + ' formes montrées à la fois', G.formesAffichees(tout, P).length <= P.formesMax);
+  const vue = [C.length - 50, C.length];
+  const aff = G.formesAffichees(tout, P, vue[0], vue[1]);
+  check('formes montrées : toutes commencent dans la vue, aucune candidate tombée avant confirmation, aucun recouvrement', aff.every(f => f.debut >= vue[0] && f.fin !== 'invalide_avant')
+    && aff.every((f, k) => aff.every((g, m) => m === k || f.debut > (g.fin ? g.jFin : tout.n - 1) || g.debut > (f.fin ? f.jFin : tout.n - 1))), aff.map(f => [f.type, f.debut, f.fin]));
+  check('aucune forme comptée n’est confirmée avant d’être repérable (jConf > t)', tout.formes.every(f => f.jConf === null || f.jConf > f.t));
+  check('repère sans forme calculé pour chaque type confirmé (mêmes distances, même sens)', G.TYPES.every(k => !b[k].confirmes || b[k].temoin.departs > 0), G.TYPES.map(k => [k, b[k].confirmes, b[k].temoin]));
   const exp = G.texteBilan(b.triangle, { n: C.length, intervalle: '15m', duree: C.length * 900 }, P, 'expert'), deb = G.texteBilan(b.triangle, { n: C.length, intervalle: '15m', duree: C.length * 900 }, P, 'debutant');
   t(exp); t(deb);
-  check('bilan : mêmes comptes en débutant et en expert, « mesuré sur l’historique chargé » dit', exp.includes(b.triangle.confirmes + ' conf.') && deb.includes(String(b.triangle.confirmes)) && /Mesuré sur l’historique chargé/.test(deb), { exp, deb });
+  check('bilan : mêmes comptes en débutant et en expert, « mesuré » dit dans les deux', exp.includes(b.triangle.confirmes + ' conf.') && deb.includes(String(b.triangle.confirmes)) && /Mesuré sur l’historique chargé/.test(deb) && /^Mesuré · /.test(exp), { exp, deb });
+  const td = G.texteBilan(b.double_creux, { n: C.length, intervalle: '15m', duree: C.length * 900 }, P, 'debutant');
+  check('bilan débutant : formes repérées, issues, et le repère sans forme en comptes (aucun %)', /repérés/.test(t(td)) && (!b.double_creux.confirmes || /Repère sans forme/.test(td)) && !/%/.test(td), td);
   const t0 = Date.now(); for (let k = 0; k < 5; k++) G.detecter({ h: H, l: L, c: C, atr, n: C.length }, P);
   check(`rejeu rapide (${((Date.now() - t0) / 5).toFixed(1)} ms pour ${C.length} bougies)`, (Date.now() - t0) / 5 < 200);
 }
@@ -238,7 +309,9 @@ titre('6. Et ensuite ? et lecture du moment : des niveaux nommés, aucune direct
   check('deux chemins : seuil = premier niveau de chaque côté, cible = le suivant (ou aucune)', s.haut.seuil.p === 84120 && s.haut.cible.p === 85400 && s.bas.seuil.p === 81900 && s.bas.cible === null);
   const h = G.texteSuite(s.haut, 'debutant'), b = G.texteSuite(s.bas, 'debutant');
   t(h.join(' ')); t(b.join(' '));
-  check('« Si clôture au-dessus de 84 120 $ → prochain niveau 85 400 $ » ; sans cible : dit', h.join(' ') === 'Si clôture au-dessus de 84 120 $ → prochain niveau 85 400 $' && /aucun autre niveau/.test(b.join(' ')), [h, b]);
+  check('« Si clôture au-dessus de 84 120 $ → niveau suivant : 85 400 $ » ; sans cible : dit', h.join(' ') === 'Si clôture au-dessus de 84 120 $ → niveau suivant : 85 400 $' && /aucun autre niveau/.test(b.join(' ')), [h, b]);
+  const h15 = G.texteSuite(s.haut, 'debutant', '$', '15m');
+  check('l’intervalle de la clôture est dit : « Si clôture 15 min au-dessus de … »', t(h15[0]) === 'Si clôture 15 min au-dessus de 84 120 $', h15);
   check('aucune probabilité dans les chemins', ![...h, ...b].some(x => /%|probab|chance/i.test(x)));
   const l = t(G.lecture({ prix: 82600, unite: '$', choix, enTest: null, regime: { cle: 'sans' }, forme: null }));
   check('lecture : « Le prix (82 600 $) est entre le plus bas d’hier (81 900 $) et le plus haut d’hier (84 120 $). Marché sans tendance nette. »',
@@ -246,6 +319,24 @@ titre('6. Et ensuite ? et lecture du moment : des niveaux nommés, aucune direct
   const l2 = t(G.lecture({ prix: 81910, unite: '$', choix, enTest: choix.dessous[0], regime: null, forme: null }));
   check('prix dans une bande : « teste »', l2 === 'Le prix (81 910 $) teste le plus bas d’hier (81 900 $).', l2);
   check('prix live absent : dit absent', /Prix live absent/.test(G.lecture({ prix: null, choix, regime: null })));
+  const bas1 = { dessus: [], dessous: [{ p: 95, raisons: [{ cle: 'sr', p: 95, nom: 'Zone de 4 demi-tours (bougies 4 h)', art: 'une zone de 4 demi-tours (bougies 4 h)' }] }] };
+  const l3 = t(G.lecture({ prix: 100, unite: '$', choix: bas1, regime: null }));
+  check('« au-dessus d’une zone » (élision), jamais « de une »', /au-dessus d’une zone de 4 demi-tours/.test(l3) && !/\bde une?\b/.test(l3), l3);
+  check('élisions : du, des, d’un, d’une, d’', G.deArt('le zéro gamma') === 'du zéro gamma' && G.deArt('un mur') === 'd’un mur' && G.deArt('une zone') === 'd’une zone' && G.deArt('les murs') === 'des murs');
+  // Niveaux publiés : la phrase et les chemins disent l'heure de lecture et « modèle ».
+  const md = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'contre', 'publication.json'), 'utf8'));
+  const pub = G.niveauxPublies(md), hm = md.liquidity.snapshot_at.slice(11, 16);
+  const zg = pub.find(r => r.cle === 'zero_gamma'), pw = pub.find(r => r.cle === 'put_wall'), mur = pub.find(r => r.cle === 'mur_achat');
+  const unNiv = r => ({ p: r.p, pMin: r.p, pMax: r.p, raisons: [r] });
+  const lp = t(G.lecture({ prix: Math.max(zg.p, pw.p) + 50, unite: '$', choix: { dessus: [], dessous: [unNiv(pw), unNiv(zg)] }, regime: null }));
+  check('lecture avec un niveau d’options : « modèle » et « lu à HH:MM » dits', /modèle/.test(lp) && /lu à \d\d:\d\d/.test(lp), lp);
+  const lm = t(G.lecture({ prix: mur.p + 20, unite: '$', choix: { dessus: [], dessous: [unNiv(mur)] }, regime: null }));
+  check('lecture avec un mur du carnet : « lu à " + hm + " »'.replace('" + hm + "', hm), lm.includes('lu à ' + hm), lm);
+  const sp = G.suite({ dessus: [], dessous: [unNiv(mur), unNiv(pw)] }).bas;
+  const ts = ['debutant', 'expert'].flatMap(m => ['plein', 'court', 'mini'].map(v => G.texteSuite(sp, m, '$', '15m', P, v).join(' ')));
+  ts.forEach(t);
+  check('chemins : un niveau publié garde son heure dans toutes les variantes (débutant, expert, court, minimal)', ts.every(x => /\d\d:\d\d/.test(x)), ts);
+  check('chemin vers un mur d’options : le strike publié (80 000), « modèle »', /80 000/.test(ts[0]) && /modèle/.test(ts[0]), ts[0]);
 }
 
 // ── 7. Dans la page ──
@@ -267,10 +358,17 @@ titre('7. Dans la page : paramètres, menu, fiche, choix gardé, marge de futur'
   check('Guide affiché par défaut', dansPage('overlays.guide') === true);
   const masque = chargerPage({ stockage: { 'samsara-guide-v1': '0' } });
   check('masqué une fois, il le reste (samsara-guide-v1)', vm.runInContext('overlays.guide', masque.sandbox) === false);
-  const marge = dansPage('[pasBougie(1000, 50) * 50 + margeFutur(1000), margeFutur(1000), (overlays.guide = false, pasBougie(1000, 50) * 50), margeFutur(1000), (overlays.guide = true)]');
-  check('marge de futur : bougies + marge = largeur du tracé ; Guide masqué : marge nulle, le pas d’avant', Math.abs(marge[0] - 1000) < 1e-9 && marge[1] > 0 && marge[2] === 1000 && marge[3] === 0, marge);
+  const marge = dansPage('candles = Array.from({ length: 60 }, (_, i) => ({ time: i * 900, open: 1, high: 2, low: 0.5, close: 1, volume: 1 })); viewStart = 10; viewEnd = 60;'
+    + '[pasBougie(1000, 50) * 50 + margeFutur(1000), margeFutur(1000), (overlays.guide = false, pasBougie(1000, 50) * 50), margeFutur(1000), (overlays.guide = true, viewEnd = 40, margeFutur(1000))]');
+  dansPage('candles = []; viewEnd = 0;');
+  check('marge de futur : bougies + marge = largeur du tracé ; Guide masqué, ou vue qui ne montre plus la dernière bougie : marge nulle, le pas d’avant', Math.abs(marge[0] - 1000) < 1e-9 && marge[1] > 0 && marge[2] === 1000 && marge[3] === 0 && marge[4] === 0, marge);
   const appSrc = fs.readFileSync(path.join(REPO, 'js/app.js'), 'utf8');
   check('une seule formule du pas : plus aucun « pw / » dans le calcul des bougies, du réticule, de la chaleur, des sous-graphes', !/const gap = pw \//.test(appSrc) && !/chartPw \/ n/.test(appSrc), (appSrc.match(/const gap = [^;]+;/g) || []));
+  // Les points d'une forme et le départ des chemins sont au CENTRE des bougies, au pixel près de
+  // tracerBougie (x + candleW / 2, x = pad.left + gap × i) — pas au milieu du créneau (gap / 2).
+  const xGuide = /const xDe = i => g\.pad\.left \+ g\.gap \* \(i - g\.vs\) \+ g\.candleW \/ 2;/.test(appSrc);
+  const xBougie = /const xm = x \+ candleW \/ 2;/.test(appSrc) && /tracerBougie\(ctx, pad\.left \+ gap \* i, candleW,/.test(appSrc) && /guidePreparer\(\{[^}]*candleW[^}]*\}\)/.test(appSrc);
+  check('Guide et bougies : même centre x (pad.left + gap × (i − vs) + candleW / 2)', xGuide && xBougie, { xGuide, xBougie });
   check('aucune minuterie dans le Guide (rien ne tourne au repos)', !/setInterval|setTimeout/.test(src) && !/setInterval|setTimeout/.test(appSrc.slice(appSrc.indexOf('// GUIDE — le dessin'), appSrc.indexOf('// Étiquettes d\'overlays posées'))));
 }
 
