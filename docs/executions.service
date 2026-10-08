@@ -1,0 +1,18 @@
+# Service systemd de l'enregistreur d'exécutions (executions.py), 08/10/2026.
+# Remplacer CHEMIN_DU_DEPOT et UTILISATEUR (le même utilisateur que la crontab de heatmap.py),
+# puis : sudo cp docs/executions.service /etc/systemd/system/samsara-executions.service
+#        sudo systemctl daemon-reload && sudo systemctl enable --now samsara-executions
+[Unit]
+Description=Samsara : exécutions BTCUSDT 24 h (executions.json)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=UTILISATEUR
+WorkingDirectory=CHEMIN_DU_DEPOT
+ExecStart=/usr/bin/python3 CHEMIN_DU_DEPOT/executions.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
