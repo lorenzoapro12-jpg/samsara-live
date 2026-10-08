@@ -92,7 +92,7 @@ async function ouvrir(nav, theme, vue) {
   await page.route('**/*', r => {
     const u = r.request().url(), h = new URL(u).host, cors = { 'access-control-allow-origin': '*' };
     if (h.startsWith('127.0.0.1')) return r.continue();
-    if (h === 'api.binance.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(binance(u)) });
+    if (h === 'data-api.binance.vision') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(binance(u)) });
     // Historique (js/chronique.js) : la publication d'il y a N commits, datée 7,5 × N min plus tôt
     // (une publication sur deux commits) — de quoi tracer les chiffres clés.
     const anc = u.match(/\/master~(\d+)\/market-data\.json/);

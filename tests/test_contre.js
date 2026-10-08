@@ -54,7 +54,7 @@ const ligne = (r, cle) => r.lignes.find(l => l.cle === cle);
 
 (async () => {
   titre('0. Constante d’API lue dans js/app.js');
-  check(`API de la page : ${API}`, /^https:\/\/api\.binance\.com\//.test(API || ''));
+  check(`API de la page : ${API}`, /^https:\/\/data-api\.binance\.vision\//.test(API || ''));
 
   titre('1. La publication enregistrée se retrouve');
   const r0 = await lancer(MD);

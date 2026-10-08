@@ -11,7 +11,7 @@
    au lieu de les redemander (prechargee) — paire et intervalle par défaut. */
 (function () {
   try {
-    var B = 'https://api.binance.com/api/v3/', P = window.__precharge = {};
+    var B = 'https://data-api.binance.vision/api/v3/', P = window.__precharge = {};
     var lire = function (u, o) { P[u] = fetch(u, o); P[u].catch(function () {}); };
     lire(B + 'klines?symbol=BTCUSDT&interval=15m&limit=1000');
     lire(B + 'ticker/24hr?symbol=BTCUSDT&type=MINI');

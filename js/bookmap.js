@@ -29,7 +29,7 @@
   const HEATMAP_URL = RAW + 'heatmap.json';
   const DATA_URL = RAW + 'market-data.json';
   const EXEC_URL = RAW + 'executions.json';
-  const API = 'https://api.binance.com/api/v3/';
+  const API = 'https://data-api.binance.vision/api/v3/';
   const SYMBOLE = 'BTCUSDT';
 
   // ─── Réglages : changent le DÉTAIL, jamais une valeur affichée ──────────────
