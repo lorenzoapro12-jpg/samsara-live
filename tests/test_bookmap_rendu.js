@@ -138,6 +138,11 @@ async function ouvrir(nav, opts) {
         if (!corps) return r.fulfill({ status: 404, headers: cors }).catch(() => {});
         return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(corps) }).catch(() => {});
       }
+      if (u.includes('profondeur.json')) {
+        const corps = opts.profondeur && opts.profondeur();
+        if (!corps) return r.fulfill({ status: 404, headers: cors }).catch(() => {});
+        return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(corps) }).catch(() => {});
+      }
       if (u.includes('executions.json')) {
         comptes.exec++;
         if (!opts.executions) return r.fulfill({ status: 404, headers: cors }).catch(() => {});
@@ -413,7 +418,7 @@ async function pixel(page, x, y) {
         lu = await p12.evaluate(() => document.getElementById('lecture').innerText);
         if (/Live [^\n]*intensité/.test(lu)) break;
       }
-      check('lecture du live (lu avant l\'arrivée de heatmap.json) : en BTC, valeur mesurée', /Live [^\n]*intensité \d+ → plus gros niveau/.test(lu) && /mesuré : [\d,]+ BTC/.test(lu), lu);
+      check('lecture du live (lu avant l\'arrivée de heatmap.json) : en BTC, valeur mesurée', /Live [^\n]*intensité \d+ → (plus gros niveau|somme de la tranche)/.test(lu) && /mesuré : [\d,]+ BTC/.test(lu), lu);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p12.close();
     }
@@ -1175,6 +1180,25 @@ async function pixel(page, x, y) {
       check('la carte va jusqu\'à la dernière minute de « direct » (3 de plus que master)', fin === (der[0] + 4) * 60e3, [fin, (der[0] + 4) * 60e3]);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p42.close();
+    }
+    {
+      titre('43. Profondeur Coinbase (profondeur.json) : peinte sous la carte, visible hors de sa bande, rendu exact');
+      const t = Math.floor(Date.now() / 300e3), cols = [];
+      // Une bande de ±10 % autour de 83 000 $ (tranches de 100 $), intensité 120 partout.
+      for (let k = 30; k >= 1; k--) cols.push([t - k, 747, new Array(83).fill(120), 830, new Array(83).fill(120)]);
+      const loin = () => ({ updated: new Date().toISOString(), sym: 'BTC-USD', t0: cols[0][0] * 300, dt: 300, dp: 100, format: 'colonnes-1',
+        encodage: { ref_btc: 100, plafond: 255, agregation_tranche: 'somme', echelle: 'propre' }, colonnes: cols });
+      let p43;
+      ({ page: p43, erreurs } = await ouvrir(nav, { encodage: true, profondeur: loin }));
+      await p43.waitForTimeout(1500);
+      const e43 = await etat(p43);
+      check('profondeur lue et peinte', e43.loin && e43.loin.peinte && e43.loin.dp === 100, e43.loin);
+      const v43 = await p43.evaluate(() => window.__carte.verifierChaleur());
+      check('chaleur affichée = repeint complet (profondeur comprise)', v43.differents === 0, v43);
+      const P43 = (await etat(p43)).pastillesCompletes.find(x => x.startsWith('Carte publiée')) || '';
+      check('la pastille de la carte dit la source et l\'échelle propre', /au-delà : carnet Coinbase ±10 %.+échelle propre/.test(P43), P43);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p43.close();
     }
   } finally {
     await nav.close();
