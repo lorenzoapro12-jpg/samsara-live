@@ -179,6 +179,9 @@ def tour(s, prochain):
 
 
 def main():
+    # Sous systemd, stdout n'est pas un terminal : Python l'écrirait par blocs de 8 Ko et le
+    # journal resterait vide pendant ≈ 2 h (constaté au premier démarrage, 08/10/2026).
+    sys.stdout.reconfigure(line_buffering=True)
     une_fois = "--une-fois" in sys.argv
     os.makedirs(os.path.dirname(RUN_LOCK) or ".", exist_ok=True)
     lk = open(RUN_LOCK, "w")

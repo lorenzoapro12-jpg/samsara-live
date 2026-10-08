@@ -11,6 +11,7 @@ Wants=network-online.target
 User=UTILISATEUR
 WorkingDirectory=CHEMIN_DU_DEPOT
 ExecStart=/usr/bin/python3 CHEMIN_DU_DEPOT/executions.py
+Environment=PYTHONUNBUFFERED=1
 Restart=always
 RestartSec=10
 
