@@ -115,7 +115,7 @@ async function ouvrir(nav, opts) {
   const erreurs = [];
   page.on('pageerror', e => erreurs.push(e.message));
   const hotes = new Set(), S = opts.S || simulateur(), urls = [];
-  const comptes = { heatmap: 0, md: 0 };
+  const comptes = { heatmap: 0, md: 0, exec: 0 };
   await page.route('**/*', async r => {
     const u = r.request().url(), h = new URL(u).host;
     if (h.startsWith('127.0.0.1')) return r.continue();
@@ -132,6 +132,11 @@ async function ouvrir(nav, opts) {
       return (d ? r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(d) }) : r.fulfill({ status: 404, headers: cors })).catch(() => {});
     }
     if (h === 'raw.githubusercontent.com') {
+      if (u.includes('executions.json')) {
+        comptes.exec++;
+        if (!opts.executions) return r.fulfill({ status: 404, headers: cors }).catch(() => {});
+        return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(opts.executions()) }).catch(() => {});
+      }
       if (u.includes('heatmap.json')) {
         comptes.heatmap++;
         let corps = opts.heatmap ? opts.heatmap() : (opts.encodage ? Object.assign({}, hm, { encodage }) : sansEncodage());
@@ -226,7 +231,7 @@ async function pixel(page, x, y) {
     const rc = await page.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(); return { x: r.left, y: r.top }; });
     const lire = async () => { await page.mouse.move(rc.x + cx + 1, rc.y + cy); await page.mouse.move(rc.x + cx, rc.y + cy); await page.waitForTimeout(300); return page.evaluate(() => document.getElementById('lecture').innerText); };
     const lu1 = await lire();
-    const m1 = lu1.match(/Carte ([\d\s ]+)–([\d\s ]+) \$ \((bid|ask)\) : intensité (\d+) → plus gros niveau ([\d,]+)–([\d,]+) BTC/);
+    const m1 = lu1.match(/Carte ([\d\s ]+)–([\d\s ]+) \$ \((bid|ask)\) : intensité (\d+) → (?:plus gros niveau|somme de la tranche) ([\d,]+)–([\d,]+) BTC/);
     check(`lecture d'une cellule publiée : intensité ${cible.val} décodée en BTC`, m1 && +m1[4] >= cible.val, lu1);
     await page.evaluate(() => { const s = document.getElementById('rSaturation'); s.value = '60'; s.dispatchEvent(new Event('input')); });
     const lu2 = await lire();
@@ -604,7 +609,7 @@ async function pixel(page, x, y) {
       ({ page: p22, erreurs } = await ouvrir(nav, { encodage: true, reglages: { palette: 'disparue', fusionT: 3, fusionP: 7, dpLive: 0, bulleMin: 'abc', seuilBas: 500, saturation: 'x', calques: { live: 'oui' } } }));
       const e22 = await etat(p22), r = e22.reglages;
       check('aucune erreur JavaScript (une palette inconnue tuait la page)', !erreurs.length, erreurs);
-      check('défauts appliqués : palette, fusions, tranche live, bulles, contraste, calques', r.palette === 'classique' && r.fusionT === 1 && r.fusionP === 1 && r.dpLive === 5 && r.bulleMin === 0.1 && r.seuilBas === 2 && r.saturation === 200 && r.calques.live === true, r);
+      check('défauts appliqués : palette, fusions, tranche live, bulles, contraste, calques', r.palette === 'classique' && r.fusionT === 1 && r.fusionP === 1 && r.dpLive === 20 && r.bulleMin === 0.1 && r.seuilBas === 2 && r.saturation === 200 && r.calques.live === true, r);
       const vals = await p22.evaluate(() => ['rPalette', 'rFusionT', 'rFusionP', 'rDpLive', 'rBulleMin'].map(id => document.getElementById(id).value));
       check('aucune liste de réglages vide', vals.every(v => v !== ''), vals);
       check('carte et carnet live affichés', e22.publiee && e22.live && e22.live.n >= 1, e22.live);
@@ -978,7 +983,8 @@ async function pixel(page, x, y) {
       else {
         const lu1 = await lire();
         const lp = BM.plusLonguePresence(G, s.vS, cible.pb, f0, f1);
-        const attendu = 'un niveau ≥ ' + BM.nombre(s.qS, 2, 2) + ' BTC dans la tranche pendant ' + BM.nombre(cible.pres, 0, 0) + ' des ' + BM.nombre(cible.obs, 0, 0) + ' min observées';
+        // Carte en somme (encodage.agregation_tranche) : la tranche porte Σ ≥ seuil ; sinon un niveau.
+        const attendu = (encodage.agregation_tranche === 'somme' ? 'la tranche porte Σ ≥ ' + BM.nombre(s.qS, 2, 2) + ' BTC' : 'un niveau ≥ ' + BM.nombre(s.qS, 2, 2) + ' BTC dans la tranche') + ' pendant ' + BM.nombre(cible.pres, 0, 0) + ' des ' + BM.nombre(cible.obs, 0, 0) + ' min observées';
         check(`survol : « ${attendu} … plus longue présence ${BM.age(lp.n * G.dt)} »`, lu1.includes(attendu) && lu1.includes('plus longue présence ' + (lp.n ? BM.age(lp.n * G.dt) : '—')) && / · côté (bid|ask|bid et ask)/.test(lu1), lu1);
         for (const [id, v] of [['rFusionT', '15'], ['rFusionP', '5'], ['rPalette', 'cote'], ['rSaturation', '60']]) await p37.evaluate(([i, x]) => { const el = document.getElementById(i); el.value = x; el.dispatchEvent(new Event('input')); }, [id, v]);
         await p37.waitForTimeout(400);
@@ -1127,6 +1133,28 @@ async function pixel(page, x, y) {
       check(`± u > ${BM.MURS.uAlerteMs} ms : la pastille le signale`, /⚠ horloge incertaine \(± \d+ ms > 500 ms\)/.test(Pb), Pb);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p40b.close();
+    }
+    {
+      titre('41. Exécutions publiées (executions.json) : 24 h avant l\'ouverture, sans double compte ; absentes : rien ne change');
+      const now = Date.now(), dt = 10, lu = Math.floor(now / 1000) - 1800;
+      const seaux = [];
+      for (let k = Math.floor((lu - 6 * 3600) / dt); k * dt + dt <= lu; k += 30) seaux.push([k, 8300, [500, 0, 250], [0, 1000, 0]]);
+      const fichier = () => ({ updated: new Date(now).toISOString(), dt, dp: 10, unite_btc: 0.001, format: 'seaux-1', lu_depuis: lu - 6 * 3600, lu_jusqua: lu, trous: [], seaux });
+      let p41;
+      ({ page: p41, erreurs } = await ouvrir(nav, { encodage: true, executions: fichier }));
+      const e41 = await etat(p41);
+      const P = e41.executionsPubliees;
+      check('seaux publiés versés, frontière au plus à la fin de ce que le fichier a lu', P && P.seaux > 0 && P.frontiere <= lu * 1000, P);
+      check('les exécutions remontent jusqu\'au début du fichier', e41.executions.premier !== null && e41.executions.premier <= (lu - 6 * 3600 + 30) * 1000, e41.executions);
+      check('aucune erreur de lecture du fichier', !e41.erreurs.historique, e41.erreurs);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p41.close();
+      let p41b;
+      ({ page: p41b, erreurs } = await ouvrir(nav, { encodage: true }));
+      const e41b = await etat(p41b);
+      check('fichier absent (404) : ni erreur affichée, ni seau publié', !e41b.erreurs.historique && e41b.executionsPubliees === null, e41b.erreurs);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p41b.close();
     }
   } finally {
     await nav.close();

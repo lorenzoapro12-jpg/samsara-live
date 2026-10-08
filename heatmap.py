@@ -26,6 +26,10 @@ Livraison du 07/10/2026 (à valider par un passage réel du cron) :
   · CADENCE — 15 min au lieu de 16 (voir main()).
 
 Livraison du 08/10/2026 :
+  · SOMME PAR TRANCHE — une case porte la somme des BTC de sa tranche de 20 $, comme les murs
+    de market-data.json et comme Bookmap. Le MAX d'un seul niveau rendait presque invisible un
+    mur fait de nombreux ordres (mesuré le 08/10 à 08:33 : Σ 26,9 BTC à 82 820 $, case ≈ 3 BTC).
+    Les colonnes plus anciennes que le changement restent en MAX : `agregation_depuis` le dit.
   · EXÉCUTIONS — executions.py (service permanent) écrit executions.json ; il part dans le
     MÊME commit que heatmap.json, s'il existe : pas un commit ni un déploiement de plus.
 """
@@ -56,7 +60,13 @@ GIT_BRANCH = CFG["git_branch"]
 DT = 60           # secondes par colonne (1 min)
 DP = 20.0         # $ par bin de prix
 WINDOW_S = 24 * 3600
-REF = 100.0       # qty BTC de référence pour l'échelle d'intensité
+REF = 50.0        # qty BTC de référence pour l'échelle d'intensité (somme d'une tranche de 20 $ :
+                  # mesuré le 08/10, p50 ≈ 4 BTC, p90 ≈ 15, plus gros mur ≈ 46 — 100 laissait la carte terne)
+# Agrégation d'une tranche (08/10/2026) : la SOMME des niveaux. Retour arrière : AGREGATION = "max"
+# (et REF = 100.0). Les colonnes sont gardées dans state.json en intensités : celles d'avant le
+# changement ne se recalculent pas ; leur première minute en somme est notée dans AGREG_DEPUIS.
+AGREGATION = "somme"
+AGREG_DEPUIS = SC.state(CFG, "agregation-depuis.txt")
 PLAFOND = 255     # intensité maximale (atteinte dès q ≥ REF)
 NIVEAUX = 5000    # niveaux de carnet demandés à Binance (le maximum de l'API)
 # Intervalle minimal entre deux publications. Mesuré le 04/10/2026 : à 120 s, ce fichier
@@ -188,20 +198,52 @@ def encodage():
     """
     return {
         "valeur": f"min({PLAFOND}, ent({PLAFOND} × √(q / ref)))",
-        "q": ("quantité du plus gros NIVEAU DE PRIX de la tranche, en BTC — un niveau peut "
-              "réunir plusieurs ordres posés au même prix"),
+        "q": (("SOMME des niveaux de prix de la tranche, en BTC" if AGREGATION == "somme" else
+               "quantité du plus gros NIVEAU DE PRIX de la tranche, en BTC — un niveau peut "
+               "réunir plusieurs ordres posés au même prix")
+              + " ; colonnes avant `agregation_depuis` (minute absolue) : plus gros niveau"),
         "ref_btc": REF,
         "plafond": PLAFOND,
         "sature_des_btc": REF,
         "seuil_btc": round(REF / PLAFOND ** 2, 6),
         "decodage": "q ∈ [ref × (v / plafond)², ref × ((v + 1) / plafond)²[ ; v = plafond : q ≥ ref (saturé)",
-        "agregation_tranche": "max",
-        "fusion": ("tranches ou colonnes voisines : prendre le MAX (exact : √ est croissante) ; "
+        "agregation_tranche": AGREGATION,
+        "agregation_depuis": agregation_depuis(),
+        "fusion": ("tranches ou colonnes voisines : prendre le MAX (la plus forte case du bloc) ; "
                    "jamais la somme (une somme d'intensités n'a pas d'unité)"),
         "instantane": f"un carnet complet ({NIVEAUX} niveaux) lu une fois par colonne de {DT} s",
         "niveaux": NIVEAUX,
         "couverture": f"bande vue par {NIVEAUX} niveaux (≈ ±1 %) : hors de cette bande, « non observé », pas « vide »",
     }
+
+
+def agregation_depuis():
+    """Première minute agrégée en somme (notée au premier tour qui l'applique), ou None."""
+    try:
+        return int(open(AGREG_DEPUIS).read().strip())
+    except Exception:
+        return None
+
+
+REF_AVANT = 100.0   # REF des colonnes écrites avant le passage à la somme
+
+
+def reencoder_avant(state):
+    """Au passage à la somme, les colonnes gardées (intensités sur REF_AVANT) passent sur REF :
+    v' = min(PLAFOND, ent(v × √(REF_AVANT / REF))). Sans cela, l'encodage publié (REF) décoderait
+    24 h de colonnes à la moitié de leur quantité. Arrondi : ± 1 cran, saturation au plafond."""
+    k = math.sqrt(REF_AVANT / REF)
+    for cells in state.values():
+        for key in ("b", "a"):
+            cells[key] = {p: min(PLAFOND, int(v * k)) for p, v in cells.get(key, {}).items()}
+
+
+def noter_agregation(state, col):
+    """Premier tour en somme : ré-encode les colonnes d'avant, puis note la minute du changement."""
+    if AGREGATION == "somme" and agregation_depuis() is None:
+        if REF != REF_AVANT:
+            reencoder_avant(state)
+        write_atomic(str(col), AGREG_DEPUIS)
 
 
 def plage(cote):
@@ -324,7 +366,9 @@ def main():
         for ps, qs in d[side]:
             q = float(qs)
             pb = int(float(ps) // DP)
-            if q > bins[key].get(pb, 0):
+            if AGREGATION == "somme":
+                bins[key][pb] = bins[key].get(pb, 0) + q
+            elif q > bins[key].get(pb, 0):
                 bins[key][pb] = q
     cells = {"b": {}, "a": {}}
     for key in ("b", "a"):
@@ -332,6 +376,7 @@ def main():
             v = intensite(q)
             if v >= 1:
                 cells[key][pb] = v
+    noter_agregation(state, col)    # AVANT d'ajouter la colonne du tour, déjà sur REF
     state[str(col)] = cells
     cutoff = (int(time.time()) - WINDOW_S) // DT
     state = {k: v for k, v in state.items() if int(k) >= cutoff}

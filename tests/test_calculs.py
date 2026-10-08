@@ -135,13 +135,19 @@ check("sans cours USDT : la prime historique reste publiée", P.calcul_prime(cb,
 # ── Heatmap : ce qu'est une cellule ─────────────────────────────────────────
 e = H.encodage()
 check("encodage publié = constantes du calcul", e["ref_btc"] == H.REF and e["plafond"] == H.PLAFOND and e["niveaux"] == H.NIVEAUX)
-check("100 BTC et plus : saturé", H.intensite(100) == H.intensite(5000) == 255)
+check("ref et plus : saturé", H.intensite(H.REF) == H.intensite(5000) == 255 and H.intensite(H.REF * 0.99) < 255)
 check("décodage : q dans [ref·(v/255)², ref·((v+1)/255)²[", all(
     e["ref_btc"] * (H.intensite(q) / 255) ** 2 <= q < e["ref_btc"] * ((H.intensite(q) + 1) / 255) ** 2
-    for q in (0.002, 0.5, 1, 7.3, 42, 99.9)))
+    for q in (0.002, 0.5, 1, 7.3, 42, 99.9) if q < e["ref_btc"]))
 check("fusion par MAX exacte : intensité(max q) = max(intensités)",
       all(H.intensite(max(a, b)) == max(H.intensite(a), H.intensite(b)) for a in (0.1, 3, 50) for b in (0.2, 9, 120)))
 check("sous le seuil publié : cellule absente", H.intensite(e["seuil_btc"] * 0.99) == 0 and H.intensite(e["seuil_btc"] * 1.01) == 1)
+
+# Passage à la somme : les colonnes d'avant (REF_AVANT) sont ré-encodées sur REF, à ± 1 cran.
+st = {"1": {"b": {"10": H.intensite(4.0) if H.REF == H.REF_AVANT else min(255, int(255 * (4.0 / H.REF_AVANT) ** 0.5))}, "a": {}}}
+H.reencoder_avant(st)
+check("colonnes d'avant ré-encodées : 4 BTC sur l'ancienne échelle = 4 BTC sur la nouvelle (± 1 cran)",
+      abs(st["1"]["b"]["10"] - H.intensite(4.0)) <= 1, (st, H.intensite(4.0)))
 
 ko = CHECKS.count(False)
 print(f"\n{'✅ CALCULS SERVEUR : TOUS LES CONTRÔLES PASSENT' if not ko else f'❌ {ko} contrôle(s) en échec'}")

@@ -15,8 +15,10 @@
 
    RÈGLES QUI NE SE DISCUTENT PAS (06/10/2026)
    · Une cellule publiée n'est PAS une quantité : c'est min(255, ent(255·√(q/ref))), q = le
-     plus gros niveau de prix de la tranche. Fusionner des tranches = prendre le MAX (exact,
-     √ est croissante) ; jamais la somme. On peut fusionner, jamais affiner.
+     plus gros niveau de prix de la tranche — depuis le 08/10/2026, la SOMME de ses niveaux
+     (`encodage.agregation_tranche`, et `agregation_depuis` pour les colonnes d'avant).
+     Fusionner des tranches = prendre le MAX (la plus forte case) ; jamais la somme
+     d'intensités. On peut fusionner, jamais affiner.
    · La référence `ref` se LIT dans heatmap.json (`encodage`) ; elle n'est jamais recopiée
      ici. Absente (fichier antérieur), la carte affiche des intensités, pas des BTC.
    · Hors de la bande que le carnet reçu couvre, c'est « non observé », pas « vide ».
