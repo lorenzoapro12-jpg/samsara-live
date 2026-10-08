@@ -67,6 +67,9 @@ node test_contre.js || ko=1
 etape "2i. Chronique : historique des publications relu dans git (arrêts, trous, cache, tracés) — hors ligne"
 node test_chronique.js || ko=1
 
+etape "2j. Guide du graphique : niveaux nommés, règle de cassure, régime, formes rejouées sans regarder l'avenir, mots sans conseil — hors ligne"
+node test_guide.js || ko=1
+
 etape "3. Extraction du JavaScript inline"
 python3 refresh_harness.py || ko=1
 
@@ -78,6 +81,9 @@ node test_live.js || ko=1
 
 etape "5b. Carte (bookmap) : fusion, décodage, exécutions, isolement — hors ligne"
 node test_bookmap.js || ko=1
+
+etape "5b2. Carte (bookmap) : le Guide — murs en mots, résumé, journal, zones, mots interdits — hors ligne"
+node test_guide_carte.js || ko=1
 
 etape "5c. Carte (bookmap) rendue dans Chromium — Binance simulé (non exécuté sans Playwright)"
 node test_bookmap_rendu.js || ko=1
@@ -108,6 +114,9 @@ node test_fenetres.js || ko=1
 
 etape "9b. Interface dans Chromium : menus dans l'écran, crochets du graphique, sous-graphes sans débordement (non exécuté sans Playwright)"
 node test_interface.js || ko=1
+
+etape "9b'. Guide du graphique dans Chromium : chaque bande nommée, heures gardées à 390 px, deux chemins ensemble, survol et tap (non exécuté sans Playwright)"
+node test_guide_page.js || ko=1
 
 etape "9c. Sobriété dans Chromium : éclair, horloge, onde, calque, verre, chargement, chaleur (non exécuté sans Playwright)"
 node test_sobriete.js || ko=1

@@ -21,14 +21,26 @@
   <div class="barre-droite">
     <button type="button" class="bouton" id="btnSuivre" aria-pressed="true" title="Suivre le présent (F) — double-clic sur la carte : vue par défaut">Suivre</button>
     <button type="button" class="bouton" id="btnReglages" aria-controls="reglages" aria-expanded="false" title="Réglages d'affichage">Réglages</button>
+    <button type="button" class="bouton" id="btnJournal" aria-controls="journalPanneau" aria-expanded="false" title="Ce qui vient de se passer : murs apparus, retirés, absorbés, rafales (J)">Journal</button>
     <button type="button" class="bouton" id="btnRafales" aria-controls="rafalesPanneau" aria-expanded="false" title="Les dernières rafales au marché">Rafales</button>
     <button type="button" class="bouton" id="btnLegende" aria-controls="legende" aria-expanded="false" title="Ce que montre la carte (L)">Légende</button>
   </div>
 </header>
+<!-- Le résumé du guide : une phrase (débutant) ou ses chiffres (expert), tirés du DERNIER carnet live seul. -->
+<div class="resume-carte" id="resumeCarte" role="status" title="Un appui : la phrase entière">Carnet live : lecture…</div>
 
 <main class="scene">
   <canvas id="carte" role="img" aria-label="Carte de liquidité : axe horizontal le temps, axe vertical le prix en dollars, la chaleur est la taille du plus gros niveau du carnet par tranche ; le prix, les exécutions, les murs et les niveaux de gamma sont dessinés par-dessus, chacun avec son âge."></canvas>
   <div class="statut" id="statut" role="status" hidden></div>
+  <!-- Première visite : comment lire la carte. Les repères numérotés sont posés SUR la carte (canevas) ;
+       sur un grand écran la carte reste utilisable dessous (seuls les boutons prennent le pointeur) ;
+       sur un téléphone, ou quand elle cache plus de la moitié de la carte, elle prend le pointeur. -->
+  <section class="guide-intro" id="guideIntro" hidden aria-labelledby="guideIntroTitre">
+    <div class="panneau-tete"><h2 id="guideIntroTitre">Comment lire cette carte</h2><button type="button" class="fermer" id="guideIntroFermer" aria-label="Fermer">×</button></div>
+    <ol class="intro-liste" id="guideIntroListe"></ol>
+    <p class="note" id="guideIntroNote"></p>
+    <button type="button" class="bouton" id="guideIntroOk">J'ai compris</button>
+  </section>
 </main>
 
 <div class="lecture" id="lecture" role="tooltip" hidden></div>
@@ -118,6 +130,12 @@
   <ol class="liste-rafales" id="listeRafales"></ol>
 </section>
 
+<section class="panneau-flottant" id="journalPanneau" hidden aria-label="Ce qui vient de se passer">
+  <div class="panneau-tete"><h2>Ce qui vient de se passer</h2><button type="button" class="fermer" data-fermer aria-label="Fermer">×</button></div>
+  <p class="note" id="journalNote"></p>
+  <ol class="liste-rafales liste-journal" id="listeJournal"></ol>
+</section>
+
 <section class="panneau-flottant large" id="legende" hidden aria-label="Légende">
   <div class="panneau-tete"><h2>Ce que montre la carte</h2><button type="button" class="fermer" data-fermer aria-label="Fermer">×</button></div>
   <div class="barre-couleurs"><div id="barreCouleurs"></div><div class="grad" id="gradBarre"></div></div>
@@ -148,8 +166,20 @@
     <dt>Carnet latéral, profil, volume, CVD</dt>
     <dd>À droite, la <b>somme</b> des ordres du dernier carnet live par tranche. À gauche, le profil des exécutions visibles. En bas, le volume (achats au-dessus, ventes au-dessous), regroupé par <span id="legVolume">1, 2, 3, 5, 10…</span> min selon le zoom — le titre du panneau dit la durée — et le CVD : achats au marché moins ventes au marché, cumulés depuis le bord gauche de la vue ; après des bougies non lues (hachurées), il repart de 0 et le dit.</dd>
   </dl>
+  <h3>Guide : la carte en mots</h3>
+  <p><button type="button" class="bouton" id="btnIntro">Comment lire cette carte (?)</button> <button type="button" class="bouton" id="btnMode">Mode</button></p>
+  <p class="note" id="legGuideMode"></p>
+  <dl class="leg-guide">
+    <dt>Le guide</dt><dd id="legGuide"></dd>
+    <dt>Murs en mots</dt><dd id="legGuideMurs"></dd>
+    <dt>Zones à surveiller</dt><dd id="legGuideZones"></dd>
+    <dt>Résumé (bandeau du haut)</dt><dd id="legGuideResume"></dd>
+    <dt>Journal</dt><dd id="legGuideJournal"></dd>
+    <dt>Marques sur la carte</dt><dd id="legGuideSymboles"></dd>
+    <dt>Limites</dt><dd id="legGuideLimites"></dd>
+  </dl>
   <h3>Gestes</h3>
-  <p>Glisser : déplacer. Molette : zoom dans le temps (sur l'axe des prix, ou avec Maj : zoom des prix). Pincer à deux doigts. Glisser sur un axe : l'étirer. Double-clic ou R : vue par défaut. F : suivre le présent. Flèches : se déplacer. Échap : fermer un panneau.</p>
+  <p>Glisser : déplacer. Molette : zoom dans le temps (sur l'axe des prix, ou avec Maj : zoom des prix). Pincer à deux doigts. Glisser sur un axe : l'étirer. Double-clic ou R : vue par défaut. F : suivre le présent. Flèches : se déplacer. Échap : fermer un panneau. ? : comment lire cette carte. G : le guide sur la carte. J : le journal. M : mode débutant / expert (le même que le terminal : le changer ici le change aussi là-bas).</p>
   <p>Au doigt : un appui bref épingle la lecture là où il tombe (le même appui l'enlève) ; un appui long l'affiche et la fait suivre le doigt sans déplacer la carte.</p>
   <p class="note">Les heures de l'axe sont celles de l'appareil (le fuseau est écrit dans l'angle, sous l'axe des prix) ; « maintenant » est l'heure de Binance, recalée.</p>
   <p class="note">Ce que la carte montre est une lecture du carnet, pas une recommandation : un mur peut être retiré avant d'être touché, et une bulle ne dit pas qui a acheté.</p>
