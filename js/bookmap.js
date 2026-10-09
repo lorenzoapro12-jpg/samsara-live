@@ -615,16 +615,31 @@
     dessiner();
   }
   /** Suivre le présent : la vue avance par PIXELS ENTIERS (et se recentre sur le prix par pixels
-   *  entiers) — le calque publié se décale alors sur lui-même au lieu d'être repeint. */
+   *  entiers) — le calque publié se décale alors sur lui-même au lieu d'être repeint.
+   *  Sans saccade : quand le prix sort de la moitié centrale, la vue GLISSE vers lui en quelques
+   *  images (au lieu d'un saut d'un quart de hauteur) ; et quand un pixel vaut moins d'une seconde
+   *  (vue rapprochée), un rendu est demandé à chaque pixel franchi, pas seulement au battement. */
+  const GLISSE_TAU = 110;   // ms : constante du glissement (≈ 95 % du chemin en 0,33 s)
+  let glisse = null, minuteurPas = null;
   function suivreMaintenant() {
-    if (!E.suivre || !E.vue || !Z) return;
+    if (!E.suivre || !E.vue || !Z) { glisse = null; return; }
     const v = E.vue, L = v.t2 - v.t1, tpp = L / Math.max(1, Z.chaleur.w), k = Math.trunc((maintenant() + L * 0.07 - v.t2) / tpp);
     if (k) { v.t1 += k * tpp; v.t2 += k * tpp; }
     const p = dernierPrix();
     if (p) {
       const H = v.p2 - v.p1, pp = H / Math.max(1, Z.chaleur.h), bas = v.p1 + H * 0.25, haut = v.p2 - H * 0.25;
-      if (p < bas || p > haut) { const d = Math.round((p - (v.p1 + v.p2) / 2) / pp) * pp; v.p1 += d; v.p2 += d; }
+      if (!glisse && (p < bas || p > haut)) glisse = { t: performance.now() };
+      if (glisse) {
+        const reste = Math.round((p - (v.p1 + v.p2) / 2) / pp), t = performance.now();
+        const n = reste && Math.sign(reste) * Math.max(1, Math.round(Math.abs(reste) * (1 - Math.exp(-(t - glisse.t) / GLISSE_TAU))));
+        glisse.t = t;
+        if (n) { v.p1 += n * pp; v.p2 += n * pp; }
+        if (Math.abs(reste - n) < 1) glisse = null; else dessiner();
+      }
     }
+    // Prochain pixel franchi avant le battement : un rendu à ce moment-là (au plus ≈ 30 par seconde).
+    const attente = v.t2 + tpp - (maintenant() + L * 0.07);
+    if (attente < 1000 && !minuteurPas) minuteurPas = setTimeout(() => { minuteurPas = null; dessiner(); }, Math.max(33, attente));
   }
 
   // ─── Rendu ─────────────────────────────────────────────────────────────────
