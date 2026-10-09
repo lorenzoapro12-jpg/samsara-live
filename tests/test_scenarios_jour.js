@@ -155,9 +155,12 @@ check('17:30 : le 1 sorti (bougie 17:15–17:30) → plus aucun ouvert', a1730 &
   const J = S.classerJour(items, k15.C[n - 1], F08, now, S.rejouerJour(F08, F08.scenarios, k15.T, k15.H, k15.L, k15.C, n - 1, Q, PJ), PJ);
   check('17:40 : « realise » (le 2) ; montré = le 2 ; le 1 sorti, en fondu', J.cas === 'realise' && J.montre && J.montre.sc.rang === '2' && J.items[0].ferme && J.items[0].ferme.type === 'sortie' && J.items[0].fondu > 0, [J.cas, J.montre && J.montre.sc.rang, J.items[0].fondu]);
   const l48 = S.ligneJourDebutant(F08, J, items, now, 48, {}), l40 = S.ligneJourDebutant(F08, J, items, now, 40, {});
-  check(`17:40 : ligne F « ${l48} » / « ${l40} »`, l48 === 'Scén. 1 sorti · le 2 réalisé ✓ (en direct) ▸' && l40 === 'Scén. 1 ✗ · le 2 réalisé ✓ (en direct) ▸', [l48, l40]);
+  // Changé délibérément (revue) : « zone du 2 ✓ » au lieu de « le 2 réalisé ✓ » (jamais « réalisé »
+  // sur le tracé pour un scénario peut-être pas dessiné) ; le libellé porte sa marque « (en direct) »
+  // (la ligne peut céder sa place) et dit « zone ✓ », jamais le niveau seul coché (A3).
+  check(`17:40 : ligne F « ${l48} » / « ${l40} »`, l48 === 'Scén. 1 sorti · zone du 2 ✓ (en direct) ▸' && l40 === 'Scén. 1 ✗ · zone du 2 ✓ (en direct) ▸', [l48, l40]);
   const lib = S.libellesJourDebutant(J.montre, 32, null);
-  check(`17:40 : libellé du montré « ${lib[0]} » : dit « zone », jamais « atteint » (A3), ≤ 32`, lib[0] === 'Scénario 2 : zone 80 806 $ ✓' && lib.every(t => !/atteint/.test(t) && t.length <= 32), lib);
+  check(`17:40 : libellé du montré « ${lib[0]} » : dit « zone », jamais « atteint » (A3), marqué « (en direct) », ≤ 32`, lib[0] === 'Scénario 2 : zone ✓ (en direct)' && lib.every(t => !/atteint/.test(t) && /\(en direct\)$/.test(t) && t.length <= 32), lib);
   check('M10 : le fondu part de la CLÔTURE de la bougie du contact (17:30) : à 17:40, 1 − 10/60', proche(J.items[0].fondu, 1 - 10 / 60, 1e-9), J.items[0].fondu);
 }
 // Rejeu incrémental = rejeu d'un coup.
@@ -207,7 +210,7 @@ check('17:30 : le 1 sorti (bougie 17:15–17:30) → plus aucun ouvert', a1730 &
   const items = F06.scenarios.map(sc => ({ sc, sv: S.etat(sc, S.plier(sc, k.T, k.H, k.L, 0, n, null, Q, k.C), now) }));
   const J = S.classerJour(items, k.C[n - 1], F06, now, S.rejouerJour(F06, F06.scenarios, k.T, k.H, k.L, k.C, n - 1, Q, PJ), PJ);
   const l48 = S.ligneJourDebutant(F06, J, items, now, 48, {}), l40 = S.ligneJourDebutant(F06, J, items, now, 40, {});
-  check(`06/10, 02:20 UTC le 07/10 : « aucun » ; ligne G « ${l48} » / « ${l40} »`, J.cas === 'aucun' && l48 === 'Aucun scénario ne tient plus (en direct) ▸' && l40 === 'Aucun ne tient plus (en direct) ▸', [J.cas, l48, l40]);
+  check(`06/10, 02:20 UTC le 07/10 : « aucun » ; ligne G « ${l48} » / « ${l40} »`, J.cas === 'aucun' && l48 === 'Aucun scénario ne tient plus (en direct) ▸' && l40 === 'Scénarios : aucun ne tient (en direct) ▸', [J.cas, l48, l40]);
   check('06/10 : Expert « Aucun scénario du matin ne décrit ce mouvement »', /^Aucun scénario du matin ne décrit ce mouvement/.test(S.phraseJourExpert(J)[0]), S.phraseJourExpert(J));
 }
 
@@ -232,8 +235,13 @@ titre('5. Lignes Débutant (cas A à I) : longueurs, marques, mots');
   };
   for (const h of ['05:00', '10:00', '14:05', '15:40', '17:40']) { const x = instant(F08, k15, h); pousser('08/10 ' + h + ' (' + x.J.cas + ')', F08, x.J, x.items, x.now); }
   const c14 = lignes.find(l => l.nom.startsWith('08/10 14:05') && l.max === 48), d15 = lignes.find(l => l.nom.startsWith('08/10 15:40') && l.max === 48);
-  check(`C (14:05, le 2 a le plus petit écart) : « ${c14.t} »`, c14.t === 'En direct : le 2 (80 806 $) suit mieux le prix ▸', c14.t);
-  check(`D (15:40, le 2 réalisé, le 1 ouvert) : « ${d15.t} »`, d15.t === 'Scén. : en cours · le 2 réalisé ✓ (en direct) ▸', d15.t);
+  // Changé délibérément (revue) : à 14:05 le nom (2) n'est gardé que par l'hystérésis, le 1 a le
+  // plus petit écart → la ligne ne dit pas « le 2 suit mieux » (cas A ; le nom gardé est dans les
+  // bulles). Le cas C lui-même est vérifié à 13:50 (le 2 a alors le plus petit écart).
+  check(`C (14:05, nom 2 gardé, le 1 a le plus petit écart) : cas A « ${c14.t} »`, c14.t === 'Scénario du matin : en cours (en direct) ▸', c14.t);
+  { const x = instant(F08, k15, '13:50'), t = S.ligneJourDebutant(F08, x.J, x.items, x.now, 48, {});
+    check(`C (13:50, le 2 nommé ET au plus petit écart) : « ${t} »`, S.nomNet(x.J) && x.J.meneur && x.J.meneur.sc.rang === '2' && t === 'En direct : le 2 (80 806 $) suit mieux le prix ▸', [t, x.J.cas, S.nomNet(x.J)]); }
+  check(`D (15:40, le 2 réalisé, le 1 ouvert) : « ${d15.t} »`, d15.t === 'En direct : zone du 2 (80 806 $) ✓ ▸', d15.t);
   // Rang 1 en chemin (le 3 du 08/10 en tête), le range en 2 : E et F « invalidé ».
   const fx = JSON.parse(JSON.stringify(X08.fichier));
   const [r0, r1, r2] = fx.scenarios; r2.rang = '1'; r0.rang = '2'; r1.rang = '3'; r1.cibles = [Math.round(r1.prix_emission * 0.96)];
@@ -273,7 +281,8 @@ titre('6. Textes Expert : une mesure, jamais un indice en liste ni « en tête �
   check(`phrase, le nom a le plus petit écart : « ${ph2[0]} »`, S.nomNet(Jn) && ph2[0] === 'Plus petit écart pour l’instant : 1 (une mesure, pas une probabilité)' && ph2.includes('Écart min. : 1'), ph2);
   const tous = ph.concat(suf, re);
   check('encadré : aucun « écart 0,xx », aucun « en tête », aucun « % », aucun « probable »', tous.every(t => !/écart (relatif )?0,\d/.test(t) && !/en tête/.test(t) && !/%/.test(t) && !/probable/.test(t)), tous);
-  check(`suffixes en dollars : « ${suf.join(' » « ')} »`, /^ · bord toléré à [\d ]+ \$$/.test(suf[0]) && /^ · zone à [\d ]+ \$ · inv\. à [\d ]+ \$ ◂$/.test(suf[1]), suf);
+  // Changé délibérément (revue) : « ◂ » marque le plus petit écart EN CE MOMENT (le 1), plus le nom gardé (le 2).
+  check(`suffixes en dollars, ◂ sur le plus petit écart : « ${suf.join(' » « ')} »`, /^ · bord toléré à [\d ]+ \$ ◂$/.test(suf[0]) && /^ · zone à [\d ]+ \$ · inv\. à [\d ]+ \$$/.test(suf[1]), suf);
   check(`temps restant : « ${re[0]} »`, /^Reste 14 h 15 \(fin 09\/10 04:20 UTC\) · aucune nouvelle prévision avant le prochain point$/.test(re[0]), re);
   const bulle = S.ligneJourExpert(J.items[1], J, { itv: '15 min', maintenant: now });
   check('bulle Expert : l’indice SEULEMENT avec sa formule et son nom complet', /écart relatif 0,\d\d = [\d ]+ \/ \([\d ]+ \+ [\d ]+\) \(0 = sur la zone, 1 = sur l’invalidation\)/.test(bulle) && /une mesure, pas une probabilité/.test(bulle), bulle);
@@ -300,11 +309,12 @@ titre('7. raison() et contacts en mèche');
   check('pas() sans clôture : l’ancien comportement exact (aucune mèche affirmée)', JSON.stringify(Object.assign({}, sv2, { meche: [] })) === JSON.stringify(sv1) && sv2.mecheInv === false);
   const rx = S.raison(b, svI, 'expert'), rd = S.raison(b, svI, 'debutant');
   check(`chemin, Expert : « ${rx} »`, /^zone 97 000 touchée avant 103 000 \(en mèche : contact, règle du journal\)$/.test(rx), rx);
-  check(`chemin, Débutant : « ${rd} »`, /^le prix a touché la zone de 97 000 \$ \(à partir de 97 970 \$\) avant de toucher la zone de 103 000 \$$/.test(rd), rd);
+  // Changé délibérément (revue) : un contact seulement en mèche est qualifié aussi pour une invalidation et une sortie.
+  check(`chemin, Débutant : « ${rd} »`, /^le prix a touché la zone de 97 000 \$ \(à partir de 97 970 \$\) avant de toucher la zone de 103 000 \$, par un passage bref du prix : le journal compte ce passage/.test(rd), rd);
   const er = S.suiviVide(Q); S.pas(a, er, 0, T0, 102100, 100000, 101000);
   const svR = S.etat(a, er, T0 + Q);
   const rrx = S.raison(a, svR, 'expert'), rrd = S.raison(a, svR, 'debutant');
-  check(`range : « ${rrx} » / « ${rrd} »`, /^borne haute 102 010 dépassée \(en mèche/.test(rrx) && /^le prix est passé au-dessus de 102 010 \$ \(101 000 \$ plus la marge\)$/.test(rrd), [rrx, rrd]);
+  check(`range : « ${rrx} » / « ${rrd} »`, /^borne haute 102 010 dépassée \(en mèche/.test(rrx) && /^le prix est passé au-dessus de 102 010 \$ \(101 000 \$ plus la marge\), par un passage bref du prix/.test(rrd), [rrx, rrd]);
   const ea = S.suiviVide(Q); S.pas(b, ea, 0, T0, 103500, 96500, 100000);
   const svA = S.etat(b, ea, T0 + Q), rax = S.raison(b, svA, 'expert'), rad = S.raison(b, svA, 'debutant');
   check(`ambigu : « ${rax} » / « ${rad} »`, svA.cle === 'ambigu' && /ordre inconnu/.test(rax) && /^non tranché : .* le même quart d’heure, et l’ordre est inconnu ; le journal tranchera avec les minutes$/.test(rad), [svA.cle, rax, rad]);

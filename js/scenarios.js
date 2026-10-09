@@ -563,7 +563,13 @@ const Scenarios = (function () {
     let quoi = S.forme === 'range' ? 'le prix reste ' + niveaux(S, false) : 'le prix va vers ' + niveaux(S, false) + (S.invalidation !== null ? ', sans toucher ' + prix(S.invalidation) + ' avant' : '');
     if (S.rang !== 'S') quoi = quoi.charAt(0).toUpperCase() + quoi.slice(1);
     const e = etatCourtDebutant(S, sv);
-    return MARQUES_RANG[S.rang] + ' ' + quoi + ' — ' + e.etat + (e.marque ? ' ' + e.marque : '');
+    return MARQUES_RANG[S.rang] + ' ' + quoi + ' — ' + e.etat + (e.marque ? ' ' + e.marque : '') + momentFerme(S, sv);
+  }
+  /** Le moment d'une fermeture calculée ici (invalidé, sorti, indécis, réalisé), en heure de Paris :
+   *  « entre 19h15 et 19h30 (heure de Paris) » ; rien pour un état ouvert ou une note du journal. */
+  function momentFerme(S, sv) {
+    if (S.statut !== '⏳' || !sv || !fini(sv.t) || !['invalide', 'sortie', 'ambigu', 'realise'].includes(sv.cle)) return '';
+    return momentDebutant(sv.t, sv.pas || 0);
   }
   /** Une origine du fichier, gardée en Débutant morceau par morceau : sans nom d'indicateur, sans
    *  « R1 » ni « 4h » ; null s'il ne reste rien. « plus haut du 08/10 (83 521), EMA 20 1d » →
@@ -737,11 +743,12 @@ const Scenarios = (function () {
     const Q = pj(PJ);
     const ouv = items.filter(i => ouvertJour(i.sc, i.sv, t)).map(i => ({ sc: i.sc, sv: i.sv, pos: position(i.sc, i.sv, P) })).filter(i => i.pos);
     ouv.sort((a, b) => a.pos.e - b.pos.e || RANGS.indexOf(a.sc.rang) - RANGS.indexOf(b.sc.rang));
-    if (ouv.length < 2) return { cas: ouv.length ? 'seul' : 'ferme', prec: mem.prec, change: false };
+    const ordre = ouv.map(i => i.sc.id);
+    if (ouv.length < 2) return { cas: ouv.length ? 'seul' : 'ferme', prec: mem.prec, change: false, ordre };
     if (!mem.sortiTot) {
       const P0 = fini(F.prixEmission) ? F.prixEmission : ouv[0].sc.prixEmission;
       const tot = t - F.emis < Q.departageMinutes * 60000 && fini(P0) && Math.abs(P - P0) < Q.departageMouvementPct / 100 * P0 && !ouv.some(i => i.sv.k > 0);
-      if (tot) return { cas: 'tot', prec: null, change: false };
+      if (tot) return { cas: 'tot', prec: null, change: false, ordre };
       mem.sortiTot = true;
       const un = ouv.find(i => i.sc.rang === '1');
       mem.prec = (un || ouv[0]).sc.id;
@@ -750,16 +757,18 @@ const Scenarios = (function () {
     const p = ouv.find(i => i.sc.id === mem.prec);
     if (!p) { change = mem.prec !== null; mem.prec = ouv[0].sc.id; }
     else if (ouv[0] !== p && p.pos.e - ouv[0].pos.e >= Q.ecartChangement - 1e-9) { mem.prec = ouv[0].sc.id; change = true; }
-    return { cas: ouv[0].pos.e >= Q.colle ? 'aucunNeColle' : 'meneur', prec: mem.prec, change };
+    return { cas: ouv[0].pos.e >= Q.colle ? 'aucunNeColle' : 'meneur', prec: mem.prec, change, ordre };
   }
   /** Le rejeu de la journée sur les bougies CLOSES [0, n) du graphique (T en s, H, L, C), regroupées
    *  par quart d'heure : les plis des quarts et la décision de chaque clôture depuis le point.
    *  scs : les scénarios du jour (rangs 1 à 3). Déterministe : tout lecteur obtient le même nom au
    *  même moment, quel que soit l'heure d'ouverture de la page ou l'intervalle (1, 5 ou 15 min).
-   *  → { grille, cas, prec, sortiTot, tDecision (dernière clôture décidée), changements: [{ t, id, de }], decisions } */
+   *  → { grille, cas, prec, sortiTot, tDecision (dernière clôture décidée), ordre (les ouverts de cette
+   *  clôture, du plus petit écart au plus grand : le remplaçant d'un nommé qui se ferme pendant la
+   *  bougie en cours est pris là, figé jusqu'à la clôture suivante), changements: [{ t, id, de }], decisions } */
   function rejouerJour(F, scs, T, H, L, C, n, pasMs, PJ, garderDecisions) {
     const Q = pj(PJ), q = Q.quartMs;
-    const out = { grille: grilleOk(pasMs, Q), cas: 'tot', prec: null, sortiTot: false, tDecision: null, changements: [], decisions: garderDecisions ? [] : null };
+    const out = { grille: grilleOk(pasMs, Q), cas: 'tot', prec: null, sortiTot: false, tDecision: null, ordre: [], changements: [], decisions: garderDecisions ? [] : null };
     if (!out.grille || !scs.length || !(n > 0)) return out;
     const debut = Math.min(...scs.map(s => s.emis)), finJ = Math.max(...scs.map(s => s.fin));
     const plis = scs.map(() => suiviVide(q)), mem = { prec: null, sortiTot: false }, parQuart = q / pasMs;
@@ -778,9 +787,8 @@ const Scenarios = (function () {
       const items = scs.map((sc, j) => ({ sc: sc.statut !== '⏳' && (!fini(sc.resolu) || sc.resolu <= tClo) ? sc : Object.assign({}, sc, { statut: '⏳' }), sv: etat(sc, plis[j], tClo) }));
       const avant = mem.prec;
       const d = decider(items, cq, F, tClo, mem, Q);
-      if (d.cas === 'tot' || d.cas === 'meneur' || d.cas === 'aucunNeColle') out.cas = d.cas;
-      else out.cas = d.cas;
-      out.tDecision = tClo;
+      out.cas = d.cas;
+      out.tDecision = tClo; out.ordre = d.ordre || [];
       if (d.change && avant !== null) out.changements.push({ t: tClo, id: mem.prec, de: avant });
       if (out.decisions) out.decisions.push({ t: tClo, cas: d.cas, prec: mem.prec, prix: cq });
     };
@@ -813,40 +821,60 @@ const Scenarios = (function () {
    *  l'intervalle affiché, bougie en cours comprise) ; P : le prix (clôture de la dernière bougie) ;
    *  rejeu : rejouerJour(…) sur les bougies closes. Les items des rangs 1 à 3 reçoivent ouvert, pos,
    *  ferme, fondu ; le rang S n'entre jamais dans le classement.
-   *  → { cas: 'fini' | 'realise' | 'aucun' | 'seul' | 'grille' | 'tot' | 'meneur' | 'aucunNeColle',
-   *      meneur, seul, ouverts (triés par écart), realises, hors, montre, reste, fin, tDecision } */
+   *  → { cas: 'fini' | 'realise' | 'aucun' | 'nonSuivi' | 'seul' | 'grille' | 'tot' | 'meneur' | 'aucunNeColle',
+   *      meneur, seul, ouverts (triés par écart), realises, hors, montre, reste, fin, tDecision, remplace }
+   *  'nonSuivi' : aucun scénario ouvert SUIVI, mais au moins un encore en cours que ces bougies ne
+   *  suivent pas (4 h, 1 jour : 'large' ; historique trop court : 'incomplet') — rien n'est dit de
+   *  la journée sur cet intervalle (jamais « aucun ne tient »). */
   function classerJour(items, P, F, maintenant, rejeu, PJ) {
     const Q = pj(PJ), jour = (items || []).filter(i => i.sc.rang !== 'S');
+    // Une note du journal sans heure de résolution : son fondu part de la publication du fichier
+    // (updated, la même pour tous les lecteurs ; jamais de zéro d'un coup) ; sans elle, il ne
+    // s'efface pas.
+    const luA = F && fini(F.updated) ? F.updated : null;
     for (const it of jour) {
       it.ouvert = ouvertJour(it.sc, it.sv, maintenant);
       it.pos = it.ouvert ? position(it.sc, it.sv, P) : null;
       if (!it.pos) it.ouvert = false;
       it.ferme = it.ouvert ? null : fermeture(it.sc, it.sv);
-      it.fondu = it.ferme && (it.ferme.type === 'invalide' || it.ferme.type === 'sortie' || it.ferme.type === 'ambigu') ? fondu(it.ferme.tFin, maintenant, Q) : null;
+      const fe = it.ferme;
+      it.fondu = fe && (fe.type === 'invalide' || fe.type === 'sortie' || fe.type === 'ambigu')
+        ? (fe.journal && !fini(fe.tFin) ? (luA !== null ? fondu(luA, maintenant, Q) : 1) : fondu(fe.tFin, maintenant, Q)) : null;
     }
+    const nonSuivi = it => it.sc.statut === '⏳' && !(fini(maintenant) && maintenant >= it.sc.fin) && (!it.sv || it.sv.cle === 'large' || it.sv.cle === 'incomplet');
     const finJ = jour.length ? Math.max(...jour.map(i => i.sc.fin)) : F && F.fin;
     const ouverts = jour.filter(i => i.ouvert).sort((a, b) => a.pos.e - b.pos.e || RANGS.indexOf(a.sc.rang) - RANGS.indexOf(b.sc.rang));
     const realises = jour.filter(estRealise);
     const r = { cas: null, meneur: null, seul: null, ouverts, realises, items: jour, hors: horsNiveaux(jour.map(i => i.sc), P, Q), prix: P,
-      fin: finJ, reste: fini(finJ) && fini(maintenant) ? finJ - maintenant : null, tDecision: rejeu ? rejeu.tDecision : null, montre: null, remplace: false };
+      fin: finJ, reste: fini(finJ) && fini(maintenant) ? finJ - maintenant : null, tDecision: rejeu ? rejeu.tDecision : null, montre: null, remplace: false,
+      notes: jour.length > 0 && jour.every(i => i.sc.statut !== '⏳') };
+    const parRang = L => L.slice().sort((a, b) => RANGS.indexOf(a.sc.rang) - RANGS.indexOf(b.sc.rang));
     if (fini(maintenant) && fini(finJ) && maintenant >= finJ) r.cas = 'fini';
+    else if (!ouverts.length && jour.some(nonSuivi)) r.cas = 'nonSuivi';
     else if (!ouverts.length) r.cas = realises.length ? 'realise' : 'aucun';
     else if (ouverts.length === 1) { r.cas = 'seul'; r.seul = ouverts[0]; }
     else if (!rejeu || !rejeu.grille) r.cas = 'grille';
     else if (!rejeu.sortiTot) r.cas = 'tot';
     else {
       let m = ouverts.find(i => i.sc.id === rejeu.prec);
-      if (!m) { m = ouverts[0]; r.remplace = true; }     // le nommé vient de se fermer : le suivant, tout de suite
-      r.cas = (r.remplace ? ouverts[0].pos.e >= Q.colle : rejeu.cas === 'aucunNeColle') ? 'aucunNeColle' : 'meneur';
+      // Le nommé vient de se fermer pendant la bougie en cours : le suivant tout de suite, choisi
+      // UNE fois et figé jusqu'à la clôture suivante — le plus petit écart parmi les restants à la
+      // dernière clôture décidée (rejeu.ordre), sinon le plus petit rang. Jamais re-choisi à chaque tick.
+      if (!m) {
+        for (const id of rejeu.ordre || []) if ((m = ouverts.find(i => i.sc.id === id))) break;
+        if (!m) m = parRang(ouverts)[0];
+        r.remplace = true;
+      }
+      r.cas = rejeu.cas === 'aucunNeColle' ? 'aucunNeColle' : 'meneur';
       if (r.cas === 'meneur') r.meneur = m;
     }
     // Le scénario MONTRÉ (Débutant) : le rang 1 s'il est ouvert ou réalisé ; sinon le plus petit rang
     // encore ouvert ; sinon un réalisé ; sinon le rang 1 pendant son fondu. Il ne change qu'à une
     // fermeture (un fait), jamais avec le meneur.
     const un = jour.find(i => i.sc.rang === '1');
-    const parRang = L => L.slice().sort((a, b) => RANGS.indexOf(a.sc.rang) - RANGS.indexOf(b.sc.rang));
     if (un && (un.ouvert || estRealise(un))) r.montre = un;
     else if (ouverts.length) r.montre = parRang(ouverts)[0];
+    else if (r.cas === 'nonSuivi') r.montre = parRang(jour.filter(nonSuivi))[0];   // comme avant le suivi de la journée
     else if (realises.length) r.montre = parRang(realises)[0];
     else if (un && un.fondu > 0) r.montre = un;
     return r;
@@ -858,6 +886,8 @@ const Scenarios = (function () {
   const dec1 = v => (Math.round(v * 10) / 10).toLocaleString('fr-FR', { maximumFractionDigits: 1 }).replace(/[  ]/g, ' ');
   /** Le nom d'un créneau de bougie, pour un débutant : « le même quart d'heure ». */
   const memeCreneau = pasMs => (pasMs === 60000 ? 'la même minute' : pasMs === 900000 ? 'le même quart d’heure' : pasMs === 3600000 ? 'la même heure' : pasMs > 0 ? 'les mêmes ' + Math.round(pasMs / 60000) + ' minutes' : 'le même moment');
+  /** Un contact seulement en mèche, pour un débutant (sans « mèche ») : compté par le journal. */
+  const BREF = ', par un passage bref du prix : le journal compte ce passage, alors que pour les figures, la page attend que le prix s’y maintienne';
   /** Pourquoi un scénario s'est fermé, en mots. → texte (sans majuscule ni point). */
   function raison(S, sv, mode) {
     const exp = mode === 'expert', f = fermeture(S, sv);
@@ -865,11 +895,11 @@ const Scenarios = (function () {
     if (f.type === 'invalide') {
       const z = f.zone, prochaine = S.cibles[sv.premier ? Math.min(1, S.cibles.length - 1) : 0];
       if (exp) return 'zone ' + chiffres(S.invalidation) + ' touchée' + (sv.premier ? ' après la 1re cible' : ' avant ' + chiffres(prochaine)) + (f.meche ? ' (en mèche : contact, règle du journal)' : '');
-      return 'le prix a touché la zone de ' + prix(S.invalidation) + ' (à partir de ' + dollars(S.invalidation > (fini(S.prixEmission) ? S.prixEmission : S.cibles[0]) ? z[0] : z[1]) + ') avant de toucher la zone de ' + prix(prochaine);
+      return 'le prix a touché la zone de ' + prix(S.invalidation) + ' (à partir de ' + dollars(S.invalidation > (fini(S.prixEmission) ? S.prixEmission : S.cibles[0]) ? z[0] : z[1]) + ') avant de toucher la zone de ' + prix(prochaine) + (f.meche ? BREF : '');
     }
     if (f.type === 'sortie') {
       if (exp) return 'borne ' + (f.haut ? 'haute ' : 'basse ') + chiffres(f.niveau) + ' dépassée' + (f.meche ? ' (en mèche : contact, règle du journal)' : '');
-      return 'le prix est passé ' + (f.haut ? 'au-dessus de ' : 'au-dessous de ') + dollars(f.niveau) + ' (' + prix(f.borne) + (f.haut ? ' plus' : ' moins') + ' la marge)';
+      return 'le prix est passé ' + (f.haut ? 'au-dessus de ' : 'au-dessous de ') + dollars(f.niveau) + ' (' + prix(f.borne) + (f.haut ? ' plus' : ' moins') + ' la marge)' + (f.meche ? BREF : '');
     }
     if (f.type === 'ambigu') {
       if (exp) return (S.forme === 'range' ? 'les deux bornes' : 'cible et invalidation') + ' dans la même bougie : ordre inconnu';
@@ -877,9 +907,24 @@ const Scenarios = (function () {
     }
     if (f.type === 'realise') {
       if (exp) return 'zone ' + chiffres(f.niveau) + ' touchée' + (f.meche ? ' (en mèche : contact, règle du journal)' : '');
-      return 'le prix a touché la zone de ' + prix(f.niveau) + (f.meche ? ', par un passage bref du prix : le journal compte ce passage, alors que pour les figures, la page attend que le prix s’y maintienne' : '');
+      return 'le prix a touché la zone de ' + prix(f.niveau) + (f.meche ? BREF : '');
     }
     return null;
+  }
+  /** Les cibles touchées QUI COMPTENT : la chaîne stricte (dans l'ordre, chacune dans une bougie plus
+   *  tardive que la précédente), seulement avant l'invalidation (un contact dans la bougie même de
+   *  l'invalidation n'en est pas, l'ordre y est inconnu) ; aucune quand le journal a noté ❌ ou ⚠.
+   *  → [{ j, t, meche }] (j : l'indice de la cible). Les contacts bruts (sv.touchees) ne se montrent
+   *  jamais : hors de l'ordre ou après l'invalidation, ils ne disent rien du scénario. */
+  function touchesValides(S, sv) {
+    if (!sv || S.forme !== 'chemin' || S.statut === '❌' || S.statut === '⚠' || !Array.isArray(sv.temps)) return [];
+    const out = [];
+    for (let j = 0; j < sv.temps.length; j++) {
+      const t = sv.temps[j];
+      if (!fini(t) || (fini(sv.tInv) && t >= sv.tInv)) break;
+      out.push({ j, t, meche: !!(sv.meche && sv.meche[j] && sv.touchees && sv.touchees[j] === t) });
+    }
+    return out;
   }
   /** Le nom d'un scénario de la journée dans une phrase : « le 3 ». */
   const leN = it => 'le ' + it.sc.rang;
@@ -890,6 +935,12 @@ const Scenarios = (function () {
     const k = it.pos ? it.pos.k : 0;
     return prix(S.cibles[Math.min(k, S.cibles.length - 1)]);
   }
+  /** Le niveau de la dernière cible d'un chemin (réalisé) : « 80 806 $ ». */
+  const niveauRealise = it => (it.sc.forme === 'range' ? null : prix(it.sc.cibles[it.sc.cibles.length - 1]));
+  /** La marque d'un fait : « (journal) » pour une note du fichier, « (en direct) » sinon. */
+  const marqueDe = it => (it.sc.statut !== '⏳' ? '(journal)' : '(en direct)');
+  /** L'état court d'une note du journal sur la ligne : ✗ seulement pour ❌ (⚠ = « indécis »). */
+  const etatJournal = st => ETATS_COURTS_DEBUTANT.journal[st] || 'noté';
   /** Le mot court de la fermeture du rang 1 : « invalidé », « sorti », « indécis ». */
   const motFerme = it => (it.ferme && it.ferme.type === 'sortie' ? 'sorti' : it.ferme && it.ferme.type === 'ambigu' ? 'indécis' : 'invalidé');
   /** La ligne des scénarios du Débutant pendant la journée (au plus `max` caractères et `maxPx`
@@ -899,38 +950,48 @@ const Scenarios = (function () {
    *  journal, « (journal) » ; jamais les deux. */
   function ligneJourDebutant(F, jour, items, maintenant, max, P, mesure, maxPx) {
     const base = () => ligneBoiteDebutant(F, items, maintenant, max, P, mesure, maxPx);
-    if (!F || F.etat !== 'ok' || !jour || estAncien(F, maintenant) || jour.cas === 'fini') return base();
+    if (!F || F.etat !== 'ok' || !jour || estAncien(F, maintenant) || jour.cas === 'fini' || jour.cas === 'nonSuivi') return base();
     const un = jour.items.find(i => i.sc.rang === '1');
     if (!un || (un.sv && ['large', 'incomplet'].includes(un.sv.cle)) || (un.sv && un.sv.cle === 'avant')) return base();
     const V = [], M = jour.montre, real = jour.realises.filter(i => i !== un), r1 = real.length ? real[0] : null;
-    const men = jour.meneur;
+    // Le nom n'est dit sur la ligne que s'il a, en ce moment, le plus petit écart (nomNet) : un nom
+    // gardé par l'hystérésis reste dans les bulles, qui l'expliquent.
+    // Un remplaçant (le nommé vient de se fermer dans la bougie en cours) n'y est pas dit non plus :
+    // provisoire jusqu'à la clôture, la ligne ne le ferait qu'apparaître et disparaître.
+    const men = jour.meneur && nomNet(jour) && !jour.remplace ? jour.meneur : null;
     if (!jour.ouverts.length && !jour.realises.length) {
-      V.push('Aucun scénario ne tient plus (en direct) ▸', 'Aucun ne tient plus (en direct) ▸');
+      V.push('Aucun scénario ne tient plus (en direct) ▸', 'Scénarios : aucun ne tient (en direct) ▸');
       return premiere(V, max, mesure, maxPx);
     }
+    // Un autre scénario réalisé : « zone du 2 (80 806 $) ✓ » — jamais « réalisé » pour un scénario
+    // qui n'est peut-être pas dessiné (A3) ; « (journal) » quand c'est la note du fichier.
+    const zoneR = (avecNiv) => 'zone du ' + r1.sc.rang + (avecNiv && niveauRealise(r1) ? ' (' + niveauRealise(r1) + ')' : '') + ' ✓';
     const unFerme = !un.ouvert && !estRealise(un);
     if (unFerme) {
       const mot = motFerme(un), journal = un.sc.statut !== '⏳';
       if (journal) {
-        const etatJ = un.sc.statut === '❌' ? 'invalidé ✗' : ETATS_COURTS_DEBUTANT.journal[un.sc.statut] || 'noté';
-        if (men && men === M) V.push('Scén. 1 ✗ (journal) · ' + leN(men) + ' suit mieux ▸');
-        V.push('Scén. 1 ' + etatJ + ' (journal) ▸', 'Scén. 1 ✗ (journal) ▸');
+        const etatJ = etatJournal(un.sc.statut);
+        V.push('Scén. 1 ' + etatJ + ' (journal) ▸');
         return premiere(V, max, mesure, maxPx);
       }
-      const croix = mot === 'indécis' ? 'indécis' : mot + ' ✗';
-      if (!jour.ouverts.length && r1) V.push('Scén. 1 ' + mot + ' · ' + leN(r1) + ' réalisé ✓ (en direct) ▸', 'Scén. 1 ✗ · ' + leN(r1) + ' réalisé ✓ (en direct) ▸');
-      else if (r1) V.push('Scén. 1 ✗ · ' + leN(r1) + ' réalisé ✓ (en direct) ▸');
-      else if (men && men === M) V.push('Scén. 1 ✗ (en direct) · ' + leN(men) + ' suit mieux ▸');
-      else if (jour.cas === 'seul') V.push('Scén. 1 ✗ · seul ' + leN(jour.seul) + ' en cours (en direct) ▸');
-      V.push('Scén. 1 ' + croix + ' (en direct) ▸', 'Scén. 1 ✗ (en direct) ▸');
+      const croix = mot === 'indécis' ? 'indécis' : mot + ' ✗', court = mot === 'indécis' ? 'indécis' : '✗';
+      // (Un autre réalisé par la note du journal : pas sur cette ligne, qui dirait les deux marques.)
+      if (r1 && r1.sc.statut === '⏳') V.push('Scén. 1 ' + mot + ' · ' + zoneR(false) + ' (en direct) ▸', 'Scén. 1 ' + court + ' · ' + zoneR(false) + ' (en direct) ▸');
+      else if (!r1 && men && men === M) V.push('Scén. 1 ' + court + ' (en direct) · ' + leN(men) + ' suit mieux ▸');
+      else if (!r1 && jour.cas === 'seul') V.push('Scén. 1 ' + court + ' · seul ' + leN(jour.seul) + ' en cours (en direct) ▸');
+      V.push('Scén. 1 ' + croix + ' (en direct) ▸', 'Scén. 1 ' + court + ' (en direct) ▸');
       return premiere(V, max, mesure, maxPx);
     }
     if (estRealise(un)) return base();
     // Le rang 1 est ouvert (et montré).
     const k = un.sv && un.sv.cle === 'cible' ? un.sv.k : 0;
     if (r1) {
-      if (k) V.push('Scén. : ' + ordinal(k) + ' cible ✓ · ' + leN(r1) + ' réalisé ✓ (en direct) ▸');
-      V.push('Scén. : en cours · ' + leN(r1) + ' réalisé ✓ (en direct) ▸', 'En cours · ' + leN(r1) + ' réalisé ✓ (en direct) ▸');
+      const mq = marqueDe(r1);
+      if (mq === '(journal)') V.push(zoneR(true).replace(/^z/, 'Z') + ' (journal) ▸', zoneR(false).replace(/^z/, 'Z') + ' (journal) ▸');
+      else {
+        if (k) V.push('En direct : ' + ordinal(k) + ' cible ✓ · ' + zoneR(false) + ' ▸');
+        V.push('En direct : ' + zoneR(true) + ' ▸', 'En direct : ' + zoneR(false) + ' ▸');
+      }
       return premiere(V, max, mesure, maxPx);
     }
     if (jour.cas === 'seul') {
@@ -945,23 +1006,40 @@ const Scenarios = (function () {
     }
     return base();
   }
-  /** Le libellé du scénario MONTRÉ (Débutant) quand il est réalisé ou fermé : « Scénario 2 : zone
-   *  80 806 $ ✓ » ; « Scén. 1 invalidé ✗ vers 17h15 » (heure de Paris du créneau du contact). Les
-   *  autres cas : libellesDebutant. */
+  /** Le libellé du scénario MONTRÉ (Débutant) quand il est réalisé ou fermé, toujours avec sa marque
+   *  (la ligne peut avoir cédé sa place) : « Scén. 2 : zone ✓ (en direct) » (jamais « atteint » ni
+   *  le niveau seul coché, A3 : c'est la ZONE qui a été touchée ; le libellé est posé sur elle) ;
+   *  « Scén. 1 ✗ vers 17h15 (en direct) » (heure de Paris du créneau du contact) ; une note du
+   *  journal, « (journal) ». Un range encore ouvert dont le prix est sorti des bornes mais pas de la
+   *  marge : « Scén. 1 : tient jusqu’à 80 622 $ » (le bord toléré, que la boîte seule ne montre pas).
+   *  Les autres cas : libellesDebutant. */
   function libellesJourDebutant(it, max, fleche) {
-    const S = it.sc, f = fleche ? fleche + ' ' : '';
+    const S = it.sc, f = fleche ? fleche + ' ' : '', mq = marqueDe(it);
+    const garder = V => V.map(t => f + t).filter((t, i, W) => i === W.length - 1 || !(max > 0) || t.length <= max);
     if (estRealise(it)) {
-      const v = S.forme === 'range' ? null : S.cibles[S.cibles.length - 1];
-      if (v === null) return libellesDebutant(S, it.sv, max, fleche);
-      const V = ['Scénario ' + S.rang + ' : zone ' + prix(v) + ' ✓', 'Scén. ' + S.rang + ' : zone ' + prix(v) + ' ✓', 'Scén. ' + S.rang + ' : zone ' + chiffres(v) + ' ✓', 'Scén. ' + S.rang + ' ✓'].map(t => f + t);
-      return V.filter((t, i) => i === V.length - 1 || !(max > 0) || t.length <= max);
+      if (S.forme === 'range') return libellesDebutant(S, it.sv, max, fleche);
+      return garder(['Scénario ' + S.rang + ' : zone ✓ ' + mq, 'Scén. ' + S.rang + ' : zone ✓ ' + mq, 'Scén. ' + S.rang + ' ✓ ' + mq]);
     }
     if (!it.ouvert && it.ferme) {
-      const h = fini(it.ferme.t) ? heureParis(it.ferme.t) : null, mot = motFerme(it), croix = mot === 'indécis' ? 'indécis' : mot + ' ✗';
-      const V = (h ? ['Scén. ' + S.rang + ' ' + croix + ' vers ' + h] : []).concat(['Scén. ' + S.rang + ' ' + croix]).map(t => f + t);
-      return V.filter((t, i) => i === V.length - 1 || !(max > 0) || t.length <= max);
+      if (it.ferme.journal) { const e = etatJournal(S.statut); return garder(['Scén. ' + S.rang + ' ' + e + ' (journal)', 'Scén. ' + S.rang + ' (journal)']); }
+      const h = fini(it.ferme.t) ? heureParis(it.ferme.t) : null, mot = motFerme(it), ind = mot === 'indécis', croix = ind ? 'indécis' : mot + ' ✗', c = ind ? 'indécis' : '✗';
+      return garder((h ? ['Scén. ' + S.rang + ' ' + croix + ' vers ' + h + ' (en direct)', 'Scén. ' + S.rang + ' ' + c + ' vers ' + h + ' (en direct)'] : [])
+        .concat(['Scén. ' + S.rang + ' ' + croix + ' (en direct)', 'Scén. ' + S.rang + ' ' + c + ' (en direct)']));
+    }
+    if (it.ouvert && it.pos && it.pos.forme === 'range' && dansMarge(it)) {
+      const n = dollars(it.pos.niveauBord), noms = ['Scénario ' + S.rang, 'Scén. ' + S.rang];
+      const V = [];
+      for (const nm of noms) V.push(nm + ' : tient jusqu’à ' + n);
+      for (const nm of noms) V.push(nm + ' : jusqu’à ' + n);
+      return garder(V.concat(libellesDebutant(S, it.sv, max, null)));
     }
     return libellesDebutant(S, it.sv, max, fleche);
+  }
+  /** Un range ouvert dont le prix est au-delà d'une borne du fichier, mais encore dans la marge. */
+  function dansMarge(it) {
+    const p = it.pos, S = it.sc;
+    if (!p || p.forme !== 'range') return false;
+    return p.bord === 'bas' ? p.dBord < S.range[0] - S.zones.bas : p.dBord < S.zones.haut - S.range[1];
   }
   /** « Valables jusqu'à demain 06h20 (heure de Paris) : encore 13 h 25. » */
   function texteResteDebutant(jour, maintenant) {
@@ -969,7 +1047,7 @@ const Scenarios = (function () {
     const h = heureParis(jour.fin), r = reste(jour.fin - maintenant);
     const jF = jourParis(jour.fin), jA = jourParis(maintenant), demain = jourParis(maintenant + 86400000);
     const quand = jF === jA ? 'aujourd’hui' : jF === demain ? 'demain' : 'le ' + jF;
-    if (!r) return 'Terminés depuis ' + quand.replace('aujourd’hui', 'aujourd’hui') + (h ? ' ' + h : '') + ' (heure de Paris) ; la note du journal suivra.';
+    if (!r) return 'Terminés depuis ' + quand + (h ? ' ' + h : '') + ' (heure de Paris) ; ' + (jour.notes ? 'le journal les a notés.' : 'la note du journal suivra.');
     return 'Valables jusqu’à ' + quand + (h ? ' ' + h : '') + ' (heure de Paris) : encore ' + r + '. Pas de nouvelle prévision d’ici là : la page recalcule seulement où en est chaque scénario du matin.';
   }
   /** La ligne d'un scénario dans la bulle du Débutant : ce qu'il dit, son état, ses distances.
@@ -978,18 +1056,27 @@ const Scenarios = (function () {
    *  1 892 $ (81 204 $). » court : sans « Le prix va vers … ». */
   function ligneDebutantJour(it, jour, court) {
     const S = it.sc, sv = it.sv, e = etatCourtDebutant(S, sv);
-    let t = court ? MARQUES_RANG[S.rang] + ' ' + e.etat + (e.marque ? ' ' + e.marque : '') : ligneDebutant(S, sv);
-    if (jour && jour.meneur === it) t += !nomNet(jour) ? (court ? ', nommé au dernier quart d’heure' : ', nommé au dernier quart d’heure décidé') : court ? ', suit le mieux le prix' : ', suit le mieux le prix pour l’instant';
+    // Court (téléphone) : ce que dit le scénario en peu de mots (« vers 80 400 $ », « entre 81 000 et
+    // 83 500 $ »), sinon « sa zone » ne renverrait à rien.
+    let t = court ? ligneCourteDebutant(S, sv) : ligneDebutant(S, sv);
+    if (jour && jour.meneur === it) t += jour.remplace ? ', nommé à la place du scénario qui vient de se fermer' : !nomNet(jour) ? (court ? ', nommé au dernier quart d’heure' : ', nommé au dernier quart d’heure décidé') : court ? ', suit le mieux le prix' : ', suit le mieux le prix pour l’instant';
     const d = distancesDebutant(it, court);
     return t + (d ? ' : ' + d : '') + '.';
+  }
+  /** Un scénario en peu de mots (écrans courts) : « 2. vers 80 400 $ — en cours (en direct) » ;
+   *  « 1. entre 81 000 et 83 500 $ — … » ; une fermeture calculée ici dit son heure de Paris. */
+  function ligneCourteDebutant(S, sv) {
+    const e = etatCourtDebutant(S, sv);
+    const quoi = S.forme === 'range' ? 'entre ' + chiffres(S.range[0]) + ' et ' + prix(S.range[1]) : 'vers ' + S.cibles.map(prix).join(' puis ');
+    return MARQUES_RANG[S.rang] + ' ' + quoi + ' — ' + e.etat + (e.marque ? ' ' + e.marque : '') + momentFerme(S, sv);
   }
   /** Où en est le prix pour ce scénario, en mots (Débutant) : « encore 559 $ jusqu'au début de sa zone
    *  (83 655 $, autour de 84 500 $) ; ce qui l'invaliderait commence à 1 892 $ (81 204 $) » ; range :
    *  « il est à 1 239 $ de sa limite haute (83 500 $ plus la marge, soit 84 335 $) » ; fermé : sa raison. */
   function distancesDebutant(it, court) {
     const S = it.sc, p = it.pos;
-    if (court && p && p.forme === 'chemin') return (p.bordCible === null ? 'dans sa zone' : 'à ' + dollars(p.dCible) + ' de sa zone') + (p.zoneInv ? (p.bordInv === null ? ', dans la zone qui l’invaliderait' : ', à ' + dollars(p.dInv) + ' de ce qui l’invaliderait') : '');
-    if (court && p && p.forme === 'range') return 'à ' + dollars(p.dBord) + ' de sa limite ' + (p.bord === 'haut' ? 'haute' : 'basse') + ' (marge comprise)';
+    if (court && p && p.forme === 'chemin') return (p.bordCible === null ? 'dans sa zone' : 'à ' + dollars(p.dCible) + ' de sa zone (dès ' + dollars(p.bordCible) + ')') + (p.zoneInv ? (p.bordInv === null ? ', dans la zone qui l’invaliderait' : ', à ' + dollars(p.dInv) + ' de ce qui l’invaliderait (dès ' + dollars(p.bordInv) + ')') : '');
+    if (court && p && p.forme === 'range') return 'à ' + dollars(p.dBord) + ' de sa limite ' + (p.bord === 'haut' ? 'haute' : 'basse') + ' (marge comprise, ' + dollars(p.niveauBord) + ')';
     if (court && !it.ouvert) return null;
     if (p && p.forme === 'chemin') {
       let t = p.bordCible === null ? 'le prix est dans sa zone (autour de ' + prix(p.cible) + ')' : 'encore ' + dollars(p.dCible) + ' jusqu’au début de sa zone (' + dollars(p.bordCible) + ', autour de ' + prix(p.cible) + ')';
@@ -1003,9 +1090,16 @@ const Scenarios = (function () {
   /** La phrase du Débutant sur le scénario au plus petit écart (bulle de la ligne), ou null. */
   /** La phrase courte du nom (bulles du libellé et écran court, Débutant) ; it : le scénario de la
    *  bulle (ou rien). Nom gardé sans le plus petit écart : dit tel quel. */
-  function phraseNomDebutant(jour, it) {
+  function phraseNomDebutant(jour, it, court) {
     if (!jour || jour.cas !== 'meneur' || !jour.meneur) return null;
     const n = jour.meneur.sc.rang;
+    // Court (écran court, bulle d'un libellé) : une phrase, le nom d'abord.
+    if (court) {
+      if (jour.remplace) return 'Nommé pour l’instant : le scénario ' + n + ', à la place de celui qui vient de se fermer (une règle de calcul).';
+      if (!nomNet(jour)) return 'Nommé au dernier quart d’heure : le scénario ' + n + ' ; le ' + jour.ouverts[0].sc.rang + ' est maintenant un peu plus près (une règle de calcul).';
+      return it && it === jour.meneur ? 'Pour l’instant, il suit le mieux le prix (une règle de calcul).' : 'Pour l’instant, le scénario ' + n + ' suit le mieux le prix (une règle de calcul).';
+    }
+    if (jour.remplace) return 'Le scénario ' + n + ' est nommé à la place du scénario qui vient de se fermer (le plus près de ce qu’il décrit au dernier quart d’heure décidé, parmi ceux qui restent) ; revu à la prochaine fin de quart d’heure. Une règle de calcul, pas une prévision.';
     if (!nomNet(jour)) return 'Le scénario ' + n + ' a été nommé au dernier quart d’heure décidé ; depuis, le prix s’est rapproché du scénario ' + jour.ouverts[0].sc.rang + ', pas encore assez nettement pour changer de nom (une règle de calcul, pas une prévision).';
     if (it && it === jour.meneur) return 'Pour l’instant, il suit le mieux le prix (décidé tous les quarts d’heure) : une règle de calcul, pas une prévision.';
     return 'Pour l’instant, le prix est le plus près de ce que décrit le scénario ' + n + ' (décidé tous les quarts d’heure) : une règle de calcul, pas une prévision ni une chance de réussite.';
@@ -1020,12 +1114,19 @@ const Scenarios = (function () {
         excl = 'Les scénarios ne s’excluent pas : ' + leN(m) + ' peut se réaliser pendant que le 1 tient.';
       // Nom gardé (le prix s'est rapproché d'un autre, pas encore nettement, ou depuis moins d'un
       // quart d'heure) : dit tel quel, jamais « le plus près » pour un scénario qui ne l'est plus.
+      if (jour.remplace) return 'Le scénario nommé vient de se fermer : le ' + m.sc.rang + ' prend le nom (le plus près de ce qu’il décrit au dernier quart d’heure décidé, parmi ceux qui restent), revu à la prochaine fin de quart d’heure. ' + excl + ' ' + regle;
       if (!nomNet(jour)) return 'Au dernier quart d’heure décidé, le prix était le plus près de ce que décrit le scénario ' + m.sc.rang + ' ; depuis, il s’est rapproché du scénario ' + jour.ouverts[0].sc.rang + ', pas encore assez nettement pour changer de nom (décidé tous les quarts d’heure). ' + excl + ' ' + regle;
       return 'Pour l’instant, le prix est le plus près de ce que décrit le scénario ' + m.sc.rang + ' (décidé tous les quarts d’heure, seulement si l’écart est net). ' + excl + ' ' + regle;
     }
     if (jour.cas === 'tot') return 'Trop tôt pour départager : le prix a encore peu bougé depuis le point du matin ; le classement du matin tient.';
     if (jour.cas === 'aucunNeColle') return 'Aucun scénario en cours ne colle au prix : chacun est plus près de ce qui l’invaliderait que de sa zone (pour « le prix reste entre », plus près d’une limite que du milieu). ' + regle;
-    if (jour.cas === 'seul') return 'Un seul scénario est encore en cours : le ' + jour.seul.sc.rang + '.' + (jour.seul.pos && jour.seul.pos.e >= 0.5 ? ' Le prix est plus près de ce qui l’invaliderait que de ce qu’il décrit.' : '');
+    if (jour.cas === 'seul') {
+      const s = jour.seul, p = s.pos, loin = p && p.e >= 0.5;
+      // Un range décrit la fourchette où le prix EST : « plus près de ce qui l'invaliderait que de ce
+      // qu'il décrit » s'y lirait comme une contradiction ; il dit sa limite la plus proche.
+      const t = !loin ? '' : p.forme === 'range' ? ' Le prix est plus près de sa limite ' + (p.bord === 'haut' ? 'haute' : 'basse') + ' (' + dollars(p.niveauBord) + ', marge comprise) que du milieu de la fourchette.' : ' Le prix est plus près de ce qui l’invaliderait que de ce qu’il décrit.';
+      return 'Un seul scénario est encore en cours : le ' + s.sc.rang + '.' + t;
+    }
     if (jour.cas === 'grille') return 'Sur des bougies d’une heure, la page ne dit pas quel scénario suit le mieux le prix : à voir en 15 min.';
     if (jour.cas === 'aucun') return 'Aucun scénario du matin ne décrit ce mouvement : les trois ne tiennent plus (en direct). Pas de nouvelle prévision avant le prochain point de 07h00.';
     return null;
@@ -1041,7 +1142,8 @@ const Scenarios = (function () {
     const finU = heureUTC(jour.fin) + ' UTC';
     const hors = jour.hors ? ' · prix au-delà de tous les niveaux du matin (' + (jour.hors.haut ? 'au-dessus de ' : 'au-dessous de ') + dollars(jour.hors.seuil) + ')' : '';
     switch (jour.cas) {
-      case 'fini': return ['Terminé à ' + finU + ' · note du journal à venir'];
+      case 'fini': return ['Terminé à ' + finU + (jour.notes ? ' · noté par le journal' : ' · note du journal à venir')];
+      case 'nonSuivi': return [];
       case 'meneur': {
         // Le nom ne change qu'à une clôture de 15 min, et seulement si l'écart est net (A1,
         // hystérésis) : entre-temps, un autre scénario peut avoir un écart un peu plus petit. Alors
@@ -1049,6 +1151,8 @@ const Scenarios = (function () {
         const n = jour.meneur.sc.rang;
         if (nomNet(jour)) return ['Plus petit écart pour l’instant : ' + n + ' (une mesure, pas une probabilité)' + hors, 'Plus petit écart : ' + n + ' (pas une probabilité)' + hors, 'Plus petit écart : ' + n + ' (pas une probabilité)', 'Écart min. : ' + n];
         const m = jour.ouverts[0].sc.rang;
+        if (jour.remplace) return ['Plus petit écart pour l’instant : ' + m + ' · nom repris : ' + n + ' (le nommé s’est fermé ; revu à la clôture de 15 min)' + hors,
+          'Plus petit écart : ' + m + ' · nom repris : ' + n, 'Écart min. : ' + m + ' · nom repris : ' + n];
         return ['Plus petit écart pour l’instant : ' + m + ' · nom gardé : ' + n + ' (revu à chaque clôture de 15 min, écart net exigé)' + hors,
           'Plus petit écart : ' + m + ' · nom gardé : ' + n + ' (revu au quart d’heure)', 'Écart min. : ' + m + ' · nom gardé : ' + n];
       }
@@ -1061,12 +1165,15 @@ const Scenarios = (function () {
       default: return [];
     }
   }
+  /** « ◂ » : le scénario au plus petit écart EN CE MOMENT (pendant un nom gardé, ce n'est pas le
+   *  nommé : la phrase de l'encadré dit les deux). Seulement quand un nom est donné (cas 'meneur'). */
+  const pointe = (it, jour) => !!(jour && jour.cas === 'meneur' && jour.ouverts.length && jour.ouverts[0] === it);
   /** Le suffixe d'une ligne de l'encadré Expert : les distances en dollars (jamais l'indice) ;
-   *  « ◂ » pour le plus petit écart. */
+   *  « ◂ » pour le plus petit écart (pointe). */
   function suffixeExpert(it, jour) {
     const p = it.pos;
     if (!p) return '';
-    const m = jour && jour.meneur === it ? ' ◂' : '';
+    const m = pointe(it, jour) ? ' ◂' : '';
     if (p.forme === 'range') return ' · bord toléré à ' + dollars(p.dBord) + m;
     return ' · zone à ' + dollars(p.dCible) + (p.zoneInv ? ' · inv. à ' + dollars(p.dInv) : '') + m;
   }
@@ -1081,7 +1188,8 @@ const Scenarios = (function () {
   function ligneJourExpert(it, jour, ctx) {
     const S = it.sc, sv = it.sv, c = ctx || {}, p = it.pos, out = [];
     const cr = t => creneau(t, sv ? sv.pas : 0, c.maintenant, true);
-    if (sv && sv.touchees) sv.touchees.forEach((t, j) => { if (fini(t)) out.push(ordinal(j + 1) + ' cible touchée' + (sv.meche && sv.meche[j] ? ' en mèche' : '') + ' ' + cr(t) + (sv.meche && sv.meche[j] ? ' (contact : règle du journal)' : '')); });
+    // Les cibles touchées qui comptent (chaîne stricte, avant l'invalidation) ; jamais un contact brut.
+    for (const x of touchesValides(S, sv)) out.push(ordinal(x.j + 1) + ' cible touchée' + (x.meche ? ' en mèche' : '') + ' ' + cr(x.t) + (x.meche ? ' (contact : règle du journal)' : ''));
     if (p && p.forme === 'chemin') {
       out.push('prochaine zone ' + chiffres(p.cible) + (p.bordCible !== null ? ' (dès ' + dollars(p.bordCible) + ') à ' + dollars(p.dCible) : ' : prix dedans'));
       if (p.zoneInv) out.push('invalidation ' + chiffres(p.inv) + (p.bordInv !== null ? ' (dès ' + dollars(p.bordInv) + ') à ' + dollars(p.dInv) : ' : prix dedans'));
@@ -1093,7 +1201,10 @@ const Scenarios = (function () {
       const r = raison(S, sv, 'expert');
       if (r) out.push(r);
     }
-    if (jour && jour.meneur === it) out.push('plus petit écart pour l’instant (décidé à chaque clôture de 15 min ; une mesure, pas une probabilité)');
+    if (jour && jour.meneur === it) {
+      if (nomNet(jour)) out.push('plus petit écart pour l’instant (décidé à chaque clôture de 15 min ; une mesure, pas une probabilité)');
+      else out.push((jour.remplace ? 'nom repris (le nommé s’est fermé ; revu à la clôture de 15 min)' : 'nom gardé (revu à chaque clôture de 15 min, écart net exigé)') + ' ; plus petit écart en ce moment : ' + jour.ouverts[0].sc.rang + ' (une mesure, pas une probabilité)');
+    } else if (pointe(it, jour)) out.push('plus petit écart en ce moment ; le nom reste au ' + jour.meneur.sc.rang + ' jusqu’à une clôture de 15 min où l’écart est net (une mesure, pas une probabilité)');
     if (it.fondu !== null && it.fondu !== undefined && it.fondu > 0 && it.fondu < 1) out.push('s’efface (fondu de ' + pj(c.PJ).fonduMinutes + ' min après le créneau du contact)');
     const r = jour ? reste(jour.reste) : null;
     if (r) out.push('reste ' + r + ' (fin ' + jourGroupe(new Date(jour.fin).toISOString().slice(0, 10)) + ' ' + heureUTC(jour.fin) + ' UTC)');
@@ -1105,13 +1216,14 @@ const Scenarios = (function () {
     const Q = pj(PJ);
     return ['Écart (une mesure, pas une probabilité ; comparer un range et un chemin par cet écart est une convention) : chemin = d(prochaine zone) / (d(prochaine zone) + d(invalidation)), distances aux bords des zones ; range = 1 − d(bord toléré le plus proche) / demi-largeur tolérée.',
       'Le nom du plus petit écart se décide à chaque clôture de 15 min (bougies 1 et 5 min regroupées ; en 1 h, aucun nom) ; départ : le rang 1 du matin ; un changement demande ' + virg2(Q.ecartChangement) + ' d’avance ; la bougie en cours ne change le nom que si elle ferme le scénario nommé. « Trop tôt pour départager » tant que le prix reste à moins de ' + nb(Q.departageMouvementPct) + ' % du prix du point pendant la 1re heure, puis plus jamais de la journée. Un scénario invalidé s’efface en ' + Q.fonduMinutes + ' min après le créneau du contact ; sa marque ✗ reste.',
+      'Aucun nom quand le plus petit écart des scénarios en cours est d’au moins ' + virg2(Q.colle) + ' (« aucun ne colle » : chacun plus près de sa limite que de sa zone ; seuil de convention). « Au-delà de tous les niveaux du matin » : le prix est à plus de ' + nb(Q.horsMarges) + ' marge' + (Q.horsMarges > 1 ? 's' : '') + ' au-delà du bord extérieur de la zone la plus extrême.',
       'Les scénarios ne s’excluent pas : leurs zones se recouvrent. Le classement du matin ne change pas. La note officielle reste celle du journal.'];
   }
 
   return { FORMAT, RANGS, STATUTS, chiffres, prix, heureUTC, heureParis, jourGroupe, dateUTC, zone, lire, vivants, estAncien, ouvert, compte, suiviVide, pas, plier, etat, etatLarge, suivre, copie,
     niveaux, originePremiere, libelle, quand, creneau, motsStatut, texteEtat, titre, ligne, texteBilan, REGLE_BILAN, REGLE_BILAN_SUITE, explication, ligneEtats, noteLarge, manque, etatIncomplet, NOMS_RANG, COURTS_RANG, SENS_RANG,
     ETATS_COURTS_DEBUTANT, etatCourtDebutant, ligneBoiteDebutant, libelleDebutant, libellesDebutant, ligneDebutant, origineDebutant, etatLongDebutant, enteteDebutant, explicationDebutant, jourParis,
-    PJ_DEFAUT, distanceZone, ouvertJour, position, fermeture, fondu, reste, grilleOk, decider, rejouerJour, horsNiveaux, classerJour, estRealise, raison, ligneJourDebutant, libellesJourDebutant,
-    texteResteDebutant, ligneDebutantJour, distancesDebutant, phraseMeneurDebutant, COMMENT_DEBUTANT, phraseJourExpert, nomNet, phraseNomDebutant, suffixeExpert, ligneResteExpert, ligneJourExpert, regleJourExpert, momentDebutant };
+    PJ_DEFAUT, touchesValides, dansMarge, pointe, distanceZone, ouvertJour, position, fermeture, fondu, reste, grilleOk, decider, rejouerJour, horsNiveaux, classerJour, estRealise, raison, ligneJourDebutant, libellesJourDebutant,
+    texteResteDebutant, ligneDebutantJour, ligneCourteDebutant, distancesDebutant, phraseMeneurDebutant, COMMENT_DEBUTANT, phraseJourExpert, nomNet, phraseNomDebutant, suffixeExpert, ligneResteExpert, ligneJourExpert, regleJourExpert, momentDebutant };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Scenarios;

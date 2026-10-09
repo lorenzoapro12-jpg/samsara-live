@@ -451,8 +451,9 @@ const PARAM = {
     ecartCouleur: 90,
     // La journée (js/scenarios.js, section 5) : aucune nouvelle prévision ; les scénarios du matin
     // recalculés en continu. Le nom du scénario au plus petit écart ne change qu'à la clôture d'un
-    // quart d'heure (`quartMs`), avec `ecartChangement` d'avance au moins (≈ 3 changements par jour
-    // mesurés sur 399 matins synthétiques, modèle) ; « trop tôt pour départager » pendant
+    // quart d'heure (`quartMs`), avec `ecartChangement` d'avance au moins (1,65 changement par jour en
+    // moyenne, médiane 1, 9e décile 4 : 398 matins synthétiques, règles v1, rejoués sur les bougies
+    // BTCUSDT 15 min du 06/09/2025 au 08/10/2026 — modèle) ; « trop tôt pour départager » pendant
     // `departageMinutes` tant que le prix reste à moins de `departageMouvementPct` % du prix du
     // point ; aucun nom quand le plus petit écart est ≥ `colle` (chacun plus près de sa limite que de
     // sa zone) ; « au-delà de tous les niveaux » à `horsMarges` marge(s) au-delà de la zone la plus
@@ -4989,7 +4990,11 @@ function debArbitrer() {
   B.cede = true;
   debEtat.items = debEtat.items.filter(i => i.role !== 'boite');
   if (B.cible) S.cibles = S.cibles.filter(c => c !== B.cible);
-  if (B.cible && S.cibleUn) S.cibleUn.texte = S.cibleUn.texte.concat(['La ligne des scénarios (place prise) :'], B.cible.texte);
+  if (B.cible && S.cibleUn) {
+    S.cibleUn.texte = S.cibleUn.texte.concat(['La ligne des scénarios (place prise) :'], B.cible.texte);
+    // Écran court : la ligne elle-même, en une phrase, avant l'avertissement final.
+    if (S.cibleUn.texteCourt && B.texte) { const tc = S.cibleUn.texteCourt; S.cibleUn.texteCourt = tc.slice(0, -1).concat(['La ligne des scénarios (place prise) : « ' + B.texte.replace(/\s*▸$/, '') + ' ».'], tc.slice(-1)); }
+  }
 }
 
 /** La cible du Guide ou des scénarios sous (x, y) — son étiquette, sa bande, ou à quelques pixels
@@ -5150,7 +5155,8 @@ function scenEchelle(vs, ve) {
   const L = scenDessinables();
   if (!L || !(PARAM.scenarios.echelleMax > 0) || scenLargeur < PARAM.scenarios.echelleLargeurMin || !candles[ve - 1] || !candles[vs]) return null;
   const jr = scenJour(), m = jr && jr.montre, s = m ? m.sc : null;
-  if (!s || !m.ouvert || candles[ve - 1].time * 1000 < s.emis || candles[vs].time * 1000 >= s.fin) return null;
+  // Ouvert : suivi et ouvert, ou en cours sur des bougies qui ne le suivent pas (4 h, 1 jour : 'nonSuivi').
+  if (!s || !(m.ouvert || (jr.cas === 'nonSuivi' && Scenarios.ouvert(s, m.sv, jr.maintenant))) || candles[ve - 1].time * 1000 < s.emis || candles[vs].time * 1000 >= s.fin) return null;
   const k = m.pos && m.pos.forme === 'chemin' ? m.pos.k : 0;
   const z = s.forme === 'range' ? [s.zones.bas, s.zones.haut] : [s.zones.cibles[k][0], s.zones.cibles[k][1]].concat(s.zones.inv || []);
   return [Math.min(...z), Math.max(...z)];
@@ -5277,14 +5283,20 @@ function scenBandes(S) {
   // après le créneau du contact ; une cible touchée garde un aplat plus marqué.
   const deb = S.deb;
   for (const it of S.items.slice().reverse()) {
-    if (deb && it !== S.montre) continue;
-    const fon = it.fondu === null || it.fondu === undefined ? 1 : it.fondu;
+    // Débutant : le montré, et le rang 1 pendant son fondu même quand un autre est montré (sa boîte
+    // ne disparaît pas d'une minute à l'autre ; sans texte : le budget ne change pas).
+    if (deb && it !== S.montre && !scenUnEnFondu(S, it)) continue;
+    let fon = it.fondu === null || it.fondu === undefined ? 1 : it.fondu;
+    // Expert : un scénario fermé garde une bande pâle après son fondu (le détail reste).
+    if (!deb) fon = Math.max(fon, 0.3);
     if (fon <= 0) continue;
     const sc = it.sc, c = it.coul, x0 = Math.max(g.pad.left, xDeT(sc.emis)), x1 = Math.min(xMax, xDeT(sc.fin)), w = x1 - x0;
     if (w <= 1) continue;
     const a = (deb ? (it.ouvert ? 0.5 : 0.4) : (sc.rang === '1' ? 1 : sc.rang === 'S' ? 0.45 : 0.65) * (it.ouvert ? 1 : 0.5)) * fon;
     const ligne = (p, dash, alpha, lw) => { const y = yDe(p); ctx.strokeStyle = avecAlpha(c, alpha * a); ctx.lineWidth = lw || 1; ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); };
-    const touchees = it.sv && it.sv.touchees ? it.sv.touchees : [];
+    // Les cibles touchées QUI COMPTENT (chaîne stricte, avant l'invalidation) : un aplat plus marqué.
+    const touchees = [];
+    for (const x of Scenarios.touchesValides(sc, it.sv)) touchees[x.j] = x.t;
     if (sc.forme === 'chemin') {
       sc.zones.cibles.forEach((z, k) => {
         const y1 = yDe(z[1]), y0 = yDe(z[0]);
@@ -5327,6 +5339,8 @@ function scenBandes(S) {
   ctx.setLineDash([]);
   ctx.restore();
 }
+/** Le rang 1 fermé, pendant son fondu, quand un autre scénario est le montré (Débutant). */
+const scenUnEnFondu = (S, it) => !!(S.deb && it !== S.montre && it.sc.rang === '1' && !it.ouvert && it.fondu > 0);
 /** Les bougies visibles, gêne « douce » des étiquettes : essayées d'abord sans les couvrir. */
 function scenSurBougies(S) {
   const g = S.g;
@@ -5383,6 +5397,9 @@ function scenTracer(S) {
       if (M.ouvert) scenChemin(S, M, top, bas);
       scenMarques(S, M, top, bas);
     }
+    // Le rang 1 en fondu quand un autre est montré : sa croix, dessinée (sans texte).
+    const un1 = S.F ? S.items.find(i => scenUnEnFondu(S, i)) : null;
+    if (un1) scenMarques(S, un1, top, bas);
     scenBoiteDebutant(S);
     return;
   }
@@ -5407,25 +5424,31 @@ const scenBordFranchi = (z, ref) => (isNum(ref) && (z[0] + z[1]) / 2 < ref ? z[1
 function scenMarques(S, it, top, bas) {
   const { g, xDeT, yDe, xMax } = S, sc = it.sc, sv = it.sv;
   if (!sv || !sv.pas || !(sv.n > 0) || ['large', 'incomplet'].includes(sv.cle)) return;
-  const pas = sv.pas, marques = [];
+  const pas = sv.pas, marques = [], nomR = Scenarios.COURTS_RANG[sc.rang];
   const ref0 = isNum(sc.prixEmission) ? sc.prixEmission : null;
-  if (sc.forme === 'chemin') sc.zones.cibles.forEach((z, k) => {
-    const t = sv.touchees && sv.touchees[k];
-    if (isNum(t)) marques.push({ t, y: scenBordFranchi(z, k ? sc.cibles[k - 1] : ref0), ok: true, texte: '✓ ' + Scenarios.creneau(t, pas, S.maintenant, true) });
-  });
+  // Une coche par cible qui COMPTE (chaîne stricte, avant l'invalidation ; aucune si le journal a
+  // noté ❌ ou ⚠) : un contact brut, hors de l'ordre ou après l'invalidation, n'en a pas. La
+  // pastille nomme son scénario (deux marques au même point se lisaient l'une pour l'autre).
+  for (const x of Scenarios.touchesValides(sc, sv)) {
+    const z = sc.zones.cibles[x.j];
+    marques.push({ t: x.t, y: scenBordFranchi(z, x.j ? sc.cibles[x.j - 1] : ref0), ok: true, texte: '✓ ' + nomR + ' ' + Scenarios.creneau(x.t, pas, S.maintenant, true) });
+  }
   const f = it.ferme;
-  const croixVue = f && !f.journal && ['invalide', 'sortie', 'ambigu'].includes(f.type) && (S.deb ? it.fondu > 0 : true);
+  // La croix : un contact calculé ici, ou la note du journal à son heure de résolution (resolu_utc).
+  const croixVue = f && ['invalide', 'sortie', 'ambigu'].includes(f.type) && (S.deb ? it.fondu > 0 : true);
   if (croixVue && isNum(f.t)) {
     let y = null;
     if (f.type === 'invalide' && sc.zones.inv) y = scenBordFranchi(sc.zones.inv, ref0);
+    else if (f.type === 'invalide' && sc.forme === 'range') y = sc.premierOk === 'haut' ? sc.zones.haut : sc.premierOk === 'bas' ? sc.zones.bas : null;
     else if (f.type === 'sortie') y = f.niveau;
     else if (f.type === 'ambigu') y = sc.forme === 'range' ? sc.zones.haut : sc.zones.inv ? scenBordFranchi(sc.zones.inv, ref0) : null;
-    if (isNum(y)) marques.push({ t: f.t, y, ok: false, texte: '✗ ' + Scenarios.COURTS_RANG[sc.rang] + ' ' + Scenarios.creneau(f.t, pas, S.maintenant, true) });
+    const quand = f.journal ? Scenarios.creneau(f.t, 0, S.maintenant, true) + ' (journal)' : Scenarios.creneau(f.t, pas, S.maintenant, true);
+    if (isNum(y)) marques.push({ t: f.t, y, ok: false, texte: '✗ ' + nomR + ' ' + quand, journal: !!f.journal });
   }
   if (!marques.length) return;
   const c = it.coul, R = 3.5;
   for (const m of marques) {
-    const x = xDeT(m.t + pas / 2), y = yDe(m.y);
+    const x = xDeT(m.t + (m.journal ? 0 : pas / 2)), y = yDe(m.y);
     if (!(x >= g.pad.left + R && x <= xMax - R && y >= top + R && y <= bas - R)) continue;
     let pose = null, w = 0;
     if (!S.deb) {
@@ -5565,7 +5588,8 @@ function scenChemin(S, it, top, bas) {
     for (const p of vis) rects.push({ x0: p.x - R - 2, y0: p.y - R - 2, x1: p.x + R + 2, y1: p.y + R + 2 });
     for (const p of vis) S.rects.push({ x: p.x - R - 3, y: p.y - R - 3, w: 2 * R + 6, h: 2 * R + 6 });
     it.fleche = fleche; it.reperes = vis.length;
-    const c = it.coul, fort = sc.rang === '1', touchees = it.sv ? it.sv.touchees || [] : [];
+    const c = it.coul, fort = sc.rang === '1', touchees = [];
+    for (const x of Scenarios.touchesValides(sc, it.sv)) touchees[x.j] = x.t;
     // Le tracé : POINTILLÉ rond (les chemins du Guide sont en tirets), une pointe avant le dernier
     // repère ; les repères par-dessus.
     if (fleche) {
@@ -5624,8 +5648,10 @@ function scenLibelle(S, it, top, bas, surBougies) {
   const net = it.meneur && Scenarios.nomNet(S.jour);   // gardé sans avoir le plus petit écart : « nom gardé »
   const base = exp ? (it.meneur ? (net ? [exper + ' · plus petit écart', exper + ' · écart min.'] : [exper + ' · nom gardé']) : [exper]) : [...new Set([Scenarios.libelle(sc, 'debutant', 'complet'), Scenarios.libelle(sc, 'debutant'), Scenarios.libelle(sc, 'debutant', true)])];
   const rai = exp && !it.ouvert && sc.statut === '⏳' ? Scenarios.raison(sc, it.sv, 'expert') : null, efface = it.fondu === 0;
+  // Après le fondu, l'Expert garde ses niveaux et sa raison (le détail reste) ; seul le Débutant
+  // n'a plus que l'état court.
   const variantes = it.ouvert ? base.concat(exp ? (it.meneur ? [exper] : []) : [exper])
-    : efface ? [nom + ' · ' + et.miniD, nom + ' · ' + et.microD]
+    : efface && !exp ? [nom + ' · ' + et.miniD, nom + ' · ' + et.microD]
     : [...new Set((rai ? [exper + ' · ' + et.court + ' : ' + rai + ' · direct'] : []).concat(base.map(v => v + ' · ' + et.courtD), [nom + ' · ' + et.courtD, nom + ' · ' + et.miniD, nom + ' · ' + et.microD]))];
   const large = Math.min(place, g.pw * (g.pw < PARAM.scenarios.etroit ? 0.9 : 0.62));
   const texte = fleche => {
@@ -5675,7 +5701,7 @@ function scenReperes(S, top, bas) {
   for (const [t, noms, expl] of [
     [F.emis, exp ? ['Point · ' + hU(F.emis), hU(F.emis)] : ['Point de ' + P.point + ' Paris · écrit à ' + hU(F.emis) + pE, 'Écrit à ' + hU(F.emis) + pE, 'Point · ' + hU(F.emis), hU(F.emis)],
       'Le moment où les scénarios du point de ' + P.point + ' (Paris) ont été écrits : le ' + jour(F.emis) + ' à ' + hU(F.emis) + pE + (isNum(F.prixEmission) ? ', prix ' + Scenarios.prix(F.prixEmission) : '') + '. Les zones partent de là.'],
-    [F.fin, (resteF ? ['fin · ' + hU(F.fin) + ' · reste ' + resteF] : []).concat(exp ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)] : ['fin des scénarios du jour · ' + jour(F.fin) + ' ' + hU(F.fin) + pF, 'fin du jour · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)]),
+    [F.fin, (resteF ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin) + ' · reste ' + resteF, 'fin · ' + hU(F.fin) + ' · reste ' + resteF] : []).concat(exp ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)] : ['fin des scénarios du jour · ' + jour(F.fin) + ' ' + hU(F.fin) + pF, 'fin du jour · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)]),
       'Fin de la fenêtre des scénarios 1 à 3 : ' + jour(F.fin) + ' à ' + hU(F.fin) + (hP(F.fin) ? ' (' + hP(F.fin) + ' Paris)' : '') + '. Le journal les note ensuite, le matin même.' + sem]]) {
     const x = xDeT(t);
     if (!(x >= g.pad.left && x <= xMax)) continue;
@@ -5740,7 +5766,7 @@ function scenBoite(S, top, bas) {
     if (PJx.length) L.push({ t: PJx[0], tc: PJx[Math.min(1, PJx.length - 1)], f: 'jour', variantes: PJx });
     for (const it of S.items) {
       const et = large && it.et.cle === 'large' ? null : it.et, suf = exp && it.j ? Scenarios.suffixeExpert(it.j, S.jour) : '';
-      L.push({ t: Scenarios.ligne(it.sc, et, S.mode) + suf, tc: Scenarios.ligne(it.sc, et, S.mode, true) + (it.meneur ? ' ◂' : ''), f: 'ligne', it });
+      L.push({ t: Scenarios.ligne(it.sc, et, S.mode) + suf, tc: Scenarios.ligne(it.sc, et, S.mode, true) + (exp && it.j && Scenarios.pointe(it.j, S.jour) ? ' ◂' : ''), f: 'ligne', it });
     }
     if (large) L.push({ t: Scenarios.noteLarge(S.itv, S.mode), f: 'note', toujours: true });
     const RE = exp && S.jour ? Scenarios.ligneResteExpert(S.jour) : [];
@@ -6035,13 +6061,16 @@ function scenTexteDebutant(S, it, court) {
     const d = Scenarios.distancesDebutant(it.j), k = ex.findIndex(t => /^Suivi en direct/.test(t)), add = d ? ['Maintenant : ' + d + '.'] : [];
     // Le nom (la ligne qui le dit peut avoir cédé sa place à une figure du Guide) : « il suit le
     // mieux le prix », « le prix est le plus près du scénario N », ou le nom gardé dit tel quel.
-    const nomP = Scenarios.phraseNomDebutant(S.jour, it.j);
+    // Écran court : la phrase courte du nom (elle reste : la ligne qui le dit peut avoir cédé sa
+    // place à une figure du Guide).
+    const nomP = Scenarios.phraseNomDebutant(S.jour, it.j, !!court);
     if (nomP) add.push(nomP);
     ex.splice(k < 0 ? ex.length : k + 1, 0, ...add);
   }
-  const out = [Scenarios.enteteDebutant(F, P, S.maintenant)].concat(court ? ex.slice(0, 1).concat(ex.filter(t => /^Suivi en direct|^Maintenant :|^Rang /.test(t))) : ex);   // écran court : le nom reste dans la bulle de la ligne
+  const out = [Scenarios.enteteDebutant(F, P, S.maintenant)].concat(court ? ex.slice(0, 1).concat(ex.filter(t => /^Suivi en direct|^Maintenant :|^Pour l’instant|^Nommé |^Rang /.test(t))) : ex);
   const autres = S.items.filter(i => i !== it);
-  if (autres.length) out.push('Les autres scénarios de Claude : ' + autres.map(i => Scenarios.ligneDebutant(i.sc, i.sv)).join(' · '));
+  // Écran court : les autres en peu de mots (« 2. vers 80 806 $ — en cours (en direct) »).
+  if (autres.length) out.push('Les autres scénarios de Claude : ' + autres.map(i => (court ? Scenarios.ligneCourteDebutant(i.sc, i.sv) : Scenarios.ligneDebutant(i.sc, i.sv))).join(' · '));
   // Le classement « sans pourcentage » est dit une fois (le sens du rang, dans l'explication).
   out.push('Une hypothèse de Claude (une IA), pas une promesse ni un conseil.');
   return out;
@@ -6077,6 +6106,10 @@ function scenLibelleDebutant(S, it, top, bas) {
   // bandes des repères ; gêne douce : les autres bougies. En haut seulement : pas de glissement
   // au-delà des deux rangées du haut.
   const dur = r => recentes(r) || bandes(r);
+  // La ligne du prix live (dessinée sur le calque, par-dessus) : le libellé l'évite d'abord, sinon
+  // elle le barrerait ; seulement en dernier recours il se pose sur elle.
+  const der = candles[candles.length - 1], yP = S.finVue && der ? yDe(isNum(livePrice) ? livePrice : der.close) : null;
+  const prixL = r => yP !== null && yP >= top && yP <= bas && r.y < yP + 3 && r.y + r.h > yP - 3;
   const gl = hautSeul ? 0 : null;
   // Les libellés du plus riche au plus court (« Scén. 1 » en dernier) : un libellé qui ne trouve
   // pas sa place laisse essayer le suivant, plus court (360 px, police à chasse fixe).
@@ -6089,7 +6122,7 @@ function scenLibelleDebutant(S, it, top, bas) {
     const xBox = Math.max(x0, S.xDeT(sc.emis) + 4);
     const xs = [droite - wv].concat(range ? [Math.max(x0, Math.min(droite - wv, xBox))] : []).concat([Math.max(x0, (x0 + droite) / 2 - wv / 2), x0]);
     for (const [es, ve] of placements) {
-      for (const [ev, g0] of [[r => dur(r) || surBougies(r), 3], [dur, 3], [dur, 8]]) {
+      for (const [ev, g0] of [[r => dur(r) || prixL(r) || surBougies(r), 3], [r => dur(r) || prixL(r), 3], [r => dur(r) || prixL(r), 8], [dur, 8]]) {
         for (const x of xs) if ((pose = guidePlacer(S.rects, x, wv, H, es, top, bas, ve, 0, gl === null ? g0 : gl, ev))) { xp = x; break; }
         if (pose) break;
       }
@@ -6180,7 +6213,7 @@ function scenTexteCourtLigne(S, texte) {
     .concat(S.items.map(it => (it.j ? Scenarios.ligneDebutantJour(it.j, J, true) : Scenarios.ligneDebutant(it.sc, it.sv))))
     .concat(['Classé par Claude (une IA), du plus au moins probable, sans pourcentage ; ce classement ne change pas.',
       '« (en direct) » : suivi par cette page ; la note officielle est celle du journal, le lendemain.'])
-    .concat(m ? [m] : []).concat(r ? ['Encore ' + r + ', sans nouvelle prévision.'] : [])
+    .concat(m ? [m, 'Pour un chemin, plus le prix est près de sa zone et loin de ce qui l’invaliderait, mieux il suit ; pour « reste entre », plus il est loin des limites.'] : []).concat(r ? ['Encore ' + r + ', sans nouvelle prévision.'] : [])
     .concat([texte[texte.length - 1]]);
 }
 /** M8 (arbitrage du budget Débutant) : quand la ligne porte l'indication d'une fermeture, c'est le

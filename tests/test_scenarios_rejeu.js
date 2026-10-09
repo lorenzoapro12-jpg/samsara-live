@@ -85,8 +85,10 @@ const ligne = page => page.evaluate(() => {
           const L = s.L, t = L && L.texte;
           if (!t) { faux.push([hm(s.t), 'pas de ligne', L]); continue; }
           if (!/\(en direct\)|^En direct : /.test(t)) faux.push([hm(s.t), 'sans « en direct »', t]);
-          if (s.page.meneur === '2' && s.page.montre === '1') { if (!(etroit ? /^En direct : le 2 \(80 806 \$\) suit mieux( le prix)? ▸$|^Scénario( du matin)? : en cours \(en direct\) ▸$/ : /^En direct : le 2 \(80 806 \$\) suit mieux le prix ▸$/).test(t)) faux.push([hm(s.t), 'cas C attendu', t]); }
-          else if (s.page.meneur === '1' || s.page.cas === 'tot') { if (!/^Scénario( du matin)? : en cours \(en direct\) ▸$/.test(t)) faux.push([hm(s.t), 'cas A attendu', t]); }
+          // Changé délibérément (revue) : le cas C seulement quand le nommé a le plus petit écart EN CE
+          // MOMENT (s.page.net) ; un nom gardé par l'hystérésis reste dans les bulles (cas A sur la ligne).
+          if (s.page.meneur === '2' && s.page.montre === '1' && s.page.net) { if (!(etroit ? /^En direct : le 2 \(80 806 \$\) suit mieux( le prix)? ▸$|^Scénario( du matin)? : en cours \(en direct\) ▸$/ : /^En direct : le 2 \(80 806 \$\) suit mieux le prix ▸$/).test(t)) faux.push([hm(s.t), 'cas C attendu', t]); }
+          else if (s.page.meneur === '1' || s.page.cas === 'tot' || (s.page.meneur && !s.page.net)) { if (!/^Scénario( du matin)? : en cours \(en direct\) ▸$/.test(t)) faux.push([hm(s.t), 'cas A attendu', t]); }
           if (L.texte.length > (etroit ? 40 : 48)) faux.push([hm(s.t), 'trop longue', t]);
           // Le nom dit aussi dans la bulle du libellé (la ligne peut céder sa place à une figure).
           if (s.page.meneur && s.page.meneur !== s.page.montre && !new RegExp('^(Pour l’instant, le prix est le plus près de ce que décrit le scénario|Le scénario) ' + s.page.meneur + ' ', 'm').test(L.un)) faux.push([hm(s.t), 'bulle du libellé sans le nom', L.un.slice(0, 300)]);
@@ -109,7 +111,7 @@ const ligne = page => page.evaluate(() => {
       if (process.env.SCEN_CAPTURES) await o.page.screenshot({ path: path.join(process.env.SCEN_CAPTURES, 'aucun-0220-' + mode + '-' + vue.width + '.png') });
       const e = await H.lire(o.page), ref = H.reference(S, h), L = await ligne(o.page);
       check(`${mode} ${vue.width} : cas « aucun », = calcul pur`, e.jour && e.jour.cas === 'aucun' && ref.cas === 'aucun', [e.jour, ref]);
-      if (mode === 'debutant') check(`${mode} ${vue.width} : ligne G « ${L && L.texte} »`, L && (vue.width < 500 ? /^Aucun (scénario )?ne tient plus \(en direct\) ▸$/ : /^Aucun scénario ne tient plus \(en direct\) ▸$/).test(L.texte), L);
+      if (mode === 'debutant') check(`${mode} ${vue.width} : ligne G « ${L && L.texte} »`, L && (vue.width < 500 ? /^(Aucun scénario ne tient plus|Scénarios : aucun ne tient) \(en direct\) ▸$/ : /^Aucun scénario ne tient plus \(en direct\) ▸$/).test(L.texte), L);
       else check(`${mode} ${vue.width} : encadré « Aucun scénario du matin ne décrit ce mouvement »`, e.boite && e.boite.lignes.some(l => /^Aucun scénario (du matin )?ne décrit ce mouvement/.test(l)), e.boite);
       check(`${mode} ${vue.width} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();

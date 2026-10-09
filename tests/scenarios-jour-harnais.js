@@ -117,7 +117,7 @@ const lire = page => page.evaluate(() => {
   if (!S) return null;
   return {
     mode: document.documentElement.getAttribute('data-mode'), itv: chartInterval, n: candles.length,
-    jour: J ? { cas: J.cas, meneur: J.meneur ? J.meneur.sc.rang : null, montre: J.montre ? J.montre.sc.rang : null, remplace: J.remplace,
+    jour: J ? { cas: J.cas, meneur: J.meneur ? J.meneur.sc.rang : null, net: Scenarios.nomNet(J), montre: J.montre ? J.montre.sc.rang : null, remplace: J.remplace,
       e: J.items.map(i => (i.pos ? +i.pos.e.toFixed(4) : null)), ouverts: J.ouverts.map(i => i.sc.rang), realises: J.realises.map(i => i.sc.rang),
       fondu: J.items.map(i => i.fondu), reste: J.reste } : null,
     items: S.items.map(i => ({ rang: i.sc.rang, cle: i.sv && i.sv.cle, fondu: i.fondu, meneur: i.meneur, marques: (i.marques || []).map(m => ({ ok: m.ok, texte: m.texte })) })),

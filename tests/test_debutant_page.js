@@ -433,7 +433,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       // elle commence par « Scén. 1 » et contient « ✗ », ou dit « Aucun scénario » ; toujours marquée
       // « (en direct) » ; jamais un libellé qui nomme le scénario 1 par ses niveaux.
       check(`fermé · ${vue.width} : la ligne dit la fermeture du rang 1 (« Scén. 1 … ✗ » ou « Aucun scénario »), marquée « (en direct) » ; jamais de libellé « Scénario 1 : … »`,
-        ligne && (/^Scén\. 1\b.*✗/.test(ligne.texte) || /^Aucun (scénario|ne)\b/.test(ligne.texte)) && /\(en direct\)/.test(ligne.texte)
+        ligne && (/^Scén\. 1\b.*✗/.test(ligne.texte) || /^Aucun (scénario|ne)\b|^Scénarios : aucun\b/.test(ligne.texte)) && /\(en direct\)/.test(ligne.texte) && /▸$/.test(ligne.texte)
         && !e.items.some(i => i.role === 'scenario' && /^(↑ |↓ )?Scén(ario|\.) 1 :/.test(i.texte)), e.items);
       // Sa bulle (toucher ou survol) tient dans le tracé et dit le suivi en direct, le journal, l'avertissement.
       const r = await viser(o, 'boite', tactile);
@@ -637,6 +637,10 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       const n1 = await o.page.evaluate(() => Object.assign({}, window.__n));
       check('survol et déplacement sur une cible : aucun drawChart (le calque seul)', n1.dc === 0 && n1.cq >= 1, n1);
       await o.page.mouse.move(2, 2); await o.page.waitForTimeout(300);
+      // Le calque est redessiné une fois par minute exprès (l'âge de la couche « Liquidité »,
+      // horloge(), à la seconde qui suit le changement) : le repos mesuré ne chevauche pas un
+      // changement de minute (sinon le contrôle dépendait de l'heure à laquelle cette section tombe).
+      await o.page.evaluate(() => new Promise(r => { const s = (Date.now() % 60000) / 1000; setTimeout(r, s > 56.5 ? (61.6 - s) * 1000 : s < 1.6 ? (1.6 - s) * 1000 : 0); }));
       await o.page.evaluate(() => { window.__n = { dc: 0, cq: 0 }; });
       await o.page.waitForTimeout(2500);
       const n2 = await o.page.evaluate(() => window.__n);
