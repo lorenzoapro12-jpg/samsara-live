@@ -778,6 +778,24 @@ async function filNoir(page, x, y) {
       await p25.waitForTimeout(3500);
       const s1 = await p25.evaluate(() => window.__carte.verifierChaleur());
       check(`suivre le présent (vue de 10 min) : avance par décalages (${s1.decalages - s0.decalages}), ${s1.differents} pixel(s) différent(s)`, s1.differents === 0 && s1.decalages > s0.decalages && s1.complets === s0.complets, { s0, s1 });
+      // Sans saccade (09/10/2026) : vue rapprochée, un rendu à chaque pixel franchi, pas une fois par seconde.
+      const r0 = (await etat(p25)).mesure.rendus;
+      await p25.waitForTimeout(3000);
+      const r1 = (await etat(p25)).mesure.rendus;
+      check(`suivre, vue de 10 min (≈ 0,5 s par pixel) : plus d'un rendu par seconde (${r1 - r0} en 3 s)`, r1 - r0 >= 5, { r0, r1 });
+      // Le prix sort de la moitié centrale : la vue glisse vers lui en plusieurs images, sans saut.
+      const g0 = await etat(p25), H25 = g0.vue.p2 - g0.vue.p1;
+      await p25.evaluate(([v, H]) => window.__carte.cadrer(v.t1, v.t2, v.p1 + H * 0.45, v.p2 + H * 0.45), [g0.vue, H25]);
+      const traj = await p25.evaluate(() => new Promise(fin => {
+        const out = [], t0 = performance.now();
+        const pas = () => { const v = window.__carte.etat().vue; out.push((v.p1 + v.p2) / 2); if (performance.now() - t0 < 900) requestAnimationFrame(pas); else fin(out); };
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true }));
+        requestAnimationFrame(pas);
+      }));
+      const distincts = new Set(traj.map(x => x.toFixed(4))).size, a25 = traj[0], z25 = traj[traj.length - 1];
+      check(`recentrage : la vue glisse en ${distincts - 1} pas (au moins 3), jamais en arrière`, distincts >= 4 && traj.every((x, i) => !i || Math.sign(x - traj[i - 1]) !== -Math.sign(z25 - a25)), traj.length);
+      const g1 = await p25.evaluate(() => window.__carte.verifierChaleur());
+      check(`recentrage fini : ${g1.differents} pixel(s) différent(s) d'un repeint complet`, g1.differents === 0, g1);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p25.close();
     }
