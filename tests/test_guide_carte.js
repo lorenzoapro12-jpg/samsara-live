@@ -422,6 +422,145 @@ titre('11b. suivreNommes + seuil lissé : un passage progressif est vu, un seuil
   check(`zone de 60 BTC retombée à 33 BTC (le carnet ordinaire en a 30 partout) : gardée ${G.zoneGarde} lectures, puis effacée`, z0 && z0.q === 60 && suite.join() === [1, 2, 3, null, null, null, null, null].join(), { z0, suite });
 }
 
+// ── 13. Mode débutant : phrase, étiquettes, tendance, journal ────────────────
+titre('13. Mode débutant : phrase du haut, étiquettes, sens du prix, journal en clair');
+{
+  const MD = require('./mots_debutant.js');
+  const propre = t => !CONSEIL.test(t) && !ACCUSE.test(t) && !MD.motsInterdits(t).length;
+  const debTextes = [];
+  // a. La phrase du haut : 7 équilibres × 4 tendances × 5 âges × 3 prix.
+  const eqs = [
+    [{ qB: 120, qA: 60, sens: 'achat', usd: 160 }, {}],
+    [{ qB: 60, qA: 120, sens: 'vente', usd: 160 }, {}],
+    [{ qB: 80, qA: 82, sens: 'egal', usd: 160 }, {}],
+    [{ qB: 0, qA: 0, sens: 'egal', usd: 160 }, {}],
+    [{ qB: 80, qA: 82, sens: 'egal', usd: 160 }, { aucunRepere: true }],
+    [{ qB: 120, qA: 60, sens: 'achat', usd: 160 }, { vide: 'ask' }],
+    [{ qB: 60, qA: 120, sens: 'vente', usd: 160 }, { vide: 'bid' }],
+  ];
+  const tends = [null, { sens: 'hausse' }, { sens: 'baisse' }, { sens: 'stable' }];
+  const MOTS_SENS = { hausse: 'en hausse', baisse: 'en baisse', stable: 'stable' };
+  let maxL = 0, maxC = 0, okForme = true, avecPrix = 0, nPrix = 0;
+  const pire = [], malF = [];
+  for (const [r, e0] of eqs) for (const t of tends) for (const a of [400, 4900, 9900, 31e3, 59e3]) for (const prix of [undefined, 82548.3, 182548.6]) {
+    const e = Object.assign({ prix }, e0), p = BM.phraseCarteDebutant(r, t, a, e);
+    debTextes.push(p.long, p.court);
+    if (p.long.length > maxL) { maxL = p.long.length; pire[0] = p.long; }
+    if (p.court.length > maxC) { maxC = p.court.length; pire[1] = p.court; }
+    // Âge : « à jour » sous 5 s (la ligne ne change pas chaque seconde), puis « à jour il y a N s ».
+    const ageOk = new RegExp('(?:^À|· à) jour' + (a < G.ageFraisMs ? '' : ' il y a ' + Math.max(1, Math.ceil(a / 1000)) + ' s') + ' · pas une prévision$');
+    const P = prix ? BM.prix(prix) + ' \\$' : null, S = t ? MOTS_SENS[t.sens] : null;
+    const tete = P && S ? new RegExp('^Prix (' + P + ', )?' + S + ' · ') : S ? new RegExp('^Prix ' + S + ' · ') : P ? new RegExp('^Prix ' + P + ' · ') : /^(?!Prix)/;
+    if (!ageOk.test(p.long) || !ageOk.test(p.court) || !tete.test(p.long)) { okForme = false; malF.push(p); }
+    if (P) { nPrix++; if (p.long.startsWith('Prix ' + BM.prix(prix))) avecPrix++; }
+  }
+  check(`phrase longue ≤ 100 signes sur ${eqs.length * 60} cas (pire : ${maxL})`, maxL <= 100, pire[0]);
+  check(`phrase courte ≤ 55 signes (pire : ${maxC})`, maxC <= 55, pire[1]);
+  check('forme : « [Prix P $, ][en hausse|en baisse|stable] · … · à jour[ il y a N s] · pas une prévision », âge en secondes entières à partir de 5 s', okForme, malF.slice(0, 3));
+  check(`5 s (a) : le prix est dans la ligne longue quand il est connu (${avecPrix} / ${nPrix} cas, tous)`, avecPrix === nPrix, { avecPrix, nPrix });
+  const eq7 = eqs.map(([r, e]) => BM.phraseCarteDebutant(r, null, 2000, e).long.split(' · ')[0]);
+  check('les 7 équilibres en mots (le côté vide est dit ; le côté le plus chargé seulement quand les deux ont un repère)',
+    eq7.join('|') === 'Plus d’achats en attente|Plus de ventes en attente|Autant d’achats que de ventes|Aucun ordre en attente lu|Rien de marquant autour du prix|Rien de marquant au-dessus|Rien de marquant au-dessous', eq7);
+  const c1 = BM.phraseCarteDebutant(eqs[0][0], tends[1], 2000, { prix: 82548.3 }), c2 = BM.phraseCarteDebutant(eqs[0][0], tends[1], 31e3, { prix: 82548.3 });
+  check(`court : le prix quand il tient (« ${c1.court} »), sinon le sens seul (« ${c2.court} »)`, /^Prix 82.548 \$, en hausse · à jour · pas une prévision$/.test(sp(c1.court)) && /^Prix en hausse · à jour il y a 31 s · pas une prévision$/.test(c2.court), [c1, c2]);
+  check('âge arrondi VERS LE HAUT : 0,4 s → « 1 s », 1,2 s → « 2 s », 59,1 s → « 60 s », jamais de virgule',
+    BM.ageEntier(400) === '1 s' && BM.ageEntier(1200) === '2 s' && BM.ageEntier(59100) === '60 s' && BM.ageEntier(0) === '1 s' && BM.ageEntier(NaN) === '—', [BM.ageEntier(400), BM.ageEntier(1200), BM.ageEntier(59100)]);
+  check(`âge de la ligne : « à jour » sous ${G.ageFraisMs / 1000} s, « à jour il y a 5 s » à 5 s`, BM.ageLigne(0) === 'à jour' && BM.ageLigne(4999) === 'à jour' && BM.ageLigne(5000) === 'à jour il y a 5 s' && BM.ageLigne(NaN) === 'à jour il y a —');
+  // Le côté le plus chargé, tenu sensGardeMs : une lecture isolée de l'autre côté ne change rien.
+  {
+    let h = null; const vu = [];
+    for (const [sens, t] of [['achat', 0], ['vente', 2e3], ['achat', 4e3], ['vente', 6e3], ['vente', 8e3], ['vente', 6e3 + G.sensGardeMs - 1], ['vente', 6e3 + G.sensGardeMs], ['egal', 20e3]]) { h = BM.sensStable(h, sens, t); vu.push(h.sens); }
+    check(`côté le plus chargé tenu ${G.sensGardeMs / 1000} s : un aller-retour ne change rien, ${G.sensGardeMs / 1000} s du même autre côté le change`, vu.join() === 'achat,achat,achat,achat,achat,achat,vente,vente', vu);
+  }
+  const pause = BM.phraseCarteDebutant(eqs[0][0], tends[1], 2000, { pauseMs: 125e3 });
+  const retard = BM.phraseCarteDebutant(eqs[0][0], tends[1], 31e3, { retardMs: 12e3, prix: 82548.3 });
+  const cache = BM.phraseCarteDebutant(eqs[0][0], tends[1], 2000, { guideCache: true });
+  debTextes.push(pause.long, retard.long, retard.court, cache.long);
+  check(`pause : « Ordres en attente non relus depuis … · repères cachés » (${pause.long.length} ≤ 60)`, /^Ordres en attente non relus depuis 2 min · repères cachés$/.test(pause.long) && pause.long.length <= 60, pause);
+  check(`retard des échanges (${retard.long.length} ≤ 100, court ${retard.court.length} ≤ 55)`, /^Prix 82.548 \$, en hausse · échanges en retard de 12 s · à jour il y a 31 s · pas une prévision$/.test(sp(retard.long)) && retard.long.length <= 100 && retard.court.length <= 55, retard);
+  check('guide caché : la bande dit comment revenir', /^Guide caché : bouton «.Guide.» pour revoir les repères$/.test(cache.long) && cache.long.length <= 60, cache);
+  check('sans lecture : « Lecture en cours… »', BM.phraseCarteDebutant(null, null, 0, {}).long === 'Lecture en cours…');
+  // b. Étiquettes : ≤ 24 signes, prix avant « $ », jamais de « $ » en tête.
+  let okE = true; const malE = [];
+  for (const p of [9990, 10000, 82480, 82480.5, 99999, 100000, 123456.78, 250000]) for (const c of ['bid', 'ask']) {
+    const e = BM.etiquetteNiveau(c, p); debTextes.push(e);
+    if (!(e.length <= BM.ETIQUETTE_MAX && /^(Mur d’achat|Mur de vente) · [\d\u202f\u00a0]+\u00a0\$$/.test(e) && !/^\s*\$/.test(e))) { okE = false; malE.push(e); }
+  }
+  check(`étiquettes de 9 990 à 250 000 $, deux côtés : ≤ ${BM.ETIQUETTE_MAX} signes, « Mur d’achat / de vente · P $ »`, okE, malE);
+  check('le côté décide du nom (achat sous le prix, vente au-dessus)', /^Mur d’achat/.test(BM.etiquetteNiveau('bid', 82480)) && /^Mur de vente/.test(BM.etiquetteNiveau('ask', 82600)));
+  const autres = ['bid', 'ask'].flatMap(c => [BM.etiquetteDedans(c), BM.etiquetteVide(c)]);
+  debTextes.push(...autres);
+  check(`prix DANS la zone et côté sans repère : « ${autres.join(' », « ')} », ≤ ${BM.ETIQUETTE_MAX} signes`, autres.join('|') === 'Dans un mur d’achat|Pas de mur au-dessous|Dans un mur de vente|Pas de mur au-dessus' && autres.every(t => t.length <= BM.ETIQUETTE_MAX), autres);
+  check('typographie : une espace insécable avant « : ; ? ! » (jamais en tête de ligne)', BM.typo('Âges : a ; b ? c !') === 'Âges\u00a0: a\u00a0; b\u00a0? c\u00a0!');
+  // c. Sens du prix sur 15 min.
+  const T0 = Date.UTC(2026, 9, 9, 7, 30, 0), maint = T0 + 20e3;
+  const mins = (f, trou) => { const l = []; for (let t = T0 - 20 * 60e3; t <= T0; t += 60e3) if (t !== trou) l.push({ t, c: f(t) }); return l; };
+  const tRef = Math.floor((maint - G.tendanceMs) / 60e3) * 60e3;
+  const plat = 100000, fin = pct => t => (t === tRef ? plat : t === T0 ? plat * (1 + pct / 100) : plat);
+  const th = BM.tendancePrix(mins(fin(0.12)), null, maint), tb = BM.tendancePrix(mins(fin(-0.12)), null, maint), ts = BM.tendancePrix(mins(fin(0.08)), null, maint), ts2 = BM.tendancePrix(mins(fin(-0.099)), null, maint);
+  check(`hausse (+0,12 %), baisse (−0,12 %), stable (+0,08 % et −0,099 %) autour du seuil de ${G.tendancePct} %`, th.sens === 'hausse' && tb.sens === 'baisse' && ts.sens === 'stable' && ts2.sens === 'stable', [th, tb, ts, ts2].map(x => x && x.sens));
+  check('référence : la clôture de la minute commencée 15 min plus tôt', th.de === plat && th.depuis === tRef && Math.abs(th.pct - 0.12) < 1e-9, th);
+  check('une minute manquante dans la fenêtre : null (rien n\'est deviné)', BM.tendancePrix(mins(fin(0.12), T0 - 5 * 60e3), null, maint) === null);
+  check('la minute de référence manquante : null', BM.tendancePrix(mins(fin(0.12), tRef), null, maint) === null);
+  check('dernière bougie trop vieille (ne touche pas le présent) : null', BM.tendancePrix(mins(fin(0.12)), null, maint + 3 * 60e3) === null);
+  const tv = BM.tendancePrix(mins(() => plat), { p: plat * 0.998, t: T0 + 15e3 }, maint), tvv = BM.tendancePrix(mins(() => plat), { p: plat * 0.998, t: T0 - 60e3 }, maint);
+  check('un prix en direct plus récent que la dernière bougie est pris (−0,2 % → baisse) ; plus vieux : ignoré', tv.sens === 'baisse' && tv.a === plat * 0.998 && tv.t === T0 + 15e3 && tvv.sens === 'stable', [tv, tvv]);
+  // d. Le résumé ouvert : 6 lignes, mêmes valeurs.
+  const det = BM.detailCarteDebutant({ tendance: th, r: eqs[0][0], luMs: 2000,
+    niveaux: { ask: { etiquette: BM.etiquetteNiveau('ask', 100060), q: 36.1, pBas: 100060, pHaut: 100080 }, bid: null },
+    ages: { recentes: 2000, anciennes: 120e3, ronds: 1500, ligne: 10e3, autre: 4 * 60e3 } });
+  debTextes.push(...det);
+  const dS = det.map(sp);
+  check('résumé ouvert : 6 lignes (prix, ordres en attente, les deux côtés, âges dont l\'autre plateforme, scénario au Terminal, photo pas prévision)', det.length === 6 && /^Prix : de 100.000 \$ à 100.120 \$ en 15 min \(\+0,12 %\)/.test(dS[0]) && /120 BTC à l'achat, 60,0 BTC à la vente/.test(dS[1])
+    && /^Au-dessus : Mur de vente · 100.060 \$ \(36,1 BTC entre 100.060 et 100.080 \$\)\. Au-dessous : rien de nettement plus chargé/.test(dS[2]) && /^Âges : couleurs récentes 2,0 s, plus anciennes 2 min · ronds 1,5 s · ligne blanche 10 s · autre plateforme 4 min\.$/.test(dS[3])
+    && /^Le scénario du matin de Claude est sur le Terminal/.test(dS[4]) && /pas une prévision.+mode Expert/.test(dS[5]), dS);
+  check('résumé ouvert : jamais « : » en tête de ligne (espace insécable avant)', det.every(l => !/ [:;?!]/.test(l)), det);
+  const detD = BM.detailCarteDebutant({ tendance: th, r: eqs[0][0], luMs: 2000, niveaux: { ask: { etiquette: BM.etiquetteDedans('ask'), q: 92, pBas: 100040, pHaut: 100100, dedans: true }, bid: null }, ages: {} });
+  debTextes.push(...detD);
+  check('résumé ouvert, prix dans la zone : « Au-dessus : le prix est dans un mur de vente (92,0 BTC entre … et … $) »', /^Au-dessus : le prix est dans un mur de vente \(92,0 BTC entre 100.040 et 100.100 \$\)\./.test(sp(detD[2])), detD[2]);
+  // e. Journal : chaque type a sa phrase en clair, mêmes quantités et mêmes prix.
+  const tj = Date.UTC(2026, 9, 9, 7, 31, 0);
+  const evs = [
+    ...['retire', 'echange', 'partiel', 'incertain'].flatMap(fin2 => ['b', 'a'].map(c => BM.evenementFinMur({ cote: c, p: 82600, q0: 36.1, qMax: 36.1, fin: fin2, echange: fin2 === 'retire' ? 0 : fin2 === 'echange' ? 36.1 : fin2 === 'partiel' ? 12 : null, retire: fin2 === 'partiel' ? 24.1 : 0, t: tj }))),
+    BM.evenementFinMur({ cote: 'a', p: 82600, q0: 6.1, qMax: 36.1, fin: 'partiel', echange: 6.1, retire: 30, t: tj }),
+    BM.evenementApparu({ cote: 'a', p: 82600, q: 36.1, t: tj }), BM.evenementApparu({ cote: 'b', p: 82480, q: 20, t: tj, grossi: true }),
+    BM.evenementMurApparu({ cote: 'a', p: 82600, pas: 20, q: 36.1, t: tj }), BM.evenementMurApparu({ cote: 'b', p: 82420, pas: 20, q: 40, t: tj }),
+    BM.evenementMurFondu({ cote: 'a', p: 82600, pas: 20, q0: 36.1, q1: 8.2, dureeMs: 90e3, echange: 0, t: tj }), BM.evenementMurFondu({ cote: 'b', p: 82420, pas: 20, q0: 40, q1: 8, dureeMs: 30e3, echange: null, t: tj }),
+    BM.evenementRafale({ T: tj, achat: false, q: 12.3, vwap: 82400, pMin: 82396, pMax: 82403, aDeb: 1 }), BM.evenementRafale({ T: tj, achat: true, q: 12, vwap: 82410, pMin: 82410, pMax: 82410, aDeb: 2 }),
+    BM.evenementTraverse({ cote: 'a', p: 82600, pas: 20, q: 36.1, t: tj }), BM.evenementTraverse({ cote: 'b', p: 82420, pas: 20, q: 40, t: tj }),
+  ];
+  const trj = { cote: 'a', p: 82600, pas: 20, t: tj };
+  const m1 = { t: tj, fin: tj + 60e3, c: 82630 }, m2 = { t: tj + 60e3, fin: tj + 120e3, c: 82640 }, m2r = { t: tj + 60e3, fin: tj + 120e3, c: 82610 };
+  evs.push(BM.evenementSuite(Object.assign({}, trj, { verdict: 'meche', m1: { t: tj, fin: tj + 60e3, c: 82610 } })), BM.evenementSuite(Object.assign({}, trj, { verdict: 'casse', m1, m2 })), BM.evenementSuite(Object.assign({}, trj, { verdict: 'repasse', m1, m2: m2r })));
+  const nombres = s => (s.replace(/\b\d\d:\d\d(:\d\d)?\b/g, '').match(/\d[\d\u202f\u00a0]*(?:,\d+)?/g) || []).map(x => x.replace(/[\u202f\u00a0]/g, ''));
+  let okJ = true; const malJ = [], types = new Set();
+  for (const ev of evs) {
+    types.add(ev.type);
+    const d = ev.debutant; debTextes.push(d || '');
+    const ref = nombres(ev.texte + ' ' + BM.prix(ev.p) + ' ' + BM.prix(ev.p, 2)), extra = nombres(d || '').filter(n => !ref.includes(n));
+    if (!d || d.length > 110 || extra.length || /UTC/.test(d)) { okJ = false; malJ.push([ev.type, d, extra]); }
+  }
+  check(`journal : ${types.size} types (${[...types].join(', ')}), une phrase en clair chacun, ≤ 110 signes, sans « UTC », mêmes quantités et prix que le texte expert`, okJ && types.size >= 12, malJ);
+  check('journal : les heures débutantes sont celles de l\'axe (heure de l\'appareil)', evs.at(-2).debutant.includes(BM.heure(tj)) && evs.at(-2).debutant.includes(BM.heure(tj + 60e3)), evs.at(-2).debutant);
+  {
+    // Les sentences débutantes des fins : dollars entiers, chaque quantité avec son unité, jamais « 0,000 BTC ».
+    const fins = [BM.evenementFinMur({ cote: 'a', p: 82554.39, q0: 0, qMax: 13.7, fin: 'retire', echange: 0.78, retire: 13.7, t: tj }),
+      BM.evenementFinMur({ cote: 'b', p: 82554.39, q0: 13.7, qMax: 13.7, fin: 'partiel', echange: 0.78, retire: 0, t: tj }),
+      BM.evenementFinMur({ cote: 'b', p: 82554.39, q0: 13.7, qMax: 13.7, fin: 'partiel', echange: 0.78, retire: 12.9, t: tj }),
+      BM.evenementApparu({ cote: 'a', p: 82554.39, q: 13.7, t: tj })];
+    const dd = fins.map(e => e.debutant);
+    debTextes.push(...dd);
+    check(`journal débutant : prix en dollars entiers, « BTC » après chaque quantité, jamais « 0,000 BTC » (${dd.join(' | ')})`,
+      dd.every(d => /82.554\u00a0\$/.test(d) && !/82.554,39/.test(d) && !/0,000/.test(d) && !/\d,\d+(?! BTC)\)/.test(d) && !/ \d+,\d+ (échangés|retirés)/.test(d)), dd);
+  }
+  check('journal : « cassé » n\'est jamais dit au débutant (le fait : deux minutes de suite)', evs.every(e => !/cass/i.test(e.debutant)), evs.map(e => e.debutant));
+  check('journal : niveau d\'options non listé en débutant (estimation)', BM.evenementOptions({ nom: 'Mur call', court: 'CW', p: 85000, pAxe: 85000, t: tj, luA: tj }).debutant === null);
+  // f. Mots : tout ce qui est produit pour le débutant passe CONSEIL, ACCUSE et la liste débutant.
+  const mal = debTextes.filter(t => !propre(t));
+  check(`${debTextes.length} textes débutant : ni conseil, ni intention prêtée, ni mot technique (tests/mots_debutant.js)`, !mal.length, mal.map(t => [t, MD.motsInterdits(t)]));
+  garder(...debTextes);
+}
+
 // ── 12. Constantes et mots ───────────────────────────────────────────────────
 titre('12. Constantes et mots');
 check('journal : murs d\'au moins 10 BTC, au plus 12 lignes montrées', G.journalMurBtc === 10 && G.journalMax === 12);

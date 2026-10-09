@@ -213,3 +213,64 @@ input[type="range"] { accent-color: var(--carte-live); }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
 }
+
+/* ─── Mode débutant / expert ───
+   Le mode est posé sur <html data-mode> par la page avant le premier rendu (le même réglage que le
+   terminal). Débutant : un écran calme — titre, mode, Guide, Suivre, Journal, Légende ; le reste
+   (puces des calques, Réglages, Rafales) est derrière le bouton de mode, inchangé. */
+/* Débutant est le DÉFAUT de la feuille (aucun attribut encore posé) : rien d'expert ne s'affiche
+   avant que la page ait lu le mode, même un instant. */
+html:not([data-mode="expert"]) .expert-seul, [data-mode="expert"] .debutant-seul { display: none !important; }
+html:not([data-mode="expert"]) .calques .puce:not([data-calque="guide"]) { display: none; }
+html:not([data-mode="expert"]) .calques { flex: 0 0 auto; order: 0; overflow: visible; -webkit-mask-image: none; mask-image: none; }
+/* Le bouton de mode dit l'ACTION (le mode visé), jamais un état : pas de fond « enfoncé », le même
+   bord accent dans les deux modes. */
+.bouton-mode { border-color: rgba(255, 209, 102, 0.55); color: var(--ink-1); }
+.bouton-mode:hover, .bouton-mode:focus-visible { border-color: var(--accent); }
+.bouton-mode .mode-court, .bouton-mode .mode-mini { display: none; }
+@media (max-width: 1023px) {
+  .bouton-mode .mode-long { display: none; }
+  .bouton-mode .mode-court { display: inline; }
+}
+/* Expert : « → Débutant » à toutes les largeurs — les puces des calques gardent leur place, et
+   l'en-tête garde ses deux rangées jusqu'au téléphone couché (667 px). */
+[data-mode="expert"] .bouton-mode .mode-long, [data-mode="expert"] .bouton-mode .mode-court { display: none; }
+[data-mode="expert"] .bouton-mode .mode-mini { display: inline; }
+@media (max-width: 719px) { [data-mode="expert"] .barre-gauche { gap: 6px; } }
+/* Téléphone couché en Expert (568 px) : la première rangée garde ses huit boutons. */
+@media (max-width: 640px) { [data-mode="expert"] .barre-droite { gap: 4px; } [data-mode="expert"] .barre .bouton { padding: 4px 6px; } }
+/* « Suivre » rappelé (bord accent, sans animation) quand la carte montre le passé en mode débutant. */
+.bouton.accent { border-color: var(--accent); color: var(--ink-1); }
+/* La ligne du haut : UNE ligne de hauteur fixe (la carte ne change pas de taille quand elle arrive) ;
+   ouverte par un appui, elle montre son détail sur plusieurs lignes. */
+html:not([data-mode="expert"]) .resume-carte { height: 26px; display: block; white-space: nowrap; text-overflow: ellipsis; line-height: 18px; padding: 4px 12px 0; -webkit-line-clamp: unset; }
+@media (max-width: 640px) { html:not([data-mode="expert"]) .resume-carte { height: 26px; padding: 4px 8px 0; font-size: 12px; } }
+@media (max-width: 380px) { html:not([data-mode="expert"]) .resume-carte { font-size: 11.5px; } }
+/* Ouverte : une feuille PAR-DESSUS la carte (js : marge basse négative de ce qu'elle dépasse) ; la
+   carte garde sa taille et son échelle. */
+html:not([data-mode="expert"]) .resume-carte.ouvert { height: auto; max-height: 40vh; overflow-y: auto; white-space: pre-line; padding-bottom: 6px;
+  position: relative; z-index: 12; box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5); }
+/* Détail au toucher : la ligne des âges, plus discrète. */
+.lecture .lecture-ages { color: var(--ink-3); }
+/* L'indice « Touchez pour le détail » (téléphone, mode débutant) : une seule fois, sans prendre le
+   pointeur ; un fondu unique à l'apparition. */
+.indice-tap {
+  position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); z-index: 4; pointer-events: none;
+  background: var(--surface); color: var(--ink-1); border: 1px solid rgba(255, 209, 102, 0.55); border-radius: 999px;
+  padding: 5px 12px; font-size: 12.5px; white-space: nowrap; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  animation: indice-fondu 300ms ease-out 1;
+}
+.indice-tap[hidden] { display: none; }
+@keyframes indice-fondu { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .indice-tap { animation: none; } }
+
+/* Détail au toucher (débutant) : un fond plein — ni la chaleur, ni un repère, ni l'axe ne
+   transparaissent sous le texte. */
+html:not([data-mode="expert"]) .lecture { background: var(--surface); }
+/* Statut d'erreur (débutant) : une ligne, au-dessus de l'axe du temps. */
+html:not([data-mode="expert"]) .statut { bottom: 26px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Légende débutante : les gestes du doigt sur un écran tactile, ceux de la souris ailleurs ; trois
+   graduations seulement sous 480 px (les nombres ne se touchent pas). */
+.geste-doigt { display: none; }
+@media (pointer: coarse) { .geste-souris { display: none; } .geste-doigt { display: inline; } }
+@media (max-width: 479px) { #gradBarre span.mi { display: none; } }
