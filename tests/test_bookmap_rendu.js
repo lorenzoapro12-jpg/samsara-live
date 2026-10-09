@@ -210,6 +210,25 @@ async function pixel(page, x, y) {
   }, [x, y]);
 }
 
+// Mode débutant : la ligne de prix « à fil noir » — dans un voisinage 7 × 7, un pixel sombre bordé de
+// blanc des deux côtés (dessus et dessous, ou gauche et droite) : aucune bande de chaleur n'a ce motif.
+async function filNoir(page, x, y) {
+  return page.evaluate(([x, y]) => {
+    const c = document.getElementById('carte'), k = c.width / c.clientWidth, R = Math.max(3, Math.round(3 * k)), N = 2 * R + 1;
+    const d = c.getContext('2d').getImageData(Math.round(x * k) - R, Math.round(y * k) - R, N, N).data;
+    const px = (i, j) => (i < 0 || j < 0 || i >= N || j >= N ? null : [d[(j * N + i) * 4], d[(j * N + i) * 4 + 1], d[(j * N + i) * 4 + 2]]);
+    const blanc = q => q && q.every(v => v > 215), noir = q => q && q[0] + q[1] + q[2] < 180;
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      if (!noir(px(i, j))) continue;
+      for (let e = 1; e <= Math.max(3, Math.round(3 * k)); e++) {
+        if (blanc(px(i, j - e)) && [1, 2, 3, 4].some(f => blanc(px(i, j + f)))) return true;
+        if (blanc(px(i - e, j)) && [1, 2, 3, 4].some(f => blanc(px(i + f, j)))) return true;
+      }
+    }
+    return false;
+  }, [x, y]);
+}
+
 (async () => {
   await new Promise(r => serveur.listen(0, '127.0.0.1', r));
   const nav = await playwright.chromium.launch();
@@ -826,7 +845,7 @@ async function pixel(page, x, y) {
     // ════ Mise en page : en-tête, canevas, densité, pastilles ═══════════════════
     titre('28. En-tête : jamais plus de deux lignes ; canevas à sa taille réelle (jamais étiré)');
     // 667 × 375 (téléphone couché) et 650 : juste au-dessus de 640 px, là où le libellé du bouton de mode change.
-    for (const mode of ['expert', 'debutant']) for (const [w, h, dpr] of [[800, 900, 1], [1024, 768, 1], [1280, 800, 1], [1440, 860, 1], [740, 360, 2], [667, 375, 2], [650, 800, 1], [568, 320, 2]]) {
+    for (const mode of ['expert', 'debutant']) for (const [w, h, dpr] of [[800, 900, 1], [1024, 768, 1], [1280, 800, 1], [1366, 768, 1], [1440, 860, 1], [1680, 1000, 1], [740, 360, 2], [667, 375, 2], [650, 800, 1], [568, 320, 2]]) {
       const pg = await nav.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: dpr });
       await pg.addInitScript(m => { try { localStorage.setItem('samsara-mode', m); } catch (e) { /* */ } }, mode);
       await pg.route('**/*', r => (new URL(r.request().url()).host.startsWith('127.0.0.1') ? r.continue() : r.abort()));
@@ -837,10 +856,15 @@ async function pixel(page, x, y) {
       check(`${mode === 'expert' ? 'Expert' : 'Débutant'}, ${w} × ${h} (densité ${dpr}) : en-tête ${Math.round(d.barre)} px, canevas ${d.cw} × ${d.ch} CSS → ${d.bw} × ${d.bh}, ${etire ? 'ÉTIRÉ' : 'non étiré'}`,
         d.barre <= 82 && !etire && d.defil <= 0 && d.ch >= Math.min(400, h - 120), d);
       if (mode === 'expert' && w >= 1280) {
-        // Le bouton de mode (« → Débutant ») ne pousse pas les puces des calques hors de la bande.
+        // Le bouton de mode (« → Débutant ») ne pousse pas les puces des calques hors de la bande : autant
+        // de puces entièrement visibles qu'avant le mode Débutant (mesuré sur c532402 : 10 à 1280 px, 11 à
+        // 1366, 12 à 1440 et à 1680). Il est posé au début de la bande du résumé, qui lui garde sa place.
         const n = await pg.evaluate(() => { const c = document.getElementById('calques'), r = c.getBoundingClientRect(); return [...c.querySelectorAll('.puce')].filter(p => { const b = p.getBoundingClientRect(); return b.left >= r.left - 0.5 && b.right <= r.right + 0.5; }).length; });
-        const min = w >= 1440 ? 10 : 9;
-        check(`Expert, ${w} px : ${n} puces de calques entièrement visibles (≥ ${min}), libellé court du bouton de mode`, n >= min && (await pg.evaluate(() => document.getElementById('btnModeBarre').innerText)) === '→ Débutant', n);
+        const min = { 1280: 10, 1366: 11, 1440: 12, 1680: 12 }[w];
+        const bm = await pg.evaluate(() => { const b = document.getElementById('btnModeBarre'), r = b.getBoundingClientRect(), z = document.getElementById('resumeCarte'), q = z.getBoundingClientRect(), x = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return { texte: b.innerText, visible: b.offsetParent !== null && r.width > 0, dessus: x === b || b.contains(x), haut: r.top, bas: r.bottom, zt: q.top, zb: q.bottom, gauche: r.right - q.left, pad: parseFloat(getComputedStyle(z).paddingLeft) }; });
+        check(`Expert, ${w} px : ${n} puces de calques entièrement visibles (= ${min}, comme avant), « → Débutant » visible et cliquable au début de la bande du résumé, la bande lui garde sa place`,
+          n >= min && bm.texte === '→ Débutant' && bm.visible && bm.dessus && bm.haut >= bm.zt - 0.5 && bm.bas <= bm.zb + 0.5 && bm.pad >= bm.gauche, { n, bm });
       }
       await pg.close();
     }
@@ -1298,12 +1322,20 @@ async function pixel(page, x, y) {
       check('gros ordre posé puis retiré, « Destin » éteint : au journal du guide (« Gros ordre d\'achat de 30,0 BTC … retiré … (un seul prix) »)', j44.some(j => /^Gros ordre d'achat de 30,0 BTC.* (retiré|disparu).+un seul prix/.test(j.texte) || /^Gros ordre d'achat de .+ BTC.* retiré.+un seul prix/.test(j.texte)), j44);
       await p44.click('#btnJournal'); await p44.waitForTimeout(300);
       const lj = await p44.evaluate(() => document.getElementById('listeJournal').innerText);
-      check('panneau « Ce qui vient de se passer » (Débutant) : heure de l\'appareil et phrase en clair (sans symbole), jamais « UTC »', /\d\d:\d\d:\d\d Gros ordre d'achat/.test(lj) && !/UTC/.test(lj), lj.slice(0, 200));
+      // Débutant : l'ordre était posé à 15 $ du prix (moins d'une tranche de 20 $) : il est dit dans la ligne
+      // regroupée « Près du prix du moment … » (BM.journalDebutant), sans symbole, à l'heure de l'appareil.
+      check('panneau « Ce qui vient de se passer » (Débutant) : heure de l\'appareil et phrase en clair (sans symbole), jamais « UTC » ; l\'ordre posé au prix du moment est regroupé',
+        /\d\d:\d\d:\d\d Près du prix du moment.: \d+ gros ordres? d'achat (posés?|disparus?)/.test(lj) && !/UTC/.test(lj) && !/un seul prix/.test(lj), lj.slice(0, 200));
       await p44.keyboard.press('Escape');
       // b et c portent sur les puces des calques (cachées en Débutant) : la page passe en Expert par
       // la touche M (ce qui contrôle aussi la bascule), puis revient en Débutant.
       await p44.keyboard.press('m'); await p44.waitForTimeout(400);
       check('touche M : la page passe en Expert', (await etat(p44)).mode === 'expert');
+      // Expert : le contrôle d'origine, intact — chaque évènement, à l'heure UTC, avec sa phrase entière.
+      await p44.click('#btnJournal'); await p44.waitForTimeout(300);
+      const ljx = await p44.evaluate(() => ({ liste: document.getElementById('listeJournal').innerText, note: document.getElementById('journalNote').innerText }));
+      check('panneau « Ce qui vient de se passer » (Expert) : heure UTC et phrase', /\d\d:\d\d:\d\d .+Gros ordre d'achat/.test(ljx.liste) && /UTC/.test(ljx.note), ljx.liste.slice(0, 200));
+      await p44.keyboard.press('Escape');
       // a (jumeau Expert) : le même panneau, en heures UTC, la phrase experte et sa note.
       await p44.click('#btnJournal'); await p44.waitForTimeout(300);
       const ljX = await p44.evaluate(() => ({ liste: document.getElementById('listeJournal').innerText, note: document.getElementById('journalNote').innerText }));
@@ -1441,6 +1473,9 @@ async function pixel(page, x, y) {
         // cadre, et jamais plus de 60 px à gauche quand elle commence dans le cadre (pas à côté d'un vieux sommet).
         const loin = et.filter(x => x.source === 'zone' && cadres.some(f => f.cote === x.cote && (x.x + x.w < f.x0 - 60 || (x.x + x.w > f.x0 + 1 && x.x < f.x0 - 61))));
         check(`${nom} : une étiquette de zone n'est jamais à plus de 60 px de son cadre`, !loin.length, { loin, cadres });
+        // … ni au-dessus ou au-dessous de lui : son centre à au plus (demi-hauteur du cadre + sa hauteur) du centre du cadre.
+        const hautBas = et.filter(x => x.source === 'zone' && cadres.some(f => f.cote === x.cote && Math.abs(x.y + x.h / 2 - (f.ya + f.yb) / 2) > (f.yb - f.ya) / 2 + x.h + 2));
+        check(`${nom} : chaque étiquette de zone à la hauteur de son cadre (écart ≤ demi-hauteur du cadre + hauteur de l'étiquette)`, !hautBas.length, { hautBas, cadres });
         const muets = cadres.filter(f => !et.some(x => x.cote === f.cote && x.source === 'zone'));
         const malPlaces = cadres.filter(f => yP !== null && !f.dedans && (f.cote === 'ask' ? f.yb > yP + 2 : f.ya < yP - 2));
         check(`${nom} : ${cadres.length} cadre(s), chacun nommé par son étiquette, aucun de l'autre côté du prix`, !muets.length && !malPlaces.length, { muets, malPlaces, yP });
@@ -1474,6 +1509,10 @@ async function pixel(page, x, y) {
       const nv = e.debutant.niveaux, ea = e.debutant.etiquettes.find(x => x.cote === 'bid'), ev = e.debutant.etiquettes.find(x => x.cote === 'ask');
       check('valeur : le prix de l\'étiquette est le bord de l\'amas le plus proche du prix (achat : son haut, vente : son bas), zone ou, sinon, mur',
         ea && ev && nv.bid && nv.ask && ea.prix === nv.bid.P && ev.prix === nv.ask.P && nv.bid.P === nv.bid.pHaut && nv.ask.P === nv.ask.pBas, { nv, ea, ev });
+      {
+        const ti = await p45.evaluate(() => document.title);
+        check(`titre de l'onglet sans mot technique (« ${ti} ») ; le trait « maintenant » nommé sous lui, sur l'axe du temps`, !interdits(ti).length && !/carnet/i.test(ti) && e.debutant.maintenant === 'maintenant', { ti, m: e.debutant.maintenant });
+      }
       check('aucun « Σ », aucun repère gamma sur l\'axe, aucune marque du journal', !e.textesCarte.some(t => /Σ/.test(t.t || t.texte || '')) && !(e.textes.axePrix || []).some(t => /CW|PW|GW|ZG/.test(t)) && e.guide.marques === 0, { tc: e.textesCarte, axe: e.textes.axePrix });
       // A14 : obstacles durs — la ligne de prix des 15 dernières minutes et la rangée du prix.
       {
@@ -1520,9 +1559,10 @@ async function pixel(page, x, y) {
         for (const m of [3, 5, 7]) {
           const t = Math.floor(e.maintenant / 60e3) * 60e3 - m * 60e3, k = S45.kline(t, e.maintenant), v = e.vue, ch = e.mise.chaleur;
           const x = ch.x + (t + 60e3 - v.t1) / (v.t2 - v.t1) * ch.w - 1, y = ch.y + (v.p2 - +k[4]) / (v.p2 - v.p1) * ch.h;
-          res.push({ m, px: await pixel(p45, x, y), x, y });
+          res.push({ m, px: await pixel(p45, x, y), fil: await filNoir(p45, x, y), x, y });
         }
         check('5 s : la ligne de prix est blanche au-dessus des ronds (clôtures d\'il y a 3, 5 et 7 min)', res.filter(r => r.px.every(c => c > 225)).length >= 2, res);
+        check('5 s : … avec son fil noir au milieu (« la ligne à fil noir » : aucune bande de chaleur ne la prend)', res.filter(r => r.fil).length >= 2, res);
       }
       check('5 s (b) le sens du prix est écrit ; (c) un repère de chaque côté ; (d) scénario : au terminal (dit dans le résumé ouvert)', motifTete.test(b45.texte) && e.debutant.etiquettes.filter(x => x.prix !== null).length === 2, b45.texte);
       // A17 : les textes sur la chaleur comptés au niveau du canevas = textesCarte.
@@ -1548,7 +1588,7 @@ async function pixel(page, x, y) {
         await p45.click('#btnJournal'); await p45.waitForTimeout(300);
         const jn = await p45.evaluate(() => ({ note: document.getElementById('journalNote').innerText, liste: document.getElementById('listeJournal').innerText }));
         morceaux.push(['journal (note)', jn.note], ['journal (liste)', jn.liste]);
-        check('journal en Débutant : heure de l\'appareil, jamais « UTC », sans les symboles de la carte Expert (✕ ◐ ● ▲ ▼)', !/UTC/.test(jn.note + jn.liste) && /heure de cet appareil/.test(jn.note) && !/[✕◐●▲▼]/.test(jn.liste), jn);
+        check('journal en Débutant : heure de l\'appareil, jamais « UTC », sans les symboles de la carte Expert (✕ ◐ ● ▲ ▼), jamais « (un seul prix) »', !/UTC/.test(jn.note + jn.liste) && /heure de cet appareil/.test(jn.note) && !/[✕◐●▲▼]/.test(jn.liste) && !/un seul prix/.test(jn.liste), jn);
         await p45.keyboard.press('Escape');
         await p45.keyboard.press('?'); await p45.waitForTimeout(400);
         morceaux.push(['explication', await p45.evaluate(() => document.getElementById('guideIntro').innerText)]);
@@ -1558,6 +1598,9 @@ async function pixel(page, x, y) {
         // jamais « plus c'est clair », faux pour l'orange.
         const coul = morceaux.filter(([n]) => n === 'légende' || n === 'explication').map(([n, t]) => [n, /Bleu foncé : peu d'ordres à ce prix ; puis vert, jaune, orange ; blanc : le plus d'ordres\./.test(t) && !/Plus c'est clair/.test(t)]);
         check('légende et explication : « Bleu foncé : peu … ; puis vert, jaune, orange ; blanc : le plus d\'ordres »', coul.length === 2 && coul.every(([, ok]) => ok), coul);
+        // « Blanc » ne désigne plus deux choses : le prix est « la ligne à fil noir », jamais « la ligne blanche ».
+        const lb = morceaux.filter(([n]) => n === 'légende' || n === 'explication').map(([n, t]) => [n, /Ligne à fil noir = le prix/.test(t) && !/Ligne blanche = le prix|ligne blanche =/i.test(t)]);
+        check('légende et explication : « Ligne à fil noir = le prix » (jamais « Ligne blanche = le prix »)', lb.length === 2 && lb.every(([, ok]) => ok), lb);
         const mal = morceaux.map(([n, t]) => [n, interdits(t)]).filter(([, l]) => l.length);
         check(`mots interdits : aucun dans ${morceaux.map(m => m[0]).join(', ')}`, !mal.length, mal);
         // A10 : « bulle » désigne le détail au toucher ; les échanges sont des « ronds ».
@@ -1573,9 +1616,12 @@ async function pixel(page, x, y) {
         await p45.mouse.move(rc.x + x.x + x.w / 2 + 1, rc.y + x.y + x.h / 2); await p45.mouse.move(rc.x + x.x + x.w / 2, rc.y + x.y + x.h / 2); await p45.waitForTimeout(300);
         const lu = await lecture(p45), ls = lu.split('\n'), sp2 = t => t.replace(/[\u202f\u00a0]/g, ' ');
         check('survol d\'une étiquette : sa phrase entière (« … d\'ordres … en attente … », « à tout moment ») et la ligne des âges',
-          /(Beaucoup d'ordres|Mur d’achat|Mur de vente|ordres d'achat|ordres de vente)/.test(lu) && /à tout moment/.test(lu) && /^Âges : couleurs récentes .+ · ronds .+ · ligne blanche /m.test(lu), lu);
+          /(Beaucoup d'ordres|Mur d’achat|Mur de vente|ordres d'achat|ordres de vente)/.test(lu) && /à tout moment/.test(lu) && /^Âges : couleurs récentes .+ · ronds .+ · ligne du prix /m.test(lu), lu);
         check('… le nom de l\'étiquette en titre, sa phrase juste après, ni prix ni case sous le pointeur (« Ici (… ) ») : 3 lignes',
-          ls.length === 3 && sp2(ls[0]) === sp2(x.texte) && /^(Mur d’achat|Mur de vente) : /.test(ls[1]) && !/^Ici \(/m.test(lu) && /^Âges : /.test(ls[2]), { ls, t: x.texte });
+          ls.length === 3 && sp2(ls[0]) === sp2(x.texte) && /^([\d,]+ BTC d'ordres (d'achat|de vente) en attente |Le prix est dans cette zone)/.test(sp2(ls[1])) && !/^Ici \(/m.test(lu) && /^Âges : /.test(ls[2]), { ls, t: x.texte });
+        check('… la phrase ne répète pas le nom du titre (« Mur d’achat : … »)', !/^(Mur d’achat|Mur de vente|Dans un mur)/.test(ls[1] || ''), ls);
+        const cx = (await etat(p45)).debutant.croix;
+        check('… et pas de croix sur le repère survolé (elle barrerait son nom)', cx === false, cx);
         const mal = interdits(lu);
         check('bulle de lecture débutante : sans mot technique (Binance et Coinbase admis)', !mal.length, { mal, lu });
       }
@@ -1639,7 +1685,7 @@ async function pixel(page, x, y) {
         const o = await bande(p45), lignes = o.texte.replace(/[\u202f\u00a0]/g, ' ').split('\n');
         check('résumé ouvert : la ligne + 6 lignes (variation chiffrée, ordres lus, deux côtés, 3 âges, le scénario au Terminal, « pas une prévision » et « mode Expert »)',
           lignes.length === 7 && /^Prix : de .+ \$ à .+ \$ en 15 min \([+−]\d/.test(lignes[1]) && /^Ordres en attente lus il y a /.test(lignes[2]) && /^Au-dessus : .+ Au-dessous : /.test(lignes[3])
-            && /^Âges : couleurs récentes .+, plus anciennes .+ · ronds .+ · ligne blanche /.test(lignes[4]) && /^Le scénario du matin de Claude est sur le Terminal/.test(lignes[5]) && /pas une prévision.+mode Expert/.test(lignes[6]) && o.h > h0, { lignes, h0, h: o.h });
+            && /^Âges : couleurs récentes .+, plus anciennes .+ · ronds .+ · ligne du prix /.test(lignes[4]) && /^Le scénario du matin de Claude est sur le Terminal/.test(lignes[5]) && /pas une prévision.+mode Expert/.test(lignes[6]) && o.h > h0, { lignes, h0, h: o.h });
         const cv1 = await p45.evaluate(() => document.getElementById('carte').getBoundingClientRect().toJSON());
         check(`résumé ouvert PAR-DESSUS la carte : la carte ne bouge pas (${Math.round(cv0.top)}/${Math.round(cv0.height)} → ${Math.round(cv1.top)}/${Math.round(cv1.height)} px)`, cv0.top === cv1.top && cv0.height === cv1.height, { cv0, cv1 });
         const mal = interdits(o.texte);
@@ -1716,6 +1762,23 @@ async function pixel(page, x, y) {
         check(`45m. vue large : des repères posés (${n}/4 relevés)`, n >= 3, n);
         await p45.keyboard.press('f'); await p45.waitForTimeout(800);
       }
+      // ── 45o. Vue zoomée (deux crans de molette, un pincement) : chaque cadre dessiné reste nommé ──
+      {
+        await p45.keyboard.press('f'); await p45.waitForTimeout(1500);
+        for (const [avant, apres, demi] of [[25, 3, 120], [20, 2, 80]]) {
+          const e0 = await etat(p45), pm = e0.debutant.dernierPrix, t = e0.maintenant;
+          await p45.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [t - avant * 60e3, t + apres * 60e3, pm - demi, pm + demi]);
+          let n = 0;
+          for (let i = 0; i < 3; i++) {
+            await p45.waitForTimeout(1200);
+            const g = await etat(p45);
+            n += g.debutant.cadres.length;
+            controlerEtiquettes(g, `45o. vue −${avant} min / +${apres} min, ±${demi} $ (${i + 1}/3)`);
+          }
+          check(`45o. vue −${avant} min, ±${demi} $ : des cadres dessinés (${n} relevés en 3 rendus), chacun nommé (contrôles ci-dessus)`, n >= 2, n);
+        }
+        await p45.keyboard.press('f'); await p45.waitForTimeout(800);
+      }
       // ── A13. Statut d'erreur en Débutant (429) ─────────────────────────────
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p45.close();
@@ -1753,6 +1816,15 @@ async function pixel(page, x, y) {
         ({ page: pg, erreurs } = await ouvrir(nav, { encodage: true, mode: 'debutant', vue: { width: 390, height: 844 }, contexte: { deviceScaleFactor: 3, hasTouch: true, isMobile: true }, intercept: deuxCotes }));
         await pg.waitForFunction(() => window.__carte.etat().debutant.etiquettes.length >= 1, null, { timeout: 15000 }).catch(() => {});
         const i0 = (await etat(pg)).debutant.indice;
+        {
+          // Première visite : l'explication se pose loin de la rangée du prix ; ses numéros sur des exemples visibles.
+          await pg.waitForTimeout(1200);
+          const g0 = await etat(pg);
+          const ir = await pg.evaluate(() => { const a = document.getElementById('guideIntro').getBoundingClientRect(), c = document.getElementById('carte').getBoundingClientRect(); return { top: a.top - c.top, bottom: a.bottom - c.top, txt: document.getElementById('guideIntro').innerText }; });
+          const yP = g0.debutant.yPrix !== null ? g0.mise.chaleur.y + g0.debutant.yPrix : null;
+          check(`45d. première visite au téléphone : l'explication (y ${Math.round(ir.top)}–${Math.round(ir.bottom)}) laisse la rangée du prix visible (y ${yP && Math.round(yP)}), ${g0.guide.reperes.length} numéros posés (≥ 2), jamais « caché sous ce cadre »`,
+            yP !== null && (yP < ir.top - 8 || yP > ir.bottom + 8) && g0.guide.reperes.length >= 2 && !/caché sous ce cadre/.test(ir.txt), { ir, yP, rep: g0.guide.reperes });
+        }
         await pg.click('#guideIntroOk'); await pg.waitForTimeout(500);
         const i1 = (await etat(pg)).debutant.indice;
         check('45d. indice « Touchez pour le détail » : caché sous l\'explication, montré après', !i0 && i1, [i0, i1]);
@@ -1809,6 +1881,9 @@ async function pixel(page, x, y) {
         const b = await bande(pg), av4 = await avertissementVisible(pg), g = await etat(pg);
         check(`45e. 844 × 390 : résumé sur une ligne, « pas une prévision » visible (${b.texte})`, b.sw <= b.cw + 1 && b.h <= 26.5 && av4 && av4.dedans, { b, av4 });
         controlerEtiquettes(g, '844 × 390');
+        const bl = await pg.evaluate(() => window.__carte.bulles());
+        const qMax = Math.max(...bl.map(z => z.achat + z.vente)), rMax = Math.max(...bl.map(z => z.r));
+        check(`carte basse (${g.mise.chaleur.h} px) : ronds bornés à l'échelle 0,6 comme au téléphone debout (rayon max ${rMax.toFixed(1)} ≤ ${BM.rayonBulle(qMax, 0.6).toFixed(1)})`, bl.length > 0 && g.mise.chaleur.h < 400 && rMax <= BM.rayonBulle(qMax, 0.6) + 0.01, { rMax, qMax, h: g.mise.chaleur.h });
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
         await pg.close();
       }
@@ -1891,7 +1966,7 @@ async function pixel(page, x, y) {
             const xs = [f.x0 + 8, (f.x0 + f.x1) / 2, f.x1 - 8].filter(x => !(x >= ex.x && x <= ex.x + ex.w)), yc = (f.ya + f.yb) / 2;
             await pg.mouse.move(rc.x + xs[0] + 1, rc.y + yc); await pg.mouse.move(rc.x + xs[0], rc.y + yc); await pg.waitForTimeout(400);
             const lu = await lecture(pg);
-            check('45l. survol du cadre allumé : son nom en titre et sa phrase (« le prix est dans cette zone », « à tout moment »)', /^Dans un mur de vente\n/.test(lu) && /le prix est dans cette zone/.test(lu) && /à tout moment/.test(lu), lu);
+            check('45l. survol du cadre allumé : son nom en titre et sa phrase (« le prix est dans cette zone », « à tout moment »)', /^Dans un mur de vente\n/.test(lu) && /Le prix est dans cette zone/.test(lu) && /à tout moment/.test(lu), lu);
             await pg.mouse.move(rc.x + 2, rc.y + 2);
           }
           const b = await bande(pg);

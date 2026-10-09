@@ -192,6 +192,8 @@ input[type="range"] { accent-color: var(--carte-live); }
   .guide-intro { top: 6px; bottom: auto; max-height: calc(100% - 12px); overflow-y: auto; padding: 4px 10px 8px; }
   .guide-intro .detail:not(.garde) { display: none; }
   .guide-intro .note { margin: 4px 0 6px; }
+  /* Quand l'explication défile, « J'ai compris » reste au bas du cadre, visible sans défiler. */
+  .guide-intro #guideIntroOk { position: sticky; bottom: 0; display: block; width: 100%; background: var(--surface); box-shadow: 0 6px 0 2px var(--surface), 0 -8px 8px var(--surface); }
 }
 /* Écran bas ou étroit (téléphone), ou explication qui couvre plus de la moitié de la carte (classe
    .couvre, posée par la page) : elle prend le pointeur — un appui ou un glissement sur ce qu'on lit
@@ -237,6 +239,16 @@ html:not([data-mode="expert"]) .calques { flex: 0 0 auto; order: 0; overflow: vi
 [data-mode="expert"] .bouton-mode .mode-long, [data-mode="expert"] .bouton-mode .mode-court { display: none; }
 [data-mode="expert"] .bouton-mode .mode-mini { display: inline; }
 @media (max-width: 719px) { [data-mode="expert"] .barre-gauche { gap: 6px; } }
+/* Expert, en-tête sur UNE rangée (≥ 1280 px) : le bouton de mode quitte la rangée (elle a déjà toute sa
+   largeur, les puces des calques la prennent comme avant le mode Débutant) et se pose au début de la
+   bande du résumé, sous « ← Terminal » — là où il était, une rangée plus bas, loin des panneaux qui
+   s'ouvrent à droite ; la bande lui garde sa place (marge gauche). Bande cachée (Guide éteint) : il
+   revient dans la rangée. */
+@media (min-width: 1280px) {
+  .barre { position: relative; }
+  [data-mode="expert"] .barre:has(+ .resume-carte:not([hidden])) .bouton-mode { position: absolute; left: 12px; top: calc(100% + 9px); z-index: 8; background: var(--surface); }
+  [data-mode="expert"] .barre:has(+ .resume-carte:not([hidden])) + .resume-carte { padding-left: 116px; }
+}
 /* Téléphone couché en Expert (568 px) : la première rangée garde ses huit boutons. */
 @media (max-width: 640px) { [data-mode="expert"] .barre-droite { gap: 4px; } [data-mode="expert"] .barre .bouton { padding: 4px 6px; } }
 /* « Suivre » rappelé (bord accent, sans animation) quand la carte montre le passé en mode débutant. */
