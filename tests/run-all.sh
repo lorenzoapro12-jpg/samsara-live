@@ -127,6 +127,15 @@ node test_guide_page.js || ko=1
 etape "9b''. Scénarios du matin dans Chromium : encadré, libellé du rang 1, survol et tap, fichier d'attente, fichier absent, masquage (non exécuté sans Playwright)"
 node test_scenarios_page.js || ko=1
 
+etape "9b''a. Scénarios du matin, la journée (hors ligne) : écart, nom décidé aux clôtures de 15 min, fondu, lignes et textes sans probabilité"
+node test_scenarios_jour.js || ko=1
+
+etape "9b''b. Scénarios du matin, la journée dans Chromium (08/10 rejoué) : page = calcul pur, Débutant ≤ 5 textes, pastilles, fondu, sobriété (non exécuté sans Playwright)"
+node test_scenarios_jour_page.js || ko=1
+
+etape "9b''c. Scénarios du matin, rejeu animé (bougie en cours qui bouge) : le nom ne change qu'aux clôtures, la ligne suit, journée « aucun » (non exécuté sans Playwright)"
+node test_scenarios_rejeu.js || ko=1
+
 etape "9b‴. Débutant à l'écran dans Chromium : au plus 5 textes, phrase et repères aux mêmes prix, bulles au survol et au toucher, cartes et menu sans jargon, 11 thèmes (non exécuté sans Playwright)"
 node test_debutant_page.js || ko=1
 
