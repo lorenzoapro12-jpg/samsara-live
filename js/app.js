@@ -3948,7 +3948,9 @@ function guideTracer(E) {
 
 /** Libellés des bandes (différés : posés après les bougies et les étiquettes d'overlays).
  *  Le LIBELLÉ a la priorité sur l'état : la forme la plus riche qui tient ENTIÈRE (pleine,
- *  courte, mini, micro) ; jamais coupé s'il porte un chiffre publié (sur deux lignes au besoin).
+ *  courte, mini, micro) ; jamais coupé s'il porte un chiffre publié : sur autant de lignes qu'il
+ *  faut (une bande de cinq raisons dont deux publiées ne tient pas en trois lignes à 390 px ; la
+ *  couper perdait l'heure de la dernière). Trop haut pour sa place, il est nommé au bord.
  *  L'état au prix live (calque) se pose à sa droite s'il y a la place, sinon sur la ligne du
  *  dessous. Le libellé reste près de SA bande : aucune autre bande entre eux, et les libellés
  *  gardent l'ordre des bandes de haut en bas. Une bande sans place est nommée au bord (guideBords). */
@@ -3968,7 +3970,7 @@ function guideLibellesNiveaux(E, top, bas, surBougies) {
     const publie = L.niv.raisons.some(r => isNum(r.lu));
     let lignes = null;
     for (const [t, lim] of [[L.libelle, Math.min(largMax, dispo)], [L.court, dispo], [L.mini, dispo], [L.micro, dispo]]) if (larg(t) <= lim) { lignes = [t]; break; }
-    if (!lignes) lignes = publie ? guideLignes(ctx, L.micro, dispo - 14, 3) : [guideCouper(ctx, L.micro, dispo - 14)];
+    if (!lignes) lignes = publie ? guideLignes(ctx, L.micro, dispo - 14) : [guideCouper(ctx, L.micro, dispo - 14)];
     const wL = Math.min(dispo, Math.max(...lignes.map(larg)));
     const etatPlein = ctx.measureText(Guide.texteEtatMax(E.mode, 'plein', L.niv.ferme)).width + 16;
     const etatMini = ctx.measureText(Guide.texteEtatMax(E.mode, 'mini', L.niv.ferme)).width + 16;
@@ -4015,7 +4017,10 @@ function guideBords(E, top, bas) {
     };
     let lignes = null;
     for (const v of [true, 'mini', 'micro']) { const t = texte(v); if (ctx.measureText(t).width + 14 <= place) { lignes = [t]; break; } }
-    if (!lignes) lignes = guideLignes(ctx, texte('micro'), place - 14, 3);
+    // Trois lignes au plus, sauf si l'étiquette nomme un chiffre publié : son heure n'est jamais
+    // coupée (« … ») — elle prend les lignes qu'il lui faut.
+    const publie = hors.concat(sans).some(L => L.niv.raisons.some(r => isNum(r.lu)));
+    if (!lignes) lignes = guideLignes(ctx, texte('micro'), place - 14, publie ? 0 : 3);
     const w = Math.min(place, Math.max(...lignes.map(t => ctx.measureText(t).width)) + 14), h = lignes.length * H;
     // Au bord de son côté, sinon au bord opposé (la flèche et les prix disent le côté) ; jamais
     // glissée au milieu des bandes, où elle se lirait comme le nom d'une voisine.
@@ -4024,7 +4029,7 @@ function guideBords(E, top, bas) {
     if (!pose) continue;
     etiquettesAFaire.push(() => { ctx.font = chartFont(9, 600); guidePastilleL(ctx, x, pose.y, w, lignes, COLORS.accent2, H); });
     const Ls = hors.concat(sans);
-    E.cibles.push({ rects: [guideZone(pose)], prio: 1, niveaux: Ls,
+    E.cibles.push({ rects: [guideZone(pose)], prio: 1, niveaux: Ls, lignes,
       titre: (hors.length ? (sens > 0 ? 'Au-dessus' : 'Au-dessous') + ' de la vue' : 'Bandes du graphique') + ' : ' + Ls.map(L => Guide.libelleNiveau(L.niv, 'debutant', unite, true)).join(' | '),
       texte: [].concat(...Ls.map(L => guideTexteNiveau(L, exp).slice(0, L.niv.raisons.length))) });
   }
