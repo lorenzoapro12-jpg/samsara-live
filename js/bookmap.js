@@ -2137,7 +2137,9 @@
     for (let t = Math.ceil((E.vue.t1 - off) / pas) * pas + off; t <= E.vue.t2; t += pas) ticks.push(t);
     // Une vue qui passe minuit (ou dépasse 24 h) : le jour sur la première graduation et après
     // chaque minuit — sinon « 18:00 » aux deux bouts de l'axe ne dit pas lequel est hier.
-    const jours = ticks.length && BM.jour(ticks[0]) !== BM.jour(ticks[ticks.length - 1]);
+    // C'est la VUE qui passe minuit, pas les graduations : une vue de 26 h finie à 23:15 a ses
+    // graduations de 00:00 à 21:00 du même jour, et sa première, 00:00, doit dire lequel.
+    const jours = ticks.length && BM.jour(E.vue.t1) !== BM.jour(E.vue.t2);
     ticks.forEach((t, i) => {
       const x = X(t);
       ctx.fillStyle = C.grille; ctx.fillRect(Math.round(x), a.y, 1, 4);

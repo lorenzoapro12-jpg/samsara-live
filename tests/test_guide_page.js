@@ -13,6 +13,13 @@
 // Binance simulé (bougies déterministes) ; fichier publié recopié avec des murs et des niveaux
 // d'options posés près du prix simulé, lu « maintenant » ; scénarios du matin présents
 // (tests/fixtures/previsions.json) : le Guide reste lisible avec eux.
+// HORLOGE FIXÉE : « maintenant » est le 08/10/2026 à 22:52 UTC, pour le harnais (bougies, fichier
+// publié, scénarios) ET pour la page (page.clock), quelle que soit l'heure du lancement. Les
+// bougies simulées dépendent de l'heure (sinusoïde sur l'indice absolu de la bougie, plus haut et
+// plus bas d'hier pris sur la journée UTC) : la place laissée aux étiquettes en dépendait, et le
+// harnais passait ou non selon l'heure. À 22:52, une bande de cinq raisons dont deux publiées
+// (zéro gamma, mur de calls) est nommée à 390 px sur quatre lignes : l'heure de chacune doit y
+// rester (coupée à trois lignes, la seconde se perdait dans « … »).
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
 // USAGE   node tests/test_guide_page.js
 const fs = require('fs'), path = require('path'), http = require('http');
@@ -31,9 +38,12 @@ let ko = 0;
 const check = (nom, ok, det) => { if (!ok) ko++; console.log(`  ${ok ? '✓' : '✗'} ${nom}${!ok && det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 500) : ''}`); };
 const titre = t => console.log(`\n── ${t} ──`);
 
+// L'horloge du harnais et de la page : MAINTENANT au lancement, puis le temps qui passe.
+const MAINTENANT = Date.parse('2026-10-08T22:52:00Z'), DECALAGE = MAINTENANT - Date.now();
+const maintenant = () => Date.now() + DECALAGE;
 // Binance simulé : une sinusoïde autour de 86 000, prix fixe.
 function binance(url) {
-  const u = new URL(url), q = u.searchParams, now = Date.now();
+  const u = new URL(url), q = u.searchParams, now = maintenant();
   if (u.pathname.endsWith('/klines')) {
     const pas = { '1m': 6e4, '5m': 3e5, '15m': 9e5, '1h': 36e5, '4h': 144e5, '1d': 864e5, '1w': 6048e5 }[q.get('interval')] || 9e5;
     const n = Math.min(1000, +q.get('limit') || 500), fin = q.get('endTime') ? Math.min(+q.get('endTime'), now) : now;
@@ -45,7 +55,7 @@ function binance(url) {
   return {};
 }
 // Le fichier publié, lu « maintenant », avec des murs et des niveaux d'options près du prix simulé.
-const LU = new Date(Math.floor(Date.now() / 60000) * 60000).toISOString().replace('.000Z', '+00:00'), HM = LU.slice(11, 16);
+const LU = new Date(Math.floor(maintenant() / 60000) * 60000).toISOString().replace('.000Z', '+00:00'), HM = LU.slice(11, 16);
 const md = JSON.parse(fs.readFileSync(path.join(REPO, 'market-data.json'), 'utf8'));
 md.updated = LU;
 md.liquidity = Object.assign({}, md.liquidity, { snapshot_at: LU, wall_bin_usd: 20, bid_walls: [[85890, 31], [85700, 12]], ask_walls: [[86150, 44], [86330, 9]] });
@@ -60,8 +70,10 @@ const serveur = http.createServer((req, res) => {
   fs.createReadStream(f).pipe(res);
 });
 
-async function ouvrir(nav, vue, mode, tactile) {
+async function ouvrir(nav, vue, mode, tactile, sansScenarios) {
   const ctx = await nav.newContext(Object.assign({ viewport: vue, deviceScaleFactor: 1 }, tactile ? { hasTouch: true, isMobile: true } : {}));
+  // La page vit à l'heure du harnais (le temps s'écoule normalement à partir de là).
+  await ctx.clock.install({ time: maintenant() });
   const page = await ctx.newPage();
   const erreurs = [];
   page.on('pageerror', e => erreurs.push(e.message));
@@ -71,7 +83,8 @@ async function ouvrir(nav, vue, mode, tactile) {
     if (h === 'api.binance.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(binance(u)) });
     if (h === 'raw.githubusercontent.com') {
       // Les scénarios du matin aussi : le Guide doit rester lisible avec eux.
-      if (estPrevisions(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: previsionsFixture() });
+      if (estPrevisions(u) && sansScenarios) return r.fulfill({ status: 404, headers: cors, body: '' });
+      if (estPrevisions(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: previsionsFixture({ maintenant: maintenant() }) });
       if (u.includes('heatmap')) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, 'heatmap.json')) });
       if (/\/master\/market-data\.json/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: MD });
       return r.fulfill({ status: 404, headers: cors, body: '' });
@@ -96,6 +109,9 @@ const etat = page => page.evaluate(() => {
       auBord: E.cibles.some(c => c.niveaux && c.niveaux.includes(L) && c.rects.length) })),
     chemins: E.chemins || null, suite: { haut: !!E.D.suite.haut, bas: !!E.D.suite.bas },
     cibles: E.cibles.map(c => ({ prio: c.prio, titre: c.titre, rects: c.rects || [] })),
+    // Les étiquettes du bord posées : leurs lignes, et l'heure de CHAQUE chiffre publié qu'elles nomment.
+    bords: E.cibles.filter(c => c.niveaux && c.rects.length).map(c => ({ lignes: c.lignes,
+      heures: [].concat(...c.niveaux.map(L => L.niv.raisons.filter(r => isFinite(r.lu)).map(r => hh(r.lu)))) })),
   };
 });
 
@@ -115,6 +131,11 @@ const etat = page => page.evaluate(() => {
       check(`${nom} : chaque bande visible est nommée — son libellé près d'elle, ou dans l'étiquette du bord`, vis.every(L => L.lignes || (L.sansPlace && L.auBord)), vis);
       const pub = vis.filter(L => L.lignes && L.heures.length);
       check(`${nom} : chaque libellé posé qui porte un chiffre publié garde son heure (« ${HM} »), sans « … »`, pub.length > 0 && pub.every(L => L.heures.every(h => L.lignes.join(' ').includes(h)) && !/…/.test(L.lignes.join(' '))), pub);
+      // … et l'étiquette du bord aussi : une heure par chiffre publié nommé, rien de coupé.
+      const nFois = (t, h) => t.split(h).length - 1;
+      const bordsPub = e.bords.filter(b => b.heures.length);
+      check(`${nom} : chaque étiquette du bord qui nomme un chiffre publié garde chaque heure, sans « … » (${bordsPub.length})`,
+        bordsPub.every(b => Array.isArray(b.lignes) && b.heures.every(h => nFois(b.lignes.join(' '), h) >= b.heures.filter(x => x === h).length) && !/…/.test(b.lignes.join(' '))), bordsPub);
       // 2. Les deux chemins, ensemble, dans la même variante, chacun avec sa condition.
       const ch = e.chemins;
       const boites = ch ? ch.boites : [];
@@ -166,6 +187,18 @@ const etat = page => page.evaluate(() => {
     }
     check('écran tactile : aucune erreur JavaScript', !t.erreurs.length, t.erreurs);
     await t.ctx.close();
+
+    // Sans scénarios du matin, la bande à cinq raisons (deux chiffres publiés) se pose près d'elle
+    // à 22:52 sur un téléphone : c'est le libellé POSÉ qui doit garder ses deux heures, pas le bord.
+    titre('390 px · debutant, sans scénarios du matin');
+    const s = await ouvrir(nav, { width: 390, height: 800 }, 'debutant', false, true);
+    const es = await etat(s.page);
+    const pubS = es.niveaux.filter(L => L.visible && L.lignes && L.heures.length);
+    const nFoisS = (t, h) => t.split(h).length - 1;
+    check(`sans scénarios : chaque libellé posé qui porte un chiffre publié garde chaque heure, sans « … » (${pubS.length})`,
+      pubS.length > 0 && pubS.every(L => L.heures.every(h => nFoisS(L.lignes.join(' '), h) >= L.heures.filter(x => x === h).length) && !/…/.test(L.lignes.join(' '))), pubS);
+    check('sans scénarios : aucune erreur JavaScript', !s.erreurs.length, s.erreurs);
+    await s.ctx.close();
   } finally { await nav.close(); serveur.close(); }
   console.log(ko ? `\n❌ GUIDE À L'ÉCRAN : ${ko} contrôle(s) en échec` : '\n✅ GUIDE À L\'ÉCRAN : TOUS LES CONTRÔLES PASSENT');
   process.exit(ko ? 1 : 0);

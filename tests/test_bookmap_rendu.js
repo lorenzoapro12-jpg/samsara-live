@@ -691,10 +691,23 @@ async function pixel(page, x, y) {
       await p24.waitForTimeout(400);
       const t1 = await etat(p24);
       check(`axe du temps (vue de 10,5 min) : pas de ${t1.textes.pasTemps / 1000} s, libellés justes`, t1.textes.pasTemps !== 100000 && (t1.textes.pasTemps % 60e3 === 0 || t1.textes.axeTemps.every(x => /\d\d:\d\d:\d\d$/.test(x))), t1.textes);
-      await p24.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [e0.maintenant - 26 * 3600e3, e0.maintenant, e0.vue.p1, e0.vue.p2]);
-      await p24.waitForTimeout(400);
-      const t2 = await etat(p24);
-      check('vue de 26 h : le jour est écrit sur la première graduation et après minuit', /^(dim|lun|mar|mer|jeu|ven|sam)\. \d\d /.test(t2.textes.axeTemps[0]) && t2.textes.axeTemps.filter(x => /\. \d\d /.test(x)).length >= 2, t2.textes.axeTemps);
+      // Les vues de 26 h sont posées à des heures LOCALES fixes (celles de l'axe), pas sur
+      // « maintenant » : finie à maintenant, la vue n'a de minuit APRÈS sa première graduation
+      // qu'à certaines heures (de 23:00 à minuit, ses graduations vont de 00:00 à 21:00 du même
+      // jour) — le contrôle passait ou non selon l'heure du lancement.
+      const minuitLocal = await p24.evaluate(m => { const d = new Date(m); d.setHours(0, 0, 0, 0); return d.getTime(); }, e0.maintenant);
+      const vue26 = async fin => {
+        await p24.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [fin - 26 * 3600e3, fin, e0.vue.p1, e0.vue.p2]);
+        await p24.waitForTimeout(400);
+        return (await etat(p24)).textes.axeTemps;
+      };
+      const JOUR = /^(dim|lun|mar|mer|jeu|ven|sam)\. \d\d /;
+      // Finie à midi : de 10:00 la veille à 12:00, un minuit au milieu de la vue.
+      const a26 = await vue26(minuitLocal - 12 * 3600e3);
+      check('vue de 26 h : le jour est écrit sur la première graduation et après minuit', JOUR.test(a26[0]) && a26.filter(x => /\. \d\d /.test(x)).length >= 2, a26);
+      // Finie à 23:15 : la vue commence la veille à 21:15, sa première graduation EST minuit.
+      const b26 = await vue26(minuitLocal + 23.25 * 3600e3 - 24 * 3600e3);
+      check(`vue de 26 h finie à 23:15 : la vue passe minuit, la première graduation dit son jour (${b26[0]})`, JOUR.test(b26[0]), b26);
       await p24.evaluate(() => { for (const [id, v] of [['rSeuil', '100'], ['rSaturation', '60']]) { const s = document.getElementById(id); s.value = v; s.dispatchEvent(new Event('input')); } });
       const sat = await p24.evaluate(() => document.getElementById('rSaturationVal').textContent);
       const dec = BM.decoder(101, encodage);
