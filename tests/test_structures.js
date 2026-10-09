@@ -14,6 +14,7 @@
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
 // USAGE   node tests/test_structures.js
 const fs = require('fs'), path = require('path'), http = require('http');
+const { previsionsFixture, estPrevisions } = require('./previsions-fixture');   // scénarios du matin (branche previsions)
 const REPO = path.resolve(__dirname, '..');
 
 let playwright = null;
@@ -102,6 +103,7 @@ async function ouvrir(nav, theme, vue) {
       if (md.micro) md.micro.cvd_24h_usd = (md.micro.cvd_24h_usd || 0) + Math.sin(+anc[1]) * 1e6;
       return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(md) });
     }
+    if (estPrevisions(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: previsionsFixture() });
     if (h === 'raw.githubusercontent.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, u.includes('heatmap') ? 'heatmap.json' : 'market-data.json')) });
     return r.abort();
   });
