@@ -81,7 +81,10 @@ async function ouvrir(nav, vue, options) {
       body: u.includes('heatmap') ? fs.readFileSync(path.join(REPO, 'heatmap.json')) : publication() });
     return r.abort();
   });
-  await page.addInitScript(t => { try { localStorage.clear(); localStorage.setItem('samsara-theme', t); } catch (e) { /* */ } }, THEME);
+  // Mode Expert : ce test mesure les éléments denses (chiffres clés, heure de publication, couche de
+  // chaleur, étiquettes de l'axe…), masqués en Débutant (le mode par défaut) ; leur version Débutant
+  // est vérifiée dans test_debutant_page.js.
+  await page.addInitScript(t => { try { localStorage.clear(); localStorage.setItem('samsara-mode', 'expert'); localStorage.setItem('samsara-theme', t); } catch (e) { /* */ } }, THEME);
   // Observateurs BRANCHÉS (observe sans disconnect) créés par js/structures.js, comptés pour le
   // contrôle du démontage. Les autres ne comptent pas : le verre d'Aero (hyalite) a les siens.
   await page.addInitScript(() => {

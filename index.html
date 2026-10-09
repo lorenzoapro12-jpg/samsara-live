@@ -103,12 +103,12 @@
   <div class="kpis" id="cycle" onclick="toggleFeed()" title="Dernière publication — cliquer pour le détail"></div>
   <div class="header-right">
     <span id="updated"></span>
-    <button class="theme-btn ico-btn" onclick="toggleFeed()" id="feedBtn" title="Marché live (F)" aria-label="Marché live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
-    <button class="theme-btn ico-btn" onclick="openLiveModal()" id="liveBtn" title="Lecture LIVE — Binance, à la seconde" aria-label="Lecture live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></button>
-    <button class="theme-btn ico-btn" onclick="resetView()" title="Réinitialiser le zoom (R)" aria-label="Réinitialiser le zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg></button>
+    <button class="theme-btn ico-btn expert-seul" onclick="toggleFeed()" id="feedBtn" title="Marché live (F)" aria-label="Marché live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
+    <button class="theme-btn ico-btn expert-seul" onclick="openLiveModal()" id="liveBtn" title="Lecture LIVE — Binance, à la seconde" aria-label="Lecture live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></button>
+    <button class="theme-btn ico-btn" onclick="resetView()" id="resetBtn" title="Réinitialiser le zoom (R)" aria-label="Réinitialiser le zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg></button>
     <a class="theme-btn ico-btn" href="bookmap.html" id="carteBtn" title="Carte du carnet (bookmap) — page à côté" aria-label="Carte du carnet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M8 4v16M14 4v16"/></svg></a>
     <button class="theme-btn mode-btn" onclick="basculerMode()" id="modeBtn" title="Niveau de détail : débutant ou expert (M) — les valeurs ne changent pas" aria-pressed="false">Débutant</button>
-    <button class="theme-btn ico-btn" onclick="ouvrirReglages(this)" id="reglagesBtn" title="Réglages d'affichage : bandes, tranches, profondeur, seuils" aria-label="Réglages d'affichage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
+    <button class="theme-btn ico-btn expert-seul" onclick="ouvrirReglages(this)" id="reglagesBtn" title="Réglages d'affichage : bandes, tranches, profondeur, seuils" aria-label="Réglages d'affichage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
     <button class="theme-btn ico-btn" onclick="ouvrirGlossaire(this)" id="legendesBtn" title="Légendes : comment lire chaque indicateur (?)" aria-label="Légendes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></button>
     <span class="refresh-dot" id="dot" title="Flux temps réel actif"></span>
     <button class="theme-btn ico-btn" onclick="ouvrirThemes(event)" id="themeBtn" title="Thème (T : suivant · D : clair / sombre)" aria-label="Choisir le thème" aria-haspopup="menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.7-.8 1.7-1.7 0-.9-.7-1.3-.7-2.2 0-.9.8-1.6 1.7-1.6H17a4 4 0 0 0 4-4C21 6.8 17 3 12 3z"/><circle cx="7.5" cy="11.5" r="1.1"/><circle cx="10" cy="7.3" r="1.1"/><circle cx="14.6" cy="7.3" r="1.1"/></svg></button>
@@ -116,32 +116,32 @@
 </div>
 
 <div class="indicator-bar" id="indicatorBar">
-  <span class="section-title">Overlays</span>
-  <label id="lbl_ema20" onclick="toggleInd('ema20',this)"><span class="ind-label ov">EMA20</span></label>
-  <label id="lbl_ema50" onclick="toggleInd('ema50',this)"><span class="ind-label ov">EMA50</span></label>
-  <label id="lbl_ema100" onclick="toggleInd('ema100',this)"><span class="ind-label ov">EMA100</span></label>
-  <label id="lbl_ema200" onclick="toggleInd('ema200',this)"><span class="ind-label ov">EMA200</span></label>
-  <label id="lbl_sma20" onclick="toggleInd('sma20',this)"><span class="ind-label ov">SMA20</span></label>
-  <label id="lbl_sma50" onclick="toggleInd('sma50',this)"><span class="ind-label ov">SMA50</span></label>
-  <label id="lbl_bb" onclick="toggleInd('bb',this)"><span class="ind-label ov">Bollinger</span></label>
-  <span class="sep"></span>
-  <span class="section-title">Sous-graphes</span>
-  <label id="lbl_vol" class="active" onclick="toggleSub('vol',this)"><span class="ind-label sg">Volume</span></label>
-  <label id="lbl_rsi" onclick="toggleSub('rsi',this)"><span class="ind-label sg">RSI</span></label>
-  <label id="lbl_macd" onclick="toggleSub('macd',this)"><span class="ind-label sg">MACD</span></label>
-  <label id="lbl_stoch" onclick="toggleSub('stoch',this)"><span class="ind-label sg">Stoch</span></label>
-  <label id="lbl_atr" onclick="toggleSub('atr',this)"><span class="ind-label sg">ATR</span></label>
-  <span class="sep"></span>
+  <span class="section-title expert-seul">Overlays</span>
+  <label id="lbl_ema20" class="expert-seul" onclick="toggleInd('ema20',this)"><span class="ind-label ov">EMA20</span></label>
+  <label id="lbl_ema50" class="expert-seul" onclick="toggleInd('ema50',this)"><span class="ind-label ov">EMA50</span></label>
+  <label id="lbl_ema100" class="expert-seul" onclick="toggleInd('ema100',this)"><span class="ind-label ov">EMA100</span></label>
+  <label id="lbl_ema200" class="expert-seul" onclick="toggleInd('ema200',this)"><span class="ind-label ov">EMA200</span></label>
+  <label id="lbl_sma20" class="expert-seul" onclick="toggleInd('sma20',this)"><span class="ind-label ov">SMA20</span></label>
+  <label id="lbl_sma50" class="expert-seul" onclick="toggleInd('sma50',this)"><span class="ind-label ov">SMA50</span></label>
+  <label id="lbl_bb" class="expert-seul" onclick="toggleInd('bb',this)"><span class="ind-label ov">Bollinger</span></label>
+  <span class="sep expert-seul"></span>
+  <span class="section-title expert-seul">Sous-graphes</span>
+  <label id="lbl_vol" class="active expert-seul" onclick="toggleSub('vol',this)"><span class="ind-label sg">Volume</span></label>
+  <label id="lbl_rsi" class="expert-seul" onclick="toggleSub('rsi',this)"><span class="ind-label sg">RSI</span></label>
+  <label id="lbl_macd" class="expert-seul" onclick="toggleSub('macd',this)"><span class="ind-label sg">MACD</span></label>
+  <label id="lbl_stoch" class="expert-seul" onclick="toggleSub('stoch',this)"><span class="ind-label sg">Stoch</span></label>
+  <label id="lbl_atr" class="expert-seul" onclick="toggleSub('atr',this)"><span class="ind-label sg">ATR</span></label>
+  <span class="sep expert-seul"></span>
   <span class="section-title">Intervalle</span>
-  <label id="int_1m" onclick="changeInterval('1m',this)"><span class="ind-label">1m</span></label>
-  <label id="int_5m" onclick="changeInterval('5m',this)"><span class="ind-label">5m</span></label>
-  <label id="int_15m" class="active" onclick="changeInterval('15m',this)"><span class="ind-label">15m</span></label>
-  <label id="int_1h" onclick="changeInterval('1h',this)"><span class="ind-label">1h</span></label>
-  <label id="int_4h" onclick="changeInterval('4h',this)"><span class="ind-label">4h</span></label>
-  <label id="int_1d" onclick="changeInterval('1d',this)"><span class="ind-label">1D</span></label>
+  <label id="int_1m" onclick="changeInterval('1m',this)"><span class="ind-label"><span class="expert-seul">1m</span><span class="debutant-seul">1 min</span></span></label>
+  <label id="int_5m" onclick="changeInterval('5m',this)"><span class="ind-label"><span class="expert-seul">5m</span><span class="debutant-seul">5 min</span></span></label>
+  <label id="int_15m" class="active" onclick="changeInterval('15m',this)"><span class="ind-label"><span class="expert-seul">15m</span><span class="debutant-seul">15 min</span></span></label>
+  <label id="int_1h" onclick="changeInterval('1h',this)"><span class="ind-label"><span class="expert-seul">1h</span><span class="debutant-seul">1 h</span></span></label>
+  <label id="int_4h" onclick="changeInterval('4h',this)"><span class="ind-label"><span class="expert-seul">4h</span><span class="debutant-seul">4 h</span></span></label>
+  <label id="int_1d" onclick="changeInterval('1d',this)"><span class="ind-label"><span class="expert-seul">1D</span><span class="debutant-seul">1 j</span></span></label>
   <span class="sep"></span>
   <div class="ind-dropdown">
-    <button class="ind-dropdown-btn" id="indDropdownBtn" onclick="toggleDropdown(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Indicateurs</button>
+    <button class="ind-dropdown-btn" id="indDropdownBtn" onclick="toggleDropdown(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="expert-seul">Indicateurs</span><span class="debutant-seul">Affichage</span></button>
   </div>
 </div>
 
@@ -158,10 +158,10 @@
 <div class="theme-menu" id="themeMenu" role="menu" aria-label="Thèmes" onclick="event.stopPropagation()"></div>
 
 <div class="main-area">
-<div class="chart-container"><div class="gloss-bubble"></div><div class="lg-ring"></div><div class="lg-ring-cotes"></div><canvas id="chart"></canvas><canvas id="chartCalque" class="calque" aria-hidden="true"></canvas></div>
+<div class="chart-container"><div class="gloss-bubble"></div><div class="lg-ring"></div><div class="lg-ring-cotes"></div><canvas id="chart"></canvas><canvas id="chartCalque" class="calque" aria-hidden="true"></canvas><div id="astuceTap" class="astuce-tap debutant-seul" role="status" hidden></div></div>
 
 <div class="feed-panel collapsed" id="feedPanel">
-  <div class="feed-panel-handle" onclick="toggleFeed()" id="feedHandle">Marché live</div>
+  <div class="feed-panel-handle" onclick="toggleFeed()" id="feedHandle"><span class="expert-seul">Marché live</span><span class="debutant-seul">Infos du marché</span></div>
   <div class="feed-panel-body">
     <div class="feed" id="feed">
       <div class="loading">📊 En attente des données…</div>
@@ -171,7 +171,7 @@
 </div>
 
 <!-- ═══ GRID BOT SECTION — bottom panel under chart ═══ -->
-<div class="strat-section collapsed" id="stratSection">
+<div class="strat-section collapsed expert-seul" id="stratSection">
   <div class="strat-handle" onclick="toggleStratPanel()">
     <span>🤖 Grid Bot</span>
     <span class="strat-handle-arrow">▸</span>
@@ -220,7 +220,7 @@
 <!-- Mobile : modal Marché live -->
 <div id="marketModal" class="modal" style="display:none;z-index:1000">
   <div class="modal-tete">
-    <span class="modal-titre">Marché live</span>
+    <span class="modal-titre expert-seul">Marché live</span><span class="modal-titre debutant-seul">Infos du marché</span>
     <button onclick="closeMarketModal()" class="modal-fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
   <div id="marketModalBody" class="modal-corps">

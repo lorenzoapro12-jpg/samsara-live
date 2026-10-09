@@ -45,7 +45,7 @@ function chargerPage(opts = {}) {
 globalThis.__T__ = {
   get FICHES() { return FICHES; }, get PARAM() { return PARAM; }, get INDICATORS() { return INDICATORS; },
   get REGLAGES() { return REGLAGES; }, set REGLAGES(v) { REGLAGES = v; }, REGLAGES_DEFAUT, lireReglages,
-  ETIQ, subTitle, ficheHtml, lectureCourte, renderFeedTo, renderLive, modeCourant, FICHE_IND,
+  ETIQ, subTitle, ficheHtml, lectureCourte, phraseCarte, renderFeedTo, renderLive, modeCourant, FICHE_IND,
   bandeProfil, mursFusionnes, fusionnerGrille, grilleChaleur, bandeLive, palier, ladderHtml,
   setData(d) { marketData = d; }, el: id => document.getElementById(id),
   get COLORS() { return COLORS; }, FORMES_BOUGIE, BOUGIE_DENSE_PX, CADENCES, ageBannerHtml,

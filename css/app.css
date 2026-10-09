@@ -1064,3 +1064,96 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
 .puce-case input { margin: 0; accent-color: var(--accent); }
 .puce-case.indispo { opacity: 0.45; cursor: not-allowed; }
 @media (max-width: 768px) { .reglages-pop { right: 8px !important; left: 8px !important; top: auto !important; bottom: 8px; width: auto; } }
+
+/* ─── Mode Débutant : l'écran calme ──────────────────────────────────────────────
+   Le HTML est le même dans les deux modes ; ici, seulement ce qui se montre. En Débutant :
+   le prix, sa variation 24 h (durée dite), une pastille « Infos du marché ▸ » à la place des
+   chiffres clés, et les boutons utiles. Sans flou, sans animation infinie. */
+.kpi-deb {
+  flex-shrink: 0; display: inline-flex; align-items: center; padding: 4px 11px; border-radius: 999px;
+  font-size: 11px; font-weight: 650; white-space: nowrap; color: var(--ink-2); background: var(--rail);
+  cursor: pointer;
+}
+.kpi-deb:hover, .kpi-deb:focus-visible { color: var(--ink-1); outline: none; box-shadow: 0 0 0 1px var(--accent); }
+.kpi-deb .deb-retard { display: none; }
+.kpis.vieux .kpi-deb { color: var(--warn-ink); background: var(--warn-soft); }
+.kpis.vieux .kpi-deb .deb-frais { display: none; }
+.kpis.vieux .kpi-deb .deb-retard { display: inline; }
+[data-mode="debutant"] #cycle .kpi, [data-mode="debutant"] #cycle .kpi-age { display: none; }
+[data-mode="debutant"] .header-right > #updated { display: none; }
+/* Les structures déplacent l'heure de publication (en UTC) hors de l'en-tête : en Débutant, son
+   âge est dit par la pastille « Infos du marché » (infobulle) ; l'heure UTC et ses étiquettes
+   restent en Expert. La légende de la Gazette nomme les « bougies » : Expert aussi. */
+[data-mode="debutant"] #updated, [data-mode="debutant"] .f95-pub, [data-mode="debutant"] .gare-heure,
+[data-mode="debutant"] .gazette-edition, [data-mode="debutant"] .gazette-legende { display: none !important; }
+/* Planche (cyanotype, diazo) : les chiffres clés masqués, la case du cartouche garde son fond de
+   case (sinon le trait clair de la grille paraît) et s'étend sous « date de rév. » (heure UTC masquée). */
+:root[data-mode="debutant"] .plan-cartouche > .kpis { grid-column: 1 / -1; display: flex; align-items: center; padding: 4px 9px; background: var(--plan-case); }
+/* Sans les neuf cases, rien ne donne sa largeur au cartouche : les sources la donnent (sur une
+   ligne), et la nomenclature, courte, part de la gauche. */
+:root[data-mode="debutant"] .plan-cartouche > .plan-sources { contain: none; white-space: nowrap; }
+:root[data-mode="debutant"] .plan-pied .indicator-bar > .ind-dropdown { margin-left: 0; }
+[data-mode="debutant"] .gazette-manchette { display: none; }
+/* Le bouton de mode : où il mène (« Débutant · passer en Expert »), plus court sur téléphone. */
+.mode-court { display: none; }
+@media (max-width: 480px) { .mode-long { display: none; } .mode-court { display: inline; } }
+/* Le menu « Affichage » du Débutant : ses deux cases, puis le lien vers l'Expert. */
+.ind-dropdown-menu .menu-expert {
+  display: block; width: calc(100% - 12px); margin: 6px; padding: 6px 10px; text-align: left;
+  font: inherit; font-size: 11.5px; font-weight: 600; color: var(--accent-2);
+  background: var(--rail); border: 1px solid var(--hairline); border-radius: 8px; cursor: pointer;
+}
+.ind-dropdown-menu .menu-expert:hover { border-color: var(--accent); }
+/* L'astuce, une seule fois : en bas du tracé, au-dessus du graphique (pas un texte du canvas). */
+.astuce-tap {
+  position: absolute; z-index: 3; left: 20px; bottom: 60px; padding: 5px 11px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; color: var(--ink-1); background: var(--card-solid, var(--rail));
+  border: 1px solid var(--hairline); box-shadow: var(--capsule-ombre); pointer-events: none;
+  transition: opacity .3s ease;
+}
+.astuce-tap[hidden] { display: none; }
+/* Le prix, sa variation et la pastille d'abord (la pastille ne rétrécit pas : elle n'a qu'un
+   mot) ; les boutons à droite, et à la ligne quand ils ne tiennent plus. La barre d'outils
+   passe aussi à la ligne plutôt que de défiler. */
+[data-mode="debutant"] .kpis { flex: 0 0 auto; order: 2; }
+html[data-mode="debutant"]:not([data-structure="fenetres"]) .header { flex-wrap: wrap; row-gap: 6px; }
+html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { order: 3; margin-left: auto; }
+@media (max-width: 1100px) {
+  html[data-mode="debutant"]:not([data-structure="fenetres"]) .header { column-gap: 8px; }
+  html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { gap: 6px; }
+}
+[data-mode="debutant"] .indicator-bar { flex-wrap: wrap; overflow-x: visible; row-gap: 4px; }
+@media (max-width: 800px) {
+  /* La pastille reste : c'est l'accès aux cartes du Débutant. */
+  [data-mode="debutant"] .kpis { display: flex; }
+}
+@media (max-width: 480px) {
+  /* La variation 24 h répond à « ça monte ou ça baisse ? » : visible aussi sur téléphone. */
+  [data-mode="debutant"] .var24 { display: inline-flex; }
+  /* Structure « fenêtres » (bureau95) : l'en-tête ne passe pas à la ligne (le bouton de mode y
+     recouvrait la variation). Le bloc du prix passe, lui, sur deux rangées : la paire et le prix,
+     puis la variation 24 h en entier ; le bouton de mode reste à droite. */
+  html[data-mode="debutant"][data-structure="fenetres"] .header-left { min-width: 0; }
+  /* Tous thèmes : quand la variation ne tient plus à droite du prix (Gazette à 360 px), elle passe
+     sous lui, entière — jamais coupée au bord de l'écran. */
+  html[data-mode="debutant"] .hero-prix { flex-wrap: wrap; row-gap: 4px; }
+  html[data-mode="debutant"][data-structure="fenetres"] .header-right { flex-shrink: 0; }
+  [data-mode="debutant"] .kpi-deb { padding: 4px 9px; font-size: 10.5px; }
+  html[data-mode="debutant"]:not([data-structure="fenetres"]) .kpis { order: 2; flex: 0 1 auto; }
+  html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { order: 3; flex: 1 1 auto; justify-content: flex-end; gap: 4px; }
+  /* La pastille et les boutons sur la 2e rangée : des boutons un peu plus petits (28 px). */
+  [data-mode="debutant"] .header-right .theme-btn.ico-btn { width: 28px; height: 28px; }
+  /* La barre d'outils sur deux rangées au plus : sans son titre ni ses séparateurs. */
+  [data-mode="debutant"] .indicator-bar .section-title { display: none; }
+  [data-mode="debutant"] .indicator-bar .sep { display: none; }
+}
+@media (max-width: 400px) {
+  [data-mode="debutant"] .kpi-deb { padding: 3px 7px; font-size: 10px; }
+  html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { gap: 3px; }
+  [data-mode="debutant"] .header-right .theme-btn.ico-btn { width: 26px; height: 26px; }
+  [data-mode="debutant"] .mode-btn { padding: 0 6px; font-size: 9.5px; }
+}
+/* Cartes : un bloc réservé à l'Expert est enveloppé sans boîte (même mise en page qu'avant) ;
+   en Débutant, une carte d'une seule tuile la montre en entier. */
+.env-exp { display: contents; }
+[data-mode="debutant"] .tuiles.deb-une { grid-template-columns: minmax(0, 1fr); }

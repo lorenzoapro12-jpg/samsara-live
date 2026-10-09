@@ -145,7 +145,7 @@ const Guide = (function () {
         origine: l.touches + ' sommets ou creux locaux (pivots' + (m.pivot ? ' de ' + m.pivot + ' bougies de chaque côté' : '') + ') regroupés autour de ce prix'
           + (m.bougies ? ', sur les ' + m.bougies + ' dernières bougies ' + itv : ', sur les bougies ' + itv)
           + (fini(m.tolMin) && fini(m.tolMax) ? ' (méthode S/R de la page : tolérance entre ' + nombre(m.tolMin * 100, 1) + ' et ' + nombre(m.tolMax * 100, 1) + ' % du prix, selon l’ATR)' : ' (méthode S/R de la page)'),
-        touches: l.touches, tf: l.tf });
+        touches: l.touches, tf: l.tf, bougies: m.bougies });
     });
   }
   /** market-data.json (BTCUSDT seulement) : le plus gros mur de chaque côté du carnet, et les
@@ -163,7 +163,7 @@ const Guide = (function () {
       if (!murs.length) continue;
       const m = murs.reduce((a, b) => (b[1] > a[1] ? b : a));
       const q = nombre(m[1], m[1] >= 10 ? 0 : 1) + ' BTC';
-      out.push(raison(cle, m[0] + bin / 2, { nom, court, art, mot, nature: 'mesuré', lu: tMurs, btc: m[1],
+      out.push(raison(cle, m[0] + bin / 2, { nom, court, art, mot, nature: 'mesuré', lu: tMurs, btc: m[1], bin,
         detail: q + ' · lu à ' + heureUTC(tMurs), detailCourt: q + ' · ' + heureUTC(tMurs),
         origine: 'la tranche de ' + bin + ' $ où le plus de BTC étaient posés ' + (cote === 'bid_walls' ? 'à l’achat' : 'à la vente') + ' (' + q + ') dans le carnet Binance, lue à ' + heureUTC(tMurs) + ' UTC : une photo publiée ; le carnet a pu changer depuis, un ordre posé peut être retiré' }));
     }
@@ -837,8 +837,341 @@ const Guide = (function () {
    *  qui tient dans ses lignes (pour TOUS les prix « en test » possibles). */
   const VARIANTES_LECTURE = [{}, { court: true }, { court: true, compact: true }, { court: true, compact: true, sansForme: true }];
 
+  // ─── 7. Mode Débutant : l'écran calme ─────────────────────────────────────
+  // Le Débutant voit le prix, UNE phrase, un repère au-dessus, un au-dessous, le scénario 1 : le
+  // détail est dans la bulle (survol, toucher). Mêmes valeurs que l'Expert, d'autres mots ; aucun
+  // nom d'indicateur, aucune heure UTC, aucun pourcentage dans la phrase. Chaque texte d'étiquette
+  // rend la PREMIÈRE variante qui tient en caractères (max) ET en pixels (mesure(t) ≤ maxPx).
+  const OPTIONS_CLES = ['put_wall', 'call_wall', 'zero_gamma'];
+  const estOption = r => OPTIONS_CLES.includes(r.cle);
+  const optionsSeules = niv => !!niv && niv.raisons.length > 0 && niv.raisons.every(estOption);
+  /** [nom, mot (étroit), avec article] : les mots de l'écran Débutant (aucun mot technique). */
+  /** [nom, mot (étroit), avec article, mini (≤ 8 : téléphone avec flèche)] : les mots de l'écran
+   *  Débutant (aucun mot technique). Une zone où le prix a fait demi-tour se dit « zone de
+   *  retour » : elle peut être au-dessus ou au-dessous du prix (« rebond » ferait lire un plancher). */
+  const NOMS_DEBUTANT = {
+    hier_haut: ['Haut d’hier', 'Haut hier', 'le plus haut d’hier', 'Max hier'],
+    hier_bas: ['Bas d’hier', 'Bas hier', 'le plus bas d’hier', 'Min hier'],
+    h24_haut: ['Haut des 24 h', 'Haut 24 h', 'le plus haut des 24 h', 'Max 24 h'],
+    h24_bas: ['Bas des 24 h', 'Bas 24 h', 'le plus bas des 24 h', 'Min 24 h'],
+    sem_haut: ['Haut sem. passée', 'Haut sem.', 'le plus haut de la semaine dernière', 'Max sem.'],
+    sem_bas: ['Bas sem. passée', 'Bas sem.', 'le plus bas de la semaine dernière', 'Min sem.'],
+    sr: ['Zone de retour', 'Demi-tour', 'une zone de retour', 'Retour'],
+    mur_achat: ['Mur d’achat', 'Mur achat', 'le mur d’achat', 'Achats'],
+    mur_vente: ['Mur de vente', 'Mur vente', 'le mur de vente', 'Ventes'],
+    options: ['Repère d’options', 'Options', 'un repère d’options', 'Options'],
+  };
+
+  const nomsDebutant = r => NOMS_DEBUTANT[estOption(r) ? 'options' : r.cle] || [r.nom, r.mot || r.nom, r.art || minuscule(r.nom), r.mot || r.nom];
+  // À égalité de prix : hier, semaine, 24 h, mur, zone de retour, options.
+  const rangRaison = r => { const k = ['hier_', 'sem_', 'h24_', 'mur_', 'sr'].findIndex(p => r.cle.indexOf(p) === 0); return k < 0 ? 9 : k; };
+  /** La raison qui NOMME une bande à l'écran : celle dont le prix est le prix de la bande (le prix
+   *  réel le plus proche du prix de référence), jamais une option si la bande a une autre raison. */
+  function raisonPrincipale(niv) {
+    if (niv && niv.principale) return niv.principale;   // un repère du Débutant (reperesDe) : sa raison
+    const R = (niv && niv.raisons) || [], hors = R.filter(r => !estOption(r)), C = hors.length ? hors : R;
+    return C.slice().sort((a, b) => Math.abs(a.p - niv.p) - Math.abs(b.p - niv.p) || rangRaison(a) - rangRaison(b))[0] || null;
+  }
+  /** Les deux bandes de l'écran Débutant : la plus proche de chaque côté, sauf une bande faite
+   *  seulement d'options quand ce côté en a une autre (une estimation ne passe pas devant une mesure). */
+  function choixDebutant(choix) {
+    const un = L => (L || []).find(n => !optionsSeules(n)) || (L || [])[0] || null;
+    return { dessus: choix ? un(choix.dessus) : null, dessous: choix ? un(choix.dessous) : null };
+  }
+  /** Les REPÈRES du Débutant : un par prix nommé des bandes de l'Expert (deux raisons au même prix
+   *  n'en font qu'un). Une bande de l'Expert réunit des prix proches (fusion) ; le Débutant, lui,
+   *  montre UN prix de chaque côté du prix live : chaque repère est donc le prix d'une raison réelle,
+   *  sa bande à lui (± demi), et garde sa bande d'origine (bande) pour la bulle. Les valeurs sont
+   *  celles de l'Expert : rien n'est recalculé, sauf l'état fermé de la petite bande (app.js). */
+  function reperesDe(choix, demi) {
+    const out = [];
+    for (const niv of choix ? choix.dessus.concat(choix.dessous) : []) {
+      for (const r of niv.raisons) {
+        if (!fini(r.p)) continue;
+        const deja = out.find(x => x.p === r.p);
+        if (deja) { if (!deja.raisons.includes(r)) deja.raisons.push(r); continue; }
+        out.push({ raisons: [r], p: r.p, pMin: r.p, pMax: r.p, bande: niv });
+      }
+    }
+    for (const x of out) {
+      const hors = x.raisons.filter(r => !estOption(r)), C = hors.length ? hors : x.raisons;
+      x.principale = C.slice().sort((a, b) => rangRaison(a) - rangRaison(b))[0];
+      x.raisons.sort((a, b) => (a === x.principale ? -1 : b === x.principale ? 1 : 0));
+      x.demi = fini(demi) ? demi : (x.bande.demi || 0);
+      x.lo = x.p - x.demi; x.hi = x.p + x.demi;
+      let lu = -Infinity;
+      for (const r of x.raisons) if (fini(r.lu) && r.lu > lu) lu = r.lu;
+      if (lu > -Infinity) x.lu = lu;
+    }
+    return out.sort((a, b) => a.p - b.p);
+  }
+  /** Les deux repères à l'écran, au prix LIVE : de chaque côté, le plus proche STRICTEMENT au-dessus
+   *  et au-dessous (une bande de l'Expert qui enjambe le prix donne un repère à chaque côté) ; un
+   *  repère fait seulement d'options ne passe qu'à défaut d'une mesure du même côté ; un mur d'achat
+   *  n'est jamais « au-dessus », un mur de vente jamais « au-dessous » (même règle que les bandes).
+   *  Deux repères distincts : s'ils sont à moins de `ecart` l'un de l'autre, le plus proche du prix
+   *  reste et l'autre côté passe au suivant (à au moins `ecart` de lui). Les suivants (au-delà de
+   *  chacun, à au moins `ecart`) disent le chemin « si le prix finit au-delà ».
+   *  → { dessus, dessous, suivantHaut, suivantBas } (copies portant `dessus`), null d'un côté vide. */
+  function choisirReperes(reps, prix, ecart) {
+    const vide = { dessus: null, dessous: null, suivantHaut: null, suivantBas: null };
+    if (!fini(prix) || !reps || !reps.length) return vide;
+    const e = fini(ecart) && ecart > 0 ? ecart : 0;
+    const que = x => x.raisons.every(r => r.cle === x.raisons[0].cle) ? x.raisons[0].cle : null;
+    const H = reps.filter(x => x.p > prix && que(x) !== 'mur_achat').sort((a, b) => a.p - b.p);
+    const B = reps.filter(x => x.p < prix && que(x) !== 'mur_vente').sort((a, b) => b.p - a.p);
+    const mesure = L => { const m = L.filter(x => !optionsSeules(x)); return m.length ? m : L; };
+    const Hm = mesure(H), Bm = mesure(B);
+    let h = Hm[0] || null, b = Bm[0] || null;
+    if (h && b && h.p - b.p < e) {
+      if (h.p - prix <= prix - b.p) b = Bm.find(x => h.p - x.p >= e) || b;
+      else h = Hm.find(x => x.p - b.p >= e) || h;
+    }
+    const sh = h ? Hm.find(x => x.p - h.p >= e && x !== h) || null : null;
+    const sb = b ? Bm.find(x => b.p - x.p >= e && x !== b) || null : null;
+    const cote = (x, d) => (x ? Object.assign({}, x, { dessus: d }) : null);
+    return { dessus: cote(h, true), dessous: cote(b, false), suivantHaut: cote(sh, true), suivantBas: cote(sb, false) };
+  }
+  const tient = (t, max, mesure, maxPx) => (!(max > 0) || t.length <= max) && (typeof mesure !== 'function' || !(maxPx > 0) || mesure(t) <= maxPx);
+  /** La première variante qui tient ; sinon la dernière (la plus courte). */
+  function premiere(V, max, mesure, maxPx) { for (const t of V) if (tient(t, max, mesure, maxPx)) return t; return V[V.length - 1]; }
+  /** Les FORMATS d'un libellé de repère, du plus riche au plus court ; tous gardent le prix ET son
+   *  unité : 0 « Mur de vente · 82 610 $ », 1 « Mur vente · 82 610 $ », 2 « Mur vente 82 610 $ »,
+   *  3 « Ventes 82 610 $ », 4 « 82 610 $ ». Une flèche (bande hors de la vue) précède, collée dans
+   *  les formats sans « · ». Les formats 0 et 1 ont le séparateur « · », les autres non : l'écran
+   *  choisit un même style pour ses deux libellés (app.js). */
+  const AVEC_POINT = k => k < 2;
+  function libellesDebutant(niv, o) {
+    const q = o || {}, r = raisonPrincipale(niv);
+    if (!r) return [];
+    const [nom, mot, , mini] = nomsDebutant(r), p = prixR(r, q.unite), f = q.fleche || '';
+    const fs = f ? f + ' ' : '';
+    return [fs + nom + ' · ' + p, fs + mot + ' · ' + p, f + mot + ' ' + p, f + mini + ' ' + p, f + (f ? ' ' : '') + p];
+  }
+  /** Le premier format qui tient (caractères, pixels) : son indice. */
+  function formatDebutant(V, o) {
+    const q = o || {};
+    for (let k = 0; k < V.length; k++) if (tient(V[k], q.max, q.mesure, q.maxPx)) return k;
+    return V.length - 1;
+  }
+  /** Le libellé d'un repère (le premier format qui tient). o = { max, unite, fleche ('↑' | '↓' :
+   *  bande hors de la vue), mesure, maxPx }. */
+  function libelleDebutant(niv, o) {
+    const V = libellesDebutant(niv, o);
+    return V.length ? V[formatDebutant(V, o)] : '';
+  }
+  /** Le nom entier d'une raison, en mots du Débutant (« Mur de vente »). */
+  const nomDebutant = r => nomsDebutant(r)[0];
+  /** Son nom dans une phrase, sans article : « plus haut d’hier », « mur de vente ». */
+  const nomPhrase = r => nomsDebutant(r)[2].replace(/^(?:le|la|les|une?) /, '');
+  /** Le titre de la bulle d'un repère : son nom entier et son prix. */
+  function titreDebutant(niv, unite) {
+    const r = raisonPrincipale(niv);
+    return r ? nomsDebutant(r)[0] + ' · ' + prixR(r, unite) : '';
+  }
+  /** Le début de la phrase, selon l'intervalle affiché : le verbe décrit CETTE durée, pas 24 h. */
+  const HORIZON_DEBUTANT = { '1m': 'Ces dernières minutes', '5m': 'Depuis une heure environ', '15m': 'Ces dernières heures', '1h': 'Depuis hier', '4h': 'Ces derniers jours', '1d': 'Ces dernières semaines' };
+  /** Une bougie, dite en mots : [singulier, pluriel (2), démonstratif, pluriel sans nombre]. */
+  const PERIODE_DEBUTANT = {
+    '1m': ['une minute', '2 minutes', 'cette minute', 'minutes'],
+    '5m': ['une tranche de 5 min', '2 tranches de 5 min', 'cette tranche de 5 min', 'tranches de 5 min'],
+    '15m': ['un quart d’heure', '2 quarts d’heure', 'ce quart d’heure', 'quarts d’heure'],
+    '1h': ['une heure', '2 heures', 'cette heure', 'heures'],
+    '4h': ['une tranche de 4 h', '2 tranches de 4 h', 'cette tranche de 4 h', 'tranches de 4 h'],
+    '1d': ['une journée', '2 journées', 'cette journée', 'journées'],
+  };
+  const periode = itv => PERIODE_DEBUTANT[itv] || ['une période', '2 périodes', 'cette période', 'périodes'];
+  /** « 5 derniers jours », « 18 dernières heures », « 45 dernières minutes » (s en secondes). */
+  function dernieres(s) {
+    if (!fini(s) || s <= 0) return null;
+    if (s >= 2 * 86400) return Math.round(s / 86400) + ' derniers jours';
+    if (s >= 2 * 3600) return Math.round(s / 3600) + ' dernières heures';
+    return Math.max(2, Math.round(s / 60)) + ' dernières minutes';
+  }
+  /** « environ 3 h 30 », « environ 5 jours » (s en secondes). */
+  function environ(s) {
+    if (!fini(s) || s <= 0) return null;
+    if (s >= 2 * 86400) return 'environ ' + Math.round(s / 86400) + ' jours';
+    if (s >= 3600) { const h = Math.floor(s / 3600), m = Math.round((s - h * 3600) / 1800) * 30; return 'environ ' + h + ' h' + (m === 60 ? '' : m ? ' ' + m : ''); }
+    return 'environ ' + Math.round(s / 60) + ' min';
+  }
+  let FMT_PARIS = null;
+  try { FMT_PARIS = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }); } catch (e) { FMT_PARIS = null; }
+  /** « 07h33 » (heure de Paris), null si le fuseau est inconnu du navigateur. */
+  function heureParis(ms) {
+    if (!fini(ms) || !FMT_PARIS) return null;
+    const p = {};
+    for (const x of FMT_PARIS.formatToParts(new Date(ms))) p[x.type] = x.value;
+    return p.hour + 'h' + p.minute;
+  }
+  /** L'âge d'un chiffre publié, en mots : « il y a 4 min (07h33, heure de Paris) » ; sans
+   *  `maintenant`, l'heure de Paris seule. */
+  function ageDebutant(lu, maintenant, sansHeure) {
+    if (!fini(lu)) return '';
+    const hp = heureParis(lu), m = fini(maintenant) ? Math.max(0, Math.round((maintenant - lu) / 60000)) : null;
+    const age = m === null ? null : m < 90 ? m + ' min' : Math.round(m / 60) + ' h';
+    if (age === null) return hp ? 'à ' + hp + ' (heure de Paris)' : '';
+    return 'il y a ' + age + (hp && !sansHeure ? ' (' + hp + ', heure de Paris)' : '');
+  }
+  // Un écart en dollars se lit à l'unité près (« 84 $ », pas « 83,57 $ ») dès 10 $.
+  const prixRond = (v, unite) => (Math.abs(v) >= ((unite || '$') === '$' ? 10 : 100) ? nombre(Math.round(Math.abs(v)), 0) + ' ' + (unite || '$') : prix(Math.abs(v), unite));
+  /** La phrase de lecture, ses variantes de la plus riche à la plus courte (la dernière est la
+   *  forme COMPACTE). o = { prix (live), unite, choix, enTest (bande où est le prix, ou null),
+   *  regime, maintenant (la vue montre le passé), itv (« 15m ») }. Jamais de %, d'heure, ni de nom
+   *  d'indicateur : le verbe vient du régime (le même objet que le badge Expert). */
+  const VERBE_DEBUTANT = { hausse: 'monte', baisse: 'baisse', faible: 'hésite', sans: 'hésite', incertaine: 's’agite' };
+  function phrasesDebutant(o) {
+    if (!fini(o.prix)) return ['Prix en direct indisponible pour l’instant.'];
+    const u = o.unite, ch = o.reperes || choixDebutant(o.choix), rA = ch.dessus && raisonPrincipale(ch.dessus), rB = ch.dessous && raisonPrincipale(ch.dessous);
+    const A = rA && prixR(rA, u), B = rB && prixR(rB, u), Bc = rB && chiffresR(rB);
+    const H = HORIZON_DEBUTANT[o.itv] || null, cle = o.regime ? o.regime.cle : 'inconnu';
+    const avecH = s => (H ? [H + ', ' + minuscule(s)] : []).concat([s]);
+    let V, compacte;
+    const enTest = o.enTest && raisonPrincipale(o.enTest);
+    const casseSous = ch.dessus && ch.dessus.ferme && ch.dessus.ferme.cassure === 'valide' && ch.dessus.ferme.sens < 0;
+    const casseSur = ch.dessous && ch.dessous.ferme && ch.dessous.ferme.cassure === 'valide' && ch.dessous.ferme.sens > 0;
+    if (enTest) {
+      const N = nomsDebutant(enTest)[2], P = prixR(enTest, u), sens = VERBE_DEBUTANT[cle] || null;
+      // Le verbe du mouvement passe avant le nom du repère : sur téléphone (48 caractères),
+      // « Le prix monte et touche 82 710 $. » plutôt que « Le prix touche le mur de vente (…) ».
+      V = (sens ? avecH('Le prix ' + sens + ' et touche ' + N + ' (' + P + ').').concat(['Le prix ' + sens + ' et touche ' + P + '.']) : [])
+        .concat(['Le prix touche ' + N + ' (' + P + ').', 'Le prix touche le repère ' + P + '.']);
+      compacte = 'Le prix touche ' + P + '.';
+    } else if (casseSur || casseSous) {
+      V = [casseSur ? 'Le prix est passé au-dessus de ' + B + '.' : 'Le prix est passé sous ' + A + '.'];
+      compacte = V[0];
+    } else if (cle === 'hausse') {
+      V = A ? avecH('Le prix monte. Repère au-dessus : ' + A + '.') : avecH('Le prix monte. Aucun repère proche au-dessus.').concat(['Le prix monte.']);
+      compacte = A ? 'Le prix monte. Au-dessus : ' + A + '.' : 'Le prix monte.';
+    } else if (cle === 'baisse') {
+      V = B ? avecH('Le prix baisse. Repère en dessous : ' + B + '.') : avecH('Le prix baisse. Aucun repère proche en dessous.').concat(['Le prix baisse.']);
+      compacte = B ? 'Le prix baisse. En dessous : ' + B + '.' : 'Le prix baisse.';
+    } else if (cle === 'inconnu') {
+      if (A && B) { V = ['Le prix est entre ' + B + ' et ' + A + '.', 'Le prix est entre ' + Bc + ' et ' + A + '.']; compacte = V[1]; }
+      else if (A) { V = ['Le prix est sous ' + A + '. Aucun repère proche en dessous.', 'Le prix est sous ' + A + '.']; compacte = V[1]; }
+      else if (B) { V = ['Le prix est au-dessus de ' + B + '. Aucun repère proche au-dessus.', 'Le prix est au-dessus de ' + B + '.']; compacte = V[1]; }
+      else { V = ['Le prix est sans repère proche.']; compacte = V[0]; }
+    } else {
+      // faible, sans tendance : « hésite » ; tendance de sens incertain : « s'agite » (il bouge fort).
+      const verbe = cle === 'incertaine' ? 's’agite' : 'hésite';
+      if (A && B) { V = avecH('Le prix ' + verbe + ' entre ' + B + ' et ' + A + '.').concat(['Le prix ' + verbe + ' entre ' + Bc + ' et ' + A + '.']); compacte = 'Le prix ' + verbe + ' : ' + Bc + ' – ' + A + '.'; }
+      else if (A) { V = avecH('Le prix ' + verbe + ' sous ' + A + '. Aucun repère proche en dessous.').concat(['Le prix ' + verbe + ' sous ' + A + '.']); compacte = V[V.length - 1]; }
+      else if (B) { V = avecH('Le prix ' + verbe + ' au-dessus de ' + B + '. Aucun repère proche au-dessus.').concat(['Le prix ' + verbe + ' au-dessus de ' + B + '.']); compacte = V[V.length - 1]; }
+      else { V = avecH('Le prix ' + verbe + ' : aucun repère proche.'); compacte = V[V.length - 1]; }
+    }
+    // Vue dans le passé : « Maintenant, … » (sans l'horizon, qui parlerait d'une autre durée), s'il tient.
+    if (o.maintenant) { const sansH = V.filter(v => !H || v.indexOf(H) !== 0); V = ['Maintenant, ' + minuscule(sansH[0])].concat(sansH); }
+    return V.concat([compacte]);
+  }
+  /** La phrase qui tient (caractères et pixels) ; à défaut, la forme compacte. */
+  function phraseDebutant(o, max, mesure, maxPx) {
+    const V = phrasesDebutant(o);
+    for (const t of V) if (tient(t, max, mesure, maxPx)) return t;
+    return V[V.length - 1];
+  }
+  /** Un chemin « Et ensuite ? » en une phrase : « Si le prix finit un quart d'heure au-dessus de
+   *  82 827 $ (zone de retour), le repère suivant est 83 105 $ (haut d'hier). » Un chiffre
+   *  publié dit son âge. ch null : le côté sans repère proche, dit. */
+  function texteSuiteDebutant(ch, unite, itv, sens, maintenant) {
+    const up = ch ? ch.sens > 0 : sens > 0, per = periode(itv);
+    if (!ch) return 'Aucun repère proche ' + (up ? 'au-dessus' : 'en dessous') + ' : pas de suite à décrire de ce côté.';
+    const rx = ch.rx || bord(ch.seuil, up), ry = ch.ry || (ch.cible ? bord(ch.cible, !up) : null);
+    const de = r => ' (' + nomPhrase(r) + (fini(r.lu) ? ', relevé ' + ageDebutant(r.lu, maintenant, true) : '') + ')';
+    return 'Si le prix finit ' + per[0] + (up ? ' au-dessus de ' : ' sous ') + prixR(rx, unite) + de(rx) + ', '
+      + (ry ? 'le repère suivant est ' + prixR(ry, unite) + de(ry) + '.' : 'aucun autre repère n’est proche de ce côté.');
+  }
+  /** L'état d'un repère au prix live, en mots (bulle). */
+  const ETATS_DEBUTANT = {
+    loin: () => 'loin du prix', proche: () => 'proche du prix', test: () => 'le prix est dedans',
+    meche: () => 'le prix l’a traversé un instant, puis il est revenu', mecheCours: () => 'le prix le traverse en ce moment',
+    franchi: p => 'le prix est au-delà ; à confirmer quand ' + p[2] + ' se termine',
+    demi: p => 'franchi une fois ; ' + p[0] + ' de plus au-delà le confirmerait',
+    demiRetour: () => 'franchi, puis le prix est revenu dans la bande',
+    valide: p => 'franchi et confirmé (' + p[1] + ' finis au-delà)',
+    valideRetour: () => 'franchi, revenu le toucher, puis reparti : confirmé',
+  };
+  /** « Maintenant : proche du prix, 264 $ au-dessus (0,32 %). » e : etatLive ; live : le prix. */
+  function texteEtatDebutant(e, niv, live, unite, itv) {
+    if (!e || e.mot === null || !fini(live) || !niv) return 'Maintenant : prix en direct indisponible, distance inconnue.';
+    const f = ETATS_DEBUTANT[e.mot], d = niv.p - live;
+    const dist = e.mot === 'test' ? '' : ', ' + prixRond(d, unite) + (d > 0 ? ' au-dessus' : ' en dessous') + (fini(e.dist) ? ' (' + nombre(Math.abs(e.dist), 2) + ' %)' : '');
+    return 'Maintenant : ' + (f ? f(periode(itv)) : e.mot) + dist + '.';
+  }
+  /** L'origine d'une raison en mots simples, pour la bulle d'un repère. pasS : la durée d'une
+   *  bougie (s), pour dire la fenêtre des zones de rebonds en jours ou en heures. */
+  function origineDebutant(r, unite, maintenant, pasS) {
+    const n = nomsDebutant(r)[0] + ' (' + prixR(r, unite) + ') : ';
+    const age = fini(r.lu) ? ', relevée ' + ageDebutant(r.lu, maintenant) : '';
+    if (estOption(r)) return n + 'une estimation, tirée des contrats d’options de la plateforme Deribit (des contrats sur le prix futur du BTC)' + age + '. Pas une mesure : un calcul sur ces contrats.';
+    switch (r.cle) {
+      case 'hier_haut': return n + 'le prix le plus haut atteint hier, sur ce graphique.';
+      case 'hier_bas': return n + 'le prix le plus bas atteint hier, sur ce graphique.';
+      case 'sem_haut': return n + 'le prix le plus haut de la semaine dernière.';
+      case 'sem_bas': return n + 'le prix le plus bas de la semaine dernière.';
+      case 'h24_haut': return n + 'le prix le plus haut des dernières 24 heures.';
+      case 'h24_bas': return n + 'le prix le plus bas des dernières 24 heures.';
+      case 'sr': { const d = fini(r.bougies) && fini(pasS) ? dernieres(r.bougies * pasS) : null; return n + (r.touches || '') + ' fois, le prix a fait demi-tour autour de ce prix' + (d ? ' sur les ' + d + ' de ce graphique' : '') + '.'; }
+      case 'mur_achat': case 'mur_vente': {
+        const q = fini(r.btc) ? ' (' + nombre(r.btc, r.btc >= 10 ? 0 : 1) + ' BTC)' : '';
+        return n + (fini(r.bin) && r.bin > 0 ? 'la tranche de ' + nombre(r.bin, 0) + ' $' : 'le prix') + ' où le plus de BTC attendaient ' + (r.cle === 'mur_achat' ? 'à l’achat' : 'à la vente') + q
+          + ' parmi les ordres en attente de Binance' + age + '. Ces ordres peuvent avoir bougé depuis.';
+      }
+      default: return n + minuscule(r.nom) + '.';
+    }
+  }
+  /** Le libellé d'une forme en Débutant (au plus 24 caractères) : seulement confirmée ou invalidée. */
+  const NOM_FORME_DEBUTANT = { double_sommet: 'Double sommet', double_creux: 'Double creux', range: 'Rectangle', triangle: 'Triangle' };
+  function libelleFormeDebutant(f) {
+    const e = etatForme(f), nom = NOM_FORME_DEBUTANT[f.type];
+    if (!nom) return null;
+    if (e.cle === 'confirme') return estDouble(f) ? nom + ' confirmé' : 'Sortie du ' + minuscule(nom) + (f.sens > 0 ? ' ↑' : ' ↓');
+    if (e.cle === 'invalide') return nom + ' invalidé';
+    return null;
+  }
+  const DEFINITION_FORME = {
+    double_sommet: 'Double sommet : le prix a buté deux fois sur le même plafond, puis il est passé sous le creux entre les deux.',
+    double_creux: 'Double creux : le prix a buté deux fois sur le même plancher, puis il est passé au-dessus du sommet entre les deux.',
+    range: 'Rectangle : le prix a fait des allers-retours entre un plafond et un plancher, puis il en est sorti.',
+    triangle: 'Triangle : les allers-retours du prix se sont resserrés, puis il en est sorti.',
+  };
+  /** La bulle d'une forme en Débutant : la définition d'abord, puis le prix visé TOUJOURS avec son
+   *  bilan mesuré (jamais seul : seul, il se lirait comme une promesse), puis l'avertissement.
+   *  ctx = { duree (s) de l'historique }. */
+  function texteFormeDebutant(f, b, ctx, P, unite) {
+    const e = etatForme(f), out = [];
+    out.push(DEFINITION_FORME[f.type].replace(/\.$/, '') + (e.cle === 'invalide' ? ', puis le prix est revenu : la figure ne tient plus.' : '.'));
+    if (b) {
+      const T = b.temoin || { departs: 0, atteints: 0 }, finis = b.atteints + b.invalides + b.expires;
+      const d = dernieres(ctx && ctx.duree);
+      let t = 'Mesuré sur les ' + (d || 'données') + ' de ce graphique : ' + b.formes + (b.formes > 1 ? ' figures' : ' figure') + ' de ce type, ' + b.confirmes + (b.confirmes > 1 ? ' confirmées' : ' confirmée');
+      t += finis ? ', cible atteinte ' + b.atteints + ' fois sur ' + finis + '.' : ', aucune n’est encore allée au bout.';
+      if (T.departs) t += ' Pour comparer, sans figure, un trajet de même taille : ' + nombre(T.atteints, 0) + ' fois sur ' + nombre(T.departs, 0) + '.';
+      if (b.confirmes < P.echantillonFaible) t += ' Trop peu de cas pour en tirer une règle.';
+      if (e.cle === 'confirme' && finis && fini(f.objectif)) t = 'En théorie, cette figure vise ' + prix(f.objectif, unite) + '. ' + t;
+      out.push(t);
+    }
+    out.push('Une lecture débattue, pas une prévision ni un conseil.');
+    return out;
+  }
+  /** Les mots qui n'ont pas leur place sur l'écran Débutant (noms d'indicateurs, jargon, heures UTC,
+   *  intervalles abrégés). Partagée avec les tests et js/scenarios.js. */
+  const MOTS_BANNIS_DEBUTANT = [
+    /\b(?:ADX|EMA|SMA|ATR|RSI|MACD|VWAP|GEX|CVD|OI|SAR|POC|OBV|MFI|CCI|VIX|DXY)\b/, /[+−-]?\bDI\b/, /\bUTC\b/, /\b[RS][1-4]\b/, /\b\d+[mhd]\b/,
+    /bollinger/i, /\bstoch\w*/i, /gamma/i, /γ/, /Σ/, /\bbid\b/i, /\bask\b/i, /\bdelta\b/i, /\bfunding\b/i, /open interest/i, /\btaker\b/i,
+    /\bL\/S\b/i, /\bratio\b/i, /\bpivots?\b/i, /\bS\/R\b/i, /\bcalls?\b/i, /\bputs?\b/i, /\bstrikes?\b/i, /liquidité/i, /\bcarnet\b/i, /convention/i,
+    /\bmodèles?\b/i, /percentile/i, /\bbougies?\b/i, /\bclôtur\w*/i, /\bmèches?\b/i, /\brange\b/i, /ichimoku/i, /\bfibo\w*/i, /oscillateur\w*/i,
+    /chartisme/i, /volatilité/i,
+  ];
+  /** Les mots bannis trouvés dans t (liste vide : rien à redire). */
+  const motsBannis = t => MOTS_BANNIS_DEBUTANT.filter(re => re.test(String(t))).map(re => (String(t).match(re) || [''])[0]);
+  /** Un terme permis dans une bulle Débutant seulement avec son explication, dans la même bulle. */
+  const EXPLIQUES_DEBUTANT = { 'repère d’options': 'une estimation, tirée des contrats d’options de la plateforme Deribit' };
+
   return { pctParam, nombre, prix, chiffres, pct, nomIntervalle, duree, heureUTC, niveauxDuJour, niveauxSR, niveauxPublies, choisirNiveaux, libelleNiveau,
     prixR, tagLu, artLu, quoi, bord, etatFerme, etatLive, texteEtatLive, texteEtatMax, MOTS, centile, regime, texteRegime, pivots, regression,
-    detecter, bilan, formesAffichees, etatForme, NOMS_FORMES, texteBilan, suite, texteSuite, VARIANTES_SUITE, tagMicro, deArt, decrire, decrireCompact, lecture, VARIANTES_LECTURE, phraseForme, TYPES, bornes };
+    detecter, bilan, formesAffichees, etatForme, NOMS_FORMES, texteBilan, suite, texteSuite, VARIANTES_SUITE, tagMicro, deArt, decrire, decrireCompact, lecture, VARIANTES_LECTURE, phraseForme, TYPES, bornes,
+    NOMS_DEBUTANT, raisonPrincipale, choixDebutant, reperesDe, choisirReperes, VERBE_DEBUTANT, optionsSeules, libelleDebutant, libellesDebutant, formatDebutant, AVEC_POINT, titreDebutant, nomDebutant, nomPhrase, HORIZON_DEBUTANT, PERIODE_DEBUTANT, phrasesDebutant, phraseDebutant,
+    texteSuiteDebutant, prixRond, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureParis, dernieres, environ, libelleFormeDebutant, texteFormeDebutant,
+    MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;

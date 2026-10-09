@@ -85,6 +85,9 @@ node test_live.js || ko=1
 etape "5b. Carte (bookmap) : fusion, décodage, exécutions, isolement — hors ligne"
 node test_bookmap.js || ko=1
 
+etape "5b1. Carte (bookmap) : liste des mots interdits à l'écran débutant — se contrôle elle-même"
+node mots_debutant.js || ko=1
+
 etape "5b2. Carte (bookmap) : le Guide — murs en mots, résumé, journal, zones, mots interdits — hors ligne"
 node test_guide_carte.js || ko=1
 
@@ -123,6 +126,9 @@ node test_guide_page.js || ko=1
 
 etape "9b''. Scénarios du matin dans Chromium : encadré, libellé du rang 1, survol et tap, fichier d'attente, fichier absent, masquage (non exécuté sans Playwright)"
 node test_scenarios_page.js || ko=1
+
+etape "9b‴. Débutant à l'écran dans Chromium : au plus 5 textes, phrase et repères aux mêmes prix, bulles au survol et au toucher, cartes et menu sans jargon, 11 thèmes (non exécuté sans Playwright)"
+node test_debutant_page.js || ko=1
 
 etape "9c. Sobriété dans Chromium : éclair, horloge, onde, calque, verre, chargement, chaleur (non exécuté sans Playwright)"
 node test_sobriete.js || ko=1
