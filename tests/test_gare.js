@@ -20,6 +20,7 @@
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
 // USAGE   node tests/test_gare.js
 const fs = require('fs'), path = require('path'), http = require('http');
+const { previsionsFixture, estPrevisions } = require('./previsions-fixture');   // scénarios du matin (branche previsions)
 const REPO = path.resolve(__dirname, '..');
 const THEME = 'gare';
 
@@ -75,6 +76,7 @@ async function ouvrir(nav, vue, options) {
     const u = r.request().url(), h = new URL(u).host, cors = { 'access-control-allow-origin': '*' };
     if (h.startsWith('127.0.0.1')) return r.continue();
     if (h === 'api.binance.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(binance(u)) });
+    if (estPrevisions(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: previsionsFixture() });
     if (h === 'raw.githubusercontent.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors,
       body: u.includes('heatmap') ? fs.readFileSync(path.join(REPO, 'heatmap.json')) : publication() });
     return r.abort();

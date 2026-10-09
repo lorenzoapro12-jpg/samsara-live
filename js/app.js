@@ -345,11 +345,15 @@ let rsDragStartEnd = 0;
 let crossX = null, crossY = null;  // coordonnées canvas du curseur
 
 // ============ INDICATOR STATE ============
-const overlays = { ema20: false, ema50: false, ema100: false, ema200: false, sma20: false, sma50: false, bb: false, vwap: false, ichimoku: false, sar: false, sr: false, fib: false, vp: false, liq: false, guide: guideMemorise() };
+const overlays = { ema20: false, ema50: false, ema100: false, ema200: false, sma20: false, sma50: false, bb: false, vwap: false, ichimoku: false, sar: false, sr: false, fib: false, vp: false, liq: false, guide: guideMemorise(), scenarios: scenariosMemorise() };
 // Le Guide (niveaux nommés, régime, formes, suite, lecture) est affiché par défaut ; le choix de
 // le masquer est gardé d'une visite à l'autre (navigation privée : affiché).
 function guideMemorise() { try { return localStorage.getItem('samsara-guide-v1') !== '0'; } catch (e) { return true; } }
 function guideNoter(on) { try { localStorage.setItem('samsara-guide-v1', on ? '1' : '0'); } catch (e) { /* navigation privée */ } }
+// Les scénarios du matin (previsions.json) : affichés par défaut, indépendants du Guide ; le choix
+// de les masquer est gardé de la même façon (clé samsara-scenarios-v1).
+function scenariosMemorise() { try { return localStorage.getItem('samsara-scenarios-v1') !== '0'; } catch (e) { return true; } }
+function scenariosNoter(on) { try { localStorage.setItem('samsara-scenarios-v1', on ? '1' : '0'); } catch (e) { /* navigation privée */ } }
 const activeSubs = { vol: true, rsi: false, macd: false, stoch: false, atr: false, obv: false, mfi: false, williamsR: false, cci: false, adx: false, ao: false, equity: false };
 const subHeights = { vol: 110, rsi: 120, macd: 120, stoch: 120, atr: 110, obv: 110, mfi: 120, williamsR: 120, cci: 120, adx: 120, ao: 110, equity: 140 };
 
@@ -406,6 +410,29 @@ const PARAM = {
     // quittée à droite (un glissement ne fait pas sauter la largeur des bougies).
     futur: 0.18, futurMinPx: 56, futurMaxPx: 250, futurMaxFraction: 0.4,
   },
+  // Scénarios du matin (js/scenarios.js) : les nombres de leur dessin et de leurs mots.
+  scenarios: {
+    point: '07h00',               // le nom du point du matin (heure de Paris de la routine)
+    echantillonFaible: 20,        // « échantillon faible » sous 20 matins notés (bilan de l'ordre)
+    // L'encadré : en haut à droite du tracé, au plus `boiteMax` px de large et `boiteFraction` du
+    // tracé (téléphone : `boiteFractionEtroit`) ; jamais au-delà de la moitié haute du tracé.
+    boiteMax: 440, boiteFraction: 0.46, boiteFractionEtroit: 0.94,
+    // Échelle de prix : la vue s'élargit pour montrer la 1re zone et l'invalidation du rang 1
+    // (et les bornes d'un range de rang 1), d'au plus `echelleMax` fois l'amplitude des bougies
+    // visibles de chaque côté ; seulement quand la vue montre des bougies depuis le point, et sur
+    // un tracé d'au moins `echelleLargeurMin` px (téléphone : l'échelle reste celle des bougies,
+    // un niveau hors de la vue est nommé au bord avec sa flèche).
+    echelleMax: 0.6, echelleLargeurMin: 520,
+    // Tracé « étroit » (téléphone) sous `etroit` px : libellés plus larges, encadré plus large.
+    etroit: 520,
+    // Suivi en direct : seulement sur des bougies d'au plus `suiviPasMax` s (1 h). Une bougie de
+    // 4 h ou d'un jour couvre une trop grande part de la fenêtre (≈ 24 h) pour dire un ordre.
+    suiviPasMax: 3600,
+    // Couleurs des rangs : prises parmi les jetons du thème, à au moins `ecartCouleur` (distance
+    // RVB) de la hausse, de la baisse, de la couleur du Guide et du fond — une couleur de rang ne
+    // doit jamais se lire comme une direction.
+    ecartCouleur: 90,
+  },
 };
 const periodeDe = cle => +String(cle).replace(/\D/g, '');     // 'ema20' -> 20
 const ETIQ = {
@@ -427,6 +454,7 @@ const INDICATORS = [
   // sans faire défiler le menu.
   { cat: 'Guide', items: [
     { key: 'guide', label: 'Guide : niveaux nommés, régime, formes, suite', tag: 'gd' },
+    { key: 'scenarios', label: 'Scénarios du matin de Claude, une IA (' + PARAM.scenarios.point + ' Paris, BTC)', tag: 'gd' },
   ]},
   { cat: 'Overlays', items: [
     ...['ema20', 'ema50', 'ema100', 'ema200', 'sma20', 'sma50'].map(k => ({ key: k, label: k.slice(0, 3).toUpperCase() + ' ' + periodeDe(k), tag: 'ov' })),
@@ -463,6 +491,7 @@ function toggleAny(key) {
     overlays[key] = !overlays[key];
     if (key === 'liq') toggleDepth(overlays.liq);
     if (key === 'guide') guideNoter(overlays.guide);
+    if (key === 'scenarios') { scenariosNoter(overlays.scenarios); if (overlays.scenarios) fetchPrevisions(); }
     // S/R : dessiner tout de suite, puis redessiner quand les TF de reference sont arrives.
     if (key === 'sr' && overlays.sr) { drawChart(); refreshRefSR().then(drawChart); }
     else drawChart();
@@ -475,7 +504,7 @@ function toggleAny(key) {
 
 // Indicateur du menu -> sa fiche de lecture (js/fiches.js).
 const FICHE_IND = { ema20: 'ema', ema50: 'ema', ema100: 'ema', ema200: 'ema', sma20: 'ema', sma50: 'ema', bb: 'bb', vwap: 'vwap',
-  vol: 'volume', rsi: 'rsi', macd: 'macd', stoch: 'stoch', atr: 'atr', adx: 'adx', sr: 'sr', guide: 'guide' };
+  vol: 'volume', rsi: 'rsi', macd: 'macd', stoch: 'stoch', atr: 'atr', adx: 'adx', sr: 'sr', guide: 'guide', scenarios: 'scenarios' };
 function buildDropdown() {
   const menu = document.getElementById('indMenu');
   let html = '';
@@ -537,6 +566,8 @@ async function changeInterval(interval, label) {
   chartInterval = interval;
   priceScale = 1.0; pricePan = 0;
   await afficherSerie();
+  // Les scénarios du matin, s'ils n'ont pas été relus depuis une cadence (BTCUSDT seulement).
+  if (activeSymbol === 'BTCUSDT' && (!previsions || Horloges.maintenant() - previsions.luA > CADENCES.previsions_lue)) fetchPrevisions();
 }
 
 const NOMS_PAIRES = { BTCUSDT: 'BTC/USDT', SOLUSDT: 'SOL/USDT', XRPUSDT: 'XRP/USDT', TAOUSDT: 'TAO/USDT', BTCSOL: 'BTC/SOL' };
@@ -561,6 +592,8 @@ async function changeSymbol(symbol, label) {
   livePrice = null; fetchPrice();
   priceScale = 1.0; pricePan = 0;
   await afficherSerie();
+  // Retour sur BTCUSDT : les scénarios du matin, s'ils n'ont pas été relus depuis une cadence.
+  if (symbol === 'BTCUSDT' && (!previsions || Horloges.maintenant() - previsions.luA > CADENCES.previsions_lue)) fetchPrevisions();
 }
 
 // Changer d'intervalle ou de paire. Avant : le cache était EFFACÉ puis trois pages de 1000
@@ -1619,6 +1652,46 @@ function toggleDepth(on) {
   else { clearInterval(depthTimer); depthTimer = null; }
 }
 
+// ============ SCÉNARIOS DU MATIN : previsions.json (branche `previsions`) ============
+// Publié par la routine du matin (format « previsions-1 », js/scenarios.js le lit). Lu sur GitHub
+// Raw comme les autres fichiers publiés : sans paramètre d'URL, en revalidation (`no-cache`, 304
+// tant qu'il n'a pas changé) — le CDN ignore un `?t=` (mesuré : voir fetchMarket). Au démarrage
+// APRÈS le premier dessin (hors du chemin critique : le script de tête ne le précharge pas), puis
+// toutes les CADENCES.previsions_lue, onglet visible, BTCUSDT seulement, couche affichée.
+// Le même contenu relu ne redessine rien. Panne, 404, JSON ou format illisibles : la couche le dit
+// en une ligne discrète ; le dernier fichier lisible, s'il y en a un, reste affiché.
+const PREVISIONS_URL = 'https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/previsions/previsions.json';
+let previsions = null;        // Scenarios.lire(…) + { texte, luA } : le dernier fichier LISIBLE
+let previsionsEchec = null;   // { a (ms), raison } : la dernière lecture ratée (null après un succès)
+let previsionsN = 0;          // numéro du fichier lisible (clé des suivis mémorisés)
+let previsionsEnVol = null;
+function fetchPrevisions() {
+  if (activeSymbol !== 'BTCUSDT' || !overlays.scenarios || typeof Scenarios === 'undefined') return Promise.resolve(false);
+  if (previsionsEnVol) return previsionsEnVol;
+  previsionsEnVol = (async () => {
+    const a = Horloges.maintenant();
+    let F = null, texte = null, raison = null;
+    try {
+      const r = Horloges.verifier(await fetch(PREVISIONS_URL, { cache: 'no-cache' }));
+      texte = await r.text();
+      // Même contenu, dernière lecture réussie : rien à refaire, rien à redessiner.
+      if (previsions && texte === previsions.texte && !previsionsEchec) { previsions.luA = a; return false; }
+      let d = null;
+      try { d = JSON.parse(texte); } catch (e) { raison = 'JSON illisible'; }
+      if (!raison) { F = Scenarios.lire(d, a); if (F.etat === 'illisible') { raison = F.raison; F = null; } }
+    } catch (e) { raison = e && e.status ? 'HTTP ' + e.status : 'réseau'; }
+    if (F) {
+      const meme = previsions && previsions.texte === texte;
+      F.texte = texte; F.luA = a;
+      if (!meme) previsionsN++;
+      previsions = F; previsionsEchec = null;
+    } else previsionsEchec = { a, raison };
+    if (activeSymbol === 'BTCUSDT' && overlays.scenarios) scheduleDraw();
+    return true;
+  })().finally(() => { previsionsEnVol = null; });
+  return previsionsEnVol;
+}
+
 // ============ INDICATEURS ============
 function calcEMA(data, period) {
   const k = 2 / (period + 1);
@@ -2564,6 +2637,7 @@ function lireJetons() {
   COLORS.upInk = v('--up-ink', up); COLORS.downInk = v('--down-ink', down);
   COLORS.surUp = v('--up-sur', '#ffffff'); COLORS.surDown = v('--down-sur', '#ffffff');
   COLORS.accent2 = v('--accent-2', '#4f5fe0');
+  COLORS.accent = v('--accent', '#0b84b0');   // scénarios du matin : le rang 1
   COLORS.surface = v('--chart-surface', '#f4f6fe');
   COLORS.grid = v('--grille', COLORS.grid);
   COLORS.hairline = v('--hairline', 'rgba(127,127,127,0.18)');
@@ -2572,6 +2646,7 @@ function lireJetons() {
   COLORS.warn = v('--warn', '#f0a50b');
   COLORS.sess = [v('--sess-asie', 'rgba(255,152,0,0.75)'), v('--sess-europe', 'rgba(33,150,243,0.75)'), v('--sess-us', 'rgba(156,39,176,0.75)')];
   COLORS.sr = [v('--sr-1', '#ce93d8'), v('--sr-2', '#26c6da'), v('--sr-3', '#ffc107')];
+  COLORS.scen = scenPalette();
   COLORS.fib = v('--fib', '#f0a50b'); COLORS.vp = v('--vp', '#64b4ff'); COLORS.vpPoc = v('--vp-poc', '#ffc828');
   COLORS.grid_tp = avecAlpha(COLORS.sr[2], 0.6);
   COLORS.filigrane = num('--filigrane', 0.05);
@@ -2642,7 +2717,7 @@ function drawChart() {
   const H = canvas.height / window.devicePixelRatio;
   // Palette : jetons du thème, lus UNE fois (lireJetons) — pas un getComputedStyle par image.
   if (!jetonsLus) { lireJetons(); jetonsLus = true; }
-  geo = null; geoPrix = null; guideEtat = null;
+  geo = null; geoPrix = null; guideEtat = null; scenEtat = null;
   
   ctx.clearRect(0, 0, W, H);
   if (candles.length < 2) {
@@ -2795,6 +2870,8 @@ function dessinerCalque() {
   }
   // Guide : état de chaque niveau au prix LIVE, lecture du moment (relus, pas recalculés).
   if (guideEtat) guideCalque();
+  // Scénarios du matin : l'encadré (relu, pas recalculé).
+  if (scenEtat) scenCalque();
   if (crossX === null || crossY === null) return;
   // x → indice : le pas des bougies (pasBougie), et la bougie dont le CRÉNEAU contient le
   // curseur [x, x + pas[ — l'arrondi d'avant désignait la voisine sur la moitié droite du créneau.
@@ -2845,8 +2922,9 @@ function dessinerCalque() {
       cx.restore();
       bulleOHLCV = { x: tX, y: tY, w: 135, h: 72 };
     }
-    // Guide : ce que désigne le curseur (bande, forme, chemin, régime), expliqué sur le calque.
-    if (guideEtat) guideSurvol(W, mainH, bulleOHLCV);
+    // Guide et scénarios : ce que désigne le curseur (bande, forme, chemin, régime, zone,
+    // encadré), expliqué sur le calque.
+    if (guideEtat || scenEtat) guideSurvol(W, mainH, bulleOHLCV);
   }
   // --- Réticule des sous-graphes : une verticale à travers eux, la valeur de chacun ---
   if (crossY > mainH && idx >= 0 && idx < n) {
@@ -3011,7 +3089,8 @@ let scaleSeq = 0, lastScale = null;
 // vue collée à la fin) — un glissement d'une bougie change le pas de 1/n au plus, jamais d'un
 // coup ; au-delà, marge nulle (une marge vide après le passé se lirait comme un trou).
 function margeFutur(pw, n) {
-  if (!overlays.guide || candles.length < 2 * PARAM.guide.atrPeriode + 2) return 0;
+  // Les scénarios du matin dessinent aussi leurs flèches dans cette marge (Guide masqué compris).
+  if (!(overlays.guide || scenFleches()) || candles.length < 2 * PARAM.guide.atrPeriode + 2) return 0;
   const g = PARAM.guide;
   const M = Math.min(pw * g.futurMaxFraction, Math.max(g.futurMinPx, Math.min(g.futurMaxPx, pw * g.futur)));
   const k = Math.max(0, candles.length - viewEnd);
@@ -3037,6 +3116,14 @@ function priceWindow(vs, ve) {
     maxP = Math.min(maxP, rawMax + maxExt);
     minP = Math.max(minP, rawMin - maxExt);
   }
+  // Scénarios du matin : la 1re zone et l'invalidation du rang 1 entrent dans l'échelle, bornées
+  // à PARAM.scenarios.echelleMax fois l'amplitude des bougies visibles de chaque côté.
+  const ext = scenEchelle(vs, ve);
+  if (ext) {
+    const maxExt = naturalRange * PARAM.scenarios.echelleMax;
+    maxP = Math.max(maxP, Math.min(ext[1], rawMax + maxExt));
+    minP = Math.min(minP, Math.max(ext[0], rawMin - maxExt));
+  }
   // Échelle verticale manuelle (molette / glisser sur l'axe)
   const midP = (maxP + minP) / 2, halfRange = ((maxP - minP) / 2) * priceScale;
   minP = midP - halfRange + pricePan * naturalRange;
@@ -3051,6 +3138,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
   const pw = W - pad.left - pad.right;
   const ph = chartH - pad.top - pad.bottom;
   if (ph < 30) return;
+  scenLargeur = pw;
 
   // Viewport
   const vs = Math.max(0, viewStart);
@@ -3364,6 +3452,11 @@ function resolveChart(candles, padL, padR, chartH, W) {
   // Guide : bandes des niveaux nommés, SOUS les bougies (le reste du Guide est tracé après elles).
   const guide = overlays.guide ? guidePreparer({ pad, pw, ph, W, minP, maxP, range, vs, ve, gap, candleW, n: visible.length }) : null;
   guideEtat = guide;
+  // Scénarios du matin : leurs zones aussi sous les bougies ; leurs étiquettes partagent la liste
+  // des places du Guide (posées APRÈS les libellés du Guide).
+  const scen = scenPreparer({ pad, pw, ph, W, minP, maxP, range, vs, ve, gap, candleW, n: visible.length }, guide);
+  scenEtat = scen;
+  if (scen) scenBandes(scen);
   if (guide) guideBandes(guide);
 
   // Candles
@@ -3417,7 +3510,11 @@ function resolveChart(candles, padL, padR, chartH, W) {
   }
   
   // Guide : formes, chemins conditionnels, libellés (au-dessus des bougies et de la chaleur).
+  // Les scénarios du matin ensuite : ils prennent la place que le Guide laisse.
+  // Le libellé du rang 1 d'abord (il passe devant les libellés des niveaux du Guide).
+  if (scen) scenAvantGuide(scen);
   if (guide) guideTracer(guide);
+  if (scen) scenTracer(scen);
 
   // Time labels (X axis) — densité ET format déduits de la largeur réellement
   // disponible. Avec 6 libellés fixes, sur téléphone (299 px de tracé) ils se
@@ -3653,7 +3750,7 @@ function guideLignes(g, texte, w, max) {
   const mots = [];
   for (const m of String(texte).split(' ')) {
     const k = mots.length - 1;
-    if (k >= 0 && /\d$/.test(mots[k]) && /^(\d{3}(?:\D|$)|\$|%|SOL\b|min\b|h\b|j\b|jours?\b|semaines?\b)/.test(m)) mots[k] += ' ' + m;
+    if (k >= 0 && /\d$/.test(mots[k]) && /^(\d{3}(?:\D|$)|\$|%|SOL\b|UTC\b|min\b|h\b|j\b|jours?\b|semaines?\b)/.test(m)) mots[k] += ' ' + m;
     else mots.push(m);
   }
   const out = [];
@@ -4241,47 +4338,804 @@ function guideCalque() {
 /** Survol : la cible du Guide sous le curseur — son étiquette, sa bande, ou à quelques pixels
  *  de son tracé ; jamais la zone des bougies entière (l'infobulle OHLCV y reste seule). */
 function guideSurvol(W, mainH, evite) {
-  const E = guideEtat;
-  if (E) E.survol = null;
-  if (!E || !overlays.guide || crossX === null || crossY === null || crossY > mainH) return;
+  const E = guideEtat && overlays.guide ? guideEtat : null, Sc = scenEtat;
+  if (guideEtat) guideEtat.survol = null;
+  if (Sc) { Sc.survol = null; Sc.bulle = null; }
+  if (!(E || Sc) || crossX === null || crossY === null || crossY > mainH) return;
   const dansR = q => (q.rects || []).some(r => crossX >= r.x0 && crossX <= r.x1 && crossY >= r.y0 && crossY <= r.y1);
   const surS = q => (q.segs || []).some(s => guideDistSeg(crossX, crossY, s) <= 6);
   const surZ = q => (q.zones || []).some(r => crossX >= r.x0 && crossX <= r.x1 && crossY >= r.y0 && crossY <= r.y1);
-  // Une étiquette d'abord, puis un tracé (forme, chemin), puis une bande.
+  // Une étiquette d'abord, puis un tracé (forme, chemin, flèche), puis une bande ou une zone.
+  // Les cibles du Guide et des scénarios du matin : une seule liste, une seule bulle.
   let c = null, rang = Infinity;
-  for (const q of E.cibles) {
+  for (const q of (E ? E.cibles : []).concat(Sc ? Sc.cibles : [])) {
     const r = dansR(q) ? q.prio : surS(q) ? 10 + q.prio : surZ(q) ? 20 + q.prio : Infinity;
     if (r < rang) { rang = r; c = q; }
   }
   if (!c) return;
-  E.survol = c;                      // ce que la bulle explique (relu par les tests)
+  if (Sc && Sc.cibles.includes(c)) Sc.survol = c; else E.survol = c;   // ce que la bulle explique (relu par les tests)
   const texte = c.texte.slice();
   if (c.niveau && c.niveau.live) texte.unshift('Maintenant : ' + Guide.texteEtatLive(c.niveau.live, 'debutant') + '.');
-  if (c.niveaux) for (const L of c.niveaux.slice().reverse()) if (L.live) texte.unshift(Guide.libelleNiveau(L.niv, 'debutant', E.unite, true) + ' — maintenant : ' + Guide.texteEtatLive(L.live, 'debutant') + '.');
+  if (c.niveaux) for (const L of c.niveaux.slice().reverse()) if (L.live) texte.unshift(Guide.libelleNiveau(L.niv, 'debutant', guideUnite(), true) + ' — maintenant : ' + Guide.texteEtatLive(L.live, 'debutant') + '.');
   const bw = Math.min(330, W - 32);
   cx.save();
   cx.font = chartFont(10, 700);
   const tl = guideLignes(cx, c.titre, bw - 20, 2);
   cx.font = chartFont(9.5, 500);
-  const corps = [];
-  for (const t of texte) corps.push(...guideLignes(cx, t, bw - 20), '');
-  corps.pop();
-  const bh = tl.length * 14 + corps.length * 12.5 + 16;
+  // La bulle tient TOUJOURS dans le tracé (téléphone : un tracé de 380 px) : sinon la version courte
+  // de l'explication (texteCourt), puis les paragraphes du début, un renvoi à la fiche et le
+  // dernier paragraphe (« pas une recommandation ») — jamais une phrase coupée au bord de l'écran.
+  // Entre deux paragraphes, une ligne vide ; serrée (5 px) quand la place manque.
+  let sep = 12.5;
+  const hMax = mainH - 8, hL = l => (l === '' ? sep : 12.5);
+  const hDe = ls => tl.length * 14 + ls.reduce((a, l) => a + hL(l), 0) + 16;
+  const decouper = ts => { const out = []; for (const t of ts) out.push(guideLignes(cx, t, bw - 20)); return out; };
+  const aplatir = ps => { const out = []; ps.forEach((p, k) => { if (k) out.push(''); out.push(...p); }); return out; };
+  // Ordre : l'explication entière, puis serrée ; puis la version courte, puis serrée ; enfin coupée.
+  let paras = decouper(texte);
+  if (hDe(aplatir(paras)) > hMax) sep = 5;
+  if (hDe(aplatir(paras)) > hMax && c.texteCourt) { paras = decouper(c.texteCourt); sep = 12.5; if (hDe(aplatir(paras)) > hMax) sep = 5; }
+  if (hDe(aplatir(paras)) > hMax) {
+    const dernier = /recommandation/.test(paras[paras.length - 1].join(' ')) ? paras[paras.length - 1] : null;
+    const suite = guideLignes(cx, '… (suite : fiche dans les Légendes, bouton ?)', bw - 20);
+    const garde = [];
+    for (const p of dernier ? paras.slice(0, -1) : paras) {
+      if (hDe(aplatir(garde.concat([p], [suite], dernier ? [dernier] : []))) > hMax) break;
+      garde.push(p);
+    }
+    paras = garde.concat([suite], dernier ? [dernier] : []);
+    // Encore trop haut (titre long, écran minuscule) : le renvoi part, « pas une recommandation » reste.
+    while (paras.length > 1 && hDe(aplatir(paras)) > hMax) paras.shift();
+  }
+  const corps = aplatir(paras);
+  const bh = Math.min(hDe(corps), Math.max(hMax, 40));
   // Sous le curseur, et sous l'infobulle OHLCV si elle est là ; au-dessus quand la place manque.
   let bx = crossX + 16, by = Math.max(crossY + 18, evite ? evite.y + evite.h + 6 : 0);
   if (bx + bw > W - 75) bx = Math.max(16, crossX - bw - 16);
   if (by + bh > mainH - 4) by = Math.max(4, Math.min(crossY, evite ? evite.y : crossY) - bh - 8);
+  by = Math.max(4, Math.min(by, mainH - 4 - bh));
+  if (Sc && Sc.survol === c) Sc.bulle = { x: bx, y: by, w: bw, h: bh, corps: corps.slice() };
   // Fond du tracé d'abord : une bulle translucide laisserait lire la lecture et les étiquettes à travers.
   cx.fillStyle = COLORS.surface;
   cx.shadowColor = 'rgba(16,35,61,0.18)'; cx.shadowBlur = 14; cx.shadowOffsetY = 4;
   cx.beginPath(); cx.roundRect(bx, by, bw, bh, 8); cx.fill();
   cx.shadowColor = 'transparent'; cx.shadowBlur = 0; cx.shadowOffsetY = 0;
   cx.fillStyle = COLORS.bulle; cx.fill();
-  cx.fillStyle = COLORS.accent2; cx.fillRect(bx + 5, by + 8, 3, bh - 16);
+  cx.fillStyle = c.coul || COLORS.accent2; cx.fillRect(bx + 5, by + 8, 3, bh - 16);
   cx.fillStyle = COLORS.ink1; cx.font = chartFont(10, 700);
   tl.forEach((l, k) => cx.fillText(l, bx + 14, by + 16 + k * 14));
   cx.font = chartFont(9.5, 500); cx.fillStyle = COLORS.text;
-  corps.forEach((l, k) => { if (l) cx.fillText(l, bx + 14, by + 16 + tl.length * 14 + 2 + k * 12.5); });
+  let yl = by + 16 + tl.length * 14 + 2;
+  for (const l of corps) { if (l) cx.fillText(l, bx + 14, yl); yl += hL(l); }
+  cx.restore();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCÉNARIOS DU MATIN — le dessin (le cœur pur est js/scenarios.js ; ses nombres, PARAM.scenarios)
+// ─────────────────────────────────────────────────────────────────────────────
+// Sur le GRAPHIQUE (redessiné quand la donnée, la vue ou le fichier change) : les zones de chaque
+// scénario (bandes translucides du point jusqu'au bord droit, invalidation hachurée, range en
+// boîte), le trait du point et celui de la fin, les flèches et les repères numérotés dans la marge
+// de futur, les libellés. Sur le CALQUE : l'encadré (mis en page ici, relu chaque seconde) et
+// l'explication au survol (guideSurvol). Le suivi en direct est un AFFICHAGE : mémorisé sur les
+// bougies CLOSES (SCEN_SUIVI), la bougie en cours s'y ajoute ; la note officielle est celle du
+// journal. Rien ici ne tourne sur une minuterie ; le survol ne redessine pas le graphique.
+let scenEtat = null;
+let scenLargeur = Infinity;            // largeur du tracé de la dernière image (échelle des scénarios)
+const SCEN_SUIVI = new Map();          // (fichier, scénario, intervalle, bougies closes) → pli du suivi
+/** Les scénarios à dessiner MAINTENANT (couche affichée, BTCUSDT, fichier lisible ; la semaine d'un
+ *  matin passé disparaît une fois finie, même si le fichier n'a pas changé), ou null. */
+function scenDessinables() {
+  if (!overlays.scenarios || activeSymbol !== 'BTCUSDT' || !previsions || previsions.etat !== 'ok') return null;
+  const L = Scenarios.vivants(previsions, Horloges.maintenant());
+  return L.length ? L : null;
+}
+/** Au moins un scénario dessinera-t-il une flèche dans la marge de futur (chemin ouvert, rangs 1 à
+ *  3, suivi possible sur ces bougies) ? Sinon, sans le Guide, pas de marge : vide, elle se lirait
+ *  comme un trou. Mémorisé sur (fichier, intervalle, dernière bougie, minute). */
+let scenFlechesMemo = null;
+function scenFleches() {
+  const L = scenDessinables();
+  if (!L || candles.length < 2) return false;
+  const now = Horloges.maintenant(), d = candles[candles.length - 1];
+  const cle = previsionsN + '|' + chartInterval + '|' + candles.length + '|' + candles[0].time + '|' + d.time + '|' + d.high + '|' + d.low + '|' + Math.floor(now / 60000);
+  if (scenFlechesMemo && scenFlechesMemo.cle === cle) return scenFlechesMemo.val;
+  const val = L.some(s => {
+    if (s.forme !== 'chemin' || s.rang === 'S') return false;
+    const sv = scenSuivi(s);
+    return Scenarios.ouvert(s, sv, now) && !(sv && (sv.cle === 'large' || sv.cle === 'incomplet'));
+  });
+  scenFlechesMemo = { cle, val };
+  return val;
+}
+/** Les couleurs des rangs 1 et 2 (lireJetons, jamais par image) : parmi les jetons du thème, la
+ *  première assez loin de la hausse, de la baisse, de la couleur du Guide (accent-2) et du fond —
+ *  une couleur de rang ne se lit pas comme une direction. Rangs 3 et semaine : l'encre pâle. */
+function scenPalette() {
+  const d = (a, b) => { const x = rvb(a), y = rvb(b); return x && y ? Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]) : 999; };
+  const E = PARAM.scenarios.ecartCouleur, eviter = [COLORS.candleUp, COLORS.candleDown, COLORS.accent2, COLORS.surface];
+  const cands = [COLORS.accent, COLORS.sr[0], COLORS.sr[1], COLORS.warn, COLORS.sr[2], COLORS.fib, COLORS.vp];
+  const ok = (c, autres, e) => eviter.concat(autres).every(x => d(c, x) >= (e || E));
+  const un = cands.find(c => ok(c, [])) || COLORS.accent;
+  // Le rang 2 : loin de tout, sinon (thèmes à peu de couleurs) à mi-distance au moins.
+  const deux = cands.find(c => c !== un && ok(c, [un])) || cands.find(c => c !== un && ok(c, [un], E / 2)) || COLORS.ink1;
+  return [un, deux];
+}
+const scenCouleur = rang => (rang === '1' ? (COLORS.scen || [COLORS.accent])[0] : rang === '2' ? (COLORS.scen || [0, COLORS.ink1])[1] : COLORS.ink3);
+/** L'échelle de prix : [bas, haut] de la 1re zone et de l'invalidation du rang 1 (bornes d'un range),
+ *  quand la vue montre des bougies depuis le point et avant sa fin, et seulement tant que le rang 1
+ *  est OUVERT (un rang 1 invalidé, réalisé ou noté n'écrase plus les bougies) ; sinon null. */
+function scenEchelle(vs, ve) {
+  const L = scenDessinables();
+  if (!L || !(PARAM.scenarios.echelleMax > 0) || scenLargeur < PARAM.scenarios.echelleLargeurMin || !candles[ve - 1] || !candles[vs]) return null;
+  const s = L.find(x => x.rang === '1');
+  if (!s || candles[ve - 1].time * 1000 < s.emis || candles[vs].time * 1000 >= s.fin) return null;
+  if (!Scenarios.ouvert(s, scenSuivi(s), Horloges.maintenant())) return null;
+  const z = s.forme === 'range' ? [s.zones.bas, s.zones.haut] : [s.zones.cibles[0][0], s.zones.cibles[0][1]].concat(s.zones.inv || []);
+  return [Math.min(...z), Math.max(...z)];
+}
+/** Le suivi en direct d'un scénario sur les bougies de l'intervalle affiché : le pli des bougies
+ *  CLOSES est mémorisé, la bougie en cours s'y ajoute (une copie). → Scenarios.etat(…).
+ *  Seules comptent les bougies ENTIÈRES dans la fenêtre ; au-delà d'une heure, pas d'état. */
+function scenSuivi(S) {
+  const n = candles.length;
+  if (n < 2) return null;
+  const pasMs = (candles[1].time - candles[0].time) * 1000, maintenant = Horloges.maintenant();
+  if (pasMs > PARAM.scenarios.suiviPasMax * 1000) return Scenarios.etatLarge(S, pasMs, maintenant);
+  const K = cols(), nF = n - 1;
+  // L'historique chargé ne remonte pas jusqu'au point (1 min : 3000 bougies = 50 h ; ou la seule
+  // première page pendant le chargement) : rien n'est affirmé, l'état dit « incomplet ».
+  if (Scenarios.manque(S, K.time[0] * 1000, pasMs)) return Scenarios.etatIncomplet(S, pasMs, maintenant, K.time[0] * 1000);
+  const cle = previsionsN + '|' + S.id + '|' + activeSymbol + '|' + chartInterval + '|' + K.time[0] + '|' + K.time[nF - 1] + '|' + nF;
+  let e = SCEN_SUIVI.get(cle);
+  if (!e) {
+    if (SCEN_SUIVI.size > 32) SCEN_SUIVI.clear();
+    e = Scenarios.plier(S, K.time, K.high, K.low, 0, nF, null, pasMs);
+    SCEN_SUIVI.set(cle, e);
+  }
+  const c = candles[n - 1], tc = c.time * 1000;
+  const e2 = Scenarios.compte(S, tc, pasMs) ? Scenarios.pas(S, Scenarios.copie(e), n - 1, tc, c.high, c.low) : e;
+  return Scenarios.etat(S, e2, maintenant);
+}
+/** Prépare ce que les scénarios posent sur le graphique (géométrie de resolveChart) → scenEtat.
+ *  guide : l'état du Guide (ses places réservées sont partagées), ou null. */
+function scenPreparer(g, guide) {
+  if (!overlays.scenarios || activeSymbol !== 'BTCUSDT' || typeof Scenarios === 'undefined' || !(previsions || previsionsEchec)) return null;
+  const mode = guideMode(), exp = mode === 'expert', L = scenDessinables(), F = L ? previsions : null;
+  const pasS = geoPrix && geoPrix.pas > 0 ? geoPrix.pas : 900, t0 = candles[g.vs].time;
+  const yDe = p => g.pad.top + g.ph * (1 - (p - g.minP) / g.range);
+  const xDeT = ms => g.pad.left + (ms / 1000 - t0) / pasS * g.gap;
+  const xFin = g.pad.left + g.gap * g.n, xMax = g.W - g.pad.right, finVue = g.ve === candles.length;
+  let rects = guide ? guide.rects : null;
+  if (!rects) {
+    // Sans le Guide : les badges S/R et le texte du repère de publication gardent leur place.
+    rects = srBadges.slice();
+    const rep = geoPrix && reperePublication(geoPrix);
+    if (rep) { ctx.font = chartFont(9, 650); const lw = ctx.measureText(rep.texte).width; rects.push({ x: texteRepere(rep, geoPrix, lw) - 2, y: g.pad.top + g.ph - 22, w: lw + 4, h: 14 }); }
+    // La ligne de la vue et sa pastille de variation (en haut à gauche, drawChart) : sous le
+    // Guide, ses rangées les écartent ; sans lui, le tracé commence juste dessous.
+    rects.push({ x: 0, y: 0, w: 240, h: 36 });
+  }
+  const maintenant = Horloges.maintenant();
+  const S = { g, F, mode, exp, yDe, xDeT, xFin, xMax, finVue, marge: finVue ? xMax - xFin : 0, itv: Guide.nomIntervalle(chartInterval), rects,
+    items: [], cibles: [], boite: null, survol: null, maintenant, unPose: null, propres: [], libelles: [], obstSegs: [], segsPris: [] };
+  if (F) for (const sc of L) {
+    const sv = scenSuivi(sc);
+    S.items.push({ sc, sv, et: Scenarios.texteEtat(sc, sv, F.statuts, mode, { itv: S.itv, maintenant }), coul: scenCouleur(sc.rang), ouvert: Scenarios.ouvert(sc, sv, maintenant) });
+  }
+  return S;
+}
+/** Une zone d'invalidation : hachures fines dans [x0, x1] × [y0, y1]. */
+function scenHachures(x0, y0, x1, y1, coul) {
+  if (!(x1 > x0 && y1 > y0)) return;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
+  ctx.strokeStyle = coul; ctx.lineWidth = 1; ctx.setLineDash([]);
+  const h = y1 - y0;
+  ctx.beginPath();
+  for (let x = x0 - h; x < x1; x += 6) { ctx.moveTo(x, y1); ctx.lineTo(x + h, y0); }
+  ctx.stroke();
+  ctx.restore();
+}
+/** Zones, range, traits du point et de la fin : SOUS les bougies, du point (ou du bord gauche)
+ *  jusqu'à la FIN du scénario (ou le bout de la marge de futur). Une zone (niveau ± marge) est une
+ *  bande très pâle bordée de pointillés fins, son niveau un tiret plus marqué ; l'invalidation, un
+ *  ruban hachuré sur son niveau et des bords en tirets courts ; un range, une boîte en tirets. Le
+ *  rang 1 est tracé en dernier (au-dessus) et plus marqué ; les autres rangs, plus pâles ; un
+ *  scénario fermé (noté, fini, invalidé, réalisé), à moitié. */
+function scenBandes(S) {
+  const { g, xMax, yDe, xDeT, F } = S;
+  if (!F) return;
+  const top = g.pad.top, bas = top + g.ph;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(g.pad.left, top, xMax - g.pad.left, g.ph); ctx.clip();
+  for (const it of S.items.slice().reverse()) {
+    const sc = it.sc, c = it.coul, x0 = Math.max(g.pad.left, xDeT(sc.emis)), x1 = Math.min(xMax, xDeT(sc.fin)), w = x1 - x0;
+    if (w <= 1) continue;
+    const a = (sc.rang === '1' ? 1 : sc.rang === 'S' ? 0.45 : 0.65) * (it.ouvert ? 1 : 0.5);
+    const ligne = (p, dash, alpha, lw) => { const y = yDe(p); ctx.strokeStyle = avecAlpha(c, alpha * a); ctx.lineWidth = lw || 1; ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); };
+    if (sc.forme === 'chemin') {
+      sc.zones.cibles.forEach((z, k) => {
+        const y1 = yDe(z[1]), y0 = yDe(z[0]);
+        ctx.fillStyle = avecAlpha(c, 0.06 * a); ctx.fillRect(x0, y1, w, y0 - y1);
+        ligne(z[0], [1, 3], 0.45); ligne(z[1], [1, 3], 0.45);
+        ligne(sc.cibles[k], [7, 4], 0.85, sc.rang === '1' ? 1.4 : 1.1);
+      });
+      if (sc.zones.inv) {
+        const y = yDe(sc.invalidation);
+        scenHachures(x0, y - 3, x1, y + 3, avecAlpha(c, 0.55 * a));
+        ligne(sc.zones.inv[0], [3, 3], 0.4); ligne(sc.zones.inv[1], [3, 3], 0.4);
+      }
+    } else {
+      const y1 = yDe(sc.range[1]), y0 = yDe(sc.range[0]);
+      ctx.fillStyle = avecAlpha(c, 0.04 * a); ctx.fillRect(x0, y1, w, y0 - y1);
+      ctx.strokeStyle = avecAlpha(c, 0.8 * a); ctx.lineWidth = 1.1; ctx.setLineDash([7, 4]);
+      ctx.strokeRect(x0 + 0.5, y1, w - 1, y0 - y1);
+      // Ce que la marge tolère au-delà des bornes : pointillé fin.
+      ligne(sc.zones.haut, [1, 3], 0.45); ligne(sc.zones.bas, [1, 3], 0.45);
+    }
+  }
+  // Le point du matin et la fin des scénarios du jour : deux verticales pointillées.
+  ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+  const xE = xDeT(F.emis);
+  if (xE >= g.pad.left && xE <= xMax) {
+    ctx.strokeStyle = avecAlpha(COLORS.ink1, 0.55);
+    ctx.beginPath(); ctx.moveTo(xE, top); ctx.lineTo(xE, bas); ctx.stroke();
+  }
+  const xF = xDeT(F.fin);
+  if (xF >= g.pad.left && xF <= xMax) {
+    ctx.strokeStyle = avecAlpha(COLORS.ink3, 0.6);
+    ctx.beginPath(); ctx.moveTo(xF, top); ctx.lineTo(xF, bas); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+/** Les bougies visibles, gêne « douce » des étiquettes : essayées d'abord sans les couvrir. */
+function scenSurBougies(S) {
+  const g = S.g;
+  return r => {
+    const i0 = Math.max(g.vs, g.vs + Math.floor((r.x - g.pad.left) / g.gap)), i1 = Math.min(g.ve - 1, g.vs + Math.floor((r.x + r.w - g.pad.left) / g.gap));
+    for (let i = i0; i <= i1; i++) { const c = candles[i]; if (S.yDe(c.high) <= r.y + r.h && S.yDe(c.low) >= r.y) return true; }
+    return false;
+  };
+}
+/** Un segment [x0, y0, x1, y1] passe-t-il dans le rectangle r ({x, y, w, h}) agrandi de m px ? */
+function scenSegDans(sg, r, m) {
+  const n = Math.max(1, Math.ceil(Math.hypot(sg[2] - sg[0], sg[3] - sg[1]) / 3));
+  for (let j = 0; j <= n; j++) {
+    const x = sg[0] + (sg[2] - sg[0]) * j / n, y = sg[1] + (sg[3] - sg[1]) * j / n;
+    if (x > r.x - m && x < r.x + r.w + m && y > r.y - m && y < r.y + r.h + m) return true;
+  }
+  return false;
+}
+/** Les bougies les plus récentes (le quart de la vue, au moins 3) : gêne « dure » de l'encadré et des
+ *  libellés posés en repli — rien ne les couvre. */
+function scenRecentes(S) {
+  const g = S.g, n = Math.max(3, Math.ceil(g.n * 0.25)), i0 = Math.max(0, g.n - n);
+  return r => {
+    const a = Math.max(g.vs + i0, g.vs + Math.floor((r.x - g.pad.left) / g.gap)), b = Math.min(g.ve - 1, g.vs + Math.floor((r.x + r.w - g.pad.left) / g.gap));
+    for (let i = a; i <= b; i++) { const c = candles[i]; if (S.yDe(c.high) <= r.y + r.h && S.yDe(c.low) >= r.y) return true; }
+    return false;
+  };
+}
+/** AVANT les libellés du Guide : le libellé du rang 1, la seule étiquette des scénarios qui passe
+ *  devant ceux des niveaux du Guide quand la place manque (un niveau du Guide sans place est nommé
+ *  au bord, guideBords). */
+function scenAvantGuide(S) {
+  if (!S || !S.F) return;
+  const g = S.g, top = g.pad.top, bas = top + g.ph;
+  const un = S.items.find(it => it.sc.rang === '1');
+  // 'hors' (fenêtre du rang 1 finie avant la vue) ne retient pas les autres rangs.
+  S.unPose = un ? scenLibelle(S, un, top, bas, scenSurBougies(S)) : null;
+}
+/** Les étiquettes et tracés AU-DESSUS des bougies, APRÈS les libellés du Guide : l'encadré, les
+ *  flèches et repères, les libellés des rangs 2, 3 et semaine, les noms des traits du point et de
+ *  la fin. Si le rang 1 n'a pas de libellé, les autres rangs n'en ont pas non plus (la hiérarchie
+ *  ne s'inverse pas : le plus probable n'est jamais le seul sans nom). */
+function scenTracer(S) {
+  const g = S.g, top = g.pad.top, bas = top + g.ph;
+  // Les tracés du Guide (chemins conditionnels, formes) : posés avant, ils gênent l'encadré et les flèches.
+  S.obstSegs = guideEtat && overlays.guide ? [].concat(...guideEtat.cibles.map(c => c.segs || [])) : [];
+  scenBoite(S, top, bas);
+  if (!S.F) return;
+  for (const it of S.items) scenChemin(S, it, top, bas);
+  const un = S.items.find(it => it.sc.rang === '1');
+  if (!un || S.unPose) { const sb = scenSurBougies(S); for (const it of S.items) if (it.sc.rang !== '1') scenLibelle(S, it, top, bas, sb); }
+  scenReperes(S, top, bas);
+}
+/** Le titre de la bulle d'un scénario : « Scénario 1 (rang 1) · 86 500 $ (plus haut du 08/10) puis
+ *  87 200 $ » ; expert : « S1 (rang 1) 86 500 > 87 200 · inv 85 500 ». « (rang 1) » insécable. */
+function scenTitre(sc, mode) {
+  const r = sc.rang === 'S' ? '' : ' (rang ' + sc.rang + ')';
+  if (mode === 'expert') return Scenarios.libelle(sc, 'expert').replace(/^(\S+)/, '$1' + r);
+  return Scenarios.libelle(sc, 'debutant').replace(/^([^·]+?) ·/, '$1' + r + ' ·');
+}
+/** L'explication d'un scénario pour la bulle de survol. */
+function scenCible(S, it, rects, segs, zones, prio) {
+  const ctxE = { itv: S.itv, statuts: S.F.statuts, maintenant: S.maintenant };
+  S.cibles.push({ rects, segs, zones, prio, coul: it.coul, scenario: it.sc.id, titre: scenTitre(it.sc, S.mode),
+    texte: Scenarios.explication(it.sc, it.sv, S.mode, PARAM.scenarios, ctxE) });
+}
+/** Flèche et repères numérotés d'un chemin ENCORE OUVERT, dans la marge de futur : de la dernière
+ *  bougie vers la cible 1, puis 2 ; le prix du point est marqué d'un point. Un scénario fermé
+ *  (noté, fini, invalidé, réalisé) n'a plus de flèche : il ne se lit pas comme une projection.
+ *  Un repère reste à la hauteur de SON niveau (au bord du tracé si le niveau est hors de la vue,
+ *  avec un petit triangle vers lui) ; il ne glisse qu'à l'horizontale, et toujours de gauche à
+ *  droite dans l'ordre des cibles, jamais sur un tracé du Guide. Sans place pour ①, rien ; sans
+ *  place pour ②, ① seul (jamais ② sans ①). Une flèche qui croiserait ou longerait un chemin du
+ *  Guide (ou d'un rang mieux classé), ou passerait sous une étiquette, n'est pas tracée : les
+ *  repères restent seuls sur leurs niveaux. */
+function scenChemin(S, it, top, bas) {
+  const { g, yDe, xDeT, xFin, xMax } = S, sc = it.sc;
+  // La zone (le trait du niveau ± 4 px, et la zone entière dans la marge de futur) : survolable.
+  const x0 = Math.max(g.pad.left, xDeT(sc.emis)), x1 = Math.min(xMax, xDeT(sc.fin));
+  const zones = [];
+  if (x1 > x0) {
+    const niveaux = sc.forme === 'range' ? sc.range : sc.cibles.concat(sc.invalidation !== null ? [sc.invalidation] : []);
+    for (const p of niveaux) { const y = yDe(p); if (y >= top && y <= bas) zones.push({ x0, y0: y - 4, x1, y1: y + 4 }); }
+    if (S.marge > 20 && x1 > xFin) {
+      const zs = sc.forme === 'range' ? [[sc.zones.bas, sc.zones.haut]] : sc.zones.cibles;
+      for (const z of zs) { const y1 = Math.max(top, yDe(z[1])), y0 = Math.min(bas, yDe(z[0])); if (y0 > y1) zones.push({ x0: xFin, y0: y1, x1, y1: y0 }); }
+    }
+  }
+  const segs = [], rects = [];
+  // La semaine (rang S) n'a ni flèche ni repères : ses zones et son libellé suffisent.
+  // Sur des bougies trop larges (4 h, 1 jour), le suivi ne sait pas si le chemin est encore ouvert :
+  // pas de flèche non plus.
+  if (it.ouvert && !(it.sv && (it.sv.cle === 'large' || it.sv.cle === 'incomplet')) && sc.forme === 'chemin' && sc.rang !== 'S' && S.finVue && S.marge > 24) {
+    const R = 7, lo = top + R + 1, hi = bas - R - 1;
+    const der = candles[candles.length - 1];
+    // La flèche part un peu à droite de la dernière bougie (les chemins du Guide partent d'elle).
+    const p0 = [g.pad.left + g.gap * (candles.length - 1 - g.vs) + g.candleW + 5, Math.max(lo, Math.min(hi, yDe(der.close)))];
+    const xE = xDeT(sc.emis), dansVue = xE >= g.pad.left && xE <= xFin && isNum(sc.prixEmission);
+    const pE = dansVue ? [xE, yDe(sc.prixEmission)] : null;
+    const N = sc.cibles.length, deja = [];
+    // Les tracés déjà là : chemins conditionnels (et formes) du Guide, flèches des rangs mieux classés.
+    const obst = S.obstSegs.concat(S.segsPris);
+    // Les places prises (encadré, libellés, badges, repères déjà posés), avec 3 px d'air ; un repère
+    // ne se pose pas non plus sur un tracé du Guide.
+    const pris = (x, y) => S.rects.concat(deja).some(r => x + R + 3 > r.x && x - R - 3 < r.x + r.w && y + R + 3 > r.y && y - R - 3 < r.y + r.h)
+      || obst.some(sg => guideDistSeg(x, y, sg) < R + 6 || Math.hypot(x - sg[2], y - sg[3]) < R + 18);
+    let xPrec = -Infinity;
+    const pts = sc.cibles.map((v, k) => {
+      const y = yDe(v), yb = Math.max(lo, Math.min(hi, y)), hors = y < lo - 0.5 ? -1 : y > hi + 0.5 ? 1 : 0;
+      const xMin = Math.max(xFin + R + 2, xPrec + 2 * R + 4), xLim = xMax - R - 3;
+      const x = Math.max(xMin, xFin + S.marge * (N > 1 ? 0.4 + 0.42 * k / (N - 1) : 0.55));
+      let xb = null;
+      for (let d = 0; xb === null && d <= S.marge; d += 4) for (const c of [x + d, x - d]) if (c >= xMin && c <= xLim && !pris(c, yb)) { xb = c; break; }
+      const cache = xb === null;
+      if (!cache) { deja.push({ x: xb - R - 1, y: yb - R - 1, w: 2 * R + 2, h: 2 * R + 2 }); xPrec = xb; }
+      return { x: cache ? Math.min(x, xLim) : xb, y: yb, hors, k, cache };
+    });
+    // Jamais ② sans ① : seuls les repères posés AVANT le premier sans place sont gardés (la flèche
+    // ne plie pas à l'endroit d'un repère absent) ; sans ①, ni flèche ni repère.
+    const k0 = pts.findIndex(p => p.cache), vis = k0 < 0 ? pts : pts.slice(0, k0);
+    // La flèche ne croise ni ne longe un tracé du Guide (ou d'un rang mieux classé), ni ne passe
+    // sous une étiquette ; le départ commun (la dernière bougie) est exclu. Sinon, la flèche de ①
+    // à ② seule ; sinon les repères seuls, sur leurs niveaux.
+    const segsDe = ch => { const out = []; for (let k = 1; k < ch.length; k++) out.push([ch[k - 1][0], ch[k - 1][1], ch[k][0], ch[k][1]]); return out; };
+    const gene = (x, y) => Math.hypot(x - p0[0], y - p0[1]) > 16
+      && (obst.some(sg => guideDistSeg(x, y, sg) < 5) || S.rects.some(r => x > r.x - 2 && x < r.x + r.w + 2 && y > r.y - 2 && y < r.y + r.h + 2));
+    const croise = ch => segsDe(ch).some(([xa, ya, xb, yb]) => {
+      const L = Math.hypot(xb - xa, yb - ya), n = Math.max(1, Math.ceil(L / 3));
+      for (let j = 0; j <= n; j++) {
+        const x = xa + (xb - xa) * j / n, y = ya + (yb - ya) * j / n;
+        // Les bords des repères de ce chemin ne gênent pas leur propre flèche.
+        if (vis.some(p => Math.hypot(x - p.x, y - p.y) <= R + 4)) continue;
+        if (gene(x, y)) return true;
+      }
+      return false;
+    });
+    const pv = vis.map(p => [p.x, p.y]);
+    let chemin = vis.length ? [p0].concat(pv) : [];
+    if (chemin.length && croise(chemin)) chemin = pv.length >= 2 && !croise(pv) ? pv : [];
+    const tous = segsDe(chemin), fleche = chemin.length >= 2;
+    if (fleche) { for (const sg of tous) { segs.push(sg); S.segsPris.push(sg); } }
+    for (const p of vis) rects.push({ x0: p.x - R - 2, y0: p.y - R - 2, x1: p.x + R + 2, y1: p.y + R + 2 });
+    for (const p of vis) S.rects.push({ x: p.x - R - 3, y: p.y - R - 3, w: 2 * R + 6, h: 2 * R + 6 });
+    it.fleche = fleche; it.reperes = vis.length;
+    const c = it.coul, fort = sc.rang === '1', touchees = it.sv ? it.sv.touchees || [] : [];
+    // Le tracé : POINTILLÉ rond (les chemins du Guide sont en tirets), une pointe avant le dernier
+    // repère ; les repères par-dessus.
+    if (fleche) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(g.pad.left, top, xMax - g.pad.left, g.ph); ctx.clip();
+      ctx.strokeStyle = avecAlpha(c, fort ? 0.9 : 0.7); ctx.lineWidth = fort ? 2 : 1.6; ctx.lineCap = 'round'; ctx.setLineDash([0.5, 4.5]);
+      ctx.beginPath(); chemin.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); ctx.setLineDash([]); ctx.lineCap = 'butt';
+      const [xa, ya] = chemin[chemin.length - 2], [xe, ye] = chemin[chemin.length - 1], ang = Math.atan2(ye - ya, xe - xa);
+      const xp = xe - (R + 1) * Math.cos(ang), yp = ye - (R + 1) * Math.sin(ang);
+      ctx.fillStyle = avecAlpha(c, fort ? 0.9 : 0.7);
+      ctx.beginPath(); ctx.moveTo(xp, yp); ctx.lineTo(xp - 7 * Math.cos(ang - 0.45), yp - 7 * Math.sin(ang - 0.45)); ctx.lineTo(xp - 7 * Math.cos(ang + 0.45), yp - 7 * Math.sin(ang + 0.45)); ctx.closePath(); ctx.fill();
+      if (pE && pE[1] >= top && pE[1] <= bas) { ctx.fillStyle = COLORS.ink1; ctx.beginPath(); ctx.arc(pE[0], pE[1], 3, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+    }
+    if (vis.length) etiquettesAFaire.push(() => {
+      for (const p of vis) {
+        const touche = !!touchees[p.k];
+        ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI * 2); ctx.fill();
+        if (touche) { ctx.fillStyle = avecAlpha(c, 0.35); ctx.fill(); }
+        ctx.strokeStyle = c; ctx.lineWidth = fort ? 1.8 : 1.3; ctx.stroke();
+        ctx.fillStyle = COLORS.ink1; ctx.font = chartFont(9, 750); ctx.textAlign = 'center';
+        ctx.fillText(String(p.k + 1), p.x, p.y + 3.2);
+        ctx.textAlign = 'left';
+        // Niveau hors de la vue : un petit triangle (dessiné, pas une glyphe) vers lui, dans le tracé.
+        if (p.hors) {
+          const xt = p.x + R + 6 <= xMax - 2 ? p.x + R + 5 : p.x - R - 5, h = 4.5 * p.hors;
+          ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(xt - 4, p.y - h / 2); ctx.lineTo(xt + 4, p.y - h / 2); ctx.lineTo(xt, p.y + h / 2 + (p.hors > 0 ? 2 : -2)); ctx.closePath(); ctx.fill();
+        }
+      }
+    });
+  }
+  scenCible(S, it, rects, segs, zones, 2);
+}
+/** Le libellé d'un scénario, près du trait de son premier niveau (le haut d'un range), à gauche
+ *  de la marge de futur ; un niveau hors de la vue est nommé au bord, avec sa flèche. Fermé, il dit
+ *  aussi son état court (« · invalidation d'abord 13:30–13:45 UTC (en direct) »). */
+function scenLibelle(S, it, top, bas, surBougies) {
+  const { g, yDe, xFin, xMax, exp } = S, sc = it.sc, H = 15;
+  if (S.xDeT(sc.fin) < g.pad.left) return 'hors';      // fenêtre finie avant la vue : rien à nommer
+  ctx.font = chartFont(9, 600);
+  const p = sc.forme === 'range' ? sc.range[1] : sc.cibles[0], y = yDe(p);
+  const hors = y < top + 2 ? -1 : y > bas - 2 ? 1 : 0;
+  const droite = (S.marge > 24 ? xFin : xMax) - 4, place = droite - g.pad.left - 6;
+  // Un scénario FERMÉ garde toujours son état (marqué « en direct » s'il n'est pas la note du
+  // journal) : sans place, ses niveaux partent d'abord (« Scénario 1 · invalidé (en direct) »,
+  // « Scénario 1 · terminé (en direct) »), sinon pas de libellé — jamais ses niveaux seuls, qui se
+  // liraient comme une cible encore vivante.
+  const et = it.et, nom = exp ? Scenarios.COURTS_RANG[sc.rang] : Scenarios.NOMS_RANG[sc.rang];
+  const exper = Scenarios.libelle(sc, 'expert');
+  const base = exp ? [exper] : [...new Set([Scenarios.libelle(sc, 'debutant', 'complet'), Scenarios.libelle(sc, 'debutant'), Scenarios.libelle(sc, 'debutant', true)])];
+  const variantes = it.ouvert ? base.concat(exp ? [] : [exper])
+    : [...new Set(base.map(v => v + ' · ' + et.courtD).concat([nom + ' · ' + et.courtD, nom + ' · ' + et.miniD, nom + ' · ' + et.microD]))];
+  const large = Math.min(place, g.pw * (g.pw < PARAM.scenarios.etroit ? 0.9 : 0.62));
+  const texte = fleche => {
+    for (const v of variantes) if (ctx.measureText(fleche + v).width + 14 <= large) return fleche + v;
+    if (!it.ouvert) { const v = fleche + variantes[variantes.length - 1]; return ctx.measureText(v).width + 14 <= place ? v : null; }
+    return guideCouper(ctx, fleche + variantes[variantes.length - 1], place - 14);
+  };
+  // Collé à droite (avant la marge de futur), sinon à gauche de l'encadré, sinon au milieu du
+  // tracé : toujours sur le trait de SON niveau ; sans les bougies d'abord, puis par-dessus.
+  const B = S.boite;
+  const poser = (t, essais, vers, evs) => {
+    const w = ctx.measureText(t).width + 14, xs = [droite - w];
+    if (B && B.x - 4 - w >= g.pad.left + 2) xs.push(B.x - 4 - w);
+    xs.push(Math.max(g.pad.left + 2, (g.pad.left + droite) / 2 - w / 2));
+    for (const ev of evs || [surBougies, null]) for (const x of xs) {
+      const pose = guidePlacer(S.rects, x, w, H, essais, top, bas, vers, 0, 3, ev || undefined);
+      if (pose) return { x, w, pose, t };
+    }
+    return null;
+  };
+  let t = texte(hors < 0 ? '↑ ' : hors > 0 ? '↓ ' : '');
+  // Hors de la vue : au bord, sinon une ou deux rangées plus loin (sous la ligne de la vue, en haut à gauche).
+  const essais = hors < 0 ? [top + 2, top + H + 4, Math.max(top + 2, 38), top + 2 * H + 6] : hors > 0 ? [bas - H - 2, bas - 2 * H - 4, bas - 3 * H - 6] : [y - H - 2, y + 2];
+  let r = t ? poser(t, essais, hors > 0 || (!hors && y > (top + bas) / 2) ? -1 : 1) : null;
+  // Niveau caché sous l'encadré (téléphone) : le libellé juste sous l'encadré, flèche vers le haut.
+  // Niveau au-dessus de la vue, encadré en haut : de même.
+  // Comme l'encadré : jamais par-dessus les bougies les plus récentes (sans place, pas de libellé :
+  // la ligne de l'encadré nomme déjà le scénario).
+  if (!r && B && (hors < 0 ? B.y <= top + 40 : !hors && y >= B.y - H && y <= B.y + B.h + H) && (t = texte('↑ '))) r = poser(t, [B.y + B.h + 2], 1, [surBougies, scenRecentes(S)]);
+  if (!r) return false;
+  const c = it.coul;
+  etiquettesAFaire.push(() => { ctx.font = chartFont(9, 600); guidePastille(ctx, r.x, r.pose.y, r.w, H, r.t, c); });
+  S.propres.push({ x: r.x, y: r.pose.y, w: r.w, h: H });
+  S.libelles.push({ rang: sc.rang, t: r.t });
+  scenCible(S, it, [guideZone(r.pose)], [], [], 1);
+  return true;
+}
+/** Les traits du point et de la fin des scénarios du jour, nommés en haut (sinon plus bas, sinon
+ *  au bas du tracé), sous la forme la plus complète qui trouve une place. */
+function scenReperes(S, top, bas) {
+  const { g, F, xDeT, xMax, exp } = S, P = PARAM.scenarios;
+  const H = 14, hU = t => Scenarios.heureUTC(t) + ' UTC', hP = t => Scenarios.heureParis(t), jour = t => Scenarios.jourGroupe(new Date(t).toISOString().slice(0, 10));
+  const pE = hP(F.emis) ? ' (' + hP(F.emis) + ' Paris)' : '', pF = hP(F.fin) ? ' (' + hP(F.fin) + ' Paris)' : '';
+  const sem = isNum(F.finSemaine) && F.finSemaine !== F.fin && S.items.some(i => i.sc.rang === 'S') ? ' Le scénario de la semaine court jusqu’au ' + jour(F.finSemaine) + ' à ' + hU(F.finSemaine) + '.' : '';
+  for (const [t, noms, expl] of [
+    [F.emis, exp ? ['Point · ' + hU(F.emis), hU(F.emis)] : ['Point de ' + P.point + ' Paris · écrit à ' + hU(F.emis) + pE, 'Écrit à ' + hU(F.emis) + pE, 'Point · ' + hU(F.emis), hU(F.emis)],
+      'Le moment où les scénarios du point de ' + P.point + ' (Paris) ont été écrits : le ' + jour(F.emis) + ' à ' + hU(F.emis) + pE + (isNum(F.prixEmission) ? ', prix ' + Scenarios.prix(F.prixEmission) : '') + '. Les zones partent de là.'],
+    [F.fin, exp ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)] : ['fin des scénarios du jour · ' + jour(F.fin) + ' ' + hU(F.fin) + pF, 'fin du jour · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)],
+      'Fin de la fenêtre des scénarios 1 à 3 : ' + jour(F.fin) + ' à ' + hU(F.fin) + (hP(F.fin) ? ' (' + hP(F.fin) + ' Paris)' : '') + '. Le journal les note ensuite, le matin même.' + sem]]) {
+    const x = xDeT(t);
+    if (!(x >= g.pad.left && x <= xMax)) continue;
+    ctx.font = chartFont(8.5, 650);
+    const rangs = [0, 1, 2, 3, 4].map(k => top + 2 + k * (H + 2)).concat([bas - H - 26, bas - H - 42]);
+    let pose = null, nom = null, xl = 0, w = 0;
+    for (const n of noms) {
+      w = ctx.measureText(n).width + 10;
+      for (const xc of [x + 3, x - 3 - w]) {
+        if (xc < g.pad.left || xc + w > xMax) continue;
+        if ((pose = guidePlacer(S.rects, xc, w, H, rangs, top, bas, 1, 0, 0))) { xl = xc; nom = n; break; }
+      }
+      if (pose) break;
+    }
+    S.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs: [[x, top, x, bas]], prio: 3, coul: COLORS.ink3, titre: noms[0], texte: [expl, 'Une description, pas une recommandation.'] });
+    if (!pose) continue;
+    etiquettesAFaire.push(() => {
+      ctx.font = chartFont(8.5, 650);
+      ctx.globalAlpha = 0.92; ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(xl, pose.y, w, H, 3); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = COLORS.text; ctx.fillText(nom, xl + 5, pose.y + H - 4);
+    });
+  }
+}
+/** Une raison de lecture ratée, dite simplement. */
+function scenRaison(r) {
+  if (r === 'réseau') return 'réseau injoignable';
+  if (r === 'HTTP 404') return 'fichier introuvable (HTTP 404)';
+  if (/^HTTP \d+$/.test(r || '')) return 'serveur en erreur (' + r + ')';
+  if (r === 'JSON illisible') return 'fichier illisible (JSON)';
+  return 'fichier illisible (' + r + ')';
+}
+/** L'encadré, en haut à droite du tracé, dans sa moitié haute : le titre, une ligne par scénario
+ *  classé avec son état, le sens du classement (débutant), la mesure de l'ordre, et ce qui est un
+ *  suivi en direct. Posé APRÈS les libellés du Guide, dans une place libre (jamais sur un chemin du
+ *  Guide), sous sa forme la plus complète qui tient (pleine, courte, compacte, serrée : les états de
+ *  tous les rangs sur une ligne) — en haut à droite d'abord, ailleurs ensuite ; jamais sur les
+ *  bougies les plus récentes. Sans
+ *  place, une seule ligne qui nomme le rang 1 et renvoie à l'explication (survol ou doigt). Dessiné
+ *  sur le calque (scenCalque). Fichier d'attente : sa note (2 lignes au plus) ; illisible : une ligne. */
+function scenBoite(S, top, bas) {
+  const P = PARAM.scenarios, g = S.g, exp = S.exp, F = S.F;
+  const etroit = g.pw < P.etroit, tactile = etroit || (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches);
+  const wMax = Math.floor(Math.min(P.boiteMax, (S.xMax - g.pad.left) * (etroit ? P.boiteFractionEtroit : P.boiteFraction)));
+  const L = [];   // { t, f: 'titre' | 'ligne' | 'note' | 'seule', it, garde, compact, toujours }
+  const heure = ms => Scenarios.heureUTC(ms) + ' UTC';
+  let titreBoite, large = false;
+  if (!F) {
+    let t;
+    if (previsions && previsions.etat === 'attente') t = 'Scénarios du matin : ' + (previsions.note ? previsions.note.charAt(0).toLowerCase() + previsions.note.slice(1) : 'en attente du prochain point.');
+    else t = 'Scénarios du matin : pas de fichier lisible (' + heure(previsionsEchec ? previsionsEchec.a : S.maintenant) + ')';
+    L.push({ t, f: 'seule' });
+    titreBoite = 'Scénarios du matin';
+  } else {
+    const semI = S.items.find(i => i.sc.rang === 'S');
+    titreBoite = Scenarios.titre(F, P, S.maintenant, semI ? semI.ouvert : false);
+    L.push({ t: titreBoite, f: 'titre' });
+    // Bougies trop larges (4 h, 1 jour) : les lignes sans état, et une seule note qui le dit.
+    large = S.items.some(i => i.et.cle === 'large');
+    for (const it of S.items) { const et = large && it.et.cle === 'large' ? null : it.et; L.push({ t: Scenarios.ligne(it.sc, et, S.mode), tc: Scenarios.ligne(it.sc, et, S.mode, true), f: 'ligne', it }); }
+    if (large) L.push({ t: Scenarios.noteLarge(S.itv, S.mode), f: 'note', toujours: true });
+    const sem = !!semI;
+    if (!exp) L.push({ t: 'Classement de Claude (une IA) : 1 = jugé le plus probable, 3 = le moins' + (sem ? ' ; la ligne Semaine est à part' : '') + '. Sans pourcentage.', f: 'note', garde: 2 });
+    const b = Scenarios.texteBilan(F.bilan, P, S.mode);
+    if (b) L.push({ t: b, f: 'note', garde: 3 });
+    L.push({ t: exp ? 'Claude (IA) · suivi en direct · note officielle : le journal' : 'États : suivi en direct, la note officielle est celle du journal.', f: 'note', garde: 1 });
+    if (previsionsEchec) L.push({ t: 'Relecture impossible (' + heure(previsionsEchec.a) + ') · fichier lu à ' + heure(F.luA), f: 'note', garde: 0 });
+    // La forme compacte : une note qui dit les deux (classement, suivi en direct), le bilan en bref.
+    L.push({ t: exp ? 'Claude (IA) · suivi en direct · officiel : le journal' : 'Classé par Claude (une IA), sans pourcentage · suivi en direct, la note officielle est celle du journal', f: 'note', compact: 2 });
+    L.push({ t: exp ? 'Claude (IA) · suivi en direct' : 'Classé par Claude (IA), sans pourcentage · suivi en direct', f: 'note', compact: 1 });
+    const bc = Scenarios.texteBilan(F.bilan, P, 'expert');
+    if (bc) L.push({ t: bc, f: 'note', compact: 'bilan' });
+  }
+  const police = f => (f === 'titre' ? chartFont(9.5, 700) : f === 'ligne' || f === 'etats' ? chartFont(9, 600) : chartFont(8.5, 550));
+  const hL = f => (f === 'titre' ? 14 : f === 'ligne' || f === 'etats' ? 12.5 : 11.5);
+  // Mise en page : chaque ligne d'un scénario sur 2 lignes au plus, puis sa forme courte sur 1 ;
+  // les notes restent (le sens du classement, la mesure de l'ordre, « suivi en direct ») ; la
+  // note de relecture ratée part la première (elle reste dans l'explication du titre) ; enfin la
+  // forme compacte (une note qui dit tout, sur 2 lignes puis 1).
+  const mettre = (maxL, gardeMin, court, compact) => {
+    const out = [];
+    for (const l of L) {
+      // Forme compacte (compact = 2 ou 1) : sa note sur `compact` lignes, et le bilan en bref.
+      if (l.f === 'note' && !l.toujours && (compact ? !(l.compact === compact || l.compact === 'bilan') : l.compact || l.garde < gardeMin)) continue;
+      ctx.font = police(l.f);
+      const nMax = l.f === 'ligne' ? maxL : l.compact ? 1 : 2;
+      const ls = guideLignes(ctx, court && l.tc ? l.tc : l.t, wMax - 16, nMax);
+      for (const t of ls) out.push({ t, f: l.f, it: l.it, h: hL(l.f) });
+    }
+    return out;
+  };
+  const mesurer = lignes => {
+    let w = 0;
+    for (const l of lignes) { ctx.font = police(l.f); w = Math.max(w, ctx.measureText(l.t).width); }
+    return { lignes, w: Math.min(wMax, Math.ceil(w) + (F ? 18 : 12)), h: lignes.reduce((a, l) => a + l.h, 0) + 8 };
+  };
+  // La forme SERRÉE (écrans de portable) : le titre, les états de tous les rangs sur une ligne
+  // (« Suivi en direct : 1 · invalidé | 2 · rien de touché | … », deux lignes au plus), puis
+  // (niveau 2) le classement sans pourcentage et le bilan en bref. Chaque scénario s'explique au
+  // survol de l'encadré (sa ligne complète en tête). Niveau 1 : une seule note ; niveau 0 : aucune
+  // (débutant : « classés sans pourcentage » au bout du titre) ; niveau −1 : le titre seul.
+  const serrer = niveau => {
+    const out = [];
+    const pousser = (t, f, max) => { ctx.font = police(f); for (const x of guideLignes(ctx, t, wMax - 16, max)) out.push({ t: x, f, h: hL(f) }); };
+    // Niveau 0, débutant : le classement sans pourcentage tient dans le titre (sur une ligne), s'il y tient.
+    ctx.font = police('titre');
+    const tSans = titreBoite + ' · classés sans pourcentage';
+    pousser(niveau === 0 && !exp && ctx.measureText(tSans).width <= wMax - 16 ? tSans : titreBoite, 'titre', 2);
+    const etats = Scenarios.ligneEtats(S.items, S.mode, large);
+    if (etats) pousser(etats, 'etats', 2);
+    const bc = Scenarios.texteBilan(F.bilan, P, 'expert');
+    if (niveau === 2) {
+      if (!exp) pousser('Classé par Claude (IA), sans pourcentage', 'note', 1);
+      if (bc) pousser(bc, 'note', 1);
+    } else if (niveau === 1) {
+      // Une note : le classement sans pourcentage (débutant), le bilan (expert).
+      if (!exp) pousser('Classé par Claude (IA), sans pourcentage', 'note', 1);
+      else if (bc) pousser(bc, 'note', 1);
+    }
+    for (const l of L) if (l.toujours) pousser(l.t, 'note', 2);
+    return out;
+  };
+  const hMax = (bas - top) / 2 - 8;
+  const formes = [];
+  const essais = F ? [[2, 0, false, 0], [1, 0, true, 0], [1, 1, true, 0], [1, 0, true, 2], [1, 0, true, 1], ['serre', 2], ['serre', 1], ['serre', 0], ['serre', -1]] : [[0, 0, false, 0]];
+  for (const [maxL, gardeMin, court, compact] of essais) {
+    const m = maxL === 'serre' ? Object.assign(mesurer(serrer(gardeMin)), { serre: true }) : mesurer(mettre(maxL, gardeMin, court, compact));
+    if (m.h <= hMax && !formes.some(f => f.h === m.h && f.w === m.w)) formes.push(m);
+  }
+  // La place : en haut à droite, puis en descendant (jamais sous la moitié du tracé ; une seule
+  // ligne, jamais sous son tiers), puis plus à gauche ; d'abord sans couvrir de bougie, puis sans
+  // couvrir les plus récentes — jamais par-dessus elles.
+  const nRec = Math.max(3, Math.ceil(g.n * 0.25));
+  const couvre = (r, i0) => {
+    const a = Math.max(g.vs + i0, g.vs + Math.floor((r.x - g.pad.left) / g.gap)), b = Math.min(g.ve - 1, g.vs + Math.floor((r.x + r.w - g.pad.left) / g.gap));
+    for (let i = a; i <= b; i++) { const c = candles[i]; if (S.yDe(c.high) <= r.y + r.h && S.yDe(c.low) >= r.y) return true; }
+    return false;
+  };
+  const gene = [r => couvre(r, 0), r => couvre(r, Math.max(0, g.n - nRec))];
+  // « En haut à droite » : le bord droit de l'encadré contre la marge de futur (ou le bord du
+  // tracé), à 12 % de la largeur près ; jamais au milieu du tracé tant qu'une forme y tient.
+  const bordD = (S.marge > 24 ? S.xFin : S.xMax) - (S.xMax - g.pad.left) * 0.12;
+  const chercher = (w, h, yMax, ev, aDroite) => {
+    const xs = [S.xMax - w - 4];
+    if (S.marge > 24 && S.xFin - w - 4 < xs[0]) xs.push(S.xFin - w - 4);
+    for (let x = Math.min(...xs) - 32; x > g.pad.left + 4; x -= 32) xs.push(x);
+    xs.push(g.pad.left + 4);
+    for (const x of xs) {
+      if (x < g.pad.left + 2 || (aDroite && x + w < bordD)) continue;
+      // Sous la ligne de la vue et sa pastille de variation (en haut à gauche du graphique).
+      for (let y = x < 320 ? Math.max(top + 4, 38) : top + 4; y + h <= yMax; y += 4) {
+        const r = { x, y, w, h };
+        if (guideLibre(S.rects, r) && !(ev && ev(r)) && !S.obstSegs.some(sg => scenSegDans(sg, r, 2))) return r;
+      }
+    }
+    return null;
+  };
+  // Sans couvrir aucune bougie : dans la moitié haute ; par-dessus des bougies anciennes : dans le
+  // tiers haut seulement (jamais au milieu du tracé).
+  const yMoitie = top + Math.max(0, (bas - top) / 2), yTiers = top + (bas - top) / 3;
+  let pose = null, forme = null;
+  for (const aDroite of [true, false]) {
+    for (const ev of gene) {
+      for (const f of formes) if ((pose = chercher(f.w, f.h, ev === gene[0] ? yMoitie : yTiers + 8, ev, aDroite))) { forme = f; break; }
+      if (pose) break;
+    }
+    if (pose) break;
+  }
+  let replie = false;
+  if (!pose) {
+    // Sans place : une ligne qui nomme le rang 1 (ses niveaux tant qu'il est ouvert, son état
+    // sinon) et renvoie à l'explication ; au doigt, « toucher » est écrit (jamais un ▸ seul).
+    replie = !!F;
+    ctx.font = police(F ? 'titre' : 'seule');
+    const suite = tactile ? ' · toucher ▸' : ' · détail au survol';
+    const un = S.items.find(i => i.sc.rang === '1');
+    // Fermé : son état, marqué « (en direct) » s'il n'est pas la note du journal, de la forme la
+    // plus complète à la plus courte (« Scénario 1 : invalidé (en direct) · toucher ▸ »).
+    const r1s = !un ? [] : un.ouvert ? [Scenarios.niveaux(un.sc, exp)] : [un.et.courtD, un.et.miniD, un.et.microD];
+    const tient = x => ctx.measureText(x).width <= wMax - 14;
+    const attente = previsions && previsions.etat === 'attente';
+    const variantes = !F ? [L[0].t].concat(attente ? ['Scénarios du matin : en attente' + suite] : [])
+      : (Scenarios.estAncien(F, S.maintenant) ? [titreBoite + suite] : []).concat(...r1s.map(r1 => [titreBoite + ' · 1. ' + r1 + suite, 'Scénario 1 (en tête) : ' + r1 + suite, 'Scénario 1 : ' + r1 + suite, titreBoite + ' · 1. ' + r1 + (tactile ? suite : ' ▸')]))
+        .concat([titreBoite + suite, 'Scénarios' + (tactile ? suite : ' ▸')]);
+    const f1 = F ? 'titre' : 'seule';
+    const essaisL = [];
+    for (const v of variantes) {
+      if (!F && v === L[0].t) { const ls = guideLignes(ctx, v, wMax - 14, 2); essaisL.push(ls.map(t => ({ t, f: f1, h: hL(f1) }))); continue; }
+      if (tient(v)) essaisL.push([{ t: v, f: f1, h: hL(f1) }]);
+    }
+    if (!essaisL.length) essaisL.push([{ t: guideCouper(ctx, variantes[variantes.length - 1], wMax - 14) || 'Scénarios', f: f1, h: hL(f1) }]);
+    // Sans couvrir de bougie, puis sans couvrir les récentes, puis (une ligne) par-dessus des
+    // bougies plus anciennes — jamais sur une étiquette.
+    // La forme la plus riche d'abord (celle qui nomme le rang 1 et son état) : à droite puis
+    // ailleurs, sans couvrir de bougie puis sans couvrir les récentes ; enfin par-dessus des
+    // bougies plus anciennes.
+    for (const evs of [gene, [null]]) {
+      for (const ls of essaisL) {
+        const f = mesurer(ls);
+        for (const aDroite of [true, false]) {
+          for (const ev of evs) if ((pose = chercher(f.w, f.h, top + (bas - top) / 3 + f.h, ev, aDroite))) break;
+          if (pose) break;
+        }
+        if (pose) { forme = f; break; }
+      }
+      if (pose) break;
+    }
+    if (!pose) {
+      // Toujours dit : épinglée en haut à droite (dans le tiers haut), par-dessus une étiquette du
+      // Guide s'il le faut — jamais sur le libellé du rang 1.
+      // La plus courte d'abord (elle couvre le moins) — sauf si le rang 1 n'a pas de libellé sur le
+      // graphique : alors la forme qui le nomme avec son état passe d'abord.
+      for (const ls of F && S.unPose ? essaisL.slice().reverse() : essaisL) {
+        const f = mesurer(ls), x = S.xMax - f.w - 4;
+        for (let y = x < 320 ? Math.max(top + 4, 38) : top + 4; !pose && y + f.h <= top + (bas - top) / 3 + f.h; y += 4) if (guideLibre(S.propres, { x, y, w: f.w, h: f.h })) { pose = { x, y, w: f.w, h: f.h }; forme = f; }
+        if (pose) break;
+      }
+      if (!pose) { forme = mesurer(essaisL[essaisL.length - 1]); pose = { x: S.xMax - forme.w - 4, y: S.xMax - forme.w - 4 < 320 ? Math.max(top + 4, 38) : top + 4, w: forme.w, h: forme.h }; }
+    }
+  }
+  const { lignes, w, h } = forme, x = pose.x, y = pose.y;
+  S.rects.push({ x, y, w, h });
+  const serre = !!forme.serre;
+  S.boite = { x, y, w, h, lignes, seule: !F, replie, serre, police, coul: S.items.map(i => i.coul) };
+  // Le survol : chaque ligne d'un scénario l'explique ; le titre explique l'encadré.
+  let yy = y + 4;
+  const parIt = new Map();
+  for (const l of lignes) {
+    const r = { x0: x, y0: yy, x1: x + w, y1: yy + l.h };
+    if (l.it) { if (!parIt.has(l.it)) parIt.set(l.it, []); parIt.get(l.it).push(r); }
+    yy += l.h;
+  }
+  for (const [it, rs] of parIt) scenCible(S, it, rs, [], [], 0);
+  const resteRect = { x0: x, y0: y, x1: x + w, y1: y + h };
+  // Replié : l'explication commence par ce que l'encadré aurait montré (le bilan y est déjà dit,
+  // suivi de ce qu'il compte).
+  const plein = L.filter(l => l.f === 'ligne' || l.toujours || (!l.compact && l.garde >= 1)).map(l => l.t);
+  const texte = replie || serre ? plein.concat(scenTexteBoite(S, true)) : scenTexteBoite(S);
+  // Écran court (téléphone) : la bulle garde les lignes, le bilan et ce qui est en direct ou
+  // officiel, et renvoie à la fiche pour le reste (guideSurvol la prend si l'autre ne tient pas).
+  const texteCourt = F ? scenTexteBoite(S, true, true) : null;
+  S.cibles.push({ rects: [resteRect], prio: replie || serre ? 0 : 1, coul: COLORS.accent, titre: titreBoite, texte, texteCourt });
+}
+/** L'explication de l'encadré (survol du titre ou des notes). sansBilan : la ligne du bilan est
+ *  déjà dite (encadré replié) ; seule sa règle suit. court : la version des écrans courts — ce qui
+ *  est en direct ou officiel, un renvoi à la fiche, et « pas une recommandation ». */
+function scenTexteBoite(S, sansBilan, court) {
+  const F = S.F, P = PARAM.scenarios, exp = S.exp, out = [];
+  if (court && F) {
+    // Les lignes courtes des scénarios (niveaux, invalidation, état), le bilan, ce qui est en direct.
+    const large = S.items.some(i => i.et.cle === 'large');
+    const b = Scenarios.texteBilan(F.bilan, P, S.mode);
+    return [exp ? 'États : suivi en direct sur les bougies ' + S.itv + ' (un affichage) ; note officielle : le journal, le lendemain.' : 'Les états sont un suivi EN DIRECT sur les bougies ' + S.itv + ' (un affichage) ; la note officielle est celle du journal, le lendemain.']
+      .concat(S.items.map(it => Scenarios.ligne(it.sc, large && it.et.cle === 'large' ? null : it.et, S.mode, true)))
+      .concat(large ? [Scenarios.noteLarge(S.itv, 'debutant')] : [])
+      .concat(b ? [b + '.'] : [])
+      .concat(exp ? [] : ['Classé par Claude (une IA), du plus au moins probable, sans pourcentage.'])
+      .concat(['Plus : fiche « Scénarios du matin » dans les Légendes (bouton ?).', exp ? 'Description, pas une recommandation.' : 'Une description, pas une recommandation : rien ici ne dit quoi faire.']);
+  }
+  const attente = !F && previsions && previsions.etat === 'attente';
+  if (attente && previsions.note) out.push(previsions.note);
+  out.push('Chaque matin vers ' + P.point + ' (Paris), Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ, à partir de son analyse du marché, et les classe du plus au moins probable selon son jugement, sans pourcentage. Chaque niveau a une origine nommée et se lit comme une zone : le niveau plus ou moins la marge.');
+  if (F) out.push('Les états de cet encadré sont un suivi EN DIRECT sur les bougies ' + S.itv + ' du graphique (un affichage). La note officielle est celle du journal, faite mécaniquement le lendemain sur des bougies d’une minute.');
+  if (F && F.bilan && F.bilan.matins > 0) {
+    // La règle du fichier, si elle est écrite, nomme déjà le chemin compté : la suite seule, sans redite.
+    if (!sansBilan) out.push(Scenarios.texteBilan(F.bilan, P, 'debutant') + (F.bilan.regle ? ' (règle du journal : ' + F.bilan.regle + ').' : '.'));
+    out.push(F.bilan.regle && !sansBilan ? Scenarios.REGLE_BILAN_SUITE : Scenarios.REGLE_BILAN);
+  } else if (F && F.bilan) out.push('Pas encore de matin compté dans la mesure de l’ordre du premier mouvement.');
+  else if (F) out.push('Ce fichier ne donne pas la mesure de l’ordre du premier mouvement : aucun chiffre de réussite n’est montré.');
+  if (F && F.precedents.length) {
+    const st = F.statuts || Scenarios.STATUTS;
+    const p = F.precedents.slice(0, 3).map(m => Scenarios.jourGroupe(m.groupe) + ' — ' + m.scenarios.slice(0, 3).map(x => {
+      const mo = Scenarios.motsStatut(x.statut, x.premier_ok, null, st, exp);
+      return (x.rang === 'S' ? 'sem.' : x.rang + '.') + ' ' + (x.enonce || '') + ' : ' + (x.premier_ok === 'bas' || x.premier_ok === 'haut' ? mo.long : mo.court);
+    }).join(' ; '));
+    out.push('Matins précédents (note du journal) : ' + p.join(' | ') + '.');
+  }
+  const src = F || (attente ? previsions : null);
+  const jourH = t => Scenarios.jourGroupe(new Date(t).toISOString().slice(0, 10)) + ' à ' + Scenarios.heureUTC(t) + ' UTC';
+  if (src) out.push((isNum(src.updated) ? 'Fichier publié le ' + jourH(src.updated) + ', relu' : 'Fichier relu') + ' à ' + Scenarios.heureUTC(src.luA) + ' UTC'
+    + (previsionsEchec ? ' ; dernière relecture impossible (' + scenRaison(previsionsEchec.raison) + ', ' + Scenarios.heureUTC(previsionsEchec.a) + ' UTC)' : '') + '.');
+  else if (previsionsEchec) out.push('Dernière lecture : ' + scenRaison(previsionsEchec.raison) + ' à ' + Scenarios.heureUTC(previsionsEchec.a) + ' UTC. Rien n’est dessiné tant qu’aucun fichier lisible n’est arrivé.');
+  out.push(exp ? 'Description, pas une recommandation.' : 'Une description, pas une recommandation : rien ici ne dit quoi faire.');
+  return out;
+}
+/** Calque : l'encadré (déjà mis en page). Ne recalcule rien. */
+function scenCalque() {
+  const S = scenEtat, B = S && S.boite;
+  if (S) S.survol = null;            // posé par guideSurvol, s'il y a un curseur
+  if (!B || !overlays.scenarios) return;
+  cx.save();
+  cx.globalAlpha = B.seule ? 0.85 : 0.95; cx.fillStyle = COLORS.bulle;
+  cx.beginPath(); cx.roundRect(B.x, B.y, B.w, B.h, 5); cx.fill(); cx.globalAlpha = 1;
+  if (!B.seule) { cx.strokeStyle = avecAlpha(COLORS.accent, 0.5); cx.lineWidth = 1; cx.stroke(); }
+  let y = B.y + 4, prec = null;
+  for (const l of B.lignes) {
+    cx.font = B.police(l.f);
+    if (l.it && l.it !== prec) { cx.fillStyle = l.it.coul; cx.fillRect(B.x + 5, y + 2.5, 3, l.h - 4); }
+    if (l.it) prec = l.it;
+    cx.fillStyle = l.f === 'note' || l.f === 'seule' ? COLORS.text : COLORS.ink1;
+    cx.fillText(l.t, B.x + (B.seule || B.replie ? 6 : 12), y + l.h - 3.5);
+    y += l.h;
+  }
   cx.restore();
 }
 
@@ -5869,6 +6723,8 @@ async function init() {
   viewStart = Math.max(0, candles.length - 50);
   viewEnd = candles.length;
   drawChart();
+  // Les scénarios du matin : APRÈS le premier dessin (ils ne retardent pas le premier écran).
+  fetchPrevisions();
   verreDuTheme();          // hyalite n'arrive qu'APRÈS le premier dessin, et seulement si le thème le veut
   await Promise.all([prix, marche]);
   ajusterRuban();
@@ -5890,6 +6746,7 @@ async function init() {
   setInterval(visible(async () => { if (await fetchKlines()) drawChart(); }), CADENCES.bougies);
   setInterval(visible(fetchMarket), CADENCES.publication_lue);
   setInterval(visible(refreshRefSR), CADENCES.niveaux_sr);
+  setInterval(visible(fetchPrevisions), CADENCES.previsions_lue);
   // Heure de Binance (poids 1) : l'écart de l'horloge de ce poste, pour des âges justes.
   const heureBinance = visible(() => Horloges.mesurer(API_BINANCE + 'time'));
   heureBinance();
@@ -5902,6 +6759,7 @@ async function init() {
     lancerChronique();
     fetchPrice(); fetchMarket();
     if (overlays.liq) fetchHeatmap();
+    if (!previsions || Horloges.maintenant() - previsions.luA > CADENCES.previsions_lue) fetchPrevisions();
     if (await fetchKlines()) drawChart();
   });
 }

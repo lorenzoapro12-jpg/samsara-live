@@ -24,6 +24,7 @@
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
 // USAGE   node tests/test_sobriete.js
 const fs = require('fs'), path = require('path'), http = require('http');
+const { previsionsFixture, estPrevisions } = require('./previsions-fixture');   // scénarios du matin (branche previsions)
 const REPO = path.resolve(__dirname, '..');
 
 let playwright = null;
@@ -73,6 +74,7 @@ async function ouvrir(nav, theme, o = {}) {
     const u = r.request().url(), h = new URL(u).host, cors = { 'access-control-allow-origin': '*' };
     if (h.startsWith('127.0.0.1')) return r.continue();
     if (h === 'api.binance.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(binance(u)) });
+    if (estPrevisions(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: previsionsFixture() });
     if (h === 'raw.githubusercontent.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors,
       body: u.includes('heatmap') ? fs.readFileSync(path.join(REPO, 'heatmap.json')) : JSON.stringify(Object.assign({ updated: etat.maj }, MARCHE, { updated: etat.maj })) });
     return r.abort();

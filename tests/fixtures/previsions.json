@@ -1,0 +1,173 @@
+{
+ "format": "previsions-1",
+ "updated": "2026-10-09T04:52Z",
+ "groupe": "2026-10-09",
+ "version_methode": "v1",
+ "marge_pct": 0.3,
+ "emis_utc": "2026-10-09T04:40Z",
+ "prix_emission": 86000,
+ "scenarios": [
+  {
+   "id": "P0004",
+   "rang": "1",
+   "groupe": "2026-10-09",
+   "emis_utc": "2026-10-09T04:40Z",
+   "fin_utc": "2026-10-10T04:20Z",
+   "horizon_h": 23.7,
+   "prix_emission": 86000,
+   "forme": "chemin",
+   "cibles": [
+    86500,
+    87200
+   ],
+   "invalidation": 85500,
+   "range": null,
+   "marge_pct": 0.3,
+   "etiquettes": [
+    "structure",
+    "mur_options"
+   ],
+   "origines": {
+    "86500": "plus haut du 08/10",
+    "87200": "mur de calls",
+    "85500": "plus bas de la nuit"
+   },
+   "enonce": "Hausse vers 86 500 puis 87 200",
+   "version_methode": "v1",
+   "base_hasard_pct": 31,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null
+  },
+  {
+   "id": "P0005",
+   "rang": "2",
+   "groupe": "2026-10-09",
+   "emis_utc": "2026-10-09T04:40Z",
+   "fin_utc": "2026-10-10T04:20Z",
+   "horizon_h": 23.7,
+   "prix_emission": 86000,
+   "forme": "chemin",
+   "cibles": [
+    85500,
+    84800
+   ],
+   "invalidation": 86500,
+   "range": null,
+   "marge_pct": 0.3,
+   "etiquettes": [
+    "structure"
+   ],
+   "origines": {
+    "85500": "plus bas de la nuit",
+    "84800": "mur de puts",
+    "86500": "plus haut du 08/10"
+   },
+   "enonce": "Baisse vers 85 500 puis 84 800",
+   "version_methode": "v1",
+   "base_hasard_pct": 28,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null
+  },
+  {
+   "id": "P0006",
+   "rang": "3",
+   "groupe": "2026-10-09",
+   "emis_utc": "2026-10-09T04:40Z",
+   "fin_utc": "2026-10-10T04:20Z",
+   "horizon_h": 23.7,
+   "prix_emission": 86000,
+   "forme": "range",
+   "cibles": [],
+   "invalidation": null,
+   "range": [
+    85600,
+    86400
+   ],
+   "marge_pct": 0.3,
+   "etiquettes": [
+    "structure"
+   ],
+   "origines": {},
+   "enonce": "Range 85 600 – 86 400",
+   "version_methode": "v1",
+   "base_hasard_pct": 40,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null
+  },
+  {
+   "id": "P0003",
+   "rang": "S",
+   "groupe": "2026-10-08",
+   "emis_utc": "2026-10-08T04:40Z",
+   "fin_utc": "2026-10-15T04:40Z",
+   "horizon_h": 168,
+   "prix_emission": 86000,
+   "forme": "chemin",
+   "cibles": [
+    88000
+   ],
+   "invalidation": 84000,
+   "range": null,
+   "marge_pct": 0.3,
+   "etiquettes": [
+    "structure"
+   ],
+   "origines": {
+    "88000": "plus haut de la semaine"
+   },
+   "enonce": "Semaine : vers 88 000",
+   "version_methode": "v1",
+   "base_hasard_pct": 22,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null
+  }
+ ],
+ "precedents": [
+  {
+   "groupe": "2026-10-08",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Hausse vers 84 300 puis 86 000",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "2",
+     "enonce": "Baisse vers 80 900 puis 79 000",
+     "statut": "◐",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "3",
+     "enonce": "Range 81 000 – 84 000",
+     "statut": "❌",
+     "premier_ok": "haut"
+    }
+   ]
+  }
+ ],
+ "bilan": {
+  "ordre": {
+   "matins": 1,
+   "reussis": 0,
+   "regle": "chemin le mieux classé avec invalidation, première zone touchée avant l'invalidation"
+  }
+ },
+ "statuts": {
+  "⏳": "en cours",
+  "✅": "réalisé",
+  "❌": "invalidé d’abord",
+  "◐": "partiel",
+  "⌛": "rien de touché",
+  "⚠": "ambigu"
+ }
+}

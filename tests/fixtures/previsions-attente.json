@@ -1,0 +1,16 @@
+{
+ "format": "previsions-1",
+ "updated": "2026-10-08T16:39Z",
+ "groupe": null,
+ "version_methode": "v1",
+ "marge_pct": 1,
+ "emis_utc": null,
+ "prix_emission": null,
+ "scenarios": [],
+ "precedents": [],
+ "bilan": {
+  "matins_notes": 0,
+  "rang1_realises": 0
+ },
+ "note": "En attente du premier point du matin (09/10/2026, 07h00 Paris)."
+}
