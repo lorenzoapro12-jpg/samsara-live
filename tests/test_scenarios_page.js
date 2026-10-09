@@ -58,7 +58,8 @@ const serveur = http.createServer((req, res) => {
   fs.createReadStream(f).pipe(res);
 });
 
-/** prev : 'complet' | 'attente' | 'absent' ; sansGuide : le Guide masqué. */
+/** prev : 'complet' | 'attente' | 'absent' | 'hier' (point 26 h avant maintenant, rangs 1 à 3 finis) ;
+ *  sansGuide : le Guide masqué. */
 async function ouvrir(nav, vue, mode, prev, tactile, sansGuide) {
   const ctx = await nav.newContext(Object.assign({ viewport: vue, deviceScaleFactor: 1 }, tactile ? { hasTouch: true, isMobile: true } : {}));
   const page = await ctx.newPage();
@@ -71,7 +72,7 @@ async function ouvrir(nav, vue, mode, prev, tactile, sansGuide) {
     if (h === 'raw.githubusercontent.com') {
       if (estPrevisions(u)) {
         if (prev === 'absent') return r.fulfill({ status: 404, headers: cors, body: '' });
-        return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: prev === 'attente' ? previsionsAttente() : previsionsFixture() });
+        return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: prev === 'attente' ? previsionsAttente() : previsionsFixture(prev === 'hier' ? { ilYaMs: 26 * 3600e3 } : {}) });
       }
       if (u.includes('heatmap')) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, 'heatmap.json')) });
       if (/\/master\/market-data\.json/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: MD });
@@ -93,8 +94,12 @@ const etat = page => page.evaluate(() => {
     bx: b.left, by: b.top, vw: window.innerWidth, top: S.g.pad.top, ph: S.g.ph, left: S.g.pad.left, xMax: S.xMax,
     items: S.items.map(i => ({ rang: i.sc.rang, et: i.et.texte })),
     boite: S.boite ? { x: S.boite.x, y: S.boite.y, w: S.boite.w, h: S.boite.h, seule: S.boite.seule, replie: S.boite.replie, lignes: S.boite.lignes.map(l => l.t) } : null,
-    cibles: S.cibles.map(c => ({ prio: c.prio, titre: c.titre, rects: c.rects || [], texte: c.texte })),
-    groupe: previsions && previsions.groupe,
+    cibles: S.cibles.map(c => ({ prio: c.prio, titre: c.titre, rects: c.rects || [], texte: c.texte, segs: (c.segs || []).length })),
+    groupe: previsions && previsions.groupe, itv: S.itv, ouverts: S.items.map(i => i.ouvert),
+    // Les bougies les plus récentes (le quart de la vue, au moins 3) : leurs rectangles à l'écran.
+    recentes: (() => { const g = S.g, n = Math.max(3, Math.ceil(g.n * 0.25)), out = [];
+      for (let i = Math.max(g.vs, g.ve - n); i < g.ve; i++) { const c = candles[i]; out.push({ x0: g.pad.left + g.gap * (i - g.vs), x1: g.pad.left + g.gap * (i - g.vs) + g.candleW, y0: S.yDe(c.high), y1: S.yDe(c.low) }); }
+      return out; })(),
   };
 });
 
@@ -112,27 +117,35 @@ const etat = page => page.evaluate(() => {
       if (!e) { check(`${nom} : la couche des scénarios est préparée`, false); await o.ctx.close(); continue; }
       check(`${nom} : 4 scénarios suivis (1, 2, 3, semaine)`, e.items.map(i => i.rang).join() === '1,2,3,S', e.items);
       const B = e.boite, jour = e.groupe.slice(8, 10) + '/' + e.groupe.slice(5, 7), titreB = 'Scénarios du matin · ' + jour + ' 07h00 Paris';
-      // Avec le Guide (il place ses libellés d'abord) : l'encadré tient, ou il est replié en une
-      // ligne (son titre, et le rang 1 si la ligne le permet) dont l'explication dit tout ;
-      // jamais replié sans le Guide, ni sur un grand écran (1440 px).
-      const repliable = !sansGuide && vue.width < 1400;
+      // L'encadré ne couvre jamais les bougies récentes, ni des bougies au milieu du tracé : sous
+      // 1400 px (bougies simulées sur toute la hauteur), il tient ou il est replié en une ligne qui
+      // nomme le rang 1 si la ligne le permet, et dont l'explication dit tout ; jamais replié sur
+      // un grand écran (1440 px).
+      const repliable = vue.width < 1400;
       check(`${nom} : encadré ${repliable ? 'complet ou replié en une ligne' : 'complet (non replié)'}`, B && (repliable || !B.replie), B);
       const expl = B && B.replie ? (e.cibles.find(c => c.titre === titreB && c.prio === 0) || {}).texte || [] : [];
       const L = B ? (B.replie ? [B.lignes[0]].concat(expl) : B.lignes) : [];
-      check(`${nom} : titre « ${titreB} »`, B && B.lignes[0].startsWith(titreB), B && B.lignes[0]);
+      check(`${nom} : titre « ${titreB} »${repliable ? ' (replié : ou « Scénario 1 … »)' : ''}`, B && (B.lignes[0].startsWith(titreB) || (B.replie && /^Scénarios?( 1)?\b/.test(B.lignes[0]))), B && B.lignes[0]);
+      check(`${nom} : l'encadré ne couvre aucune des bougies les plus récentes${B && B.replie ? ' (sauf ligne épinglée faute de place)' : ''}`,
+        B && (B.replie || !e.recentes.some(c => c.x1 > B.x && c.x0 < B.x + B.w && c.y1 > B.y && c.y0 < B.y + B.h)), [B, e.recentes.slice(-3)]);
       check(`${nom} : une ligne par scénario, marquée 1., 2., 3., Semaine${B && B.replie ? ' (dans l’explication du titre replié)' : ''}`, ['1. ', '2. ', '3. ', 'Semaine : '].every(m => L.some(l => l.startsWith(m))), L);
       check(`${nom} : encadré dans le tracé ${B && B.replie ? '' : '(dans sa moitié haute) '}et dans l'écran`, B && B.x >= e.left && B.x + B.w <= e.xMax + 0.5 && B.y >= e.top
         && B.y + B.h <= e.top + (B.replie ? e.ph : e.ph / 2 + 0.5) && e.bx + B.x + B.w <= e.vw, [B, e.left, e.xMax, e.top, e.ph]);
       const texte = L.join(' ');
       if (mode === 'debutant') {
-        check(`${nom} : « Le classement va du plus au moins probable, sans pourcentage. »`, /Le classement va du plus au moins probable, sans/.test(texte), L);
+        check(`${nom} : le classement est dit de Claude (une IA), sans pourcentage`, /Class(ement de|é par) Claude \((une )?IA\)[^]*[Ss]ans pourcentage/.test(texte), L);
         check(`${nom} : aucun « % » dans l'encadré ni dans les libellés`, !/%/.test(B.lignes.join(' ')) && !e.cibles.some(c => /%/.test(c.titre || '')), L);
       }
       check(`${nom} : bilan « Ordre du premier mouvement … 0 fois sur 1 matin · échantillon faible »`, /Ordre du (premier|1er) mouvement/.test(texte) && /échantillon faible/.test(texte), L);
       check(`${nom} : « suivi en direct » dit`, /[Ss]uivi en direct/.test(texte), L);
       // Libellé du rang 1 et survol.
-      const lib = e.cibles.find(c => c.prio === 1 && c.rects.length && /\(rang 1\)$/.test(c.titre));
-      check(`${nom} : libellé du rang 1 posé sur le graphique${repliable ? ' (ou nommé par l’explication de l’encadré replié)' : ''}`, !!lib || (repliable && B && B.replie && L.some(l => l.startsWith('1. '))), e.cibles.map(c => [c.prio, c.titre]));
+      // Le rang 1 passe devant les libellés du Guide : nommé sur le graphique (au téléphone, au
+      // moins par la ligne repliée, sans toucher), et jamais seul sans nom quand un autre rang en a un.
+      const lib = e.cibles.find(c => c.prio === 1 && c.rects.length && /\(rang\s1\)/.test(c.titre));
+      const autres = e.cibles.filter(c => c.prio === 1 && c.rects.length && /\(rang\s[23]\)|^Scénario de la semaine|^Sem\./.test(c.titre));
+      const vuSansToucher = !!lib || (vue.width < 500 && B && B.replie && /Scénario 1\b| 1\. /.test(B.lignes[0]));
+      check(`${nom} : rang 1 nommé sur le graphique sans toucher${vue.width < 500 ? ' (libellé, ou ligne repliée qui le nomme)' : ' (libellé posé)'}`, vuSansToucher, [B && B.lignes[0], e.cibles.map(c => [c.prio, c.titre])]);
+      check(`${nom} : jamais un autre rang nommé quand le rang 1 ne l’est pas`, !!lib || !autres.length, autres.map(c => c.titre));
       if (lib) {
         const r = lib.rects[0], x = e.bx + (r.x0 + r.x1) / 2, y = e.by + (r.y0 + r.y1) / 2;
         await o.page.mouse.move(x - 12, y - 4); await o.page.mouse.move(x, y, { steps: 3 }); await o.page.waitForTimeout(150);
@@ -151,7 +164,7 @@ const etat = page => page.evaluate(() => {
     {
       const t = await ouvrir(nav, { width: 390, height: 800 }, 'debutant', 'complet', true);
       const e = await etat(t.page);
-      const c = e && (e.cibles.find(q => q.prio === 1 && q.rects.length && /\(rang 1\)$/.test(q.titre))
+      const c = e && (e.cibles.find(q => q.prio === 1 && q.rects.length && /\(rang\s1\)/.test(q.titre))
         || (e.boite && e.boite.replie ? e.cibles.find(q => q.prio === 0 && q.rects.length && /^Scénarios du matin/.test(q.titre)) : null));
       if (!c) check('un libellé du rang 1 (ou l’encadré replié) à toucher', false, e && e.cibles.map(q => [q.prio, q.titre]));
       else {
@@ -165,6 +178,27 @@ const etat = page => page.evaluate(() => {
       }
       check('écran tactile : aucune erreur JavaScript', !t.erreurs.length, t.erreurs);
       await t.ctx.close();
+    }
+
+    titre('Changement d’intervalle, groupe terminé');
+    {
+      const o = await ouvrir(nav, { width: 1440, height: 900 }, 'debutant', 'complet');
+      await o.page.click('#int_1h'); await o.page.waitForTimeout(800);
+      const e = await etat(o.page);
+      check('clic sur 1h : aucune erreur JavaScript (changeInterval)', !o.erreurs.length, o.erreurs);
+      check('clic sur 1h : la couche est refaite sur les bougies 1 h', e && e.itv === '1 h' && e.items.length === 4, e && [e.itv, e.items.length]);
+      await o.page.click('#int_4h'); await o.page.waitForTimeout(800);
+      const e4 = await etat(o.page);
+      check('clic sur 4h : pas de suivi sur des bougies trop larges (dit tel quel), aucune erreur', !o.erreurs.length && e4 && e4.items.filter(i => i.rang !== '3' || true).some(i => /bougies 4 h \(trop larges\)/.test(i.et)), [o.erreurs, e4 && e4.items]);
+      await o.ctx.close();
+      const h = await ouvrir(nav, { width: 1440, height: 900 }, 'debutant', 'hier');
+      const eh = await etat(h.page);
+      check('groupe terminé : titre « Scénarios d’hier (terminés) · semaine en cours » (encadré complet ou replié)', eh && eh.boite && /^Scénarios d’hier \(terminés\) · semaine en cours/.test(eh.boite.lignes[0]), eh && eh.boite);
+      check('groupe terminé : aucun scénario ouvert parmi les rangs 1 à 3, aucune flèche vers le futur', eh && eh.items.every((i, k) => i.rang === 'S' || !eh.ouverts[k])
+        && !eh.cibles.some(c => c.prio === 2 && c.segs > 0 && !/^Scénario de la semaine/.test(c.titre)), eh && eh.cibles.filter(c => c.prio === 2).map(c => [c.titre, c.segs]));
+      check('groupe terminé : aucune erreur JavaScript', !h.erreurs.length, h.erreurs);
+      if (process.env.SCEN_CAPTURES) await h.page.screenshot({ path: path.join(process.env.SCEN_CAPTURES, 'hier-1440.png') });
+      await h.ctx.close();
     }
 
     titre('Fichier d’attente, fichier absent : une ligne');

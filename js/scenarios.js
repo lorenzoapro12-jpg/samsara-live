@@ -61,6 +61,8 @@ const Scenarios = (function () {
   /** Zone d'un niveau : [niveau × (1 − m), niveau × (1 + m)] (zone() de noter.py). */
   const zone = (niveau, margePct) => [niveau * (1 - margePct / 100), niveau * (1 + margePct / 100)];
   const ordinal = k => (k === 1 ? '1re' : k + 'e');
+  /** Un niveau venu d'un modèle d'options (murs de calls ou de puts, zéro gamma) le dit : « (modèle) ». */
+  const modele = o => (/\b(calls?|puts?|gamma|options?)\b/i.test(o) && !/modèle/i.test(o) ? o + ' (modèle)' : o);
 
   // ─── 1. Lecture du fichier ─────────────────────────────────────────────────
   /** Un scénario du fichier → objet propre, ou null s'il n'est pas utilisable (dates, niveaux). */
@@ -84,7 +86,7 @@ const Scenarios = (function () {
       if (!bornes || bornes.length !== 2 || !bornes.every(v => fini(v) && v > 0) || !(bornes[0] < bornes[1])) return null;
     }
     const origines = {};
-    if (x.origines && typeof x.origines === 'object') for (const [k, v] of Object.entries(x.origines)) if (typeof v === 'string' && v.trim()) origines[k] = v.trim();
+    if (x.origines && typeof x.origines === 'object') for (const [k, v] of Object.entries(x.origines)) if (typeof v === 'string' && v.trim()) origines[k] = modele(v.trim());
     const statut = typeof x.statut === 'string' && x.statut in STATUTS ? x.statut : '⏳';
     return {
       id: String(x.id || rang + '@' + x.emis_utc), rang, groupe: typeof x.groupe === 'string' ? x.groupe : null, emis, fin,
@@ -116,7 +118,8 @@ const Scenarios = (function () {
     const o = d.bilan && d.bilan.ordre;
     if (o && fini(o.matins) && fini(o.reussis) && o.matins >= 0 && o.reussis >= 0 && o.reussis <= o.matins) bilan = { matins: o.matins, reussis: o.reussis, regle: typeof o.regle === 'string' ? o.regle : null };
     const base = { updated: dateUTC(d.updated), groupe: typeof d.groupe === 'string' ? d.groupe : null, note, statuts, bilan,
-      precedents: Array.isArray(d.precedents) ? d.precedents.filter(p => p && typeof p.groupe === 'string' && Array.isArray(p.scenarios)) : [] };
+      precedents: Array.isArray(d.precedents) ? d.precedents.filter(p => p && typeof p.groupe === 'string' && Array.isArray(p.scenarios))
+        .map(p => ({ groupe: p.groupe, scenarios: p.scenarios.filter(x => x && typeof x === 'object') })) : [] };
     if (!base.groupe || !d.scenarios.length) return Object.assign(base, { etat: 'attente', scenarios: [] });
     const margeDefaut = fini(d.marge_pct) ? d.marge_pct : null;
     const tous = d.scenarios.map(x => scenario(x, margeDefaut));
@@ -134,18 +137,39 @@ const Scenarios = (function () {
       prixEmission: fini(d.prix_emission) ? d.prix_emission : (gardes[0].prixEmission),
       marge: margeDefaut !== null ? margeDefaut : gardes[0].marge,
       ancien: jour.length > 0 && jour.every(s => s.fin <= t),
-      fin: Math.max(...jour.concat(gardes).map(s => s.fin)),
+      // La fin des scénarios DU JOUR (rangs 1 à 3) ; la semaine seulement s'il n'y a qu'elle.
+      fin: Math.max(...(jour.length ? jour : gardes).map(s => s.fin)),
+      finSemaine: gardes.some(s => s.rang === 'S') ? Math.max(...gardes.filter(s => s.rang === 'S').map(s => s.fin)) : null,
     });
+  }
+  /** Les scénarios à montrer MAINTENANT (une page restée ouverte relit l'heure, pas le fichier) :
+   *  le scénario de la semaine d'un matin passé disparaît une fois fini. */
+  function vivants(F, maintenant) {
+    if (!F || F.etat !== 'ok') return [];
+    const t = fini(maintenant) ? maintenant : Date.now();
+    return F.scenarios.filter(s => s.rang !== 'S' || s.groupe === F.groupe || (s.statut === '⏳' && s.fin > t));
+  }
+  /** Le groupe est-il terminé MAINTENANT (les rangs 1 à 3 tous finis) ? */
+  function estAncien(F, maintenant) {
+    if (!F || F.etat !== 'ok') return false;
+    const t = fini(maintenant) ? maintenant : Date.now(), jour = F.scenarios.filter(s => s.rang !== 'S');
+    return jour.length > 0 && jour.every(s => s.fin <= t);
+  }
+  /** Le scénario est-il encore OUVERT (statut ⏳, fenêtre en cours, rien de décisif touché) ? Seul un
+   *  scénario ouvert garde sa flèche vers le futur. */
+  function ouvert(S, sv, maintenant) {
+    if (S.statut !== '⏳' || (fini(maintenant) && maintenant >= S.fin)) return false;
+    return !sv || sv.cle === null || ['avant', 'rien', 'cible', 'dedans', 'large'].includes(sv.cle);
   }
 
   // ─── 2. Suivi en direct (affichage), sur les bougies du graphique ──────────
   // Un pli bougie par bougie : l'état après les bougies CLOSES se mémorise, la bougie en cours
   // s'y ajoute (prolonger) sans rien refaire. Bougie = { t (ms, ouverture), h, l }.
-  function suiviVide() { return { n: 0, k: 0, kOpt: 0, temps: [], tempsI: [], opt: [], tInv: null, iInv: null, sortie: null, touchees: [], dernier: null }; }
+  function suiviVide(pasMs) { return { n: 0, k: 0, kOpt: 0, temps: [], tempsI: [], opt: [], tInv: null, iInv: null, sortie: null, touchees: [], dernier: null, debut: null, pas: fini(pasMs) ? pasMs : 0 }; }
   function touche(z, h, l) { return l <= z[1] && h >= z[0]; }
   /** Ajoute la bougie numéro i (ouverte à t ms, plus haut h, plus bas l) au suivi e (modifié). */
   function pas(S, e, i, t, h, l) {
-    e.n++; e.dernier = t;
+    e.n++; e.dernier = t; if (e.debut === null) e.debut = t;
     if (S.forme === 'range') {
       if (!e.sortie) {
         const b = l <= S.zones.bas, hh = h >= S.zones.haut;
@@ -163,14 +187,18 @@ const Scenarios = (function () {
     return e;
   }
   const copie = e => ({ n: e.n, k: e.k, kOpt: e.kOpt, temps: e.temps.slice(), tempsI: e.tempsI.slice(), opt: e.opt.slice(), tInv: e.tInv, iInv: e.iInv,
-    sortie: e.sortie ? Object.assign({}, e.sortie) : null, touchees: e.touchees.slice(), dernier: e.dernier });
-  /** Les bougies de T (s), H, L d'indices [a, b) qui comptent pour S : ouvertes au point ou après,
-   *  avant sa fin. → le pli. */
-  function plier(S, T, H, L, a, b, e0) {
-    const e = e0 ? copie(e0) : suiviVide();
+    sortie: e.sortie ? Object.assign({}, e.sortie) : null, touchees: e.touchees.slice(), dernier: e.dernier, debut: e.debut, pas: e.pas });
+  /** Une bougie ouverte à t (ms), de durée pasMs, compte-t-elle pour S ? Seulement si elle tient
+   *  ENTIÈRE dans la fenêtre [point, fin] : ni celle qui contient le point, ni celle qui déborde
+   *  la fin (ce qu'elle a fait après la fin n'est pas du scénario). */
+  const compte = (S, t, pasMs) => t >= S.emis && t + (fini(pasMs) ? pasMs : 0) <= S.fin && t < S.fin;
+  /** Les bougies de T (s), H, L d'indices [a, b) qui comptent pour S (compte()). pasMs : la durée
+   *  d'une bougie (ms). → le pli. */
+  function plier(S, T, H, L, a, b, e0, pasMs) {
+    const e = e0 ? copie(e0) : suiviVide(pasMs);
     for (let i = a; i < b; i++) {
       const t = T[i] * 1000;
-      if (t < S.emis || t >= S.fin) continue;
+      if (!compte(S, t, e.pas)) continue;
       pas(S, e, i, t, H[i], L[i]);
     }
     return e;
@@ -180,7 +208,8 @@ const Scenarios = (function () {
    *        'realise' | 'invalide' | 'ambigu' (même bougie, ordre inconnu) | 'dedans' | 'sortie'.
    *  fini : le scénario a dépassé sa fin (maintenant ≥ fin). */
   function etat(S, e, maintenant) {
-    const r = { cle: null, fini: fini(maintenant) && maintenant >= S.fin, n: e.n, t: null, k: e.k, temps: e.temps, tInv: e.tInv, touchees: e.touchees, sortie: e.sortie, memeBougie: false };
+    const r = { cle: null, fini: fini(maintenant) && maintenant >= S.fin, n: e.n, t: null, k: e.k, temps: e.temps, tInv: e.tInv, touchees: e.touchees, sortie: e.sortie, memeBougie: false,
+      pas: e.pas || 0, debut: e.debut };
     if (!e.n) { r.cle = 'avant'; return r; }
     if (S.forme === 'range') {
       if (e.sortie) { r.cle = e.sortie.bas && e.sortie.haut ? 'ambigu' : 'sortie'; r.t = e.sortie.t; r.memeBougie = e.sortie.bas && e.sortie.haut; }
@@ -201,18 +230,33 @@ const Scenarios = (function () {
     return r;
   }
   /** Suivi complet sur des colonnes (T en secondes) : → état lisible. */
-  function suivre(S, T, H, L, n, maintenant) { return etat(S, plier(S, T, H, L, 0, n), maintenant); }
+  function suivre(S, T, H, L, n, maintenant, pasMs) { return etat(S, plier(S, T, H, L, 0, n, null, pasMs), maintenant); }
+  /** Bougies trop larges pour suivre une fenêtre d'environ un jour (4 h, 1 jour…) : pas d'état. */
+  function etatLarge(S, pasMs, maintenant) {
+    return { cle: 'large', fini: fini(maintenant) && maintenant >= S.fin, n: 0, t: null, k: 0, temps: [], tInv: null, touchees: [], sortie: null, memeBougie: false, pas: pasMs, debut: null };
+  }
 
   // ─── 3. Les mots ───────────────────────────────────────────────────────────
   const NOMS_RANG = { '1': 'Scénario 1', '2': 'Scénario 2', '3': 'Scénario 3', S: 'Scénario de la semaine' };
   const COURTS_RANG = { '1': 'S1', '2': 'S2', '3': 'S3', S: 'Sem.' };
   const MARQUES_RANG = { '1': '1.', '2': '2.', '3': '3.', S: 'Semaine :' };
-  /** Les niveaux d'un scénario en mots : « 84 300 $ puis 86 000 $ » ; « entre 81 000 et 84 000 $ ». */
-  function niveaux(S, exp) {
-    if (S.forme === 'range') return exp ? 'range ' + chiffres(S.range[0]) + ' – ' + chiffres(S.range[1]) : 'entre ' + chiffres(S.range[0]) + ' et ' + prix(S.range[1]);
-    return exp ? S.cibles.map(chiffres).join(' > ') : S.cibles.map(prix).join(' puis ');
-  }
   const origine = (S, v) => (fini(v) ? S.origines[String(v)] || null : null);
+  /** Une origine entre parenthèses ; une origine qui en porte déjà (« mur de puts (modèle) ») ne
+   *  s'emboîte pas : « (mur de puts, modèle) ». */
+  const entreP = o => ' (' + o.replace(/\s*\(([^)]*)\)/g, ', $1') + ')';
+  /** Les niveaux d'un scénario en mots : « 84 300 $ puis 86 000 $ » ; « entre 81 000 et 84 000 $ ».
+   *  maxO : au plus maxO origines (défaut 0), chacune JUSTE APRÈS son propre niveau — jamais une
+   *  origine loin du nombre qu'elle nomme : « 84 300 $ (plus haut du 07/10) puis 85 600 $ ». */
+  function niveaux(S, exp, maxO) {
+    if (exp) return S.forme === 'range' ? 'range ' + chiffres(S.range[0]) + ' – ' + chiffres(S.range[1]) : S.cibles.map(chiffres).join(' > ');
+    let reste = maxO === undefined ? 0 : maxO;
+    const o = v => { const x = reste > 0 ? origine(S, v) : null; if (x) reste--; return x; };
+    if (S.forme === 'range') {
+      const oa = o(S.range[0]), ob = o(S.range[1]);
+      return 'entre ' + (oa ? prix(S.range[0]) + entreP(oa) : chiffres(S.range[0])) + ' et ' + prix(S.range[1]) + (ob ? entreP(ob) : '');
+    }
+    return S.cibles.map(v => { const x = o(v); return prix(v) + (x ? entreP(x) : ''); }).join(' puis ');
+  }
   /** L'origine du premier niveau qui en a une (libellé court). */
   function originePremiere(S) {
     const vs = S.forme === 'range' ? S.range : S.cibles;
@@ -220,60 +264,105 @@ const Scenarios = (function () {
     return null;
   }
   /** Le libellé posé près d'un scénario.
-   *  débutant : « Scénario 1 · 84 300 $ puis 86 000 $ · plus haut du 06/10 » ;
-   *  expert   : « S1 84 300 > 86 000 · inv 80 900 ».  court : sans l'origine. */
+   *  débutant : « Scénario 1 · 84 300 $ (plus haut du 06/10) puis 86 000 $ » (une origine, après
+   *  son niveau) ; court = true : sans origine ; court = 'complet' : toutes les origines ;
+   *  expert   : « S1 84 300 > 86 000 · inv 80 900 ». */
   function libelle(S, mode, court) {
     if (mode === 'expert') return COURTS_RANG[S.rang] + ' ' + niveaux(S, true) + (S.invalidation !== null ? ' · inv ' + chiffres(S.invalidation) : '');
-    const o = court ? null : originePremiere(S);
-    return NOMS_RANG[S.rang] + ' · ' + niveaux(S, false) + (o ? ' · ' + o : '');
+    return NOMS_RANG[S.rang] + ' · ' + niveaux(S, false, court === true ? 0 : court === 'complet' ? Infinity : 1);
   }
-  /** L'état en mots. sv : l'état du suivi (etat()) ; ctx = { itv (« 15 min ») }.
+  const jourDe = ms => new Date(ms).toISOString().slice(0, 10);
+  /** « 10:30 », précédé du jour (« 07/10 10:30 ») quand ce n'est pas le jour de `maintenant`. */
+  const quand = (t, maintenant) => (fini(maintenant) && fini(t) && jourDe(t) !== jourDe(maintenant) ? jourGroupe(jourDe(t)) + ' ' : '') + heureUTC(t);
+  /** Le moment d'un toucher : une bougie de plus d'une minute ne dit pas l'instant, seulement son
+   *  créneau. « entre 10:30 et 10:45 UTC » (court : « 10:30–10:45 UTC ») ; en 1 min, « à 10:31 UTC ». */
+  function creneau(t, pasMs, maintenant, court) {
+    if (!(pasMs > 60000)) return (court ? '' : 'à ') + quand(t, maintenant) + ' UTC';
+    return court ? quand(t, maintenant) + '–' + heureUTC(t + pasMs) + ' UTC' : 'entre ' + quand(t, maintenant) + ' et ' + heureUTC(t + pasMs) + ' UTC';
+  }
+  /** Le statut du journal en mots, avec ce que dit premier_ok (chemin : « oui » = la 1re cible avant
+   *  l'invalidation ; range : la borne qui a cédé). forme : 'chemin' | 'range' | null (déduite).
+   *  → { long, court } */
+  function motsStatut(statut, premierOk, forme, statuts, exp) {
+    const lib = (statuts || STATUTS)[statut] || STATUTS[statut] || String(statut || '—');
+    const range = forme === 'range' || (!forme && (premierOk === 'bas' || premierOk === 'haut'));
+    if (range) {
+      if (premierOk !== 'bas' && premierOk !== 'haut') return { long: lib, court: lib };
+      const sens = premierOk === 'bas' ? 'sorti par le bas' : 'sorti par le haut';
+      const l = statut === '❌' ? lib.replace(/\s*d[’']abord$/, '') : lib;
+      return { long: l + ' (' + sens + ')', court: statut === '❌' ? sens : l };
+    }
+    if (statut === '❌' && premierOk === 'oui') return { long: 'invalidé après la 1re cible' + (exp ? '' : ' (1re cible touchée d’abord)'), court: 'invalidé après la 1re cible' };
+    if (statut === '❌' && premierOk === 'non') return { long: lib + (exp ? ' (inval. avant la 1re cible)' : ' (invalidation touchée avant la 1re cible)'), court: lib };
+    if (premierOk === 'oui') return { long: lib + (exp ? ' (1re cible d’abord)' : ' (1re cible touchée avant l’invalidation)'), court: lib };
+    if (premierOk === 'non') return { long: lib + (exp ? ' (inval. d’abord)' : ' (invalidation touchée d’abord)'), court: lib };
+    return { long: lib, court: lib };
+  }
+  /** L'état en mots. sv : l'état du suivi (etat()) ; ctx = { itv (« 15 min »), maintenant (ms) }.
    *  Un statut résolu du fichier (≠ ⏳) passe AVANT le suivi : c'est la note officielle.
    *  → { texte, court, officiel, cle } */
   function texteEtat(S, sv, statuts, mode, ctx) {
-    const lib = (statuts || STATUTS)[S.statut] || STATUTS[S.statut] || S.statut;
-    const exp = mode === 'expert';
+    const exp = mode === 'expert', c = ctx || {}, now = c.maintenant;
     if (S.statut !== '⏳') {
-      let det = '';
-      if (S.forme === 'range' && (S.premierOk === 'bas' || S.premierOk === 'haut')) det = S.premierOk === 'bas' ? ' (borne basse cédée)' : ' (borne haute cédée)';
-      else if (S.premierOk === 'oui') det = exp ? ' (1re cible d’abord)' : ' (1re cible touchée avant l’invalidation)';
-      else if (S.premierOk === 'non' && S.statut !== '❌') det = exp ? ' (inval. d’abord)' : ' (invalidation touchée d’abord)';
-      const quand = fini(S.resolu) ? ' · ' + heureUTC(S.resolu) + ' UTC' : '';
-      return { cle: 'officiel', officiel: true, texte: (exp ? 'journal : ' : 'note du journal : ') + lib + det + quand, court: 'journal : ' + lib };
+      const m = motsStatut(S.statut, S.premierOk, S.forme, statuts, exp);
+      const q = fini(S.resolu) ? ' · ' + quand(S.resolu, now) + ' UTC' : '';
+      return { cle: 'officiel', officiel: true, texte: (exp ? 'journal : ' : 'note du journal : ') + m.long + q, court: 'journal : ' + m.court };
     }
-    const h = t => heureUTC(t) + ' UTC';
-    const itv = ctx && ctx.itv ? ctx.itv : '';
-    let t, c;
+    const pasMs = sv && sv.pas ? sv.pas : 0;
+    const cr = t => creneau(t, pasMs, now), crC = t => creneau(t, pasMs, now, true);
+    const itv = c.itv || '';
+    let t, k;
     switch (sv ? sv.cle : null) {
-      case 'avant': t = exp ? 'pas encore de bougie ' + itv + ' depuis le point' : 'en cours · pas encore de bougie ' + itv + ' depuis le point'; c = 'en cours'; break;
-      case 'rien': t = exp ? 'rien touché' : 'en cours · rien de touché'; c = 'rien touché'; break;
-      case 'cible': t = ordinal(sv.k) + ' cible touchée à ' + h(sv.t) + (sv.memeBougie ? ' · la suivante dans la même bougie, ordre inconnu' : ''); c = ordinal(sv.k) + ' cible ' + h(sv.t) + (sv.memeBougie ? ' · ordre inconnu' : ''); break;
-      case 'realise': t = (exp ? 'réalisé ' : 'réalisé à ') + h(sv.t); c = 'réalisé ' + h(sv.t); break;
-      case 'invalide': t = sv.premier ? '1re cible, puis invalidation à ' + h(sv.t) : 'invalidation touchée d’abord à ' + h(sv.t); c = 'invalidation ' + h(sv.t); break;
-      case 'ambigu': t = 'même bougie, ordre inconnu (' + h(sv.t || (sv.temps && sv.temps[0])) + ')'; c = 'ordre inconnu'; break;
-      case 'dedans': t = exp ? 'dedans' : 'dedans · aucune borne dépassée'; c = 'dedans'; break;
-      case 'sortie': t = (sv.sortie.haut ? 'borne haute' : 'borne basse') + ' dépassée à ' + h(sv.t); c = (sv.sortie.haut ? 'borne haute ' : 'borne basse ') + h(sv.t); break;
-      default: t = 'suivi indisponible'; c = '—';
+      case 'avant': t = (exp ? '' : 'en cours · ') + 'pas encore de bougie ' + itv + ' depuis le point'; k = 'en cours'; break;
+      case 'rien': {
+        // La 1re bougie comptée s'ouvre bien après le point (bougies d'une heure) : dit.
+        const tard = fini(sv.debut) && sv.debut - S.emis > 5 * 60000 ? ' depuis ' + quand(sv.debut, now) + ' UTC (bougies ' + itv + ')' : '';
+        t = (exp ? 'rien de touché' : 'en cours · rien de touché') + tard; k = 'rien de touché'; break;
+      }
+      case 'cible': t = ordinal(sv.k) + ' cible touchée ' + cr(sv.t) + (sv.memeBougie ? ' · la suivante dans la même bougie, ordre inconnu' : ''); k = ordinal(sv.k) + ' cible ' + crC(sv.t) + (sv.memeBougie ? ' · ordre inconnu' : ''); break;
+      case 'realise': t = 'réalisé ' + cr(sv.t); k = 'réalisé ' + crC(sv.t); break;
+      case 'invalide': t = sv.premier ? '1re cible, puis invalidation ' + cr(sv.t) : 'invalidation touchée d’abord ' + cr(sv.t); k = (sv.premier ? '1re cible, puis invalidation ' : 'invalidation d’abord ') + crC(sv.t); break;
+      case 'ambigu': {
+        const q = crC(sv.t || (sv.temps && sv.temps[0]));
+        t = (S.forme === 'range' ? 'les deux bornes dépassées' : 'une cible et l’invalidation') + ' dans la même bougie (' + q + ') : ordre inconnu'; k = 'ordre inconnu (même bougie)'; break;
+      }
+      case 'dedans': t = exp ? 'dedans' : 'dedans · aucune borne dépassée'; k = 'dedans'; break;
+      case 'sortie': t = (sv.sortie.haut ? 'borne haute' : 'borne basse') + ' dépassée ' + cr(sv.t); k = (sv.sortie.haut ? 'borne haute ' : 'borne basse ') + crC(sv.t); break;
+      case 'large': t = exp ? 'suivi : bougies trop larges' : 'suivi en direct indisponible sur les bougies ' + itv + ' (trop larges) : il se lit en 15 min ou 1 h'; k = 'suivi : bougies trop larges'; break;
+      default: t = 'suivi indisponible'; k = '—';
     }
-    if (sv && sv.fini) { t = 'terminé · ' + t.replace(/^en cours · /, '') + (exp ? ' · note à venir' : ' · note du journal à venir'); c = 'terminé · ' + c; }
-    return { cle: sv ? sv.cle : null, officiel: false, texte: t, court: c };
+    if (sv && sv.fini) { t = 'terminé · ' + t.replace(/^en cours · /, '') + (exp ? ' · note à venir' : ' · note du journal à venir'); k = 'terminé · ' + k; }
+    return { cle: sv ? sv.cle : null, officiel: false, texte: t, court: k };
   }
-  /** Le titre de l'encadré : « Scénarios du matin · 09/10 07h00 Paris » ; groupe terminé :
-   *  « Scénarios d'hier (terminés) » (ou de la date, s'il est plus vieux qu'hier). */
+  /** Le titre de l'encadré : « Scénarios du matin · 09/10 07h00 Paris » ; groupe terminé (à l'heure
+   *  de `maintenant`, pas à celle de la lecture) : « Scénarios d'hier (terminés) » (ou de la date,
+   *  s'il est plus vieux qu'hier), « · semaine en cours » si la semaine court encore. */
   function titre(F, P, maintenant) {
     if (!F || F.etat !== 'ok') return 'Scénarios du matin';
     const point = P && P.point ? ' ' + P.point + ' Paris' : '';
-    if (!F.ancien) return 'Scénarios du matin · ' + jourGroupe(F.groupe) + point;
-    const hier = fini(maintenant) ? new Date(maintenant - 86400000).toISOString().slice(0, 10) : null;
-    const auj = fini(maintenant) ? new Date(maintenant).toISOString().slice(0, 10) : null;
-    return (F.groupe === hier || F.groupe === auj ? 'Scénarios d’hier' : 'Scénarios du ' + jourGroupe(F.groupe)) + ' (terminés)';
+    if (!estAncien(F, maintenant)) return 'Scénarios du matin · ' + jourGroupe(F.groupe) + point;
+    const t = fini(maintenant) ? maintenant : Date.now();
+    const hier = jourDe(t - 86400000), auj = jourDe(t);
+    const sem = vivants(F, t).some(s => s.rang === 'S' && s.statut === '⏳' && s.fin > t) ? ' · semaine en cours' : '';
+    return (F.groupe === hier || F.groupe === auj ? 'Scénarios d’hier' : 'Scénarios du ' + jourGroupe(F.groupe)) + ' (terminés)' + sem;
   }
-  /** Une ligne de l'encadré : « 1. Hausse vers 84 300 puis 86 000 — en cours · rien de touché ». */
+  /** Une ligne de l'encadré. Débutant : ce qui est attendu ET ce qui l'invalide —
+   *  « 1. Hausse vers 86 500 puis 87 200, sans toucher 85 500 avant — en cours · rien de touché » ;
+   *  court : « 1. 86 500 $ puis 87 200 $ (inval. 85 500 $) — rien de touché » ; range :
+   *  « 3. Le prix reste entre 85 600 et 86 400 $ — dedans · aucune borne dépassée ». */
   function ligne(S, et, mode, court) {
-    let quoi = mode === 'expert' ? libelle(S, 'expert').replace(/^\S+ /, '') : court ? niveaux(S, false) : (S.enonce || niveaux(S, false));
-    // « Sem. Semaine : … » se lirait deux fois : l'énoncé de la semaine perd son préfixe.
-    if (S.rang === 'S') quoi = quoi.replace(/^semaine\s*:\s*/i, '');
-    return MARQUES_RANG[S.rang] + ' ' + quoi + ' — ' + (mode === 'expert' || court ? et.court : et.texte);
+    const exp = mode === 'expert';
+    let quoi;
+    if (exp) quoi = libelle(S, 'expert').replace(/^\S+ /, '');
+    else if (S.forme === 'range') quoi = 'Le prix reste ' + niveaux(S, false);
+    else if (court) quoi = niveaux(S, false) + (S.invalidation !== null ? ' (inval. ' + prix(S.invalidation) + ')' : '');
+    else {
+      quoi = S.enonce || 'Vers ' + niveaux(S, false);
+      if (S.invalidation !== null && !quoi.includes(chiffres(S.invalidation))) quoi += ', sans toucher ' + chiffres(S.invalidation) + ' avant';
+    }
+    // « Semaine : Semaine : … » se lirait deux fois : l'énoncé de la semaine perd son préfixe.
+    if (S.rang === 'S') { quoi = quoi.replace(/^semaine\s*:\s*/i, ''); if (!exp) quoi = quoi.charAt(0).toLowerCase() + quoi.slice(1); }
+    return MARQUES_RANG[S.rang] + ' ' + quoi + ' — ' + (exp || court ? et.court : et.texte);
   }
   /** La mesure de l'ordre, seul chiffre de réussite montré (bilan.ordre du fichier). */
   function texteBilan(b, P, mode) {
@@ -283,23 +372,27 @@ const Scenarios = (function () {
     if (mode === 'expert') return 'Ordre du 1er mouvement : ' + b.reussis + '/' + m + (faible ? ' · échantillon faible' : '');
     return 'Ordre du premier mouvement juste ' + b.reussis + ' fois sur ' + m + (faible ? ' · échantillon faible' : '');
   }
+  /** Ce que compte la mesure de l'ordre (dit avec elle). */
+  const REGLE_BILAN = 'Ne comptent que les matins où le chemin le mieux classé a touché sa 1re zone ou son invalidation ; « juste » = la 1re zone d’abord. C’est le seul chiffre de réussite montré ici.';
   const SENS_RANG = {
-    '1': 'Rang 1 : le scénario jugé le plus probable ce matin parmi les trois. Un classement, sans pourcentage.',
-    '2': 'Rang 2 : jugé moins probable que le 1, plus que le 3. Un classement, sans pourcentage.',
-    '3': 'Rang 3 : le moins probable des trois. Un classement, sans pourcentage.',
-    S: 'Scénario de la semaine : une fenêtre plus longue, qui chevauche les matins suivants ; il ne compte pas dans la mesure de l’ordre.',
+    '1': 'Rang 1 : jugé par Claude le plus probable des trois ce matin. Un classement, sans pourcentage.',
+    '2': 'Rang 2 : jugé par Claude moins probable que le 1, plus que le 3. Un classement, sans pourcentage.',
+    '3': 'Rang 3 : jugé le moins probable des trois. Un classement, sans pourcentage.',
+    S: 'Scénario de la semaine : une fenêtre plus longue, à part du classement, qui chevauche les matins suivants ; il ne compte pas dans la mesure de l’ordre.',
   };
-  /** L'explication complète d'un scénario (survol), en lignes. sv : état du suivi ; ctx = { itv, statuts }. */
+  /** L'explication complète d'un scénario (survol), en lignes. sv : état du suivi ; ctx = { itv, statuts, maintenant }. */
   function explication(S, sv, mode, P, ctx) {
     const exp = mode === 'expert', c = ctx || {}, out = [];
     const m = nb(S.marge) + ' %';
     const z = v => { const [a, b] = zone(v, S.marge); return chiffres(a) + ' – ' + prix(b); };
-    // Une origine déjà entre parenthèses (« mur de puts (modèle) ») ne s'emboîte pas : virgule.
-    const avecO = v => { const o = origine(S, v); return prix(v) + (o ? ' (' + o.replace(/\s*\(([^)]*)\)/g, ', $1') + ')' : ''); };
+    const avecO = v => { const o = origine(S, v); return prix(v) + (o ? entreP(o) : ''); };
     if (S.enonce) out.push(S.enonce + '.');
     if (S.forme === 'chemin') {
-      out.push((exp ? 'Cibles dans l’ordre : ' : 'Ce scénario se lit : ') + S.cibles.map(avecO).join(exp ? ' > ' : ', puis ')
-        + (S.invalidation !== null ? (exp ? ' ; invalidation ' : ', sans toucher d’abord ') + avecO(S.invalidation) : '') + '.');
+      if (exp) out.push('Cibles dans l’ordre : ' + S.cibles.map(avecO).join(' > ') + (S.invalidation !== null ? ' ; invalidation ' + avecO(S.invalidation) : '') + '.');
+      else {
+        out.push('Ce scénario se lit : le prix touche ' + S.cibles.map(avecO).join(', puis ') + (S.invalidation !== null ? ', sans toucher avant ' + avecO(S.invalidation) : '') + '.');
+        if (S.invalidation !== null) out.push(prix(S.invalidation) + ' est l’invalidation : si sa zone est touchée avant la dernière cible, le scénario est invalidé.');
+      }
       out.push((exp ? 'Zones ± ' + m + ' : ' : 'Chaque niveau est une zone (le niveau ± ' + m + ') : ') + S.cibles.map((v, k) => (exp ? ordinal(k + 1) + ' ' : 'cible ' + (k + 1) + ' : ') + z(v)).join(' ; ')
         + (S.invalidation !== null ? (exp ? ' ; invalidation ' : ' ; invalidation : ') + z(S.invalidation) : '') + '.');
     } else {
@@ -308,7 +401,7 @@ const Scenarios = (function () {
     }
     const finP = heureParis(S.fin);
     const emP = heureParis(S.emis);
-    out.push((exp ? 'Émis ' : 'Émis à ') + heureUTC(S.emis) + ' UTC' + (emP ? ' (' + emP + ' Paris)' : '') + (fini(S.prixEmission) ? (exp ? ' à ' : ', prix ') + prix(S.prixEmission) : '') + ' · fin ' + jourGroupe(new Date(S.fin).toISOString().slice(0, 10)) + ' ' + heureUTC(S.fin) + ' UTC'
+    out.push((exp ? 'Émis ' : 'Émis le ') + jourGroupe(jourDe(S.emis)) + ' à ' + heureUTC(S.emis) + ' UTC' + (emP ? ' (' + emP + ' Paris)' : '') + (fini(S.prixEmission) ? (exp ? ' à ' : ', prix ') + prix(S.prixEmission) : '') + ' · fin ' + jourGroupe(jourDe(S.fin)) + ' ' + heureUTC(S.fin) + ' UTC'
       + (finP ? ' (jusqu’à ' + finP + ' Paris)' : '') + (fini(S.horizon) ? ' · horizon ' + nb(Math.round(S.horizon * 10) / 10) + ' h' : '') + '.');
     const et = texteEtat(Object.assign({}, S, { statut: '⏳' }), sv, c.statuts, mode, c);
     out.push((exp ? 'Suivi en direct (bougies ' + (c.itv || '') + ') : ' : 'Suivi en direct sur les bougies ' + (c.itv || '') + ' du graphique : ') + et.texte + '.'
@@ -321,7 +414,7 @@ const Scenarios = (function () {
     return out;
   }
 
-  return { FORMAT, RANGS, STATUTS, chiffres, prix, heureUTC, heureParis, jourGroupe, dateUTC, zone, lire, suiviVide, pas, plier, etat, suivre, copie,
-    niveaux, originePremiere, libelle, texteEtat, titre, ligne, texteBilan, explication, NOMS_RANG, COURTS_RANG, SENS_RANG };
+  return { FORMAT, RANGS, STATUTS, chiffres, prix, heureUTC, heureParis, jourGroupe, dateUTC, zone, lire, vivants, estAncien, ouvert, compte, suiviVide, pas, plier, etat, etatLarge, suivre, copie,
+    niveaux, originePremiere, libelle, quand, creneau, motsStatut, texteEtat, titre, ligne, texteBilan, REGLE_BILAN, explication, NOMS_RANG, COURTS_RANG, SENS_RANG };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Scenarios;

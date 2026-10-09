@@ -416,7 +416,7 @@ const PARAM = {
     echantillonFaible: 20,        // « échantillon faible » sous 20 matins notés (bilan de l'ordre)
     // L'encadré : en haut à droite du tracé, au plus `boiteMax` px de large et `boiteFraction` du
     // tracé (téléphone : `boiteFractionEtroit`) ; jamais au-delà de la moitié haute du tracé.
-    boiteMax: 380, boiteFraction: 0.46, boiteFractionEtroit: 0.94,
+    boiteMax: 440, boiteFraction: 0.46, boiteFractionEtroit: 0.94,
     // Échelle de prix : la vue s'élargit pour montrer la 1re zone et l'invalidation du rang 1
     // (et les bornes d'un range de rang 1), d'au plus `echelleMax` fois l'amplitude des bougies
     // visibles de chaque côté ; seulement quand la vue montre des bougies depuis le point, et sur
@@ -425,6 +425,13 @@ const PARAM = {
     echelleMax: 0.6, echelleLargeurMin: 520,
     // Tracé « étroit » (téléphone) sous `etroit` px : libellés plus larges, encadré plus large.
     etroit: 520,
+    // Suivi en direct : seulement sur des bougies d'au plus `suiviPasMax` s (1 h). Une bougie de
+    // 4 h ou d'un jour couvre une trop grande part de la fenêtre (≈ 24 h) pour dire un ordre.
+    suiviPasMax: 3600,
+    // Couleurs des rangs : prises parmi les jetons du thème, à au moins `ecartCouleur` (distance
+    // RVB) de la hausse, de la baisse, de la couleur du Guide et du fond — une couleur de rang ne
+    // doit jamais se lire comme une direction.
+    ecartCouleur: 90,
   },
 };
 const periodeDe = cle => +String(cle).replace(/\D/g, '');     // 'ema20' -> 20
@@ -447,7 +454,7 @@ const INDICATORS = [
   // sans faire défiler le menu.
   { cat: 'Guide', items: [
     { key: 'guide', label: 'Guide : niveaux nommés, régime, formes, suite', tag: 'gd' },
-    { key: 'scenarios', label: 'Scénarios du matin (point de ' + PARAM.scenarios.point + ', BTC)', tag: 'gd' },
+    { key: 'scenarios', label: 'Scénarios du matin de Claude, une IA (' + PARAM.scenarios.point + ' Paris, BTC)', tag: 'gd' },
   ]},
   { cat: 'Overlays', items: [
     ...['ema20', 'ema50', 'ema100', 'ema200', 'sma20', 'sma50'].map(k => ({ key: k, label: k.slice(0, 3).toUpperCase() + ' ' + periodeDe(k), tag: 'ov' })),
@@ -559,8 +566,8 @@ async function changeInterval(interval, label) {
   chartInterval = interval;
   priceScale = 1.0; pricePan = 0;
   await afficherSerie();
-  // Retour sur BTCUSDT : les scénarios du matin, s'ils n'ont pas été relus depuis une cadence.
-  if (symbol === 'BTCUSDT' && (!previsions || Horloges.maintenant() - previsions.luA > CADENCES.previsions_lue)) fetchPrevisions();
+  // Les scénarios du matin, s'ils n'ont pas été relus depuis une cadence (BTCUSDT seulement).
+  if (activeSymbol === 'BTCUSDT' && (!previsions || Horloges.maintenant() - previsions.luA > CADENCES.previsions_lue)) fetchPrevisions();
 }
 
 const NOMS_PAIRES = { BTCUSDT: 'BTC/USDT', SOLUSDT: 'SOL/USDT', XRPUSDT: 'XRP/USDT', TAOUSDT: 'TAO/USDT', BTCSOL: 'BTC/SOL' };
@@ -2639,6 +2646,7 @@ function lireJetons() {
   COLORS.warn = v('--warn', '#f0a50b');
   COLORS.sess = [v('--sess-asie', 'rgba(255,152,0,0.75)'), v('--sess-europe', 'rgba(33,150,243,0.75)'), v('--sess-us', 'rgba(156,39,176,0.75)')];
   COLORS.sr = [v('--sr-1', '#ce93d8'), v('--sr-2', '#26c6da'), v('--sr-3', '#ffc107')];
+  COLORS.scen = scenPalette();
   COLORS.fib = v('--fib', '#f0a50b'); COLORS.vp = v('--vp', '#64b4ff'); COLORS.vpPoc = v('--vp-poc', '#ffc828');
   COLORS.grid_tp = avecAlpha(COLORS.sr[2], 0.6);
   COLORS.filigrane = num('--filigrane', 0.05);
@@ -3503,6 +3511,8 @@ function resolveChart(candles, padL, padR, chartH, W) {
   
   // Guide : formes, chemins conditionnels, libellés (au-dessus des bougies et de la chaleur).
   // Les scénarios du matin ensuite : ils prennent la place que le Guide laisse.
+  // Le libellé du rang 1 d'abord (il passe devant les libellés des niveaux du Guide).
+  if (scen) scenAvantGuide(scen);
   if (guide) guideTracer(guide);
   if (scen) scenTracer(scen);
 
@@ -3740,7 +3750,7 @@ function guideLignes(g, texte, w, max) {
   const mots = [];
   for (const m of String(texte).split(' ')) {
     const k = mots.length - 1;
-    if (k >= 0 && /\d$/.test(mots[k]) && /^(\d{3}(?:\D|$)|\$|%|SOL\b|min\b|h\b|j\b|jours?\b|semaines?\b)/.test(m)) mots[k] += ' ' + m;
+    if (k >= 0 && /\d$/.test(mots[k]) && /^(\d{3}(?:\D|$)|\$|%|SOL\b|UTC\b|min\b|h\b|j\b|jours?\b|semaines?\b)/.test(m)) mots[k] += ' ' + m;
     else mots.push(m);
   }
   const out = [];
@@ -4387,13 +4397,27 @@ function guideSurvol(W, mainH, evite) {
 let scenEtat = null;
 let scenLargeur = Infinity;            // largeur du tracé de la dernière image (échelle des scénarios)
 const SCEN_SUIVI = new Map();          // (fichier, scénario, intervalle, bougies closes) → pli du suivi
-/** Les scénarios à dessiner (couche affichée, BTCUSDT, fichier lisible avec des scénarios), ou null. */
+/** Les scénarios à dessiner MAINTENANT (couche affichée, BTCUSDT, fichier lisible ; la semaine d'un
+ *  matin passé disparaît une fois finie, même si le fichier n'a pas changé), ou null. */
 function scenDessinables() {
-  if (!overlays.scenarios || activeSymbol !== 'BTCUSDT' || !previsions || previsions.etat !== 'ok' || !previsions.scenarios.length) return null;
-  return previsions.scenarios;
+  if (!overlays.scenarios || activeSymbol !== 'BTCUSDT' || !previsions || previsions.etat !== 'ok') return null;
+  const L = Scenarios.vivants(previsions, Horloges.maintenant());
+  return L.length ? L : null;
 }
-/** Couleur d'un rang : le 1 à l'accent du thème, le 2 à l'encre, le 3 et la semaine à l'encre pâle. */
-const scenCouleur = rang => (rang === '1' ? COLORS.accent : rang === '2' ? COLORS.ink1 : COLORS.ink3);
+/** Les couleurs des rangs 1 et 2 (lireJetons, jamais par image) : parmi les jetons du thème, la
+ *  première assez loin de la hausse, de la baisse, de la couleur du Guide (accent-2) et du fond —
+ *  une couleur de rang ne se lit pas comme une direction. Rangs 3 et semaine : l'encre pâle. */
+function scenPalette() {
+  const d = (a, b) => { const x = rvb(a), y = rvb(b); return x && y ? Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]) : 999; };
+  const E = PARAM.scenarios.ecartCouleur, eviter = [COLORS.candleUp, COLORS.candleDown, COLORS.accent2, COLORS.surface];
+  const cands = [COLORS.accent, COLORS.sr[0], COLORS.sr[1], COLORS.warn, COLORS.sr[2], COLORS.fib, COLORS.vp];
+  const ok = (c, autres, e) => eviter.concat(autres).every(x => d(c, x) >= (e || E));
+  const un = cands.find(c => ok(c, [])) || COLORS.accent;
+  // Le rang 2 : loin de tout, sinon (thèmes à peu de couleurs) à mi-distance au moins.
+  const deux = cands.find(c => c !== un && ok(c, [un])) || cands.find(c => c !== un && ok(c, [un], E / 2)) || COLORS.ink1;
+  return [un, deux];
+}
+const scenCouleur = rang => (rang === '1' ? (COLORS.scen || [COLORS.accent])[0] : rang === '2' ? (COLORS.scen || [0, COLORS.ink1])[1] : COLORS.ink3);
 /** L'échelle de prix : [bas, haut] de la 1re zone et de l'invalidation du rang 1 (bornes d'un range),
  *  quand la vue montre des bougies depuis le point et avant sa fin ; sinon null. */
 function scenEchelle(vs, ve) {
@@ -4405,27 +4429,30 @@ function scenEchelle(vs, ve) {
   return [Math.min(...z), Math.max(...z)];
 }
 /** Le suivi en direct d'un scénario sur les bougies de l'intervalle affiché : le pli des bougies
- *  CLOSES est mémorisé, la bougie en cours s'y ajoute (une copie). → Scenarios.etat(…). */
+ *  CLOSES est mémorisé, la bougie en cours s'y ajoute (une copie). → Scenarios.etat(…).
+ *  Seules comptent les bougies ENTIÈRES dans la fenêtre ; au-delà d'une heure, pas d'état. */
 function scenSuivi(S) {
   const n = candles.length;
   if (n < 2) return null;
+  const pasMs = (candles[1].time - candles[0].time) * 1000, maintenant = Horloges.maintenant();
+  if (pasMs > PARAM.scenarios.suiviPasMax * 1000) return Scenarios.etatLarge(S, pasMs, maintenant);
   const K = cols(), nF = n - 1;
   const cle = previsionsN + '|' + S.id + '|' + activeSymbol + '|' + chartInterval + '|' + K.time[0] + '|' + K.time[nF - 1] + '|' + nF;
   let e = SCEN_SUIVI.get(cle);
   if (!e) {
     if (SCEN_SUIVI.size > 32) SCEN_SUIVI.clear();
-    e = Scenarios.plier(S, K.time, K.high, K.low, 0, nF);
+    e = Scenarios.plier(S, K.time, K.high, K.low, 0, nF, null, pasMs);
     SCEN_SUIVI.set(cle, e);
   }
   const c = candles[n - 1], tc = c.time * 1000;
-  const e2 = tc >= S.emis && tc < S.fin ? Scenarios.pas(S, Scenarios.copie(e), n - 1, tc, c.high, c.low) : e;
-  return Scenarios.etat(S, e2, Horloges.maintenant());
+  const e2 = Scenarios.compte(S, tc, pasMs) ? Scenarios.pas(S, Scenarios.copie(e), n - 1, tc, c.high, c.low) : e;
+  return Scenarios.etat(S, e2, maintenant);
 }
 /** Prépare ce que les scénarios posent sur le graphique (géométrie de resolveChart) → scenEtat.
  *  guide : l'état du Guide (ses places réservées sont partagées), ou null. */
 function scenPreparer(g, guide) {
   if (!overlays.scenarios || activeSymbol !== 'BTCUSDT' || typeof Scenarios === 'undefined' || !(previsions || previsionsEchec)) return null;
-  const mode = guideMode(), exp = mode === 'expert', F = scenDessinables() ? previsions : null;
+  const mode = guideMode(), exp = mode === 'expert', L = scenDessinables(), F = L ? previsions : null;
   const pasS = geoPrix && geoPrix.pas > 0 ? geoPrix.pas : 900, t0 = candles[g.vs].time;
   const yDe = p => g.pad.top + g.ph * (1 - (p - g.minP) / g.range);
   const xDeT = ms => g.pad.left + (ms / 1000 - t0) / pasS * g.gap;
@@ -4440,11 +4467,12 @@ function scenPreparer(g, guide) {
     // Guide, ses rangées les écartent ; sans lui, le tracé commence juste dessous.
     rects.push({ x: 0, y: 0, w: 240, h: 36 });
   }
+  const maintenant = Horloges.maintenant();
   const S = { g, F, mode, exp, yDe, xDeT, xFin, xMax, finVue, marge: finVue ? xMax - xFin : 0, itv: Guide.nomIntervalle(chartInterval), rects,
-    items: [], cibles: [], boite: null, survol: null, maintenant: Horloges.maintenant() };
-  if (F) for (const sc of F.scenarios) {
+    items: [], cibles: [], boite: null, survol: null, maintenant, unPose: null, propres: [] };
+  if (F) for (const sc of L) {
     const sv = scenSuivi(sc);
-    S.items.push({ sc, sv, et: Scenarios.texteEtat(sc, sv, F.statuts, mode, { itv: S.itv }), coul: scenCouleur(sc.rang) });
+    S.items.push({ sc, sv, et: Scenarios.texteEtat(sc, sv, F.statuts, mode, { itv: S.itv, maintenant }), coul: scenCouleur(sc.rang), ouvert: Scenarios.ouvert(sc, sv, maintenant) });
   }
   return S;
 }
@@ -4461,10 +4489,11 @@ function scenHachures(x0, y0, x1, y1, coul) {
   ctx.restore();
 }
 /** Zones, range, traits du point et de la fin : SOUS les bougies, du point (ou du bord gauche)
- *  jusqu'au bout de la marge de futur. Une zone (niveau ± marge) est une bande très pâle bordée
- *  de pointillés fins, son niveau un tiret plus marqué ; l'invalidation, un ruban hachuré sur son
- *  niveau et des bords en tirets courts ; un range, une boîte en tirets. Le rang 1 est tracé en
- *  dernier (au-dessus) et plus marqué ; les autres rangs, plus pâles. */
+ *  jusqu'à la FIN du scénario (ou le bout de la marge de futur). Une zone (niveau ± marge) est une
+ *  bande très pâle bordée de pointillés fins, son niveau un tiret plus marqué ; l'invalidation, un
+ *  ruban hachuré sur son niveau et des bords en tirets courts ; un range, une boîte en tirets. Le
+ *  rang 1 est tracé en dernier (au-dessus) et plus marqué ; les autres rangs, plus pâles ; un
+ *  scénario fermé (noté, fini, invalidé, réalisé), à moitié. */
 function scenBandes(S) {
   const { g, xMax, yDe, xDeT, F } = S;
   if (!F) return;
@@ -4472,10 +4501,10 @@ function scenBandes(S) {
   ctx.save();
   ctx.beginPath(); ctx.rect(g.pad.left, top, xMax - g.pad.left, g.ph); ctx.clip();
   for (const it of S.items.slice().reverse()) {
-    const sc = it.sc, c = it.coul, x0 = Math.max(g.pad.left, xDeT(sc.emis)), w = xMax - x0;
-    if (w <= 1 || xDeT(sc.fin) < g.pad.left) continue;
-    const a = sc.rang === '1' ? 1 : sc.rang === 'S' ? 0.45 : 0.65;
-    const ligne = (p, dash, alpha, lw) => { const y = yDe(p); ctx.strokeStyle = avecAlpha(c, alpha * a); ctx.lineWidth = lw || 1; ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(xMax, y); ctx.stroke(); };
+    const sc = it.sc, c = it.coul, x0 = Math.max(g.pad.left, xDeT(sc.emis)), x1 = Math.min(xMax, xDeT(sc.fin)), w = x1 - x0;
+    if (w <= 1) continue;
+    const a = (sc.rang === '1' ? 1 : sc.rang === 'S' ? 0.45 : 0.65) * (it.ouvert ? 1 : 0.5);
+    const ligne = (p, dash, alpha, lw) => { const y = yDe(p); ctx.strokeStyle = avecAlpha(c, alpha * a); ctx.lineWidth = lw || 1; ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); };
     if (sc.forme === 'chemin') {
       sc.zones.cibles.forEach((z, k) => {
         const y1 = yDe(z[1]), y0 = yDe(z[0]);
@@ -4485,7 +4514,7 @@ function scenBandes(S) {
       });
       if (sc.zones.inv) {
         const y = yDe(sc.invalidation);
-        scenHachures(x0, y - 3, xMax, y + 3, avecAlpha(c, 0.55 * a));
+        scenHachures(x0, y - 3, x1, y + 3, avecAlpha(c, 0.55 * a));
         ligne(sc.zones.inv[0], [3, 3], 0.4); ligne(sc.zones.inv[1], [3, 3], 0.4);
       }
     } else {
@@ -4497,7 +4526,7 @@ function scenBandes(S) {
       ligne(sc.zones.haut, [1, 3], 0.45); ligne(sc.zones.bas, [1, 3], 0.45);
     }
   }
-  // Le point du matin et la fin : deux verticales pointillées.
+  // Le point du matin et la fin des scénarios du jour : deux verticales pointillées.
   ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
   const xE = xDeT(F.emis);
   if (xE >= g.pad.left && xE <= xMax) {
@@ -4512,98 +4541,106 @@ function scenBandes(S) {
   ctx.setLineDash([]);
   ctx.restore();
 }
-/** Les étiquettes et tracés AU-DESSUS des bougies : l'encadré, les libellés, les repères
- *  numérotés, les traits du point et de la fin. */
-function scenTracer(S) {
-  const g = S.g, top = g.pad.top, bas = top + g.ph;
-  const surBougies = r => {
+/** Les bougies visibles, gêne « douce » des étiquettes : essayées d'abord sans les couvrir. */
+function scenSurBougies(S) {
+  const g = S.g;
+  return r => {
     const i0 = Math.max(g.vs, g.vs + Math.floor((r.x - g.pad.left) / g.gap)), i1 = Math.min(g.ve - 1, g.vs + Math.floor((r.x + r.w - g.pad.left) / g.gap));
     for (let i = i0; i <= i1; i++) { const c = candles[i]; if (S.yDe(c.high) <= r.y + r.h && S.yDe(c.low) >= r.y) return true; }
     return false;
   };
-  // Tout se pose APRÈS les libellés du Guide (chacune de ses bandes reste nommée, ses deux
-  // chemins restent ensemble) : l'encadré dans une place libre (ou replié en une ligne qui nomme
-  // le rang 1), puis le libellé du rang 1, avant ceux des autres rangs ; puis les repères.
+}
+/** AVANT les libellés du Guide : le libellé du rang 1, la seule étiquette des scénarios qui passe
+ *  devant ceux des niveaux du Guide quand la place manque (un niveau du Guide sans place est nommé
+ *  au bord, guideBords). */
+function scenAvantGuide(S) {
+  if (!S || !S.F) return;
+  const g = S.g, top = g.pad.top, bas = top + g.ph;
   const un = S.items.find(it => it.sc.rang === '1');
+  // 'hors' (fenêtre du rang 1 finie avant la vue) ne retient pas les autres rangs.
+  S.unPose = un ? scenLibelle(S, un, top, bas, scenSurBougies(S)) : null;
+}
+/** Les étiquettes et tracés AU-DESSUS des bougies, APRÈS les libellés du Guide : l'encadré, les
+ *  flèches et repères, les libellés des rangs 2, 3 et semaine, les noms des traits du point et de
+ *  la fin. Si le rang 1 n'a pas de libellé, les autres rangs n'en ont pas non plus (la hiérarchie
+ *  ne s'inverse pas : le plus probable n'est jamais le seul sans nom). */
+function scenTracer(S) {
+  const g = S.g, top = g.pad.top, bas = top + g.ph;
   scenBoite(S, top, bas);
   if (!S.F) return;
-  if (un) scenLibelle(S, un, top, bas, surBougies);
   for (const it of S.items) scenChemin(S, it, top, bas);
-  for (const it of S.items) if (it.sc.rang !== '1') scenLibelle(S, it, top, bas, surBougies);
+  const un = S.items.find(it => it.sc.rang === '1');
+  if (!un || S.unPose) { const sb = scenSurBougies(S); for (const it of S.items) if (it.sc.rang !== '1') scenLibelle(S, it, top, bas, sb); }
   scenReperes(S, top, bas);
+}
+/** Le titre de la bulle d'un scénario : « Scénario 1 (rang 1) · 86 500 $ (plus haut du 08/10) puis
+ *  87 200 $ » ; expert : « S1 (rang 1) 86 500 > 87 200 · inv 85 500 ». « (rang 1) » insécable. */
+function scenTitre(sc, mode) {
+  const r = sc.rang === 'S' ? '' : ' (rang ' + sc.rang + ')';
+  if (mode === 'expert') return Scenarios.libelle(sc, 'expert').replace(/^(\S+)/, '$1' + r);
+  return Scenarios.libelle(sc, 'debutant').replace(/^([^·]+?) ·/, '$1' + r + ' ·');
 }
 /** L'explication d'un scénario pour la bulle de survol. */
 function scenCible(S, it, rects, segs, zones, prio) {
-  const ctxE = { itv: S.itv, statuts: S.F.statuts };
-  S.cibles.push({ rects, segs, zones, prio, coul: it.coul, scenario: it.sc.id,
-    titre: Scenarios.libelle(it.sc, 'debutant') + (it.sc.rang === 'S' ? '' : ' (rang ' + it.sc.rang + ')'),
+  const ctxE = { itv: S.itv, statuts: S.F.statuts, maintenant: S.maintenant };
+  S.cibles.push({ rects, segs, zones, prio, coul: it.coul, scenario: it.sc.id, titre: scenTitre(it.sc, S.mode),
     texte: Scenarios.explication(it.sc, it.sv, S.mode, PARAM.scenarios, ctxE) });
 }
-/** Flèche et repères numérotés d'un chemin, dans la marge de futur (la dernière bougie à l'écran) :
- *  de la dernière bougie vers la cible 1, puis 2 ; le prix du point est marqué d'un point. */
+/** Flèche et repères numérotés d'un chemin ENCORE OUVERT, dans la marge de futur : de la dernière
+ *  bougie vers la cible 1, puis 2 ; le prix du point est marqué d'un point. Un scénario fermé
+ *  (noté, fini, invalidé, réalisé) n'a plus de flèche : il ne se lit pas comme une projection.
+ *  Un repère reste à la hauteur de SON niveau (au bord du tracé si le niveau est hors de la vue,
+ *  avec un petit triangle vers lui) ; il ne glisse qu'à l'horizontale, et toujours de gauche à
+ *  droite dans l'ordre des cibles ; sans place, il n'est pas dessiné (la flèche garde son point). */
 function scenChemin(S, it, top, bas) {
-  const { g, yDe, xDeT, xFin, xMax, F } = S, sc = it.sc;
+  const { g, yDe, xDeT, xFin, xMax } = S, sc = it.sc;
   // La zone (le trait du niveau ± 4 px, et la zone entière dans la marge de futur) : survolable.
-  const x0 = Math.max(g.pad.left, xDeT(sc.emis));
+  const x0 = Math.max(g.pad.left, xDeT(sc.emis)), x1 = Math.min(xMax, xDeT(sc.fin));
   const zones = [];
-  const niveaux = sc.forme === 'range' ? sc.range : sc.cibles.concat(sc.invalidation !== null ? [sc.invalidation] : []);
-  for (const p of niveaux) { const y = yDe(p); if (y >= top && y <= bas) zones.push({ x0, y0: y - 4, x1: xMax, y1: y + 4 }); }
-  if (S.marge > 20) {
-    const zs = sc.forme === 'range' ? [[sc.zones.bas, sc.zones.haut]] : sc.zones.cibles;
-    for (const z of zs) { const y1 = Math.max(top, yDe(z[1])), y0 = Math.min(bas, yDe(z[0])); if (y0 > y1) zones.push({ x0: xFin, y0: y1, x1: xMax, y1: y0 }); }
+  if (x1 > x0) {
+    const niveaux = sc.forme === 'range' ? sc.range : sc.cibles.concat(sc.invalidation !== null ? [sc.invalidation] : []);
+    for (const p of niveaux) { const y = yDe(p); if (y >= top && y <= bas) zones.push({ x0, y0: y - 4, x1, y1: y + 4 }); }
+    if (S.marge > 20 && x1 > xFin) {
+      const zs = sc.forme === 'range' ? [[sc.zones.bas, sc.zones.haut]] : sc.zones.cibles;
+      for (const z of zs) { const y1 = Math.max(top, yDe(z[1])), y0 = Math.min(bas, yDe(z[0])); if (y0 > y1) zones.push({ x0: xFin, y0: y1, x1, y1: y0 }); }
+    }
   }
   const segs = [], rects = [];
-  // La semaine (rang S) n'a ni flèche ni repères : ses zones et son libellé suffisent, et ses
-  // repères se confondraient avec ceux du rang 1.
-  if (sc.forme === 'chemin' && sc.rang !== 'S' && S.finVue && S.marge > 24 && xDeT(sc.fin) > g.pad.left) {
-    const R = 7, B = S.boite;
-    // Sous l'encadré quand il couvre la marge : un repère au bord haut ne passe jamais dessous.
-    const haut = x => (B && B.y <= top + 40 && x + R >= B.x && x - R <= B.x + B.w ? B.y + B.h + R + 3 : top + R + 1);
-    const borne = (y, x) => Math.max(x === undefined ? top + R + 1 : haut(x), Math.min(bas - R - 1, y));
-    const xE = xDeT(sc.emis), dansVue = xE >= g.pad.left && xE <= xFin && isNum(sc.prixEmission);
+  // La semaine (rang S) n'a ni flèche ni repères : ses zones et son libellé suffisent.
+  // Sur des bougies trop larges (4 h, 1 jour), le suivi ne sait pas si le chemin est encore ouvert :
+  // pas de flèche non plus.
+  if (it.ouvert && !(it.sv && it.sv.cle === 'large') && sc.forme === 'chemin' && sc.rang !== 'S' && S.finVue && S.marge > 24) {
+    const R = 7, lo = top + R + 1, hi = bas - R - 1;
     const der = candles[candles.length - 1];
-    // La flèche part de la dernière bougie (elle reste dans la marge de futur) ; le prix du point
-    // est un simple point sur son trait.
-    const p0 = [g.pad.left + g.gap * (candles.length - 1 - g.vs) + g.candleW / 2, borne(yDe(der.close))];
+    // La flèche part un peu à droite de la dernière bougie (les chemins du Guide partent d'elle).
+    const p0 = [g.pad.left + g.gap * (candles.length - 1 - g.vs) + g.candleW + 5, Math.max(lo, Math.min(hi, yDe(der.close)))];
+    const xE = xDeT(sc.emis), dansVue = xE >= g.pad.left && xE <= xFin && isNum(sc.prixEmission);
     const pE = dansVue ? [xE, yDe(sc.prixEmission)] : null;
-    const N = sc.cibles.length;
-    // Un repère ramené au bord (ou sous l'encadré) porte une flèche vers son niveau ; il s'écarte
-    // vers le milieu des places déjà prises (texte du repère de publication, badges, libellés).
-    const deja = [];
-    const pris = (x, y) => S.rects.concat(deja).some(r => x + R + 1 > r.x && x - R - 1 < r.x + r.w && y + R + 1 > r.y && y - R - 1 < r.y + r.h);
-    const pts = sc.cibles.map((v, k) => { const y = yDe(v), x = xFin + S.marge * (N > 1 ? 0.4 + 0.42 * k / (N - 1) : 0.55);
-      let yb = borne(y, x);
-      const hors = yb > y + 1 ? -1 : yb < y - 1 ? 1 : 0;
-      if (hors) for (let d = 0; d < 60 && pris(x, yb); d += 3) yb = Math.max(top + R + 1, Math.min(bas - R - 1, yb + (hors < 0 ? 3 : -3)));
-      // Sur une étiquette (un chemin du Guide) : glissé de côté dans la marge, à la même hauteur ;
-      // sinon un peu plus haut ou plus bas ; sans place, le repère n'est pas dessiné (jamais sur
-      // une étiquette du Guide), la flèche garde son point.
-      let xb = x, cache = false;
-      if (pris(x, yb)) {
-        let ok = null;
-        for (const dy of [0, -(R + 4), R + 4]) {
-          const yy = yb + dy;
-          if (yy < top + R + 1 || yy > bas - R - 1) continue;
-          for (let d = 0; !ok && d <= S.marge; d += 8) {
-            const c = [x + d, x - d].find(v => v >= xFin + R + 2 && v <= xMax - R - 12 && !pris(v, yy));
-            if (c !== undefined) ok = [c, yy];
-          }
-          if (ok) break;
-        }
-        if (ok) [xb, yb] = ok; else cache = true;
-      }
-      if (!cache) deja.push({ x: xb - R - 1, y: yb - R - 1, w: 2 * R + 2, h: 2 * R + 2 });
-      return { x: xb, y: yb, hors, k, cache }; });
+    const N = sc.cibles.length, deja = [];
+    // Les places prises (encadré, libellés, badges, repères déjà posés), avec 3 px d'air.
+    const pris = (x, y) => S.rects.concat(deja).some(r => x + R + 3 > r.x && x - R - 3 < r.x + r.w && y + R + 3 > r.y && y - R - 3 < r.y + r.h);
+    let xPrec = -Infinity;
+    const pts = sc.cibles.map((v, k) => {
+      const y = yDe(v), yb = Math.max(lo, Math.min(hi, y)), hors = y < lo - 0.5 ? -1 : y > hi + 0.5 ? 1 : 0;
+      const xMin = Math.max(xFin + R + 2, xPrec + 2 * R + 4), xLim = xMax - R - 3;
+      const x = Math.max(xMin, xFin + S.marge * (N > 1 ? 0.4 + 0.42 * k / (N - 1) : 0.55));
+      let xb = null;
+      for (let d = 0; xb === null && d <= S.marge; d += 4) for (const c of [x + d, x - d]) if (c >= xMin && c <= xLim && !pris(c, yb)) { xb = c; break; }
+      const cache = xb === null;
+      if (!cache) { deja.push({ x: xb - R - 1, y: yb - R - 1, w: 2 * R + 2, h: 2 * R + 2 }); xPrec = xb; }
+      return { x: cache ? Math.min(x, xLim) : xb, y: yb, hors, k, cache };
+    });
     const chemin = [p0].concat(pts.map(p => [p.x, p.y]));
     for (let k = 1; k < chemin.length; k++) segs.push([chemin[k - 1][0], chemin[k - 1][1], chemin[k][0], chemin[k][1]]);
     for (const p of pts) if (!p.cache) rects.push({ x0: p.x - R - 2, y0: p.y - R - 2, x1: p.x + R + 2, y1: p.y + R + 2 });
-    for (const p of pts) if (!p.cache) S.rects.push({ x: p.x - R - 1, y: p.y - R - 1, w: 2 * R + 2, h: 2 * R + 2 });
+    for (const p of pts) if (!p.cache) S.rects.push({ x: p.x - R - 3, y: p.y - R - 3, w: 2 * R + 6, h: 2 * R + 6 });
     const c = it.coul, fort = sc.rang === '1', touchees = it.sv ? it.sv.touchees || [] : [];
-    // Le tracé : pointillés, une pointe avant le dernier repère ; les repères par-dessus.
+    // Le tracé : POINTILLÉ rond (les chemins du Guide sont en tirets), une pointe avant le dernier
+    // repère ; les repères par-dessus.
     ctx.save();
     ctx.beginPath(); ctx.rect(g.pad.left, top, xMax - g.pad.left, g.ph); ctx.clip();
-    ctx.strokeStyle = avecAlpha(c, fort ? 0.85 : 0.6); ctx.lineWidth = fort ? 1.5 : 1.1; ctx.setLineDash([5, 4]);
-    ctx.beginPath(); chemin.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = avecAlpha(c, fort ? 0.9 : 0.7); ctx.lineWidth = fort ? 2 : 1.6; ctx.lineCap = 'round'; ctx.setLineDash([0.5, 4.5]);
+    ctx.beginPath(); chemin.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); ctx.setLineDash([]); ctx.lineCap = 'butt';
     const [xa, ya] = chemin[chemin.length - 2], [xe, ye] = chemin[chemin.length - 1], ang = Math.atan2(ye - ya, xe - xa);
     const xp = xe - (R + 1) * Math.cos(ang), yp = ye - (R + 1) * Math.sin(ang);
     ctx.fillStyle = avecAlpha(c, fort ? 0.9 : 0.7);
@@ -4619,23 +4656,31 @@ function scenChemin(S, it, top, bas) {
         ctx.strokeStyle = c; ctx.lineWidth = fort ? 1.8 : 1.3; ctx.stroke();
         ctx.fillStyle = COLORS.ink1; ctx.font = chartFont(9, 750); ctx.textAlign = 'center';
         ctx.fillText(String(p.k + 1), p.x, p.y + 3.2);
-        if (p.hors) ctx.fillText(p.hors < 0 ? '↑' : '↓', p.x + R + 6, p.y + 3.5);
         ctx.textAlign = 'left';
+        // Niveau hors de la vue : un petit triangle (dessiné, pas une glyphe) vers lui, dans le tracé.
+        if (p.hors) {
+          const xt = p.x + R + 6 <= xMax - 2 ? p.x + R + 5 : p.x - R - 5, h = 4.5 * p.hors;
+          ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(xt - 4, p.y - h / 2); ctx.lineTo(xt + 4, p.y - h / 2); ctx.lineTo(xt, p.y + h / 2 + (p.hors > 0 ? 2 : -2)); ctx.closePath(); ctx.fill();
+        }
       }
     });
   }
   scenCible(S, it, rects, segs, zones, 2);
 }
 /** Le libellé d'un scénario, près du trait de son premier niveau (le haut d'un range), à gauche
- *  de la marge de futur ; un niveau hors de la vue est nommé au bord, avec sa flèche. */
+ *  de la marge de futur ; un niveau hors de la vue est nommé au bord, avec sa flèche. Fermé, il dit
+ *  aussi son état court (« · invalidation d'abord 13:30–13:45 UTC (en direct) »). */
 function scenLibelle(S, it, top, bas, surBougies) {
   const { g, yDe, xFin, xMax, exp } = S, sc = it.sc, H = 15;
-  if (S.xDeT(sc.fin) < g.pad.left) return false;
+  if (S.xDeT(sc.fin) < g.pad.left) return 'hors';      // fenêtre finie avant la vue : rien à nommer
   ctx.font = chartFont(9, 600);
   const p = sc.forme === 'range' ? sc.range[1] : sc.cibles[0], y = yDe(p);
   const hors = y < top + 2 ? -1 : y > bas - 2 ? 1 : 0;
   const droite = (S.marge > 24 ? xFin : xMax) - 4, place = droite - g.pad.left - 6;
-  const variantes = exp ? [Scenarios.libelle(sc, 'expert')] : [Scenarios.libelle(sc, 'debutant'), Scenarios.libelle(sc, 'debutant', true), Scenarios.libelle(sc, 'expert')];
+  const etat = it.ouvert ? '' : ' · ' + it.et.court + (it.et.officiel ? '' : ' (en direct)');
+  const exper = Scenarios.libelle(sc, 'expert') + (it.ouvert ? '' : ' · ' + it.et.court);
+  const base = exp ? [] : [...new Set([Scenarios.libelle(sc, 'debutant', 'complet'), Scenarios.libelle(sc, 'debutant'), Scenarios.libelle(sc, 'debutant', true)])];
+  const variantes = base.map(v => v + etat).concat(etat ? base : [], [exper]);
   const large = Math.min(place, g.pw * (g.pw < PARAM.scenarios.etroit ? 0.9 : 0.62));
   const texte = fleche => {
     for (const v of variantes) if (ctx.measureText(fleche + v).width + 14 <= large) return fleche + v;
@@ -4655,31 +4700,45 @@ function scenLibelle(S, it, top, bas, surBougies) {
     return null;
   };
   let t = texte(hors < 0 ? '↑ ' : hors > 0 ? '↓ ' : '');
-  let r = t ? poser(t, hors < 0 ? [top + 2] : hors > 0 ? [bas - H - 2] : [y - H - 2, y + 2], hors > 0 || (!hors && y > (top + bas) / 2) ? -1 : 1) : null;
+  // Hors de la vue : au bord, sinon une ou deux rangées plus loin (sous la ligne de la vue, en haut à gauche).
+  const essais = hors < 0 ? [top + 2, top + H + 4, Math.max(top + 2, 38), top + 2 * H + 6] : hors > 0 ? [bas - H - 2, bas - 2 * H - 4, bas - 3 * H - 6] : [y - H - 2, y + 2];
+  let r = t ? poser(t, essais, hors > 0 || (!hors && y > (top + bas) / 2) ? -1 : 1) : null;
   // Niveau caché sous l'encadré (téléphone) : le libellé juste sous l'encadré, flèche vers le haut.
   // Niveau au-dessus de la vue, encadré en haut : de même.
   if (!r && B && (hors < 0 ? B.y <= top + 40 : !hors && y >= B.y - H && y <= B.y + B.h + H) && (t = texte('↑ '))) r = poser(t, [B.y + B.h + 2], 1);
   if (!r) return false;
   const c = it.coul;
   etiquettesAFaire.push(() => { ctx.font = chartFont(9, 600); guidePastille(ctx, r.x, r.pose.y, r.w, H, r.t, c); });
+  S.propres.push({ x: r.x, y: r.pose.y, w: r.w, h: H });
   scenCible(S, it, [guideZone(r.pose)], [], [], 1);
   return true;
 }
-/** Les traits du point (« Point de 07h00 ») et de la fin (« fin des scénarios »), nommés en haut. */
+/** Les traits du point et de la fin des scénarios du jour, nommés en haut (sinon plus bas, sinon
+ *  au bas du tracé), sous la forme la plus complète qui trouve une place. */
 function scenReperes(S, top, bas) {
   const { g, F, xDeT, xMax, exp } = S, P = PARAM.scenarios;
-  const H = 14;
-  for (const [t, nom, expl] of [
-    [F.emis, (exp ? 'Point ' : 'Point de ') + P.point + ' · ' + Scenarios.heureUTC(F.emis) + ' UTC',
-      'Le moment où les scénarios ont été écrits : ' + Scenarios.heureUTC(F.emis) + ' UTC' + (Scenarios.heureParis(F.emis) ? ' (' + Scenarios.heureParis(F.emis) + ' Paris)' : '') + (isNum(F.prixEmission) ? ', prix ' + Scenarios.prix(F.prixEmission) : '') + '. Les zones partent de là.'],
-    [F.fin, 'fin des scénarios · ' + Scenarios.heureUTC(F.fin) + ' UTC', 'La fin de la fenêtre des scénarios du jour : ' + Scenarios.heureUTC(F.fin) + ' UTC' + (Scenarios.heureParis(F.fin) ? ' (jusqu’à ' + Scenarios.heureParis(F.fin) + ' Paris)' : '') + '. Le journal les note le lendemain matin.']]) {
+  const H = 14, hU = t => Scenarios.heureUTC(t) + ' UTC', hP = t => Scenarios.heureParis(t), jour = t => Scenarios.jourGroupe(new Date(t).toISOString().slice(0, 10));
+  const pE = hP(F.emis) ? ' (' + hP(F.emis) + ' Paris)' : '', pF = hP(F.fin) ? ' (' + hP(F.fin) + ' Paris)' : '';
+  const sem = isNum(F.finSemaine) && F.finSemaine !== F.fin && S.items.some(i => i.sc.rang === 'S') ? ' Le scénario de la semaine court jusqu’au ' + jour(F.finSemaine) + ' à ' + hU(F.finSemaine) + '.' : '';
+  for (const [t, noms, expl] of [
+    [F.emis, exp ? ['Point · ' + hU(F.emis), hU(F.emis)] : ['Point de ' + P.point + ' Paris · écrit à ' + hU(F.emis) + pE, 'Écrit à ' + hU(F.emis) + pE, 'Point · ' + hU(F.emis), hU(F.emis)],
+      'Le moment où les scénarios du point de ' + P.point + ' (Paris) ont été écrits : le ' + jour(F.emis) + ' à ' + hU(F.emis) + pE + (isNum(F.prixEmission) ? ', prix ' + Scenarios.prix(F.prixEmission) : '') + '. Les zones partent de là.'],
+    [F.fin, exp ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)] : ['fin des scénarios du jour · ' + jour(F.fin) + ' ' + hU(F.fin) + pF, 'fin du jour · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)],
+      'Fin de la fenêtre des scénarios 1 à 3 : ' + jour(F.fin) + ' à ' + hU(F.fin) + (hP(F.fin) ? ' (' + hP(F.fin) + ' Paris)' : '') + '. Le journal les note ensuite, le matin même.' + sem]]) {
     const x = xDeT(t);
     if (!(x >= g.pad.left && x <= xMax)) continue;
     ctx.font = chartFont(8.5, 650);
-    const w = ctx.measureText(nom).width + 10, xl = x + 3 + w <= xMax ? x + 3 : x - 3 - w;
-    if (xl < g.pad.left) continue;
-    const pose = guidePlacer(S.rects, xl, w, H, [top + 2], top, bas, 1, 0, 12);
-    S.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs: [[x, top, x, bas]], prio: 3, coul: COLORS.ink3, titre: nom, texte: [expl, 'Une description, pas une recommandation.'] });
+    const rangs = [0, 1, 2, 3, 4].map(k => top + 2 + k * (H + 2)).concat([bas - H - 26, bas - H - 42]);
+    let pose = null, nom = null, xl = 0, w = 0;
+    for (const n of noms) {
+      w = ctx.measureText(n).width + 10;
+      for (const xc of [x + 3, x - 3 - w]) {
+        if (xc < g.pad.left || xc + w > xMax) continue;
+        if ((pose = guidePlacer(S.rects, xc, w, H, rangs, top, bas, 1, 0, 0))) { xl = xc; nom = n; break; }
+      }
+      if (pose) break;
+    }
+    S.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs: [[x, top, x, bas]], prio: 3, coul: COLORS.ink3, titre: noms[0], texte: [expl, 'Une description, pas une recommandation.'] });
     if (!pose) continue;
     etiquettesAFaire.push(() => {
       ctx.font = chartFont(8.5, 650);
@@ -4688,18 +4747,25 @@ function scenReperes(S, top, bas) {
     });
   }
 }
-/** L'encadré, en haut à droite du tracé, jamais au-delà de sa moitié haute : le titre, une ligne
- *  par scénario classé avec son état, le sens du classement (débutant), la mesure de l'ordre, et
- *  ce qui est un suivi en direct. Posé APRÈS les libellés du Guide, dans une place libre (en
- *  haut à droite d'abord, puis plus bas, puis à gauche), sous sa forme la plus complète qui
- *  tient ; sans place (téléphone chargé), une seule ligne — le titre — dont le survol ou le
- *  doigt montre tout. Dessiné sur le calque (scenCalque). Fichier d'attente ou illisible : une ligne. */
+/** Une raison de lecture ratée, dite simplement. */
+function scenRaison(r) {
+  if (r === 'réseau') return 'réseau injoignable';
+  if (r === 'HTTP 404') return 'fichier introuvable (HTTP 404)';
+  if (/^HTTP \d+$/.test(r || '')) return 'serveur en erreur (' + r + ')';
+  if (r === 'JSON illisible') return 'fichier illisible (JSON)';
+  return 'fichier illisible (' + r + ')';
+}
+/** L'encadré, en haut à droite du tracé, dans sa moitié haute : le titre, une ligne par scénario
+ *  classé avec son état, le sens du classement (débutant), la mesure de l'ordre, et ce qui est un
+ *  suivi en direct. Posé APRÈS les libellés du Guide, dans une place libre, sous sa forme la plus
+ *  complète qui tient (pleine, courte, compacte) ; jamais sur les bougies les plus récentes. Sans
+ *  place, une seule ligne qui nomme le rang 1 et renvoie à l'explication (survol ou doigt). Dessiné
+ *  sur le calque (scenCalque). Fichier d'attente : sa note (2 lignes au plus) ; illisible : une ligne. */
 function scenBoite(S, top, bas) {
   const P = PARAM.scenarios, g = S.g, exp = S.exp, F = S.F;
   const etroit = g.pw < P.etroit, tactile = etroit || (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches);
   const wMax = Math.floor(Math.min(P.boiteMax, (S.xMax - g.pad.left) * (etroit ? P.boiteFractionEtroit : P.boiteFraction)));
-  const hMax = (bas - top) / 2 - 8;
-  const L = [];   // { t, f: 'titre' | 'ligne' | 'note' | 'seule', it }
+  const L = [];   // { t, f: 'titre' | 'ligne' | 'note' | 'seule', it, garde, compact }
   const heure = ms => Scenarios.heureUTC(ms) + ' UTC';
   let titreBoite;
   if (!F) {
@@ -4712,23 +4778,32 @@ function scenBoite(S, top, bas) {
     titreBoite = Scenarios.titre(F, P, S.maintenant);
     L.push({ t: titreBoite, f: 'titre' });
     for (const it of S.items) L.push({ t: Scenarios.ligne(it.sc, it.et, S.mode), tc: Scenarios.ligne(it.sc, it.et, S.mode, true), f: 'ligne', it });
-    if (!exp) L.push({ t: 'Le classement va du plus au moins probable, sans pourcentage.', f: 'note', garde: 2 });
+    const sem = S.items.some(i => i.sc.rang === 'S');
+    if (!exp) L.push({ t: 'Classement de Claude (une IA) : 1 = jugé le plus probable, 3 = le moins' + (sem ? ' ; la ligne Semaine est à part' : '') + '. Sans pourcentage.', f: 'note', garde: 2 });
     const b = Scenarios.texteBilan(F.bilan, P, S.mode);
     if (b) L.push({ t: b, f: 'note', garde: 3 });
-    L.push({ t: exp ? 'Suivi en direct · note officielle : le journal' : 'États : suivi en direct, la note officielle est celle du journal.', f: 'note', garde: 1 });
+    L.push({ t: exp ? 'Claude (IA) · suivi en direct · note officielle : le journal' : 'États : suivi en direct, la note officielle est celle du journal.', f: 'note', garde: 1 });
     if (previsionsEchec) L.push({ t: 'Relecture impossible (' + heure(previsionsEchec.a) + ') · fichier lu à ' + heure(F.luA), f: 'note', garde: 0 });
+    // La forme compacte : une note qui dit les deux (classement, suivi en direct), le bilan en bref.
+    L.push({ t: exp ? 'Claude (IA) · suivi en direct · officiel : le journal' : 'Classé par Claude (une IA), sans pourcentage · suivi en direct, la note officielle est celle du journal', f: 'note', compact: 2 });
+    L.push({ t: exp ? 'Claude (IA) · suivi en direct' : 'Classé par Claude (IA), sans pourcentage · suivi en direct', f: 'note', compact: 1 });
+    const bc = Scenarios.texteBilan(F.bilan, P, 'expert');
+    if (bc) L.push({ t: bc, f: 'note', compact: 'bilan' });
   }
   const police = f => (f === 'titre' ? chartFont(9.5, 700) : f === 'ligne' ? chartFont(9, 600) : chartFont(8.5, 550));
   const hL = f => (f === 'titre' ? 14 : f === 'ligne' ? 12.5 : 11.5);
   // Mise en page : chaque ligne d'un scénario sur 2 lignes au plus, puis sa forme courte sur 1 ;
   // les notes restent (le sens du classement, la mesure de l'ordre, « suivi en direct ») ; la
-  // note de relecture ratée part la première (elle reste dans l'explication du titre).
-  const mettre = (maxL, gardeMin, court) => {
+  // note de relecture ratée part la première (elle reste dans l'explication du titre) ; enfin la
+  // forme compacte (une note qui dit tout, sur 2 lignes puis 1).
+  const mettre = (maxL, gardeMin, court, compact) => {
     const out = [];
     for (const l of L) {
-      if (l.f === 'note' && l.garde < gardeMin) continue;
+      // Forme compacte (compact = 2 ou 1) : sa note sur `compact` lignes, et le bilan en bref.
+      if (l.f === 'note' && (compact ? !(l.compact === compact || l.compact === 'bilan') : l.compact || l.garde < gardeMin)) continue;
       ctx.font = police(l.f);
-      const ls = l.f === 'seule' ? [guideCouper(ctx, l.t, wMax - 14)] : guideLignes(ctx, court && l.tc ? l.tc : l.t, wMax - 16, l.f === 'ligne' ? maxL : 2);
+      const nMax = l.f === 'ligne' ? maxL : l.compact ? 1 : 2;
+      const ls = guideLignes(ctx, court && l.tc ? l.tc : l.t, wMax - 16, nMax);
       for (const t of ls) out.push({ t, f: l.f, it: l.it, h: hL(l.f) });
     }
     return out;
@@ -4738,49 +4813,83 @@ function scenBoite(S, top, bas) {
     for (const l of lignes) { ctx.font = police(l.f); w = Math.max(w, ctx.measureText(l.t).width); }
     return { lignes, w: Math.min(wMax, Math.ceil(w) + (F ? 18 : 12)), h: lignes.reduce((a, l) => a + l.h, 0) + 8 };
   };
+  const hMax = (bas - top) / 2 - 8;
   const formes = [];
-  for (const [maxL, gardeMin, court] of [[2, 0, false], [1, 0, true], [1, 1, true]]) {
-    const m = mesurer(mettre(maxL, gardeMin, court));
+  const essais = F ? [[2, 0, false, 0], [1, 0, true, 0], [1, 1, true, 0], [1, 0, true, 2], [1, 0, true, 1]] : [[0, 0, false, 0]];
+  for (const [maxL, gardeMin, court, compact] of essais) {
+    const m = mesurer(mettre(maxL, gardeMin, court, compact));
     if (m.h <= hMax && !formes.some(f => f.h === m.h && f.w === m.w)) formes.push(m);
   }
-  // La place : en haut à droite, puis en descendant (jamais sous la moitié du tracé), puis à
-  // gauche ; d'abord sans couvrir de bougie, puis sans couvrir les plus récentes, puis libre.
+  // La place : en haut à droite, puis en descendant (jamais sous la moitié du tracé ; une seule
+  // ligne, jamais sous son tiers), puis plus à gauche ; d'abord sans couvrir de bougie, puis sans
+  // couvrir les plus récentes — jamais par-dessus elles.
   const nRec = Math.max(3, Math.ceil(g.n * 0.25));
   const couvre = (r, i0) => {
     const a = Math.max(g.vs + i0, g.vs + Math.floor((r.x - g.pad.left) / g.gap)), b = Math.min(g.ve - 1, g.vs + Math.floor((r.x + r.w - g.pad.left) / g.gap));
     for (let i = a; i <= b; i++) { const c = candles[i]; if (S.yDe(c.high) <= r.y + r.h && S.yDe(c.low) >= r.y) return true; }
     return false;
   };
-  const gene = [r => couvre(r, 0), r => couvre(r, Math.max(0, g.n - nRec)), () => false];
+  const gene = [r => couvre(r, 0), r => couvre(r, Math.max(0, g.n - nRec))];
   const chercher = (w, h, yMax, ev) => {
-    for (const x of [S.xMax - w - 4, g.pad.left + 4]) {
+    const xs = [S.xMax - w - 4];
+    if (S.marge > 24 && S.xFin - w - 4 < xs[0]) xs.push(S.xFin - w - 4);
+    for (let x = Math.min(...xs) - 32; x > g.pad.left + 4; x -= 32) xs.push(x);
+    xs.push(g.pad.left + 4);
+    for (const x of xs) {
+      if (x < g.pad.left + 2) continue;
       // Sous la ligne de la vue et sa pastille de variation (en haut à gauche du graphique).
-      for (let y = x < 320 ? Math.max(top + 4, 38) : top + 4; y + h <= (yMax || top + Math.max(h + 4, (bas - top) / 2)); y += 4) {
+      for (let y = x < 320 ? Math.max(top + 4, 38) : top + 4; y + h <= yMax; y += 4) {
         const r = { x, y, w, h };
         if (guideLibre(S.rects, r) && !(ev && ev(r))) return r;
       }
     }
     return null;
   };
+  // Sans couvrir aucune bougie : dans la moitié haute ; par-dessus des bougies anciennes : dans le
+  // tiers haut seulement (jamais au milieu du tracé).
+  const yMoitie = top + Math.max(0, (bas - top) / 2), yTiers = top + (bas - top) / 3;
   let pose = null, forme = null;
   for (const ev of gene) {
-    for (const f of formes) if ((pose = chercher(f.w, f.h, 0, ev))) { forme = f; break; }
+    for (const f of formes) if ((pose = chercher(f.w, f.h, ev === gene[0] ? yMoitie : yTiers + 8, ev))) { forme = f; break; }
     if (pose) break;
   }
   let replie = false;
   if (!pose) {
-    // Sans place : le titre seul (ou la ligne d'attente), qui renvoie à l'explication.
+    // Sans place : une ligne qui nomme le rang 1 (ses niveaux tant qu'il est ouvert, son état
+    // sinon) et renvoie à l'explication ; au doigt, « toucher » est écrit (jamais un ▸ seul).
     replie = !!F;
     ctx.font = police(F ? 'titre' : 'seule');
-    // Replié, il nomme encore le rang 1 (ses niveaux, en bref) quand la ligne le permet.
-    const suite = tactile ? ' · toucher pour le détail' : ' · détail au survol';
-    const un = S.items.find(i => i.sc.rang === '1'), rang1 = un ? ' · 1. ' + Scenarios.niveaux(un.sc, exp) : '';
+    const suite = tactile ? ' · toucher ▸' : ' · détail au survol';
+    const un = S.items.find(i => i.sc.rang === '1');
+    const r1 = un ? (un.ouvert ? Scenarios.niveaux(un.sc, exp) : un.et.court) : '';
     const tient = x => ctx.measureText(x).width <= wMax - 14;
-    const t = !F ? L[0].t : [titreBoite + rang1 + suite, titreBoite + rang1 + ' ▸', titreBoite + suite, titreBoite + ' ▸'].find(tient) || titreBoite;
-    const lignes = [{ t: guideCouper(ctx, t, wMax - 14) || titreBoite, f: F ? 'titre' : 'seule', h: hL(F ? 'titre' : 'seule') }];
-    forme = mesurer(lignes);
-    // Toujours dit : à sa place libre (tout le tracé), sinon en haut à droite par-dessus (une ligne).
-    pose = chercher(forme.w, forme.h, bas) || { x: S.xMax - forme.w - 4, y: S.xMax - forme.w - 4 < 320 ? Math.max(top + 4, 38) : top + 4, w: forme.w, h: forme.h };
+    const attente = previsions && previsions.etat === 'attente';
+    const variantes = !F ? [L[0].t].concat(attente ? ['Scénarios du matin : en attente' + suite] : [])
+      : (Scenarios.estAncien(F, S.maintenant) ? [titreBoite + suite] : []).concat(un ? [titreBoite + ' · 1. ' + r1 + suite, 'Scénario 1 (en tête) : ' + r1 + suite, 'Scénario 1 : ' + r1 + suite, titreBoite + ' · 1. ' + r1 + (tactile ? suite : ' ▸')] : [])
+        .concat([titreBoite + suite, 'Scénarios' + (tactile ? suite : ' ▸')]);
+    const f1 = F ? 'titre' : 'seule';
+    const essaisL = [];
+    for (const v of variantes) {
+      if (!F && v === L[0].t) { const ls = guideLignes(ctx, v, wMax - 14, 2); essaisL.push(ls.map(t => ({ t, f: f1, h: hL(f1) }))); continue; }
+      if (tient(v)) essaisL.push([{ t: v, f: f1, h: hL(f1) }]);
+    }
+    if (!essaisL.length) essaisL.push([{ t: guideCouper(ctx, variantes[variantes.length - 1], wMax - 14) || 'Scénarios', f: f1, h: hL(f1) }]);
+    // Sans couvrir de bougie, puis sans couvrir les récentes, puis (une ligne) par-dessus des
+    // bougies plus anciennes — jamais sur une étiquette.
+    for (const ev of gene.concat([null])) {
+      for (const ls of essaisL) { const f = mesurer(ls); if ((pose = chercher(f.w, f.h, top + (bas - top) / 3 + f.h, ev))) { forme = f; break; } }
+      if (pose) break;
+    }
+    if (!pose) {
+      // Toujours dit : épinglée en haut à droite (dans le tiers haut), par-dessus une étiquette du
+      // Guide s'il le faut — jamais sur le libellé du rang 1.
+      for (const ls of F ? essaisL.slice().reverse() : essaisL) {
+        const f = mesurer(ls), x = S.xMax - f.w - 4;
+        for (let y = x < 320 ? Math.max(top + 4, 38) : top + 4; !pose && y + f.h <= top + (bas - top) / 3 + f.h; y += 4) if (guideLibre(S.propres, { x, y, w: f.w, h: f.h })) { pose = { x, y, w: f.w, h: f.h }; forme = f; }
+        if (pose) break;
+      }
+      if (!pose) { forme = mesurer(essaisL[essaisL.length - 1]); pose = { x: S.xMax - forme.w - 4, y: S.xMax - forme.w - 4 < 320 ? Math.max(top + 4, 38) : top + 4, w: forme.w, h: forme.h }; }
+    }
   }
   const { lignes, w, h } = forme, x = pose.x, y = pose.y;
   S.rects.push({ x, y, w, h });
@@ -4795,24 +4904,37 @@ function scenBoite(S, top, bas) {
   }
   for (const [it, rs] of parIt) scenCible(S, it, rs, [], [], 0);
   const resteRect = { x0: x, y0: y, x1: x + w, y1: y + h };
-  // Replié : l'explication commence par ce que l'encadré aurait montré.
-  // (le bilan y est déjà dit : l'explication ne le répète pas)
-  const texte = replie ? L.filter(l => l.f === 'ligne' || l.garde >= 1).map(l => l.t).concat(scenTexteBoite(S, true)) : scenTexteBoite(S);
+  // Replié : l'explication commence par ce que l'encadré aurait montré (le bilan y est déjà dit,
+  // suivi de ce qu'il compte).
+  const texte = replie ? L.filter(l => l.f === 'ligne' || (!l.compact && l.garde >= 1)).map(l => l.t).concat(scenTexteBoite(S, true)) : scenTexteBoite(S);
   S.cibles.push({ rects: [resteRect], prio: replie ? 0 : 1, coul: COLORS.accent, titre: titreBoite, texte });
 }
-/** L'explication de l'encadré (survol du titre ou des notes). */
+/** L'explication de l'encadré (survol du titre ou des notes). sansBilan : la ligne du bilan est
+ *  déjà dite (encadré replié) ; seule sa règle suit. */
 function scenTexteBoite(S, sansBilan) {
   const F = S.F, P = PARAM.scenarios, exp = S.exp, out = [];
-  out.push('Chaque matin vers ' + P.point + ' (Paris), Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ, à partir de son analyse du marché, et les classe du plus au moins probable, sans pourcentage. Chaque niveau a une origine nommée et se lit comme une zone : le niveau plus ou moins la marge.');
-  out.push('Les états de cet encadré sont un suivi EN DIRECT sur les bougies ' + S.itv + ' du graphique (un affichage). La note officielle est celle du journal, faite mécaniquement le lendemain sur des bougies d’une minute.');
-  if (F && F.bilan && F.bilan.matins > 0) { if (!sansBilan) out.push(Scenarios.texteBilan(F.bilan, P, 'debutant') + (F.bilan.regle ? ' (règle : ' + F.bilan.regle + ').' : '.') + ' C’est le seul chiffre de réussite montré ici.'); }
-  else if (F) out.push('Aucun matin noté pour l’instant : pas encore de mesure de l’ordre du premier mouvement.');
+  const attente = !F && previsions && previsions.etat === 'attente';
+  if (attente && previsions.note) out.push(previsions.note);
+  out.push('Chaque matin vers ' + P.point + ' (Paris), Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ, à partir de son analyse du marché, et les classe du plus au moins probable selon son jugement, sans pourcentage. Chaque niveau a une origine nommée et se lit comme une zone : le niveau plus ou moins la marge.');
+  if (F) out.push('Les états de cet encadré sont un suivi EN DIRECT sur les bougies ' + S.itv + ' du graphique (un affichage). La note officielle est celle du journal, faite mécaniquement le lendemain sur des bougies d’une minute.');
+  if (F && F.bilan && F.bilan.matins > 0) {
+    if (!sansBilan) out.push(Scenarios.texteBilan(F.bilan, P, 'debutant') + (F.bilan.regle ? ' (règle : ' + F.bilan.regle + ').' : '.'));
+    out.push(Scenarios.REGLE_BILAN);
+  } else if (F && F.bilan) out.push('Pas encore de matin compté dans la mesure de l’ordre du premier mouvement.');
+  else if (F) out.push('Ce fichier ne donne pas la mesure de l’ordre du premier mouvement : aucun chiffre de réussite n’est montré.');
   if (F && F.precedents.length) {
-    const p = F.precedents.slice(0, 3).map(m => Scenarios.jourGroupe(m.groupe) + ' — ' + m.scenarios.slice(0, 3).map(x => (x.rang === 'S' ? 'sem.' : x.rang + '.') + ' ' + (x.enonce || '') + ' : ' + ((F.statuts || Scenarios.STATUTS)[x.statut] || x.statut)).join(' ; '));
+    const st = F.statuts || Scenarios.STATUTS;
+    const p = F.precedents.slice(0, 3).map(m => Scenarios.jourGroupe(m.groupe) + ' — ' + m.scenarios.slice(0, 3).map(x => {
+      const mo = Scenarios.motsStatut(x.statut, x.premier_ok, null, st, exp);
+      return (x.rang === 'S' ? 'sem.' : x.rang + '.') + ' ' + (x.enonce || '') + ' : ' + (x.premier_ok === 'bas' || x.premier_ok === 'haut' ? mo.long : mo.court);
+    }).join(' ; '));
     out.push('Matins précédents (note du journal) : ' + p.join(' | ') + '.');
   }
-  if (F) out.push('Fichier publié à ' + Scenarios.heureUTC(F.updated) + ' UTC, lu à ' + Scenarios.heureUTC(F.luA) + ' UTC' + (previsionsEchec ? ' ; dernière relecture impossible (' + previsionsEchec.raison + ', ' + Scenarios.heureUTC(previsionsEchec.a) + ' UTC)' : '') + '.');
-  else if (previsionsEchec) out.push('Dernière lecture : ' + previsionsEchec.raison + ' à ' + Scenarios.heureUTC(previsionsEchec.a) + ' UTC. Rien n’est dessiné tant qu’aucun fichier lisible n’est arrivé.');
+  const src = F || (attente ? previsions : null);
+  const jourH = t => Scenarios.jourGroupe(new Date(t).toISOString().slice(0, 10)) + ' à ' + Scenarios.heureUTC(t) + ' UTC';
+  if (src) out.push((isNum(src.updated) ? 'Fichier publié le ' + jourH(src.updated) + ', relu' : 'Fichier relu') + ' à ' + Scenarios.heureUTC(src.luA) + ' UTC'
+    + (previsionsEchec ? ' ; dernière relecture impossible (' + scenRaison(previsionsEchec.raison) + ', ' + Scenarios.heureUTC(previsionsEchec.a) + ' UTC)' : '') + '.');
+  else if (previsionsEchec) out.push('Dernière lecture : ' + scenRaison(previsionsEchec.raison) + ' à ' + Scenarios.heureUTC(previsionsEchec.a) + ' UTC. Rien n’est dessiné tant qu’aucun fichier lisible n’est arrivé.');
   out.push(exp ? 'Description, pas une recommandation.' : 'Une description, pas une recommandation : rien ici ne dit quoi faire.');
   return out;
 }
