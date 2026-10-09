@@ -1283,6 +1283,19 @@ async function filNoir(page, x, y) {
       check('la pastille de la carte dit la source et l\'échelle propre', /au-delà : carnet Coinbase ±10 %.+échelle propre/.test(P43), P43);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p43.close();
+      // Débutant : la profondeur Coinbase n'est pas peinte (sa propre échelle de couleur ne se compare
+      // pas à la chaleur Binance) ; elle reste en Expert (09/10/2026).
+      let p43d;
+      ({ page: p43d, erreurs } = await ouvrir(nav, { encodage: true, profondeur: loin, mode: 'debutant' }));
+      await p43d.waitForTimeout(1500);
+      const e43d = await etat(p43d);
+      check('débutant : profondeur lue mais pas peinte', e43d.loin && !e43d.loin.peinte, e43d.loin);
+      const v43d = await p43d.evaluate(() => window.__carte.verifierChaleur());
+      check('débutant : chaleur affichée = repeint complet (sans Coinbase)', v43d.differents === 0, v43d);
+      const txt43d = await p43d.evaluate(() => document.body.innerText);
+      check('débutant : ni Coinbase ni « autre plateforme » dans la page', !/Coinbase|autre plateforme/.test(txt43d));
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p43d.close();
       // La branche « direct » porte aussi les 30 dernières minutes de profondeur : elles prolongent
       // celle de master (publiée toutes les 15 min) sans rien remplacer avant.
       const plus = [2, 1, 0].map(k => [t - k, 747, new Array(83).fill(60), 830, new Array(83).fill(60)]);
