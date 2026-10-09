@@ -70,7 +70,7 @@ const serveur = http.createServer((req, res) => {
   fs.createReadStream(f).pipe(res);
 });
 
-async function ouvrir(nav, vue, mode, tactile) {
+async function ouvrir(nav, vue, mode, tactile, sansScenarios) {
   const ctx = await nav.newContext(Object.assign({ viewport: vue, deviceScaleFactor: 1 }, tactile ? { hasTouch: true, isMobile: true } : {}));
   // La page vit à l'heure du harnais (le temps s'écoule normalement à partir de là).
   await ctx.clock.install({ time: maintenant() });
@@ -83,6 +83,7 @@ async function ouvrir(nav, vue, mode, tactile) {
     if (h === 'api.binance.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(binance(u)) });
     if (h === 'raw.githubusercontent.com') {
       // Les scénarios du matin aussi : le Guide doit rester lisible avec eux.
+      if (estPrevisions(u) && sansScenarios) return r.fulfill({ status: 404, headers: cors, body: '' });
       if (estPrevisions(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: previsionsFixture({ maintenant: maintenant() }) });
       if (u.includes('heatmap')) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, 'heatmap.json')) });
       if (/\/master\/market-data\.json/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: MD });
@@ -186,6 +187,18 @@ const etat = page => page.evaluate(() => {
     }
     check('écran tactile : aucune erreur JavaScript', !t.erreurs.length, t.erreurs);
     await t.ctx.close();
+
+    // Sans scénarios du matin, la bande à cinq raisons (deux chiffres publiés) se pose près d'elle
+    // à 22:52 sur un téléphone : c'est le libellé POSÉ qui doit garder ses deux heures, pas le bord.
+    titre('390 px · debutant, sans scénarios du matin');
+    const s = await ouvrir(nav, { width: 390, height: 800 }, 'debutant', false, true);
+    const es = await etat(s.page);
+    const pubS = es.niveaux.filter(L => L.visible && L.lignes && L.heures.length);
+    const nFoisS = (t, h) => t.split(h).length - 1;
+    check(`sans scénarios : chaque libellé posé qui porte un chiffre publié garde chaque heure, sans « … » (${pubS.length})`,
+      pubS.length > 0 && pubS.every(L => L.heures.every(h => nFoisS(L.lignes.join(' '), h) >= L.heures.filter(x => x === h).length) && !/…/.test(L.lignes.join(' '))), pubS);
+    check('sans scénarios : aucune erreur JavaScript', !s.erreurs.length, s.erreurs);
+    await s.ctx.close();
   } finally { await nav.close(); serveur.close(); }
   console.log(ko ? `\n❌ GUIDE À L'ÉCRAN : ${ko} contrôle(s) en échec` : '\n✅ GUIDE À L\'ÉCRAN : TOUS LES CONTRÔLES PASSENT');
   process.exit(ko ? 1 : 0);
