@@ -99,7 +99,7 @@ check('la formule est réservée au mode expert (dans chaque fiche)', Object.key
 // ── 5. Une lecture n'est pas un conseil ──────────────────────────────────────
 titre('5. « Voici comment ça se lit » n’est pas « voici quoi faire »');
 const CONSEIL = /\b(achetez|vendez|achète[rz]?\b|vends\b|il faut (?:acheter|vendre)|entrez|sortez|prenez position|signal d['’]achat|signal de vente|recommand(?:e|ons))/i;
-const textes = Object.entries(T.FICHES).flatMap(([k, f]) => [f.simple, f.debat, f.limites, ...f.lectures.map(l => l.t)].filter(Boolean).map(t => [k, t]));
+const textes = Object.entries(T.FICHES).flatMap(([k, f]) => [f.simple, f.simpleDeb, f.titreDeb, f.debat, f.limites, ...f.lectures.map(l => l.t)].filter(Boolean).map(t => [k, t]));
 const conseils = textes.filter(([, t]) => CONSEIL.test(t));
 check('aucune fiche ne dit quoi acheter ou vendre', !conseils.length, conseils);
 const courtes = ['funding', 'oi', 'ls', 'cvd', 'gex', 'rsi_tf', 'vix', 'prime', 'carnet'].flatMap(k => [-5, -0.5, 0.2, 1, 50, 80].map(v => T.lectureCourte(k, v)));
@@ -113,6 +113,29 @@ check('aucune lecture courte ne dit quoi faire', courtes.every(t => !CONSEIL.tes
   check('fourchette : « Sur 24 h, le prix est dans le bas de sa fourchette. » ; écart achats/ventes arrondi en millions (« 120 millions $ », « 34 millions $ », jamais un nombre à 7 chiffres)', /^<div[^>]*>Sur 24 h, le prix est dans le bas de sa fourchette\.<\/div>$/.test(ph[0]) && /de 120 millions \$\./.test(ph[6]) && /de 34 millions \$\./.test(ph[7])
     && /de 3,4 millions \$\./.test(T.phraseCarte('cvd', 3356931)) && /de 1,2 million \$\./.test(T.phraseCarte('cvd', -1.2e6)) && /de 845 000 \$\./.test(T.phraseCarte('cvd', 845000)) && !/\d{1,3}(?: \d{3}){2}/.test(ph[6] + ph[7] + T.phraseCarte('cvd', 3356931)) && /2 sources manquent/.test(ph[9]) && /1 source manque/.test(ph[10]), [ph[0], ph[6], ph[9]]);
   check('valeur absente ou clé inconnue : aucune phrase (rien d’inventé)', T.phraseCarte('vix', null) === '' && T.phraseCarte('fourchette', NaN) === '' && T.phraseCarte('inconnue', 1) === '' && T.phraseCarte('sources', 3) === '');
+}
+// Le glossaire en Débutant : d'abord ce que montre SON écran, avec un titre et une explication du
+// Débutant, sans mot technique (constat de revue : il s'ouvrait sur GEX, funding, CVD…).
+{
+  const Gd = require(path.join(REPO, 'js/guide.js'));
+  const G = T.GLOSSAIRE_DEBUTANT || [];
+  const manque = G.filter(k => !T.FICHES[k] || !T.FICHES[k].titreDeb || !T.FICHES[k].simpleDeb);
+  check(`glossaire Débutant : ${G.length} fiches (guide, repères, scénarios, dessin des prix, les cartes), chacune avec titreDeb et simpleDeb`, G.length >= 6 && !manque.length && ['guide_niveaux', 'scenarios'].every(k => G.includes(k)), manque);
+  const sales = Object.entries(T.FICHES).filter(([, f]) => f.titreDeb || f.simpleDeb).map(([k, f]) => [k, Gd.motsBannis((f.titreDeb || '') + ' ' + (f.simpleDeb || ''))]).filter(([, b]) => b.length);
+  check('titres et explications du Débutant : aucun mot de la liste du Guide', !sales.length, sales);
+  check('guide, guide_regime, guide_suite : une explication du Débutant qui décrit l’écran Débutant (ni badge, ni chemins dessinés, « + Affichage »)', ['guide', 'guide_regime', 'guide_suite'].every(k => T.FICHES[k].simpleDeb)
+    && /« \+ Affichage »/.test(T.FICHES.guide.simpleDeb) && /pas de badge/.test(T.FICHES.guide_regime.simpleDeb) && /rien n’est dessiné/.test(T.FICHES.guide_suite.simpleDeb));
+  const fg = T.ficheHtml('guide_regime');
+  check('fiche avec texte du Débutant : les deux explications, chacune dans sa classe ; les deux titres de même', /<p class="fiche-simple expert-seul">/.test(fg) && /<p class="fiche-simple debutant-seul">/.test(fg) && /<span class="debutant-seul">Le mouvement du prix<\/span>/.test(fg));
+  // Autre paire : les cartes du Débutant nomment le bitcoin (le fichier ne suit que lui).
+  const sym = T.activeSymbol;
+  T.activeSymbol = 'SOLUSDT';
+  const dS = rendre(null), eS = rendre('expert');
+  T.activeSymbol = sym;
+  check('SOL/USDT : cartes identiques dans les deux modes ; le Débutant dit « Ces infos parlent du bitcoin », « Bitcoin : fourchette des 24 h », « le bitcoin est … de sa fourchette »', dS === eS && /Ces infos parlent du bitcoin \(en dollars\), pas de SOL\/USDT\./.test(dS)
+    && /Bitcoin : fourchette des 24 h/.test(dS) && /le bitcoin est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(dS) && !/le prix est (dans le haut|dans le bas|au milieu)/.test(dS), dS.slice(0, 400));
+  const dB = rendre(null);
+  check('BTC/USDT : « le prix », pas de mention « Ces infos parlent du bitcoin » ; haut et bas publiés dits « publié »', !/Ces infos parlent du bitcoin/.test(dB) && /le prix est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(dB) && /Haut publié/.test(dB) && /Bas publié/.test(dB));
 }
 check('chaque fiche se termine par « ce n’est pas une recommandation »', Object.keys(T.FICHES).every(k => /pas une recommandation/.test(T.ficheHtml(k))));
 
