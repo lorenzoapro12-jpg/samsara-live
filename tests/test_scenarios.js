@@ -378,9 +378,10 @@ titre('6 bis. Débutant : une ligne d’état marquée, un libellé court, une b
   for (const sc of F.scenarios) for (const fl of [null, '↑', '↓']) for (const sv of [null, { cle: 'cible', k: 1 }]) for (const max of [DEB.scenario, 20]) libs.push([sc.rang, fl, max, t(S.libelleDebutant(sc, sv, max, null, 0, fl))]);
   check('libellé du scénario : ≤ ' + DEB.scenario + ' caractères, une flèche au plus (hors de la vue, la flèche de tête remplace celle du sens)',
     libs.every(([, , max, l]) => l.length <= Math.max(max, 9) && (l.match(/[↑↓]/g) || []).length <= 1) && libs.every(([, , max, l]) => max < DEB.scenario || l.length <= DEB.scenario), libs.filter(([, , max, l]) => l.length > DEB.scenario || (l.match(/[↑↓]/g) || []).length > 1));
-  check('libellé : « Scénario 1 : vers 86 500 $ ↑ », après la 1re cible « Scénario 1 : ensuite 87 200 $ ↑ » ; range « Scénario 3 : 85 600 – 86 400 $ » (avec son unité)',
+  check('libellé : « Scénario 1 : vers 86 500 $ ↑ », après la 1re cible « Scénario 1 : ensuite 87 200 $ ↑ » ; range avec son verbe et son unité « Scén. 3 : reste 85 600–86 400 $ » (sans « reste », il se lisait « va de … à … »), « Scénario 3 : 85 600 – 86 400 $ » en repli',
     S.libelleDebutant(un, null, DEB.scenario) === 'Scénario 1 : vers 86 500 $ ↑' && S.libelleDebutant(un, { cle: 'cible', k: 1 }, DEB.scenario) === 'Scénario 1 : ensuite 87 200 $ ↑'
-    && S.libelleDebutant(F.scenarios[2], null, DEB.scenario) === 'Scénario 3 : 85 600 – 86 400 $' && S.libelleDebutant(un, null, DEB.scenario, null, 0, '↑') === '↑ Scénario 1 : vers 86 500 $',
+    && S.libelleDebutant(F.scenarios[2], null, DEB.scenario) === 'Scén. 3 : reste 85 600–86 400 $' && S.libellesDebutant(F.scenarios[2], null, DEB.scenario).includes('Scénario 3 : 85 600 – 86 400 $')
+    && S.libellesDebutant(F.scenarios[2], null, DEB.scenario).slice(-1)[0] === 'Scén. 3' && S.libellesDebutant(F.scenarios[2], null, DEB.scenario).every(l => l.length <= DEB.scenario) && S.libelleDebutant(un, null, DEB.scenario, null, 0, '↑') === '↑ Scénario 1 : vers 86 500 $',
     [S.libelleDebutant(un, null, DEB.scenario), S.libelleDebutant(F.scenarios[2], null, DEB.scenario), S.libelleDebutant(un, null, DEB.scenario, null, 0, '↑')]);
   // La bulle : chaque scénario en mots, ses origines sans jargon, aucun pourcentage hors la marge.
   const bul = [];

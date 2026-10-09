@@ -856,7 +856,7 @@ const Guide = (function () {
     h24_bas: ['Bas des 24 h', 'Bas 24 h', 'le plus bas des 24 h', 'Min 24 h'],
     sem_haut: ['Haut sem. passée', 'Haut sem.', 'le plus haut de la semaine dernière', 'Max sem.'],
     sem_bas: ['Bas sem. passée', 'Bas sem.', 'le plus bas de la semaine dernière', 'Min sem.'],
-    sr: ['Zone de retour', 'Demi-tour', 'une zone de retour', 'Retour'],
+    sr: ['Zone de retour', 'Zone retour', 'une zone de retour', 'Retour'],
     mur_achat: ['Mur d’achat', 'Mur achat', 'le mur d’achat', 'Achats'],
     mur_vente: ['Mur de vente', 'Mur vente', 'le mur de vente', 'Ventes'],
     options: ['Repère d’options', 'Options', 'un repère d’options', 'Options'],
@@ -971,6 +971,10 @@ const Guide = (function () {
   }
   /** Le début de la phrase, selon l'intervalle affiché : le verbe décrit CETTE durée, pas 24 h. */
   const HORIZON_DEBUTANT = { '1m': 'Ces dernières minutes', '5m': 'Depuis une heure environ', '15m': 'Ces dernières heures', '1h': 'Depuis hier', '4h': 'Ces derniers jours', '1d': 'Ces dernières semaines' };
+  /** La même durée, en court (téléphone, 48 caractères) : un verbe de mouvement sans sa durée se
+   *  lisait comme le contraire de la variation 24 h affichée juste au-dessus (« Le prix monte. » à
+   *  côté de « −0,57 % en 24 h »). Environ la fenêtre du mouvement mesuré (ADX 14 bougies). */
+  const HORIZON_COURT = { '1m': 'Depuis 15 min', '5m': 'Depuis 1 h', '15m': 'Depuis 3 h', '1h': 'Depuis hier', '4h': 'Sur 2 jours', '1d': 'Sur 2 semaines' };
   /** Une bougie, dite en mots : [singulier, pluriel (2), démonstratif, pluriel sans nombre]. */
   const PERIODE_DEBUTANT = {
     '1m': ['une minute', '2 minutes', 'cette minute', 'minutes'],
@@ -1024,8 +1028,14 @@ const Guide = (function () {
     if (!fini(o.prix)) return ['Prix en direct indisponible pour l’instant.'];
     const u = o.unite, ch = o.reperes || choixDebutant(o.choix), rA = ch.dessus && raisonPrincipale(ch.dessus), rB = ch.dessous && raisonPrincipale(ch.dessous);
     const A = rA && prixR(rA, u), B = rB && prixR(rB, u), Bc = rB && chiffresR(rB);
-    const H = HORIZON_DEBUTANT[o.itv] || null, cle = o.regime ? o.regime.cle : 'inconnu';
-    const avecH = s => (H ? [H + ', ' + minuscule(s)] : []).concat([s]);
+    const H = HORIZON_DEBUTANT[o.itv] || null, Hc = HORIZON_COURT[o.itv] || null, cle = o.regime ? o.regime.cle : 'inconnu';
+    // Les variantes AVEC la durée : la longue, puis la courte (téléphone) ; sans durée, en dernier.
+    const avecH = s => (H ? [H + ', ' + minuscule(s)] : []).concat(Hc && Hc !== H ? [Hc + ', ' + minuscule(s)] : []);
+    const avecHc = s => (Hc ? [Hc + ', ' + minuscule(s)] : []);
+    // « Entre B et A » seulement si les deux repères sont dans la vue (o.vue = { lo, hi }, l'échelle
+    // de prix affichée) : un repère loin hors de la vue n'encadre pas un prix qui ne l'a jamais
+    // approché (constat de revue : « hésite entre 82 626 $ et 83 170 $ » sur un axe 82 465–82 777).
+    const dansVue = r => !r || !o.vue || !fini(o.vue.lo) || !fini(o.vue.hi) || (r.p >= o.vue.lo && r.p <= o.vue.hi);
     let V, compacte;
     const enTest = o.enTest && raisonPrincipale(o.enTest);
     const casseSous = ch.dessus && ch.dessus.ferme && ch.dessus.ferme.cassure === 'valide' && ch.dessus.ferme.sens < 0;
@@ -1033,19 +1043,26 @@ const Guide = (function () {
     if (enTest) {
       const N = nomsDebutant(enTest)[2], P = prixR(enTest, u), sens = VERBE_DEBUTANT[cle] || null;
       // Le verbe du mouvement passe avant le nom du repère : sur téléphone (48 caractères),
-      // « Le prix monte et touche 82 710 $. » plutôt que « Le prix touche le mur de vente (…) ».
-      V = (sens ? avecH('Le prix ' + sens + ' et touche ' + N + ' (' + P + ').').concat(['Le prix ' + sens + ' et touche ' + P + '.']) : [])
+      // « Depuis 3 h, le prix monte et touche 82 710 $. » plutôt que « Le prix touche le mur de vente (…) ».
+      // Un sens garde sa durée : sans place pour les deux, le prix touché quitte la phrase (sa bande
+      // s'allume sur le tracé) avant la durée (« Sur 2 semaines, le prix monte. »).
+      const dir = sens === 'monte' || sens === 'baisse';
+      V = (sens ? avecH('Le prix ' + sens + ' et touche ' + N + ' (' + P + ').').concat(avecHc('Le prix ' + sens + ' et touche ' + P + '.'), dir ? avecHc('Le prix ' + sens + '.') : [], ['Le prix ' + sens + ' et touche ' + P + '.']) : [])
         .concat(['Le prix touche ' + N + ' (' + P + ').', 'Le prix touche le repère ' + P + '.']);
       compacte = 'Le prix touche ' + P + '.';
     } else if (casseSur || casseSous) {
       V = [casseSur ? 'Le prix est passé au-dessus de ' + B + '.' : 'Le prix est passé sous ' + A + '.'];
       compacte = V[0];
-    } else if (cle === 'hausse') {
-      V = A ? avecH('Le prix monte. Repère au-dessus : ' + A + '.') : avecH('Le prix monte. Aucun repère proche au-dessus.').concat(['Le prix monte.']);
-      compacte = A ? 'Le prix monte. Au-dessus : ' + A + '.' : 'Le prix monte.';
-    } else if (cle === 'baisse') {
-      V = B ? avecH('Le prix baisse. Repère en dessous : ' + B + '.') : avecH('Le prix baisse. Aucun repère proche en dessous.').concat(['Le prix baisse.']);
-      compacte = B ? 'Le prix baisse. En dessous : ' + B + '.' : 'Le prix baisse.';
+    } else if (cle === 'hausse' || cle === 'baisse') {
+      // Un sens (monte, baisse) garde TOUJOURS sa durée : au téléphone, le repère quitte la phrase
+      // avant elle (il a son libellé sur le tracé).
+      const verbe = VERBE_DEBUTANT[cle], X = cle === 'hausse' ? A : B;
+      const repere = cle === 'hausse' ? 'Repère au-dessus : ' : 'Repère en dessous : ', court = cle === 'hausse' ? 'Au-dessus : ' : 'En dessous : ';
+      const aucun = cle === 'hausse' ? 'Aucun repère proche au-dessus.' : 'Aucun repère proche en dessous.';
+      const base = 'Le prix ' + verbe + '.';
+      V = X ? avecH(base + ' ' + repere + X + '.').concat(avecHc(base + ' ' + court + X + '.'), avecHc(base), [base + ' ' + repere + X + '.'])
+        : avecH(base + ' ' + aucun).concat(avecHc(base), [base]);
+      compacte = X ? base + ' ' + court + X + '.' : base;
     } else if (cle === 'inconnu') {
       if (A && B) { V = ['Le prix est entre ' + B + ' et ' + A + '.', 'Le prix est entre ' + Bc + ' et ' + A + '.']; compacte = V[1]; }
       else if (A) { V = ['Le prix est sous ' + A + '. Aucun repère proche en dessous.', 'Le prix est sous ' + A + '.']; compacte = V[1]; }
@@ -1054,13 +1071,25 @@ const Guide = (function () {
     } else {
       // faible, sans tendance : « hésite » ; tendance de sens incertain : « s'agite » (il bouge fort).
       const verbe = cle === 'incertaine' ? 's’agite' : 'hésite';
-      if (A && B) { V = avecH('Le prix ' + verbe + ' entre ' + B + ' et ' + A + '.').concat(['Le prix ' + verbe + ' entre ' + Bc + ' et ' + A + '.']); compacte = 'Le prix ' + verbe + ' : ' + Bc + ' – ' + A + '.'; }
-      else if (A) { V = avecH('Le prix ' + verbe + ' sous ' + A + '. Aucun repère proche en dessous.').concat(['Le prix ' + verbe + ' sous ' + A + '.']); compacte = V[V.length - 1]; }
-      else if (B) { V = avecH('Le prix ' + verbe + ' au-dessus de ' + B + '. Aucun repère proche au-dessus.').concat(['Le prix ' + verbe + ' au-dessus de ' + B + '.']); compacte = V[V.length - 1]; }
-      else { V = avecH('Le prix ' + verbe + ' : aucun repère proche.'); compacte = V[V.length - 1]; }
+      // Avec la durée (longue, courte), puis sans elle.
+      const avecHs = t => avecH(t).concat([t]);
+      const vA = A && dansVue(rA), vB = B && dansVue(rB);
+      if (vA && vB) { V = avecHs('Le prix ' + verbe + ' entre ' + B + ' et ' + A + '.').concat(['Le prix ' + verbe + ' entre ' + Bc + ' et ' + A + '.']); compacte = 'Le prix ' + verbe + ' : ' + Bc + ' – ' + A + '.'; }
+      // Un repère de chaque côté, l'un loin hors de la vue : la phrase nomme le proche seul (le
+      // lointain garde son libellé, fléché, au bord du tracé).
+      else if (A && B && vB) { V = avecHs('Le prix ' + verbe + ' au-dessus de ' + B + '.'); compacte = V[V.length - 1]; }
+      else if (A && B && vA) { V = avecHs('Le prix ' + verbe + ' sous ' + A + '.'); compacte = V[V.length - 1]; }
+      else if (A && B) { V = avecHs('Le prix ' + verbe + ', loin de ses repères.').concat(avecHs('Le prix ' + verbe + '.')); compacte = V[V.length - 1]; }
+      else if (A) { V = avecHs('Le prix ' + verbe + ' sous ' + A + '. Aucun repère proche en dessous.').concat(['Le prix ' + verbe + ' sous ' + A + '.']); compacte = V[V.length - 1]; }
+      else if (B) { V = avecHs('Le prix ' + verbe + ' au-dessus de ' + B + '. Aucun repère proche au-dessus.').concat(['Le prix ' + verbe + ' au-dessus de ' + B + '.']); compacte = V[V.length - 1]; }
+      else { V = avecHs('Le prix ' + verbe + ' : aucun repère proche.'); compacte = V[V.length - 1]; }
     }
-    // Vue dans le passé : « Maintenant, … » (sans l'horizon, qui parlerait d'une autre durée), s'il tient.
-    if (o.maintenant) { const sansH = V.filter(v => !H || v.indexOf(H) !== 0); V = ['Maintenant, ' + minuscule(sansH[0])].concat(sansH); }
+    // Vue dans le passé : « Maintenant, … » (sans la durée, qui parlerait d'une autre période), s'il tient.
+    if (o.maintenant) {
+      const aH = v => (H && v.indexOf(H + ',') === 0) || (Hc && v.indexOf(Hc + ',') === 0);
+      const sansH = V.filter(v => !aH(v));
+      V = ['Maintenant, ' + minuscule(sansH[0])].concat(sansH);
+    }
     return V.concat([compacte]);
   }
   /** La phrase qui tient (caractères et pixels) ; à défaut, la forme compacte. */
@@ -1108,8 +1137,8 @@ const Guide = (function () {
       case 'hier_bas': return n + 'le prix le plus bas atteint hier, sur ce graphique.';
       case 'sem_haut': return n + 'le prix le plus haut de la semaine dernière.';
       case 'sem_bas': return n + 'le prix le plus bas de la semaine dernière.';
-      case 'h24_haut': return n + 'le prix le plus haut des dernières 24 heures.';
-      case 'h24_bas': return n + 'le prix le plus bas des dernières 24 heures.';
+      case 'h24_haut': return n + 'le prix le plus haut des dernières 24 heures, sur ce graphique.';
+      case 'h24_bas': return n + 'le prix le plus bas des dernières 24 heures, sur ce graphique.';
       case 'sr': { const d = fini(r.bougies) && fini(pasS) ? dernieres(r.bougies * pasS) : null; return n + (r.touches || '') + ' fois, le prix a fait demi-tour autour de ce prix' + (d ? ' sur les ' + d + ' de ce graphique' : '') + '.'; }
       case 'mur_achat': case 'mur_vente': {
         const q = fini(r.btc) ? ' (' + nombre(r.btc, r.btc >= 10 ? 0 : 1) + ' BTC)' : '';
@@ -1170,7 +1199,7 @@ const Guide = (function () {
   return { pctParam, nombre, prix, chiffres, pct, nomIntervalle, duree, heureUTC, niveauxDuJour, niveauxSR, niveauxPublies, choisirNiveaux, libelleNiveau,
     prixR, tagLu, artLu, quoi, bord, etatFerme, etatLive, texteEtatLive, texteEtatMax, MOTS, centile, regime, texteRegime, pivots, regression,
     detecter, bilan, formesAffichees, etatForme, NOMS_FORMES, texteBilan, suite, texteSuite, VARIANTES_SUITE, tagMicro, deArt, decrire, decrireCompact, lecture, VARIANTES_LECTURE, phraseForme, TYPES, bornes,
-    NOMS_DEBUTANT, raisonPrincipale, choixDebutant, reperesDe, choisirReperes, VERBE_DEBUTANT, optionsSeules, libelleDebutant, libellesDebutant, formatDebutant, AVEC_POINT, titreDebutant, nomDebutant, nomPhrase, HORIZON_DEBUTANT, PERIODE_DEBUTANT, phrasesDebutant, phraseDebutant,
+    NOMS_DEBUTANT, raisonPrincipale, choixDebutant, reperesDe, choisirReperes, VERBE_DEBUTANT, optionsSeules, libelleDebutant, libellesDebutant, formatDebutant, AVEC_POINT, titreDebutant, nomDebutant, nomPhrase, HORIZON_DEBUTANT, HORIZON_COURT, PERIODE_DEBUTANT, phrasesDebutant, phraseDebutant,
     texteSuiteDebutant, prixRond, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureParis, dernieres, environ, libelleFormeDebutant, texteFormeDebutant,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT };
 })();

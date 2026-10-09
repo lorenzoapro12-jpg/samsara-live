@@ -509,7 +509,10 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     // La phrase garde son verbe sur téléphone quand le prix touche un repère.
     const enT = s1.dessus, court = [];
     for (const cle of ['hausse', 'baisse', 'faible', 'incertaine']) court.push([cle, G.phraseDebutant({ prix: 86120, unite: '$', reperes: s1, enTest: enT, regime: { cle }, itv: '15m' }, DEB.phraseEtroit)]);
-    check('phrase au téléphone, prix dans un repère : le verbe du mouvement reste (« Le prix monte et touche 86 133 $. »)', court.every(([cle, t]) => t.length <= DEB.phraseEtroit && t.includes(G.VERBE_DEBUTANT[cle]) && /touche/.test(t)), court);
+    check('phrase au téléphone, prix dans un repère : le verbe du mouvement reste (« Depuis 3 h, le prix monte et touche 86 133 $. »)', court.every(([cle, t]) => t.length <= DEB.phraseEtroit && t.includes(G.VERBE_DEBUTANT[cle]) && /touche/.test(t)), court);
+    // Sur 1 jour, durée + « touche » ne tiennent pas en 48 : la durée reste, le prix touché part.
+    const jour = ['hausse', 'baisse'].map(cle => G.phraseDebutant({ prix: 86120, unite: '$', reperes: s1, enTest: enT, regime: { cle }, itv: '1d' }, DEB.phraseEtroit));
+    check('téléphone, 1 jour, prix dans un repère : « Sur 2 semaines, le prix monte. » (la durée avant le prix touché)', jour[0] === 'Sur 2 semaines, le prix monte.' && jour[1] === 'Sur 2 semaines, le prix baisse.', jour);
   }
   // 3. La phrase : un verbe, ni %, ni heure, ni nom d'indicateur ; « hésite » seulement sans tendance.
   const haut = N(Rd('hier_haut', 86398)), bas = N(Rd('mur_achat', 85900));
@@ -534,6 +537,40 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
   check('phrase : un côté sans repère est dit (« Aucun repère proche en dessous »)', vide.length > 0 && vide.every(x => /Aucun repère proche en dessous/.test(x.V[0])), vide.slice(0, 2).map(x => x.V));
   const prixAbsent = G.phrasesDebutant({ prix: null, choix: { dessus: [haut], dessous: [bas] }, regime: { cle: 'faible' } });
   check('phrase : prix en direct absent, dit (aucun prix inventé)', prixAbsent.length === 1 && /indisponible/.test(prixAbsent[0]), prixAbsent);
+  // 3 bis. Au téléphone, un sens (monte, baisse) garde sa durée (constat de revue : « Le prix
+  // monte. » à côté de « −0,57 % en 24 h » en rouge) ; le repère quitte la phrase avant elle.
+  {
+    const duree = [];
+    for (const itv of Object.keys(G.HORIZON_COURT)) for (const cle of ['hausse', 'baisse']) for (const ch of [{ dessus: [haut], dessous: [bas] }, { dessus: [], dessous: [] }]) {
+      const o = { prix: 86012.5, unite: '$', choix: ch, enTest: null, regime: { cle }, itv };
+      const e = G.phraseDebutant(o, DEB.phraseEtroit), l = G.phraseDebutant(o, DEB.phrase);
+      duree.push({ itv, cle, e, l, ok: e.length <= DEB.phraseEtroit && [G.HORIZON_DEBUTANT[itv], G.HORIZON_COURT[itv]].some(h => e.indexOf(h + ', ') === 0) && l.indexOf(G.HORIZON_DEBUTANT[itv] + ', ') === 0 && e.includes(G.VERBE_DEBUTANT[cle]) });
+    }
+    check('téléphone (48) : « Depuis 3 h, le prix monte. Au-dessus : 86 398 $. » — un sens garde toujours sa durée, sur chaque intervalle', duree.every(x => x.ok)
+      && duree.some(x => x.e === 'Depuis 3 h, le prix monte. Au-dessus : 86 398 $.'), duree.filter(x => !x.ok).slice(0, 4));
+    const Hs = Object.values(G.HORIZON_COURT).filter(h => G.motsBannis(h).length || h.length > 14);
+    check('durées courtes : ≤ 14 caractères, sans mot banni (« 3 h », jamais « 3h »)', !Hs.length, Hs);
+  }
+  // 3 ter. « Entre B et A » seulement si les deux repères sont dans la vue (constat de revue :
+  // « hésite entre 82 626 $ et 83 170 $ » sur un axe 82 465–82 777).
+  {
+    const loinH = N(Rd('h24_haut', 87000)), presB = N(Rd('sr', 85900));
+    const vue = { lo: 85700, hi: 86300 }, ent = [];
+    for (const cle of ['faible', 'sans', 'incertaine']) for (const [ch, att] of [[{ dessus: [loinH], dessous: [presB] }, /au-dessus de 85 900 \$/], [{ dessus: [N(Rd('hier_haut', 86200))], dessous: [N(Rd('hier_bas', 85000))] }, /sous 86 200 \$/],
+      [{ dessus: [loinH], dessous: [N(Rd('hier_bas', 85000))] }, /loin de ses repères|hésite\.|s’agite\./]]) {
+      const V = G.phrasesDebutant({ prix: 86012.5, unite: '$', choix: ch, enTest: null, regime: { cle }, itv: '15m', vue });
+      ent.push({ cle, V, ok: !V.some(v => /entre/.test(v)) && att.test(V[0]) });
+    }
+    const dedans = G.phrasesDebutant({ prix: 86012.5, unite: '$', choix: { dessus: [N(Rd('hier_haut', 86200))], dessous: [presB] }, enTest: null, regime: { cle: 'faible' }, itv: '15m', vue });
+    check('un repère hors de la vue : jamais « entre » ; la phrase nomme le repère proche seul (« … hésite au-dessus de 85 900 $. ») ; les deux dans la vue : « entre »', ent.every(x => x.ok) && /entre 85 900 \$ et 86 200 \$/.test(dedans[0]), ent.filter(x => !x.ok).concat([dedans[0]]));
+  }
+  // 3 quater. Une zone de retour se nomme par ce qu'elle a été (« Zone retour », « Retour »), jamais
+  // « Demi-tour » (lu comme une consigne ou une prévision).
+  {
+    const z = N(Rd('sr', 82681)), Z = [DEB.niveau, DEB.niveauEtroit].map(max => t(G.libelleDebutant(z, { max })));
+    check('zone de retour : « Zone de retour · 82 681 $ » (26), « Retour 82 681 $ » (18), jamais « Demi-tour »', Z[0] === 'Zone de retour · 82 681 $' && Z[1] === 'Retour 82 681 $' && !JSON.stringify(G.NOMS_DEBUTANT).includes('Demi-tour')
+      && t(G.libelleDebutant(Object.assign({}, z, { raisons: [Rd('sr', 749.15)] }), { max: DEB.niveau, unite: 'SOL' })) === 'Zone retour · 749,15 SOL', Z);
+  }
   // 4. La forme : seulement confirmée ou invalidée, ≤ 24 caractères.
   const fo = [['double_sommet', { phase: 'confirme', sens: -1 }], ['double_creux', { fin: 'invalide', sens: 1 }], ['triangle', { phase: 'confirme', sens: 1 }], ['range', { phase: 'confirme', sens: -1 }], ['double_sommet', {}], ['triangle', { demi: true, demiSens: 1 }]]
     .map(([type, e]) => [type, t(G.libelleFormeDebutant(Object.assign({ type, sens: 1 }, e)) || '') || null]);
