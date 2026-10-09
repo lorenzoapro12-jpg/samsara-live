@@ -219,7 +219,7 @@ titre('9. Libellés Débutant : le nom de la figure gardé, ≤ ' + DEB.forme + 
   for (const f of R.formes.concat(R.ebauches.liste)) {
     for (const t of G.libellesPossiblesDebutant(f, DEB.forme)) {
       n++;
-      if (!(t.length <= DEB.forme && !G.motsBannis(t).length && (t.includes(G.NOM_FORME_DEBUTANT[f.type]) || /^Cible atteinte$/.test(t)))) mauvais.push(f.type + ' : ' + t);
+      if (!(t.length <= DEB.forme && !G.motsBannis(t).length && t.includes(G.NOM_FORME_DEBUTANT[f.type]))) mauvais.push(f.type + ' : ' + t);
     }
   }
   check(`${n} libellés possibles, tous corrects`, n > 0 && !mauvais.length, [...new Set(mauvais)].slice(0, 6));

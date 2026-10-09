@@ -223,7 +223,9 @@ async function bulle(o, tactile) {
       // oscillait autour de la ligne ; le libellé garde désormais le nom et ne revient pas en arrière
       // avant la clôture.
       check(`le prix live au-delà de la ligne qui valide : le calque dit « ${nom} à confirmer » ; la bulle « Si … finit … (à HHhMM) »`, r && r.a.t === nom + ' à confirmer' && r.a.item === r.a.t && /^En ce moment le prix est .* finit .*\(à \d\dh\d\d\)/.test(r.a.vivant), r);
-      check('il revient, une mèche reste : le libellé ne change pas (pas de clignotement) ; « Cela ne compte pas » (Débutant), « percé en mèche » (Expert)', r && r.b.t === r.a.t && /Cela ne compte pas/.test(r.b.vivant) && /percé en mèche/.test(r.b.expert), r && r.b);
+      // (Changé exprès, revue des figures 2 : « … à confirmer » restait affiché alors que le prix était
+      // revenu dedans — une mèche seule ne valide rien ; le libellé garde le nom et dit « revenu ».)
+      check('il revient, une mèche reste : le libellé garde le nom et dit « revenu » (plus « à confirmer ») ; « Cela ne compte pas » (Débutant), « percé en mèche » (Expert)', r && (r.b.t === nom + ' : revenu dedans' || r.b.t === nom + ' : revenu') && r.b.t !== r.a.t && /Cela ne compte pas/.test(r.b.vivant) && /percé en mèche/.test(r.b.expert), r && r.b);
       check('… sans redessiner le graphique (calque seul), et le libellé de la clôture ne change pas', r && r.dc === 0 && r.base === r.apres, r && { dc: r.dc, base: r.base, apres: r.apres });
       check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();

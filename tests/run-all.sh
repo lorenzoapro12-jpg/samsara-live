@@ -160,6 +160,9 @@ node test_figures_page.js || ko=1
 etape "9b⁗'. Suivi des figures clôture après clôture : naissance via l'ébauche, pas de doublon, entrée en V, abandon sur la mèche, invalidation en 2 clôtures, dates, ✗ seulement pour ce qui a été dessiné, reprise du rejeu au retour sur un intervalle (page non exécutée sans Playwright)"
 node test_figures_suivi.js || ko=1
 
+etape "9b⁗''. Figures, 2e revue : ✗ gardée en Expert, droites de 2 points approchées, un mouvement compté une fois, double devenu triple, mots (côté de la ✗, mèche, cible), trait d'invalidation, rejeu à froid par tranches (page non exécutée sans Playwright)"
+node test_figures_revue2.js || ko=1
+
 etape "9c. Sobriété dans Chromium : éclair, horloge, onde, calque, verre, chargement, chaleur (non exécuté sans Playwright)"
 node test_sobriete.js || ko=1
 etape "9d. Thème Gare dans Chromium : palettes à 1ch, provenance lue dans CADENCES, remarque d'âge, chutes à l'événement, démontage (non exécuté sans Playwright)"

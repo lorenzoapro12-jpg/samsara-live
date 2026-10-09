@@ -593,10 +593,10 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     ['double_sommet', {}], ['triangle_symetrique', { demi: true, demiSens: 1 }], ['range', {}], ['double_creux', { demi: true }], ['double_sommet', { fin: 'atteint' }], ['triangle_symetrique', { fin: 'expire_avant' }]]
     .map(([type, e]) => [type, t(G.libelleFormeDebutant(Object.assign({ type, sens: 1 }, e)) || '') || null]);
   // (Changé exprès : le côté d'une sortie se dit en mots, jamais par une flèche seule ; le nom reste.)
-  check('forme : « Double sommet confirmé », « ✗ Double creux invalidé », « Triangle : sortie en haut », « Rectangle : sortie en bas » ; en train de se dessiner : « Double sommet possible », « Triangle : sort en haut ? », « Prix dans un rectangle », « Double creux à confirmer » ; issues : « Cible atteinte » (nom trop long), « Triangle sans suite »',
+  check('forme : « Double sommet confirmé », « ✗ Double creux invalidé », « Triangle : sortie en haut », « Rectangle : sortie en bas » ; en train de se dessiner : « Double sommet possible », « Triangle : sort en haut ? », « Prix dans un rectangle », « Double creux à confirmer » ; issues : « Double sommet : cible ✓ » (la forme longue dépasse : le nom reste — changé exprès, revue des figures 2), « Triangle sans suite »',
     fo[0][1] === 'Double sommet confirmé' && fo[1][1] === '✗ Double creux invalidé' && fo[2][1] === 'Triangle : sortie en haut' && fo[3][1] === 'Rectangle : sortie en bas'
     && fo[4][1] === 'Double sommet possible' && fo[5][1] === 'Triangle : sort en haut ?' && fo[6][1] === 'Prix dans un rectangle' && fo[7][1] === 'Double creux à confirmer'
-    && fo[8][1] === 'Cible atteinte' && fo[9][1] === 'Triangle sans suite' && fo.every(([, l]) => !l || l.length <= DEB.forme) && !fo.some(([, l]) => /[↑↓]/.test(l || '')), fo);
+    && fo[8][1] === 'Double sommet : cible ✓' && fo[9][1] === 'Triangle sans suite' && fo.every(([, l]) => !l || l.length <= DEB.forme) && !fo.some(([, l]) => /[↑↓]/.test(l || '')), fo);
   // 4 bis. La bulle d'une figure qui se dessine : ce qu'on voit, ce qui la validerait (2 périodes
   // finies de suite), ce qui l'annulerait, sa cible conditionnelle (« cible théorique … non
   // garantie »), toujours avec le bilan mesuré ; mots du Débutant seulement. (Plan figures §9.3 :
