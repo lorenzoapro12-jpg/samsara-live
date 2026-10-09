@@ -1489,6 +1489,8 @@
     textesDebutant: 2,       // mode débutant : 2 repères au plus sur la carte, un de chaque côté du prix
     tendanceMs: 15 * 60e3,   // mode débutant : « prix en hausse / en baisse / stable sur 15 min »…
     tendancePct: 0.1,        // … « stable » sous ±0,1 % de variation (convention)
+    ageFraisMs: 5e3,         // mode débutant : sous 5 s, la ligne du haut dit « à jour » (elle ne change pas chaque seconde)
+    sensGardeMs: 10e3,       // mode débutant : « plus d’achats / de ventes en attente » ne change qu'après 10 s du même autre côté
   };
   // Les symboles du journal qui ne sont pas ceux des fins de murs (BM.FINS_MURS) : la légende et la
   // carte les lisent ici.
@@ -1694,13 +1696,28 @@
     return { sens: Math.abs(pct) < o.tendancePct ? 'stable' : pct > 0 ? 'hausse' : 'baisse', de, a, pct, depuis: t0, t: vif ? prix.t : (o.lu !== undefined ? o.lu : null) };
   };
   const majuscule = s => s.charAt(0).toUpperCase() + s.slice(1);
+  /** L'âge de la ligne du haut : « à jour » sous ageFraisMs (elle ne change pas chaque seconde),
+   *  sinon « à jour il y a N s » (secondes entières) ; l'âge exact est dans le détail. */
+  BM.ageLigne = (ms, o) => (ms >= 0 && ms < Object.assign({}, BM.GUIDE, o).ageFraisMs ? 'à jour' : 'à jour il y a ' + BM.ageEntier(ms));
+  /** Le côté le plus chargé, tenu : un AUTRE côté ne remplace le côté dit qu'après sensGardeMs de
+   *  lectures qui le disent toutes (la ligne ne bascule pas d'un mot à l'autre chaque seconde).
+   *  h = l'état d'avant (ou null), sens = celui de la dernière lecture, t = son instant (ms). */
+  BM.sensStable = function (h, sens, t, o) {
+    o = Object.assign({}, BM.GUIDE, o);
+    if (!sens) return h || { sens: null, cand: null, depuis: null };
+    if (!h || !h.sens || h.sens === sens) return { sens, cand: null, depuis: null };
+    if (h.cand !== sens) return { sens: h.sens, cand: sens, depuis: t };
+    return t - h.depuis >= o.sensGardeMs ? { sens, cand: null, depuis: null } : h;
+  };
   /** La ligne du haut en mode débutant : { long (≤ 100 signes), court (≤ 55) }.
-   *    long  = « [Prix en hausse sur 15 min · ]plus d'achats en attente · à jour il y a 2 s · pas une prévision »
-   *    court = « [Prix en hausse · ]à jour il y a 2 s · pas une prévision »
+   *    long  = « Prix 82 548 $, en hausse · plus d’achats en attente · à jour · pas une prévision »
+   *    court = « Prix 82 548 $, en hausse · à jour · pas une prévision » (le prix tombe s'il ne tient pas)
    *  r = BM.resumeCarnet (null : pas encore de lecture) ; tendance = BM.tendancePrix (null : le
    *  morceau disparaît) ; ageMs = l'âge de la PLUS VIEILLE valeur de la ligne. etat : { guideCache,
    *  pauseMs (carnet plus frais : repères cachés), retardMs (échanges en retard), aucunRepere
-   *  (aucune étiquette posée, d'aucun côté) }. */
+   *  (aucun repère d'aucun côté), vide ('ask' | 'bid' : ce côté n'a pas de repère), prix (le dernier
+   *  prix, celui de la pastille de l'axe) }. Le côté le plus chargé n'est dit que quand les DEUX
+   *  côtés ont un repère : sinon la ligne dit le côté vide (elle ne contredit jamais la carte). */
   BM.phraseCarteDebutant = function (r, tendance, ageMs, etat, o) {
     o = Object.assign({}, BM.GUIDE, o);
     etat = etat || {};
@@ -1708,14 +1725,19 @@
     if (etat.guideCache) return une('Guide caché : bouton «' + NB + 'Guide' + NB + '» pour revoir les repères');
     if (etat.pauseMs !== undefined && etat.pauseMs !== null) return une('Ordres en attente non relus depuis ' + BM.ageEntier(etat.pauseMs) + ' · repères cachés');
     if (!r) return une('Lecture en cours…');
-    const T = tendance ? 'Prix ' + { hausse: 'en hausse', baisse: 'en baisse', stable: 'stable' }[tendance.sens] : null;
-    const age = 'à jour il y a ' + BM.ageEntier(ageMs), fin = ' · pas une prévision';
+    const sens = tendance ? { hausse: 'en hausse', baisse: 'en baisse', stable: 'stable' }[tendance.sens] : null;
+    const px = etat.prix > 0 ? 'Prix ' + BM.prix(etat.prix) + DOL : null;
+    const tetes = [px && sens ? px + ', ' + sens : px, sens ? 'Prix ' + sens : null].filter(Boolean);
+    const age = BM.ageLigne(ageMs, o), fin = ' · pas une prévision';
     const retard = etat.retardMs ? 'échanges en retard de ' + BM.ageEntier(etat.retardMs) : null;
     const eq = retard || (etat.aucunRepere ? 'rien de marquant autour du prix'
       : r.qB === 0 && r.qA === 0 ? 'aucun ordre en attente lu'
-        : { achat: 'plus d\'achats en attente', vente: 'plus de ventes en attente', egal: 'autant d\'achats que de ventes' }[r.sens]);
-    const long = (T ? T + ' sur ' + BM.age(o.tendanceMs) + ' · ' + eq : majuscule(eq)) + ' · ' + age + fin;
-    const court = retard ? majuscule(retard) + fin : (T ? T + ' · ' + age : majuscule(age)) + fin;
+        : etat.vide === 'ask' ? 'rien de marquant au-dessus'
+          : etat.vide === 'bid' ? 'rien de marquant au-dessous'
+            : { achat: 'plus d’achats en attente', vente: 'plus de ventes en attente', egal: 'autant d’achats que de ventes' }[r.sens]);
+    const premier = (l, max) => l.find(t => t.length <= max) || l[l.length - 1];
+    const long = premier(tetes.map(h => h + ' · ' + eq + ' · ' + age + fin).concat([majuscule(eq) + ' · ' + age + fin]), 100);
+    const court = retard ? majuscule(retard) + fin : premier(tetes.map(h => h + ' · ' + age + fin).concat([majuscule(age) + fin]), 55);
     return { long, court };
   };
   /** Le nom d'un repère sur la carte (≤ 24 signes) : « Mur d’achat · 82 480 $ » sous le prix,
@@ -1726,25 +1748,37 @@
     const nom = cote === 'bid' ? 'Mur d’achat' : 'Mur de vente', P = BM.prix(p) + DOL, t = nom + ' · ' + P;
     return t.length <= BM.ETIQUETTE_MAX ? t : nom + ' ' + P;
   };
-  /** Le résumé OUVERT en mode débutant (un appui sur la ligne du haut) : 5 lignes en clair, mêmes
+  /** Le prix est DANS la zone de ce côté (son cadre est « allumé ») : son nom, sans prix. */
+  BM.etiquetteDedans = cote => (cote === 'bid' ? 'Dans un mur d’achat' : 'Dans un mur de vente');
+  /** Ce côté n'a aucun repère : la carte le dit (on ne prend pas « rien » pour « en panne »). */
+  BM.etiquetteVide = cote => (cote === 'bid' ? 'Pas de mur au-dessous' : 'Pas de mur au-dessus');
+  /** Typographie des phrases débutantes : une espace insécable avant « : ; ? ! » (jamais en tête de ligne). */
+  BM.typo = s => String(s).replace(/ ([:;?!])/g, NB + '$1');
+  /** Le résumé OUVERT en mode débutant (un appui sur la ligne du haut) : 6 lignes en clair, mêmes
    *  valeurs que l'expert. d = { tendance, r (BM.resumeCarnet), luMs (âge de la lecture), niveaux:
-   *  { ask, bid } (null, ou { etiquette, q, pBas, pHaut }), ages: { recentes, anciennes, ronds,
-   *  ligne } (ms, ou null), o (constantes) }. */
+   *  { ask, bid } (null, ou { etiquette, q, pBas, pHaut, dedans }), ages: { recentes, anciennes,
+   *  ronds, ligne, autre (Coinbase) } (ms, ou null), o (constantes) }. Une espace insécable avant
+   *  « : » (BM.typo) : un deux-points ne commence jamais une ligne. */
   BM.detailCarteDebutant = function (d) {
     const o = Object.assign({}, BM.GUIDE, d.o), t = d.tendance, r = d.r, n = d.niveaux || {}, a = d.ages || {};
     const l1 = t ? 'Prix : de ' + BM.prix(t.de) + DOL + ' à ' + BM.prix(t.a) + DOL + ' en ' + BM.age(o.tendanceMs) + ' (' + BM.pourcent(t.pct, 2) + '). «' + NB + 'Stable' + NB + '» = moins de ' + BM.nombre(o.tendancePct, 0, 2) + ' % de variation.'
       : 'Prix sur ' + BM.age(o.tendanceMs) + ' : des minutes manquent, pas de sens écrit.';
     const l2 = r ? 'Ordres en attente lus il y a ' + BM.age(d.luMs) + ', jusqu\'à ' + BM.prix(r.usd) + DOL + ' de chaque côté du prix : ' + BM.btc(r.qB) + ' BTC à l\'achat, ' + BM.btc(r.qA) + ' BTC à la vente.'
       : 'Ordres en attente : lecture en cours.';
-    const cote = (mot, x) => mot + ' : ' + (x ? x.etiquette + ' (' + BM.btc(x.q) + ' BTC entre ' + BM.prix(x.pBas) + ' et ' + BM.prix(x.pHaut) + DOL + ').' : 'rien de nettement plus chargé dans ce qui est lu.');
+    const entre = x => BM.btc(x.q) + ' BTC entre ' + BM.prix(x.pBas) + ' et ' + BM.prix(x.pHaut) + DOL;
+    const cote = (mot, x) => mot + ' : ' + (!x ? 'rien de nettement plus chargé dans ce qui est lu.'
+      : x.dedans ? 'le prix est dans un mur ' + (mot === 'Au-dessus' ? 'de vente' : 'd\'achat') + ' (' + entre(x) + ').'
+        : x.etiquette + ' (' + entre(x) + ').');
     const l3 = cote('Au-dessus', n.ask) + ' ' + cote('Au-dessous', n.bid);
-    const ag = [];
-    const couleurs = [a.recentes !== null && a.recentes !== undefined ? 'récentes ' + BM.age(a.recentes) : '', a.anciennes !== null && a.anciennes !== undefined ? 'plus anciennes ' + BM.age(a.anciennes) : ''].filter(Boolean);
+    const ag = [], dit = v => v !== null && v !== undefined;
+    const couleurs = [dit(a.recentes) ? 'récentes ' + BM.age(a.recentes) : '', dit(a.anciennes) ? 'plus anciennes ' + BM.age(a.anciennes) : ''].filter(Boolean);
     if (couleurs.length) ag.push('couleurs ' + couleurs.join(', '));
-    if (a.ronds !== null && a.ronds !== undefined) ag.push('ronds ' + BM.age(a.ronds));
-    if (a.ligne !== null && a.ligne !== undefined) ag.push('ligne blanche ' + BM.age(a.ligne));
+    if (dit(a.ronds)) ag.push('ronds ' + BM.age(a.ronds));
+    if (dit(a.ligne)) ag.push('ligne blanche ' + BM.age(a.ligne));
+    if (dit(a.autre)) ag.push('autre plateforme ' + BM.age(a.autre));
     const l4 = 'Âges : ' + (ag.length ? ag.join(' · ') : 'rien de lu encore') + '.';
-    return [l1, l2, l3, l4, 'Une photo de l\'instant, pas une prévision. Tout le détail technique : mode Expert.'];
+    return [l1, l2, l3, l4, 'Le scénario du matin de Claude est sur le Terminal (bouton «' + NB + '←' + NB + 'Terminal' + NB + '»).',
+      'Une photo de l\'instant, pas une prévision. Tout le détail technique : mode Expert.'].map(BM.typo);
   };
 
   /** L'histoire d'une tranche (k, de `pas` $, côté 'b' ou 'a') dans le carnet live gardé
@@ -1945,13 +1979,14 @@
       incertain: [taille + ' disparu à ' + px + ', échanges incertains' + (vie ? ' : ' + vie + ' au cours de sa vie' : '') + (plus ? ' ; on ne sait pas si ses derniers ' + BM.btc(x.q0) + ' BTC ont été échangés' : '') + ' (un seul prix)',
         nom + ' disparu à ' + hc + ' (échanges incertains)', '? ' + mot + ' : échanges incertains ' + hc],
     }[type];
-    const o2 = ordreMot(x.cote);
+    // Débutant : des dollars entiers, chaque quantité avec son unité, et jamais « ses derniers 0,000 BTC ».
+    const o2 = ordreMot(x.cote), pxD = BM.prix(x.p) + DOL;
     const D = {
-      retire: !plus && !(ech > 0.0005) ? o2 + ' retiré à ' + px + ', sans échange (' + BM.btc(qMax) + ' BTC)' : o2 + ' retiré à ' + px + ' : ses derniers ' + BM.btc(x.q0) + ' BTC partis sans échange',
-      echange: o2 + ' entièrement échangé à ' + px + ' (' + BM.btc(ech) + ' BTC)',
-      partiel: o2 + ' en partie échangé à ' + px + ' (' + BM.btc(ech) + ' sur ' + BM.btc(qMax) + ' BTC), puis disparu',
-      essentiel: o2 + ' surtout retiré à ' + px + ' (' + BM.btc(ret) + ' BTC retirés, ' + BM.btc(ech) + ' échangés)',
-      incertain: o2 + ' disparu à ' + px + ' : on ne sait pas s\'il a été échangé',
+      retire: o2 + ' retiré à ' + pxD + (ech > 0.0005 ? ' (' + BM.btc(qMax) + ' BTC, dont ' + BM.btc(ech) + ' BTC échangés avant)' : ', sans échange (' + BM.btc(qMax) + ' BTC)'),
+      echange: o2 + ' entièrement échangé à ' + pxD + ' (' + BM.btc(ech) + ' BTC)',
+      partiel: o2 + ' en partie échangé à ' + pxD + ' (' + BM.btc(ech) + ' BTC sur ' + BM.btc(qMax) + ' BTC), puis disparu',
+      essentiel: o2 + ' surtout retiré à ' + pxD + (ret > 0.0005 ? ' (' + BM.btc(ret) + ' BTC retirés, ' + BM.btc(ech) + ' BTC échangés)' : ' (' + BM.btc(ech) + ' BTC échangés sur ' + BM.btc(qMax) + ' BTC)'),
+      incertain: o2 + ' disparu à ' + pxD + ' : on ne sait pas s\'il a été échangé',
     }[type];
     return { t: x.t, type, cote: x.cote, p: x.p, q: type === 'echange' ? ech : qMax, s: BM.FINS_MURS[type === 'essentiel' ? 'partiel' : type].s, texte: T[0], carte: T[1],
       court: T[2], debutant: D, cle: type + x.cote + Math.round(x.p * 100) };
@@ -1963,7 +1998,7 @@
     return { t: x.t, type: 'apparu', cote: x.cote, p: x.p, q: x.q, s: BM.SYMBOLES_GUIDE.apparu.s,
       texte: x.grossi ? nom + ' : ' + q + ' à ' + BM.prixExact(x.p) + DOL + ' (un seul prix ; il y en avait moins avant)' : nom + ' apparu : ' + q + ' à ' + BM.prixExact(x.p) + DOL + ' (un seul prix)',
       carte: nom + ' apparu à ' + hc + ' (' + q + ')', court: '+ ' + coteMot(x.cote) + ' ' + q + ' ' + hc,
-      debutant: ordreMot(x.cote) + (x.grossi ? ' agrandi : ' + q + ' à ' + BM.prixExact(x.p) + DOL : ' posé : ' + q + ' à ' + BM.prixExact(x.p) + DOL + ' (un seul prix)'), cle: 'apparu' + x.cote + Math.round(x.p * 100) };
+      debutant: ordreMot(x.cote) + (x.grossi ? ' agrandi : ' + q + ' à ' + BM.prix(x.p) + DOL : ' posé : ' + q + ' à ' + BM.prix(x.p) + DOL + ' (un seul prix)'), cle: 'apparu' + x.cote + Math.round(x.p * 100) };
   };
   /** Un mur NOMMÉ (tranche du carnet live) passé au-dessus du seuil sous les yeux de la page.
    *  x = { cote: 'b'|'a', p, pas, q, t }. */

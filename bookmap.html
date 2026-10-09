@@ -17,7 +17,7 @@
     <a class="retour" href="index.html" title="Revenir au terminal">← Terminal</a>
     <h1>Carte <span class="sous expert-seul">BTC/USDT · carnet, exécutions, murs, gamma</span><span class="sous debutant-seul">BTC/USDT · ordres en attente et échanges</span></h1>
     <!-- Le mode (débutant / expert) : le même que le terminal. Libellé long à partir de 1024 px. -->
-    <button type="button" class="bouton bouton-mode" id="btnModeBarre" aria-pressed="false" title="Changer de mode (touche M) : le même réglage que le terminal, le changer ici le change aussi là-bas"><span class="mode-long">Débutant · passer en Expert</span><span class="mode-court">Passer en Expert</span><span class="mode-mini">Expert</span></button>
+    <button type="button" class="bouton bouton-mode" id="btnModeBarre" title="Changer de mode (touche M) : le même réglage que le terminal, le changer ici le change aussi là-bas"><span class="mode-long">Débutant · passer en Expert</span><span class="mode-court">Passer en Expert</span><span class="mode-mini">→ Expert</span></button>
   </div>
   <nav class="calques" id="calques" aria-label="Calques affichés"></nav>
   <div class="barre-droite">
@@ -147,19 +147,19 @@
   <div class="debutant-seul" id="legendeDebutant">
     <h3>L'essentiel</h3>
     <dl>
-      <dt>Couleurs = ordres en attente</dt>
-      <dd>Plus c'est clair (<span id="legPaletteDeb">du sombre au clair</span>), plus il y a d'ordres d'achat ou de vente à ce prix. Un ordre peut être retiré à tout moment. Hachures : rien n'a été lu là.</dd>
+      <dt>Couleurs = ordres d'achat ou de vente en attente</dt>
+      <dd><span id="legPaletteDeb">Bleu foncé : peu d'ordres à ce prix ; puis vert, jaune, orange ; blanc : le plus d'ordres.</span> Un ordre peut être retiré à tout moment. Hachures : rien n'a été lu là.</dd>
       <dt>Ligne blanche = le prix</dt>
       <dd>Jusqu'au trait vertical « maintenant ».</dd>
       <dt>Ronds = échanges réels</dt>
       <dd>Vert : un acheteur a pris une vente en attente. Rouge : un vendeur a pris un achat en attente. Plus gros = plus de BTC.</dd>
       <dt>« Mur d’achat » sous le prix, « Mur de vente » au-dessus</dt>
-      <dd>Là où le plus d'ordres attendent en ce moment. Ils peuvent être retirés avant que le prix y arrive.</dd>
+      <dd>Là où le plus d'ordres attendent en ce moment. Ils peuvent être retirés avant que le prix y arrive. «&nbsp;Dans un mur…&nbsp;» : le prix y est entré (son cadre s'allume). «&nbsp;Pas de mur au-dessus&nbsp;» (ou au-dessous) : rien de nettement plus chargé de ce côté.</dd>
       <dt>La phrase du haut</dt>
       <dd>Une photo de l'instant, pas une prévision : plus d'ordres d'un côté ne dit pas où ira le prix.</dd>
     </dl>
     <h3>Gestes</h3>
-    <p>Glisser : déplacer la carte. Molette ou deux doigts : zoomer ; double-clic : revenir à la vue par défaut.</p>
+    <p>Glisser : déplacer la carte. <span class="geste-souris">Molette ou deux doigts : zoomer ; double-clic : revenir à la vue par défaut.</span><span class="geste-doigt">Deux doigts : zoomer ; double appui : revenir à la vue par défaut.</span></p>
     <p>Toucher ou survoler un élément : son détail. Au doigt, un appui bref le montre et le même appui l'enlève ; un appui long le fait suivre le doigt.</p>
     <p><button type="button" class="bouton" id="btnIntroDebutant">Comment lire cette carte</button> <button type="button" class="bouton bouton-mode" id="btnModeDebutant">Passer en Expert</button></p>
     <p class="note">La carte décrit des ordres en attente et des échanges passés, pas une recommandation : un ordre peut être retiré avant d'être touché, et un rond ne dit pas qui a acheté.</p>
