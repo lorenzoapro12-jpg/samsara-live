@@ -497,9 +497,38 @@ titre('13. Mode débutant : phrase du haut, étiquettes, sens du prix, journal e
   const mins = (f, trou) => { const l = []; for (let t = T0 - 20 * 60e3; t <= T0; t += 60e3) if (t !== trou) l.push({ t, c: f(t) }); return l; };
   const tRef = Math.floor((maint - G.tendanceMs) / 60e3) * 60e3;
   const plat = 100000, fin = pct => t => (t === tRef ? plat : t === T0 ? plat * (1 + pct / 100) : plat);
-  const th = BM.tendancePrix(mins(fin(0.12)), null, maint), tb = BM.tendancePrix(mins(fin(-0.12)), null, maint), ts = BM.tendancePrix(mins(fin(0.08)), null, maint), ts2 = BM.tendancePrix(mins(fin(-0.099)), null, maint);
-  check(`hausse (+0,12 %), baisse (−0,12 %), stable (+0,08 % et −0,099 %) autour du seuil de ${G.tendancePct} %`, th.sens === 'hausse' && tb.sens === 'baisse' && ts.sens === 'stable' && ts2.sens === 'stable', [th, tb, ts, ts2].map(x => x && x.sens));
-  check('référence : la clôture de la minute commencée 15 min plus tôt', th.de === plat && th.depuis === tRef && Math.abs(th.pct - 0.12) < 1e-9, th);
+  const th = BM.tendancePrix(mins(fin(0.12)), null, maint), tb = BM.tendancePrix(mins(fin(-0.13)), null, maint), ts = BM.tendancePrix(mins(fin(0.08)), null, maint), ts2 = BM.tendancePrix(mins(fin(-0.11)), null, maint);
+  const th2 = BM.tendancePrix(mins(fin(0.13)), null, maint);
+  check(`hausse (+0,13 %), baisse (−0,13 %), stable (+0,08 % et −0,11 %) autour du seuil de ${G.tendancePct} %`, th2.sens === 'hausse' && tb.sens === 'baisse' && ts.sens === 'stable' && ts2.sens === 'stable', [th2, tb, ts, ts2].map(x => x && x.sens));
+  check('référence : la moyenne des clôtures des 3 minutes centrées sur 15 min plus tôt', th.de === plat && th.depuis === tRef && Math.abs(th.pct - 0.12) < 1e-9 && G.tendanceRefMin === 3, th);
+  {
+    // La référence est une MOYENNE : une minute de référence plus haute pèse un tiers.
+    const pic = t => (t === tRef - 60e3 ? plat * 1.003 : t === T0 ? plat : plat);
+    const tp = BM.tendancePrix(mins(pic), null, maint);
+    check('référence moyenne : une seule minute de référence à +0,3 % ne fait que −0,1 % (pas −0,3 %)', tp && Math.abs(tp.pct + 0.1) < 0.002, tp);
+    // Le mot TENU : la minute de référence change seule (prix immobile) — le mot ne bascule pas.
+    // Avant : référence 82 571 → −0,086 % ; une minute plus tard : référence 82 598 → −0,119 %.
+    const P = 82500, serie = (t, ref) => { const l = []; for (let u = t - 20 * 60e3; u <= t; u += 60e3) l.push({ t: u, c: u === Math.floor((t + 20e3 - G.tendanceMs) / 60e3) * 60e3 || Math.abs(u - (Math.floor((t + 20e3 - G.tendanceMs) / 60e3) * 60e3)) === 60e3 ? ref : u === t ? P : P }); return l; };
+    const m1 = serie(T0, 82571), m2 = serie(T0 + 60e3, 82598);
+    const a1 = BM.tendancePrix(m1, { p: P, t: T0 + 20e3 }, T0 + 20e3), a2 = BM.tendancePrix(m2, { p: P, t: T0 + 62e3 }, T0 + 80e3);
+    let h = BM.sensPrixTenu(null, a1, T0 + 20e3);
+    const avant = h.sens;
+    h = BM.sensPrixTenu(h, a2, T0 + 80e3);
+    check(`sens tenu : la référence passe de ${a1 && a1.de} à ${a2 && a2.de} $ (prix immobile, ${a1 && a1.pct.toFixed(3)} → ${a2 && a2.pct.toFixed(3)} %) : le mot reste « ${avant} »`, a1 && a2 && avant === 'stable' && h.sens === 'stable' && a2.pct < -0.1, { a1, a2, h });
+    // Hystérésis et durée : entré en hausse au-delà de +0,12 %, il reste « en hausse » à +0,07 % ; il
+    // revient à « stable » sous +0,06 % seulement après une minute.
+    const tt = p => ({ pct: p }), t1 = 1e6;
+    let k = BM.sensPrixTenu({ sens: 'stable', depuis: 0 }, tt(0.11), t1);
+    const resteStable = k.sens === 'stable';
+    k = BM.sensPrixTenu(k, tt(0.125), t1 + 1e3);
+    const monte = k.sens === 'hausse' && k.depuis === t1 + 1e3;
+    const k2 = BM.sensPrixTenu(k, tt(0.07), t1 + 30e3), k3 = BM.sensPrixTenu(k, tt(0.02), t1 + 30e3), k4 = BM.sensPrixTenu(k, tt(0.02), t1 + 1e3 + G.tendanceGardeMs);
+    const k5 = BM.sensPrixTenu(k, tt(-0.2), t1 + 1e3 + G.tendanceGardeMs), k6 = BM.sensPrixTenu(k, tt(-0.08), t1 + 1e3 + G.tendanceGardeMs);
+    check(`hystérésis : +0,11 % reste stable, +0,125 % → hausse, +0,07 % reste hausse, +0,02 % tenu ${G.tendanceGardeMs / 1000} s puis stable, −0,2 % → baisse, −0,08 % → stable`,
+      resteStable && monte && k2.sens === 'hausse' && k3.sens === 'hausse' && k4.sens === 'stable' && k5.sens === 'baisse' && k6.sens === 'stable' && G.tendancePct === 0.12 && G.tendanceRetourPct === 0.06 && G.tendanceGardeMs === 60e3,
+      [k, k2, k3, k4, k5, k6]);
+    check('sens tenu : sans tendance (minutes manquantes), l\'état est gardé', BM.sensPrixTenu(k, null, t1 + 5e5) === k);
+  }
   check('une minute manquante dans la fenêtre : null (rien n\'est deviné)', BM.tendancePrix(mins(fin(0.12), T0 - 5 * 60e3), null, maint) === null);
   check('la minute de référence manquante : null', BM.tendancePrix(mins(fin(0.12), tRef), null, maint) === null);
   check('dernière bougie trop vieille (ne touche pas le présent) : null', BM.tendancePrix(mins(fin(0.12)), null, maint + 3 * 60e3) === null);
@@ -512,7 +541,7 @@ titre('13. Mode débutant : phrase du haut, étiquettes, sens du prix, journal e
   debTextes.push(...det);
   const dS = det.map(sp);
   check('résumé ouvert : 6 lignes (prix, ordres en attente, les deux côtés, âges dont l\'autre plateforme, scénario au Terminal, photo pas prévision)', det.length === 6 && /^Prix : de 100.000 \$ à 100.120 \$ en 15 min \(\+0,12 %\)/.test(dS[0]) && /120 BTC à l'achat, 60,0 BTC à la vente/.test(dS[1])
-    && /^Au-dessus : Mur de vente · 100.060 \$ \(36,1 BTC entre 100.060 et 100.080 \$\)\. Au-dessous : rien de nettement plus chargé/.test(dS[2]) && /^Âges : couleurs récentes 2,0 s, plus anciennes 2 min · ronds 1,5 s · ligne blanche 10 s · autre plateforme 4 min\.$/.test(dS[3])
+    && /^Au-dessus : Mur de vente · 100.060 \$ \(36,1 BTC entre 100.060 et 100.080 \$\)\. Au-dessous : rien de nettement plus chargé/.test(dS[2]) && /^Âges : couleurs récentes 2,0 s, plus anciennes 2 min · ronds 1,5 s · ligne du prix 10 s · autre plateforme 4 min\.$/.test(dS[3])
     && /^Le scénario du matin de Claude est sur le Terminal/.test(dS[4]) && /pas une prévision.+mode Expert/.test(dS[5]), dS);
   check('résumé ouvert : jamais « : » en tête de ligne (espace insécable avant)', det.every(l => !/ [:;?!]/.test(l)), det);
   const detD = BM.detailCarteDebutant({ tendance: th, r: eqs[0][0], luMs: 2000, niveaux: { ask: { etiquette: BM.etiquetteDedans('ask'), q: 92, pBas: 100040, pHaut: 100100, dedans: true }, bid: null }, ages: {} });
@@ -555,6 +584,23 @@ titre('13. Mode débutant : phrase du haut, étiquettes, sens du prix, journal e
   }
   check('journal : « cassé » n\'est jamais dit au débutant (le fait : deux minutes de suite)', evs.every(e => !/cass/i.test(e.debutant)), evs.map(e => e.debutant));
   check('journal : niveau d\'options non listé en débutant (estimation)', BM.evenementOptions({ nom: 'Mur call', court: 'CW', p: 85000, pAxe: 85000, t: tj, luA: tj }).debutant === null);
+  {
+    // Journal débutant : les gros ordres posés / retirés AU PRIX du moment sont regroupés par côté ; ceux
+    // loin du prix, les murs nommés, les passages et les rafales gardent leur phrase ; plus de « (un seul prix) ».
+    const tk = Date.UTC(2026, 9, 9, 9, 12, 0), ap = (cote, p, t, n) => Object.assign(BM.evenementApparu({ cote, p, q: 14.5, t }), n ? { n } : {});
+    const fi = (cote, p, t) => BM.evenementFinMur({ cote, p, q0: 14.5, qMax: 14.5, fin: 'incertain', echange: null, retire: 0, t });
+    const liste = [ap('b', 82504, tk), fi('b', 82504, tk + 20e3), fi('b', 82504, tk + 21e3), ap('a', 82494, tk + 30e3), fi('a', 82494, tk + 66e3),
+      ap('b', 82420, tk + 70e3), BM.evenementMurApparu({ cote: 'a', p: 82540, pas: 20, q: 60, t: tk + 80e3 }), ap('b', 82500, tk + 130e3, 2)];
+    const fourchette = () => ({ bas: 82490, haut: 82505 });
+    const jd = BM.journalDebutant(liste, fourchette), tx = jd.map(x => sp(x.texte));
+    const gb = tx.find(t => /gros ordres? d'achat posés?, \d+ disparus?/.test(t)), ga = tx.find(t => /gros ordre de vente posé, 1 disparu/.test(t));
+    check(`journal débutant : 8 évènements → ${jd.length} lignes ; au prix, regroupés par côté (« ${gb} », « ${ga} »)`,
+      jd.length === 4 && /^Près du prix du moment : 3 gros ordres d'achat posés, 2 disparus \(\d\d:\d\d–\d\d:\d\d\)$/.test(gb || '') && /^Près du prix du moment : 1 gros ordre de vente posé, 1 disparu \(\d\d:\d\d(–\d\d:\d\d)?\)$/.test(ga || ''), tx);
+    check('journal débutant : un gros ordre à plus d\'une tranche du prix et un mur nommé gardent leur phrase', tx.some(t => /^Gros ordre d'achat posé : 14,5 BTC à 82.420 \$$/.test(t)) && tx.some(t => /^Beaucoup de ventes en attente apparues entre 82.540 et 82.560/.test(t)), tx);
+    check('journal débutant : jamais « (un seul prix) », et rangé du plus ancien au plus récent', !tx.some(t => /un seul prix/.test(t)) && jd.every((x, i) => !i || jd[i - 1].t <= x.t), jd);
+    check('journal débutant : prix inconnu à cet instant : la phrase est gardée telle quelle', BM.journalDebutant(liste.slice(0, 2), () => null).length === 2);
+    debTextes.push(...tx);
+  }
   // f. Mots : tout ce qui est produit pour le débutant passe CONSEIL, ACCUSE et la liste débutant.
   const mal = debTextes.filter(t => !propre(t));
   check(`${debTextes.length} textes débutant : ni conseil, ni intention prêtée, ni mot technique (tests/mots_debutant.js)`, !mal.length, mal.map(t => [t, MD.motsInterdits(t)]));

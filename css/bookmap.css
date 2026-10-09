@@ -237,6 +237,16 @@ html:not([data-mode="expert"]) .calques { flex: 0 0 auto; order: 0; overflow: vi
 [data-mode="expert"] .bouton-mode .mode-long, [data-mode="expert"] .bouton-mode .mode-court { display: none; }
 [data-mode="expert"] .bouton-mode .mode-mini { display: inline; }
 @media (max-width: 719px) { [data-mode="expert"] .barre-gauche { gap: 6px; } }
+/* Expert, en-tête sur UNE rangée (≥ 1280 px) : le bouton de mode quitte la rangée (elle a déjà toute sa
+   largeur, les puces des calques la prennent comme avant le mode Débutant) et se pose au début de la
+   bande du résumé, sous « ← Terminal » — là où il était, une rangée plus bas, loin des panneaux qui
+   s'ouvrent à droite ; la bande lui garde sa place (marge gauche). Bande cachée (Guide éteint) : il
+   revient dans la rangée. */
+@media (min-width: 1280px) {
+  .barre { position: relative; }
+  [data-mode="expert"] .barre:has(+ .resume-carte:not([hidden])) .bouton-mode { position: absolute; left: 12px; top: calc(100% + 9px); z-index: 8; background: var(--surface); }
+  [data-mode="expert"] .barre:has(+ .resume-carte:not([hidden])) + .resume-carte { padding-left: 116px; }
+}
 /* Téléphone couché en Expert (568 px) : la première rangée garde ses huit boutons. */
 @media (max-width: 640px) { [data-mode="expert"] .barre-droite { gap: 4px; } [data-mode="expert"] .barre .bouton { padding: 4px 6px; } }
 /* « Suivre » rappelé (bord accent, sans animation) quand la carte montre le passé en mode débutant. */

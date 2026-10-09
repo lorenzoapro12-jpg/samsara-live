@@ -1488,8 +1488,12 @@
     marquePx: 9,             // marques du journal d'une même case de 9 px : une seule (×n au survol)
     textesDebutant: 2,       // mode débutant : 2 repères au plus sur la carte, un de chaque côté du prix
     tendanceMs: 15 * 60e3,   // mode débutant : « prix en hausse / en baisse / stable sur 15 min »…
-    tendancePct: 0.1,        // … « stable » sous ±0,1 % de variation (convention)
+    tendancePct: 0.12,       // … « en hausse / en baisse » au-delà de ±0,12 % de variation (convention)…
+    tendanceRetourPct: 0.06, // … et le mot ne revient à « stable » que sous ±0,06 % (hystérésis)…
+    tendanceGardeMs: 60e3,   // … et un nouveau mot est tenu au moins 1 min (il ne bascule pas d'une minute à l'autre)
+    tendanceRefMin: 3,       // la référence : la moyenne des clôtures de 3 minutes autour de « il y a 15 min »
     ageFraisMs: 5e3,         // mode débutant : sous 5 s, la ligne du haut dit « à jour » (elle ne change pas chaque seconde)
+    regroupeMs: 5 * 60e3,    // mode débutant : les gros ordres au prix du moment, à moins de 5 min l'un de l'autre, en une ligne du journal
     sensGardeMs: 10e3,       // mode débutant : « plus d’achats / de ventes en attente » ne change qu'après 10 s du même autre côté
   };
   // Les symboles du journal qui ne sont pas ceux des fins de murs (BM.FINS_MURS) : la légende et la
@@ -1675,25 +1679,51 @@
   BM.ageEntier = ms => (!(ms >= 0) ? '—' : ms < 60e3 ? Math.max(1, Math.ceil(ms / 1000)) + ' s' : BM.age(ms));
   /** Le sens du prix sur tendanceMs (convention) : le dernier prix — `prix` = { p, t } lu en direct
    *  s'il est plus récent que le début de la dernière bougie, sinon la clôture de celle-ci —
-   *  comparé à la clôture de la minute commencée tendanceMs plus tôt. Une minute manquante entre les
-   *  deux, ou une dernière bougie qui ne touche pas le présent : null (rien n'est deviné).
-   *  Rend { sens: 'hausse' | 'baisse' | 'stable', de, a, pct, depuis (début de la minute de
-   *  référence), t (instant du prix comparé, null s'il n'est pas connu) }. */
+   *  comparé à la MOYENNE des clôtures de tendanceRefMin minutes centrées sur la minute commencée
+   *  tendanceMs plus tôt (une seule minute de référence faisait changer le mot quand elle changeait,
+   *  le prix immobile). Une minute manquante entre la première de référence et la dernière, ou une
+   *  dernière bougie qui ne touche pas le présent : null (rien n'est deviné).
+   *  Rend { sens: 'hausse' | 'baisse' | 'stable' (seuil tendancePct, sans mémoire : BM.sensPrixTenu
+   *  le tient), de (la référence), a, pct, depuis (début de la minute centrale de référence), t
+   *  (instant du prix comparé, null s'il n'est pas connu) }. */
   BM.tendancePrix = function (minutes, prix, maintenant, o) {
     o = Object.assign({}, BM.GUIDE, o);
     if (!minutes || !minutes.length || !isFinite(maintenant)) return null;
-    const t0 = Math.floor((maintenant - o.tendanceMs) / 60e3) * 60e3;
+    const t0 = Math.floor((maintenant - o.tendanceMs) / 60e3) * 60e3, demi = (Math.max(1, o.tendanceRefMin | 0) - 1) >> 1;
     let i = minutes.length - 1;
     while (i >= 0 && minutes[i].t > t0) i--;
     if (i < 0 || minutes[i].t !== t0) return null;
     for (let j = i + 1; j < minutes.length; j++) if (minutes[j].t !== minutes[j - 1].t + 60e3) return null;
     const der = minutes[minutes.length - 1];
     if (der.t < Math.floor(maintenant / 60e3) * 60e3 - 60e3) return null;
+    // Les minutes de référence : la centrale, et jusqu'à `demi` de chaque côté quand elles sont lues
+    // et contiguës (au bord de l'historique, ou fenêtre de 0, la référence est plus courte).
+    let i0 = i;
+    while (i0 > 0 && i - i0 < demi && minutes[i0 - 1].t === minutes[i0].t - 60e3) i0--;
+    const refs = minutes.slice(i0, Math.min(minutes.length, i + demi + 1));
+    if (!refs.length || refs.some(m => !(m.c > 0))) return null;
     const vif = prix && isFinite(prix.p) && prix.p > 0 && isFinite(prix.t) && prix.t >= der.t;
-    const de = minutes[i].c, a = vif ? prix.p : der.c;
+    const de = refs.reduce((s, m) => s + m.c, 0) / refs.length, a = vif ? prix.p : der.c;
     if (!(de > 0 && a > 0)) return null;
     const pct = (a - de) / de * 100;
     return { sens: Math.abs(pct) < o.tendancePct ? 'stable' : pct > 0 ? 'hausse' : 'baisse', de, a, pct, depuis: t0, t: vif ? prix.t : (o.lu !== undefined ? o.lu : null) };
+  };
+  /** Le mot du sens, tenu (hystérésis) : « en hausse / en baisse » au-delà de ±tendancePct ; revenu
+   *  à « stable » seulement sous ±tendanceRetourPct ; un mot nouveau est tenu au moins
+   *  tendanceGardeMs. h = l'état d'avant ({ sens, depuis } ou null), tendance = BM.tendancePrix
+   *  (null : rien n'est dit, l'état est gardé), t = maintenant. Rend { sens, depuis }. */
+  BM.sensPrixTenu = function (h, tendance, t, o) {
+    o = Object.assign({}, BM.GUIDE, o);
+    if (!tendance || !isFinite(tendance.pct)) return h || null;
+    const p = tendance.pct, vers = p >= o.tendancePct ? 'hausse' : p <= -o.tendancePct ? 'baisse' : null;
+    if (!h || !h.sens) return { sens: vers || 'stable', depuis: t };
+    let cible = h.sens;
+    if (vers && vers !== h.sens) cible = vers;
+    else if (h.sens !== 'stable' && Math.abs(p) < o.tendanceRetourPct) cible = 'stable';
+    else if (h.sens === 'hausse' && p <= -o.tendanceRetourPct && !vers) cible = 'stable';
+    else if (h.sens === 'baisse' && p >= o.tendanceRetourPct && !vers) cible = 'stable';
+    if (cible === h.sens || t - h.depuis < o.tendanceGardeMs) return h;
+    return { sens: cible, depuis: t };
   };
   const majuscule = s => s.charAt(0).toUpperCase() + s.slice(1);
   /** L'âge de la ligne du haut : « à jour » sous ageFraisMs (elle ne change pas chaque seconde),
@@ -1750,6 +1780,39 @@
   };
   /** Le prix est DANS la zone de ce côté (son cadre est « allumé ») : son nom, sans prix. */
   BM.etiquetteDedans = cote => (cote === 'bid' ? 'Dans un mur d’achat' : 'Dans un mur de vente');
+  /** Le journal en mode débutant : les gros ordres (un seul prix) posés ou disparus AU PRIX du
+   *  moment — à moins d'une tranche (trancheUsd) de la fourchette de sa minute — sont regroupés,
+   *  par côté, en une ligne (« Près du prix du moment : 3 gros ordres d'achat posés, 2 disparus
+   *  (11:12–11:14) ») ; tout le reste (murs nommés, passages, rafales, gros ordres loin du prix)
+   *  garde sa phrase. liste : évènements du journal, du plus ancien au plus récent ; fourchette(t)
+   *  → { bas, haut } du prix à l'instant t (null : inconnu, l'évènement garde sa phrase). Rend
+   *  [{ t, texte, n }] du plus ancien au plus récent (t = l'instant du dernier évènement). */
+  BM.FINS_ORDRE = ['retire', 'echange', 'partiel', 'essentiel', 'incertain'];
+  BM.journalDebutant = function (liste, fourchette, o) {
+    o = Object.assign({}, BM.GUIDE, o);
+    const out = [], ouverts = { b: null, a: null }, ecart = o.trancheUsd, garde = o.regroupeMs;
+    for (const ev of liste || []) {
+      if (!ev || !ev.debutant) continue;
+      const ordre = (ev.type === 'apparu' || BM.FINS_ORDRE.includes(ev.type)) && (ev.cote === 'b' || ev.cote === 'a');
+      const f = ordre && fourchette ? fourchette(ev.t) : null;
+      const pres = f && isFinite(f.bas) && isFinite(f.haut) && ev.p >= f.bas - ecart && ev.p <= f.haut + ecart;
+      if (!pres) { out.push({ t: ev.t, texte: ev.debutant, n: ev.n || 1 }); continue; }
+      let g = ouverts[ev.cote];
+      if (!g || ev.t - g.t > garde) { g = ouverts[ev.cote] = { t: ev.t, t0: ev.t, cote: ev.cote, poses: 0, partis: 0, groupe: true }; out.push(g); }
+      g.t = ev.t;
+      if (ev.type === 'apparu') g.poses += ev.n || 1; else g.partis += ev.n || 1;
+    }
+    for (const g of out) {
+      if (!g.groupe) continue;
+      const nom = n => n + ' gros ordre' + (n > 1 ? 's' : '') + ' ' + (g.cote === 'b' ? 'd\'achat' : 'de vente');
+      const parts = g.poses && g.partis ? [nom(g.poses) + ' posé' + (g.poses > 1 ? 's' : ''), g.partis + ' disparu' + (g.partis > 1 ? 's' : '')]
+        : g.poses ? [nom(g.poses) + ' posé' + (g.poses > 1 ? 's' : '')] : [nom(g.partis) + ' disparu' + (g.partis > 1 ? 's' : '')];
+      const h0 = BM.heure(g.t0), h1 = BM.heure(g.t);
+      g.texte = 'Près du prix du moment : ' + parts.join(', ') + ' (' + h0 + (h1 !== h0 ? '–' + h1 : '') + ')';
+      g.n = 1;
+    }
+    return out.sort((x, y) => x.t - y.t).map(x => ({ t: x.t, texte: x.texte, n: x.n }));
+  };
   /** Ce côté n'a aucun repère : la carte le dit (on ne prend pas « rien » pour « en panne »). */
   BM.etiquetteVide = cote => (cote === 'bid' ? 'Pas de mur au-dessous' : 'Pas de mur au-dessus');
   /** Typographie des phrases débutantes : une espace insécable avant « : ; ? ! » (jamais en tête de ligne). */
@@ -1761,7 +1824,7 @@
    *  « : » (BM.typo) : un deux-points ne commence jamais une ligne. */
   BM.detailCarteDebutant = function (d) {
     const o = Object.assign({}, BM.GUIDE, d.o), t = d.tendance, r = d.r, n = d.niveaux || {}, a = d.ages || {};
-    const l1 = t ? 'Prix : de ' + BM.prix(t.de) + DOL + ' à ' + BM.prix(t.a) + DOL + ' en ' + BM.age(o.tendanceMs) + ' (' + BM.pourcent(t.pct, 2) + '). «' + NB + 'Stable' + NB + '» = moins de ' + BM.nombre(o.tendancePct, 0, 2) + ' % de variation.'
+    const l1 = t ? 'Prix : de ' + BM.prix(t.de) + DOL + ' à ' + BM.prix(t.a) + DOL + ' en ' + BM.age(o.tendanceMs) + ' (' + BM.pourcent(t.pct, 2) + '). «' + NB + 'En hausse' + NB + '» ou «' + NB + 'en baisse' + NB + '» au-delà de ' + BM.nombre(o.tendancePct, 0, 2) + ' %, «' + NB + 'stable' + NB + '» de retour sous ' + BM.nombre(o.tendanceRetourPct, 0, 2) + ' % ; un mot reste au moins ' + BM.age(o.tendanceGardeMs) + '.'
       : 'Prix sur ' + BM.age(o.tendanceMs) + ' : des minutes manquent, pas de sens écrit.';
     const l2 = r ? 'Ordres en attente lus il y a ' + BM.age(d.luMs) + ', jusqu\'à ' + BM.prix(r.usd) + DOL + ' de chaque côté du prix : ' + BM.btc(r.qB) + ' BTC à l\'achat, ' + BM.btc(r.qA) + ' BTC à la vente.'
       : 'Ordres en attente : lecture en cours.';
@@ -1774,7 +1837,7 @@
     const couleurs = [dit(a.recentes) ? 'récentes ' + BM.age(a.recentes) : '', dit(a.anciennes) ? 'plus anciennes ' + BM.age(a.anciennes) : ''].filter(Boolean);
     if (couleurs.length) ag.push('couleurs ' + couleurs.join(', '));
     if (dit(a.ronds)) ag.push('ronds ' + BM.age(a.ronds));
-    if (dit(a.ligne)) ag.push('ligne blanche ' + BM.age(a.ligne));
+    if (dit(a.ligne)) ag.push('ligne du prix ' + BM.age(a.ligne));
     if (dit(a.autre)) ag.push('autre plateforme ' + BM.age(a.autre));
     const l4 = 'Âges : ' + (ag.length ? ag.join(' · ') : 'rien de lu encore') + '.';
     return [l1, l2, l3, l4, 'Le scénario du matin de Claude est sur le Terminal (bouton «' + NB + '←' + NB + 'Terminal' + NB + '»).',
@@ -1998,7 +2061,7 @@
     return { t: x.t, type: 'apparu', cote: x.cote, p: x.p, q: x.q, s: BM.SYMBOLES_GUIDE.apparu.s,
       texte: x.grossi ? nom + ' : ' + q + ' à ' + BM.prixExact(x.p) + DOL + ' (un seul prix ; il y en avait moins avant)' : nom + ' apparu : ' + q + ' à ' + BM.prixExact(x.p) + DOL + ' (un seul prix)',
       carte: nom + ' apparu à ' + hc + ' (' + q + ')', court: '+ ' + coteMot(x.cote) + ' ' + q + ' ' + hc,
-      debutant: ordreMot(x.cote) + (x.grossi ? ' agrandi : ' + q + ' à ' + BM.prix(x.p) + DOL : ' posé : ' + q + ' à ' + BM.prix(x.p) + DOL + ' (un seul prix)'), cle: 'apparu' + x.cote + Math.round(x.p * 100) };
+      debutant: ordreMot(x.cote) + (x.grossi ? ' agrandi : ' + q + ' à ' + BM.prix(x.p) + DOL : ' posé : ' + q + ' à ' + BM.prix(x.p) + DOL), cle: 'apparu' + x.cote + Math.round(x.p * 100) };
   };
   /** Un mur NOMMÉ (tranche du carnet live) passé au-dessus du seuil sous les yeux de la page.
    *  x = { cote: 'b'|'a', p, pas, q, t }. */
