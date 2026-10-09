@@ -203,6 +203,72 @@ titre('4 bis. Bougies entières dans la fenêtre, créneau d’une bougie, bougi
     && !S.ouvert(Object.assign({}, chemin, { statut: '✅' }), null, now) && S.ouvert(chemin, lg, now));
 }
 
+// ── 4 ter. Historique incomplet, marque « en direct », ligne des états ──
+titre('4 ter. Historique qui ne remonte pas au point, marque « en direct » hors de l’encadré, ligne des états');
+{
+  const P1m = 60e3, P15 = 900e3;
+  // manque() : la 1re bougie qui compte s'ouvre au 1er multiple du pas depuis le point (04:40 → 04:45 en 15 min).
+  check('historique depuis 04:45 (15 min, point 04:40) : complet ; depuis 05:00 : il manque la bougie de 04:45',
+    !S.manque(chemin, E0 + 5 * 60e3, P15) && S.manque(chemin, E0 + 20 * 60e3, P15) && !S.manque(chemin, E0 - 3600e3, P15));
+  check('point pile sur une ouverture (04:40 en 1 min) : historique depuis 04:40 complet, depuis 04:41 incomplet', !S.manque(chemin, E0, P1m) && S.manque(chemin, E0 + P1m, P1m));
+  check('historique qui commence après la fin du scénario : incomplet aussi (aucune bougie de la fenêtre chargée, rien n’est affirmé)', S.manque(chemin, chemin.fin + 3600e3, P15));
+  // Fenêtre qui commence AVANT la 1re bougie chargée : en 1 min, l'invalidation touchée avant le
+  // début de l'historique n'est pas vue — le pli dirait « réalisé » ; la page dit « incomplet ».
+  const T = [], H = [], L = [];
+  for (let k = 0; k < 120; k++) { T.push((E0 + 6 * 3600e3 + k * P1m) / 1000); H.push(k === 60 ? 110.5 : k === 10 ? 100.5 : 98); L.push(96); }
+  const naif = S.suivre(chemin, T, H, L, T.length, E0 + 9 * 3600e3, P1m);
+  check('le pli seul, sur un historique qui commence 6 h après le point, dirait « réalisé » (rien ne prouve l’ordre)', naif.cle === 'realise', naif.cle);
+  check('… manque() le voit : historique incomplet', S.manque(chemin, T[0] * 1000, P1m));
+  const inc = S.etatIncomplet(chemin, P1m, E0 + 9 * 3600e3, T[0] * 1000);
+  const ti = S.texteEtat(chemin, inc, null, 'debutant', { itv: '1 min', maintenant: E0 + 9 * 3600e3 });
+  check('« suivi en direct incomplet sur les bougies 1 min (historique chargé depuis 10:40 UTC, après le point) : il se lit en 15 min »',
+    t(ti.texte) === 'suivi en direct incomplet sur les bougies 1 min (historique chargé depuis 10:40 UTC, après le point) : il se lit en 15 min', ti.texte);
+  check('incomplet : jamais « réalisé », « invalid… » ni « ordre » ; le scénario reste ouvert (pas d’affirmation)', !/réalisé|invalid|ordre/.test(ti.texte + ti.court + ti.mini) && S.ouvert(chemin, inc, E0 + 9 * 3600e3));
+  // La page : scenSuivi() sur des bougies 1 min qui commencent après le point → « incomplet ».
+  const pg = chargerPage(), run = c => vm.runInContext(c, pg.sandbox);
+  run('candles = Array.from({ length: 200 }, (_, i) => ({ time: ' + (E0 / 1000 + 6 * 3600) + ' + i * 60, open: 97, high: i === 100 ? 110.5 : 98, low: 96, close: 97, volume: 1 }));');
+  pg.sandbox.__S = chemin;
+  check('page : scenSuivi() sur des bougies 1 min commencées après le point → « incomplet »', run('scenSuivi(__S).cle') === 'incomplet', run('scenSuivi(__S).cle'));
+  run('candles = Array.from({ length: 200 }, (_, i) => ({ time: ' + (E0 / 1000 - 600) + ' + i * 60, open: 97, high: 98, low: 96, close: 97, volume: 1 }));');
+  check('page : historique depuis avant le point → suivi normal (« rien »)', run('scenSuivi(__S).cle') === 'rien', run('scenSuivi(__S).cle'));
+  // Marque « en direct » : toute forme courte d'un état calculé ici la porte ; une note du journal, « journal ».
+  const cas = [['avant', bougies([], [[112, 98]])], ['rien', bougies([[98, 95]])], ['cible', bougies([[100.5, 96]])], ['realise', bougies([[100.5, 96], [110, 104]])],
+    ['invalide', bougies([[95, 90]])], ['ambigu', bougies([[100, 90]])]].map(([c, b]) => [c, chemin, suivre(chemin, b)])
+    .concat([['dedans', range, suivre(range, bougies([[105, 101]]))], ['sortie', range, suivre(range, bougies([[112, 101]]))], ['large', chemin, S.etatLarge(chemin, 4 * 3600e3, E0)], ['incomplet', chemin, inc],
+      ['fini', chemin, suivre(chemin, bougies([[96, 94]]), FIN + 3600e3)]]);
+  const sans = [];
+  for (const [c, sc, sv] of cas) for (const mode of ['debutant', 'expert']) {
+    const e = S.texteEtat(sc, sv, null, mode, { itv: '15 min', maintenant: E0 + 3600e3 });
+    t([e.courtD, e.miniD, e.microD]);
+    const m = mode === 'expert' ? / · direct$/ : / \(en direct\)$/;
+    if (e.officiel || ![e.courtD, e.miniD, e.microD].every(x => m.test(x))) sans.push([c, mode, e.courtD, e.miniD, e.microD]);
+  }
+  check(`${cas.length} états en direct × 2 modes : formes courtes hors encadré (courtD, miniD, microD) marquées « (en direct) » / « · direct »`, !sans.length, sans);
+  const fin = S.texteEtat(chemin, suivre(chemin, bougies([[96, 94]]), FIN + 3600e3), null, 'debutant', {});
+  check('fenêtre finie sans note : la forme la plus courte reste un état (« terminé (en direct) »)', fin.microD === 'terminé (en direct)' && fin.miniD === 'terminé · rien de touché (en direct)', [fin.miniD, fin.microD]);
+  const inv = S.texteEtat(chemin, suivre(chemin, bougies([[95, 90]])), null, 'debutant', {});
+  check('invalidé : « invalidé (en direct) »', inv.miniD === 'invalidé (en direct)', inv.miniD);
+  const off = S.texteEtat(Object.assign({}, chemin, { statut: '✅', premierOk: 'oui' }), null, { '✅': 'réalisé' }, 'debutant', {});
+  check('note du journal : « journal : réalisé » / « réalisé (journal) », jamais « en direct »', off.courtD === 'journal : réalisé' && off.miniD === 'réalisé (journal)' && !/direct/.test(off.courtD + off.miniD + off.microD), [off.courtD, off.miniD]);
+  // La ligne des états (encadré serré).
+  const sc2 = Object.assign({}, chemin, { rang: '2' }), sc3 = Object.assign({}, range, { rang: '3' }), scS = Object.assign({}, chemin, { rang: 'S' });
+  const etd = (sc, sv) => S.texteEtat(sc, sv, null, 'debutant', {});
+  const items = [{ sc: chemin, et: inv }, { sc: sc2, et: etd(sc2, suivre(chemin, bougies([[98, 95]]))) }, { sc: sc3, et: etd(sc3, suivre(range, bougies([[105, 101]]))) }, { sc: scS, et: off }];
+  check('ligne des états : « Suivi en direct : 1 · invalidé | 2 · rien de touché | 3 · dedans | Sem. · réalisé (journal) »',
+    t(S.ligneEtats(items, 'debutant')) === 'Suivi en direct : 1 · invalidé | 2 · rien de touché | 3 · dedans | Sem. · réalisé (journal)', S.ligneEtats(items, 'debutant'));
+  check('tout noté par le journal : « Note du journal : 1 · réalisé »', S.ligneEtats([{ sc: chemin, et: off }], 'debutant') === 'Note du journal : 1 · réalisé', S.ligneEtats([{ sc: chemin, et: off }], 'debutant'));
+  const lg = S.texteEtat(chemin, S.etatLarge(chemin, 4 * 3600e3, E0), null, 'debutant', { itv: '4 h' });
+  check('bougies trop larges : la ligne omet les scénarios non suivis (une seule note le dit) ; tous omis → rien',
+    S.ligneEtats([{ sc: chemin, et: lg }, { sc: scS, et: off }], 'debutant', true) === 'Note du journal : Sem. · réalisé' && S.ligneEtats([{ sc: chemin, et: lg }], 'debutant', true) === null);
+  check('ligne de l’encadré sans état (bougies trop larges) : pas de « — »', S.ligne(chemin, null, 'debutant', true) === '1. 100 $ puis 110 $ (inval. 90 $)', S.ligne(chemin, null, 'debutant', true));
+  // Le titre suit le suivi en direct de la semaine.
+  const Fa = S.lire(copie(FIX), ms('2026-10-10T08:00Z'));
+  check('groupe terminé, semaine réalisée en direct : pas de « semaine en cours » (semOuverte = false)',
+    S.titre(Fa, P, ms('2026-10-10T08:00Z'), false) === 'Scénarios d’hier (terminés)' && S.titre(Fa, P, ms('2026-10-10T08:00Z'), true) === 'Scénarios d’hier (terminés) · semaine en cours');
+  check('règle du bilan : « le chemin le mieux classé qui a une invalidation » (règle de noter.py)', /chemin le mieux classé qui a une invalidation/.test(t(S.REGLE_BILAN)) && !/mieux classé a touché/.test(S.REGLE_BILAN));
+  t(S.REGLE_BILAN_SUITE); t(S.noteLarge('4 h', 'debutant')); t(S.noteLarge('4 h', 'expert'));
+}
+
 // ── 5. Note officielle ──
 titre('5. Note du journal (statut du fichier) AVANT le suivi en direct');
 {

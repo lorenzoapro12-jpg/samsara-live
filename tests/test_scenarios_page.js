@@ -58,7 +58,8 @@ const serveur = http.createServer((req, res) => {
   fs.createReadStream(f).pipe(res);
 });
 
-/** prev : 'complet' | 'attente' | 'absent' | 'hier' (point 26 h avant maintenant, rangs 1 à 3 finis) ;
+/** prev : 'complet' | 'attente' | 'absent' | 'hier' (point 26 h avant maintenant, rangs 1 à 3 finis) |
+ *  'ferme' (le rang 1 invalidé en direct : cibles 89 000 puis 90 000, invalidation 86 000) ;
  *  sansGuide : le Guide masqué. */
 async function ouvrir(nav, vue, mode, prev, tactile, sansGuide) {
   const ctx = await nav.newContext(Object.assign({ viewport: vue, deviceScaleFactor: 1 }, tactile ? { hasTouch: true, isMobile: true } : {}));
@@ -72,7 +73,8 @@ async function ouvrir(nav, vue, mode, prev, tactile, sansGuide) {
     if (h === 'raw.githubusercontent.com') {
       if (estPrevisions(u)) {
         if (prev === 'absent') return r.fulfill({ status: 404, headers: cors, body: '' });
-        return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: prev === 'attente' ? previsionsAttente() : previsionsFixture(prev === 'hier' ? { ilYaMs: 26 * 3600e3 } : {}) });
+        const ferme = d => { const s = d.scenarios.find(x => x.rang === '1'); s.cibles = [89000, 90000]; s.invalidation = 86000; s.origines = {}; };
+        return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: prev === 'attente' ? previsionsAttente() : previsionsFixture(prev === 'hier' ? { ilYaMs: 26 * 3600e3 } : prev === 'ferme' ? { modifier: ferme } : {}) });
       }
       if (u.includes('heatmap')) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, 'heatmap.json')) });
       if (/\/master\/market-data\.json/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: MD });
@@ -93,7 +95,12 @@ const etat = page => page.evaluate(() => {
   return {
     bx: b.left, by: b.top, vw: window.innerWidth, top: S.g.pad.top, ph: S.g.ph, left: S.g.pad.left, xMax: S.xMax,
     items: S.items.map(i => ({ rang: i.sc.rang, et: i.et.texte })),
-    boite: S.boite ? { x: S.boite.x, y: S.boite.y, w: S.boite.w, h: S.boite.h, seule: S.boite.seule, replie: S.boite.replie, lignes: S.boite.lignes.map(l => l.t) } : null,
+    boite: S.boite ? { x: S.boite.x, y: S.boite.y, w: S.boite.w, h: S.boite.h, seule: S.boite.seule, replie: S.boite.replie, serre: S.boite.serre, lignes: S.boite.lignes.map(l => l.t) } : null,
+    libelles: (S.libelles || []).slice(), mainH: geo && geo.mainH,
+    // Les flèches des scénarios et les tracés du Guide (chemins conditionnels, formes).
+    fleches: S.cibles.filter(c => c.prio === 2 && c.segs && c.segs.length).map(c => ({ titre: c.titre, segs: c.segs })),
+    guideSegs: guideEtat && overlays.guide ? [].concat(...guideEtat.cibles.map(c => c.segs || [])) : [],
+    reperes: S.items.map(i => ({ rang: i.sc.rang, n: i.reperes || 0, fleche: !!i.fleche })),
     cibles: S.cibles.map(c => ({ prio: c.prio, titre: c.titre, rects: c.rects || [], texte: c.texte, segs: (c.segs || []).length })),
     groupe: previsions && previsions.groupe, itv: S.itv, ouverts: S.items.map(i => i.ouvert),
     // Les bougies les plus récentes (le quart de la vue, au moins 3) : leurs rectangles à l'écran.
@@ -122,13 +129,33 @@ const etat = page => page.evaluate(() => {
       // nomme le rang 1 si la ligne le permet, et dont l'explication dit tout ; jamais replié sur
       // un grand écran (1440 px).
       const repliable = vue.width < 1400;
-      check(`${nom} : encadré ${repliable ? 'complet ou replié en une ligne' : 'complet (non replié)'}`, B && (repliable || !B.replie), B);
-      const expl = B && B.replie ? (e.cibles.find(c => c.titre === titreB && c.prio === 0) || {}).texte || [] : [];
-      const L = B ? (B.replie ? [B.lignes[0]].concat(expl) : B.lignes) : [];
+      check(`${nom} : encadré ${repliable ? 'complet, serré ou replié en une ligne' : 'complet ou serré (non replié)'}`, B && (repliable || !B.replie), B);
+      if (B && B.serre) {
+        check(`${nom} : encadré serré : les états de tous les rangs sur une ligne (« ${mode === 'expert' ? 'En direct' : 'Suivi en direct'} : 1 · … | Sem. · … »)`,
+          B.lignes.some(l => /^(Suivi en direct|En direct|Note du journal|Journal) : 1 · /.test(l)) && /Sem\. · /.test(B.lignes.join(' ')), B.lignes);
+        if (mode === 'debutant') check(`${nom} : encadré serré, débutant : « sans pourcentage » dans l’encadré même`, /sans pourcentage/.test(B.lignes.join(' ')), B.lignes);
+      }
+      // Les flèches des scénarios ne croisent ni ne longent un tracé du Guide (départ commun exclu).
+      const pres = e.fleches.map(f => {
+        const p0 = f.segs[0];
+        for (const sg of f.segs) for (let j = 0; j <= 20; j++) {
+          const x = sg[0] + (sg[2] - sg[0]) * j / 20, y = sg[1] + (sg[3] - sg[1]) * j / 20;
+          if (Math.hypot(x - p0[0], y - p0[1]) <= 16) continue;
+          for (const g of e.guideSegs) {
+            const dx = g[2] - g[0], dy = g[3] - g[1], l2 = dx * dx + dy * dy, t = l2 ? Math.max(0, Math.min(1, ((x - g[0]) * dx + (y - g[1]) * dy) / l2)) : 0;
+            if (Math.hypot(x - g[0] - t * dx, y - g[1] - t * dy) < 4.5) return [f.titre, x, y];
+          }
+        }
+        return null;
+      }).filter(Boolean);
+      check(`${nom} : aucune flèche de scénario sur un chemin du Guide (${e.fleches.length} flèche(s), ${e.guideSegs.length} tracé(s) du Guide)`, !pres.length, pres);
+      // Replié en une ligne, ou serré (titre et états sur une ligne) : l'explication de l'encadré dit le reste.
+      const expl = B && (B.replie || B.serre) ? (e.cibles.find(c => c.titre === titreB && c.prio === 0) || {}).texte || [] : [];
+      const L = B ? (B.replie ? [B.lignes[0]].concat(expl) : B.serre ? B.lignes.concat(expl) : B.lignes) : [];
       check(`${nom} : titre « ${titreB} »${repliable ? ' (replié : ou « Scénario 1 … »)' : ''}`, B && (B.lignes[0].startsWith(titreB) || (B.replie && /^Scénarios?( 1)?\b/.test(B.lignes[0]))), B && B.lignes[0]);
       check(`${nom} : l'encadré ne couvre aucune des bougies les plus récentes${B && B.replie ? ' (sauf ligne épinglée faute de place)' : ''}`,
         B && (B.replie || !e.recentes.some(c => c.x1 > B.x && c.x0 < B.x + B.w && c.y1 > B.y && c.y0 < B.y + B.h)), [B, e.recentes.slice(-3)]);
-      check(`${nom} : une ligne par scénario, marquée 1., 2., 3., Semaine${B && B.replie ? ' (dans l’explication du titre replié)' : ''}`, ['1. ', '2. ', '3. ', 'Semaine : '].every(m => L.some(l => l.startsWith(m))), L);
+      check(`${nom} : une ligne par scénario, marquée 1., 2., 3., Semaine${B && (B.replie || B.serre) ? ' (dans l’explication de l’encadré ' + (B.replie ? 'replié' : 'serré') + ')' : ''}`, ['1. ', '2. ', '3. ', 'Semaine : '].every(m => L.some(l => l.startsWith(m))), L);
       check(`${nom} : encadré dans le tracé ${B && B.replie ? '' : '(dans sa moitié haute) '}et dans l'écran`, B && B.x >= e.left && B.x + B.w <= e.xMax + 0.5 && B.y >= e.top
         && B.y + B.h <= e.top + (B.replie ? e.ph : e.ph / 2 + 0.5) && e.bx + B.x + B.w <= e.vw, [B, e.left, e.xMax, e.top, e.ph]);
       const texte = L.join(' ');
@@ -178,6 +205,37 @@ const etat = page => page.evaluate(() => {
       }
       check('écran tactile : aucune erreur JavaScript', !t.erreurs.length, t.erreurs);
       await t.ctx.close();
+    }
+
+    titre('Rang 1 fermé (invalidé en direct), téléphone : son état reste dit ; la bulle tient dans l’écran');
+    for (const [vue, mode, tactile] of [[{ width: 390, height: 800 }, 'debutant', true], [{ width: 390, height: 800 }, 'expert', true], [{ width: 375, height: 667 }, 'debutant', true], [{ width: 1024, height: 760 }, 'debutant', false]]) {
+      const nom = vue.width + '×' + vue.height + ' · ' + mode;
+      const o = await ouvrir(nav, vue, mode, 'ferme', tactile);
+      if (process.env.SCEN_CAPTURES) await o.page.screenshot({ path: path.join(process.env.SCEN_CAPTURES, 'ferme-' + vue.width + '-' + mode + '.png') });
+      const e = await etat(o.page);
+      const un = e && e.items.find(i => i.rang === '1');
+      check(`${nom} : le rang 1 est fermé en direct (invalidation d’abord)`, un && /^invalidation touchée d’abord/.test(un.et), un);
+      const lib = e && e.libelles.find(l => l.rang === '1');
+      const B = e && e.boite;
+      // Un rang 1 fermé n'est jamais nommé par ses niveaux seuls : son libellé, ou la ligne repliée, dit son état.
+      const marque = mode === 'expert' ? / · direct$/ : / \(en direct\)$/;
+      check(`${nom} : libellé du rang 1 fermé = son état, marqué « ${mode === 'expert' ? '· direct' : '(en direct)'} » (jamais les niveaux seuls)`,
+        lib ? marque.test(lib.t) && /invalid/.test(lib.t) : !!(B && B.replie && /Scénario 1\b.*invalid.*direct/.test(B.lignes[0])), [lib, B && B.lignes[0]]);
+      if (B && B.replie && /Scénario 1\b/.test(B.lignes[0])) check(`${nom} : ligne repliée qui nomme le rang 1 : son état, marqué en direct`, /invalid.*direct/.test(B.lignes[0]), B.lignes[0]);
+      // Un tap (ou survol) sur l'encadré : la bulle tient dans le tracé, « pas une recommandation » compris.
+      const c = e && e.cibles.find(q => q.prio <= 1 && q.rects.length && /^Scénarios/.test(q.titre));
+      if (!c) check(`${nom} : l’encadré à toucher`, false, e && e.cibles.map(q => [q.prio, q.titre]));
+      else {
+        const r = c.rects[0], x = e.bx + (r.x0 + r.x1) / 2, y = e.by + (r.y0 + r.y1) / 2;
+        if (tactile) await o.page.touchscreen.tap(x, y); else { await o.page.mouse.move(x - 8, y - 2); await o.page.mouse.move(x, y, { steps: 3 }); }
+        await o.page.waitForTimeout(250);
+        const b = await o.page.evaluate(() => (scenEtat && scenEtat.bulle ? scenEtat.bulle : null));
+        const vu = b ? b.corps.join(' ') : '';
+        check(`${nom} : bulle de l’encadré dans le tracé (haut ≥ 0, bas ≤ ${e.mainH} px)`, b && b.y >= 0 && b.y + b.h <= e.mainH, b && { y: b.y, h: b.h, mainH: e.mainH });
+        check(`${nom} : la bulle MONTRE le suivi en direct, la note du journal et « pas une recommandation »`, /en direct/i.test(vu) && /journal/.test(vu) && /pas une recommandation/.test(vu), b && b.corps);
+      }
+      check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
     }
 
     titre('Changement d’intervalle, groupe terminé');

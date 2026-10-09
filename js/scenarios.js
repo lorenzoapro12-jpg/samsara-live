@@ -159,7 +159,7 @@ const Scenarios = (function () {
    *  scénario ouvert garde sa flèche vers le futur. */
   function ouvert(S, sv, maintenant) {
     if (S.statut !== '⏳' || (fini(maintenant) && maintenant >= S.fin)) return false;
-    return !sv || sv.cle === null || ['avant', 'rien', 'cible', 'dedans', 'large'].includes(sv.cle);
+    return !sv || sv.cle === null || ['avant', 'rien', 'cible', 'dedans', 'large', 'incomplet'].includes(sv.cle);
   }
 
   // ─── 2. Suivi en direct (affichage), sur les bougies du graphique ──────────
@@ -229,8 +229,22 @@ const Scenarios = (function () {
     else r.cle = e.kOpt > 0 ? 'ambigu' : 'rien';
     return r;
   }
-  /** Suivi complet sur des colonnes (T en secondes) : → état lisible. */
+  /** L'historique chargé commence-t-il APRÈS la première bougie qui compte pour S ? (t0Ms : ouverture
+   *  de la première bougie chargée.) Alors des bougies de la fenêtre manquent : un toucher, un ordre
+   *  ou une invalidation peuvent être passés inaperçus — le suivi ne dit rien d'autre qu'« incomplet ».
+   *  La première bougie qui compte s'ouvre au premier multiple du pas à partir du point. */
+  function manque(S, t0Ms, pasMs) {
+    if (!fini(t0Ms) || !(pasMs > 0)) return false;
+    const premiere = Math.ceil(S.emis / pasMs) * pasMs;
+    return premiere < S.fin && t0Ms > premiere;
+  }
+  /** Suivi complet sur des colonnes (T en secondes) : → état lisible. Le pli seul : la page vérifie
+   *  d'abord que l'historique remonte jusqu'au point (manque()). */
   function suivre(S, T, H, L, n, maintenant, pasMs) { return etat(S, plier(S, T, H, L, 0, n, null, pasMs), maintenant); }
+  /** Historique trop court (manque()) : aucun état, l'heure de la première bougie chargée. */
+  function etatIncomplet(S, pasMs, maintenant, debutMs) {
+    return { cle: 'incomplet', fini: fini(maintenant) && maintenant >= S.fin, n: 0, t: null, k: 0, temps: [], tInv: null, touchees: [], sortie: null, memeBougie: false, pas: pasMs, debut: debutMs };
+  }
   /** Bougies trop larges pour suivre une fenêtre d'environ un jour (4 h, 1 jour…) : pas d'état. */
   function etatLarge(S, pasMs, maintenant) {
     return { cle: 'large', fini: fini(maintenant) && maintenant >= S.fin, n: 0, t: null, k: 0, temps: [], tInv: null, touchees: [], sortie: null, memeBougie: false, pas: pasMs, debut: null };
@@ -306,7 +320,9 @@ const Scenarios = (function () {
     if (S.statut !== '⏳') {
       const m = motsStatut(S.statut, S.premierOk, S.forme, statuts, exp);
       const q = fini(S.resolu) ? ' · ' + quand(S.resolu, now) + ' UTC' : '';
-      return { cle: 'officiel', officiel: true, texte: (exp ? 'journal : ' : 'note du journal : ') + m.long + q, court: 'journal : ' + m.court };
+      const court = 'journal : ' + m.court;
+      return { cle: 'officiel', officiel: true, texte: (exp ? 'journal : ' : 'note du journal : ') + m.long + q, court, courtD: court,
+        mini: m.court, micro: m.court, miniD: m.court + ' (journal)', microD: m.court + ' (journal)' };
     }
     const pasMs = sv && sv.pas ? sv.pas : 0;
     const cr = t => creneau(t, pasMs, now), crC = t => creneau(t, pasMs, now, true);
@@ -329,21 +345,41 @@ const Scenarios = (function () {
       case 'dedans': t = exp ? 'dedans' : 'dedans · aucune borne dépassée'; k = 'dedans'; break;
       case 'sortie': t = (sv.sortie.haut ? 'borne haute' : 'borne basse') + ' dépassée ' + cr(sv.t); k = (sv.sortie.haut ? 'borne haute ' : 'borne basse ') + crC(sv.t); break;
       case 'large': t = exp ? 'suivi : bougies trop larges' : 'suivi en direct indisponible sur les bougies ' + itv + ' (trop larges) : il se lit en 15 min ou 1 h'; k = 'suivi : bougies trop larges'; break;
+      case 'incomplet': {
+        const ou = pasMs < 900000 ? '15 min' : '1 h', depuis = fini(sv.debut) ? quand(sv.debut, now) + ' UTC' : '—';
+        t = exp ? 'suivi incomplet (historique ' + itv + ' depuis ' + depuis + ')' : 'suivi en direct incomplet sur les bougies ' + itv + ' (historique chargé depuis ' + depuis + ', après le point) : il se lit en ' + ou;
+        k = 'suivi incomplet'; break;
+      }
       default: t = 'suivi indisponible'; k = '—';
     }
-    if (sv && sv.fini) { t = 'terminé · ' + t.replace(/^en cours · /, '') + (exp ? ' · note à venir' : ' · note du journal à venir'); k = 'terminé · ' + k; }
-    return { cle: sv ? sv.cle : null, officiel: false, texte: t, court: k };
+    // Les formes les plus courtes (libellés étroits, ligne des états) : un mot ou deux.
+    const MINI = { avant: 'en cours', rien: 'rien de touché', cible: sv && sv.k ? ordinal(sv.k) + ' cible' : 'cible', realise: 'réalisé', invalide: sv && sv.premier ? 'invalidé après la 1re cible' : 'invalidé',
+      ambigu: 'ordre inconnu', dedans: 'dedans', sortie: sv && sv.sortie && sv.sortie.haut ? 'sorti par le haut' : 'sorti par le bas', large: 'non suivi', incomplet: 'suivi incomplet' };
+    let mini = (sv && MINI[sv.cle]) || '—', micro = mini;
+    const ouvertes = ['avant', 'rien', 'cible', 'dedans', 'large', 'incomplet'];
+    if (sv && sv.fini) {
+      t = 'terminé · ' + t.replace(/^en cours · /, '') + (exp ? ' · note à venir' : ' · note du journal à venir'); k = 'terminé · ' + k;
+      if (ouvertes.includes(sv.cle)) { mini = 'terminé · ' + mini; micro = 'terminé'; }
+    }
+    // Un état calculé ici est un AFFICHAGE : hors de l'encadré complet (qui le dit dans sa note),
+    // il porte sa marque « (en direct) » (expert : « · direct »).
+    const D = x => x + (exp ? ' · direct' : ' (en direct)');
+    return { cle: sv ? sv.cle : null, officiel: false, texte: t, court: k, courtD: D(k), mini, micro, miniD: D(mini), microD: D(micro) };
   }
   /** Le titre de l'encadré : « Scénarios du matin · 09/10 07h00 Paris » ; groupe terminé (à l'heure
    *  de `maintenant`, pas à celle de la lecture) : « Scénarios d'hier (terminés) » (ou de la date,
-   *  s'il est plus vieux qu'hier), « · semaine en cours » si la semaine court encore. */
-  function titre(F, P, maintenant) {
+   *  s'il est plus vieux qu'hier), « · semaine en cours » si la semaine court encore (semOuverte :
+   *  l'état du suivi en direct, facultatif). */
+  function titre(F, P, maintenant, semOuverte) {
     if (!F || F.etat !== 'ok') return 'Scénarios du matin';
     const point = P && P.point ? ' ' + P.point + ' Paris' : '';
     if (!estAncien(F, maintenant)) return 'Scénarios du matin · ' + jourGroupe(F.groupe) + point;
     const t = fini(maintenant) ? maintenant : Date.now();
     const hier = jourDe(t - 86400000), auj = jourDe(t);
-    const sem = vivants(F, t).some(s => s.rang === 'S' && s.statut === '⏳' && s.fin > t) ? ' · semaine en cours' : '';
+    // « semaine en cours » : seulement tant que la semaine est OUVERTE — selon le suivi en direct
+    // quand la page le donne (semOuverte), sinon selon le fichier.
+    const ouverte = typeof semOuverte === 'boolean' ? semOuverte : vivants(F, t).some(s => s.rang === 'S' && s.statut === '⏳' && s.fin > t);
+    const sem = ouverte ? ' · semaine en cours' : '';
     return (F.groupe === hier || F.groupe === auj ? 'Scénarios d’hier' : 'Scénarios du ' + jourGroupe(F.groupe)) + ' (terminés)' + sem;
   }
   /** Une ligne de l'encadré. Débutant : ce qui est attendu ET ce qui l'invalide —
@@ -362,7 +398,22 @@ const Scenarios = (function () {
     }
     // « Semaine : Semaine : … » se lirait deux fois : l'énoncé de la semaine perd son préfixe.
     if (S.rang === 'S') { quoi = quoi.replace(/^semaine\s*:\s*/i, ''); if (!exp) quoi = quoi.charAt(0).toLowerCase() + quoi.slice(1); }
-    return MARQUES_RANG[S.rang] + ' ' + quoi + ' — ' + (exp || court ? et.court : et.texte);
+    return MARQUES_RANG[S.rang] + ' ' + quoi + (et ? ' — ' + (exp || court ? et.court : et.texte) : '');
+  }
+  /** Les états de tous les scénarios sur une ligne (encadré serré) : « Suivi en direct : 1 · invalidé
+   *  | 2 · rien de touché | 3 · dedans | Sem. · réalisé » ; une note du journal porte « (journal) » ;
+   *  tout noté : « Note du journal : … ». items : [{ sc, et }]. sansLarge : les scénarios non suivis
+   *  (bougies trop larges) sont omis (une note le dit une fois). */
+  function ligneEtats(items, mode, sansLarge) {
+    const L = items.filter(it => !(sansLarge && it.et.cle === 'large'));
+    if (!L.length) return null;
+    const tousOff = L.every(it => it.et.officiel);
+    const parts = L.map(it => (it.sc.rang === 'S' ? 'Sem.' : it.sc.rang) + ' · ' + it.et.mini + (it.et.officiel && !tousOff ? ' (journal)' : ''));
+    return (tousOff ? (mode === 'expert' ? 'Journal : ' : 'Note du journal : ') : (mode === 'expert' ? 'En direct : ' : 'Suivi en direct : ')) + parts.join(' | ');
+  }
+  /** Bougies trop larges pour le suivi : dit UNE fois (encadré), pas sur chaque ligne. */
+  function noteLarge(itv, mode) {
+    return mode === 'expert' ? 'Suivi en direct : bougies ' + itv + ' trop larges (15 min ou 1 h)' : 'Suivi en direct : bougies ' + itv + ' trop larges, il se lit en 15 min ou 1 h.';
   }
   /** La mesure de l'ordre, seul chiffre de réussite montré (bilan.ordre du fichier). */
   function texteBilan(b, P, mode) {
@@ -373,7 +424,11 @@ const Scenarios = (function () {
     return 'Ordre du premier mouvement juste ' + b.reussis + ' fois sur ' + m + (faible ? ' · échantillon faible' : '');
   }
   /** Ce que compte la mesure de l'ordre (dit avec elle). */
-  const REGLE_BILAN = 'Ne comptent que les matins où le chemin le mieux classé a touché sa 1re zone ou son invalidation ; « juste » = la 1re zone d’abord. C’est le seul chiffre de réussite montré ici.';
+  // La règle de noter.py (bilan) : chaque matin, le chemin le mieux classé QUI A UNE INVALIDATION
+  // (rangs 1 à 3, horizon ≤ 25 h ; si le 1 n'en a pas, c'est le 2…), statut ⚠ exclu.
+  const REGLE_BILAN = 'Chaque matin compte le chemin le mieux classé qui a une invalidation (rangs 1 à 3 ; si le 1 n’en a pas, le suivant). Ne comptent que les matins où il a touché sa 1re zone ou son invalidation ; « juste » = la 1re zone d’abord. C’est le seul chiffre de réussite montré ici.';
+  /** Après la règle écrite par le fichier (qui nomme déjà le chemin compté) : le reste, sans redite. */
+  const REGLE_BILAN_SUITE = 'Ne comptent que les matins où ce chemin a touché sa 1re zone ou son invalidation. C’est le seul chiffre de réussite montré ici.';
   const SENS_RANG = {
     '1': 'Rang 1 : jugé par Claude le plus probable des trois ce matin. Un classement, sans pourcentage.',
     '2': 'Rang 2 : jugé par Claude moins probable que le 1, plus que le 3. Un classement, sans pourcentage.',
@@ -415,6 +470,6 @@ const Scenarios = (function () {
   }
 
   return { FORMAT, RANGS, STATUTS, chiffres, prix, heureUTC, heureParis, jourGroupe, dateUTC, zone, lire, vivants, estAncien, ouvert, compte, suiviVide, pas, plier, etat, etatLarge, suivre, copie,
-    niveaux, originePremiere, libelle, quand, creneau, motsStatut, texteEtat, titre, ligne, texteBilan, REGLE_BILAN, explication, NOMS_RANG, COURTS_RANG, SENS_RANG };
+    niveaux, originePremiere, libelle, quand, creneau, motsStatut, texteEtat, titre, ligne, texteBilan, REGLE_BILAN, REGLE_BILAN_SUITE, explication, ligneEtats, noteLarge, manque, etatIncomplet, NOMS_RANG, COURTS_RANG, SENS_RANG };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Scenarios;
