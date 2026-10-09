@@ -520,24 +520,37 @@ const Scenarios = (function () {
     const pre = it.sc.rang === '1' ? ['Scénario du matin : ', 'Scénario : ', 'Scén. : '] : ['Scénario de la semaine : ', 'Semaine : '];
     return premiere(pre.map(p => p + corps), max, mesure, maxPx);
   }
-  /** Le libellé du scénario près de sa zone (au plus 32) : « Scénario 1 : 81 000 – 83 500 $ »,
-   *  « Scénario 1 : vers 84 300 $ ↑ », après la 1re cible « Scénario 1 : ensuite 86 000 $ ↑ ».
-   *  fleche ('↑' | '↓') : le niveau est hors de la vue. */
-  function libelleDebutant(S, sv, max, mesure, maxPx, fleche) {
+  /** Les libellés possibles du scénario près de sa zone (au plus `max` caractères), du plus riche
+   *  au plus court : « Scén. 1 : reste 81 000–83 500 $ » (un range dit son verbe : sans lui, « 81 000
+   *  – 83 500 $ » se lisait « va de 81 000 à 83 500 »), « Scénario 1 : vers 84 300 $ ↑ », après la
+   *  1re cible « Scénario 1 : ensuite 86 000 $ ↑ » ; le dernier, « Scén. 1 », toujours. fleche ('↑' |
+   *  '↓') : le niveau est hors de la vue. L'app essaie chacun tant qu'aucun n'a trouvé sa place. */
+  function libellesDebutant(S, sv, max, fleche) {
     const f = fleche ? fleche + ' ' : '', noms = S.rang === 'S' ? ['Semaine', 'Sem.'] : ['Scénario ' + S.rang, 'Scén. ' + S.rang];
-    let corps;
-    if (S.forme === 'range') corps = [chiffres(S.range[0]) + ' – ' + prix(S.range[1]), chiffres(S.range[0]) + '–' + prix(S.range[1]), chiffres(S.range[0]) + '–' + chiffres(S.range[1])];
-    else {
+    const V = [];
+    if (S.forme === 'range') {
+      const a = chiffres(S.range[0]), b = chiffres(S.range[1]), B = prix(S.range[1]);
+      // Avec l'unité d'abord (le verbe, puis sans lui) ; sans l'unité seulement en dernier recours.
+      const avec = [a + ' – ' + B, a + '–' + B], nu = [a + '–' + b];
+      for (const C of [avec, nu]) {
+        for (const c of C) for (const n of noms) V.push(f + n + ' : reste ' + c);
+        for (const n of noms) for (const c of C) V.push(f + n + ' : ' + c);
+      }
+    } else {
       const N = S.cibles.length, k = sv && sv.cle === 'cible' && sv.k > 0 && sv.k < N ? sv.k : 0;
       const ref = k ? S.cibles[k - 1] : fini(S.prixEmission) ? S.prixEmission : S.invalidation !== null ? S.invalidation : S.cibles[0];
       // Cible hors de la vue : la flèche de tête dit déjà où elle est ; une 2e flèche (le sens)
       // ferait « ↑ Scénario 1 : vers 86 900 $ ↑ ».
       const s = f ? '' : S.cibles[k] >= ref ? ' ↑' : ' ↓', mot = k ? 'ensuite ' : 'vers ';
-      corps = [mot + prix(S.cibles[k]) + s, mot + chiffres(S.cibles[k]) + s];
+      for (const n of noms) for (const c of [mot + prix(S.cibles[k]) + s, mot + chiffres(S.cibles[k]) + s]) V.push(f + n + ' : ' + c);
     }
-    const V = [];
-    for (const n of noms) for (const c of corps) V.push(f + n + ' : ' + c);
-    return premiere(V.concat([f + noms[1]]), max, mesure, maxPx);
+    V.push(f + noms[1]);
+    return V.filter((t, i) => i === V.length - 1 || !(max > 0) || t.length <= max);
+  }
+  /** Le libellé du scénario près de sa zone : le premier de libellesDebutant qui tient
+   *  (caractères, pixels). */
+  function libelleDebutant(S, sv, max, mesure, maxPx, fleche) {
+    return premiere(libellesDebutant(S, sv, max, fleche), max, mesure, maxPx);
   }
   /** Une ligne de la bulle, en mots : « 2. Le prix va vers 84 300 $ puis 86 000 $, sans toucher
    *  80 900 $ avant — en cours (en direct) ». */
@@ -619,6 +632,6 @@ const Scenarios = (function () {
 
   return { FORMAT, RANGS, STATUTS, chiffres, prix, heureUTC, heureParis, jourGroupe, dateUTC, zone, lire, vivants, estAncien, ouvert, compte, suiviVide, pas, plier, etat, etatLarge, suivre, copie,
     niveaux, originePremiere, libelle, quand, creneau, motsStatut, texteEtat, titre, ligne, texteBilan, REGLE_BILAN, REGLE_BILAN_SUITE, explication, ligneEtats, noteLarge, manque, etatIncomplet, NOMS_RANG, COURTS_RANG, SENS_RANG,
-    ETATS_COURTS_DEBUTANT, etatCourtDebutant, ligneBoiteDebutant, libelleDebutant, ligneDebutant, origineDebutant, etatLongDebutant, enteteDebutant, explicationDebutant, jourParis };
+    ETATS_COURTS_DEBUTANT, etatCourtDebutant, ligneBoiteDebutant, libelleDebutant, libellesDebutant, ligneDebutant, origineDebutant, etatLongDebutant, enteteDebutant, explicationDebutant, jourParis };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Scenarios;

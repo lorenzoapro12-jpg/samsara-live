@@ -676,6 +676,12 @@ async function changeSymbol(symbol, label) {
   // Le dernier prix d'une AUTRE paire ne doit ni colorer la flèche ni allumer l'éclair.
   livePrice = null; fetchPrice();
   priceScale = 1.0; pricePan = 0;
+  // Les cartes du Débutant nomment le bitcoin sur une autre paire : elles suivent la paire.
+  if (marketData) {
+    renderFeed();
+    const mm = document.getElementById('marketModal');
+    if (mm && mm.style.display === 'flex') renderFeedTo(document.getElementById('marketModalBody'));
+  }
   await afficherSerie();
   // Retour sur BTCUSDT : les scénarios du matin, s'ils n'ont pas été relus depuis une cadence.
   if (symbol === 'BTCUSDT' && (!previsions || Horloges.maintenant() - previsions.luA > CADENCES.previsions_lue)) fetchPrevisions();
@@ -4544,10 +4550,13 @@ function debItem(role, texte, rect) {
   debEtat.items.push(it);
   return it;
 }
+/** L'échelle de prix affichée ({ lo, hi }), ou null avant le premier dessin : la phrase ne dit
+ *  « entre B et A » que si les deux repères y sont. */
+function debVue() { return geoPrix && isNum(geoPrix.minP) && isNum(geoPrix.maxP) ? { lo: geoPrix.minP, hi: geoPrix.maxP } : null; }
 /** Les phrases possibles à ce dessin (le prix live ne change que la bande « touchée ») : pour
  *  décider si la ligne des scénarios partage la rangée de la phrase sans la raccourcir. */
 function debPhrases(D, maintenant) {
-  const ch = debReperes(D), base = { prix: ch.prix, unite: guideUnite(), choix: D.choix, reperes: ch, regime: D.regime, maintenant, itv: chartInterval };
+  const ch = debReperes(D), base = { prix: ch.prix, unite: guideUnite(), choix: D.choix, reperes: ch, regime: D.regime, maintenant, itv: chartInterval, vue: debVue() };
   return [null, ch.dessus, ch.dessous].filter((x, k) => !k || x).map(enTest => Guide.phrasesDebutant(Object.assign({}, base, { enTest })));
 }
 /** La hauteur des rangées du haut du tracé en Débutant : la phrase (si le Guide est affiché), la
@@ -4567,11 +4576,12 @@ function debHaut(W, padL, padR) {
       ctx.font = chartFont(DEB_POLICE_LIGNE, 650);
       wLigne = ctx.measureText(ligne).width + 16;
       if (D) {
-        ctx.font = chartFont(DEB_POLICE_PHRASE, 650);
-        const m = t => ctx.measureText(t).width + 16, max = etroit ? P.phraseEtroit : P.phrase;
-        const rang = (V, px) => { const k = V.findIndex(t => t.length <= max && m(t) <= px); return k < 0 ? V.length : k; };
-        // Partager la rangée seulement si la phrase y tient ENTIÈRE (une variante, sans coupure).
-        partage = phrases.every(V => { const k = rang(V, pw - 8 - wLigne - 12); return k < V.length && k === rang(V, pw - 8); });
+        const max = etroit ? P.phraseEtroit : P.phrase;
+        const mesure = taille => { ctx.font = chartFont(taille, 650); return t => ctx.measureText(t).width + 16; };
+        const rang = (V, px, m) => { const k = V.findIndex(t => t.length <= max && m(t) <= px); return k < 0 ? V.length : k; };
+        // Partager la rangée seulement si la phrase y tient ENTIÈRE, à 11,5 px (la variante que
+        // debPhraseChoisir prendrait sur toute la largeur, à 11,5 ou 10,5 px, sans coupure).
+        partage = phrases.every(V => { const k = rang(V, pw - 8 - wLigne - 12, mesure(DEB_POLICE_PHRASE)); return k < V.length && k === rang(V, pw - 8, mesure(10.5)); });
         if (!partage) rangs = 2;
       } else rangs = 1;
     }
@@ -4581,6 +4591,18 @@ function debHaut(W, padL, padR) {
 }
 /** Le chemin d'un repère du Débutant : son seuil (ce repère), sa cible (le repère suivant au-delà). */
 const debChemin = (niv, suivant, sens) => (niv ? { sens, seuil: niv, cible: suivant || null, rx: niv.principale, ry: suivant ? suivant.principale : null } : null);
+/** Les raisons « tout près » d'un repère du Débutant (bulle) : celles de sa bande Expert à moins de
+ *  max(demi-bande, 0,25 × ATR) de son prix, du même côté du prix live, hors des deux repères de
+ *  l'écran et du repère suivant. */
+function guidePresDebutant(L, E) {
+  const n = L.niv, b = n.bande;
+  if (!b) return [];
+  const atr = E.D && isNum(E.D.atr) ? E.D.atr : 0, lim = Math.max(isNum(n.demi) ? n.demi : 0, 0.25 * atr);
+  const live = isNum(livePrice) ? livePrice : null, S = E.debSel || {};
+  const exclus = [S.dessus, S.dessous, L.suivant].filter(Boolean).map(x => x.p);
+  return b.raisons.filter(r => isNum(r.p) && r.p !== n.p && Math.abs(r.p - n.p) <= lim && !exclus.includes(r.p)
+    && (live === null || (r.p > live) === (n.p > live)));
+}
 /** Le texte d'un repère pour la bulle Débutant : chaque raison en mots, ce qui est tout près (les
  *  autres prix de sa bande Expert), son chemin (de CE repère au suivant), sa bande. */
 function guideTexteNiveauDebutant(L, E) {
@@ -4590,7 +4612,15 @@ function guideTexteNiveauDebutant(L, E) {
     out.push('Une estimation, tirée des contrats d’options de la plateforme Deribit' + (isFinite(lu) ? ', relevée ' + Guide.ageDebutant(lu, now) : '') + '.');
   }
   for (const r of R) out.push(Guide.origineDebutant(r, E.unite, now, pas));
-  const pres = L.niv.bande ? L.niv.bande.raisons.filter(r => r.p !== L.niv.p) : [];
+  // Le « Haut des 24 h » du graphique (bougies, en direct) et celui de la carte des infos du marché
+  // (publié, 24 h glissantes de Binance) peuvent différer : la bulle dit pourquoi.
+  if (activeSymbol === 'BTCUSDT' && R.some(r => /^h24_/.test(r.cle)))
+    out.push('La carte « Fourchette des 24 h » des infos du marché peut dire un autre chiffre : elle est publiée à heure fixe, et ses 24 h ne commencent pas à la même minute que celles de ce graphique.');
+  // « Tout près » : les autres prix de sa bande Expert À CÔTÉ de ce repère seulement — à moins
+  // d'une demi-bande (au moins 0,25 × ATR), du même côté du prix, jamais l'autre repère de l'écran
+  // ni le repère suivant (une bande fusionnée de 200 $ qui enjambe le prix appelait « tout près »
+  // le repère de l'autre côté).
+  const pres = guidePresDebutant(L, E);
   if (pres.length) out.push('Tout près : ' + pres.map(r => Guide.nomPhrase(r) + ' (' + Guide.prixR(r, E.unite) + ')').join(', ') + '.');
   out.push(Guide.texteSuiteDebutant(debChemin(L.niv, L.suivant, L.niv.dessus ? 1 : -1), E.unite, chartInterval, L.niv.dessus ? 1 : -1, now));
   out.push('La bande couvre ' + Guide.prixRond(L.niv.demi, E.unite) + ' de part et d’autre de ce prix : le prix réagit rarement au dollar près.');
@@ -4765,9 +4795,11 @@ function guidePastilleDebutant(g, x, y, w, h, texte, coul, encre) {
 function debPhraseChoisir(g, o, maxPx, etroit) {
   const P = PARAM.guide.debutant, max = etroit ? P.phraseEtroit : P.phrase, V = Guide.phrasesDebutant(o);
   const pleines = V.slice(0, -1), compacte = V[V.length - 1];
-  for (const taille of [DEB_POLICE_PHRASE, 10.5]) {
-    g.font = chartFont(taille, 650);
-    for (const t of pleines) if (t.length <= max && g.measureText(t).width + 16 <= maxPx) return { t, taille };
+  // Chaque variante à 11,5 px puis à 10,5 px avant la suivante : au téléphone, « Depuis 3 h, le
+  // prix monte et touche 86 133 $. » en 10,5 px plutôt que de perdre « touche » (ou la durée).
+  for (const t of pleines) {
+    if (t.length > max) continue;
+    for (const taille of [DEB_POLICE_PHRASE, 10.5]) { g.font = chartFont(taille, 650); if (g.measureText(t).width + 16 <= maxPx) return { t, taille }; }
   }
   for (const taille of [DEB_POLICE_PHRASE, 10.5]) { g.font = chartFont(taille, 650); if (g.measureText(compacte).width + 16 <= maxPx) return { t: compacte, taille }; }
   // Une police large sur un écran étroit : le verbe seul (« Le prix monte. », « Le prix s’agite. »),
@@ -4810,7 +4842,7 @@ function guideCalqueDebutant(E) {
   // partagent la rangée.
   const memo = debHautMemo, etroit = g.pw < P.etroit;
   const maxPx = E.xMax - g.pad.left - 8 - (memo && memo.partage ? memo.wLigne + 12 : 0);
-  const o = { prix: isNum(livePrice) ? livePrice : null, unite: E.unite, choix: E.D.choix, reperes: E.debSel, enTest, regime: E.D.regime, maintenant: !E.finVue, itv: chartInterval };
+  const o = { prix: isNum(livePrice) ? livePrice : null, unite: E.unite, choix: E.D.choix, reperes: E.debSel, enTest, regime: E.D.regime, maintenant: !E.finVue, itv: chartInterval, vue: debVue() };
   const cle = [o.prix === null, enTest ? enTest.p : '-', maxPx, o.maintenant].join('|');
   if (!E.phraseCache || E.phraseCache.cle !== cle) {
     const ph = debPhraseChoisir(cx, o, maxPx, etroit);
@@ -5103,8 +5135,12 @@ function scenBandes(S) {
     } else {
       const y1 = yDe(sc.range[1]), y0 = yDe(sc.range[0]);
       ctx.fillStyle = avecAlpha(c, 0.04 * a); ctx.fillRect(x0, y1, w, y0 - y1);
-      ctx.strokeStyle = avecAlpha(c, 0.8 * a); ctx.lineWidth = 1.1; ctx.setLineDash([7, 4]);
-      ctx.strokeRect(x0 + 0.5, y1, w - 1, y0 - y1);
+      // Débutant : un range plus haut que toute la vue n'a que ses deux bords verticaux à l'écran,
+      // deux tirets sans explication : il n'est pas tracé (son libellé, en haut, le nomme).
+      if (!(deb && y1 <= top && y0 >= bas)) {
+        ctx.strokeStyle = avecAlpha(c, 0.8 * a); ctx.lineWidth = 1.1; ctx.setLineDash([7, 4]);
+        ctx.strokeRect(x0 + 0.5, y1, w - 1, y0 - y1);
+      }
       // Ce que la marge tolère au-delà des bornes : pointillé fin.
       ligne(sc.zones.haut, [1, 3], 0.45); ligne(sc.zones.bas, [1, 3], 0.45);
     }
@@ -5220,6 +5256,11 @@ function scenChemin(S, it, top, bas) {
   if (x1 > x0) {
     const niveaux = sc.forme === 'range' ? sc.range : sc.cibles.concat(sc.invalidation !== null ? [sc.invalidation] : []);
     for (const p of niveaux) { const y = yDe(p); if (y >= top && y <= bas) zones.push({ x0, y0: y - 4, x1, y1: y + 4 }); }
+    // Débutant : les bords verticaux tracés d'un range se survolent (ou se touchent) aussi.
+    if (S.deb && sc.forme === 'range') {
+      const yt = Math.max(top, yDe(sc.range[1])), yb = Math.min(bas, yDe(sc.range[0]));
+      if (yb > yt && !(yDe(sc.range[1]) <= top && yDe(sc.range[0]) >= bas)) for (const xe of [x0, x1]) zones.push({ x0: xe - 5, y0: yt, x1: xe + 5, y1: yb });
+    }
     if (S.marge > 20 && x1 > xFin) {
       const zs = sc.forme === 'range' ? [[sc.zones.bas, sc.zones.haut]] : sc.zones.cibles;
       for (const z of zs) { const y1 = Math.max(top, yDe(z[1])), y0 = Math.min(bas, yDe(z[0])); if (y0 > y1) zones.push({ x0: xFin, y0: y1, x1, y1: y0 }); }
@@ -5741,21 +5782,37 @@ function scenLibelleDebutant(S, it, top, bas) {
   const yH = yDe(range ? sc.range[1] : sc.cibles[0]), yB = range ? yDe(sc.range[0]) : yH;
   const hors = yB < top + 2 ? -1 : yH > bas - 2 ? 1 : 0, y = range ? Math.max(top, yH) : yH;
   const droite = (S.marge > 24 ? xFin : xMax) - 4, x0 = g.pad.left + 6;
-  const t = Scenarios.libelleDebutant(sc, it.sv, P.scenario, m, droite - x0, hors < 0 ? '↑' : hors > 0 ? '↓' : null);
-  const w = Math.min(m(t), droite - x0);
-  const xBox = Math.max(x0, S.xDeT(sc.emis) + 4);
-  const xs = [droite - w].concat(range ? [Math.max(x0, Math.min(droite - w, xBox))] : []).concat([Math.max(x0, (x0 + droite) / 2 - w / 2), x0]);
-  // Range : sous son bord haut (dans la boîte), sinon au-dessus ; chemin : au-dessus de la cible.
-  const essais = hors < 0 ? [top + 2, top + H + 4] : hors > 0 ? [bas - H - 2, bas - 2 * H - 4] : range ? [y + 2, y - H - 2] : [y - H - 2, y + 2];
-  const vers = hors > 0 ? -1 : hors < 0 ? 1 : range ? 1 : -1;
+  // Un range dont le haut est au-dessus de la vue : sa place est en haut du tracé, et nulle part
+  // ailleurs (glissé vers le bas, il tombait entre la ligne du prix et un repère, et se lisait
+  // comme un 3e repère).
+  // Plus haute ET plus basse que la vue : ses deux bords sont hors de la vue, le libellé va dans
+  // les deux rangées du haut, ou à défaut dans les deux du bas (toujours dans la boîte).
+  const hautSeul = range && yH < top + 2, couvre = hautSeul && yB > bas - 2;
+  const essais = hors < 0 || hautSeul ? [top + 2, top + H + 4] : hors > 0 ? [bas - H - 2, bas - 2 * H - 4] : range ? [y + 2, y - H - 2] : [y - H - 2, y + 2];
+  const vers = hors > 0 ? -1 : hors < 0 || hautSeul ? 1 : range ? 1 : -1;
+  const placements = [[essais, vers]].concat(couvre ? [[[bas - H - 2, bas - 2 * H - 4], -1]] : []);
   const surBougies = scenSurBougies(S), recentes = scenRecentes(S), bandes = debSurBandes(guideEtat && overlays.guide ? guideEtat : null);
   // Gênes dures : les bougies les plus récentes (le prix d'à présent ne se cache jamais) et les
-  // bandes des repères ; gêne douce : les autres bougies.
+  // bandes des repères ; gêne douce : les autres bougies. En haut seulement : pas de glissement
+  // au-delà des deux rangées du haut.
   const dur = r => recentes(r) || bandes(r);
-  let pose = null, xp = x0;
-  for (const [ev, gl] of [[r => dur(r) || surBougies(r), 3], [dur, 3], [dur, 8]]) {
-    for (const x of xs) if ((pose = guidePlacer(S.rects, x, w, H, essais, top, bas, vers, 0, gl, ev))) { xp = x; break; }
-    if (pose) break;
+  const gl = hautSeul ? 0 : null;
+  // Les libellés du plus riche au plus court (« Scén. 1 » en dernier) : un libellé qui ne trouve
+  // pas sa place laisse essayer le suivant, plus court (360 px, police à chasse fixe).
+  const V = Scenarios.libellesDebutant(sc, it.sv, P.scenario, hors < 0 ? '↑' : hors > 0 ? '↓' : null).filter(t => m(t) <= droite - x0);
+  let pose = null, xp = x0, t = null, w = 0;
+  for (const tv of V.length ? V : [Scenarios.libelleDebutant(sc, it.sv, P.scenario, m, droite - x0, hors < 0 ? '↑' : hors > 0 ? '↓' : null)]) {
+    const wv = Math.min(m(tv), droite - x0);
+    const xBox = Math.max(x0, S.xDeT(sc.emis) + 4);
+    const xs = [droite - wv].concat(range ? [Math.max(x0, Math.min(droite - wv, xBox))] : []).concat([Math.max(x0, (x0 + droite) / 2 - wv / 2), x0]);
+    for (const [es, ve] of placements) {
+      for (const [ev, g0] of [[r => dur(r) || surBougies(r), 3], [dur, 3], [dur, 8]]) {
+        for (const x of xs) if ((pose = guidePlacer(S.rects, x, wv, H, es, top, bas, ve, 0, gl === null ? g0 : gl, ev))) { xp = x; break; }
+        if (pose) break;
+      }
+      if (pose) break;
+    }
+    if (pose) { t = tv; w = wv; break; }
   }
   if (!pose) return false;
   const c = it.coul;
@@ -6708,16 +6765,21 @@ function renderFeedTo(container) {
   // retard se LISE. Le bandeau d'âge (ageBannerHtml) ne se déclenche qu'au-delà de CADENCES.vieux_min,
   // c'est-à-dire jamais dans le cas normal : d'où deux prix contradictoires à l'écran.
   const ageMin = upd ? Math.max(0, Math.round((Date.now() - upd.getTime()) / 60000)) : null;
+  // Débutant, sur une autre paire que BTCUSDT : ces cartes parlent du BITCOIN (le fichier publié ne
+  // suit que lui). Elles le disent dans leurs titres et leurs phrases (« le bitcoin », pas « le
+  // prix ») — sinon on lisait « le prix est dans le haut de sa fourchette » à côté de SOL à −4 %.
+  const autrePaire = activeSymbol !== 'BTCUSDT', sujet = autrePaire ? 'le bitcoin' : 'le prix';
+  const btcTitre = t => (autrePaire ? 'Bitcoin : ' + t.charAt(0).toLowerCase() + t.slice(1) : t);
   // Débutant : « Fourchette des 24 h » — un seul prix en grand à l'écran (celui du haut, en
   // direct) ; le prix publié, en petit, avec son âge.
-  html += mCard('📊', modes('Marché live', 'Fourchette des 24 h'), modes('Binance spot · maj ' + hhmm + ' UTC'
+  html += mCard('📊', modes('Marché live', btcTitre('Fourchette des 24 h')), modes('Binance spot · maj ' + hhmm + ' UTC'
       + (ageMin !== null ? ' (+' + ageDe(d.updated, ageMin) + ' min — le badge du haut est live)' : ''), 'Binance · le prix du haut est en direct'), '',
     envExpert('<div class="hero"><span class="hero-val">' + fmtUsd(b.price) + '</span>'
     + '<span class="' + chipCls(b.change_24h_pct) + '">' + pctSigne(b.change_24h_pct) + ' 24h</span></div>')
-    + envDebutant('<div class="fine">Prix publié ' + ilYaDeb(d.updated, ageMin) + ' : <b style="color:var(--ink-1)">' + prixDeb(b.price) + '</b></div>')
-    + trackHtml(b.price, b.low_24h, b.high_24h, modes('Bas&nbsp;<b>' + fmtUsd(b.low_24h) + '</b>', 'Bas 24 h&nbsp;<b>' + prixDeb(b.low_24h) + '</b>'),
-      modes('Haut&nbsp;<b>' + fmtUsd(b.high_24h) + '</b>', 'Haut 24 h&nbsp;<b>' + prixDeb(b.high_24h) + '</b>'))
-    + phraseCarte('fourchette', positionDans(b.price, b.low_24h, b.high_24h), '24 h')
+    + envDebutant('<div class="fine">' + (autrePaire ? 'Prix du bitcoin publié ' : 'Prix publié ') + ilYaDeb(d.updated, ageMin) + ' : <b style="color:var(--ink-1)">' + prixDeb(b.price) + '</b></div>')
+    + trackHtml(b.price, b.low_24h, b.high_24h, modes('Bas&nbsp;<b>' + fmtUsd(b.low_24h) + '</b>', 'Bas publié&nbsp;<b>' + prixDeb(b.low_24h) + '</b>'),
+      modes('Haut&nbsp;<b>' + fmtUsd(b.high_24h) + '</b>', 'Haut publié&nbsp;<b>' + prixDeb(b.high_24h) + '</b>'))
+    + phraseCarte('fourchette', positionDans(b.price, b.low_24h, b.high_24h), '24 h', sujet)
     + envExpert('<div class="fine" style="margin-top:8px">Volume 24h&nbsp;<b style="color:var(--ink-1)">' + fmtBig(b.quote_volume_24h_usd) + '</b></div>'));
 
   // ── 2. MACRO ──
@@ -6768,8 +6830,8 @@ function renderFeedTo(container) {
   const fenMots = h => (h % 24 === 0 ? (h / 24) + (h / 24 > 1 ? ' jours' : ' jour') : h + ' heures');
   const fenCourt = h => (h % 24 === 0 ? (h / 24) + ' j' : h + ' h');
   const indDeb = t4 ? trackHtml(t4.last_close, t4.support_30, t4.resistance_30, 'Bas ' + fenCourt(fen4) + '&nbsp;<b>' + prixDeb(t4.support_30) + '</b>', 'Haut ' + fenCourt(fen4) + '&nbsp;<b>' + prixDeb(t4.resistance_30) + '</b>')
-    + phraseCarte('fourchette', positionDans(t4.last_close, t4.support_30, t4.resistance_30), fenMots(fen4)) : '<div class="fine">En attente de la prochaine publication.</div>';
-  html += mCard('📈', modes('Indicateurs', 'Fourchette des ' + (fen4 ? fenMots(fen4) : '5 jours')), modes('Binance 4h/1h/1d · RSI Wilder · bougie en cours incluse', 'Publié ' + ilYaDeb(d.updated, ageMin)), '',
+    + phraseCarte('fourchette', positionDans(t4.last_close, t4.support_30, t4.resistance_30), fenMots(fen4), sujet) : '<div class="fine">En attente de la prochaine publication.</div>';
+  html += mCard('📈', modes('Indicateurs', btcTitre('Fourchette des ' + (fen4 ? fenMots(fen4) : '5 jours'))), modes('Binance 4h/1h/1d · RSI Wilder · bougie en cours incluse', 'Publié ' + ilYaDeb(d.updated, ageMin)), '',
     envExpert(indBody) + envDebutant(indDeb));
 
   // ── 4. MICROSTRUCTURE ──
@@ -6833,7 +6895,7 @@ function renderFeedTo(container) {
     + lectureCourte('prime', x.premium_pct, x.premium_hors_usdt_pct) + '</div>';
   // Débutant : « Achats et ventes » — une phrase qui porte la valeur (l'écart des achats et des
   // ventes immédiats sur 24 h) ; le reste est en Expert.
-  html += mCard('📡', modes('Microstructure', 'Achats et ventes'), modes('Binance Futures · Deribit · Coinbase', 'Binance, 24 h · ' + ilYaDeb(d.updated, ageMin)), '',
+  html += mCard('📡', modes('Microstructure', btcTitre('Achats et ventes')), modes('Binance Futures · Deribit · Coinbase', 'Binance, 24 h · ' + ilYaDeb(d.updated, ageMin)), '',
     envExpert(microBody) + (isNum(x.cvd_24h_usd) ? phraseCarte('cvd', x.cvd_24h_usd) : envDebutant('<div class="fine">En attente de la prochaine publication.</div>')));
 
   // ── 5. LIQUIDITÉ ──
@@ -6878,7 +6940,7 @@ function renderFeedTo(container) {
       + lectureCourte('carnet', bt.ratio)
       + '<div class="fine" style="margin-top:6px">Une photo : ces ordres peuvent être retirés à tout moment.</div>';
   }
-  html += mCard('💧', modes('Liquidité', 'Ordres en attente'), modes('Carnet Binance spot · BTC posés', 'Binance, près du prix · relevés ' + ilYaDeb(d.updated, ageMin)), '',
+  html += mCard('💧', modes('Liquidité', btcTitre('Ordres en attente')), modes('Carnet Binance spot · BTC posés', 'Binance, près du prix · relevés ' + ilYaDeb(d.updated, ageMin)), '',
     envExpert(liqBody) + envDebutant(liqDeb));
 
   // ── 6. ÉTAT DU FLUX ──
@@ -6906,7 +6968,8 @@ function renderFeedTo(container) {
 
   // Le bandeau d'âge voyage AVEC les cartes : il apparaît donc dans le conteneur
   // réellement affiché, quel qu'il soit.
-  container.innerHTML = ageBannerHtml(d) + html;
+  container.innerHTML = ageBannerHtml(d)
+    + (autrePaire ? envDebutant('<div class="deb-btc">Ces infos parlent du bitcoin (en dollars), pas de ' + escHtml(NOMS_PAIRES[activeSymbol] || activeSymbol) + '.</div>') : '') + html;
   brancherContre(container);
 }
 

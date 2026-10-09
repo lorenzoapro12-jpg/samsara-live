@@ -109,9 +109,14 @@ async function ouvrir(nav, o) {
         // ouvert : le rang 1 vise 86 900 puis 87 400, invalidation 84 800 — les bougies simulées
         // (86 000 ± 400) n'atteignent ni l'un ni l'autre : le scénario reste en cours.
         const ouvert = d => { const s = d.scenarios.find(x => x.rang === '1'); s.cibles = [86900, 87400]; s.invalidation = 84800; s.origines = { 86900: 'plus haut du 08/10', 87400: 'mur de calls', 84800: 'plus bas de la nuit' }; s.enonce = 'Hausse vers 86 900 puis 87 400'; };
+        // range : le rang 1 devient un range plus haut que toute la vue (84 500 – 87 500) ; range2 :
+        // un range dont les bords sont dans la vue (85 700 – 86 350) ; les bougies simulées
+        // (86 000 ± 460) y restent : en cours.
+        const range = (lo, hi) => d => { const s = d.scenarios.find(x => x.rang === '1'); Object.assign(s, { forme: 'range', cibles: [], invalidation: null, range: [lo, hi], origines: {}, enonce: 'Range' }); };
         const ferme = d => { const s = d.scenarios.find(x => x.rang === '1'); s.cibles = [89000, 90000]; s.invalidation = 86000; s.origines = {}; };
         return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: prev === 'attente' ? previsionsAttente()
-          : previsionsFixture(Object.assign({ maintenant: maintenant() }, prev === 'hier' ? { ilYaMs: 26 * 3600e3 } : prev === 'ferme' ? { modifier: ferme } : prev === 'ouvert' ? { modifier: ouvert } : {})) });
+          : previsionsFixture(Object.assign({ maintenant: maintenant() }, prev === 'hier' ? { ilYaMs: 26 * 3600e3 } : prev === 'ferme' ? { modifier: ferme } : prev === 'ouvert' ? { modifier: ouvert }
+            : prev === 'range' ? { modifier: range(84500, 87500) } : prev === 'range2' ? { modifier: range(85700, 86350) } : {})) });
       }
       if (u.includes('heatmap')) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, 'heatmap.json')) });
       if (/\/master\/market-data\.json/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: MD });
@@ -669,6 +674,145 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         const r = await o.page.evaluate(() => { window.__ftOn = false; return { ohlcv: window.__ft.some(e => e.c === 'chartCalque' && /^Début$/.test(e.t)), bulle: !!(guideEtat.survol && guideEtat.bulle), curseur: canvas.style.cursor }; });
         check('survol d’une bande hors étiquette : les valeurs de la bougie (« Début », « Haut »…) ET la bulle du repère, à côté', r.ohlcv && r.bulle && r.curseur === 'crosshair', r);
       } else check('survol d’une bande : un point de bande hors étiquette existe', false, null);
+      await o.ctx.close();
+    }
+
+    // ── Les Légendes (« ? ») en Débutant : d'abord ce que montre l'écran, sans jargon ──
+    // Constat de revue : elles s'ouvraient sur « GEX », « Funding », « CVD »… et leurs fiches du
+    // Guide décrivaient l'écran Expert (badge, chemins).
+    titre('Légendes en Débutant (390 px)');
+    {
+      const o = await ouvrir(nav, { vue: { width: 390, height: 844 }, tactile: true });
+      await o.page.click('#legendesBtn'); await o.page.waitForTimeout(250);
+      const g = await o.page.evaluate(() => {
+        const p = document.getElementById('fichePop'), d = p.querySelector('details.glossaire-plus');
+        const vis = el => el.getClientRects().length > 0;
+        return { texte: p.innerText, ouvert: !p.hidden, replie: !!d && !d.open, h4: [...p.querySelectorAll('h4')].filter(vis).map(h => h.innerText.trim()).filter(Boolean),
+          boutons: [...p.querySelectorAll('.glossaire-item')].filter(vis).map(b => b.innerText) };
+      });
+      check('Légendes, Débutant : « Ce que montre l’écran » d’abord (phrase et repères, scénarios du matin, les cartes) ; les fiches de l’Expert repliées',
+        g.ouvert && g.replie && /^Ce que montre l’écran$/i.test(g.h4[0]) && g.h4.length === 1 && g.boutons.includes('Scénarios du matin') && g.boutons.includes('La phrase et les deux repères') && g.boutons.includes('Ordres en attente'), g);
+      check('Légendes, Débutant : aucun mot banni dans ce qui est affiché', !bannis(g.texte).length && !CONSEIL.test(g.texte), bannis(g.texte));
+      // Les fiches du Guide ouvertes en Débutant : leur explication est celle de l'écran Débutant.
+      const fiches = [];
+      for (const id of ['guide', 'guide_regime', 'guide_suite', 'guide_niveaux', 'scenarios']) {
+        fiches.push(await o.page.evaluate(id => {
+          ouvrirFiche(id);
+          const p = document.getElementById('fichePop'), vis = el => el.getClientRects().length > 0;
+          const simple = [...p.querySelectorAll('.fiche-simple')].filter(vis).map(x => x.innerText).join(' '), t = [...p.querySelectorAll('.fiche-titre, .fiche-nature')].map(x => x.innerText).join(' ');
+          return { id, simple, titre: t };
+        }, id));
+      }
+      const mal = fiches.filter(f => bannis(f.simple + ' ' + f.titre).length || /badge en haut|à droite de la dernière bougie|Bollinger|Indicateurs »/.test(f.simple));
+      check('fiches du Guide en Débutant : titre, pastille et explication du Débutant (ni badge, ni chemins dessinés, ni « convention », ni jargon)', !mal.length && fiches.find(f => f.id === 'guide_regime').simple.includes('pas de badge'), mal.length ? mal : fiches.map(f => f.titre));
+      await o.page.evaluate(() => { basculerMode(); ouvrirGlossaire(); });
+      await o.page.waitForTimeout(200);
+      const x = await o.page.evaluate(() => { const p = document.getElementById('fichePop'), vis = el => el.getClientRects().length > 0; return [...p.querySelectorAll('h4')].filter(vis).map(h => h.innerText.trim()).filter(Boolean); });
+      check('Légendes, Expert : tous les groupes, à plat, comme avant', x.length === 7 && /^Positionnement et dérivés$/i.test(x[0]), x);
+      check('Légendes : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
+    // ── Autre paire : les cartes du Débutant parlent du bitcoin, et le disent ──
+    titre('SOL/USDT : les infos du marché nomment le bitcoin');
+    for (const [vue, tactile] of [[{ width: 1440, height: 900 }, false], [{ width: 390, height: 844 }, true]]) {
+      const o = await ouvrir(nav, { vue, tactile });
+      await o.page.evaluate(async () => { await changeSymbol('SOLUSDT', document.getElementById('sym_SOLUSDT') || document.createElement('label')); });
+      await o.page.waitForTimeout(800);
+      await o.page.evaluate(() => { const k = document.querySelector('#cycle .kpi-deb'); if (k) k.click(); });
+      await o.page.waitForTimeout(500);
+      const t = await o.page.evaluate(() => { const box = document.getElementById(innerWidth <= 768 ? 'marketModalBody' : 'feed'); return box ? box.innerText : ''; });
+      check(`SOL · ${vue.width} : « Ces infos parlent du bitcoin (en dollars), pas de SOL/USDT. », titres « Bitcoin : … », « le bitcoin est … de sa fourchette »`,
+        /Ces infos parlent du bitcoin \(en dollars\), pas de SOL\/USDT\./.test(t) && /Bitcoin : fourchette des 24 h/i.test(t) && /le bitcoin est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(t) && !/le prix est (dans le haut|dans le bas|au milieu)/.test(t), t.slice(0, 500));
+      scanTexte(`SOL · ${vue.width}, cartes ouvertes`, await texteVisible(o.page));
+      check(`SOL · ${vue.width} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
+    // ── Téléphone : un sens (monte, baisse) dit toujours sa durée ──
+    // Constat de revue : « Le prix monte. » sous « −0,57 % en 24 h » en rouge.
+    titre('Téléphone : la phrase garde sa durée');
+    for (const [w, cle, itv] of [[390, 'hausse', '15m'], [390, 'baisse', '1d'], [360, 'hausse', '5m']]) {
+      const o = await ouvrir(nav, { vue: { width: w, height: 800 }, tactile: true });
+      if (itv !== '15m') { await o.page.click('#int_' + itv); await o.page.waitForTimeout(1500); }
+      const r = await o.page.evaluate(cle => {
+        const r0 = Guide.regime;
+        Guide.regime = (...a) => Object.assign({}, r0(...a), { cle });
+        var24Courant = cle === 'hausse' ? -0.57 : 0.57;
+        memoCache.clear(); debHautMemo = null; drawChart(); dessinerCalque();
+        const ph = debEtat.items.find(i => i.role === 'phrase');
+        const out = { phrase: ph && ph.texte, H: [Guide.HORIZON_DEBUTANT[chartInterval], Guide.HORIZON_COURT[chartInterval]] };
+        Guide.regime = r0; memoCache.clear(); debHautMemo = null; drawChart();
+        return out;
+      }, cle);
+      check(`${w} px, ${itv}, ${cle}, variation 24 h de sens contraire : « ${r.phrase} » commence par sa durée (${r.H.join(' / ')}), ≤ 48`,
+        r.phrase && r.phrase.length <= 48 && r.H.some(h => r.phrase.indexOf(h + ', ') === 0) && r.phrase.includes(Guide.VERBE_DEBUTANT[cle]), r);
+      await o.ctx.close();
+    }
+
+    // ── Bulle d'un repère : « Tout près » ne cite jamais l'autre repère de l'écran ──
+    titre('Bulle d’un repère : « Tout près », du même côté et à côté seulement');
+    for (const itv of ['1h', '1m']) {
+      const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
+      await o.page.click('#int_' + itv); await o.page.waitForTimeout(1500);
+      const r = await o.page.evaluate(() => {
+        const D = guideDonnees();
+        const b = D && D.choix.dessus.concat(D.choix.dessous).find(n => n.raisons.length >= 2 && n.pMax - n.pMin > 1);
+        if (!b) return null;
+        const ps = b.raisons.map(x => x.p).sort((x, y) => x - y);
+        livePrice = (ps[0] + ps[1]) / 2; drawChart(); dessinerCalque();
+        const E = guideEtat, S = E.debSel, lim = L => Math.max(L.niv.demi || 0, 0.25 * E.D.atr);
+        return { live: livePrice, bande: ps, niveaux: E.niveaux.map(L => {
+          const t = guideTexteNiveauDebutant(L, E).find(x => /^Tout près : /.test(x)) || '';
+          const prix = (t.match(/\((\d{1,3}(?:[\s  ]\d{3})*(?:,\d+)?) \$\)/g) || []).map(x => +x.replace(/[^\d,]/g, '').replace(',', '.'));
+          return { p: L.niv.p, autres: [S.dessus, S.dessous, L.suivant].filter(Boolean).map(x => x.p).filter(p => p !== L.niv.p), prix, lim: lim(L), t };
+        }) };
+      });
+      if (!r) { check(`Tout près · ${itv} : une bande de plusieurs prix existe dans ce montage`, false, null); await o.ctx.close(); continue; }
+      const mal = r.niveaux.filter(n => n.prix.some(p => n.autres.some(a => Math.abs(a - p) < 0.5) || Math.abs(p - n.p) > n.lim + 0.5 || (p > r.live) !== (n.p > r.live)));
+      check(`Tout près · ${itv} : prix ${Math.round(r.live)} dans la bande ${r.bande.join(' / ')} → aucune bulle ne cite l'autre repère ni le suivant, ni un prix de l'autre côté ou à plus d'une demi-bande`, !mal.length, mal);
+      await o.ctx.close();
+    }
+
+    // ── Un range pour scénario 1 : son libellé, toujours, en haut ; ses bords se survolent ──
+    // Constat de revue : à 360 px en neon, plus de libellé du tout ; en aero et gazette, posé entre
+    // la ligne du prix et le repère du bas (il se lisait comme un 3e repère).
+    titre('Scénario 1 en range (plus haut que la vue) : libellé en haut, à 360 et 390 px');
+    for (const [theme, w] of [['neon', 360], ['aero', 360], ['gazette', 360], ['neon', 390], ['aero', 1440]]) {
+      const o = await ouvrir(nav, { vue: { width: w, height: w > 500 ? 900 : 740 }, theme, tactile: w < 500, prev: 'range' });
+      const e = await controlerEcran(o, `range · ${theme} · ${w}`);
+      const sc = e.items.find(i => i.role === 'scenario');
+      const bas = e.bandes.filter(b => b.p < e.live).sort((a, b) => b.p - a.p)[0];
+      const entre = sc && sc.rect && bas && e.yLive !== null && sc.rect.y + sc.rect.h > e.yLive && sc.rect.y < bas.yB;
+      const haut = e.bandes.filter(b => b.p > e.live).sort((a, b) => a.p - b.p)[0];
+      const entreH = sc && sc.rect && haut && e.yLive !== null && sc.rect.y < e.yLive && sc.rect.y + sc.rect.h > haut.yH;
+      const bord = sc && sc.rect && (sc.rect.y <= e.top + 17 + 4 + 1 || sc.rect.y + sc.rect.h >= e.top + e.ph - 2 * 17 - 4 - 1);
+      check(`range · ${theme} · ${w} : le libellé du scénario 1 est posé (« ${sc && sc.texte} »), dans les deux rangées du haut (ou du bas), jamais entre la ligne du prix et un repère`,
+        sc && sc.rect && bord && !entre && !entreH && /^Scén(ario|\.) 1/.test(sc.texte), { sc, top: e.top, ph: e.ph, yLive: e.yLive, bas, haut });
+      if (sc && w === 360) {
+        const r = await viser(o, 'scenario', true);
+        check(`range · ${theme} · ${w} : le toucher du libellé ouvre la bulle du scénario 1 (« reste entre »)`, r && /^Scénario 1 de Claude$/.test(r.titre) && /reste entre/.test(r.corps), r);
+      }
+      check(`range · ${theme} · ${w} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+    titre('Scénario 1 en range (bords dans la vue) : libellé avec son verbe, bords survolables');
+    {
+      const o = await ouvrir(nav, { vue: { width: 1440, height: 900 }, prev: 'range2' });
+      const e = await controlerEcran(o, 'range2 · 1440');
+      const sc = e.items.find(i => i.role === 'scenario');
+      check(`range2 : « ${sc && sc.texte} » dit son verbe (« reste »)`, sc && /^Scén(ario|\.) 1 : reste /.test(sc.texte), e.items);
+      const p = await o.page.evaluate(() => {
+        const S = scenEtat, un = S && S.items.find(i => i.sc.rang === '1');
+        if (!un) return null;
+        const g = S.g, x0 = Math.max(g.pad.left, S.xDeT(un.sc.emis)), y = (S.yDe(un.sc.range[0]) + S.yDe(un.sc.range[1])) / 2, b = canvas.getBoundingClientRect();
+        return { x: b.left + x0, y: b.top + y, dansVue: x0 > g.pad.left + 2 };
+      });
+      if (p && p.dansVue) {
+        await o.page.mouse.move(p.x - 12, p.y); await o.page.mouse.move(p.x, p.y, { steps: 3 }); await o.page.waitForTimeout(150);
+        const r = await o.page.evaluate(() => ({ titre: scenEtat.survol ? scenEtat.survol.titre : null }));
+        check('range2 : survoler le bord gauche de la boîte ouvre la bulle du scénario 1', r.titre === 'Scénario 1 de Claude', r);
+      } else check('range2 : le bord gauche de la boîte est dans la vue', false, p);
       await o.ctx.close();
     }
 

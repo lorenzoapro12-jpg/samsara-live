@@ -125,6 +125,8 @@ const FICHES = {
     limites: 'Binance seulement ; la variation 24 h compare deux points de la série horaire.',
   },
   cvd: {
+    titreDeb: 'Achats et ventes',
+    simpleDeb: 'Sur 24 h, les achats faits tout de suite au prix du moment, comparés aux ventes faites tout de suite : qui a été le plus pressé d’échanger.',
     titre: 'CVD — delta cumulé des volumes', champ: 'micro.cvd_1h_usd',
     simple: 'Achats au marché moins ventes au marché, en dollars, sur une fenêtre : qui a été le plus pressé.',
     lectures: [
@@ -154,6 +156,8 @@ const FICHES = {
     limites: 'Dernière clôture journalière d’un jour ouvré, différée ; marché fermé le week-end.',
   },
   vix: {
+    titreDeb: 'Nervosité des bourses',
+    simpleDeb: 'Un indice qui dit la nervosité attendue des bourses américaines pour les 30 prochains jours : bas, elles sont calmes ; haut, elles sont nerveuses.',
     titre: 'VIX — volatilité implicite du S&P 500', champ: 'macro.vix',
     simple: 'La volatilité que les options sur les actions américaines anticipent pour les 30 prochains jours — l’« indice de la peur ».',
     lectures: [
@@ -164,6 +168,8 @@ const FICHES = {
   },
   // ── Carnet (fichier de 15 min) ──
   carnet: {
+    titreDeb: 'Ordres en attente',
+    simpleDeb: 'Les ordres d’achat et de vente qui attendent sur Binance, près du prix : combien de BTC sont posés de chaque côté. Un ordre posé peut être retiré à tout moment.',
     titre: 'Ratio bid / ask du carnet', champ: 'liquidity.ratio_bid_ask',
     simple: 'BTC posés à l’achat divisés par BTC posés à la vente, dans une bande de prix autour du milieu du carnet.',
     lectures: [
@@ -210,6 +216,8 @@ const FICHES = {
     limites: 'Un état qui peut durer des semaines ; il ne dit pas quand le croisement a eu lieu.',
   },
   sr_tf: {
+    titreDeb: 'Fourchette (plus bas, plus haut)',
+    simpleDeb: 'Le plus bas et le plus haut des derniers jours : la carte dit si le prix est dans le haut, au milieu ou dans le bas de cette fourchette.',
     titre: 'Support / résistance (fichier)', champ: 'tf.*.support_30',
     simple: 'Le plus bas et le plus haut des dernières bougies de l’échelle de temps.',
     lectures: [
@@ -327,6 +335,8 @@ const FICHES = {
   // ── Le Guide du graphique (js/guide.js) : ses nombres viennent de PARAM.guide ──
   guide: {
     titre: 'Guide du graphique', page: 'guide', nature: 'convention',
+    titreDeb: 'Le graphique en Débutant',
+    simpleDeb: 'En haut du graphique, une phrase dit si le prix monte, baisse ou hésite, et depuis quand. Deux repères de prix l’encadrent : le plus proche au-dessus, le plus proche en dessous. Puis le scénario n° 1 de Claude. Touchez (ou survolez) un texte pour le détail. Une description, jamais un conseil ; le reste est en mode Expert, et tout se masque dans « + Affichage ».',
     simple: 'Une couche qui DÉCRIT ce que montre le graphique : les niveaux de prix proches et d’où ils viennent, le régime du marché, les formes chartistes en cours avec leur bilan mesuré, deux chemins conditionnels et une phrase de résumé. Elle ne dit jamais quoi faire.',
     formule: P => 'Niveaux : au plus ' + P.guide.niveauxParCote + ' au-dessus et ' + P.guide.niveauxParCote + ' au-dessous du prix, à moins de ' + pcF(P.guide.distanceMax) + ' %. Régime : ADX ' + P.adx.periode
       + ', EMA ' + P.guide.emaCourte + '/' + P.guide.emaLongue + ', Bollinger ' + P.bb.periode + '. Formes : au plus ' + P.guide.formesMax + ' à la fois. Choix gardé dans ce navigateur (clé samsara-guide-v1).',
@@ -340,6 +350,8 @@ const FICHES = {
   },
   guide_niveaux: {
     titre: 'Guide — niveaux nommés', page: 'guide', nature: 'mesure',
+    titreDeb: 'La phrase et les deux repères',
+    simpleDeb: 'Les deux repères sont les prix les plus proches où il s’est passé quelque chose : le haut ou le bas d’hier, un mur d’ordres en attente, une zone où le prix a souvent fait demi-tour… Chacun dit son origine en mots. La phrase du haut les cite. Touchez un repère : d’où il vient, où est le prix, et le repère suivant si le prix le dépasse.',
     simple: 'Les niveaux de prix les plus proches, au-dessus et au-dessous du prix, chacun dans une bande fine avec son ORIGINE en mots. Des niveaux très proches ne font qu’une bande, qui couvre tous leurs prix et dit chacun d’eux avec son prix réel.',
     formule: P => 'Bande : ± ' + nbF(P.guide.bandeAtr) + ' × ATR ' + P.guide.atrPeriode + '. Une bande regroupe des niveaux dont l’écart total reste sous ' + pcF(P.guide.fusion) + ' %. Niveaux à moins de ' + pcF(P.guide.distanceMax) + ' % du prix, au plus '
       + P.guide.niveauxParCote + ' de chaque côté. Zones de demi-tours : au moins ' + P.guide.touchesMin + ' pivots regroupés (méthode S/R de la page, sur les ' + P.sr.bougies + ' dernières bougies de l’intervalle affiché). Cassure : 2 clôtures successives hors de la bande, ou 1 puis un retour réussi, parmi les '
@@ -355,6 +367,8 @@ const FICHES = {
   },
   guide_regime: {
     titre: 'Guide — régime du marché', page: 'guide', nature: 'convention',
+    titreDeb: 'Le mouvement du prix',
+    simpleDeb: 'En mode Débutant, le mouvement n’a pas de badge : il donne le verbe de la phrase en haut du graphique. « Monte » ou « baisse » : le prix a pris une direction nette ; « hésite » : pas de direction nette ; « s’agite » : il bouge fort, sans sens clair. Le badge et ses mesures sont en mode Expert.',
     simple: 'Un badge en haut du graphique : marché en tendance (et dans quel sens), sans tendance nette, ou en compression (bandes de Bollinger parmi les plus étroites des dernières bougies).',
     formule: P => 'ADX ' + P.adx.periode + ' ≥ ' + P.guide.adxTendance + ' : tendance (haussière si +DI > −DI et EMA ' + P.guide.emaCourte + ' > EMA ' + P.guide.emaLongue + ', baissière si les deux disent l’inverse, sinon sens incertain) ; ADX ≤ '
       + P.guide.adxSans + ' : sans tendance nette ; entre les deux : tendance faible. Compression : largeur de Bollinger (' + P.bb.periode + ', ' + P.bb.ecarts + ' σ) au plus à son ' + P.guide.bbPercentile + 'e centile des ' + P.guide.bbFenetre + ' dernières bougies ; « au plus bas depuis N bougies » n’est dit qu’à partir de N = ' + P.guide.compressionDepuisMin + '.',
@@ -382,6 +396,8 @@ const FICHES = {
   },
   guide_suite: {
     titre: 'Guide — et ensuite ?', page: 'guide', nature: 'convention',
+    titreDeb: 'Et après un repère ?',
+    simpleDeb: 'En mode Débutant, rien n’est dessiné pour la suite : touchez un repère (ou la phrase) pour lire « si le prix finit au-delà de ce repère, le repère suivant est … ». Une condition, pas une prévision. Les chemins dessinés sont en mode Expert.',
     simple: 'Deux chemins conditionnels à droite de la dernière bougie : « si clôture au-dessus de X, prochain niveau Y » et « si clôture sous Z, prochain niveau W ».',
     formule: P => 'X et Z : le premier niveau nommé au-dessus et au-dessous du prix ; Y et W : le suivant de chaque côté. Prix DANS une bande : X et Z sont ses deux bords. Marge de dessin : ' + pcF(P.guide.futur) + ' % de la largeur du tracé, entre ' + P.guide.futurMinPx + ' et ' + P.guide.futurMaxPx + ' pixels, au plus ' + pcF(P.guide.futurMaxFraction) + ' % du tracé.',
     lectures: [
@@ -392,6 +408,8 @@ const FICHES = {
   },
   // ── Les scénarios du matin (js/scenarios.js) : fichier previsions.json, branche « previsions » ──
   scenarios: {
+    titreDeb: 'Scénarios du matin',
+    simpleDeb: 'Chaque matin, Claude (une IA) écrit trois scénarios pour les 24 h qui suivent et les classe du plus au moins probable, sans pourcentage. L’écran Débutant montre le n° 1 (son libellé près de sa zone) et une ligne qui dit où il en est ; touchez-les pour les trois. Une hypothèse, jamais un conseil.',
     titre: 'Scénarios du matin', page: 'scenarios', nature: 'convention',
     simple: 'Chaque matin, Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ, à partir de son analyse du marché, et les classe du plus au moins probable, SANS pourcentage. Chaque niveau a une origine nommée (plus haut d’hier, mur d’options…) et se lit comme une zone : le niveau plus ou moins une marge. Le graphique les dessine et suit en direct ce que les bougies en font. Une description, jamais un conseil.',
     formule: P => 'Point du matin : ' + P.scenarios.point + ' (heure de Paris), BTCUSDT seulement. Zone : niveau × (1 ± marge du fichier). Une bougie touche une zone si son plus bas est sous le haut de la zone et son plus haut au-dessus du bas. Chemin : chaque cible dans une bougie plus tardive que la précédente ; invalidation touchée d’abord = invalidé. Range : sorti si une bougie dépasse une borne de plus de la marge. Suivi en direct : seules les bougies ENTIÈRES dans la fenêtre comptent, sur des bougies de ' + Math.round(P.scenarios.suiviPasMax / 60) + ' min au plus. « Échantillon faible » sous '
@@ -409,6 +427,8 @@ const FICHES = {
   // La forme d'une bougie est une CONVENTION du thème (jeton --bougie-forme) : la fiche dit celle
   // du thème courant, lue dans le code du tracé (FORMES_BOUGIE, BOUGIE_DENSE_PX, js/app.js).
   bougies: {
+    titreDeb: 'Le dessin des prix',
+    simpleDeb: 'Chaque petit bâton du graphique résume une période (un quart d’heure, une heure…) : le prix au début, le plus haut, le plus bas et le prix à la fin. Le thème choisit la forme du dessin, jamais les valeurs.',
     titre: 'Bougies : la forme du thème', page: 'bougies', nature: 'convention',
     simple: 'Une bougie résume une période : son ouverture, son plus haut, son plus bas et sa clôture. Le thème choisit la forme qui les dessine.',
     etat: () => {
@@ -440,6 +460,11 @@ const FICHES = {
 // ─── Valeurs et métadonnées ───────────────────────────────────────────────────
 const NATURES = { mesure: 'Mesuré', 'modèle': 'Modèle', convention: 'Convention', seuil: 'Seuil de ce code', horodatage: 'Horodatage' };
 const STATUTS = { usuel: 'Usuel', convention: 'Convention', 'débattu': 'Débattu', 'mesuré': 'Mesuré' };
+// Les mêmes pastilles en mots du Débutant (« convention » et « modèle » sont des mots de l'Expert).
+const NATURES_DEB = { 'modèle': 'Estimation', convention: 'Règle d’usage' };
+const STATUTS_DEB = { convention: 'Règle d’usage' };
+/** Un mot dit autrement en Débutant : les deux, chacun dans sa classe (même HTML dans les deux modes). */
+const motModes = (exp, deb) => (deb && deb !== exp ? '<span class="expert-seul">' + echapF(exp) + '</span><span class="debutant-seul">' + echapF(deb) + '</span>' : echapF(exp));
 /** Une fraction en pourcentage, à la française (0.003 → « 0,3 ») : pour les formules des fiches du Guide. */
 const pcF = x => (x * 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
 const nbF = x => x.toLocaleString('fr-FR');
@@ -477,10 +502,12 @@ function ficheHtml(id) {
   // Nature : celle que publie le producteur (champ du fichier), sinon celle que la fiche déclare
   // (la forme des bougies est une convention), sinon « mesuré » pour un calcul de la page.
   const nature = m ? m.nature : (f.nature || (f.page ? 'mesure' : null));
-  let h = '<div class="fiche-tete"><h3 class="fiche-titre">' + echapF(f.titre) + '</h3>'
-    + (nature ? '<span class="fiche-nature nature-' + echapF(nature) + '">' + echapF(NATURES[nature] || nature) + '</span>' : '')
+  const titre = f.titreDeb ? '<span class="expert-seul">' + echapF(f.titre) + '</span><span class="debutant-seul">' + echapF(f.titreDeb) + '</span>' : echapF(f.titre);
+  let h = '<div class="fiche-tete"><h3 class="fiche-titre">' + titre + '</h3>'
+    + (nature ? '<span class="fiche-nature nature-' + echapF(nature) + '">' + motModes(NATURES[nature] || nature, NATURES_DEB[nature]) + '</span>' : '')
     + '<button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>'
-    + '<p class="fiche-simple">' + echapF(f.simple) + '</p>';
+    + (f.simpleDeb ? '<p class="fiche-simple expert-seul">' + echapF(f.simple) + '</p><p class="fiche-simple debutant-seul">' + echapF(f.simpleDeb) + '</p>'
+      : '<p class="fiche-simple">' + echapF(f.simple) + '</p>');
   // État du moment dérivé du code (ex. la forme de bougie du thème courant) : même HTML dans les deux modes.
   const etat = f.etat ? f.etat() : null;
   if (etat) h += '<p class="fiche-valeur">' + echapF(etat) + '</p>';
@@ -497,7 +524,7 @@ function ficheHtml(id) {
     if (typeof chroniqueFiche === 'function') h += chroniqueFiche(f.champ, id);
   }
   h += '<h4>Comment ça se lit</h4><ul class="fiche-lectures">' + f.lectures.map(l =>
-    '<li><span class="statut statut-' + echapF(l.s) + '">' + echapF(STATUTS[l.s] || l.s) + '</span> ' + echapF(l.t) + '</li>').join('') + '</ul>';
+    '<li><span class="statut statut-' + echapF(l.s) + '">' + motModes(STATUTS[l.s] || l.s, STATUTS_DEB[l.s]) + '</span> ' + echapF(l.t) + '</li>').join('') + '</ul>';
   if (f.debat) h += '<div class="fiche-debat"><b>La littérature se contredit.</b> ' + echapF(f.debat) + '</div>';
   if (f.limites) h += '<p class="fiche-limites"><b>Ce que ça ne dit pas :</b> ' + echapF(f.limites) + '</p>';
   // Détail technique : expert. La formule n'est JAMAIS écrite ici à la main.
@@ -552,7 +579,10 @@ function infoBtn(id) {
   return '<button type="button" class="info-btn" onclick="event.stopPropagation();ouvrirFiche(\'' + id + '\',this)" aria-label="Comment lire : '
     + echapF(f.titre) + '">i</button>';
 }
-/** Le glossaire : toutes les fiches, ouvert depuis l'en-tête. */
+/** Le glossaire : toutes les fiches, ouvert depuis l'en-tête. En Débutant, d'abord ce que
+ *  montre SON écran (titres du Débutant) ; les fiches de l'Expert, repliées dessous. Même HTML
+ *  dans les deux modes : seules les classes .debutant-seul / .expert-seul changent. */
+const GLOSSAIRE_DEBUTANT = ['guide', 'guide_niveaux', 'scenarios', 'bougies', 'sr_tf', 'vix', 'cvd', 'carnet'];
 function ouvrirGlossaire(ancre) {
   const p = document.getElementById('fichePop');
   if (!p) return;
@@ -562,11 +592,14 @@ function ouvrirGlossaire(ancre) {
     ['Le dessin du graphique', ['bougies']],
     ['Guide du graphique', ['guide', 'guide_niveaux', 'guide_regime', 'guide_formes', 'guide_suite', 'scenarios']],
     ['Indicateurs du graphique', ['rsi', 'ema', 'vwap', 'adx', 'atr', 'volume', 'sr', 'bb', 'macd', 'stoch']]];
+  const bouton = (i, t) => '<button type="button" class="glossaire-item" onclick="ouvrirFiche(\'' + i + '\')">' + echapF(t) + '</button>';
+  const tous = groupes.map(([g, ids]) => '<h4>' + g + '</h4><div class="glossaire">' + ids.map(i => bouton(i, FICHES[i].titre)).join('') + '</div>').join('');
   p.innerHTML = '<div class="fiche-tete"><h3 class="fiche-titre">Légendes</h3><button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>'
-    + '<p class="fiche-simple">Comment chaque chiffre se lit — et ce qu’il ne dit pas. Mode <b>' + (modeCourant() === 'expert' ? 'Expert' : 'Débutant') + '</b> : '
+    + '<p class="fiche-simple">Comment chaque chiffre se lit — et ce qu’il ne dit pas. Mode <b><span class="expert-seul">Expert</span><span class="debutant-seul">Débutant</span></b> : '
     + '<button type="button" class="lien" onclick="basculerMode();ouvrirGlossaire()">changer</button>.</p>'
-    + groupes.map(([g, ids]) => '<h4>' + g + '</h4><div class="glossaire">' + ids.map(i =>
-      '<button type="button" class="glossaire-item" onclick="ouvrirFiche(\'' + i + '\')">' + echapF(FICHES[i].titre) + '</button>').join('') + '</div>').join('');
+    + '<div class="debutant-seul"><h4>Ce que montre l’écran</h4><div class="glossaire">' + GLOSSAIRE_DEBUTANT.map(i => bouton(i, FICHES[i].titreDeb || FICHES[i].titre)).join('') + '</div>'
+    + '<details class="glossaire-plus"><summary>Fiches de l’Expert ▸</summary>' + tous + '</details></div>'
+    + '<div class="expert-seul">' + tous + '</div>';
   p.hidden = false;
   p.style.left = ''; p.style.top = '';
   ficheOuverte = 'glossaire'; ficheRetour = ancre || null;
@@ -581,9 +614,10 @@ document.addEventListener('click', e => {
 // Les seuils utilisés ici sont des CONVENTIONS ; la phrase le dit quand c'en est une.
 /** Les phrases des cartes en mode Débutant (sans jargon, sans seuil inventé) : le même bloc que
  *  lectureCourte, pour des cartes qui n'ont pas de fiche. cle : 'fourchette' (v : position dans
- *  la fourchette, de 0 au plus bas à 1 au plus haut ; v2 : « 24 h » ou « 5 jours »), 'vix',
+ *  la fourchette, de 0 au plus bas à 1 au plus haut ; v2 : « 24 h » ou « 5 jours » ; sujet : « le
+ *  prix », ou « le bitcoin » sur une autre paire), 'vix',
  *  'cvd' (v : écart achats − ventes en $), 'sources' (v : à jour, v2 : attendues). */
-function phraseCarte(cle, v, v2) {
+function phraseCarte(cle, v, v2, sujet) {
   const n = x => typeof x === 'number' && isFinite(x);
   // Un montant se lit arrondi : « 3,4 millions $ », « 1,2 milliard $ » ; sous un million, en dollars entiers.
   const fr = (x, d) => x.toLocaleString('fr-FR', { maximumFractionDigits: d }).replace(/[\u00a0\u202f]/g, ' ');
@@ -595,7 +629,7 @@ function phraseCarte(cle, v, v2) {
   };
   let t = null;
   switch (cle) {
-    case 'fourchette': if (n(v)) t = 'Sur ' + (v2 || '24 h') + ', le prix est ' + (v >= 2 / 3 ? 'dans le haut' : v <= 1 / 3 ? 'dans le bas' : 'au milieu') + ' de sa fourchette.'; break;
+    case 'fourchette': if (n(v)) t = 'Sur ' + (v2 || '24 h') + ', ' + (sujet || 'le prix') + ' est ' + (v >= 2 / 3 ? 'dans le haut' : v <= 1 / 3 ? 'dans le bas' : 'au milieu') + ' de sa fourchette.'; break;
     case 'vix': if (n(v)) t = v < 15 ? 'Les bourses américaines sont calmes.' : v > 25 ? 'Les bourses américaines sont nerveuses.' : 'Les bourses américaines ne sont ni calmes ni nerveuses.'; break;
     case 'cvd': if (n(v)) t = v >= 0 ? 'Sur 24 h, les achats immédiats ont dépassé les ventes immédiates de ' + dollars(v) + '.' : 'Sur 24 h, les ventes immédiates ont dépassé les achats immédiats de ' + dollars(v) + '.'; break;
     case 'sources': if (n(v) && n(v2)) t = v >= v2 ? 'Toutes les données publiées sont arrivées.' : (v2 - v) + (v2 - v > 1 ? ' sources manquent' : ' source manque') + ' (détail en mode Expert).'; break;
