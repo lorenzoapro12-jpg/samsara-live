@@ -379,6 +379,11 @@ const PARAM = {
   adx: { periode: 14 },
   ao: { rapide: 5, lente: 34 },
   bb: { periode: 20, ecarts: 2 },
+  ichimoku: { tenkan: 9, kijun: 26, senkouB: 52 },   // le nuage est reporté de `kijun` bougies
+  sar: { pas: 0.02, max: 0.2 },
+  fib: { niveaux: [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1] },
+  // Profil de volume : tranches d'environ `dollarsParTranche` $ de l'échelle de la vue, bornées ; zone de valeur.
+  vp: { dollarsParTranche: 100, tranchesMin: 24, tranchesMax: 72, zoneValeur: 0.7 },
   // VWAP : remis à zéro chaque jour à 00:00 UTC en intraday ; au-delà, toutes les N bougies.
   vwap: { ancrageIntradayS: 86400, ancrageBougies: 20 },
   // Supports / résistances de la page : pivots, regroupés, pondérés par récence × log-volume.
@@ -510,38 +515,105 @@ function toggleAny(key) {
   }
   else { activeSubs[key] = !activeSubs[key]; resizeCanvas(); drawChart(); }
   buildDropdown();
+  compterIndicateurs();
   const lbl = document.getElementById('lbl_' + key);
   if (lbl) lbl.classList.toggle('active', isActive(key));
 }
 
-// Indicateur du menu -> sa fiche de lecture (js/fiches.js).
+// Indicateur du menu -> sa fiche de lecture (js/fiches.js) : TOUS en ont une (tests/test_fiches.js).
 const FICHE_IND = { ema20: 'ema', ema50: 'ema', ema100: 'ema', ema200: 'ema', sma20: 'ema', sma50: 'ema', bb: 'bb', vwap: 'vwap',
-  vol: 'volume', rsi: 'rsi', macd: 'macd', stoch: 'stoch', atr: 'atr', adx: 'adx', sr: 'sr', guide: 'guide', scenarios: 'scenarios' };
+  ichimoku: 'ichimoku', sar: 'sar', vol: 'volume', rsi: 'rsi', macd: 'macd', stoch: 'stoch', atr: 'atr', obv: 'obv', mfi: 'mfi',
+  williamsR: 'williamsR', cci: 'cci', adx: 'adx', ao: 'ao', sr: 'sr', fib: 'fib', vp: 'vp', liq: 'liq', guide: 'guide', scenarios: 'scenarios' };
 // Débutant : le menu « Affichage » n'a que les deux couches du Guide, en mots simples ; les outils
 // d'analyse sont en Expert (une ligne y mène).
 const LIBELLES_DEBUTANT = { guide: 'Repères et phrase de lecture', scenarios: 'Scénarios du matin de Claude, une IA (' + PARAM.scenarios.point + ' Paris, BTC)' };
+// Les catégories en mots : où l'indicateur se dessine. La clé `cat` reste le nom court (tests).
+const TITRES_CAT = { Guide: 'Guide', Overlays: 'Sur les bougies', 'Sous-graphes': 'Sous le graphique', Chartiste: 'Niveaux et zones' };
+// L'aperçu du menu : l'indicateur survolé, touché ou au clavier, et le filtre de l'Expert. Gardés
+// d'une reconstruction à l'autre (cocher une case reconstruit le menu).
+let menuApercu = null, menuFiltre = '';
+const sansAccents = t => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+/** Le contenu de l'aperçu : ce que c'est, comment s'en servir, la fiche complète. */
+function apercuHtml(key) {
+  const id = key && FICHE_IND[key], f = id && typeof FICHES !== 'undefined' ? FICHES[id] : null;
+  if (!f) return '<p class="ind-apercu-vide">' + (debutant() ? 'Survolez ou touchez une ligne : ce qu’elle montre et comment s’en servir.'
+    : 'Survolez ou touchez un indicateur : ce que c’est et comment s’en servir. Le « i » ouvre sa fiche complète.') + '</p>';
+  const deb = debutant();
+  const titre = deb && f.titreDeb ? f.titreDeb : f.titre;
+  const quoi = deb && f.simpleDeb ? f.simpleDeb : f.simple;
+  const u = f.usage, usage = !u ? '' : typeof u === 'string' ? u : (deb ? u.deb : u.exp);
+  return '<p class="ind-apercu-titre">' + echapF(titre) + '</p>'
+    + '<p><b>C’est quoi ?</b> ' + echapF(quoi) + '</p>'
+    + (usage ? '<p><b>Comment s’en servir ?</b> ' + echapF(usage) + '</p>' : '')
+    + '<button type="button" class="lien" onclick="event.stopPropagation();ouvrirFiche(\'' + id + '\',this)">Fiche complète ▸</button>';
+}
+function montrerApercu(key) {
+  if (key === menuApercu) return;
+  menuApercu = key;
+  const a = document.getElementById('indApercu');
+  if (a) a.innerHTML = apercuHtml(key);
+}
+/** Le filtre de l'Expert : sur le libellé, le titre de la fiche et sa catégorie, sans accents. */
+function filtrerMenu(t) {
+  menuFiltre = t;
+  const q = sansAccents(t.trim());
+  const menu = document.getElementById('indMenu');
+  for (const l of menu.querySelectorAll('label[data-ind]')) l.hidden = !!q && !sansAccents(l.dataset.cherche).includes(q);
+  for (const c of menu.querySelectorAll('.cat-title[data-cat]')) c.hidden = !menu.querySelector('label[data-cat="' + c.dataset.cat + '"]:not([hidden])');
+  const vide = menu.querySelector('.ind-aucun');
+  if (vide) vide.hidden = !!menu.querySelector('label[data-ind]:not([hidden])');
+}
+function ligneMenu(item, libelle, cat, tag) {
+  const checked = isActive(item.key) ? ' checked' : '';
+  const fiche = FICHE_IND[item.key], f = fiche && typeof FICHES !== 'undefined' ? FICHES[fiche] : null;
+  const cherche = libelle + ' ' + (f ? f.titre : '') + ' ' + (TITRES_CAT[cat] || cat);
+  return `<label data-ind="${item.key}" data-cat="${cat}" data-cherche="${echapF(cherche)}"><input type="checkbox"${checked} onchange="toggleAny('${item.key}')">${libelle}${fiche ? infoBtn(fiche) : ''}${tag ? `<span class="tag tag-${item.tag}" title="${echapF(TITRES_CAT[cat] || cat)}">${item.tag.toUpperCase()}</span>` : ''}</label>`;
+}
 function buildDropdown() {
   const menu = document.getElementById('indMenu');
-  let html = '';
+  const defile = menu.scrollTop;
+  let html = '<div class="ind-liste">';
   if (debutant()) {
-    for (const item of INDICATORS[0].items) {
-      const checked = isActive(item.key) ? ' checked' : '';
-      const fiche = FICHE_IND[item.key];
-      html += `<label><input type="checkbox"${checked} onchange="toggleAny('${item.key}')">${LIBELLES_DEBUTANT[item.key] || item.label}${fiche ? infoBtn(fiche) : ''}</label>`;
-    }
+    for (const item of INDICATORS[0].items) html += ligneMenu(item, LIBELLES_DEBUTANT[item.key] || item.label, INDICATORS[0].cat, false);
     html += '<button type="button" class="lien menu-expert" onclick="event.stopPropagation();basculerMode()">Autres outils d’analyse : passer en Expert ▸</button>';
-    menu.innerHTML = html;
-    return;
-  }
-  for (const cat of INDICATORS) {
-    html += `<div class="cat-title">${cat.cat}</div>`;
-    for (const item of cat.items) {
-      const checked = isActive(item.key) ? ' checked' : '';
-      const fiche = FICHE_IND[item.key];
-      html += `<label><input type="checkbox"${checked} onchange="toggleAny('${item.key}')">${item.label}${fiche ? infoBtn(fiche) : ''}<span class="tag tag-${item.tag}">${item.tag.toUpperCase()}</span></label>`;
+  } else {
+    html += '<div class="ind-filtre"><input type="search" id="indFiltre" placeholder="Chercher un indicateur…" aria-label="Chercher un indicateur" autocomplete="off" oninput="filtrerMenu(this.value)"></div>';
+    for (const cat of INDICATORS) {
+      html += `<div class="cat-title" data-cat="${cat.cat}">${TITRES_CAT[cat.cat] || cat.cat}</div>`;
+      for (const item of cat.items) html += ligneMenu(item, item.label, cat.cat, true);
     }
+    html += '<p class="ind-aucun" hidden>Aucun indicateur ne correspond.</p>';
   }
+  html += '</div><div class="ind-apercu" id="indApercu" aria-live="polite">' + apercuHtml(menuApercu) + '</div>';
   menu.innerHTML = html;
+  // Survol, toucher et clavier montrent l'explication dans l'aperçu (sans rien cocher de plus).
+  for (const l of menu.querySelectorAll('label[data-ind]')) {
+    const k = l.dataset.ind;
+    l.addEventListener('mouseenter', () => montrerApercu(k));
+    l.addEventListener('pointerdown', () => montrerApercu(k));
+    l.addEventListener('focusin', () => montrerApercu(k));
+  }
+  const filtre = document.getElementById('indFiltre');
+  if (filtre && menuFiltre) { filtre.value = menuFiltre; filtrerMenu(menuFiltre); }
+  menu.scrollTop = defile;
+}
+/** Les raccourcis de la barre (Expert) : au survol, ce que c'est et comment s'en servir. */
+function titresBarre() {
+  if (typeof FICHES === 'undefined') return;
+  for (const l of document.querySelectorAll('#indicatorBar label[id^="lbl_"]')) {
+    const f = FICHES[FICHE_IND[l.id.slice(4)]];
+    if (!f) continue;
+    const u = typeof f.usage === 'string' ? f.usage : f.usage ? f.usage.exp : '';
+    l.title = f.titre + ' : ' + f.simple + (u ? '\nComment s’en servir : ' + u : '') + '\n(Le menu « + Indicateurs » en a la fiche complète.)';
+  }
+}
+/** Le bouton du menu dit combien d'indicateurs l'Expert a allumés (le Guide compris). */
+function compterIndicateurs() {
+  const c = document.getElementById('indCompte');
+  if (!c) return;
+  const n = INDICATORS.reduce((s, cat) => s + cat.items.filter(i => isActive(i.key)).length, 0);
+  c.textContent = n ? String(n) : '';
+  c.hidden = !n;
 }
 
 /** Après un changement de mode (appliquerMode, js/fiches.js) : ce qui ne vaut plus est fermé, la
@@ -628,20 +700,28 @@ document.addEventListener('click', (e) => {
   }
 });
 // Fermer les menus si la fenêtre est redimensionnée
+// (sauf le menu des indicateurs pendant qu'on tape dans son filtre : le clavier d'un téléphone
+// redimensionne la fenêtre).
 window.addEventListener('resize', () => {
-  for (const id of ['indMenu', 'themeMenu', 'paireMenu']) document.getElementById(id).classList.remove('open');
+  for (const id of ['indMenu', 'themeMenu', 'paireMenu']) {
+    const m = document.getElementById(id);
+    if (id === 'indMenu' && m.contains(document.activeElement) && document.activeElement.id === 'indFiltre') continue;
+    m.classList.remove('open');
+  }
 });
 
 function toggleInd(key, label) {
   overlays[key] = !overlays[key];
   if (key === 'liq') toggleDepth(overlays.liq);
   label.classList.toggle('active', overlays[key]);
+  compterIndicateurs();
   if (key === 'sr' && overlays.sr) { drawChart(); refreshRefSR().then(drawChart); }
   else drawChart();
 }
 function toggleSub(key, label) {
   activeSubs[key] = !activeSubs[key];
   label.classList.toggle('active', activeSubs[key]);
+  compterIndicateurs();
   resizeCanvas(); drawChart();
 }
 
@@ -1949,29 +2029,29 @@ function calcVWAP(highs, lows, closes, volumes, times, interval, ancrageS, ancra
   return out;
 }
 
-function calcIchimoku(highs, lows, closes) {
+function calcIchimoku(highs, lows, closes, t = 9, k = 26, b = 52) {
   const n = closes.length;
   const tenkan = new Array(n), kijun = new Array(n), senkouA = new Array(n), senkouB = new Array(n), chikou = [];
-  // Fenêtres 9 / 26 / 52 (tenkan / kijun / senkou B) : extrêmes glissants, une passe chacun.
-  const h9 = extremeGlissant(highs, 9, 1), l9 = extremeGlissant(lows, 9, -1);
-  const h26 = extremeGlissant(highs, 26, 1), l26 = extremeGlissant(lows, 26, -1);
-  const h52 = extremeGlissant(highs, 52, 1), l52 = extremeGlissant(lows, 52, -1);
+  // Fenêtres tenkan / kijun / senkou B (9 / 26 / 52 par défaut, PARAM.ichimoku) : extrêmes glissants, une passe chacun.
+  const hT = extremeGlissant(highs, t, 1), lT = extremeGlissant(lows, t, -1);
+  const hK = extremeGlissant(highs, k, 1), lK = extremeGlissant(lows, k, -1);
+  const hB = extremeGlissant(highs, b, 1), lB = extremeGlissant(lows, b, -1);
   for (let i = 0; i < n; i++) {
-    tenkan[i] = i >= 8 ? (h9[i] + l9[i]) / 2 : null;
-    kijun[i] = i >= 25 ? (h26[i] + l26[i]) / 2 : null;
-    senkouA[i] = i >= 25 ? ((tenkan[i] || 0) + (kijun[i] || 0)) / 2 : null;
-    senkouB[i] = i >= 51 ? (h52[i] + l52[i]) / 2 : null;
+    tenkan[i] = i >= t - 1 ? (hT[i] + lT[i]) / 2 : null;
+    kijun[i] = i >= k - 1 ? (hK[i] + lK[i]) / 2 : null;
+    senkouA[i] = i >= k - 1 ? ((tenkan[i] || 0) + (kijun[i] || 0)) / 2 : null;
+    senkouB[i] = i >= b - 1 ? (hB[i] + lB[i]) / 2 : null;
   }
-  // Chikou = cloture COURANTE reportee 26 periodes EN ARRIERE : a l'indice i, la cloture
-  // de i+25 (convention TradingView, decalage 26 => offset 25). L'ancienne formule lisait
+  // Chikou = cloture COURANTE reportee `k` periodes EN ARRIERE : a l'indice i, la cloture
+  // de i+k-1 (convention TradingView, decalage 26 => offset 25). L'ancienne formule lisait
   // closes[i-25] : un prix d'il y a 25 bougies avance dans le futur, l'inverse du Chikou.
-  for (let i = 0; i < closes.length; i++) chikou.push(i + 25 < closes.length ? closes[i + 25] : null);
-  // Shift senkou forward 26 periods
-  const shiftedA = new Array(closes.length + 26).fill(null);
-  const shiftedB = new Array(closes.length + 26).fill(null);
+  for (let i = 0; i < closes.length; i++) chikou.push(i + k - 1 < closes.length ? closes[i + k - 1] : null);
+  // Senkou reportes de `k` periodes vers la droite
+  const shiftedA = new Array(closes.length + k).fill(null);
+  const shiftedB = new Array(closes.length + k).fill(null);
   for (let i = 0; i < senkouA.length; i++) {
-    if (senkouA[i] !== null && i + 26 < shiftedA.length) shiftedA[i + 26] = senkouA[i];
-    if (senkouB[i] !== null && i + 26 < shiftedB.length) shiftedB[i + 26] = senkouB[i];
+    if (senkouA[i] !== null && i + k < shiftedA.length) shiftedA[i + k] = senkouA[i];
+    if (senkouB[i] !== null && i + k < shiftedB.length) shiftedB[i + k] = senkouB[i];
   }
   return { tenkan, kijun, senkouA: shiftedA, senkouB: shiftedB, chikou };
 }
@@ -3425,9 +3505,9 @@ function resolveChart(candles, padL, padR, chartH, W) {
   }
 
   // Ichimoku
-  if (ov('ichimoku') && candles.length >= 52) {
+  if (ov('ichimoku') && candles.length >= PARAM.ichimoku.senkouB) {
     const highs = cols().high, lows = cols().low;
-    const ichi = memoized('ichimoku', calcIchimoku, highs, lows, closes);
+    const ichi = memoized('ichimoku', calcIchimoku, highs, lows, closes, PARAM.ichimoku.tenkan, PARAM.ichimoku.kijun, PARAM.ichimoku.senkouB);
     drawLine(ichi.tenkan, minP, range, pad, gap, ph, COLORS.ichi_tenkan, [], 1, vs);
     drawLine(ichi.kijun, minP, range, pad, gap, ph, COLORS.ichi_kijun, [], 1, vs);
     // Kumo : un remplissage PAR SEGMENT de signe constant (A >= B vert haussier, sinon rouge baissier).
@@ -3460,7 +3540,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
   // Parabolic SAR
   if (ov('sar')) {
     const highs2 = cols().high, lows2 = cols().low;
-    const sarData = memoized('sar', calcSAR, highs2, lows2, closes);
+    const sarData = memoized('sar', calcSAR, highs2, lows2, closes, PARAM.sar.pas, PARAM.sar.max);
     for (let i = vs; i < ve; i++) {
       if (sarData[i] === null) continue;
       const x = pad.left + gap * (i - vs) + gap/2;
@@ -3551,7 +3631,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
     for (const c of visible) { if (c.high > fibHigh) fibHigh = c.high; if (c.low < fibLow) fibLow = c.low; }
     const fibRange = fibHigh - fibLow;
     const isUpTrend = visible[visible.length - 1].close > visible[0].close;
-    const fibLevels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+    const fibLevels = PARAM.fib.niveaux;
     for (const lvl of fibLevels) {
       const price = isUpTrend ? fibHigh - fibRange * lvl : fibLow + fibRange * lvl;
       if (price < minP - range * 0.1 || price > maxP + range * 0.1) continue;
@@ -3569,7 +3649,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
   
   // --- Volume Profile (Market Profile : POC + Value Area 70%) ---
   if (ov('vp') && visible.length >= 5) {
-    const bins = Math.max(24, Math.min(72, Math.round(range / 100)));
+    const bins = Math.max(PARAM.vp.tranchesMin, Math.min(PARAM.vp.tranchesMax, Math.round(range / PARAM.vp.dollarsParTranche)));
     const binH = range / bins;
     const profile = new Array(bins).fill(0);
     for (const c of visible) {
@@ -3586,7 +3666,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
       acc += profile[b];
       if (b < vaLo) vaLo = b;
       if (b > vaHi) vaHi = b;
-      if (acc >= totalVol * 0.7) break;
+      if (acc >= totalVol * PARAM.vp.zoneValeur) break;
     }
     const vpMaxW = 48;
     const yOf = b => pad.top + ph - (b + 0.5) * (ph / bins);
@@ -7573,6 +7653,8 @@ async function init() {
   // Pre-fetch des TF de reference S/R : no-op si l'overlay est eteint, c'est le toggle qui declenche.
   await refreshRefSR();
   toggleDepth(overlays.liq);
+  compterIndicateurs();
+  titresBarre();
   // Onglet caché = aucune requête. La page restait ouverte en arrière-plan toute la journée
   // en interrogeant Binance chaque seconde ; au retour, tout est rafraîchi d'un coup.
   const visible = fn => () => { if (!document.hidden) return fn(); };

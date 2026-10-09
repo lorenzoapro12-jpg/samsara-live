@@ -3071,19 +3071,36 @@
     const b = document.querySelector('[aria-controls="' + id + '"]');
     if (b) b.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
   }
-  const NOMS_CALQUES = [['guide', 'Guide'], ['publiee', 'Carte publiée'], ['live', 'Carnet live'], ['executions', 'Exécutions'], ['prix', 'Prix'],
-    ['bidask', 'Bid / ask'], ['murs', 'Murs'], ['gamma', 'Gamma'], ['profil', 'Profil'], ['dom', 'Carnet latéral'],
-    ['volume', 'Volume'], ['cvd', 'CVD'], ['memoire', 'Mémoire'], ['rafales', 'Rafales'], ['destin', 'Destin des murs'],
-    ['loin', 'Profondeur Coinbase']];
+  // Les puces des calques : [clé, nom, ce que c'est et comment s'en servir]. Le texte s'affiche au
+  // survol de la puce et dans la Légende (Expert), pour le toucher. Une manière de regarder,
+  // jamais quoi faire.
+  const NOMS_CALQUES = [
+    ['guide', 'Guide', 'Les murs, les zones et les événements racontés en mots, avec le résumé du haut et le journal. Laissez-le allumé pour lire la carte sans tout décoder.'],
+    ['publiee', 'Carte publiée', 'L’historique du carnet publié par le serveur toutes les 15 min, une colonne par minute. Sert à voir où de gros ordres sont restés posés pendant des heures.'],
+    ['live', 'Carnet live', 'Le carnet Binance lu par la page toutes les quelques secondes, depuis son ouverture. Sert à voir les ordres qui apparaissent ou disparaissent en ce moment.'],
+    ['executions', 'Exécutions', 'Les échanges réels au marché, en ronds : vert quand les achats dominent, rouge quand ce sont les ventes. Sert à voir où, et avec quelle force, le prix a été poussé.'],
+    ['prix', 'Prix', 'La ligne du prix (clôtures 1 min, puis prix moyen de chaque seconde). C’est le repère de tout le reste : à garder allumé.'],
+    ['bidask', 'Bid / ask', 'Le meilleur prix d’achat (bid) et de vente (ask) à chaque lecture du carnet. Sert, en zoom serré, à voir l’écart entre acheteurs et vendeurs.'],
+    ['murs', 'Murs', 'Les tranches de 20 $ les plus chargées d’ordres à la dernière publication (fichier de 15 min). Sert à repérer les prix où de gros ordres attendent ; ils peuvent être retirés.'],
+    ['gamma', 'Gamma', 'Des niveaux tirés des options Deribit : mur de calls, mur de puts, zéro gamma. Un modèle, pas une mesure : à lire comme des repères possibles.'],
+    ['profil', 'Profil', 'À gauche, le volume échangé à chaque prix de la vue. Les prix très échangés sont souvent des zones où le prix ralentit.'],
+    ['dom', 'Carnet latéral', 'À droite, la somme des ordres du dernier carnet live, par tranche. Sert à voir de quel côté les ordres s’accumulent maintenant.'],
+    ['volume', 'Volume', 'En bas, les achats (au-dessus) et les ventes (au-dessous) au marché par période. Sert à juger si un mouvement est soutenu par des échanges.'],
+    ['cvd', 'CVD', 'Achats au marché moins ventes au marché, cumulés depuis le bord gauche de la vue. Une courbe qui monte : les acheteurs pressés dominent sur la période.'],
+    ['memoire', 'Mémoire', 'Au bord droit : à chaque prix, la part du temps visible où un gros ordre y était posé. Sert à distinguer une zone souvent chargée d’un ordre fugace ; une présence passée, ni support ni résistance.'],
+    ['rafales', 'Rafales', 'Des traits verticaux là où un gros volume s’est échangé d’un même côté dans la même milliseconde. Sert à repérer les accélérations brutales.'],
+    ['destin', 'Destin des murs', 'Ce que devient chaque gros ordre du carnet live quand il disparaît : retiré, échangé, en partie… Sert à voir si les murs tiennent quand le prix arrive.'],
+    ['loin', 'Profondeur Coinbase', 'Le carnet complet de Coinbase sur ±10 % (5 min × 100 $). Sert à voir les gros ordres loin du prix, hors de la bande lue chez Binance.'],
+  ];
   function construireBarre() {
     const z = $('calques');
     // Une ligne de puces qui défile : la molette verticale la fait défiler (sans Maj).
     z.addEventListener('wheel', e => {
       if (z.scrollWidth > z.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { z.scrollLeft += e.deltaY; e.preventDefault(); }
     }, { passive: false });
-    for (const [k, nom] of NOMS_CALQUES) {
+    for (const [k, nom, aide] of NOMS_CALQUES) {
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'puce'; b.textContent = nom; b.dataset.calque = k;
+      b.type = 'button'; b.className = 'puce'; b.textContent = nom; b.dataset.calque = k; b.title = nom + ' : ' + aide;
       b.setAttribute('aria-pressed', R.calques[k] ? 'true' : 'false');
       b.addEventListener('click', () => {
         R.calques[k] = !R.calques[k]; b.setAttribute('aria-pressed', R.calques[k] ? 'true' : 'false');
@@ -3096,6 +3113,9 @@
       });
       z.appendChild(b);
     }
+    // La même aide dans la Légende : au doigt, une puce n'a pas de survol.
+    const lc = $('legCalques');
+    if (lc) lc.innerHTML = NOMS_CALQUES.map(([, nom, aide]) => '<dt>' + echap(nom) + '</dt><dd>' + echap(aide) + '</dd>').join('');
     // Des puces cachées à droite : un fondu le dit (rien ne disparaît en silence).
     const debord = () => z.classList.toggle('deborde-droite', z.scrollWidth > z.clientWidth + 1 && z.scrollLeft + z.clientWidth < z.scrollWidth - 2);
     z.addEventListener('scroll', debord, { passive: true });
