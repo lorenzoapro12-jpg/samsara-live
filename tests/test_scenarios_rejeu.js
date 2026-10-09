@@ -98,7 +98,9 @@ const ligne = page => page.evaluate(() => {
         check(`${mode} ${vue.width} : un seul libellé, celui du montré (le 1), qui ne change pas avec le nom`, !lib.length, lib.map(s => [hm(s.t), s.libelles]));
       } else {
         const ph = await o.page.evaluate(() => scenEtat.boite && scenEtat.boite.lignes.map(l => l.t));
-        check(`${mode} ${vue.width} : l'encadré nomme le ${noms[noms.length - 1]} (« Plus petit écart pour l’instant : ${noms[noms.length - 1]} … », ou « … nom gardé : ${noms[noms.length - 1]} » quand un autre est un peu plus près)`, ph && ph.some(l => new RegExp('^(Plus petit écart pour l’instant : |Plus petit écart : |Écart min\\. : )' + noms[noms.length - 1] + '\\b|nom gardé : ' + noms[noms.length - 1] + '\\b').test(l)), ph);
+        // Changé délibérément (figures en direct) : les libellés des figures prennent de la place en
+        // Expert ; l'encadré peut passer à sa forme serrée, qui nomme aussi (« … · écart min. : 1 »).
+        check(`${mode} ${vue.width} : l'encadré nomme le ${noms[noms.length - 1]} (« Plus petit écart pour l’instant : ${noms[noms.length - 1]} … », « … nom gardé : ${noms[noms.length - 1]} » quand un autre est un peu plus près, ou en forme serrée « … · écart min. : ${noms[noms.length - 1]} »)`, ph && ph.some(l => new RegExp('^(Plus petit écart pour l’instant : |Plus petit écart : |Écart min\\. : )' + noms[noms.length - 1] + '\\b|(nom gardé|nom repris| · écart min\\.) : ' + noms[noms.length - 1] + '\\b').test(l)), ph);
       }
       check(`${mode} ${vue.width} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();

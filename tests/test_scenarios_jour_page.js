@@ -159,13 +159,15 @@ const capt = async (o, nom) => { if (process.env.SCEN_CAPTURES) await o.page.scr
       const r = await o.page.evaluate(() => {
         const n = candles.length, G = PARAM.guide, C = i => candles[i];
         const ia = n - 34, ic = n - 24, ib = n - 14, pa = Math.max(C(ia).high, C(ib).high), pc = C(ic).low;
-        const f = { type: 'double_sommet', sens: -1, phase: 'confirme', a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, objectif: pc - (pa - pc), t: ib + G.pivot, debut: ia, fin: null, jFin: null };
-        const f0 = Guide.formesAffichees;
-        Guide.formesAffichees = () => [f];
+        // (Figures en direct : une figure complète, et le Débutant lit sa liste dans Guide.formesDebutant.)
+        const f = { type: 'double_sommet', famille: 'extremes', sens: -1, phase: 'confirme', a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, extreme: pa, hauteur: pa - pc, objectif: pc - (pa - pc),
+          invalidation: pa, t: ib + G.pivot, debut: ia, depart: ib + 1, jConf: ib + G.pivot + 2, fin: null, jFin: null, journal: [] };
+        const f0 = Guide.formesAffichees, fd0 = Guide.formesDebutant;
+        Guide.formesAffichees = () => [f]; Guide.formesDebutant = () => [f];
         drawChart();
         const out = { items: debEtat.items.map(i => ({ role: i.role, texte: i.texte })), cede: !!scenEtat.libelleCede, boite: scenEtat.boite && scenEtat.boite.texte,
           bulle: (scenEtat.cibles.find(c => /^Scénarios du matin · /.test(c.titre || '') && c.rects && c.rects.length) || { texte: [] }).texte.join('\n') };
-        Guide.formesAffichees = f0; drawChart();
+        Guide.formesAffichees = f0; Guide.formesDebutant = fd0; drawChart();
         return out;
       });
       const roles = r.items.map(i => i.role);

@@ -74,9 +74,11 @@ const textes = page => page.evaluate(() => {
       const r = await o.page.evaluate(() => {
         const n = candles.length, G = PARAM.guide, C = i => candles[i];
         const ia = n - 34, ic = n - 24, ib = n - 14, pa = Math.max(C(ia).high, C(ib).high), pc = C(ic).low;
-        const f = { type: 'double_sommet', sens: -1, phase: 'confirme', a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, objectif: pc - (pa - pc), t: ib + G.pivot, debut: ia, fin: null, jFin: null };
-        window.__f0 = Guide.formesAffichees;
-        Guide.formesAffichees = () => [f];
+        // (Figures en direct : une figure complète, et le Débutant lit sa liste dans Guide.formesDebutant.)
+        const f = { type: 'double_sommet', famille: 'extremes', sens: -1, phase: 'confirme', a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, extreme: pa, hauteur: pa - pc, objectif: pc - (pa - pc),
+          invalidation: pa, t: ib + G.pivot, debut: ia, depart: ib + 1, jConf: ib + G.pivot + 2, fin: null, jFin: null, journal: [] };
+        window.__f0 = Guide.formesAffichees; window.__fd0 = Guide.formesDebutant;
+        Guide.formesAffichees = () => [f]; Guide.formesDebutant = () => [f];
         drawChart();
         const it = debEtat.items.find(i => i.role === 'scenario');
         return { cede: !!(scenEtat.boite && scenEtat.boite.cede), roles: debEtat.items.map(i => i.role), rect: it ? it.rect : null, cv: canvas.getBoundingClientRect().toJSON() };
@@ -88,7 +90,7 @@ const textes = page => page.evaluate(() => {
         const b = await o.page.evaluate(() => (scenEtat && scenEtat.bulle ? scenEtat.bulle.corps.join(' ') : ''));
         check(`${vue.width} : bulle dessinée du libellé : le scénario 2 y est nommé (« ${(b.match(/[^.]*scénario 2[^.]*/i) || [''])[0].slice(0, 120)} »)`, /le plus près de ce que décrit le scénario 2|scénario 2 a été nommé|scénario 2 suit le mieux|Nommé[^.]* le scénario 2\b|La ligne des scénarios \(place prise\) : « En direct : le 2/.test(b.replace(/\s+/g, ' ')), b.slice(0, 900));
       }
-      await o.page.evaluate(() => { Guide.formesAffichees = window.__f0; drawChart(); });
+      await o.page.evaluate(() => { Guide.formesAffichees = window.__f0; Guide.formesDebutant = window.__fd0; drawChart(); });
       check(`${vue.width} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }

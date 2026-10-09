@@ -68,9 +68,11 @@ async function survoler(o, rect, doigt) {
       const r = await o.page.evaluate(() => {
         const n = candles.length, G = PARAM.guide, C = i => candles[i];
         const ia = n - 34, ic = n - 24, ib = n - 14, pa = Math.max(C(ia).high, C(ib).high), pc = C(ic).low;
-        const f = { type: 'double_sommet', sens: -1, phase: 'confirme', a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, objectif: pc - (pa - pc), t: ib + G.pivot, debut: ia, fin: null, jFin: null };
-        window.__f0 = Guide.formesAffichees;
-        Guide.formesAffichees = () => [f];
+        // (Figures en direct : une figure complète, et le Débutant lit sa liste dans Guide.formesDebutant.)
+        const f = { type: 'double_sommet', famille: 'extremes', sens: -1, phase: 'confirme', a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, extreme: pa, hauteur: pa - pc, objectif: pc - (pa - pc),
+          invalidation: pa, t: ib + G.pivot, debut: ia, depart: ib + 1, jConf: ib + G.pivot + 2, fin: null, jFin: null, journal: [] };
+        window.__f0 = Guide.formesAffichees; window.__fd0 = Guide.formesDebutant;
+        Guide.formesAffichees = () => [f]; Guide.formesDebutant = () => [f];
         drawChart();
         const B = scenEtat.boite;
         return { roles: debEtat.items.map(i => i.role), textes: debEtat.items.map(i => i.texte), cede: !!(B && B.cede), prio: !!(B && B.prioritaire), ligne: B && B.texte, frais: scenEtat.jour.frais.map(i => i.sc.rang) };
@@ -79,7 +81,7 @@ async function survoler(o, rect, doigt) {
       // 1440 : la figure trouve sa place (l'arbitrage joue) ; 390 : elle peut ne pas en trouver, la ligne reste posée.
       const avecForme = r.roles.includes('forme');
       check(`${vue.width} : ${avecForme ? 'figure posée, ' : 'figure sans place, '}ligne prioritaire et posée${avecForme ? ', libellé cédé' : ''} ; ${r.roles.length} textes ≤ 5`, (avecForme ? !r.roles.includes('scenario') : vue.width < 500) && r.roles.includes('boite') && r.prio && !r.cede && r.roles.length <= 5, r);
-      await o.page.evaluate(() => { Guide.formesAffichees = window.__f0; drawChart(); });
+      await o.page.evaluate(() => { Guide.formesAffichees = window.__f0; Guide.formesDebutant = window.__fd0; drawChart(); });
       check(`${vue.width} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
