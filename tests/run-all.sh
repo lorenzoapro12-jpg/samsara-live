@@ -124,6 +124,9 @@ node test_guide_page.js || ko=1
 etape "9b''. Scénarios du matin dans Chromium : encadré, libellé du rang 1, survol et tap, fichier d'attente, fichier absent, masquage (non exécuté sans Playwright)"
 node test_scenarios_page.js || ko=1
 
+etape "9b‴. Débutant à l'écran dans Chromium : au plus 5 textes, phrase et repères aux mêmes prix, bulles au survol et au toucher, cartes et menu sans jargon, 11 thèmes (non exécuté sans Playwright)"
+node test_debutant_page.js || ko=1
+
 etape "9c. Sobriété dans Chromium : éclair, horloge, onde, calque, verre, chargement, chaleur (non exécuté sans Playwright)"
 node test_sobriete.js || ko=1
 etape "9d. Thème Gare dans Chromium : palettes à 1ch, provenance lue dans CADENCES, remarque d'âge, chutes à l'événement, démontage (non exécuté sans Playwright)"

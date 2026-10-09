@@ -24,6 +24,30 @@ globalThis.__TEST__ = {
                                updated: document.getElementById('updated').textContent }; }
 };`;
 
+/** Le HTML sans ses sous-arbres « expert-seul » (masqués en Débutant par display:none). */
+function sansExpert(html) {
+  const VIDES = /^(br|hr|img|input|meta|link|wbr|source)$/i;
+  let out = '', i = 0;
+  while (i < html.length) {
+    const lt = html.indexOf('<', i);
+    if (lt < 0) { out += html.slice(i); break; }
+    out += html.slice(i, lt);
+    const gt = html.indexOf('>', lt), tag = html.slice(lt, gt + 1), m = tag.match(/^<([a-z0-9]+)/i);
+    if (m && /class="[^"]*\bexpert-seul\b/.test(tag) && !VIDES.test(m[1]) && !/\/>$/.test(tag)) {
+      // Saute jusqu'à la fermeture assortie (même nom de balise, imbrications comptées).
+      const nom = m[1].toLowerCase(), re = new RegExp('<(/?)' + nom + '\\b[^>]*>', 'gi');
+      re.lastIndex = gt + 1;
+      let prof = 1, x;
+      while (prof && (x = re.exec(html))) prof += x[1] ? -1 : 1;
+      i = x ? re.lastIndex : html.length;
+      continue;
+    }
+    out += tag; i = gt + 1;
+  }
+  return out;
+}
+const texteDe = h => h.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;|&quot;/g, "'").replace(/\s+/g, ' ').trim();
+
 const DATA = JSON.parse(fs.readFileSync(path.join(REPO, 'market-data.json'), 'utf8'));
 
 const store = {};
@@ -167,6 +191,23 @@ try {
         && r.texte === 'fichier ' + D.updated.slice(11, 16) + ' UTC · prix publié ' + Math.round(D.btc.price).toLocaleString('fr-FR') + ' (' + vm.runInContext('Horloges', sandbox).texteAge(Date.now() - Date.parse(D.updated)) + ')'
         && sandbox.reperePublication(Object.assign({}, P, { t0: tu + 900 })) === null;
     })()],
+    // Débutant (le mode par défaut, stockage vide) : ce qui reste visible quand les sous-arbres
+    // .expert-seul sont masqués — un titre Débutant par carte, une phrase simple, aucun mot technique.
+    ...(() => {
+      const Gd = require(path.join(REPO, 'js/guide.js'));
+      const CONSEIL = /\b(achetez|vendez|achète[rz]?\b|vends\b|il faut (?:acheter|vendre)|entrez|sortez|prenez position|signal d['’]achat|signal de vente|recommand(?:e|ons))/i;
+      const cartes = feed.innerHTML.split('<div class="demon-card').slice(1);
+      const deb = cartes.map(c => sansExpert('<div class="demon-card' + c));
+      const titres = deb.map(c => texteDe((c.match(/<div class="demon-name">([\s\S]*?)<\/div>/) || [])[1] || ''));
+      const vu = texteDe(sansExpert(feed.innerHTML)), bannis = Gd.motsBannis(vu);
+      if (bannis.length) console.log('      Débutant, mots techniques visibles :', bannis.join(', '));
+      return [
+        ['Débutant : 8 cartes, chacune avec un titre Débutant (ni « Microstructure », ni « Liquidité », ni « Contre-expertise »)', cartes.length === 8 && titres.every(t => t && !/Microstructure|Liquidité|Contre-expertise|Marché live|Macro|Indicateurs|Flux/.test(t))],
+        ['Débutant : chaque carte garde un texte en mots simples', deb.every(c => texteDe(c.replace(/<div class="demon-header">[\s\S]*?<div class="demon-body">/, '')).length > 20)],
+        ['Débutant : texte visible sans mot technique (liste du Guide), sans conseil', !bannis.length && !CONSEIL.test(vu)],
+        ['Débutant : les âges écrits restent réécrits chaque minute ([data-age-de] visibles)', /data-age-de/.test(sansExpert(feed.innerHTML))],
+      ];
+    })(),
     ['Aucun motif interdit dans le RENDU', hitsFeed.length === 0],
     ['Aucun motif interdit dans la SOURCE publiée', hitsSrc.length === 0],
   ];

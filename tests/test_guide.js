@@ -427,13 +427,19 @@ titre('7. Dans la page : paramètres, menu, fiche, choix gardé, marge de futur'
   check('Guide affiché par défaut', dansPage('overlays.guide') === true);
   const masque = chargerPage({ stockage: { 'samsara-guide-v1': '0' } });
   check('masqué une fois, il le reste (samsara-guide-v1)', vm.runInContext('overlays.guide', masque.sandbox) === false);
+  // En Expert : le Guide y ouvre la marge de futur (ses chemins « Et ensuite ? ») ; en Débutant, seule
+  // la flèche du scénario 1 l'ouvre (contrôlé juste après).
+  page.stockage['samsara-mode'] = 'expert';
   const marge = dansPage('candles = Array.from({ length: 60 }, (_, i) => ({ time: i * 900, open: 1, high: 2, low: 0.5, close: 1, volume: 1 })); viewStart = 10; viewEnd = 60;'
     + '[pasBougie(1000, 50) * 50 + margeFutur(1000, 50), margeFutur(1000, 50), (overlays.guide = false, pasBougie(1000, 50) * 50), margeFutur(1000, 50), (overlays.guide = true, viewStart = 0, viewEnd = 30, margeFutur(1000, 30))]');
   // Glissement d'une bougie à la fois depuis la fin : le pas change d'au plus 1/n par bougie (la
   // marge se referme d'un pas par bougie quittée), jamais d'un coup.
   const pas = dansPage('(() => { const n = 50, out = []; for (let k = 0; k <= 12; k++) { viewEnd = 60 - k; viewStart = viewEnd - n; out.push(pasBougie(1000, n)); } return out; })()');
   const sauts = pas.slice(1).map((p, k) => p / pas[k] - 1);
+  page.stockage['samsara-mode'] = 'debutant';
+  const margeDeb = dansPage('viewStart = 10; viewEnd = 60; overlays.guide = true; [margeFutur(1000, 50), pasBougie(1000, 50) * 50]');
   dansPage('candles = []; viewEnd = 0; viewStart = 0;');
+  check('Débutant : le Guide n’ouvre pas de marge de futur (pas de chemins dessinés), sans flèche de scénario la marge est nulle', margeDeb[0] === 0 && margeDeb[1] === 1000, margeDeb);
   check('marge de futur : bougies + marge = largeur du tracé ; Guide masqué, ou vue loin de la dernière bougie : marge nulle, le pas d’avant', Math.abs(marge[0] - 1000) < 1e-9 && marge[1] > 0 && marge[2] === 1000 && marge[3] === 0 && marge[4] === 0, marge);
   check('glisser d’une bougie hors de la fin : le pas des bougies varie de ≤ 1/n à chaque cran (avant : +22 % d’un coup) et rejoint le pas sans marge', sauts.every(x => x >= -1e-9 && x <= 1 / 50 + 1e-9) && Math.abs(pas[pas.length - 1] - 1000 / 50) < 1e-9, { pas, sauts });
   check('plafond de la marge dans PARAM.guide (futurMaxFraction), dit par la fiche « et ensuite ? »', P.futurMaxFraction > 0 && T.ficheHtml('guide_suite').includes(String(P.futurMaxFraction * 100).replace('.', ',') + ' %'));
@@ -456,6 +462,93 @@ titre('7. Dans la page : paramètres, menu, fiche, choix gardé, marge de futur'
   const xBougie = /const xm = x \+ candleW \/ 2;/.test(appSrc) && /tracerBougie\(ctx, pad\.left \+ gap \* i, candleW,/.test(appSrc) && /guidePreparer\(\{[^}]*candleW[^}]*\}\)/.test(appSrc);
   check('Guide et bougies : même centre x (pad.left + gap × (i − vs) + candleW / 2)', xGuide && xBougie, { xGuide, xBougie });
   check('aucune minuterie dans le Guide (rien ne tourne au repos)', !/setInterval|setTimeout/.test(src) && !/setInterval|setTimeout/.test(appSrc.slice(appSrc.indexOf('// GUIDE — le dessin'), appSrc.indexOf('// Étiquettes d\'overlays posées'))));
+}
+
+// ── 7b. Débutant : les textes courts de l'écran ──
+titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simples');
+{
+  const DEB = dansPage('PARAM.guide.debutant');
+  const Rd = (cle, p, extra) => Object.assign({ cle, p, nom: cle, court: cle, art: 'le ' + cle, origine: '', nature: 'mesuré', detail: '', detailCourt: '' }, extra || {});
+  const N = (...rs) => ({ p: rs[0].p, pMin: Math.min(...rs.map(r => r.p)), pMax: Math.max(...rs.map(r => r.p)), raisons: rs });
+  // 1. Libellés des repères : ≤ 26 caractères (≤ 18 étroit) ; le MOT d'origine gardé pour un prix BTC.
+  const cles = Object.keys(G.NOMS_DEBUTANT).map(k => k === 'options' ? 'put_wall' : k);
+  const libs = [];
+  for (const cle of cles) for (const fl of [null, '↑', '↓']) {
+    const n = N(Rd(cle, 85640));
+    libs.push([cle, fl, t(G.libelleDebutant(n, { max: DEB.niveau, fleche: fl })), t(G.libelleDebutant(n, { max: DEB.niveauEtroit, fleche: fl }))]);
+  }
+  check('libellé d’un repère : ≤ ' + DEB.niveau + ' caractères, ≤ ' + DEB.niveauEtroit + ' en étroit, toujours avec son prix', libs.every(([, , a, b]) => a.length <= DEB.niveau && b.length <= DEB.niveauEtroit && /85 640/.test(a) && /85 640/.test(b)), libs);
+  const mots = libs.filter(([cle, , , b]) => { const N = G.NOMS_DEBUTANT[cle === 'put_wall' ? 'options' : cle]; return !b.includes(N[1]) && !b.includes(N[3]); });
+  check('prix BTC (5 chiffres), étroit : le mot d’origine reste (« ↓Bas hier 85 640 $ », « ↑Max hier 85 640 $ »), flèche collée, toujours avec « $ »', !mots.length && libs.find(l => l[0] === 'hier_bas' && l[1] === '↓')[3] === '↓Bas hier 85 640 $'
+    && libs.find(l => l[0] === 'hier_haut' && l[1] === '↑')[3] === '↑Max hier 85 640 $' && libs.every(l => / \$$/.test(l[2]) && / \$$/.test(l[3])), mots.concat(libs.filter(l => !/ \$$/.test(l[3]))));
+  check('libellé d’un repère : aucun mot banni du Débutant', libs.every(l => !G.motsBannis(l[2]).length && !G.motsBannis(l[3]).length), libs.filter(l => G.motsBannis(l[2] + ' ' + l[3]).length));
+  // 2. La raison qui nomme une bande : jamais une option quand une mesure est dans la bande ; sinon la plus proche du prix de la bande.
+  const nOpt = { p: 85600, pMin: 85600, pMax: 85640, raisons: [Rd('put_wall', 85600, { strike: 85600 }), Rd('hier_bas', 85640)] };
+  const nDeux = { p: 85640, pMin: 85600, pMax: 85640, raisons: [Rd('sr', 85600), Rd('hier_bas', 85640)] };
+  check('raisonPrincipale : une option ne nomme pas une bande qui a une mesure ; sinon le prix le plus proche de la bande', G.raisonPrincipale(nOpt).cle === 'hier_bas' && G.raisonPrincipale(nDeux).cle === 'hier_bas'
+    && G.raisonPrincipale(N(Rd('call_wall', 87000, { strike: 87000 }))).cle === 'call_wall' && G.raisonPrincipale(null) === null, [G.raisonPrincipale(nOpt).cle, G.raisonPrincipale(nDeux).cle]);
+  check('choixDebutant : une bande faite seulement d’options passe après une mesure du même côté', G.choixDebutant({ dessus: [N(Rd('call_wall', 86500, { strike: 86500 })), N(Rd('hier_haut', 86700))], dessous: [] }).dessus.raisons[0].cle === 'hier_haut'
+    && G.choixDebutant({ dessus: [N(Rd('call_wall', 86500, { strike: 86500 }))], dessous: [] }).dessus.raisons[0].cle === 'call_wall' && G.choixDebutant(null).dessus === null);
+  // 2 bis. Les repères du Débutant, choisis au prix LIVE (constat de revue : une bande fusionnée qui
+  // enjambait le prix nommait « au-dessus » un prix situé en dessous).
+  {
+    const bA = N(Rd('hier_bas', 85600), Rd('sr', 85602), Rd('put_wall', 85643, { strike: 85643 })), bB = N(Rd('h24_bas', 85887), Rd('hier_haut', 86133));
+    const reps = G.reperesDe({ dessus: [bB], dessous: [bA] }, 20);
+    const s1 = G.choisirReperes(reps, 86000, 100), s2 = G.choisirReperes(reps, 85620, 100), s3 = G.choisirReperes(reps, 85900, 100);
+    check('repères : une bande qui enjambe le prix donne un repère de chaque côté, chacun strictement de son côté (86 000 → 86 133 au-dessus, 85 887 au-dessous)',
+      s1.dessus.p === 86133 && s1.dessous.p === 85887 && s1.dessus.dessus === true && s1.dessous.dessus === false && G.raisonPrincipale(s1.dessus).cle === 'hier_haut', [s1.dessus && s1.dessus.p, s1.dessous && s1.dessous.p]);
+    check('repères : prix DANS une bande de trois prix (85 620) → au-dessus une mesure (85 887, pas l’option 85 643), au-dessous 85 602 ; le suivant au-delà de chacun',
+      s2.dessus.p === 85887 && s2.dessous.p === 85602 && s2.suivantHaut && s2.suivantHaut.p === 86133 && (!s2.suivantBas || s2.suivantBas.p <= 85502), [s2.dessus && s2.dessus.p, s2.dessous && s2.dessous.p, s2.suivantHaut && s2.suivantHaut.p]);
+    const r5 = G.reperesDe({ dessus: [N(Rd('mur_vente', 82710)), N(Rd('hier_haut', 82890))], dessous: [N(Rd('sr', 82672))] }, 20), s5 = G.choisirReperes(r5, 82680, 75);
+    check('repères : deux prix à moins de l’écart minimal (82 672 et 82 710, prix 82 680 : 38 $ < 75) ne font pas deux repères : le plus proche reste, l’autre côté passe au suivant (82 890)',
+      s5.dessous.p === 82672 && s5.dessus.p === 82890 && s3.dessous.p === 85887 && s3.dessus.p === 86133, [s5.dessus && s5.dessus.p, s5.dessous && s5.dessous.p]);
+    const r2 = G.reperesDe({ dessus: [N(Rd('mur_achat', 86100)), N(Rd('mur_vente', 86300))], dessous: [N(Rd('mur_vente', 85950)), N(Rd('hier_bas', 85800))] }, 20), s4 = G.choisirReperes(r2, 86050, 50);
+    check('repères : un mur d’achat n’est jamais « au-dessus », un mur de vente jamais « au-dessous »', s4.dessus.p === 86300 && s4.dessous.p === 85800, [s4.dessus && s4.dessus.p, s4.dessous && s4.dessous.p]);
+    const r3 = G.reperesDe({ dessus: [N(Rd('hier_haut', 86200), Rd('h24_haut', 86200))], dessous: [] }, 20);
+    check('repères : deux raisons au même prix font un seul repère, nommé par la plus parlante (hier avant 24 h)', r3.length === 1 && r3[0].raisons.length === 2 && G.raisonPrincipale(r3[0]).cle === 'hier_haut', r3);
+    // La phrase garde son verbe sur téléphone quand le prix touche un repère.
+    const enT = s1.dessus, court = [];
+    for (const cle of ['hausse', 'baisse', 'faible', 'incertaine']) court.push([cle, G.phraseDebutant({ prix: 86120, unite: '$', reperes: s1, enTest: enT, regime: { cle }, itv: '15m' }, DEB.phraseEtroit)]);
+    check('phrase au téléphone, prix dans un repère : le verbe du mouvement reste (« Le prix monte et touche 86 133 $. »)', court.every(([cle, t]) => t.length <= DEB.phraseEtroit && t.includes(G.VERBE_DEBUTANT[cle]) && /touche/.test(t)), court);
+  }
+  // 3. La phrase : un verbe, ni %, ni heure, ni nom d'indicateur ; « hésite » seulement sans tendance.
+  const haut = N(Rd('hier_haut', 86398)), bas = N(Rd('mur_achat', 85900));
+  const phr = [];
+  for (const cle of ['hausse', 'baisse', 'faible', 'sans', 'incertaine', 'inconnu']) for (const ch of [{ dessus: [haut], dessous: [bas] }, { dessus: [], dessous: [bas] }, { dessus: [haut], dessous: [] }, { dessus: [], dessous: [] }])
+    for (const itv of ['15m', '4h', null]) for (const maint of [false, true]) {
+      const o = { prix: 86012.5, unite: '$', choix: ch, enTest: null, regime: { cle }, maintenant: maint, itv };
+      const V = G.phrasesDebutant(o).map(t);
+      phr.push({ cle, V, large: G.phraseDebutant(o, DEB.phrase), etroit: G.phraseDebutant(o, DEB.phraseEtroit) });
+    }
+  const sansVerbe = phr.filter(x => x.V.some(v => !/\b(monte|baisse|hésite|s’agite|touche|est|indisponible)\b/.test(v)));
+  check('phrase : chaque variante porte un verbe (monte, baisse, hésite, s’agite, touche, est…)', !sansVerbe.length, sansVerbe.slice(0, 3));
+  const tropLong = phr.filter(x => x.large.length > DEB.phrase || x.etroit.length > DEB.phraseEtroit);
+  check('phrase choisie : ≤ ' + DEB.phrase + ' caractères, ≤ ' + DEB.phraseEtroit + ' en étroit (la forme compacte tient toujours)', !tropLong.length, tropLong.slice(0, 3).map(x => [x.large, x.etroit]));
+  const sales = phr.filter(x => x.V.some(v => /%|\d\d:\d\d|\d+h\d\d|\bUTC\b/.test(v) || G.motsBannis(v).length));
+  check('phrase : ni %, ni heure, ni mot banni', !sales.length, sales.slice(0, 3).map(x => x.V));
+  const hesite = phr.filter(x => (x.cle === 'inconnu' || x.cle === 'incertaine') && x.V.some(v => /hésite/.test(v)));
+  check('phrase : un régime inconnu ou de sens incertain ne « hésite » jamais (« s’agite » : le prix bouge fort)', !hesite.length && phr.some(x => x.cle === 'incertaine' && x.V.some(v => /s’agite/.test(v))), hesite.slice(0, 2).map(x => x.V));
+  const deuxPrix = phr.filter(x => x.V[0].includes('entre')).every(x => x.V[0].includes('85 900 $') && x.V[0].includes('86 398 $'));
+  check('phrase : les prix cités sont ceux des repères (85 900 $ et 86 398 $)', deuxPrix);
+  const vide = phr.filter(x => !x.cle.match(/hausse|baisse/) && x.V[0].includes('86 398') && !x.V[0].includes('85 900'));
+  check('phrase : un côté sans repère est dit (« Aucun repère proche en dessous »)', vide.length > 0 && vide.every(x => /Aucun repère proche en dessous/.test(x.V[0])), vide.slice(0, 2).map(x => x.V));
+  const prixAbsent = G.phrasesDebutant({ prix: null, choix: { dessus: [haut], dessous: [bas] }, regime: { cle: 'faible' } });
+  check('phrase : prix en direct absent, dit (aucun prix inventé)', prixAbsent.length === 1 && /indisponible/.test(prixAbsent[0]), prixAbsent);
+  // 4. La forme : seulement confirmée ou invalidée, ≤ 24 caractères.
+  const fo = [['double_sommet', { phase: 'confirme', sens: -1 }], ['double_creux', { fin: 'invalide', sens: 1 }], ['triangle', { phase: 'confirme', sens: 1 }], ['range', { phase: 'confirme', sens: -1 }], ['double_sommet', {}], ['triangle', { demi: true, demiSens: 1 }]]
+    .map(([type, e]) => [type, t(G.libelleFormeDebutant(Object.assign({ type, sens: 1 }, e)) || '') || null]);
+  check('forme : « Double sommet confirmé », « Double creux invalidé », « Sortie du triangle ↑ », « Sortie du rectangle ↓ » ; en formation ou à confirmer : rien', fo[0][1] === 'Double sommet confirmé' && fo[1][1] === 'Double creux invalidé' && fo[2][1] === 'Sortie du triangle ↑'
+    && fo[3][1] === 'Sortie du rectangle ↓' && fo[4][1] === null && fo[5][1] === null && fo.every(([, l]) => !l || l.length <= DEB.forme), fo);
+  // 5. La suite, en une phrase : « Si le prix finit un quart d'heure au-dessus de … ».
+  const s2 = G.suite({ dessus: [N(Rd('hier_haut', 86398)), N(Rd('mur_vente', 86700, { lu: Date.parse('2026-10-08T22:51:00Z') }))], dessous: [bas] }, 86012.5);
+  const sh = t(G.texteSuiteDebutant(s2.haut, '$', '15m', 1, Date.parse('2026-10-08T22:52:00Z'))), sb = t(G.texteSuiteDebutant(s2.bas, '$', '4h', -1)), sv = t(G.texteSuiteDebutant(null, '$', '15m', 1));
+  check('suite : « Si le prix finit un quart d’heure au-dessus de 86 398 $ (plus haut d’hier), le repère suivant est 86 700 $ (mur de vente, relevé il y a 1 min). »',
+    sh === 'Si le prix finit un quart d’heure au-dessus de 86 398 $ (plus haut d’hier), le repère suivant est 86 700 $ (mur de vente, relevé il y a 1 min).', sh);
+  check('suite : la durée suit l’intervalle (« une tranche de 4 h ») ; sans repère suivant, dit ; côté vide, dit', /^Si le prix finit une tranche de 4 h sous 85 900 \$ \(mur d’achat\), aucun autre repère n’est proche de ce côté\.$/.test(sb)
+    && sv === 'Aucun repère proche au-dessus : pas de suite à décrire de ce côté.', [sb, sv]);
+  check('suite et forme : aucun mot banni, aucun conseil', ![sh, sb, sv].concat(fo.map(f => f[1] || '')).some(x => G.motsBannis(x).length || CONSEIL.test(x)));
+  // 6. Les écarts en dollars : à l'unité près dès 10 $.
+  check('prixRond : « 84 $ » (pas « 83,57 $ »), « 24 $ », « 3,50 $ » sous 10 $', G.prixRond(83.57) === '84 $' && G.prixRond(-24) === '24 $' && G.prixRond(3.5) === '3,50 $', [G.prixRond(83.57), G.prixRond(-24), G.prixRond(3.5)]);
 }
 
 // ── 8. Mots ──
