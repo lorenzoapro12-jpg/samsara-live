@@ -378,6 +378,18 @@ titre('4 bis. 1 min : aucun regard vers l’avenir, rejeu ≤ 60 ms');
   check(`1 min : rejeu des ${n1} bougies en ${ms.toFixed(1)} ms (moyenne de 5, ≤ 60 ms)`, ms <= 60, ms);
 }
 
+// ── 6 bis. Une figure tombée AVANT sa validation : la bulle ne dit pas qu'elle est sortie ──
+titre('6 bis. Figure tombée avant validation : la définition s’arrête avant « puis … sorti »');
+{
+  const tombees = R.formes.filter(f => f.jConf === null && ['invalide_avant', 'expire_avant'].includes(f.fin));
+  const faux = [];
+  for (const f of tombees) {
+    const t = G.texteFormeDebutant(f, R.bilan[f.type], ctxDe(f.jFin + 2), P, '$').join(' ');
+    if (/puis (il|le prix) (est passé|en est sorti|est sorti)|puis il en est sorti/.test(t) || !/la sortie n’a pas été validée/.test(t)) faux.push({ type: f.type, t: t.slice(0, 200) });
+  }
+  check(`${tombees.length} figures tombées avant validation : « la sortie n’a pas été validée », jamais « puis … sorti »`, tombees.length > 5 && !faux.length, faux.slice(0, 3));
+}
+
 // ── 4 ter. Rejeu repris d'une clôture à l'autre : le même résultat qu'un rejeu complet ──
 titre('4 ter. Rejeu repris (une bougie de plus) = rejeu complet ; repli si l’historique change');
 {

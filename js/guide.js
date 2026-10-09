@@ -1997,6 +1997,8 @@ const Guide = (function () {
       out.push(niveauxDebutant(f, c, P, unite));
     } else {
       let def = DEFINITION_FORME[f.type] || '';
+      // Tombée avant sa validation : la définition s'arrête avant « puis … sorti » (ce n'est pas arrivé).
+      if (def && f.jConf == null) def = def.replace(/\s*[,;]\s*puis .*$/, '') + ' ; la sortie n’a pas été validée.';
       if (e.cle === 'confirme') out.push(def, niveauxDebutant(f, c, P, unite));
       else out.push(def.replace(/\.$/, '') + '.', marqueFin(f, c, 'debutant', unite));
       // La cible de la figure tombée : la sienne si elle était confirmée, sinon celle qu'annonçait sa bulle.
