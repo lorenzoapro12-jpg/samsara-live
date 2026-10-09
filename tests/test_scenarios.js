@@ -361,8 +361,8 @@ titre('6 bis. Débutant : une ligne d’état marquée, un libellé court, une b
   const SV = [{ cle: 'avant' }, { cle: 'rien' }, { cle: 'dedans' }, { cle: 'cible', k: 1 }, { cle: 'realise' }, { cle: 'invalide' }, { cle: 'sortie', sortie: { haut: true } }, { cle: 'ambigu' }, { cle: 'rien', fini: true }];
   const lignes = [];
   for (const sv of SV) for (const max of [DEB.boite, DEB.boiteEtroit]) lignes.push([sv.cle + (sv.fini ? ' fini' : ''), max, t(S.ligneBoiteDebutant(F, [{ sc: un, sv }], H3, max, P))]);
-  check('ligne des scénarios : ≤ ' + DEB.boite + ' caractères (≤ ' + DEB.boiteEtroit + ' en étroit), l’état calculé ici marqué « (en direct) », le renvoi ▸', lignes.every(([, max, l]) => l.length <= max && / \(en direct\) ▸$/.test(l) && /^Scén(?:ario|\.) 1/.test(l)), lignes);
-  check('ligne au large : « Scénario 1 de Claude : en cours (en direct) ▸ »', S.ligneBoiteDebutant(F, [{ sc: un, sv: { cle: 'avant' } }], H3, DEB.boite, P) === 'Scénario 1 de Claude : en cours (en direct) ▸', S.ligneBoiteDebutant(F, [{ sc: un, sv: { cle: 'avant' } }], H3, DEB.boite, P));
+  check('ligne des scénarios : ≤ ' + DEB.boite + ' caractères (≤ ' + DEB.boiteEtroit + ' en étroit), l’état calculé ici marqué « (en direct) », le renvoi ▸', lignes.every(([, max, l]) => l.length <= max && / \(en direct\) ▸$/.test(l) && /^Scén(?:ario|\.)(?: du matin)? : /.test(l) && !/Scén(?:ario|\.) 1/.test(l)), lignes);
+  check('ligne au large : « Scénario du matin : en cours (en direct) ▸ » (jamais un 2e « Scénario 1 » sous le libellé)', S.ligneBoiteDebutant(F, [{ sc: un, sv: { cle: 'avant' } }], H3, DEB.boite, P) === 'Scénario du matin : en cours (en direct) ▸', S.ligneBoiteDebutant(F, [{ sc: un, sv: { cle: 'avant' } }], H3, DEB.boite, P));
   const renvois = ['large', 'incomplet'].map(cle => t(S.ligneBoiteDebutant(F, [{ sc: un, sv: { cle } }], H3, DEB.boite, P)));
   check('bougies trop larges, historique trop court : un renvoi, SANS marque (rien n’est calculé)', renvois.every(l => l.length <= DEB.boite && !/\((en direct|journal)\)/.test(l)) && /à voir en 15 min ou 1 h/.test(renvois[0]) && /données manquantes/.test(renvois[1]), renvois);
   const jn = Object.assign({}, un, { statut: '✅' });
@@ -378,19 +378,21 @@ titre('6 bis. Débutant : une ligne d’état marquée, un libellé court, une b
   for (const sc of F.scenarios) for (const fl of [null, '↑', '↓']) for (const sv of [null, { cle: 'cible', k: 1 }]) for (const max of [DEB.scenario, 20]) libs.push([sc.rang, fl, max, t(S.libelleDebutant(sc, sv, max, null, 0, fl))]);
   check('libellé du scénario : ≤ ' + DEB.scenario + ' caractères, une flèche au plus (hors de la vue, la flèche de tête remplace celle du sens)',
     libs.every(([, , max, l]) => l.length <= Math.max(max, 9) && (l.match(/[↑↓]/g) || []).length <= 1) && libs.every(([, , max, l]) => max < DEB.scenario || l.length <= DEB.scenario), libs.filter(([, , max, l]) => l.length > DEB.scenario || (l.match(/[↑↓]/g) || []).length > 1));
-  check('libellé : « Scénario 1 : vers 86 500 $ ↑ », après la 1re cible « Scénario 1 : ensuite 87 200 $ ↑ » ; range « Scénario 3 : reste 85 600–86 400 »',
+  check('libellé : « Scénario 1 : vers 86 500 $ ↑ », après la 1re cible « Scénario 1 : ensuite 87 200 $ ↑ » ; range « Scénario 3 : 85 600 – 86 400 $ » (avec son unité)',
     S.libelleDebutant(un, null, DEB.scenario) === 'Scénario 1 : vers 86 500 $ ↑' && S.libelleDebutant(un, { cle: 'cible', k: 1 }, DEB.scenario) === 'Scénario 1 : ensuite 87 200 $ ↑'
-    && S.libelleDebutant(F.scenarios[2], null, DEB.scenario) === 'Scénario 3 : reste 85 600–86 400' && S.libelleDebutant(un, null, DEB.scenario, null, 0, '↑') === '↑ Scénario 1 : vers 86 500 $',
+    && S.libelleDebutant(F.scenarios[2], null, DEB.scenario) === 'Scénario 3 : 85 600 – 86 400 $' && S.libelleDebutant(un, null, DEB.scenario, null, 0, '↑') === '↑ Scénario 1 : vers 86 500 $',
     [S.libelleDebutant(un, null, DEB.scenario), S.libelleDebutant(F.scenarios[2], null, DEB.scenario), S.libelleDebutant(un, null, DEB.scenario, null, 0, '↑')]);
   // La bulle : chaque scénario en mots, ses origines sans jargon, aucun pourcentage hors la marge.
   const bul = [];
   for (const sc of F.scenarios) for (const sv of SV) { bul.push(t(S.ligneDebutant(sc, sv))); bul.push(...t(S.explicationDebutant(sc, sv, P, {}))); }
   bul.push(t(S.enteteDebutant(F, P, H3)), t(S.enteteDebutant(null, P, H3)));
-  const sales = bul.filter(x => G.motsBannis(x).length || /%/.test(x.replace(/±\s*[\d,]+\s*%/g, '')) || /hasard|\bUTC\b/i.test(x));
-  check(`${bul.length} textes de bulle : aucun mot banni, ni UTC, ni pourcentage (hors la marge « ± N % »), ni base du hasard`, !sales.length, sales.slice(0, 4));
+  const sales = bul.filter(x => G.motsBannis(x).length || /%/.test(x) || /hasard|\bUTC\b/i.test(x));
+  check(`${bul.length} textes de bulle : aucun mot banni, ni UTC, ni pourcentage (pas même la marge d’une zone : dite en dollars, choix 1B), ni base du hasard`, !sales.length, sales.slice(0, 4));
   check('ligne de bulle : « 1. Le prix va vers 86 500 $ puis 87 200 $, sans toucher 85 500 $ avant — en cours (en direct) »', S.ligneDebutant(un, { cle: 'avant' }) === '1. Le prix va vers 86 500 $ puis 87 200 $, sans toucher 85 500 $ avant — en cours (en direct)', S.ligneDebutant(un, { cle: 'avant' }));
   check('origine sans jargon : « plus haut du 08/10 (83 521), EMA 20 1d » → « plus haut du 08/10, 83 521 » ; « mur de calls (modèle) » → rien', S.origineDebutant('plus haut du 08/10 (83 521), EMA 20 1d') === 'plus haut du 08/10, 83 521' && S.origineDebutant('mur de calls (modèle)') === null, [S.origineDebutant('plus haut du 08/10 (83 521), EMA 20 1d'), S.origineDebutant('mur de calls (modèle)')]);
-  check('en-tête : « Écrits par Claude, une IA, ce matin à ' + P.point + ' (heure de Paris). »', S.enteteDebutant(F, P, H3) === 'Écrits par Claude, une IA, ce matin à ' + P.point + ' (heure de Paris).', S.enteteDebutant(F, P, H3));
+  check('en-tête : « Écrits par Claude, une IA, ce matin, publiés au point de ' + P.point + ' (heure de Paris). »', S.enteteDebutant(F, P, H3) === 'Écrits par Claude, une IA, ce matin, publiés au point de ' + P.point + ' (heure de Paris).', S.enteteDebutant(F, P, H3));
+  const exR = S.explicationDebutant(F.scenarios[2], null, P, {}).join(' ');
+  check('range, bulle : ses bornes élargies en dollars (« sans sortir de 85 343 – 86 659 $ »), aucun « ± N % »', /sans sortir de \d{1,3}(?: \d{3})* – \d{1,3}(?: \d{3})* \$/.test(exR) && !/%/.test(exR), exR);
 }
 
 // ── 7. Dans la page ──

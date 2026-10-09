@@ -163,6 +163,10 @@ const etat = page => page.evaluate(() => {
       check(`${nom} : encadré dans le tracé ${B && B.replie ? '' : '(dans sa moitié haute) '}et dans l'écran`, B && B.x >= e.left && B.x + B.w <= e.xMax + 0.5 && B.y >= e.top
         && B.y + B.h <= e.top + (B.replie ? e.ph : e.ph / 2 + 0.5) && e.bx + B.x + B.w <= e.vw, [B, e.left, e.xMax, e.top, e.ph]);
       const texte = L.join(' ');
+      // Branches « debutant » : ce fichier n'ouvre plus l'encadré dense qu'en Expert (le Débutant
+      // n'a plus d'encadré, une seule ligne). Leurs équivalents Débutant sont dans
+      // tests/test_debutant_page.js : bulles du libellé et de la ligne (« Claude, une IA »,
+      // « sans pourcentage », aucun « % »), aucun « % » sur le tracé, ligne marquée « (en direct) ».
       if (mode === 'debutant') {
         check(`${nom} : le classement est dit de Claude (une IA), sans pourcentage`, /Class(ement de|é par) Claude \((une )?IA\)[^]*[Ss]ans pourcentage/.test(texte), L);
         check(`${nom} : aucun « % » dans l'encadré ni dans les libellés`, !/%/.test(B.lignes.join(' ')) && !e.cibles.some(c => /%/.test(c.titre || '')), L);

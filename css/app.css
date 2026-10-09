@@ -1130,6 +1130,14 @@ html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { orde
 @media (max-width: 480px) {
   /* La variation 24 h répond à « ça monte ou ça baisse ? » : visible aussi sur téléphone. */
   [data-mode="debutant"] .var24 { display: inline-flex; }
+  /* Structure « fenêtres » (bureau95) : l'en-tête ne passe pas à la ligne (le bouton de mode y
+     recouvrait la variation). Le bloc du prix passe, lui, sur deux rangées : la paire et le prix,
+     puis la variation 24 h en entier ; le bouton de mode reste à droite. */
+  html[data-mode="debutant"][data-structure="fenetres"] .header-left { min-width: 0; }
+  /* Tous thèmes : quand la variation ne tient plus à droite du prix (Gazette à 360 px), elle passe
+     sous lui, entière — jamais coupée au bord de l'écran. */
+  html[data-mode="debutant"] .hero-prix { flex-wrap: wrap; row-gap: 4px; }
+  html[data-mode="debutant"][data-structure="fenetres"] .header-right { flex-shrink: 0; }
   [data-mode="debutant"] .kpi-deb { padding: 4px 9px; font-size: 10.5px; }
   html[data-mode="debutant"]:not([data-structure="fenetres"]) .kpis { order: 2; flex: 0 1 auto; }
   html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { order: 3; flex: 1 1 auto; justify-content: flex-end; gap: 4px; }

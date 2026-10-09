@@ -515,16 +515,18 @@ const Scenarios = (function () {
     const it = (items || []).find(i => i.sc.rang === '1') || (items || [])[0];
     if (!it) return 'Scénarios du matin : indisponibles';
     const e = etatCourtDebutant(it.sc, it.sv), corps = e.etat + (e.marque ? ' ' + e.marque : '') + ' ▸';
-    const pre = it.sc.rang === '1' ? ['Scénario 1 de Claude : ', 'Scénario 1 : ', 'Scén. 1 : '] : ['Scénario de la semaine : ', 'Semaine : '];
+    // « Scénario du matin » : le libellé près de la zone dit déjà « Scénario 1 » (deux lignes
+    // « Scénario 1 » l'une sous l'autre se lisaient comme deux scénarios).
+    const pre = it.sc.rang === '1' ? ['Scénario du matin : ', 'Scénario : ', 'Scén. : '] : ['Scénario de la semaine : ', 'Semaine : '];
     return premiere(pre.map(p => p + corps), max, mesure, maxPx);
   }
-  /** Le libellé du scénario près de sa zone (au plus 32) : « Scénario 1 : reste 81 000–83 500 »,
+  /** Le libellé du scénario près de sa zone (au plus 32) : « Scénario 1 : 81 000 – 83 500 $ »,
    *  « Scénario 1 : vers 84 300 $ ↑ », après la 1re cible « Scénario 1 : ensuite 86 000 $ ↑ ».
    *  fleche ('↑' | '↓') : le niveau est hors de la vue. */
   function libelleDebutant(S, sv, max, mesure, maxPx, fleche) {
     const f = fleche ? fleche + ' ' : '', noms = S.rang === 'S' ? ['Semaine', 'Sem.'] : ['Scénario ' + S.rang, 'Scén. ' + S.rang];
     let corps;
-    if (S.forme === 'range') corps = ['reste ' + chiffres(S.range[0]) + '–' + chiffres(S.range[1]), chiffres(S.range[0]) + '–' + chiffres(S.range[1])];
+    if (S.forme === 'range') corps = [chiffres(S.range[0]) + ' – ' + prix(S.range[1]), chiffres(S.range[0]) + '–' + prix(S.range[1]), chiffres(S.range[0]) + '–' + chiffres(S.range[1])];
     else {
       const N = S.cibles.length, k = sv && sv.cle === 'cible' && sv.k > 0 && sv.k < N ? sv.k : 0;
       const ref = k ? S.cibles[k - 1] : fini(S.prixEmission) ? S.prixEmission : S.invalidation !== null ? S.invalidation : S.cibles[0];
@@ -587,26 +589,28 @@ const Scenarios = (function () {
     if (!F || F.etat !== 'ok') return 'Scénarios du matin de Claude, une IA.';
     const t = fini(maintenant) ? maintenant : Date.now(), jour = jourParis(F.emis), auj = jourParis(t);
     const point = P && P.point ? P.point : heureParis(F.emis);
-    return 'Écrits par Claude, une IA, ' + (jour === auj ? 'ce matin' : 'le ' + jour) + (point ? ' à ' + point : '') + ' (heure de Paris).';
+    // L'heure du POINT (la publication) ; celle de l'écriture de chaque scénario est dans sa bulle (« Écrit le … à … »).
+    return 'Écrits par Claude, une IA, ' + (jour === auj ? 'ce matin' : 'le ' + jour) + (point ? ', publiés au point de ' + point : '') + ' (heure de Paris).';
   }
   /** L'explication d'un scénario en Débutant (bulle) : ce qu'il dit, ses zones, quand il a été
    *  écrit (heure de Paris), son suivi en direct, le sens du rang. Les origines et l'énoncé de
    *  Claude n'y passent que sans jargon (origineDebutant). La base du hasard reste en Expert. */
   function explicationDebutant(S, sv, P, ctx) {
-    const c = ctx || {}, out = [], m = nb(S.marge) + ' %';
+    // Choix 1B : aucun pourcentage en Débutant, pas même la marge des zones — elles sont dites en dollars.
+    const c = ctx || {}, out = [];
     const z = v => { const [a, b] = zone(v, S.marge); return chiffres(a) + ' – ' + prix(b); };
     const avecO = v => { const o = origineDebutant(origine(S, v)); return prix(v) + (o ? ' (' + o + ')' : ''); };
     if (S.forme === 'chemin') {
       out.push('Ce scénario se lit : le prix touche ' + S.cibles.map(avecO).join(', puis ') + (S.invalidation !== null ? ', sans toucher avant ' + avecO(S.invalidation) : '') + '.');
       if (S.invalidation !== null) out.push(prix(S.invalidation) + ' est l’invalidation : si le prix y arrive avant la dernière cible, le scénario ne tient plus (zone hachurée pendant le survol).');
-      out.push('Chaque niveau est une zone (le niveau ± ' + m + ') : ' + S.cibles.map((v, k) => 'cible ' + (k + 1) + ' : ' + z(v)).join(' ; ') + (S.invalidation !== null ? ' ; invalidation : ' + z(S.invalidation) : '') + '.');
+      out.push('Chaque niveau se lit comme une zone autour de son prix : ' + S.cibles.map((v, k) => 'cible ' + (k + 1) + ' : ' + z(v)).join(' ; ') + (S.invalidation !== null ? ' ; invalidation : ' + z(S.invalidation) : '') + '.');
     } else {
-      out.push('Ce scénario se lit : le prix reste entre ' + avecO(S.range[0]) + ' et ' + avecO(S.range[1]) + ', sans sortir de ses bornes ± ' + m + ' (de ' + prix(S.zones.bas) + ' à ' + prix(S.zones.haut) + ') jusqu’à la fin.');
+      out.push('Ce scénario se lit : le prix reste entre ' + avecO(S.range[0]) + ' et ' + avecO(S.range[1]) + ', sans sortir de ' + chiffres(S.zones.bas) + ' – ' + prix(S.zones.haut) + ' jusqu’à la fin.');
     }
     if (propre(S.enonce)) out.push('Les mots de Claude : « ' + S.enonce + ' ».');
     const emP = heureParis(S.emis), finP = heureParis(S.fin);
     out.push('Écrit le ' + jourParis(S.emis) + (emP ? ' à ' + emP : '') + (fini(S.prixEmission) ? ', quand le prix valait ' + prix(S.prixEmission) : '') + ' ; valable jusqu’au ' + jourParis(S.fin) + (finP ? ' à ' + finP : '') + ' (heures de Paris).');
-    out.push('Suivi en direct sur ce graphique : ' + etatLongDebutant(S, sv) + '. Un affichage : la note officielle est celle du journal, faite le lendemain.');
+    out.push('Suivi en direct sur ce graphique : ' + etatLongDebutant(S, sv) + ' (un simple affichage).');
     if (S.statut !== '⏳') { const e = etatCourtDebutant(S, sv); out.push('Note du journal : ' + e.etat + '.'); }
     if (propre(S.note)) out.push('Note du journal : ' + S.note);
     out.push(SENS_RANG[S.rang]);

@@ -168,6 +168,14 @@ const dessin = page => page.evaluate(() => {
     sous: geo.sous.map(s => s.cle),
     valeurs: D ? { choix: { dessus: D.choix.dessus.map(n => n.p), dessous: D.choix.dessous.map(n => n.p) }, regime: D.regime ? D.regime.cle : null } : null,
     badge: isNum(live) ? { x: xAxe, y: geoPrix.top + geoPrix.ph * (1 - (live - geoPrix.minP) / geoPrix.range) - 10, w: 75, h: 20 } : null,
+    yLive: isNum(live) ? geoPrix.top + geoPrix.ph * (1 - (live - geoPrix.minP) / geoPrix.range) : null,
+    // Les bougies les plus récentes (le quart de la vue, au moins 3) : leur boîte haut–bas.
+    recentes: (() => {
+      const P = geoPrix, n = P.ve - P.vs, k = Math.max(3, Math.ceil(n * 0.25)), y = p => P.top + P.ph * (1 - (p - P.minP) / P.range), out = [];
+      for (let i = P.ve - k; i < P.ve; i++) { const c = candles[i]; out.push({ x: P.left + P.gap * (i - P.vs), y: y(c.high), w: Math.max(1, P.gap * 0.8), h: y(c.low) - y(c.high) }); }
+      return out;
+    })(),
+    bandes: guideEtat && guideEtat.deb ? guideEtat.niveaux.filter(L => L.visible).map(L => ({ p: L.niv.p, yH: L.yH, yB: L.yB, yD: guideEtat.yDe(L.niv.p) })) : [],
   };
 });
 const chevauche = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -193,9 +201,22 @@ async function controlerEcran(o, nom, opts = {}) {
   check(`${nom} : limites de caractères (phrase ${etroit ? 48 : 90}, repère ${etroit ? 18 : 26}, scénario 32, forme 24, ligne ${etroit ? 40 : 48})`, !trop.length, trop);
   const dehors = e.items.filter(i => !i.rect || i.rect.x < 16 - 0.5 || i.rect.x + i.rect.w > e.xAxe + 0.5 || i.rect.y < 0 || i.rect.y + i.rect.h > e.mainH - 20 + 0.5);
   check(`${nom} : chaque texte tient dans le tracé, en pixels`, !dehors.length, dehors);
-  // 3. Mots.
-  const motsT = e.items.map(i => [i.texte, bannis(i.texte), CONSEIL.test(i.texte), FORMATS_EXPERT.some(re => re.test(i.texte))]).filter(x => x[1].length || x[2] || x[3]);
-  check(`${nom} : aucun mot banni, aucun conseil, aucun format Expert sur le tracé`, !motsT.length, motsT);
+  // 3. Mots (et aucun pourcentage sur le tracé : choix 1B, rien qui se lise comme une probabilité).
+  const motsT = e.items.map(i => [i.texte, bannis(i.texte), CONSEIL.test(i.texte), FORMATS_EXPERT.some(re => re.test(i.texte)), /%/.test(i.texte)]).filter(x => x[1].length || x[2] || x[3] || x[4]);
+  check(`${nom} : aucun mot banni, aucun conseil, aucun format Expert, aucun « % » sur le tracé`, !motsT.length, motsT);
+  // Chaque repère est posé de SON côté du prix live et contre son trait (pas au bord d'une bande lointaine).
+  if (e.yLive !== null) {
+    const cote = e.items.filter(i => i.role === 'niveau' && i.rect).map(i => ({ t: i.texte, p: +nombres(i.texte).filter(x => x.length >= 4)[0], r: i.rect, fl: /[↑↓]/.test(i.texte) }))
+      .filter(n => !n.fl && ((n.p > e.live && n.r.y + n.r.h > e.yLive + 0.5) || (n.p < e.live && n.r.y < e.yLive - 0.5)));
+    check(`${nom} : le libellé du repère du haut est au-dessus de la ligne du prix, celui du bas au-dessous`, !cote.length, { cote, yLive: e.yLive });
+    const loin = e.items.filter(i => i.role === 'niveau' && i.rect && !/[↑↓]/.test(i.texte)).map(i => ({ t: i.texte, p: +nombres(i.texte).filter(x => x.length >= 4)[0], r: i.rect }))
+      .map(n => Object.assign(n, { b: e.bandes.find(b => Math.abs(b.p - n.p) < 0.5) })).filter(n => !n.b || Math.min(Math.abs(n.r.y - n.b.yD), Math.abs(n.r.y + n.r.h - n.b.yD)) > 40);
+    check(`${nom} : chaque libellé de repère à moins de 40 px du trait du prix qu'il nomme`, !loin.length, loin);
+  }
+  const surRecentes = e.items.filter(i => (i.role === 'scenario' || i.role === 'forme') && i.rect && e.recentes.some(c => chevauche(i.rect, c)));
+  check(`${nom} : ni le libellé du scénario ni celui de la forme sur les bougies les plus récentes`, !surRecentes.length, surRecentes);
+  const dansBande = e.items.filter(i => (i.role === 'scenario' || i.role === 'forme') && i.rect && e.bandes.some(b => i.rect.y < b.yB + 3 && i.rect.y + i.rect.h > b.yH - 3));
+  check(`${nom} : ni le libellé du scénario ni celui de la forme dans la bande d'un repère`, !dansBande.length, { dansBande, bandes: e.bandes });
   // 4. Chevauchements.
   const paires = [];
   for (let a = 0; a < e.items.length; a++) for (let b = a + 1; b < e.items.length; b++) if (e.items[a].rect && e.items[b].rect && chevauche(e.items[a].rect, e.items[b].rect)) paires.push([e.items[a].texte, e.items[b].texte]);
@@ -260,6 +281,7 @@ async function viser(o, role, tactile, k) {
     const c = (G && G.survol) || (S && S.survol) || null;
     const b = (G && G.survol && G.bulle) || (S && S.survol && S.bulle) || null;
     return { titre: c ? c.titre : null, prio: c ? c.prio : null, scenario: c ? c.scenario || null : null, corps: b ? b.corps.join(' ') : '', curseur: canvas.style.cursor,
+      police: b ? b.police : null, dansTrace: b ? b.y >= 0 && b.y + b.h <= geo.mainH && b.x >= 0 && b.x + b.w <= canvas.width / devicePixelRatio : null,
       ohlcv: window.__ft.some(e => e.c === 'chartCalque' && /^(Début|Haut|Bas|Fin|Volume)$|^[OHLC] /.test(e.t)) };
   });
   return Object.assign(r, { vise: p.texte });
@@ -325,10 +347,15 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         const bx = 20, by = e.mainH - 30;   // un point neutre (bas à gauche du tracé) pour quitter
         for (const [role, k] of [['niveau', 0], ['niveau', 1], ['phrase', 0], ['scenario', 0], ['boite', 0]]) {
           const r = await viser(o, role, tactile, k);
-          if (!r) { if (role !== 'niveau' || k === 0) check(`${nom} : ${role} à viser`, (role === 'scenario' && prev !== 'ouvert') || role === 'boite', role); continue; }
+          // Une cible absente : le libellé du scénario 1 quand il est fermé ; la ligne seulement quand
+          // elle a cédé sa place (forme et scénario posés) — jamais en silence.
+          if (!r) { if (role !== 'niveau' || k === 0) check(`${nom} : ${role} à viser`, (role === 'scenario' && prev !== 'ouvert') || (role === 'boite' && !!(e.scen && e.scen.boite && e.scen.boite.cede)), { role, boite: e.scen && e.scen.boite }); continue; }
+          if (tactile) check(`${nom} : ${role}${k ? ' ' + (k + 1) : ''} : bulle en ${r.police} px (au moins 12 au téléphone), entière dans le tracé`, r.police >= 12 && r.dansTrace, r);
           const ok = { titre: !!r.titre, ohlcv: !r.ohlcv, curseur: tactile || r.curseur === 'pointer', mots: bannisBulle(r.corps + ' ' + r.titre), conseil: CONSEIL.test(r.corps), hasard: /hasard/i.test(r.corps) };
           let detail = true;
-          if (role === 'niveau') detail = /^Maintenant : /.test(r.corps) && /\(\d+,\d\d %\)|le prix est dedans/.test(r.corps) && /Si le prix finit|Aucun repère proche/.test(r.corps) && r.titre === r.vise;
+          if (role === 'niveau') detail = /^Maintenant : /.test(r.corps) && /\(\d+,\d\d %\)|le prix est dedans/.test(r.corps) && /Si le prix finit|Aucun repère proche/.test(r.corps)
+            // Le titre : le nom entier du repère et le prix de son libellé.
+            && nombres(r.vise).filter(x => x.length >= 4).every(x => nombres(r.titre).includes(x)) && / · \d/.test(r.titre);
           if (role === 'phrase') detail = (r.corps.match(/Si le prix finit|Aucun repère proche/g) || []).length >= 2;
           if (role === 'scenario') detail = /^Scénario 1 de Claude$/.test(r.titre) && /\b2\. /.test(r.corps) && /\b3\. /.test(r.corps) && /sans pourcentage/.test(r.corps) && /pas une promesse ni un conseil/.test(r.corps);
           if (role === 'boite') detail = /\b1\. /.test(r.corps) && /\b2\. /.test(r.corps) && /\b3\. /.test(r.corps) && /journal/.test(r.corps);
@@ -531,7 +558,8 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         const c = canvas, box = c.parentElement.getBoundingClientRect();
         return { mode: document.documentElement.getAttribute('data-mode'), kpis: [...document.querySelectorAll('#cycle .kpi')].filter(k => k.getBoundingClientRect().width > 0).length,
           strat: vis(document.getElementById('stratSection')), puces: [...document.querySelectorAll('#indicatorBar label[id^="lbl_"]')].filter(vis).length,
-          taille: [c.width, c.height], attendu: [Math.round(c.clientWidth * devicePixelRatio), Math.round(c.clientHeight * devicePixelRatio)], liveBtn: vis(document.getElementById('liveBtn')) };
+          taille: [c.width, c.height], attendu: [Math.round(c.clientWidth * devicePixelRatio), Math.round(c.clientHeight * devicePixelRatio)], liveBtn: vis(document.getElementById('liveBtn')),
+          kpisDom: document.querySelectorAll('#cycle .kpi').length, aria: c.getAttribute('aria-label') };
       });
       check('M → data-mode="expert"', exp.mode === 'expert' && x.mode === 'expert', exp);
       check('Expert : le badge du régime, « Et ensuite ? » (2 boîtes ou une commune), le compteur', x.cibles.some(c => /^Tendance|^Sans tendance|^Régime/.test(c.titre || '')) && x.chemins && x.chemins.boites.length >= 1 && x.trace.some(t => /^\d+\/\d+ · /.test(t)), { cibles: x.cibles.map(c => c.titre), chemins: x.chemins, trace: x.trace.slice(0, 8) });
@@ -539,7 +567,8 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         x.cibles.filter(c => c.prio === 1).length >= 2 && x.scen && x.scen.boite && !x.scen.boite.deb && x.scen.boite.lignes.length > 1 && /^Scénarios du matin · /.test(x.scen.boite.lignes[0])
         && (x.scen.libelles.some(l => l.rang === '2') || x.scen.boite.lignes.some(l => /^2\b|2\./.test(l)) || x.scen.boite.lignes.some(l => /\| 2/.test(l)) || x.scen.boite.lignes.length >= 3), x.scen);
       check('Expert : le repère de publication est dessiné', x.tous.some(t => /fichier .*UTC/.test(t)), x.tous.filter(t => /UTC/.test(t)));
-      check('Expert : 8 chiffres clés de largeur > 0, le Grid Bot, les puces d\'indicateurs, le bouton ⚡', exp.kpis >= 3 && exp.strat && exp.puces === 12 && exp.liveBtn, exp);
+      check('Expert : les 8 chiffres clés dans la bande (au moins 3 de largeur > 0 à cette taille), le Grid Bot, les puces d\'indicateurs, le bouton ⚡', exp.kpisDom === 8 && exp.kpis >= 3 && exp.strat && exp.puces === 12 && exp.liveBtn, exp);
+      check('Expert : le graphique n\'a plus pour nom la phrase du Débutant (aria-label retiré)', exp.aria === null, exp.aria);
       check('Expert : le graphique remis en page (taille du canvas = son conteneur × devicePixelRatio)', exp.taille[0] === exp.attendu[0] && exp.taille[1] === exp.attendu[1], exp);
       check('Expert : un sous-graphe (Volume) revient', x.sous.includes('vol'), x.sous);
       check('mêmes valeurs dans les deux modes : niveaux choisis, régime, états des scénarios', JSON.stringify(d1.valeurs) === JSON.stringify(x.valeurs) && JSON.stringify(d1.scen.items) === JSON.stringify(x.scen.items), { deb: [d1.valeurs, d1.scen.items], exp: [x.valeurs, x.scen.items] });
@@ -570,6 +599,143 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       await o.page.waitForTimeout(2500);
       const n2 = await o.page.evaluate(() => window.__n);
       check('au repos, sans donnée nouvelle (prix inchangé) : aucun dessin', n2.dc === 0 && n2.cq === 0, n2);
+      await o.ctx.close();
+    }
+
+    // ── Prix DANS une bande de l'Expert (plusieurs prix fusionnés) : un repère de chaque côté ──
+    // Constat de revue : la bande « du haut » était nommée par un prix situé SOUS le prix, et son
+    // libellé posé au bord de la bande, loin du trait qu'il nommait.
+    titre('Prix dans une bande fusionnée : un repère au-dessus, un au-dessous, contre leurs traits');
+    for (const [vue, tactile, itv] of [[{ width: 1440, height: 900 }, false, '1h'], [{ width: 390, height: 844 }, true, '1h'], [{ width: 1440, height: 900 }, false, '1m']]) {
+      const o = await ouvrir(nav, { vue, tactile });
+      await o.page.click('#int_' + itv); await o.page.waitForTimeout(1500);
+      // Le prix live posé entre deux prix d'une même bande de l'Expert (s'il en existe une).
+      const pose = await o.page.evaluate(() => {
+        const D = guideDonnees();
+        const b = D && D.choix.dessus.concat(D.choix.dessous).find(n => n.raisons.length >= 2 && n.pMax - n.pMin > 1);
+        if (!b) return null;
+        const ps = b.raisons.map(r => r.p).sort((x, y) => x - y);
+        livePrice = (ps[0] + ps[1]) / 2; drawChart(); dessinerCalque();
+        return { live: livePrice, prix: ps };
+      });
+      const nom = 'bande fusionnée · ' + vue.width + ' · ' + itv;
+      if (!pose) { check(`${nom} : une bande de plusieurs prix existe dans ce montage`, false, null); await o.ctx.close(); continue; }
+      const e = await controlerEcran(o, nom, { sansScenarios: true });
+      const niv = e.items.filter(i => i.role === 'niveau').map(i => +nombres(i.texte).filter(x => x.length >= 4)[0]);
+      check(`${nom} : prix ${Math.round(pose.live)} dans la bande ${pose.prix.join(' / ')} → un repère strictement au-dessus et un strictement au-dessous`, niv.some(p => p > pose.live) && niv.some(p => p < pose.live), { niv, pose });
+      check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
+    // ── Téléphone, prix dans un repère, tendance nette : la phrase garde son verbe ──
+    titre('Téléphone : « Le prix monte et touche … » (le verbe reste)');
+    for (const cle of ['hausse', 'baisse']) {
+      const o = await ouvrir(nav, { vue: { width: 390, height: 844 }, tactile: true });
+      const r = await o.page.evaluate(cle => {
+        const r0 = Guide.regime;
+        Guide.regime = (...a) => Object.assign({}, r0(...a), { cle });
+        memoCache.clear(); debHautMemo = null; drawChart();
+        const L = guideEtat.niveaux[0];
+        livePrice = L.niv.p + (L.niv.dessus ? -1 : 1); drawChart(); dessinerCalque();
+        const ph = debEtat.items.find(i => i.role === 'phrase');
+        const out = { phrase: ph && ph.texte, bulle: guideEtat.ciblePhrase.texte.join(' '), regime: guideEtat.D.regime.cle };
+        Guide.regime = r0; memoCache.clear(); debHautMemo = null; drawChart();
+        return out;
+      }, cle);
+      const verbe = cle === 'hausse' ? 'monte' : 'baisse';
+      check(`390 px, ${cle}, prix dans un repère : « ${r.phrase} » (≤ 48, avec « ${verbe} » et « touche »)`, r.phrase && r.phrase.length <= 48 && r.phrase.includes(verbe) && /touche/.test(r.phrase), r);
+      check(`390 px, ${cle} : la bulle de la phrase explique « ${verbe} », un mot qui est à l'écran`, new RegExp('« ' + verbe.charAt(0).toUpperCase() + verbe.slice(1) + ' »').test(r.bulle), r.bulle);
+      await o.ctx.close();
+    }
+
+    // ── Bougies dans une bande : leurs quatre valeurs restent lisibles au survol ──
+    titre('Survol d’une bougie dans une bande : réticule et valeurs de la bougie');
+    {
+      const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
+      const p = await o.page.evaluate(() => {
+        const E = guideEtat, P = geoPrix, b = canvas.getBoundingClientRect();
+        const L = E.niveaux.find(x => x.visible);
+        if (!L) return null;
+        // Un point de la bande, hors de toute étiquette, sur une bougie de la vue.
+        for (let i = P.ve - 1; i > P.vs; i--) {
+          const x = P.left + P.gap * (i - P.vs) + P.gap * 0.4, y = (L.yH + L.yB) / 2;
+          if (!guideCibleSous(x, y, geo.mainH, true) && guideCibleSous(x, y, geo.mainH)) return { x: b.left + x, y: b.top + y };
+        }
+        return null;
+      });
+      if (p) {
+        await o.page.evaluate(() => { window.__ft = []; window.__ftOn = true; });
+        await o.page.mouse.move(p.x - 5, p.y); await o.page.mouse.move(p.x, p.y, { steps: 2 }); await o.page.waitForTimeout(150);
+        const r = await o.page.evaluate(() => { window.__ftOn = false; return { ohlcv: window.__ft.some(e => e.c === 'chartCalque' && /^Début$/.test(e.t)), bulle: !!(guideEtat.survol && guideEtat.bulle), curseur: canvas.style.cursor }; });
+        check('survol d’une bande hors étiquette : les valeurs de la bougie (« Début », « Haut »…) ET la bulle du repère, à côté', r.ohlcv && r.bulle && r.curseur === 'crosshair', r);
+      } else check('survol d’une bande : un point de bande hors étiquette existe', false, null);
+      await o.ctx.close();
+    }
+
+    // ── Stockage bloqué : la touche M et l'astuce suivent quand même ──
+    titre('Stockage bloqué (navigation privée stricte)');
+    {
+      const ctx = await nav.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+      await ctx.clock.install({ time: maintenant() });
+      await ctx.addInitScript(() => {
+        const bloque = () => { throw new DOMException('bloqué', 'SecurityError'); };
+        for (const k of ['getItem', 'setItem', 'removeItem', 'clear']) Storage.prototype[k] = bloque;
+      });
+      const o = await ouvrir(nav, { ctx });
+      const etat = () => o.page.evaluate(() => ({ html: document.documentElement.getAttribute('data-mode'), deb: debutant(), items: debEtat ? debEtat.items.length : null, astuce: !document.getElementById('astuceTap').hidden }));
+      const e0 = await etat();
+      await o.page.keyboard.press('m'); await o.page.waitForTimeout(400);
+      const e1 = await etat();
+      await o.page.keyboard.press('m'); await o.page.waitForTimeout(400);
+      const e2 = await etat();
+      check('stockage bloqué : Débutant au départ ; M → Expert partout (page ET graphique) ; 2e M → Débutant', e0.html === 'debutant' && e0.deb && e1.html === 'expert' && !e1.deb && e1.items === null && e2.html === 'debutant' && e2.deb && e2.items > 0, { e0, e1, e2 });
+      await o.page.clock.runFor(9000); await o.page.waitForTimeout(100);
+      const a1 = await o.page.evaluate(() => { drawChart(); astuceMontrer(); return !document.getElementById('astuceTap').hidden; });
+      check('stockage bloqué : l’astuce, cachée au bout de 8 s, ne revient pas au dessin suivant', !a1, a1);
+      check('stockage bloqué : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
+      await ctx.close();
+    }
+
+    // ── Clavier : la pastille « Infos du marché » s'ouvre à Entrée ; titre du panneau ──
+    titre('Pastille « Infos du marché » au clavier ; titre du panneau des cartes');
+    for (const [vue, tactile] of [[{ width: 1440, height: 900 }, false], [{ width: 390, height: 844 }, true]]) {
+      for (const mode of ['debutant', 'expert']) {
+        const o = await ouvrir(nav, { vue, tactile, mode });
+        const nom = vue.width + ' · ' + mode;
+        if (mode === 'debutant') {
+          const a = await o.page.evaluate(() => { const k = document.querySelector('#cycle .kpi-deb'); k.focus(); return { focus: document.activeElement === k, aria: k.getAttribute('aria-label') }; });
+          await o.page.keyboard.press('Enter'); await o.page.waitForTimeout(500);
+          const ouvert = await o.page.evaluate(() => (innerWidth <= 768 ? getComputedStyle(document.getElementById('marketModal')).display !== 'none' : feedVisible));
+          check(`${nom} : la pastille prend le focus, son nom accessible commence par « Infos du marché », Entrée ouvre les cartes`, a.focus && /^Infos du marché/.test(a.aria || '') && ouvert, Object.assign(a, { ouvert }));
+        }
+        // Le titre du panneau des cartes (téléphone) : la même police que celui du panneau « live ».
+        const t = await o.page.evaluate(() => {
+          const vis = el => el.getClientRects().length > 0 || getComputedStyle(el).display !== 'none';
+          const m = [...document.querySelectorAll('#marketModal .modal-titre')].find(el => getComputedStyle(el).display !== 'none');
+          const l = document.querySelector('#liveModal .modal-titre'), c = el => { const cs = getComputedStyle(el); return [cs.fontSize, cs.fontWeight]; };
+          return { texte: m && m.textContent, m: m && c(m), l: l && c(l) };
+        });
+        check(`${nom} : titre des cartes « ${t.texte} », même taille et graisse que le titre du panneau live (${t.l})`, t.m && t.l && t.m[0] === t.l[0] && t.m[1] === t.l[1] && (mode === 'expert' ? t.texte === 'Marché live' : t.texte === 'Infos du marché'), t);
+        await o.ctx.close();
+      }
+    }
+
+    // ── L'en-tête au téléphone, 11 thèmes : prix, variation, bouton de mode, pastille sans chevauchement ──
+    titre('En-tête au téléphone, 11 thèmes (390 et 360 px)');
+    for (const theme of ['aero', 'aero-nuit', 'kala', 'neon', 'codex', 'bureau95', 'bureau95-contraste', 'gare', 'gazette', 'cyanotype', 'diazo']) for (const w of [390, 360]) {
+      const o = await ouvrir(nav, { vue: { width: w, height: 800 }, theme, tactile: true });
+      const r = await o.page.evaluate(() => {
+        const vis = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden' && el.getBoundingClientRect().width > 0;
+        const rs = ['#price', '#var24', '#modeBtn', '#cycle .kpi-deb'].map(q => [q, document.querySelector(q)]).filter(([, e]) => vis(e)).map(([q, e]) => ({ q, r: e.getBoundingClientRect().toJSON() }));
+        const ch = [];
+        for (let a = 0; a < rs.length; a++) for (let b = a + 1; b < rs.length; b++) { const A = rs[a].r, B = rs[b].r; if (A.left < B.right - 0.5 && A.right > B.left + 0.5 && A.top < B.bottom - 0.5 && A.bottom > B.top + 0.5) ch.push(rs[a].q + ' × ' + rs[b].q); }
+        const hp = document.querySelector('.hero-prix'), v = document.getElementById('var24');
+        const ph = debEtat && debEtat.items.find(i => i.role === 'phrase');
+        return { ch, vus: rs.map(x => x.q), debord: hp ? hp.scrollWidth - hp.clientWidth : 0, var24: v.textContent, v24: v.getBoundingClientRect().toJSON(), vw: innerWidth, phrase: ph && ph.texte };
+      });
+      check(`${theme} · ${w} : la phrase entière, jamais coupée (« ${r.phrase} »)`, r.phrase && !/…$/.test(r.phrase) && /\.$/.test(r.phrase), r.phrase);
+      check(`${theme} · ${w} : prix, variation 24 h (« ${r.var24} »), bouton de mode et pastille visibles, sans chevauchement ni débordement`,
+        !r.ch.length && r.debord <= 1 && ['#price', '#var24', '#modeBtn', '#cycle .kpi-deb'].every(q => r.vus.includes(q)) && r.v24.right <= r.vw + 0.5, r);
       await o.ctx.close();
     }
 

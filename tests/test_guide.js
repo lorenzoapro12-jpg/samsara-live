@@ -478,8 +478,9 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     libs.push([cle, fl, t(G.libelleDebutant(n, { max: DEB.niveau, fleche: fl })), t(G.libelleDebutant(n, { max: DEB.niveauEtroit, fleche: fl }))]);
   }
   check('libellé d’un repère : ≤ ' + DEB.niveau + ' caractères, ≤ ' + DEB.niveauEtroit + ' en étroit, toujours avec son prix', libs.every(([, , a, b]) => a.length <= DEB.niveau && b.length <= DEB.niveauEtroit && /85 640/.test(a) && /85 640/.test(b)), libs);
-  const mots = libs.filter(([cle, , , b]) => !b.includes(G.NOMS_DEBUTANT[cle === 'put_wall' ? 'options' : cle][1]));
-  check('prix BTC (5 chiffres), étroit : le mot d’origine reste (« ↓Bas d’hier 85 640 »), flèche collée', !mots.length && libs.find(l => l[0] === 'hier_bas' && l[1] === '↓')[3] === '↓Bas d’hier 85 640', mots);
+  const mots = libs.filter(([cle, , , b]) => { const N = G.NOMS_DEBUTANT[cle === 'put_wall' ? 'options' : cle]; return !b.includes(N[1]) && !b.includes(N[3]); });
+  check('prix BTC (5 chiffres), étroit : le mot d’origine reste (« ↓Bas hier 85 640 $ », « ↑Max hier 85 640 $ »), flèche collée, toujours avec « $ »', !mots.length && libs.find(l => l[0] === 'hier_bas' && l[1] === '↓')[3] === '↓Bas hier 85 640 $'
+    && libs.find(l => l[0] === 'hier_haut' && l[1] === '↑')[3] === '↑Max hier 85 640 $' && libs.every(l => / \$$/.test(l[2]) && / \$$/.test(l[3])), mots.concat(libs.filter(l => !/ \$$/.test(l[3]))));
   check('libellé d’un repère : aucun mot banni du Débutant', libs.every(l => !G.motsBannis(l[2]).length && !G.motsBannis(l[3]).length), libs.filter(l => G.motsBannis(l[2] + ' ' + l[3]).length));
   // 2. La raison qui nomme une bande : jamais une option quand une mesure est dans la bande ; sinon la plus proche du prix de la bande.
   const nOpt = { p: 85600, pMin: 85600, pMax: 85640, raisons: [Rd('put_wall', 85600, { strike: 85600 }), Rd('hier_bas', 85640)] };
@@ -488,6 +489,28 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     && G.raisonPrincipale(N(Rd('call_wall', 87000, { strike: 87000 }))).cle === 'call_wall' && G.raisonPrincipale(null) === null, [G.raisonPrincipale(nOpt).cle, G.raisonPrincipale(nDeux).cle]);
   check('choixDebutant : une bande faite seulement d’options passe après une mesure du même côté', G.choixDebutant({ dessus: [N(Rd('call_wall', 86500, { strike: 86500 })), N(Rd('hier_haut', 86700))], dessous: [] }).dessus.raisons[0].cle === 'hier_haut'
     && G.choixDebutant({ dessus: [N(Rd('call_wall', 86500, { strike: 86500 }))], dessous: [] }).dessus.raisons[0].cle === 'call_wall' && G.choixDebutant(null).dessus === null);
+  // 2 bis. Les repères du Débutant, choisis au prix LIVE (constat de revue : une bande fusionnée qui
+  // enjambait le prix nommait « au-dessus » un prix situé en dessous).
+  {
+    const bA = N(Rd('hier_bas', 85600), Rd('sr', 85602), Rd('put_wall', 85643, { strike: 85643 })), bB = N(Rd('h24_bas', 85887), Rd('hier_haut', 86133));
+    const reps = G.reperesDe({ dessus: [bB], dessous: [bA] }, 20);
+    const s1 = G.choisirReperes(reps, 86000, 100), s2 = G.choisirReperes(reps, 85620, 100), s3 = G.choisirReperes(reps, 85900, 100);
+    check('repères : une bande qui enjambe le prix donne un repère de chaque côté, chacun strictement de son côté (86 000 → 86 133 au-dessus, 85 887 au-dessous)',
+      s1.dessus.p === 86133 && s1.dessous.p === 85887 && s1.dessus.dessus === true && s1.dessous.dessus === false && G.raisonPrincipale(s1.dessus).cle === 'hier_haut', [s1.dessus && s1.dessus.p, s1.dessous && s1.dessous.p]);
+    check('repères : prix DANS une bande de trois prix (85 620) → au-dessus une mesure (85 887, pas l’option 85 643), au-dessous 85 602 ; le suivant au-delà de chacun',
+      s2.dessus.p === 85887 && s2.dessous.p === 85602 && s2.suivantHaut && s2.suivantHaut.p === 86133 && (!s2.suivantBas || s2.suivantBas.p <= 85502), [s2.dessus && s2.dessus.p, s2.dessous && s2.dessous.p, s2.suivantHaut && s2.suivantHaut.p]);
+    const r5 = G.reperesDe({ dessus: [N(Rd('mur_vente', 82710)), N(Rd('hier_haut', 82890))], dessous: [N(Rd('sr', 82672))] }, 20), s5 = G.choisirReperes(r5, 82680, 75);
+    check('repères : deux prix à moins de l’écart minimal (82 672 et 82 710, prix 82 680 : 38 $ < 75) ne font pas deux repères : le plus proche reste, l’autre côté passe au suivant (82 890)',
+      s5.dessous.p === 82672 && s5.dessus.p === 82890 && s3.dessous.p === 85887 && s3.dessus.p === 86133, [s5.dessus && s5.dessus.p, s5.dessous && s5.dessous.p]);
+    const r2 = G.reperesDe({ dessus: [N(Rd('mur_achat', 86100)), N(Rd('mur_vente', 86300))], dessous: [N(Rd('mur_vente', 85950)), N(Rd('hier_bas', 85800))] }, 20), s4 = G.choisirReperes(r2, 86050, 50);
+    check('repères : un mur d’achat n’est jamais « au-dessus », un mur de vente jamais « au-dessous »', s4.dessus.p === 86300 && s4.dessous.p === 85800, [s4.dessus && s4.dessus.p, s4.dessous && s4.dessous.p]);
+    const r3 = G.reperesDe({ dessus: [N(Rd('hier_haut', 86200), Rd('h24_haut', 86200))], dessous: [] }, 20);
+    check('repères : deux raisons au même prix font un seul repère, nommé par la plus parlante (hier avant 24 h)', r3.length === 1 && r3[0].raisons.length === 2 && G.raisonPrincipale(r3[0]).cle === 'hier_haut', r3);
+    // La phrase garde son verbe sur téléphone quand le prix touche un repère.
+    const enT = s1.dessus, court = [];
+    for (const cle of ['hausse', 'baisse', 'faible', 'incertaine']) court.push([cle, G.phraseDebutant({ prix: 86120, unite: '$', reperes: s1, enTest: enT, regime: { cle }, itv: '15m' }, DEB.phraseEtroit)]);
+    check('phrase au téléphone, prix dans un repère : le verbe du mouvement reste (« Le prix monte et touche 86 133 $. »)', court.every(([cle, t]) => t.length <= DEB.phraseEtroit && t.includes(G.VERBE_DEBUTANT[cle]) && /touche/.test(t)), court);
+  }
   // 3. La phrase : un verbe, ni %, ni heure, ni nom d'indicateur ; « hésite » seulement sans tendance.
   const haut = N(Rd('hier_haut', 86398)), bas = N(Rd('mur_achat', 85900));
   const phr = [];

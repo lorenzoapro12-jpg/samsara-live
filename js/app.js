@@ -418,7 +418,9 @@ const PARAM = {
     // scénario 1, forme, ligne des scénarios), chacun sur une ligne d'au plus N caractères ;
     // « étroit » : un tracé de moins de `etroit` px (téléphone).
     debutant: { items: 5, etroit: 520, phrase: 90, phraseEtroit: 48, niveau: 26, niveauEtroit: 18,
-                scenario: 32, forme: 24, boite: 48, boiteEtroit: 40 },
+                scenario: 32, forme: 24, boite: 48, boiteEtroit: 40,
+                ecartAtr: 0.5,          // deux repères à l'écran : au moins 0,5 × ATR l'un de l'autre
+                marge: 0.07 },          // échelle : 7 % de l'amplitude au-dessus et au-dessous (place des libellés)
   },
   // Scénarios du matin (js/scenarios.js) : les nombres de leur dessin et de leurs mots.
   scenarios: {
@@ -552,6 +554,8 @@ function apresChangementMode(m) {
   if (menu && menu.classList.contains('open')) buildDropdown();
   if (m !== 'expert' && typeof closeLiveModal === 'function') closeLiveModal();
   guideHautMemo = null; scenFlechesMemo = null; debHautMemo = null;
+  // Le nom accessible du graphique est la phrase du Débutant : l'Expert ne l'a pas.
+  if (m === 'expert') { try { canvas.removeAttribute('aria-label'); } catch (e) { /* hors navigateur */ } }
   if (isNum(livePrice)) ecrirePrixEntete(livePrice, isNum(var24Courant) ? var24Courant : NaN);
   astuceMontrer();
   requestAnimationFrame(() => {
@@ -566,8 +570,8 @@ function apresChangementMode(m) {
 // bout de 8 s. Un élément HTML, pas un texte du graphique ; posée là où elle ne couvre aucune
 // étiquette.
 const ASTUCE_CLE = 'samsara-astuce-tap-v1';
-let astuceFin = null;
-function astuceVue() { try { return localStorage.getItem(ASTUCE_CLE) === '1'; } catch (e) { return false; } }
+let astuceFin = null, astuceVueIci = false;   // vue dans cette page (le stockage peut être bloqué)
+function astuceVue() { if (astuceVueIci) return true; try { return localStorage.getItem(ASTUCE_CLE) === '1'; } catch (e) { return false; } }
 function astuceMontrer() {
   const a = document.getElementById('astuceTap');
   if (!a) return;
@@ -596,6 +600,7 @@ function astuceCacher() {
   clearTimeout(astuceFin); astuceFin = null;
   if (!a || a.hidden) return;
   a.hidden = true;
+  astuceVueIci = true;
   try { localStorage.setItem(ASTUCE_CLE, '1'); } catch (e) { /* navigation privée */ }
 }
 
@@ -775,7 +780,7 @@ canvas.addEventListener('mousemove', (e) => {
     canvas.style.cursor = 'ns-resize';
   } else if (!isPanning && !isPriceDrag) {
     // Débutant : une étiquette se désigne (main) ; un test de cible, sans redessiner le graphique.
-    canvas.style.cursor = debutant() && geo && guideCibleSous(crossX, crossY, geo.mainH) ? 'pointer' : 'crosshair';
+    canvas.style.cursor = debutant() && geo && guideCibleSous(crossX, crossY, geo.mainH, true) ? 'pointer' : 'crosshair';
   }
   // Le réticule est sur le calque : le graphique lui-même n'est pas redessiné au survol.
   survol();
@@ -2989,9 +2994,11 @@ function dessinerCalque() {
   const idx = n > 0 && crossX >= 16 ? Math.floor((crossX - 16) / pasC) : -1;
   // --- Réticule du tracé principal ---
   let bulleOHLCV = null;
-  // Débutant : une étiquette (ou une zone) sous le curseur → sa bulle seule, sans réticule ni
-  // infobulle des prix (la bulle prend leur place).
-  const cibleDeb = deb && crossY < mainH && P && (guideEtat || scenEtat) ? guideCibleSous(crossX, crossY, mainH) : null;
+  // Débutant : une ÉTIQUETTE sous le curseur → sa bulle seule, sans réticule ni infobulle des prix
+  // (la bulle prend leur place). Sur une bande, une zone ou un tracé, le réticule et les quatre
+  // valeurs de la bougie restent (les bougies récentes sont souvent dans une bande) ; la bulle se
+  // pose à côté, comme en Expert.
+  const cibleDeb = deb && crossY < mainH && P && (guideEtat || scenEtat) ? guideCibleSous(crossX, crossY, mainH, true) : null;
   if (cibleDeb) {
     if (guideEtat) guideEtat.survol = null;
     if (scenEtat) { scenEtat.survol = null; scenEtat.bulle = null; }
@@ -3240,10 +3247,14 @@ function margeFutur(pw, n) {
 function pasBougie(pw, n) { return (pw - margeFutur(pw, n)) / Math.max(1, n); }
 function priceWindow(vs, ve) {
   const s = lastScale;
-  if (s && s.seq === scaleSeq && s.vs === vs && s.ve === ve) return s;
+  const deb = debutant();
+  if (s && s.seq === scaleSeq && s.vs === vs && s.ve === ve && s.deb === deb) return s;
   let minP = Infinity, maxP = -Infinity;
   for (let i = vs; i < ve; i++) { const c = candles[i]; if (c.high > maxP) maxP = c.high; if (c.low < minP) minP = c.low; }
   const naturalRange = maxP - minP || 1, rawMin = minP, rawMax = maxP;
+  // Débutant : un peu de place au-dessus et au-dessous des bougies, pour que le libellé du repère
+  // du haut tienne AU-DESSUS du prix (et celui du bas au-dessous) même quand le prix est au bord.
+  if (deb) { maxP += naturalRange * PARAM.guide.debutant.marge; minP -= naturalRange * PARAM.guide.debutant.marge; }
   // Étendre si Bollinger actif, mais cap à ±15% du range naturel
   if (overlays.bb && !debutant() && candles.length >= 20) {
     const bb = memoized('bb', calcBollinger, cols().close, PARAM.bb.periode, PARAM.bb.ecarts);
@@ -3268,7 +3279,7 @@ function priceWindow(vs, ve) {
   const midP = (maxP + minP) / 2, halfRange = ((maxP - minP) / 2) * priceScale;
   minP = midP - halfRange + pricePan * naturalRange;
   maxP = midP + halfRange + pricePan * naturalRange;
-  return (lastScale = { seq: scaleSeq, vs, ve, minP, maxP, range: maxP - minP || 1 });
+  return (lastScale = { seq: scaleSeq, vs, ve, deb, minP, maxP, range: maxP - minP || 1 });
 }
 
 function resolveChart(candles, padL, padR, chartH, W) {
@@ -3878,7 +3889,16 @@ function guideDonnees() {
     const bb = memoized('bb', calcBollinger, K.close, PARAM.bb.periode, PARAM.bb.ecarts);
     const largeur = bb.sma.map((m, i) => (m && bb.upper[i] !== null ? (bb.upper[i] - bb.lower[i]) / m : null));
     const regime = Guide.regime({ adx: adx.adx, plusDI: adx.plusDI, minusDI: adx.minusDI, emaC, emaL, largeur }, iF, G);
-    return { choix, demi, regime, suite: Guide.suite(choix, ref), atr: atr[iF], ref };
+    // Débutant : un repère par prix nommé, sa petite bande (± demi) et son état sur les bougies
+    // closes (même règle que les bandes : un chiffre publié ne compte qu'après sa lecture).
+    const reperes = Guide.reperesDe(choix, demi);
+    for (const x of reperes) {
+      let iMin = 0;
+      if (isNum(x.lu)) { iMin = n - 1; for (let k = n - 2; k >= 0 && K.time[k] * 1000 >= x.lu; k--) iMin = k; }
+      x.iMin = iMin;
+      x.ferme = Guide.etatFerme(K.close, K.high, K.low, n - 1, x.lo, x.hi, G, iMin);
+    }
+    return { choix, demi, regime, suite: Guide.suite(choix, ref), atr: atr[iF], ref, reperes };
   });
 }
 
@@ -4024,12 +4044,15 @@ function guidePreparer(g) {
   E.formes = Guide.formesAffichees(GUIDE_FORMES.val, G, g.vs, g.ve);
   E.formeQuand = guideFormeQuand(E.formes[0]);
   if (debutant()) {
-    // Débutant : deux bandes à l'écran (la plus proche de chaque côté, choixDebutant) ; toutes
-    // gardent leur état au prix live pour les bulles (niveauxTous).
-    const ch = Guide.choixDebutant(D.choix);
-    E.deb = true; E.debutant = debEtat;
+    // Débutant : deux repères à l'écran, choisis au prix LIVE (debReperes) : le plus proche
+    // au-dessus et au-dessous ; chacun avec sa petite bande et le repère suivant (la bulle).
+    const sel = debReperes(D);
+    E.deb = true; E.debutant = debEtat; E.debSel = sel;
+    E.niveaux = [[sel.dessus, sel.suivantHaut], [sel.dessous, sel.suivantBas]].filter(([x]) => x).map(([niv, suivant]) => {
+      const y = yDe(niv.p), yH = y - E.demiPx, yB = y + E.demiPx;
+      return { niv, suivant, y, yH, yB, visible: niv.p >= g.minP && niv.p <= g.maxP };
+    });
     E.niveauxTous = E.niveaux;
-    E.niveaux = E.niveaux.filter(L => L.niv === ch.dessus || L.niv === ch.dessous);
   }
   return E;
 }
@@ -4508,6 +4531,12 @@ function guideCalque() {
 // suit le prix live), le repère du haut, le repère du bas (calque : leur couleur dit leur état),
 // le libellé du scénario 1, la forme, la ligne des scénarios. Le détail est dans la bulle.
 const DEB_POLICE_PHRASE = 11.5, DEB_POLICE_LIGNE = 10.5;
+/** Les deux repères du Débutant au prix live (au dernier prix clos sans prix live) ; deux repères
+ *  à moins de PARAM.guide.debutant.ecartAtr × ATR l'un de l'autre n'en font pas deux. */
+function debReperes(D) {
+  const px = isNum(livePrice) ? livePrice : D.ref;
+  return Object.assign(Guide.choisirReperes(D.reperes, px, D.atr * PARAM.guide.debutant.ecartAtr), { prix: px });
+}
 /** Enregistre un texte posé (registre relu par les tests). */
 function debItem(role, texte, rect) {
   if (!debEtat) return null;
@@ -4518,7 +4547,7 @@ function debItem(role, texte, rect) {
 /** Les phrases possibles à ce dessin (le prix live ne change que la bande « touchée ») : pour
  *  décider si la ligne des scénarios partage la rangée de la phrase sans la raccourcir. */
 function debPhrases(D, maintenant) {
-  const ch = Guide.choixDebutant(D.choix), base = { prix: D.ref, unite: guideUnite(), choix: D.choix, regime: D.regime, maintenant, itv: chartInterval };
+  const ch = debReperes(D), base = { prix: ch.prix, unite: guideUnite(), choix: D.choix, reperes: ch, regime: D.regime, maintenant, itv: chartInterval };
   return [null, ch.dessus, ch.dessous].filter((x, k) => !k || x).map(enTest => Guide.phrasesDebutant(Object.assign({}, base, { enTest })));
 }
 /** La hauteur des rangées du haut du tracé en Débutant : la phrase (si le Guide est affiché), la
@@ -4541,7 +4570,8 @@ function debHaut(W, padL, padR) {
         ctx.font = chartFont(DEB_POLICE_PHRASE, 650);
         const m = t => ctx.measureText(t).width + 16, max = etroit ? P.phraseEtroit : P.phrase;
         const rang = (V, px) => { const k = V.findIndex(t => t.length <= max && m(t) <= px); return k < 0 ? V.length : k; };
-        partage = phrases.every(V => rang(V, pw - 8 - wLigne - 12) === rang(V, pw - 8));
+        // Partager la rangée seulement si la phrase y tient ENTIÈRE (une variante, sans coupure).
+        partage = phrases.every(V => { const k = rang(V, pw - 8 - wLigne - 12); return k < V.length && k === rang(V, pw - 8); });
         if (!partage) rangs = 2;
       } else rangs = 1;
     }
@@ -4549,7 +4579,10 @@ function debHaut(W, padL, padR) {
   }
   return debHautMemo.rangs ? debHautMemo.rangs * 22 + 2 : 0;
 }
-/** Le texte d'une bande pour la bulle Débutant : chaque raison en mots, son chemin, la bande. */
+/** Le chemin d'un repère du Débutant : son seuil (ce repère), sa cible (le repère suivant au-delà). */
+const debChemin = (niv, suivant, sens) => (niv ? { sens, seuil: niv, cible: suivant || null, rx: niv.principale, ry: suivant ? suivant.principale : null } : null);
+/** Le texte d'un repère pour la bulle Débutant : chaque raison en mots, ce qui est tout près (les
+ *  autres prix de sa bande Expert), son chemin (de CE repère au suivant), sa bande. */
 function guideTexteNiveauDebutant(L, E) {
   const out = [], R = L.niv.raisons, now = Horloges.maintenant(), pas = geoPrix && geoPrix.pas > 0 ? geoPrix.pas : 900;
   if (Guide.optionsSeules(L.niv)) {
@@ -4557,9 +4590,10 @@ function guideTexteNiveauDebutant(L, E) {
     out.push('Une estimation, tirée des contrats d’options de la plateforme Deribit' + (isFinite(lu) ? ', relevée ' + Guide.ageDebutant(lu, now) : '') + '.');
   }
   for (const r of R) out.push(Guide.origineDebutant(r, E.unite, now, pas));
-  const D = E.D, ch = L.niv.dessus ? D.suite.haut : D.suite.bas;
-  out.push(Guide.texteSuiteDebutant(ch, E.unite, chartInterval, L.niv.dessus ? 1 : -1, now));
-  out.push('La bande couvre ' + Guide.prixRond(L.niv.demi, E.unite) + ' de part et d’autre de ' + (R.length > 1 ? 'ses prix' : 'ce prix') + ' : le prix réagit rarement au dollar près.');
+  const pres = L.niv.bande ? L.niv.bande.raisons.filter(r => r.p !== L.niv.p) : [];
+  if (pres.length) out.push('Tout près : ' + pres.map(r => Guide.nomPhrase(r) + ' (' + Guide.prixR(r, E.unite) + ')').join(', ') + '.');
+  out.push(Guide.texteSuiteDebutant(debChemin(L.niv, L.suivant, L.niv.dessus ? 1 : -1), E.unite, chartInterval, L.niv.dessus ? 1 : -1, now));
+  out.push('La bande couvre ' + Guide.prixRond(L.niv.demi, E.unite) + ' de part et d’autre de ce prix : le prix réagit rarement au dollar près.');
   out.push('Une description, pas une recommandation.');
   return out;
 }
@@ -4573,17 +4607,27 @@ function guideTextePhraseDebutant(E, phrase) {
   const out = [];
   if (/touche/.test(phrase)) out.push('« Touche » : le prix est en ce moment dans la bande de ce repère.');
   if (/est passé/.test(phrase)) out.push('« Est passé » : ' + per[1] + ' de suite ont fini au-delà de ce repère (la règle de la page pour dire « franchi »).');
-  out.push({
+  // Le sens du verbe, seulement s'il est dans la phrase affichée (sinon : ce que dit le mouvement).
+  const verbe = Guide.VERBE_DEBUTANT[r.cle], dit = verbe && new RegExp('\\b' + verbe + '\\b').test(phrase);
+  out.push((dit ? {
     hausse: '« Monte » : ' + sur + ', le prix a pris une direction nette vers le haut.',
     baisse: '« Baisse » : ' + sur + ', le prix a pris une direction nette vers le bas.',
     faible: '« Hésite » : ' + sur + ', le mouvement n’a pas de direction nette.',
     sans: '« Hésite » : ' + sur + ', le mouvement n’a pas de direction nette.',
     incertaine: '« S’agite » : ' + sur + ', le prix bouge nettement, mais sans sens clair.',
-  }[r.cle] || 'Pas encore assez d’historique sur ce graphique pour dire si le prix monte ou baisse.');
+  } : {
+    hausse: 'Le mouvement : ' + sur + ', le prix a pris une direction nette vers le haut.',
+    baisse: 'Le mouvement : ' + sur + ', le prix a pris une direction nette vers le bas.',
+    faible: 'Le mouvement : ' + sur + ', le prix n’a pas de direction nette.',
+    sans: 'Le mouvement : ' + sur + ', le prix n’a pas de direction nette.',
+    incertaine: 'Le mouvement : ' + sur + ', le prix bouge nettement, mais sans sens clair.',
+  })[r.cle] || 'Pas encore assez d’historique sur ce graphique pour dire si le prix monte ou baisse.');
   if (isNum(var24Courant) && ((r.cle === 'hausse' && var24Courant < 0) || (r.cle === 'baisse' && var24Courant > 0)))
     out.push('La variation en haut de l’écran (' + texteVar24(var24Courant, true) + ') porte sur 24 h : sur une durée plus courte, le prix peut aller dans l’autre sens.');
   if (r.compression) out.push('Le prix bouge peu en ce moment, moins que d’habitude sur les ' + Guide.dernieres(G.bbFenetre * pas) + '.');
-  out.push(Guide.texteSuiteDebutant(D.suite.haut, E.unite, itv, 1, now), Guide.texteSuiteDebutant(D.suite.bas, E.unite, itv, -1, now));
+  // Les deux chemins partent des deux repères de l'écran (aucun autre seuil).
+  const S = E.debSel || {};
+  out.push(Guide.texteSuiteDebutant(debChemin(S.dessus, S.suivantHaut, 1), E.unite, itv, 1, now), Guide.texteSuiteDebutant(debChemin(S.dessous, S.suivantBas, -1), E.unite, itv, -1, now));
   out.push('Une description, pas une recommandation.');
   return out;
 }
@@ -4597,11 +4641,12 @@ function guideSurBougies(E) {
   };
 }
 /** Débutant : la cible de la phrase (son rectangle suit le texte, posé par le calque) et les deux
- *  repères — celui du haut AU-DESSUS de sa bande, celui du bas AU-DESSOUS ; une bande hors de la
- *  vue, au bord, son libellé préfixé de ↑ ou ↓. Les pastilles sont peintes par le calque (leur
- *  couleur dit l'état au prix live). */
+ *  repères — chacun posé CONTRE son trait, du côté du prix qui est le sien : celui du haut
+ *  au-dessus de son trait (jamais sous la ligne du prix live), celui du bas au-dessous ; un repère
+ *  hors de la vue, au bord, son libellé préfixé de ↑ ou ↓. Les deux libellés ont le même style
+ *  (avec ou sans « · ») ; les pastilles sont peintes par le calque (leur couleur dit l'état). */
 function guideDebutant(E) {
-  const { g, xFin, xMax } = E, P = PARAM.guide.debutant, top = g.pad.top, bas = g.pad.top + g.ph, H = 17;
+  const { g, xFin, xMax, yDe } = E, P = PARAM.guide.debutant, top = g.pad.top, bas = g.pad.top + g.ph, H = 17;
   E.ciblePhrase = { rects: [], prio: 0, titre: '', texte: [] };
   E.cibles.push(E.ciblePhrase);
   E.itemPhrase = debItem('phrase', '', null);
@@ -4609,22 +4654,33 @@ function guideDebutant(E) {
   ctx.font = chartFont(10, 600);
   const m = t => ctx.measureText(t).width + 14;
   const x0 = g.pad.left + 6, droite = (E.marge ? xFin : xMax) - 2;
-  for (const L of E.niveaux.slice().sort((a, b) => b.niv.dessus - a.niv.dessus)) {
-    const fl = L.niv.pMin > g.maxP ? '↑' : L.niv.pMax < g.minP ? '↓' : null;
-    const t = Guide.libelleDebutant(L.niv, { max, unite: E.unite, fleche: fl, mesure: m, maxPx: droite - x0 });
-    const w = Math.min(m(t), droite - x0), haut = L.niv.dessus;
-    // Au-dessus de la bande du haut (au-dessous de celle du bas) ; sans place au bord du tracé, de
-    // l'autre côté de la bande — l'ordre vertical des deux libellés est gardé.
-    const essais = fl === '↑' ? [top + 2] : fl === '↓' ? [bas - H - 2] : haut ? [L.yH - H - 1, L.yB + 1] : [L.yB + 1, L.yH - H - 1];
+  const yLive = isNum(livePrice) ? yDe(livePrice) : null;
+  // Le style commun : chaque libellé prend le premier format qui tient ; si l'un perd le « · »,
+  // l'autre aussi (jamais « Mur vente 82 710 $ » à côté de « Options · 82 510 $ »).
+  const formats = E.niveaux.map(L => {
+    const fl = L.niv.pMin > g.maxP ? '↑' : L.niv.pMax < g.minP ? '↓' : null, o = { max, unite: E.unite, fleche: fl, mesure: m, maxPx: droite - x0 };
+    const V = Guide.libellesDebutant(L.niv, o);
+    return { L, fl, V, k: Guide.formatDebutant(V, o), o };
+  });
+  if (formats.some(f => !Guide.AVEC_POINT(f.k))) for (const f of formats) if (Guide.AVEC_POINT(f.k)) f.k = Math.max(2, Guide.formatDebutant(f.V.slice(2), f.o) + 2);
+  for (const { L, fl, V, k } of formats.sort((a, b) => b.L.niv.dessus - a.L.niv.dessus)) {
+    const t = V[k], w = Math.min(m(t), droite - x0), haut = L.niv.dessus, yD = yDe(L.niv.p);
+    // Du bon côté du prix live : le bas du libellé du haut au-dessus de la ligne du prix, le haut
+    // de celui du bas au-dessous (gêne dure, sauf hors de la vue).
+    const cote = yLive === null || fl ? null : haut ? r => r.y + r.h > yLive - 1 : r => r.y < yLive + 1;
+    // Contre le trait ; le bord du tracé seulement quand le trait y est (le glissement fait le reste).
+    const essais = fl === '↑' ? [top + 2] : fl === '↓' ? [bas - H - 2] : haut ? [yD - H - 2, yD - H / 2].concat(yD - H - 2 < top + 1 ? [top + 1] : [])
+      : [yD + 2, yD - H / 2].concat(yD + 2 + H > bas - 1 ? [bas - H - 1] : []);
     const vers = fl === '↑' ? 1 : fl === '↓' ? -1 : haut ? -1 : 1;
     const xs = [x0, Math.max(x0, (x0 + droite) / 2 - w / 2), Math.max(x0, droite - w)];
     let pose = null, xp = x0;
-    for (const [ev, gl] of [[surBougies, 3], [null, 3], [null, 8]]) {
+    const et = (a, b) => (a && b ? r => a(r) || b(r) : a || b || undefined);
+    for (const [ev, gl] of [[et(surBougies, cote), 3], [cote, 3], [cote, 8], [null, 8]]) {
       for (const x of xs) if ((pose = guidePlacer(E.rects, x, w, H, essais, top, bas, vers, 0, gl, ev || undefined))) { xp = x; break; }
       if (pose) break;
     }
     const zones = L.visible ? [{ x0: g.pad.left, y0: L.yH - 3, x1: xMax, y1: L.yB + 3 }] : [];
-    E.cibles.push({ rects: pose ? [guideZone(pose)] : [], zones, prio: 1, niveau: L, titre: t, texte: guideTexteNiveauDebutant(L, E), optionsSeules: Guide.optionsSeules(L.niv) });
+    E.cibles.push({ rects: pose ? [guideZone(pose)] : [], zones, prio: 1, niveau: L, titre: Guide.titreDebutant(L.niv, E.unite), texte: guideTexteNiveauDebutant(L, E), optionsSeules: Guide.optionsSeules(L.niv) });
     if (!pose) continue;
     L.etiq = { x: xp, y: pose.y, w, h: H, t };
     debItem('niveau', t, { x: xp, y: pose.y, w, h: H });
@@ -4643,6 +4699,9 @@ function guideFormeDebutant(E, f, t) {
   const { g, yDe, xDe, xFin, xMax, unite } = E, G = PARAM.guide, top = g.pad.top, bas = top + g.ph, H = 17;
   const iFin = f.fin ? f.jFin : candles.length - 2;
   if (f.debut >= g.ve || f.t - G.pivot < g.vs) return false;
+  // Toute la figure dans la vue (ses deux sommets ou creux, sa ligne ; le début d'un rectangle ou
+  // d'un triangle) : un nom posé à côté d'un trait isolé se lirait comme le nom d'autre chose.
+  if ((f.type === 'double_sommet' || f.type === 'double_creux' ? f.a.i : f.debut) < g.vs) return false;
   const X = xDe, dbl = f.type === 'double_sommet' || f.type === 'double_creux', encre = avecAlpha(COLORS.ink1, 0.5);
   const ys = [], segs = [];
   const seg = (xa, ya, xb, yb) => { segs.push([xa, ya, xb, yb]); ctx.moveTo(xa, ya); ctx.lineTo(xb, yb); };
@@ -4673,9 +4732,12 @@ function guideFormeDebutant(E, f, t) {
   const xPivot = X(f.t - G.pivot), x0 = Math.max(g.pad.left + 2, Math.min(xPivot - w / 2, xDroite - w));
   const yH = Math.min(...ys), yB = Math.max(...ys);
   const essais = f.type === 'double_creux' ? [yB + 4, yH - H - 4] : [yH - H - 4, yB + 4];
-  const surBougies = guideSurBougies(E);
+  const surBougies = guideSurBougies(E), bandes = debSurBandes(E), recentes = scenRecentes(E);
+  // Près de la figure (au plus 2 demi-hauteurs de glissement), jamais dans la bande d'un repère
+  // (posé là, le nom de la forme se lirait comme celui du repère) ni sur les bougies récentes.
+  const dur = r => bandes(r) || recentes(r);
   let pose = null;
-  for (const [ev, gl] of [[surBougies, 4], [null, 4]]) if ((pose = guidePlacer(E.rects, x0, w, H, essais, top, bas, essais[0] < (top + bas) / 2 ? 1 : -1, 0, gl, ev || undefined))) break;
+  for (const [ev, gl] of [[r => dur(r) || surBougies(r), 2], [dur, 2]]) if ((pose = guidePlacer(E.rects, x0, w, H, essais, top, bas, essais[0] < (top + bas) / 2 ? 1 : -1, 0, gl, ev))) break;
   const b = GUIDE_FORMES.val.bilan[f.type];
   const ctxB = { duree: candles[candles.length - 2].time - candles[0].time };
   E.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs, prio: 2, titre: t, texte: Guide.texteFormeDebutant(f, b, ctxB, G, unite) });
@@ -4683,6 +4745,12 @@ function guideFormeDebutant(E, f, t) {
   etiquettesAFaire.push(() => { ctx.font = chartFont(10, 600); guidePastilleDebutant(ctx, pose.x, pose.y, w, H, t, encre, COLORS.ink1); });
   debItem('forme', t, { x: pose.x, y: pose.y, w, h: H });
   return true;
+}
+/** Les bandes des deux repères à l'écran (± 3 px) : gêne dure des libellés de la forme et du
+ *  scénario 1 en Débutant. */
+function debSurBandes(E) {
+  const Z = E && E.niveaux ? E.niveaux.filter(L => L.visible).map(L => [L.yH - 3, L.yB + 3]) : [];
+  return r => Z.some(([a, b]) => r.y < b && r.y + r.h > a);
 }
 /** Une pastille d'une ligne du Débutant : fond de bulle, trait de couleur à gauche, texte. */
 function guidePastilleDebutant(g, x, y, w, h, texte, coul, encre) {
@@ -4702,6 +4770,10 @@ function debPhraseChoisir(g, o, maxPx, etroit) {
     for (const t of pleines) if (t.length <= max && g.measureText(t).width + 16 <= maxPx) return { t, taille };
   }
   for (const taille of [DEB_POLICE_PHRASE, 10.5]) { g.font = chartFont(taille, 650); if (g.measureText(compacte).width + 16 <= maxPx) return { t: compacte, taille }; }
+  // Une police large sur un écran étroit : le verbe seul (« Le prix monte. », « Le prix s’agite. »),
+  // entier, plutôt qu'une phrase coupée au milieu d'un prix ; les repères ont leurs libellés.
+  const verbe = compacte.replace(/(?:\.|\s*:)\s.*$/, '.');
+  for (const taille of [DEB_POLICE_PHRASE, 10.5]) { g.font = chartFont(taille, 650); if (verbe !== compacte && g.measureText(verbe).width + 16 <= maxPx) return { t: verbe, taille }; }
   g.font = chartFont(10.5, 650);
   return { t: guideCouper(g, compacte, maxPx - 16), taille: 10.5 };
 }
@@ -4710,8 +4782,15 @@ function debPhraseChoisir(g, o, maxPx, etroit) {
 function guideCalqueDebutant(E) {
   const G = PARAM.guide, cur = candles[candles.length - 1], g = E.g, P = PARAM.guide.debutant;
   let enTest = null;
+  // Le prix live a passé un repère depuis le dessin : les deux repères changent, le graphique est
+  // redessiné une fois (rien d'autre ne le redessine au rythme du prix).
+  if (E.debSel) {
+    const sel = debReperes(E.D), p = x => (x ? x.p : null);
+    if (p(sel.dessus) !== p(E.debSel.dessus) || p(sel.dessous) !== p(E.debSel.dessous)) scheduleDraw();
+  }
   for (const L of E.niveauxTous) L.live = Guide.etatLive(L.niv, livePrice, cur, G);
-  for (const L of E.niveaux) if (L.live.mot === 'test' && !enTest) enTest = L.niv;
+  // Le prix dans les deux petites bandes à la fois : la phrase nomme la plus proche.
+  for (const L of E.niveaux) if (L.live.mot === 'test' && (!enTest || Math.abs(L.niv.p - livePrice) < Math.abs(enTest.p - livePrice))) enTest = L.niv;
   E.enTest = enTest;
   cx.save();
   // La bande où est le prix « s'allume » (lueur posée sur le calque).
@@ -4731,7 +4810,7 @@ function guideCalqueDebutant(E) {
   // partagent la rangée.
   const memo = debHautMemo, etroit = g.pw < P.etroit;
   const maxPx = E.xMax - g.pad.left - 8 - (memo && memo.partage ? memo.wLigne + 12 : 0);
-  const o = { prix: isNum(livePrice) ? livePrice : null, unite: E.unite, choix: E.D.choix, enTest, regime: E.D.regime, maintenant: !E.finVue, itv: chartInterval };
+  const o = { prix: isNum(livePrice) ? livePrice : null, unite: E.unite, choix: E.D.choix, reperes: E.debSel, enTest, regime: E.D.regime, maintenant: !E.finVue, itv: chartInterval };
   const cle = [o.prix === null, enTest ? enTest.p : '-', maxPx, o.maintenant].join('|');
   if (!E.phraseCache || E.phraseCache.cle !== cle) {
     const ph = debPhraseChoisir(cx, o, maxPx, etroit);
@@ -4766,7 +4845,7 @@ function debArbitrer() {
 /** La cible du Guide ou des scénarios sous (x, y) — son étiquette, sa bande, ou à quelques pixels
  *  de son tracé ; jamais la zone des bougies entière (l'infobulle OHLCV y reste seule). Un test
  *  pur : rien n'est dessiné ni posé (le gestionnaire de souris le lit pour le curseur). */
-function guideCibleSous(x, y, mainH) {
+function guideCibleSous(x, y, mainH, etiquettesSeules) {
   const E = guideEtat && overlays.guide ? guideEtat : null, Sc = scenEtat;
   if (!(E || Sc) || x === null || y === null || y > mainH) return null;
   const dansR = q => (q.rects || []).some(r => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1);
@@ -4776,7 +4855,7 @@ function guideCibleSous(x, y, mainH) {
   // Les cibles du Guide et des scénarios du matin : une seule liste, une seule bulle.
   let c = null, rang = Infinity;
   for (const q of (E ? E.cibles : []).concat(Sc ? Sc.cibles : [])) {
-    const r = dansR(q) ? q.prio : surS(q) ? 10 + q.prio : surZ(q) ? 20 + q.prio : Infinity;
+    const r = dansR(q) ? q.prio : etiquettesSeules ? Infinity : surS(q) ? 10 + q.prio : surZ(q) ? 20 + q.prio : Infinity;
     if (r < rang) { rang = r; c = q; }
   }
   return c;
@@ -4786,6 +4865,7 @@ function guideSurvol(W, mainH, evite) {
   if (guideEtat) guideEtat.survol = null;
   if (scenEtat) { scenEtat.survol = null; scenEtat.bulle = null; }
   const c = guideCibleSous(crossX, crossY, mainH);
+  if (c && debutant()) scenSurvolDebutant(c);   // la zone d'invalidation du scénario 1, sous la bulle
   if (c) guideBulle(c, W, mainH, evite);
 }
 /** La bulle d'une cible, près du curseur, toujours dans le tracé. */
@@ -4801,23 +4881,27 @@ function guideBulle(c, W, mainH, evite) {
     if (c.niveaux) for (const L of c.niveaux.slice().reverse()) if (L.live) texte.unshift(Guide.libelleNiveau(L.niv, 'debutant', guideUnite(), true) + ' — maintenant : ' + Guide.texteEtatLive(L.live, 'debutant') + '.');
   }
   const bw = Math.min(330, W - 32);
+  // Débutant sur téléphone : la bulle est le seul endroit du détail — un corps de 12 px (titre
+  // 13 px), lisible au doigt ; ailleurs, la taille de toujours.
+  const gros = debutant() && W - 16 - 75 < PARAM.guide.debutant.etroit;
+  const fT = gros ? 13 : 10, fC = gros ? 12 : 9.5, hT = gros ? 17 : 14, hC = gros ? 15.5 : 12.5;
   cx.save();
-  cx.font = chartFont(10, 700);
+  cx.font = chartFont(fT, 700);
   const tl = guideLignes(cx, c.titre, bw - 20, 2);
-  cx.font = chartFont(9.5, 500);
+  cx.font = chartFont(fC, 500);
   // La bulle tient TOUJOURS dans le tracé (téléphone : un tracé de 380 px) : sinon la version courte
   // de l'explication (texteCourt), puis les paragraphes du début, un renvoi à la fiche et le
   // dernier paragraphe (« pas une recommandation ») — jamais une phrase coupée au bord de l'écran.
   // Entre deux paragraphes, une ligne vide ; serrée (5 px) quand la place manque.
-  let sep = 12.5;
-  const hMax = mainH - 8, hL = l => (l === '' ? sep : 12.5);
-  const hDe = ls => tl.length * 14 + ls.reduce((a, l) => a + hL(l), 0) + 16;
+  let sep = hC;
+  const hMax = mainH - 8, hL = l => (l === '' ? sep : hC);
+  const hDe = ls => tl.length * hT + ls.reduce((a, l) => a + hL(l), 0) + 16;
   const decouper = ts => { const out = []; for (const t of ts) out.push(guideLignes(cx, t, bw - 20)); return out; };
   const aplatir = ps => { const out = []; ps.forEach((p, k) => { if (k) out.push(''); out.push(...p); }); return out; };
   // Ordre : l'explication entière, puis serrée ; puis la version courte, puis serrée ; enfin coupée.
   let paras = decouper(texte);
   if (hDe(aplatir(paras)) > hMax) sep = 5;
-  if (hDe(aplatir(paras)) > hMax && c.texteCourt) { paras = decouper(c.texteCourt); sep = 12.5; if (hDe(aplatir(paras)) > hMax) sep = 5; }
+  if (hDe(aplatir(paras)) > hMax && c.texteCourt) { paras = decouper(c.texteCourt); sep = hC; if (hDe(aplatir(paras)) > hMax) sep = 5; }
   if (hDe(aplatir(paras)) > hMax) {
     const dernier = (debutant() ? /recommandation|conseil/ : /recommandation/).test(paras[paras.length - 1].join(' ')) ? paras[paras.length - 1] : null;
     const suite = guideLignes(cx, '… (suite : fiche dans les Légendes, bouton ?)', bw - 20);
@@ -4837,8 +4921,8 @@ function guideBulle(c, W, mainH, evite) {
   if (bx + bw > W - 75) bx = Math.max(16, crossX - bw - 16);
   if (by + bh > mainH - 4) by = Math.max(4, Math.min(crossY, evite ? evite.y : crossY) - bh - 8);
   by = Math.max(4, Math.min(by, mainH - 4 - bh));
-  if (Sc && Sc.survol === c) Sc.bulle = { x: bx, y: by, w: bw, h: bh, corps: corps.slice() };
-  else if (E && E.survol === c) E.bulle = { x: bx, y: by, w: bw, h: bh, corps: corps.slice() };   // relue par les tests
+  if (Sc && Sc.survol === c) Sc.bulle = { x: bx, y: by, w: bw, h: bh, corps: corps.slice(), police: fC };
+  else if (E && E.survol === c) E.bulle = { x: bx, y: by, w: bw, h: bh, corps: corps.slice(), police: fC };   // relue par les tests
   // Fond du tracé d'abord : une bulle translucide laisserait lire la lecture et les étiquettes à travers.
   cx.fillStyle = COLORS.surface;
   cx.shadowColor = 'rgba(16,35,61,0.18)'; cx.shadowBlur = 14; cx.shadowOffsetY = 4;
@@ -4846,10 +4930,10 @@ function guideBulle(c, W, mainH, evite) {
   cx.shadowColor = 'transparent'; cx.shadowBlur = 0; cx.shadowOffsetY = 0;
   cx.fillStyle = COLORS.bulle; cx.fill();
   cx.fillStyle = c.coul || COLORS.accent2; cx.fillRect(bx + 5, by + 8, 3, bh - 16);
-  cx.fillStyle = COLORS.ink1; cx.font = chartFont(10, 700);
-  tl.forEach((l, k) => cx.fillText(l, bx + 14, by + 16 + k * 14));
-  cx.font = chartFont(9.5, 500); cx.fillStyle = COLORS.text;
-  let yl = by + 16 + tl.length * 14 + 2;
+  cx.fillStyle = COLORS.ink1; cx.font = chartFont(fT, 700);
+  tl.forEach((l, k) => cx.fillText(l, bx + 14, by + 16 + (hT - 14) + k * hT));
+  cx.font = chartFont(fC, 500); cx.fillStyle = COLORS.text;
+  let yl = by + 16 + (hT - 14) + tl.length * hT + 2;
   for (const l of corps) { if (l) cx.fillText(l, bx + 14, yl); yl += hL(l); }
   cx.restore();
 }
@@ -5637,10 +5721,10 @@ function scenTitreDebutant(sc) {
 function scenTexteDebutant(S, it, court) {
   const P = PARAM.scenarios, F = S.F;
   const ex = Scenarios.explicationDebutant(it.sc, it.sv, P, { itv: S.itv, statuts: F.statuts, maintenant: S.maintenant });
-  const out = [Scenarios.enteteDebutant(F, P, S.maintenant)].concat(court ? ex.slice(0, 1).concat(ex.filter(t => /^Suivi en direct/.test(t))) : ex);
+  const out = [Scenarios.enteteDebutant(F, P, S.maintenant)].concat(court ? ex.slice(0, 1).concat(ex.filter(t => /^Suivi en direct|^Rang /.test(t))) : ex);
   const autres = S.items.filter(i => i !== it);
   if (autres.length) out.push('Les autres scénarios de Claude : ' + autres.map(i => Scenarios.ligneDebutant(i.sc, i.sv)).join(' · '));
-  out.push('Classé par Claude (une IA), du plus au moins probable, sans pourcentage.');
+  // Le classement « sans pourcentage » est dit une fois (le sens du rang, dans l'explication).
   out.push('Une hypothèse de Claude (une IA), pas une promesse ni un conseil.');
   return out;
 }
@@ -5664,10 +5748,13 @@ function scenLibelleDebutant(S, it, top, bas) {
   // Range : sous son bord haut (dans la boîte), sinon au-dessus ; chemin : au-dessus de la cible.
   const essais = hors < 0 ? [top + 2, top + H + 4] : hors > 0 ? [bas - H - 2, bas - 2 * H - 4] : range ? [y + 2, y - H - 2] : [y - H - 2, y + 2];
   const vers = hors > 0 ? -1 : hors < 0 ? 1 : range ? 1 : -1;
-  const surBougies = scenSurBougies(S);
+  const surBougies = scenSurBougies(S), recentes = scenRecentes(S), bandes = debSurBandes(guideEtat && overlays.guide ? guideEtat : null);
+  // Gênes dures : les bougies les plus récentes (le prix d'à présent ne se cache jamais) et les
+  // bandes des repères ; gêne douce : les autres bougies.
+  const dur = r => recentes(r) || bandes(r);
   let pose = null, xp = x0;
-  for (const [ev, gl] of [[surBougies, 3], [null, 3], [null, 8]]) {
-    for (const x of xs) if ((pose = guidePlacer(S.rects, x, w, H, essais, top, bas, vers, 0, gl, ev || undefined))) { xp = x; break; }
+  for (const [ev, gl] of [[r => dur(r) || surBougies(r), 3], [dur, 3], [dur, 8]]) {
+    for (const x of xs) if ((pose = guidePlacer(S.rects, x, w, H, essais, top, bas, vers, 0, gl, ev))) { xp = x; break; }
     if (pose) break;
   }
   if (!pose) return false;
@@ -5700,7 +5787,7 @@ function scenTexteLigneDebutant(S) {
   for (const it of S.items) out.push(Scenarios.ligneDebutant(it.sc, it.sv));
   out.push('Classé par Claude (une IA), du plus au moins probable, sans pourcentage.');
   const b = F.bilan;
-  if (b && b.matins > 0) out.push('Sur les ' + b.matins + (b.matins > 1 ? ' derniers matins comptés' : ' dernier matin compté') + ', le premier mouvement annoncé par Claude est arrivé en premier ' + b.reussis + ' fois.' + (b.matins < P.echantillonFaible ? ' Trop peu de matins pour en tirer une règle.' : ''));
+  if (b && b.matins > 0) out.push((b.matins > 1 ? 'Sur les ' + b.matins + ' derniers matins comptés' : 'Sur le dernier matin compté') + ', le premier mouvement annoncé par Claude est arrivé en premier ' + b.reussis + ' fois.' + (b.matins < P.echantillonFaible ? ' Trop peu de matins pour en tirer une règle.' : ''));
   out.push('« (en direct) » : l’état est suivi par cette page sur le graphique affiché, un simple affichage. La note officielle est celle du journal, faite le lendemain ; elle est marquée « (journal) ».');
   out.push('Plus : fiche « Scénarios du matin » dans les Légendes (bouton ?).');
   out.push(fin);
@@ -5716,7 +5803,8 @@ function scenBoiteDebutant(S) {
   const texte = scenTexteLigneDebutant(S);
   const titre = S.F ? Scenarios.titre(S.F, PARAM.scenarios, S.maintenant) : 'Scénarios du matin';
   const cible = { rects: [{ x0: x, y0: y, x1: x + w, y1: y + h }], prio: 0, coul: COLORS.accent, titre, texte,
-    texteCourt: texte.filter(l => !/^« \(en direct\) »|^Plus :/.test(l)) };
+    // Écran court : le bilan et le renvoi partent ; « (en direct) » et le journal restent, en une phrase.
+    texteCourt: texte.filter(l => !/^Plus :|^Sur (?:les \d+ derniers|le dernier) matin/.test(l)).map(l => (/^« \(en direct\) »/.test(l) ? '« (en direct) » : suivi par cette page ; la note officielle est celle du journal, le lendemain.' : l)) };
   S.cibles.push(cible);
   S.boite = { deb: true, x, y, w, h, texte: t, cible, lignes: [], seule: !S.F, cede: false };
   debItem('boite', t, { x, y, w, h });
@@ -6168,7 +6256,7 @@ function majAges(nouvelle) {
     const cy = document.getElementById('cycle');
     if (cy) cy.classList.toggle('vieux', Math.round(ageMin) > CADENCES.vieux_min);
     const kd = cy && cy.querySelector ? cy.querySelector('.kpi-deb') : null;
-    if (kd && kd.title !== titreKpiDeb(n)) { kd.title = titreKpiDeb(n); kd.setAttribute('aria-label', kd.title); }
+    if (kd && kd.title !== titreKpiDeb(n)) { kd.title = titreKpiDeb(n); kd.setAttribute('aria-label', ariaKpiDeb(n)); }
   }
 }
 // L'onde du voyant : UNE par publication NOUVELLE, deux passages puis le calme. Avant : à chaque
@@ -6511,13 +6599,23 @@ function renderCycle(d) {
     + '<span class="kpi-age" title="Âge de la publication">' + (ageK === null ? '—' : ageDe(d.updated, ageK) + ' min') + '</span>'
     // Débutant : une seule pastille, qui ouvre les cartes ; son âge dans l'infobulle (collé au prix
     // en direct, « il y a 18 min » se lisait comme l'âge du prix). « en retard » au-delà du seuil.
-    + '<span class="kpi-deb debutant-seul" role="button" tabindex="0" title="' + titreKpiDeb(ageK) + '" aria-label="' + titreKpiDeb(ageK) + '">'
+    + '<span class="kpi-deb debutant-seul" role="button" tabindex="0" title="' + titreKpiDeb(ageK) + '" aria-label="' + ariaKpiDeb(ageK) + '">'
     + '<span class="deb-frais">Infos du marché ▸</span><span class="deb-retard">Infos du marché · en retard ▸</span></span>';
   cy.classList.toggle('vieux', ageK !== null && ageK > CADENCES.vieux_min);
   const cad = chronique.cadence();
   cy.title = 'Dernière publication (cadence ' + (cad ? 'mesurée ' + Math.round(cad / 60000) : 'attendue ' + CADENCES.attendue_min) + ' min) — cliquer pour le détail';
   ajusterKpis();
 }
+// Le nom accessible commence par le texte visible (« Infos du marché »), l'âge ensuite.
+const ariaKpiDeb = min => 'Infos du marché — ' + titreKpiDeb(min);
+// Au clavier : Entrée ou Espace sur la pastille ouvre les cartes (comme le clic sur #cycle).
+(function () {
+  const cy = typeof document !== 'undefined' && document.getElementById ? document.getElementById('cycle') : null;
+  if (cy && cy.addEventListener) cy.addEventListener('keydown', e => {
+    if (!(e.target && e.target.classList && e.target.classList.contains('kpi-deb'))) return;
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); e.stopPropagation(); toggleFeed(); }
+  });
+})();
 const titreKpiDeb = min => (min === null ? 'Infos publiées : âge inconnu' : 'Infos publiées il y a ' + min + ' min') + ' (toutes les ' + CADENCES.attendue_min + ' min). Le prix du haut est en direct.';
 function renderFeed() { renderFeedTo(document.getElementById('feed')); }
 // Un âge en minutes, réécrit sur place à chaque tour par majAges().
@@ -6630,8 +6728,8 @@ function renderFeedTo(container) {
   html += mCard('🌍', modes('Macro', 'Bourses américaines'), modes('Dollar et volatilité · Yahoo', 'Yahoo · ' + ilYaDeb(d.updated, ageMin)), '',
     '<div class="tuiles deb-une">'
     + envExpert(tuile('DXY', fmtNum(m.dxy_spot,2), ferme ? 'clôture' + (m.dxy_date ? ' du ' + escHtml(m.dxy_date) : '') : 'indice dollar', 'dxy'))
-    + tuile(modes('VIX', 'Nervosité des bourses (VIX)'), modes(fmtNum(m.vix,1), isNum(m.vix) ? escHtml(Guide.nombre(m.vix, 1)) : '—'),
-      modes(ferme ? 'clôture' : 'volatilité implicite S&amp;P', ferme ? 'bourse américaine, dernière séance' : 'bourse américaine'), 'vix', phraseCarte('vix', m.vix))
+    + tuile(modes('VIX', 'Nervosité des bourses'), modes(fmtNum(m.vix,1), isNum(m.vix) ? escHtml(Guide.nombre(m.vix, 1)) : '—'),
+      modes(ferme ? 'clôture' : 'volatilité implicite S&amp;P', ferme ? 'dernière séance' : ''), 'vix', phraseCarte('vix', m.vix))
     + '</div>');
 
   // ── 3. INDICATEURS ──

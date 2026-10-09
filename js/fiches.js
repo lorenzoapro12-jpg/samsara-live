@@ -20,12 +20,21 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const MODE_CLE = 'samsara-mode';
+// Le mode quand le stockage ne le garde pas (navigation privée, stockage bloqué) : la page entière
+// — classes, bouton ET graphique — lit alors ce mode-ci, jamais un stockage muet ou figé.
+let MODE_MEMOIRE = null;
+function modeHtml() {
+  try { return document.documentElement.getAttribute('data-mode') === 'expert' ? 'expert' : 'debutant'; } catch (e) { return 'debutant'; }
+}
 function modeCourant() {
-  try { return localStorage.getItem(MODE_CLE) === 'expert' ? 'expert' : 'debutant'; } catch (e) { return 'debutant'; }
+  if (MODE_MEMOIRE) return MODE_MEMOIRE;
+  try { return localStorage.getItem(MODE_CLE) === 'expert' ? 'expert' : 'debutant'; } catch (e) { return modeHtml(); }
 }
 function appliquerMode(m) {
   document.documentElement.setAttribute('data-mode', m);
-  try { localStorage.setItem(MODE_CLE, m); } catch (e) { /* navigation privée */ }
+  let garde = false;
+  try { localStorage.setItem(MODE_CLE, m); garde = localStorage.getItem(MODE_CLE) === m; } catch (e) { /* navigation privée */ }
+  MODE_MEMOIRE = garde ? null : m;
   const b = document.getElementById('modeBtn');
   if (b) {
     // Débutant : le bouton dit où il mène (« Débutant · passer en Expert », « Passer en Expert »
@@ -35,7 +44,10 @@ function appliquerMode(m) {
     b.setAttribute('aria-pressed', m === 'expert' ? 'true' : 'false');
   }
   const c = document.getElementById('carteBtn');
-  if (c) c.title = m === 'expert' ? 'Carte du carnet (bookmap) — page à côté' : 'Carte des ordres en attente (page à côté)';
+  if (c) {
+    c.title = m === 'expert' ? 'Carte du carnet (bookmap) — page à côté' : 'Carte des ordres en attente (page à côté)';
+    c.setAttribute('aria-label', m === 'expert' ? 'Carte du carnet' : 'Carte des ordres en attente');
+  }
   const r = document.getElementById('resetBtn');
   if (r) r.title = m === 'expert' ? 'Réinitialiser le zoom (R)' : 'Revenir au présent (R)';
   // Le graphique écrit ses mots selon le mode (le canvas n'a pas de classes) : remise en page et
@@ -573,7 +585,14 @@ document.addEventListener('click', e => {
  *  'cvd' (v : écart achats − ventes en $), 'sources' (v : à jour, v2 : attendues). */
 function phraseCarte(cle, v, v2) {
   const n = x => typeof x === 'number' && isFinite(x);
-  const dollars = x => Math.round(Math.abs(x)).toLocaleString('fr-FR').replace(/[\u00a0\u202f]/g, ' ') + ' $';
+  // Un montant se lit arrondi : « 3,4 millions $ », « 1,2 milliard $ » ; sous un million, en dollars entiers.
+  const fr = (x, d) => x.toLocaleString('fr-FR', { maximumFractionDigits: d }).replace(/[\u00a0\u202f]/g, ' ');
+  const dollars = x => {
+    const a = Math.abs(x);
+    if (a >= 1e9) { const m = Math.round(a / 1e8) / 10; return fr(m, 1) + (m >= 2 ? ' milliards $' : ' milliard $'); }
+    if (a >= 1e6) { const m = Math.round(a / 1e5) / 10; return fr(m, 1) + (m >= 2 ? ' millions $' : ' million $'); }
+    return fr(Math.round(a), 0) + ' $';
+  };
   let t = null;
   switch (cle) {
     case 'fourchette': if (n(v)) t = 'Sur ' + (v2 || '24 h') + ', le prix est ' + (v >= 2 / 3 ? 'dans le haut' : v <= 1 / 3 ? 'dans le bas' : 'au milieu') + ' de sa fourchette.'; break;
