@@ -7,8 +7,10 @@
 //      dernière clôture), il ne change pas d'un tick à l'autre quand la clôture oscille ;
 //   3. « fini » : « noté par le journal » / « le journal les a notés » quand les statuts sont là ;
 //   4. honnêteté du nom : sur toutes les minutes du 08/10, la ligne Débutant ne dit « le N suit
-//      mieux » que si N a le plus petit écart EN CE MOMENT ; la bulle Expert ne dit « plus petit
-//      écart pour l'instant » que pour lui (14:05 et 14:10 compris) ;
+//      mieux » que si N avait le plus petit écart à la DERNIÈRE CLÔTURE de 15 min (changé
+//      délibérément au round 2 : « net » se décide à la clôture, comme le nom ; les noms gardés à la
+//      clôture et la stabilité dans une bougie : test_scenarios_jour_stable.js, sur le 09/10) ; la
+//      bulle Expert ne dit plus jamais « pour l'instant » ;
 //   5. les coches : la chaîne stricte avant l'invalidation, aucune après (06/10, le 2 invalidé à
 //      13:30 puis touché le 07/10), aucune sur une note ❌ du journal ;
 //   6. une note ❌ du journal sans heure de résolution ne s'efface pas d'un coup ;
@@ -124,25 +126,27 @@ titre('4. Honnêteté du nom, sur toutes les minutes du 08/10 (bougie 15 min en 
     const J = S.classerJour(items, c, F08, now, memo.get(nClos), PJ);
     n++;
     if (J.meneur && !S.nomNet(J)) gardes++;
-    const premier = J.ouverts.length ? J.ouverts[0].sc.rang : null;
+    const premier = J.pointe ? J.pointe.sc.rang : null;
     for (const max of [48, 40]) {
       const L = S.ligneJourDebutant(F08, J, items, now, max, {}), mm = L.match(/le (\d)\b[^·]*suit mieux/);
       if (mm && mm[1] !== premier) faux.push([hm(t), max, L, 'plus petit écart : ' + premier]);
     }
     for (const x of J.items) {
       const b = S.ligneJourExpert(x, J, { itv: '15 min', maintenant: now }) || '';
-      if (/plus petit écart pour l’instant/.test(b) && x.sc.rang !== premier) fauxE.push([hm(t), x.sc.rang, premier]);
+      if (/pour l’instant/.test(b) || (/plus petit écart à la dernière clôture/.test(b) && x.sc.rang !== premier)) fauxE.push([hm(t), x.sc.rang, premier]);
     }
   }
-  check(`ligne Débutant : « le N suit mieux » seulement pour le plus petit écart du moment (${n} minutes, dont ${gardes} à nom gardé)`, !faux.length && gardes > 0, faux.slice(0, 5));
-  check('bulle Expert : « plus petit écart pour l’instant » seulement pour le plus petit écart du moment', !fauxE.length, fauxE.slice(0, 5));
+  check(`ligne Débutant : « le N suit mieux » seulement pour le plus petit écart de la dernière clôture (${n} minutes, dont ${gardes} à nom gardé)`, !faux.length, faux.slice(0, 5));
+  check('bulle Expert : jamais « pour l’instant » ; « plus petit écart à la dernière clôture » seulement pour lui', !fauxE.length, fauxE.slice(0, 5));
   for (const hh of ['14:05', '14:10']) {
     const x = instant(F08, k15, '2026-10-08T' + hh + 'Z'), J = x.J, m = J.meneur, p0 = J.ouverts[0];
     const L48 = S.ligneJourDebutant(F08, J, x.items, x.now, 48, {}), bm = S.ligneJourExpert(m, J, { itv: '15 min', maintenant: x.now }), b0 = S.ligneJourExpert(p0, J, { itv: '15 min', maintenant: x.now });
-    check(`${hh} : nom gardé (${m && m.sc.rang}) sans le plus petit écart (${p0.sc.rang}) → ligne cas A « ${L48} »`, m && m !== p0 && !S.nomNet(J) && L48 === 'Scénario du matin : en cours (en direct) ▸', [L48, m && m.sc.rang, p0.sc.rang]);
-    check(`${hh} : bulle Expert du nom gardé : « nom gardé … ; plus petit écart en ce moment : ${p0.sc.rang} », jamais « plus petit écart pour l’instant »`, /nom gardé \(revu à chaque clôture de 15 min, écart net exigé\) ; plus petit écart en ce moment : \d/.test(bm) && !/plus petit écart pour l’instant/.test(bm), bm);
-    check(`${hh} : bulle Expert du ${p0.sc.rang} : « plus petit écart en ce moment »`, /plus petit écart en ce moment ; le nom reste au \d/.test(b0), b0);
-    check(`${hh} : « ◂ » sur le ${p0.sc.rang} (plus petit écart), pas sur le nom gardé`, S.pointe(p0, J) && !S.pointe(m, J) && / ◂$/.test(S.suffixeExpert(p0, J)) && !/◂/.test(S.suffixeExpert(m, J)));
+    // Le 2 avait le plus petit écart à 14:00 ; le 1 est un peu plus près en ce moment : la ligne et
+    // « ◂ » restent au 2 jusqu'à 14:15 ; la bulle du 1 dit qu'il est plus près en ce moment.
+    check(`${hh} : le 2 nommé et au plus petit écart à 14:00, le ${p0.sc.rang} plus près en ce moment → ligne « ${L48} » (figée jusqu’à 14:15)`, m && m !== p0 && S.nomNet(J) && L48 === 'En direct : le 2 (80 806 $) suit mieux le prix ▸', [L48, m && m.sc.rang, p0.sc.rang]);
+    check(`${hh} : bulle Expert du nommé : « plus petit écart à la dernière clôture de 15 min, d’où le nom »`, /plus petit écart à la dernière clôture de 15 min, d’où le nom/.test(bm) && !/pour l’instant/.test(bm), bm);
+    check(`${hh} : bulle Expert du ${p0.sc.rang} : « plus petit écart en ce moment (… revus à la prochaine clôture …) »`, /plus petit écart en ce moment \(le nom et « ◂ » sont revus à la prochaine clôture de 15 min\)/.test(b0), b0);
+    check(`${hh} : « ◂ » sur le 2 (plus petit écart à la clôture), pas sur le ${p0.sc.rang}`, S.pointe(m, J) && !S.pointe(p0, J) && / ◂$/.test(S.suffixeExpert(m, J)) && !/◂/.test(S.suffixeExpert(p0, J)));
   }
 }
 

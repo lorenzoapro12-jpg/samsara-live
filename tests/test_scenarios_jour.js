@@ -10,7 +10,7 @@
 //   4. fondu (depuis la clôture de la bougie du contact, M10), reste ;
 //   5. lignes Débutant (A à I, M4) : longueurs, « (en direct) » / « (journal) », aucun mot banni,
 //      aucun %, aucun conseil ; libellé réalisé « zone … ✓ » (A3) ;
-//   6. textes Expert : « Plus petit écart pour l’instant », « nom gardé » quand l'hystérésis garde un autre nom, jamais « écart 0,xx » ni « en tête » (A2) ;
+//   6. textes Expert : « Plus petit écart : N (clôture de 15 min …) », « nom gardé » quand l'hystérésis garde un autre nom à la clôture, jamais « écart 0,xx » ni « en tête » (A2) ;
 //   7. raison() (chemin, range, ambigu, mèche) ; pas() avec la clôture (contact en mèche) ;
 //   8. coût : rejeu de 3000 bougies 1 min, classement + bougie en cours.
 // USAGE   node tests/test_scenarios_jour.js
@@ -235,13 +235,17 @@ titre('5. Lignes Débutant (cas A à I) : longueurs, marques, mots');
   };
   for (const h of ['05:00', '10:00', '14:05', '15:40', '17:40']) { const x = instant(F08, k15, h); pousser('08/10 ' + h + ' (' + x.J.cas + ')', F08, x.J, x.items, x.now); }
   const c14 = lignes.find(l => l.nom.startsWith('08/10 14:05') && l.max === 48), d15 = lignes.find(l => l.nom.startsWith('08/10 15:40') && l.max === 48);
-  // Changé délibérément (revue) : à 14:05 le nom (2) n'est gardé que par l'hystérésis, le 1 a le
-  // plus petit écart → la ligne ne dit pas « le 2 suit mieux » (cas A ; le nom gardé est dans les
-  // bulles). Le cas C lui-même est vérifié à 13:50 (le 2 a alors le plus petit écart).
-  check(`C (14:05, nom 2 gardé, le 1 a le plus petit écart) : cas A « ${c14.t} »`, c14.t === 'Scénario du matin : en cours (en direct) ▸', c14.t);
+  // Changé délibérément (revue, round 2) : « net » se décide à la clôture de 15 min, comme le nom
+  // (sinon la ligne faisait des allers-retours dans une même bougie). À 14:05, le 2 avait le plus
+  // petit écart à la clôture de 14:00 : cas C pour tout le quart d'heure, même si le 1 est un peu plus
+  // près en ce moment. Le cas A d'un nom gardé à la clôture : test_scenarios_jour_stable.js (09/10).
+  { const x14 = instant(F08, k15, '14:05');
+    check(`C (14:05, le 2 au plus petit écart à la clôture de 14:00, le 1 plus près en ce moment) : « ${c14.t} »`, c14.t === 'En direct : le 2 (80 806 $) suit mieux le prix ▸' && S.nomNet(x14.J) && x14.J.ouverts[0].sc.rang === '1' && x14.J.pointe.sc.rang === '2', [c14.t, x14.J.ouverts[0].sc.rang]); }
   { const x = instant(F08, k15, '13:50'), t = S.ligneJourDebutant(F08, x.J, x.items, x.now, 48, {});
     check(`C (13:50, le 2 nommé ET au plus petit écart) : « ${t} »`, S.nomNet(x.J) && x.J.meneur && x.J.meneur.sc.rang === '2' && t === 'En direct : le 2 (80 806 $) suit mieux le prix ▸', [t, x.J.cas, S.nomNet(x.J)]); }
-  check(`D (15:40, le 2 réalisé, le 1 ouvert) : « ${d15.t} »`, d15.t === 'En direct : zone du 2 (80 806 $) ✓ ▸', d15.t);
+  // Changé délibérément (revue, round 2) : le 3 s'est fermé dans la même heure (un fait frais) ; la
+  // ligne dit les deux tant qu'elle tient (à 40 caractères : « zone du 2 ✓ · scén. 3 ✗ »).
+  check(`D (15:40, le 2 réalisé, le 1 ouvert, le 3 fermé depuis peu) : « ${d15.t} »`, d15.t === 'En direct : zone du 2 (80 806 $) ✓ · scén. 3 ✗ ▸', d15.t);
   // Rang 1 en chemin (le 3 du 08/10 en tête), le range en 2 : E et F « invalidé ».
   const fx = JSON.parse(JSON.stringify(X08.fichier));
   const [r0, r1, r2] = fx.scenarios; r2.rang = '1'; r0.rang = '2'; r1.rang = '3'; r1.cibles = [Math.round(r1.prix_emission * 0.96)];
@@ -273,16 +277,21 @@ titre('6. Textes Expert : une mesure, jamais un indice en liste ni « en tête �
   const items = F08.scenarios.map(sc => ({ sc, sv: S.etat(sc, S.plier(sc, k15.T, k15.H, k15.L, 0, n + 1, null, Q, k15.C), now) }));
   const J = S.classerJour(items, k15.C[n], F08, now, S.rejouerJour(F08, F08.scenarios, k15.T, k15.H, k15.L, k15.C, n, Q, PJ), PJ);
   const ph = S.phraseJourExpert(J), suf = J.items.map(i => S.suffixeExpert(i, J)), re = S.ligneResteExpert(J);
-  // 14:05 : le nom (2), décidé à la clôture de 13:45, est gardé (hystérésis) alors que le 1 a
-  // maintenant un écart plus petit : l'encadré dit les deux, jamais « plus petit écart : 2 ».
-  check(`phrase, nom gardé sans le plus petit écart : « ${ph[0]} »`, !S.nomNet(J) && ph[0] === 'Plus petit écart pour l’instant : 1 · nom gardé : 2 (revu à chaque clôture de 15 min, écart net exigé)'
-    && ph.includes('Écart min. : 1 · nom gardé : 2') && !ph.some(t => /Plus petit écart( pour l’instant)? : 2\b|Écart min\. : 2\b/.test(t)), ph);
-  const Jn = Object.assign({}, J, { meneur: J.ouverts[0] }), ph2 = S.phraseJourExpert(Jn);
-  check(`phrase, le nom a le plus petit écart : « ${ph2[0]} »`, S.nomNet(Jn) && ph2[0] === 'Plus petit écart pour l’instant : 1 (une mesure, pas une probabilité)' && ph2.includes('Écart min. : 1'), ph2);
+  // Changé délibérément (revue, round 2) : tout se lit à la dernière clôture de 15 min. À 14:05, le
+  // 2 (nommé) avait le plus petit écart à 14:00 : « Plus petit écart : 2 », jamais « pour
+  // l'instant » (le 1 est un peu plus près en ce moment ; revu à 14:15).
+  check(`phrase, le nom a le plus petit écart à la clôture : « ${ph[0]} »`, S.nomNet(J) && ph[0] === 'Plus petit écart : 2 (clôture de 15 min ; une mesure, pas une probabilité)' && ph.includes('Écart min. : 2') && !ph.some(t => /pour l’instant/.test(t)), ph);
+  // Nom gardé à la clôture (un autre avait un écart un peu plus petit, sans avance nette) : l'encadré dit les deux.
+  const Jg = Object.assign({}, J, { pointe: J.items[0] }), ph2 = S.phraseJourExpert(Jg);
+  check(`phrase, nom gardé sans le plus petit écart à la clôture : « ${ph2[0]} »`, !S.nomNet(Jg) && ph2[0] === 'Plus petit écart : 1 · nom gardé : 2 (avance pas assez nette à la clôture de 15 min)'
+    && ph2.includes('Écart min. : 1 · nom gardé : 2') && !ph2.some(t => /Plus petit écart : 2\b|Écart min\. : 2\b/.test(t)), ph2);
   const tous = ph.concat(suf, re);
   check('encadré : aucun « écart 0,xx », aucun « en tête », aucun « % », aucun « probable »', tous.every(t => !/écart (relatif )?0,\d/.test(t) && !/en tête/.test(t) && !/%/.test(t) && !/probable/.test(t)), tous);
-  // Changé délibérément (revue) : « ◂ » marque le plus petit écart EN CE MOMENT (le 1), plus le nom gardé (le 2).
-  check(`suffixes en dollars, ◂ sur le plus petit écart : « ${suf.join(' » « ')} »`, /^ · bord toléré à [\d ]+ \$ ◂$/.test(suf[0]) && /^ · zone à [\d ]+ \$ · inv\. à [\d ]+ \$$/.test(suf[1]), suf);
+  // Changé délibérément (revue, round 2) : « ◂ » marque le plus petit écart de la DERNIÈRE CLÔTURE
+  // (le 2 à 14:00), figé jusqu'à la suivante ; avec un nom gardé, il va au plus petit écart (le 1).
+  const sufG = J.items.map(i => S.suffixeExpert(i, Jg));
+  check(`suffixes en dollars, ◂ sur le plus petit écart de la clôture : « ${suf.join(' » « ')} » ; nom gardé : « ${sufG.join(' » « ')} »`, /^ · bord toléré à [\d ]+ \$$/.test(suf[0]) && /^ · zone à [\d ]+ \$ · inv\. à [\d ]+ \$ ◂$/.test(suf[1])
+    && /^ · bord toléré à [\d ]+ \$ ◂$/.test(sufG[0]) && !/◂/.test(sufG[1]), [suf, sufG]);
   check(`temps restant : « ${re[0]} »`, /^Reste 14 h 15 \(fin 09\/10 04:20 UTC\) · aucune nouvelle prévision avant le prochain point$/.test(re[0]), re);
   const bulle = S.ligneJourExpert(J.items[1], J, { itv: '15 min', maintenant: now });
   check('bulle Expert : l’indice SEULEMENT avec sa formule et son nom complet', /écart relatif 0,\d\d = [\d ]+ \/ \([\d ]+ \+ [\d ]+\) \(0 = sur la zone, 1 = sur l’invalidation\)/.test(bulle) && /une mesure, pas une probabilité/.test(bulle), bulle);

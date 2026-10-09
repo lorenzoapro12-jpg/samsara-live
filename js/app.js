@@ -5405,7 +5405,15 @@ function scenTracer(S) {
   }
   scenBoite(S, top, bas);
   if (!S.F) return;
-  for (const it of S.items) scenChemin(S, it, top, bas);
+  // Le chemin du scénario NOMMÉ (plus petit écart) d'abord : les autres le contournent. S'il n'a
+  // pas de place pour sa flèche, aucun autre n'en a (une seule flèche partant du prix, celle d'un
+  // scénario moins proche, se lirait comme la plus probable) : leurs repères restent.
+  const nomme = S.items.find(i => i.meneur && i.ouvert && i.sc.forme === 'chemin');
+  S.flechesBloquees = false;
+  for (const it of nomme ? [nomme].concat(S.items.filter(i => i !== nomme)) : S.items) {
+    scenChemin(S, it, top, bas);
+    if (it === nomme && !it.fleche) S.flechesBloquees = true;
+  }
   for (const it of S.items) scenMarques(S, it, top, bas);
   const un = S.items.find(it => it.sc.rang === '1');
   if (!un || S.unPose) { const sb = scenSurBougies(S); for (const it of S.items) if (it.sc.rang !== '1') scenLibelle(S, it, top, bas, sb); }
@@ -5448,8 +5456,14 @@ function scenMarques(S, it, top, bas) {
   if (!marques.length) return;
   const c = it.coul, R = 3.5;
   for (const m of marques) {
-    const x = xDeT(m.t + (m.journal ? 0 : pas / 2)), y = yDe(m.y);
+    const x = xDeT(m.t + (m.journal ? 0 : pas / 2));
+    let y = yDe(m.y);
+    // Deux marques au même point (la coche d'un scénario, la croix d'un autre : la zone de l'un est
+    // l'invalidation de l'autre) : décalées de quelques pixels (coche au-dessus, croix au-dessous).
+    const pris = S.marquesPos || (S.marquesPos = []);
+    for (let k = 0; k < 3 && pris.some(q => Math.abs(q.x - x) < 2 * R + 1 && Math.abs(q.y - y) < 2 * R + 1); k++) y += m.ok ? -(2 * R + 2) : 2 * R + 2;
     if (!(x >= g.pad.left + R && x <= xMax - R && y >= top + R && y <= bas - R)) continue;
+    pris.push({ x, y });
     let pose = null, w = 0;
     if (!S.deb) {
       ctx.font = chartFont(8.5, 650);
@@ -5583,6 +5597,7 @@ function scenChemin(S, it, top, bas) {
     const pv = vis.map(p => [p.x, p.y]);
     let chemin = vis.length ? [p0].concat(pv) : [];
     if (chemin.length && croise(chemin)) chemin = pv.length >= 2 && !croise(pv) ? pv : [];
+    if (S.flechesBloquees) chemin = [];
     const tous = segsDe(chemin), fleche = chemin.length >= 2;
     if (fleche) { for (const sg of tous) { segs.push(sg); S.segsPris.push(sg); } }
     for (const p of vis) rects.push({ x0: p.x - R - 2, y0: p.y - R - 2, x1: p.x + R + 2, y1: p.y + R + 2 });
@@ -5645,8 +5660,10 @@ function scenLibelle(S, it, top, bas, surBougies) {
   const exper = Scenarios.libelle(sc, 'expert');
   // Le plus petit écart de la journée (la mesure, jamais sa valeur sur le tracé) ; un scénario fermé
   // dit pourquoi ; une fois effacé (fondu fini), son état court seulement.
-  const net = it.meneur && Scenarios.nomNet(S.jour);   // gardé sans avoir le plus petit écart : « nom gardé »
-  const base = exp ? (it.meneur ? (net ? [exper + ' · plus petit écart', exper + ' · écart min.'] : [exper + ' · nom gardé']) : [exper]) : [...new Set([Scenarios.libelle(sc, 'debutant', 'complet'), Scenarios.libelle(sc, 'debutant'), Scenarios.libelle(sc, 'debutant', true)])];
+  // Décidé à la clôture de 15 min (Scenarios.nomNet) : « plus petit écart », « nom gardé » (l'avance
+  // d'un autre n'était pas nette) ou « nom repris » (le nommé s'est fermé) ne change pas d'un tick à l'autre.
+  const net = it.meneur && Scenarios.nomNet(S.jour), repris = it.meneur && S.jour && S.jour.remplace;
+  const base = exp ? (it.meneur ? (net ? [exper + ' · plus petit écart', exper + ' · écart min.'] : [exper + (repris ? ' · nom repris' : ' · nom gardé')]) : [exper]) : [...new Set([Scenarios.libelle(sc, 'debutant', 'complet'), Scenarios.libelle(sc, 'debutant'), Scenarios.libelle(sc, 'debutant', true)])];
   const rai = exp && !it.ouvert && sc.statut === '⏳' ? Scenarios.raison(sc, it.sv, 'expert') : null, efface = it.fondu === 0;
   // Après le fondu, l'Expert garde ses niveaux et sa raison (le détail reste) ; seul le Débutant
   // n'a plus que l'état court.
@@ -5746,6 +5763,7 @@ function scenBoite(S, top, bas) {
   const etroit = g.pw < P.etroit, tactile = etroit || (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches);
   const wMax = Math.floor(Math.min(P.boiteMax, (S.xMax - g.pad.left) * (etroit ? P.boiteFractionEtroit : P.boiteFraction)));
   const L = [];   // { t, f: 'titre' | 'ligne' | 'note' | 'seule', it, garde, compact, toujours }
+  let PJx = [], RE = [];   // Expert : les variantes de la phrase de la journée et du temps restant
   const heure = ms => Scenarios.heureUTC(ms) + ' UTC';
   let titreBoite, large = false;
   if (!F) {
@@ -5762,14 +5780,17 @@ function scenBoite(S, top, bas) {
     large = S.items.some(i => i.et.cle === 'large');
     // La journée : le plus petit écart (ou « trop tôt », « aucun ne colle », « seul encore en cours »…),
     // une mesure et jamais une probabilité ; les distances en dollars sur chaque ligne (jamais l'indice).
-    const PJx = exp && S.jour ? [...new Set(Scenarios.phraseJourExpert(S.jour, PARAM.scenarios.jour))] : [];
+    PJx = exp && S.jour ? [...new Set(Scenarios.phraseJourExpert(S.jour, PARAM.scenarios.jour))] : [];
     if (PJx.length) L.push({ t: PJx[0], tc: PJx[Math.min(1, PJx.length - 1)], f: 'jour', variantes: PJx });
     for (const it of S.items) {
       const et = large && it.et.cle === 'large' ? null : it.et, suf = exp && it.j ? Scenarios.suffixeExpert(it.j, S.jour) : '';
-      L.push({ t: Scenarios.ligne(it.sc, et, S.mode) + suf, tc: Scenarios.ligne(it.sc, et, S.mode, true) + (exp && it.j && Scenarios.pointe(it.j, S.jour) ? ' ◂' : ''), f: 'ligne', it });
+      const lc = Scenarios.ligne(it.sc, et, S.mode, true), mq = exp && it.j && Scenarios.pointe(it.j, S.jour) ? ' ◂' : '';
+      // Forme courte : avec ses distances en dollars si elles tiennent sur la ligne, sinon sans.
+      L.push({ t: Scenarios.ligne(it.sc, et, S.mode) + suf, tc: lc + mq, tcs: suf ? [lc + suf, lc + mq] : null, f: 'ligne', it });
     }
     if (large) L.push({ t: Scenarios.noteLarge(S.itv, S.mode), f: 'note', toujours: true });
-    const RE = exp && S.jour ? Scenarios.ligneResteExpert(S.jour) : [];
+    RE = exp && S.jour ? Scenarios.ligneResteExpert(S.jour) : [];
+    // Le temps restant : dans les formes compactes, au bout de leur note (même hauteur).
     if (RE.length) L.push({ t: RE[0], tc: RE[1], f: 'note', garde: 2, variantes: RE });
     const sem = !!semI;
     if (!exp) L.push({ t: 'Classement de Claude (une IA) : 1 = jugé le plus probable, 3 = le moins' + (sem ? ' ; la ligne Semaine est à part' : '') + '. Sans pourcentage.', f: 'note', garde: 2 });
@@ -5795,6 +5816,11 @@ function scenBoite(S, top, bas) {
       // Forme compacte (compact = 2 ou 1) : sa note sur `compact` lignes, et le bilan en bref.
       if (l.f === 'note' && !l.toujours && (compact ? !(l.compact === compact || l.compact === 'bilan') : l.compact || l.garde < gardeMin)) continue;
       ctx.font = police(l.f);
+      if (compact && l.compact === compact && RE.length) {
+        const ls = guideLignes(ctx, l.t + ' · ' + RE[RE.length - 1], wMax - 16, compact);
+        if (!/…$/.test(ls[ls.length - 1])) { out.push(...ls.map(t => ({ t, f: l.f, h: hL(l.f) }))); continue; }
+      }
+      if (court && l.tcs) { const v = l.tcs.find(x => ctx.measureText(x).width <= wMax - 16); if (v) { out.push({ t: v, f: l.f, it: l.it, h: hL(l.f) }); continue; } }
       // La ligne de la journée et celle du temps restant : sur UNE ligne, la plus riche qui tient.
       if (l.variantes) { const v = l.variantes.find(x => ctx.measureText(x).width <= wMax - 16) || l.variantes[l.variantes.length - 1]; out.push({ t: guideCouper(ctx, v, wMax - 16) || v, f: l.f, h: hL(l.f) }); continue; }
       const nMax = l.f === 'ligne' ? maxL : l.compact ? 1 : 2;
@@ -5821,8 +5847,14 @@ function scenBoite(S, top, bas) {
     const tSans = titreBoite + ' · classés sans pourcentage';
     pousser(niveau === 0 && !exp && ctx.measureText(tSans).width <= wMax - 16 ? tSans : titreBoite, 'titre', 2);
     const etats = Scenarios.ligneEtats(S.items, S.mode, large);
-    const J = S.jour, nomJ = exp && J && J.cas === 'meneur' ? (Scenarios.nomNet(J) ? ' · écart min. : ' : ' · nom gardé : ') + J.meneur.sc.rang : exp && J && J.cas === 'tot' ? ' · trop tôt pour départager' : '';
+    const J = S.jour, nomJ = exp && J && J.cas === 'meneur' ? (Scenarios.nomNet(J) ? ' · écart min. : ' : J.remplace ? ' · nom repris : ' : ' · nom gardé : ') + J.meneur.sc.rang : exp && J && J.cas === 'tot' ? ' · trop tôt pour départager' : '';
     if (etats) pousser(etats + nomJ, 'etats', 2);
+    // Expert : la phrase courte de la journée (sauf un nom, déjà dit) et le temps restant, sur une ligne.
+    if (exp && niveau >= 0 && J) {
+      const pj = J.cas === 'meneur' || J.cas === 'tot' ? null : PJx[PJx.length - 1], re = RE.length ? RE[RE.length - 1] : null;
+      const tj = [pj, re].filter(Boolean).join(' · ');
+      if (tj) pousser(tj, 'jour', 1);
+    }
     const bc = Scenarios.texteBilan(F.bilan, P, 'expert');
     if (niveau === 2) {
       if (!exp) pousser('Classé par Claude (IA), sans pourcentage', 'note', 1);
@@ -5965,8 +5997,12 @@ function scenTexteBoite(S, sansBilan, court) {
     // Les lignes courtes des scénarios (niveaux, invalidation, état), le bilan, ce qui est en direct.
     const large = S.items.some(i => i.et.cle === 'large');
     const b = Scenarios.texteBilan(F.bilan, P, S.mode);
+    // Expert : la journée aussi (plus petit écart, « seul », « hors », distances, temps restant).
+    const J = exp ? S.jour : null, PJ = J ? Scenarios.phraseJourExpert(J, PARAM.scenarios.jour) : [], RE = J ? Scenarios.ligneResteExpert(J) : [];
     return [exp ? 'États : suivi en direct sur les bougies ' + S.itv + ' (un affichage) ; note officielle : le journal, le lendemain.' : 'Les états sont un suivi EN DIRECT sur les bougies ' + S.itv + ' (un affichage) ; la note officielle est celle du journal, le lendemain.']
-      .concat(S.items.map(it => Scenarios.ligne(it.sc, large && it.et.cle === 'large' ? null : it.et, S.mode, true)))
+      .concat(PJ.length ? [PJ[Math.min(1, PJ.length - 1)] + '.'] : [])
+      .concat(S.items.map(it => Scenarios.ligne(it.sc, large && it.et.cle === 'large' ? null : it.et, S.mode, true) + (J && it.j ? Scenarios.suffixeExpert(it.j, J) : '')))
+      .concat(RE.length ? [RE[Math.min(1, RE.length - 1)] + '.'] : [])
       .concat(large ? [Scenarios.noteLarge(S.itv, 'debutant')] : [])
       .concat(b ? [b + '.'] : [])
       .concat(exp ? [] : ['Classé par Claude (une IA), du plus au moins probable, sans pourcentage.'])
@@ -6070,7 +6106,11 @@ function scenTexteDebutant(S, it, court) {
   const out = [Scenarios.enteteDebutant(F, P, S.maintenant)].concat(court ? ex.slice(0, 1).concat(ex.filter(t => /^Suivi en direct|^Maintenant :|^Pour l’instant|^Nommé |^Rang /.test(t))) : ex);
   const autres = S.items.filter(i => i !== it);
   // Écran court : les autres en peu de mots (« 2. vers 80 806 $ — en cours (en direct) »).
-  if (autres.length) out.push('Les autres scénarios de Claude : ' + autres.map(i => (court ? Scenarios.ligneCourteDebutant(i.sc, i.sv) : Scenarios.ligneDebutant(i.sc, i.sv))).join(' · '));
+  // Un scénario fermé (ou réalisé) ici dit sa raison (la zone touchée, « par un passage bref du
+  // prix » pour un contact en mèche) : jamais « réalisé ✓ » seul.
+  // Écran court : sans la raison (la place manque), mais « par un passage bref du prix » reste.
+  if (autres.length) out.push('Les autres scénarios de Claude : ' + autres.map(i => (court ? Scenarios.ligneCourteDebutant(i.sc, i.sv, S.maintenant, true)
+    : i.j && S.jour && !i.j.ouvert ? Scenarios.ligneDebutantJour(i.j, S.jour).replace(/\.$/, '') : Scenarios.ligneDebutant(i.sc, i.sv, S.maintenant))).join(' · '));
   // Le classement « sans pourcentage » est dit une fois (le sens du rang, dans l'explication).
   out.push('Une hypothèse de Claude (une IA), pas une promesse ni un conseil.');
   return out;
@@ -6114,13 +6154,17 @@ function scenLibelleDebutant(S, it, top, bas) {
   // Les libellés du plus riche au plus court (« Scén. 1 » en dernier) : un libellé qui ne trouve
   // pas sa place laisse essayer le suivant, plus court (360 px, police à chasse fixe).
   const fl = hors < 0 ? '↑' : hors > 0 ? '↓' : null;
-  const VJ = it.j ? Scenarios.libellesJourDebutant(it.j, P.scenario, fl) : Scenarios.libellesDebutant(sc, it.sv, P.scenario, fl);
+  const VJ = it.j ? Scenarios.libellesJourDebutant(it.j, P.scenario, fl, S.maintenant) : Scenarios.libellesDebutant(sc, it.sv, P.scenario, fl);
   const V = VJ.filter(t => m(t) <= droite - x0);
   let pose = null, xp = x0, t = null, w = 0;
   for (const tv of V.length ? V : [VJ[VJ.length - 1]]) {
     const wv = Math.min(m(tv), droite - x0);
     const xBox = Math.max(x0, S.xDeT(sc.emis) + 4);
-    const xs = [droite - wv].concat(range ? [Math.max(x0, Math.min(droite - wv, xBox))] : []).concat([Math.max(x0, (x0 + droite) / 2 - wv / 2), x0]);
+    // Un range se nomme sur sa boîte : dedans d'abord, sinon collé à son bord droit et au moins à
+    // moitié dedans (écran étroit) — jamais au milieu du tracé, au-dessus des bougies d'avant le
+    // point (il s'y lisait comme un autre niveau). Sans place, pas de libellé (la ligne le nomme).
+    const xs = range ? [droite - wv, xBox, (xBox + droite) / 2 - wv / 2].sort((a, b) => (a >= xBox - 0.5 ? 0 : 1) - (b >= xBox - 0.5 ? 0 : 1)).filter(x => x + wv / 2 >= xBox && x >= x0 - 0.5 && x + wv <= droite + 0.5)
+      : [droite - wv, Math.max(x0, (x0 + droite) / 2 - wv / 2), x0];
     for (const [es, ve] of placements) {
       for (const [ev, g0] of [[r => dur(r) || prixL(r) || surBougies(r), 3], [r => dur(r) || prixL(r), 3], [r => dur(r) || prixL(r), 8], [dur, 8]]) {
         for (const x of xs) if ((pose = guidePlacer(S.rects, x, wv, H, es, top, bas, ve, 0, gl === null ? g0 : gl, ev))) { xp = x; break; }
@@ -6163,7 +6207,7 @@ function scenTexteLigneDebutant(S) {
   // le classement du matin, qui ne change pas ; le temps restant ; puis seulement le scénario au plus
   // petit écart, une règle de calcul.
   const J = S.jour;
-  for (const it of S.items) out.push(it.j && J ? Scenarios.ligneDebutantJour(it.j, J) : Scenarios.ligneDebutant(it.sc, it.sv));
+  for (const it of S.items) out.push(it.j && J ? Scenarios.ligneDebutantJour(it.j, J) : Scenarios.ligneDebutant(it.sc, it.sv, S.maintenant));
   if (J && J.hors) out.push('Le prix est allé au-delà de tous les niveaux du matin.');
   out.push('Classé par Claude (une IA), du plus au moins probable, sans pourcentage.' + (J ? ' Ce classement ne change pas pendant la journée.' : ''));
   if (J) {
@@ -6193,9 +6237,12 @@ function scenBoiteDebutant(S) {
     texteCourt: scenTexteCourtLigne(S, texte, true) };
   S.cibles.push(cible);
   // M8 : pendant le fondu d'une fermeture, « aucun ne tient plus » et une note du journal sur le
-  // rang 1, c'est la LIGNE qui porte l'indication : à l'arbitrage du budget, le libellé cède.
+  // rang 1, c'est la LIGNE qui porte l'indication : à l'arbitrage du budget, le libellé cède. De
+  // même quand la ligne dit un fait FRAIS (réalisation ou fermeture d'un rang 1 à 3, depuis moins de
+  // PARAM.scenarios.jour.fonduMinutes après son créneau) : elle est le seul endroit qui le dit.
   const J = S.jour, un = S.items.find(i => i.sc.rang === '1');
-  const prioritaire = !!(J && un && (J.cas === 'aucun' || (un.sc.statut !== '⏳' && un.sc.statut !== '✅') || (un.fondu > 0 && !un.ouvert)));
+  const fait = !!(J && J.frais && J.frais.length && /✓|✗|indécis/.test(t));
+  const prioritaire = !!(J && un && (J.cas === 'aucun' || (un.sc.statut !== '⏳' && un.sc.statut !== '✅') || (un.fondu > 0 && !un.ouvert) || fait));
   S.boite = { deb: true, x, y, w, h, texte: t, cible, lignes: [], seule: !S.F, cede: false, prioritaire, coulMontre: S.montre ? S.montre.coul : null };
   debItem('boite', t, { x, y, w, h });
 }
@@ -6210,11 +6257,12 @@ function scenTexteCourtLigne(S, texte) {
   const m = Scenarios.phraseNomDebutant(J, null);
   const r = Scenarios.reste(J.reste);
   return [Scenarios.enteteDebutant(F, PARAM.scenarios, S.maintenant)]
-    .concat(S.items.map(it => (it.j ? Scenarios.ligneDebutantJour(it.j, J, true) : Scenarios.ligneDebutant(it.sc, it.sv))))
-    .concat(['Classé par Claude (une IA), du plus au moins probable, sans pourcentage ; ce classement ne change pas.',
-      '« (en direct) » : suivi par cette page ; la note officielle est celle du journal, le lendemain.'])
+    .concat(S.items.map(it => (it.j ? Scenarios.ligneDebutantJour(it.j, J, true) : Scenarios.ligneDebutant(it.sc, it.sv, S.maintenant))))
+    .concat(['Classé par Claude (une IA), du plus au moins probable, sans pourcentage ; ce classement ne change pas.'])
     .concat(m ? [m, 'Pour un chemin, plus le prix est près de sa zone et loin de ce qui l’invaliderait, mieux il suit ; pour « reste entre », plus il est loin des limites.'] : []).concat(r ? ['Encore ' + r + ', sans nouvelle prévision.'] : [])
-    .concat([texte[texte.length - 1]]);
+    // Le suivi « (en direct) » et le journal vont avec l'avertissement, dans le dernier paragraphe :
+    // une bulle coupée faute de place (375×667, des fermetures avec leur raison) les garde toujours.
+    .concat(['« (en direct) » : suivi par cette page ; la note officielle est celle du journal, le lendemain. ' + texte[texte.length - 1]]);
 }
 /** M8 (arbitrage du budget Débutant) : quand la ligne porte l'indication d'une fermeture, c'est le
  *  libellé du scénario qui cède (sa zone reste dessinée, sans texte) ; la bulle de la ligne reprend
@@ -6225,7 +6273,13 @@ function scenCederLibelle() {
   const k = etiquettesAFaire.indexOf(S.libelleDeb.dessin);
   if (k >= 0) etiquettesAFaire.splice(k, 1);
   debEtat.items = debEtat.items.filter(i => i.role !== 'scenario');
-  if (S.cibleUn) { S.cibles = S.cibles.filter(c => c !== S.cibleUn); if (B.cible) B.cible.texte = B.cible.texte.concat(['Le libellé du scénario (place prise) :'], S.cibleUn.texte); }
+  // La bulle de la ligne reprend le libellé en bref (sa version courte, sans l'en-tête, les autres
+  // scénarios ni l'avertissement, déjà dans la ligne) : la bulle longue tient encore à l'écran.
+  if (S.cibleUn) {
+    S.cibles = S.cibles.filter(c => c !== S.cibleUn);
+    const lc = (S.cibleUn.texteCourt || []).slice(1, -1).filter(l => !/^Les autres scénarios/.test(l));
+    if (B.cible && lc.length) B.cible.texte = B.cible.texte.slice(0, -1).concat(['Le libellé du scénario (place prise) :'], lc, B.cible.texte.slice(-1));
+  }
   S.libelles = S.libelles.filter(l => l.t !== S.libelleDeb.t);
   S.libelleDeb = null; S.libelleCede = true;
   return true;

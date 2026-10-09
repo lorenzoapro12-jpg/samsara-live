@@ -7,7 +7,7 @@
 //      · scenEtat.jour de la page = classerJour pur sur les mêmes bougies (cas, meneur, montré,
 //        écarts à 0,01 près, fondus) ; les deux modes donnent les mêmes valeurs ;
 //      · Débutant : au plus 5 textes, un seul libellé (celui du montré, le 1), la ligne du cas D
-//        (« … le 2 réalisé ✓ (en direct) ▸ »), sa bulle : les trois lignes numérotées, « Ce
+//        (« En direct : zone du 2 ✓ · scén. 3 ✗ ▸ » : la fermeture fraîche du 3 y est dite aussi), sa bulle : les trois lignes numérotées, « Ce
 //        classement ne change pas pendant la journée », « pas de nouvelle prévision » ; aucun mot
 //        banni, aucun « % » ; aucune marque dessinée pour un scénario qui n'est pas montré ;
 //      · Expert : « Seul encore en cours : 1 », les distances en $ sur la ligne ouverte, les
@@ -85,7 +85,8 @@ const capt = async (o, nom) => { if (process.env.SCEN_CAPTURES) await o.page.scr
         check(`${nom} : un seul libellé de scénario, celui du montré (le 1) : « Scén. 1 : tient jusqu’à 80 622 $ »`, lib.length === 1 && lib[0].rang === '1' && /^Scén(ario|\.) 1 : (tient )?jusqu’à 80 622 \$$/.test(lib[0].t), lib);
         const L = e.boite && e.boite.texte;
         // Changé délibérément (revue) : « zone du 2 (niveau) ✓ », jamais « réalisé » pour un scénario non dessiné.
-        check(`${nom} : ligne du cas D (« ${L} »)`, !!L && /^En direct : zone du 2( \(80 806 \$\))? ✓ ▸$/.test(L) && L.length <= (etroit ? 40 : 48), L);
+        // Changé délibérément (revue, round 2) : le 3, fermé à 15:15–15:30 (fait frais), est dit avec la réalisation du 2.
+        check(`${nom} : ligne du cas D (« ${L} »)`, !!L && /^En direct : zone du 2( \(80 806 \$\))? ✓( · scén\. 3 ✗)? ▸$/.test(L) && /scén\. 3 ✗/.test(L) && L.length <= (etroit ? 40 : 48), L);
         check(`${nom} : aucune marque dessinée pour un scénario non montré`, e.items.every(i => i.rang === e.montre || !i.marques.length), e.items);
         const b = await bulle(o.page);
         check(`${nom} : bulle de la ligne : 1., 2., 3., « Ce classement ne change pas pendant la journée », « Pas de nouvelle prévision »`,

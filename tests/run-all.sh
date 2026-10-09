@@ -142,6 +142,12 @@ node test_scenarios_jour_suivi.js || ko=1
 etape "9b''e. Scénarios du matin, la journée après revue dans Chromium : 4 h / 1 j / 1 min incomplet, bulle dessinée qui nomme, croix du rang 1 en fondu, niveaux gardés en Expert (non exécuté sans Playwright)"
 node test_scenarios_jour_revue_page.js || ko=1
 
+etape "9b''f. Scénarios du matin, la journée stable (revue 2, hors navigateur, 09/10 réel puis synthétique) : rien ne bascule dans une bougie sans fait, nom gardé à la clôture, fait frais sur la ligne, « passage bref » et « zone », « hier »"
+node test_scenarios_jour_stable.js || ko=1
+
+etape "9b''g. Scénarios du matin, la journée stable dans Chromium : ligne, phrase et « ◂ » constants dans une bougie, la ligne garde sa place pour un fait frais, bulle longue qui tient, encadré replié Expert, range nommé dans sa boîte, marques séparées (non exécuté sans Playwright)"
+node test_scenarios_jour_stable_page.js || ko=1
+
 etape "9b‴. Débutant à l'écran dans Chromium : au plus 5 textes, phrase et repères aux mêmes prix, bulles au survol et au toucher, cartes et menu sans jargon, 11 thèmes (non exécuté sans Playwright)"
 node test_debutant_page.js || ko=1
 
