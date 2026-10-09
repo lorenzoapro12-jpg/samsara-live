@@ -474,6 +474,8 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   background: var(--accent); color: var(--card-solid);
 }
 .ind-compte[hidden] { display: none !important; }
+/* Planche : le pied est compté au pixel (deux rangées) ; le compte y reste dans le menu, pas sur le bouton. */
+.plan-pied .ind-compte { display: none !important; }
 
 /* ─── 6. Graphique ──────────────────────────────────────────────────────────── */
 .main-area { display: flex; flex: 1; min-height: 0; gap: var(--gap); overflow: hidden; }
