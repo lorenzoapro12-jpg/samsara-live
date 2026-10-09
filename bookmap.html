@@ -15,19 +15,21 @@
 <header class="barre">
   <div class="barre-gauche">
     <a class="retour" href="index.html" title="Revenir au terminal">← Terminal</a>
-    <h1>Carte <span class="sous">BTC/USDT · carnet, exécutions, murs, gamma</span></h1>
+    <h1>Carte <span class="sous expert-seul">BTC/USDT · carnet, exécutions, murs, gamma</span><span class="sous debutant-seul">BTC/USDT · ordres en attente et échanges</span></h1>
+    <!-- Le mode (débutant / expert) : le même que le terminal. Libellé long à partir de 1024 px. -->
+    <button type="button" class="bouton bouton-mode" id="btnModeBarre" aria-pressed="false" title="Changer de mode (touche M) : le même réglage que le terminal, le changer ici le change aussi là-bas"><span class="mode-long">Débutant · passer en Expert</span><span class="mode-court">Passer en Expert</span><span class="mode-mini">Expert</span></button>
   </div>
   <nav class="calques" id="calques" aria-label="Calques affichés"></nav>
   <div class="barre-droite">
     <button type="button" class="bouton" id="btnSuivre" aria-pressed="true" title="Suivre le présent (F) — double-clic sur la carte : vue par défaut">Suivre</button>
-    <button type="button" class="bouton" id="btnReglages" aria-controls="reglages" aria-expanded="false" title="Réglages d'affichage">Réglages</button>
+    <button type="button" class="bouton expert-seul" id="btnReglages" aria-controls="reglages" aria-expanded="false" title="Réglages d'affichage">Réglages</button>
     <button type="button" class="bouton" id="btnJournal" aria-controls="journalPanneau" aria-expanded="false" title="Ce qui vient de se passer : murs apparus, retirés, absorbés, rafales (J)">Journal</button>
-    <button type="button" class="bouton" id="btnRafales" aria-controls="rafalesPanneau" aria-expanded="false" title="Les dernières rafales au marché">Rafales</button>
+    <button type="button" class="bouton expert-seul" id="btnRafales" aria-controls="rafalesPanneau" aria-expanded="false" title="Les dernières rafales au marché">Rafales</button>
     <button type="button" class="bouton" id="btnLegende" aria-controls="legende" aria-expanded="false" title="Ce que montre la carte (L)">Légende</button>
   </div>
 </header>
 <!-- Le résumé du guide : une phrase (débutant) ou ses chiffres (expert), tirés du DERNIER carnet live seul. -->
-<div class="resume-carte" id="resumeCarte" role="status" title="Un appui : la phrase entière">Carnet live : lecture…</div>
+<div class="resume-carte" id="resumeCarte" role="status" title="Un appui : la phrase entière">Lecture en cours…</div>
 
 <main class="scene">
   <canvas id="carte" role="img" aria-label="Carte de liquidité : axe horizontal le temps, axe vertical le prix en dollars, la chaleur est la taille du plus gros niveau du carnet par tranche ; le prix, les exécutions, les murs et les niveaux de gamma sont dessinés par-dessus, chacun avec son âge."></canvas>
@@ -41,6 +43,8 @@
     <p class="note" id="guideIntroNote"></p>
     <button type="button" class="bouton" id="guideIntroOk">J'ai compris</button>
   </section>
+  <!-- Téléphone, mode débutant : une seule fois, après l'explication. -->
+  <div class="indice-tap" id="indiceTap" hidden>Touchez pour le détail</div>
 </main>
 
 <div class="lecture" id="lecture" role="tooltip" hidden></div>
@@ -139,6 +143,28 @@
 <section class="panneau-flottant large" id="legende" hidden aria-label="Légende">
   <div class="panneau-tete"><h2>Ce que montre la carte</h2><button type="button" class="fermer" data-fermer aria-label="Fermer">×</button></div>
   <div class="barre-couleurs"><div id="barreCouleurs"></div><div class="grad" id="gradBarre"></div></div>
+  <!-- Mode débutant : l'essentiel, les mêmes mots que l'explication de première visite. -->
+  <div class="debutant-seul" id="legendeDebutant">
+    <h3>L'essentiel</h3>
+    <dl>
+      <dt>Couleurs = ordres en attente</dt>
+      <dd>Plus c'est clair (<span id="legPaletteDeb">du sombre au clair</span>), plus il y a d'ordres d'achat ou de vente à ce prix. Un ordre peut être retiré à tout moment. Hachures : rien n'a été lu là.</dd>
+      <dt>Ligne blanche = le prix</dt>
+      <dd>Jusqu'au trait vertical « maintenant ».</dd>
+      <dt>Ronds = échanges réels</dt>
+      <dd>Vert : un acheteur a pris une vente en attente. Rouge : un vendeur a pris un achat en attente. Plus gros = plus de BTC.</dd>
+      <dt>« Mur d’achat » sous le prix, « Mur de vente » au-dessus</dt>
+      <dd>Là où le plus d'ordres attendent en ce moment. Ils peuvent être retirés avant que le prix y arrive.</dd>
+      <dt>La phrase du haut</dt>
+      <dd>Une photo de l'instant, pas une prévision : plus d'ordres d'un côté ne dit pas où ira le prix.</dd>
+    </dl>
+    <h3>Gestes</h3>
+    <p>Glisser : déplacer la carte. Molette ou deux doigts : zoomer ; double-clic : revenir à la vue par défaut.</p>
+    <p>Toucher ou survoler un élément : son détail. Au doigt, un appui bref le montre et le même appui l'enlève ; un appui long le fait suivre le doigt.</p>
+    <p><button type="button" class="bouton" id="btnIntroDebutant">Comment lire cette carte</button> <button type="button" class="bouton bouton-mode" id="btnModeDebutant">Passer en Expert</button></p>
+    <p class="note">La carte décrit des ordres en attente et des échanges passés, pas une recommandation : un ordre peut être retiré avant d'être touché, et un rond ne dit pas qui a acheté.</p>
+  </div>
+  <div class="expert-seul">
   <p class="note" id="encodageEtat"></p>
   <h3>Trois horloges sur une même surface</h3>
   <p>Chaque calque porte son âge <b>sur la carte</b>. Deux chiffres côte à côte peuvent décrire deux instants différents : on ne les compare pas sans regarder leur pastille.</p>
@@ -183,6 +209,7 @@
   <p>Au doigt : un appui bref épingle la lecture là où il tombe (le même appui l'enlève) ; un appui long l'affiche et la fait suivre le doigt sans déplacer la carte.</p>
   <p class="note">Les heures de l'axe sont celles de l'appareil (le fuseau est écrit dans l'angle, sous l'axe des prix) ; « maintenant » est l'heure de Binance, recalée.</p>
   <p class="note">Ce que la carte montre est une lecture du carnet, pas une recommandation : un mur peut être retiré avant d'être touché, et une bulle ne dit pas qui a acheté.</p>
+  </div>
 </section>
 
 <script src="js/binance-repli.js"></script>

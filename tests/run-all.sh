@@ -85,6 +85,9 @@ node test_live.js || ko=1
 etape "5b. Carte (bookmap) : fusion, décodage, exécutions, isolement — hors ligne"
 node test_bookmap.js || ko=1
 
+etape "5b1. Carte (bookmap) : liste des mots interdits à l'écran débutant — se contrôle elle-même"
+node mots_debutant.js || ko=1
+
 etape "5b2. Carte (bookmap) : le Guide — murs en mots, résumé, journal, zones, mots interdits — hors ligne"
 node test_guide_carte.js || ko=1
 

@@ -33,14 +33,23 @@
   // La bande de profondeur.json : BANDE_PCT de profondeur.py (le fichier ne la publie qu'en mots,
   // encodage.couverture). Pastille d'âge et légende la lisent ici.
   const LOIN_BANDE_PCT = 10;
-  // Sous cette largeur (px), la carte est « étroite » (pastilles et résumé courts) ; sous la
-  // seconde, le guide débutant ne nomme qu'un mur par côté.
-  const ETROIT_PX = 640, MURS_UN_PX = 1280;
+  // Sous cette largeur (px), la carte est « étroite » (pastilles et résumé courts, ronds plus petits
+  // en mode débutant).
+  const ETROIT_PX = 640;
   // Branche `direct` (heatmap.py, 08/10/2026) : les 30 dernières minutes, publiées chaque minute.
   // Elle comble le retard de master (15 min) : il ne reste que le cache de raw.githubusercontent.
   const DIRECT = 'https://raw.githubusercontent.com/lorenzoapro12-jpg/samsara-live/direct/';
   const API = 'https://api.binance.com/api/v3/';
   const SYMBOLE = 'BTCUSDT';
+
+  // ─── Mode : débutant (par défaut) ou expert ─────────────────────────────────
+  // Le même que le terminal (même clé, même origine) : le changer ici le change là-bas. Il est posé
+  // sur <html> AVANT le premier rendu : la feuille cache d'emblée ce qui est expert. Le mode change ce
+  // qui est MONTRÉ, jamais une valeur.
+  const MODE_CLE = 'samsara-mode', INTRO_CLE = 'samsara-carte-intro-v1', INDICE_CLE = 'samsara-carte-indice-v1';
+  function lireMode() { try { return localStorage.getItem(MODE_CLE) === 'expert' ? 'expert' : 'debutant'; } catch (e) { return 'debutant'; } }
+  let MODE = lireMode();
+  document.documentElement.setAttribute('data-mode', MODE);
 
   // ─── Réglages : changent le DÉTAIL, jamais une valeur affichée ──────────────
   const CLE = 'samsara-carte-v1';
@@ -75,6 +84,16 @@
   }
   remplirChoix();
   const R = charger();
+  // CE QUI EST LU ET CE QUI EST DESSINÉ — une seule source.
+  //  · estLu : R.calques (les puces, réglages stockés) décide de ce qui est lu et calculé ; en mode
+  //    débutant, la chaleur, les ronds et la ligne de prix le sont toujours (FORCE_DEBUTANT) : un
+  //    réglage expert, invisible en débutant, ne vide pas l'écran. R.calques n'est jamais modifié.
+  //  · estVu : seules les couches de VOIT_DEBUTANT sont dessinées en débutant ; l'expert les a toutes.
+  const FORCE_DEBUTANT = new Set(['publiee', 'live', 'executions', 'prix']);
+  const VOIT_DEBUTANT = new Set(['guide', 'publiee', 'live', 'executions', 'prix', 'loin']);
+  const estLu = k => !!R.calques[k] || (MODE === 'debutant' && FORCE_DEBUTANT.has(k));
+  const estVu = k => estLu(k) && (MODE === 'expert' || VOIT_DEBUTANT.has(k));
+  const debutant = () => MODE === 'debutant';
 
   /** Les réglages stockés, VALIDÉS contre ce que la page permet — les listes viennent des
    *  <option> et des bornes des curseurs de bookmap.html : elles ne peuvent pas diverger. */
@@ -482,7 +501,7 @@
   }
   /** Le carnet n'est lu que si un calque s'en sert (chaleur live, carnet latéral, bid / ask) :
    *  1 000 niveaux toutes les 2 s, c'est ≈ 1 500 de poids Binance par minute et ≈ 19 Mo par heure. */
-  const carnetUtile = () => R.calques.live || R.calques.dom || R.calques.bidask || R.calques.destin || R.calques.guide;
+  const carnetUtile = () => estLu('live') || R.calques.dom || R.calques.bidask || R.calques.destin || R.calques.guide;
   async function lireCarnet() {
     const n = R.niveauxLive, cadence = CADENCE_CARNET[n];
     if (!carnetUtile()) { erreur('carnet', null); return; }
@@ -708,8 +727,8 @@
     if (cv.width !== bw || cv.height !== bh) { cv.width = bw; cv.height = bh; }
     const w = Math.floor(wf), h = Math.floor(hf), etroit = w < ETROIT_PX, masques = [];
     const axeP = etroit ? 54 : 66, axeT = 20;
-    let dom = R.calques.dom ? (etroit ? 64 : 112) : 0;
-    let vol = R.calques.volume ? (etroit ? 44 : 58) : 0, cvd = R.calques.cvd ? (etroit ? 44 : 58) : 0;
+    let dom = estVu('dom') ? (etroit ? 64 : 112) : 0;
+    let vol = estVu('volume') ? (etroit ? 44 : 58) : 0, cvd = estVu('cvd') ? (etroit ? 44 : 58) : 0;
     if (h - axeT - vol - cvd < MIN_CHALEUR) { vol = Math.min(vol, 34); cvd = Math.min(cvd, 34); }
     if (h - axeT - vol - cvd < MIN_CHALEUR && cvd) { cvd = 0; masques.push('CVD'); }
     if (h - axeT - vol - cvd < MIN_CHALEUR && vol) { vol = 0; masques.push('volume'); }
@@ -744,7 +763,7 @@
 
   /** La carte publiée telle qu'affichée : fusionnée (MAX) selon le réglage, calculée une fois. */
   function grillePublieeAffichee() {
-    if (!R.calques.publiee || !E.pub) return null;
+    if (!estLu('publiee') || !E.pub) return null;
     if (!E.pubF || E.pubCle !== R.fusionT + 'x' + R.fusionP) {
       E.pubF = BM.fusionMax(E.pub, R.fusionT, R.fusionP); E.pubCle = R.fusionT + 'x' + R.fusionP;
     }
@@ -799,7 +818,7 @@
     return true;
   }
   function peindreLive(w, h) {
-    const g = R.calques.live && E.live && E.live.n ? E.live : null;
+    const g = estLu('live') && E.live && E.live.n ? E.live : null;
     if (!g) { const etait = !LIVE.vide; if (etait) LIVE.x.clearRect(0, 0, w, h); LIVE.vide = true; LIVE.cle = null; return etait; }
     const v = E.vue, cle = [w, h, E.liveV, LUTV, v.t1, v.t2, v.p1, v.p2].join('|'), finD = g.fin[g.n - 1];
     // La dernière lecture vaut jusqu'à « maintenant » : quand il a avancé d'un pixel depuis la dernière
@@ -876,28 +895,35 @@
     ctx.drawImage(COMP.c, Z.chaleur.x, Z.chaleur.y);
     ctx.save();
     ctx.beginPath(); ctx.rect(Z.chaleur.x, Z.chaleur.y, Z.chaleur.w, Z.chaleur.h); ctx.clip();
-    posees = []; fileP = [];
+    posees = []; fileP = []; AGES = []; TEXTES_CARTE = []; DANS_CHALEUR = true;
+    const deb = debutant();
     reserverIntro();
     grille();
-    if (R.calques.memoire) memoire();       // sous les murs et le gamma : leurs libellés restent lisibles
-    if (R.calques.profil) profilExecutions();
-    if (R.calques.destin) destin(); else DM.items = [];
-    if (R.calques.murs) murs();
-    if (R.calques.gamma) gamma();
-    if (R.calques.bidask) bidAsk();
-    if (R.calques.prix) lignePrix();
-    if (R.calques.executions) bulles();
-    if (R.calques.rafales) rafales(); else RAF.items = [];
-    if (R.calques.executions || R.calques.rafales) hachuresExecutions();
-    if (R.calques.guide) guideFond(); else { GU.cadres = []; GU.marques = []; }
+    if (estVu('loin') && deb) limiteCoinbase();
+    if (estVu('memoire')) memoire();       // sous les murs et le gamma : leurs libellés restent lisibles
+    if (estVu('profil')) profilExecutions();
+    if (estVu('destin')) destin(); else DM.items = [];
+    if (estVu('murs')) murs();
+    if (estVu('gamma')) gamma();
+    if (estVu('bidask')) bidAsk();
+    // Débutant : la ligne de prix passe AU-DESSUS des ronds (elle ne se perd pas dessous).
+    if (estVu('prix') && !deb) lignePrix();
+    if (estVu('executions')) bulles();
+    // Débutant : les cadres des repères (une zone « allumée » est remplie) passent SOUS la ligne de prix.
+    if (deb) { if (R.calques.guide) guideFond(); else { GU.cadres = []; GU.marques = []; } }
+    if (estVu('prix') && deb) lignePrix();
+    if (estVu('rafales')) rafales(); else RAF.items = [];
+    if (estVu('executions') || estVu('rafales')) hachuresExecutions();
+    if (!deb) { if (R.calques.guide) guideFond(); else { GU.cadres = []; GU.marques = []; } }
     reperesEtAges();
     dessinerPastilles();
     // Le guide écrit APRÈS les pastilles d'âge : elles gardent leur place, ses mots les évitent.
     GU.etiquettes = [];
-    if (R.calques.guide) guideTextes();
+    if (R.calques.guide) { if (deb) guideTextesDebutant(); else guideTextes(); }
     guideReperes();
     croix();
     ctx.restore();
+    DANS_CHALEUR = false;
     axePrix();
     axeTemps();
     if (Z.dom.w) carnetLateral();
@@ -920,10 +946,49 @@
     }
     ctx.stroke();
   }
+  /** Débutant : la limite entre la chaleur de Binance et celle de Coinbase (autre plateforme, autre
+   *  échelle de couleur), en pointillé fin, sans texte : « plus clair = plus d'ordres » ne compare que
+   *  des couleurs d'un même côté de ce trait. Par colonnes de 2 px, la bande couverte par la lecture
+   *  live (sinon la colonne publiée) qui est sous elle ; gardée tant que ni les lectures ni la vue ne
+   *  changent. Le détail au toucher dit « autre plateforme ». */
+  let LIMITE = { cle: null, chemin: null };
+  function limiteCoinbase() {
+    if (LOIN.vide) return;
+    const W = Z.chaleur.w, v = E.vue, L = estLu('live') && E.live && E.live.n ? E.live : null, g = estLu('publiee') ? E.pub : null;
+    const cle = [E.liveV, E.pubN, v.t1, v.t2, v.p1, v.p2, W, Z.chaleur.h].join('|');
+    if (LIMITE.cle !== cle) {
+      const ch = new Path2D(), PAS = 2;
+      let prec = null;
+      for (let x = 0; x < W; x += PAS) {
+        const t = T(x + PAS / 2);
+        let bande = null;
+        if (L && t >= L.deb[0]) {
+          let lo = 0, hi = L.n - 1;
+          while (lo < hi) { const m = (lo + hi + 1) >> 1; if (L.deb[m] <= t) lo = m; else hi = m - 1; }
+          if (t < L.fin[lo] && L.bas[lo] >= 0) bande = [L.bas[lo] * L.dp, (L.haut[lo] + 1) * L.dp];
+        }
+        if (!bande && g) { const c = Math.floor((t - g.t0) / g.dt); if (c >= 0 && c < g.W && g.bas[c] >= 0) bande = [g.bas[c] * g.dp, (g.haut[c] + 1) * g.dp]; }
+        if (!bande) { prec = null; continue; }
+        const ys = [Y(bande[1]), Y(bande[0])];
+        ys.forEach((y, i) => { if (prec) { ch.moveTo(x, prec[i]); ch.lineTo(x, y); } else ch.moveTo(x, y); ch.lineTo(x + PAS, y); });
+        prec = ys;
+      }
+      LIMITE = { cle, chemin: ch };
+    }
+    ctx.save(); ctx.strokeStyle = C.ink2; ctx.globalAlpha = 0.55; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.stroke(LIMITE.chemin); ctx.restore();
+  }
   function texte(t, x, y, coul, taille, align, gras) {
     ctx.font = (gras ? '600 ' : '') + (taille || 11) + 'px ' + POLICE;
     ctx.fillStyle = coul; ctx.textAlign = align || 'left'; ctx.textBaseline = 'middle';
     ctx.fillText(t, x, y);
+    if (DANS_CHALEUR) noterTexte(t, x, y, align, taille);
+  }
+  // Les textes écrits SUR la chaleur (entre le clip et le restore de rendre), relevés pour les harnais :
+  // le budget de l'écran débutant se compte ici. Les symboles écrits sans texte() y sont ajoutés.
+  let TEXTES_CARTE = [], DANS_CHALEUR = false;
+  function noterTexte(t, x, y, align, taille) {
+    const w = ctx.measureText(t).width, h = (taille || 11) + 2;
+    TEXTES_CARTE.push({ texte: String(t), x: align === 'center' ? x - w / 2 : align === 'right' ? x - w : x, y: y - h / 2, w, h });
   }
   const POLICE = getComputedStyle(document.documentElement).getPropertyValue('--police-carte').trim() || 'system-ui, sans-serif';
   const largeurTexte = (t, taille, gras) => { ctx.font = (gras ? '600 ' : '') + (taille || 11) + 'px ' + POLICE; return ctx.measureText(t).width; };
@@ -947,7 +1012,11 @@
   }
   /** Une pastille d'âge, posée SUR la carte. Mise en file pendant le dessin des calques, puis
    *  dessinée en dernier — au-dessus du prix et des bulles — sans recouvrir les autres. */
-  function pastille(lignes, x, y, coul, align, court) { fileP.push([lignes, x, y, coul, align, court]); }
+  function pastille(lignes, x, y, coul, align, court) { AGES.push({ lignes, court, coul }); if (!debutant()) fileP.push([lignes, x, y, coul, align, court]); }
+  // AGES : les lignes de toutes les pastilles du rendu, dans les DEUX modes (mêmes chaînes). En mode
+  // débutant elles ne sont pas dessinées : leur âge passe dans la ligne du haut et dans le détail au
+  // toucher (« Âges »), leurs lignes complètes en mode Expert.
+  let AGES = [];
   function dessinerPastilles() { for (const a of fileP) poserPastille(...a); fileP = []; }
   /** Une pastille est TOUJOURS dans la carte (aucun âge ne disparaît) : à l'endroit voulu, sinon
    *  plus bas, plus haut, en version courte, ailleurs dans la carte ; puis, si l'explication
@@ -967,8 +1036,7 @@
       return null;
     };
     const ici = [w => (align === 'right' ? x - w : (align === 'center' ? x - w / 2 : x))], ailleurs = [w => W - w - 4, () => 4, w => (W - w) / 2];
-    // Mode débutant, guide allumé : la PREMIÈRE ligne seule (l'âge, en mots) ; le reste au survol.
-    const courtes = court ? [court] : null, longues = Z.court && courtes ? courtes : R.calques.guide && MODE === 'debutant' && lignes.length > 1 ? [lignes[0]] : lignes;
+    const courtes = court ? [court] : null, longues = Z.court && courtes ? courtes : lignes;
     let p = placer(longues, ici) || (courtes && placer(courtes, ici)) || placer(courtes || longues, ailleurs) || placer(courtes || longues, ici.concat(ailleurs), true);
     if (!p) {
       const ls = courtes || longues, { w, h } = taille(ls);
@@ -992,17 +1060,17 @@
   }
 
   function reperesEtAges() {
-    const now = maintenant();
+    const now = maintenant(), exp = !debutant();
     // L'écart d'horloge (> 1 s) est écrit dans la pastille du live, sinon dans celle des exécutions.
     let horlogeTexte = E.horloge.texte();
     // Maintenant
     const xn = X(now);
     ctx.fillStyle = C.accent; ctx.globalAlpha = 0.8; ctx.fillRect(Math.round(xn), 0, 1, Z.chaleur.h); ctx.globalAlpha = 1;
     // Carte publiée : jusqu'où elle va, et de quand elle date.
-    if (R.calques.publiee && E.pub) {
+    if (estLu('publiee') && E.pub) {
       const fin = BM.finGrille(E.pub), lue = BM.instantDerniereColonne(E.pub);
       const xf = X(fin);
-      if (xf > 0 && xf < Z.chaleur.w) tirets(xf, C.publie);
+      if (exp && xf > 0 && xf < Z.chaleur.w) tirets(xf, C.publie);
       const l = ['Carte publiée · dernière colonne il y a ' + BM.age(now - lue) + (E.pub.encodage ? '' : ' · encodage non publié'),
         (E.pub.dt / 1000) + ' s × ' + (E.pub.dp) + ' $' + (E.pubF && E.pubF !== E.pub ? ' (affichée : ' + E.pubF.dt / 1000 + ' s × ' + E.pubF.dp + ' $, MAX, blocs alignés sur l\'horloge)' : '')
         + ' · publiée il y a ' + BM.age(now - E.pubMaj)];
@@ -1011,11 +1079,11 @@
       pastille(l, Math.min(xf, Z.chaleur.w) - 8, 8, C.publie, 'right', 'Carte publiée · ' + BM.age(now - lue));
     }
     // Carnet live
-    if (R.calques.live) {
+    if (estLu('live')) {
       if (E.live && E.live.n) {
         // « depuis » : la plus ancienne lecture GARDÉE (la moitié ancienne s'oublie quand c'est plein).
         const debut = E.live.deb[0], xs = X(debut);
-        if (xs > 0 && xs < Z.chaleur.w) tirets(xs, C.live);
+        if (exp && xs > 0 && xs < Z.chaleur.w) tirets(xs, C.live);
         const l = ['Carnet live · dernier il y a ' + BM.age(now - axe(E.carnetA)) + (E.liveRef === 'publiee' ? '' : ' · échelle propre'),
           R.niveauxLive + ' niveaux / ' + CADENCE_CARNET[R.niveauxLive] / 1000 + ' s · ' + R.dpLive + ' $ · depuis ' + BM.heure(debut, true),
           E.liveRef === 'publiee' ? 'même échelle que la carte publiée' : 'échelle propre : NON comparable à la carte publiée'];
@@ -1029,12 +1097,12 @@
     if (E.pub) {
       const fin = BM.finGrille(E.pub), deb = E.live && E.live.n ? E.live.deb[0] : now;
       const xa = Math.max(0, X(fin)), xb = Math.min(Z.chaleur.w, X(deb));
-      if (xb - xa > 70) texteLibre('non observé', (xa + xb) / 2, Z.chaleur.h - 16, C.ink3, 11);
+      if (exp && xb - xa > 70) texteLibre('non observé', (xa + xb) / 2, Z.chaleur.h - 16, C.ink3, 11);
     }
     // Panneaux qui n'ont pas la place d'être dessinés : dit, jamais en silence.
     if (Z.masques.length) pastille(['Masqués faute de place : ' + Z.masques.join(', ')], 8, Z.chaleur.h - 30, C.ink3, 'left', 'Masqués : ' + Z.masques.join(', '));
     // Mémoire du carnet : la carte publiée dont elle vient, sa fenêtre et son seuil.
-    if (R.calques.memoire && E.pub) {
+    if (estVu('memoire') && E.pub) {
       const s = seuilMemoire(), f = s && fenetreMemoire(), xm = Z.chaleur.w - largeurMemoire() - 6;
       if (!s) pastille(['Mémoire du carnet · éteinte', 'encodage non publié : aucun seuil en BTC'], xm, 120, C.ink3, 'right', 'Mémoire · encodage non publié');
       else {
@@ -1045,15 +1113,15 @@
       }
     }
     // Rafales au marché : depuis quand elles sont lues, et la dernière.
-    if (R.calques.rafales && E.exec.premier !== null) {
+    if (estVu('rafales') && E.exec.premier !== null) {
       const d = E.raf.dernieres(1, R.rafaleMin)[0];
       pastille(['Rafales ≥ ' + BM.nombre(R.rafaleMin, 0, 2) + ' BTC · depuis ' + BM.heure(E.exec.premier) + ' · ' + (d ? 'dernière il y a ' + BM.age(now - d.T) : 'aucune encore'),
         '≥ k ordres : borne basse prouvée, le nombre exact n\'est pas publié'],
       Math.min(xn, Z.chaleur.w) - 8, Z.chaleur.h - 130, C.ink2, 'right', 'Rafales · ' + (d ? BM.age(now - d.T) : 'aucune'));
     }
-    if (R.calques.destin) pastilleDestin(now);
+    if (estVu('destin')) pastilleDestin(now);
     // Exécutions
-    if (R.calques.executions) {
+    if (estLu('executions')) {
       if (E.exec.dernier) {
         const l = ['Exécutions · dernière il y a ' + BM.age(now - E.exec.dernier),
           'depuis ' + BM.heure(E.exec.premier) + (E.execArriere && !E.execArriere.fini ? ' (remplissage…)' : '')
@@ -1086,7 +1154,7 @@
       const xa = Math.max(0, X(a)), xb = Math.min(Z.chaleur.w, X(b));
       if (xb <= xa) continue;
       hachurer(xa, 0, xb - xa, Z.chaleur.h, 0.35);
-      if (xb - xa > 120) texteLibre('exécutions non lues', (xa + xb) / 2, Z.chaleur.h - 30, C.ink2, 10.5);
+      if (!debutant() && xb - xa > 120) texteLibre('exécutions non lues', (xa + xb) / 2, Z.chaleur.h - 30, C.ink2, 10.5);
     }
   }
   function murs() {
@@ -1218,8 +1286,10 @@
     }
     // Un trait sombre plus large SOUS la ligne la détache de la chaleur (une ombre floue coûtait
     // ≈ 1,5 ms par image au navigateur).
-    ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 3.6; ctx.stroke(LIGNE.chemin);
-    ctx.strokeStyle = C.prix; ctx.lineWidth = 1.6; ctx.stroke(LIGNE.chemin);
+    // Débutant : plus épaisse (2 px sur un halo de 4,5 px) — c'est elle qu'on cherche d'abord.
+    const deb = debutant();
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = deb ? 4.5 : 3.6; ctx.stroke(LIGNE.chemin);
+    ctx.strokeStyle = C.prix; ctx.lineWidth = deb ? 2 : 1.6; ctx.stroke(LIGNE.chemin);
     ctx.restore();
   }
   /** Seaux des bulles : pas de temps dans une échelle fixe et pas de prix multiple de la tranche
@@ -1240,14 +1310,18 @@
       TRI = { cle, g: E.exec.regrouper(E.vue.t1, E.vue.t2, pasT, pasP).filter(b => b.achat + b.vente >= R.bulleMin).sort((a, b) => (a.achat + a.vente) - (b.achat + b.vente)) };
     }
     const g = TRI.g;
+    // Débutant : couleur et taille seules (ni arc, ni nombre), plus pâles, et plus petites sur un
+    // écran étroit. Le rayon dessiné est gardé : la lecture au pointeur vise la bulle vue.
+    const deb = debutant(), echelle = deb && Z.etroit ? Math.min(R.bulleEchelle, 0.6) : R.bulleEchelle;
     for (const b of g) {
-      const q = b.achat + b.vente, r = BM.rayonBulle(q, R.bulleEchelle);
+      const q = b.achat + b.vente, r = BM.rayonBulle(q, echelle);
       const x = X(b.t), y = Y(b.p);
       BULLES.push({ x, y, r, b });
       const coul = b.achat >= b.vente ? C.up : C.down;
-      ctx.globalAlpha = 0.55; ctx.fillStyle = coul;
+      ctx.globalAlpha = deb ? 0.4 : 0.55; ctx.fillStyle = coul;
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 0.95; ctx.strokeStyle = coul; ctx.lineWidth = 1; ctx.stroke();
+      if (deb) continue;
       // Part achetée : un arc intérieur, quand la bulle est assez grande pour le montrer.
       if (r >= 8) {
         ctx.globalAlpha = 0.9; ctx.strokeStyle = C.prix; ctx.lineWidth = 1.5;
@@ -1500,16 +1574,53 @@
   }
 
   // ─── Guide : la carte dite en mots ─────────────────────────────────────────
-  // Le mode est celui du terminal (même clé, même origine) : débutant, des phrases ; expert, les
-  // chiffres seuls. Le mode change les MOTS, jamais une valeur. Le changer ici (touche M, bouton de
-  // la légende) le change aussi dans le terminal, et la page le dit. Les calculs : BM.GUIDE et suivants.
-  const MODE_CLE = 'samsara-mode', INTRO_CLE = 'samsara-carte-intro-v1';
-  function lireMode() { try { return localStorage.getItem(MODE_CLE) === 'expert' ? 'expert' : 'debutant'; } catch (e) { return 'debutant'; } }
-  let MODE = lireMode();
+  // Le mode est celui du terminal (même clé, même origine) : débutant, un écran calme et des phrases ;
+  // expert, toutes les couches et les chiffres. Le mode change ce qui est MONTRÉ, jamais une valeur.
+  // Le changer ici (touche M, bouton de l'en-tête ou de la légende) le change aussi dans le terminal.
+  // Les calculs : BM.GUIDE et suivants.
   function changerMode(m) {
     MODE = m || (MODE === 'expert' ? 'debutant' : 'expert');
     if (!m) { try { localStorage.setItem(MODE_CLE, MODE); } catch (e) { /* navigation privée : le mode vaut pour cette page */ } }
-    GU.cleJournal = null; GU.slots.clear(); majLegende(); remplirIntro(); dessiner();
+    document.documentElement.setAttribute('data-mode', MODE);
+    majBoutonMode();
+    // Débutant : les panneaux experts ouverts se ferment (leurs boutons sont cachés).
+    if (debutant()) for (const id of ['reglages', 'rafalesPanneau']) { const el = document.getElementById(id); if (el && !el.hidden) fermerPanneaux(); }
+    GU.cleJournal = null; GU.slots.clear(); RESUME_FORME.cle = null; RECT = null; INTRO_RECT = null; LISTE_RAF = null;
+    majBoutonSuivre(); majHauteurBarre(); majLegende(); remplirIntro(); majIndice(); majPanneauJournal();
+    // Débutant : la chaleur live est toujours lue (FORCE_DEBUTANT) — relue tout de suite.
+    if (boucleCarnet && debutant()) boucleCarnet.reveiller();
+    dessiner();
+  }
+  /** Les boutons de mode : libellé, état (aria-pressed = expert), et l'infobulle de la puce Guide. */
+  function majBoutonMode() {
+    const exp = MODE === 'expert', b = document.getElementById('btnModeBarre');
+    if (b) {
+      b.setAttribute('aria-pressed', exp ? 'true' : 'false');
+      b.querySelector('.mode-long').textContent = exp ? 'Expert · passer en Débutant' : 'Débutant · passer en Expert';
+      b.querySelector('.mode-court').textContent = exp ? 'Passer en Débutant' : 'Passer en Expert';
+      // Écran étroit en Expert : l'en-tête garde ses deux rangées (le nom du mode visé suffit, le titre explique).
+      const m = b.querySelector('.mode-mini'); if (m) m.textContent = exp ? 'Débutant' : 'Expert';
+    }
+    const d = document.getElementById('btnModeDebutant');
+    if (d) d.textContent = exp ? 'Passer en Débutant' : 'Passer en Expert';
+    const g = document.querySelector('button[data-calque="guide"]');
+    if (g) g.title = exp ? 'Le guide : la carte dite en mots, le résumé et le journal (touche G)' : 'Afficher ou cacher la phrase du haut et les repères «\u00a0Mur d’achat\u00a0» / «\u00a0Mur de vente\u00a0» (touche G)';
+  }
+  /** Téléphone, mode débutant : « Touchez pour le détail », UNE fois (après l'explication), jusqu'au
+   *  premier appui sur la carte ou 8 s ; la clé INDICE_CLE l'empêche de revenir. */
+  const indiceEl = document.getElementById('indiceTap');
+  let indiceMinuteur = null;
+  function indiceVu() { try { return localStorage.getItem(INDICE_CLE) === 'vu'; } catch (e) { return false; } }
+  function majIndice() {
+    if (!indiceEl) return;
+    const montrer = debutant() && !indiceVu() && introEl && introEl.hidden && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    if (montrer && indiceEl.hidden) { indiceEl.hidden = false; clearTimeout(indiceMinuteur); indiceMinuteur = setTimeout(cacherIndice, 8000); }
+    else if (!montrer && !indiceEl.hidden) { indiceEl.hidden = true; clearTimeout(indiceMinuteur); }
+  }
+  function cacherIndice() {
+    if (!indiceEl || indiceEl.hidden) return;
+    indiceEl.hidden = true; clearTimeout(indiceMinuteur);
+    try { localStorage.setItem(INDICE_CLE, 'vu'); } catch (e) { /* navigation privée : il reviendra */ }
   }
   // Le mode changé dans le terminal (autre onglet) : suivi ici.
   window.addEventListener('storage', e => { if (e.key === MODE_CLE || e.key === null) changerMode(lireMode()); });
@@ -1668,8 +1779,8 @@
       GU.optJusqua = m.t;
     }
   }
-  /** Murs nommés par côté à l'écran : 1 en mode débutant sous MURS_UN_PX de large (moins de texte), sinon parCote. */
-  const nombreMurs = () => (MODE === 'debutant' && (window.innerWidth < MURS_UN_PX || Z.etroit) ? 1 : BM.GUIDE.parCote);
+  /** Murs nommés par côté à l'écran (mode expert ; le débutant a ses deux repères). */
+  const nombreMurs = () => BM.GUIDE.parCote;
   /** Les murs à nommer : ceux du dernier carnet live s'il est frais ; sinon les plus gros du
    *  fichier de 15 min (avec leur heure de lecture). */
   function mursAffiches() {
@@ -1689,6 +1800,7 @@
     const W = Z.chaleur.w, H = Z.chaleur.h, now = maintenant(), xn = Math.min(W, X(now)), G = BM.GUIDE;
     GU.cadres = []; GU.marques = [];
     GU.present = presentVisible();
+    const deb = debutant();
     if (GU.present && carnetFrais() && GU.C) {
       // Zones à surveiller : un cadre net (2 px, halo sombre) sur une largeur fixe avant « maintenant »,
       // prolongé jusqu'au bord (l'avenir hachuré) et marqué au bord droit, côté axe des prix.
@@ -1698,28 +1810,37 @@
         if (!z) continue;
         const ya = Math.round(Y(z.pHaut)), yb = Math.round(Y(z.pBas));
         if (yb < 0 || ya > H || yb - ya < 2) continue;
-        const coul = cote === 'bid' ? C.murBid : C.murAsk;
+        const coul = cote === 'bid' ? C.murBid : C.murAsk, dedans = GU.C.mid >= z.pBas && GU.C.mid <= z.pHaut;
+        // Débutant : le prix DANS la zone l'« allume » (trait plus épais, fond plus dense) — un état dit
+        // par la couleur, pas par des mots.
+        const allume = deb && dedans;
         ctx.save();
-        ctx.globalAlpha = 0.16; ctx.fillStyle = coul; ctx.fillRect(x0, ya, W - x0, yb - ya);
-        ctx.globalAlpha = 0.6; ctx.strokeStyle = '#000'; ctx.lineWidth = 4; ctx.strokeRect(x0 + 0.5, ya + 0.5, xn - x0 - 1, yb - ya - 1);
-        ctx.globalAlpha = 0.95; ctx.strokeStyle = coul; ctx.lineWidth = 2; ctx.strokeRect(x0 + 0.5, ya + 0.5, xn - x0 - 1, yb - ya - 1);
+        ctx.globalAlpha = allume ? 0.26 : 0.16; ctx.fillStyle = coul; ctx.fillRect(x0, ya, W - x0, yb - ya);
+        ctx.globalAlpha = 0.6; ctx.strokeStyle = '#000'; ctx.lineWidth = allume ? 5 : 4; ctx.strokeRect(x0 + 0.5, ya + 0.5, xn - x0 - 1, yb - ya - 1);
+        ctx.globalAlpha = allume ? 1 : 0.95; ctx.strokeStyle = coul; ctx.lineWidth = allume ? 3 : 2; ctx.strokeRect(x0 + 0.5, ya + 0.5, xn - x0 - 1, yb - ya - 1);
         ctx.fillRect(W - 5, ya, 5, yb - ya);
         ctx.restore();
-        GU.cadres.push({ z, x0, x1: xn, ya, yb, dedans: GU.C.mid >= z.pBas && GU.C.mid <= z.pHaut });
+        GU.cadres.push({ z, x0, x1: xn, ya, yb, dedans });
       }
       // Vie des murs nommés : un trait à leur prix, depuis quand ils portent au moins le seuil « mur ».
-      for (const m of mursAffiches()) {
-        if (m.source !== 'live' || m.depuis === null) continue;
-        const y = Math.round(Y(m.p + m.pas / 2)) + 0.5, xa = Math.max(0, X(m.depuis));
+      // Débutant : seulement le mur de repli (le côté sans zone), celui que son repère nomme.
+      for (const m of deb ? mursRepli() : mursAffiches()) {
+        // Débutant : un mur de repli dont la série n'est pas connue est marqué sur la largeur des cadres
+        // (sans point de départ : rien n'est daté).
+        const connu = m.depuis !== null && m.depuis !== undefined;
+        if (m.source !== 'live' || (!connu && !deb)) continue;
+        const y = Math.round(Y(m.p + m.pas / 2)) + 0.5, xa = connu ? Math.max(0, X(m.depuis)) : x0;
         if (y < 0 || y > H || xn - xa < 2) continue;
         ctx.save(); ctx.strokeStyle = m.cote === 'bid' ? C.murBid : C.murAsk; ctx.globalAlpha = 0.9; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(xa, y); ctx.lineTo(xn, y); ctx.stroke();
-        if (xa > 0) { ctx.fillStyle = ctx.strokeStyle; ctx.beginPath(); ctx.arc(xa, y, 3, 0, Math.PI * 2); ctx.fill(); }
+        if (connu && xa > 0) { ctx.fillStyle = ctx.strokeStyle; ctx.beginPath(); ctx.arc(xa, y, 3, 0, Math.PI * 2); ctx.fill(); }
         ctx.restore();
       }
     }
     // Marques du journal : un symbole à l'instant et au prix de chaque évènement, une seule par case
-    // de quelques pixels (×n au survol, la phrase de chacun).
+    // de quelques pixels (×n au survol, la phrase de chacun). Expert seulement : en débutant, le
+    // panneau Journal les garde.
+    if (deb) return;
     const evs = GU.journal.dans(E.vue.t1, E.vue.t2), pts = [];
     for (const ev of evs) { const x = X(ev.t), y = Y(ev.p); if (x >= -6 && x <= W + 6 && y >= -6 && y <= H + 6) pts.push({ x, y, ev }); }
     const cases = BM.regrouperMarques(pts, G.marquePx);
@@ -1727,8 +1848,8 @@
     ctx.font = '600 10px ' + POLICE; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const m of cases) {
       ctx.globalAlpha = 0.9; ctx.fillStyle = C.pastille; ctx.beginPath(); ctx.arc(m.x, m.y, 6.5, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = 1; ctx.fillStyle = couleurEv(m.ev); ctx.fillText(m.ev.s, m.x, m.y + 0.5);
-      if (m.evs.length > 1) { ctx.font = '600 8px ' + POLICE; ctx.fillStyle = C.ink2; ctx.fillText('×' + m.evs.length, m.x + 11, m.y - 6); ctx.font = '600 10px ' + POLICE; }
+      ctx.globalAlpha = 1; ctx.fillStyle = couleurEv(m.ev); ctx.fillText(m.ev.s, m.x, m.y + 0.5); noterTexte(m.ev.s, m.x, m.y + 0.5, 'center', 10);
+      if (m.evs.length > 1) { ctx.font = '600 8px ' + POLICE; ctx.fillStyle = C.ink2; ctx.fillText('×' + m.evs.length, m.x + 11, m.y - 6); noterTexte('×' + m.evs.length, m.x + 11, m.y - 6, 'center', 8); ctx.font = '600 10px ' + POLICE; }
       GU.marques.push(m);
     }
     ctx.restore();
@@ -1748,7 +1869,7 @@
     const essai = (vi, xi, d, strict) => {
       const ls = variantes[vi], w = Math.max(...ls.map((l, i) => largeurTexte(l, 11, i === 0))) + 14, h = 8 + ls.length * 14;
       const xa = X0[xi], x0 = Math.max(2, Math.min(W - w - 2, align === 'right' ? xa - w : xa)), y0 = Math.round(y - h / 2 + d * (h / 2 + 3));
-      if (Math.abs(y0 + h / 2 - y) > ecartMax || y0 < 2 || y0 + h > H - 2 || chevauche(x0, y0, w, h) || (strict && surObstacle(x0, y0, w, h))) return null;
+      if (Math.abs(y0 + h / 2 - y) > ecartMax || y0 < 2 || y0 + h > H - 2 || chevauche(x0, y0, w, h) || surDur(x0, y0, w, h) || (strict && surObstacle(x0, y0, w, h))) return null;
       return { ls, x0, y0, w, h };
     };
     const vs = Z.court ? [variantes.length - 1] : variantes.map((v, i) => i);
@@ -1796,13 +1917,110 @@
     if (R.calques.executions) for (const z of BULLES) if (z.r >= 3 && z.x + z.r >= xMin) l.push({ x: z.x - z.r, y: z.y - z.r, w: 2 * z.r, h: 2 * z.r });
     return l;
   }
+  // ─── Mode débutant : deux repères, un de chaque côté du prix ────────────────
+  /** Les repères débutants, un par côté : la zone à surveiller de ce côté, sinon le mur le plus
+   *  proche du prix (BM.murPlusProche), sinon rien. P : le bord de l'amas le plus proche du prix
+   *  (là où il commence). Seulement avec un carnet frais : un repère tiré d'une lecture périmée
+   *  aurait l'air actuel. */
+  function niveauxDebutant() {
+    const out = { bid: null, ask: null };
+    if (!GU.C || !carnetFrais()) return out;
+    // Le repère est du BON côté du prix affiché (achat dessous, vente dessus) : le prix a pu bouger
+    // depuis la lecture du carnet, ou être DANS la zone ; sinon le mur le plus proche, sinon rien.
+    const px = dernierPrix(), bonCote = (cote, P) => !(px > 0) || (cote === 'bid' ? P < px : P > px);
+    for (const cote of ['bid', 'ask']) {
+      const z0 = GU.zones[cote], m0 = GU.proches && GU.proches[cote];
+      const z = z0 && bonCote(cote, cote === 'bid' ? z0.pHaut : z0.pBas) ? z0 : null, m = m0 && bonCote(cote, cote === 'bid' ? m0.p + m0.pas : m0.p) ? m0 : null;
+      if (z) out[cote] = { cote, source: 'zone', pBas: z.pBas, pHaut: z.pHaut, q: z.q, P: cote === 'bid' ? z.pHaut : z.pBas, z };
+      else if (m) out[cote] = { cote, source: 'mur', pBas: m.p, pHaut: m.p + m.pas, q: m.q, P: cote === 'bid' ? m.p + m.pas : m.p, m, h: GU.murs.find(w => w.cote === cote && w.p === m.p) || null };
+      if (out[cote]) out[cote].etiquette = BM.etiquetteNiveau(cote, out[cote].P);
+    }
+    return out;
+  }
+  /** Les murs de repli (côté sans zone), au format de mursAffiches : leur trait de vie est dessiné. */
+  function mursRepli() {
+    const N = niveauxDebutant(), out = [];
+    for (const n of [N.bid, N.ask]) if (n && n.source === 'mur') out.push(Object.assign({ cote: n.cote, p: n.m.p, pas: n.m.pas, q: n.m.q, source: 'live', depuis: null }, n.h ? { depuis: n.h.depuis } : {}));
+    return out;
+  }
+  /** « là depuis 13 min » d'un mur nommé (son histoire), ou rien. */
+  // « au moins moins d'une minute » ne se dit pas : une série vue depuis moins d'une minute, sans son début, n'a pas d'âge à dire.
+  const depuisMots = (w, now) => (w && w.depuis !== null && w.depuis !== undefined && w.note !== 'prix' && !(w.auMoins && now - w.depuis < 60e3)
+    ? ', là depuis ' + (w.auMoins ? 'au moins ' : '') + BM.duree(Math.max(0, now - w.depuis)) : '');
+  /** Le détail d'un repère débutant, au toucher : des phrases entières, les mêmes valeurs. */
+  function texteNiveauDebutant(n, now) {
+    const achat = n.cote === 'bid', mot = achat ? 'd\'achat' : 'de vente', nom = achat ? 'Mur d’achat' : 'Mur de vente', NB = '\u00a0';
+    const ou = 'entre ' + BM.prix(n.pBas) + ' et ' + BM.prix(n.pHaut) + NB + '$', lus = 'lus il y a ' + BM.ageEntier(Date.now() - GU.lu);
+    const suite = 'Si le prix ' + (achat ? 'descend' : 'monte') + ' jusque-là, on verra si ces ordres sont échangés ou retirés : ils peuvent l\'être à tout moment.';
+    if (n.source === 'zone') {
+      if (GU.C && GU.C.mid >= n.pBas && GU.C.mid <= n.pHaut) return nom + ' : le prix est dans cette zone (' + BM.btc(n.q) + ' BTC d\'ordres ' + mot + ' en attente ' + ou + ', ' + lus + ') : on voit maintenant si ses ordres sont échangés ou retirés.';
+      const w = GU.murs.filter(m => m.cote === n.cote && m.p >= n.pBas - 1e-6 && m.p + m.pas <= n.pHaut + 1e-6).sort((a, b) => b.q - a.q)[0];
+      const dont = w ? ', dont ' + BM.btc(w.q) + ' BTC entre ' + BM.prix(w.p) + ' et ' + BM.prix(w.p + w.pas) + NB + '$' + depuisMots(w, now) : '';
+      return nom + ' : ' + BM.btc(n.q) + ' BTC d\'ordres ' + mot + ' en attente ' + ou + ', ' + lus + dont + '. ' + suite;
+    }
+    const ecart = GU.C ? (achat ? GU.C.mid - n.pHaut : n.pBas - GU.C.mid) : null;
+    return nom + ' : ' + BM.btc(n.q) + ' BTC d\'ordres ' + mot + ' en attente ' + ou + depuisMots(n.h, now) + ', ' + lus + '.'
+      + (ecart !== null ? ' À ' + BM.prix(Math.max(0, ecart)) + NB + '$ ' + (achat ? 'sous le' : 'au-dessus du') + ' prix (' + BM.nombre(Math.abs(n.m.ecartPct || 0), 2, 2) + ' %).' : '') + ' ' + suite;
+  }
+  /** Obstacles DURS des repères débutants : la ligne de prix des tendanceMs dernières minutes et la
+   *  rangée du prix actuel — un repère ne cache jamais le prix récent. */
+  let DUR = [];
+  const surDur = (x0, y0, w, h) => DUR.some(r => x0 < r.x + r.w && x0 + w > r.x && y0 < r.y + r.h && y0 + h > r.y);
+  function obstaclesDurs(now) {
+    const l = [], cols = new Map(), PAS = 6, t0 = now - BM.GUIDE.tendanceMs;
+    let prec = null;
+    for (const m of E.minutes) {
+      if (m.fin >= Math.max(E.vue.t1, t0) && m.t <= E.vue.t2) {
+        const xa = X(m.t), xb = X(Math.min(m.fin, now)), c0 = prec ? prec.c : m.c, hi = Y(Math.max(c0, m.c, m.h)), lo = Y(Math.min(c0, m.c, m.l));
+        for (let k = Math.floor(xa / PAS); k <= Math.floor(xb / PAS); k++) { const c = cols.get(k); if (c) { c[0] = Math.min(c[0], hi); c[1] = Math.max(c[1], lo); } else cols.set(k, [hi, lo]); }
+      }
+      prec = m;
+    }
+    for (const [k, [hi, lo]] of cols) l.push({ x: k * PAS - 2, y: hi - 3, w: PAS + 4, h: lo - hi + 6 });
+    const p = dernierPrix();
+    if (p) { const y = Y(p); l.push({ x: 0, y: y - 10, w: Z.chaleur.w, h: 20 }); }
+    return l;
+  }
+  /** Les mots de la carte en mode débutant : deux repères au plus, d'une ligne (≤ 24 signes), posés
+   *  au bord de leur cadre (ou avant « maintenant » pour un mur de repli) ; le détail au toucher.
+   *  Vue passée : un seul mot, « Vue du passé ». */
+  function guideTextesDebutant() {
+    const W = Z.chaleur.w, H = Z.chaleur.h, now = maintenant(), xnow = X(now), xn = Math.min(W, xnow);
+    OBST = []; DUR = [];
+    if (!GU.present) {
+      const survol = window.matchMedia && window.matchMedia('(hover: hover)').matches;
+      if (xnow > W) for (const y of [H / 2, 40, H - 40]) {
+        const b = poserBoite([['Vue du passé']], W - 6, y, 'right', C.accent, 30, null, null);
+        if (b) { GU.etiquettes.push(Object.assign(b, { texte: 'Vue du passé', cote: null, long: 'La carte montre le passé. Les repères « Mur d’achat » et « Mur de vente » décrivent le présent : bouton « Suivre » pour y revenir'.replace(/« /g, '«\u00a0').replace(/ »/g, '\u00a0»') + (survol ? ' (touche F)' : '') + '.' })); break; }
+      }
+      return;
+    }
+    if (!carnetFrais()) return;
+    const N = niveauxDebutant();
+    OBST = obstaclesGuide(Math.max(0, xn - Math.max(700, W * 0.6)));
+    DUR = obstaclesDurs(now);
+    for (const cote of ['ask', 'bid']) {
+      const n = N[cote];
+      if (!n) continue;
+      const coul = cote === 'bid' ? C.murBid : C.murAsk;
+      let b = null;
+      if (n.source === 'zone') {
+        const f = GU.cadres.find(c => c.z === n.z);
+        if (f) b = poserBoite([[n.etiquette]], f.x0 + 6, (f.ya + f.yb) / 2, 'left', coul, 70, [f.x0 + 6, f.x0 - 150, f.x0 - 300, xn - 400], 'zone' + cote);
+      } else {
+        const y = Y((n.pBas + n.pHaut) / 2);
+        if (y >= 4 && y <= H - 4) b = poserBoite([[n.etiquette]], xn, y, 'right', coul, 34, [xn - 10, xn - 10 - Math.min(230, W * 0.2), xn - 400], 'mur' + cote);
+      }
+      if (b) GU.etiquettes.push(Object.assign(b, { texte: n.etiquette, cote, prix: n.P, source: n.source, long: texteNiveauDebutant(n, now) }));
+    }
+  }
   /** Au-dessus de tout, après les pastilles d'âge (elles gardent la priorité) : les mots. D'abord
    *  les zones à surveiller (avec le mur qu'elles contiennent : le même carnet n'est pas dit deux
    *  fois), puis les autres murs (dans une colonne fixe juste avant « maintenant »), puis les fins
    *  de murs récentes. Mode débutant : textesDebutant boîtes au plus (une carte lisible d'abord). */
   function guideTextes() {
     const W = Z.chaleur.w, H = Z.chaleur.h, now = maintenant(), xnow = X(now), xn = Math.min(W, xnow), exp = MODE === 'expert', G = BM.GUIDE;
-    OBST = [];
+    OBST = []; DUR = [];
     if (!GU.present) {
       // Vue passée : les murs et les zones décrivent le présent, hors de la vue — dit en une boîte.
       if (xnow > W) for (const y of [H / 2, 40, H - 40]) {
@@ -1859,6 +2077,14 @@
   /** L'élément du guide sous le pointeur : une marque du journal (toutes celles de sa case), un
    *  libellé, une zone ; ou le texte entier d'une pastille d'âge abrégée. */
   function guideEn(x, y) {
+    // Débutant : la phrase entière d'un repère, de son cadre, ou du trait de son mur de repli.
+    if (debutant()) {
+      for (const e of GU.etiquettes) if (x >= e.x && x <= e.x + e.w && y >= e.y && y <= e.y + e.h) return e.long;
+      const de = (cote, src) => { const e = GU.etiquettes.find(q => q.cote === cote && q.source === src); return e ? e.long : null; };
+      for (const f of GU.cadres) if (x >= f.x0 && x <= f.x1 && y >= f.ya - 2 && y <= f.yb + 2) { const t = de(f.z.cote, 'zone'); if (t) return t; }
+      for (const m of GU.present && carnetFrais() ? mursRepli() : []) { const ym = Y(m.p + m.pas / 2); if (Math.abs(y - ym) <= 4 && x <= X(maintenant()) + 4) return de(m.cote, 'mur'); }
+      return null;
+    }
     let best = null, d2 = 8 * 8;
     for (const m of GU.marques) { const d = (m.x - x) ** 2 + (m.y - y) ** 2; if (d <= d2) { d2 = d; best = m; } }
     if (best) return best.evs.slice(-4).reverse().map(ev => 'Guide · ' + BM.heureUtc(ev.t, true) + ' UTC : ' + ev.texte + (ev.n > 1 ? ' (×' + ev.n + ' dans la minute)' : '')).join('\n')
@@ -1879,6 +2105,7 @@
   function majResume() {
     const el = document.getElementById('resumeCarte');
     if (!el) return;
+    if (debutant()) { majResumeDebutant(el); return; }
     let txt = '', long = '';
     if (R.calques.guide) {
       if (GU.resume && GU.lu !== null && E.carnet && carnetFrais()) {
@@ -1902,6 +2129,46 @@
     if (el.title !== long) el.title = long;
     if (el.hidden !== !R.calques.guide) { el.hidden = !R.calques.guide; RECT = null; RESUME_FORME.cle = null; }
   }
+  /** Mode débutant : UNE ligne (≤ 100 signes, ≤ 55 en version courte), toujours datée, d'abord le
+   *  sens du prix ; la bande reste là guide caché (elle dit comment le rallumer) : la carte ne change
+   *  pas de taille. Un appui l'ouvre : 5 lignes en clair (BM.detailCarteDebutant). */
+  let RESUME_DEB = { long: '', court: '', affiche: '', tendance: null };
+  function tendanceDebutant(now) {
+    if (!estLu('prix') || !E.minutes.length) return null;
+    return BM.tendancePrix(E.minutes, E.exec.dernierPrix && E.exec.dernier ? { p: E.exec.dernierPrix, t: E.exec.dernier } : null, now, { lu: E.minutesA ? axe(E.minutesA) : null });
+  }
+  function majResumeDebutant(el) {
+    const now = maintenant(), N = niveauxDebutant(), tendance = tendanceDebutant(now), etat = {};
+    if (!R.calques.guide) etat.guideCache = true;
+    else if (E.carnet && !carnetFrais()) etat.pauseMs = Date.now() - E.carnetA;
+    else {
+      const lu = execLuJusqua();
+      if (lu > -Infinity && now - lu > BM.validiteLecture(1000)) etat.retardMs = now - lu;
+      etat.aucunRepere = !N.bid && !N.ask;
+    }
+    const r = GU.resume && GU.lu !== null && E.carnet ? GU.resume : null;
+    const ageMs = Math.max(GU.lu !== null ? Date.now() - GU.lu : 0, tendance && tendance.t !== null ? now - tendance.t : 0);
+    const ph = BM.phraseCarteDebutant(r, tendance, ageMs, etat);
+    let txt;
+    if (el.classList.contains('ouvert')) {
+      const niv = x => (x ? { etiquette: x.etiquette, q: x.q, pBas: x.pBas, pHaut: x.pHaut } : null);
+      txt = [ph.long].concat(BM.detailCarteDebutant({ tendance, r, luMs: GU.lu !== null ? Date.now() - GU.lu : null, niveaux: { ask: niv(N.ask), bid: niv(N.bid) }, ages: agesDebutantMs(now) })).join('\n');
+    } else {
+      // La ligne entière tient-elle ? Mesuré une fois par forme (chiffres mis à part) et par largeur.
+      const cle = 'deb|' + ph.long.replace(/\d/g, '0') + '|' + el.clientWidth + '|' + (Z && Z.etroit);
+      if (RESUME_FORME.cle !== cle) {
+        let court = !!(Z && Z.etroit);
+        if (!court && !el.hidden) { el.textContent = ph.long; court = el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1; }
+        RESUME_FORME = { cle, court };
+      }
+      txt = RESUME_FORME.court ? ph.court : ph.long;
+    }
+    RESUME_DEB = { long: ph.long, court: ph.court, affiche: txt, tendance };
+    if (el.textContent !== txt) el.textContent = txt;
+    const titre = 'Un appui : le détail de cette ligne';
+    if (el.title !== titre) el.title = titre;
+    if (el.hidden) { el.hidden = false; RECT = null; RESUME_FORME.cle = null; }
+  }
   /** Le panneau « Ce qui vient de se passer » : réécrit s'il est ouvert et que le journal a changé. */
   function majPanneauJournal() {
     const p = document.getElementById('journalPanneau');
@@ -1909,7 +2176,18 @@
     const cle = GU.journal.version + '|' + R.calques.guide + '|' + R.mursSeuil + '|' + R.rafaleMin + '|' + MODE;
     if (GU.cleJournal === cle) return;
     GU.cleJournal = cle;
-    const G = BM.GUIDE, l = GU.journal.derniers(G.journalMax), debut = E.murs.totaux[0].depuis;
+    const G = BM.GUIDE, debut = E.murs.totaux[0].depuis;
+    if (debutant()) {
+      // Débutant : les phrases simples de chaque évènement (mêmes quantités, mêmes prix), à l'heure
+      // de l'appareil (celle de l'axe) ; les niveaux d'une estimation (options) ne sont pas listés.
+      const l = GU.journal.liste.filter(ev => ev.debutant).slice(-G.journalMax).reverse(), depuis = debut !== null ? BM.heure(axe(debut)) : null;
+      document.getElementById('journalNote').textContent = 'Ce qui s\'est passé' + (depuis ? ' depuis ' + depuis : '') + ', le plus récent en haut (heure de cet appareil). Le journal décrit ; il n\'explique pas et ne prévoit rien.';
+      document.getElementById('listeJournal').innerHTML = !R.calques.guide ? '<li>Guide caché : le journal ne se remplit pas (bouton «\u00a0Guide\u00a0»).</li>'
+        : l.length ? l.map(ev => '<li><time>' + BM.heure(ev.t, true) + '</time> <span class="sym" style="color:' + couleurEv(ev) + '">' + echap(ev.s) + '</span> ' + echap(ev.debutant) + (ev.n > 1 ? ' <b>×' + ev.n + '</b>' : '') + '</li>').join('')
+          : '<li>Rien de notable' + (depuis ? ' depuis ' + depuis : '') + ' : aucun gros ordre posé ou retiré, aucune grosse vague d\'échanges. C\'est courant quand le marché est calme.</li>';
+      return;
+    }
+    const l = GU.journal.derniers(G.journalMax);
     const sj = BM.nombre(E.murs.seuils[E.murs.indice(seuilJournal())], 0, 2), sr = BM.nombre(Math.max(R.rafaleMin, G.rafaleBtc), 0, 2);
     const depuis = debut !== null ? BM.heureUtc(axe(debut)) + ' UTC' : null, fus = BM.fuseau(new Date().getTimezoneOffset());
     document.getElementById('journalNote').textContent = 'Heures UTC' + (fus !== 'UTC' ? ' (l\'axe de la carte est à l\'heure de l\'appareil, ' + fus + ')' : '') + ', le plus récent d\'abord. '
@@ -1928,15 +2206,17 @@
   const introEl = document.getElementById('guideIntro');
   let INTRO_RECT = null;
   function introVue() { try { return localStorage.getItem(INTRO_CLE) === 'vue'; } catch (e) { return false; } }
-  function ouvrirIntro() { if (!introEl) return; remplirIntro(); introEl.hidden = false; INTRO_RECT = null; dessiner(); }
+  function ouvrirIntro() { if (!introEl) return; remplirIntro(); introEl.hidden = false; INTRO_RECT = null; majIndice(); dessiner(); }
   function fermerIntro() {
     if (!introEl || introEl.hidden) return;
     introEl.hidden = true; GU.reperes = []; INTRO_RECT = null;
     try { localStorage.setItem(INTRO_CLE, 'vue'); } catch (e) { /* navigation privée : elle reviendra */ }
+    majIndice();
     dessiner();
   }
   /** Les mots des couleurs de la chaleur : ceux de la palette choisie (le texte de son option). */
   function paletteMots() {
+    if (debutant() && R.palette === 'cote') return 'du sombre au clair, teinté selon le côté';
     const o = document.querySelector('#rPalette option:checked') || document.querySelector('#rPalette option');
     const m = o && /\(([^)]+)\)/.exec(o.textContent);
     return m ? m[1] : (o ? o.textContent.toLowerCase() : 'du sombre au clair');
@@ -1945,6 +2225,12 @@
   /** Un mot de couleur et sa pastille, insécables. */
   const couleurMot = (mot, v) => '<span class="mot-couleur">' + mot + ' ' + pastilleCss(v) + '</span>';
   function itemsIntro() {
+    // Débutant : 3 points, ce qu'il voit — couleurs, ligne blanche et ronds, les deux repères.
+    if (debutant()) return [
+      ['Couleurs = ordres en attente.', 'Plus c\'est clair (' + paletteMots() + '), plus il y a d\'ordres d\'achat ou de vente à ce prix. Un ordre peut être retiré à tout moment. Hachures : rien n\'a été lu là.'],
+      ['Ligne blanche = le prix, jusqu\'au trait vertical «\u00a0maintenant\u00a0». Ronds = échanges réels.', couleurMot('Vert', '--up') + ' : un acheteur a pris une vente en attente. ' + couleurMot('Rouge', '--down') + ' : un vendeur a pris un achat en attente. Plus gros = plus de BTC.'],
+      ['«\u00a0Mur d’achat\u00a0» sous le prix, «\u00a0Mur de vente\u00a0» au-dessus : là où le plus d\'ordres attendent en ce moment.', 'La phrase du haut décrit l\'instant : ce n\'est pas une prévision.'],
+    ];
     const n = E.niv, tr = (n && n.tranche) || BM.GUIDE.trancheUsd;
     // Les niveaux d'options montrés : tirés du fichier (court + nom), pas d'une liste écrite à la main.
     const gam = n && n.gamma && n.gamma.length ? [...new Map(n.gamma.map(g => [g.court, g.nom])).entries()].map(([c, nom]) => c + ' ' + nom.charAt(0).toLowerCase() + nom.slice(1)).join(', ') : 'aucun niveau dans le fichier lu';
@@ -1960,8 +2246,13 @@
     if (!introEl) return;
     INTRO_RECT = null;
     const vus = new Set(GU.reperes.map(r => r.n)), ouvert = !introEl.hidden, survol = window.matchMedia && window.matchMedia('(hover: hover)').matches;
-    document.getElementById('guideIntroListe').innerHTML = itemsIntro().map(([t, d], i) => '<li><span class="num">' + (i + 1) + '</span><span><b>' + t + '</b> <span class="detail' + (i === 2 ? ' garde' : '') + '">' + d + '</span>'
+    const deb = debutant();
+    document.getElementById('guideIntroListe').innerHTML = itemsIntro().map(([t, d], i) => '<li><span class="num">' + (i + 1) + '</span><span><b>' + t + '</b> <span class="detail' + (i === 2 || deb ? ' garde' : '') + '">' + d + '</span>'
       + (ouvert && R.calques.guide && !vus.has(i + 1) ? ' <i>' + (GU.caches.has(i + 1) ? '(caché sous ce cadre)' : GU.sansPlace.has(i + 1) ? '(visible, mais sans place libre pour son numéro)' : '(pas d\'exemple dans cette vue)') + '</i>' : '') + '</span></li>').join('');
+    if (deb) {
+      document.getElementById('guideIntroNote').textContent = (survol ? 'Touchez ou survolez' : 'Touchez') + ' un repère pour le détail. Tout voir : bouton «\u00a0Passer en Expert\u00a0»' + (survol ? ' (touche M).' : '.');
+      return;
+    }
     document.getElementById('guideIntroNote').textContent = (R.calques.guide ? 'Les numéros montrent un exemple réel de chacun. Vert ou turquoise : côté achat ; rouge ou rose : côté vente. Rond : échangé ; rectangle : en attente.' : 'Calque Guide éteint : pas de numéros sur la carte.')
       + ' Le Guide écrit aussi les murs, les zones à surveiller, un résumé (en haut) et le Journal. '
       + 'Mode ' + (MODE === 'expert' ? 'expert : chiffres seuls' : 'débutant : des phrases') + ' (bouton dans la Légende' + (survol ? ' ou touche M' : '') + ' ; change aussi le terminal).'
@@ -1989,18 +2280,21 @@
     const avant = cleRep();
     GU.reperes = []; GU.caches = new Set(); GU.sansPlace = new Set();
     if (!introEl || introEl.hidden || !R.calques.guide) { if (avant !== '||') remplirIntro(); return; }   // calque Guide éteint : rien de peint
+    // Débutant : 1 = la chaleur, 2 = la ligne de prix (puis un rond), 3 = un repère (cadre de zone,
+    // sinon le trait du mur de repli).
+    const deb = debutant();
     const W = Z.chaleur.w, H = Z.chaleur.h, now = maintenant(), xn = Math.min(W, X(now)), ri = rectIntro(), cibles = [];
     const dans = (x, y, m) => x > m && x < W - m && y > m && y < H - m;
     // 1. La chaleur : les tranches les plus chargées du dernier carnet live, à plusieurs instants ;
     //    puis celles de la carte publiée à plusieurs colonnes de la vue.
-    if (R.calques.live && E.carnet && E.live && E.live.n) {
+    if (estVu('live') && E.carnet && E.live && E.live.n) {
       const l = [];
       for (const mp of [E.carnet.sb, E.carnet.sa]) for (const [pb, q] of mp) { const y = Y((pb + 0.5) * E.carnet.dp); if (y > 24 && y < H - 24) l.push([q, y]); }
       l.sort((a, b) => b[0] - a[0]);
       const xl = Math.max(0, X(E.live.deb[0]));
       for (const [, y] of l.slice(0, 5)) for (const f of [0.85, 0.5, 0.15]) { const x = xl + (xn - xl) * f; if (xn - xl > 30) cibles.push([1, x, y]); }
     }
-    if (R.calques.publiee && E.pub) {
+    if (estVu('publiee') && E.pub) {
       const g = E.pub;
       for (const f of [0.75, 0.5, 0.25, 0.9]) {
         const t = E.vue.t1 + (Math.min(now, E.vue.t2) - E.vue.t1) * f, c = Math.floor((t - g.t0) / g.dt);
@@ -2012,7 +2306,7 @@
     }
     // 2. La ligne de prix : la clôture de plusieurs minutes de la vue (placée à la FIN de sa minute,
     //    comme la ligne la dessine).
-    if (R.calques.prix && E.minutes.length) {
+    if (estVu('prix') && E.minutes.length) {
       for (const f of [0.85, 0.6, 0.35, 0.15]) {
         const tc = E.vue.t1 + (Math.min(now, E.vue.t2) - E.vue.t1) * f;
         let lo = 0, hi = E.minutes.length;
@@ -2022,17 +2316,21 @@
       }
     }
     // 3. Une bulle : les plus grosses de la vue.
-    if (R.calques.executions) for (const z of BULLES.filter(z => z.r >= 4 && dans(z.x, z.y, 20)).sort((a, b) => b.r - a.r).slice(0, 6)) cibles.push([3, z.x, z.y - z.r]);
+    if (estVu('executions')) for (const z of BULLES.filter(z => z.r >= 4 && dans(z.x, z.y, 20)).sort((a, b) => b.r - a.r).slice(0, 6)) cibles.push([deb ? 2 : 3, z.x, z.y - z.r]);
+    if (deb) {
+      for (const f of GU.cadres) for (const fx of [0.5, 0.25, 0.75]) cibles.push([3, f.x0 + (f.x1 - f.x0) * fx, (f.ya + f.yb) / 2]);
+      for (const m of GU.present && carnetFrais() ? mursRepli() : []) { const y = Y(m.p + m.pas / 2); if (y > 4 && y < H - 4) for (const fx of [0.92, 0.8, 0.65]) cibles.push([3, xn * fx, y]); }
+    }
     // 4. Un rectangle Σ (fichier de 15 min).
     const n = E.niv;
-    if (R.calques.murs && n && n.mursA && n.tranche) {
+    if (estVu('murs') && n && n.mursA && n.tranche) {
       const x0 = Math.max(0, X(n.mursA));
       // Chaque rectangle visible, à plusieurs points de sa longueur : le premier libre l'emporte.
       // (Sur un écran étroit, un rectangle récent n'a que quelques pixels : il compte quand même.)
       if (x0 < W - 4) for (const w of n.murs) { const y = Y(w.p + n.tranche / 2); if (y > 4 && y < H - 4) for (const f of [0, 0.5, 0.25, 0.75]) cibles.push([4, Math.min(W - 6, x0 + 2 + Math.max(0, xn - x0 - 4) * f), y]); }
     }
     // 5. Un niveau d'options (tirets).
-    if (R.calques.gamma && n && n.gammaA) {
+    if (estVu('gamma') && n && n.gammaA) {
       const x0 = Math.max(0, X(n.gammaA));
       // Plusieurs points le long de chaque ligne visible : le premier libre l'emporte.
       // (Sur un écran étroit, la ligne d'un fichier récent n'a que quelques pixels : elle compte quand même.)
@@ -2058,6 +2356,7 @@
       ctx.beginPath(); ctx.arc(pos[0], pos[1], 9.5, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
       texte(String(k), pos[0], pos[1] + 0.5, '#0b0b12', 11, 'center', true);
+      TEXTES_CARTE[TEXTES_CARTE.length - 1].repere = true;
       reserver(pos[0] - 10, pos[1] - 10, 20, 20, String(k));
       GU.reperes.push({ n: k, x: pos[0], y: pos[1], cx, cy });
       poses.add(k);
@@ -2084,7 +2383,7 @@
     // Gamma d'abord : ses repères (dans le champ ou fléchés hors champ) réservent leur place,
     // et les graduations s'effacent devant eux.
     const reserve = [];
-    if (R.calques.gamma && E.niv) {
+    if (estVu('gamma') && E.niv) {
       let haut = 0, bas = 0;
       const centre = (E.vue.p1 + E.vue.p2) / 2;
       for (const g of [...E.niv.gamma].sort((u, v) => Math.abs(u.pAxe - centre) - Math.abs(v.pAxe - centre))) {
@@ -2110,13 +2409,17 @@
     const graduations = TEXTES.axePrix = [];
     for (let q = Math.ceil(E.vue.p1 / pas) * pas; q <= E.vue.p2; q += pas) {
       const y = Y(q);
-      if (reserve.some(r => Math.abs(r - y) < 13)) continue;
+      if (reserve.some(r => Math.abs(r - y) < (debutant() ? 16 : 13))) continue;
       graduations.push(BM.prix(q, dec));
       texte(BM.prix(q, dec), a.x + 6, y, C.ink3, 10.5);
     }
     if (p) {
-      ctx.fillStyle = C.prix; arrondi(a.x + 1, yPrix - 9, a.w - 2, 18, 4); ctx.fill();
-      texte(ajuster([BM.prix(p, 1), BM.prix(p, 0)], a.w - 7, 11, true), a.x + 5, yPrix, '#0b0b12', 11, 'left', true);
+      // Débutant : le prix se lit d'un coup d'œil — plus grand (13 px), sans décimale ; la valeur
+      // exacte est dans le détail au toucher et en Expert.
+      const deb = debutant(), taille = deb ? 13 : 11, hb = deb ? 22 : 18;
+      ctx.fillStyle = C.prix; arrondi(a.x + 1, yPrix - hb / 2, a.w - 2, hb, 4); ctx.fill();
+      TEXTES.prix = deb ? BM.prix(p, 0) : ajuster([BM.prix(p, 1), BM.prix(p, 0)], a.w - 7, 11, true);
+      texte(TEXTES.prix, a.x + 5, yPrix, '#0b0b12', deb && largeurTexte(TEXTES.prix, 13, true) > a.w - 7 ? 12 : taille, 'left', true);
     }
   }
   const kilo = p => BM.nombre(p / 1000, 0, 1) + ' k';
@@ -2271,6 +2574,7 @@
     const s = E.souris;
     // Pendant un glissement à la souris, la croix suit le pointeur et la lecture attend le lâcher.
     if (!s || s.zone !== 'chaleur' || s.geste) { cacherLecture(); return; }
+    if (debutant()) { placerLecture(lignesDebutant(s), s); return; }
     const t = T(s.x), p = Pr(s.y), l = [];
     l.push('<b>' + BM.prix(p, 1) + ' $</b> · ' + BM.heure(t, true));
     // Le PIXEL sous le pointeur, tel que la peinture le calcule : mêmes colonnes, mêmes tranches,
@@ -2300,32 +2604,98 @@
       l.push('&nbsp;&nbsp;' + (q ? 'mesuré : ' + BM.btc(q) + ' BTC · ' : '') + quand + pixel);
     };
     const pub = grillePublieeAffichee();
-    if (R.calques.loin && E.loin) cel(E.loin, 'Coinbase', E.loin.encodage, LOIN.coupe);
+    if (estVu('loin') && E.loin) cel(E.loin, 'Coinbase', E.loin.encodage, LOIN.coupe);
     if (pub) cel(pub, 'Carte', pub.encodage, PUB.coupe);
-    if (R.calques.live && !LIVE.vide) cel(E.live, 'Live', E.liveRef === 'publiee' ? E.pub && E.pub.encodage : null, LIVE.coupe);
-    if (R.calques.executions && E.exec.seaux.size) {
+    if (estVu('live') && !LIVE.vide) cel(E.live, 'Live', E.liveRef === 'publiee' ? E.pub && E.pub.encodage : null, LIVE.coupe);
+    if (estVu('executions') && E.exec.seaux.size) {
       // La bulle SURVOLÉE (la plus haute qui contient le pointeur), sinon le seau sous le pointeur :
       // la même grille de seaux que le dessin, jamais une fenêtre centrée sur le pointeur.
-      let b = null;
-      for (let i = BULLES.length - 1; i >= 0 && !b; i--) { const z = BULLES[i]; if ((s.x - z.x) ** 2 + (s.y - z.y) ** 2 <= z.r * z.r) b = z.b; }
-      if (!b) {
-        const { pasT, pasP } = pasBulles(), T0 = Math.floor(t / pasT) * pasT;
-        b = E.exec.regrouper(T0, T0 + pasT, pasT, pasP).find(x => p >= x.pa && p < x.pb) || null;
-      }
+      const b = bulleSous(s, t, p);
       if (b && b.achat + b.vente > 0) {
         l.push('Exécutions ' + BM.heure(b.ta, true) + '–' + BM.heure(b.tb, true) + ' · ' + BM.prix(b.pa) + '–' + BM.prix(b.pb) + ' $ : '
           + BM.btc(b.achat) + ' BTC achetés / ' + BM.btc(b.vente) + ' vendus au marché');
       }
     }
-    if (R.calques.rafales) { const rf = rafaleEn(s.x, s.y); if (rf) l.push('Rafale ' + texteRafale(rf)); }
-    if (R.calques.memoire && E.pub) { const tm = texteMemoire(s.y); if (tm) l.push(tm); }
-    if (R.calques.destin) { const dn = destinEn(s.x, s.y); if (dn) l.push(texteDestin(dn)); }
+    if (estVu('rafales')) { const rf = rafaleEn(s.x, s.y); if (rf) l.push('Rafale ' + texteRafale(rf)); }
+    if (estVu('memoire') && E.pub) { const tm = texteMemoire(s.y); if (tm) l.push(tm); }
+    if (estVu('destin')) { const dn = destinEn(s.x, s.y); if (dn) l.push(texteDestin(dn)); }
     if (R.calques.guide) { const gd = guideEn(s.x, s.y); if (gd) l.push(echap(gd).replace(/\n/g, '<br>')); }
     { const pa = pastilleEn(s.x, s.y); if (pa) l.push(echap(pa)); }
-    // Le texte n'est réécrit que s'il a changé ; à la souris, la bulle se place sans être MESURÉE
-    // (une mesure après innerHTML force une mise en page à chaque mouvement) : elle bascule à gauche
-    // ou au-dessus du pointeur par un translate(-100 %) quand sa largeur maximale (LECTURE_MAX) ou
-    // une hauteur prudente ne tiendraient pas. Au doigt (un appui, rare), elle est mesurée.
+    placerLecture(l, s);
+  }
+  /** La bulle d'exécutions sous le pointeur : la bulle SURVOLÉE (la plus haute qui le contient, au
+   *  rayon dessiné), sinon le seau sous le pointeur — la même grille de seaux que le dessin. */
+  function bulleSous(s, t, p) {
+    let b = null;
+    for (let i = BULLES.length - 1; i >= 0 && !b; i--) { const z = BULLES[i]; if ((s.x - z.x) ** 2 + (s.y - z.y) ** 2 <= z.r * z.r) b = z.b; }
+    if (!b) {
+      const { pasT, pasP } = pasBulles(), T0 = Math.floor(t / pasT) * pasT;
+      b = E.exec.regrouper(T0, T0 + pasT, pasT, pasP).find(x => p >= x.pa && p < x.pb) || null;
+    }
+    return b;
+  }
+  /** La lecture en mode débutant : les MÊMES valeurs (même pixel lu par BM.lirePixel, même quantité
+   *  mesurée, mêmes seaux), en phrases ; sans les lignes techniques (intensité, MAX du pixel). */
+  function lignesDebutant(s) {
+    const t = T(s.x), p = Pr(s.y), l = [], now = maintenant(), NB = '\u00a0';
+    l.push('<b>' + BM.prix(p, 0) + NB + '$</b> · ' + BM.heure(t, true));
+    const tpp = (E.vue.t2 - E.vue.t1) / Z.chaleur.w, pp = (E.vue.p2 - E.vue.p1) / Z.chaleur.h;
+    const ix = Math.floor(s.x), iy = Math.floor(s.y), ta = E.vue.t1 + ix * tpp;
+    // Le calque du DESSUS qui a observé ce pixel : carnet live, puis carte publiée, puis Coinbase.
+    const lire = (g, coupe) => {
+      const tb = Math.min(ta + tpp, coupe);
+      if (!g || !(tb > ta)) return null;
+      const [ja, jb] = BM.tranchesLigne(E.vue.p2, pp, iy, g.dp, [0, 0]);
+      const r = BM.lirePixel(g, ta, tb, ja, jb);
+      return r && r.nObs && !r.horsBande ? Object.assign(r, { ja, jb, g }) : null;
+    };
+    const live = estVu('live') && !LIVE.vide ? lire(E.live, LIVE.coupe) : null, pub = grillePublieeAffichee(), rp = !live && pub ? lire(pub, PUB.coupe) : null;
+    const rl = !live && !rp && estVu('loin') && E.loin && !LOIN.vide ? lire(E.loin, LOIN.coupe) : null;
+    const r = live || rp;
+    if (r) {
+      const g = r.g, ici = 'Ici (' + BM.prix(r.pb * g.dp) + '–' + BM.prix((r.pb + 1) * g.dp) + NB + '$)', mot = r.cote === 'bid' ? 'd\'achat' : 'de vente';
+      if (!r.v) l.push('Peu d\'ordres en attente ici');
+      else if (live) {
+        const q = g.quantite(r.c, r.pb, r.cote === 'bid' ? 'b' : 'a');
+        l.push(ici + ' : ' + (q ? BM.btc(q) + ' BTC d\'ordres ' + mot + ' en attente' : 'ordres ' + mot + ' en attente') + ', lus il y a ' + BM.age(now - g.deb[r.c]));
+      } else {
+        const [d] = BM.etendueColonne(g, r.c), dec = BM.decoder(r.v, g.encodage), plusGros = natureCase(g, d) === 'plus gros niveau';
+        const quand = g.fusion ? ' (minutes de ' + BM.heure(d) + ' à ' + BM.heure(BM.etendueColonne(g, r.c)[1]) + ')' : ' (minute de ' + BM.heure(d) + ')';
+        const qte = !dec ? 'ordres ' + mot + ' en attente (quantité non publiée)'
+          : plusGros ? 'des ordres ' + mot + ' en attente, dont jusqu\'à ' + BM.btc(dec.sature ? dec.min : dec.max) + ' BTC sur un seul prix'
+            : (dec.sature ? 'au moins ' + BM.btc(dec.min) : 'entre ' + BM.btc(dec.min) + ' et ' + BM.btc(dec.max)) + ' BTC d\'ordres ' + mot + ' en attente';
+        l.push(ici + ' : ' + qte + quand);
+      }
+    } else if (rl) l.push('Ici, ordres lus sur une autre plateforme (Coinbase), avec une autre échelle de couleur');
+    else l.push('Rien n\'a été lu ici (ce n\'est pas «' + NB + 'aucun ordre' + NB + '»)');
+    if (estVu('executions') && E.exec.seaux.size) {
+      const b = bulleSous(s, t, p);
+      if (b && b.achat + b.vente > 0) l.push('Échangé ici : ' + BM.btc(b.achat) + ' BTC acheté, ' + BM.btc(b.vente) + ' BTC vendu (' + BM.heure(b.ta, true) + '–' + BM.heure(b.tb, true) + ')');
+    }
+    if (R.calques.guide) { const gd = guideEn(s.x, s.y); if (gd) l.push(echap(gd)); }
+    l.push('<span class="lecture-ages">' + agesDebutant(now) + '</span>');
+    return l;
+  }
+  /** Les âges des couches que voit un débutant, sous les noms qu'il a appris : couleurs (récentes :
+   *  carnet live ; plus anciennes : carte publiée), ronds (échanges), ligne blanche (prix). */
+  function agesDebutantMs(now) {
+    return {
+      recentes: estLu('live') && E.carnetA !== null && E.live && E.live.n ? now - axe(E.carnetA) : null,
+      anciennes: estLu('publiee') && E.pub ? now - BM.instantDerniereColonne(E.pub) : null,
+      ronds: estLu('executions') && E.exec.dernier ? now - E.exec.dernier : null,
+      ligne: estLu('prix') && E.minutesA ? Date.now() - E.minutesA : null,
+    };
+  }
+  function agesDebutant(now) {
+    const a = agesDebutantMs(now), c = [a.recentes !== null ? 'récentes ' + BM.age(a.recentes) : '', a.anciennes !== null ? 'plus anciennes ' + BM.age(a.anciennes) : ''].filter(Boolean);
+    return 'Âges : ' + [c.length ? 'couleurs ' + c.join(', ') : '', a.ronds !== null ? 'ronds ' + BM.age(a.ronds) : '', a.ligne !== null ? 'ligne blanche ' + BM.age(a.ligne) : ''].filter(Boolean).join(' · ');
+  }
+  /** Écrit et place la bulle de lecture.
+   *  Le texte n'est réécrit que s'il a changé ; à la souris, la bulle se place sans être MESURÉE
+   *  (une mesure après innerHTML force une mise en page à chaque mouvement) : elle bascule à gauche
+   *  ou au-dessus du pointeur par un translate(-100 %) quand sa largeur maximale (LECTURE_MAX) ou
+   *  une hauteur prudente ne tiendraient pas. Au doigt (un appui, rare), elle est mesurée. */
+  function placerLecture(l, s) {
     const html = l.join('<br>');
     if (html !== lectureHtml) { bulleInfo.innerHTML = html; bulleInfo.hidden = false; lectureHtml = html; lectureTaille = null; }
     const r = rect(), vw = window.innerWidth, vh = window.innerHeight, px = r.left + s.x, py = r.top + s.y;
@@ -2382,6 +2752,7 @@
   const position = e => { const r = rect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
   cv.addEventListener('pointerdown', e => {
     try { cv.setPointerCapture(e.pointerId); } catch (x) { /* pointeur synthétique */ }
+    cacherIndice();
     const { x, y } = position(e), tactile = e.pointerType === 'touch';
     pointeurs.set(e.pointerId, { x, y });
     clearTimeout(minuteurAppui);
@@ -2509,7 +2880,13 @@
   // ─── Barre, réglages, légende ──────────────────────────────────────────────
   const $ = id => document.getElementById(id);
   function basculerSuivre() { E.suivre = !E.suivre; if (E.suivre) suivreMaintenant(); majBoutonSuivre(); dessiner(); }
-  function majBoutonSuivre() { const b = $('btnSuivre'); if (b) b.setAttribute('aria-pressed', E.suivre ? 'true' : 'false'); }
+  function majBoutonSuivre() {
+    const b = $('btnSuivre');
+    if (!b) return;
+    b.setAttribute('aria-pressed', E.suivre ? 'true' : 'false');
+    // Débutant : la carte ne suit plus le présent — « Suivre » le rappelle d'un bord accent.
+    b.classList.toggle('accent', debutant() && !E.suivre);
+  }
   /** Ferme les panneaux ; `rendreFocus` : le bouton qui avait ouvert le panneau reprend la main. */
   function fermerPanneaux(rendreFocus) {
     let ouvreur = null;
@@ -2565,6 +2942,9 @@
     $('btnJournal').addEventListener('click', () => { GU.cleJournal = null; basculerPanneau('journalPanneau'); majPanneauJournal(); });
     $('btnIntro').addEventListener('click', () => { fermerPanneaux(); ouvrirIntro(); });
     $('btnMode').addEventListener('click', () => changerMode());
+    $('btnModeBarre').addEventListener('click', () => changerMode());
+    $('btnModeDebutant').addEventListener('click', () => changerMode());
+    $('btnIntroDebutant').addEventListener('click', () => { fermerPanneaux(); ouvrirIntro(); });
     $('resumeCarte').addEventListener('click', () => { $('resumeCarte').classList.toggle('ouvert'); RECT = null; majResume(); dessiner(); });
     $('guideIntroOk').addEventListener('click', fermerIntro);
     $('guideIntroFermer').addEventListener('click', fermerIntro);
@@ -2661,17 +3041,19 @@
     const fus = BM.fuseau(new Date().getTimezoneOffset());
     tx('legGuideMode', 'Mode ' + (MODE === 'expert' ? 'expert : les chiffres seuls' : 'débutant : des phrases') + '. C\'est le même réglage que le terminal : le changer ici (bouton, ou touche M) le change aussi là-bas.');
     tx('btnMode', 'Mode : ' + (MODE === 'expert' ? 'expert (chiffres)' : 'débutant (phrases)'));
+    tx('legPaletteDeb', paletteMots());
     tx('legGuide', 'Il relit ce que la carte montre et l\'écrit en mots ; il ne mesure rien de neuf, et ne dit ni pourquoi ni ce qui va suivre. Mesuré : lu dans les données ; convention : un seuil choisi par ce code ; modèle : les niveaux d\'options. '
       + 'Heures du guide en UTC' + (fus !== 'UTC' ? ' (l\'axe de la carte est à l\'heure de l\'appareil, ' + fus + ')' : '') + '. Le guide ne décrit le présent qu\'avec un carnet live de moins de ' + BM.VALIDITE.cadences + ' cadences ; sur une vue passée, il ne dessine que les marques du journal.');
-    tx('legGuideMurs', 'Les ' + GD.parCote + ' tranches de ' + GD.trancheUsd + NB + '$ les plus chargées de chaque côté du prix (1 en mode débutant sur un écran de moins de ' + BM.nombre(MURS_UN_PX, 0, 0) + NB + 'px de large), dans le dernier carnet live (mesuré), à ±' + n2(GD.procheMaxPct) + ' % au plus et dans la bande lue. '
+    tx('legGuideMurs', 'Les ' + GD.parCote + ' tranches de ' + GD.trancheUsd + NB + '$ les plus chargées de chaque côté du prix, dans le dernier carnet live (mesuré), à ±' + n2(GD.procheMaxPct) + ' % au plus et dans la bande lue. '
       + '«' + NB + 'Mur' + NB + '» : au moins ' + n2(GD.murMinBtc) + ' BTC et ' + n2(GD.murFacteur) + ' fois la tranche médiane de la bande lue (convention' + (GU.seuil && GU.seuil.mediane !== null ? ' ; en ce moment médiane ' + BM.btc(GU.seuil.mediane) + ' BTC, seuil ' + BM.btc(GU.seuil.seuil) + ' BTC' : '') + ') ; la médiane est celle des ' + GD.seuilLectures + ' dernières lectures (elle ne saute pas d\'une lecture à l\'autre), et un mur déjà nommé le reste jusqu\'à ' + pc(GD.murSortiePart) + ' de ce seuil (il ne clignote pas). La tranche du prix et sa voisine de chaque côté ne sont jamais nommées. '
       + '«' + NB + 'Là depuis' + NB + '» : depuis quand la tranche porte au moins ce seuil de sortie à chaque lecture ; une lecture manquée, la tranche hors de la bande lue ou le prix dans la tranche arrêtent la série («' + NB + 'au moins' + NB + '», ou «' + NB + 'rien à comparer' + NB + '»). '
       + 'Au-delà du carnet live gardé, la carte publiée prend le relais si elle s\'arrête moins de ' + GD.trouMaxMs / 60e3 + ' min avant lui. «' + NB + 'Grossit' + NB + '» / «' + NB + 'diminue' + NB + '» : variation sur ' + BM.age(GD.fenetreMs) + ', dite au-delà de ' + n2(GD.varMinBtc) + ' BTC et de ' + pc(GD.varMinPart) + ' de la taille d\'avant (convention).');
     tx('legGuideZones', GD.zoneTranches + ' tranches de ' + GD.trancheUsd + NB + '$ consécutives sommées, d\'au moins ' + n2(GD.zoneMinBtc) + ' BTC et ' + n2(GD.zoneFacteur) + ' fois la zone médiane du même côté (convention), la plus proche du prix hors de sa tranche. Un cadre avant «' + NB + 'maintenant' + NB + '», une marque au bord droit. '
       + 'Quand le prix y entre, elle reste dessinée, pour voir si ses ordres sont échangés ou retirés. Une zone dessinée le reste tant qu\'elle porte au moins ' + n2(GD.zoneMinBtc) + ' BTC et ' + pc(GD.zoneSortiePart) + ' du seuil d\'entrée du moment ; en dessous, encore ' + GD.zoneGarde + ' lectures, puis elle s\'efface. '
-      + 'Le plus gros mur nommé dans une zone est dit dans sa phrase (le même carnet n\'est pas écrit deux fois). Mode débutant : ' + GD.textesDebutant + ' textes du guide au plus sur la carte, posés à côté de la ligne de prix et des bulles quand il y a la place.');
+      + 'Le plus gros mur nommé dans une zone est dit dans sa phrase (le même carnet n\'est pas écrit deux fois). Mode débutant : ' + (GD.textesDebutant === 2 ? 'deux' : GD.textesDebutant) + ' repères au plus, un de chaque côté du prix (la zone de ce côté, sinon le mur le plus proche), d\'au plus ' + BM.ETIQUETTE_MAX + ' signes ; jamais sur la ligne de prix des ' + BM.age(GD.tendanceMs) + ' dernières ni sur la rangée du prix ; seulement avec un carnet live frais.');
     tx('legGuideResume', 'Le DERNIER carnet live seul (prix de référence : milieu meilleur bid / meilleur ask de cette lecture) : ordres posés à ±' + n2(GD.bandePct) + ' % du prix, moins si le carnet lu ne va pas si loin (il le dit) ; «' + NB + 'à peu près autant' + NB + '» sous ' + n2(GD.rapportNet) + ' fois (convention). '
-      + 'Une photo de l\'instant, pas une prévision : plus d\'ordres d\'un côté ne dit pas où ira le prix. Moins de ' + BM.nombre(ETROIT_PX, 0, 0) + NB + 'px de large, carte basse, ou phrase qui ne tient pas dans la bande : la version courte, «' + NB + 'photo, pas une prévision' + NB + '» dès le début ; un appui déplie la phrase. Expert : les chiffres seuls.');
+      + 'Une photo de l\'instant, pas une prévision : plus d\'ordres d\'un côté ne dit pas où ira le prix. Moins de ' + BM.nombre(ETROIT_PX, 0, 0) + NB + 'px de large, carte basse, ou phrase qui ne tient pas dans la bande : la version courte, «' + NB + 'photo, pas une prévision' + NB + '» dès le début ; un appui déplie la phrase. Expert : les chiffres seuls. '
+      + 'Mode débutant : une ligne, d\'abord le sens du prix — «' + NB + 'en hausse / en baisse / stable sur ' + BM.age(GD.tendanceMs) + NB + '» : le dernier prix comparé à la clôture de la minute commencée ' + BM.age(GD.tendanceMs) + ' plus tôt, «' + NB + 'stable' + NB + '» sous ±' + BM.nombre(GD.tendancePct, 0, 2) + ' % (convention) ; une minute manquante : rien n\'est écrit —, puis le côté le plus chargé (même seuil), et l\'âge de la plus vieille valeur, en secondes entières.');
     tx('legGuideJournal', 'Bouton Journal (touche J), heures UTC. Gros ordres : au moins ' + n2(BM.MURS.seuilsBtc[E.murs.indice(seuilJournal())]) + ' BTC à un même prix (réglage «' + NB + 'Destin des murs' + NB + '», ' + n2(GD.journalMurBtc) + ' BTC au moins) apparus (restés ' + GD.vieMinMs / 1000 + ' s ; un ordre vu en entrant dans la bande lue n\'est pas «' + NB + 'apparu' + NB + '»), retirés, absorbés. '
       + '«' + NB + 'Absorbé' + NB + '» = entièrement échangé ; un ordre retiré pour l\'essentiel puis touché est dit «' + NB + 'retiré pour l\'essentiel' + NB + '» (échanges sous ' + pc(GD.absorbePart) + ' de sa plus grande taille). '
       + 'Murs nommés (stables ' + GD.nommeLectures + ' lectures) : apparus (la tranche elle-même a grossi d\'au moins ' + n2(GD.varMinBtc) + ' BTC et ' + pc(GD.varMinPart) + ', pas seulement le seuil qui a baissé), fondus, ou passés par le prix (guettés aussi quand le prix s\'en approche et qu\'ils ne sont plus nommés) ; la suite d\'un passage suit la règle de travail du propriétaire (non mesurée) : cassé après deux clôtures 1 min au-delà, percé en mèche si la bougie clôture de l\'autre côté. '
@@ -2697,13 +3079,19 @@
     const t = Date.now(), l = [];
     for (const [nom, p] of [['Binance', E.recul.binance], ['GitHub', E.recul.github]]) {
       const a = p.attente(t);
-      if (a > 0) l.push(nom + ' : limite de requêtes atteinte (HTTP ' + (p.statut || 429) + ') — lectures suspendues, reprise dans ' + BM.age(a));
+      if (a > 0) l.push(debutant() ? nom + ' : trop de demandes, lectures en pause — reprise dans ' + BM.ageEntier(a)
+        : nom + ' : limite de requêtes atteinte (HTTP ' + (p.statut || 429) + ') — lectures suspendues, reprise dans ' + BM.age(a));
     }
-    const noms = { carte: 'carte publiée', fichier: 'fichier 15 min', bougies: 'bougies', executions: 'exécutions', carnet: 'carnet live', horloge: 'horloge Binance' };
+    const deb = debutant();
+    // Débutant : seulement les sources de ce qui est dessiné, sous les noms appris ; le fichier de
+    // 15 min (murs et niveaux d'options) ne nourrit que des couches Expert.
+    const noms = deb ? { carte: 'historique de la carte', direct: 'dernières minutes de la carte', profondeur: 'autre plateforme (Coinbase)', historique: 'échanges publiés', bougies: 'prix', executions: 'échanges', carnet: 'ordres en attente', horloge: 'heure de Binance' }
+      : { carte: 'carte publiée', fichier: 'fichier 15 min', bougies: 'bougies', executions: 'exécutions', carnet: 'carnet live', horloge: 'horloge Binance' };
     for (const [k, v] of Object.entries(E.erreurs)) {
-      if (!v) continue;
+      if (!v || (deb && !noms[k])) continue;
       const b = boucles.find(x => x.nom === k), d = b && b.echecs && b.prochain ? b.prochain - t : 0;
-      l.push((noms[k] || k) + ' : ' + v + (d > 0 ? ' — nouvel essai dans ' + BM.age(d) : ''));
+      const quoi = deb ? String(v).replace(/^HTTP \d+$/, 'le serveur ne répond pas comme prévu').replace(/^en pause \(limite de requêtes\)$/, 'en pause') : v;
+      l.push((noms[k] || k) + ' : ' + quoi + (d > 0 ? ' — nouvel essai dans ' + BM.age(d) : ''));
     }
     const txt = l.length ? '⚠ ' + l.join(' · ') : '';
     if (el.textContent !== txt) el.textContent = txt;
@@ -2716,9 +3104,10 @@
   // ─── Démarrage ─────────────────────────────────────────────────────────────
   lireCouleurs();
   construireBarre();
+  majBoutonMode();
   majLegende();
   // Première visite : « Comment lire cette carte » s'ouvre (refermée, elle ne revient que sur demande).
-  if (!introVue()) ouvrirIntro();
+  if (!introVue()) ouvrirIntro(); else majIndice();
   demarrer();
   // Pour les harnais : un regard en lecture seule sur l'état, et un cadrage (la même chose
   // qu'un geste de l'utilisateur : aucune donnée n'est touchée).
@@ -2753,7 +3142,18 @@
       statut: ($('statut') || {}).textContent || '',
       pastilles: posees.map(p => p.texte), pastillesCompletes: posees.map(p => (p.complet || p.lignes).join(' | ')), reglages: JSON.parse(JSON.stringify(R)),
       mesure: Object.assign({}, MESURE), chaleurPeinteA: LIVE.coupe, carnetLu: carnetUtile(), souris: E.souris && Object.assign({}, E.souris),
-      mise: Z && { w: Z.w, h: Z.h, dpr: Z.dpr, sx: Z.sx, sy: Z.sy, chaleur: Object.assign({}, Z.chaleur), masques: Z.masques.slice(), court: Z.court },
+      mise: Z && { w: Z.w, h: Z.h, dpr: Z.dpr, sx: Z.sx, sy: Z.sy, chaleur: Object.assign({}, Z.chaleur), masques: Z.masques.slice(), court: Z.court, etroit: Z.etroit,
+        dom: Object.assign({}, Z.dom), vol: Object.assign({}, Z.vol), cvd: Object.assign({}, Z.cvd), axeP: Object.assign({}, Z.axeP) },
+      mode: MODE,
+      // Les textes écrits SUR la chaleur au dernier rendu (le budget de l'écran débutant), et les lignes
+      // de toutes les pastilles d'âge (dessinées en expert seulement : mêmes chaînes dans les deux modes).
+      textesCarte: TEXTES_CARTE.map(t => Object.assign({}, t)),
+      ages: AGES.map(a => a.lignes.join(' | ')),
+      debutant: { resume: Object.assign({}, RESUME_DEB, { tendance: undefined }), tendance: RESUME_DEB.tendance && Object.assign({}, RESUME_DEB.tendance),
+        etiquettes: GU.etiquettes.map(x => ({ texte: x.texte, cote: x.cote || null, prix: x.prix === undefined ? null : x.prix, x: x.x, y: x.y, w: x.w, h: x.h, long: x.long })),
+        cadres: GU.cadres.map(f => ({ cote: f.z.cote, x0: f.x0, x1: f.x1, ya: f.ya, yb: f.yb, dedans: f.dedans })),
+        niveaux: Z ? (n => ({ bid: n.bid && { P: n.bid.P, source: n.bid.source, pBas: n.bid.pBas, pHaut: n.bid.pHaut }, ask: n.ask && { P: n.ask.P, source: n.ask.source, pBas: n.ask.pBas, pHaut: n.ask.pHaut } }))(niveauxDebutant()) : null,
+        indice: !!(indiceEl && !indiceEl.hidden), dernierPrix: dernierPrix() },
       posees: posees.map(p => ({ x: p.x, y: p.y, w: p.w, h: p.h, texte: p.texte, pastille: !!p.pastille })),
       memoire: { barres: MEM.barres.map(r => ({ y0: r.y0, y1: r.y1, pb: r.b.pb, part: r.b.part, obs: r.b.obs, pres: r.b.pres, peu: r.b.peu, cote: r.cote })), largeur: Z ? largeurMemoire() : 0, seuil: seuilMemoire(), fenetre: E.vue && fenetreMemoire() },
       destin: { niveaux: E.murs.niveaux.length, actifs: E.murs.actifs.size, attente: E.murs.attente.length, total: Object.assign({}, E.murs.totaux[E.murs.indice(R.mursSeuil)]), totaux: E.murs.totaux.map(x => Object.assign({}, x)), seuil: E.murs.seuils[E.murs.indice(R.mursSeuil)], dessines: DM.items.length, traits: DM.traits, marques: DM.marques.map(m => m.t), items: DM.items.slice(-200).map(it => ({ x0: it.x0, x1: it.x1, y: it.y, fin: it.n.fin })) },

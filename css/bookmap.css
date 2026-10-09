@@ -213,3 +213,46 @@ input[type="range"] { accent-color: var(--carte-live); }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
 }
+
+/* ─── Mode débutant / expert ───
+   Le mode est posé sur <html data-mode> par la page avant le premier rendu (le même réglage que le
+   terminal). Débutant : un écran calme — titre, mode, Guide, Suivre, Journal, Légende ; le reste
+   (puces des calques, Réglages, Rafales) est derrière le bouton de mode, inchangé. */
+[data-mode="debutant"] .expert-seul, [data-mode="expert"] .debutant-seul { display: none !important; }
+[data-mode="debutant"] .calques .puce:not([data-calque="guide"]) { display: none; }
+[data-mode="debutant"] .calques { flex: 0 0 auto; order: 0; overflow: visible; -webkit-mask-image: none; mask-image: none; }
+.bouton-mode { border-color: rgba(255, 209, 102, 0.55); color: var(--ink-1); }
+.bouton-mode:hover, .bouton-mode:focus-visible { border-color: var(--accent); }
+.bouton-mode .mode-court { display: none; }
+@media (max-width: 1023px) {
+  .bouton-mode .mode-long { display: none; }
+  .bouton-mode .mode-court { display: inline; }
+}
+.bouton-mode .mode-mini { display: none; }
+/* Téléphone en Expert : huit boutons sur la première rangée ; le bouton de mode dit seulement le mode visé. */
+@media (max-width: 640px) {
+  [data-mode="expert"] .bouton-mode .mode-court { display: none; }
+  [data-mode="expert"] .bouton-mode .mode-mini { display: inline; }
+  [data-mode="expert"] .barre-gauche { gap: 6px; }
+}
+/* « Suivre » rappelé (bord accent, sans animation) quand la carte montre le passé en mode débutant. */
+.bouton.accent { border-color: var(--accent); color: var(--ink-1); }
+/* La ligne du haut : UNE ligne de hauteur fixe (la carte ne change pas de taille quand elle arrive) ;
+   ouverte par un appui, elle montre son détail sur plusieurs lignes. */
+[data-mode="debutant"] .resume-carte { height: 26px; display: block; white-space: nowrap; text-overflow: ellipsis; line-height: 18px; padding: 4px 12px 0; -webkit-line-clamp: unset; }
+@media (max-width: 640px) { [data-mode="debutant"] .resume-carte { height: 26px; padding: 4px 8px 0; font-size: 12px; } }
+@media (max-width: 380px) { [data-mode="debutant"] .resume-carte { font-size: 11.5px; } }
+[data-mode="debutant"] .resume-carte.ouvert { height: auto; max-height: 40vh; overflow-y: auto; white-space: pre-line; padding-bottom: 6px; }
+/* Détail au toucher : la ligne des âges, plus discrète. */
+.lecture .lecture-ages { color: var(--ink-3); }
+/* L'indice « Touchez pour le détail » (téléphone, mode débutant) : une seule fois, sans prendre le
+   pointeur ; un fondu unique à l'apparition. */
+.indice-tap {
+  position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); z-index: 4; pointer-events: none;
+  background: var(--surface); color: var(--ink-1); border: 1px solid rgba(255, 209, 102, 0.55); border-radius: 999px;
+  padding: 5px 12px; font-size: 12.5px; white-space: nowrap; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  animation: indice-fondu 300ms ease-out 1;
+}
+.indice-tap[hidden] { display: none; }
+@keyframes indice-fondu { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .indice-tap { animation: none; } }
