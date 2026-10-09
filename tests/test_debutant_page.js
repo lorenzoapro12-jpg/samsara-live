@@ -169,7 +169,7 @@ const dessin = page => page.evaluate(() => {
     cibles: (guideEtat ? guideEtat.cibles : []).map(c => ({ prio: c.prio, titre: c.titre })),
     scen: scenEtat ? { libelles: scenEtat.libelles, cibles: scenEtat.cibles.map(c => ({ prio: c.prio, titre: c.titre, scenario: c.scenario || null })),
       boite: scenEtat.boite ? { deb: !!scenEtat.boite.deb, cede: !!scenEtat.boite.cede, texte: scenEtat.boite.texte || null, lignes: scenEtat.boite.lignes.map(l => l.t) } : null,
-      items: scenEtat.items.map(i => ({ rang: i.sc.rang, cle: i.et.cle })) } : null,
+      items: scenEtat.items.map(i => ({ rang: i.sc.rang, cle: i.et.cle })), montre: scenEtat.montre ? scenEtat.montre.sc.rang : null } : null,
     sous: geo.sous.map(s => s.cle),
     valeurs: D ? { choix: { dessus: D.choix.dessus.map(n => n.p), dessous: D.choix.dessous.map(n => n.p) }, regime: D.regime ? D.regime.cle : null } : null,
     badge: isNum(live) ? { x: xAxe, y: geoPrix.top + geoPrix.ph * (1 - (live - geoPrix.minP) / geoPrix.range) - 10, w: 75, h: 20 } : null,
@@ -253,7 +253,9 @@ async function controlerEcran(o, nom, opts = {}) {
   const exp = e.trace.filter(t => /^\d+\/\d+ · /.test(t) || /^[+-]\d+\.\d+%$/.test(t) || /^fichier .* UTC/.test(t) || /^\d$/.test(t) || /^(Point|fin|Écrit à)/.test(t) || /EMA|RSI|Bollinger/.test(t));
   check(`${nom} : ni compteur, ni pastille de la vue, ni repère de publication, ni repères ①②, ni traits du point et de la fin`, !exp.length, exp);
   check(`${nom} : ni badge du régime, ni « Et ensuite ? » (guideEtat.chemins vide)`, !e.cibles.some(c => /^Tendance/.test(c.titre || '')) && !e.chemins, { chemins: e.chemins, cibles: e.cibles.map(c => c.titre) });
-  if (e.scen) check(`${nom} : ni libellé des rangs 2, 3 et Semaine, ni nom du point et de la fin`, e.scen.libelles.every(l => l.rang === '1') && !e.scen.cibles.some(c => c.prio === 3), e.scen);
+  // Le scénario MONTRÉ (rang 1 tant qu'il est ouvert ou réalisé ; sinon le suivant encore ouvert —
+  // contrat de la journée, plan-scenarios.md M7) : son libellé seul, jamais deux.
+  if (e.scen) check(`${nom} : un seul libellé de scénario, celui du scénario montré (${e.scen.montre || '1'}) ; ni nom du point et de la fin`, e.scen.libelles.length <= 1 && e.scen.libelles.every(l => l.rang === (e.scen.montre || '1')) && !e.scen.cibles.some(c => c.prio === 3), e.scen);
   check(`${nom} : boutons Expert, puces d'indicateurs, Grid Bot et chiffres clés masqués ; ↺ visible ; la pastille « Infos du marché » dit l'âge (infobulle)`,
     !dom.caches.length && dom.puces === 0 && dom.kpis === 0 && dom.reset && /il y a \d+ min/.test(dom.kpiDeb || ''), dom);
   check(`${nom} : aucun sous-graphe (${e.sous.join(', ') || 'aucun'})`, !e.sous.length, e.sous);
@@ -362,7 +364,10 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
             // Le titre : le nom entier du repère et le prix de son libellé.
             && nombres(r.vise).filter(x => x.length >= 4).every(x => nombres(r.titre).includes(x)) && / · \d/.test(r.titre);
           if (role === 'phrase') detail = (r.corps.match(/Si le prix finit|Aucun repère proche/g) || []).length >= 2;
-          if (role === 'scenario') detail = /^Scénario 1 de Claude$/.test(r.titre) && /\b2\. /.test(r.corps) && /\b3\. /.test(r.corps) && /sans pourcentage/.test(r.corps) && /pas une promesse ni un conseil/.test(r.corps);
+          // Le libellé est celui du scénario MONTRÉ (le 1, ou le suivant encore ouvert s'il est tombé) :
+          // sa bulle nomme les deux autres.
+          const mo = (e.scen && e.scen.montre) || '1', autres = ['1', '2', '3'].filter(x => x !== mo);
+          if (role === 'scenario') detail = new RegExp('^Scénario ' + mo + ' de Claude$').test(r.titre) && autres.every(x => new RegExp('\\b' + x + '\\. ').test(r.corps)) && /sans pourcentage/.test(r.corps) && /pas une promesse ni un conseil/.test(r.corps);
           if (role === 'boite') detail = /\b1\. /.test(r.corps) && /\b2\. /.test(r.corps) && /\b3\. /.test(r.corps) && /journal/.test(r.corps);
           // Choix 1B : le classement est celui de Claude (une IA), sans pourcentage ; le seul « % »
           // admis est la marge d'une zone (« ± 0,3 % »), qui n'est pas une probabilité.
@@ -423,7 +428,13 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       const o = await ouvrir(nav, { vue, tactile, prev: 'ferme' });
       const e = await controlerEcran(o, 'fermé · ' + vue.width);
       const ligne = e.items.find(i => i.role === 'boite');
-      check(`fermé · ${vue.width} : la ligne dit l'état du rang 1, marqué « (en direct) » ; pas de libellé du scénario 1`, ligne && /invalidé ✗ \(en direct\) ▸$/.test(ligne.texte) && !e.items.some(i => i.role === 'scenario'), e.items);
+      // Changé délibérément (contrat de la journée, plan-scenarios.md A4) : quand le rang 1 tombe, le
+      // scénario encore ouvert qui suit est montré (son libellé) et la ligne dit la fermeture du 1 :
+      // elle commence par « Scén. 1 » et contient « ✗ », ou dit « Aucun scénario » ; toujours marquée
+      // « (en direct) » ; jamais un libellé qui nomme le scénario 1 par ses niveaux.
+      check(`fermé · ${vue.width} : la ligne dit la fermeture du rang 1 (« Scén. 1 … ✗ » ou « Aucun scénario »), marquée « (en direct) » ; jamais de libellé « Scénario 1 : … »`,
+        ligne && (/^Scén\. 1\b.*✗/.test(ligne.texte) || /^Aucun (scénario|ne)\b|^Scénarios : aucun\b/.test(ligne.texte)) && /\(en direct\)/.test(ligne.texte) && /▸$/.test(ligne.texte)
+        && !e.items.some(i => i.role === 'scenario' && /^(↑ |↓ )?Scén(ario|\.) 1 :/.test(i.texte)), e.items);
       // Sa bulle (toucher ou survol) tient dans le tracé et dit le suivi en direct, le journal, l'avertissement.
       const r = await viser(o, 'boite', tactile);
       const b = await o.page.evaluate(() => (scenEtat && scenEtat.bulle ? { y: scenEtat.bulle.y, h: scenEtat.bulle.h, mainH: geo.mainH } : null));
@@ -506,6 +517,32 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       check('4 h : la ligne des scénarios renvoie au suivi en 15 min ou 1 h (quand elle est posée)', !e.items.some(i => i.role === 'boite') || e.items.some(i => /à voir en 15 min ou 1 h/.test(i.texte)), e.items);
       await o.page.evaluate(() => window.__retablir());
       check('4 h : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
+    // ── Une figure qui se dessine encore : nommée « possible », en tirets, sa bulle dit ce qui la validerait ──
+    titre('15 min · double creux possible (forme forcée, pas encore confirmée)');
+    {
+      const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
+      const r = await o.page.evaluate(() => {
+        const n = candles.length, G = PARAM.guide, C = i => candles[i];
+        const ia = n - 34, ic = n - 24, ib = n - 14, pa = Math.min(C(ia).low, C(ib).low), pc = C(ic).high;
+        const f = { type: 'double_creux', sens: 1, a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, objectif: pc + (pc - pa),
+          t: ib + G.pivot, debut: ia, fin: null, jFin: null, demi: false };
+        const f0 = Guide.formesAffichees, b0 = GUIDE_FORMES.val && GUIDE_FORMES.val.bilan;
+        Guide.formesAffichees = () => [f];
+        if (GUIDE_FORMES.val) GUIDE_FORMES.val.bilan = Object.assign({}, b0, { double_creux: { formes: 4, confirmes: 2, atteints: 1, invalides: 1, expires: 0, temoin: { departs: 40, atteints: 12 } } });
+        drawChart();
+        const items = debEtat.items.map(i => ({ role: i.role, texte: i.texte }));
+        const forme = guideEtat.cibles.find(c => c.prio === 2 && c.rects.length);
+        Guide.formesAffichees = f0; if (GUIDE_FORMES.val) GUIDE_FORMES.val.bilan = b0; drawChart();
+        return { items, forme: forme ? { titre: forme.titre, texte: forme.texte.join(' ') } : null };
+      });
+      check('« Double creux possible » posé, au plus 5 textes', r.items.some(i => i.role === 'forme' && i.texte === 'Double creux possible') && r.items.length <= 5, r.items);
+      check('sa bulle : ce qu’on voit, ce qui la validerait (« serait validée si le prix finit 2 quarts d’heure de suite au-dessus de »), le bilan mesuré, aucun prix visé, aucun mot banni',
+        r.forme && /^Double creux possible : le prix a rebondi deux fois vers /.test(r.forme.texte) && /serait validée si le prix finit 2 quarts d’heure de suite au-dessus de /.test(r.forme.texte)
+        && /Mesuré sur/.test(r.forme.texte) && !/vise/.test(r.forme.texte) && !bannisBulle(r.forme.texte).length, r.forme);
+      check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
 
@@ -600,6 +637,10 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       const n1 = await o.page.evaluate(() => Object.assign({}, window.__n));
       check('survol et déplacement sur une cible : aucun drawChart (le calque seul)', n1.dc === 0 && n1.cq >= 1, n1);
       await o.page.mouse.move(2, 2); await o.page.waitForTimeout(300);
+      // Le calque est redessiné une fois par minute exprès (l'âge de la couche « Liquidité »,
+      // horloge(), à la seconde qui suit le changement) : le repos mesuré ne chevauche pas un
+      // changement de minute (sinon le contrôle dépendait de l'heure à laquelle cette section tombe).
+      await o.page.evaluate(() => new Promise(r => { const s = (Date.now() % 60000) / 1000; setTimeout(r, s > 56.5 ? (61.6 - s) * 1000 : s < 1.6 ? (1.6 - s) * 1000 : 0); }));
       await o.page.evaluate(() => { window.__n = { dc: 0, cq: 0 }; });
       await o.page.waitForTimeout(2500);
       const n2 = await o.page.evaluate(() => window.__n);

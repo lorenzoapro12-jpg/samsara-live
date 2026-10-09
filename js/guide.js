@@ -1148,14 +1148,38 @@ const Guide = (function () {
       default: return n + minuscule(r.nom) + '.';
     }
   }
-  /** Le libellé d'une forme en Débutant (au plus 24 caractères) : seulement confirmée ou invalidée. */
+  /** Le libellé d'une forme en Débutant (au plus 26 caractères) : confirmée ou invalidée, et aussi
+   *  pendant qu'elle se dessine (« possible », « Prix dans un … », « à confirmer ») ; une figure
+   *  allée au bout ou oubliée n'est pas nommée. */
   const NOM_FORME_DEBUTANT = { double_sommet: 'Double sommet', double_creux: 'Double creux', range: 'Rectangle', triangle: 'Triangle' };
   function libelleFormeDebutant(f) {
     const e = etatForme(f), nom = NOM_FORME_DEBUTANT[f.type];
     if (!nom) return null;
     if (e.cle === 'confirme') return estDouble(f) ? nom + ' confirmé' : 'Sortie du ' + minuscule(nom) + (f.sens > 0 ? ' ↑' : ' ↓');
     if (e.cle === 'invalide') return nom + ' invalidé';
+    if (e.cle === 'formation') return nom + ' possible';
+    if (e.cle === 'dedans') return 'Prix dans un ' + minuscule(nom);
+    if (e.cle === 'demi') return estDouble(f) ? nom + ' à confirmer' : 'Sortie ' + (f.demiSens > 0 ? '↑' : '↓') + ' à confirmer';
     return null;
+  }
+  /** Une figure qui se dessine encore, en mots (bulle Débutant) : ce qu'on voit, et ce qui la
+   *  validerait (2 périodes finies de suite au-delà, la règle de etatForme) ; jamais de prix visé. */
+  function texteEnCoursDebutant(f, e, unite, itv) {
+    const per = periode(itv);
+    if (estDouble(f)) {
+      const haut = f.sens < 0, nom = haut ? 'Double sommet' : 'Double creux';
+      const ext = prix(haut ? Math.max(f.a.p, f.b.p) : Math.min(f.a.p, f.b.p), unite), cou = prix(f.niveau, unite);
+      const cote = haut ? 'sous ' : 'au-dessus de ', entre = haut ? 'le creux entre les deux' : 'le sommet entre les deux';
+      const vu = 'le prix a ' + (haut ? 'buté' : 'rebondi') + ' deux fois vers ' + ext;
+      if (e.cle === 'demi') return nom + ' à confirmer : ' + vu + ', puis il a fini ' + per[0] + ' ' + cote + cou + ' (' + entre + '). S’il finit encore '
+        + per[0] + ' ' + cote + 'ce prix, la figure serait validée.';
+      return nom + ' possible : ' + vu + '. La figure serait validée si le prix finit ' + per[1] + ' de suite ' + cote + cou + ' (' + entre + ').';
+    }
+    const nom = f.type === 'range' ? 'rectangle' : 'triangle';
+    if (e.cle === 'demi') return 'Le prix vient de sortir du ' + nom + (f.demiSens > 0 ? ' par le haut' : ' par le bas') + '. S’il finit encore ' + per[0]
+      + ' dehors, la sortie serait validée ; s’il revient dedans, elle ne compte pas.';
+    return 'Prix dans un ' + nom + ' : ' + (f.type === 'range' ? 'il fait des allers-retours entre ' + chiffres(f.bas) + ' et ' + prix(f.haut, unite)
+      : 'ses allers-retours se resserrent entre deux droites') + '. Une sortie compte quand le prix finit ' + per[1] + ' de suite dehors.';
   }
   const DEFINITION_FORME = {
     double_sommet: 'Double sommet : le prix a buté deux fois sur le même plafond, puis il est passé sous le creux entre les deux.',
@@ -1165,10 +1189,11 @@ const Guide = (function () {
   };
   /** La bulle d'une forme en Débutant : la définition d'abord, puis le prix visé TOUJOURS avec son
    *  bilan mesuré (jamais seul : seul, il se lirait comme une promesse), puis l'avertissement.
-   *  ctx = { duree (s) de l'historique }. */
+   *  ctx = { duree (s) de l'historique, itv (intervalle du graphique) }. */
   function texteFormeDebutant(f, b, ctx, P, unite) {
     const e = etatForme(f), out = [];
-    out.push(DEFINITION_FORME[f.type].replace(/\.$/, '') + (e.cle === 'invalide' ? ', puis le prix est revenu : la figure ne tient plus.' : '.'));
+    if (e.cle === 'formation' || e.cle === 'dedans' || e.cle === 'demi') out.push(texteEnCoursDebutant(f, e, unite, ctx && ctx.itv));
+    else out.push(DEFINITION_FORME[f.type].replace(/\.$/, '') + (e.cle === 'invalide' ? ', puis le prix est revenu : la figure ne tient plus.' : '.'));
     if (b) {
       const T = b.temoin || { departs: 0, atteints: 0 }, finis = b.atteints + b.invalides + b.expires;
       const d = dernieres(ctx && ctx.duree);
@@ -1200,7 +1225,7 @@ const Guide = (function () {
     prixR, tagLu, artLu, quoi, bord, etatFerme, etatLive, texteEtatLive, texteEtatMax, MOTS, centile, regime, texteRegime, pivots, regression,
     detecter, bilan, formesAffichees, etatForme, NOMS_FORMES, texteBilan, suite, texteSuite, VARIANTES_SUITE, tagMicro, deArt, decrire, decrireCompact, lecture, VARIANTES_LECTURE, phraseForme, TYPES, bornes,
     NOMS_DEBUTANT, raisonPrincipale, choixDebutant, reperesDe, choisirReperes, VERBE_DEBUTANT, optionsSeules, libelleDebutant, libellesDebutant, formatDebutant, AVEC_POINT, titreDebutant, nomDebutant, nomPhrase, HORIZON_DEBUTANT, HORIZON_COURT, PERIODE_DEBUTANT, phrasesDebutant, phraseDebutant,
-    texteSuiteDebutant, prixRond, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureParis, dernieres, environ, libelleFormeDebutant, texteFormeDebutant,
+    texteSuiteDebutant, prixRond, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureParis, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;

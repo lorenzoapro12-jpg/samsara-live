@@ -1,0 +1,124 @@
+{
+ "format": "previsions-1",
+ "updated": "2026-10-09T04:30Z",
+ "groupe": "2026-10-09",
+ "version_methode": "v1",
+ "marge_pct": 1,
+ "emis_utc": "2026-10-09T04:29Z",
+ "prix_emission": 82434,
+ "scenarios": [
+  {
+   "id": "P0001",
+   "rang": "1",
+   "groupe": "2026-10-09",
+   "emis_utc": "2026-10-09T04:29Z",
+   "fin_utc": "2026-10-10T04:20Z",
+   "horizon_h": 23.834,
+   "prix_emission": 82434,
+   "forme": "range",
+   "cibles": [],
+   "invalidation": null,
+   "range": [
+    81000,
+    83500
+   ],
+   "marge_pct": 1,
+   "etiquettes": [
+    "zero_gamma",
+    "mur_options",
+    "structure"
+   ],
+   "origines": {
+    "81000": "support R1, bande de Bollinger basse 1d",
+    "83500": "plus haut du 08/10 (83 521), EMA 20 1d"
+   },
+   "enonce": "Range sous le plancher cassé : ni 80 190 ni 84 335 touchés",
+   "version_methode": "v1",
+   "base_hasard_pct": 71.8,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null
+  },
+  {
+   "id": "P0002",
+   "rang": "2",
+   "groupe": "2026-10-09",
+   "emis_utc": "2026-10-09T04:30Z",
+   "fin_utc": "2026-10-10T04:20Z",
+   "horizon_h": 23.8315,
+   "prix_emission": 82428,
+   "forme": "chemin",
+   "cibles": [
+    80400
+   ],
+   "invalidation": 84500,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure",
+    "long_short",
+    "mur_carnet"
+   ],
+   "origines": {
+    "80400": "plus bas du 08/10 (80 394)",
+    "84500": "haut de la zone R4, EMA 50 4h à 84 004"
+   },
+   "enonce": "Rejet du plancher cassé, retour vers 80 400 avant 84 500",
+   "version_methode": "v1",
+   "base_hasard_pct": 40.5,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null
+  },
+  {
+   "id": "P0003",
+   "rang": "3",
+   "groupe": "2026-10-09",
+   "emis_utc": "2026-10-09T04:30Z",
+   "fin_utc": "2026-10-10T04:20Z",
+   "horizon_h": 23.8295,
+   "prix_emission": 82428,
+   "forme": "chemin",
+   "cibles": [
+    84500
+   ],
+   "invalidation": 80400,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "cvd",
+    "open_interest",
+    "funding"
+   ],
+   "origines": {
+    "84500": "haut de la zone R4, EMA 50 4h à 84 004",
+    "80400": "plus bas du 08/10 (80 394)"
+   },
+   "enonce": "Plancher repris, 84 500 avant 80 400",
+   "version_methode": "v1",
+   "base_hasard_pct": 32.9,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null
+  }
+ ],
+ "precedents": [],
+ "bilan": {
+  "ordre": {
+   "matins": 0,
+   "reussis": 0,
+   "regle": "chemin le mieux classé avec invalidation, première zone touchée avant l'invalidation"
+  }
+ },
+ "statuts": {
+  "⏳": "en cours",
+  "✅": "réalisé",
+  "❌": "invalidé d'abord",
+  "◐": "partiel",
+  "⌛": "rien de touché",
+  "⚠": "ambigu"
+ }
+}

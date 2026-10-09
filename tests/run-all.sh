@@ -127,6 +127,27 @@ node test_guide_page.js || ko=1
 etape "9b''. Scénarios du matin dans Chromium : encadré, libellé du rang 1, survol et tap, fichier d'attente, fichier absent, masquage (non exécuté sans Playwright)"
 node test_scenarios_page.js || ko=1
 
+etape "9b''a. Scénarios du matin, la journée (hors ligne) : écart, nom décidé aux clôtures de 15 min, fondu, lignes et textes sans probabilité"
+node test_scenarios_jour.js || ko=1
+
+etape "9b''b. Scénarios du matin, la journée dans Chromium (08/10 rejoué) : page = calcul pur, Débutant ≤ 5 textes, pastilles, fondu, sobriété (non exécuté sans Playwright)"
+node test_scenarios_jour_page.js || ko=1
+
+etape "9b''c. Scénarios du matin, rejeu animé (bougie en cours qui bouge) : le nom ne change qu'aux clôtures, la ligne suit, journée « aucun » (non exécuté sans Playwright)"
+node test_scenarios_rejeu.js || ko=1
+
+etape "9b''d. Scénarios du matin, la journée après revue (hors ligne) : 4 h / 1 j / incomplet jamais « aucun », remplaçant figé, nom dit seulement au plus petit écart, coches dans l'ordre, marques des libellés"
+node test_scenarios_jour_suivi.js || ko=1
+
+etape "9b''e. Scénarios du matin, la journée après revue dans Chromium : 4 h / 1 j / 1 min incomplet, bulle dessinée qui nomme, croix du rang 1 en fondu, niveaux gardés en Expert (non exécuté sans Playwright)"
+node test_scenarios_jour_revue_page.js || ko=1
+
+etape "9b''f. Scénarios du matin, la journée stable (revue 2, hors navigateur, 09/10 réel puis synthétique) : rien ne bascule dans une bougie sans fait, nom gardé à la clôture, fait frais sur la ligne, « passage bref » et « zone », « hier »"
+node test_scenarios_jour_stable.js || ko=1
+
+etape "9b''g. Scénarios du matin, la journée stable dans Chromium : ligne, phrase et « ◂ » constants dans une bougie, la ligne garde sa place pour un fait frais, bulle longue qui tient, encadré replié Expert, range nommé dans sa boîte, marques séparées (non exécuté sans Playwright)"
+node test_scenarios_jour_stable_page.js || ko=1
+
 etape "9b‴. Débutant à l'écran dans Chromium : au plus 5 textes, phrase et repères aux mêmes prix, bulles au survol et au toucher, cartes et menu sans jargon, 11 thèmes (non exécuté sans Playwright)"
 node test_debutant_page.js || ko=1
 
