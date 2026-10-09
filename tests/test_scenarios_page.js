@@ -114,8 +114,12 @@ const etat = page => page.evaluate(() => {
   await new Promise(r => serveur.listen(0, '127.0.0.1', r));
   const nav = await playwright.chromium.launch();
   try {
-    for (const [vue, mode, sansGuide] of [[{ width: 1440, height: 900 }, 'debutant'], [{ width: 1440, height: 900 }, 'expert'], [{ width: 1024, height: 760 }, 'debutant'],
-      [{ width: 390, height: 800 }, 'debutant'], [{ width: 1024, height: 760 }, 'debutant', true], [{ width: 390, height: 800 }, 'debutant', true]]) {
+    // Mode Expert : l'encadré complet (titre, une ligne par rang, bilan) et les libellés de chaque
+    // rang sont des éléments denses, réservés à l'Expert. En Débutant, une seule ligne d'état et le
+    // libellé du rang 1 : vérifiés dans test_debutant_page.js (classement de Claude sans
+    // pourcentage, base du hasard absente, bulle au survol et au toucher).
+    for (const [vue, mode, sansGuide] of [[{ width: 1440, height: 900 }, 'expert'], [{ width: 1024, height: 760 }, 'expert'],
+      [{ width: 390, height: 800 }, 'expert'], [{ width: 1024, height: 760 }, 'expert', true], [{ width: 390, height: 800 }, 'expert', true]]) {
       const nom = vue.width + ' px · ' + mode + (sansGuide ? ' · Guide masqué' : '');
       titre(nom + ' · fichier complet');
       const o = await ouvrir(nav, vue, mode, 'complet', false, sansGuide);
@@ -189,7 +193,9 @@ const etat = page => page.evaluate(() => {
 
     titre('Doigt (390 px, écran tactile) : un tap sur le libellé du rang 1 (ou sur l’encadré replié)');
     {
-      const t = await ouvrir(nav, { width: 390, height: 800 }, 'debutant', 'complet', true);
+      // Mode Expert : le libellé du rang 1 du fichier complet (déjà invalidé) et l'encadré replié
+      // n'existent qu'en Expert ; le toucher en Débutant est vérifié dans test_debutant_page.js.
+      const t = await ouvrir(nav, { width: 390, height: 800 }, 'expert', 'complet', true);
       const e = await etat(t.page);
       const c = e && (e.cibles.find(q => q.prio === 1 && q.rects.length && /\(rang\s1\)/.test(q.titre))
         || (e.boite && e.boite.replie ? e.cibles.find(q => q.prio === 0 && q.rects.length && /^Scénarios du matin/.test(q.titre)) : null));
@@ -208,7 +214,10 @@ const etat = page => page.evaluate(() => {
     }
 
     titre('Rang 1 fermé (invalidé en direct), téléphone : son état reste dit ; la bulle tient dans l’écran');
-    for (const [vue, mode, tactile] of [[{ width: 390, height: 800 }, 'debutant', true], [{ width: 390, height: 800 }, 'expert', true], [{ width: 375, height: 667 }, 'debutant', true], [{ width: 1024, height: 760 }, 'debutant', false]]) {
+    // Mode Expert : le libellé d'état du rang 1 et l'encadré (« · direct ») sont ceux de l'Expert ; en
+    // Débutant, la ligne « Scénario 1 : invalidé ✗ (en direct) ▸ » et sa bulle dans le tracé sont
+    // vérifiées dans test_debutant_page.js (1440, 390 et 375 px).
+    for (const [vue, mode, tactile] of [[{ width: 390, height: 800 }, 'expert', true], [{ width: 375, height: 667 }, 'expert', true], [{ width: 1024, height: 760 }, 'expert', false]]) {
       const nom = vue.width + '×' + vue.height + ' · ' + mode;
       const o = await ouvrir(nav, vue, mode, 'ferme', tactile);
       if (process.env.SCEN_CAPTURES) await o.page.screenshot({ path: path.join(process.env.SCEN_CAPTURES, 'ferme-' + vue.width + '-' + mode + '.png') });
@@ -249,7 +258,9 @@ const etat = page => page.evaluate(() => {
       const e4 = await etat(o.page);
       check('clic sur 4h : pas de suivi sur des bougies trop larges (dit tel quel), aucune erreur', !o.erreurs.length && e4 && e4.items.filter(i => i.rang !== '3' || true).some(i => /bougies 4 h \(trop larges\)/.test(i.et)), [o.erreurs, e4 && e4.items]);
       await o.ctx.close();
-      const h = await ouvrir(nav, { width: 1440, height: 900 }, 'debutant', 'hier');
+      // Mode Expert : le titre de l'encadré complet est de l'Expert ; la ligne Débutant
+      // (« Scénarios d’hier : terminés ▸ ») est vérifiée dans test_debutant_page.js.
+      const h = await ouvrir(nav, { width: 1440, height: 900 }, 'expert', 'hier');
       const eh = await etat(h.page);
       check('groupe terminé : titre « Scénarios d’hier (terminés) · semaine en cours » (encadré complet ou replié)', eh && eh.boite && /^Scénarios d’hier \(terminés\) · semaine en cours/.test(eh.boite.lignes[0]), eh && eh.boite);
       check('groupe terminé : aucun scénario ouvert parmi les rangs 1 à 3, aucune flèche vers le futur', eh && eh.items.every((i, k) => i.rang === 'S' || !eh.ouverts[k])
@@ -262,14 +273,16 @@ const etat = page => page.evaluate(() => {
     titre('Fichier d’attente, fichier absent : une ligne');
     {
       const note = JSON.parse(previsionsAttente()).note;
-      const a = await ouvrir(nav, { width: 1440, height: 900 }, 'debutant', 'attente');
+      // Mode Expert : les lignes « attente » et « absent » ci-dessous sont celles de l'Expert (heure
+      // UTC) ; leurs lignes Débutant sont vérifiées dans test_debutant_page.js.
+      const a = await ouvrir(nav, { width: 1440, height: 900 }, 'expert', 'attente');
       const e = await etat(a.page);
       check('attente : une seule ligne « Scénarios du matin : » + la note du fichier', e && e.boite && e.boite.seule && e.boite.lignes.length === 1
         && e.boite.lignes[0] === 'Scénarios du matin : ' + note.charAt(0).toLowerCase() + note.slice(1), e && e.boite);
       check('attente : aucun scénario dessiné', e && e.items.length === 0 && await a.page.evaluate(() => scenDessinables() === null));
       check('attente : aucune erreur JavaScript', !a.erreurs.length, a.erreurs);
       await a.ctx.close();
-      const z = await ouvrir(nav, { width: 390, height: 800 }, 'debutant', 'absent');
+      const z = await ouvrir(nav, { width: 390, height: 800 }, 'expert', 'absent');
       const ez = await etat(z.page);
       check('absent (404) : « Scénarios du matin : pas de fichier lisible (HH:MM UTC) »', ez && ez.boite && ez.boite.seule && /^Scénarios du matin : pas de fichier lisible \(\d\d:\d\d UTC\)$/.test(ez.boite.lignes[0]), ez && ez.boite);
       check('absent : aucune erreur JavaScript', !z.erreurs.length, z.erreurs);

@@ -104,6 +104,15 @@ const conseils = textes.filter(([, t]) => CONSEIL.test(t));
 check('aucune fiche ne dit quoi acheter ou vendre', !conseils.length, conseils);
 const courtes = ['funding', 'oi', 'ls', 'cvd', 'gex', 'rsi_tf', 'vix', 'prime', 'carnet'].flatMap(k => [-5, -0.5, 0.2, 1, 50, 80].map(v => T.lectureCourte(k, v)));
 check('aucune lecture courte ne dit quoi faire', courtes.every(t => !CONSEIL.test(t)));
+// Les phrases des cartes du Débutant (phraseCarte) : le même bloc réservé au Débutant, en mots
+// simples (aucun mot de la liste du Guide), sans conseil.
+{
+  const Gd = require(path.join(REPO, 'js/guide.js'));
+  const ph = [['fourchette', 0, '24 h'], ['fourchette', 0.5, '5 jours'], ['fourchette', 0.9], ['vix', 12], ['vix', 20], ['vix', 30], ['cvd', 1.2e8], ['cvd', -3.4e7], ['sources', 9, 9], ['sources', 7, 9], ['sources', 8, 9]].map(a => T.phraseCarte(...a));
+  check(`${ph.length} phrases des cartes : chacune « lecture-courte debutant-seul », sans conseil ni mot technique`, ph.every(h => /^<div class="lecture-courte debutant-seul">[^<]+<\/div>$/.test(h) && !CONSEIL.test(h) && !Gd.motsBannis(h).length), ph);
+  check('fourchette : « Sur 24 h, le prix est dans le bas de sa fourchette. » ; écart achats/ventes en dollars entiers', /^<div[^>]*>Sur 24 h, le prix est dans le bas de sa fourchette\.<\/div>$/.test(ph[0]) && /de 120 000 000 \$\./.test(ph[6]) && /2 sources manquent/.test(ph[9]) && /1 source manque/.test(ph[10]), [ph[0], ph[6], ph[9]]);
+  check('valeur absente ou clé inconnue : aucune phrase (rien d’inventé)', T.phraseCarte('vix', null) === '' && T.phraseCarte('fourchette', NaN) === '' && T.phraseCarte('inconnue', 1) === '' && T.phraseCarte('sources', 3) === '');
+}
 check('chaque fiche se termine par « ce n’est pas une recommandation »', Object.keys(T.FICHES).every(k => /pas une recommandation/.test(T.ficheHtml(k))));
 
 // ── 6. Chaque bouton « i » ouvre une fiche qui existe ────────────────────────

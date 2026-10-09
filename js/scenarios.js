@@ -469,7 +469,152 @@ const Scenarios = (function () {
     return out;
   }
 
+  // ─── 4. Mode Débutant : une ligne, un libellé, une bulle sans jargon ──────
+  // L'écran Débutant montre le scénario 1 de Claude (un libellé court près de sa zone) et UNE
+  // ligne d'état (« Scénario 1 de Claude : en cours (en direct) ▸ ») ; le reste est dans la bulle,
+  // en mots simples, heures de Paris. Un état calculé par la page porte « (en direct) » ; la note
+  // du journal, « (journal) ». Rien d'existant ne change.
+  const MOTS_BANNIS = (typeof Guide !== 'undefined' && Guide.MOTS_BANNIS_DEBUTANT)
+    || (typeof require === 'function' ? require('./guide.js').MOTS_BANNIS_DEBUTANT : []);
+  /** Un texte libre (énoncé, origine, note) montrable en Débutant : aucun mot de la liste. */
+  const propre = t => !!t && !MOTS_BANNIS.some(re => re.test(t));
+  const tient = (t, max, mesure, maxPx) => (!(max > 0) || t.length <= max) && (typeof mesure !== 'function' || !(maxPx > 0) || mesure(t) <= maxPx);
+  const premiere = (V, max, mesure, maxPx) => { for (const t of V) if (tient(t, max, mesure, maxPx)) return t; return V[V.length - 1]; };
+  /** Les états courts du Débutant (au plus 11 caractères, sauf les deux renvois). */
+  const ETATS_COURTS_DEBUTANT = {
+    avant: 'en cours', rien: 'en cours', dedans: 'en cours', cible: k => ordinal(k) + ' cible ✓', realise: 'réalisé ✓', invalide: 'invalidé ✗',
+    sortie: haut => 'sorti ' + (haut ? '↑' : '↓') + ' ✗', ambigu: 'indécis', termine: 'terminé', large: 'à voir en 15 min ou 1 h', incomplet: 'données manquantes',
+    journal: { '✅': 'réalisé ✓', '❌': 'invalidé ✗', '◐': 'partiel', '⌛': 'rien atteint', '⚠': 'indécis' },
+  };
+  /** → { etat, marque } : marque « (en direct) » (calculé ici), « (journal) » (note officielle), ou
+   *  rien (un renvoi : bougies trop larges, historique trop court). */
+  function etatCourtDebutant(S, sv) {
+    const E = ETATS_COURTS_DEBUTANT;
+    if (S.statut !== '⏳') return { etat: E.journal[S.statut] || 'noté', marque: '(journal)' };
+    const cle = sv ? sv.cle : null;
+    if (cle === 'large') return { etat: E.large, marque: '' };
+    if (cle === 'incomplet') return { etat: E.incomplet, marque: '' };
+    if (!cle) return { etat: 'suivi indisponible', marque: '' };
+    if (sv.fini && ['avant', 'rien', 'cible', 'dedans'].includes(cle)) return { etat: E.termine, marque: '(en direct)' };
+    const etat = cle === 'cible' ? E.cible(sv.k) : cle === 'sortie' ? E.sortie(!!(sv.sortie && sv.sortie.haut)) : E[cle];
+    return { etat: typeof etat === 'string' ? etat : 'suivi indisponible', marque: '(en direct)' };
+  }
+  const nomRang = r => (r === 'S' ? 'Scénario de la semaine' : 'Scénario ' + r);
+  const minus = s => (s ? s.charAt(0).toLowerCase() + s.slice(1) : s);
+  /** La ligne des scénarios (au plus 48 caractères, 40 en étroit) : « Scénario 1 de Claude : en cours
+   *  (en direct) ▸ ». F : le fichier lu (ou null, ou d'attente) ; items : [{ sc, sv }]. */
+  function ligneBoiteDebutant(F, items, maintenant, max, P, mesure, maxPx) {
+    if (!F || F.etat !== 'ok') {
+      if (F && F.etat === 'attente') return 'Scénarios du matin : ' + (F.note ? minus(F.note) : 'en attente du prochain point.');
+      return 'Scénarios du matin : indisponibles';
+    }
+    if (estAncien(F, maintenant)) {
+      const t = fini(maintenant) ? maintenant : Date.now(), hier = jourDe(t - 86400000), auj = jourDe(t);
+      return premiere([(F.groupe === hier || F.groupe === auj ? 'Scénarios d’hier' : 'Scénarios du ' + jourGroupe(F.groupe)) + ' : terminés ▸', 'Scénarios : terminés ▸'], max, mesure, maxPx);
+    }
+    const it = (items || []).find(i => i.sc.rang === '1') || (items || [])[0];
+    if (!it) return 'Scénarios du matin : indisponibles';
+    const e = etatCourtDebutant(it.sc, it.sv), corps = e.etat + (e.marque ? ' ' + e.marque : '') + ' ▸';
+    const pre = it.sc.rang === '1' ? ['Scénario 1 de Claude : ', 'Scénario 1 : ', 'Scén. 1 : '] : ['Scénario de la semaine : ', 'Semaine : '];
+    return premiere(pre.map(p => p + corps), max, mesure, maxPx);
+  }
+  /** Le libellé du scénario près de sa zone (au plus 32) : « Scénario 1 : reste 81 000–83 500 »,
+   *  « Scénario 1 : vers 84 300 $ ↑ », après la 1re cible « Scénario 1 : ensuite 86 000 $ ↑ ».
+   *  fleche ('↑' | '↓') : le niveau est hors de la vue. */
+  function libelleDebutant(S, sv, max, mesure, maxPx, fleche) {
+    const f = fleche ? fleche + ' ' : '', noms = S.rang === 'S' ? ['Semaine', 'Sem.'] : ['Scénario ' + S.rang, 'Scén. ' + S.rang];
+    let corps;
+    if (S.forme === 'range') corps = ['reste ' + chiffres(S.range[0]) + '–' + chiffres(S.range[1]), chiffres(S.range[0]) + '–' + chiffres(S.range[1])];
+    else {
+      const N = S.cibles.length, k = sv && sv.cle === 'cible' && sv.k > 0 && sv.k < N ? sv.k : 0;
+      const ref = k ? S.cibles[k - 1] : fini(S.prixEmission) ? S.prixEmission : S.invalidation !== null ? S.invalidation : S.cibles[0];
+      // Cible hors de la vue : la flèche de tête dit déjà où elle est ; une 2e flèche (le sens)
+      // ferait « ↑ Scénario 1 : vers 86 900 $ ↑ ».
+      const s = f ? '' : S.cibles[k] >= ref ? ' ↑' : ' ↓', mot = k ? 'ensuite ' : 'vers ';
+      corps = [mot + prix(S.cibles[k]) + s, mot + chiffres(S.cibles[k]) + s];
+    }
+    const V = [];
+    for (const n of noms) for (const c of corps) V.push(f + n + ' : ' + c);
+    return premiere(V.concat([f + noms[1]]), max, mesure, maxPx);
+  }
+  /** Une ligne de la bulle, en mots : « 2. Le prix va vers 84 300 $ puis 86 000 $, sans toucher
+   *  80 900 $ avant — en cours (en direct) ». */
+  function ligneDebutant(S, sv) {
+    let quoi = S.forme === 'range' ? 'le prix reste ' + niveaux(S, false) : 'le prix va vers ' + niveaux(S, false) + (S.invalidation !== null ? ', sans toucher ' + prix(S.invalidation) + ' avant' : '');
+    if (S.rang !== 'S') quoi = quoi.charAt(0).toUpperCase() + quoi.slice(1);
+    const e = etatCourtDebutant(S, sv);
+    return MARQUES_RANG[S.rang] + ' ' + quoi + ' — ' + e.etat + (e.marque ? ' ' + e.marque : '');
+  }
+  /** Une origine du fichier, gardée en Débutant morceau par morceau : sans nom d'indicateur, sans
+   *  « R1 » ni « 4h » ; null s'il ne reste rien. « plus haut du 08/10 (83 521), EMA 20 1d » →
+   *  « plus haut du 08/10, 83 521 ». */
+  function origineDebutant(o) {
+    if (!o) return null;
+    const m = o.replace(/\s*\(([^)]*)\)/g, ', $1').split(',').map(x => x.trim()).filter(x => x && propre(x));
+    return m.length ? m.join(', ') : null;
+  }
+  let FMT_JOUR_PARIS = null;
+  try { FMT_JOUR_PARIS = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit' }); } catch (e) { FMT_JOUR_PARIS = null; }
+  const jourParis = ms => (FMT_JOUR_PARIS && fini(ms) ? FMT_JOUR_PARIS.format(new Date(ms)) : jourGroupe(jourDe(ms)));
+  /** « vers 07h45 (heure de Paris) » ; une bougie de plus d'une minute : son créneau. */
+  function momentDebutant(t, pasMs) {
+    const a = heureParis(t);
+    if (!a) return '';
+    if (!(pasMs > 60000)) return ' vers ' + a + ' (heure de Paris)';
+    return ' entre ' + a + ' et ' + heureParis(t + pasMs) + ' (heure de Paris)';
+  }
+  /** L'état du suivi en direct, en mots (bulle Débutant). */
+  function etatLongDebutant(S, sv) {
+    const pas = sv && sv.pas ? sv.pas : 0, q = t => momentDebutant(t, pas);
+    let t;
+    switch (sv ? sv.cle : null) {
+      case 'avant': case 'rien': t = 'en cours, rien de touché pour l’instant'; break;
+      case 'dedans': t = 'en cours, le prix est resté entre les bornes'; break;
+      case 'cible': t = ordinal(sv.k) + ' cible touchée' + q(sv.t) + (sv.memeBougie ? ', la suivante dans le même créneau (ordre inconnu)' : ''); break;
+      case 'realise': t = 'réalisé : dernière cible touchée' + q(sv.t); break;
+      case 'invalide': t = sv.premier ? '1re cible touchée, puis invalidation' + q(sv.t) : 'invalidation touchée d’abord' + q(sv.t); break;
+      case 'ambigu': t = 'indécis : ' + (S.forme === 'range' ? 'les deux bornes dépassées' : 'une cible et l’invalidation') + ' dans le même créneau, l’ordre est inconnu'; break;
+      case 'sortie': t = 'sorti par ' + (sv.sortie.haut ? 'le haut' : 'le bas') + q(sv.t); break;
+      case 'large': t = 'à voir en 15 min ou 1 h : sur cet intervalle, le suivi en direct n’est pas possible'; break;
+      case 'incomplet': t = 'données manquantes : l’historique chargé commence après l’écriture du scénario ; à voir en 15 min ou 1 h'; break;
+      default: t = 'suivi indisponible';
+    }
+    if (sv && sv.fini && ['avant', 'rien', 'cible', 'dedans'].includes(sv.cle)) t = 'terminé (' + t.replace(/^en cours, /, '') + ') ; la note du journal suivra';
+    return t;
+  }
+  /** La première ligne des bulles du Débutant : qui a écrit, quand (heure de Paris). */
+  function enteteDebutant(F, P, maintenant) {
+    if (!F || F.etat !== 'ok') return 'Scénarios du matin de Claude, une IA.';
+    const t = fini(maintenant) ? maintenant : Date.now(), jour = jourParis(F.emis), auj = jourParis(t);
+    const point = P && P.point ? P.point : heureParis(F.emis);
+    return 'Écrits par Claude, une IA, ' + (jour === auj ? 'ce matin' : 'le ' + jour) + (point ? ' à ' + point : '') + ' (heure de Paris).';
+  }
+  /** L'explication d'un scénario en Débutant (bulle) : ce qu'il dit, ses zones, quand il a été
+   *  écrit (heure de Paris), son suivi en direct, le sens du rang. Les origines et l'énoncé de
+   *  Claude n'y passent que sans jargon (origineDebutant). La base du hasard reste en Expert. */
+  function explicationDebutant(S, sv, P, ctx) {
+    const c = ctx || {}, out = [], m = nb(S.marge) + ' %';
+    const z = v => { const [a, b] = zone(v, S.marge); return chiffres(a) + ' – ' + prix(b); };
+    const avecO = v => { const o = origineDebutant(origine(S, v)); return prix(v) + (o ? ' (' + o + ')' : ''); };
+    if (S.forme === 'chemin') {
+      out.push('Ce scénario se lit : le prix touche ' + S.cibles.map(avecO).join(', puis ') + (S.invalidation !== null ? ', sans toucher avant ' + avecO(S.invalidation) : '') + '.');
+      if (S.invalidation !== null) out.push(prix(S.invalidation) + ' est l’invalidation : si le prix y arrive avant la dernière cible, le scénario ne tient plus (zone hachurée pendant le survol).');
+      out.push('Chaque niveau est une zone (le niveau ± ' + m + ') : ' + S.cibles.map((v, k) => 'cible ' + (k + 1) + ' : ' + z(v)).join(' ; ') + (S.invalidation !== null ? ' ; invalidation : ' + z(S.invalidation) : '') + '.');
+    } else {
+      out.push('Ce scénario se lit : le prix reste entre ' + avecO(S.range[0]) + ' et ' + avecO(S.range[1]) + ', sans sortir de ses bornes ± ' + m + ' (de ' + prix(S.zones.bas) + ' à ' + prix(S.zones.haut) + ') jusqu’à la fin.');
+    }
+    if (propre(S.enonce)) out.push('Les mots de Claude : « ' + S.enonce + ' ».');
+    const emP = heureParis(S.emis), finP = heureParis(S.fin);
+    out.push('Écrit le ' + jourParis(S.emis) + (emP ? ' à ' + emP : '') + (fini(S.prixEmission) ? ', quand le prix valait ' + prix(S.prixEmission) : '') + ' ; valable jusqu’au ' + jourParis(S.fin) + (finP ? ' à ' + finP : '') + ' (heures de Paris).');
+    out.push('Suivi en direct sur ce graphique : ' + etatLongDebutant(S, sv) + '. Un affichage : la note officielle est celle du journal, faite le lendemain.');
+    if (S.statut !== '⏳') { const e = etatCourtDebutant(S, sv); out.push('Note du journal : ' + e.etat + '.'); }
+    if (propre(S.note)) out.push('Note du journal : ' + S.note);
+    out.push(SENS_RANG[S.rang]);
+    return out;
+  }
+
   return { FORMAT, RANGS, STATUTS, chiffres, prix, heureUTC, heureParis, jourGroupe, dateUTC, zone, lire, vivants, estAncien, ouvert, compte, suiviVide, pas, plier, etat, etatLarge, suivre, copie,
-    niveaux, originePremiere, libelle, quand, creneau, motsStatut, texteEtat, titre, ligne, texteBilan, REGLE_BILAN, REGLE_BILAN_SUITE, explication, ligneEtats, noteLarge, manque, etatIncomplet, NOMS_RANG, COURTS_RANG, SENS_RANG };
+    niveaux, originePremiere, libelle, quand, creneau, motsStatut, texteEtat, titre, ligne, texteBilan, REGLE_BILAN, REGLE_BILAN_SUITE, explication, ligneEtats, noteLarge, manque, etatIncomplet, NOMS_RANG, COURTS_RANG, SENS_RANG,
+    ETATS_COURTS_DEBUTANT, etatCourtDebutant, ligneBoiteDebutant, libelleDebutant, ligneDebutant, origineDebutant, etatLongDebutant, enteteDebutant, explicationDebutant, jourParis };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Scenarios;

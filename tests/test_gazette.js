@@ -88,7 +88,10 @@ async function ouvrir(nav, vue, theme) {
   // Observateurs et minuteries : chaque MutationObserver est noté (branché / débranché) ; chaque
   // setTimeout posé DEPUIS js/structures.js est suivi jusqu'à son annulation ou son échéance.
   await page.addInitScript(t => {
-    try { localStorage.clear(); localStorage.setItem('samsara-theme', t); } catch (e) { /* */ }
+    // Mode Expert : ce test mesure les éléments denses (chiffres clés, heure de publication, couche de
+    // chaleur, étiquettes de l'axe…), masqués en Débutant (le mode par défaut) ; leur version Débutant
+    // est vérifiée dans test_debutant_page.js.
+    try { localStorage.clear(); localStorage.setItem('samsara-mode', 'expert'); localStorage.setItem('samsara-theme', t); } catch (e) { /* */ }
     window.__observateurs = [];
     const MO = window.MutationObserver;
     window.MutationObserver = class extends MO {

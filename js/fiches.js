@@ -27,10 +27,23 @@ function appliquerMode(m) {
   document.documentElement.setAttribute('data-mode', m);
   try { localStorage.setItem(MODE_CLE, m); } catch (e) { /* navigation privée */ }
   const b = document.getElementById('modeBtn');
-  if (b) { b.textContent = m === 'expert' ? 'Expert' : 'Débutant'; b.setAttribute('aria-pressed', m === 'expert' ? 'true' : 'false'); }
-  // Le Guide du graphique écrit ses mots selon le mode (le canvas n'a pas de classes) : un
+  if (b) {
+    // Débutant : le bouton dit où il mène (« Débutant · passer en Expert », « Passer en Expert »
+    // sur téléphone) ; Expert : « Expert », la touche M ramène au Débutant.
+    if (m === 'expert') { b.textContent = 'Expert'; b.title = 'Mode Expert · revenir en Débutant : touche M'; }
+    else { b.innerHTML = '<span class="mode-long">Débutant · passer en Expert</span><span class="mode-court">Passer en Expert</span>'; b.title = 'Mode Débutant · passer en Expert : touche M (les valeurs ne changent pas)'; }
+    b.setAttribute('aria-pressed', m === 'expert' ? 'true' : 'false');
+  }
+  const c = document.getElementById('carteBtn');
+  if (c) c.title = m === 'expert' ? 'Carte du carnet (bookmap) — page à côté' : 'Carte des ordres en attente (page à côté)';
+  const r = document.getElementById('resetBtn');
+  if (r) r.title = m === 'expert' ? 'Réinitialiser le zoom (R)' : 'Revenir au présent (R)';
+  // Le graphique écrit ses mots selon le mode (le canvas n'a pas de classes) : remise en page et
   // dessin à la prochaine image — mêmes valeurs, autres mots.
-  try { if (typeof scheduleDraw === 'function' && candles.length) scheduleDraw(); } catch (e) { /* page pas encore chargée */ }
+  try {
+    if (typeof apresChangementMode === 'function') apresChangementMode(m);
+    else if (typeof scheduleDraw === 'function' && candles.length) scheduleDraw();
+  } catch (e) { /* page pas encore chargée */ }
 }
 function basculerMode() { appliquerMode(modeCourant() === 'expert' ? 'debutant' : 'expert'); }
 
@@ -554,6 +567,24 @@ document.addEventListener('click', e => {
 
 // ─── Lecture courte (mode débutant) : ce que dit la valeur DU MOMENT, sans conseil ─────────
 // Les seuils utilisés ici sont des CONVENTIONS ; la phrase le dit quand c'en est une.
+/** Les phrases des cartes en mode Débutant (sans jargon, sans seuil inventé) : le même bloc que
+ *  lectureCourte, pour des cartes qui n'ont pas de fiche. cle : 'fourchette' (v : position dans
+ *  la fourchette, de 0 au plus bas à 1 au plus haut ; v2 : « 24 h » ou « 5 jours »), 'vix',
+ *  'cvd' (v : écart achats − ventes en $), 'sources' (v : à jour, v2 : attendues). */
+function phraseCarte(cle, v, v2) {
+  const n = x => typeof x === 'number' && isFinite(x);
+  const dollars = x => Math.round(Math.abs(x)).toLocaleString('fr-FR').replace(/[\u00a0\u202f]/g, ' ') + ' $';
+  let t = null;
+  switch (cle) {
+    case 'fourchette': if (n(v)) t = 'Sur ' + (v2 || '24 h') + ', le prix est ' + (v >= 2 / 3 ? 'dans le haut' : v <= 1 / 3 ? 'dans le bas' : 'au milieu') + ' de sa fourchette.'; break;
+    case 'vix': if (n(v)) t = v < 15 ? 'Les bourses américaines sont calmes.' : v > 25 ? 'Les bourses américaines sont nerveuses.' : 'Les bourses américaines ne sont ni calmes ni nerveuses.'; break;
+    case 'cvd': if (n(v)) t = v >= 0 ? 'Sur 24 h, les achats immédiats ont dépassé les ventes immédiates de ' + dollars(v) + '.' : 'Sur 24 h, les ventes immédiates ont dépassé les achats immédiats de ' + dollars(v) + '.'; break;
+    case 'sources': if (n(v) && n(v2)) t = v >= v2 ? 'Toutes les données publiées sont arrivées.' : (v2 - v) + (v2 - v > 1 ? ' sources manquent' : ' source manque') + ' (détail en mode Expert).'; break;
+    default: t = null;
+  }
+  return t ? '<div class="lecture-courte debutant-seul">' + echapF(t) + '</div>' : '';
+}
+
 function lectureCourte(id, v, v2) {
   const n = x => typeof x === 'number' && isFinite(x);
   const pct = x => (x > 0 ? '+' : '') + x.toLocaleString('fr-FR', { maximumFractionDigits: 2 }) + ' %';
