@@ -186,7 +186,8 @@ const dessin = page => page.evaluate(() => {
 const chevauche = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 const nombres = t => (t.match(/\d{1,3}(?:[\s  ]\d{3})+|\d+/g) || []).map(x => x.replace(/[\s  ]/g, ''));
 const VERBES = /\b(touche|est passé|monte|baisse|hésite|s’agite|est entre|est sous|est au-dessus|est sans repère|indisponible)\b/;
-const LIMITES = { phrase: [90, 48], niveau: [26, 18], scenario: [32, 32], forme: [24, 24], boite: [48, 40] };
+// forme : PARAM.guide.debutant.forme (26) — plan figures §5.3 et amendement C1 (« Cible touchée, à confirmer », 26).
+const LIMITES = { phrase: [90, 48], niveau: [26, 18], scenario: [32, 32], forme: [26, 26], boite: [48, 40] };
 const ROLES_MAX = { phrase: 1, niveau: 2, scenario: 1, forme: 1, boite: 1 };
 
 /** Les contrôles d'un écran Débutant (budget, limites, mots, chevauchements, 5 secondes, absents). */
@@ -495,8 +496,10 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       const r = await o.page.evaluate(() => {
         const n = candles.length, G = PARAM.guide, C = i => candles[i];
         const ia = n - 34, ic = n - 24, ib = n - 14, pa = Math.max(C(ia).high, C(ib).high), pc = C(ic).low;
-        const f = { type: 'double_sommet', sens: -1, phase: 'confirme', a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, objectif: pc - (pa - pc),
-          t: ib + G.pivot, debut: ia, fin: null, jFin: null };
+        // (Plan figures : la figure forcée porte ce que le détecteur rend — extrême, hauteur,
+        // invalidation, clôture de confirmation — car la bulle lit ses niveaux dans niveauxFigure.)
+        const f = { type: 'double_sommet', famille: 'extremes', sens: -1, phase: 'confirme', a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, extreme: pa, hauteur: pa - pc, objectif: pc - (pa - pc),
+          invalidation: pa, t: ib + G.pivot, debut: ia, depart: ib + 1, jConf: ib + G.pivot + 2, fin: null, jFin: null, journal: [] };
         const f0 = Guide.formesAffichees, b0 = GUIDE_FORMES.val && GUIDE_FORMES.val.bilan;
         Guide.formesAffichees = () => [f];
         if (GUIDE_FORMES.val) GUIDE_FORMES.val.bilan = Object.assign({}, b0, { double_sommet: { formes: 3, confirmes: 1, atteints: 1, invalides: 0, expires: 0, temoin: { departs: 40, atteints: 12 } } });
@@ -504,15 +507,19 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         const items = debEtat.items.map(i => ({ role: i.role, texte: i.texte, rect: i.rect }));
         const forme = guideEtat.cibles.find(c => c.prio === 2 && c.rects.length);
         const B = scenEtat && scenEtat.boite, un = scenEtat && scenEtat.cibleUn;
-        const out = { items, forme: forme ? { titre: forme.titre, texte: forme.texte.join(' '), rect: forme.rects[0] } : null, cede: !!(B && B.cede), un: un ? un.texte.join(' ') : '' };
+        const out = { base: guideEtat.debForme ? guideEtat.debForme.t : null, possibles: Guide.libellesPossiblesDebutant(f), items, forme: forme ? { titre: forme.titre, texte: forme.texte.join(' '), rect: forme.rects[0] } : null, cede: !!(B && B.cede), un: un ? un.texte.join(' ') : '' };
         window.__retablir = () => { Guide.formesAffichees = f0; if (GUIDE_FORMES.val) GUIDE_FORMES.val.bilan = b0; drawChart(); };
         return out;
       });
       const roles = r.items.map(i => i.role);
-      check('4 h : « Double sommet confirmé » posé, au plus 5 textes', roles.includes('forme') && r.items.length <= 5 && r.items.some(i => i.texte === 'Double sommet confirmé'), r.items);
+      // (Amendement C1 : le libellé de la figure est posé sur le calque et dit l'état vivant au prix
+      // live ; « Double sommet confirmé » est le libellé de la clôture, le texte posé l'un des possibles.)
+      check('4 h : « Double sommet confirmé » posé, au plus 5 textes', roles.includes('forme') && r.items.length <= 5 && r.base === 'Double sommet confirmé'
+        && r.items.some(i => i.role === 'forme' && r.possibles.includes(i.texte)), { base: r.base, items: r.items });
       if (roles.includes('scenario')) check('4 h : forme + scénario 1 posés → la ligne des scénarios cède ; sa bulle passe dans celle du libellé « Scénario 1 »', r.cede && !roles.includes('boite') && /La ligne des scénarios/.test(r.un), r);
-      check('4 h : la bulle de la forme la définit, dit son bilan (« Mesuré sur », « fois sur ») avec le prix visé, et « pas une prévision ni un conseil »',
-        r.forme && /^Double sommet : /.test(r.forme.texte) && /Mesuré sur/.test(r.forme.texte) && /fois sur/.test(r.forme.texte) && /vise \d/.test(r.forme.texte) && /pas une prévision ni un conseil/.test(r.forme.texte) && !bannisBulle(r.forme.texte).length, r.forme);
+      // (Amendement E4 : la cible s'écrit « cible théorique selon l'usage des analystes : X, non garantie ».)
+      check('4 h : la bulle de la forme la définit, dit son bilan (« Mesuré sur », « fois sur ») avec la cible théorique, et « pas une prévision ni un conseil »',
+        r.forme && /^Double sommet : /.test(r.forme.texte) && /Mesuré sur/.test(r.forme.texte) && /fois sur/.test(r.forme.texte) && /[Cc]ible théorique selon l’usage des analystes : \d[\d  ]* \$, non garantie/.test(r.forme.texte) && /pas une prévision ni un conseil/.test(r.forme.texte) && !bannisBulle(r.forme.texte).length, r.forme);
       const e = await dessin(o.page);
       check('4 h : la ligne des scénarios renvoie au suivi en 15 min ou 1 h (quand elle est posée)', !e.items.some(i => i.role === 'boite') || e.items.some(i => /à voir en 15 min ou 1 h/.test(i.texte)), e.items);
       await o.page.evaluate(() => window.__retablir());
@@ -527,18 +534,20 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       const r = await o.page.evaluate(() => {
         const n = candles.length, G = PARAM.guide, C = i => candles[i];
         const ia = n - 34, ic = n - 24, ib = n - 14, pa = Math.min(C(ia).low, C(ib).low), pc = C(ic).high;
-        const f = { type: 'double_creux', sens: 1, a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, objectif: pc + (pc - pa),
-          t: ib + G.pivot, debut: ia, fin: null, jFin: null, demi: false };
+        const f = { type: 'double_creux', famille: 'extremes', sens: 1, a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, extreme: pa, hauteur: pc - pa, objectif: pc + (pc - pa),
+          invalidation: pa, t: ib + G.pivot, debut: ia, depart: ib + 1, phase: 'formation', fin: null, jFin: null, demi: false, journal: [] };
         const f0 = Guide.formesAffichees, b0 = GUIDE_FORMES.val && GUIDE_FORMES.val.bilan;
         Guide.formesAffichees = () => [f];
         if (GUIDE_FORMES.val) GUIDE_FORMES.val.bilan = Object.assign({}, b0, { double_creux: { formes: 4, confirmes: 2, atteints: 1, invalides: 1, expires: 0, temoin: { departs: 40, atteints: 12 } } });
         drawChart();
         const items = debEtat.items.map(i => ({ role: i.role, texte: i.texte }));
         const forme = guideEtat.cibles.find(c => c.prio === 2 && c.rects.length);
+        const base = guideEtat.debForme ? guideEtat.debForme.t : null, possibles = Guide.libellesPossiblesDebutant(f);
         Guide.formesAffichees = f0; if (GUIDE_FORMES.val) GUIDE_FORMES.val.bilan = b0; drawChart();
-        return { items, forme: forme ? { titre: forme.titre, texte: forme.texte.join(' ') } : null };
+        return { base, possibles, items, forme: forme ? { titre: forme.titre, texte: forme.texte.join(' ') } : null };
       });
-      check('« Double creux possible » posé, au plus 5 textes', r.items.some(i => i.role === 'forme' && i.texte === 'Double creux possible') && r.items.length <= 5, r.items);
+      // (Amendement C1 : au prix live, le libellé peut dire « Ligne passée, à confirmer »…)
+      check('« Double creux possible » posé, au plus 5 textes', r.base === 'Double creux possible' && r.items.some(i => i.role === 'forme' && r.possibles.includes(i.texte)) && r.items.length <= 5, { base: r.base, items: r.items });
       check('sa bulle : ce qu’on voit, ce qui la validerait (« serait validée si le prix finit 2 quarts d’heure de suite au-dessus de »), le bilan mesuré, aucun prix visé, aucun mot banni',
         r.forme && /^Double creux possible : le prix a rebondi deux fois vers /.test(r.forme.texte) && /serait validée si le prix finit 2 quarts d’heure de suite au-dessus de /.test(r.forme.texte)
         && /Mesuré sur/.test(r.forme.texte) && !/vise/.test(r.forme.texte) && !bannisBulle(r.forme.texte).length, r.forme);

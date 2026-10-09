@@ -260,7 +260,8 @@ const d = 0.4;
   // Ligne de cou cassée ENTRE le 2e sommet et la clôture qui le rend repérable (b.i + pivot) :
   // la forme n'était visible qu'après coup — ni montrée, ni comptée.
   const k = P.pivot;
-  const base = [...lin(100, 100, 20), ...lin(100, 110, 10), ...lin(110, 104, 8), ...lin(104, 110.1, 8), ...lin(110.1, 100, k), 99.5, 99];
+  // (Sortie jugée hors de la bande ± bandeAtr × ATR : la chute franchit la ligne de cou nettement.)
+  const base = [...lin(100, 100, 20), ...lin(100, 110, 10), ...lin(110, 104, 8), ...lin(104, 110.1, 8), ...lin(110.1, 98, k), 97.5, 97];
   const s = serie(base, d), r = G.detecter({ h: s.H, l: s.L, c: s.C, atr: atrDe(s.H, s.L, s.C, P.atrPeriode), n: s.C.length }, P);
   check('ligne de cou confirmée avant que la forme soit repérable : non comptée (aucun « atteint » connu d’avance)', !r.formes.some(f => f.type === 'double_sommet' && f.jConf !== null && f.jConf <= f.t)
     && r.bilan.double_sommet.confirmes === 0, r.formes.filter(f => f.type === 'double_sommet').map(f => ({ t: f.t, jConf: f.jConf, fin: f.fin })));
@@ -269,8 +270,10 @@ const d = 0.4;
   // Triple sommet : (a, b) puis (b, c) — le même mouvement, un seul cas dans le bilan.
   const base = [...lin(100, 100, 20), ...lin(100, 110, 10), ...lin(110, 104, 8), ...lin(104, 110.1, 8), ...lin(110.1, 104.2, 8), ...lin(104.2, 110.05, 8), ...lin(110.05, 102.5, 4), 102, 101.5];
   const s = serie(base, d), r = G.detecter({ h: s.H, l: s.L, c: s.C, atr: atrDe(s.H, s.L, s.C, P.atrPeriode), n: s.C.length }, P);
-  const conf = r.formes.filter(f => f.type === 'double_sommet' && f.jConf !== null && !f.doublon);
-  check('triple sommet : une seule confirmation comptée (pas deux doubles sur la même cassure)', conf.length === 1 && r.bilan.double_sommet.confirmes === 1, r.formes.filter(f => f.type === 'double_sommet').map(f => ({ a: f.a.i, b: f.b.i, jConf: f.jConf, doublon: f.doublon })));
+  // Depuis les figures triples (plan figures §2.2) : le double vivant devient le triple ; le
+  // mouvement reste compté une seule fois (double OU triple, jamais deux doubles).
+  const conf = r.formes.filter(f => /^(double|triple)_sommet$/.test(f.type) && f.jConf !== null && !f.doublon);
+  check('triple sommet : une seule confirmation comptée (pas deux doubles sur la même cassure)', conf.length === 1 && r.bilan.double_sommet.confirmes + r.bilan.triple_sommet.confirmes === 1, r.formes.filter(f => /sommet/.test(f.type)).map(f => ({ type: f.type, a: f.a.i, b: f.b.i, jConf: f.jConf, fin: f.fin, doublon: f.doublon })));
 }
 {
   // Range : 60 bougies entre 98 et 102, puis deux clôtures au-dessus.
@@ -285,13 +288,15 @@ const d = 0.4;
   check('2 clôtures au-dessus : « sortie validée », objectif = borne + hauteur', f2 && G.etatForme(f2).cle === 'confirme' && Math.abs(f2.objectif - (f2.niveau + f2.hauteur)) < 1e-9, f2 && G.etatForme(f2));
 }
 {
-  // Triangle : sommets qui baissent, creux qui montent.
-  const pts = [100, 110, 101.5, 108.5, 103, 107, 104.5, 106];
+  // Triangle : sommets qui baissent, creux qui montent. (Plan figures §2.4 : un triangle repéré
+  // à plus de 85 % du chemin vers sa pointe n'est plus rendu : des droites qui se resserrent moins
+  // vite, pour qu'il soit repéré avant ; type « triangle_symetrique ».)
+  const pts = [100, 110, 101.5, 109, 102.5, 108, 103.5, 107];
   const ch = [...lin(100, 100, 10)];
   for (let k = 1; k < pts.length; k++) ch.push(...lin(pts[k - 1], pts[k], 6));
-  ch.push(...lin(106, 105.2, 3));
+  ch.push(...lin(107, 106, 3));
   const s = serie(ch, 0.2), r = G.detecter({ h: s.H, l: s.L, c: s.C, atr: atrDe(s.H, s.L, s.C, P.atrPeriode), n: s.C.length }, P);
-  const f = r.formes.find(x => x.type === 'triangle');
+  const f = r.formes.find(x => x.type === 'triangle_symetrique');
   check('triangle (droites qui se resserrent) détecté', !!f && f.hautL.b < 0 && f.basL.b > 0, f && { h: f.hautL, b: f.basL, etat: G.etatForme(f) });
 }
 {
@@ -316,9 +321,11 @@ const d = 0.4;
     && aff.every((f, k) => aff.every((g, m) => m === k || f.debut > (g.fin ? g.jFin : tout.n - 1) || g.debut > (f.fin ? f.jFin : tout.n - 1))), aff.map(f => [f.type, f.debut, f.fin]));
   check('aucune forme comptée n’est confirmée avant d’être repérable (jConf > t)', tout.formes.every(f => f.jConf === null || f.jConf > f.t));
   check('repère sans forme calculé pour chaque type confirmé (mêmes distances, même sens)', G.TYPES.every(k => !b[k].confirmes || b[k].temoin.departs > 0), G.TYPES.map(k => [k, b[k].confirmes, b[k].temoin]));
-  const exp = G.texteBilan(b.triangle, { n: C.length, intervalle: '15m', duree: C.length * 900 }, P, 'expert'), deb = G.texteBilan(b.triangle, { n: C.length, intervalle: '15m', duree: C.length * 900 }, P, 'debutant');
+  // (Plan figures §9.3 : un type à deux droites ne dit plus « confirmés » mais ses sorties ↑ / ↓ ;
+  // le contrôle des mêmes comptes porte sur un type à extrêmes présent dans la fixture.)
+  const exp = G.texteBilan(b.double_creux, { n: C.length, intervalle: '15m', duree: C.length * 900 }, P, 'expert'), deb = G.texteBilan(b.double_creux, { n: C.length, intervalle: '15m', duree: C.length * 900 }, P, 'debutant');
   t(exp); t(deb);
-  check('bilan : mêmes comptes en débutant et en expert, « mesuré » dit dans les deux', exp.includes(b.triangle.confirmes + ' conf.') && deb.includes(String(b.triangle.confirmes)) && /Mesuré sur l’historique chargé/.test(deb) && /^Mesuré · /.test(exp), { exp, deb });
+  check('bilan : mêmes comptes en débutant et en expert, « mesuré » dit dans les deux', exp.includes(b.double_creux.confirmes + ' conf.') && deb.includes(String(b.double_creux.confirmes)) && /Mesuré sur l’historique chargé/.test(deb) && /^Mesuré · /.test(exp), { exp, deb });
   const td = G.texteBilan(b.double_creux, { n: C.length, intervalle: '15m', duree: C.length * 900 }, P, 'debutant');
   check('bilan débutant : formes repérées, issues, et le repère sans forme en comptes (aucun %)', /repérés?/.test(t(td)) && (!b.double_creux.confirmes || /Repère sans forme/.test(td)) && !/%/.test(td), td);
   // Débutant : la phrase du cahier des charges d'abord, courte (une bulle de téléphone la lit).
@@ -327,7 +334,8 @@ const d = 0.4;
   check('bilan débutant : « Sur les 2 980 dernières bougies 15 min (31 j) : 14 … confirmés …, objectif théorique atteint 6 fois avant invalidation … Échantillon faible. » — court', /sur les 2 980 dernières bougies 15 min \(31 j\) : 14 doubles sommets confirmés/.test(tb)
     && /objectif théorique atteint 6 fois avant invalidation/.test(tb) && /2 335 fois sur 4 614/.test(tb) && /Échantillon faible\.$/.test(tb) && tb.split(' ').length <= 60, [tb.split(' ').length, tb]);
   const ec = t(G.texteBilan(bx, { n: 2980, intervalle: '15m', duree: 31 * 86400 }, P, 'expertCourt'));
-  check('étiquette expert : les comptes et « éch. faible » d’abord (une coupure en bout de ligne n’ôte que la durée)', /^14 conf\. · éch\. faible · obj\. 6 · inval\. 7/.test(ec), ec);
+  // (Plan figures, amendement D1 : libellé ≤ 80 caractères, « mesuré {conf}/{repérées} conf., obj. {a}/{finies} ».)
+  check('étiquette expert : les comptes et « éch. faible » d’abord (une coupure en bout de ligne n’ôte que la durée)', /^mesuré 14\/31 conf\., obj\. 6\/14 · éch\. faible/.test(ec), ec);
   // Une forme dont le début est sorti à gauche de la vue, mais dont le dernier pivot est dedans : montrée.
   const vive = tout.formes.find(f => !f.doublon && f.t - P.pivot - f.debut >= 2);
   if (vive) {
@@ -572,30 +580,35 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
       && t(G.libelleDebutant(Object.assign({}, z, { raisons: [Rd('sr', 749.15)] }), { max: DEB.niveau, unite: 'SOL' })) === 'Zone retour · 749,15 SOL', Z);
   }
   // 4. La forme : confirmée, invalidée, et aussi pendant qu'elle se dessine (« possible », « Prix
-  //    dans un … », « à confirmer ») ; allée au bout ou oubliée : rien. ≤ 26 caractères.
-  const fo = [['double_sommet', { phase: 'confirme', sens: -1 }], ['double_creux', { fin: 'invalide', sens: 1 }], ['triangle', { phase: 'confirme', sens: 1 }], ['range', { phase: 'confirme', sens: -1 }],
-    ['double_sommet', {}], ['triangle', { demi: true, demiSens: 1 }], ['range', {}], ['double_creux', { demi: true }], ['double_sommet', { fin: 'atteint' }], ['triangle', { fin: 'expire_avant' }]]
+  //    dans un … », « à confirmer ») ; ≤ 26 caractères. (Plan figures §5.3 et amendement C6 : une
+  //    figure invalidée porte « ✗ » ; la cible atteinte et la figure sans suite sont nommées.)
+  const fo = [['double_sommet', { phase: 'confirme', sens: -1 }], ['double_creux', { fin: 'invalide', sens: 1 }], ['triangle_symetrique', { phase: 'confirme', sens: 1 }], ['range', { phase: 'confirme', sens: -1 }],
+    ['double_sommet', {}], ['triangle_symetrique', { demi: true, demiSens: 1 }], ['range', {}], ['double_creux', { demi: true }], ['double_sommet', { fin: 'atteint' }], ['triangle_symetrique', { fin: 'expire_avant' }]]
     .map(([type, e]) => [type, t(G.libelleFormeDebutant(Object.assign({ type, sens: 1 }, e)) || '') || null]);
-  check('forme : « Double sommet confirmé », « Double creux invalidé », « Sortie du triangle ↑ », « Sortie du rectangle ↓ » ; en train de se dessiner : « Double sommet possible », « Sortie ↑ à confirmer », « Prix dans un rectangle », « Double creux à confirmer » ; allée au bout ou oubliée : rien',
-    fo[0][1] === 'Double sommet confirmé' && fo[1][1] === 'Double creux invalidé' && fo[2][1] === 'Sortie du triangle ↑' && fo[3][1] === 'Sortie du rectangle ↓'
+  check('forme : « Double sommet confirmé », « ✗ Double creux invalidé », « Sortie du triangle ↑ », « Sortie du rectangle ↓ » ; en train de se dessiner : « Double sommet possible », « Sortie ↑ à confirmer », « Prix dans un rectangle », « Double creux à confirmer » ; issues : « Cible théorique atteinte », « Triangle sans suite »',
+    fo[0][1] === 'Double sommet confirmé' && fo[1][1] === '✗ Double creux invalidé' && fo[2][1] === 'Sortie du triangle ↑' && fo[3][1] === 'Sortie du rectangle ↓'
     && fo[4][1] === 'Double sommet possible' && fo[5][1] === 'Sortie ↑ à confirmer' && fo[6][1] === 'Prix dans un rectangle' && fo[7][1] === 'Double creux à confirmer'
-    && fo[8][1] === null && fo[9][1] === null && fo.every(([, l]) => !l || l.length <= DEB.forme), fo);
+    && fo[8][1] === 'Cible théorique atteinte' && fo[9][1] === 'Triangle sans suite' && fo.every(([, l]) => !l || l.length <= DEB.forme), fo);
   // 4 bis. La bulle d'une figure qui se dessine : ce qu'on voit, ce qui la validerait (2 périodes
-  // finies de suite), jamais un prix visé ; mots du Débutant seulement.
+  // finies de suite), ce qui l'annulerait, sa cible conditionnelle (« cible théorique … non
+  // garantie »), toujours avec le bilan mesuré ; mots du Débutant seulement. (Plan figures §9.3 :
+  // « jamais un prix visé » devient « cible conditionnelle, toujours avec le bilan mesuré » ; figures
+  // complètes, comme le détecteur les rend ; wording des amendements C2 et C4.)
   {
-    const ds = { type: 'double_sommet', sens: -1, a: { i: 10, p: 86400 }, b: { i: 30, p: 86350 }, cou: { i: 20, p: 85700 }, niveau: 85700, objectif: 85000 };
-    const dc = { type: 'double_creux', sens: 1, a: { i: 10, p: 81900 }, b: { i: 30, p: 81950 }, cou: { i: 20, p: 82600 }, niveau: 82600, objectif: 83300, demi: true };
-    const rg = { type: 'range', sens: 1, haut: 83500, bas: 82900, debut: 5 };
-    const tr = { type: 'triangle', sens: 1, demi: true, demiSens: -1, debut: 5 };
-    const b = { type: 'double_sommet', formes: 6, confirmes: 3, atteints: 1, invalides: 1, expires: 0, temoin: { departs: 300, atteints: 90 } };
-    const ec = [[ds, '15m'], [dc, '1h'], [rg, '15m'], [tr, '4h']].map(([f, itv]) => t(G.texteFormeDebutant(f, b, { duree: 5 * 86400, itv }, P, '$').join(' ')));
-    check('en train de se dessiner : « Double sommet possible : le prix a buté deux fois vers 86 400 $. La figure serait validée si le prix finit 2 quarts d’heure de suite sous 85 700 $ (le creux entre les deux). »',
-      /^Double sommet possible : le prix a buté deux fois vers 86 400 \$\. La figure serait validée si le prix finit 2 quarts d’heure de suite sous 85 700 \$ \(le creux entre les deux\)\./.test(ec[0]), ec[0]);
-    check('… à confirmer : « S’il finit encore une heure au-dessus de ce prix, la figure serait validée » ; rectangle : « entre 82 900 et 83 500 $ » ; sortie : « s’il revient dedans, elle ne compte pas »',
-      /^Double creux à confirmer : .*S’il finit encore une heure au-dessus de ce prix, la figure serait validée\./.test(ec[1]) && /Prix dans un rectangle : il fait des allers-retours entre 82 900 et 83 500 \$/.test(ec[2])
-      && /^Le prix vient de sortir du triangle par le bas\..*s’il revient dedans, elle ne compte pas\./.test(ec[3]), ec);
-    check('… toujours avec le bilan mesuré, jamais un prix visé, aucun mot banni, aucun conseil, « pas une prévision ni un conseil »',
-      ec.every(x => /Mesuré sur/.test(x) && !/vise/.test(x) && !G.motsBannis(x).length && !CONSEIL.test(x.replace('pas une prévision ni un conseil', '')) && /pas une prévision ni un conseil/.test(x)), ec.map(x => [x, G.motsBannis(x)]));
+    const ds = { type: 'double_sommet', sens: -1, a: { i: 10, p: 86400 }, b: { i: 30, p: 86350 }, cou: { i: 20, p: 85700 }, niveau: 85700, extreme: 86400, hauteur: 700, objectif: 85000, invalidation: 86400, debut: 10 };
+    const dc = { type: 'double_creux', sens: 1, a: { i: 10, p: 81900 }, b: { i: 30, p: 81950 }, cou: { i: 20, p: 82600 }, niveau: 82600, extreme: 81900, hauteur: 700, objectif: 83300, invalidation: 81900, demi: true, demiSens: 1, jDemi: 40, debut: 10 };
+    const rg = { type: 'range', haut: 83500, bas: 82900, hautL: { a: 83500, b: 0 }, basL: { a: 82900, b: 0 }, hauteur: 600, apex: Infinity, debut: 5 };
+    const tr = { type: 'triangle_symetrique', hautL: { a: 84000, b: -10 }, basL: { a: 82000, b: 10 }, hauteur: 1900, apex: 100, demi: true, demiSens: -1, jDemi: 40, debut: 5 };
+    const b = { type: 'double_sommet', formes: 6, confirmes: 3, atteints: 1, invalides: 1, expires: 0, haut: 1, bas: 2, ebauches: { n: 0, devenues: 0, confirmees: 0 }, temoin: { departs: 300, atteints: 90 } };
+    const ec = [[ds, '15m'], [dc, '1h'], [rg, '15m'], [tr, '4h']].map(([f, itv]) => t(G.texteFormeDebutant(f, b, { duree: 5 * 86400, itv, j: 41 }, P, '$').join(' ')));
+    check('en train de se dessiner : « Double sommet possible : le prix a buté deux fois entre 86 350 et 86 400 $. La figure serait validée si le prix finit 2 quarts d’heure de suite sous 85 700 $ (le creux entre les sommets). »',
+      /^Double sommet possible : le prix a buté deux fois entre 86 350 et 86 400 \$\. La figure serait validée si le prix finit 2 quarts d’heure de suite sous 85 700 \$ \(le creux entre les sommets\)\./.test(ec[0]), ec[0]);
+    check('… à confirmer : « s’il finit encore une heure au-dessus, la figure sera validée » ; rectangle : « entre 82 900 et 83 500 $ » ; sortie : « s’il revient franchement dedans, la sortie ne compte pas »',
+      /^Double creux à confirmer : .*s’il finit encore une heure au-dessus, la figure sera validée\./.test(ec[1]) && /Prix dans un rectangle : il fait des allers-retours entre 82 900 et 83 500 \$/.test(ec[2])
+      && /^Triangle qui se resserre : .*Le prix vient de sortir par le bas \(.*s’il revient franchement dedans, la sortie ne compte pas\./.test(ec[3]), ec);
+    check('… toujours la cible théorique (« non garantie ») avec le bilan mesuré, l’annulation dite pour les doubles, jamais « vise », aucun mot banni, aucun conseil, « pas une prévision ni un conseil »',
+      ec.every(x => /Mesuré sur/.test(x) && /cibles? théoriques? selon l’usage des analystes : \d/.test(x) && /non garanties?/.test(x) && !/vise/.test(x) && !G.motsBannis(x).length && !CONSEIL.test(x.replace('pas une prévision ni un conseil', '')) && /pas une prévision ni un conseil/.test(x))
+      && /Annulée si le prix finit un quart d’heure au-dessus de 86 400 \$/.test(ec[0]) && /Annulée si le prix finit une heure sous 81 900 \$/.test(ec[1]), ec.map(x => [x, G.motsBannis(x)]));
   }
   // 5. La suite, en une phrase : « Si le prix finit un quart d'heure au-dessus de … ».
   const s2 = G.suite({ dessus: [N(Rd('hier_haut', 86398)), N(Rd('mur_vente', 86700, { lu: Date.parse('2026-10-08T22:51:00Z') }))], dessous: [bas] }, 86012.5);

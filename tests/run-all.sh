@@ -70,6 +70,9 @@ node test_chronique.js || ko=1
 etape "2j. Guide du graphique : niveaux nommés, règle de cassure, régime, formes rejouées sans regarder l'avenir, mots sans conseil — hors ligne"
 node test_guide.js || ko=1
 
+etape "2j'. Figures chartistes : 16 types, ébauches, niveaux annoncés = niveaux appliqués (±ε), sans regard vers l'avenir (15 min et 1 min), mots, sélection, temps — hors ligne"
+node test_figures.js || ko=1
+
 etape "2k. Scénarios du matin : lecture du fichier, suivi des zones dans l'ordre, range, note du journal d'abord, aucun pourcentage en débutant, mots sans conseil — hors ligne"
 node test_scenarios.js || ko=1
 
@@ -150,6 +153,9 @@ node test_scenarios_jour_stable_page.js || ko=1
 
 etape "9b‴. Débutant à l'écran dans Chromium : au plus 5 textes, phrase et repères aux mêmes prix, bulles au survol et au toucher, cartes et menu sans jargon, 11 thèmes (non exécuté sans Playwright)"
 node test_debutant_page.js || ko=1
+
+etape "9b⁗. Figures dans Chromium : rejeu ébauche → figure → confirmée → invalidée, bougie en cours (ligne passée, percé en mèche) sans redessin, effacement, bulles à 1440 et 390, rejeu ralenti 4× (non exécuté sans Playwright)"
+node test_figures_page.js || ko=1
 
 etape "9c. Sobriété dans Chromium : éclair, horloge, onde, calque, verre, chargement, chaleur (non exécuté sans Playwright)"
 node test_sobriete.js || ko=1
