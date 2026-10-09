@@ -455,6 +455,112 @@ const FICHES = {
     lectures: [{ s: 'convention', t: 'Au-dessus de 80 : haut du range ; sous 20 : bas du range (seuils usuels).' }],
     limites: 'Très nerveux en version rapide.',
   },
+  // ── Indicateurs du menu sans fiche jusqu'au 09/10/2026 (formule construite avec PARAM) ──
+  ichimoku: {
+    titre: 'Ichimoku (nuage)', page: 'ichimoku',
+    simple: 'Deux lignes de milieu de fourchette (rapide et lente) et un « nuage » coloré, décalé vers la droite, qui montre la zone d’équilibre récente du prix.',
+    formule: P => 'Ligne rapide (tenkan) = (plus haut + plus bas) / 2 sur ' + P.ichimoku.tenkan + ' bougies ; ligne lente (kijun) = idem sur ' + P.ichimoku.kijun
+      + ' ; nuage : bord A = (tenkan + kijun) / 2, bord B = (plus haut + plus bas) / 2 sur ' + P.ichimoku.senkouB + ', tous deux reportés de ' + P.ichimoku.kijun
+      + ' bougies vers la droite. Nuage vert quand A ≥ B, rouge sinon. La ligne retardée (chikou) n’est pas dessinée.',
+    lectures: [
+      { s: 'usuel', t: 'Prix au-dessus du nuage : tendance haussière sur cet horizon ; au-dessous : baissière ; dedans : zone d’hésitation.' },
+      { s: 'usuel', t: 'Un nuage épais est lu comme une zone difficile à traverser ; un nuage fin, comme une zone fragile.' },
+      { s: 'convention', t: 'Ligne rapide qui croise la ligne lente : lu comme un changement de rythme, en retard sur le prix.' },
+    ],
+    limites: 'Réglages pensés pour les marchés actions japonais des années 1960 ; tous des milieux de fourchette, donc en retard. Rien n’est dessiné tant que la fenêtre la plus longue n’est pas chargée.',
+  },
+  sar: {
+    titre: 'Parabolic SAR', page: 'sar',
+    simple: 'Des points posés sous les bougies quand le prix monte, au-dessus quand il baisse. Ils se rapprochent du prix à mesure que le mouvement dure.',
+    formule: P => 'SAR de Wilder (même algorithme que TradingView, ta.sar) : SARₜ = SARₜ₋₁ + AF × (EP − SARₜ₋₁), EP = extrême du mouvement en cours ; AF part de ' + nbF(P.sar.pas)
+      + ', monte de ' + nbF(P.sar.pas) + ' à chaque nouvel extrême, plafonné à ' + nbF(P.sar.max) + '. Le point change de côté quand le prix le traverse.',
+    lectures: [
+      { s: 'usuel', t: 'Points sous le prix : mouvement haussier en cours ; au-dessus : baissier. Le changement de côté marque la fin du mouvement précédent.' },
+      { s: 'usuel', t: 'Souvent utilisé comme niveau de sortie qui suit le prix (« stop suiveur »), plus que comme indication de direction.' },
+    ],
+    limites: 'Dans un marché sans tendance, les points changent de côté sans arrêt et ne disent rien.',
+  },
+  obv: {
+    titre: 'OBV — On-Balance Volume', page: 'obv',
+    simple: 'Un compteur de volume : il ajoute le volume des bougies qui finissent en hausse et retire celui des bougies qui finissent en baisse.',
+    formule: () => 'OBVₜ = OBVₜ₋₁ + volume si clôture > clôture précédente, − volume si clôture < clôture précédente, inchangé sinon. Part de 0 à la première bougie chargée.',
+    lectures: [
+      { s: 'usuel', t: 'Seule la PENTE compte : un OBV qui monte veut dire que plus de volume s’échange sur les bougies haussières que sur les baissières.' },
+      { s: 'débattu', t: 'Un OBV qui ne suit pas le prix (le prix monte, l’OBV stagne) est lu comme un mouvement peu soutenu. Lecture répandue, rarement vérifiée.' },
+    ],
+    limites: 'Sa valeur absolue n’a pas de sens : elle dépend de la première bougie chargée. Tout le volume d’une bougie est compté d’un seul côté, même pour une clôture à peine différente.',
+  },
+  mfi: {
+    titre: 'MFI — Money Flow Index', page: 'mfi',
+    simple: 'Un RSI qui tient compte du volume : de 0 à 100, il compare l’argent échangé sur les bougies qui montent et sur celles qui baissent.',
+    formule: P => 'Prix typique = (H + B + C) / 3 ; flux = prix typique × volume. Sur ' + P.mfi.periode + ' bougies : flux positifs (prix typique en hausse) et négatifs ; MFI = 100 − 100 / (1 + positifs / négatifs).',
+    lectures: [
+      { s: 'convention', t: 'Au-dessus de 80 : zone haute ; sous 20 : zone basse (lignes tracées sur le sous-graphe).' },
+      { s: 'usuel', t: 'Se lit comme le RSI, avec le volume en plus : il réagit davantage aux bougies très échangées.' },
+    ],
+    limites: 'Corrélé au RSI : ne pas les compter comme deux signaux. Volume Binance seulement.',
+  },
+  williamsR: {
+    titre: 'Williams %R', page: 'williamsR',
+    simple: 'Où se trouve le prix dans sa fourchette récente, de 0 (au plus haut) à −100 (au plus bas).',
+    formule: P => '%R = (plus haut ' + P.williamsR.periode + ' − clôture) / (plus haut ' + P.williamsR.periode + ' − plus bas ' + P.williamsR.periode + ') × −100.',
+    lectures: [
+      { s: 'convention', t: 'Au-dessus de −20 : haut de la fourchette ; sous −80 : bas de la fourchette (lignes tracées sur le sous-graphe).' },
+      { s: 'usuel', t: 'C’est le stochastique rapide retourné : il dit la même chose, sur une autre échelle.' },
+    ],
+    limites: 'Très corrélé au stochastique et au RSI : ne pas les compter comme des signaux séparés.',
+  },
+  cci: {
+    titre: 'CCI — Commodity Channel Index', page: 'cci',
+    simple: 'L’écart entre le prix et sa moyenne, mesuré en « écarts habituels » : il dit si le prix s’est éloigné de sa normale récente.',
+    formule: P => 'Prix typique = (H + B + C) / 3 ; CCI = (prix typique − sa moyenne sur ' + P.cci.periode + ') / (0,015 × écart moyen absolu sur ' + P.cci.periode + ').',
+    lectures: [
+      { s: 'convention', t: 'Au-dessus de +100 : prix nettement au-dessus de sa normale ; sous −100 : nettement au-dessous (lignes tracées). Le 0,015 de la formule est choisi pour que la plupart des valeurs restent entre −100 et +100.' },
+      { s: 'usuel', t: 'Un CCI qui reste longtemps au-delà de ±100 est lu comme une tendance forte plutôt que comme un excès.' },
+    ],
+    limites: 'Non borné : pas d’extrême universel. Corrélé aux autres oscillateurs.',
+  },
+  ao: {
+    titre: 'Awesome Oscillator', page: 'ao',
+    simple: 'Des barres qui montrent si le prix récent (court terme) est au-dessus ou au-dessous du prix moyen d’une période plus longue : la vitesse du mouvement.',
+    formule: P => 'Milieu de bougie = (H + B) / 2 ; AO = moyenne simple ' + P.ao.rapide + ' du milieu − moyenne simple ' + P.ao.lente + ' du milieu.',
+    lectures: [
+      { s: 'usuel', t: 'Barres au-dessus de 0 : le court terme est au-dessus du long terme (élan haussier) ; au-dessous : élan baissier.' },
+      { s: 'usuel', t: 'Barres qui raccourcissent : l’élan faiblit, sans dire si le prix va se retourner.' },
+    ],
+    limites: 'En retard sur le prix, comme toute différence de moyennes. Proche du MACD : ne pas les compter deux fois.',
+  },
+  fib: {
+    titre: 'Retracements de Fibonacci', page: 'fib',
+    simple: 'Des lignes posées à des fractions fixes (23,6 %, 38,2 %, 50 %, 61,8 %, 78,6 %) entre le plus haut et le plus bas de la partie visible du graphique.',
+    formule: P => 'Plus haut et plus bas des bougies VISIBLES ; niveaux ' + P.fib.niveaux.map(x => pcF(x) + ' %').join(', ') + '. Si la dernière clôture visible est au-dessus de la première, ils sont mesurés depuis le haut (retour d’une hausse), sinon depuis le bas.',
+    lectures: [
+      { s: 'débattu', t: 'Beaucoup de participants regardent ces niveaux, ce qui peut leur donner du poids ; aucune raison mathématique ne fait réagir un prix à 61,8 %.' },
+      { s: 'usuel', t: 'Lecture courante : un repli qui s’arrête vers 38,2 % ou 50 % garde la tendance intacte ; au-delà de 78,6 %, le mouvement précédent est presque effacé.' },
+    ],
+    limites: 'Les lignes bougent quand on déplace ou zoome le graphique : elles dépendent de ce qui est visible, pas d’un sommet choisi.',
+  },
+  vp: {
+    titre: 'Profil de volume', page: 'vp',
+    simple: 'Des barres horizontales au bord droit : combien a été échangé à chaque niveau de prix sur la partie visible du graphique. La ligne jaune (POC) marque le prix le plus échangé.',
+    formule: P => 'Échelle de prix de la vue découpée en tranches (environ ' + P.vp.dollarsParTranche + ' $, entre ' + P.vp.tranchesMin + ' et ' + P.vp.tranchesMax
+      + ' tranches) ; le volume de chaque bougie visible est ajouté à chaque tranche entre son plus bas et son plus haut. POC = tranche la plus chargée ; zone de valeur = les tranches les plus chargées jusqu’à ' + pcF(P.vp.zoneValeur) + ' % du total (pointillés).',
+    lectures: [
+      { s: 'usuel', t: 'Les prix très échangés sont lus comme des zones d’accord où le prix ralentit ; les creux du profil, comme des zones que le prix traverse vite.' },
+      { s: 'usuel', t: 'La zone de valeur (pointillés) encadre l’essentiel des échanges de la période visible.' },
+    ],
+    limites: 'Approximation : le volume d’une bougie est compté sur toute sa hauteur, faute de savoir à quel prix il s’est échangé. Change quand on déplace ou zoome la vue.',
+  },
+  liq: {
+    titre: 'Liquidité (carnet publié)', page: 'liq',
+    simple: 'Une carte de chaleur derrière les bougies : là où de gros ordres d’achat ou de vente attendaient dans le carnet de Binance, minute par minute.',
+    formule: () => 'heatmap.json, publié toutes les 15 min par le serveur : une colonne par minute, une tranche de prix par 20 $ ; la chaleur d’une case est la taille du plus gros niveau de prix de la tranche (pas la somme). BTC/USDT seulement. L’âge de la dernière colonne est écrit en haut à droite.',
+    lectures: [
+      { s: 'mesuré', t: 'Une bande claire et horizontale : un gros ordre resté posé longtemps à ce prix.' },
+      { s: 'usuel', t: 'Les gros ordres en attente sont lus comme des zones où le prix peut ralentir ou rebondir, tant qu’ils restent posés.' },
+    ],
+    limites: 'Un ordre peut être retiré à tout moment, avant que le prix n’arrive. La colonne la plus récente a jusqu’à 16 min. La carte détaillée, en direct, est sur la page « Carte ».',
+  },
 };
 
 // ─── Valeurs et métadonnées ───────────────────────────────────────────────────
@@ -469,6 +575,46 @@ const motModes = (exp, deb) => (deb && deb !== exp ? '<span class="expert-seul">
 const pcF = x => (x * 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
 const nbF = x => x.toLocaleString('fr-FR');
 const echapF = s => String(s === undefined || s === null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// ─── Comment s'en servir ──────────────────────────────────────────────────────
+// Une ligne par indicateur du menu (demande du 09/10/2026 : « ce que c'est et comment on
+// l'utilise »). Elle s'affiche dans l'aperçu du menu (survol, toucher) et en tête de la fiche.
+// Une MANIÈRE de regarder, jamais quoi acheter ou vendre (tests/test_fiches.js) : les
+// indicateurs décrivent l'état du marché, ils ne donnent pas la direction.
+// Chaîne simple, ou { exp, deb } quand le Débutant voit un écran différent.
+const USAGES = {
+  guide: { exp: 'Laissez-le affiché pour savoir où vous en êtes : la phrase dit le mouvement, les bandes les prix à surveiller, et les deux chemins à droite ce qui vient si le prix franchit un niveau. Survolez un libellé pour son origine.',
+    deb: 'Lisez la phrase du haut, puis regardez les deux repères : tant que le prix reste entre eux, rien de neuf. S’il en dépasse un, touchez-le pour voir le repère suivant.' },
+  scenarios: { exp: 'Comparez chaque matin le chemin du scénario n° 1 à ce que font les bougies : l’encadré dit quelle zone a été touchée en premier. Un scénario invalidé se lit comme « l’hypothèse du matin ne tient plus ».',
+    deb: 'Regardez le scénario n° 1 et sa zone : la ligne du haut dit si le prix suit ce chemin ou non. Touchez-la pour les trois scénarios.' },
+  ema: 'Affichez-en une ou deux (par exemple 20 et 50) : le prix au-dessus d’une moyenne qui monte décrit une tendance haussière sur cet horizon. Deux moyennes qui se croisent marquent un changement de tendance, toujours en retard.',
+  bb: 'Regardez la largeur des bandes : très resserrées, le marché est calme et un mouvement plus ample se prépare souvent, sans en dire le sens. Un prix qui longe une bande décrit une tendance forte, pas un excès.',
+  vwap: 'Utilisez-le en intraday comme le prix moyen de la journée : au-dessus, ceux qui ont échangé aujourd’hui sont en moyenne gagnants. Le prix revient souvent le tester.',
+  ichimoku: 'Regardez où est le prix par rapport au nuage : au-dessus, en dessous ou dedans. Le nuage projeté à droite montre la zone d’équilibre des prochaines bougies selon cette méthode.',
+  sar: 'Suivez de quel côté sont les points : ils accompagnent un mouvement et changent de côté quand il s’arrête. Utile pour situer un niveau qui suit le prix, peu utile dans un marché sans direction.',
+  volume: 'Comparez la barre d’un mouvement aux barres d’avant : un franchissement de niveau sur un volume plus fort que d’habitude est jugé plus solide qu’un franchissement sur volume faible.',
+  rsi: 'Regardez s’il est haut (plus de 70) ou bas (moins de 30) : le mouvement récent a été fort dans un sens. Mesuré sur le BTC dans ce projet : un RSI bas annonce surtout de l’agitation dans les deux sens, pas un rebond.',
+  macd: 'Regardez l’histogramme : des barres qui grandissent, le mouvement accélère ; qui rétrécissent, il ralentit. Le croisement des deux lignes confirme un changement déjà visible sur le prix.',
+  stoch: 'Regardez où est la ligne entre 0 et 100 : près de 100, le prix finit en haut de sa fourchette récente ; près de 0, en bas. En tendance, il peut rester collé à un bord longtemps.',
+  atr: 'Servez-vous-en comme d’une règle : il donne la taille d’un mouvement normal. Un mouvement de 3 ATR est grand ; de 0,5 ATR, banal. Pratique pour juger si un niveau est « proche ».',
+  obv: 'Comparez sa pente à celle du prix : si les deux montent ensemble, la hausse s’accompagne de volume ; si le prix monte et l’OBV non, la hausse se fait sur peu d’échanges.',
+  mfi: 'Lisez-le comme le RSI : au-dessus de 80 ou sous 20, le mouvement récent a été fort et très échangé. Ne l’ajoutez pas au RSI comme une seconde preuve.',
+  williamsR: 'Regardez s’il est près de 0 (prix en haut de sa fourchette récente) ou de −100 (en bas). Il dit la même chose que le stochastique : un seul des deux suffit.',
+  cci: 'Regardez quand il dépasse +100 ou −100 : le prix s’éloigne nettement de sa normale. S’il y reste longtemps, c’est une tendance, pas un excès.',
+  adx: 'Regardez d’abord la ligne pleine : au-dessus de 25, le marché suit une tendance ; sous 20, il tourne en rond. Les deux pointillés disent ensuite qui pousse : +DI les hausses, −DI les baisses.',
+  ao: 'Regardez la couleur et la taille des barres : au-dessus de 0 et qui grandissent, l’élan haussier s’accélère ; qui rétrécissent, il s’essouffle.',
+  sr: 'Repérez les lignes les plus proches du prix au-dessus et en dessous : ce sont les prix où il a déjà fait demi-tour. Un niveau touché plusieurs fois récemment compte davantage.',
+  fib: 'Après un grand mouvement, cadrez la vue sur ce mouvement : les lignes montrent jusqu’où un repli est allé (38,2 %, 50 %, 61,8 %). Elles changent si vous déplacez la vue.',
+  vp: 'Repérez la ligne jaune (le prix le plus échangé) et les zones vides : le prix ralentit souvent dans les zones chargées et traverse vite les zones vides.',
+  liq: 'Cherchez les bandes claires proches du prix : ce sont de gros ordres posés. Vérifiez leur âge en haut à droite ; pour suivre le carnet en direct, ouvrez la page « Carte ».',
+};
+for (const k of Object.keys(USAGES)) if (FICHES[k]) FICHES[k].usage = USAGES[k];
+/** La ligne « Comment s'en servir » d'une fiche, en HTML (les deux textes, chacun dans sa classe, s'ils diffèrent). */
+function usageHtml(id) {
+  const u = FICHES[id] && FICHES[id].usage;
+  if (!u) return '';
+  return typeof u === 'string' ? echapF(u) : motModes(u.exp, u.deb);
+}
+
 function metaDe(cle) {
   const md = typeof marketData !== 'undefined' ? marketData : null;
   return md && md.meta && md.meta.champs ? md.meta.champs[cle] || null : null;
@@ -511,6 +657,7 @@ function ficheHtml(id) {
   // État du moment dérivé du code (ex. la forme de bougie du thème courant) : même HTML dans les deux modes.
   const etat = f.etat ? f.etat() : null;
   if (etat) h += '<p class="fiche-valeur">' + echapF(etat) + '</p>';
+  if (f.usage) h += '<h4>Comment s’en servir</h4><p class="fiche-usage">' + usageHtml(id) + '</p>';
   if (f.champ) {
     const vals = valeursDe(f.champ);
     const md = typeof marketData !== 'undefined' ? marketData : null;
@@ -591,7 +738,7 @@ function ouvrirGlossaire(ancre) {
     ['Indicateurs du fichier', ['rsi_tf', 'ema_tf', 'croisement', 'sr_tf', 'amplitude', 'atr_tf', 'volume_tf']],
     ['Le dessin du graphique', ['bougies']],
     ['Guide du graphique', ['guide', 'guide_niveaux', 'guide_regime', 'guide_formes', 'guide_suite', 'scenarios']],
-    ['Indicateurs du graphique', ['rsi', 'ema', 'vwap', 'adx', 'atr', 'volume', 'sr', 'bb', 'macd', 'stoch']]];
+    ['Indicateurs du graphique', ['rsi', 'ema', 'vwap', 'adx', 'atr', 'volume', 'sr', 'bb', 'macd', 'stoch', 'ichimoku', 'sar', 'obv', 'mfi', 'williamsR', 'cci', 'ao', 'fib', 'vp', 'liq']]];
   const bouton = (i, t) => '<button type="button" class="glossaire-item" onclick="ouvrirFiche(\'' + i + '\')">' + echapF(t) + '</button>';
   const tous = groupes.map(([g, ids]) => '<h4>' + g + '</h4><div class="glossaire">' + ids.map(i => bouton(i, FICHES[i].titre)).join('') + '</div>').join('');
   p.innerHTML = '<div class="fiche-tete"><h3 class="fiche-titre">Légendes</h3><button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>'

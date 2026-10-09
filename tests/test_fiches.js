@@ -198,6 +198,36 @@ Object.assign(C, sauveC);
 check('CADENCES = 3 / 5 / 8 min → bandeau à 6 min (« cadence attendue : 3 min »), figé à 9 min, rien à 4 min',
   /cadence attendue : 3 min/.test(b6) && /figées/.test(b9) && b4 === '', { b4, b6, b9 });
 
+// ── 9. Chaque indicateur du menu : ce que c'est ET comment s'en servir (demande du 09/10/2026) ──
+titre('9. Chaque indicateur du menu a une fiche, une ligne « Comment s’en servir » et un aperçu');
+{
+  const Gd = require(path.join(REPO, 'js/guide.js'));
+  const items = T.INDICATORS.flatMap(c => c.items);
+  const sansFiche = items.filter(i => !T.FICHE_IND[i.key] || !T.FICHES[T.FICHE_IND[i.key]]).map(i => i.key);
+  check(`les ${items.length} indicateurs du menu ont une fiche`, !sansFiche.length, sansFiche);
+  const sansUsage = items.filter(i => { const f = T.FICHES[T.FICHE_IND[i.key]]; return !f || !f.usage; }).map(i => i.key);
+  check('chacun a sa ligne « Comment s’en servir »', !sansUsage.length, sansUsage);
+  const usages = Object.entries(T.FICHES).filter(([, f]) => f.usage).flatMap(([k, f]) => (typeof f.usage === 'string' ? [f.usage] : [f.usage.exp, f.usage.deb]).map(t => [k, t]));
+  check('aucune ligne « Comment s’en servir » ne dit quoi acheter ou vendre', usages.every(([, t]) => t && !CONSEIL.test(t)), usages.filter(([, t]) => !t || CONSEIL.test(t)));
+  const debSales = Object.entries(T.FICHES).filter(([, f]) => f.usage && typeof f.usage !== 'string').map(([k, f]) => [k, Gd.motsBannis(f.usage.deb)]).filter(([, b]) => b.length);
+  check('les lignes du Débutant (guide, scénarios) : aucun mot de la liste du Guide', !debSales.length, debSales);
+  check('la fiche affiche « Comment s’en servir » (les deux textes, chacun dans sa classe, s’ils diffèrent)', /Comment s’en servir/.test(T.ficheHtml('rsi')) && /<span class="debutant-seul">/.test(T.usageHtml('guide')));
+  MODE.v = null;
+  const apDeb = T.apercuHtml('guide'), apVide = T.apercuHtml(null);
+  MODE.v = 'expert';
+  const apExp = T.apercuHtml('ichimoku');
+  check('aperçu du menu : titre, « C’est quoi ? », « Comment s’en servir ? », lien vers la fiche ; en Débutant, ses mots à lui', /C’est quoi \?/.test(apExp) && /Comment s’en servir \?/.test(apExp) && /ouvrirFiche\('ichimoku'/.test(apExp)
+    && apDeb.includes(T.FICHES.guide.titreDeb) && apDeb.includes(T.FICHES.guide.usage.deb.slice(0, 30)) && !Gd.motsBannis(apDeb.replace(/<[^>]+>/g, ' ')).length && !Gd.motsBannis(apVide.replace(/<[^>]+>/g, ' ')).length, { apDeb, apExp });
+  // Les dents : les formules des nouvelles fiches suivent PARAM.
+  const sauveP = JSON.stringify(T.PARAM);
+  T.PARAM.ichimoku.tenkan = 7; T.PARAM.sar.max = 0.3; T.PARAM.vp.zoneValeur = 0.68; T.PARAM.fib.niveaux = [0, 0.5, 1];
+  check('PARAM change → Ichimoku dit 7, SAR 0,3, profil de volume 68 %, Fibonacci ses seuls niveaux', T.ficheHtml('ichimoku').includes('sur 7 bougies') && T.ficheHtml('sar').includes('plafonné à 0,3')
+    && T.ficheHtml('vp').includes('68 %') && T.ficheHtml('fib').includes('niveaux 0 %, 50 %, 100 %'));
+  Object.assign(T.PARAM, JSON.parse(sauveP));
+  check('Ichimoku, SAR, Fibonacci, profil de volume : le dessin lit PARAM', /calcIchimoku, highs, lows, closes, PARAM\.ichimoku\.tenkan/.test(SRC_APP) && /calcSAR, highs2, lows2, closes, PARAM\.sar\.pas, PARAM\.sar\.max/.test(SRC_APP)
+    && /fibLevels = PARAM\.fib\.niveaux/.test(SRC_APP) && /PARAM\.vp\.zoneValeur/.test(SRC_APP) && !/\[0, 0\.236, 0\.382/.test(SRC_APP.replace(/^.*fib: \{ niveaux.*$/m, '')));
+}
+
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 console.log(ko ? `\n❌ LÉGENDES : ${ko} contrôle(s) en échec` : '\n✅ LÉGENDES : TOUS LES CONTRÔLES PASSENT');
 process.exit(ko ? 1 : 0);
