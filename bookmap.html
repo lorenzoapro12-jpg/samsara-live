@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Saṃsāra — Carte du carnet</title>
+<title>Saṃsāra — Carte des ordres</title>
 <meta name="description" content="Carte de liquidité BTC/USDT : carnet publié, carnet live, exécutions, murs et gamma, chacun avec son âge.">
 <!-- La carte est une page À CÔTÉ du terminal (index.html), qu'elle ne modifie pas et dont
      elle ne charge aucun code. Elle n'interroge que Binance et GitHub Raw (contrat réseau :
@@ -148,15 +148,15 @@
     <h3>L'essentiel</h3>
     <dl>
       <dt>Couleurs = ordres d'achat ou de vente en attente</dt>
-      <dd><span id="legPaletteDeb">Bleu foncé : peu d'ordres à ce prix ; puis vert, jaune, orange ; blanc : le plus d'ordres.</span> Un ordre peut être retiré à tout moment. Hachures : rien n'a été lu là.</dd>
-      <dt>Ligne blanche = le prix</dt>
-      <dd>Jusqu'au trait vertical « maintenant ».</dd>
+      <dd><span id="legPaletteDeb">Bleu foncé : peu d'ordres à ce prix ; puis vert, jaune, orange ; blanc : le plus d'ordres.</span> Un ordre peut être retiré à tout moment. Hachures : rien n'a été lu là. <span id="legAutreDeb">Au-delà d'un fin pointillé, ou en bande unie sans pointillé : ordres lus sur une autre plateforme, avec ses propres couleurs.</span></dd>
+      <dt>Ligne à fil noir = le prix</dt>
+      <dd>Une ligne blanche avec un fil noir au milieu, qui zigzague jusqu'au trait jaune « maintenant » (nommé sous l'axe du temps). Les bandes claires et droites sont des ordres en attente, pas le prix.</dd>
       <dt>Ronds = échanges réels</dt>
       <dd>Vert : un acheteur a pris une vente en attente. Rouge : un vendeur a pris un achat en attente. Plus gros = plus de BTC.</dd>
       <dt>« Mur d’achat » sous le prix, « Mur de vente » au-dessus</dt>
       <dd>Là où le plus d'ordres attendent en ce moment. Ils peuvent être retirés avant que le prix y arrive. «&nbsp;Dans un mur…&nbsp;» : le prix y est entré (son cadre s'allume). «&nbsp;Pas de mur au-dessus&nbsp;» (ou au-dessous) : rien de nettement plus chargé de ce côté.</dd>
       <dt>La phrase du haut</dt>
-      <dd>Une photo de l'instant, pas une prévision : plus d'ordres d'un côté ne dit pas où ira le prix.</dd>
+      <dd>Une photo de l'instant, pas une prévision : plus d'ordres d'un côté ne dit pas où ira le prix. <span id="legSensDeb">«&nbsp;En hausse&nbsp;» ou «&nbsp;en baisse&nbsp;» : le prix a bougé nettement depuis un quart d'heure ; le mot change au plus une fois par minute.</span></dd>
     </dl>
     <h3>Gestes</h3>
     <p>Glisser : déplacer la carte. <span class="geste-souris">Molette ou deux doigts : zoomer ; double-clic : revenir à la vue par défaut.</span><span class="geste-doigt">Deux doigts : zoomer ; double appui : revenir à la vue par défaut.</span></p>
