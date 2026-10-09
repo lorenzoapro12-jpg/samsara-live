@@ -90,7 +90,9 @@
   //    réglage expert, invisible en débutant, ne vide pas l'écran. R.calques n'est jamais modifié.
   //  · estVu : seules les couches de VOIT_DEBUTANT sont dessinées en débutant ; l'expert les a toutes.
   const FORCE_DEBUTANT = new Set(['publiee', 'live', 'executions', 'prix']);
-  const VOIT_DEBUTANT = new Set(['guide', 'publiee', 'live', 'executions', 'prix', 'loin']);
+  // La profondeur Coinbase (« loin ») reste en Expert : ses couleurs ont leur propre échelle et ne se
+  // comparent pas à la chaleur Binance (choix de Lorenzo, 09/10/2026).
+  const VOIT_DEBUTANT = new Set(['guide', 'publiee', 'live', 'executions', 'prix']);
   const estLu = k => !!R.calques[k] || (MODE === 'debutant' && FORCE_DEBUTANT.has(k));
   const estVu = k => estLu(k) && (MODE === 'expert' || VOIT_DEBUTANT.has(k));
   const debutant = () => MODE === 'debutant';
@@ -808,7 +810,7 @@
   }
   /** Profondeur Coinbase : repeinte entière quand la vue ou le fichier change (288 colonnes au plus). */
   function peindreLoin(w, h) {
-    const g = R.calques.loin && E.loin ? E.loin : null;
+    const g = estVu('loin') && E.loin ? E.loin : null;
     if (!g) { const etait = !LOIN.vide; if (etait) LOIN.x.clearRect(0, 0, w, h); LOIN.vide = true; LOIN.cle = null; return etait; }
     const v = E.vue, cle = [w, h, E.loinN, LUTV, v.t1, v.t2, v.p1, v.p2].join('|');
     if (cle === LOIN.cle) return false;
@@ -899,7 +901,6 @@
     const deb = debutant();
     reserverIntro();
     grille();
-    if (estVu('loin') && deb) limiteCoinbase();
     if (estVu('memoire')) memoire();       // sous les murs et le gamma : leurs libellés restent lisibles
     if (estVu('profil')) profilExecutions();
     if (estVu('destin')) destin(); else DM.items = [];
@@ -946,37 +947,6 @@
       const y = Math.round(Y(p)) + 0.5; ctx.moveTo(0, y); ctx.lineTo(Z.chaleur.w, y);
     }
     ctx.stroke();
-  }
-  /** Débutant : la limite entre la chaleur de Binance et celle de Coinbase (autre plateforme, autre
-   *  échelle de couleur), en pointillé fin, sans texte : « plus clair = plus d'ordres » ne compare que
-   *  des couleurs d'un même côté de ce trait. Par colonnes de 2 px, la bande couverte par la lecture
-   *  live (sinon la colonne publiée) qui est sous elle ; gardée tant que ni les lectures ni la vue ne
-   *  changent. Le détail au toucher dit « autre plateforme ». */
-  let LIMITE = { cle: null, chemin: null };
-  function limiteCoinbase() {
-    if (LOIN.vide) return;
-    const W = Z.chaleur.w, v = E.vue, L = estLu('live') && E.live && E.live.n ? E.live : null, g = estLu('publiee') ? E.pub : null;
-    const cle = [E.liveV, E.pubN, v.t1, v.t2, v.p1, v.p2, W, Z.chaleur.h].join('|');
-    if (LIMITE.cle !== cle) {
-      const ch = new Path2D(), PAS = 2;
-      let prec = null;
-      for (let x = 0; x < W; x += PAS) {
-        const t = T(x + PAS / 2);
-        let bande = null;
-        if (L && t >= L.deb[0]) {
-          let lo = 0, hi = L.n - 1;
-          while (lo < hi) { const m = (lo + hi + 1) >> 1; if (L.deb[m] <= t) lo = m; else hi = m - 1; }
-          if (t < L.fin[lo] && L.bas[lo] >= 0) bande = [L.bas[lo] * L.dp, (L.haut[lo] + 1) * L.dp];
-        }
-        if (!bande && g) { const c = Math.floor((t - g.t0) / g.dt); if (c >= 0 && c < g.W && g.bas[c] >= 0) bande = [g.bas[c] * g.dp, (g.haut[c] + 1) * g.dp]; }
-        if (!bande) { prec = null; continue; }
-        const ys = [Y(bande[1]), Y(bande[0])];
-        ys.forEach((y, i) => { if (prec) { ch.moveTo(x, prec[i]); ch.lineTo(x, y); } else ch.moveTo(x, y); ch.lineTo(x + PAS, y); });
-        prec = ys;
-      }
-      LIMITE = { cle, chemin: ch };
-    }
-    ctx.save(); ctx.strokeStyle = C.ink2; ctx.globalAlpha = 0.55; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.stroke(LIMITE.chemin); ctx.restore();
   }
   function texte(t, x, y, coul, taille, align, gras) {
     ctx.font = (gras ? '600 ' : '') + (taille || 11) + 'px ' + POLICE;
@@ -2345,9 +2315,6 @@
   /** Mode débutant : les couleurs de la chaleur DANS L'ORDRE de la palette (PALETTES) — « plus
    *  clair » serait faux pour l'orange de la palette classique, plus sombre que le jaune mais qui
    *  dit plus d'ordres. */
-  /** Débutant : ce que sont les couleurs lues sur une autre plateforme (Coinbase, sa propre échelle) —
-   *  au-delà du fin pointillé, ou en bande unie là où Binance n'a rien publié ni lu. */
-  const AUTRE_PLATEFORME = 'Au-delà d\'un fin pointillé, ou en bande unie sans pointillé : ordres lus sur une autre plateforme, avec ses propres couleurs.';
   function couleursDebutant() {
     if (R.palette === 'cote') return 'Achats en turquoise, ventes en rouge : sombre, peu d\'ordres à ce prix ; clair, le plus d\'ordres.';
     if (R.palette === 'cividis') return 'Bleu foncé : peu d\'ordres à ce prix ; puis gris ; jaune : le plus d\'ordres.';
@@ -2365,8 +2332,7 @@
   function itemsIntro() {
     // Débutant : 3 points, ce qu'il voit — couleurs, ligne du prix (à fil noir) et ronds, les deux repères.
     if (debutant()) return [
-      ['Couleurs = ordres d\'achat ou de vente en attente.', couleursDebutant() + ' Un ordre peut être retiré à tout moment. Hachures : rien n\'a été lu là.'
-        + (estVu('loin') && E.loin && !LOIN.vide ? ' ' + AUTRE_PLATEFORME : '')],
+      ['Couleurs = ordres d\'achat ou de vente en attente.', couleursDebutant() + ' Un ordre peut être retiré à tout moment. Hachures : rien n\'a été lu là.'],
       ['Ligne à fil noir = le prix, jusqu\'au trait jaune «\u00a0maintenant\u00a0». Ronds = échanges réels.', couleurMot('Vert', '--up') + ' : un acheteur a pris une vente en attente. ' + couleurMot('Rouge', '--down') + ' : un vendeur a pris un achat en attente. Plus gros = plus de BTC.'],
       ['«\u00a0Mur d’achat\u00a0» sous le prix, «\u00a0Mur de vente\u00a0» au-dessus : là où le plus d\'ordres attendent en ce moment.', 'La phrase du haut décrit l\'instant : ce n\'est pas une prévision.'],
     ];
@@ -2822,7 +2788,7 @@
     l.push('<b>' + BM.prix(p, 0) + NB + '$</b> · ' + BM.heure(t, true));
     const tpp = (E.vue.t2 - E.vue.t1) / Z.chaleur.w, pp = (E.vue.p2 - E.vue.p1) / Z.chaleur.h;
     const ix = Math.floor(s.x), iy = Math.floor(s.y), ta = E.vue.t1 + ix * tpp;
-    // Le calque du DESSUS qui a observé ce pixel : carnet live, puis carte publiée, puis Coinbase.
+    // Le calque du DESSUS qui a observé ce pixel : carnet live, puis carte publiée.
     const lire = (g, coupe) => {
       const tb = Math.min(ta + tpp, coupe);
       if (!g || !(tb > ta)) return null;
@@ -2831,7 +2797,6 @@
       return r && r.nObs && !r.horsBande ? Object.assign(r, { ja, jb, g }) : null;
     };
     const live = estVu('live') && !LIVE.vide ? lire(E.live, LIVE.coupe) : null, pub = grillePublieeAffichee(), rp = !live && pub ? lire(pub, PUB.coupe) : null;
-    const rl = !live && !rp && estVu('loin') && E.loin && !LOIN.vide ? lire(E.loin, LOIN.coupe) : null;
     const r = live || rp;
     if (r) {
       const g = r.g, ici = 'Ici (' + BM.prix(r.pb * g.dp) + '–' + BM.prix((r.pb + 1) * g.dp) + NB + '$)', mot = r.cote === 'bid' ? 'd\'achat' : 'de vente';
@@ -2847,8 +2812,7 @@
             : (dec.sature ? 'au moins ' + BM.btc(dec.min) : 'entre ' + BM.btc(dec.min) + ' et ' + BM.btc(dec.max)) + ' BTC d\'ordres ' + mot + ' en attente';
         l.push(ici + ' : ' + qte + quand);
       }
-    } else if (rl) { const ag = agesDebutantMs(now).autre; l.push('Ici, ordres lus sur une autre plateforme (Coinbase), avec une autre échelle de couleur' + (ag !== null ? ', il y a ' + BM.age(ag) : '')); }
-    else l.push('Rien n\'a été lu ici (ce n\'est pas «' + NB + 'aucun ordre' + NB + '»)');
+    } else l.push('Rien n\'a été lu ici (ce n\'est pas «' + NB + 'aucun ordre' + NB + '»)');
     if (estVu('executions') && E.exec.seaux.size) {
       const b = bulleSous(s, t, p);
       if (b && b.achat + b.vente > 0) l.push('Échangé ici : ' + BM.btc(b.achat) + ' BTC acheté, ' + BM.btc(b.vente) + ' BTC vendu (' + BM.heure(b.ta, true) + '–' + BM.heure(b.tb, true) + ')');
@@ -2864,14 +2828,11 @@
       anciennes: estLu('publiee') && E.pub ? now - BM.instantDerniereColonne(E.pub) : null,
       ronds: estLu('executions') && E.exec.dernier ? now - E.exec.dernier : null,
       ligne: estLu('prix') && E.minutesA ? Date.now() - E.minutesA : null,
-      // La chaleur de l'autre plateforme (Coinbase, colonnes de 5 min) : dessinée, donc datée aussi.
-      autre: estVu('loin') && E.loin && !LOIN.vide && BM.instantDerniereColonne(E.loin) !== null ? now - BM.instantDerniereColonne(E.loin) : null,
     };
   }
   function agesDebutant(now) {
     const a = agesDebutantMs(now), c = [a.recentes !== null ? 'récentes ' + BM.age(a.recentes) : '', a.anciennes !== null ? 'plus anciennes ' + BM.age(a.anciennes) : ''].filter(Boolean);
-    return 'Âges : ' + [c.length ? 'couleurs ' + c.join(', ') : '', a.ronds !== null ? 'ronds ' + BM.age(a.ronds) : '', a.ligne !== null ? 'ligne du prix ' + BM.age(a.ligne) : '',
-      a.autre !== null ? 'autre plateforme ' + BM.age(a.autre) : ''].filter(Boolean).join(' · ');
+    return 'Âges : ' + [c.length ? 'couleurs ' + c.join(', ') : '', a.ronds !== null ? 'ronds ' + BM.age(a.ronds) : '', a.ligne !== null ? 'ligne du prix ' + BM.age(a.ligne) : ''].filter(Boolean).join(' · ');
   }
   /** Écrit et place la bulle de lecture.
    *  Le texte n'est réécrit que s'il a changé ; à la souris, la bulle se place sans être MESURÉE
@@ -3233,7 +3194,6 @@
     tx('btnMode', 'Mode : ' + (MODE === 'expert' ? 'expert (chiffres)' : 'débutant (phrases)'));
     tx('legPaletteDeb', couleursDebutant());
     tx('legSensDeb', '«' + NB + 'En hausse' + NB + '» ou «' + NB + 'en baisse' + NB + '» : le prix a bougé de plus de ' + n2(GD.tendancePct) + ' % depuis ' + BM.age(GD.tendanceMs) + ' ; «' + NB + 'stable' + NB + '» revient sous ' + n2(GD.tendanceRetourPct) + ' %, et le mot change au plus une fois par ' + (GD.tendanceGardeMs === 60e3 ? 'minute' : BM.age(GD.tendanceGardeMs)) + '.');
-    { const a = document.getElementById('legAutreDeb'); if (a) a.hidden = !(estVu('loin') && E.loin && !LOIN.vide); }
     tx('legGuide', 'Il relit ce que la carte montre et l\'écrit en mots ; il ne mesure rien de neuf, et ne dit ni pourquoi ni ce qui va suivre. Mesuré : lu dans les données ; convention : un seuil choisi par ce code ; modèle : les niveaux d\'options. '
       + 'Heures du guide en UTC' + (fus !== 'UTC' ? ' (l\'axe de la carte est à l\'heure de l\'appareil, ' + fus + ')' : '') + '. Le guide ne décrit le présent qu\'avec un carnet live de moins de ' + BM.VALIDITE.cadences + ' cadences ; sur une vue passée, il ne dessine que les marques du journal.');
     tx('legGuideMurs', 'Les ' + GD.parCote + ' tranches de ' + GD.trancheUsd + NB + '$ les plus chargées de chaque côté du prix, dans le dernier carnet live (mesuré), à ±' + n2(GD.procheMaxPct) + ' % au plus et dans la bande lue. '
@@ -3279,7 +3239,7 @@
     // 15 min (murs et niveaux d'options) ne nourrit que des couches Expert.
     // Les noms appris (A13) : « historique de la carte », « échanges », « ordres en attente », « prix » —
     // deux sources du même nom ne font qu'une ligne.
-    const noms = deb ? { carte: 'historique de la carte', direct: 'historique de la carte', profondeur: 'autre plateforme (Coinbase)', historique: 'échanges', bougies: 'prix', executions: 'échanges', carnet: 'ordres en attente', horloge: 'heure de Binance' }
+    const noms = deb ? { carte: 'historique de la carte', direct: 'historique de la carte', historique: 'échanges', bougies: 'prix', executions: 'échanges', carnet: 'ordres en attente', horloge: 'heure de Binance' }
       : { carte: 'carte publiée', fichier: 'fichier 15 min', bougies: 'bougies', executions: 'exécutions', carnet: 'carnet live', horloge: 'horloge Binance' };
     const dits = new Set();
     for (const [k, v] of Object.entries(E.erreurs)) {
