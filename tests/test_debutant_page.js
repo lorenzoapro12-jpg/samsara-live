@@ -509,6 +509,32 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       await o.ctx.close();
     }
 
+    // ── Une figure qui se dessine encore : nommée « possible », en tirets, sa bulle dit ce qui la validerait ──
+    titre('15 min · double creux possible (forme forcée, pas encore confirmée)');
+    {
+      const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
+      const r = await o.page.evaluate(() => {
+        const n = candles.length, G = PARAM.guide, C = i => candles[i];
+        const ia = n - 34, ic = n - 24, ib = n - 14, pa = Math.min(C(ia).low, C(ib).low), pc = C(ic).high;
+        const f = { type: 'double_creux', sens: 1, a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, objectif: pc + (pc - pa),
+          t: ib + G.pivot, debut: ia, fin: null, jFin: null, demi: false };
+        const f0 = Guide.formesAffichees, b0 = GUIDE_FORMES.val && GUIDE_FORMES.val.bilan;
+        Guide.formesAffichees = () => [f];
+        if (GUIDE_FORMES.val) GUIDE_FORMES.val.bilan = Object.assign({}, b0, { double_creux: { formes: 4, confirmes: 2, atteints: 1, invalides: 1, expires: 0, temoin: { departs: 40, atteints: 12 } } });
+        drawChart();
+        const items = debEtat.items.map(i => ({ role: i.role, texte: i.texte }));
+        const forme = guideEtat.cibles.find(c => c.prio === 2 && c.rects.length);
+        Guide.formesAffichees = f0; if (GUIDE_FORMES.val) GUIDE_FORMES.val.bilan = b0; drawChart();
+        return { items, forme: forme ? { titre: forme.titre, texte: forme.texte.join(' ') } : null };
+      });
+      check('« Double creux possible » posé, au plus 5 textes', r.items.some(i => i.role === 'forme' && i.texte === 'Double creux possible') && r.items.length <= 5, r.items);
+      check('sa bulle : ce qu’on voit, ce qui la validerait (« serait validée si le prix finit 2 quarts d’heure de suite au-dessus de »), le bilan mesuré, aucun prix visé, aucun mot banni',
+        r.forme && /^Double creux possible : le prix a rebondi deux fois vers /.test(r.forme.texte) && /serait validée si le prix finit 2 quarts d’heure de suite au-dessus de /.test(r.forme.texte)
+        && /Mesuré sur/.test(r.forme.texte) && !/vise/.test(r.forme.texte) && !bannisBulle(r.forme.texte).length, r.forme);
+      check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
     // ── L'astuce : une fois ──
     titre('Astuce : une fois, jamais sur un texte');
     {

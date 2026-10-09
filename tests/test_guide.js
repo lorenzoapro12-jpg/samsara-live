@@ -571,11 +571,32 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     check('zone de retour : « Zone de retour · 82 681 $ » (26), « Retour 82 681 $ » (18), jamais « Demi-tour »', Z[0] === 'Zone de retour · 82 681 $' && Z[1] === 'Retour 82 681 $' && !JSON.stringify(G.NOMS_DEBUTANT).includes('Demi-tour')
       && t(G.libelleDebutant(Object.assign({}, z, { raisons: [Rd('sr', 749.15)] }), { max: DEB.niveau, unite: 'SOL' })) === 'Zone retour · 749,15 SOL', Z);
   }
-  // 4. La forme : seulement confirmée ou invalidée, ≤ 24 caractères.
-  const fo = [['double_sommet', { phase: 'confirme', sens: -1 }], ['double_creux', { fin: 'invalide', sens: 1 }], ['triangle', { phase: 'confirme', sens: 1 }], ['range', { phase: 'confirme', sens: -1 }], ['double_sommet', {}], ['triangle', { demi: true, demiSens: 1 }]]
+  // 4. La forme : confirmée, invalidée, et aussi pendant qu'elle se dessine (« possible », « Prix
+  //    dans un … », « à confirmer ») ; allée au bout ou oubliée : rien. ≤ 26 caractères.
+  const fo = [['double_sommet', { phase: 'confirme', sens: -1 }], ['double_creux', { fin: 'invalide', sens: 1 }], ['triangle', { phase: 'confirme', sens: 1 }], ['range', { phase: 'confirme', sens: -1 }],
+    ['double_sommet', {}], ['triangle', { demi: true, demiSens: 1 }], ['range', {}], ['double_creux', { demi: true }], ['double_sommet', { fin: 'atteint' }], ['triangle', { fin: 'expire_avant' }]]
     .map(([type, e]) => [type, t(G.libelleFormeDebutant(Object.assign({ type, sens: 1 }, e)) || '') || null]);
-  check('forme : « Double sommet confirmé », « Double creux invalidé », « Sortie du triangle ↑ », « Sortie du rectangle ↓ » ; en formation ou à confirmer : rien', fo[0][1] === 'Double sommet confirmé' && fo[1][1] === 'Double creux invalidé' && fo[2][1] === 'Sortie du triangle ↑'
-    && fo[3][1] === 'Sortie du rectangle ↓' && fo[4][1] === null && fo[5][1] === null && fo.every(([, l]) => !l || l.length <= DEB.forme), fo);
+  check('forme : « Double sommet confirmé », « Double creux invalidé », « Sortie du triangle ↑ », « Sortie du rectangle ↓ » ; en train de se dessiner : « Double sommet possible », « Sortie ↑ à confirmer », « Prix dans un rectangle », « Double creux à confirmer » ; allée au bout ou oubliée : rien',
+    fo[0][1] === 'Double sommet confirmé' && fo[1][1] === 'Double creux invalidé' && fo[2][1] === 'Sortie du triangle ↑' && fo[3][1] === 'Sortie du rectangle ↓'
+    && fo[4][1] === 'Double sommet possible' && fo[5][1] === 'Sortie ↑ à confirmer' && fo[6][1] === 'Prix dans un rectangle' && fo[7][1] === 'Double creux à confirmer'
+    && fo[8][1] === null && fo[9][1] === null && fo.every(([, l]) => !l || l.length <= DEB.forme), fo);
+  // 4 bis. La bulle d'une figure qui se dessine : ce qu'on voit, ce qui la validerait (2 périodes
+  // finies de suite), jamais un prix visé ; mots du Débutant seulement.
+  {
+    const ds = { type: 'double_sommet', sens: -1, a: { i: 10, p: 86400 }, b: { i: 30, p: 86350 }, cou: { i: 20, p: 85700 }, niveau: 85700, objectif: 85000 };
+    const dc = { type: 'double_creux', sens: 1, a: { i: 10, p: 81900 }, b: { i: 30, p: 81950 }, cou: { i: 20, p: 82600 }, niveau: 82600, objectif: 83300, demi: true };
+    const rg = { type: 'range', sens: 1, haut: 83500, bas: 82900, debut: 5 };
+    const tr = { type: 'triangle', sens: 1, demi: true, demiSens: -1, debut: 5 };
+    const b = { type: 'double_sommet', formes: 6, confirmes: 3, atteints: 1, invalides: 1, expires: 0, temoin: { departs: 300, atteints: 90 } };
+    const ec = [[ds, '15m'], [dc, '1h'], [rg, '15m'], [tr, '4h']].map(([f, itv]) => t(G.texteFormeDebutant(f, b, { duree: 5 * 86400, itv }, P, '$').join(' ')));
+    check('en train de se dessiner : « Double sommet possible : le prix a buté deux fois vers 86 400 $. La figure serait validée si le prix finit 2 quarts d’heure de suite sous 85 700 $ (le creux entre les deux). »',
+      /^Double sommet possible : le prix a buté deux fois vers 86 400 \$\. La figure serait validée si le prix finit 2 quarts d’heure de suite sous 85 700 \$ \(le creux entre les deux\)\./.test(ec[0]), ec[0]);
+    check('… à confirmer : « S’il finit encore une heure au-dessus de ce prix, la figure serait validée » ; rectangle : « entre 82 900 et 83 500 $ » ; sortie : « s’il revient dedans, elle ne compte pas »',
+      /^Double creux à confirmer : .*S’il finit encore une heure au-dessus de ce prix, la figure serait validée\./.test(ec[1]) && /Prix dans un rectangle : il fait des allers-retours entre 82 900 et 83 500 \$/.test(ec[2])
+      && /^Le prix vient de sortir du triangle par le bas\..*s’il revient dedans, elle ne compte pas\./.test(ec[3]), ec);
+    check('… toujours avec le bilan mesuré, jamais un prix visé, aucun mot banni, aucun conseil, « pas une prévision ni un conseil »',
+      ec.every(x => /Mesuré sur/.test(x) && !/vise/.test(x) && !G.motsBannis(x).length && !CONSEIL.test(x.replace('pas une prévision ni un conseil', '')) && /pas une prévision ni un conseil/.test(x)), ec.map(x => [x, G.motsBannis(x)]));
+  }
   // 5. La suite, en une phrase : « Si le prix finit un quart d'heure au-dessus de … ».
   const s2 = G.suite({ dessus: [N(Rd('hier_haut', 86398)), N(Rd('mur_vente', 86700, { lu: Date.parse('2026-10-08T22:51:00Z') }))], dessous: [bas] }, 86012.5);
   const sh = t(G.texteSuiteDebutant(s2.haut, '$', '15m', 1, Date.parse('2026-10-08T22:52:00Z'))), sb = t(G.texteSuiteDebutant(s2.bas, '$', '4h', -1)), sv = t(G.texteSuiteDebutant(null, '$', '15m', 1));

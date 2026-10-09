@@ -423,7 +423,7 @@ const PARAM = {
     // scénario 1, forme, ligne des scénarios), chacun sur une ligne d'au plus N caractères ;
     // « étroit » : un tracé de moins de `etroit` px (téléphone).
     debutant: { items: 5, etroit: 520, phrase: 90, phraseEtroit: 48, niveau: 26, niveauEtroit: 18,
-                scenario: 32, forme: 24, boite: 48, boiteEtroit: 40,
+                scenario: 32, forme: 26, boite: 48, boiteEtroit: 40,
                 ecartAtr: 0.5,          // deux repères à l'écran : au moins 0,5 × ATR l'un de l'autre
                 marge: 0.07 },          // échelle : 7 % de l'amplitude au-dessus et au-dessous (place des libellés)
   },
@@ -4433,6 +4433,22 @@ function guideChemins(E, top, bas, surBougies) {
  *  Montrée quand son DERNIER pivot est dans la vue (formesAffichees) : un début sorti à gauche
  *  est coupé au bord du tracé. Une forme finie s'arrête à son issue (son objectif ne s'étend pas
  *  dans la marge de futur) ; libellés à gauche de la marge (les chemins y sont). */
+/** L'aplat léger d'une forme, sous ses traits : la surface entre ses deux sommets (ou creux) et
+ *  sa ligne de cou, le rectangle, le triangle jusqu'à sa pointe. Dans le clip du tracé. */
+function guideFormeAplat(E, f, iFin, couleur) {
+  const X = E.xDe, Y = E.yDe;
+  ctx.beginPath();
+  if (f.type === 'double_sommet' || f.type === 'double_creux') {
+    ctx.moveTo(X(f.a.i), Y(f.a.p)); ctx.lineTo(X(f.cou.i), Y(f.cou.p)); ctx.lineTo(X(f.b.i), Y(f.b.p));
+    ctx.lineTo(X(f.b.i), Y(f.niveau)); ctx.lineTo(X(f.a.i), Y(f.niveau));
+  } else if (f.type === 'range') {
+    ctx.rect(X(f.debut), Y(f.haut), X(iFin) - X(f.debut), Y(f.bas) - Y(f.haut));
+  } else {
+    const iB = Math.min(iFin, Math.floor(f.apex)), l = (L, i) => Y(L.a + L.b * i);
+    ctx.moveTo(X(f.debut), l(f.hautL, f.debut)); ctx.lineTo(X(iB), l(f.hautL, iB)); ctx.lineTo(X(iB), l(f.basL, iB)); ctx.lineTo(X(f.debut), l(f.basL, f.debut));
+  }
+  ctx.closePath(); ctx.fillStyle = couleur; ctx.fill();
+}
 function guideForme(E, f, encre, surBougies) {
   const { g, exp, unite, yDe, xDe, xFin, xMax } = E, G = PARAM.guide;
   const iFin = f.fin ? f.jFin : candles.length - 2;
@@ -4444,6 +4460,7 @@ function guideForme(E, f, encre, surBougies) {
   const top = g.pad.top, bas = g.pad.top + g.ph, xDroite = E.marge ? xFin - 2 : xMax - 2;
   ctx.save();
   ctx.beginPath(); ctx.rect(g.pad.left, g.pad.top, xMax - g.pad.left, g.ph); ctx.clip();
+  guideFormeAplat(E, f, iFin, avecAlpha(COLORS.ink1, 0.06));
   ctx.strokeStyle = encre; ctx.lineWidth = 1.6;
   if (dbl) {
     ctx.beginPath(); seg(X(f.a.i), yDe(f.a.p), X(f.cou.i), yDe(f.cou.p)); seg(X(f.cou.i), yDe(f.cou.p), X(f.b.i), yDe(f.b.p)); ctx.stroke();
@@ -4796,11 +4813,13 @@ function guideDebutant(E) {
     debItem('niveau', t, { x: xp, y: pose.y, w, h: H });
   }
 }
-/** Débutant : une forme seulement, et seulement confirmée ou invalidée (libelleFormeDebutant) ;
- *  sa figure en encre pâle, sans objectif ni ligne d'objectif ; son nom près du dernier pivot. */
+/** Débutant : une forme seulement (libelleFormeDebutant) : confirmée d'abord, puis à confirmer,
+ *  puis en train de se dessiner, puis invalidée ; sa figure sur un aplat léger (traits tiretés tant
+ *  qu'elle n'est pas confirmée), sans objectif ni ligne d'objectif ; son nom près du dernier pivot. */
+const DEB_RANG_FORME = { confirme: 0, demi: 1, formation: 2, dedans: 2, invalide: 3 };
 function guideFormesDebutant(E) {
-  const P = PARAM.guide.debutant;
-  for (const f of E.formes) {
+  const P = PARAM.guide.debutant, rang = f => { const r = DEB_RANG_FORME[Guide.etatForme(f).cle]; return r === undefined ? 9 : r; };
+  for (const f of E.formes.slice().sort((a, b) => rang(a) - rang(b))) {
     const t = Guide.libelleFormeDebutant(f);
     if (t && t.length <= P.forme && guideFormeDebutant(E, f, t)) return;
   }
@@ -4812,31 +4831,39 @@ function guideFormeDebutant(E, f, t) {
   // Toute la figure dans la vue (ses deux sommets ou creux, sa ligne ; le début d'un rectangle ou
   // d'un triangle) : un nom posé à côté d'un trait isolé se lirait comme le nom d'autre chose.
   if ((f.type === 'double_sommet' || f.type === 'double_creux' ? f.a.i : f.debut) < g.vs) return false;
-  const X = xDe, dbl = f.type === 'double_sommet' || f.type === 'double_creux', encre = avecAlpha(COLORS.ink1, 0.5);
-  const ys = [], segs = [];
+  const X = xDe, dbl = f.type === 'double_sommet' || f.type === 'double_creux', cle = Guide.etatForme(f).cle;
+  // Confirmée : traits pleins et nets ; en train de se dessiner : tiretés ; invalidée : pâle.
+  const invalide = cle === 'invalide', enCours = !invalide && cle !== 'confirme';
+  const encre = avecAlpha(COLORS.ink1, invalide ? 0.45 : 0.75), tirets = enCours ? [5, 3] : [];
+  // La place du nom d'abord : une figure dont le nom ne trouve pas de place n'est pas dessinée
+  // (un tracé sans nom se lirait comme celui d'autre chose).
+  const iB = f.type === 'triangle' ? Math.min(iFin, Math.floor(f.apex)) : iFin;
+  const ys = dbl ? [yDe(f.a.p), yDe(f.b.p), yDe(f.niveau)] : f.type === 'range' ? [yDe(f.haut), yDe(f.bas)]
+    : [f.hautL, f.basL].flatMap(l => [yDe(l.a + l.b * f.debut), yDe(l.a + l.b * iB)]);
+  const segs = [];
   const seg = (xa, ya, xb, yb) => { segs.push([xa, ya, xb, yb]); ctx.moveTo(xa, ya); ctx.lineTo(xb, yb); };
-  ctx.save();
-  ctx.beginPath(); ctx.rect(g.pad.left, top, xMax - g.pad.left, g.ph); ctx.clip();
-  ctx.strokeStyle = encre; ctx.lineWidth = 1.4;
-  if (dbl) {
-    ctx.beginPath(); seg(X(f.a.i), yDe(f.a.p), X(f.cou.i), yDe(f.cou.p)); seg(X(f.cou.i), yDe(f.cou.p), X(f.b.i), yDe(f.b.p)); ctx.stroke();
-    for (const q of [f.a, f.b]) { ctx.beginPath(); ctx.arc(X(q.i), yDe(q.p), 2.5, 0, Math.PI * 2); ctx.fillStyle = encre; ctx.fill(); }
-    ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
-    ctx.beginPath(); seg(X(f.a.i), yDe(f.niveau), X(iFin), yDe(f.niveau)); ctx.stroke();
-    ys.push(yDe(f.a.p), yDe(f.b.p), yDe(f.niveau));
-  } else if (f.type === 'range') {
-    ctx.setLineDash([6, 3]);
-    const xa = X(f.debut), xb = X(iFin), yh = yDe(f.haut), yb = yDe(f.bas);
-    ctx.beginPath(); seg(xa, yh, xb, yh); seg(xb, yh, xb, yb); seg(xb, yb, xa, yb); seg(xa, yb, xa, yh); ctx.stroke();
-    ys.push(yh, yb);
-  } else {
-    const iB = Math.min(iFin, Math.floor(f.apex));
-    ctx.beginPath();
-    for (const l of [f.hautL, f.basL]) { seg(X(f.debut), yDe(l.a + l.b * f.debut), X(iB), yDe(l.a + l.b * iB)); ys.push(yDe(l.a + l.b * f.debut), yDe(l.a + l.b * iB)); }
-    ctx.stroke();
-  }
-  ctx.setLineDash([]);
-  ctx.restore();
+  const dessiner = () => {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(g.pad.left, top, xMax - g.pad.left, g.ph); ctx.clip();
+    guideFormeAplat(E, f, iFin, avecAlpha(COLORS.ink1, invalide ? 0.04 : 0.09));
+    ctx.strokeStyle = encre; ctx.lineWidth = 1.8; ctx.setLineDash(tirets);
+    if (dbl) {
+      ctx.beginPath(); seg(X(f.a.i), yDe(f.a.p), X(f.cou.i), yDe(f.cou.p)); seg(X(f.cou.i), yDe(f.cou.p), X(f.b.i), yDe(f.b.p)); ctx.stroke();
+      for (const q of [f.a, f.b]) { ctx.beginPath(); ctx.arc(X(q.i), yDe(q.p), 3.5, 0, Math.PI * 2); ctx.fillStyle = encre; ctx.fill(); }
+      ctx.setLineDash([3, 3]); ctx.lineWidth = 1.2;
+      ctx.beginPath(); seg(X(f.a.i), yDe(f.niveau), X(iFin), yDe(f.niveau)); ctx.stroke();
+    } else if (f.type === 'range') {
+      ctx.setLineDash(enCours ? [6, 3] : []);
+      const xa = X(f.debut), xb = X(iFin), yh = yDe(f.haut), yb = yDe(f.bas);
+      ctx.beginPath(); seg(xa, yh, xb, yh); seg(xb, yh, xb, yb); seg(xb, yb, xa, yb); seg(xa, yb, xa, yh); ctx.stroke();
+    } else {
+      ctx.beginPath();
+      for (const l of [f.hautL, f.basL]) seg(X(f.debut), yDe(l.a + l.b * f.debut), X(iB), yDe(l.a + l.b * iB));
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+  };
   ctx.font = chartFont(10, 600);
   const xDroite = E.marge ? xFin - 2 : xMax - 2, w = ctx.measureText(t).width + 14;
   const xPivot = X(f.t - G.pivot), x0 = Math.max(g.pad.left + 2, Math.min(xPivot - w / 2, xDroite - w));
@@ -4849,9 +4876,10 @@ function guideFormeDebutant(E, f, t) {
   let pose = null;
   for (const [ev, gl] of [[r => dur(r) || surBougies(r), 2], [dur, 2]]) if ((pose = guidePlacer(E.rects, x0, w, H, essais, top, bas, essais[0] < (top + bas) / 2 ? 1 : -1, 0, gl, ev))) break;
   const b = GUIDE_FORMES.val.bilan[f.type];
-  const ctxB = { duree: candles[candles.length - 2].time - candles[0].time };
-  E.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs, prio: 2, titre: t, texte: Guide.texteFormeDebutant(f, b, ctxB, G, unite) });
+  const ctxB = { duree: candles[candles.length - 2].time - candles[0].time, itv: chartInterval };
   if (!pose) return false;
+  dessiner();
+  E.cibles.push({ rects: [guideZone(pose)], segs, prio: 2, titre: t, texte: Guide.texteFormeDebutant(f, b, ctxB, G, unite) });
   etiquettesAFaire.push(() => { ctx.font = chartFont(10, 600); guidePastilleDebutant(ctx, pose.x, pose.y, w, H, t, encre, COLORS.ink1); });
   debItem('forme', t, { x: pose.x, y: pose.y, w, h: H });
   return true;
