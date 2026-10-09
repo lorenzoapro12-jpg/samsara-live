@@ -263,8 +263,15 @@ const d = 0.4;
   // (Sortie jugée hors de la bande ± bandeAtr × ATR : la chute franchit la ligne de cou nettement.)
   const base = [...lin(100, 100, 20), ...lin(100, 110, 10), ...lin(110, 104, 8), ...lin(104, 110.1, 8), ...lin(110.1, 98, k), 97.5, 97];
   const s = serie(base, d), r = G.detecter({ h: s.H, l: s.L, c: s.C, atr: atrDe(s.H, s.L, s.C, P.atrPeriode), n: s.C.length }, P);
-  check('ligne de cou confirmée avant que la forme soit repérable : non comptée (aucun « atteint » connu d’avance)', !r.formes.some(f => f.type === 'double_sommet' && f.jConf !== null && f.jConf <= f.t)
-    && r.bilan.double_sommet.confirmes === 0, r.formes.filter(f => f.type === 'double_sommet').map(f => ({ t: f.t, jConf: f.jConf, fin: f.fin })));
+  // (Changé exprès : l'ébauche de ce double sommet — son 2e sommet en attente — était à l'écran quand
+  // la ligne de cou a cédé ; elle a suivi la même règle de sortie, et la figure née de son point
+  // garde ce qui a été vu en direct. Repérable = à la naissance de l'ébauche, pas après coup.)
+  const ds = r.formes.filter(f => f.type === 'double_sommet');
+  check('ligne de cou confirmée pendant que l’ébauche était à l’écran : comptée, jamais confirmée avant l’ébauche (aucun « atteint » connu d’avance)', ds.every(f => f.jConf === null || f.jConf > (f.depuisEbauche ? f.t0Ebauche : f.t))
+    && ds.filter(f => f.jConf !== null).every(f => f.depuisEbauche && r.ebauches.liste.some(e => e.devenue === f)), ds.map(f => ({ t: f.t, jConf: f.jConf, fin: f.fin, t0: f.t0Ebauche })));
+  // Sans ébauche à l'écran (aucune bougie close à droite du 2e sommet avant la chute) : non comptée.
+  const r0 = G.detecter({ h: s.H, l: s.L, c: s.C, atr: atrDe(s.H, s.L, s.C, P.atrPeriode), n: s.C.length }, Object.assign({}, P, { ebaucheDroiteMin: 99 }));
+  check('… sans ébauche vue avant : la forme n’était repérable qu’après coup — ni montrée, ni comptée', !r0.formes.some(f => f.type === 'double_sommet' && f.jConf !== null && f.jConf <= f.t) && r0.bilan.double_sommet.confirmes === 0);
 }
 {
   // Triple sommet : (a, b) puis (b, c) — le même mouvement, un seul cas dans le bilan.
@@ -319,7 +326,7 @@ const d = 0.4;
   const aff = G.formesAffichees(tout, P, vue[0], vue[1]);
   check('formes montrées : leur DERNIER pivot est dans la vue (le début peut en sortir à gauche), aucune candidate tombée avant confirmation, aucun recouvrement', aff.every(f => f.t - P.pivot >= vue[0] && f.debut < vue[1] && f.fin !== 'invalide_avant')
     && aff.every((f, k) => aff.every((g, m) => m === k || f.debut > (g.fin ? g.jFin : tout.n - 1) || g.debut > (f.fin ? f.jFin : tout.n - 1))), aff.map(f => [f.type, f.debut, f.fin]));
-  check('aucune forme comptée n’est confirmée avant d’être repérable (jConf > t)', tout.formes.every(f => f.jConf === null || f.jConf > f.t));
+  check('aucune forme comptée n’est confirmée avant d’être repérable (jConf > t, ou > naissance de son ébauche)', tout.formes.every(f => f.jConf === null || f.jConf > (f.depuisEbauche ? f.t0Ebauche : f.t)));
   check('repère sans forme calculé pour chaque type confirmé (mêmes distances, même sens)', G.TYPES.every(k => !b[k].confirmes || b[k].temoin.departs > 0), G.TYPES.map(k => [k, b[k].confirmes, b[k].temoin]));
   // (Plan figures §9.3 : un type à deux droites ne dit plus « confirmés » mais ses sorties ↑ / ↓ ;
   // le contrôle des mêmes comptes porte sur un type à extrêmes présent dans la fixture.)
@@ -585,10 +592,11 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
   const fo = [['double_sommet', { phase: 'confirme', sens: -1 }], ['double_creux', { fin: 'invalide', sens: 1 }], ['triangle_symetrique', { phase: 'confirme', sens: 1 }], ['range', { phase: 'confirme', sens: -1 }],
     ['double_sommet', {}], ['triangle_symetrique', { demi: true, demiSens: 1 }], ['range', {}], ['double_creux', { demi: true }], ['double_sommet', { fin: 'atteint' }], ['triangle_symetrique', { fin: 'expire_avant' }]]
     .map(([type, e]) => [type, t(G.libelleFormeDebutant(Object.assign({ type, sens: 1 }, e)) || '') || null]);
-  check('forme : « Double sommet confirmé », « ✗ Double creux invalidé », « Sortie du triangle ↑ », « Sortie du rectangle ↓ » ; en train de se dessiner : « Double sommet possible », « Sortie ↑ à confirmer », « Prix dans un rectangle », « Double creux à confirmer » ; issues : « Cible théorique atteinte », « Triangle sans suite »',
-    fo[0][1] === 'Double sommet confirmé' && fo[1][1] === '✗ Double creux invalidé' && fo[2][1] === 'Sortie du triangle ↑' && fo[3][1] === 'Sortie du rectangle ↓'
-    && fo[4][1] === 'Double sommet possible' && fo[5][1] === 'Sortie ↑ à confirmer' && fo[6][1] === 'Prix dans un rectangle' && fo[7][1] === 'Double creux à confirmer'
-    && fo[8][1] === 'Cible théorique atteinte' && fo[9][1] === 'Triangle sans suite' && fo.every(([, l]) => !l || l.length <= DEB.forme), fo);
+  // (Changé exprès : le côté d'une sortie se dit en mots, jamais par une flèche seule ; le nom reste.)
+  check('forme : « Double sommet confirmé », « ✗ Double creux invalidé », « Triangle : sortie en haut », « Rectangle : sortie en bas » ; en train de se dessiner : « Double sommet possible », « Triangle : sort en haut ? », « Prix dans un rectangle », « Double creux à confirmer » ; issues : « Cible atteinte » (nom trop long), « Triangle sans suite »',
+    fo[0][1] === 'Double sommet confirmé' && fo[1][1] === '✗ Double creux invalidé' && fo[2][1] === 'Triangle : sortie en haut' && fo[3][1] === 'Rectangle : sortie en bas'
+    && fo[4][1] === 'Double sommet possible' && fo[5][1] === 'Triangle : sort en haut ?' && fo[6][1] === 'Prix dans un rectangle' && fo[7][1] === 'Double creux à confirmer'
+    && fo[8][1] === 'Cible atteinte' && fo[9][1] === 'Triangle sans suite' && fo.every(([, l]) => !l || l.length <= DEB.forme) && !fo.some(([, l]) => /[↑↓]/.test(l || '')), fo);
   // 4 bis. La bulle d'une figure qui se dessine : ce qu'on voit, ce qui la validerait (2 périodes
   // finies de suite), ce qui l'annulerait, sa cible conditionnelle (« cible théorique … non
   // garantie »), toujours avec le bilan mesuré ; mots du Débutant seulement. (Plan figures §9.3 :

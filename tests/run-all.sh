@@ -157,6 +157,9 @@ node test_debutant_page.js || ko=1
 etape "9b⁗. Figures dans Chromium : rejeu ébauche → figure → confirmée → invalidée, bougie en cours (ligne passée, percé en mèche) sans redessin, effacement, bulles à 1440 et 390, rejeu ralenti 4× (non exécuté sans Playwright)"
 node test_figures_page.js || ko=1
 
+etape "9b⁗'. Suivi des figures clôture après clôture : naissance via l'ébauche, pas de doublon, entrée en V, abandon sur la mèche, invalidation en 2 clôtures, dates, ✗ seulement pour ce qui a été dessiné, reprise du rejeu au retour sur un intervalle (page non exécutée sans Playwright)"
+node test_figures_suivi.js || ko=1
+
 etape "9c. Sobriété dans Chromium : éclair, horloge, onde, calque, verre, chargement, chaleur (non exécuté sans Playwright)"
 node test_sobriete.js || ko=1
 etape "9d. Thème Gare dans Chromium : palettes à 1ch, provenance lue dans CADENCES, remarque d'âge, chutes à l'événement, démontage (non exécuté sans Playwright)"

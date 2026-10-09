@@ -500,15 +500,17 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         // invalidation, clôture de confirmation — car la bulle lit ses niveaux dans niveauxFigure.)
         const f = { type: 'double_sommet', famille: 'extremes', sens: -1, phase: 'confirme', a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, extreme: pa, hauteur: pa - pc, objectif: pc - (pa - pc),
           invalidation: pa, t: ib + G.pivot, debut: ia, depart: ib + 1, jConf: ib + G.pivot + 2, fin: null, jFin: null, journal: [] };
-        const f0 = Guide.formesAffichees, b0 = GUIDE_FORMES.val && GUIDE_FORMES.val.bilan;
-        Guide.formesAffichees = () => [f];
+        // (Revue des figures : le Débutant lit sa liste dans Guide.formesDebutant — la forme forcée y
+        // passe aussi.)
+        const f0 = Guide.formesAffichees, fd0 = Guide.formesDebutant, b0 = GUIDE_FORMES.val && GUIDE_FORMES.val.bilan;
+        Guide.formesAffichees = () => [f]; Guide.formesDebutant = () => [f];
         if (GUIDE_FORMES.val) GUIDE_FORMES.val.bilan = Object.assign({}, b0, { double_sommet: { formes: 3, confirmes: 1, atteints: 1, invalides: 0, expires: 0, temoin: { departs: 40, atteints: 12 } } });
         drawChart();
         const items = debEtat.items.map(i => ({ role: i.role, texte: i.texte, rect: i.rect }));
         const forme = guideEtat.cibles.find(c => c.prio === 2 && c.rects.length);
         const B = scenEtat && scenEtat.boite, un = scenEtat && scenEtat.cibleUn;
         const out = { base: guideEtat.debForme ? guideEtat.debForme.t : null, possibles: Guide.libellesPossiblesDebutant(f), items, forme: forme ? { titre: forme.titre, texte: forme.texte.join(' '), rect: forme.rects[0] } : null, cede: !!(B && B.cede), un: un ? un.texte.join(' ') : '' };
-        window.__retablir = () => { Guide.formesAffichees = f0; if (GUIDE_FORMES.val) GUIDE_FORMES.val.bilan = b0; drawChart(); };
+        window.__retablir = () => { Guide.formesAffichees = f0; Guide.formesDebutant = fd0; if (GUIDE_FORMES.val) GUIDE_FORMES.val.bilan = b0; drawChart(); };
         return out;
       });
       const roles = r.items.map(i => i.role);
@@ -536,14 +538,16 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         const ia = n - 34, ic = n - 24, ib = n - 14, pa = Math.min(C(ia).low, C(ib).low), pc = C(ic).high;
         const f = { type: 'double_creux', famille: 'extremes', sens: 1, a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, extreme: pa, hauteur: pc - pa, objectif: pc + (pc - pa),
           invalidation: pa, t: ib + G.pivot, debut: ia, depart: ib + 1, phase: 'formation', fin: null, jFin: null, demi: false, journal: [] };
-        const f0 = Guide.formesAffichees, b0 = GUIDE_FORMES.val && GUIDE_FORMES.val.bilan;
-        Guide.formesAffichees = () => [f];
+        // (Revue des figures : le Débutant lit sa liste dans Guide.formesDebutant — la forme forcée y
+        // passe aussi.)
+        const f0 = Guide.formesAffichees, fd0 = Guide.formesDebutant, b0 = GUIDE_FORMES.val && GUIDE_FORMES.val.bilan;
+        Guide.formesAffichees = () => [f]; Guide.formesDebutant = () => [f];
         if (GUIDE_FORMES.val) GUIDE_FORMES.val.bilan = Object.assign({}, b0, { double_creux: { formes: 4, confirmes: 2, atteints: 1, invalides: 1, expires: 0, temoin: { departs: 40, atteints: 12 } } });
         drawChart();
         const items = debEtat.items.map(i => ({ role: i.role, texte: i.texte }));
         const forme = guideEtat.cibles.find(c => c.prio === 2 && c.rects.length);
         const base = guideEtat.debForme ? guideEtat.debForme.t : null, possibles = Guide.libellesPossiblesDebutant(f);
-        Guide.formesAffichees = f0; if (GUIDE_FORMES.val) GUIDE_FORMES.val.bilan = b0; drawChart();
+        Guide.formesAffichees = f0; Guide.formesDebutant = fd0; if (GUIDE_FORMES.val) GUIDE_FORMES.val.bilan = b0; drawChart();
         return { base, possibles, items, forme: forme ? { titre: forme.titre, texte: forme.texte.join(' ') } : null };
       });
       // (Amendement C1 : au prix live, le libellé peut dire « Ligne passée, à confirmer »…)

@@ -53,6 +53,7 @@ const Guide = (function () {
   /** Durée en secondes → « 31 j » / « 18 h » / « 45 min ». */
   function duree(s) {
     if (!fini(s) || s < 0) return '—';
+    if (s >= 365 * 86400) return nombre(Math.round(s / 86400), 0) + ' j (' + nombre(s / (365.25 * 86400), 1) + ' ans)';
     if (s >= 2 * 86400) return Math.round(s / 86400) + ' j';
     if (s >= 2 * 3600) return Math.round(s / 3600) + ' h';
     return Math.max(1, Math.round(s / 60)) + ' min';
@@ -550,7 +551,8 @@ const Guide = (function () {
         let ext = s < 0 ? -Infinity : Infinity;
         for (let j = a.i + 1; j < c.i; j++) if (j !== b.i) { if (s < 0) { if (H[j] > ext) ext = H[j]; } else if (L[j] < ext) ext = L[j]; }
         if (s < 0 ? ext > hi : ext < lo) continue;
-        const c1 = oppose(H, L, a.i, b.i, s), c2 = oppose(H, L, b.i, c.i, s);
+        // Les creux (sommets) entre eux, mèche de la bougie du pivot du milieu comprise (comme on la trace).
+        const c1 = oppose(H, L, a.i, b.i + 1, s), c2 = oppose(H, L, b.i - 1, c.i, s);
         if (c1.i < 0 || c2.i < 0) continue;
         const cou = s < 0 ? (c1.p <= c2.p ? c1 : c2) : (c1.p >= c2.p ? c1 : c2);
         const E = s < 0 ? hi : lo, h = Math.abs(E - cou.p);
@@ -660,6 +662,17 @@ const Guide = (function () {
       if (dehors) continue;
       const w0 = ligne(rh, x0) - ligne(rb, x0);
       if (w0 < P.hauteurMinAtr * atr) continue;
+      // La figure se voit dès son début : la 1re droite d'en face commence tôt (decalage × durée au
+      // plus après le début), et le prix occupe la bande au début (sur le premier quart, ses plus haut
+      // et plus bas couvrent au moins `remplissage` de la largeur) : pas un V ni une jambe d'entrée
+      // qui traverse la bande, avec une droite encore sans point.
+      if (fini(Q.decalage) && x1 - x0 > Q.decalage * span) continue;
+      if (fini(Q.remplissage)) {
+        const z = x0 + Math.max(2, Math.round(span / 4));
+        let hi = -Infinity, lo = Infinity;
+        for (let j = x0; j <= z; j++) { if (H[j] > hi) hi = H[j]; if (L[j] < lo) lo = L[j]; }
+        if ((Math.min(hi, ligne(rh, x0)) - Math.max(lo, ligne(rb, x0))) / w0 < Q.remplissage) continue;
+      }
       if (type.startsWith('canal') && (w0 > Q.canalLargeurMaxAtr * atr || t - x0 < Q.canalMin)) continue;
       const apex = type.startsWith('triangle') || type.startsWith('biseau') ? pointe(rh, rb) : Infinity;
       // Repérée trop près de sa pointe : la figure est déjà finie, rien à suivre.
@@ -788,7 +801,8 @@ const Guide = (function () {
     const C = S.c, H = S.h, L = S.l, A = S.atr, c = C[j], fam = famille(f);
     const fin = (cle, raison, x) => { f.fin = cle; f.jFin = j; f.raison = raison || null; noter(f, j, cle, Object.assign({ raison: raison || null, c }, x || {})); };
     if (f.phase === 'confirme') {
-      if (j <= f.jConf) return;
+      // Une ébauche confirmée attend son point : la figure née de lui rejoue la suite (objectif, invalidation).
+      if (j <= f.jConf || f.ebauche) return;
       const s = f.sens;
       if (s > 0 ? c < f.invalidation : c > f.invalidation) fin('invalide', fam === 'lignes' ? 'milieu' : fam === 'ete' ? 'epaule' : fam === 'drapeau' ? 'pause' : 'extreme', { p: f.invalidation });
       else if (s > 0 ? c >= f.objectif : c <= f.objectif) fin('atteint', null, { p: f.objectif });
@@ -801,6 +815,8 @@ const Guide = (function () {
     if (fam === 'drapeau' && !f.demi) f.extremePause = f.sens > 0 ? Math.min(f.extremePause, L[j]) : Math.max(f.extremePause, H[j]);
     const N = niveauxFigure(f, j, P);
     for (const iv of N.invals) {
+      // Une ébauche : l'extrême et la tête sont l'affaire de son point en attente (abandon, recalage).
+      if (f.ebauche && (iv.raison === 'extreme' || iv.raison === 'tete')) continue;
       if (!auDela(c, iv.s, iv.p)) { if (iv.clotures === 2) f.contre = 0; continue; }
       if (iv.clotures === 2) { f.contre = (f.contre || 0) + 1; if (f.contre < 2) continue; }
       fin('invalide_avant', iv.raison, { p: iv.p });
@@ -875,8 +891,11 @@ const Guide = (function () {
   const cleFigure = f => { const m = famille(f); return f.type + '|' + (m === 'extremes' ? f.a.i : m === 'ete' ? f.G.i + ',' + f.T.i : m === 'drapeau' ? f.mat.i1 : f.debut); };
   /** Le niveau (prix extrême du pivot en attente) au-delà duquel une ébauche est abandonnée, pour
    *  un double ou un triple : min(autres sommets) + tol, figé à sa naissance (pour un creux :
-   *  max(autres creux) − tol). Pour les autres familles : null (la bulle dit la règle en mots). */
+   *  max(autres creux) − tol) ; pour une tête-épaules : la tête (l'épaule droite ne la dépasse pas).
+   *  Pour les autres familles : null (la bulle dit la règle en mots). Il se juge sur le plus haut
+   *  (le plus bas) des bougies — c'est lui qui fait le point en attente —, pas sur la clôture. */
   function niveauAbandon(e) {
+    if (famille(e) === 'ete') return e.T ? e.T.p : null;
     if (famille(e) !== 'extremes') return null;
     const autres = estTriple(e) ? [e.a, e.b] : [e.a];
     return e.sens < 0 ? Math.min(...autres.map(x => x.p)) + e.tol : Math.max(...autres.map(x => x.p)) - e.tol;
@@ -906,12 +925,74 @@ const Guide = (function () {
     const cleExiste = cle => cles.has(cle);
     // Les pivots connus plus le point en attente, sans copier la liste (lue seulement).
     const avecPend = (s, pend, fn) => { const l = s > 0 ? hauts : bas; l.push(pend); try { return fn(); } finally { l.pop(); } };
+    // Une ébauche suit la MÊME règle de sortie que la figure, à chaque clôture (sortie 1/2, puis
+    // confirmée) : la figure qui naîtra de son point fera de même. Une issue qui ferait tomber la
+    // figure (recul, sortie contraire, pointe, délai) annule l'ébauche (finFig dit laquelle).
+    const avancerEbauche = (e, j) => { avancer(e, j, S, P); if (e.fin) { e.finFig = e.fin; e.fin = 'abandon'; } };
+    const rejouerEbauche = (e, t) => {
+      Object.assign(e, { phase: 'ebauche', demi: false, demiSens: null, jDemi: null, enRetour: false, nRetour: 0, jConf: null, retest: false, contre: 0, finFig: null });
+      if (famille(e) !== 'extremes') { delete e.niveau; delete e.objectif; delete e.invalidation; }
+      delete e.dObj; delete e.dInv;
+      e.journal = (e.journal || []).filter(x => x.quoi === 'ebauche' || x.quoi === 'suivi');
+      for (let j = e.depart; j <= t && !e.fin; j++) avancerEbauche(e, j);
+    };
+    // Une figure à deux droites (ou un rectangle) trouvée sur les mêmes pivots (la moitié au moins, et
+    // au moins deux ; ou le même début) qu'une figure de son groupe ENCORE VIVANTE : la même figure vue une 2e fois (après
+    // sa confirmation, la détection de son groupe reprend), pas un cas de plus. Une figure tombée
+    // laisse ses pivots libres : une autre lecture peut naître d'eux.
+    const pivIdx = f => (f.pivotsH || []).map(x => 'h' + x.i).concat((f.pivotsB || []).map(x => 'b' + x.i));
+    const dejaTrouvee = (f, t) => {
+      if (famille(f) !== 'lignes') return false;
+      const gr = groupeDetect(f), mien = pivIdx(f), lim = t - Math.max(P.lignes.fenetre, P.rangeFenetre) - k;
+      for (let m = formes.length - 1; m >= 0 && formes[m].t >= lim; m--) {
+        const g = formes[m];
+        if (g.doublon || groupeDetect(g) !== gr || (g.fin && g.jFin < t)) continue;
+        const sien = pivIdx(g), communs = sien.filter(x => mien.includes(x)).length;
+        if (g.debut === f.debut || (communs >= 2 && 2 * communs >= Math.min(sien.length, mien.length))) return true;
+      }
+      return false;
+    };
+    /** Une figure candidate à t : refusée (même mouvement qu'une figure vivante, déjà trouvée, ou
+     *  sortie déjà confirmée à sa naissance sans ébauche vue avant), ou née (rejouée depuis son
+     *  départ). → true si elle est née. */
+    const accueillir = (f, t, at, triples) => {
+      // Un double qui partage un pivot avec un double du même type encore vivant, ou né en même
+      // temps qu'un triple sur les mêmes sommets : le MÊME mouvement, pas un cas de plus.
+      if (estDouble(f) && actives.some(g => g.type === f.type && (g.a.i === f.a.i || g.b.i === f.a.i))) return false;
+      if (estDouble(f) && triples.some(g => g.sens === f.sens && [g.a.i, g.b.i, g.c.i].includes(f.a.i) && [g.b.i, g.c.i].includes(f.b.i))) return false;
+      if (estTriple(f) && actives.some(g => g.type === f.type && g.a.i === f.a.i)) return false;
+      // Tête-épaules : même épaule gauche et même tête qu'une figure vivante = la même, recalée.
+      if (famille(f) === 'ete') {
+        const g = actives.find(x => x.type === f.type && x.G.i === f.G.i && x.T.i === f.T.i && x.phase !== 'confirme' && !x.demi);
+        if (g) { Object.assign(g, { D: f.D, N2: f.N2, couL: f.couL, hauteur: f.hauteur, tMaj: t, dernier: f.D.i }); noter(g, t, 'recalage', { cote: 'epaule' }); return false; }
+        if (formes.some(x => x.type === f.type && x.G.i === f.G.i && x.T.i === f.T.i)) return false;
+      }
+      if (dejaTrouvee(f, t)) return false;
+      Object.assign(f, { phase: 'formation', demi: false, fin: null, jFin: null, jConf: null, journal: [], dernier: t - k, bande: P.bandeAtr * at, nRetour: 0, enRetour: false, atrN: at });
+      // Le double vivant sur les mêmes sommets devient ce triple : un recalage, pas un ✗.
+      const dbls = estTriple(f) ? actives.filter(g => g.type === 'double_' + f.type.slice(7) && g.phase !== 'confirme' && !g.fin && [f.a.i, f.b.i].includes(g.a.i)) : [];
+      if (dbls.length) f.depuisDouble = dbls[dbls.length - 1];
+      noter(f, t, 'repere', f.depuisDouble ? { triple: true } : null);
+      // L'ébauche vivante de même identité dont le point en attente est confirmé à cette clôture :
+      // elle était à l'écran, sa sortie a été vue en direct ; la figure garde sa bande et naît
+      // même si sa sortie est déjà confirmée (ou son issue déjà connue).
+      const eb = vivantes.find(x => !x.fin && x.pend && x.pend.i + k === t && x.cle === cleFigure(f));
+      if (eb) f.bande = eb.bande;
+      for (let j = f.depart; j <= t && !f.fin; j++) avancer(f, j, S, P);
+      if ((f.fin || f.phase === 'confirme') && !eb) { delete f.depuisDouble; return false; }
+      if (eb && (f.fin || f.phase === 'confirme')) { f.depuisEbauche = true; f.t0Ebauche = eb.t0; }
+      for (const g of dbls) { g.fin = 'devenu_triple'; g.jFin = t; g.raison = 'triple'; noter(g, t, 'devenu_triple'); }
+      if (famille(f) === 'drapeau') mats.push({ i0: f.mat.i0, i1: f.mat.i1 });
+      formes.push(f); cles.add(cleFigure(f)); actives.push(f);
+      return true;
+    };
     let ih = X.ih, ib = X.ib;
     for (let t = X.t; t < n; t++) {
       for (let a = actives.length - 1; a >= 0; a--) {
         avancer(actives[a], t, S, P);
         if (actives[a].fin) actives.splice(a, 1);
       }
+      for (const e of vivantes) if (!e.fin && e.t0 < t) avancerEbauche(e, t);
       let nh = false, nb = false;
       while (ih < piv.hauts.length && piv.hauts[ih].c === t) { hauts.push(piv.hauts[ih++]); nh = true; }
       while (ib < piv.bas.length && piv.bas[ib].c === t) { bas.push(piv.bas[ib++]); nb = true; }
@@ -922,31 +1003,7 @@ const Guide = (function () {
         for (const f of actives) recaler(f, hauts, bas, t, at, P, nh, nb);
         const nouvelles = candidats(hauts, bas, H, L, C, t, at, P, actives, nh, nb, matUtilise);
         const triples = nouvelles.filter(estTriple);
-        for (const f of nouvelles) {
-          // Un double qui partage un pivot avec un double du même type encore vivant, ou né en même
-          // temps qu'un triple sur les mêmes sommets : le MÊME mouvement, pas un cas de plus.
-          if (estDouble(f) && actives.some(g => g.type === f.type && (g.a.i === f.a.i || g.b.i === f.a.i))) continue;
-          if (estDouble(f) && triples.some(g => g.sens === f.sens && [g.a.i, g.b.i, g.c.i].includes(f.a.i) && [g.b.i, g.c.i].includes(f.b.i))) continue;
-          if (estTriple(f) && actives.some(g => g.type === f.type && g.a.i === f.a.i)) continue;
-          // Tête-épaules : même épaule gauche et même tête qu'une figure vivante = la même, recalée.
-          if (famille(f) === 'ete') {
-            const g = actives.find(x => x.type === f.type && x.G.i === f.G.i && x.T.i === f.T.i && x.phase !== 'confirme' && !x.demi);
-            if (g) { Object.assign(g, { D: f.D, N2: f.N2, couL: f.couL, hauteur: f.hauteur, tMaj: t, dernier: f.D.i }); noter(g, t, 'recalage', { cote: 'epaule' }); continue; }
-            if (formes.some(x => x.type === f.type && x.G.i === f.G.i && x.T.i === f.T.i)) continue;
-          }
-          Object.assign(f, { phase: 'formation', demi: false, fin: null, jFin: null, jConf: null, journal: [], dernier: t - k, bande: P.bandeAtr * at, nRetour: 0, enRetour: false });
-          if (estTriple(f)) {
-            // Le double vivant sur les mêmes sommets devient ce triple : un recalage, pas un ✗.
-            for (const g of actives) if (g.type === 'double_' + f.type.slice(7) && g.phase !== 'confirme' && !g.fin && [f.a.i, f.b.i].includes(g.a.i)) {
-              g.fin = 'devenu_triple'; g.jFin = t; g.raison = 'triple'; noter(g, t, 'devenu_triple'); f.depuisDouble = g;
-            }
-          }
-          noter(f, t, 'repere', f.depuisDouble ? { triple: true } : null);
-          for (let j = f.depart; j <= t && !f.fin; j++) avancer(f, j, S, P);
-          if (f.fin || f.phase === 'confirme') continue;
-          if (famille(f) === 'drapeau') mats.push({ i0: f.mat.i0, i1: f.mat.i1 });
-          formes.push(f); cles.add(cleFigure(f)); actives.push(f); nees.push(f);
-        }
+        for (const f of nouvelles) if (accueillir(f, t, at, triples)) nees.push(f);
         for (let a = actives.length - 1; a >= 0; a--) if (actives[a].fin) actives.splice(a, 1);
       }
       // ── Ébauches ──
@@ -954,12 +1011,24 @@ const Guide = (function () {
         const cote = cotes[s];
         // Le pivot en attente vient d'être confirmé : l'ébauche devient la figure de même identité,
         // ou s'arrête (« la figure ne tient plus »).
-        for (const e of vivantes) if (!e.fin && e.s === s && e.pend.i + k === t) {
-          const g = nees.find(x => cleFigure(x) === e.cle) || null;
+        // (Le point a-t-il vraiment été confirmé ? Sinon un nouvel extrême l'a remplacé : c'est le
+        // recalage plus bas qui en décide.)
+        const confirmes = s > 0 ? (nh ? hauts : null) : (nb ? bas : null);
+        const vientDe = i => !!confirmes && confirmes.length > 0 && confirmes[confirmes.length - 1].i === i;
+        for (const e of vivantes) if (!e.fin && e.s === s && e.pend.i + k === t && vientDe(e.pend.i)) {
+          let g = nees.find(x => cleFigure(x) === e.cle) || null;
+          const triple = !g && estDouble(e) && nees.some(x => estTriple(x) && x.sens === e.sens && [x.b.i, x.c.i].includes(e.b.i));
+          // Pas née avec l'ATR du moment : la même figure avec la tolérance figée de l'ébauche (l'ATR
+          // a bougé de quelques bougies, pas la figure).
+          if (!g && !triple && fini(e.atr0)) {
+            const alt = candidats(hauts, bas, H, L, C, t, e.atr0, P, actives, s > 0, s < 0, matUtilise).find(x => cleFigure(x) === e.cle);
+            if (alt && accueillir(alt, t, e.atr0, [])) { g = alt; nees.push(alt); }
+          }
           if (g) { e.fin = 'devenue'; e.jFin = t; e.devenue = g; }
-          else if (estDouble(e) && nees.some(x => estTriple(x) && x.sens === e.sens && [x.b.i, x.c.i].includes(e.b.i))) { e.fin = 'triple'; e.jFin = t; }
-          else { e.fin = 'abandon'; e.jFin = t; e.raison = 'forme'; }
+          else if (triple) { e.fin = 'triple'; e.jFin = t; }
+          else { e.fin = 'abandon'; e.jFin = t; e.raison = 'regle'; }     // point acquis, mais la figure ne remplit plus ses règles
         }
+        for (let a = actives.length - 1; a >= 0; a--) if (actives[a].fin) actives.splice(a, 1);
         const pend = enAttente(H, L, t, k, s, 0);
         const change = pend && (!cote.pend || pend.i !== cote.pend.i || pend.p !== cote.pend.p);
         if (change) {
@@ -968,7 +1037,7 @@ const Guide = (function () {
           const parAtr = a => { if (!memo.has(a)) memo.set(a, avecPend(s, pend, () => candidats(hauts, bas, H, L, C, t, a, P, actives, s > 0, s < 0, matUtilise))); return memo.get(a); };
           for (const e of vivantes) if (!e.fin && e.s === s) {
             const g = parAtr(e.atr0).find(x => cleFigure(x) === e.cle);
-            if (g) { Object.assign(e, g, { t: t }); e.pend = pend; e.dernier = pend.i; noter(e, t, 'suivi', { p: pend.p }); }
+            if (g) { Object.assign(e, g, { t: t }); e.pend = pend; e.dernier = pend.i; noter(e, t, 'suivi', { p: pend.p }); rejouerEbauche(e, t); }
             else {
               const lim = niveauAbandon(e);
               e.fin = 'abandon'; e.jFin = t; e.raison = lim !== null && auDela(pend.p, -e.sens, lim) ? 'depasse' : 'forme'; e.pAbandon = pend.p;
@@ -984,9 +1053,13 @@ const Guide = (function () {
             const cle = cleFigure(g);
             if (vivantes.some(e => !e.fin && e.cle === cle) || cleExiste(cle)) continue;
             if (estDouble(g) && actives.some(x => x.type === g.type && (x.a.i === g.a.i || x.b.i === g.a.i))) continue;
+            if (dejaTrouvee(g, t)) continue;
             const e = Object.assign(g, { ebauche: true, phase: 'ebauche', cle, s, pend, pend0: pend.i, t0: t, atr0: at, tol: P.tolAtr * at, bande: P.bandeAtr * at, dernier: pend.i,
               fin: null, jFin: null, devenue: null, demi: false, journal: [{ j: t, quoi: 'ebauche' }] });
             e.abandonP = niveauAbandon(e);
+            rejouerEbauche(e, t);
+            // Déjà tombée, ou déjà confirmée à sa naissance : rien à suivre (sa sortie n'a pas été vue).
+            if (e.fin || e.phase === 'confirme') continue;
             liste.push(e); vivantes.push(e);
           }
         }
@@ -1084,12 +1157,12 @@ const Guide = (function () {
   // ── Ce que l'écran montre ──
   /** L'état d'une figure à la clôture j, relu dans son journal (sans mémoire à part). */
   function phaseA(f, j) {
-    if (f.ebauche) return 'ebauche';
-    let e = 'formee';
+    const base = f.ebauche ? 'ebauche' : 'formee';
+    let e = base;
     for (const x of f.journal || []) {
       if (x.j > j) break;
       if (x.quoi === 'demi' || x.quoi === 'retour') e = 'demi';
-      else if (x.quoi === 'sortie_annulee') e = 'formee';
+      else if (x.quoi === 'sortie_annulee') e = base;
       else if (x.quoi === 'confirme') e = 'confirme';
     }
     return e;
@@ -1168,6 +1241,52 @@ const Guide = (function () {
     if (m === 'debutant') return cands;
     return choisir(cands, P, m, j, res);
   }
+  /** L'identité d'une figure À L'ÉCRAN : son type et son ancre (une ébauche et la figure née d'elle
+   *  ont la même ; un rejeu complet la garde). */
+  const idFigure = f => cleFigure(f);
+  /** Débutant : la liste ordonnée des figures à essayer (l'écran prend la première dont le libellé
+   *  trouve sa place, ou à défaut dessine la première sans libellé), d'après ce que la page a
+   *  RÉELLEMENT dessiné aux clôtures d'avant (memo) :
+   *   memo = { parJ: Map(clôture → id dessinée ou null), dernier: id dessinée à l'image d'avant }.
+   *  - une figure tombée (✗, annulée, sans suite, cible atteinte) n'est montrée que si la page la
+   *    dessinait à la clôture d'avant sa chute (on ne barre que ce qui a été vu) ; elle passe en tête
+   *    pendant 2 clôtures (la chute se lit) ;
+   *  - la figure dessinée reste en tête tant qu'elle vit, même si son début sort de la vue à gauche
+   *    (le tracé est coupé au bord) ; une autre ne la remplace que si elle est nettement plus avancée
+   *    (sortie à confirmer ou confirmée, contre une figure formée ou une ébauche) ;
+   *  - une identité tombée depuis peu (2 × garderEbauche clôtures) ne revient pas comme une figure
+   *    vivante (pas de « possible » / « ✗ annulé » / « possible » d'une clôture à l'autre). */
+  function formesDebutant(res, P, vs, ve, memo) {
+    if (!res) return [];
+    const j = res.n - 1, a = fini(vs) ? vs : -Infinity, z = fini(ve) ? ve : Infinity, M = memo || {}, parJ = M.parJ || new Map();
+    const vu = f => {
+      for (let q = f.jFin - 1; q >= f.jFin - 3; q--) if (parJ.has(q)) return parJ.get(q) === idFigure(f);
+      return false;
+    };
+    const tombe = f => !!f.fin && f.jFin <= j;
+    let L = candidatesA(res, P, a, z, 'debutant', j);
+    // La figure dessinée à l'image d'avant, même si son début (ou son dernier point) est sorti de la
+    // vue : elle garde sa place tant qu'un morceau de son tracé (jusqu'à sa clôture ou sa croix) y est.
+    if (M.dernier && !L.some(f => idFigure(f) === M.dernier)) {
+      const large = candidatesA(res, P, -Infinity, z, 'expert', j).find(f => idFigure(f) === M.dernier && (tombe(f) ? f.jFin : j) >= a);
+      if (large) L = L.concat([large]);
+    }
+    // Une figure tombée : seulement si elle était dessinée à la clôture d'avant son issue, et tant
+    // qu'elle tient sa place (une autre dessinée depuis : elle ne revient pas, barrée).
+    L = L.filter(f => !tombe(f) || (vu(f) && (j - f.jFin < 2 || idFigure(f) === M.dernier)));
+    // Une identité tombée depuis peu ne revient pas comme une figure vivante.
+    const recentes = new Set();
+    for (const f of res.formes.concat((res.ebauches && res.ebauches.liste) || [])) if (tombe(f) && f.fin !== 'devenue' && f.fin !== 'triple' && j - f.jFin <= 2 * P.garderEbauche) recentes.add(idFigure(f));
+    L = L.filter(f => tombe(f) || !recentes.has(idFigure(f)));
+    // Deux objets de même identité (une ébauche tombée et une figure) : le premier rangé seul.
+    const ids = new Set();
+    L = L.filter(f => { const k = idFigure(f); if (ids.has(k)) return false; ids.add(k); return true; });
+    const S = M.dernier ? L.find(f => idFigure(f) === M.dernier) : null;
+    if (!S) return L;
+    const rS = rangFigure(S, j);
+    const garderS = tombe(S) ? j - S.jFin < 2 : !L.some(f => f !== S && !tombe(f) && rangFigure(f, j) <= 1 && rS >= 3);
+    return garderS ? [S].concat(L.filter(f => f !== S)) : L;
+  }
   /** Les figures concurrentes d'une figure montrée : celles qui partagent son dernier point (la
    *  bulle Expert les cite). */
   function concurrentes(res, f, P) {
@@ -1176,44 +1295,61 @@ const Guide = (function () {
     return candidatesA(res, P, -Infinity, Infinity, 'expert', j).filter(g => g !== f && (!g.fin || g.jFin > j) && dernierPoint(g, P) === d);
   }
   /** Les dernières figures tombées de l'historique (invalidées, annulées, sans suite), les plus
-   *  récentes d'abord. */
-  function tombees(res, nb) {
+   *  récentes d'abord, tombées depuis au plus `age` bougies closes (P.horizon par défaut : au-delà,
+   *  « récemment » ne se dirait plus). */
+  function tombees(res, nb, age) {
     if (!res) return [];
-    const L0 = res.formes.filter(f => !f.doublon && ['invalide', 'invalide_avant', 'expire_avant'].includes(f.fin))
-      .concat(((res.ebauches && res.ebauches.liste) || []).filter(e => e.fin === 'abandon' && e.raison === 'depasse'));
+    const jMin = res.n - 1 - (fini(age) ? age : 60);
+    const L0 = res.formes.filter(f => !f.doublon && ['invalide', 'invalide_avant', 'expire_avant'].includes(f.fin) && f.jFin >= jMin)
+      .concat(((res.ebauches && res.ebauches.liste) || []).filter(e => e.fin === 'abandon' && e.raison === 'depasse' && e.jFin >= jMin));
     return L0.sort((x, y) => y.jFin - x.jFin).slice(0, nb || 3);
   }
   /** L'état VIVANT d'une figure montrée, au prix live : il ne change jamais son état fermé.
    *  S = { h, l, c } (bougies closes 0..j−1) ; j : l'indice de la bougie en cours ; cur : elle
-   *  ({ high, low }) ; live : le prix. → { cle: null | franchi | meche | meche_close | menace |
-   *  cible | remise | suit, s, p, niveaux } */
+   *  ({ high, low }) ; live : le prix. → { cle, s, p, niveaux, etiq, … }
+   *  cle (le prix live) : null | menace | cible | franchi | meche | meche_close | remise | suit ;
+   *  etiq (ce que dit le libellé) : la même lecture sur le plus haut et le plus bas de la bougie en
+   *  cours — elle ne revient jamais en arrière avant la clôture (pas de libellé qui clignote quand
+   *  le prix oscille autour d'une ligne) : menace | cible | sortie | remise | null.
+   *  Une ébauche lit les mêmes niveaux que sa figure (sorties, recul, sortie contraire), plus son
+   *  niveau d'abandon (le plus haut ou le plus bas de la bougie, pas la clôture : `remise`). */
   function figureVivante(f, S, j, cur, live, P) {
-    const out = { cle: null, s: 0, p: null, niveaux: null };
+    const out = { cle: null, s: 0, p: null, niveaux: null, etiq: null };
     if (!f || f.fin) return out;
     const N = niveauxFigure(f, j, P);
     out.niveaux = N;
     const hi = cur && fini(cur.high) ? Math.max(cur.high, fini(live) ? live : -Infinity) : live, lo = cur && fini(cur.low) ? Math.min(cur.low, fini(live) ? live : Infinity) : live;
     if (!fini(live)) return out;
-    if (f.ebauche) {
-      const s = f.s, ext = s > 0 ? hi : lo;
-      if (fini(f.abandonP) && auDela(ext, s, f.abandonP)) return Object.assign(out, { cle: 'remise', s, p: f.abandonP });
-      if (auDela(ext, s, f.pend.p)) return Object.assign(out, { cle: 'suit', s, p: ext });
-      return out;
+    const ext = s => (s > 0 ? hi : lo);
+    // Les invalidations que la machine applique (une ébauche : l'extrême et la tête sont l'affaire
+    // de son point en attente).
+    const invals = N.invals.filter(iv => !(f.ebauche && (iv.raison === 'extreme' || iv.raison === 'tete')));
+    let etiq = null, etiqS = 0;
+    const touchee = N.confirme ? null : N.sorties.find(x => auDela(live, x.s, x.seuil)) || N.sorties.find(x => auDela(ext(x.s), x.s, x.seuil));
+    if (invals.some(iv => auDela(ext(iv.s), iv.s, iv.p))) etiq = 'menace';
+    else if (N.confirme && N.objectifs[0] && auDela(ext(N.objectifs[0].s), N.objectifs[0].s, N.objectifs[0].p)) etiq = 'cible';
+    else if (touchee) { etiq = 'sortie'; etiqS = touchee.s; }
+    if (f.ebauche && fini(f.abandonP) && auDela(ext(f.s), f.s, f.abandonP)) {
+      // Le plus haut (plus bas) de la bougie a passé le niveau d'abandon : à la clôture, ce sera le
+      // nouveau point en attente, et l'ébauche sera annulée, même si le prix revient.
+      return Object.assign(out, { cle: 'remise', s: f.s, p: f.abandonP, ext: ext(f.s), etiq: 'remise' });
     }
-    for (const iv of N.invals) if (auDela(live, iv.s, iv.p)) return Object.assign(out, { cle: 'menace', s: iv.s, p: iv.p, raison: iv.raison });
+    out.etiq = etiq; out.etiqS = etiqS;
+    for (const iv of invals) if (auDela(live, iv.s, iv.p)) return Object.assign(out, { cle: 'menace', s: iv.s, p: iv.p, raison: iv.raison, clotures: iv.clotures || 1, contre: f.contre || 0 });
     if (N.confirme) {
       const o = N.objectifs[0];
-      if (o && (auDela(live, o.s, o.p) || auDela(o.s > 0 ? hi : lo, o.s, o.p))) return Object.assign(out, { cle: 'cible', s: o.s, p: o.p });
+      if (o && (auDela(live, o.s, o.p) || auDela(ext(o.s), o.s, o.p))) return Object.assign(out, { cle: 'cible', s: o.s, p: o.p });
       return out;
     }
-    for (const x of N.sorties) if (auDela(live, x.s, x.seuil)) return Object.assign(out, { cle: 'franchi', s: x.s, p: x.seuil });
-    for (const x of N.sorties) if (auDela(x.s > 0 ? hi : lo, x.s, x.seuil)) return Object.assign(out, { cle: 'meche', s: x.s, p: x.seuil });
+    for (const x of N.sorties) if (auDela(live, x.s, x.seuil)) return Object.assign(out, { cle: 'franchi', s: x.s, p: x.seuil, ligne: x.ligne });
+    for (const x of N.sorties) if (auDela(ext(x.s), x.s, x.seuil)) return Object.assign(out, { cle: 'meche', s: x.s, p: x.seuil, ligne: x.ligne });
     if (!f.demi && S && S.h) {
       for (let k = j - 1; k >= Math.max(f.depart || 0, j - P.mecheBougies); k--) {
         const Nk = niveauxFigure(f, k, P);
         for (const x of Nk.sorties) if (auDela(x.s > 0 ? S.h[k] : S.l[k], x.s, x.seuil) && !auDela(S.c[k], x.s, x.seuil)) return Object.assign(out, { cle: 'meche_close', s: x.s, p: x.seuil, k });
       }
     }
+    if (f.ebauche && f.pend && auDela(ext(f.s), f.s, f.pend.p)) return Object.assign(out, { cle: 'suit', s: f.s, p: ext(f.s) });
     return out;
   }
 
@@ -1237,7 +1373,7 @@ const Guide = (function () {
     const ligneV = fam === 'ete' || fam === 'extremes' ? 'la ligne de cou' : 'la borne';
     if (f.ebauche) {
       if (f.fin === 'abandon') return { cle: 'abandon', texte: 'ébauche annulée', court: '✗ annulée' };
-      return { cle: 'ebauche', texte: 'ébauche : dernier ' + (f.s > 0 ? 'sommet' : 'creux') + ' pas encore confirmé', court: 'ébauche (' + (f.pend && f.pend.reste > 0 ? f.pend.reste : 1) + ' b.)' };
+      if (!f.demi && f.phase !== 'confirme') return { cle: 'ebauche', texte: 'ébauche : dernier ' + (f.s > 0 ? 'sommet' : 'creux') + ' pas encore confirmé', court: 'ébauche (' + (f.pend && f.pend.reste > 0 ? f.pend.reste : 1) + ' b.)' };
     }
     if (f.fin === 'atteint') return { cle: 'atteint', texte: 'objectif théorique atteint (en clôture)', court: 'obj. atteint' };
     if (f.fin === 'invalide' || f.fin === 'invalide_avant') return { cle: 'invalide',
@@ -1747,37 +1883,60 @@ const Guide = (function () {
     triangle_symetrique: 'Triangle qui se resserre', biseau_montant: 'Biseau qui monte', biseau_descendant: 'Biseau qui descend', canal_montant: 'Canal qui monte',
     canal_descendant: 'Canal qui descend', drapeau: 'Drapeau', fanion: 'Fanion' };
   const fleche = s => (s > 0 ? '↑' : '↓');
-  /** Le libellé d'une figure en Débutant (≤ 26 caractères), à la dernière clôture. Une ébauche et
-   *  une figure formée portent le même « … possible » : le trait les distingue (tirets fins et
-   *  point creux), et la 1re phrase de la bulle. */
+  /** Le côté d'une sortie, en mots (jamais une flèche seule, qui se lirait comme une prévision). */
+  const enHautBas = s => (s > 0 ? 'en haut' : 'en bas');
+  /** Le premier libellé d'une liste qui tient en `max` caractères (26 par défaut), sinon le dernier. */
+  const tenir = (V, max) => V.find(t => t.length <= (max || 26)) || V[V.length - 1];
+  /** Le libellé d'une figure en Débutant (≤ 26 caractères), à la dernière clôture : son nom, puis
+   *  son état. Une ébauche et une figure formée portent le même « … possible » : le trait les
+   *  distingue (tirets fins et point creux), et la 1re phrase de la bulle. Le côté d'une sortie se
+   *  dit en mots (« Biseau : sortie en bas »). */
   function libelleFormeDebutant(f) {
     const e = etatForme(f), nom = NOM_FORME_DEBUTANT[f.type], sortie = famille(f) === 'lignes' || famille(f) === 'drapeau';
     if (!nom) return null;
     switch (e.cle) {
       case 'ebauche': case 'formation': return nom + ' possible';
       case 'dedans': return 'Prix dans un ' + minuscule(nom);
-      case 'demi': return sortie ? 'Sortie ' + fleche(famille(f) === 'drapeau' ? f.sens : f.demiSens) + ' à confirmer' : nom + ' à confirmer';
-      case 'confirme': return sortie ? 'Sortie du ' + minuscule(nom) + ' ' + fleche(f.sens) : nom + ' confirmé';
+      case 'demi': return sortie ? nom + ' : sort ' + enHautBas(famille(f) === 'drapeau' ? f.sens : f.demiSens) + ' ?' : nom + ' à confirmer';
+      case 'confirme': return sortie ? nom + ' : sortie ' + enHautBas(f.sens) : nom + ' confirmé';
       case 'invalide': return '✗ ' + nom + ' invalidé';
       case 'abandon': return '✗ ' + nom + ' annulé';
       case 'sans_suite': return nom + ' sans suite';
-      case 'atteint': return 'Cible théorique atteinte';
-      case 'oublie': return 'Délai écoulé sans cible';
+      case 'atteint': return tenir([nom + ' : cible atteinte', 'Cible atteinte']);
+      case 'oublie': return tenir([nom + ' : délai écoulé', nom + ' : expiré']);
       default: return null;
     }
   }
-  /** Le libellé VIVANT (Débutant, posé sur le calque) : il change avec le prix live, sans redessin
-   *  du graphique ; sinon celui de la dernière clôture. */
-  const LIBELLES_VIVANTS = { franchi: 'Ligne passée, à confirmer', meche: 'Passé et revenu, à suivre', meche_close: 'Passé puis revenu',
-    menace: 'Invalidation à confirmer', cible: 'Cible touchée, à confirmer', remise: 'Remise en cause' };
-  function libelleVivantDebutant(f, v) { return (v && LIBELLES_VIVANTS[v.cle]) || libelleFormeDebutant(f); }
+  /** Les libellés VIVANTS (Débutant, posés sur le calque, au prix live, sans redessin du graphique) :
+   *  le nom de la figure reste, l'état du moment s'y ajoute. Clé : figureVivante(…).etiq, lue sur le
+   *  plus haut et le plus bas de la bougie en cours (il ne revient pas en arrière avant la clôture).
+   *  → les variantes, de la plus riche à la plus courte. */
+  function libellesVivantsDebutant(f, etiq, s) {
+    const nom = NOM_FORME_DEBUTANT[f.type], cote = famille(f) === 'lignes' || famille(f) === 'drapeau';
+    if (!nom) return [];
+    switch (etiq) {
+      case 'sortie': return cote ? [nom + ' : sort ' + enHautBas(famille(f) === 'drapeau' ? f.sens : s) + ' ?'] : [nom + ' à confirmer'];
+      case 'menace': return [nom + ' : menacé'];
+      case 'cible': return [nom + ' : à la cible'];
+      case 'remise': return [nom + ' : se défait'];
+      default: return [];
+    }
+  }
+  /** Des exemples de libellés vivants (un par état), pour les tests de mots. */
+  const LIBELLES_VIVANTS = { sortie: 'Rectangle : sort en haut ?', menace: 'Double sommet : menacé', cible: 'Tête-épaules : à la cible', remise: 'Double sommet : se défait' };
+  function libelleVivantDebutant(f, v, max) {
+    const V = v && v.etiq ? libellesVivantsDebutant(f, v.etiq, v.etiqS != null ? v.etiqS : v.s).filter(t => t.length <= (max || 26)) : [];
+    return V[0] || libelleFormeDebutant(f);
+  }
   /** Tous les libellés qu'une figure peut porter jusqu'à la prochaine clôture (la place réservée
    *  est celle du plus long). */
-  function libellesPossiblesDebutant(f) {
+  function libellesPossiblesDebutant(f, max) {
     const base = libelleFormeDebutant(f);
     if (!base || f.fin) return base ? [base] : [];
-    const k = f.ebauche ? ['remise'] : f.phase === 'confirme' ? ['menace', 'cible'] : ['franchi', 'meche', 'meche_close', 'menace'];
-    return [base].concat(k.map(x => LIBELLES_VIVANTS[x]));
+    const etiqs = f.phase === 'confirme' ? ['menace', 'cible'] : ['sortie', 'menace'].concat(f.ebauche && fini(f.abandonP) ? ['remise'] : []);
+    const out = [base];
+    for (const k of etiqs) for (const s of [1, -1]) { const t = libellesVivantsDebutant(f, k, s).find(x => x.length <= (max || 26)); if (t && !out.includes(t)) out.push(t); }
+    return out;
   }
 
   // Heures : celle de la FIN d'une bougie, partout ; le Débutant lit l'heure de Paris, l'Expert
@@ -1796,21 +1955,53 @@ const Guide = (function () {
     const j = jourParis(ms);
     if (j === jourParis(maintenant)) return 'aujourd’hui à ' + h;
     if (j === jourParis(maintenant - 86400000)) return 'hier à ' + h;
-    return 'le ' + j.split('/')[0] + ' à ' + h;
+    if (j === jourParis(maintenant + 86400000)) return 'demain à ' + h;
+    // Le jour seul dans le mois en cours ; le jour et le mois au-delà de 20 jours.
+    const [d, m] = j.split('/');
+    return 'le ' + d + (Math.abs(maintenant - ms) > 20 * 86400000 ? '/' + String(m).padStart(2, '0') : '') + ' à ' + h;
   }
-  const heureExpert = ms => (fini(ms) ? heureUTC(ms) + ' UTC' + (heureParis(ms) ? ' (' + heureParis(ms) + ' Paris)' : '') : '—');
-  const heureCourteUTC = ms => (fini(ms) ? heureUTC(ms) + ' UTC' : '—');
+  /** Débutant : « à 14h00 » aujourd'hui, sinon « hier à 14h00 », « demain à 02h00 », « le 7 à
+   *  14h00 » (heure de Paris) — une heure seule se lirait comme celle d'aujourd'hui. */
+  function quandDeb(ms, ctx) {
+    if (!fini(ms) || !heureParis(ms)) return '';
+    const now = ctx && ctx.maintenant;
+    return fini(now) ? quandParis(ms, now).replace(/^aujourd’hui /, '') : 'à ' + heureParis(ms);
+  }
+  /** Expert : la date (jj/mm) s'ajoute à l'heure UTC sur des bougies de 4 h ou plus, ou quand
+   *  l'instant n'est pas du même jour (UTC) que maintenant ; sur des bougies d'un jour, la date seule. */
+  const dateUTC = ms => { const d = new Date(ms).toISOString(); return d.slice(8, 10) + '/' + d.slice(5, 7); };
+  function avecDate(ms, ctx) {
+    const now = ctx && fini(ctx.maintenant) ? ctx.maintenant : NaN, pas = ctx && fini(ctx.pas) ? ctx.pas : 0;
+    return pas >= 4 * 3600 || (fini(now) && fini(ms) && dateUTC(now) !== dateUTC(ms));
+  }
+  function heureCourteUTC(ms, ctx) {
+    if (!fini(ms)) return '—';
+    if (ctx && ctx.pas >= 86400) return dateUTC(ms);
+    return (avecDate(ms, ctx) ? dateUTC(ms) + ' ' : '') + heureUTC(ms) + ' UTC';
+  }
+  const heureExpert = (ms, ctx) => (fini(ms) ? heureCourteUTC(ms, ctx) + (heureParis(ms) && !(ctx && ctx.pas >= 86400) ? ' (' + heureParis(ms) + ' Paris)' : '') : '—');
 
   /** La marque de fin d'une figure tombée : « ✗ invalidé à 06:15 UTC (08h15 Paris) : clôture
    *  au-dessus des sommets (83 664 $) » (Expert) ; « Invalidé à 08h15 (heure de Paris) : … » (Débutant). */
   function marqueFin(f, ctx, mode, unite) {
     if (!f || !f.fin) return '';
     const exp = mode === 'expert', ms = finMs(ctx, f.jFin), per = periode(ctx && ctx.intervalle), fam = famille(f);
-    const h = exp ? 'à ' + heureExpert(ms) : fini(ms) && heureParis(ms) ? 'à ' + heureParis(ms) + ' (heure de Paris)' : '';
+    // Expert : « à 06:15 UTC (08h15 Paris) », « le 13/09 à 09:00 UTC (11h00 Paris) », « le 13/09 » (1 j).
+    const hx = exp ? heureExpert(ms, ctx) : '';
+    const h = exp ? (ctx && ctx.pas >= 86400 ? 'le ' + hx : /^\d\d\/\d\d /.test(hx) ? 'le ' + hx.replace(/^(\d\d\/\d\d) /, '$1 à ') : 'à ' + hx)
+      : fini(ms) && heureParis(ms) ? quandDeb(ms, ctx) + ' (heure de Paris)' : '';
     const s = f.sens, ev = (f.journal || []).filter(x => x.j === f.jFin).pop() || {}, p = fini(ev.p) ? ev.p : f.invalidation;
     if (f.ebauche && f.fin === 'abandon') {
-      if (exp) return '✗ ébauche annulée ' + h + ' : ' + (f.raison === 'depasse' ? 'nouvel extrême ' + prix(f.pAbandon, unite) + ' au-delà de ' + prix(f.abandonP, unite) : 'la figure ne tient plus avec le nouvel extrême');
-      return 'Annulé ' + h + ' : ' + (f.raison === 'depasse' ? 'le prix est ' + (f.s > 0 ? 'monté au-dessus de ' : 'descendu sous ') + prix(f.abandonP, unite) + ' ; les ' + (f.s > 0 ? 'sommets' : 'creux') + ' ne sont plus au même niveau.' : 'avec ce nouveau ' + (f.s > 0 ? 'sommet' : 'creux') + ', la figure ne tient plus.');
+      const pt = f.s > 0 ? 'sommet' : 'creux', pts = f.s > 0 ? 'sommets' : 'creux', ete = famille(f) === 'ete';
+      if (f.finFig) {
+        // Tombée comme la figure serait tombée (recul, sortie contraire, pointe, délai).
+        const g = Object.assign({}, f, { ebauche: false, fin: f.finFig });
+        return marqueFin(g, ctx, mode, unite).replace(/^✗ invalidé|^sans suite|^Invalidé|^Sans suite/, exp ? '✗ ébauche annulée' : 'Annulé');
+      }
+      if (exp) return '✗ ébauche annulée ' + h + ' : ' + (f.raison === 'depasse' ? 'nouvel extrême ' + prix(f.pAbandon, unite) + ' au-delà de ' + prix(f.abandonP, unite) + (ete ? ' (la tête)' : '')
+        : f.raison === 'regle' ? 'point confirmé, mais les règles de la figure ne sont plus remplies' : 'la figure ne tient plus avec le nouvel extrême');
+      return 'Annulé ' + h + ' : ' + (f.raison === 'depasse' ? 'le prix est ' + (f.s > 0 ? 'monté au-dessus de ' : 'descendu sous ') + prix(f.abandonP, unite) + (ete ? ', plus loin que la tête.' : ' ; les ' + pts + ' ne sont plus au même niveau.')
+        : f.raison === 'regle' ? 'le dernier ' + pt + ' est acquis, mais la figure ne remplit plus ses conditions.' : 'avec ce nouveau ' + pt + ', la figure ne tient plus.');
     }
     if (f.fin === 'atteint') return exp ? 'objectif théorique atteint ' + h + ' (clôture ' + prix(ev.c, unite) + ')' : 'Cible théorique atteinte ' + h + ' (' + prix(f.objectif, unite) + ').';
     if (f.fin === 'expire_avant') return exp ? 'sans suite ' + h + ' : ' + (f.raison === 'pointe' ? 'pointe atteinte sans sortie' : 'délai écoulé') : 'Sans suite ' + h + ' : ' + (f.raison === 'pointe' ? 'le prix est resté dedans jusqu’à la pointe.' : 'le prix n’en est pas sorti à temps.');
@@ -1831,9 +2022,9 @@ const Guide = (function () {
   /** L'état court Expert : « ébauche (1 b.) », « cassure 1/2 », « ✗ invalidé 06:15 UTC »… */
   function etatCourtExpert(f, ctx) {
     const e = etatForme(f);
-    if (e.cle === 'invalide') return '✗ invalidé ' + heureCourteUTC(finMs(ctx, f.jFin));
-    if (e.cle === 'abandon') return '✗ annulé ' + heureCourteUTC(finMs(ctx, f.jFin));
-    const rec = !f.fin && fini(f.tMaj) && ctx && fini(ctx.n) && ctx.n - 1 - f.tMaj <= 1 ? ' · recalé ' + heureCourteUTC(finMs(ctx, f.tMaj)) : '';
+    if (e.cle === 'invalide') return '✗ invalidé ' + heureCourteUTC(finMs(ctx, f.jFin), ctx);
+    if (e.cle === 'abandon') return '✗ annulé ' + heureCourteUTC(finMs(ctx, f.jFin), ctx);
+    const rec = !f.fin && fini(f.tMaj) && ctx && fini(ctx.n) && ctx.n - 1 - f.tMaj <= 1 ? ' · recalé ' + heureCourteUTC(finMs(ctx, f.tMaj), ctx) : '';
     return e.court + rec;
   }
   /** Les libellés Expert, du plus riche au plus court (≤ 80 caractères) :
@@ -1857,28 +2048,33 @@ const Guide = (function () {
   function vuDebutant(f, ctx, unite) {
     const fam = famille(f), per = periode(ctx && ctx.intervalle), now = ctx && ctx.maintenant;
     const q = i => quandParis(debutMs(ctx, i), now);
+    // « d’ici 14h00 », « d’ici demain 02h00 » ; le point en attente au prix de la bougie en cours
+    // quand elle va plus loin que lui (v.cle 'suit') ; rien à promettre quand l'ébauche se défait.
+    const dici = ms => { const t = quandDeb(ms, ctx); return t ? ' d’ici ' + t.replace(/^à /, '').replace(/ à /, ' ') : ''; };
+    const v = ctx && ctx.vivant, pendP = f.pend ? (v && v.cle === 'suit' && fini(v.p) ? v.p : f.pend.p) : NaN, defait = v && v.cle === 'remise';
+    const pourLInstant = v && v.cle === 'suit' ? ' (pour l’instant ' + prix(pendP, unite) + ')' : '';
     if (fam === 'extremes') {
       const pts = estTriple(f) ? [f.a, f.b, f.c] : [f.a, f.b], haut = f.sens < 0;
       const ps = pts.map(x => x.p), lo = Math.min(...ps), hi = Math.max(...ps);
       const dates = pts.map(x => q(x.i)).filter(Boolean);
       const vu = 'Le prix a ' + (haut ? 'buté ' : 'rebondi ') + (pts.length === 3 ? 'trois' : 'deux') + ' fois ' + (hi - lo >= 1 ? 'entre ' + chiffres(lo) + ' et ' + prix(hi, unite) : 'vers ' + prix(hi, unite))
         + (dates.length ? ' (' + dates.join(', ') + ', heure de Paris)' : '') + '.';
-      if (f.ebauche) {
-        const k = pts.length === 3 ? '3e' : '2e', fin = finMs(ctx, f.pend.conf);
-        return vu + ' Le ' + k + (haut ? ' sommet' : ' creux') + ' sera acquis si le prix ' + (haut ? 'ne dépasse pas ' : 'ne descend pas sous ') + prix(f.pend.p, unite) + (fini(fin) && heureParis(fin) ? ' d’ici ' + heureParis(fin) : ' encore ' + (f.pend.reste > 1 ? f.pend.reste + ' ' + per[3] : per[0])) + '.';
+      if (f.ebauche && !defait) {
+        const k = pts.length === 3 ? '3e' : '2e', fin = finMs(ctx, f.pend.conf), d = dici(fin);
+        return vu + ' Le ' + k + (haut ? ' sommet' : ' creux') + pourLInstant + ' sera acquis si le prix ' + (haut ? 'ne va pas plus haut' : 'ne va pas plus bas') + (d || ' encore ' + (f.pend.reste > 1 ? f.pend.reste + ' ' + per[3] : per[0])) + '.';
       }
       return vu;
     }
     if (fam === 'ete') {
       const haut = f.sens < 0;
       const vu = 'Trois ' + (haut ? 'sommets' : 'creux') + ', celui du milieu ' + (haut ? 'plus haut' : 'plus bas') + ' (la tête, ' + prix(f.T.p, unite) + ' ' + q(f.T.i) + '), les deux autres à peu près au même niveau (les épaules).';
-      if (f.ebauche) { const fin = finMs(ctx, f.pend.conf); return vu + ' La 2e épaule sera acquise si le prix ' + (haut ? 'ne dépasse pas ' : 'ne descend pas sous ') + prix(f.pend.p, unite) + (fini(fin) && heureParis(fin) ? ' d’ici ' + heureParis(fin) : '') + '.'; }
+      if (f.ebauche && !defait) { const fin = finMs(ctx, f.pend.conf); return vu + ' La 2e épaule' + pourLInstant + ' sera acquise si le prix ' + (haut ? 'ne va pas plus haut' : 'ne va pas plus bas') + dici(fin) + '.'; }
       return vu;
     }
     if (fam === 'drapeau') {
       const up = f.sens > 0;
       const vu = 'Après ' + (up ? 'une montée rapide' : 'une descente rapide') + ' de ' + prixRond(f.mat.h, unite) + ' (le mât), le prix fait une pause étroite' + (f.type === 'fanion' ? ' qui se resserre' : '') + '.';
-      if (f.ebauche) return vu + ' Le dernier ' + (f.s > 0 ? 'sommet' : 'creux') + ' de la pause n’est pas encore acquis.';
+      if (f.ebauche && !defait) return vu + ' Le dernier ' + (f.s > 0 ? 'sommet' : 'creux') + ' de la pause' + pourLInstant + ' n’est pas encore acquis.';
       return vu;
     }
     const nom = NOM_LONG_DEBUTANT[f.type];
@@ -1887,7 +2083,7 @@ const Guide = (function () {
     else if (/^triangle/.test(f.type)) vu = nom + ' : ses allers-retours se resserrent entre deux droites' + (f.type === 'triangle_ascendant' ? ', le plafond reste plat' : f.type === 'triangle_descendant' ? ', le plancher reste plat' : '') + '.';
     else if (/^biseau/.test(f.type)) vu = nom + ' : ses allers-retours se resserrent entre deux droites qui ' + (f.type === 'biseau_montant' ? 'montent' : 'descendent') + ' toutes les deux.';
     else vu = nom + ' : ses allers-retours restent entre deux droites parallèles qui ' + (f.type === 'canal_montant' ? 'montent' : 'descendent') + '.';
-    if (f.ebauche) vu += ' Le dernier ' + (f.s > 0 ? 'sommet' : 'creux') + ' n’est pas encore acquis.';
+    if (f.ebauche && !defait) vu += ' Le dernier ' + (f.s > 0 ? 'sommet' : 'creux') + pourLInstant + ' n’est pas encore acquis.';
     return vu;
   }
   /** Les niveaux du moment, en mots du Débutant : validation, annulation (ou invalidation), cible
@@ -1899,7 +2095,7 @@ const Guide = (function () {
     const enCeMoment = pente ? ' en ce moment' : '';
     if (N.confirme) {
       const o = N.objectifs[0], iv = N.invals[0];
-      out.push('Validée ' + (fini(f.jConf) && heureParis(finMs(ctx, f.jConf)) ? 'à ' + heureParis(finMs(ctx, f.jConf)) + ' (heure de Paris)' : '') + (f.retest ? ', après un court retour vers la ligne' : '') + '. Si le prix finit ' + per[0] + ' ' + sousSur(iv.s) + prix(iv.p, unite)
+      out.push('Validée ' + (fini(f.jConf) && heureParis(finMs(ctx, f.jConf)) ? quandDeb(finMs(ctx, f.jConf), ctx) + ' (heure de Paris)' : '') + (f.retest ? ', après un court retour vers la ligne' : '') + '. Si le prix finit ' + per[0] + ' ' + sousSur(iv.s) + prix(iv.p, unite)
         + ', la figure ne tient plus. ' + cible(prix(o.p, unite)).replace(/^c/, 'C') + '.');
       return out.join(' ');
     }
@@ -1909,8 +2105,11 @@ const Guide = (function () {
       const marge = Math.abs(x.seuil - x.ligne) >= 0.5 ? ' (' + quoi + ', ' + prix(x.ligne, unite) + enCeMoment + ', avec une petite marge)' : ' (' + quoi + enCeMoment + ')';
       let t = (f.demi ? 'Il a fini ' + per[0] + ' ' + sousSur(s) + prix(x.seuil, unite) + marge + ' ; s’il finit encore ' + per[0] + ' ' + dessous(s) + ', la figure sera validée. S’il revient tout près de la ligne puis ressort, cela compte aussi ; s’il revient franchement dedans, la sortie ne compte pas.'
         : 'La figure serait validée si le prix finit ' + per[1] + ' de suite ' + sousSur(s) + prix(x.seuil, unite) + marge + '. ' + majuscule(per[0]) + ' ' + dessous(s) + ', puis un court retour vers ce prix et ' + nouvellePer(per) + ' ' + dessous(s) + ', compte aussi.');
-      if (f.ebauche && fini(f.abandonP)) t += ' Annulée si le prix ' + (f.s > 0 ? 'dépasse ' : 'descend sous ') + prix(f.abandonP, unite) + '.';
+      // Une ébauche : UN niveau d'annulation, celui que la machine applique (le plus haut ou le plus
+      // bas des bougies, pas leur fin) ; l'extrême et la tête sont l'affaire de ce niveau.
+      if (f.ebauche && fini(f.abandonP)) t += ' Annulée si le prix ' + (f.s > 0 ? 'monte au-dessus de ' : 'descend sous ') + prix(f.abandonP, unite) + ', même un instant' + (fam === 'ete' ? ' (plus loin que la tête).' : ' (les ' + (f.s > 0 ? 'sommets' : 'creux') + ' ne seraient plus au même niveau).');
       for (const iv of N.invals) {
+        if (f.ebauche && (iv.raison === 'extreme' || iv.raison === 'tete')) continue;
         if (iv.raison === 'recul') t += ' Annulée si le prix finit ' + per[0] + ' ' + sousSur(iv.s) + prix(iv.p, unite) + ' (' + (s > 0 ? 'recul' : 'remontée') + ' de plus de la moitié du mât).';
         else if (iv.raison === 'sortie_contraire') t += ' Annulée aussi si le prix finit ' + per[1] + ' de suite ' + sousSur(iv.s) + prix(iv.p, unite) + '.';
         else t += ' Annulée si le prix finit ' + per[0] + ' ' + sousSur(iv.s) + prix(iv.p, unite) + (iv.raison === 'tete' ? ' (la tête)' : '') + '.';
@@ -1993,41 +2192,67 @@ const Guide = (function () {
       out.push(famille(f) === 'lignes' ? vu : libelleFormeDebutant(f) + ' : ' + minuscule(vu));
       // Lignes redessinées depuis la dernière clôture : dit pendant une bougie.
       const rec = (f.journal || []).filter(x => x.quoi === 'recalage').pop();
-      if (rec && fini(c.n) && c.n - 1 - rec.j <= 1) out.push('Lignes redessinées ' + (heureParis(finMs(c, rec.j)) ? 'à ' + heureParis(finMs(c, rec.j)) : '') + ' : un nouveau point touche ' + (rec.cote === 'bas' ? 'la ligne du bas' : rec.cote === 'epaule' ? 'l’épaule droite' : 'la ligne du haut') + '.');
-      out.push(niveauxDebutant(f, c, P, unite));
+      if (rec && fini(c.n) && c.n - 1 - rec.j <= 1) out.push('Lignes redessinées ' + quandDeb(finMs(c, rec.j), c) + ' : un nouveau point touche ' + (rec.cote === 'bas' ? 'la ligne du bas' : rec.cote === 'epaule' ? 'l’épaule droite' : 'la ligne du haut') + '.');
+      // L'ébauche se défait (le prix live a passé son niveau d'annulation) : la tête de bulle le dit,
+      // aucun niveau de validation n'est plus promis.
+      if (!(c.vivant && c.vivant.cle === 'remise')) out.push(niveauxDebutant(f, c, P, unite));
     } else {
       let def = DEFINITION_FORME[f.type] || '';
+      const cote = famille(f) === 'lignes';
+      if (f.ebauche && e.cle === 'abandon') def = NOM_LONG_DEBUTANT[f.type] + ' possible : l’ébauche ne s’est pas formée.';
       // Tombée avant sa validation : la définition s'arrête avant « puis … sorti » (ce n'est pas arrivé).
-      if (def && f.jConf == null) def = def.replace(/\s*[,;]\s*puis .*$/, '') + ' ; la sortie n’a pas été validée.';
-      if (e.cle === 'confirme') out.push(def, niveauxDebutant(f, c, P, unite));
-      else out.push(def.replace(/\.$/, '') + '.', marqueFin(f, c, 'debutant', unite));
-      // La cible de la figure tombée : la sienne si elle était confirmée, sinon celle qu'annonçait sa bulle.
-      const N0 = !fini(f.objectif) && P && fini(f.jFin) ? niveauxFigure(f, f.jFin, P) : null, obj = fini(f.objectif) ? f.objectif : N0 && N0.objectifs.length === 1 ? N0.objectifs[0].p : NaN;
-      if ((e.cle === 'atteint' || e.cle === 'invalide') && fini(obj)) out.push('Cible théorique selon l’usage des analystes : ' + prix(obj, unite) + ', non garantie' + (e.cle === 'atteint' ? ' ; elle a été atteinte.' : ' ; elle n’est plus suivie.'));
+      else if (def && f.jConf == null) def = def.replace(/\s*[,;]\s*puis .*$/, '') + ' ; la figure est tombée avant d’être validée.';
+      // Sortie validée : le côté, en mots.
+      else if (cote && fini(f.sens)) def = def.replace(/en est sorti\./, 'en est sorti ' + (f.sens > 0 ? 'par le haut' : 'par le bas') + '.');
+      if (e.cle === 'confirme') {
+        out.push(def);
+        if (f.ebauche && f.pend) { const d = quandDeb(finMs(c, f.pend.conf), c); out.push('Le dernier ' + (f.s > 0 ? 'sommet' : 'creux') + ' n’est pas encore acquis' + (d ? ' (' + d.replace(/^à /, 'jusqu’à ') + ')' : '') + '.'); }
+        out.push(niveauxDebutant(f, c, P, unite));
+      } else out.push(def.replace(/\.$/, '') + '.', marqueFin(f, c, 'debutant', unite));
+      // La cible : dite seulement quand elle a été atteinte (une figure tombée n'en a plus).
+      if (e.cle === 'atteint' && fini(f.objectif)) out.push('Cible théorique selon l’usage des analystes : ' + prix(f.objectif, unite) + ', non garantie ; elle a été atteinte.');
     }
     if (b) out.push(bilanDebutant(f, b, c, P));
     out.push('Une lecture débattue, pas une prévision ni un conseil.');
     return out.filter(Boolean);
   }
-  /** L'état vivant en mots, en tête de bulle (calque) : seule la fin de la bougie compte. */
+  /** L'état vivant en mots, en tête de bulle (calque) : seule la fin de la bougie compte. Le prix
+   *  live et le plus haut (plus bas) de la bougie en cours sont dits chacun pour lui. */
   function texteVivantFigure(f, v, ctx, mode, unite) {
-    if (!v || !v.cle || v.cle === 'suit') return '';
+    if (!v || (!v.cle && !v.etiq) || v.cle === 'suit') return '';
     const exp = mode === 'expert', per = periode(ctx && ctx.intervalle), fin = finMs(ctx, ctx && fini(ctx.j) ? ctx.j : 0);
-    const hd = fini(fin) && heureParis(fin) ? heureParis(fin) : null, he = fini(fin) ? heureCourteUTC(fin) : '';
-    const P0 = prix(v.p, unite);
+    const hd = fini(fin) && heureParis(fin) ? quandDeb(fin, ctx) : null, he = fini(fin) ? heureCourteUTC(fin, ctx) : '';
+    const P0 = prix(v.p, unite), deux = v.clotures === 2, n1 = (v.contre || 0) + 1;
+    // Rien au-delà maintenant, mais la bougie y est allée (le libellé le garde jusqu'à la clôture).
+    if (!v.cle && v.etiq === 'menace') {
+      const iv = (v.niveaux && v.niveaux.invals || []).find(x => !(f.ebauche && (x.raison === 'extreme' || x.raison === 'tete'))) || null;
+      const Pi = iv ? prix(iv.p, unite) : '';
+      return exp ? 'Maintenant : invalidation (' + Pi + ') touchée en cours de bougie, prix revenu · jugé à la clôture (' + he + ').'
+        : 'Pendant ' + per[2] + ', le prix est allé ' + (iv ? sousSur(iv.s) + Pi : 'au-delà du niveau') + ', le niveau qui annule la figure, puis il est revenu : cela ne compte pas ; seule la fin ' + duPer(per) + (hd ? ' (' + hd + ')' : '') + ' compte.';
+    }
+    if (!v.cle) return '';
     if (exp) {
       return 'Maintenant : ' + ({ franchi: 'au-delà de ' + P0 + ' · à confirmer à la fin de la bougie (' + he + ')', meche: 'percé en mèche (bougie en cours) au-delà de ' + P0 + ', revenu dedans · à confirmer',
-        meche_close: 'percé en mèche sur une bougie close (' + P0 + '), pas validé', menace: 'au-delà de l’invalidation (' + P0 + '), jugé à la fin de la bougie (' + he + ')',
-        cible: 'objectif touché en cours de bougie (' + P0 + '), à confirmer à la clôture', remise: 'ébauche remise en cause : extrême au-delà de ' + P0 + ', à voir à la fin de la bougie' })[v.cle] + '.';
+        meche_close: 'percé en mèche sur une bougie close (' + P0 + '), pas validé',
+        menace: 'au-delà de l’invalidation (' + P0 + ')' + (deux ? ', 2 clôtures de suite nécessaires (ce serait la ' + (n1 === 1 ? '1re' : n1 + 'e') + ')' : '') + ', jugé à la fin de la bougie (' + he + ')',
+        cible: 'objectif touché en cours de bougie (' + P0 + '), à confirmer à la clôture',
+        remise: 'ébauche remise en cause : ' + (v.s > 0 ? 'plus haut' : 'plus bas') + ' de la bougie ' + prix(v.ext, unite) + (v.s > 0 ? ' > ' : ' < ') + P0 + ' (abandon) ; annulée à la clôture (' + he + ') même si le prix revient (prix ' + prix(ctx && fini(ctx.live) ? ctx.live : v.ext, unite) + ')' })[v.cle] + '.';
     }
-    const fn = hd ? ' (à ' + hd + ')' : '';
+    const fn = hd ? ' (' + hd + ')' : '';
     switch (v.cle) {
       case 'franchi': return 'En ce moment le prix est ' + sousSur(v.s) + P0 + '. Si ' + per[2] + ' finit ' + dessous(v.s) + fn + ', ce sera ' + (f.demi && (f.demiSens == null || f.demiSens === v.s) ? 'la 2e fin ' + dePer(per) + ' ' + dessous(v.s) + ' : la figure sera validée.' : 'la 1re fin ' + dePer(per) + ' ' + dessous(v.s) + ' sur les 2 qu’il faut.');
-      case 'meche': return 'Le prix est passé ' + sousSur(v.s) + P0 + ' puis il est revenu. Cela ne compte pas : seule la fin de ' + per[2] + fn + ' compte.';
+      case 'meche': return 'Le prix est passé ' + sousSur(v.s) + P0 + ' puis il est revenu. Cela ne compte pas : seule la fin ' + duPer(per) + fn + ' compte.';
       case 'meche_close': return 'Le prix est passé ' + sousSur(v.s) + P0 + ' un instant, puis il est revenu avant la fin ' + duPer(per) + ' : cela ne valide rien.';
-      case 'menace': return 'En ce moment le prix est ' + sousSur(v.s) + P0 + ', le niveau qui annule la figure. Cela ne compte que si ' + per[2] + ' finit ' + dessous(v.s) + fn + '.';
+      case 'menace': return 'En ce moment le prix est ' + sousSur(v.s) + P0 + ', le niveau qui annule la figure. ' + (deux
+        ? 'Il faut ' + per[1] + ' de suite ' + dessous(v.s) + ' : si ' + per[2] + ' finit ' + dessous(v.s) + fn + ', ce sera la ' + (n1 === 1 ? '1re' : n1 + 'e') + '.'
+        : 'Cela ne compte que si ' + per[2] + ' finit ' + dessous(v.s) + fn + '.');
       case 'cible': return 'Le prix touche en ce moment la cible théorique (' + P0 + '). Cela compte seulement si ' + per[2] + ' finit au-delà' + fn + '.';
-      case 'remise': return 'Le prix ' + (v.s > 0 ? 'dépasse ' : 'descend sous ') + P0 + ' : si cela tient jusqu’à la fin ' + duPer(per) + fn + ', la figure possible est annulée.';
+      case 'remise': {
+        const live = ctx && fini(ctx.live) ? ctx.live : null, haut = v.s > 0;
+        return 'Le plus ' + (haut ? 'haut' : 'bas') + ' de ' + per[2] + ' (' + prix(v.ext, unite) + ') est passé ' + (haut ? 'au-dessus de ' : 'sous ') + P0 + ' : '
+          + (famille(f) === 'ete' ? 'plus loin que la tête' : 'les ' + (f.s > 0 ? 'sommets' : 'creux') + ' ne sont plus au même niveau') + '. À la fin ' + duPer(per) + fn + ', la figure possible sera annulée, même si le prix ' + (haut ? 'redescend' : 'remonte')
+          + (live !== null ? ' (il est à ' + prix(live, unite) + ')' : '') + '.';
+      }
       default: return '';
     }
   }
@@ -2054,13 +2279,13 @@ const Guide = (function () {
     const j = ctx && fini(ctx.j) ? ctx.j : (ctx && ctx.n) || 0, N = niveauxFigure(f, j, P), itv = nomIntervalle(ctx && ctx.intervalle), b = bandeSortie(f);
     const obj = o => prix(o.p, unite);
     if (N.confirme) return 'Maintenant : invalidation = clôture ' + itv + (N.invals[0].s > 0 ? ' > ' : ' < ') + prix(N.invals[0].p, unite) + ' · objectif théorique (convention, non garanti) : ' + obj(N.objectifs[0]) + ' · horizon ' + P.horizon + ' bougies.';
-    const sorties = N.sorties.map(x => '2 clôtures ' + itv + (x.s > 0 ? ' > ' : ' < ') + prix(x.seuil, unite) + (b ? ' (ligne ' + chiffres(x.ligne) + ' ' + (x.s > 0 ? '+' : '−') + ' bande ' + chiffres(b) + ')' : '')).join(' ou ');
-    const invals = N.invals.map(iv => (iv.clotures === 2 ? '2 clôtures' : 'clôture') + (iv.s > 0 ? ' > ' : ' < ') + prix(iv.p, unite) + ' (' + { extreme: 'extrême', tete: 'tête', recul: 'recul > ' + nombre(P.drapeau.retrait * 100, 0) + ' % du mât', sortie_contraire: 'sortie contraire' }[iv.raison] + ')');
-    const ab = f.ebauche && fini(f.abandonP) ? ' · abandon de l’ébauche = extrême ' + (f.s > 0 ? '> ' : '< ') + prix(f.abandonP, unite) + ' (autres ' + (f.s > 0 ? 'sommets' : 'creux') + ' ' + (f.s > 0 ? '+' : '−') + ' tol. ' + chiffres(f.tol) + ', figée)' : '';
+    const sorties = N.sorties.map(x => '2 clôtures ' + itv + (x.s > 0 ? ' > ' : ' < ') + prix(x.seuil, unite) + (b ? ' (ligne ' + prix(x.ligne, unite) + ' ' + (x.s > 0 ? '+' : '−') + ' bande ' + prixRond(b, unite) + ')' : '')).join(' ou ');
+    const invals = N.invals.filter(iv => !(f.ebauche && (iv.raison === 'extreme' || iv.raison === 'tete'))).map(iv => (iv.clotures === 2 ? '2 clôtures' : 'clôture') + (iv.s > 0 ? ' > ' : ' < ') + prix(iv.p, unite) + ' (' + { extreme: 'extrême', tete: 'tête', recul: 'recul > ' + nombre(P.drapeau.retrait * 100, 0) + ' % du mât', sortie_contraire: 'sortie contraire' }[iv.raison] + ')');
+    const ab = f.ebauche && fini(f.abandonP) ? ' · abandon de l’ébauche = ' + (f.s > 0 ? 'plus haut > ' : 'plus bas < ') + prix(f.abandonP, unite) + (famille(f) === 'ete' ? ' (la tête)' : ' (autres ' + (f.s > 0 ? 'sommets' : 'creux') + ' ' + (f.s > 0 ? '+' : '−') + ' tol. ' + prixRond(f.tol, unite) + ', figée)') + ', jugé sur l’extrême de la bougie, pas la clôture' : '';
     const objs = N.objectifs.map(o => (N.objectifs.length > 1 ? (o.s > 0 ? '↑ ' : '↓ ') : '') + obj(o)).join(' / ');
     const base = famille(f) === 'drapeau' ? 'mât reporté' : famille(f) === 'lignes' ? 'largeur ' + prix(f.hauteur, unite) + ' reportée' : 'hauteur ' + prix(f.hauteur, unite) + ' reportée';
     return 'Maintenant : validation = ' + sorties + ' (ou 1 clôture + retour réussi, ≤ ' + P.retourMax + ')' + (invals.length ? ' · invalidation = ' + invals.join(' ou ') : '') + ab
-      + (fini(N.pointe) ? ' · pointe à ' + heureCourteUTC(finMs(ctx, Math.floor(N.pointe))) + ' (sans sortie : sans suite)' : '') + ' · objectif théorique (convention, non garanti) : ' + objs + ' (' + base + ').';
+      + (fini(N.pointe) ? ' · pointe à ' + heureCourteUTC(finMs(ctx, Math.floor(N.pointe)), ctx) + ' (sans sortie : sans suite)' : '') + ' · objectif théorique (convention, non garanti) : ' + objs + ' (' + base + ').';
   }
   const QUOI_JOURNAL = { repere: 'repéré', ebauche: 'ébauche', suivi: 'point en attente déplacé', recalage: 'recalé', demi: 'sortie 1/2', retour: 'retour', sortie_annulee: 'sortie non confirmée',
     confirme: 'confirmé', atteint: 'objectif atteint', invalide: '✗ invalidé', invalide_avant: '✗ invalidé', expire_avant: 'sans suite', expire: 'délai écoulé', devenu_triple: 'devenu un triple' };
@@ -2068,11 +2293,22 @@ const Guide = (function () {
   function texteJournal(f, ctx, unite) {
     const J = (f.journal || []).filter(x => QUOI_JOURNAL[x.quoi]);
     if (!J.length) return '';
-    const parts = J.slice(-8).map(x => heureUTC(finMs(ctx, x.j)) + ' ' + QUOI_JOURNAL[x.quoi]
+    // L'heure UTC seule le même jour ; la date (jj/mm) à chaque changement de jour, ou partout sur
+    // des bougies de 4 h et plus (un jour : la date seule).
+    const J8 = J.slice(-8), plusieurs = new Set(J8.map(x => fini(finMs(ctx, x.j)) ? dateUTC(finMs(ctx, x.j)) : '')).size > 1;
+    let jourPrec = null;
+    const quand = ms => {
+      if (!fini(ms)) return '—';
+      if (ctx && ctx.pas >= 86400) return dateUTC(ms);
+      const d = dateUTC(ms), montre = (ctx && ctx.pas >= 4 * 3600) || (jourPrec === null ? plusieurs || avecDate(ms, ctx) : d !== jourPrec);
+      jourPrec = d;
+      return (montre ? d + ' ' : '') + heureUTC(ms);
+    };
+    const parts = J8.map(x => quand(finMs(ctx, x.j)) + ' ' + QUOI_JOURNAL[x.quoi]
       + (x.quoi === 'repere' && x.triple ? ' (3e ' + (/creux/.test(f.type) ? 'creux' : 'sommet') + ' : le double devient un triple)' : '')
       + (x.quoi === 'recalage' && x.apres ? ' (bornes ' + chiffres(x.avant[0]) + ' / ' + chiffres(x.avant[1]) + ' → ' + chiffres(x.apres[0]) + ' / ' + chiffres(x.apres[1]) + ')' : '')
       + ((x.quoi === 'demi' || x.quoi === 'confirme' || x.quoi === 'invalide' || x.quoi === 'invalide_avant' || x.quoi === 'atteint') && fini(x.c) ? ' (clôture ' + prix(x.c, unite) + ')' : ''));
-    return 'Observé (heures UTC, fin de bougie) : ' + (J.length > 8 ? '… · ' : '') + parts.join(' · ') + '.';
+    return 'Observé (' + (ctx && ctx.pas >= 86400 ? 'dates UTC' : 'heures UTC') + ', fin de bougie) : ' + (J.length > 8 ? '… · ' : '') + parts.join(' · ') + '.';
   }
   /** La lecture classique (débattue) d'un type, à côté du partage mesuré des sorties (Expert). */
   const CLASSIQUE = { biseau_montant: 'sortie par le bas', biseau_descendant: 'sortie par le haut', drapeau: 'sortie dans le sens du mât', fanion: 'sortie dans le sens du mât',
@@ -2084,7 +2320,7 @@ const Guide = (function () {
     out.push('Règle (seuils de convention) : ' + regleExpert(f, P, unite) + ' Détection mécanique sur les bougies ' + itv + ' closes (pivots : ' + P.pivot + ' bougies de chaque côté).'
       + (f.ebauche ? ' Ébauche : le dernier ' + (f.s > 0 ? 'sommet' : 'creux') + ' (' + prix(f.pend.p, unite) + ') est en attente, il manque ' + f.pend.reste + ' bougie' + (f.pend.reste > 1 ? 's' : '') + ' ' + itv + ' pour le confirmer.' : ''));
     if (!f.fin) out.push(niveauxExpert(f, ctx, P, unite));
-    else out.push(marqueFin(f, ctx, 'expert', unite).replace(/^./, c => c.toUpperCase()) + '.' + (fini(f.objectif) && f.fin !== 'abandon' ? ' Objectif théorique (convention, non garanti) : ' + prix(f.objectif, unite) + '.' : ''));
+    else out.push(marqueFin(f, ctx, 'expert', unite).replace(/^./, c => c.toUpperCase()) + '.' + (fini(f.objectif) && f.fin !== 'abandon' ? (f.fin === 'atteint' ? ' Objectif théorique (convention, non garanti) : ' : ' Objectif (caduc) : ') + prix(f.objectif, unite) + '.' : ''));
     if (b) {
       let t = texteBilan(b, ctx, P, 'expert');
       if (CLASSIQUE[f.type]) t += ' · lecture classique (débattue) : ' + CLASSIQUE[f.type] + ' ; ici, mesuré : ↑ ' + b.haut + ' / ↓ ' + b.bas + ' sur ' + (b.haut + b.bas);
@@ -2121,7 +2357,7 @@ const Guide = (function () {
 
   return { pctParam, nombre, prix, chiffres, pct, nomIntervalle, duree, heureUTC, niveauxDuJour, niveauxSR, niveauxPublies, choisirNiveaux, libelleNiveau,
     prixR, tagLu, artLu, quoi, bord, etatFerme, etatLive, texteEtatLive, texteEtatMax, MOTS, centile, regime, texteRegime, pivots, regression, regressionParallele,
-    detecter, bilan, formesAffichees, etatForme, NOMS_FORMES, texteBilan, suite, texteSuite, VARIANTES_SUITE, tagMicro, deArt, decrire, decrireCompact, lecture, VARIANTES_LECTURE, phraseForme, TYPES, bornes,
+    detecter, bilan, formesAffichees, formesDebutant, idFigure, etatForme, NOMS_FORMES, texteBilan, suite, texteSuite, VARIANTES_SUITE, tagMicro, deArt, decrire, decrireCompact, lecture, VARIANTES_LECTURE, phraseForme, TYPES, bornes,
     FAMILLES, famille, groupeVue, enAttente, candidats, avancer, niveauxFigure, figureVivante, cleFigure, niveauAbandon, wilson, ecartTemoin, dernierPoint, rangFigure, concurrentes, tombees, phaseA, classer, deuxDroites, ete, drapeau, tripleExtreme, doubleExtreme, range, ligne,
     NOMS_DEBUTANT, raisonPrincipale, choixDebutant, reperesDe, choisirReperes, VERBE_DEBUTANT, optionsSeules, libelleDebutant, libellesDebutant, formatDebutant, AVEC_POINT, titreDebutant, nomDebutant, nomPhrase, HORIZON_DEBUTANT, HORIZON_COURT, PERIODE_DEBUTANT, phrasesDebutant, phraseDebutant,
     texteSuiteDebutant, prixRond, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureParis, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),

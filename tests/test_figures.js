@@ -89,8 +89,11 @@ titre('1. Les 16 types sur la fixture : type, objectif, invalidations, sans suit
   check('invalidations : extrême (doubles, triples), tête puis épaule (ETE), milieu (deux droites), recul ou sortie contraire puis bout de la pause (drapeaux)', !raisons.length, raisons.slice(0, 5));
   const pointes = R.formes.filter(f => f.fin === 'expire_avant' && f.raison === 'pointe');
   check(`sans suite à la pointe (${pointes.length} cas) : jamais avant la pointe`, pointes.length > 0 && pointes.every(f => f.jFin >= f.apex), pointes.map(f => [f.type, f.jFin, f.apex]));
-  const confAvant = R.formes.filter(f => f.jConf !== null && f.jConf <= f.t);
-  check('aucune figure comptée n’est confirmée avant d’être repérable', !confAvant.length, confAvant.map(f => [f.type, f.t, f.jConf]));
+  // Repérable : à sa naissance, ou (figure née d'une ébauche vue à l'écran) à celle de son ébauche.
+  const confAvant = R.formes.filter(f => f.jConf !== null && f.jConf <= (f.depuisEbauche ? f.t0Ebauche : f.t));
+  check('aucune figure comptée n’est confirmée avant d’être repérable (à sa naissance, ou à celle de l’ébauche dont elle vient)', !confAvant.length, confAvant.map(f => [f.type, f.t, f.jConf]));
+  const viaEb = R.formes.filter(f => f.depuisEbauche);
+  check(`figures nées d'une ébauche déjà sortie (${viaEb.length}) : l'ébauche de même identité était vivante et est « devenue » cette figure`, viaEb.every(f => R.ebauches.liste.some(e => e.devenue === f && e.t0 === f.t0Ebauche)), viaEb.map(f => [f.type, f.t]));
 }
 
 // ── 1 bis. Le niveau annoncé est celui que la machine applique (A2) ──
@@ -160,7 +163,8 @@ titre('2. Règles d’élimination');
   check('ETE aux épaules dissemblables : refusée (épaules à 0 ATR l’une de l’autre exigées)', etes.every(f => { const g = refaire(f, avec('ete', { epaulesAtr: 0 })); return !g || g.T.i !== f.T.i; }));
   // Deux droites : la pointe trop proche, des pivots serrés.
   const dd = R.formes.filter(f => fam(f) === 'lignes' && f.type !== 'range' && !f.tMaj);
-  const refaireL = (f, Q) => G.deuxDroites(connus(piv.hauts, f.t), connus(piv.bas, f.t), H, L, C, f.t, A[f.t], Q);
+  // (Une figure née de son ébauche garde la tolérance figée de celle-ci : son ATR de naissance, atrN.)
+  const refaireL = (f, Q) => G.deuxDroites(connus(piv.hauts, f.t), connus(piv.bas, f.t), H, L, C, f.t, f.atrN || A[f.t], Q);
   check(`deux droites (${dd.length}) : retrouvées avec les seuils de la page`, dd.length > 0 && dd.every(f => { const g = refaireL(f, P); return g && g.type === f.type; }), dd.filter(f => { const g = refaireL(f, P); return !g || g.type !== f.type; }).map(f => [f.type, f.t]));
   check('triangle ou biseau repéré trop près de sa pointe (avancementMax = 0) : refusé', dd.filter(f => isFinite(f.apex)).every(f => { const g = refaireL(f, avec('lignes', { avancementMax: 0 })); return !g || !isFinite(g.apex) || g.debut !== f.debut; }));
   check('droites à pivots serrés (étalement exigé > 100 %) : refusées', dd.every(f => !refaireL(f, avec('lignes', { etalement: 1.01 }))));
@@ -249,6 +253,8 @@ titre('6. Mots : libellés, bulles, mêmes valeurs, heures');
   const lib = new Set();
   for (const type of G.TYPES) for (const e of etats) { const l = G.libelleFormeDebutant(Object.assign({ type, sens: 1 }, e)); if (l) lib.add(l); }
   for (const l of Object.values(G.LIBELLES_VIVANTS)) lib.add(l);
+  // Les libellés vivants (nom + état du moment) de chaque type et de chaque état vivant.
+  for (const type of G.TYPES) for (const e of etats.filter(x => !x.fin)) for (const l of G.libellesPossiblesDebutant(Object.assign({ type, sens: 1, abandonP: 1 }, e))) lib.add(l);
   const L0 = [...lib], trop = L0.filter(l => l.length > DEB.forme), sales = L0.filter(l => G.motsBannis(l).length || CONSEIL.test(l) || /%/.test(l));
   check(`${L0.length} libellés Débutant distincts : ≤ ${DEB.forme} caractères, aucun mot banni, aucun conseil`, L0.length >= 40 && !trop.length && !sales.length, { trop, sales });
   // Bulles, sur les figures montrées à 40 instants de la fixture, dans les deux modes.
@@ -307,8 +313,10 @@ titre('7. États vivants (figureVivante) ; une ébauche ne naît qu’à une cl�
   const v1 = G.figureVivante(f, Sv, j, { high: x.ligne + 50, low: x.seuil - 30 }, x.seuil - 20, P);
   const v2 = G.figureVivante(f, Sv, j, { high: x.ligne + 50, low: x.seuil - 30 }, x.ligne + 10, P);
   const t1 = G.texteVivantFigure(f, v1, ctx, 'expert', '$'), t2 = G.texteVivantFigure(f, v2, ctx, 'expert', '$');
-  check('prix live au-delà de la ligne de cou : « franchi », « à confirmer à la fin de la bougie » ; Débutant « Ligne passée, à confirmer »', v1.cle === 'franchi' && /à confirmer à la fin de la bougie/.test(t1) && G.libelleVivantDebutant(f, v1) === 'Ligne passée, à confirmer', [v1.cle, t1]);
-  check('mèche seule (la bougie en cours y est allée, le prix est revenu) : « percé en mèche » ; Débutant « Passé et revenu, à suivre »', v2.cle === 'meche' && /percé en mèche/.test(t2) && G.libelleVivantDebutant(f, v2) === 'Passé et revenu, à suivre', [v2.cle, t2]);
+  // (Comportement changé exprès : le libellé Débutant garde le nom de la figure et ne revient pas en
+  // arrière avant la clôture — il ne clignote plus quand le prix oscille autour de la ligne.)
+  check('prix live au-delà de la ligne de cou : « franchi », « à confirmer à la fin de la bougie » ; Débutant « Double sommet à confirmer » (le nom reste)', v1.cle === 'franchi' && v1.etiq === 'sortie' && /à confirmer à la fin de la bougie/.test(t1) && G.libelleVivantDebutant(f, v1) === 'Double sommet à confirmer', [v1.cle, t1, G.libelleVivantDebutant(f, v1)]);
+  check('mèche seule (la bougie en cours y est allée, le prix est revenu) : « percé en mèche » ; Débutant : le MÊME libellé qu’au-delà (pas de clignotement), la bulle dit la différence', v2.cle === 'meche' && /percé en mèche/.test(t2) && G.libelleVivantDebutant(f, v2) === G.libelleVivantDebutant(f, v1), [v2.cle, t2]);
   const tD = G.texteVivantFigure(f, v2, ctx, 'debutant', '$');
   check('… en Débutant : « Cela ne compte pas : seule la fin de … compte », l’heure de Paris, aucun mot banni', /Cela ne compte pas : seule la fin d/.test(tD) && /\d\dh\d\d/.test(tD) && !G.motsBannis(tD).length, tD);
   check('un état vivant ne change jamais la figure (phase, demi, journal)', JSON.stringify(f) === avant);
@@ -385,9 +393,10 @@ titre('6 bis. Figure tombée avant validation : la définition s’arrête avant
   const faux = [];
   for (const f of tombees) {
     const t = G.texteFormeDebutant(f, R.bilan[f.type], ctxDe(f.jFin + 2), P, '$').join(' ');
-    if (/puis (il|le prix) (est passé|en est sorti|est sorti)|puis il en est sorti/.test(t) || !/la sortie n’a pas été validée/.test(t)) faux.push({ type: f.type, t: t.slice(0, 200) });
+    // (Mots changés exprès : « tombée avant d’être validée » ; la cible d'une figure tombée n'est plus dite.)
+    if (/puis (il|le prix) (est passé|en est sorti|est sorti)|puis il en est sorti/.test(t) || !/la figure est tombée avant d’être validée/.test(t) || /[Cc]ible théorique/.test(t)) faux.push({ type: f.type, t: t.slice(0, 200) });
   }
-  check(`${tombees.length} figures tombées avant validation : « la sortie n’a pas été validée », jamais « puis … sorti »`, tombees.length > 5 && !faux.length, faux.slice(0, 3));
+  check(`${tombees.length} figures tombées avant validation : « la figure est tombée avant d’être validée », jamais « puis … sorti », pas de cible`, tombees.length > 5 && !faux.length, faux.slice(0, 3));
 }
 
 // ── 4 ter. Rejeu repris d'une clôture à l'autre : le même résultat qu'un rejeu complet ──

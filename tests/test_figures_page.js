@@ -7,12 +7,17 @@
 //   1. ÉBAUCHE : Débutant « … possible » (registre debItem 'forme'), au plus 5 textes, tirets fins et
 //      point creux ; Expert : le libellé dit « ébauche » et les comptes mesurés.
 //   2. BOUGIE EN COURS : le prix live passe la ligne qui valide, puis revient en ne laissant qu'une
-//      mèche : le calque dit « Ligne passée, à confirmer » puis « Passé et revenu, à suivre » ; le
-//      graphique n'est pas redessiné ; le libellé de la clôture ne change pas.
+//      mèche : le calque dit « <Nom> à confirmer » et le GARDE quand le prix revient (le libellé lit
+//      le plus haut / le plus bas de la bougie : il ne clignote pas, il garde le nom de la figure) ;
+//      la bulle dit « Cela ne compte pas » / « percé en mèche » ; le graphique n'est pas redessiné ;
+//      le libellé de la clôture ne change pas.
 //   3. CLÔTURES SUCCESSIVES : « … à confirmer » (1/2), puis « … confirmé » (2/2) ; Expert : l'objectif
 //      théorique est dessiné, ou une flèche au bord s'il est hors de l'échelle.
-//   4. INVALIDATION : « ✗ … invalidé » pendant garderInvalide bougies, de plus en plus pâle, puis
-//      plus rien ; bulle Expert « invalidé à HH:MM UTC » et journal ; bulle Débutant « (heure de Paris) ».
+//   4. INVALIDATION, clôture après clôture DANS UNE MÊME PAGE (le Débutant ne barre que la figure
+//      qu'il a dessinée : une page ouverte après coup ne la barre pas) : « ✗ … invalidé » pendant
+//      garderInvalide bougies, de plus en plus pâle, puis plus rien ; bulle Expert « invalidé à
+//      HH:MM UTC » et journal ; bulle Débutant « (heure de Paris) » ; une page ouverte APRÈS
+//      l'invalidation ne montre pas de ✗ pour une figure qu'elle n'a jamais dessinée.
 //   5. BULLES (survol à 1440, toucher à 390) : validation, invalidation, cible et « Mesuré sur »
 //      ensemble ; aucun mot banni ; bulle entière dans le tracé ; la ligne qui valide n'est couverte
 //      par aucun texte sur plus de 30 % de sa longueur visible (amendement C5).
@@ -193,7 +198,7 @@ async function bulle(o, tactile) {
     }
 
     // ── 2. La bougie en cours : ligne passée, puis mèche ; sans redessin du graphique ──
-    titre('2. Bougie en cours : « Ligne passée, à confirmer », puis « Passé et revenu, à suivre »');
+    titre('2. Bougie en cours : ligne passée, puis mèche — le libellé garde le nom de la figure');
     {
       const o = await ouvrir(nav, { iC: seq.iF, mode: 'debutant', w: 1440, h: 900 });
       const r = await o.page.evaluate(() => {
@@ -213,8 +218,12 @@ async function bulle(o, tactile) {
         cur.high = h0; cur.low = l0;
         return { base, apres: x.t, a, b, dc: window.__dc };
       });
-      check('le prix live au-delà de la ligne qui valide : le calque dit « Ligne passée, à confirmer » ; la bulle « Si … finit … (à HHhMM) »', r && r.a.t === 'Ligne passée, à confirmer' && r.a.item === r.a.t && /^En ce moment le prix est .* finit .*\(à \d\dh\d\d\)/.test(r.a.vivant), r);
-      check('il revient, une mèche reste : « Passé et revenu, à suivre » ; « Cela ne compte pas » (Débutant), « percé en mèche » (Expert)', r && r.b.t === 'Passé et revenu, à suivre' && /Cela ne compte pas/.test(r.b.vivant) && /percé en mèche/.test(r.b.expert), r && r.b);
+      // Changement voulu (revue des figures) : l'ancien libellé « Ligne passée, à confirmer » puis
+      // « Passé et revenu, à suivre » perdait le nom de la figure et clignotait quand le prix
+      // oscillait autour de la ligne ; le libellé garde désormais le nom et ne revient pas en arrière
+      // avant la clôture.
+      check(`le prix live au-delà de la ligne qui valide : le calque dit « ${nom} à confirmer » ; la bulle « Si … finit … (à HHhMM) »`, r && r.a.t === nom + ' à confirmer' && r.a.item === r.a.t && /^En ce moment le prix est .* finit .*\(à \d\dh\d\d\)/.test(r.a.vivant), r);
+      check('il revient, une mèche reste : le libellé ne change pas (pas de clignotement) ; « Cela ne compte pas » (Débutant), « percé en mèche » (Expert)', r && r.b.t === r.a.t && /Cela ne compte pas/.test(r.b.vivant) && /percé en mèche/.test(r.b.expert), r && r.b);
       check('… sans redessiner le graphique (calque seul), et le libellé de la clôture ne change pas', r && r.dc === 0 && r.base === r.apres, r && { dc: r.dc, base: r.base, apres: r.apres });
       check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();
@@ -239,13 +248,25 @@ async function bulle(o, tactile) {
       await x.ctx.close();
     }
 
-    // ── 4. Invalidation et effacement ──
+    // ── 4. Invalidation et effacement, clôture après clôture dans une même page ──
+    // Changement voulu (revue des figures) : le Débutant ne barre (✗) que la figure qu'il a dessinée
+    // à la clôture d'avant son issue (mémoire de la page). Le test n'ouvre donc plus une page neuve
+    // à chaque instant : il ouvre la page avant l'invalidation et fait avancer les clôtures dedans.
     titre('4. Invalidation : ✗ pendant ' + P.garderInvalide + ' bougies, de plus en plus pâle, puis plus rien');
     {
       const nomI = G.NOM_FORME_DEBUTANT[inv.f.type], alphas = [];
-      let okLib = true, vuApres = null;
+      let okLib = true, vuApres = null, avant = null;
+      const o = await ouvrir(nav, { iC: inv.iI - 1, mode: 'debutant', w: 1440, h: 900 });
+      await o.page.evaluate(rows => { window.__K = rows; }, K);
+      const avancer = iC => o.page.evaluate(([iC, v]) => {
+        const K = window.__K, o0 = K.findIndex(y => y[0] === candles[0].time), x = K[iC];
+        const cours = { time: x[0], open: x[1], high: Math.max(x[1], x[4]), low: Math.min(x[1], x[4]), close: x[4], volume: x[5] };
+        candles = K.slice(o0, iC).map(y => ({ time: y[0], open: y[1], high: y[2], low: y[3], close: y[4], volume: y[5] })).concat([cours]);
+        viewEnd = candles.length; viewStart = Math.max(0, viewEnd - v); livePrice = x[4]; memoCache.clear(); drawChart();
+      }, [iC, VUE]);
+      avant = await lireEtat(o.page);
       for (let k = 0; k <= P.garderInvalide + 1; k++) {
-        const o = await ouvrir(nav, { iC: inv.iI + k, mode: 'debutant', w: 1440, h: 900 });
+        await avancer(inv.iI + k);
         const e = await lireEtat(o.page);
         if (k <= P.garderInvalide) {
           if (!(e.debForme && e.debForme.t === '✗ ' + nomI + ' invalidé' && e.debForme.croix)) okLib = false;
@@ -254,11 +275,19 @@ async function bulle(o, tactile) {
         if (k === 0) {
           const b = await bulle(o, false);
           check('bulle Débutant : « Invalidé à HHhMM (heure de Paris) », jamais « UTC »', b && /Invalidé à \d\dh\d\d \(heure de Paris\)/.test(b.texte) && !/UTC/.test(b.texte), b && b.texte.slice(0, 300));
+          await o.page.mouse.move(2, 2);
         }
-        await o.ctx.close();
       }
+      check(`la figure est dessinée vivante à la clôture d’avant (« ${avant && avant.debForme ? avant.debForme.t : '—'} »)`, avant && avant.debForme && avant.debForme.type === inv.f.type && !avant.debForme.croix, avant && avant.debForme);
       check(`« ✗ ${nomI} invalidé » avec sa croix pendant ${P.garderInvalide} bougies`, okLib, alphas);
       check('… de plus en plus pâle (alpha lu dans l’état de dessin), puis plus rien', alphas.every((a, k) => a !== null && (!k || a < alphas[k - 1])) && (!vuApres || vuApres.t !== '✗ ' + nomI + ' invalidé'), { alphas, vuApres });
+      check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+      // Une page ouverte après coup n'a pas vu la figure vivante : pas de ✗ pour elle.
+      const neuve = await ouvrir(nav, { iC: inv.iI, mode: 'debutant', w: 1440, h: 900 });
+      const en = await lireEtat(neuve.page);
+      check('une page ouverte après l’invalidation ne barre pas une figure qu’elle n’a jamais dessinée', !(en.debForme && en.debForme.croix), en.debForme);
+      await neuve.ctx.close();
       const x = await ouvrir(nav, { iC: inv.iI, mode: 'expert', w: 1440, h: 900 });
       const b = await bulle(x, false);
       check('bulle Expert : « invalidé à HH:MM UTC (HHhMM Paris) » et le journal (« Observé »)', b && /invalidé à \d\d:\d\d UTC \(\d\dh\d\d Paris\)/.test(b.texte) && /Observé/.test(b.texte), b && b.texte.slice(0, 400));
