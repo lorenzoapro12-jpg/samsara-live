@@ -87,6 +87,8 @@ const textes = page => page.evaluate(() => {
       if (r.rect) {
         const x = r.cv.x + r.rect.x + r.rect.w / 2, y = r.cv.y + r.rect.y + r.rect.h / 2;
         await o.page.mouse.move(x - 10, y); await o.page.mouse.move(x, y, { steps: 3 }); await o.page.waitForTimeout(250);
+        // Le résumé d'abord ; le clic ouvre le détail de la bulle.
+        if (await o.page.evaluate(() => !!(scenEtat && scenEtat.bulle && scenEtat.bulle.resume))) { await o.page.mouse.click(x, y); await o.page.waitForTimeout(250); }
         const b = await o.page.evaluate(() => (scenEtat && scenEtat.bulle ? scenEtat.bulle.corps.join(' ') : ''));
         check(`${vue.width} : bulle dessinée du libellé : le scénario 2 y est nommé (« ${(b.match(/[^.]*scénario 2[^.]*/i) || [''])[0].slice(0, 120)} »)`, /le plus près de ce que décrit le scénario 2|scénario 2 a été nommé|scénario 2 suit le mieux|Nommé[^.]* le scénario 2\b|La ligne des scénarios \(place prise\) : « En direct : le 2/.test(b.replace(/\s+/g, ' ')), b.slice(0, 900));
       }

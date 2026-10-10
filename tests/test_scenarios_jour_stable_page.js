@@ -24,12 +24,17 @@ if (!H.playwright) {
 let ko = 0;
 const check = (nom, ok, det) => { if (!ok) ko++; console.log(`  ${ok ? '✓' : '✗'} ${nom}${!ok && det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 700) : ''}`); };
 const titre = t => console.log(`\n── ${t} ──`);
-/** Survole (souris) ou touche (doigt) le centre d'un rectangle du tracé ; rend la bulle dessinée. */
+/** Survole (souris) ou touche (doigt) le centre d'un rectangle du tracé ; rend la bulle dessinée.
+ *  En Débutant, la bulle montre d'abord son résumé : un 2e toucher (ou un clic) ouvre le détail, rendu ici. */
 async function survoler(o, rect, doigt) {
-  const cv = await o.page.evaluate(() => canvas.getBoundingClientRect().toJSON());
+  const cv = await o.page.evaluate(() => Object.assign(canvas.getBoundingClientRect().toJSON(), { deb: debutant() }));
   const x = cv.x + rect.x + Math.min(rect.w / 2, 40), y = cv.y + rect.y + rect.h / 2;
   if (doigt) await o.page.touchscreen.tap(x, y); else { await o.page.mouse.move(x - 10, y); await o.page.mouse.move(x, y, { steps: 3 }); }
   await o.page.waitForTimeout(300);
+  if (cv.deb && await o.page.evaluate(() => !!(scenEtat && scenEtat.bulle && scenEtat.bulle.resume))) {
+    if (doigt) await o.page.touchscreen.tap(x, y); else await o.page.mouse.click(x, y);
+    await o.page.waitForTimeout(300);
+  }
   return o.page.evaluate(() => (scenEtat && scenEtat.bulle ? scenEtat.bulle.corps.join(' ').replace(/\s+/g, ' ') : ''));
 }
 

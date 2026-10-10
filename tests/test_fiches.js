@@ -139,7 +139,8 @@ check('ratio affiché « 1,00 » (L/S, carnet) : « Autant de… », jamais « P
   check('guide, guide_regime, guide_suite : une explication du Débutant qui décrit l’écran Débutant (ni badge, ni chemins dessinés, « + Affichage »)', ['guide', 'guide_regime', 'guide_suite'].every(k => T.FICHES[k].simpleDeb)
     && /« \+ Affichage »/.test(T.FICHES.guide.simpleDeb) && /pas de badge/.test(T.FICHES.guide_regime.simpleDeb) && /rien n’est dessiné/.test(T.FICHES.guide_suite.simpleDeb));
   const fg = T.ficheHtml('guide_regime');
-  check('fiche avec texte du Débutant : les deux explications, chacune dans sa classe ; les deux titres de même', /<p class="fiche-simple expert-seul">/.test(fg) && /<p class="fiche-simple debutant-seul">/.test(fg) && /<span class="debutant-seul">Le mouvement du prix<\/span>/.test(fg));
+  check('fiche avec texte du Débutant : les deux explications, chacune dans sa classe (celle du Débutant en gras, son texte entier sous « En savoir plus ») ; les deux titres de même', /<p class="fiche-simple expert-seul">/.test(fg) && /<p class="fiche-simple fiche-quoi debutant-seul"><b>/.test(fg)
+    && fg.slice(fg.indexOf('<details class="fiche-plus">')).includes(esc(T.FICHES.guide_regime.simpleDeb)) && /<span class="debutant-seul">Le mouvement du prix<\/span>/.test(fg));
   // Autre paire : les cartes du Débutant nomment le bitcoin (le fichier ne suit que lui).
   const sym = T.activeSymbol;
   T.activeSymbol = 'SOLUSDT';
@@ -243,7 +244,7 @@ titre('9. Chaque indicateur du menu : comment les traders l’utilisent, comment
   MODE.v = 'expert';
   const apExp = T.apercuHtml('ichimoku');
   check('aperçu du menu : titre, « C’est quoi ? », usage des traders, calcul, lien vers la fiche ; en Débutant, ses mots à lui', /C’est quoi \?/.test(apExp) && /Comment les traders l’utilisent/.test(apExp) && /Comment c’est calculé/.test(apExp) && /ouvrirFiche\('ichimoku'/.test(apExp)
-    && apDeb.includes(T.FICHES.guide.titreDeb) && apDeb.includes(T.FICHES.guide.usage.deb.slice(0, 30)) && !Gd.motsBannis(apDeb.replace(/<[^>]+>/g, ' ')).length && !Gd.motsBannis(apVide.replace(/<[^>]+>/g, ' ')).length, { apDeb, apExp });
+    && apDeb.includes(T.FICHES.guide.titreDeb) && apDeb.includes(T.COURT.guide.usage.slice(0, 30)) && apDeb.includes(T.COURT.guide.quoi) && !Gd.motsBannis(apDeb.replace(/<[^>]+>/g, ' ')).length && !Gd.motsBannis(apVide.replace(/<[^>]+>/g, ' ')).length, { apDeb, apExp });
   // Les dents : les formules des nouvelles fiches suivent PARAM.
   const sauveP = JSON.stringify(T.PARAM);
   T.PARAM.ichimoku.tenkan = 7; T.PARAM.sar.max = 0.3; T.PARAM.vp.zoneValeur = 0.68; T.PARAM.fib.niveaux = [0, 0.5, 1];
@@ -263,8 +264,8 @@ titre('10. Les nombres des textes sont LUS (PARAM, meta.champs, CADENCES, carte 
   const table = nom => { const i = src.indexOf('const ' + nom + ' = {'); if (i < 0) return null; let k = src.indexOf('{', i), n = 0; const d = k;
     do { n += { '{': 1, '}': -1 }[src[k]] || 0; k++; } while (n && k < src.length); return src.slice(d, k); };
   const UNITE = /\d+(?:[,.]\d+)?\s*(?:%|\$|h\b|min\b|minutes?\b|s\b|secondes?\b|bougies?\b|jours?\b|heures?\b|semaines?\b|mois\b|BTC\b|ATR\b)/;
-  const enDur = ['TRADERS', 'CALCUL', 'USAGES'].flatMap(nom => { const b = table(nom); return b === null ? [nom + ' introuvable'] : (b.match(/'(?:[^'\\\n]|\\.)*'/g) || []).filter(t => UNITE.test(t)).map(t => nom + ' : ' + t); });
-  check('TRADERS, CALCUL, USAGES : aucun nombre avec unité écrit en dur', !enDur.length, enDur);
+  const enDur = ['TRADERS', 'CALCUL', 'USAGES', 'COURT'].flatMap(nom => { const b = table(nom); return b === null ? [nom + ' introuvable'] : (b.match(/'(?:[^'\\\n]|\\.)*'/g) || []).filter(t => UNITE.test(t)).map(t => nom + ' : ' + t); });
+  check('TRADERS, CALCUL, USAGES, COURT : aucun nombre avec unité écrit en dur', !enDur.length, enDur);
   check('les dents du contrôle : « 20 $ », « 8 h », « 14 bougies », « ±0,5 % », « 5 min » y tombent', ["'tranche de 20 $'", "'toutes les 8 h'", "'Wilder, 14 bougies'", "'à ±0,5 % du milieu'", "'bougie de 5 min'"].every(t => UNITE.test(t)));
   check('js/fiches.js : ni « 07h00 » ni seuil de prime 0.03 écrits dans le code', !/07h00|\b0\.03\b/.test(src));
   // Dynamique : chaque source change, le texte suit.
@@ -338,6 +339,43 @@ titre('11. Les fiches disent ce que la page calcule, avec les mots de l’écran
   check('figures : « validée » (plus « confirmée »), en tirets tant qu’elles se forment, une marque par issue (✗, –, ○)', !/« confirmé »|à confirmer|confirmée|confirmations/.test(txtF) && /en tirets/.test(fg.simpleDeb) && /en tirets/.test(T.FICHES.guide.usage.exp) && /en tirets/.test(T.FICHES.guide.usage.deb)
     && /délai écoulé –/.test(fg.simple) && /sans suite ○/.test(fg.simple) && /jamais sur un prix de clôture/.test(txtF));
   check('repères du Guide : l’heure de lecture sans « UTC » (heure de l’appareil)', !/UTC/.test([T.FICHES.guide_niveaux.simple, T.FICHES.guide_niveaux.limites, ...T.FICHES.guide_niveaux.lectures.map(l => l.t)].join(' ').replace(/journée UTC/g, '')));
+}
+
+// ── 12. En trois lignes : ce que lit d'abord le Débutant (demande du 10/10/2026) ──
+titre('12. Chaque fiche en trois lignes d’ado : ce que c’est, comment les traders s’en servent, comment c’est calculé');
+{
+  const Gd = require(path.join(REPO, 'js/guide.js'));
+  const C = T.COURT, ct = T.courtTexte;
+  // Les phrases d'un texte : un point, un « ? » ou un « ! » suivi d'un blanc ou de la fin.
+  const phrases = t => String(t).split(/(?<=[.?!…])\s+(?=[A-ZÀÂÉÈÊÎÔÛÇ«(+−0-9])/).filter(x => x.trim());
+  const ids = Object.keys(T.FICHES);
+  const sans = ids.filter(k => !C[k] || !ct(C[k].quoi) || !(ct(C[k].traders) || ct(C[k].usage)) || !ct(C[k].calcul));
+  check(`les ${ids.length} fiches ont leurs trois lignes (quoi, traders ou usage, calcul)`, !sans.length, sans);
+  const longs = ids.filter(k => C[k]).flatMap(k => [['quoi', 1], ['traders', 2], ['usage', 2], ['calcul', 2]].filter(([c, n]) => C[k][c] && phrases(ct(C[k][c])).length > n).map(([c]) => k + '.' + c + ' (' + phrases(ct(C[k][c])).length + ')'));
+  check('ce que c’est : une phrase ; l’usage et le calcul : deux phrases au plus', !longs.length, longs);
+  const tous = ids.filter(k => C[k]).flatMap(k => ['quoi', 'traders', 'usage', 'calcul'].filter(c => C[k][c]).map(c => [k + '.' + c, ct(C[k][c])]));
+  check('les dents du compte des phrases : « Un. Deux ? Trois ! » = 3, « 0,5 % du prix. » = 1', phrases('Un. Deux ? Trois !').length === 3 && phrases('0,5 % du prix.').length === 1);
+  const formules = tous.filter(([, t]) => /[=×÷√Σ]/.test(t));
+  check('le calcul en mots, sans formule (ni =, ×, ÷, √, Σ)', !formules.length, formules);
+  const conseils2 = tous.filter(([, t]) => CONSEIL.test(t));
+  check('aucune des trois lignes ne dit quoi faire, ni n’annonce de rebond ou de retour', !conseils2.length, conseils2);
+  // L'écran Débutant : ses fiches (glossaire) et les calques simples se lisent sans le vocabulaire des marchés.
+  const DEB = T.GLOSSAIRE_DEBUTANT.concat(['volume', 'ema', 'liq']);
+  const sales2 = DEB.flatMap(k => ['quoi', 'traders', 'usage', 'calcul'].filter(c => C[k][c]).map(c => [k + '.' + c, Gd.motsBannis(ct(C[k][c]))])).filter(([, b]) => b.length);
+  check(`fiches du Débutant (${DEB.join(', ')}) : leurs trois lignes sans mot de la liste du Guide`, !sales2.length, sales2);
+  // Ce que voit le Débutant à l'ouverture : la fiche sans les blocs .expert-seul ni « En savoir plus ».
+  const visibleDeb = h => h.replace(/<details class="fiche-plus">[\s\S]*<\/details>/, ' ').replace(/<(\w+) class="[^"]*expert-seul[^"]*">[\s\S]*?<\/\1>/g, ' ').replace(/<[^>]+>/g, ' ');
+  const vues = DEB.map(k => [k, Gd.motsBannis(visibleDeb(T.ficheHtml(k)).replace(/^\s*(Mesuré|Estimation|Règle d’usage|Horodatage|Seuil de ce code)\s*/, ''))]).filter(([, b]) => b.length);
+  check('à l’ouverture en Débutant, ces fiches se lisent sans mot de la liste du Guide (le détail est replié)', !vues.length, vues);
+  const rsi = T.ficheHtml('rsi');
+  check('fiche RSI : la phrase en gras, l’usage et le calcul courts pour le Débutant, les textes entiers pour l’Expert, puis « En savoir plus » qui garde tout (lectures, limites, formule)',
+    rsi.includes('<b>' + esc(ct(C.rsi.quoi)) + '</b>') && rsi.includes('<span class="debutant-seul">' + esc(ct(C.rsi.traders)) + '</span>') && rsi.includes('<span class="expert-seul">' + esc(T.FICHES.rsi.traders) + '</span>')
+    && /<details class="fiche-plus"><summary>En savoir plus<\/summary>[\s\S]*Le calcul en détail[\s\S]*À savoir[\s\S]*fiche-limites[\s\S]*fiche-technique[\s\S]*<\/details><p class="fiche-pied">/.test(rsi));
+  const sauveP2 = JSON.stringify(T.PARAM);
+  T.PARAM.rsi.periode = 21; T.PARAM.bb.periode = 30;
+  check('les trois lignes suivent PARAM (RSI 21, Bollinger 30)', ct(C.rsi.calcul).includes('les 21 dernières périodes') && ct(C.bb.calcul).includes('des 30 derniers prix'));
+  Object.assign(T.PARAM, JSON.parse(sauveP2));
+  check('RSI en trois lignes : la zone basse n’annonce rien (règle du propriétaire)', /pas des annonces/.test(ct(C.rsi.traders)) && !/rebond|remont|retour/.test(ct(C.rsi.traders) + ct(C.rsi_tf.traders) + ct(C.stoch.traders) + ct(C.mfi.traders)));
 }
 
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }

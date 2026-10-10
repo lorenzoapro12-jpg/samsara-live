@@ -8,7 +8,8 @@
 //      dans la même variante, chacune gardant sa condition (« si … ») ; la boîte du chemin vers
 //      le haut reste au-dessus de celle du chemin vers le bas ; un côté sans niveau nommé est dit.
 //   3. SURVOL : le centre de l'étiquette de chaque chemin montre l'explication du chemin.
-//   4. DOIGT : un tap sur le libellé d'une bande montre son explication ; un 2e tap la retire.
+//   4. DOIGT : un tap sur le libellé d'une bande montre le résumé de son explication ; un 2e, le
+//      détail ; un 3e la retire.
 //
 // Binance simulé (bougies déterministes) ; fichier publié recopié avec des murs et des niveaux
 // d'options posés près du prix simulé, lu « maintenant » ; scénarios du matin présents
@@ -216,9 +217,13 @@ const etat = page => page.evaluate(() => {
       await t.page.touchscreen.tap(x, y); await t.page.waitForTimeout(200);
       const apres = await t.page.evaluate(() => ({ survol: guideEtat.survol ? guideEtat.survol.titre : null, crossX, crossY }));
       check('tap sur le libellé d’une bande → son explication (bulle du Guide)', apres.survol === c.titre, { apres, attendu: c.titre });
+      // Débutant : le 1er tap montre le résumé de la bulle, le 2e son détail, le 3e la retire.
+      await t.page.touchscreen.tap(x, y); await t.page.waitForTimeout(200);
+      const detail = await t.page.evaluate(() => ({ survol: guideEtat.survol ? guideEtat.survol.titre : null, resume: guideEtat.bulle ? guideEtat.bulle.resume : null }));
+      check('… un 2e tap au même endroit ouvre son détail', detail.survol === c.titre && detail.resume === false, detail);
       await t.page.touchscreen.tap(x, y); await t.page.waitForTimeout(200);
       const retire = await t.page.evaluate(() => ({ survol: guideEtat.survol, crossX }));
-      check('… un 2e tap au même endroit la retire', retire.survol === null && retire.crossX === null, retire);
+      check('… un 3e tap au même endroit la retire', retire.survol === null && retire.crossX === null, retire);
     }
     check('écran tactile : aucune erreur JavaScript', !t.erreurs.length, t.erreurs);
     await t.ctx.close();

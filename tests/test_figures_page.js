@@ -152,17 +152,22 @@ const lireEtat = page => page.evaluate(() => {
   return { n: candles.length, deb: !!E.deb, items: debEtat ? debEtat.items.map(i => ({ role: i.role, texte: i.texte, rect: i.rect })) : null,
     figures: (E.figures || []).map(fig), debForme: E.debForme ? fig(E.debForme) : null, mainH: geo.mainH, top: geoPrix.top, ph: geoPrix.ph };
 });
-/** Survole (ou touche) le libellé de la figure ; rend la bulle. */
+/** Survole (ou touche) le libellé de la figure ; rend la bulle. En Débutant, la bulle montre
+ *  d'abord son résumé : un 2e toucher (ou un clic) ouvre le détail, qui est rendu ici. */
 async function bulle(o, tactile) {
   const pt = await o.page.evaluate(() => {
     const E = guideEtat, b = canvas.getBoundingClientRect();
     const c = E.cibles.find(x => x.figure && x.rects && x.rects.length);
-    return c ? { x: b.left + (c.rects[0].x0 + c.rects[0].x1) / 2, y: b.top + (c.rects[0].y0 + c.rects[0].y1) / 2 } : null;
+    return c ? { x: b.left + (c.rects[0].x0 + c.rects[0].x1) / 2, y: b.top + (c.rects[0].y0 + c.rects[0].y1) / 2, deb: debutant() } : null;
   });
   if (!pt) return null;
   if (tactile) await o.page.touchscreen.tap(pt.x, pt.y);
   else { await o.page.mouse.move(pt.x - 8, pt.y - 3); await o.page.mouse.move(pt.x, pt.y, { steps: 3 }); }
   await o.page.waitForTimeout(350);
+  if (pt.deb && await o.page.evaluate(() => !!(guideEtat.bulle && guideEtat.bulle.resume))) {
+    if (tactile) await o.page.touchscreen.tap(pt.x, pt.y); else await o.page.mouse.click(pt.x, pt.y);
+    await o.page.waitForTimeout(350);
+  }
   return o.page.evaluate(() => {
     const E = guideEtat;
     return E.survol && E.survol.figure ? { titre: E.survol.titre, corps: E.bulle ? E.bulle.corps.join(' ') : '', texte: E.survol.texte.join(' '), b: E.bulle ? { y: E.bulle.y, h: E.bulle.h } : null, mainH: geo.mainH } : null;
