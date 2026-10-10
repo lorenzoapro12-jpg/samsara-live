@@ -1161,8 +1161,11 @@ document.addEventListener('click', e => {
   if (ficheOuverte && p && !p.contains(e.target) && !(e.target.closest && e.target.closest('.info-btn, #legendesBtn'))) fermerFiche();
 });
 
-// ─── Lecture courte (mode débutant) : ce que dit la valeur DU MOMENT, sans conseil ─────────
+// ─── Lecture courte : ce que dit la valeur DU MOMENT, en mots, sans conseil ────────────────
 // Les seuils utilisés ici sont des CONVENTIONS ; la phrase le dit quand c'en est une.
+// lectureCourte : la phrase d'un bloc de chiffres, dans les deux modes (en Complet, à côté des
+// chiffres, plus discrète) ; le bloc qui la porte (envExpert / envDebutant) dit où elle se voit.
+// phraseCarte : les phrases propres aux cartes du Lisible.
 /** Les phrases des cartes en mode Débutant (sans jargon, sans seuil inventé) : le même bloc que
  *  lectureCourte, pour des cartes qui n'ont pas de fiche. cle : 'fourchette' (v : position dans
  *  la fourchette, de 0 au plus bas à 1 au plus haut ; v2 : « 24 h » ou « 5 jours » ; sujet : « le
@@ -1221,5 +1224,5 @@ function lectureCourte(id, v, v2) {
     case 'carnet': if (n(v)) t = r2(v) > 1 ? 'Plus de BTC posés à l’achat qu’à la vente près du prix.' : r2(v) < 1 ? 'Plus de BTC posés à la vente qu’à l’achat près du prix.' : 'Autant de BTC posés à l’achat qu’à la vente près du prix.'; break;
     default: t = null;
   }
-  return t ? '<div class="lecture-courte debutant-seul">' + echapF(t) + '</div>' : '';
+  return t ? '<div class="lecture-courte">' + echapF(t) + '</div>' : '';
 }

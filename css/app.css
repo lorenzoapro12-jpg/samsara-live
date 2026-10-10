@@ -1239,6 +1239,9 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
   margin-top: 6px; padding: 5px 8px; border-radius: 8px; font-size: 11px; line-height: 1.4;
   color: var(--ink-2); background: var(--rail); border-left: 2px solid var(--accent);
 }
+/* Complet : la phrase en mots se lit à côté des chiffres, un cran plus discrète qu'eux (niveau
+   « utile » : plus petite, sans fond) ; les chiffres restent ce qui se voit d'abord. */
+html[data-mode="expert"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7px; font-size: 10.5px; background: transparent; }
 /* Débutant, autre paire que BTCUSDT : les infos du marché parlent du bitcoin (js/app.js). */
 .deb-btc {
   margin: 0 0 8px; padding: 6px 9px; border-radius: 8px; font-size: 11.5px; line-height: 1.4;
@@ -1567,4 +1570,13 @@ html:not([data-mode="expert"]):not([data-structure="fenetres"]) .header-right { 
   html[data-mode="debutant"]:not([data-structure]) .header-left { padding-right: 44px; }
   html[data-mode="debutant"]:not([data-structure]) .header-right > #themeBtn { position: absolute; top: 6px; right: 6px; }
   html[data-mode="debutant"]:not([data-structure]) .indicator-bar { gap: 0; }
+}
+/* Téléphone de 400 px et moins, Complet : l'interrupteur « Lisible | Complet » est plus large que
+   l'ancien bouton « Expert ». Il se resserre, et les boutons des deux bouts rejoignent le bord de la
+   rangée : les boutons ronds gardent plus de 41 px de centre à centre (à 360 px, 40 sans cela). */
+@media (pointer: coarse) and (max-width: 400px) {
+  html[data-mode="expert"]:not([data-structure]) .mode-bascule { padding: 0; }
+  html[data-mode="expert"]:not([data-structure]) .mode-bascule .mode-btn { padding: 0 3px; }
+  html[data-mode="expert"]:not([data-structure]) .header-right > #feedBtn.ico-btn { margin-left: 2px; }
+  html[data-mode="expert"]:not([data-structure]) .header-right > #themeBtn.ico-btn { margin-right: 2px; }
 }

@@ -95,8 +95,18 @@ check('le mode est bien lu différemment', (MODE.v = null, T.modeCourant()) === 
 check('cartes du marché : HTML identique en débutant et en expert', deb === exp && deb.length > 1000, { deb: deb.length, exp: exp.length });
 const fichesIdentiques = Object.keys(T.FICHES).every(k => { MODE.v = null; const a = T.ficheHtml(k); MODE.v = 'expert'; return a === T.ficheHtml(k); });
 check('chaque fiche : HTML identique dans les deux modes', fichesIdentiques);
-check('les lectures courtes sont réservées au mode débutant', (deb.match(/lecture-courte/g) || []).length > 3
-  && (deb.match(/class="lecture-courte debutant-seul"/g) || []).length === (deb.match(/lecture-courte/g) || []).length);
+// Plan, mode Complet : les phrases de lecture en mots reviennent à côté des chiffres. Chaque bloc de
+// chiffres du Complet (funding, OI, L/S, CVD, GEX, prime, RSI 4 h, carnet ; VIX dans sa tuile commune)
+// porte sa phrase, sans classe de mode ; les phrases propres aux cartes du Lisible (phraseCarte)
+// restent réservées au Lisible. Aucune autre forme.
+{
+  const exp = (deb.match(/<div class="env-exp expert-seul">[\s\S]*?(?=<div class="env-deb debutant-seul">|<\/section>|$)/g) || []).join('');
+  const libres = deb.match(/class="lecture-courte"/g) || [], lisible = deb.match(/class="lecture-courte debutant-seul"/g) || [];
+  const dansExp = exp.match(/class="lecture-courte"/g) || [];
+  check(`lectures courtes : ${libres.length} phrases à côté des chiffres, visibles dans les deux modes (${dansExp.length} dans les blocs du Complet), ${lisible.length} propres au Lisible ; aucune autre forme`,
+    libres.length >= 9 && dansExp.length >= 8 && lisible.length >= 1 && libres.length + lisible.length === (deb.match(/lecture-courte/g) || []).length,
+    { libres: libres.length, dansExp: dansExp.length, lisible: lisible.length });
+}
 check('la formule est réservée au mode expert (dans chaque fiche)', Object.keys(T.FICHES).every(k => /class="expert-seul fiche-technique"/.test(T.ficheHtml(k))));
 
 // ── 5. Une lecture n'est pas un conseil ──────────────────────────────────────
@@ -328,7 +338,8 @@ titre('11. Les fiches disent ce que la page calcule, avec les mots de l’écran
   check('RSI : « suracheté » / « survendu » partout (plus « surachat » / « survente »), et rien n’annonce un retour', Object.values(T.FICHES).every(f => !/surachat|survente/.test([f.traders, f.simple, ...(f.lectures || []).map(l => l.t)].join(' ')))
     && /« suracheté »/.test(T.FICHES.rsi.traders) && !CONSEIL.test(T.FICHES.rsi.traders + T.FICHES.stoch.traders + T.FICHES.liq.traders + T.FICHES.atr.traders + T.FICHES.atr_tf.traders));
   const vix = [12, 20, 30].map(v => [T.lectureCourte('vix', v), T.phraseCarte('vix', v)]);
-  check('VIX : une seule phrase pour les mêmes repères (lecture courte = carte), sans mot technique', vix.every(([a, b]) => a === b && a && !Gd.motsBannis(a).length), vix);
+  const texteDe = h => h.replace(/<[^>]+>/g, '');
+  check('VIX : une seule phrase pour les mêmes repères (lecture courte = carte), sans mot technique', vix.every(([a, b]) => a && texteDe(a) === texteDe(b) && !Gd.motsBannis(a).length), vix);
   const lq = T.FICHES.liq;
   check('carte : un seul nom (« Ordres en attente (carte) »), plus de note sur les colonnes d’avant le 08/10, l’âge dit avec la cadence publiée', lq.titre === 'Ordres en attente (carte)' && !/08\/10/.test(lq.formule(T.PARAM))
     && lq.limites.includes('toutes les ' + T.CADENCES.attendue_min + ' min') && !/quart d’heure|vingtaine/.test(lq.limites));

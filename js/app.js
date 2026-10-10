@@ -8359,7 +8359,7 @@ function renderFeedTo(container) {
     '<div class="tuiles deb-une">'
     + envExpert(tuile('DXY', fmtNum(m.dxy_spot,2), ferme ? 'clôture' + (m.dxy_date ? ' du ' + escHtml(dateSeule(m.dxy_date)) : '') : 'indice dollar', 'dxy'))
     + tuile(modes('VIX', 'Nervosité des bourses'), modes(fmtNum(m.vix,1), isNum(m.vix) ? escHtml(Guide.nombre(m.vix, 1)) : '—'),
-      modes(ferme ? 'clôture' : 'volatilité implicite S&amp;P', ferme ? 'dernière séance' : ''), 'vix', phraseCarte('vix', m.vix))
+      modes(ferme ? 'clôture' : 'volatilité implicite S&amp;P', ferme ? 'dernière séance' : ''), 'vix', lectureCourte('vix', m.vix))
     + '</div>');
 
   // ── 3. INDICATEURS ──

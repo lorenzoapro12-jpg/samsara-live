@@ -2429,11 +2429,11 @@ async function filNoir(page, x, y) {
           const intro = await pg.evaluate(() => document.getElementById('guideIntro').innerText);
           check('48f. explication ouverte : la mini-clé se retire (l’explication dit les couleurs, avec ▲ et ▼)', sousIntro === null && /▲/.test(intro) && /▼/.test(intro), { sousIntro, intro: intro.slice(0, 300) });
           await pg.click('#guideIntroOk'); await pg.waitForTimeout(300);
-          await pg.click('#btnModeBarre'); await pg.waitForTimeout(800);
+          await pg.click('#btnModeBarre [data-mode-choix="expert"]'); await pg.waitForTimeout(800);
           const ex = await etat(pg);
           const cache = await pg.evaluate(() => { const m = document.getElementById('miniCle'); return m.hidden || getComputedStyle(m).display === 'none'; });
           check(`48g. Complet : ni mini-clé, ni triangle dans les ronds (${ex.debutant.formesSens.achat + ex.debutant.formesSens.vente})`, ex.mode === 'expert' && ex.debutant.miniCle === null && cache && ex.debutant.formesSens.achat + ex.debutant.formesSens.vente === 0, { mode: ex.mode, mc: ex.debutant.miniCle, fs: ex.debutant.formesSens });
-          await pg.click('#btnModeBarre'); await pg.waitForTimeout(800);
+          await pg.click('#btnModeBarre [data-mode-choix="debutant"]'); await pg.waitForTimeout(800);
           check('48h. de retour en Lisible : la mini-clé revient', !!(await etat(pg)).debutant.miniCle);
         }
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
@@ -2442,32 +2442,35 @@ async function filNoir(page, x, y) {
 
       titre('49. Au doigt (360 et 390 px) : chaque bouton et chaque puce de la barre de la carte, une cible de 40 × 40 px au moins');
       // Tout le carré de 40 × 40 px centré sur le bouton (17 × 17 points jusqu'à ±19,5 px) le touche, lui ;
-      // une puce de Complet d'abord amenée à l'écran dans sa rangée qui défile. Le bouton de mode relève
-      // d'un autre chantier : pas de taille exigée, mais aucune zone voisine sur lui.
+      // une puce de Complet d'abord amenée à l'écran dans sa rangée qui défile. Les deux segments de
+      // l'interrupteur de mode ont leur propre mesure : pas de taille exigée, mais aucune zone voisine sur eux.
       for (const mode of ['debutant', 'expert']) for (const w of [360, 390]) {
         let pg;
         ({ page: pg, erreurs } = await ouvrir(nav, { encodage: true, mode, vue: { width: w, height: 800 }, stockage: VU, contexte: { deviceScaleFactor: 2, hasTouch: true, isMobile: true } }));
         const m = await pg.evaluate(() => {
           const vis = e => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
           const nomDe = b => b.id || (b.dataset.calque ? 'puce ' + b.dataset.calque : b.className.split(' ')[0]);
-          const cibles = [...document.querySelectorAll('.barre a, .barre button')].filter(b => vis(b) && !b.classList.contains('bouton-mode')).map(b => {
+          const cibles = [...document.querySelectorAll('.barre a, .barre button')].filter(b => vis(b) && !b.closest('#btnModeBarre')).map(b => {
             if (b.closest('#calques')) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
             const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, rates = [];
             for (let i = -8; i <= 8; i++) for (let j = -8; j <= 8; j++) { const h = document.elementFromPoint(cx + i * 19.5 / 8, cy + j * 19.5 / 8); if (!h || !b.contains(h)) rates.push([Math.round(i * 19.5 / 8), Math.round(j * 19.5 / 8), h ? nomDe(h) : 'rien']); }
             return { id: nomDe(b), dessin: [Math.round(r.width), Math.round(r.height)], rates: rates.length, ex: rates.slice(0, 3) };
           });
           document.getElementById('calques').scrollLeft = 0;
-          const bm = document.querySelector('.barre .bouton-mode'), q = bm.getBoundingClientRect(), pris = new Set();
-          for (let x = q.left + 1; x < q.right - 0.5; x += 2) for (let y = q.top + 1; y < q.bottom - 0.5; y += 2) { const h = document.elementFromPoint(x, y); if (!h || !(bm.contains(h) || h.contains(bm))) pris.add(h ? nomDe(h) : 'rien'); }
+          const segs = [...document.querySelectorAll('#btnModeBarre [data-mode-choix]')].filter(vis), pris = new Set();
+          for (const bm of segs) {
+            const q = bm.getBoundingClientRect();
+            for (let x = q.left + 1; x < q.right - 0.5; x += 2) for (let y = q.top + 1; y < q.bottom - 0.5; y += 2) { const h = document.elementFromPoint(x, y); if (!h || !(bm.contains(h) || h.contains(bm))) pris.add(bm.dataset.modeChoix + ' : ' + (h ? nomDe(h) : 'rien')); }
+          }
           const ba = document.getElementById('btnAffichage'), ra = ba.getBoundingClientRect();
-          return { cibles, mode: [...pris], barre: Math.round(document.querySelector('.barre').getBoundingClientRect().height), page: document.documentElement.scrollWidth - innerWidth,
+          return { cibles, segs: segs.length, mode: [...pris], barre: Math.round(document.querySelector('.barre').getBoundingClientRect().height), page: document.documentElement.scrollWidth - innerWidth,
             aff: { texte: ba.innerText.trim(), coupe: ba.scrollWidth > ba.clientWidth + 1, dans: ra.left >= 0 && ra.right <= innerWidth } };
         });
         const nom = `${mode === 'expert' ? 'Complet' : 'Lisible'} · ${w}`;
         const petits = m.cibles.filter(c => c.rates);
         check(`49a. ${nom} : ${m.cibles.length} cibles (« ← Terminal », ${m.cibles.filter(c => /^puce/.test(c.id)).length} puces, les boutons) — chacune couvre un carré de 40 × 40 px`,
           m.cibles.length >= (mode === 'expert' ? 22 : 6) && !petits.length, petits.slice(0, 4));
-        check(`49b. ${nom} : aucune zone voisine sur le bouton de mode`, !m.mode.length, m.mode);
+        check(`49b. ${nom} : aucune zone voisine sur les deux segments de l’interrupteur de mode`, m.segs === 2 && !m.mode.length, { segs: m.segs, pris: m.mode });
         check(`49c. ${nom} : barre de ${m.barre} px${mode === 'debutant' ? ' (≤ 82)' : ''}, rien ne déborde ; « ${m.aff.texte} » entier, dans l’écran`,
           (mode === 'expert' || m.barre <= 82) && m.page <= 0 && !m.aff.coupe && m.aff.dans, m);
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
