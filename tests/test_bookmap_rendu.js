@@ -2072,6 +2072,9 @@ async function filNoir(page, x, y) {
       await pg.click('#btnLegende'); await pg.waitForTimeout(300);
       const lg = await pg.evaluate(() => ({ texte: document.getElementById('legende').innerText, mode: document.getElementById('btnMode').textContent, zones: document.getElementById('legGuideZones').textContent,
         resume: document.getElementById('legGuideResume').textContent, rafales: document.getElementById('legRafales').textContent, bulles: document.getElementById('legBulles').textContent }));
+      // La légende refermée : ouverte, elle couvre la droite de la carte, et un pointeur posé
+      // dessous ne lit plus rien (la lecture restait celle d'avant — faux vert ou faux rouge).
+      await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
       e = await etat(pg);
       const ailleurs = e.pastillesCompletes.concat(e.textesCarte.map(t => t.texte), [jn.note, jn.liste, lg.texte, e.statut]).filter(t => /\bUTC\b/.test(t));
       check('46f. aucune autre heure UTC : pastilles, carte, journal, légende à l\'heure de l\'appareil', !ailleurs.length && /^Heure de l'appareil, comme l'axe de la carte/.test(jn.note), { ailleurs: ailleurs.slice(0, 3), note: jn.note.slice(0, 80) });
@@ -2092,7 +2095,9 @@ async function filNoir(page, x, y) {
       const l1 = await viserTP(e.maintenant - 2 * 3600e3, pV);
       check('46k. lecture au pointeur : le prix au centime (« 86 012,50 $ ») et l\'heure de l\'appareil', /^[\d ]+,\d\d \$ · \d\d:\d\d:\d\d/.test(l1), l1.slice(0, 80));
       if (e.finCarte && e.live && e.live.deb0 && e.live.deb0 - e.finCarte > 20e3) {
-        const lt = await viserTP((e.finCarte + e.live.deb0) / 2, pV);
+        const tm = (e.finCarte + e.live.deb0) / 2, lt = await viserTP(tm, pV);
+        const hm = await pg.evaluate(t => Fmt.heure(t), tm);
+        check(`46l. la lecture est celle du point visé (${hm}), pas une lecture d'avant`, lt.includes(' · ' + hm), lt.slice(0, 60));
         check('46l. entre la fin de la carte publiée et le début du live : « non observé », jamais une bulle muette', /Carnet : non observé ici \(ni carte publiée, ni carnet live\)/.test(lt), lt.slice(0, 160));
       } else check('46l. un intervalle entre la carte publiée et le live, pour le contrôle', false, [e.finCarte, e.live && e.live.deb0]);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);

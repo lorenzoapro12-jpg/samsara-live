@@ -8443,8 +8443,10 @@ function showStratStats(result) {
   div.style.display = 'block';
   // Montants dans la devise de cotation de la paire, comme les prix de la page (« $ », « SOL »).
   const unite = guideUnite(), pnlStr = Fmt.signe(result.totalPnl, x => Fmt.nombre(x, 2));
-  // Verdict : le seul juge qui compte est « garder le BTC » sur la MÊME période. Une grille qui
-  // gagne 0,40 % quand le BTC fait 3 % a perdu du terrain, malgré un P&L positif.
+  // Verdict : le seul juge qui compte est « garder l'actif » (le BTC sur BTC/USDT, le SOL sur
+  // SOL/USDT) sur la MÊME période. Une grille qui gagne 0,40 % quand l'actif fait 3 % a perdu du
+  // terrain, malgré un P&L positif.
+  const actif = (NOMS_PAIRES[activeSymbol] || 'BTC/USDT').split('/')[0];
   const c0 = candles[result.startIdx], c1 = candles[result.endIdx];
   const hold = (c0 && c1 && c0.close) ? (c1.close - c0.close) / c0.close * 100 : null;
   const ret = result.totalReturn;
@@ -8453,11 +8455,11 @@ function showStratStats(result) {
   let html = '';
   if (hold !== null) {
     const v = (ret > 0 && ret > hold) ? ['stat-pos', '✅ gagne et bat le marché']
-      : (ret > 0) ? ['stat-val', '⚠️ gagne, mais garder le BTC rapportait plus']
+      : (ret > 0) ? ['stat-val', '⚠️ gagne, mais garder le ' + actif + ' rapportait plus']
       : (ret > hold) ? ['stat-val', '⚠️ perd, mais moins que le marché']
-      : ['stat-neg', '❌ perd alors que garder le BTC montait'];
+      : ['stat-neg', hold > 0 ? '❌ perd alors que garder le ' + actif + ' montait' : '❌ perd plus que le marché'];
     html += '<div class="verdict"><span class="' + v[0] + '">' + v[1] + '</span> — '
-      + Fmt.pct(ret, 2) + ' en ' + durStr + ', BTC '
+      + Fmt.pct(ret, 2) + ' en ' + durStr + ', ' + actif + ' '
       + Fmt.pct(hold, 2) + ' sur la même période</div>';
   }
   html +=

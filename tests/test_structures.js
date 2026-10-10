@@ -60,7 +60,10 @@ async function agesDuCalque(page) {
     CanvasRenderingContext2D.prototype.fillText = function (t) { if (this.canvas.id === 'chartCalque') vus.push(String(t)); return f.apply(this, arguments); };
     dessinerCalque();
     CanvasRenderingContext2D.prototype.fillText = f;
-    return { couche: vus.some(t => /^Ordres en attente \(carte\) · dernière colonne .+ · publiée .+/.test(t)), repere: vus.some(t => /^fichier (\d\d\/\d\d )?\d\d:\d\d · prix publié \d[\d ]*,\d\d \$ \((il y a .+|< 5 s)\)$/.test(t)), vus };
+    // Au téléphone, l'âge de la couche prend sa forme courte pour laisser le compteur entier
+    // (test_interface, partie 5) : l'âge de la publication y reste toujours.
+    const plein = /^Ordres en attente \(carte\) · dernière colonne .+ · publiée .+/, court = /^(Ordres en attente \(carte\) · publiée|Carte publiée) (il y a .+|< 5 s)$/;
+    return { couche: vus.some(t => plein.test(t) || (innerWidth < PARAM.guide.debutant.etroit && court.test(t))), repere: vus.some(t => /^fichier (\d\d\/\d\d )?\d\d:\d\d · prix publié \d[\d ]*,\d\d \$ \((il y a .+|< 5 s)\)$/.test(t)), vus };
   });
 }
 
