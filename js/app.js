@@ -6261,7 +6261,9 @@ function scenReperes(S, top, bas) {
   const resteF = Scenarios.reste(F.fin - S.maintenant);
   const sem = isNum(F.finSemaine) && F.finSemaine !== F.fin && S.items.some(i => i.sc.rang === 'S') ? ' Le scénario de la semaine court jusqu’au ' + jour(F.finSemaine) + ' à ' + hU(F.finSemaine) + '.' : '';
   for (const [t, noms, expl] of [
-    [F.emis, exp ? ['Point · ' + hU(F.emis), hU(F.emis)] : ['Point' + dePoint + ' · écrit à ' + hU(F.emis), 'Écrit à ' + hU(F.emis), 'Point · ' + hU(F.emis), hU(F.emis)],
+    // L'heure du point (celle du titre de l'encadré) n'est pas celle de l'écriture : le trait est
+    // posé à l'écriture, son nom le dit (« Point · 07:59 » contredisait « Scénarios du matin · 07:00 »).
+    [F.emis, exp ? ['Point' + dePoint + ' · écrit ' + hU(F.emis), 'Écrit · ' + hU(F.emis), hU(F.emis)] : ['Point' + dePoint + ' · écrit à ' + hU(F.emis), 'Écrit à ' + hU(F.emis), hU(F.emis)],
       'Le moment où les scénarios du point' + dePoint + ' ont été écrits : le ' + jour(F.emis) + ' à ' + hU(F.emis) + (isNum(F.prixEmission) ? ', prix ' + Scenarios.prix(F.prixEmission) : '') + '. Les zones partent de là.'],
     [F.fin, (resteF ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin) + ' · reste ' + resteF, 'fin · ' + hU(F.fin) + ' · reste ' + resteF] : []).concat(exp ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)] : ['fin des scénarios du jour · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin du jour · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)]),
       'Fin de la fenêtre des scénarios 1 à 3 : ' + jour(F.fin) + ' à ' + hU(F.fin) + '. Le journal les note ensuite, le matin même.' + sem]]) {
