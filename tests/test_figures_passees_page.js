@@ -184,13 +184,18 @@ const recompte = page => page.evaluate(() => {
 /** Les cibles atteintes que dit la ligne du compte (le reste des validées les a manquées) : en
  *  mots (« aucune n’a », « toutes ont », « les deux ont », « elle a ») ou le 2e nombre. */
 const lireAtteintes = (t, nb) => (/aucune n’a|elle n’a pas/.test(t) ? 0 : /toutes ont|les deux ont/.test(t) ? nb[0] : /elle a atteint/.test(t) ? 1 : nb[1]);
-/** Choisit dans le menu (bouton « Indicateurs », liste « Figures passées »), puis le referme. */
+/** Le choix que montre le panneau : la case « Figures passées » (décochée : 'non'), puis, cochée, la
+ *  liste « validées seulement / toutes ». */
+const VALEUR_MENU = () => { const c = document.getElementById('figPassees'), q = document.getElementById('figPasseesQuelles'); return !c ? null : !c.checked ? 'non' : q ? q.value : null; };
+/** Choisit dans le panneau « Choisir l'affichage » comme un utilisateur (la case, puis la liste), puis le referme. */
 async function choisir(o, v) {
   await o.page.click('#indDropdownBtn');
   await o.page.waitForTimeout(200);
-  await o.page.selectOption('#figPassees', v);
-  const lu = await o.page.evaluate(() => ({ choix: figuresPasseesChoix, stocke: localStorage.getItem('samsara-figures-passees-v1'), select: document.getElementById('figPassees').value,
-    texte: document.querySelector('label.ind-passees').innerText }));
+  const coche = await o.page.evaluate(() => document.getElementById('figPassees').checked);
+  if (coche !== (v !== 'non')) { await o.page.click('#figPassees'); await o.page.waitForTimeout(150); }
+  if (v !== 'non') await o.page.selectOption('#figPasseesQuelles', v);
+  const lu = await o.page.evaluate(f => ({ choix: figuresPasseesChoix, stocke: localStorage.getItem('samsara-figures-passees-v1'), select: (0, eval)('(' + f + ')')(),
+    texte: document.querySelector('label.ind-passees').innerText }), VALEUR_MENU.toString());
   await o.page.click('#indDropdownBtn');   // le referme
   await o.page.waitForTimeout(250);
   return lu;
@@ -326,7 +331,7 @@ async function choisir(o, v) {
       await attendre(o.page, K.length);
       const r = await vue(o.page, v[0], v[1]);
       await o.page.click('#indDropdownBtn'); await o.page.waitForTimeout(200);
-      const sel = await o.page.evaluate(() => document.getElementById('figPassees') && document.getElementById('figPassees').value);
+      const sel = await o.page.evaluate(f => (0, eval)('(' + f + ')')(), VALEUR_MENU.toString());
       check(`rechargement : « toutes » est relu (samsara-figures-passees-v1), dans le menu et sur le graphique (${r.liste.length} figures passées)`, r.choix === 'toutes' && sel === 'toutes' && r.liste.length >= 1 && r.memePur && !!r.ligne, { choix: r.choix, sel, n: r.liste.length });
       check(`${w} px : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();

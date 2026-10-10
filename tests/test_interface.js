@@ -604,12 +604,12 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
         meme(pan.boutons, ['Tout afficher', 'Revenir au départ']) && meme(pan.presets, ['L’essentiel', 'La tendance', 'L’élan', 'Le volume', 'Le carnet', 'Tout']), pan);
       const QUESTIONS = [['Dans quel sens ?', ['ema20', 'ema50', 'ema100', 'ema200', 'sma20', 'sma50', 'ichimoku', 'sar', 'vwap']],
         ['Ça s’essouffle ?', ['rsi', 'macd', 'stoch', 'williamsR', 'cci', 'mfi', 'ao']], ['Qui échange ?', ['vol', 'obv', 'vp']],
-        ['Où le prix peut réagir ?', ['guide', 'scenarios', 'sr', 'fib', 'liq']], ['Ça bouge beaucoup ?', ['atr', 'bb', 'adx']]];
+        ['Où le prix peut réagir ?', ['guide', 'scenarios', 'sr', 'fib', 'liq', 'figuresPassees']], ['Ça bouge beaucoup ?', ['atr', 'bb', 'adx']]];
       check('les calques rangés par question, dans l’ordre (« Dans quel sens ? », « Ça s’essouffle ? », « Qui échange ? », « Où le prix peut réagir ? », « Ça bouge beaucoup ? »)',
         meme(pan.cats.map(c => [c.titre, c.cles.slice().sort()]), QUESTIONS.map(([t, k]) => [t, k.slice().sort()])) && pan.cats.find(c => c.cat === 'reaction').cles[0] === 'guide', pan.cats);
       const MOTS = { 'imp-courant': 'courant', 'imp-utile': 'utile', 'imp-special': 'spécialisé' };
       const mal = pan.lignes.filter(l => !l.coche || !l.nom || !/^[A-ZÀ-Ý].{8,}[.!?]$/.test(l.quoi) || !l.fiche || MOTS[l.classe] !== l.imp);
-      check(`chaque ligne (${pan.lignes.length}) : case, nom, phrase « C’est quoi ? », importance en MOT (courant, utile, spécialisé) et bouton de fiche`, pan.lignes.length === 27 && !mal.length, mal);
+      check(`chaque ligne (${pan.lignes.length}) : case, nom, phrase « C’est quoi ? », importance en MOT (courant, utile, spécialisé) et bouton de fiche`, pan.lignes.length === 28 && !mal.length, mal);
       const formes = Object.keys(MOTS).map(c => (pan.lignes.find(l => l.classe === c) || {}).forme);
       const plein = f => f && !/rgba\(0, 0, 0, 0\)|transparent/.test(f.couleur), dessin = f => f && /gradient/.test(f.image);
       check('l’importance a aussi une FORME, jamais la couleur seule : disque plein (courant), demi-disque (utile), anneau (spécialisé)',

@@ -608,7 +608,7 @@ const calqueDe = key => CALQUES.find(i => i.key === key) || null;
 const disponible = item => !item.paires || item.paires.includes(activeSymbol);
 
 function isOverlay(key) { return key in overlays; }
-function isActive(key) { return (overlays[key] || activeSubs[key]) || false; }
+function isActive(key) { return key === 'figuresPassees' ? figuresPasseesChoix !== 'non' : (overlays[key] || activeSubs[key]) || false; }
 function toggleAny(key) {
   if (isOverlay(key)) {
     overlays[key] = !overlays[key];
@@ -849,23 +849,25 @@ function buildDropdown() {
   menu.scrollTop = defile;
 }
 /** La ligne « Figures passées » du Complet (plan §8), sous la question « Où le prix peut réagir ? » :
- *  trois choix — non (par défaut), les figures validées seulement, toutes (y compris celles tombées
- *  avant leur validation) ; chacune garde sa marque d'issue et le compte de la vue est dit sur le
- *  graphique. Son choix a sa propre clé (samsara-figures-passees-v1). */
-const CHOIX_PASSEES_MOTS = { non: 'non', validees: 'validées seulement', toutes: 'toutes, y compris celles tombées' };
+ *  une case comme les autres lignes (cochée : les figures validées), et, cochée, un choix de plus :
+ *  « toutes, y compris celles tombées » avant leur validation. Chacune garde sa marque d'issue et le
+ *  compte de la vue est dit sur le graphique. Son choix a sa propre clé (samsara-figures-passees-v1 :
+ *  'non', 'validees' ou 'toutes'). */
 const QUOI_PASSEES = 'Les figures déjà finies, à leur place, avec leur issue : ✓ cible atteinte, ✗ invalidée ou annulée, – délai écoulé, ○ sans suite. Des exemples, pas des prévisions.';
 function ligneFiguresPassees() {
-  const options = Guide.CHOIX_PASSEES.map(v => `<option value="${v}"${v === figuresPasseesChoix ? ' selected' : ''}>${CHOIX_PASSEES_MOTS[v]}</option>`).join('');
+  const on = figuresPasseesChoix !== 'non', toutes = figuresPasseesChoix === 'toutes';
+  const choix = on ? `<select id="figPasseesQuelles" aria-label="Quelles figures passées" onchange="choisirFiguresPassees(this.value)">`
+    + `<option value="validees"${toutes ? '' : ' selected'}>validées seulement</option><option value="toutes"${toutes ? ' selected' : ''}>toutes, y compris celles tombées</option></select>` : '';
   return `<label data-ind="figuresPassees" data-cat="reaction" data-cherche="${echapF('Figures passées anciennes figures chartistes exemples issue ' + TITRES_CAT.reaction + ' ' + QUOI_PASSEES)}" class="aff-ligne ind-passees">`
-    + `<span class="aff-texte"><span class="aff-nom">Figures passées</span><span class="aff-quoi">${echapF(QUOI_PASSEES)}</span>`
-    + `<select id="figPassees" aria-label="Figures passées" onchange="choisirFiguresPassees(this.value)">${options}</select></span>`
-    + `<span class="aff-imp imp-utile" title="Importance : ${IMPORTANCES.utile}">${IMPORTANCES.utile}</span></label>`;
+    + `<input type="checkbox" id="figPassees"${on ? ' checked' : ''} onchange="choisirFiguresPassees(this.checked ? 'validees' : 'non')">`
+    + `<span class="aff-texte"><span class="aff-nom">Figures passées</span><span class="aff-quoi">${echapF(QUOI_PASSEES)}</span>${choix}</span>`
+    + `<span class="aff-imp imp-utile" title="Importance : ${IMPORTANCES.utile}">${IMPORTANCES.utile}</span>${infoBtn('guide_formes')}</label>`;
 }
 function figuresPasseesPoser(v) {
   figuresPasseesChoix = Guide.CHOIX_PASSEES.includes(v) ? v : 'non';
   try { localStorage.setItem(FIG_PASSEES_CLE, figuresPasseesChoix); } catch (e) { /* navigation privée */ }
 }
-function choisirFiguresPassees(v) { figuresPasseesPoser(v); drawChart(); }
+function choisirFiguresPassees(v) { figuresPasseesPoser(v); drawChart(); buildDropdown(); }
 
 // ─── La légende des calques allumés (Complet) ───
 // Dans le ruban, juste après « À l'écran » : une puce par calque allumé qui dessine sur la paire
