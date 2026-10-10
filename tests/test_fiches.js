@@ -199,24 +199,35 @@ check('CADENCES = 3 / 5 / 8 min → bandeau à 6 min (« cadence attendue : 3 mi
   /cadence attendue : 3 min/.test(b6) && /figées/.test(b9) && b4 === '', { b4, b6, b9 });
 
 // ── 9. Chaque indicateur du menu : ce que c'est ET comment s'en servir (demande du 09/10/2026) ──
-titre('9. Chaque indicateur du menu a une fiche, une ligne « Comment s’en servir » et un aperçu');
+titre('9. Chaque indicateur du menu : comment les traders l’utilisent, comment il est calculé, et un aperçu');
 {
   const Gd = require(path.join(REPO, 'js/guide.js'));
   const items = T.INDICATORS.flatMap(c => c.items);
   const sansFiche = items.filter(i => !T.FICHE_IND[i.key] || !T.FICHES[T.FICHE_IND[i.key]]).map(i => i.key);
   check(`les ${items.length} indicateurs du menu ont une fiche`, !sansFiche.length, sansFiche);
-  const sansUsage = items.filter(i => { const f = T.FICHES[T.FICHE_IND[i.key]]; return !f || !f.usage; }).map(i => i.key);
-  check('chacun a sa ligne « Comment s’en servir »', !sansUsage.length, sansUsage);
-  const usages = Object.entries(T.FICHES).filter(([, f]) => f.usage).flatMap(([k, f]) => (typeof f.usage === 'string' ? [f.usage] : [f.usage.exp, f.usage.deb]).map(t => [k, t]));
-  check('aucune ligne « Comment s’en servir » ne dit quoi acheter ou vendre', usages.every(([, t]) => t && !CONSEIL.test(t)), usages.filter(([, t]) => !t || CONSEIL.test(t)));
-  const debSales = Object.entries(T.FICHES).filter(([, f]) => f.usage && typeof f.usage !== 'string').map(([k, f]) => [k, Gd.motsBannis(f.usage.deb)]).filter(([, b]) => b.length);
+  const COUCHES = ['guide', 'scenarios'];
+  const marche = items.filter(i => !COUCHES.includes(i.key));
+  const manque = marche.filter(i => { const f = T.FICHES[T.FICHE_IND[i.key]]; return !f || !f.traders || !f.calcul; }).map(i => i.key);
+  check(`les ${marche.length} indicateurs de marché : « Comment les traders l’utilisent » et « Comment c’est calculé »`, !manque.length, manque);
+  check('les deux couches du site (Guide, scénarios) : une ligne « Comment s’en servir »', COUCHES.every(k => T.FICHES[k].usage));
+  const champs = Object.entries(T.FICHES).filter(([, f]) => f.champ);
+  const champsSans = champs.filter(([, f]) => !f.traders || !f.calcul).map(([k]) => k);
+  check(`les ${champs.length} champs du fichier : usage des traders et calcul en mots`, !champsSans.length, champsSans);
+  const textes = Object.entries(T.FICHES).flatMap(([k, f]) => [f.traders, typeof f.calcul === 'function' ? f.calcul(T.PARAM) : f.calcul,
+    ...(f.usage ? (typeof f.usage === 'string' ? [f.usage] : [f.usage.exp, f.usage.deb]) : [])].filter(Boolean).map(t => [k, t]));
+  check('aucun de ces textes ne dit quoi acheter ou vendre', textes.every(([, t]) => !CONSEIL.test(t)), textes.filter(([, t]) => CONSEIL.test(t)));
+  const perso = Object.entries(T.FICHES).filter(([k]) => k).map(([k]) => [k, T.ficheHtml(k)]).filter(([, h]) => /propriétaire|dans ce projet|nos données|ses propres données/i.test(h)).map(([k]) => k);
+  check('aucune explication personnalisée (étude du propriétaire, « dans ce projet »)', !perso.length, perso);
+  const debSales = COUCHES.map(k => [k, Gd.motsBannis(T.FICHES[k].usage.deb)]).filter(([, b]) => b.length);
   check('les lignes du Débutant (guide, scénarios) : aucun mot de la liste du Guide', !debSales.length, debSales);
-  check('la fiche affiche « Comment s’en servir » (les deux textes, chacun dans sa classe, s’ils diffèrent)', /Comment s’en servir/.test(T.ficheHtml('rsi')) && /<span class="debutant-seul">/.test(T.usageHtml('guide')));
+  check('la fiche affiche « Comment les traders l’utilisent » et « Comment c’est calculé » (dans les deux modes)', /Comment les traders l’utilisent/.test(T.ficheHtml('rsi')) && /Comment c’est calculé/.test(T.ficheHtml('rsi'))
+    && !/expert-seul[^>]*>[^<]*Comment c’est calculé/.test(T.ficheHtml('rsi')) && /Comment s’en servir/.test(T.ficheHtml('guide')));
+  check('le calcul en mots suit PARAM (RSI 14 → 21)', (() => { const v = T.PARAM.rsi.periode; T.PARAM.rsi.periode = 21; const ok = T.ficheHtml('rsi').includes('21 dernières variations'); T.PARAM.rsi.periode = v; return ok; })());
   MODE.v = null;
   const apDeb = T.apercuHtml('guide'), apVide = T.apercuHtml(null);
   MODE.v = 'expert';
   const apExp = T.apercuHtml('ichimoku');
-  check('aperçu du menu : titre, « C’est quoi ? », « Comment s’en servir ? », lien vers la fiche ; en Débutant, ses mots à lui', /C’est quoi \?/.test(apExp) && /Comment s’en servir \?/.test(apExp) && /ouvrirFiche\('ichimoku'/.test(apExp)
+  check('aperçu du menu : titre, « C’est quoi ? », usage des traders, calcul, lien vers la fiche ; en Débutant, ses mots à lui', /C’est quoi \?/.test(apExp) && /Comment les traders l’utilisent/.test(apExp) && /Comment c’est calculé/.test(apExp) && /ouvrirFiche\('ichimoku'/.test(apExp)
     && apDeb.includes(T.FICHES.guide.titreDeb) && apDeb.includes(T.FICHES.guide.usage.deb.slice(0, 30)) && !Gd.motsBannis(apDeb.replace(/<[^>]+>/g, ' ')).length && !Gd.motsBannis(apVide.replace(/<[^>]+>/g, ' ')).length, { apDeb, apExp });
   // Les dents : les formules des nouvelles fiches suivent PARAM.
   const sauveP = JSON.stringify(T.PARAM);

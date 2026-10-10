@@ -564,14 +564,17 @@ const sansAccents = t => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLo
 function apercuHtml(key) {
   const id = key && FICHE_IND[key], f = id && typeof FICHES !== 'undefined' ? FICHES[id] : null;
   if (!f) return '<p class="ind-apercu-vide">' + (debutant() ? 'Survolez ou touchez une ligne : ce qu’elle montre et comment s’en servir.'
-    : 'Survolez ou touchez un indicateur : ce que c’est et comment s’en servir. Le « i » ouvre sa fiche complète.') + '</p>';
+    : 'Survolez ou touchez un indicateur : ce que c’est, comment les traders l’utilisent et comment il est calculé. Le « i » ouvre sa fiche complète.') + '</p>';
   const deb = debutant();
   const titre = deb && f.titreDeb ? f.titreDeb : f.titre;
   const quoi = deb && f.simpleDeb ? f.simpleDeb : f.simple;
   const u = f.usage, usage = !u ? '' : typeof u === 'string' ? u : (deb ? u.deb : u.exp);
+  const calcul = typeof calculTexte === 'function' ? calculTexte(f) : '';
   return '<p class="ind-apercu-titre">' + echapF(titre) + '</p>'
     + '<p><b>C’est quoi ?</b> ' + echapF(quoi) + '</p>'
-    + (usage ? '<p><b>Comment s’en servir ?</b> ' + echapF(usage) + '</p>' : '')
+    + (f.traders ? '<p><b>Comment les traders l’utilisent :</b> ' + echapF(f.traders) + '</p>'
+      : usage ? '<p><b>Comment s’en servir ?</b> ' + echapF(usage) + '</p>' : '')
+    + (calcul ? '<p><b>Comment c’est calculé :</b> ' + echapF(calcul) + '</p>' : '')
     + '<button type="button" class="lien" onclick="event.stopPropagation();ouvrirFiche(\'' + id + '\',this)">Fiche complète ▸</button>';
 }
 function montrerApercu(key) {
@@ -630,8 +633,7 @@ function titresBarre() {
   for (const l of document.querySelectorAll('#indicatorBar label[id^="lbl_"]')) {
     const f = FICHES[FICHE_IND[l.id.slice(4)]];
     if (!f) continue;
-    const u = typeof f.usage === 'string' ? f.usage : f.usage ? f.usage.exp : '';
-    l.title = f.titre + ' : ' + f.simple + (u ? '\nComment s’en servir : ' + u : '') + '\n(Le menu « + Indicateurs » en a la fiche complète.)';
+    l.title = f.titre + ' : ' + f.simple + (f.traders ? '\nComment les traders l’utilisent : ' + f.traders : '') + '\n(Le menu « + Indicateurs » en a la fiche complète, avec le calcul.)';
   }
 }
 /** Le bouton du menu dit combien d'indicateurs l'Expert a allumés (le Guide compris). */
