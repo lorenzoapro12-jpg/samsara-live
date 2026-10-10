@@ -321,7 +321,10 @@ const derouler = (page, i0, i1) => page.evaluate(([K, i0, i1]) => {
     if (prev && prev.f.fin && !['devenue', 'triple', 'devenu_triple'].includes(prev.f.fin) && prev.f.jFin === n - 1) {
       out.tombees++;
       const fin = prev.f.fin, defaite = ['invalide', 'invalide_avant', 'abandon'].includes(fin);
-      const marque = defaite ? !!x && x.tr.croix && /✗/.test(x.t) : fin === 'atteint' ? !!x && !x.tr.croix : fin === 'expire' ? !!x && !x.tr.croix && /^– /.test(x.t) : fin === 'expire_avant' ? !!x && !x.tr.croix && /^○ /.test(x.t) : false;
+      // La marque DESSINÉE au bout de la figure est celle de ses mots (Guide.MARQUES_FIN) : ✗ (la
+      // croix), « – » délai écoulé, « ○ » sans suite ; une figure arrivée à son objectif n'en a pas.
+      const dessin = t => !!x && !!x.tr.marque && x.tr.marque.t === t && isFinite(x.tr.marque.y);
+      const marque = defaite ? !!x && x.tr.croix && /✗/.test(x.t) && dessin('✗') : fin === 'atteint' ? !!x && !x.tr.croix && !x.tr.marque : fin === 'expire' ? !!x && !x.tr.croix && /^– /.test(x.t) && dessin('–') : fin === 'expire_avant' ? !!x && !x.tr.croix && /^○ /.test(x.t) && dessin('○') : false;
       if (!(d === prev.f && marque)) { out.nonBarree++; if (out.ex.length < 4) out.ex.push({ i, tombee: prev.f.type + '/' + prev.f.fin, maintenant: d ? x.t : null }); }
     }
     if (d && d.fin && (!prev || prev.id !== id)) { out.barreeJamaisVue++; if (out.ex.length < 4) out.ex.push({ i, jamaisVue: d.type + '/' + d.fin }); }
@@ -345,7 +348,7 @@ const derouler = (page, i0, i1) => page.evaluate(([K, i0, i1]) => {
         const r = await derouler(o.page, i0, N - 1);
         if (mode === 'debutant') {
           check(`Débutant ${w} px, ${r.inst} clôtures : ${r.avecFigure} avec une figure, chacune avec son libellé`, r.inst > 300 && r.avecFigure > 0 && r.sansLibelle === 0, r);
-          check(`… ${r.tombees} figure(s) dessinée(s) tombée(s) : toutes barrées à l’image suivante`, r.nonBarree === 0, r.ex);
+          check(`… ${r.tombees} figure(s) dessinée(s) tombée(s) : chacune porte la marque de son issue (✗, –, ○) à l’image suivante`, r.nonBarree === 0, r.ex);
           check('… aucune ✗ pour une figure jamais dessinée', r.barreeJamaisVue === 0, r.ex);
         } else check(`Expert, ${r.inst} clôtures : ${r.figuresExpert} figures montrées, chacune avec son nom posé`, r.figuresExpert > 0 && r.expertSansNom === 0, r.ex);
         check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);

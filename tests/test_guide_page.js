@@ -55,7 +55,10 @@ function binance(url) {
   return {};
 }
 // Le fichier publié, lu « maintenant », avec des murs et des niveaux d'options près du prix simulé.
-const LU = new Date(Math.floor(maintenant() / 60000) * 60000).toISOString().replace('.000Z', '+00:00'), HM = LU.slice(11, 16);
+// L'heure attendue est celle que la page AFFICHE : l'heure de l'appareil (js/format.js), quel que
+// soit le fuseau du poste qui lance le test (TZ=Europe/Paris comme UTC).
+const Fm = require(path.join(REPO, 'js/format.js'));
+const LU = new Date(Math.floor(maintenant() / 60000) * 60000).toISOString().replace('.000Z', '+00:00'), HM = Fm.heure(Date.parse(LU));
 const md = JSON.parse(fs.readFileSync(path.join(REPO, 'market-data.json'), 'utf8'));
 md.updated = LU;
 md.liquidity = Object.assign({}, md.liquidity, { snapshot_at: LU, wall_bin_usd: 20, bid_walls: [[85890, 31], [85700, 12]], ask_walls: [[86150, 44], [86330, 9]] });
@@ -114,7 +117,7 @@ async function ouvrir(nav, vue, mode, tactile, sansScenarios) {
 /** L'état du Guide, relu dans la page : bandes, libellés, étiquettes du bord, chemins. */
 const etat = page => page.evaluate(() => {
   const E = guideEtat, b = canvas.getBoundingClientRect();
-  const hh = ms => new Date(ms).toISOString().slice(11, 16);
+  const hh = ms => Fmt.heure(ms);   // l'heure affichée par la page : celle de l'appareil (js/format.js)
   return {
     bx: b.left, by: b.top, exp: E.exp,
     niveaux: E.niveaux.map(L => ({ visible: L.visible, prix: L.niv.raisons.map(r => r.p), heures: L.niv.raisons.filter(r => isFinite(r.lu)).map(r => hh(r.lu)),

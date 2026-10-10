@@ -420,12 +420,14 @@ titre('7. Dans la page : paramètres, menu, fiche, choix gardé, lecture du fich
   check('js/scenarios.js chargé (defer) avant js/app.js', /<script defer src="js\/scenarios\.js"><\/script>[\s\S]*<script defer src="js\/app\.js"><\/script>/.test(html));
   const T = page.T, cat = T.INDICATORS.find(c => c.cat === 'Guide');
   const item = cat && cat.items.find(i => i.key === 'scenarios');
-  check('menu : « Scénarios du matin » dans la catégorie Guide, avec sa fiche', item && /^Scénarios du matin/.test(item.label) && item.label.includes(P.point) && T.FICHE_IND.scenarios === 'scenarios', item);
+  // L'heure du point dans le libellé : celle de l'appareil (Fmt.heure), ni « Paris » ni « 07h00 ».
+  const hMenu = Fm.heure(S.pointMs(new Date().toISOString().slice(0, 10), P.point));
+  check(`menu : « Scénarios du matin … (${hMenu}) » dans la catégorie Guide (heure de l’appareil), avec sa fiche`, item && /^Scénarios du matin/.test(item.label) && item.label.endsWith('(' + hMenu + ')') && !/Paris|\dh\d/.test(item.label) && T.FICHE_IND.scenarios === 'scenarios', item);
   const f = T.ficheHtml('scenarios');
   check('fiche « scenarios » : Claude (une IA), sans pourcentage, ordre du premier mouvement, suivi en direct / journal, pas une recommandation',
     /Claude \(une IA\)/.test(f) && /SANS pourcentage/.test(f) && /Ordre du premier mouvement/.test(f) && /SUIVI EN DIRECT/.test(f) && /note officielle est celle du journal/.test(f) && /pas une recommandation/.test(f));
   const SRC_FICHES = fs.readFileSync(path.join(REPO, 'js/fiches.js'), 'utf8');
-  check('la fiche est dans le glossaire, groupe « Guide du graphique »', /\['Guide du graphique', \[[^\]]*'scenarios'/.test(SRC_FICHES));
+  check('la fiche est dans le glossaire, groupe « Guide et scénarios du matin »', /\['Guide et scénarios du matin', \[[^\]]*'scenarios'/.test(SRC_FICHES));
   check('fiche : la cadence de relecture et le seuil d’échantillon lus dans CADENCES / PARAM', f.includes('toutes les ' + Math.round(T.CADENCES.previsions_lue / 60000) + ' minutes') && f.includes('sous ' + P.echantillonFaible + ' matins'));
   check('affichés par défaut ; masqués une fois, ils le restent (samsara-scenarios-v1)', dansPage('overlays.scenarios') === true
     && vm.runInContext('overlays.scenarios', chargerPage({ stockage: { 'samsara-scenarios-v1': '0' } }).sandbox) === false);

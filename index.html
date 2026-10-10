@@ -207,10 +207,10 @@
       <div class="strat-col-actions">
         <button class="strat-btn" onclick="onBacktestClick()">▶ Backtest</button>
         <button class="strat-btn secondary" onclick="onFullBacktestClick()">▶ Complet</button>
-        <button class="strat-btn forward" id="stratFwdBtn" onclick="onForwardClick()">🔴 Forward</button>
-        <button class="strat-btn secondary" id="stratDumbCmp" onclick="onCompareDumbGrid()">📊 vs Grille Fixe</button>
-        <button class="strat-btn secondary" onclick="showWalkForward()">🔬 Walk-Forward</button>
-        <div class="strat-toggle" onclick="toggleAdvanced()" id="advToggle">⚙ Avancé ▸</div>
+        <button class="strat-btn forward" id="stratFwdBtn" onclick="onForwardClick()" title="Joue la grille sur chaque nouvelle bougie close (forward test)">🔴 Suivre en direct</button>
+        <button class="strat-btn secondary" id="stratDumbCmp" onclick="onCompareDumbGrid()">📊 Comparer au témoin</button>
+        <button class="strat-btn secondary" onclick="showWalkForward()" title="Walk-forward : la même grille sur des tranches successives de l'historique">🔬 Robustesse</button>
+        <div class="strat-toggle" onclick="toggleAdvanced()" id="advToggle">⚙ Mode avancé ▸</div>
       </div>
       <!-- Colonne droite : stats -->
       <div class="strat-col-stats">

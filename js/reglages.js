@@ -128,7 +128,7 @@ function reglagesHtml() {
   return '<div class="fiche-tete"><h3 class="fiche-titre">Réglages d’affichage</h3><button type="button" class="fiche-fermer" onclick="fermerReglages()" aria-label="Fermer">×</button></div>'
     + '<p class="fiche-simple">Un réglage change le niveau de détail, jamais une valeur : un chiffre affiché garde sa valeur, il porte sa bande ou sa tranche.</p>'
     // ⚡
-    + '<h4>Panneau ⚡ « En direct » — lu par la page sur Binance</h4>'
+    + '<h4>Panneau ⚡ « En direct (à la seconde) » — lu par la page sur Binance</h4>'
     + '<label class="reglage">Profondeur du carnet ' + choix('r_live_niveaux', LIVE_NIVEAUX, R.live.niveaux, v => nf(v, 0) + ' niveaux') + '</label>'
     + '<div class="reglage">Bandes affichées <div class="puces">' + LIVE_BANDES.map(b => '<label class="puce-case"><input type="checkbox" data-bande-live="' + b + '"'
       + (R.live.bandes.includes(b) ? ' checked' : '') + ' onchange="changerReglage(this)">±' + nf(b) + ' %</label>').join('') + '</div>'

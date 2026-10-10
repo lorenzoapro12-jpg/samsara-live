@@ -516,9 +516,22 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 /* Planche, bureau : les noms du ruban (« Sur les bougies », « EMA 20 », « Stochastique », « 1 j »)
    sont plus longs que les abréviations d'avant ; les pastilles de la nomenclature sont resserrées
    pour qu'elle garde ses deux rangées (le thème lui compte ≈ 690 px à côté du cartouche). */
+/* Planche : la « date de révision » (#updated) est l'heure de l'APPAREIL (js/format.js). Les
+   feuilles Cyanotype et Diazo écrivent « UTC » en dur après elle : le fuseau de l'appareil, posé
+   par js/structures.js dans data-fuseau, le remplace (sélecteur plus précis que celui du thème). */
+html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { content: attr(data-fuseau); }
 @media (min-width: 1280px) {
   :root[data-structure="planche"] .plan-pied .indicator-bar label { padding-left: 3px; padding-right: 3px; }
   :root[data-structure="planche"] .plan-pied .indicator-bar label[style*="--dot"] .ind-label::before { margin-right: 4px; }
+  :root[data-structure="planche"] .plan-pied .indicator-bar .section-title { letter-spacing: 0.06em; }
+  /* Les chiffres clés au format français sont plus larges (« +96,94 M $ ») : des cases un peu
+     plus serrées rendent au ruban la place de ses deux rangées ; le fuseau passe sous l'heure,
+     sa colonne garde la largeur de son titre (« Date de rév. »), quel que soit le fuseau. */
+  :root[data-structure="planche"] .plan-cartouche .kpi,
+  :root[data-structure="planche"] .plan-cartouche .kpi:first-child { padding-left: 5px; padding-right: 5px; }
+  :root[data-structure="planche"] .plan-cartouche .kpi b { font-size: 12px; }
+  :root[data-structure="planche"] .plan-cartouche > #updated { flex-direction: column; line-height: 1.1; }
+  :root[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { margin-left: 0; }
 }
 
 /* ─── 6. Graphique ──────────────────────────────────────────────────────────── */

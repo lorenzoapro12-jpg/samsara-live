@@ -3,9 +3,10 @@
    VGA, sarcelle du bureau, barres de titre marine, relief à quatre filets d'un pixel ; tout est
    OPAQUE, plat et net. STRUCTURE propre : « fenetres » (js/structures.js) — le graphique est une
    fenêtre (barre de titre, barre d'outils = le ruban, zone client blanche, barre d'état = les
-   chiffres clés de la publication et leur âge), le marché live une seconde fenêtre ; la barre des
-   tâches reçoit « Démarrer » (le menu des thèmes), un lancement rapide (les boutons d'accès de
-   l'en-tête) et une zone de notification (point live, heure de publication UTC, horloge locale).
+   chiffres clés de la publication et leur âge), les infos du marché une seconde fenêtre ; la barre
+   des tâches reçoit « Démarrer » (le menu des thèmes), un lancement rapide (les boutons d'accès de
+   l'en-tête) et une zone de notification (point live, heure de publication et son fuseau, horloge
+   locale — toutes deux à l'heure de l'appareil).
    Déclaré dans index.html : <link data-theme="bureau95" data-mode="clair" data-verre="aucun"
    data-structure="fenetres" data-paire="bureau95-contraste">.
 
@@ -232,7 +233,7 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='12'%3E%3Cpath d='M6.5 .5 12.5 11.5H.5Z' fill='%23ffff00' stroke='%23000000' stroke-linejoin='round'/%3E%3Crect x='6' y='4' width='1' height='4' fill='%23000000'/%3E%3Crect x='6' y='9' width='1' height='1' fill='%23000000'/%3E%3C/svg%3E");
 }
 
-/* ── Fenêtre « Marché live » ── */
+/* ── Fenêtre « Infos du marché » ── */
 [data-theme="bureau95"] .feed-panel { padding: 24px 3px 3px; transition: none; }
 [data-theme="bureau95"] .feed-panel.collapsed { padding: 3px; }
 [data-theme="bureau95"] .feed-panel.collapsed > .f95-titre { display: none; }
@@ -283,8 +284,10 @@
 }
 [data-theme="bureau95"] .track-dot { width: 7px; height: 16px; margin: -8px 0 0 -3px; border-radius: 0; background: var(--surface); box-shadow: var(--releve); }
 [data-theme="bureau95"] .rsi-meter { height: 8px; border-radius: 0; background: var(--champ); box-shadow: var(--enfonce-mince); }
-[data-theme="bureau95"] .rsi-zone.bas { border-radius: 0; background: color-mix(in srgb, var(--up) 22%, var(--champ)); }
-[data-theme="bureau95"] .rsi-zone.haut { border-radius: 0; background: color-mix(in srgb, var(--down) 22%, var(--champ)); }
+/* Zones sous 30 et au-dessus de 70 : une même teinte NEUTRE (l'avertissement, comme css/app.css),
+   jamais le vert de la hausse ni le rouge de la baisse — un RSI bas n'annonce aucun rebond. */
+[data-theme="bureau95"] .rsi-zone.bas { border-radius: 0; background: color-mix(in srgb, var(--warn) 22%, var(--champ)); }
+[data-theme="bureau95"] .rsi-zone.haut { border-radius: 0; background: color-mix(in srgb, var(--warn) 22%, var(--champ)); }
 [data-theme="bureau95"] .rsi-dot { width: 7px; height: 14px; margin: -7px 0 0 -3px; border-radius: 0; box-shadow: 0 0 0 1px var(--relief-4); }
 [data-theme="bureau95"] .split { border-radius: 0; height: 10px; }
 [data-theme="bureau95"] .dv-bar { border-radius: 0; background: var(--champ); box-shadow: var(--enfonce-mince); }

@@ -438,7 +438,8 @@ const PARAM = {
     temoinDeparts: 30000,
     // Marge de « futur » à droite de la dernière bougie (chemins conditionnels) : une fraction
     // de la largeur du tracé, bornée en pixels, jamais plus de `futurMaxFraction` du tracé.
-    // Seulement quand le Guide est affiché ; elle se referme d'un pas de bougie par bougie
+    // Elle s'ouvre quand quelque chose s'y dessine : le Guide (hors Débutant) ou la flèche d'un
+    // scénario du matin (voir margeFutur) ; elle se referme d'un pas de bougie par bougie
     // quittée à droite (un glissement ne fait pas sauter la largeur des bougies).
     futur: 0.18, futurMinPx: 56, futurMaxPx: 250, futurMaxFraction: 0.4,
     // Mode Débutant : au plus `items` textes sur le tracé (phrase, repère du haut, repère du bas,
@@ -451,7 +452,7 @@ const PARAM = {
   },
   // Scénarios du matin (js/scenarios.js) : les nombres de leur dessin et de leurs mots.
   scenarios: {
-    point: '07h00',               // le nom du point du matin (heure de Paris de la routine)
+    point: '07h00',               // l'heure du point du matin dans la routine (à Paris) ; affichée à l'heure de l'appareil (heurePointMatin)
     echantillonFaible: 20,        // « échantillon faible » sous 20 matins notés (bilan de l'ordre)
     // L'encadré : en haut à droite du tracé, au plus `boiteMax` px de large et `boiteFraction` du
     // tracé (téléphone : `boiteFractionEtroit`) ; jamais au-delà de la moitié haute du tracé.
@@ -504,12 +505,23 @@ const NOM_ORDRES_CARTE = 'Ordres en attente (carte)';
 // est celui de la fiche (js/fiches.js), du ruban et du tracé, en français.
 // `paires` : les seules paires où la couche dessine quelque chose (BTCUSDT : heatmap.json et
 // previsions.json ne parlent que de lui) — ailleurs, la case est grisée et le dit.
+/** L'heure du point du matin, à l'heure de l'APPAREIL (« 07:00 » sur un appareil à Paris), ou
+ *  null : PARAM.scenarios.point est une heure de la routine (à Paris), convertie en l'instant du
+ *  point du jour de `t` (maintenant par défaut) par js/scenarios.js — la conversion de la fiche
+ *  (js/fiches.js, pointMots). Aucun fuseau écrit à côté (il est dit une fois, à l'horloge). */
+function heurePointMatin(t) {
+  const j = new Date(Number.isFinite(t) ? t : Date.now()).toISOString().slice(0, 10);
+  const ms = typeof Scenarios !== 'undefined' && Scenarios.pointMs ? Scenarios.pointMs(j, PARAM.scenarios.point) : NaN;
+  return Number.isFinite(ms) ? Fmt.heure(ms) : null;
+}
+/** « Scénarios du matin de Claude, une IA (07:00) » : relu à chaque construction du menu. */
+const libelleScenarios = () => { const h = heurePointMatin(); return 'Scénarios du matin de Claude, une IA' + (h ? ' (' + h + ')' : ''); };
 const INDICATORS = [
   // Le Guide d'abord : la seule couche affichée par défaut, son interrupteur reste visible
   // sans faire défiler le menu.
   { cat: 'Guide', items: [
     { key: 'guide', label: 'Guide : niveaux nommés, régime, formes, suite', tag: 'gd' },
-    { key: 'scenarios', label: 'Scénarios du matin de Claude, une IA (' + PARAM.scenarios.point + ' Paris)', tag: 'gd', paires: ['BTCUSDT'] },
+    { key: 'scenarios', get label() { return libelleScenarios(); }, tag: 'gd', paires: ['BTCUSDT'] },
   ]},
   { cat: 'Overlays', items: [
     ...['ema20', 'ema50', 'ema100', 'ema200', 'sma20', 'sma50'].map(k => ({ key: k, label: k.slice(0, 3).toUpperCase() + ' ' + periodeDe(k), tag: 'ov' })),
@@ -566,7 +578,7 @@ const FICHE_IND = { ema20: 'ema', ema50: 'ema', ema100: 'ema', ema200: 'ema', sm
   williamsR: 'williamsR', cci: 'cci', adx: 'adx', ao: 'ao', sr: 'sr', fib: 'fib', vp: 'vp', liq: 'liq', guide: 'guide', scenarios: 'scenarios' };
 // Débutant : le menu « Affichage » n'a que les deux couches du Guide, en mots simples ; les outils
 // d'analyse sont en Expert (une ligne y mène).
-const LIBELLES_DEBUTANT = { guide: 'Repères et phrase de lecture', scenarios: 'Scénarios du matin de Claude, une IA (' + PARAM.scenarios.point + ' Paris)' };
+const LIBELLES_DEBUTANT = { guide: 'Repères et phrase de lecture', get scenarios() { return libelleScenarios(); } };
 // Les catégories en mots : où l'indicateur se dessine. La clé `cat` reste le nom court (tests).
 const TITRES_CAT = { Guide: 'Guide', Overlays: 'Sur les bougies', 'Sous-graphes': 'Sous le graphique', Chartiste: 'Niveaux et zones' };
 // L'aperçu du menu : l'indicateur survolé, touché ou au clavier, et le filtre de l'Expert. Gardés
@@ -1655,7 +1667,6 @@ async function refreshRefSR() {
 // Décimales selon l'ordre de grandeur du prix. 3 décimales fixes (badge, axe, infobulle)
 // affichaient un 0 inventé sur BTC (cotation au centime) et tronquaient XRP (0,0001 $).
 function pxDec(v) { const a = Math.abs(v); return a >= 10 ? 2 : a >= 1 ? 4 : 6; }
-function fmtPrix(v) { return v.toFixed(pxDec(v)); }
 
 // Prix ET variation 24 h dans la MÊME requête (ticker/24hr) : les deux chiffres du bloc héros
 // ont donc toujours le même horodatage — rien à soustraire entre deux cadences. Format MINI :
@@ -1742,6 +1753,7 @@ async function fetchPrice() {
 // endroit du terminal qui dit le fuseau (« heure de l'appareil (UTC+2) »), recalculé à chaque
 // tour (un changement d'heure d'été le suit), réécrit seulement s'il change.
 let minuteCalque = 0;
+let compteurFin = 0;   // bord droit du compteur de la vue (rangée du haut, Expert) : l'âge de la carte s'arrête avant
 function horloge() {
   const c = document.getElementById('taskbarClock'), maintenant = Date.now(), t = Fmt.heureSec(maintenant);
   if (c && c.textContent !== t) c.textContent = t;
@@ -2319,8 +2331,8 @@ function gridParams(levels, tp, sl, loHint, hiHint) {
     gridLevels: { value: levels, min: 2, max: 500, step: 1, label: 'Niveaux' },
     priceLow: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix inférieur', hint: loHint },
     priceHigh: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix supérieur', hint: hiHint },
-    tpPct: { value: tp, min: 0.1, max: 5, step: 0.1, label: 'Take Profit %' },
-    slPct: { value: sl, min: 0.5, max: 10, step: 0.5, label: 'Stop Loss %' },
+    tpPct: { value: tp, min: 0.1, max: 5, step: 0.1, label: 'Prise de gain %', hint: 'Prise de gain (take profit) : la vente d’un niveau à ce % au-dessus de son achat' },
+    slPct: { value: sl, min: 0.5, max: 10, step: 0.5, label: 'Stop de perte %', hint: 'Stop de perte (stop loss) : la vente forcée d’un niveau à ce % sous son achat' },
   };
 }
 // Borne manuelle si > 0, sinon la borne auto calculee par la strategie
@@ -2382,12 +2394,12 @@ registerStrategy('rsi_grid', {
 
 // ─── EMA Pullback Grid Strategy ───
 registerStrategy('ema_grid', {
-  label: 'Grille EMA Pullback',
+  label: 'Grille replis sur EMA',
   params: {
     ...gridParams(10, 0.5, 3, '0 = auto (EMA)', '0 = auto (prix courant)'),
     emaPeriod: { value: 50, min: 10, max: 200, step: 10, label: 'Période EMA', advanced: true },
-    pullbackPct: { value: 2, min: 0.5, max: 10, step: 0.5, label: 'Pullback min %', advanced: true },
-    trendMinBars: { value: 5, min: 3, max: 20, step: 1, label: 'Bars tendance min', advanced: true },
+    pullbackPct: { value: 2, min: 0.5, max: 10, step: 0.5, label: 'Repli min %', advanced: true },
+    trendMinBars: { value: 5, min: 3, max: 20, step: 1, label: 'Bougies de tendance min', advanced: true },
   },
   trigger(candles, idx, params, indicators) {
     if (idx < params.emaPeriod + params.trendMinBars) return 'idle';
@@ -2437,7 +2449,7 @@ registerStrategy('sr_grid', {
 
 // ─── Dumb Grid (fixed intervals, no TA) ───
 registerStrategy('dumb_grid', {
-  label: 'Grille Fixe (benchmark)',
+  label: 'Grille fixe (témoin)',
   params: gridParams(10, 0.5, 3, '0 = auto (prix − 5 %)', '0 = auto (prix + 5 %)'),
   trigger(candles, idx) {
     if (idx < 2) return 'idle';
@@ -3060,6 +3072,7 @@ function drawChart() {
   // Compteur bougies visibles + plage dates + % variation (Expert : en Débutant, la variation de
   // la vue contredirait celle de l'en-tête, et le régime est le verbe de la phrase).
   const vsC = Math.max(0, viewStart), veC = Math.min(candles.length, viewEnd);
+  compteurFin = 0;
   if (!deb) {
   ctx.fillStyle = COLORS.text; ctx.font = chartFont(10);
   const firstC = candles[vsC], lastC = candles[Math.max(0, veC - 1)];
@@ -3071,7 +3084,17 @@ function drawChart() {
   const fmtDate = ts => Fmt.jour(ts * 1000) + ' ' + Fmt.heure(ts * 1000);
   const rangeStr = firstC ? fmtDate(firstC.time) + ' → ' + fmtDate(lastC.time) : '';
   ctx.fillStyle = COLORS.ink3;
-  ctx.fillText(`${Fmt.nombre(veC - vsC)}/${Fmt.nombre(candles.length)} · ${rangeStr}`, 18, 13);
+  // L'âge de la carte (calque, à droite de la même rangée) passe avant la plage, déjà lisible sur
+  // l'axe des temps : sur un écran étroit, le compteur la laisse si l'âge le plus court n'y tient pas.
+  let cTxt = `${Fmt.nombre(veC - vsC)}/${Fmt.nombre(candles.length)} · ${rangeStr}`;
+  const ageC = ageCoucheAffiche() ? texteAgeCouche().variantes.slice(-1)[0] : '';
+  if (ageC && geoPrix) {
+    const fin = W - geoPrix.right - 8, larg = s => ctx.measureText(s).width;
+    ctx.save(); ctx.font = chartFont(9, 650); const la = larg(ageC); ctx.restore();
+    if (18 + larg(cTxt) + 14 + la > fin) cTxt = `${Fmt.nombre(veC - vsC)}/${Fmt.nombre(candles.length)}`;
+  }
+  ctx.fillText(cTxt, 18, 13);
+  compteurFin = 18 + ctx.measureText(cTxt).width;
   // Variation de la vue : une pastille teintée, texte à l'encre signée (lisible), pas la marque.
   ctx.font = chartFont(10, 650);
   const pw0 = ctx.measureText(pctStr).width + 12;
@@ -3152,11 +3175,13 @@ function dessinerCalque() {
   // lu sans son instant — DEUX ici : la dernière colonne (son début : l'instantané a été lu dans
   // la minute qui suit, l'âge dit n'est jamais plus jeune que le vrai) et la publication.
   // Sur le calque, il avance avec l'horloge du prix (minuteCalque), sans redessin.
-  if (P && overlays.liq && !deb && histHeatmap && histHeatmap.grille && histHeatmap.sym === activeSymbol && histHeatmap.majA) {
+  // La forme la plus longue qui tient à droite du compteur (compteurFin), sans le toucher.
+  if (P && !deb && ageCoucheAffiche()) {
+    const A = texteAgeCouche(), xd = W - P.right - 8;
     cx.save();
     cx.font = chartFont(9, 650); cx.textAlign = 'right';
-    cx.fillStyle = texteAgeCouche().vieux ? COLORS.warn : COLORS.ink3;
-    cx.fillText(texteAgeCouche().texte, W - P.right - 8, 13);
+    cx.fillStyle = A.vieux ? COLORS.warn : COLORS.ink3;
+    cx.fillText(A.variantes.find(t => cx.measureText(t).width <= xd - compteurFin - 14) || A.variantes[A.variantes.length - 1], xd, 13);
     cx.restore();
   }
   // Repère de la publication (market-data.json) : un trait vertical pointillé à `updated`, un
@@ -3298,14 +3323,18 @@ function dessinerCalque() {
  *  au format français. g porte déjà la police de l'infobulle. */
 function colonneOHLC(g, textes) { return Math.max(60, Math.ceil(Math.max(...textes.map(t => g.measureText(t).width))) + 10); }
 /** Âge de la couche « Ordres en attente (carte) » : « Ordres en attente (carte) · dernière colonne
- *  il y a X · publiée il y a Y » — le nom du menu, pas un autre. */
+ *  il y a X · publiée il y a Y » — le nom du menu, pas un autre. variantes : de la plus longue à la
+ *  plus courte (« Carte publiée il y a Y »), pour un écran étroit ; l'âge de publication reste. */
 function texteAgeCouche() {
   const h = histHeatmap, g = h && h.grille, t = Horloges.maintenant();
-  if (!g || !h.majA) return { texte: '', vieux: false };
-  const derniere = (g.t0 + (g.W - 1) * g.dt) * 1000;
-  return { texte: NOM_ORDRES_CARTE + ' · dernière colonne ' + Horloges.texteAge(t - derniere) + ' · publiée ' + Horloges.texteAge(t - h.majA),
+  if (!g || !h.majA) return { texte: '', variantes: [''], vieux: false };
+  const derniere = (g.t0 + (g.W - 1) * g.dt) * 1000, pub = ' · publiée ' + Horloges.texteAge(t - h.majA);
+  const texte = NOM_ORDRES_CARTE + ' · dernière colonne ' + Horloges.texteAge(t - derniere) + pub;
+  return { texte, variantes: [texte, NOM_ORDRES_CARTE + pub, 'Carte publiée ' + Horloges.texteAge(t - h.majA)],
     vieux: (t - h.majA) / 60000 > CADENCES.vieux_min };
 }
+/** L'âge de la couche est écrit sur le tracé (Expert, couche cochée, carte de la paire affichée). */
+const ageCoucheAffiche = () => overlays.liq && !debutant() && !!histHeatmap && !!histHeatmap.grille && histHeatmap.sym === activeSymbol && !!histHeatmap.majA;
 /** Le repère de la publication dans la géométrie P du dernier dessin : { x, y, texte } ou null
  *  (autre paire que celle du fichier, ou instant hors de la vue). Le prix publié est celui de
  *  BTCUSDT : sur une autre paire, il n'a pas de place. */
@@ -4632,9 +4661,9 @@ function guideCtxFigures() {
 /** Le style d'une figure (plan §5.1) : tirets, épaisseur, alpha des traits et de l'aplat. Une
  *  figure finie s'efface au fil des bougies closes (base × (1 − âge / (garder + 1)), plancher
  *  0,15) ; l'âge ne change qu'à une clôture : rien à redessiner entre deux.
- *  marque : celle de son issue, la même que dans ses mots (Guide.MARQUES_FIN) — la croix n'est
- *  dessinée que pour une figure invalidée ou annulée (✗), jamais pour un délai écoulé (–) ni une
- *  figure sans suite (○), que leurs libellés disent. */
+ *  marque : celle de son issue, la même que dans ses mots (Guide.MARQUES_FIN), dessinée au bout de
+ *  la figure (guideFigureTracer, guideMarquePrix) : la croix (croix: true) seulement pour une figure
+ *  invalidée ou annulée (✗) ; un délai écoulé a son « – », une figure sans suite son « ○ ». */
 function guideStyleFigure(f, jClos, mode) {
   const G = PARAM.guide;
   if (f.fin) {
@@ -4757,20 +4786,31 @@ function guideFigureTracer(E, f) {
     ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fillStyle = COLORS.surface; ctx.fill();
     ctx.strokeStyle = avecAlpha(COLORS.ink1, 0.85); ctx.lineWidth = 1.4; ctx.stroke();
   }
-  // La marque ✗ d'une figure tombée : sur la bougie de fin, au niveau qui l'a fait tomber.
-  let croix = null;
-  if (st.croix) {
-    const p = guideCroixPrix(f);
+  // La marque de son issue (Guide.MARQUES_FIN, la même que dans ses mots), sur la bougie de fin, au
+  // niveau de la figure qu'elle concerne (guideMarquePrix) : ✗ invalidée ou annulée, – délai écoulé,
+  // ○ sans suite. Sans niveau, pas de marque — jamais au prix de clôture. Le « – » et le « ○ » ont
+  // un liseré du fond : posés sur une ligne en pointillés, ils s'en détachent.
+  let croix = null, marque = null;
+  if (st.marque) {
+    const p = guideMarquePrix(f);
     if (isNum(p)) {
-      const x = X(f.jFin), y = Y(p), r = 5;
-      ctx.strokeStyle = avecAlpha(COLORS.ink1, Math.max(0.5, st.a)); ctx.lineWidth = 1.6;
-      ctx.beginPath(); ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke();
-      croix = { x, y }; ys.push(y);
+      const x = X(f.jFin), y = Y(p), r = 5, enc = avecAlpha(COLORS.ink1, Math.max(0.5, st.a));
+      if (st.marque === '✗') {
+        ctx.strokeStyle = enc; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke();
+        croix = { x, y };
+      } else if (st.marque === '–') {
+        for (const [c, lw] of [[COLORS.surface, 5], [enc, 2.4]]) { ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(x - r - 1, y); ctx.lineTo(x + r + 1, y); ctx.stroke(); }
+      } else {
+        ctx.beginPath(); ctx.arc(x, y, r - 0.5, 0, Math.PI * 2); ctx.fillStyle = COLORS.surface; ctx.fill();
+        ctx.strokeStyle = enc; ctx.lineWidth = 1.6; ctx.stroke();
+      }
+      marque = { t: st.marque, x, y, p }; ys.push(y);
     }
   }
   ctx.restore();
   const d = Guide.dernierPoint(f, G), qd = geo.creux || (geo.points.length ? geo.points[geo.points.length - 1] : geo.valide[0][1]);
-  return { segs, ys, xd: X(d), yd: Y(qd[1]), st, encre, geo, croix, iFin };
+  return { segs, ys, xd: X(d), yd: Y(qd[1]), st, encre, geo, croix, marque, iFin };
 }
 /** L'objectif théorique (Expert) : en tirets à partir de la 1re clôture au-delà, pâli s'il est
  *  atteint, jamais pour une figure tombée ; hors de l'échelle, une flèche au bord avec son prix. */
@@ -5066,21 +5106,24 @@ function guideTextePhraseDebutant(E, phrase) {
   const D = E.D, r = D.regime || { cle: 'inconnu' }, G = PARAM.guide, itv = chartInterval, now = Horloges.maintenant();
   const per = Guide.PERIODE_DEBUTANT[itv] || ['une période', '2 périodes', 'cette période', 'périodes'];
   const pas = geoPrix && geoPrix.pas > 0 ? geoPrix.pas : 900, n = PARAM.adx.periode;
-  const sur = 'sur les ' + n + (/^une /.test(per[0]) ? ' dernières ' : ' derniers ') + per[3] + (Guide.environ(n * pas) ? ' (' + Guide.environ(n * pas) + ')' : '');
+  // La fenêtre de l'ADX (lissé deux fois : les bougies plus anciennes comptent un peu aussi).
+  const sur = 'surtout sur les ' + n + (/^une /.test(per[0]) ? ' dernières ' : ' derniers ') + per[3] + (Guide.environ(n * pas) ? ' (' + Guide.environ(n * pas) + ')' : '');
+  // « Monte » et « Baisse » demandent aussi la moyenne courte du bon côté de la longue (Guide.regime).
+  const long = ', et la tendance plus longue va dans le même sens';
   const out = [];
   if (/touche/.test(phrase)) out.push('« Touche » : le prix est en ce moment dans la bande de ce repère.');
   if (/est passé/.test(phrase)) out.push('« Est passé » : ' + per[1] + ' de suite ont fini au-delà de ce repère (la règle de la page pour dire « franchi »).');
   // Le sens du verbe, seulement s'il est dans la phrase affichée (sinon : ce que dit le mouvement).
   const verbe = Guide.VERBE_DEBUTANT[r.cle], dit = verbe && new RegExp('\\b' + verbe + '\\b').test(phrase);
   out.push((dit ? {
-    hausse: '« Monte » : ' + sur + ', le prix a pris une direction nette vers le haut.',
-    baisse: '« Baisse » : ' + sur + ', le prix a pris une direction nette vers le bas.',
+    hausse: '« Monte » : ' + sur + ', le prix a pris une direction nette vers le haut' + long + '.',
+    baisse: '« Baisse » : ' + sur + ', le prix a pris une direction nette vers le bas' + long + '.',
     faible: '« Hésite » : ' + sur + ', le mouvement n’a pas de direction nette.',
     sans: '« Hésite » : ' + sur + ', le mouvement n’a pas de direction nette.',
     incertaine: '« S’agite » : ' + sur + ', le prix bouge nettement, mais sans sens clair.',
   } : {
-    hausse: 'Le mouvement : ' + sur + ', le prix a pris une direction nette vers le haut.',
-    baisse: 'Le mouvement : ' + sur + ', le prix a pris une direction nette vers le bas.',
+    hausse: 'Le mouvement : ' + sur + ', le prix a pris une direction nette vers le haut' + long + '.',
+    baisse: 'Le mouvement : ' + sur + ', le prix a pris une direction nette vers le bas' + long + '.',
     faible: 'Le mouvement : ' + sur + ', le prix n’a pas de direction nette.',
     sans: 'Le mouvement : ' + sur + ', le prix n’a pas de direction nette.',
     incertaine: 'Le mouvement : ' + sur + ', le prix bouge nettement, mais sans sens clair.',
@@ -5290,6 +5333,22 @@ function guideFormeDebutant(E, f, t, garder) {
   E.debForme = entree;
   return true;
 }
+/** Le prix de la marque de fin d'une figure (Guide.MARQUES_FIN), ou null — jamais le prix de
+ *  clôture, qui n'est pas un niveau de la figure : sans niveau, pas de marque sur le tracé.
+ *    ✗ invalidée ou annulée : le niveau qui l'a fait tomber (guideCroixPrix) ;
+ *    – délai écoulé (validée, ni objectif ni invalidation à temps) : la ligne qui l'a validée, à sa
+ *      dernière bougie (la ligne de cou d'une épaule-tête-épaule suit sa pente) ;
+ *    ○ sans suite (jamais validée) : le milieu de ses deux droites à sa dernière bougie, sinon la
+ *      ligne qui l'aurait validée (la ligne de cou). */
+function guideMarquePrix(f) {
+  const m = Guide.MARQUES_FIN[f.fin];
+  if (!m || !isNum(f.jFin)) return null;
+  let p;
+  if (m === '✗') p = guideCroixPrix(f);
+  else if (m === '○' && f.hautL && f.basL) p = (Guide.ligne(f.hautL, f.jFin) + Guide.ligne(f.basL, f.jFin)) / 2;
+  else p = Guide.famille(f) === 'ete' && f.couL ? Guide.ligne(f.couL, f.jFin) : f.niveau;
+  return isNum(p) && isFinite(p) ? p : null;
+}
 /** Le prix de la croix d'une figure tombée : le NIVEAU qui l'a fait tomber (noté au journal), sinon
  *  son niveau d'invalidation — jamais le prix de clôture, qui n'est pas un niveau de la figure. */
 function guideCroixPrix(f) {
@@ -5383,7 +5442,7 @@ function guidePastilleDebutant(g, x, y, w, h, texte, coul, encre) {
 function debPhraseChoisir(g, o, maxPx, etroit) {
   const P = PARAM.guide.debutant, max = etroit ? P.phraseEtroit : P.phrase, V = Guide.phrasesDebutant(o);
   const pleines = V.slice(0, -1), compacte = V[V.length - 1];
-  // Chaque variante à 11,5 px puis à 10,5 px avant la suivante : au téléphone, « Depuis 3 h, le
+  // Chaque variante à 11,5 px puis à 10,5 px avant la suivante : au téléphone, « Sur 3 h 30, le
   // prix monte et touche 86 133 $. » en 10,5 px plutôt que de perdre « touche » (ou la durée).
   for (const t of pleines) {
     if (t.length > max) continue;
@@ -5909,7 +5968,7 @@ const scenBordFranchi = (z, ref) => (isNum(ref) && (z[0] + z[1]) / 2 < ref ? z[1
 /** Les marques des contacts d'un scénario, au point du contact (x : le milieu de la bougie du
  *  contact ; y : le bord de la zone franchi) : une COCHE par cible touchée, une CROIX pour
  *  l'invalidation ou la sortie d'un range (ou un ordre inconnu). Dessinées (7 px), jamais un texte en
- *  Débutant ; en Expert, une pastille dit le créneau : « ✓ 15:15–15:30 UTC », « ✗ S2 15:15–15:30 UTC »
+ *  Débutant ; en Expert, une pastille dit le créneau : « ✓ 15:15–15:30 », « ✗ S2 15:15–15:30 » (heure de l’appareil)
  *  (posée seulement s'il y a la place). La croix reste en Expert jusqu'à la fin de la fenêtre ; en
  *  Débutant, seulement pendant le fondu du scénario montré. */
 function scenMarques(S, it, top, bas) {
@@ -6127,7 +6186,7 @@ function scenChemin(S, it, top, bas) {
 }
 /** Le libellé d'un scénario, près du trait de son premier niveau (le haut d'un range), à gauche
  *  de la marge de futur ; un niveau hors de la vue est nommé au bord, avec sa flèche. Fermé, il dit
- *  aussi son état court (« · invalidation d'abord 13:30–13:45 UTC (en direct) »). */
+ *  aussi son état court (« · invalidation d'abord 13:30–13:45 (en direct) »). */
 function scenLibelle(S, it, top, bas, surBougies) {
   const { g, yDe, xFin, xMax, exp } = S, sc = it.sc, H = 15;
   if (S.xDeT(sc.fin) < g.pad.left) return 'hors';      // fenêtre finie avant la vue : rien à nommer
@@ -6195,12 +6254,15 @@ function scenReperes(S, top, bas) {
   const { g, F, xDeT, xMax, exp } = S, P = PARAM.scenarios;
   // Heures et jours de l'appareil (js/format.js) : une seule heure par instant, sans fuseau écrit.
   const H = 14, hU = t => Fmt.heure(t), jour = t => Fmt.jour(t);
+  // Le point du matin (une heure de la routine, à Paris) dit à l'heure de l'appareil, comme le titre
+  // de l'encadré (Scenarios.titre) : « Point de 07:00 » sur un appareil à Paris.
+  const tP = Scenarios.instantPoint(F, P), dePoint = isNum(tP) ? ' de ' + hU(tP) : '';
   // Le temps restant, relu à chaque dessin (aucune minuterie : sans nouvelle donnée, il avance au dessin suivant).
   const resteF = Scenarios.reste(F.fin - S.maintenant);
   const sem = isNum(F.finSemaine) && F.finSemaine !== F.fin && S.items.some(i => i.sc.rang === 'S') ? ' Le scénario de la semaine court jusqu’au ' + jour(F.finSemaine) + ' à ' + hU(F.finSemaine) + '.' : '';
   for (const [t, noms, expl] of [
-    [F.emis, exp ? ['Point · ' + hU(F.emis), hU(F.emis)] : ['Point de ' + P.point + ' Paris · écrit à ' + hU(F.emis), 'Écrit à ' + hU(F.emis), 'Point · ' + hU(F.emis), hU(F.emis)],
-      'Le moment où les scénarios du point de ' + P.point + ' (Paris) ont été écrits : le ' + jour(F.emis) + ' à ' + hU(F.emis) + (isNum(F.prixEmission) ? ', prix ' + Scenarios.prix(F.prixEmission) : '') + '. Les zones partent de là.'],
+    [F.emis, exp ? ['Point · ' + hU(F.emis), hU(F.emis)] : ['Point' + dePoint + ' · écrit à ' + hU(F.emis), 'Écrit à ' + hU(F.emis), 'Point · ' + hU(F.emis), hU(F.emis)],
+      'Le moment où les scénarios du point' + dePoint + ' ont été écrits : le ' + jour(F.emis) + ' à ' + hU(F.emis) + (isNum(F.prixEmission) ? ', prix ' + Scenarios.prix(F.prixEmission) : '') + '. Les zones partent de là.'],
     [F.fin, (resteF ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin) + ' · reste ' + resteF, 'fin · ' + hU(F.fin) + ' · reste ' + resteF] : []).concat(exp ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)] : ['fin des scénarios du jour · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin du jour · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)]),
       'Fin de la fenêtre des scénarios 1 à 3 : ' + jour(F.fin) + ' à ' + hU(F.fin) + '. Le journal les note ensuite, le matin même.' + sem]]) {
     const x = xDeT(t);
@@ -6508,7 +6570,8 @@ function scenTexteBoite(S, sansBilan, court) {
   }
   const attente = !F && previsions && previsions.etat === 'attente';
   if (attente && previsions.note) out.push(previsions.note);
-  out.push('Chaque matin vers ' + P.point + ' (Paris), Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ, à partir de son analyse du marché, et les classe du plus au moins probable selon son jugement, sans pourcentage. Chaque niveau a une origine nommée et se lit comme une zone : le niveau plus ou moins la marge.');
+  const hP = heurePointMatin();
+  out.push('Chaque matin' + (hP ? ' vers ' + hP : '') + ', Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ, à partir de son analyse du marché, et les classe du plus au moins probable selon son jugement, sans pourcentage. Chaque niveau a une origine nommée et se lit comme une zone : le niveau plus ou moins la marge.');
   if (F) out.push('Les états de cet encadré sont un suivi EN DIRECT sur les bougies ' + S.itv + ' du graphique (un affichage). La note officielle est celle du journal, faite mécaniquement le lendemain sur des bougies d’une minute.');
   // Pendant la journée : aucune nouvelle prévision ; la règle de l'écart, en entier (Expert).
   if (F && exp && S.jour) out.push(...Scenarios.regleJourExpert(PARAM.scenarios.jour));
@@ -6560,7 +6623,7 @@ function scenCalque() {
 // ─── Scénarios du matin, mode Débutant ─────────────────────────────────────
 // Sur le tracé : le libellé du scénario 1 (ouvert) près de sa zone, et UNE ligne d'état en haut à
 // droite (« Scénario 1 de Claude : en cours (en direct) ▸ ») ; tout le reste est dans la bulle,
-// en mots simples, heures de Paris.
+// en mots simples, heures de l'appareil.
 /** Le texte de la ligne des scénarios pour un tracé de largeur pw, ou null (couche masquée, autre
  *  paire). Lu par debHaut AVANT la mise en page (la rangée du haut en dépend). */
 function scenLigneDebutant(pw) {
@@ -6693,7 +6756,8 @@ function scenLibelleDebutant(S, it, top, bas) {
 function scenTexteLigneDebutant(S) {
   const F = S.F, P = PARAM.scenarios, out = [];
   const fin = 'Une hypothèse de Claude (une IA), pas une promesse ni un conseil.';
-  const chaque = 'Chaque matin vers ' + P.point + ' (heure de Paris), Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ et les classe du plus au moins probable, sans pourcentage.';
+  const hP = heurePointMatin();
+  const chaque = 'Chaque matin' + (hP ? ' vers ' + hP : '') + ', Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ et les classe du plus au moins probable, sans pourcentage.';
   if (!F) {
     const attente = previsions && previsions.etat === 'attente';
     if (attente) out.push(previsions.note || 'En attente du prochain point.');
@@ -7472,8 +7536,8 @@ function mCard(icon, title, sub, right, body) {
 // Et le badge dit ce que le champ EST : l'état EMA20 < EMA50 sur le TF de la ligne. Il
 // affichait « DEATH CROSS », nom d'un CROISEMENT de SMA50 / SMA200 en daily — un autre objet.
 function crossTag(sous) {
-  if (sous === true)  return '<span class="badge badge-baissier" title="État sur ce TF, pas un croisement daté">EMA20 &lt; EMA50</span>';
-  if (sous === false) return '<span class="badge badge-hausser" title="État sur ce TF, pas un croisement daté">EMA20 &gt; EMA50</span>';
+  if (sous === true)  return '<span class="badge badge-baissier" title="État sur ce TF, pas un croisement daté">EMA 20 &lt; EMA 50</span>';
+  if (sous === false) return '<span class="badge badge-hausser" title="État sur ce TF, pas un croisement daté">EMA 20 &gt; EMA 50</span>';
   return '<span class="badge" style="background:var(--rail);color:var(--ink-3)">n/d</span>';
 }
 // Montant signé lisible : « −6,83 M $ » (moins typographique, unité après le nombre).
@@ -7763,7 +7827,7 @@ function renderFeedTo(container) {
       + '<span class="tf-rsi">RSI&nbsp;<b>' + fmtNum(t.rsi_14,1) + '</b></span>' + rsiMeter(t.rsi_14) + crossTag(sous) + '</div>'
       // Canal S/R : où le dernier cours se situe entre le support et la résistance de la fenêtre.
       + trackHtml(t.last_close, t.support_30, t.resistance_30, 'S&nbsp;<b>' + fmtUsd(t.support_30) + '</b>', 'R&nbsp;<b>' + fmtUsd(t.resistance_30) + '</b>')
-      + '<div class="tf-pied">EMA20 ' + fmtUsd(e20) + ' · EMA50 ' + fmtUsd(e50)
+      + '<div class="tf-pied">EMA 20 ' + fmtUsd(e20) + ' · EMA 50 ' + fmtUsd(e50)
       + ' (' + ecart + ') · amplitude ' + fmtNum(ampl,2) + ' % (min/max ' + fen + ')'
       + (isNum(t.atr_14) ? '<span class="expert-seul"> · ATR ' + fmtUsd(t.atr_14) + ' (' + fmtNum(t.atr_14_pct,2) + ' %)</span>' : '') + '</div>'
       + (k === '4h' ? lectureCourte('rsi_tf', t.rsi_14) : '') + '</div>';
@@ -8223,7 +8287,7 @@ function renderStratHelp() {
     const sl = (btUserParams.slPct !== undefined) ? btUserParams.slPct : strat.params.slPct.value;
     html += '<div class="strat-auto">' + (p.manual ? 'Bornes saisies à la main' : 'Auto') + ' : '
       + f(p.lo) + ' → ' + f(p.hi) + ' · ' + p.n + ' niveaux · pas de ' + f(p.step)
-      + ' · TP +' + Fmt.nombre(+tp, decimalesDe(tp)) + ' % / SL −' + Fmt.nombre(+sl, decimalesDe(sl)) + ' % · ' + sig + '</div>';
+      + ' · prise de gain +' + Fmt.nombre(+tp, decimalesDe(tp)) + ' % / stop de perte −' + Fmt.nombre(+sl, decimalesDe(sl)) + ' % · ' + sig + '</div>';
   }
   el.innerHTML = html;
 }
@@ -8312,7 +8376,7 @@ function startForward() {
   }
   forwardRunning = true;
   const btn = document.getElementById('stratFwdBtn');
-  btn.textContent = '🟢 Forward (arrêter)';
+  btn.textContent = '🟢 En direct (arrêter)';
   btn.classList.add('forward');
 
   // Track the last candle index processed
@@ -8352,7 +8416,7 @@ function stopForward() {
   forwardRunning = false;
   if (forwardInterval) { clearInterval(forwardInterval); forwardInterval = null; }
   const btn = document.getElementById('stratFwdBtn');
-  btn.textContent = '🔴 Forward Test';
+  btn.textContent = '🔴 Suivre en direct';
   btn.classList.remove('forward');
 }
 
@@ -8362,14 +8426,14 @@ function updateForwardStats() {
   div.style.display = 'block';
   const pnlStr = Fmt.signe(btResult.totalPnl, x => Fmt.nombre(x, 2));
   div.innerHTML =
-    '<div>🔄 <b>Forward</b> | Trades: <span class="stat-val">' + btResult.tradeCount + '</span></div>' +
-    '<div>P&L en direct: <span class="' + (btResult.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' USDT</span></div>' +
-    '<div>Return: <span class="' + (btResult.totalReturn >= 0 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.pct(btResult.totalReturn, 2) + '</span></div>';
+    '<div>🔄 <b>Suivi en direct</b> | Opérations closes : <span class="stat-val">' + btResult.tradeCount + '</span></div>' +
+    '<div>Résultat en direct : <span class="' + (btResult.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' ' + guideUnite() + '</span></div>' +
+    '<div>Rendement : <span class="' + (btResult.totalReturn >= 0 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.pct(btResult.totalReturn, 2) + '</span></div>';
 }
 
 // Un nombre du Grid Bot publié en texte par runBacktest (« 1.234 », « ∞ ») : au format commun.
 function nombreBot(t, dec) { return isFinite(parseFloat(t)) ? Fmt.nombre(parseFloat(t), dec) : String(t); }
-// Les décimales d'un réglage tel qu'il a été saisi (« 0.5 » → 1) : « TP +0,5 % ».
+// Les décimales d'un réglage tel qu'il a été saisi (« 0.5 » → 1) : « prise de gain +0,5 % ».
 function decimalesDe(v) { return (String(v).split('.')[1] || '').length; }
 // Durée d'une bougie en minutes : traduit la fenêtre testée en « 8 h » / « 3,2 j ».
 const INTERVAL_MIN = { '1m': 1, '5m': 5, '15m': 15, '1h': 60, '4h': 240, '1d': 1440 };
@@ -8377,7 +8441,8 @@ const INTERVAL_MIN = { '1m': 1, '5m': 5, '15m': 15, '1h': 60, '4h': 240, '1d': 1
 function showStratStats(result) {
   const div = document.getElementById('stratStats');
   div.style.display = 'block';
-  const pnlStr = Fmt.signe(result.totalPnl, x => Fmt.nombre(x, 2));
+  // Montants dans la devise de cotation de la paire, comme les prix de la page (« $ », « SOL »).
+  const unite = guideUnite(), pnlStr = Fmt.signe(result.totalPnl, x => Fmt.nombre(x, 2));
   // Verdict : le seul juge qui compte est « garder le BTC » sur la MÊME période. Une grille qui
   // gagne 0,40 % quand le BTC fait 3 % a perdu du terrain, malgré un P&L positif.
   const c0 = candles[result.startIdx], c1 = candles[result.endIdx];
@@ -8396,11 +8461,11 @@ function showStratStats(result) {
       + Fmt.pct(hold, 2) + ' sur la même période</div>';
   }
   html +=
-    '<div>Trades: <span class="stat-val">' + result.tradeCount + '</span> | Win: <span title="Part des trades clôturés en profit" class="' + (result.winRate >= 50 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.nombre(result.winRate, 1) + ' %</span></div>' +
-    '<div>P&L: <span title="Profit ou perte en USDT, frais 0,1 % déjà déduits" class="' + (result.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' USDT</span> (' + Fmt.pct(ret, 2) + ')</div>' +
-    '<div>Perte max: <span title="Plus forte baisse depuis un sommet du capital (drawdown)" class="stat-neg">' + Fmt.nombre(result.maxDrawdownPct, 1) + ' %</span> | Sharpe: <span title="Rendement par unité de risque, annualisé. Au-delà de 1 c\'est bon ; sur une fenêtre courte il ne veut rien dire." class="stat-val">' + nombreBot(result.sharpe, 3) + '</span></div>' +
-    '<div>Gains/pertes: <span title="Total des gains divisé par le total des pertes. Au-dessus de 1, la grille gagne." class="stat-val">' + nombreBot(result.profitFactor, 2) + '</span> | Gain moyen: <span title="Gain moyen par trade gagnant" class="stat-pos">' + Fmt.nombre(result.avgWin, 2) + '</span> | Perte moyenne: <span title="Perte moyenne par trade perdant" class="stat-neg">' + Fmt.nombre(result.avgLoss, 2) + '</span></div>';
-  if (result.tradeCount < 10) html += '<div class="strat-note">' + result.tradeCount + ' trade(s) : trop peu pour conclure — visez 30, ou élargissez la période avec les champs « Du » / « Au ».</div>';
+    '<div>Opérations closes : <span class="stat-val">' + result.tradeCount + '</span> | Gagnantes : <span title="Part des opérations closes en profit" class="' + (result.winRate >= 50 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.nombre(result.winRate, 1) + ' %</span></div>' +
+    '<div>Résultat : <span title="Profit ou perte, frais de 0,1 % déjà déduits" class="' + (result.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' ' + unite + '</span> (' + Fmt.pct(ret, 2) + ')</div>' +
+    '<div>Perte max : <span title="Plus forte baisse depuis un sommet du capital (drawdown)" class="stat-neg">' + Fmt.nombre(result.maxDrawdownPct, 1) + ' %</span> | Ratio de Sharpe : <span title="Rendement par unité de risque, annualisé. Au-delà de 1 c\'est bon ; sur une fenêtre courte il ne veut rien dire." class="stat-val">' + nombreBot(result.sharpe, 3) + '</span></div>' +
+    '<div>Gains / pertes : <span title="Total des gains divisé par le total des pertes. Au-dessus de 1, la grille gagne." class="stat-val">' + nombreBot(result.profitFactor, 2) + '</span> | Gain moyen : <span title="Gain moyen par opération gagnante" class="stat-pos">' + Fmt.nombre(result.avgWin, 2) + ' ' + unite + '</span> | Perte moyenne : <span title="Perte moyenne par opération perdante" class="stat-neg">' + Fmt.nombre(result.avgLoss, 2) + ' ' + unite + '</span></div>';
+  if (result.tradeCount < 10) html += '<div class="strat-note">' + result.tradeCount + ' opération(s) close(s) : trop peu pour conclure — visez 30, ou élargissez la période avec les champs « Du » / « Au ».</div>';
   div.innerHTML = html;
 }
 
@@ -8414,11 +8479,15 @@ function onCompareDumbGrid() {
 
   const div = document.getElementById('stratStats');
   div.style.display = 'block';
+  // Au format de la page (js/format.js), dans la devise de cotation de la paire.
+  const unite = guideUnite(), montant = v => Fmt.signe(v, x => Fmt.nombre(x, 2)) + ' ' + unite;
+  const ligne = (nom, r) => '<div><b>' + nom + '</b> : <span class="' + (r.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + montant(r.totalPnl) + '</span> ('
+    + r.tradeCount + ' opération(s) close(s), ratio de Sharpe ' + nombreBot(r.sharpe, 3) + ')</div>';
+  const ecart = taResult.totalPnl - dumbResult.totalPnl;
   div.innerHTML =
-    '<div style="margin-bottom:6px;color:var(--accent);font-weight:700">📊 Comparaison TA vs Grille Fixe</div>' +
-    '<div><b>' + STRATEGIES[btActiveStrategy].label + '</b>: <span class="' + (taResult.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + (taResult.totalPnl >= 0 ? '+' : '') + taResult.totalPnl.toFixed(2) + ' USDT</span> (' + taResult.tradeCount + ' trades, Sharpe ' + taResult.sharpe + ')</div>' +
-    '<div><b>Grille Fixe</b>: <span class="' + (dumbResult.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + (dumbResult.totalPnl >= 0 ? '+' : '') + dumbResult.totalPnl.toFixed(2) + ' USDT</span> (' + dumbResult.tradeCount + ' trades, Sharpe ' + dumbResult.sharpe + ')</div>' +
-    '<div>Delta: <span class="' + ((taResult.totalPnl - dumbResult.totalPnl) >= 0 ? 'stat-pos' : 'stat-neg') + '">' + ((taResult.totalPnl - dumbResult.totalPnl) >= 0 ? '+' : '') + (taResult.totalPnl - dumbResult.totalPnl).toFixed(2) + ' USDT</span></div>';
+    '<div style="margin-bottom:6px;color:var(--accent);font-weight:700">📊 Comparaison avec la grille fixe (témoin)</div>' +
+    ligne(STRATEGIES[btActiveStrategy].label, taResult) + ligne('Grille fixe', dumbResult) +
+    '<div>Écart : <span class="' + (ecart >= 0 ? 'stat-pos' : 'stat-neg') + '">' + montant(ecart) + '</span></div>';
   btResult = taResult;
   btBot = taResult.bot;
   drawChart();
@@ -8497,7 +8566,7 @@ function runWalkForward(strategyKey, candles, userParams, capital, segments) {
     segments: results,
     degradationRatio: degradationRatio,
     sensitivity: sensResults,
-    interpretation: degradationRatio < 0.5 ? '⚠️ Overfit probable (ratio < 0.5)' :
+    interpretation: degradationRatio < 0.5 ? '⚠️ Surajustement probable (rapport < 0,5)' :
                     degradationRatio < 0.7 ? '⚠️ Faible robustesse' :
                     degradationRatio < 0.9 ? '✅ Correct' : '✅ Robuste'
   };
@@ -8509,23 +8578,23 @@ function showWalkForward() {
 
   const div = document.getElementById('stratStats');
   div.style.display = 'block';
-  let html = '<div style="color:var(--accent);font-weight:700;margin-bottom:6px">🔬 Walk-Forward (' + wf.segments.length + ' segments)</div>';
+  let html = '<div style="color:var(--accent);font-weight:700;margin-bottom:6px">🔬 Test de robustesse (walk-forward, ' + wf.segments.length + ' segments)</div>';
 
   for (const seg of wf.segments) {
     html += '<div style="margin-bottom:4px;font-size:10px">';
-    html += '<b>S' + seg.segment + '</b> In: <span class="stat-val">' + Fmt.pct(seg.inSample.return, 2) + '</span> (Sharpe ' + Fmt.nombre(seg.inSample.sharpe, 2) + ') ';
-    html += '→ Out: <span class="' + (seg.outSample.return >= 0 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.pct(seg.outSample.return, 2) + '</span> (Sharpe ' + Fmt.nombre(seg.outSample.sharpe, 2) + ')';
+    html += '<b>S' + seg.segment + '</b> Entraînement : <span class="stat-val">' + Fmt.pct(seg.inSample.return, 2) + '</span> (Sharpe ' + Fmt.nombre(seg.inSample.sharpe, 2) + ') ';
+    html += '→ Suite : <span class="' + (seg.outSample.return >= 0 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.pct(seg.outSample.return, 2) + '</span> (Sharpe ' + Fmt.nombre(seg.outSample.sharpe, 2) + ')';
     html += '</div>';
   }
 
-  html += '<div style="margin-top:6px"><b>Degradation Ratio:</b> <span class="' + (wf.degradationRatio >= 0.7 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.nombre(wf.degradationRatio, 3) + '</span></div>';
+  html += '<div style="margin-top:6px"><b title="Ratio de Sharpe moyen sur la suite divisé par celui de l’entraînement">Rapport suite / entraînement :</b> <span class="' + (wf.degradationRatio >= 0.7 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.nombre(wf.degradationRatio, 3) + '</span></div>';
   html += '<div style="font-size:10px;color:var(--ink-2)">' + wf.interpretation + '</div>';
 
   // Sensitivity
   if (wf.sensitivity && wf.sensitivity.length > 0) {
     html += '<div style="margin-top:6px;font-size:10px"><b>Sensibilité au nombre de niveaux ±20 % :</b></div>';
     for (const s of wf.sensitivity) {
-      html += '<span style="margin-right:8px">' + s.value + ': <span class="' + (s.return >= 0 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.pct(s.return, 2) + '</span></span>';
+      html += '<span style="margin-right:8px">' + s.value + ' : <span class="' + (s.return >= 0 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.pct(s.return, 2) + '</span></span>';
     }
   }
 

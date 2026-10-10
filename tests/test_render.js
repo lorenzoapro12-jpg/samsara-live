@@ -171,7 +171,7 @@ try {
     ['Nombres à la française (aucun « 82,798 » ni « $82 »)', !/\d,\d{3}\b(?![\d,])|\$\d/.test(texteDe(feed.innerHTML).replace(/\b(?:BTC|ETH|SOL|XRP|USDT|USD)\b/g, ''))],
     // L'état EMA20 / EMA50 du TF, sous son vrai nom : le badge disait « DEATH CROSS », nom
     // d'un croisement de SMA50 / SMA200 en daily — un autre objet (voir indicateurs.py).
-    ['État EMA20 / EMA50 4h', feed.innerHTML.includes((D.tf['4h'].ema20_sous_ema50 ?? D.tf['4h'].death_cross_4h) ? 'EMA20 &lt; EMA50' : 'EMA20 &gt; EMA50')
+    ['État EMA20 / EMA50 4h', feed.innerHTML.includes((D.tf['4h'].ema20_sous_ema50 ?? D.tf['4h'].death_cross_4h) ? 'EMA 20 &lt; EMA 50' : 'EMA 20 &gt; EMA 50')
       && !/DEATH CROSS|GOLDEN CROSS/.test(feed.innerHTML)],
     ['Mur bid dominant (prix complet)', feed.innerHTML.includes(usdFr(D.liquidity.bid_walls[0][0]))],
     ['Murs en BTC', /BTC<\/span>/.test(feed.innerHTML) && D.liquidity.unit === 'BTC'],

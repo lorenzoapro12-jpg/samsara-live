@@ -607,15 +607,15 @@ const Scenarios = (function () {
     const m = o.replace(/\s*\(([^)]*)\)/g, ', $1').split(',').map(x => x.trim()).filter(x => x && propre(x));
     return m.length ? m.join(', ') : null;
   }
-  /** Le jour d'un instant, celui de l'appareil (« 09/10 ») ; le nom est resté. */
-  const jourParis = ms => Fm.jour(ms);
+  /** Le jour d'un instant, celui de l'appareil (« 09/10 »). */
+  const jourVu = ms => Fm.jour(ms);
   /** Le jour d'un moment t, s'il n'est pas celui de maintenant (appareil) : « hier », « le 08/10 » ;
    *  '' le même jour (ou sans maintenant). */
   function jourSiAutre(t, maintenant) {
     if (!fini(t) || !fini(maintenant)) return '';
-    const j = jourParis(t);
-    if (j === jourParis(maintenant)) return '';
-    return j === jourParis(maintenant - 86400000) ? 'hier' : 'le ' + j;
+    const j = jourVu(t);
+    if (j === jourVu(maintenant)) return '';
+    return j === jourVu(maintenant - 86400000) ? 'hier' : 'le ' + j;
   }
   /** « vers 07:45 » ; une bougie de plus d'une minute : son créneau ; un autre jour que celui de
    *  maintenant (après minuit) : « hier entre 22:00 et 22:15 ». */
@@ -648,7 +648,7 @@ const Scenarios = (function () {
   /** La première ligne des bulles du Débutant : qui a écrit, quand (heure de l'appareil). */
   function enteteDebutant(F, P, maintenant) {
     if (!F || F.etat !== 'ok') return 'Scénarios du matin de Claude, une IA.';
-    const t = fini(maintenant) ? maintenant : Date.now(), jour = jourParis(F.emis), auj = jourParis(t);
+    const t = fini(maintenant) ? maintenant : Date.now(), jour = jourVu(F.emis), auj = jourVu(t);
     const point = heureVueSi(instantPoint(F, P));
     // L'heure du POINT (la publication) ; celle de l'écriture de chaque scénario est dans sa bulle (« Écrit le … à … »).
     return 'Écrits par Claude, une IA, ' + (jour === auj ? 'ce matin' : 'le ' + jour) + (point ? ', publiés au point de ' + point : '') + '.';
@@ -670,7 +670,7 @@ const Scenarios = (function () {
     }
     if (propre(S.enonce)) out.push('Les mots de Claude : « ' + S.enonce + ' ».');
     const emP = heureVueSi(S.emis), finP = heureVueSi(S.fin);
-    out.push('Écrit le ' + jourParis(S.emis) + (emP ? ' à ' + emP : '') + (fini(S.prixEmission) ? ', quand le prix valait ' + prix(S.prixEmission) : '') + ' ; valable jusqu’au ' + jourParis(S.fin) + (finP ? ' à ' + finP : '') + '.');
+    out.push('Écrit le ' + jourVu(S.emis) + (emP ? ' à ' + emP : '') + (fini(S.prixEmission) ? ', quand le prix valait ' + prix(S.prixEmission) : '') + ' ; valable jusqu’au ' + jourVu(S.fin) + (finP ? ' à ' + finP : '') + '.');
     out.push('Suivi en direct sur ce graphique : ' + etatLongDebutant(S, sv, c.maintenant) + ' (un simple affichage).');
     if (S.statut !== '⏳') { const e = etatCourtDebutant(S, sv); out.push('Note du journal : ' + e.etat + '.'); }
     if (propre(S.note)) out.push('Note du journal : ' + S.note);
@@ -1121,7 +1121,7 @@ const Scenarios = (function () {
   function texteResteDebutant(jour, maintenant) {
     if (!jour || !fini(jour.fin)) return null;
     const h = heureVueSi(jour.fin), r = reste(jour.fin - maintenant);
-    const jF = jourParis(jour.fin), jA = jourParis(maintenant), demain = jourParis(maintenant + 86400000);
+    const jF = jourVu(jour.fin), jA = jourVu(maintenant), demain = jourVu(maintenant + 86400000);
     const quand = jF === jA ? 'aujourd’hui' : jF === demain ? 'demain' : 'le ' + jF;
     if (!r) return 'Terminés depuis ' + quand + (h ? ' ' + h : '') + ' ; ' + (jour.notes ? 'le journal les a notés.' : 'la note du journal suivra.');
     return 'Valables jusqu’à ' + quand + (h ? ' ' + h : '') + ' : encore ' + r + '. Pas de nouvelle prévision d’ici là : la page recalcule seulement où en est chaque scénario du matin.';
@@ -1342,7 +1342,7 @@ const Scenarios = (function () {
 
   return { FORMAT, RANGS, STATUTS, chiffres, prix, heureVue, heureUTC: HEURE_UTC_EXPORT, heureParis: HEURE_PARIS_EXPORT, pointMs, instantPoint, jourGroupe, dateUTC, zone, lire, vivants, estAncien, ouvert, compte, suiviVide, pas, plier, etat, etatLarge, suivre, copie,
     niveaux, originePremiere, libelle, quand, creneau, motsStatut, texteEtat, titre, ligne, texteBilan, REGLE_BILAN, REGLE_BILAN_SUITE, explication, ligneEtats, noteLarge, manque, etatIncomplet, NOMS_RANG, COURTS_RANG, SENS_RANG,
-    ETATS_COURTS_DEBUTANT, etatCourtDebutant, ligneBoiteDebutant, libelleDebutant, libellesDebutant, ligneDebutant, origineDebutant, etatLongDebutant, enteteDebutant, explicationDebutant, jourParis,
+    ETATS_COURTS_DEBUTANT, etatCourtDebutant, ligneBoiteDebutant, libelleDebutant, libellesDebutant, ligneDebutant, origineDebutant, etatLongDebutant, enteteDebutant, explicationDebutant, jourVu,
     PJ_DEFAUT, touchesValides, dansMarge, pointe, distanceZone, ouvertJour, position, fermeture, fondu, reste, grilleOk, decider, rejouerJour, horsNiveaux, classerJour, estRealise, raison, raisonCourte, pointeDe, jourSiAutre, ligneJourDebutant, libellesJourDebutant,
     texteResteDebutant, ligneDebutantJour, ligneCourteDebutant, distancesDebutant, phraseMeneurDebutant, COMMENT_DEBUTANT, phraseJourExpert, nomNet, phraseNomDebutant, suffixeExpert, ligneResteExpert, ligneJourExpert, regleJourExpert, momentDebutant };
 })();

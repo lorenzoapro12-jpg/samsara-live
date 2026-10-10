@@ -1,4 +1,4 @@
-# Saṃsāra — dashboard marché live
+# Saṃsāra — dashboard BTC en direct
 
 Dashboard BTC en fichiers statiques, sans build ni dépendance : servi tel quel par GitHub
 Pages, il s'ouvre dans un navigateur et se rafraîchit tout seul depuis des sources publiques.
@@ -14,7 +14,7 @@ champ publié est décrit dans `meta` par le code qui le calcule (voir « Les l�
 
 ## Retouches du 08/10/2026
 
-- **La carte s'ouvre allégée** : Mémoire du carnet, Rafales et Destin des murs sont éteints par
+- **La carte s'ouvre allégée** : Mémoire du carnet, Rafales et Destin des gros ordres sont éteints par
   défaut (un clic sur leur bouton les allume). Allumés ensemble, leurs libellés se chevauchaient.
 - **Téléphone (< 480 px)** : l'en-tête passe sur deux rangées, le prix au-dessus des boutons
   (ils se dessinaient sur le prix en Kāla, Néon, Aero et Codex).
@@ -31,7 +31,7 @@ champ publié est décrit dans `meta` par le code qui le calcule (voir « Les l�
   perdue pendant un glisser), et trois calques nouveaux, tous mesurés et bornés :
   **Mémoire du carnet** (combien de temps un niveau ≥ X BTC a tenu dans chaque tranche),
   **Rafales au marché** (exécutions d'une même milliseconde, avec un nombre d'ordres PROUVÉ minimal),
-  **Destin des murs** (un niveau disparu : mangé par des échanges, ou retiré — borne basse mesurée,
+  **Destin des gros ordres** (un niveau disparu : mangé par des échanges, ou retiré — borne basse mesurée,
   jamais une intention prêtée).
 - **Le terminal, deux fois plus sobre** : CPU au repos ≈ ÷ 2 dans chaque thème (l'éclair du prix
   coûtait 70 % à lui seul), survol d'Aero 85 → 23 ms par image, market-data.json relu en 304.
@@ -82,7 +82,7 @@ sont restreints par certains navigateurs : un serveur local est préférable.
 | `themes/<id>.css` | Un fichier par thème : les valeurs des jetons, sous `[data-theme="<id>"]`. |
 | `js/app.js` | L'application (graphique, indicateurs, cartes, Grid Bot). |
 | `js/vendor/hyalite.js` | Réfraction « verre liquide » (MIT, verbatim), chargée seulement si le thème la demande. |
-| `market-data.json` | Les données des cartes « Marché live ». Réécrit par `publish.py`. |
+| `market-data.json` | Les données des cartes « Infos du marché ». Réécrit par `publish.py`. |
 | `heatmap.json` | La heatmap de liquidité sur 24 h. Réécrite par `heatmap.py`. |
 | `publish.py` | Agrège 8 sources → `market-data.json`. |
 | `options_gex.py` | Calcul du GEX (exposition gamma des options Deribit), sans réseau — testable hors ligne. |
@@ -110,7 +110,7 @@ code) : la carte de liquidité, comme un trader garde ses OHLCV et sa bookmap ou
   avec le meilleur bid / ask en marches ; les **exécutions** sont des bulles (achats / ventes
   au marché) ; les **murs** et le **gamma** du fichier de 15 min partent de leur instant de
   lecture ; un carnet latéral, un profil des exécutions, le volume et le CVD par minute.
-- **Trois horloges, une surface** : chaque calque porte son âge SUR la carte (pastilles), et
+- **Plusieurs horloges, une surface** : chaque calque porte son âge SUR la carte (pastilles), et
   ce qui n'a pas été observé est hachuré — ce n'est pas « vide ».
 - **Réglages** (palette, contraste, fusion, profondeur live, bulles) : ils changent le
   détail, jamais la valeur. La fusion de la carte publiée prend le **MAX** (on fusionne,
@@ -162,7 +162,7 @@ chargées). Même origine, aucune ressource externe. `fonts/fabriquer.py` les re
 Bouton **Réglages** de l'en-tête. Ils changent le niveau de DÉTAIL, jamais une valeur : un
 chiffre affiché garde sa valeur et porte sa bande ou sa tranche.
 
-- **Panneau ⚡** (lu par la page sur Binance, donc libre) : profondeur du carnet (100 à
+- **Panneau ⚡ « En direct (à la seconde) »** (lu par la page sur Binance, donc libre) : profondeur du carnet (100 à
   5 000 niveaux — la cadence ralentit avec le poids de la requête), bandes affichées (une
   bande non couverte par le carnet reçu est dite « non couverte »), nombre de trades, seuils
   de LECTURE du ratio et des achats au marché (ils choisissent la phrase, pas le chiffre).
@@ -170,7 +170,7 @@ chiffre affiché garde sa valeur et porte sa bande ou sa tranche.
   serveur a PUBLIÉES ; s'il publie le profil du carnet, des bandes supplémentaires s'y
   calculent « à la tranche près ». La tranche des murs est un multiple de `wall_bin_usd`
   publié (des sommes regroupées : exact) ; nombre de murs, seuil minimal.
-- **Heatmap du graphique** : fusion des tranches et des colonnes par MAX (on fusionne, on
+- **Ordres en attente (carte)** (la couche du graphique) : fusion des tranches et des colonnes par MAX (on fusionne, on
   n'affine jamais), seuil d'intensité. En dézoom, la fusion par MAX se fait d'elle-même au
   pixel : le lissage, qui moyennait et effaçait les murs isolés, est coupé.
 

@@ -432,7 +432,7 @@ const Guide = (function () {
     if (court) return (mode === 'expert' ? 'ADX ' + adx + ' · +DI ' + Math.round(r.pdi) + '/−DI ' + Math.round(r.mdi) : COURTS_REGIME[r.cle] + ' · ADX ' + adx) + (r.compression ? ' · compression' : '');
     if (mode === 'expert') {
       return 'ADX ' + adx + ' · +DI ' + Math.round(r.pdi) + ' / −DI ' + Math.round(r.mdi)
-        + (r.emaHaut === null ? '' : ' · EMA' + P.emaCourte + (r.emaHaut ? ' > ' : ' < ') + 'EMA' + P.emaLongue)
+        + (r.emaHaut === null ? '' : ' · EMA ' + P.emaCourte + (r.emaHaut ? ' > ' : ' < ') + 'EMA ' + P.emaLongue)
         + (r.compression ? ' · largeur BB ≤ P' + P.bbPercentile + '/' + P.bbFenetre + (r.depuis ? ' (min. ' + (r.depuisDebut ? 'hist. · ' : '') + r.depuis + ' b.)' : '') : '');
     }
     let t = NOMS_REGIME[r.cle] + ' (ADX ' + adx + ')';
@@ -2076,16 +2076,16 @@ const Guide = (function () {
   const finMs = (ctx, i) => (fini(tempsDe(ctx, i)) ? (tempsDe(ctx, i) + ctx.pas) * 1000 : NaN);
   const debutMs = (ctx, i) => (fini(tempsDe(ctx, i)) ? tempsDe(ctx, i) * 1000 : NaN);
   /** Le jour de l'appareil, « 7/10/2026 » (une clé de comparaison ; le jour seul en tête). */
-  const jourParis = ms => { if (!fini(ms)) return ''; const d = new Date(ms); return d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear(); };
+  const jourVu = ms => { if (!fini(ms)) return ''; const d = new Date(ms); return d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear(); };
   /** « aujourd'hui à 13:00 », « hier à 03:00 », « le 7 à 18:00 » (heure de l'appareil). */
-  function quandParis(ms, maintenant) {
+  function quandVu(ms, maintenant) {
     const h = heureVueSi(ms);
     if (!h) return '';
     if (!fini(maintenant)) return 'à ' + h;
-    const j = jourParis(ms);
-    if (j === jourParis(maintenant)) return 'aujourd’hui à ' + h;
-    if (j === jourParis(maintenant - 86400000)) return 'hier à ' + h;
-    if (j === jourParis(maintenant + 86400000)) return 'demain à ' + h;
+    const j = jourVu(ms);
+    if (j === jourVu(maintenant)) return 'aujourd’hui à ' + h;
+    if (j === jourVu(maintenant - 86400000)) return 'hier à ' + h;
+    if (j === jourVu(maintenant + 86400000)) return 'demain à ' + h;
     // Le jour seul dans le mois en cours ; le jour et le mois au-delà de 20 jours.
     const [d, m] = j.split('/');
     return 'le ' + d + (Math.abs(maintenant - ms) > 20 * 86400000 ? '/' + String(m).padStart(2, '0') : '') + ' à ' + h;
@@ -2095,21 +2095,21 @@ const Guide = (function () {
   function quandDeb(ms, ctx) {
     if (!fini(ms) || !heureVueSi(ms)) return '';
     const now = ctx && ctx.maintenant;
-    return fini(now) ? quandParis(ms, now).replace(/^aujourd’hui /, '') : 'à ' + heureVueSi(ms);
+    return fini(now) ? quandVu(ms, now).replace(/^aujourd’hui /, '') : 'à ' + heureVueSi(ms);
   }
   /** Expert : la date (jj/mm) s'ajoute à l'heure sur des bougies de 4 h ou plus, ou quand
    *  l'instant n'est pas du même jour que maintenant ; sur des bougies d'un jour, la date seule. */
-  const dateUTC = ms => Fm.jour(ms);
+  const dateVue = ms => Fm.jour(ms);
   function avecDate(ms, ctx) {
     const now = ctx && fini(ctx.maintenant) ? ctx.maintenant : NaN, pas = ctx && fini(ctx.pas) ? ctx.pas : 0;
     return pas >= 4 * 3600 || (fini(now) && fini(ms) && !Fm.memeJour(now, ms));
   }
-  function heureCourteUTC(ms, ctx) {
+  function heureCourte(ms, ctx) {
     if (!fini(ms)) return '—';
-    if (ctx && ctx.pas >= 86400) return dateUTC(ms);
-    return (avecDate(ms, ctx) ? dateUTC(ms) + ' ' : '') + heureVue(ms);
+    if (ctx && ctx.pas >= 86400) return dateVue(ms);
+    return (avecDate(ms, ctx) ? dateVue(ms) + ' ' : '') + heureVue(ms);
   }
-  const heureExpert = (ms, ctx) => heureCourteUTC(ms, ctx);
+  const heureExpert = (ms, ctx) => heureCourte(ms, ctx);
 
   /** La marque de fin d'une figure tombée : « ✗ invalidé à 08:15 : clôture au-dessus des sommets
    *  (83 664 $) » (Expert) ; « Invalidé à 08:15 : … » (Débutant). Heure de l'appareil ; une marque
@@ -2156,9 +2156,9 @@ const Guide = (function () {
   /** L'état court Expert : « ébauche (1 b.) », « cassure 1/2 », « ✗ invalidé 08:15 »… */
   function etatCourtExpert(f, ctx) {
     const e = etatForme(f);
-    if (e.cle === 'invalide') return '✗ invalidé ' + heureCourteUTC(finMs(ctx, f.jFin), ctx);
-    if (e.cle === 'abandon') return '✗ annulé ' + heureCourteUTC(finMs(ctx, f.jFin), ctx);
-    const rec = !f.fin && fini(f.tMaj) && ctx && fini(ctx.n) && ctx.n - 1 - f.tMaj <= 1 ? ' · recalé ' + heureCourteUTC(finMs(ctx, f.tMaj), ctx) : '';
+    if (e.cle === 'invalide') return '✗ invalidé ' + heureCourte(finMs(ctx, f.jFin), ctx);
+    if (e.cle === 'abandon') return '✗ annulé ' + heureCourte(finMs(ctx, f.jFin), ctx);
+    const rec = !f.fin && fini(f.tMaj) && ctx && fini(ctx.n) && ctx.n - 1 - f.tMaj <= 1 ? ' · recalé ' + heureCourte(finMs(ctx, f.tMaj), ctx) : '';
     return e.court + rec;
   }
   /** Les libellés Expert, du plus riche au plus court (≤ 80 caractères) :
@@ -2181,7 +2181,7 @@ const Guide = (function () {
   /** Ce que la figure montre, et ce qui lui manque encore (1re phrase de la bulle Débutant). */
   function vuDebutant(f, ctx, unite) {
     const fam = famille(f), per = periode(ctx && ctx.intervalle), now = ctx && ctx.maintenant;
-    const q = i => quandParis(debutMs(ctx, i), now);
+    const q = i => quandVu(debutMs(ctx, i), now);
     // « d’ici 14:00 », « d’ici demain 02:00 » ; le point en attente au prix de la bougie en cours
     // quand elle va plus loin que lui (v.cle 'suit') ; rien à promettre quand l'ébauche se défait.
     const dici = ms => { const t = quandDeb(ms, ctx); return t ? ' d’ici ' + t.replace(/^à /, '').replace(/ à /, ' ') : ''; };
@@ -2270,7 +2270,7 @@ const Guide = (function () {
     } else {
       t = 'Une sortie compte quand le prix finit ' + per[1] + ' de suite au-dessus de ' + prix(hautB.seuil, unite) + ' ou sous ' + prix(basB.seuil, unite) + enCeMoment + (pente ? ' (ces droites bougent un peu à chaque ' + per[0].replace(/^une? /, '') + ')' : '')
         + ', ou une fois dehors, puis encore une fois dehors après un court retour. Si elle est validée, ' + cible(prix(oH.p, unite) + ' par le haut, ' + prix(oB.p, unite) + ' par le bas', true) + '.';
-      if (fini(N.pointe)) { const ms = finMs(ctx, Math.floor(N.pointe)); t += ' Sans sortie avant la pointe' + (fini(ms) && heureVueSi(ms) ? ' (vers ' + quandParis(ms, ctx && ctx.maintenant) + ')' : '') + ', elle s’arrête sans suite.'; }
+      if (fini(N.pointe)) { const ms = finMs(ctx, Math.floor(N.pointe)); t += ' Sans sortie avant la pointe' + (fini(ms) && heureVueSi(ms) ? ' (vers ' + quandVu(ms, ctx && ctx.maintenant) + ')' : '') + ', elle s’arrête sans suite.'; }
     }
     if (f.ebauche) t += ' Elle est annulée si le prochain ' + (f.s > 0 ? 'sommet' : 'creux') + ' s’écarte de sa droite.';
     return t;
@@ -2370,7 +2370,7 @@ const Guide = (function () {
   function texteVivantFigure(f, v, ctx, mode, unite) {
     if (!v || (!v.cle && !v.etiq) || v.cle === 'suit') return '';
     const exp = mode === 'expert', per = periode(ctx && ctx.intervalle), fin = finMs(ctx, ctx && fini(ctx.j) ? ctx.j : 0);
-    const hd = fini(fin) && heureVueSi(fin) ? quandDeb(fin, ctx) : null, he = fini(fin) ? heureCourteUTC(fin, ctx) : '';
+    const hd = fini(fin) && heureVueSi(fin) ? quandDeb(fin, ctx) : null, he = fini(fin) ? heureCourte(fin, ctx) : '';
     const P0 = prix(v.p, unite), deux = v.clotures === 2, n1 = (v.contre || 0) + 1;
     // Rien au-delà maintenant, mais la bougie y est allée (le libellé le garde jusqu'à la clôture).
     if (!v.cle && v.etiq === 'menace') {
@@ -2434,7 +2434,7 @@ const Guide = (function () {
     const objs = N.objectifs.map(o => (N.objectifs.length > 1 ? (o.s > 0 ? '↑ ' : '↓ ') : '') + obj(o)).join(' / ');
     const base = famille(f) === 'drapeau' ? 'mât reporté' : famille(f) === 'lignes' ? 'largeur ' + prix(f.hauteur, unite) + ' reportée' : 'hauteur ' + prix(f.hauteur, unite) + ' reportée';
     return 'Maintenant : validation = ' + sorties + ' (ou 1 clôture + retour réussi, ≤ ' + P.retourMax + ')' + (invals.length ? ' · invalidation = ' + invals.join(' ou ') : '') + ab
-      + (fini(N.pointe) ? ' · pointe à ' + heureCourteUTC(finMs(ctx, Math.floor(N.pointe)), ctx) + ' (sans sortie : sans suite)' : '') + ' · objectif théorique (convention, non garanti) : ' + objs + ' (' + base + ').';
+      + (fini(N.pointe) ? ' · pointe à ' + heureCourte(finMs(ctx, Math.floor(N.pointe)), ctx) + ' (sans sortie : sans suite)' : '') + ' · objectif théorique (convention, non garanti) : ' + objs + ' (' + base + ').';
   }
   const QUOI_JOURNAL = { repere: 'repéré', ebauche: 'ébauche', suivi: 'point en attente déplacé', recalage: 'recalé', demi: 'sortie 1/2', retour: 'retour', sortie_annulee: 'sortie non validée',
     confirme: 'validé', atteint: 'objectif atteint', invalide: '✗ invalidé', invalide_avant: '✗ invalidé', expire_avant: '○ sans suite', expire: '– délai écoulé', devenu_triple: 'devenu un triple' };
@@ -2444,12 +2444,12 @@ const Guide = (function () {
     if (!J.length) return '';
     // L'heure (de l'appareil) seule le même jour ; la date (jj/mm) à chaque changement de jour, ou
     // partout sur des bougies de 4 h et plus (un jour : la date seule).
-    const J8 = J.slice(-8), plusieurs = new Set(J8.map(x => fini(finMs(ctx, x.j)) ? dateUTC(finMs(ctx, x.j)) : '')).size > 1;
+    const J8 = J.slice(-8), plusieurs = new Set(J8.map(x => fini(finMs(ctx, x.j)) ? dateVue(finMs(ctx, x.j)) : '')).size > 1;
     let jourPrec = null;
     const quand = ms => {
       if (!fini(ms)) return '—';
-      if (ctx && ctx.pas >= 86400) return dateUTC(ms);
-      const d = dateUTC(ms), montre = (ctx && ctx.pas >= 4 * 3600) || (jourPrec === null ? plusieurs || avecDate(ms, ctx) : d !== jourPrec);
+      if (ctx && ctx.pas >= 86400) return dateVue(ms);
+      const d = dateVue(ms), montre = (ctx && ctx.pas >= 4 * 3600) || (jourPrec === null ? plusieurs || avecDate(ms, ctx) : d !== jourPrec);
       jourPrec = d;
       return (montre ? d + ' ' : '') + heureVue(ms);
     };
@@ -2515,7 +2515,7 @@ const Guide = (function () {
     FAMILLES, famille, groupeVue, enAttente, candidats, avancer, niveauxFigure, figureVivante, cleFigure, niveauAbandon, wilson, ecartTemoin, dernierPoint, rangFigure, concurrentes, tombees, phaseA, classer, deuxDroites, ete, drapeau, tripleExtreme, doubleExtreme, range, ligne,
     NOMS_DEBUTANT, raisonPrincipale, choixDebutant, reperesDe, choisirReperes, VERBE_DEBUTANT, optionsSeules, libelleDebutant, libellesDebutant, formatDebutant, AVEC_POINT, titreDebutant, nomDebutant, nomPhrase, HORIZON_DEBUTANT, HORIZON_COURT, PERIODE_DEBUTANT, phrasesDebutant, phraseDebutant,
     texteSuiteDebutant, prixRond, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
-    MARQUES_FIN, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandParis,
+    MARQUES_FIN, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;

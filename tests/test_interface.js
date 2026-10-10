@@ -18,6 +18,8 @@
 //      l'appareil (fuseau d'Auckland), le CCI à ±100 sur ses lignes, l'ATR lisible à 2,5 $, une
 //      étiquette par ligne, la légende S/R par intervalle, les couches d'une seule paire grisées
 //      et hors du compteur.
+//   5. ÂGE DE LA CARTE : à droite du compteur, sans le toucher ; au téléphone, sa forme courte
+//      (« Carte publiée il y a … ») et le compteur sans sa plage.
 //
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
 // USAGE   node tests/test_interface.js
@@ -457,6 +459,31 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
         !paires.btcsol.dollars.length && paires.btcsol.sol.length >= 6 && / SOL$/.test(paires.btcsol.atr || ''), paires.btcsol);
       check('aucune erreur JavaScript', !o4.erreurs.length, o4.erreurs);
       await o4.ctx.close();
+    }
+
+    // ─── 5. L'âge de la carte et le compteur, sur la même rangée ───
+    titre('5. Âge de la carte : jamais sur le compteur ; il garde l\'âge de la publication, même au téléphone');
+    for (const w of [360, 390, 412, 1440]) {
+      const o5 = await ouvrir(nav, BASE, { width: w, height: 844 });
+      const r5 = await o5.page.evaluate(async () => {
+        overlays.liq = true; await fetchHeatmap(true); resizeCanvas(); drawChart();
+        const vus = [], f = CanvasRenderingContext2D.prototype.fillText;
+        CanvasRenderingContext2D.prototype.fillText = function (t, x, y) {
+          if ((this.canvas.id === 'chart' || this.canvas.id === 'chartCalque') && Math.abs(y - 13) < 1) {
+            const l = this.measureText(String(t)).width, d = this.textAlign === 'right' ? x - l : x;
+            vus.push({ t: String(t), x0: d, x1: d + l, c: this.canvas.id });
+          }
+          return f.apply(this, arguments);
+        };
+        try { drawChart(); dessinerCalque(); } finally { CanvasRenderingContext2D.prototype.fillText = f; }
+        return { vus, age: texteAgeCouche() };
+      });
+      const cpt = r5.vus.find(v => v.c === 'chart' && /^\d[\d ]*\/\d/.test(v.t)), age = r5.vus.find(v => v.c === 'chartCalque' && r5.age.variantes.includes(v.t));
+      check(`${w} px : « ${age ? age.t : '—'} » à droite du compteur « ${cpt ? cpt.t : '—'} », sans le toucher`,
+        !!cpt && !!age && age.x0 >= cpt.x1 + 8 && /publiée il y a|^Carte publiée/.test(age.t), r5.vus);
+      if (w >= 1440) check('1440 px : la forme pleine (ses deux âges) et le compteur avec sa plage', !!age && age.t === r5.age.texte && !!cpt && / → /.test(cpt.t), r5.vus);
+      check(`${w} px : aucune erreur JavaScript`, !o5.erreurs.length, o5.erreurs);
+      await o5.ctx.close();
     }
   } finally { await nav.close(); serveur.close(); }
   console.log(ko ? `\n❌ INTERFACE : ${ko} contrôle(s) en échec` : '\n✅ INTERFACE : TOUS LES CONTRÔLES PASSENT');

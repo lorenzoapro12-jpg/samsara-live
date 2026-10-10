@@ -276,7 +276,7 @@ const FICHES = {
     titre: 'VWAP', page: 'vwap',
     simple: 'Prix moyen payé, pondéré par les volumes échangés, depuis un point d’ancrage.',
     formule: P => 'Σ(prix typique × volume) / Σ volume, prix typique = (H + B + C) / 3. Ancrage : remis à zéro toutes les '
-      + (P.vwap.ancrageIntradayS / 3600) + ' h (00:00 UTC) en intraday ; au-delà, toutes les ' + P.vwap.ancrageBougies + ' bougies.',
+      + (P.vwap.ancrageIntradayS / 3600) + ' h, à ' + minuitUtcMots() + ', en intraday ; au-delà, toutes les ' + P.vwap.ancrageBougies + ' bougies.',
     lectures: [
       { s: 'usuel', t: 'Prix au-dessus du VWAP : les acheteurs de la séance sont, en moyenne, en gain ; c’est une référence d’exécution des institutions.' },
     ],
@@ -308,7 +308,7 @@ const FICHES = {
   },
   sr: {
     titre: 'Supports / résistances (graphique)', page: 'sr',
-    simple: 'Niveaux où le prix a fait demi-tour, regroupés et classés par importance.',
+    simple: 'Niveaux où le prix a fait demi-tour, regroupés ; les plus forts sont tracés. Le style du trait dit de quel intervalle vient le niveau (celui du graphique ou un plus long, nommé sur son badge), pas son importance.',
     formule: P => 'Pivots (plus haut / plus bas dépassant leurs voisins), sur les ' + P.sr.bougies + ' dernières bougies, regroupés dans une tolérance de '
       + pcF(P.sr.tolMin) + ' à ' + pcF(P.sr.tolMax) + ' % (fonction de l’ATR ' + P.sr.atrPeriode + '), pondérés par récence (demi-vie par TF) × log du volume ; '
       + P.sr.niveauxTf + ' niveaux du TF affiché + ' + P.sr.niveauxRef + ' par TF de référence, fusionnés à ' + pcF(P.sr.fusionTf) + ' %.',
@@ -342,7 +342,7 @@ const FICHES = {
     simpleDeb: 'En haut du graphique, une phrase dit si le prix monte, baisse ou hésite, et depuis quand. Deux repères de prix l’encadrent : le plus proche au-dessus, le plus proche en dessous. Puis le scénario n° 1 de Claude et, s’il y en a une, une figure du graphique. Touchez (ou survolez) un texte pour le détail. Une description, jamais un conseil ; le reste est en mode Expert, et tout se masque dans « + Affichage ».',
     simple: 'Une couche qui DÉCRIT ce que montre le graphique : les niveaux de prix proches et d’où ils viennent, le régime du marché, les formes chartistes en cours avec leur bilan mesuré, deux chemins conditionnels et une phrase de résumé. Elle ne dit jamais quoi faire.',
     formule: P => 'Niveaux : au plus ' + P.guide.niveauxParCote + ' au-dessus et ' + P.guide.niveauxParCote + ' au-dessous du prix, à moins de ' + pcF(P.guide.distanceMax) + ' %. Régime : ADX ' + P.adx.periode
-      + ', EMA ' + P.guide.emaCourte + '/' + P.guide.emaLongue + ', Bollinger ' + P.bb.periode + '. Formes : au plus ' + P.guide.formesMax + ' à la fois. Choix gardé dans ce navigateur (clé samsara-guide-v1).',
+      + ', EMA ' + P.guide.emaCourte + '/' + P.guide.emaLongue + ', Bollinger ' + P.bb.periode + '. Formes : au plus ' + P.guide.formesMax + ' à la fois. Choix gardé dans ce navigateur.',
     lectures: [
       { s: 'mesuré', t: 'Les niveaux (plus haut d’hier, plus bas des 24 h, zones de demi-tours, murs du carnet) sont lus dans les données ; chaque libellé dit son origine et son propre prix — jamais une moyenne — et, pour un chiffre publié, son heure de lecture.' },
       { s: 'convention', t: 'Le régime, les états « cassé » / « percé en mèche » et l’objectif d’une forme reposent sur des seuils et des règles usuels, nommés dans leur fiche.' },
@@ -404,7 +404,7 @@ const FICHES = {
       { s: 'débattu', t: 'Les figures chartistes sont subjectives dans la littérature : deux analystes ne tracent pas la même. Ici la détection suit des règles fixes, donc reproductibles ; une règle fixe n’est pas une preuve d’efficacité.' },
       { s: 'mesuré', t: 'Bilan : le même détecteur est rejoué sur tout l’historique chargé, sans regarder l’avenir. Une figure compte depuis la clôture où son dernier pivot devient connu ; on compte les figures repérées, les validations, les objectifs atteints avant invalidation, les invalidations, les figures encore ouvertes ; pour les ébauches, combien de débuts sont devenus une figure, puis une figure validée. Un double devenu triple ne peut plus être validé : il sort du dénominateur des validations.' },
       { s: 'mesuré', t: 'L’objectif et l’invalidation ne sont pas à la même distance du point de validation : une partie des objectifs atteints s’explique par cette géométrie seule. D’où le repère sans forme : depuis n’importe quelle bougie, les mêmes distances (en ATR) et le même sens, la même règle ; l’écart entre les deux est jugé avec un intervalle de Wilson à 95 %. Un écart n’est pas une preuve.' },
-      { s: 'convention', t: 'Choix de la page (raisonnement) : quand un nouveau sommet ou creux touche une droite, les droites sont refaites (recalage) et la figure garde son nom et son début ; une figure invalidée reste quelques bougies, en pointillés barrés d’une ✗ et de plus en plus pâle, à sa place même si une autre figure la recouvre, pour qu’on voie qu’elle est tombée et pourquoi ; la ✗ se pose sur le niveau qui l’a fait tomber, jamais sur un prix de clôture ; une figure au délai écoulé (–) ou sans suite (○) passe en pointillés sans croix : elle n’a pas été invalidée. Une figure validée porte un trait fin à son niveau d’invalidation, jusqu’à la bougie en cours. Un double qui devient triple le dit (« Devenu triple creux ») et garde sa place ; double et triple sur les mêmes creux ne comptent qu’une fois au bilan. La bulle Expert cite les dernières figures invalidées (« Invalidées récemment ») et, à part, celles restées sans suite (« Sans suite récemment ») et les ébauches annulées, tirées du même rejeu.' },
+      { s: 'convention', t: 'Choix de la page (raisonnement) : quand un nouveau sommet ou creux touche une droite, les droites sont refaites (recalage) et la figure garde son nom et son début ; une figure invalidée reste quelques bougies, en pointillés barrés d’une ✗ et de plus en plus pâle, à sa place même si une autre figure la recouvre, pour qu’on voie qu’elle est tombée et pourquoi ; la ✗ se pose sur le niveau qui l’a fait tomber, jamais sur un prix de clôture ; une figure au délai écoulé passe en pointillés avec un – sur la ligne qui l’a validée, une figure sans suite avec un ○ au milieu de ses deux droites (ou sur la ligne qui l’aurait validée), jamais avec une croix : elle n’a pas été invalidée ; sans niveau, pas de marque. Une figure validée porte un trait fin à son niveau d’invalidation, jusqu’à la bougie en cours. Un double qui devient triple le dit (« Devenu triple creux ») et garde sa place ; double et triple sur les mêmes creux ne comptent qu’une fois au bilan. La bulle Expert cite les dernières figures invalidées (« Invalidées récemment ») et, à part, celles restées sans suite (« Sans suite récemment ») et les ébauches annulées, tirées du même rejeu.' },
     ],
     limites: 'Le bilan ne porte que sur l’historique CHARGÉ (son nombre de bougies et sa durée sont indiqués) et sur l’intervalle affiché : ce n’est ni une probabilité, ni une règle générale. Les échantillons sont petits : « trop peu de cas » est fréquent. Une ébauche n’est pas une figure : son dernier sommet ou creux peut encore changer. Les figures à droites en pente ont des niveaux qui bougent à chaque bougie (la bulle dit les niveaux du moment). Fanions et épaule-tête-épaule sont rares sur les petits intervalles. Seules les figures dont le dernier point est dans la vue sont montrées.',
   },
@@ -474,7 +474,7 @@ const FICHES = {
   },
   // ── Indicateurs du menu sans fiche jusqu'au 09/10/2026 (formule construite avec PARAM) ──
   ichimoku: {
-    titre: 'Ichimoku (nuage)', page: 'ichimoku',
+    titre: 'Nuage Ichimoku', page: 'ichimoku',
     simple: 'Deux lignes de milieu de fourchette (rapide et lente) et un « nuage » coloré, décalé vers la droite, qui montre la zone d’équilibre récente du prix.',
     formule: P => 'Ligne rapide (tenkan) = (plus haut + plus bas) / 2 sur ' + P.ichimoku.tenkan + ' bougies ; ligne lente (kijun) = idem sur ' + P.ichimoku.kijun
       + ' ; nuage : bord A = (tenkan + kijun) / 2, bord B = (plus haut + plus bas) / 2 sur ' + P.ichimoku.senkouB + ', tous deux reportés de ' + P.ichimoku.kijun
@@ -571,7 +571,7 @@ const FICHES = {
   liq: {
     titre: 'Ordres en attente (carte)', page: 'liq',
     simple: 'Une carte de chaleur posée en transparence sur le graphique : là où beaucoup d’ordres d’achat ou de vente attendaient dans le carnet de Binance, minute par minute.',
-    formule: () => 'heatmap.json, publié toutes les ' + CADENCES.attendue_min + ' min par le serveur : ' + grilleLiq().colonne + ', ' + grilleLiq().tranche + ' ; la chaleur d’une case est la somme des BTC posés dans la tranche. BTC/USDT seulement. En Expert, l’âge de la dernière colonne est écrit en haut à droite.',
+    formule: () => 'La carte des ordres en attente du carnet Binance, publiée toutes les ' + CADENCES.attendue_min + ' min par le serveur : ' + grilleLiq().colonne + ', ' + grilleLiq().tranche + ' ; la chaleur d’une case est la somme des BTC posés dans la tranche. BTC/USDT seulement. En Expert, l’âge de la dernière colonne est écrit en haut à droite.',
     lectures: [
       { s: 'mesuré', t: 'Une bande marquée et horizontale : beaucoup de BTC restés en attente longtemps dans cette tranche de prix (un ou plusieurs ordres).' },
       { s: 'usuel', t: 'Les gros ordres en attente sont surveillés : tiennent-ils, sont-ils absorbés ou retirés quand le prix approche ? La carte dit où ils étaient, pas ce que fera le prix.' },
@@ -605,6 +605,13 @@ function prmMeta(cle, nom) {
 const bougiesMeta = (cle, nom, repli) => { const v = prmMeta(cle, nom); return v !== null ? nbF(v) + ' bougies' : repli; };
 /** « 30 dernières bougies », lu dans meta ; sinon « dernières bougies ». */
 const dernieresMeta = (cle, nom) => { const v = prmMeta(cle, nom); return (v !== null ? nbF(v) + ' ' : '') + 'dernières bougies'; };
+/** Minuit UTC (le début du jour UTC, une définition de calcul) dit en clair, avec l'heure qui lui
+ *  correspond sur l'appareil : « minuit UTC (02:00 à l’heure de l’appareil) » ; sur un appareil à
+ *  l'heure UTC, « minuit UTC ». */
+function minuitUtcMots() {
+  const d = new Date(), h = Fmt.heure(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  return 'minuit UTC' + (h === '00:00' ? '' : ' (' + h + ' à l’heure de l’appareil)');
+}
 /** Le point du matin des scénarios à l'heure de l'appareil (« 07:00 ») : PARAM.scenarios.point est
  *  une heure de la routine (à Paris), convertie en un instant du jour par js/scenarios.js. */
 function pointMots(P) {
@@ -736,7 +743,7 @@ const CALCUL = {
   rsi: P => 'Moyenne des hausses et moyenne des baisses de clôture, lissées « à la Wilder » sur ' + P.rsi.periode + ' bougies (chaque nouvelle variation compte pour 1/' + P.rsi.periode + '). RSI = 100 − 100 / (1 + hausses / baisses) : de 0 à 100 ; 50 = hausses et baisses égales.',
   ema: () => 'EMA : moyenne des clôtures où les plus récentes pèsent plus (poids 2 / (N + 1)). SMA : somme des N dernières clôtures divisée par N. N est le nombre écrit dans le nom de la moyenne : son nombre de bougies.',
   bb: P => 'Milieu : moyenne simple des ' + P.bb.periode + ' dernières clôtures. Bandes : ce milieu ± ' + P.bb.ecarts + ' écarts-types de ces clôtures (leur dispersion autour de la moyenne).',
-  vwap: P => 'Somme de (prix typique × volume) divisée par la somme des volumes, avec prix typique = (haut + bas + clôture) / 3. Remis à zéro à minuit UTC sous l’échelle journalière, sinon toutes les ' + P.vwap.ancrageBougies + ' bougies.',
+  vwap: P => 'Somme de (prix typique × volume) divisée par la somme des volumes, avec prix typique = (haut + bas + clôture) / 3. Remis à zéro chaque jour à ' + minuitUtcMots() + ' sous l’échelle journalière, sinon toutes les ' + P.vwap.ancrageBougies + ' bougies.',
   ichimoku: P => 'Ligne rapide : milieu du plus haut et du plus bas sur ' + P.ichimoku.tenkan + ' bougies ; ligne lente : idem sur ' + P.ichimoku.kijun + '. Nuage : moyenne des deux lignes, et milieu du plus haut et du plus bas sur ' + P.ichimoku.senkouB + ' bougies, décalés de ' + P.ichimoku.kijun + ' bougies vers la droite.',
   sar: P => 'Chaque bougie, le point avance vers l’extrême du mouvement (plus haut d’une hausse, plus bas d’une baisse) d’une fraction de l’écart : ' + nbF(P.sar.pas) + ' au départ, + ' + nbF(P.sar.pas) + ' à chaque nouvel extrême, jusqu’à ' + nbF(P.sar.max) + '. Franchi par le prix, il change de côté.',
   volume: () => 'La quantité échangée pendant la bougie, dans l’actif de base de la paire (des BTC pour BTC/USDT, des SOL pour SOL/USDT ; BTC/SOL reprend le volume de BTC/USDT), publiée par Binance. Couleur des bougies haussières si la bougie finit en hausse (ou à égalité), des baissières sinon.',
@@ -916,7 +923,7 @@ function ouvrirGlossaire(ancre) {
     ['Macro', ['dxy', 'vix']], ['Carnet', ['carnet', 'murs']],
     ['Indicateurs du fichier', ['rsi_tf', 'ema_tf', 'croisement', 'sr_tf', 'amplitude', 'atr_tf', 'volume_tf']],
     ['Le dessin du graphique', ['bougies']],
-    ['Guide du graphique', ['guide', 'guide_niveaux', 'guide_regime', 'guide_formes', 'guide_suite', 'scenarios']],
+    ['Guide et scénarios du matin', ['guide', 'guide_niveaux', 'guide_regime', 'guide_formes', 'guide_suite', 'scenarios']],
     ['Indicateurs du graphique', ['rsi', 'ema', 'vwap', 'adx', 'atr', 'volume', 'sr', 'bb', 'macd', 'stoch', 'ichimoku', 'sar', 'obv', 'mfi', 'williamsR', 'cci', 'ao', 'fib', 'vp', 'liq']]];
   const bouton = (i, t) => '<button type="button" class="glossaire-item" onclick="ouvrirFiche(\'' + i + '\')">' + echapF(t) + '</button>';
   const tous = groupes.map(([g, ids]) => '<h4>' + g + '</h4><div class="glossaire">' + ids.map(i => bouton(i, FICHES[i].titre)).join('') + '</div>').join('');
