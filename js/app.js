@@ -564,14 +564,17 @@ const sansAccents = t => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLo
 function apercuHtml(key) {
   const id = key && FICHE_IND[key], f = id && typeof FICHES !== 'undefined' ? FICHES[id] : null;
   if (!f) return '<p class="ind-apercu-vide">' + (debutant() ? 'Survolez ou touchez une ligne : ce qu’elle montre et comment s’en servir.'
-    : 'Survolez ou touchez un indicateur : ce que c’est et comment s’en servir. Le « i » ouvre sa fiche complète.') + '</p>';
+    : 'Survolez ou touchez un indicateur : ce que c’est, comment les traders l’utilisent et comment il est calculé. Le « i » ouvre sa fiche complète.') + '</p>';
   const deb = debutant();
   const titre = deb && f.titreDeb ? f.titreDeb : f.titre;
   const quoi = deb && f.simpleDeb ? f.simpleDeb : f.simple;
   const u = f.usage, usage = !u ? '' : typeof u === 'string' ? u : (deb ? u.deb : u.exp);
+  const calcul = typeof calculTexte === 'function' ? calculTexte(f) : '';
   return '<p class="ind-apercu-titre">' + echapF(titre) + '</p>'
     + '<p><b>C’est quoi ?</b> ' + echapF(quoi) + '</p>'
-    + (usage ? '<p><b>Comment s’en servir ?</b> ' + echapF(usage) + '</p>' : '')
+    + (f.traders ? '<p><b>Comment les traders l’utilisent :</b> ' + echapF(f.traders) + '</p>'
+      : usage ? '<p><b>Comment s’en servir ?</b> ' + echapF(usage) + '</p>' : '')
+    + (calcul ? '<p><b>Comment c’est calculé :</b> ' + echapF(calcul) + '</p>' : '')
     + '<button type="button" class="lien" onclick="event.stopPropagation();ouvrirFiche(\'' + id + '\',this)">Fiche complète ▸</button>';
 }
 function montrerApercu(key) {
@@ -630,8 +633,7 @@ function titresBarre() {
   for (const l of document.querySelectorAll('#indicatorBar label[id^="lbl_"]')) {
     const f = FICHES[FICHE_IND[l.id.slice(4)]];
     if (!f) continue;
-    const u = typeof f.usage === 'string' ? f.usage : f.usage ? f.usage.exp : '';
-    l.title = f.titre + ' : ' + f.simple + (u ? '\nComment s’en servir : ' + u : '') + '\n(Le menu « + Indicateurs » en a la fiche complète.)';
+    l.title = f.titre + ' : ' + f.simple + (f.traders ? '\nComment les traders l’utilisent : ' + f.traders : '') + '\n(Le menu « + Indicateurs » en a la fiche complète, avec le calcul.)';
   }
 }
 /** Le bouton du menu dit combien d'indicateurs l'Expert a allumés (le Guide compris). */
@@ -7465,7 +7467,7 @@ function renderCycle(d) {
   const oiK = isNum(x.oi_change_24h_pct) ? x.oi_change_24h_pct : x.oi_change_1d_pct;
   const ageK = upd ? Math.max(0, Math.round((Date.now() - upd.getTime()) / 60000)) : null;
   cy.innerHTML = kpi('RSI 4h', fmtNum(t4.rsi_14, 1), '', 'tf.4h.rsi_14')
-    + kpi('Funding', pctSigne(x.funding_annual_pct, 1), signCls(x.funding_annual_pct), 'micro.funding_annual_pct')
+    + kpi('Funding an.', pctSigne(x.funding_annual_pct, 1), signCls(x.funding_annual_pct), 'micro.funding_annual_pct')
     + kpi('OI 24h', pctSigne(oiK, 1), signCls(oiK), 'micro.oi_change_24h_pct')
     + kpi('CVD 24h', fmtSigned(x.cvd_24h_usd), signCls(x.cvd_24h_usd), 'micro.cvd_24h_usd')
     + kpi('GEX', isNum(x.gex_usd_1pct) ? (x.gex_usd_1pct > 0 ? 'long γ' : 'short γ') : '—', signCls(x.gex_usd_1pct), 'micro.gex_usd_1pct')
@@ -7707,7 +7709,7 @@ function renderFeedTo(container) {
     + gexHtml
     + '<div class="bloc"><div class="ligne"><span class="lbl">Prime Coinbase' + infoBtn('prime') + '</span><b>' + fmtNum(x.premium_pct,4) + '%</b>'
     + '<span class="' + premCls + '"' + (premCls === 'badge' ? ' style="background:var(--rail);color:var(--ink-2)"' : '') + '>' + escHtml(x.premium_state||'—') + '</span>'
-    + '<span class="fine">' + (x.us_demand ? 'demande US ✓' : 'pas de demande US') + '</span></div>'
+    + '<span class="fine">' + (x.us_demand ? 'au-dessus du seuil « demande US » (0,03 %, USDT inclus)' : 'sous le seuil « demande US » (0,03 %, USDT inclus)') + '</span></div>'
     // Hors USDT (publish.py ≥ 4.0) : des dollars contre des dollars. La prime usuelle contient
     // l'écart USDT/USD — mesuré le 06/10/2026, il en expliquait la totalité.
     + (isNum(x.premium_hors_usdt_pct) ? '<div class="fine" style="margin-top:4px">hors USDT <b style="color:var(--ink-1)">' + pctSigne(x.premium_hors_usdt_pct, 4)

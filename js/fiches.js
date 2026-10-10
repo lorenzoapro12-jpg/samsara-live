@@ -66,13 +66,13 @@ const FICHES = {
   // ── Positionnement et dérivés (fichier de 15 min) ──
   gex: {
     titre: 'GEX — exposition gamma des dealers', champ: 'micro.gex_usd_1pct',
-    simple: 'Estime combien les teneurs de marché d’options devraient acheter ou vendre de BTC pour rester couverts si le prix bouge de 1 %.',
+    simple: 'Estime pour combien de dollars de BTC les teneurs de marché d’options devraient acheter ou vendre pour rester couverts si le prix bouge de 1 %.',
     lectures: [
       { s: 'convention', t: 'GEX positif (« long gamma ») : les dealers vendraient dans les hausses et achèteraient dans les baisses — lecture usuelle : mouvements amortis, prix attiré par les gros strikes.' },
       { s: 'convention', t: 'GEX négatif (« short gamma ») : ils suivraient le mouvement — lecture usuelle : mouvements amplifiés.' },
       { s: 'convention', t: 'Zéro gamma : le prix où le régime basculerait. Murs de calls / de puts : les strikes où la couverture serait la plus forte.' },
     ],
-    debat: 'Tout repose sur une HYPOTHÈSE : dealers acheteurs des calls, vendeurs des puts. Sur le marché crypto, une part importante des calls est vendue par des détenteurs de BTC qui cherchent du rendement — les dealers seraient alors ACHETEURS de ces calls, et le signe s’inverserait sur ces strikes. Les fournisseurs de données ne s’accordent pas sur la convention à retenir. Le positionnement réel des dealers n’est pas observable : c’est un modèle, pas une mesure.',
+    debat: 'Tout repose sur une HYPOTHÈSE : dealers acheteurs des calls, vendeurs des puts. Les détenteurs de BTC qui vendent des calls pour un rendement vont dans le sens de cette hypothèse ; mais quand des clients ACHÈTENT des calls (spéculation) ou VENDENT des puts (rendement), les dealers sont vendeurs de ces calls ou acheteurs de ces puts, et le signe s’inverse sur ces strikes. Les fournisseurs de données ne s’accordent pas sur la convention à retenir. Le positionnement réel des dealers n’est pas observable : c’est un modèle, pas une mesure.',
     limites: 'Deribit seulement (ni CME, ni gré à gré). Ne dit ni la direction ni le moment.',
   },
   ls: {
@@ -127,7 +127,7 @@ const FICHES = {
   cvd: {
     titreDeb: 'Achats et ventes',
     simpleDeb: 'Sur 24 h, les achats faits tout de suite au prix du moment, comparés aux ventes faites tout de suite : qui a été le plus pressé d’échanger.',
-    titre: 'CVD — delta cumulé des volumes', champ: 'micro.cvd_1h_usd',
+    titre: 'CVD — delta cumulé des volumes', champ: 'micro.cvd_24h_usd',
     simple: 'Achats au marché moins ventes au marché, en dollars, sur une fenêtre : qui a été le plus pressé.',
     lectures: [
       { s: 'mesuré', t: 'Positif : les achats au marché ont dominé sur la fenêtre ; négatif : les ventes.' },
@@ -140,7 +140,7 @@ const FICHES = {
     simple: 'Écart de prix entre Coinbase (bourse américaine, en dollars) et Binance (en USDT).',
     lectures: [
       { s: 'usuel', t: 'Prime positive : la demande est plus forte sur la plateforme américaine — souvent lue comme une demande institutionnelle US.' },
-      { s: 'mesuré', t: 'La prime usuelle compare des DOLLARS à des TETHERS : un USDT à 0,9997 $ crée à lui seul +0,03 %. La prime « hors USDT » compare des dollars à des dollars.' },
+      { s: 'mesuré', t: 'La prime usuelle compare des DOLLARS à des TETHERS : un USDT à 0,9997 $ crée à lui seul −0,03 % (un USDT au-dessus de 1 $, une prime positive). La prime « hors USDT » compare des dollars à des dollars.' },
       { s: 'convention', t: 'Les états POSITIVE / NEGATIVE / EXTREME sont des seuils choisis par ce code, pas une norme de marché.' },
     ],
     limites: 'Deux carnets lus à quelques millisecondes d’écart ; écarts de l’ordre de 0,01 % : du bruit.',
@@ -153,7 +153,7 @@ const FICHES = {
       { s: 'débattu', t: 'Lecture usuelle : un dollar qui se renforce pèse sur les actifs risqués, dont le BTC. La corrélation varie beaucoup selon les périodes et s’inverse parfois.' },
     ],
     debat: 'La relation dollar / BTC n’est pas stable : selon la fenêtre étudiée, la corrélation mesurée change de signe.',
-    limites: 'Dernière clôture journalière d’un jour ouvré, différée ; marché fermé le week-end.',
+    limites: 'Dernière valeur journalière d’un jour ouvré (le dernier cours pendant la séance, sinon la clôture), différée ; marché fermé le week-end.',
   },
   vix: {
     titreDeb: 'Nervosité des bourses',
@@ -192,8 +192,8 @@ const FICHES = {
     titre: 'RSI (fichier, par échelle de temps)', champ: 'tf.*.rsi_14',
     simple: 'Compare la force des hausses et des baisses récentes, sur une échelle de 0 à 100.',
     lectures: [
-      { s: 'convention', t: 'Au-dessus de 70 : « suracheté » ; en dessous de 30 : « survendu ». Ce sont les seuils proposés par Wilder.' },
-      { s: 'usuel', t: 'En tendance forte, le RSI peut rester au-dessus de 70 (ou sous 30) longtemps : ce n’est pas, seul, un signal de retournement.' },
+      { s: 'convention', t: 'Au-dessus de 70 et sous 30 : les seuils proposés par Wilder, appelés « suracheté » et « survendu ». Ce sont des noms : ils disent que le mouvement récent a été fort, pas qu’il va se retourner.' },
+      { s: 'usuel', t: 'En tendance forte, le RSI peut rester au-dessus de 70 (ou sous 30) longtemps : ce n’est pas un signal de retournement.' },
     ],
     limites: 'Calculé sur la bougie EN COURS : il bouge jusqu’à sa clôture. Le RSI du graphique est calculé par la page, sur ses propres bougies : même méthode, pas forcément même valeur.',
   },
@@ -217,7 +217,7 @@ const FICHES = {
   },
   sr_tf: {
     titreDeb: 'Fourchette (plus bas, plus haut)',
-    simpleDeb: 'Le plus bas et le plus haut des derniers jours : la carte dit si le prix est dans le haut, au milieu ou dans le bas de cette fourchette.',
+    simpleDeb: 'Le plus bas et le plus haut récents (sur les 5 derniers jours, pour la carte) : la carte dit si le prix est dans le haut, au milieu ou dans le bas de cette fourchette.',
     titre: 'Support / résistance (fichier)', champ: 'tf.*.support_30',
     simple: 'Le plus bas et le plus haut des dernières bougies de l’échelle de temps.',
     lectures: [
@@ -236,10 +236,10 @@ const FICHES = {
     titre: 'ATR (fichier)', champ: 'tf.*.atr_14',
     simple: 'L’amplitude moyenne d’une bougie, en dollars : l’échelle « normale » du mouvement sur cet horizon.',
     lectures: [
-      { s: 'usuel', t: 'Sert couramment d’ÉCHELLE : un mouvement de 2 ATR est inhabituel, une distance d’un demi-ATR est du bruit.' },
+      { s: 'usuel', t: 'Sert couramment d’ÉCHELLE : un mouvement de plusieurs ATR est jugé inhabituel, une distance d’une fraction d’ATR est lue comme du bruit (repères d’usage, sans seuil universel).' },
       { s: 'mesuré', t: 'Ne dit rien de la direction.' },
     ],
-    limites: 'Sa méthode (moyenne de Wilder ou simple) change sa valeur de plusieurs % : voir la formule.',
+    limites: 'Calculé avec la moyenne de Wilder ; une moyenne simple donnerait une valeur un peu différente. Bougie en cours incluse.',
   },
   volume_tf: {
     titre: 'Volume moyen (fichier)', champ: 'tf.*.volume_moyen_10_btc',
@@ -254,7 +254,7 @@ const FICHES = {
     formule: P => 'RSI de Wilder sur ' + P.rsi.periode + ' bougies : moyennes des hausses et des baisses lissées à 1/' + P.rsi.periode
       + ' ; RSI = 100 − 100 / (1 + hausses / baisses).',
     lectures: [
-      { s: 'convention', t: 'Au-dessus de 70 : « suracheté » ; en dessous de 30 : « survendu » (seuils de Wilder).' },
+      { s: 'convention', t: 'Au-dessus de 70 et sous 30 : les seuils de Wilder, appelés « suracheté » et « survendu ». Ce sont des noms : ils disent que le mouvement récent a été fort, pas qu’il va se retourner ; en tendance, le RSI peut y rester longtemps.' },
       { s: 'usuel', t: 'Divergence : un nouveau plus haut du prix sans nouveau plus haut du RSI est lu comme un essoufflement. Sa fiabilité est discutée.' },
     ],
     limites: 'Calculé sur les bougies chargées par la page, bougie en cours incluse.',
@@ -284,7 +284,7 @@ const FICHES = {
     simple: 'Mesure la FORCE d’une tendance, pas sa direction ; +DI et −DI disent laquelle des deux pousse.',
     formule: P => 'DM+ / DM− et vrai range lissés par Wilder sur ' + P.adx.periode + ' ; DX = |DI+ − DI−| / (DI+ + DI−) × 100 ; ADX = DX lissé par Wilder (première valeur à 2 × ' + P.adx.periode + ' − 1).',
     lectures: [
-      { s: 'convention', t: 'Repères courants : au-dessus de 25, tendance ; sous 20, marché sans tendance.' },
+      { s: 'convention', t: 'Repères courants : au-dessus de 25, tendance ; sous 20, marché sans tendance. Le graphique trace des lignes à 25 et 50 (pas à 20).' },
       { s: 'usuel', t: '+DI au-dessus de −DI : la pression haussière domine, et inversement.' },
     ],
     limites: 'Réagit lentement (double lissage).',
@@ -323,20 +323,20 @@ const FICHES = {
       { s: 'usuel', t: 'Bandes resserrées : volatilité comprimée (souvent avant un mouvement) ; prix qui longe une bande : tendance forte.' },
       { s: 'convention', t: '« Toucher la bande » n’est pas un signal en soi : en tendance, le prix peut la longer longtemps.' },
     ],
-    limites: 'Suppose implicitement des rendements « normaux », ce qu’ils ne sont pas.',
+    limites: 'L’écart-type suppose une dispersion des prix « régulière » ; sur le BTC, les grands écarts sont plus fréquents qu’une loi normale ne le prévoit.',
   },
   macd: {
     titre: 'MACD', page: 'macd',
     simple: 'Écart entre deux moyennes exponentielles, et sa propre moyenne : la dynamique de la tendance.',
     formule: P => 'MACD = EMA ' + P.macd.rapide + ' − EMA ' + P.macd.lente + ' ; signal = EMA ' + P.macd.signal + ' du MACD ; histogramme = MACD − signal.',
-    lectures: [{ s: 'usuel', t: 'MACD au-dessus de son signal : dynamique haussière qui s’accélère ; croisements en retard sur le prix.' }],
+    lectures: [{ s: 'usuel', t: 'MACD au-dessus de son signal (histogramme positif) : l’écart entre les deux moyennes évolue vers le haut, même si le MACD est encore sous 0 (une baisse qui ralentit). Les croisements sont en retard sur le prix.' }],
     limites: 'Non borné : pas de niveau « extrême » universel.',
   },
   // ── Le Guide du graphique (js/guide.js) : ses nombres viennent de PARAM.guide ──
   guide: {
     titre: 'Guide du graphique', page: 'guide', nature: 'convention',
     titreDeb: 'Le graphique en Débutant',
-    simpleDeb: 'En haut du graphique, une phrase dit si le prix monte, baisse ou hésite, et depuis quand. Deux repères de prix l’encadrent : le plus proche au-dessus, le plus proche en dessous. Puis le scénario n° 1 de Claude. Touchez (ou survolez) un texte pour le détail. Une description, jamais un conseil ; le reste est en mode Expert, et tout se masque dans « + Affichage ».',
+    simpleDeb: 'En haut du graphique, une phrase dit si le prix monte, baisse ou hésite, et depuis quand. Deux repères de prix l’encadrent : le plus proche au-dessus, le plus proche en dessous. Puis le scénario n° 1 de Claude et, s’il y en a une, une figure du graphique. Touchez (ou survolez) un texte pour le détail. Une description, jamais un conseil ; le reste est en mode Expert, et tout se masque dans « + Affichage ».',
     simple: 'Une couche qui DÉCRIT ce que montre le graphique : les niveaux de prix proches et d’où ils viennent, le régime du marché, les formes chartistes en cours avec leur bilan mesuré, deux chemins conditionnels et une phrase de résumé. Elle ne dit jamais quoi faire.',
     formule: P => 'Niveaux : au plus ' + P.guide.niveauxParCote + ' au-dessus et ' + P.guide.niveauxParCote + ' au-dessous du prix, à moins de ' + pcF(P.guide.distanceMax) + ' %. Régime : ADX ' + P.adx.periode
       + ', EMA ' + P.guide.emaCourte + '/' + P.guide.emaLongue + ', Bollinger ' + P.bb.periode + '. Formes : au plus ' + P.guide.formesMax + ' à la fois. Choix gardé dans ce navigateur (clé samsara-guide-v1).',
@@ -344,7 +344,6 @@ const FICHES = {
       { s: 'mesuré', t: 'Les niveaux (plus haut d’hier, plus bas des 24 h, zones de demi-tours, murs du carnet) sont lus dans les données ; chaque libellé dit son origine et son propre prix — jamais une moyenne — et, pour un chiffre publié, son heure de lecture.' },
       { s: 'convention', t: 'Le régime, les états « cassé » / « percé en mèche » et l’objectif d’une forme reposent sur des seuils et des règles usuels, nommés dans leur fiche.' },
       { s: 'débattu', t: 'Les murs d’options et le zéro gamma reposent sur un modèle (une hypothèse sur la position des teneurs de marché) : ils sont marqués « modèle ».' },
-      { s: 'mesuré', t: 'Étude du propriétaire sur ses propres données, hors de cette page (méthode et période non reprises ici) : aucun indicateur technique n’y a prédit le rendement à 5 jours ; des règles posées sur des niveaux ont mieux tenu que les paris de direction. Le Guide montre donc des niveaux et des conditions, jamais une probabilité de hausse ou de baisse.' },
     ],
     limites: 'Ce n’est pas une prévision : aucun chemin n’est privilégié, aucune probabilité n’est calculée. Tout se lit sur l’intervalle affiché ; un autre intervalle peut dire autre chose. Masquable dans « + Indicateurs ».',
   },
@@ -360,7 +359,7 @@ const FICHES = {
       { s: 'mesuré', t: 'Plus haut / plus bas d’hier (journée UTC) et des 24 h glissantes : lus sur les bougies du graphique. Un niveau dont la période n’est pas entièrement chargée n’est pas affiché.' },
       { s: 'usuel', t: '« Zone de N demi-tours » : N sommets ou creux locaux (pivots) regroupés autour d’un prix, sur les bougies de l’intervalle AFFICHÉ seulement — le Guide ne lit pas les intervalles de référence de la couche S/R, pour ne pas dépendre d’elle ni charger d’autres données. Souvent regardé comme un support ou une résistance.' },
       { s: 'mesuré', t: 'Mur du carnet : la tranche où le plus de BTC étaient posés au moment de la publication (« lu à HH:MM ») ; un ordre posé peut être retiré à tout moment. Un mur d’achat lu AU-DESSUS du prix actuel (ou de vente au-dessous) n’est plus dans le carnet tel quel : il n’est pas affiché. Murs d’options : le prix d’exercice publié (en dollars) est dit tel quel, placé sur l’axe en USDT. Zéro gamma : un prix CALCULÉ par le modèle (là où l’exposition estimée change de signe), pas un prix d’exercice ; dit et placé de la même façon.' },
-      { s: 'convention', t: 'État au prix live : « loin », « proche », « en test » (prix dans la bande), « percé en mèche » (seule une mèche a dépassé), « cassé (1/2 clôtures) » puis « cassé (2/2 clôtures, validé) » — deux clôtures successives au-delà de la bande — ou « cassé (validé par un retour réussi) » — une clôture au-delà, un retour sur la bande, puis une nouvelle clôture au-delà. Lu sur les bougies CLOSES de l’intervalle affiché ; pour un chiffre publié, seules les clôtures après sa lecture comptent. C’est la règle de travail du propriétaire, pas une mesure.' },
+      { s: 'convention', t: 'État au prix live : « loin », « proche », « en test » (prix dans la bande), « percé en mèche » (seule une mèche a dépassé), « cassé (1/2 clôtures) » puis « cassé (2/2 clôtures, validé) » — deux clôtures successives au-delà de la bande — ou « cassé (validé par un retour réussi) » — une clôture au-delà, un retour sur la bande, puis une nouvelle clôture au-delà. Lu sur les bougies CLOSES de l’intervalle affiché ; pour un chiffre publié, seules les clôtures après sa lecture comptent. C’est une règle de travail, pas une mesure.' },
       { s: 'débattu', t: 'Un niveau cassé « change de rôle » (un support devient résistance) : lecture répandue, rarement vérifiée.' },
     ],
     limites: 'La distance affichée est celle entre le niveau et le prix LIVE, dite comme telle. Les murs du carnet et les niveaux d’options gardent l’heure de leur publication (« lu à HH:MM UTC ») : le carnet et le prix ont pu bouger depuis. Aucun chiffre publié n’est soustrait d’un autre chiffre d’une autre heure. Un niveau sans donnée n’est pas affiché — jamais remplacé par 0.',
@@ -369,13 +368,13 @@ const FICHES = {
     titre: 'Guide — régime du marché', page: 'guide', nature: 'convention',
     titreDeb: 'Le mouvement du prix',
     simpleDeb: 'En mode Débutant, le mouvement n’a pas de badge : il donne le verbe de la phrase en haut du graphique. « Monte » ou « baisse » : le prix a pris une direction nette ; « hésite » : pas de direction nette ; « s’agite » : il bouge fort, sans sens clair. Le badge et ses mesures sont en mode Expert.',
-    simple: 'Un badge en haut du graphique : marché en tendance (et dans quel sens), sans tendance nette, ou en compression (bandes de Bollinger parmi les plus étroites des dernières bougies).',
+    simple: 'Un badge en haut du graphique : marché en tendance (et dans quel sens), en tendance faible ou sans tendance nette ; il ajoute « compression » quand les bandes de Bollinger sont parmi les plus étroites des dernières bougies.',
     formule: P => 'ADX ' + P.adx.periode + ' ≥ ' + P.guide.adxTendance + ' : tendance (haussière si +DI > −DI et EMA ' + P.guide.emaCourte + ' > EMA ' + P.guide.emaLongue + ', baissière si les deux disent l’inverse, sinon sens incertain) ; ADX ≤ '
       + P.guide.adxSans + ' : sans tendance nette ; entre les deux : tendance faible. Compression : largeur de Bollinger (' + P.bb.periode + ', ' + P.bb.ecarts + ' σ) au plus à son ' + P.guide.bbPercentile + 'e centile des ' + P.guide.bbFenetre + ' dernières bougies ; « au plus bas depuis N bougies » n’est dit qu’à partir de N = ' + P.guide.compressionDepuisMin + '.',
     lectures: [
       { s: 'convention', t: 'Les seuils de l’ADX sont ceux de l’usage (Wilder) : une convention, pas une loi. Le sens d’une tendance n’est dit que si deux mesures s’accordent.' },
       { s: 'débattu', t: 'Lecture répandue : une compression précéderait un mouvement plus ample, sans en dire le sens ; non mesuré ici.' },
-      { s: 'mesuré', t: 'Un régime décrit le passé récent, pas la suite : dans l’étude du propriétaire sur ses données (hors de cette page, méthode et période non reprises ici), aucun indicateur technique n’a prédit le rendement à 5 jours.' },
+      { s: 'usuel', t: 'Un régime décrit le passé récent, pas la suite.' },
     ],
     limites: 'Lu sur la dernière bougie CLOSE de l’intervalle affiché ; un autre intervalle peut dire autre chose.',
   },
@@ -428,13 +427,12 @@ const FICHES = {
       + P.scenarios.echantillonFaible + ' matins notés. Fichier relu toutes les ' + (typeof CADENCES !== 'undefined' ? Math.round(CADENCES.previsions_lue / 60000) : '?') + ' minutes, onglet visible. Choix gardé dans ce navigateur (clé samsara-scenarios-v1).',
     lectures: [
       { s: 'convention', t: 'Le rang (1, 2, 3) est un CLASSEMENT : le 1 est jugé plus probable que le 2, le 2 plus que le 3. Aucun pourcentage n’est montré. Le scénario de la semaine court sur plusieurs matins et ne compte pas dans la mesure.' },
-      { s: 'mesuré', t: 'Mesuré sur l’historique du propriétaire du site, hors de cette page (méthode et période non reprises ici) : avant cette méthode, les annonces de direction (« hausse » ou « baisse » à 55-60 %) se sont révélées fausses 4 fois sur 5. D’où des niveaux nommés, un ordre et une invalidation, plutôt qu’une probabilité de hausse ou de baisse.' },
       { s: 'mesuré', t: 'Le seul chiffre de réussite montré : « Ordre du premier mouvement juste N fois sur M matins », tiré du journal. Chaque matin compte le chemin le mieux classé qui a une invalidation (rangs 1 à 3 : si le 1 n’en a pas, c’est le 2 qui est mesuré). Ne comptent que les matins où il a touché sa 1re zone ou son invalidation ; « juste » = la 1re zone d’abord. C’est la mesure que suit le journal ; seule, et tant qu’il y a peu de matins notés (« échantillon faible »), elle ne prouve rien.' },
       { s: 'convention', t: 'Les états de l’encadré (« 1re cible touchée entre 10:30 et 10:45 UTC », « invalidation touchée d’abord… », « ordre inconnu ») sont un SUIVI EN DIRECT sur les bougies de l’intervalle affiché : un affichage, au créneau d’une bougie près, sur les bougies de 1 h au plus. La note officielle est celle du journal, faite mécaniquement le lendemain matin sur des bougies d’une minute ; quand elle existe, c’est elle qui s’affiche. Hors de l’encadré complet (libellés, ligne repliée), un état calculé par la page porte « (en direct) ». Si l’historique chargé ne remonte pas jusqu’au point (bougies 1 min), le suivi se dit « incomplet » plutôt que de deviner.' },
       { s: 'débattu', t: 'Les niveaux venus d’un modèle d’options (murs de calls ou de puts, zéro gamma) sont marqués « (modèle) » : ils reposent sur une hypothèse sur la position des teneurs de marché.' },
       // Pendant la journée (js/scenarios.js, section 5) : aucune nouvelle prévision, les scénarios du
       // matin recalculés. Un paragraphe par mode (classe .debutant-seul / .expert-seul).
-      { s: 'convention', mode: 'debutant', t: 'Pendant la journée, aucune nouvelle prévision : la page recalcule seulement où en est chaque scénario du matin. Une zone touchée prend une coche ✓ ; un scénario qui ne tient plus prend une croix ✗ ; pendant l’heure qui suit, la ligne le dit (elle garde alors sa place), et sa zone s’efface en une heure environ. « Suit le mieux le prix » et ce que dit la ligne ne changent qu’à la fin d’un quart d’heure, ou quand un scénario se ferme. « Suit le mieux le prix » nomme le scénario dont le prix est le plus près de ce qu’il décrit, décidé tous les quarts d’heure, et changé seulement si un autre est nettement plus près : une règle de calcul, pas une prévision ni une chance de réussite, et le classement du matin ne change pas. « Aucun scénario ne tient plus » : les trois ont été invalidés ; pas de nouvelle prévision avant le prochain point de 07h00.' },
+      { s: 'convention', mode: 'debutant', t: 'Pendant la journée, aucune nouvelle prévision : la page recalcule seulement où en est chaque scénario du matin. Une zone touchée prend une coche ✓ ; un scénario qui ne tient plus prend une croix ✗ (ou le mot « indécis » si la page ne peut pas trancher) ; pendant l’heure qui suit, la ligne le dit (elle garde alors sa place), et sa zone s’efface en une heure environ. « Suit le mieux le prix » et ce que dit la ligne ne changent qu’à la fin d’un quart d’heure, ou quand un scénario se ferme. « Suit le mieux le prix » nomme le scénario dont le prix est le plus près de ce qu’il décrit, décidé tous les quarts d’heure, et changé seulement si un autre est nettement plus près : une règle de calcul, pas une prévision ni une chance de réussite, et le classement du matin ne change pas. « Aucun scénario ne tient plus » : aucun des trois n’est encore en cours ni réalisé ; pas de nouvelle prévision avant le prochain point de 07h00.' },
       { s: 'convention', mode: 'expert', t: 'Pendant la journée (aucune nouvelle prévision) : écart relatif d’un chemin = d(prochaine zone non touchée) / (d(prochaine zone) + d(invalidation)), distances du prix aux bords des zones ; d’un range = 1 − d(bord toléré le plus proche) / demi-largeur tolérée. Comparer un range et un chemin par cet écart est une convention, pas une probabilité. Le nom du plus petit écart se décide à chaque clôture de 15 min (bougies 1 et 5 min regroupées ; en 1 h, aucun nom), au départ le rang 1 du matin, et ne change qu’avec 0,12 d’avance ; la bougie en cours ne le change que si elle ferme le scénario nommé. À une clôture, un autre scénario peut avoir un écart un peu plus petit sans avance nette : l’encadré le dit (« Plus petit écart : 1 · nom gardé : 3 ») ; « ◂ » marque le plus petit écart de la dernière clôture (il peut différer du nom gardé). Entre deux clôtures, les distances suivent le prix ; le nom, « ◂ » et la phrase de l’encadré ne changent qu’à une clôture ou quand un scénario se ferme. « Trop tôt pour départager » pendant la 1re heure tant que le prix reste près du prix du point, puis plus jamais de la journée. Un seul ouvert : « seul encore en cours », jamais « suit le mieux ». Aucun nom quand le plus petit écart est d’au moins 0,5 (« aucun ne colle » : chacun plus près de sa limite que de sa zone ; seuil de convention). « Au-delà de tous les niveaux du matin » : le prix est à plus d’une marge au-delà du bord extérieur de la zone la plus extrême. En 4 h ou 1 jour, rien n’est dit de la journée (bougies trop larges). Une cible ne prend sa coche que dans l’ordre et avant l’invalidation. Un scénario invalidé s’efface en 60 min après le créneau du contact (une note du journal, depuis son heure de résolution) ; sa croix, ses niveaux et sa raison restent, plus pâles. Stabilité mesurée de la règle : 1,65 changement du nom par jour en moyenne (médiane 1, 90e centile 4), sur des scénarios synthétiques construits avec les règles v1 (modèle) rejoués sur les bougies BTCUSDT 15 min du 06/09/2025 au 08/10/2026 (398 matins).' },
     ],
     limites: 'Ce n’est pas une prévision garantie ni une indication de quoi faire : trois scénarios sont montrés ensemble, avec leur rang et leur invalidation. Une bougie qui touche deux zones à la fois ne dit pas laquelle a été touchée la première : l’état le dit (« ordre inconnu »). Sans fichier lisible, rien n’est dessiné et l’encadré le dit en une ligne. Masquable dans « + Indicateurs » (catégorie Guide).',
@@ -458,7 +456,7 @@ const FICHES = {
       + (typeof FORMES_BOUGIE !== 'undefined' ? Object.keys(FORMES_BOUGIE).join(', ') : '—') + ').',
     lectures: [
       { s: 'convention', t: 'La forme change, jamais la valeur : les quatre prix sont tracés aux mêmes ordonnées, quelle que soit la forme du thème.' },
-      { s: 'convention', t: 'Corps creux en hausse, plein en baisse : la convention des cotes imprimées d’une seule encre — la hausse se lit à la forme, pas seulement à la couleur.' },
+      { s: 'convention', t: 'Dans les thèmes à bougies « creuses en hausse » : corps creux en hausse, plein en baisse, la convention des cotes imprimées d’une seule encre — la hausse se lit à la forme, pas seulement à la couleur.' },
       { s: 'convention', t: 'Barres OHLC : l’ouverture est le tiret de gauche, la clôture celui de droite.' },
     ],
     limites: 'En vue dense, les corps redeviennent pleins (une barre, un simple trait) : un contour de quelques pixels ne se lit plus. La dernière bougie bouge jusqu’à sa clôture.',
@@ -477,7 +475,7 @@ const FICHES = {
     simple: 'Deux lignes de milieu de fourchette (rapide et lente) et un « nuage » coloré, décalé vers la droite, qui montre la zone d’équilibre récente du prix.',
     formule: P => 'Ligne rapide (tenkan) = (plus haut + plus bas) / 2 sur ' + P.ichimoku.tenkan + ' bougies ; ligne lente (kijun) = idem sur ' + P.ichimoku.kijun
       + ' ; nuage : bord A = (tenkan + kijun) / 2, bord B = (plus haut + plus bas) / 2 sur ' + P.ichimoku.senkouB + ', tous deux reportés de ' + P.ichimoku.kijun
-      + ' bougies vers la droite. Nuage vert quand A ≥ B, rouge sinon. La ligne retardée (chikou) n’est pas dessinée.',
+      + ' bougies vers la droite. Nuage de la couleur des bougies haussières quand A ≥ B, de celle des baissières sinon. La partie du nuage au-delà de la dernière bougie et la ligne retardée (chikou) ne sont pas dessinées.',
     lectures: [
       { s: 'usuel', t: 'Prix au-dessus du nuage : tendance haussière sur cet horizon ; au-dessous : baissière ; dedans : zone d’hésitation.' },
       { s: 'usuel', t: 'Un nuage épais est lu comme une zone difficile à traverser ; un nuage fin, comme une zone fragile.' },
@@ -541,7 +539,7 @@ const FICHES = {
     simple: 'Des barres qui montrent si le prix récent (court terme) est au-dessus ou au-dessous du prix moyen d’une période plus longue : la vitesse du mouvement.',
     formule: P => 'Milieu de bougie = (H + B) / 2 ; AO = moyenne simple ' + P.ao.rapide + ' du milieu − moyenne simple ' + P.ao.lente + ' du milieu.',
     lectures: [
-      { s: 'usuel', t: 'Barres au-dessus de 0 : le court terme est au-dessus du long terme (élan haussier) ; au-dessous : élan baissier.' },
+      { s: 'usuel', t: 'Barres au-dessus de 0 : le court terme est au-dessus du long terme (élan haussier) ; au-dessous : élan baissier. Ici, la couleur des barres dit seulement de quel côté de 0 elles sont (dans l’AO classique, elle dit si la barre grandit).' },
       { s: 'usuel', t: 'Barres qui raccourcissent : l’élan faiblit, sans dire si le prix va se retourner.' },
     ],
     limites: 'En retard sur le prix, comme toute différence de moyennes. Proche du MACD : ne pas les compter deux fois.',
@@ -558,7 +556,7 @@ const FICHES = {
   },
   vp: {
     titre: 'Profil de volume', page: 'vp',
-    simple: 'Des barres horizontales au bord droit : combien a été échangé à chaque niveau de prix sur la partie visible du graphique. La ligne jaune (POC) marque le prix le plus échangé.',
+    simple: 'Des barres horizontales au bord droit : combien a été échangé à chaque niveau de prix sur la partie visible du graphique. Une barre et un trait plus marqués (le POC) signalent le prix le plus échangé.',
     formule: P => 'Échelle de prix de la vue découpée en tranches (environ ' + P.vp.dollarsParTranche + ' $, entre ' + P.vp.tranchesMin + ' et ' + P.vp.tranchesMax
       + ' tranches) ; le volume de chaque bougie visible est ajouté à chaque tranche entre son plus bas et son plus haut. POC = tranche la plus chargée ; zone de valeur = les tranches les plus chargées jusqu’à ' + pcF(P.vp.zoneValeur) + ' % du total (pointillés).',
     lectures: [
@@ -569,13 +567,13 @@ const FICHES = {
   },
   liq: {
     titre: 'Liquidité (carnet publié)', page: 'liq',
-    simple: 'Une carte de chaleur derrière les bougies : là où de gros ordres d’achat ou de vente attendaient dans le carnet de Binance, minute par minute.',
-    formule: () => 'heatmap.json, publié toutes les 15 min par le serveur : une colonne par minute, une tranche de prix par 20 $ ; la chaleur d’une case est la taille du plus gros niveau de prix de la tranche (pas la somme). BTC/USDT seulement. L’âge de la dernière colonne est écrit en haut à droite.',
+    simple: 'Une carte de chaleur posée en transparence sur le graphique : là où beaucoup d’ordres d’achat ou de vente attendaient dans le carnet de Binance, minute par minute.',
+    formule: () => 'heatmap.json, publié toutes les 15 min par le serveur : une colonne par minute, une tranche de prix par 20 $ ; la chaleur d’une case est la somme des BTC posés dans la tranche (les colonnes d’avant le 08/10/2026 gardent la taille du plus gros niveau de prix). BTC/USDT seulement. En Expert, l’âge de la dernière colonne est écrit en haut à droite.',
     lectures: [
-      { s: 'mesuré', t: 'Une bande claire et horizontale : un gros ordre resté posé longtemps à ce prix.' },
+      { s: 'mesuré', t: 'Une bande marquée et horizontale : beaucoup de BTC restés en attente longtemps dans cette tranche de prix (un ou plusieurs ordres).' },
       { s: 'usuel', t: 'Les gros ordres en attente sont lus comme des zones où le prix peut ralentir ou rebondir, tant qu’ils restent posés.' },
     ],
-    limites: 'Un ordre peut être retiré à tout moment, avant que le prix n’arrive. La colonne la plus récente a jusqu’à 16 min. La carte détaillée, en direct, est sur la page « Carte ».',
+    limites: 'Un ordre peut être retiré à tout moment, avant que le prix n’arrive. La colonne la plus récente a souvent plus d’un quart d’heure (jusqu’à une vingtaine de minutes). La carte détaillée, en direct, est sur la page « Carte ».',
   },
 };
 
@@ -591,37 +589,14 @@ const motModes = (exp, deb) => (deb && deb !== exp ? '<span class="expert-seul">
 const pcF = x => (x * 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
 const nbF = x => x.toLocaleString('fr-FR');
 const echapF = s => String(s === undefined || s === null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-// ─── Comment s'en servir ──────────────────────────────────────────────────────
-// Une ligne par indicateur du menu (demande du 09/10/2026 : « ce que c'est et comment on
-// l'utilise »). Elle s'affiche dans l'aperçu du menu (survol, toucher) et en tête de la fiche.
-// Une MANIÈRE de regarder, jamais quoi acheter ou vendre (tests/test_fiches.js) : les
-// indicateurs décrivent l'état du marché, ils ne donnent pas la direction.
+// ─── Comment s'en servir : les deux couches du site (Guide, scénarios) ─────────────
+// Elles ne sont pas des indicateurs de marché : leur fiche dit comment lire l'écran du site.
 // Chaîne simple, ou { exp, deb } quand le Débutant voit un écran différent.
 const USAGES = {
-  guide: { exp: 'Laissez-le affiché pour savoir où vous en êtes : la phrase dit le mouvement, les bandes les prix à surveiller, et les deux chemins à droite ce qui vient si le prix franchit un niveau. Une figure en pointillés se forme encore et se redessine avec le prix ; en trait plein, elle est validée (2 clôtures ou 1 et un retour) ; barrée ✗, elle ne tient plus. Survolez un libellé pour son origine et son bilan mesuré.',
+  guide: { exp: 'Laissez-le affiché pour savoir où vous en êtes : la phrase dit le mouvement, les bandes les prix à surveiller, et les deux chemins à droite le niveau suivant si une bougie clôture au-delà d’un niveau (une condition, pas une prévision). Une figure en pointillés se forme encore et se redessine avec le prix ; en trait plein, elle est validée (2 clôtures ou 1 et un retour) ; barrée ✗, elle ne tient plus. Survolez un libellé pour son origine et son bilan mesuré.',
     deb: 'Lisez la phrase du haut, puis regardez les deux repères : tant que le prix reste entre eux, rien de neuf. Une figure en pointillés est encore en train de se dessiner ; barrée d’une croix, elle ne tient plus. Touchez une étiquette pour le détail.' },
-  scenarios: { exp: 'Le matin, lisez le chemin de chaque scénario et son invalidation. Pendant la journée, sans nouvelle prévision, l’encadré dit quelles zones ont été touchées (✓), quel scénario ne tient plus (✗) et lequel suit le mieux le prix (◂ : le plus petit écart relatif, pas une probabilité). Un scénario invalidé se lit comme « l’hypothèse du matin ne tient plus ».',
+  scenarios: { exp: 'Le matin, lisez le chemin de chaque scénario et son invalidation. Pendant la journée, sans nouvelle prévision, l’encadré dit quelles zones ont été touchées (✓), quel scénario ne tient plus (✗) et lequel suit le mieux le prix (le nom, revu à chaque clôture de 15 min ; « ◂ » marque le plus petit écart relatif à cette clôture, qui peut différer du nom gardé ; pas une probabilité). Un scénario invalidé se lit comme « l’hypothèse du matin ne tient plus ».',
     deb: 'Regardez le scénario n° 1 et sa zone. Pendant la journée, la ligne du haut dit ce qui a changé depuis le matin : une zone touchée ✓, un scénario qui ne tient plus ✗, et celui qui suit le mieux le prix. Touchez-la pour les trois scénarios.' },
-  ema: 'Affichez-en une ou deux (par exemple 20 et 50) : le prix au-dessus d’une moyenne qui monte décrit une tendance haussière sur cet horizon. Deux moyennes qui se croisent marquent un changement de tendance, toujours en retard.',
-  bb: 'Regardez la largeur des bandes : très resserrées, le marché est calme et un mouvement plus ample se prépare souvent, sans en dire le sens. Un prix qui longe une bande décrit une tendance forte, pas un excès.',
-  vwap: 'Utilisez-le en intraday comme le prix moyen de la journée : au-dessus, ceux qui ont échangé aujourd’hui sont en moyenne gagnants. Le prix revient souvent le tester.',
-  ichimoku: 'Regardez où est le prix par rapport au nuage : au-dessus, en dessous ou dedans. Le nuage projeté à droite montre la zone d’équilibre des prochaines bougies selon cette méthode.',
-  sar: 'Suivez de quel côté sont les points : ils accompagnent un mouvement et changent de côté quand il s’arrête. Utile pour situer un niveau qui suit le prix, peu utile dans un marché sans direction.',
-  volume: 'Comparez la barre d’un mouvement aux barres d’avant : un franchissement de niveau sur un volume plus fort que d’habitude est jugé plus solide qu’un franchissement sur volume faible.',
-  rsi: 'Regardez s’il est haut (plus de 70) ou bas (moins de 30) : le mouvement récent a été fort dans un sens. Mesuré sur le BTC dans ce projet : un RSI bas annonce surtout de l’agitation dans les deux sens, pas un rebond.',
-  macd: 'Regardez l’histogramme : des barres qui grandissent, le mouvement accélère ; qui rétrécissent, il ralentit. Le croisement des deux lignes confirme un changement déjà visible sur le prix.',
-  stoch: 'Regardez où est la ligne entre 0 et 100 : près de 100, le prix finit en haut de sa fourchette récente ; près de 0, en bas. En tendance, il peut rester collé à un bord longtemps.',
-  atr: 'Servez-vous-en comme d’une règle : il donne la taille d’un mouvement normal. Un mouvement de 3 ATR est grand ; de 0,5 ATR, banal. Pratique pour juger si un niveau est « proche ».',
-  obv: 'Comparez sa pente à celle du prix : si les deux montent ensemble, la hausse s’accompagne de volume ; si le prix monte et l’OBV non, la hausse se fait sur peu d’échanges.',
-  mfi: 'Lisez-le comme le RSI : au-dessus de 80 ou sous 20, le mouvement récent a été fort et très échangé. Ne l’ajoutez pas au RSI comme une seconde preuve.',
-  williamsR: 'Regardez s’il est près de 0 (prix en haut de sa fourchette récente) ou de −100 (en bas). Il dit la même chose que le stochastique : un seul des deux suffit.',
-  cci: 'Regardez quand il dépasse +100 ou −100 : le prix s’éloigne nettement de sa normale. S’il y reste longtemps, c’est une tendance, pas un excès.',
-  adx: 'Regardez d’abord la ligne pleine : au-dessus de 25, le marché suit une tendance ; sous 20, il tourne en rond. Les deux pointillés disent ensuite qui pousse : +DI les hausses, −DI les baisses.',
-  ao: 'Regardez la couleur et la taille des barres : au-dessus de 0 et qui grandissent, l’élan haussier s’accélère ; qui rétrécissent, il s’essouffle.',
-  sr: 'Repérez les lignes les plus proches du prix au-dessus et en dessous : ce sont les prix où il a déjà fait demi-tour. Un niveau touché plusieurs fois récemment compte davantage.',
-  fib: 'Après un grand mouvement, cadrez la vue sur ce mouvement : les lignes montrent jusqu’où un repli est allé (38,2 %, 50 %, 61,8 %). Elles changent si vous déplacez la vue.',
-  vp: 'Repérez la ligne jaune (le prix le plus échangé) et les zones vides : le prix ralentit souvent dans les zones chargées et traverse vite les zones vides.',
-  liq: 'Cherchez les bandes claires proches du prix : ce sont de gros ordres posés. Vérifiez leur âge en haut à droite ; pour suivre le carnet en direct, ouvrez la page « Carte ».',
 };
 for (const k of Object.keys(USAGES)) if (FICHES[k]) FICHES[k].usage = USAGES[k];
 /** La ligne « Comment s'en servir » d'une fiche, en HTML (les deux textes, chacun dans sa classe, s'ils diffèrent). */
@@ -629,6 +604,105 @@ function usageHtml(id) {
   const u = FICHES[id] && FICHES[id].usage;
   if (!u) return '';
   return typeof u === 'string' ? echapF(u) : motModes(u.exp, u.deb);
+}
+
+// ─── Comment les traders l'utilisent · comment c'est calculé ─────────────────────
+// Demande du 10/10/2026 : pour chaque indicateur, l'usage COURANT chez les traders (ce que
+// décrivent les manuels d'analyse technique et les plateformes), et le calcul en mots simples
+// — rien de propre à ce site ni à son propriétaire. Une pratique décrite n'est pas un conseil
+// (tests/test_fiches.js) ; elle ne dit pas non plus que la pratique marche.
+// CALCUL : une fonction de PARAM pour un indicateur de la page (les nombres sont ceux du calcul),
+// une chaîne pour un champ du fichier (sa formule exacte, publiée, reste en mode Expert).
+const TRADERS = {
+  // ── Indicateurs du graphique ──
+  rsi: 'Dit si un mouvement est fort ou s’essouffle. Au-dessus de 70 (« surachat ») ou sous 30 (« survente »), certains attendent un retour vers le milieu ; en tendance, d’autres y voient un mouvement puissant. Ils guettent aussi les divergences (nouveau plus haut du prix, pas du RSI : essoufflement) et le passage de 50.',
+  ema: 'Repère et suit la tendance : prix au-dessus d’une moyenne qui monte, tendance haussière. Les croisements sont suivis (50 au-dessus de 200 : « golden cross » ; l’inverse : « death cross »). Les moyennes 20, 50 et 200 servent de zones de réaction lors d’un repli.',
+  bb: 'Mesure la volatilité. Bandes resserrées : marché calme, on guette la sortie. En range, toucher une bande est lu comme un excès ; en tendance, la longer comme un mouvement fort. La moyenne du milieu sert de repère de retour.',
+  vwap: 'Le prix moyen payé dans la journée. Au-dessus, les acheteurs de la séance dominent ; au-dessous, les vendeurs. Les institutions y comparent leurs exécutions, et beaucoup surveillent les retours du prix vers lui.',
+  ichimoku: 'Lecture complète de la tendance : prix au-dessus du nuage, haussier ; au-dessous, baissier ; dedans, neutre. On suit aussi le croisement des lignes rapide et lente, et la couleur du nuage projeté vers l’avant (non dessiné ici). Un nuage épais est lu comme difficile à traverser.',
+  sar: 'Suit une tendance et sert de stop qui suit le prix. Points sous les bougies : hausse ; au-dessus : baisse. Quand ils changent de côté, beaucoup lisent un retournement. Nombreux faux signaux sans tendance.',
+  volume: 'Juge la conviction d’un mouvement. Une cassure sur un volume fort est jugée plus fiable ; une hausse sur un volume qui baisse, essoufflée. Un pic extrême marque souvent la fin d’un mouvement (capitulation ou euphorie).',
+  macd: 'Suit la dynamique de la tendance. On regarde le croisement de la ligne MACD et de son signal (au-dessus : haussier ; au-dessous : baissier), son passage de zéro, et l’histogramme, qui grandit quand le mouvement accélère. Aussi les divergences avec le prix.',
+  stoch: 'Situe la clôture dans la fourchette récente. Au-dessus de 80 : zone haute ; sous 20 : zone basse ; on surveille le croisement de %K et %D dans ces zones. Surtout utilisé en range : en tendance, il peut rester collé à un bord.',
+  atr: 'L’amplitude habituelle d’une bougie, sans direction. Sert à placer les stops (par exemple à 1,5 ou 2 ATR), à dimensionner les positions et à juger si un mouvement est inhabituel.',
+  obv: 'Dit si le volume accompagne le prix. On lit sa pente : il monte avec le prix, la hausse est confirmée ; il stagne ou baisse pendant que le prix monte (divergence), la hausse est jugée peu soutenue.',
+  mfi: 'Un RSI qui tient compte du volume. Au-dessus de 80 : zone haute ; sous 20 : zone basse. On cherche aussi les divergences avec le prix.',
+  williamsR: 'Situe la clôture dans la fourchette récente, de 0 à −100 (le stochastique rapide retourné). Au-dessus de −20 : zone haute ; sous −80 : zone basse. Sert surtout à repérer des essoufflements en range.',
+  cci: 'Mesure l’écart du prix à sa moyenne. Au-dessus de +100 : début d’un mouvement fort à la hausse ; sous −100 : à la baisse. En range, d’autres y lisent au contraire des excès. Aussi les divergences.',
+  adx: 'La force d’une tendance, pas son sens. Au-dessus de 25 : marché en tendance (on suit la tendance) ; sous 20 : range. Le croisement de +DI et −DI dit quel camp pousse.',
+  ao: 'L’élan du marché (Bill Williams, proche du MACD). On regarde le passage de zéro et des figures de barres : « soucoupe » (un creux du même côté de zéro), « deux pics ». La couleur dit classiquement si la barre grandit ; ici, seulement son côté de zéro.',
+  sr: 'Les prix où le marché a déjà fait demi-tour. On s’attend à une réaction en y revenant ; ordres et stops sont placés autour. Un niveau cassé change souvent de rôle (l’ancien support devient résistance).',
+  fib: 'Estime jusqu’où un repli peut aller avant que la tendance reprenne. Niveaux tracés entre un plus haut et un plus bas marquants ; 38,2 %, 50 % et 61,8 % sont les plus surveillés.',
+  vp: 'Les prix où l’on a le plus échangé. Le prix le plus échangé (POC) et la zone de valeur (70 % des échanges) servent de repères : le prix ralentit souvent dans les zones chargées et traverse vite les zones creuses.',
+  liq: 'Où de gros ordres attendent dans le carnet (des « murs »). Ils sont surveillés comme des zones de freinage ou de rebond : tiennent-ils, sont-ils absorbés ou retirés quand le prix approche ? Certains ordres ne sont posés que pour être vus.',
+  // ── Champs du fichier ──
+  gex: 'Estime si les teneurs de marché d’options amortissent ou amplifient les mouvements. GEX positif : marché calmé, prix attiré par les gros prix d’exercice ; négatif : mouvements amplifiés. Le « zéro gamma » est la frontière entre les deux.',
+  ls: 'Le sentiment de la foule. Souvent lu à contre-courant : quand presque tous sont acheteurs, des liquidations peuvent amplifier une baisse, et inversement.',
+  top_ls: 'Le positionnement des plus gros comptes. On le compare à celui de la foule ; s’ils divergent, beaucoup suivent les gros comptes.',
+  taker: 'L’agressivité. Au-dessus de 1 : les acheteurs pressés dominent ; sous 1 : les vendeurs. On le compare au prix pour voir si la pression est absorbée.',
+  funding: 'Jauge l’excès de levier. Très positif : beaucoup d’acheteurs à levier paient cher, risque de liquidations en cascade si le prix baisse. Négatif : l’inverse, avec un possible rachat forcé des vendeurs si le prix monte.',
+  oi: 'Dit si l’argent entre ou sort des positions à levier. Prix et OI en hausse : de nouvelles positions portent la hausse. Prix en hausse, OI en baisse : des vendeurs se rachètent. Chute brutale de l’OI : souvent une vague de liquidations.',
+  cvd: 'Dit qui, des acheteurs ou des vendeurs pressés, mène. Comparé au prix : les deux montent, la hausse est confirmée ; le prix monte mais le CVD baisse (divergence), des vendeurs absorbent les achats ou la hausse n’est pas agressive.',
+  prime: 'Jauge la demande américaine, souvent associée aux institutions. Prime positive et durable : demande soutenue aux États-Unis ; négative : demande faible ou ventes américaines.',
+  dxy: 'La force du dollar. Surveillé parce qu’un dollar qui monte a souvent coïncidé avec une baisse des actifs risqués, et l’inverse.',
+  vix: 'La nervosité attendue des bourses : un thermomètre de l’appétit pour le risque. Un VIX qui bondit accompagne souvent des ventes d’actifs risqués, BTC compris.',
+  carnet: 'Compare les ordres d’achat et de vente posés près du prix. On y cherche un déséquilibre, avec méfiance : des ordres peuvent être posés pour être vus puis retirés.',
+  murs: 'Les prix où de gros ordres attendent : supports (achat) ou résistances (vente) possibles. On regarde s’ils tiennent, sont absorbés ou disparaissent quand le prix approche.',
+  rsi_tf: 'Comme le RSI du graphique : zones 70 et 30, divergences, passage de 50. Comparer 1h, 4h et journalier montre si les échelles vont dans le même sens.',
+  ema_tf: 'Comme les moyennes du graphique : prix au-dessus ou au-dessous, courte au-dessus ou au-dessous de la longue, retours du prix vers la moyenne lors d’un repli.',
+  croisement: 'Les croisements de moyennes sont lus comme des changements de tendance : la courte sous la longue, affaiblissement ; au-dessus, renforcement. Le célèbre « death cross » est la moyenne simple 50 sous la 200, en journalier.',
+  sr_tf: 'Le plus haut et le plus bas récents servent de bornes : on attend une réaction près d’eux, et leur franchissement est lu comme une cassure de la fourchette.',
+  amplitude: 'Dit si le marché a été agité ou calme. Une faible amplitude (compression) précède souvent un mouvement plus large, sans en dire le sens.',
+  atr_tf: 'Comme l’ATR du graphique : distance des stops, taille des positions, mouvement inhabituel ou non.',
+  volume_tf: 'Une référence : une bougie bien au-dessus du volume moyen est jugée significative ; une cassure sur un volume faible, fragile.',
+};
+const CALCUL = {
+  rsi: P => 'Moyenne des hausses et moyenne des baisses de clôture, lissées « à la Wilder » sur ' + P.rsi.periode + ' bougies (chaque nouvelle variation compte pour 1/' + P.rsi.periode + '). RSI = 100 − 100 / (1 + hausses / baisses) : de 0 à 100 ; 50 = hausses et baisses égales.',
+  ema: () => 'EMA : moyenne des clôtures où les plus récentes pèsent plus (poids 2 / (N + 1)). SMA : somme des N dernières clôtures divisée par N. N est le nombre du nom (EMA 20 : 20 bougies).',
+  bb: P => 'Milieu : moyenne simple des ' + P.bb.periode + ' dernières clôtures. Bandes : ce milieu ± ' + P.bb.ecarts + ' écarts-types de ces clôtures (leur dispersion autour de la moyenne).',
+  vwap: P => 'Somme de (prix typique × volume) divisée par la somme des volumes, avec prix typique = (haut + bas + clôture) / 3. Remis à zéro à minuit UTC sous l’échelle journalière, sinon toutes les ' + P.vwap.ancrageBougies + ' bougies.',
+  ichimoku: P => 'Ligne rapide : milieu du plus haut et du plus bas sur ' + P.ichimoku.tenkan + ' bougies ; ligne lente : idem sur ' + P.ichimoku.kijun + '. Nuage : moyenne des deux lignes, et milieu du plus haut et du plus bas sur ' + P.ichimoku.senkouB + ' bougies, décalés de ' + P.ichimoku.kijun + ' bougies vers la droite.',
+  sar: P => 'Chaque bougie, le point avance vers l’extrême du mouvement (plus haut d’une hausse, plus bas d’une baisse) d’une fraction de l’écart : ' + nbF(P.sar.pas) + ' au départ, + ' + nbF(P.sar.pas) + ' à chaque nouvel extrême, jusqu’à ' + nbF(P.sar.max) + '. Franchi par le prix, il change de côté.',
+  volume: () => 'La quantité de BTC échangée pendant la bougie, publiée par Binance. Couleur des bougies haussières si la bougie finit en hausse (ou à égalité), des baissières sinon.',
+  macd: P => 'Ligne MACD : moyenne exponentielle des clôtures sur ' + P.macd.rapide + ' bougies moins celle sur ' + P.macd.lente + '. Signal : moyenne exponentielle du MACD sur ' + P.macd.signal + ' bougies. Histogramme : MACD − signal.',
+  stoch: P => '%K = (clôture − plus bas) / (plus haut − plus bas) des ' + P.stoch.k + ' dernières bougies × 100 : 100 au plus haut, 0 au plus bas. %D : moyenne des ' + P.stoch.d + ' derniers %K.',
+  atr: P => 'Vrai range de chaque bougie : le plus grand de haut − bas, |haut − clôture précédente|, |bas − clôture précédente| (les trous entre bougies comptent). ATR : sa moyenne lissée sur ' + P.atr.periode + ' bougies.',
+  obv: () => 'Part de 0. Chaque bougie ajoute son volume si elle clôture plus haut que la précédente, le retire si elle clôture plus bas, ne change rien sinon.',
+  mfi: P => 'Flux = prix typique (haut + bas + clôture) / 3 × volume. Sur ' + P.mfi.periode + ' bougies, flux des bougies en hausse et flux des bougies en baisse. MFI = 100 − 100 / (1 + montants / descendants).',
+  williamsR: P => '%R = (plus haut − clôture) / (plus haut − plus bas) des ' + P.williamsR.periode + ' dernières bougies × −100 : 0 au plus haut, −100 au plus bas.',
+  cci: P => 'CCI = (prix typique − sa moyenne sur ' + P.cci.periode + ' bougies) / (0,015 × écart moyen à cette moyenne), avec prix typique = (haut + bas + clôture) / 3. Le 0,015 met la plupart des valeurs entre −100 et +100.',
+  adx: P => 'Mouvement positif : hausse du plus haut ; négatif : baisse du plus bas ; seul le plus grand compte, l’autre vaut 0. Divisés par le vrai range et lissés sur ' + P.adx.periode + ' bougies : +DI et −DI. ADX : moyenne lissée sur ' + P.adx.periode + ' de |+DI − −DI| / (+DI + −DI) × 100.',
+  ao: P => 'Milieu de chaque bougie = (haut + bas) / 2. AO = moyenne simple de ces milieux sur ' + P.ao.rapide + ' bougies moins celle sur ' + P.ao.lente + '.',
+  sr: P => 'Sommets et creux (« pivots ») des ' + P.sr.bougies + ' dernières bougies, regroupés quand ils sont proches, classés par nombre de contacts, ancienneté et volume. Les niveaux des échelles de temps supérieures s’y ajoutent.',
+  fib: P => 'Plus haut et plus bas des bougies visibles ; niveaux à ' + P.fib.niveaux.map(x => pcF(x) + ' %').join(', ') + ' de l’écart, comptés depuis le haut si le prix a monté sur la vue, depuis le bas sinon.',
+  vp: P => 'Prix de la vue découpés en tranches ; le volume de chaque bougie visible est ajouté à chaque tranche entre son bas et son haut. POC : la tranche la plus remplie. Zone de valeur : les plus remplies jusqu’à ' + pcF(P.vp.zoneValeur) + ' % du volume.',
+  liq: () => 'Chaque minute, le serveur additionne les BTC posés dans le carnet Binance par tranche de 20 $. Case plus marquée = plus de BTC en attente. Publié toutes les 15 minutes.',
+  gex: 'Pour chaque option Deribit ouverte : variation de sa couverture pour 1 % de prix (le « gamma ») × contrats ouverts. Calls comptés en positif, puts en négatif (hypothèse : les teneurs de marché ont acheté les calls, vendu les puts). En dollars.',
+  ls: 'Comptes Binance acheteurs sur le perpétuel BTC divisés par les comptes vendeurs. Un compte = une voix, quelle que soit sa taille. Un point par heure.',
+  top_ls: 'Positions acheteuses des plus gros comptes Binance divisées par leurs positions vendeuses, sur le perpétuel BTC. Un point par heure.',
+  taker: 'Volume acheté au marché divisé par volume vendu au marché, sur le perpétuel BTC de Binance, dernière heure publiée.',
+  funding: 'Fixé par Binance d’après l’écart entre le perpétuel et le spot, réglé toutes les 8 h : positif, les acheteurs paient les vendeurs ; négatif, l’inverse. Taux de la prochaine échéance, en %.',
+  oi: 'Nombre de contrats perpétuels BTC ouverts sur Binance (un acheteur et un vendeur chacun). Variation : écart en % entre le dernier point horaire et celui d’il y a 24 h.',
+  cvd: 'Pour chaque bougie de 5 min du spot Binance : achats au marché − ventes au marché, en dollars. Additionnés sur la fenêtre (1 h, 4 h ou 24 h).',
+  prime: '(Milieu du carnet Coinbase en dollars − milieu du carnet Binance en USDT) / prix Binance, en %. La version « hors USDT » convertit d’abord l’USDT en dollars.',
+  dxy: 'Valeur moyenne pondérée du dollar face à six devises (euro environ 58 %, yen, livre, dollar canadien, couronne suédoise, franc suisse). Dernière valeur journalière de Yahoo Finance.',
+  vix: 'Calculé par la bourse de Chicago à partir des options sur le S&P 500 : la volatilité annuelle qu’elles supposent pour 30 jours, en %. Dernier cours de Yahoo Finance.',
+  carnet: 'BTC posés à l’achat divisés par BTC posés à la vente, à ±0,5 % du milieu du carnet Binance (ou la bande la plus large reçue), à la publication.',
+  murs: 'Carnet Binance découpé en tranches de 20 $, quantités additionnées dans chacune. Les murs : les tranches les plus chargées de chaque côté, à la publication.',
+  rsi_tf: 'Même calcul que le RSI du graphique (Wilder, 14 bougies), fait par le serveur sur chaque échelle de temps, bougie en cours comprise.',
+  ema_tf: 'Moyennes exponentielles des clôtures sur 20 et 50 bougies de chaque échelle de temps, bougie en cours comprise.',
+  croisement: 'Vrai si la moyenne exponentielle 20 est sous la 50, sur l’échelle de temps de la ligne, à la publication.',
+  sr_tf: 'Plus bas et plus haut des 30 dernières bougies de l’échelle de temps, bougie en cours comprise.',
+  amplitude: '(Plus haut − plus bas) des 30 dernières bougies, divisé par le plus bas, en %.',
+  atr_tf: 'Même calcul que l’ATR du graphique (vrai range lissé sur 14 bougies), fait par le serveur sur chaque échelle de temps.',
+  volume_tf: 'Volume moyen (en BTC) des 10 dernières bougies, bougie en cours comprise.',
+};
+for (const k of Object.keys(TRADERS)) if (FICHES[k]) FICHES[k].traders = TRADERS[k];
+for (const k of Object.keys(CALCUL)) if (FICHES[k]) FICHES[k].calcul = CALCUL[k];
+/** « Comment c'est calculé », en mots : construit avec PARAM pour un indicateur de la page. */
+function calculTexte(f) {
+  if (!f || !f.calcul) return '';
+  return typeof f.calcul === 'function' ? (typeof PARAM !== 'undefined' ? f.calcul(PARAM) : '') : f.calcul;
 }
 
 function metaDe(cle) {
@@ -673,7 +747,9 @@ function ficheHtml(id) {
   // État du moment dérivé du code (ex. la forme de bougie du thème courant) : même HTML dans les deux modes.
   const etat = f.etat ? f.etat() : null;
   if (etat) h += '<p class="fiche-valeur">' + echapF(etat) + '</p>';
-  if (f.usage) h += '<h4>Comment s’en servir</h4><p class="fiche-usage">' + usageHtml(id) + '</p>';
+  if (f.traders) h += '<h4>Comment les traders l’utilisent</h4><p class="fiche-usage">' + echapF(f.traders) + '</p>';
+  else if (f.usage) h += '<h4>Comment s’en servir</h4><p class="fiche-usage">' + usageHtml(id) + '</p>';
+  if (f.calcul) h += '<h4>Comment c’est calculé</h4><p class="fiche-calcul">' + echapF(calculTexte(f)) + '</p>';
   if (f.champ) {
     const vals = valeursDe(f.champ);
     const md = typeof marketData !== 'undefined' ? marketData : null;
@@ -686,7 +762,7 @@ function ficheHtml(id) {
     // HTML dans les deux modes ; absent tant qu'aucun historique n'est lu.
     if (typeof chroniqueFiche === 'function') h += chroniqueFiche(f.champ, id);
   }
-  h += '<h4>Comment ça se lit</h4><ul class="fiche-lectures">' + f.lectures.map(l =>
+  h += '<h4>À savoir</h4><ul class="fiche-lectures">' + f.lectures.map(l =>
     // Une lecture propre à un mode (mode : 'debutant' | 'expert') : même HTML, seule sa classe change.
     '<li' + (l.mode === 'debutant' || l.mode === 'expert' ? ' class="' + l.mode + '-seul"' : '') + '><span class="statut statut-' + echapF(l.s) + '">' + motModes(STATUTS[l.s] || l.s, STATUTS_DEB[l.s]) + '</span> ' + echapF(l.t) + '</li>').join('') + '</ul>';
   if (f.debat) h += '<div class="fiche-debat"><b>La littérature se contredit.</b> ' + echapF(f.debat) + '</div>';
@@ -808,16 +884,16 @@ function lectureCourte(id, v, v2) {
   let t = null;
   switch (id) {
     case 'funding': if (n(v)) t = v > 0 ? 'Les acheteurs à levier paient les vendeurs.' : v < 0 ? 'Les vendeurs à découvert paient les acheteurs.' : 'Aucun paiement entre acheteurs et vendeurs.'; break;
-    case 'oi': if (n(v)) t = v > 0 ? 'Des positions à levier s’ouvrent (' + pct(v) + ' en 24 h).' : 'Des positions à levier se ferment (' + pct(v) + ' en 24 h).'; break;
+    case 'oi': if (n(v)) t = v > 0 ? 'Plus de positions à levier ouvertes qu’il y a 24 h (' + pct(v) + ').' : v < 0 ? 'Moins de positions à levier ouvertes qu’il y a 24 h (' + pct(v) + ').' : 'Autant de positions à levier ouvertes qu’il y a 24 h.'; break;
     case 'ls': if (n(v)) t = (v > 1 ? 'Plus de comptes acheteurs que vendeurs' : 'Plus de comptes vendeurs qu’acheteurs') + ' — des comptes, pas des montants.'; break;
     case 'cvd': if (n(v)) t = v > 0 ? 'Sur 24 h, les achats au marché ont dominé.' : 'Sur 24 h, les ventes au marché ont dominé.'; break;
-    case 'gex': if (n(v)) t = v > 0 ? 'Régime « long gamma » selon la convention : mouvements plutôt amortis.' : 'Régime « short gamma » selon la convention : mouvements plutôt amplifiés.'; break;
-    case 'rsi_tf': if (n(v)) t = v >= 70 ? 'Zone haute (au-dessus de 70, « suracheté » par convention).' : v <= 30 ? 'Zone basse (sous 30, « survendu » par convention).' : 'Zone neutre (entre 30 et 70).'; break;
+    case 'gex': if (n(v)) t = v > 0 ? 'Régime « long gamma » selon la convention ; lecture usuelle : mouvements amortis.' : 'Régime « short gamma » selon la convention ; lecture usuelle : mouvements amplifiés.'; break;
+    case 'rsi_tf': if (n(v)) t = v >= 70 ? 'Zone haute (au-dessus de 70) : la hausse récente a été forte.' : v <= 30 ? 'Zone basse (sous 30) : la baisse récente a été forte.' : 'Zone neutre (entre 30 et 70).'; break;
     case 'vix': if (n(v)) t = v < 15 ? 'Marchés actions calmes (repère usuel : sous 15).' : v > 25 ? 'Marchés actions sous tension (repère usuel : au-dessus de 25).' : 'Volatilité actions intermédiaire.'; break;
     case 'prime': {
       const x = n(v2) ? v2 : v;
       if (n(x)) t = Math.abs(x) < 0.03 ? 'Pas d’écart notable entre Coinbase et Binance' + (n(v2) ? ' une fois l’USDT ramené en dollars.' : '.')
-        : (x > 0 ? 'Le BTC est plus cher sur Coinbase (demande américaine plus forte).' : 'Le BTC est moins cher sur Coinbase (demande américaine plus faible).');
+        : (x > 0 ? 'Le BTC est plus cher sur Coinbase que sur Binance (souvent lu comme une demande américaine plus forte).' : 'Le BTC est moins cher sur Coinbase que sur Binance (souvent lu comme une demande américaine plus faible).');
       break;
     }
     case 'carnet': if (n(v)) t = v > 1 ? 'Plus de BTC posés à l’achat qu’à la vente près du prix.' : 'Plus de BTC posés à la vente qu’à l’achat près du prix.'; break;
