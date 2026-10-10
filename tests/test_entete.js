@@ -20,6 +20,8 @@
 //   9. GEX sans couleur hausse / baisse dans les chiffres clés ; cartes : prix publié plus petit
 //      que le prix en direct, jauge RSI sans vert ni rouge ; bandeau d'âge qui avance.
 //  10. TÉLÉPHONE : la barre du bas ne cache pas la dernière ligne des modales.
+//  11. BOUTONS DE L'EN-TÊTE, de 360 à 1440 px, dans neuf thèmes et les deux modes : ni sur le
+//      prix, ni hors de l'écran, ni cachés ; « + Indicateurs » à l'écran (Planche comprise).
 //
 // Binance simulé (prix 86 012,50, ouverture 85 700 : +0,36 % ; Binance arrondit à +0,365), le
 // fichier publié du dépôt avec l'heure de publication réglée par contrôle ; horloge fixée au
@@ -315,6 +317,45 @@ const lireEntete = page => page.evaluate(() => {
         await o.page.evaluate(() => { for (const m of document.querySelectorAll('.modal')) m.style.display = 'none'; });
       }
       await o.ctx.close();
+    }
+
+    // ── 7. Les boutons de l'en-tête, à toute largeur : ni sur le prix, ni hors de l'écran ──
+    // Constaté le 10/10 : en Expert, entre 481 et 660 px, les boutons se posaient sur le prix ;
+    // dans les thèmes à structure (Néon, Codex, Gare, Planche), entre 801 et 1000 px, Réglages,
+    // Légendes et Thème sortaient de l'écran ; dans la Planche, « + Indicateurs » restait au bout
+    // de sa nomenclature qui défile, hors de l'écran, jusqu'à 1279 px. Une page par thème et par
+    // mode, redimensionnée de largeur en largeur ; publication en retard (pastille à placer aussi).
+    titre('7. Boutons de l’en-tête et « + Indicateurs » : ni sur le prix, ni hors de l’écran, de 360 à 1440 px');
+    const LARGEURS = [360, 390, 412, 481, 540, 600, 660, 720, 800, 801, 850, 900, 950, 1000, 1100, 1279, 1280, 1440];
+    for (const theme of ['aero', 'kala', 'neon', 'codex', 'gare', 'gazette', 'cyanotype', 'diazo', 'bureau95']) {
+      for (const mode of ['debutant', 'expert']) {
+        const o = await ouvrir(nav, { vue: { width: 1440, height: 900 }, mode, theme, ageS: 25 * 60 });
+        const fautes = [];
+        for (const w of LARGEURS) {
+          await o.page.setViewportSize({ width: w, height: 900 });
+          await o.page.waitForTimeout(120);
+          const f = await o.page.evaluate(() => {
+            const r = e => e.getBoundingClientRect();
+            const vis = e => { const s = getComputedStyle(e); return s.display !== 'none' && s.visibility !== 'hidden' && r(e).width > 0 && r(e).height > 0; };
+            const prix = document.getElementById('price'), rp = r(prix), out = [];
+            const coupe = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+            const boutons = [...document.querySelectorAll('.header button, .header .ico-btn, #dot, .header .kpi-deb, .header .kpi-age, #indDropdownBtn')].filter(b => vis(b) && !b.contains(prix) && !prix.contains(b));
+            for (const b of boutons) {
+              const rb = r(b), nom = b.id || b.className.split(' ')[0];
+              if (vis(prix) && coupe(rp, rb)) out.push(nom + ' sur le prix');
+              // Dans l'écran, et réellement sous le pointeur (pas caché par un voisin ni par un bord).
+              const x = document.elementFromPoint(Math.min(innerWidth - 1, Math.max(0, rb.left + rb.width / 2)), Math.min(innerHeight - 1, Math.max(0, rb.top + rb.height / 2)));
+              if (rb.right > innerWidth + 0.5 || rb.left < -0.5) out.push(nom + ' hors de l’écran');
+              else if (!x || !(b.contains(x) || x.contains(b))) out.push(nom + ' caché');
+            }
+            if (document.documentElement.scrollWidth > innerWidth) out.push('défilement horizontal');
+            return out;
+          });
+          for (const x of f) fautes.push(w + ' px : ' + x);
+        }
+        check(`${theme.padEnd(9)} · ${mode.padEnd(8)} : de 360 à 1440 px, aucun bouton sur le prix ni hors de l’écran`, !fautes.length, fautes.slice(0, 6));
+        await o.ctx.close();
+      }
     }
   } finally {
     await nav.close();

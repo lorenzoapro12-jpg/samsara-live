@@ -393,7 +393,8 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
    téléphone, à trois écrans à droite. Au bureau, il est épinglé au bord droit du ruban (sticky),
    sur un fond plein qui recouvre en fondu ce qui défile dessous — le fondu du ruban est alors
    inutile ; au téléphone, il passe en tête, avant les intervalles. Bureau 95 l'épinglait déjà
-   et la Planche le range sur la 1re rangée de sa nomenclature : leurs règles, pas celles-ci. */
+   et la Planche le range sur la 1re rangée de sa nomenclature à partir de 1280 px : leurs
+   règles, pas celles-ci (la Planche a les siennes plus bas, en dessous de 1280 px). */
 @media (min-width: 769px) {
   :root:not([data-mode="debutant"]):not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar > .ind-dropdown {
     position: sticky; right: 0; z-index: 1; margin-left: auto;
@@ -404,8 +405,19 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   }
   :root:not([data-mode="debutant"]):not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar.deborde { -webkit-mask-image: none; mask-image: none; }
 }
+/* La Planche ne le range sur la 1re rangée de sa nomenclature qu'à partir de 1280 px : en dessous,
+   sa nomenclature est une rangée qui défile, et le bouton était au bout, hors de l'écran. */
+@media (min-width: 769px) and (max-width: 1279px) {
+  :root[data-structure="planche"]:not([data-mode="debutant"]) .indicator-bar > .ind-dropdown {
+    position: sticky; right: 0; z-index: 1; margin-left: auto;
+  }
+  :root[data-structure="planche"]:not([data-mode="debutant"]) .indicator-bar.deborde > .ind-dropdown {
+    padding-left: 22px; background: linear-gradient(90deg, transparent, var(--card-solid) 18px);
+    box-shadow: 12px 0 0 var(--card-solid);
+  }
+}
 @media (max-width: 768px) {
-  :root:not([data-mode="debutant"]):not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar > .ind-dropdown { order: -2; }
+  :root:not([data-mode="debutant"]):not([data-structure="fenetres"]) .indicator-bar > .ind-dropdown { order: -2; }
 }
 .indicator-bar .section-title {
   flex-shrink: 0;
@@ -1010,6 +1022,21 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
   html:not([data-mode="debutant"]):not([data-structure]) .header:has(> .kpis.vieux) > .header-left { flex-basis: 0; }
   html:not([data-mode="debutant"]):not([data-structure]) .header > .kpis.vieux { flex-basis: 100%; }
 }
+/* Expert : la paire, le prix et neuf boutons ne tiennent pas toujours sur une rangée. Entre 481
+   et 660 px, les boutons se posaient sur le prix ; dans les thèmes à structure, entre 801 et
+   1000 px, les derniers sortaient de l'écran (Réglages, Légendes, Thème). Le bloc du prix garde
+   sa largeur, et les boutons passent sur une 2e rangée, à droite, quand ils n'ont plus la place. */
+@media (min-width: 481px) and (max-width: 800px) {
+  html:not([data-mode="debutant"]):not([data-structure="fenetres"]) .header { flex-wrap: wrap; row-gap: 6px; }
+  html:not([data-mode="debutant"]):not([data-structure="fenetres"]) .header > .header-left,
+  html:not([data-mode="debutant"]):not([data-structure]) .header:has(> .kpis.vieux) > .header-left { flex: 1 0 auto; }
+  html:not([data-mode="debutant"]):not([data-structure="fenetres"]) .header > .header-right { margin-left: auto; }
+}
+@media (min-width: 801px) and (max-width: 1100px) {
+  html:not([data-mode="debutant"])[data-structure]:not([data-structure="fenetres"]) .header { flex-wrap: wrap; row-gap: 6px; }
+  html:not([data-mode="debutant"])[data-structure]:not([data-structure="fenetres"]) .header > .header-left { flex: 1 0 auto; }
+  html:not([data-mode="debutant"])[data-structure]:not([data-structure="fenetres"]) .header > .header-right { margin-left: auto; }
+}
 @media (max-width: 768px) {
   body { font-size: 12px; -webkit-tap-highlight-color: transparent; }
   /* Cibles tactiles : 20 px de haut étaient intappables au pouce. */
@@ -1227,6 +1254,9 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
 /* Le bouton de mode : où il mène (« Débutant · passer en Expert »), plus court sur téléphone. */
 .mode-court { display: none; }
 @media (max-width: 480px) { .mode-long { display: none; } .mode-court { display: inline; } }
+/* Bureau 95 garde l'en-tête sur une rangée : sous 560 px, le libellé long du bouton de mode
+   couvrait le prix (« 86 013 » sans son « $ ») ; le court y tient. */
+@media (max-width: 560px) { html[data-structure="fenetres"] .mode-long { display: none; } html[data-structure="fenetres"] .mode-court { display: inline; } }
 /* Le menu « Affichage » du Débutant : ses deux cases, puis le lien vers l'Expert. */
 .ind-dropdown-menu .menu-expert {
   display: block; width: calc(100% - 12px); margin: 6px; padding: 6px 10px; text-align: left;
