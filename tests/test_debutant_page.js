@@ -10,7 +10,8 @@
 //      « $82 », ni « 1.6B » — sur le graphique, dans la page (cartes ouvertes, menu ouvert), pour
 //      les 11 thèmes ; dans les bulles, un terme technique seulement avec son explication.
 //   4. RIEN NE SE CHEVAUCHE : les textes deux à deux, avec le badge du prix ; l'en-tête ; pas de
-//      défilement de côté à 390 et 360 px ; la barre d'outils sur deux rangées au plus.
+//      défilement de côté à 412, 390 et 360 px ; la barre d'outils sur deux rangées au plus (une au
+//      téléphone) ; l'en-tête en deux rangées au téléphone, « en retard » compris, rien de rogné.
 //   5. LE TEST DES 5 SECONDES : le prix (« 86 013 $ »), le verbe de la phrase, un repère de chaque
 //      côté du prix, « Scénario 1 », la variation 24 h visible au téléphone.
 //   6. ABSENTS en Débutant : compteur, pastille de la vue, régime, « Et ensuite ? », rangs 2, 3
@@ -305,7 +306,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
     // complet du dépôt de tests, où le rang 1 est déjà invalidé (seule la ligne en parle).
     for (const theme of ['aero', 'kala']) {
       const prev = theme === 'aero' ? 'ouvert' : 'complet';
-      for (const [vue, tactile] of [[{ width: 1440, height: 900 }, false], [{ width: 1024, height: 768 }, false], [{ width: 390, height: 844 }, true], [{ width: 360, height: 740 }, true]]) {
+      for (const [vue, tactile] of [[{ width: 1440, height: 900 }, false], [{ width: 1024, height: 768 }, false], [{ width: 412, height: 892 }, true], [{ width: 390, height: 844 }, true], [{ width: 360, height: 740 }, true]]) {
         const nom = vue.width + ' px · ' + theme;
         titre(nom);
         const o = await ouvrir(nav, { vue, theme, tactile, prev });
@@ -332,6 +333,10 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         check(`${nom} : couche de chaleur allumée en Expert, pas dessinée ici (données lues : ${chaleur.donnees})`, !chaleur.couche, chaleur);
         // 4. L'en-tête et la barre d'outils.
         const mise = await o.page.evaluate(() => {
+          // La pastille dans sa forme la plus longue (« Infos · en retard ▸ ») : c'est elle qui, à
+          // 412 px, poussait les boutons sur une 3e rangée.
+          const cy = document.getElementById('cycle'), etaitVieux = cy.classList.contains('vieux');
+          cy.classList.add('vieux');
           const vis = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
           const bs = [...document.querySelectorAll('.header button, .header a, .header .kpi-deb, #price, #var24')].filter(vis).map(el => ({ id: el.id || el.className, r: el.getBoundingClientRect() }));
           const ch = [];
@@ -346,11 +351,23 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
           for (const r of [...barre.children].filter(vis).map(c => c.getBoundingClientRect()).sort((a, b) => a.top - b.top)) {
             if (!tops.length || r.top >= tops[tops.length - 1].bas - 1) tops.push({ bas: r.bottom }); else tops[tops.length - 1].bas = Math.max(tops[tops.length - 1].bas, r.bottom);
           }
-          return { ch, page: [document.documentElement.scrollWidth, document.documentElement.clientWidth], tete: [hd.scrollWidth, hd.clientWidth], barre: [barre.scrollWidth, barre.clientWidth], rangees: tops.length };
+          const rangs = rs => { const t = []; for (const r of rs.slice().sort((a, b) => a.top - b.top)) { if (!t.length || r.top >= t[t.length - 1].bas - 1) t.push({ bas: r.bottom }); else t[t.length - 1].bas = Math.max(t[t.length - 1].bas, r.bottom); } return t.length; };
+          // Dans le cadre de l'en-tête, à 4 px de ses bords au moins (un coin trop rond rognait la paire).
+          const H = hd.getBoundingClientRect(), rognes = bs.filter(b => b.r.left < H.left + 4 || b.r.right > H.right - 4).map(b => b.id);
+          const res = { ch, page: [document.documentElement.scrollWidth, document.documentElement.clientWidth], tete: [hd.scrollWidth, hd.clientWidth], barre: [barre.scrollWidth, barre.clientWidth], rangees: tops.length,
+            rangsTete: rangs(bs.map(b => b.r)), rognes, rayon: parseFloat(getComputedStyle(hd).borderTopLeftRadius), hTete: H.height };
+          if (!etaitVieux) cy.classList.remove('vieux');
+          return res;
         });
         check(`${nom} : les boutons de l'en-tête ne se chevauchent pas`, !mise.ch.length, mise.ch);
         check(`${nom} : ni la page, ni l'en-tête, ni la barre d'outils ne défilent de côté ; barre sur 2 rangées au plus`,
           mise.page[0] <= mise.page[1] + 1 && mise.tete[0] <= mise.tete[1] + 1 && mise.barre[0] <= mise.barre[1] + 1 && mise.rangees <= 2, mise);
+        // Écran étroit : l'en-tête en deux rangées au plus (le prix, puis la pastille et les boutons),
+        // rien de rogné par ses coins ; la barre d'outils (six intervalles et « Affichage ») sur une
+        // seule rangée au téléphone.
+        check(`${nom} : pastille « en retard » comprise, l'en-tête tient en ${vue.width <= 480 ? 2 : 1} rangée(s) au plus (${mise.rangsTete}), rien de rogné par ses coins`,
+          mise.rangsTete <= (vue.width <= 480 ? 2 : 1) && !mise.rognes.length && (mise.rangsTete === 1 || mise.rayon < mise.hTete / 2 - 4), mise);
+        if (vue.width <= 480) check(`${nom} : la barre d'outils tient sur une rangée (${mise.rangees})`, mise.rangees === 1, mise);
         // 7. Les bulles : chaque texte, au survol ou au toucher.
         const bx = 20, by = e.mainH - 30;   // un point neutre (bas à gauche du tracé) pour quitter
         for (const [role, k] of [['niveau', 0], ['niveau', 1], ['phrase', 0], ['scenario', 0], ['boite', 0]]) {

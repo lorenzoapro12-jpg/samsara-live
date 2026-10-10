@@ -92,6 +92,19 @@ async function ouvrir(nav, vue, mode, tactile, sansScenarios) {
     return r.abort();
   });
   await page.addInitScript(m => { try { localStorage.clear(); localStorage.setItem('samsara-theme', 'aero'); localStorage.setItem('samsara-mode', m); } catch (e) { /* */ } }, mode);
+  // Les places réservées sur le tracé (E.rects, partagé par le Guide et les scénarios) qui se
+  // recouvrent de plus d'un pixel dans les deux sens.
+  await page.addInitScript(() => {
+    window.chevauchementsPlaces = () => {
+      const R = guideEtat ? guideEtat.rects : [], o = [];
+      for (let a = 0; a < R.length; a++) for (let b = a + 1; b < R.length; b++) {
+        const A = R[a], B = R[b], ix = Math.min(A.x + A.w, B.x + B.w) - Math.max(A.x, B.x), iy = Math.min(A.y + A.h, B.y + B.h) - Math.max(A.y, B.y);
+        if (ix > 1 && iy > 1) o.push([A, B].map(r => [r.x, r.y, r.w, r.h].map(Math.round)));
+      }
+      const B = typeof scenEtat !== 'undefined' && scenEtat && scenEtat.boite;
+      return { n: R.length, o, boite: B ? { x: Math.round(B.x), y: Math.round(B.y), w: Math.round(B.w), lignes: (B.lignes || []).map(l => l.t) } : null };
+    };
+  });
   await page.goto(`http://127.0.0.1:${serveur.address().port}/index.html`);
   await page.waitForFunction(() => typeof guideEtat !== 'undefined' && guideEtat && guideEtat.niveaux.length > 0 && typeof marketData !== 'undefined' && marketData, null, { timeout: 15000 }).catch(() => {});
   await page.waitForTimeout(600);
@@ -105,7 +118,7 @@ const etat = page => page.evaluate(() => {
   return {
     bx: b.left, by: b.top, exp: E.exp,
     niveaux: E.niveaux.map(L => ({ visible: L.visible, prix: L.niv.raisons.map(r => r.p), heures: L.niv.raisons.filter(r => isFinite(r.lu)).map(r => hh(r.lu)),
-      lignes: L.etiq ? L.etiq.lignes : null, sansPlace: (E.sansPlace || []).includes(L),
+      lignes: L.etiq ? L.etiq.lignes : null, etiq: L.etiq ? { enLigne: L.etiq.enLigne, sansEtat: !!L.etiq.sansEtat } : null, sansPlace: (E.sansPlace || []).includes(L),
       auBord: E.cibles.some(c => c.niveaux && c.niveaux.includes(L) && c.rects.length) })),
     chemins: E.chemins || null, suite: { haut: !!E.D.suite.haut, bas: !!E.D.suite.bas },
     cibles: E.cibles.map(c => ({ prio: c.prio, titre: c.titre, rects: c.rects || [] })),
@@ -169,7 +182,24 @@ const etat = page => page.evaluate(() => {
       });
       check(`${nom} : un côté sans niveau nommé — les deux côtés restent rendus, le vide est dit (« aucun niveau »)`, seul && seul.variante && (seul.variante === 'commune'
         ? /aucun/.test(seul.boites[0].lignes.join(' ')) : seul.boites.length === 2 && /aucun/.test(seul.boites.find(b => b.sens < 0).lignes.join(' '))), seul);
+      // 5. Rien ne se chevauche : les places réservées (libellés, bord, chemins, figures, scénarios et
+      // leur encadré) sont disjointes deux à deux — à 390 px comme à 1440 px, et à 360 px plus bas.
+      const places = await o.page.evaluate(() => { crossX = crossY = null; drawChart(); return chevauchementsPlaces(); });
+      check(`${nom} : aucune étiquette ne se pose sur une autre (${places.n} places)`, places.n > 3 && !places.o.length, places);
+      // Écran étroit : l'état d'une bande (« proche · … ») n'ajoute pas une ligne sous son libellé ;
+      // il est dans la bulle (« Maintenant : … »).
+      if (vue.width < 700) check(`${nom} : l'état de chaque bande est à côté de son libellé ou dans la bulle, jamais sur une ligne de plus`,
+        e.niveaux.filter(L => L.etiq).every(L => L.etiq.enLigne || L.etiq.sansEtat), e.niveaux.map(L => L.etiq));
       check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
+    titre('360 px · expert : rien ne se chevauche, même à l\'étroit');
+    {
+      const o = await ouvrir(nav, { width: 360, height: 740 }, 'expert');
+      const places = await o.page.evaluate(() => { crossX = crossY = null; drawChart(); return chevauchementsPlaces(); });
+      check(`360 px : aucune étiquette ne se pose sur une autre, l'encadré des scénarios compris (${places.n} places)`, places.n > 3 && !places.o.length && places.boite, places);
+      check('360 px : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
 

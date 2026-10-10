@@ -1199,3 +1199,31 @@ html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { orde
    en Débutant, une carte d'une seule tuile la montre en entier. */
 .env-exp { display: contents; }
 [data-mode="debutant"] .tuiles.deb-une { grid-template-columns: minmax(0, 1fr); }
+
+/* ─── Téléphone : l'en-tête et la barre tiennent en deux rangées, sans débord ──────────────
+   Un rayon de pilule (999 px) sur un bloc de deux rangées rognait la paire au bord gauche et
+   faisait une bulle : sur écran étroit, des coins de carte. */
+@media (max-width: 1100px) {
+  .header, .indicator-bar { border-radius: min(var(--r-bar), 22px); }
+  /* Débutant : « Infos · en retard ▸ » (le mot « du marché » cède) ; l'en-tête tient sur une rangée. */
+  [data-mode="debutant"] .kpi-deb .deb-mot { display: none; }
+}
+/* Tablette : le nom (redit dans la barre du bas) cède avant que l'en-tête passe à la ligne. */
+@media (max-width: 900px) { html[data-mode="debutant"]:not([data-structure]) .header-left h1 { display: none; } }
+@media (max-width: 480px) {
+  /* Débutant : 1re rangée, la paire, le prix et la variation ; 2e rangée, la pastille « Infos »
+     (qui cède, en entier puis en points de suspension) et les boutons (qui ne passent jamais à
+     une 3e rangée). */
+  html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-left { order: 1; }
+  html[data-mode="debutant"]:not([data-structure="fenetres"]) .kpis { flex: 0 1 auto; min-width: 0; height: auto; }
+  html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { flex: 0 0 auto; flex-wrap: nowrap; margin-left: auto; }
+  [data-mode="debutant"] .kpi-deb { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  /* La barre : les six intervalles et « Affichage » sur une seule rangée. */
+  [data-mode="debutant"] .indicator-bar { flex-wrap: nowrap; justify-content: space-between; gap: 2px; padding: 4px 6px; }
+  [data-mode="debutant"] .indicator-bar label { padding: 7px 7px; }
+  [data-mode="debutant"] .ind-dropdown-btn { padding: 7px 9px; gap: 3px; }
+}
+@media (max-width: 400px) {
+  [data-mode="debutant"] .indicator-bar label { padding: 6px 5px; }
+  [data-mode="debutant"] .ind-dropdown-btn { padding: 6px 7px; }
+}

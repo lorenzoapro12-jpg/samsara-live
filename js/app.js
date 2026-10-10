@@ -4323,7 +4323,7 @@ function guideTracer(E) {
  *  faut (une bande de cinq raisons dont deux publiées ne tient pas en trois lignes à 390 px ; la
  *  couper perdait l'heure de la dernière). Trop haut pour sa place, il est nommé au bord.
  *  L'état au prix live (calque) se pose à sa droite s'il y a la place, sinon sur la ligne du
- *  dessous. Le libellé reste près de SA bande : aucune autre bande entre eux, et les libellés
+ *  dessous (au téléphone : dans la bulle seulement). Le libellé reste près de SA bande : aucune autre bande entre eux, et les libellés
  *  gardent l'ordre des bandes de haut en bas. Une bande sans place est nommée au bord (guideBords). */
 function guideLibellesNiveaux(E, top, bas, surBougies) {
   const { g, xFin, xMax } = E, H = 15;
@@ -4346,8 +4346,11 @@ function guideLibellesNiveaux(E, top, bas, surBougies) {
     const etatPlein = ctx.measureText(Guide.texteEtatMax(E.mode, 'plein', L.niv.ferme)).width + 16;
     const etatMini = ctx.measureText(Guide.texteEtatMax(E.mode, 'mini', L.niv.ferme)).width + 16;
     const enLigne = lignes.length === 1 && wL + 3 + etatMini <= dispo;
-    const wR = enLigne ? Math.min(wL + 3 + etatPlein, dispo) : Math.max(wL, Math.min(etatPlein, dispo));
-    const h = (lignes.length + (enLigne ? 0 : 1)) * H;
+    // Écran étroit (téléphone) : l'état ne prend pas une ligne à lui sous le libellé — il est dans
+    // la bulle (« Maintenant : … », au toucher). Une ligne de moins par bande.
+    const sansEtat = etroit && !enLigne;
+    const wR = enLigne ? Math.min(wL + 3 + etatPlein, dispo) : sansEtat ? wL : Math.max(wL, Math.min(etatPlein, dispo));
+    const h = (lignes.length + (enLigne || sansEtat ? 0 : 1)) * H;
     const autres = vis.filter(M => M !== L);
     // Gêne stricte : l'ordre des libellés, une autre bande sous le libellé ou entre lui et sa bande.
     const ordre = r => r.y < yPrec;
@@ -4363,7 +4366,7 @@ function guideLibellesNiveaux(E, top, bas, surBougies) {
     const zones = [{ x0: g.pad.left, y0: L.yH - 3, x1: xMax, y1: L.yB + 3 }];
     if (!pose) { E.sansPlace.push(L); E.cibles.push({ rects: [], zones, prio: 1, niveau: L, titre: Guide.libelleNiveau(L.niv, 'debutant', E.unite), texte: guideTexteNiveau(L, E.exp) }); continue; }
     yPrec = pose.y;
-    L.etiq = { x, y: pose.y, w: wL, h: H, wR, lignes, enLigne };
+    L.etiq = { x, y: pose.y, w: wL, h: H, wR, lignes, enLigne, sansEtat };
     etiquettesAFaire.push(() => { ctx.font = chartFont(9, 600); guidePastilleL(ctx, x, pose.y, wL, lignes, COLORS.accent2, H); });
     E.cibles.push({ rects: [{ x0: x, y0: pose.y, x1: x + wR, y1: pose.y + h }], zones, prio: 1, niveau: L, titre: Guide.libelleNiveau(L.niv, 'debutant', E.unite), texte: guideTexteNiveau(L, E.exp) });
   }
@@ -4750,7 +4753,8 @@ function guideForme(E, f, surBougies) {
     const wT = ctx.measureText(texte).width + 14, place = xDroite - g.pad.left - 4;
     const w = Math.min(wT, place);
     lignes = w < wT ? guideLignes(ctx, texte, w - 12, 2) : [texte];
-    if (lignes.length > 2) continue;
+    // Écran étroit : le nom de la figure sur une ligne (le détail est dans la bulle).
+    if (lignes.length > (g.pw < 520 ? 1 : 2)) continue;
     const h = lignes.length * hL;
     const x0 = Math.max(g.pad.left + 2, Math.min(tr.xd - w / 2, xDroite - w));
     const bas1 = f.sens > 0 && Guide.famille(f) !== 'lignes';
@@ -4830,7 +4834,8 @@ function guideCalque() {
     const et = L.etiq, hLib = et.lignes.length * et.h;
     // La ligne du prix live passe sur le libellé : il est reposé au-dessus d'elle.
     if (yLive !== null && yLive > et.y - 3 && yLive < et.y + hLib + 3) guidePastilleL(cx, et.x, et.y, et.w, et.lignes, COLORS.accent2, et.h);
-    // L'état : à droite du libellé, ou sur la ligne du dessous (écran étroit).
+    if (et.sansEtat) continue;   // écran étroit : l'état est dans la bulle
+    // L'état : à droite du libellé, ou sur la ligne du dessous ; au téléphone, dans la bulle seulement.
     const x = et.enLigne ? et.x + et.w + 3 : et.x, yE = et.enLigne ? et.y : et.y + hLib, place = et.enLigne ? et.x + et.wR - x : et.wR;
     // Le texte du mode s'il tient, puis la forme courte, puis l'abrégé expert ; le mot d'abord.
     let t = null;
@@ -6331,6 +6336,21 @@ function scenBoite(S, top, bas) {
       }
       if (pose) break;
     }
+    if (!pose && F && g.pw < 520) {
+      // Écran étroit : plutôt qu'épinglée par-dessus une étiquette, la forme la plus courte d'abord,
+      // plus bas dans le tracé, sans couvrir d'étiquette (ni, si possible, les bougies récentes).
+      const micro = [{ t: 'Scén.' + (tactile ? ' · toucher ▸' : ' ▸'), f: 'titre', h: hL('titre') }];
+      for (const ls of essaisL.slice().reverse().concat([micro])) {
+        const f = mesurer(ls);
+        if ((pose = chercher(f.w, f.h, bas, gene[1], false) || chercher(f.w, f.h, bas, null, false))) { forme = f; break; }
+      }
+      // Toujours rien : par-dessus un tracé (chemin, figure) plutôt que sur une étiquette.
+      for (const ls of pose ? [] : essaisL.slice().reverse().concat([micro])) {
+        const f = mesurer(ls);
+        for (let x = S.xMax - f.w - 4; !pose && x >= g.pad.left + 2; x -= 16) for (let y = Math.max(top + 4, 38); !pose && y + f.h <= bas; y += 4) if (guideLibre(S.rects, { x, y, w: f.w, h: f.h })) pose = { x, y, w: f.w, h: f.h };
+        if (pose) { forme = f; break; }
+      }
+    }
     if (!pose) {
       // Toujours dit : épinglée en haut à droite (dans le tiers haut), par-dessus une étiquette du
       // Guide s'il le faut — jamais sur le libellé du rang 1.
@@ -7457,7 +7477,7 @@ function renderCycle(d) {
     // Débutant : une seule pastille, qui ouvre les cartes ; son âge dans l'infobulle (collé au prix
     // en direct, « il y a 18 min » se lisait comme l'âge du prix). « en retard » au-delà du seuil.
     + '<span class="kpi-deb debutant-seul" role="button" tabindex="0" title="' + titreKpiDeb(ageK) + '" aria-label="' + ariaKpiDeb(ageK) + '">'
-    + '<span class="deb-frais">Infos du marché ▸</span><span class="deb-retard">Infos du marché · en retard ▸</span></span>';
+    + '<span class="deb-frais">Infos du marché ▸</span><span class="deb-retard">Infos<span class="deb-mot"> du marché</span> · en retard ▸</span></span>';
   cy.classList.toggle('vieux', ageK !== null && ageK > CADENCES.vieux_min);
   const cad = chronique.cadence();
   cy.title = 'Dernière publication (cadence ' + (cad ? 'mesurée ' + Math.round(cad / 60000) : 'attendue ' + CADENCES.attendue_min) + ' min) — cliquer pour le détail';
