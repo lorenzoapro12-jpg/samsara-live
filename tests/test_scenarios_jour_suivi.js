@@ -17,12 +17,13 @@
 //   7. libellés Débutant d'un état : toujours « (en direct) » ou « (journal) », ≤ 32 caractères ;
 //      un range dont le prix est dans la marge : « tient jusqu’à … $ » ; la ligne ne montre jamais
 //      ⚠ comme ✗, et une réalisation notée par le journal porte « (journal) » ;
-//   8. bulles : l'heure d'une fermeture (heure de Paris) ; « seul » sur un range dit sa limite ;
+//   8. bulles : l'heure d'une fermeture (heure de l'appareil, Fmt.heure) ; « seul » sur un range dit sa limite ;
 //      version courte : le niveau de chaque scénario.
 // USAGE   node tests/test_scenarios_jour_suivi.js
 const fs = require('fs'), path = require('path');
 const S = require('../js/scenarios.js');
 const Guide = require('../js/guide.js');
+const Fm = require('../js/format.js');
 const FX = path.join(__dirname, 'fixtures');
 let ko = 0;
 const check = (nom, ok, det) => { if (!ok) ko++; console.log(`  ${ok ? '✓' : '✗'} ${nom}${!ok && det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 600) : ''}`); };
@@ -104,7 +105,9 @@ titre('3. « fini » : le journal a-t-il déjà noté ?');
   fj.scenarios.forEach((x, i) => { x.statut = ['✅', '✅', '❌'][i]; });
   const Fn = S.lire(fj, T0), now = Date.parse('2026-10-09T04:40Z');
   const J = S.classerJour(Fn.scenarios.map(sc => ({ sc, sv: S.etat(sc, S.suiviVide(Q), now) })), 82000, Fn, now, null, PJ);
-  check(`statuts notés : Expert « ${S.phraseJourExpert(J)[0]} »`, J.cas === 'fini' && /^Terminé à \d\d:\d\d UTC · noté par le journal$/.test(S.phraseJourExpert(J)[0]), S.phraseJourExpert(J));
+  // La fin du fichier (09/10 04:20 UTC), à l'heure de l'appareil, sans « UTC ».
+  const hFin = Fm.heure(Date.parse('2026-10-09T04:20Z'));
+  check(`statuts notés : Expert « ${S.phraseJourExpert(J)[0]} »`, J.cas === 'fini' && S.phraseJourExpert(J)[0] === 'Terminé à ' + hFin + ' · noté par le journal', S.phraseJourExpert(J));
   check(`statuts notés : Débutant « ${S.texteResteDebutant(J, now)} »`, /le journal les a notés\.$/.test(S.texteResteDebutant(J, now)) && !/suivra/.test(S.texteResteDebutant(J, now)), S.texteResteDebutant(J, now));
   const J2 = S.classerJour(F08.scenarios.map(sc => ({ sc, sv: S.etat(sc, S.suiviVide(Q), now) })), 82000, F08, now, null, PJ);
   check('statuts encore ⏳ : « note du journal à venir » / « la note du journal suivra »', /note du journal à venir$/.test(S.phraseJourExpert(J2)[0]) && /la note du journal suivra\.$/.test(S.texteResteDebutant(J2, now)), [S.phraseJourExpert(J2), S.texteResteDebutant(J2, now)]);
@@ -211,10 +214,11 @@ titre('7. Libellés et ligne Débutant : marques, ⚠, journal, marge d’un ran
     if (nom === 'journal ⚠') check('journal ⚠ : « indécis », jamais ✗', S.libellesJourDebutant(y, 32, null).every(t => !/✗/.test(t)));
   }
   check('libellés : aucun « atteint », aucun mot banni', tous.every(t => !/atteint/.test(t) && !Guide.motsBannis(t).length), tous.filter(t => /atteint/.test(t)));
-  // Heure de la fermeture dans le libellé (Paris).
+  // Heure de la fermeture dans le libellé (heure de l'appareil).
   const Jh = S.classerJour([it(b, sv('invalide', 0, { t: Date.parse('2026-10-08T15:15Z') })), it(a, sv('dedans')), it(c, sv('rien'))], 100000, F, Date.parse('2026-10-08T15:40Z'), { grille: true, sortiTot: true, prec: 'X1', cas: 'meneur' }, PJ);
   const Lh = S.libellesJourDebutant(Jh.items.find(i => i.sc === b), 32, null);
-  check(`fermeture : l’heure de Paris dans le libellé (« ${Lh[0]} »)`, /vers 17h15 \(en direct\)$/.test(Lh[0]), Lh);
+  const hF = Fm.heure(Date.parse('2026-10-08T15:15Z'));
+  check(`fermeture : l’heure de l’appareil dans le libellé (« ${Lh[0]} », attendu « vers ${hF} »)`, Lh[0].endsWith(' vers ' + hF + ' (en direct)') && !/UTC|Paris/.test(Lh.join(' ')), Lh);
   // Ligne : ⚠ du journal sur le rang 1.
   const fa = JSON.parse(JSON.stringify(X08.fichier)); fa.scenarios[0].statut = '⚠';
   const FA = S.lire(fa, T0), xa = instant(FA, k15, '2026-10-08T14:05Z');
@@ -237,7 +241,9 @@ titre('8. Bulles Débutant : heure des fermetures, « seul » d’un range, vers
 {
   const x = instant(F08, k15, '2026-10-08T15:40Z');
   const l3 = S.ligneDebutantJour(x.J.items[2], x.J), l3c = S.ligneDebutantJour(x.J.items[2], x.J, true);
-  check(`fermeture : l’heure de Paris (« ${l3.slice(0, 160)} … »)`, /\(en direct\) entre \d\dh\d\d et \d\dh\d\d \(heure de Paris\)/.test(l3) && /entre \d\dh\d\d et \d\dh\d\d \(heure de Paris\)/.test(l3c), [l3, l3c]);
+  // Le créneau de la bougie du contact (15:15–15:30 UTC), à l'heure de l'appareil, sans fuseau écrit.
+  const cr3 = 'entre ' + Fm.heure(Date.parse('2026-10-08T15:15Z')) + ' et ' + Fm.heure(Date.parse('2026-10-08T15:30Z'));
+  check(`fermeture : l’heure de l’appareil (« ${l3.slice(0, 160)} … », attendu « ${cr3} »)`, l3.includes('(en direct) ' + cr3 + ' :') && l3c.includes(cr3 + ' :') && !/UTC|Paris/.test(l3 + l3c), [l3, l3c]);
   const sl = S.phraseMeneurDebutant(x.J);
   check(`« seul » d’un range : « ${sl} »`, x.J.cas === 'seul' && x.J.seul.sc.forme === 'range' && !/ce qu’il décrit/.test(sl), sl);
   const xs = instant(F08, k15, '2026-10-08T15:25Z');

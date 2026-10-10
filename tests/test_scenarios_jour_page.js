@@ -11,7 +11,8 @@
 //        classement ne change pas pendant la journée », « pas de nouvelle prévision » ; aucun mot
 //        banni, aucun « % » ; aucune marque dessinée pour un scénario qui n'est pas montré ;
 //      · Expert : « Seul encore en cours : 1 », les distances en $ sur la ligne ouverte, les
-//        pastilles « ✓ 15:15–15:30 UTC » (le 2) et « ✗ S3 15:15–15:30 UTC » (le 3), le fondu du 3
+//        pastilles « ✓ S2 15:15–15:30 » (le 2) et « ✗ S3 15:15–15:30 » (le 3) — créneaux dits à l'heure
+//        de l'appareil (Fmt.heure, attendus calculés : ici en UTC), sans « UTC » —, le fondu du 3
 //        parti de la CLÔTURE (15:30) : 0,83 ; ni « écart 0,xx » ni « en tête » (A2) ;
 //   2. 17:40 (le 1 sorti, le 2 réalisé) : Débutant, libellé « Scénario 2 : zone 80 806 $ ✓ » (A3,
 //      jamais « atteint »), ligne du cas F, une coche dessinée ; Expert, la pastille ✗ du 1 ;
@@ -27,6 +28,10 @@ const H = require('./scenarios-jour-harnais');
 const S = require('../js/scenarios.js');
 const X = require('./fixtures/rejeu-jour-0810.json');
 const { motsBannis } = require('../js/guide.js');
+const Fm = require('../js/format.js');
+/** Le créneau court d'une bougie de 15 min commencée à iso, à l'heure de l'appareil (le jour devant
+ *  s'il n'est pas celui de maintenant), comme Scenarios.creneau. */
+const creneauVu = (iso, maintenant) => { const t = Date.parse(iso), m = Date.parse(maintenant); return (Fm.memeJour(t, m) ? '' : Fm.jour(t) + ' ') + Fm.heure(t) + '–' + Fm.heure(t + 900000); };
 
 if (!H.playwright) {
   console.log('  − NON EXÉCUTÉ : Playwright introuvable — la journée des scénarios n\'est pas vérifiée à l\'écran sur ce poste.');
@@ -101,8 +106,9 @@ const capt = async (o, nom) => { if (process.env.SCEN_CAPTURES) await o.page.scr
         check(`${nom} : la ligne du 1 (ouvert) dit sa distance en $ (« bord toléré à … $ »)`, txt.some(l => /^1\. .*bord toléré à [\d  ]+ \$/.test(l)), txt);
         const m2 = (e.items.find(i => i.rang === '2') || {}).marques || [], m3 = (e.items.find(i => i.rang === '3') || {}).marques || [];
         // Changé délibérément (revue) : la coche nomme son scénario (deux marques au même point se confondaient).
-        check(`${nom} : pastille « ✓ S2 15:15–15:30 UTC » sur le 2`, m2.some(m => m.ok && m.texte === '✓ S2 15:15–15:30 UTC'), m2);
-        check(`${nom} : pastille « ✗ S3 15:15–15:30 UTC » sur le 3`, m3.some(m => !m.ok && m.texte === '✗ S3 15:15–15:30 UTC'), m3);
+        const c1515 = creneauVu('2026-10-08T15:15:00Z', '2026-10-08T15:40:00Z');
+        check(`${nom} : pastille « ✓ S2 ${c1515} » sur le 2 (heure de l’appareil, sans « UTC »)`, m2.some(m => m.ok && m.texte === '✓ S2 ' + c1515), m2);
+        check(`${nom} : pastille « ✗ S3 ${c1515} » sur le 3 (heure de l’appareil, sans « UTC »)`, m3.some(m => !m.ok && m.texte === '✗ S3 ' + c1515), m3);
         const l3 = e.libelles.find(l => l.rang === '3');
         check(`${nom} : le libellé du 3 dit pourquoi il est fermé`, !l3 || /invalid|touch|zone|sorti/i.test(l3.t), l3);
         check(`${nom} : ni « écart 0,xx » ni « en tête » sur le tracé ni dans l'encadré (A2)`, !tout.some(t => A2.test(t)), tout.filter(t => A2.test(t)));
@@ -137,7 +143,9 @@ const capt = async (o, nom) => { if (process.env.SCEN_CAPTURES) await o.page.scr
         check(`17:40 · ${nom} : au plus 5 textes, aucun « % »`, T.length <= 5 && !T.some(t => /%/.test(t)), T);
       } else {
         const m1 = (e.items.find(i => i.rang === '1') || {}).marques || [];
-        check(`17:40 · ${nom} : la pastille ✗ du 1`, m1.some(m => !m.ok && /^✗ S1 \d\d:\d\d–\d\d:\d\d UTC$/.test(m.texte || '')), m1);
+        // Le 1 est sorti dans la bougie de 17:15 UTC : son créneau, à l'heure de l'appareil.
+        const c1715 = creneauVu('2026-10-08T17:15:00Z', '2026-10-08T17:40:00Z');
+        check(`17:40 · ${nom} : la pastille ✗ du 1 (« ✗ S1 ${c1715} »)`, m1.some(m => !m.ok && m.texte === '✗ S1 ' + c1715), m1);
       }
       await H.avancer(o, h, '2026-10-08T18:40:00Z');
       e = await H.lire(o.page);

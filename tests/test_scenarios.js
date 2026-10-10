@@ -1,7 +1,8 @@
 // Scénarios du matin (js/scenarios.js) — hors ligne : le cœur pur, puis son câblage dans la page.
 //
 // CE QUI EST VÉRIFIÉ
-//   1. formats : « 84 120 $ », heures UTC et de Paris, jour du groupe ;
+//   1. formats : « 84 120 $ », heures de l'appareil (Fmt.heure : les attentes sont calculées, elles
+//      tiennent dans tout fuseau), le point du matin (heure de la routine, à Paris) converti en instant ;
 //   2. lecture du fichier : complet, d'attente, ancien, mal formé, format inconnu — rien d'inventé ;
 //   3. suivi en direct (même règle que noter.py) : une bougie touche une zone si [bas, haut] la
 //      recoupe ; cibles dans l'ordre (chaîne stricte), invalidation d'abord, même bougie = ordre
@@ -18,6 +19,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const REPO = path.resolve(__dirname, '..');
 const S = require(path.join(REPO, 'js/scenarios.js'));
+const Fm = require(path.join(REPO, 'js/format.js'));
 const { chargerPage } = require('./bac');
 
 let ko = 0;
@@ -39,11 +41,17 @@ const ms = s => Date.parse(s);
 const EMIS = ms(FIX.emis_utc), H3 = EMIS + 3 * 3600e3;
 
 // ── 1. Formats ──
-titre('1. Formats : « 84 120 $ », heures UTC et de Paris');
+titre('1. Formats : « 84 120 $ », heures de l’appareil');
 check('84120 → « 84 120 $ » (espace simple, jamais insécable) ; 0,5 → « 0,5 $ »', S.prix(84120) === '84 120 $' && S.prix(0.5) === '0,5 $', [S.prix(84120), S.prix(0.5)]);
 check('aucun prix ne commence par « $ »', ![S.prix(1), S.prix(84120.5), S.prix(99999)].some(x => /^\$/.test(x)));
-check('04:40Z → « 04:40 » UTC et « 06h40 » à Paris (heure d’été) ; 05:00Z en hiver → « 06h00 »',
-  S.heureUTC(ms('2026-10-09T04:40Z')) === '04:40' && S.heureParis(ms('2026-10-09T04:40Z')) === '06h40' && S.heureParis(ms('2026-12-09T05:00Z')) === '06h00');
+check('heures affichées : celles de l’appareil (Fmt.heure), sans fuseau écrit ; instant absent → null',
+  [ms('2026-10-09T04:40Z'), ms('2026-12-09T05:00Z')].every(x => S.heureVue(x) === Fm.heure(x) && /^\d\d:\d\d$/.test(S.heureVue(x))) && S.heureVue(NaN) === '—');
+// Les deux noms exportés que js/app.js fait suivre de « UTC » ou « Paris » gardent leur sens exact
+// (sinon la page dirait « 06:40 UTC » pour une heure de Paris).
+check('noms exportés pour la page : 04:40Z → « 04:40 » UTC et « 06h40 » à Paris (heure d’été) ; 05:00Z en hiver → « 06h00 »',
+  S.heureUTC(ms('2026-10-09T04:40Z')) === '04:40' && S.heureParis(ms('2026-10-09T04:40Z')) === '06h40' && S.heureParis(ms('2026-12-09T05:00Z')) === '06h00' && S.heureParis(NaN) === null);
+check('point du matin « 07h00 » (heure de la routine, à Paris) → 05:00Z en heure d’été, 06:00Z en hiver',
+  S.pointMs('2026-10-09', '07h00') === ms('2026-10-09T05:00Z') && S.pointMs('2026-12-09', '07h00') === ms('2026-12-09T06:00Z') && isNaN(S.pointMs('x', '07h00')), [S.pointMs('2026-10-09', '07h00'), S.pointMs('2026-12-09', '07h00')]);
 check('groupe « 2026-10-09 » → « 09/10 »', S.jourGroupe('2026-10-09') === '09/10');
 check('dates : « 2026-10-09T04:40Z » lue, une date sans fuseau refusée', S.dateUTC('2026-10-09T04:40Z') === Date.UTC(2026, 9, 9, 4, 40) && isNaN(S.dateUTC('2026-10-09T04:40')));
 
@@ -55,7 +63,8 @@ titre('2. Lecture : complet, attente, ancien, mal formé');
   check('zones = niveau × (1 ± marge) ; range : bornes ± marge', Math.abs(F.scenarios[0].zones.cibles[0][0] - 86500 * 0.997) < 1e-6 && Math.abs(F.scenarios[0].zones.cibles[0][1] - 86500 * 1.003) < 1e-6
     && Math.abs(F.scenarios[2].zones.bas - 85600 * 0.997) < 1e-6 && Math.abs(F.scenarios[2].zones.haut - 86400 * 1.003) < 1e-6);
   check('bilan de l’ordre lu tel quel (1 matin, 0 juste)', F.bilan && F.bilan.matins === 1 && F.bilan.reussis === 0);
-  check('titre : « Scénarios du matin · 09/10 ' + P.point + ' Paris »', t(S.titre(F, P, H3)) === 'Scénarios du matin · 09/10 ' + P.point + ' Paris', S.titre(F, P, H3));
+  const tp = S.pointMs(F.groupe, P.point), titreAttendu = 'Scénarios du matin · ' + Fm.jour(tp) + ' ' + Fm.heure(tp);
+  check('titre : « ' + titreAttendu + ' » (le point du matin à l’heure de l’appareil, sans « Paris »)', t(S.titre(F, P, H3)) === titreAttendu, S.titre(F, P, H3));
   const tard = ms('2026-10-10T08:00Z'), Fa = S.lire(copie(FIX), tard);
   check('après la fin des rangs 1 à 3 : « ancien », titre « Scénarios d’hier (terminés) · semaine en cours » (la semaine court encore)', Fa.ancien === true && t(S.titre(Fa, P, tard)) === 'Scénarios d’hier (terminés) · semaine en cours', S.titre(Fa, P, tard));
   const Fv = S.lire(copie(FIX), ms('2026-10-13T08:00Z'));
@@ -114,7 +123,7 @@ function bougies(hl, avant) {
   return { T, H, L, n: T.length };
 }
 const suivre = (sc, b, maintenant) => S.suivre(sc, b.T, b.H, b.L, b.n, maintenant === undefined ? E0 + 3600e3 : maintenant);
-const heureDe = k => S.heureUTC(E0 + k * PAS * 1000);
+const heureDe = k => Fm.heure(E0 + k * PAS * 1000);   // l'heure de l'appareil du début de la bougie k
 const mots = (sc, sv) => t(S.texteEtat(sc, sv, null, 'debutant', { itv: '15 min' }).texte);
 {
   const avantSeul = suivre(chemin, bougies([], [[112, 98]]));
@@ -125,20 +134,20 @@ const mots = (sc, sv) => t(S.texteEtat(sc, sv, null, 'debutant', { itv: '15 min'
   const bord = suivre(chemin, bougies([[99, 95]]));
   check('le bord compte : un plus haut à 99,0 touche la zone [99 ; 101]', bord.cle === 'cible' && bord.k === 1, bord);
   const c1 = suivre(chemin, bougies([[96, 94], [100.5, 96]]));
-  check('1re cible touchée : « 1re cible touchée à ' + heureDe(1) + ' UTC »', c1.cle === 'cible' && mots(chemin, c1) === '1re cible touchée à ' + heureDe(1) + ' UTC', mots(chemin, c1));
+  check('1re cible touchée : « 1re cible touchée à ' + heureDe(1) + ' »', c1.cle === 'cible' && mots(chemin, c1) === '1re cible touchée à ' + heureDe(1), mots(chemin, c1));
   const ok = suivre(chemin, bougies([[96, 94], [100.5, 96], [105, 100], [109, 104], [104, 92]]));
-  check('cibles dans l’ordre puis invalidation plus tard : « réalisé à » la 2e cible', ok.cle === 'realise' && mots(chemin, ok) === 'réalisé à ' + heureDe(3) + ' UTC', [ok.cle, mots(chemin, ok)]);
+  check('cibles dans l’ordre puis invalidation plus tard : « réalisé à » la 2e cible', ok.cle === 'realise' && mots(chemin, ok) === 'réalisé à ' + heureDe(3), [ok.cle, mots(chemin, ok)]);
   const meme = suivre(chemin, bougies([[96, 94], [109, 99]]));
   check('les deux cibles dans la même bougie : 1re touchée, « la suivante dans la même bougie, ordre inconnu » (chaîne stricte non complète)',
     meme.cle === 'cible' && meme.k === 1 && meme.memeBougie && /la suivante dans la même bougie, ordre inconnu/.test(mots(chemin, meme)), [meme.cle, meme.k, mots(chemin, meme)]);
   const ensuite = suivre(chemin, bougies([[96, 94], [109, 99], [110, 105]]));
   check('… puis la 2e dans une bougie plus tardive : « réalisé »', ensuite.cle === 'realise', ensuite.cle);
   const inv = suivre(chemin, bougies([[96, 94], [95, 90.5], [101, 96]]));
-  check('invalidation d’abord : « invalidation touchée d’abord à ' + heureDe(1) + ' UTC »', inv.cle === 'invalide' && !inv.premier && mots(chemin, inv) === 'invalidation touchée d’abord à ' + heureDe(1) + ' UTC', mots(chemin, inv));
+  check('invalidation d’abord : « invalidation touchée d’abord à ' + heureDe(1) + ' »', inv.cle === 'invalide' && !inv.premier && mots(chemin, inv) === 'invalidation touchée d’abord à ' + heureDe(1), mots(chemin, inv));
   const puis = suivre(chemin, bougies([[100, 96], [95, 90]]));
   check('1re cible puis invalidation : « 1re cible, puis invalidation à … »', puis.cle === 'invalide' && puis.premier && /^1re cible, puis invalidation à /.test(mots(chemin, puis)), mots(chemin, puis));
   const amb = suivre(chemin, bougies([[96, 94], [100, 90]]));
-  check('cible et invalidation dans la même bougie : « une cible et l’invalidation dans la même bougie (…) : ordre inconnu »', amb.cle === 'ambigu' && /^une cible et l’invalidation dans la même bougie \(\d\d:\d\d UTC\) : ordre inconnu$/.test(mots(chemin, amb)), [amb.cle, mots(chemin, amb)]);
+  check('cible et invalidation dans la même bougie : « une cible et l’invalidation dans la même bougie (…) : ordre inconnu »', amb.cle === 'ambigu' && mots(chemin, amb) === 'une cible et l’invalidation dans la même bougie (' + heureDe(1) + ') : ordre inconnu', [amb.cle, mots(chemin, amb)]);
   const apresFin = bougies(Array.from({ length: 81 }, (_, k) => (k === 80 ? [120, 80] : [96, 94])));
   check('une bougie ouverte à la fin du scénario ne compte pas', suivre(chemin, apresFin).cle === 'rien', suivre(chemin, apresFin).cle);
   const fini = suivre(chemin, bougies([[96, 94]]), FIN + 3600e3);
@@ -156,11 +165,11 @@ titre('4. Range : dedans, borne dépassée (au-delà de la marge)');
   const dedans = suivre(range, bougies([[110.5, 99.5], [111, 99.1]]));
   check('dans les bornes ± marge (99 – 111,1) : « dedans · aucune borne dépassée »', dedans.cle === 'dedans' && mots(range, dedans) === 'dedans · aucune borne dépassée', [dedans.cle, mots(range, dedans)]);
   const bas = suivre(range, bougies([[105, 101], [102, 99]]));
-  check('plus bas à 99 : « borne basse dépassée à ' + heureDe(1) + ' UTC »', bas.cle === 'sortie' && mots(range, bas) === 'borne basse dépassée à ' + heureDe(1) + ' UTC', mots(range, bas));
+  check('plus bas à 99 : « borne basse dépassée à ' + heureDe(1) + ' »', bas.cle === 'sortie' && mots(range, bas) === 'borne basse dépassée à ' + heureDe(1), mots(range, bas));
   const haut = suivre(range, bougies([[111.1, 105]]));
   check('plus haut à 111,1 : « borne haute dépassée à … »', haut.cle === 'sortie' && /^borne haute dépassée à /.test(mots(range, haut)), mots(range, haut));
   const deux = suivre(range, bougies([[112, 98]]));
-  check('les deux bornes dans une bougie : « les deux bornes dépassées dans la même bougie (…) : ordre inconnu »', deux.cle === 'ambigu' && /^les deux bornes dépassées dans la même bougie \(\d\d:\d\d UTC\) : ordre inconnu$/.test(mots(range, deux)), mots(range, deux));
+  check('les deux bornes dans une bougie : « les deux bornes dépassées dans la même bougie (…) : ordre inconnu »', deux.cle === 'ambigu' && mots(range, deux) === 'les deux bornes dépassées dans la même bougie (' + heureDe(0) + ') : ordre inconnu', mots(range, deux));
   const garde = suivre(range, bougies([[112, 105], [104, 98]]));
   check('la 1re sortie est gardée (haute), pas la suivante', garde.cle === 'sortie' && garde.sortie.haut && !garde.sortie.bas, garde.sortie);
 }
@@ -173,7 +182,8 @@ titre('4 bis. Bougies entières dans la fenêtre, créneau d’une bougie, bougi
   // 4 h : la bougie de 04:00 contient le point (04:40) : elle ne compte pas, même si elle touche la cible 1.
   const d4 = Date.UTC(2026, 9, 9, 4, 0), b4 = col(d4, P4, [[100.5, 96], [96, 94]]);
   const s4 = S.suivre(chemin, b4.T, b4.H, b4.L, b4.n, E0 + 5 * 3600e3, P4);
-  check('bougie 4 h qui contient le point : ignorée (rien de touché, depuis 08:00 UTC)', s4.cle === 'rien' && t(S.texteEtat(chemin, s4, null, 'debutant', { itv: '4 h' }).texte) === 'en cours · rien de touché depuis 08:00 UTC (bougies 4 h)', [s4.cle, S.texteEtat(chemin, s4, null, 'debutant', { itv: '4 h' }).texte]);
+  const h8 = Fm.heure(d4 + P4);
+  check('bougie 4 h qui contient le point : ignorée (rien de touché, depuis ' + h8 + ', la bougie suivante)', s4.cle === 'rien' && t(S.texteEtat(chemin, s4, null, 'debutant', { itv: '4 h' }).texte) === 'en cours · rien de touché depuis ' + h8 + ' (bougies 4 h)', [s4.cle, S.texteEtat(chemin, s4, null, 'debutant', { itv: '4 h' }).texte]);
   // 1 h : la bougie de 00:00 déborde la fin (00:40) : ce qu'elle fait après la fin ne compte pas.
   const d1 = Date.UTC(2026, 9, 10, 0, 0), b1 = col(d1 - 2 * P1, P1, [[96, 94], [96, 94], [96, 89]]);
   check('bougie 1 h qui déborde la fin du scénario : ignorée', S.suivre(chemin, b1.T, b1.H, b1.L, b1.n, d1 + P1, P1).cle === 'rien');
@@ -182,13 +192,15 @@ titre('4 bis. Bougies entières dans la fenêtre, créneau d’une bougie, bougi
   const b15 = col(E0 + 15 * 60e3, P15, [[96, 94], [100.5, 96]]);
   const s15 = S.suivre(chemin, b15.T, b15.H, b15.L, b15.n, E0 + 3600e3, P15);
   const e15 = S.texteEtat(chemin, s15, null, 'debutant', { itv: '15 min', maintenant: E0 + 3600e3 });
-  check('bougie 15 min : « 1re cible touchée entre 05:10 et 05:25 UTC » ; court « 1re cible 05:10–05:25 UTC »', t(e15.texte) === '1re cible touchée entre 05:10 et 05:25 UTC' && e15.court === '1re cible 05:10–05:25 UTC', [e15.texte, e15.court]);
+  const hA = Fm.heure(E0 + 30 * 60e3), hB = Fm.heure(E0 + 45 * 60e3);
+  check('bougie 15 min : « 1re cible touchée entre ' + hA + ' et ' + hB + ' » ; court « 1re cible ' + hA + '–' + hB + ' »', t(e15.texte) === '1re cible touchée entre ' + hA + ' et ' + hB && e15.court === '1re cible ' + hA + '–' + hB, [e15.texte, e15.court]);
   const lendemain = S.texteEtat(chemin, s15, null, 'debutant', { itv: '15 min', maintenant: E0 + 24 * 3600e3 });
-  check('vu le lendemain : le jour est dit (« 09/10 05:10 »)', /entre 09\/10 05:10 et 05:25 UTC/.test(lendemain.texte), lendemain.texte);
+  check('vu le lendemain : le jour est dit (« ' + Fm.jour(E0 + 30 * 60e3) + ' ' + hA + ' »)', lendemain.texte.includes('entre ' + Fm.jour(E0 + 30 * 60e3) + ' ' + hA + ' et ' + hB) && !/UTC|Paris/.test(lendemain.texte), lendemain.texte);
   const inv15 = S.suivre(chemin, ...(b => [b.T, b.H, b.L, b.n])(col(E0 + 5 * 60e3, P15, [[95, 90]])), E0 + 3600e3, P15);
   const pui15 = S.suivre(chemin, ...(b => [b.T, b.H, b.L, b.n])(col(E0 + 5 * 60e3, P15, [[100, 96], [95, 90]])), E0 + 3600e3, P15);
   check('court : « invalidation d’abord … » contre « 1re cible, puis invalidation … » (jamais le même mot)',
-    /^invalidation d’abord 04:45–05:00 UTC$/.test(S.texteEtat(chemin, inv15, null, 'debutant', {}).court) && /^1re cible, puis invalidation 05:00–05:15 UTC$/.test(S.texteEtat(chemin, pui15, null, 'debutant', {}).court),
+    S.texteEtat(chemin, inv15, null, 'debutant', {}).court === 'invalidation d’abord ' + Fm.heure(E0 + 5 * 60e3) + '–' + Fm.heure(E0 + 20 * 60e3)
+    && S.texteEtat(chemin, pui15, null, 'debutant', {}).court === '1re cible, puis invalidation ' + Fm.heure(E0 + 20 * 60e3) + '–' + Fm.heure(E0 + 35 * 60e3),
     [S.texteEtat(chemin, inv15, null, 'debutant', {}).court, S.texteEtat(chemin, pui15, null, 'debutant', {}).court]);
   const lg = S.etatLarge(chemin, P4, E0 + 3600e3);
   check('bougies de 4 h : pas d’état, « suivi en direct indisponible sur les bougies 4 h (trop larges) : il se lit en 15 min ou 1 h »',
@@ -221,8 +233,9 @@ titre('4 ter. Historique qui ne remonte pas au point, marque « en direct » hor
   check('… manque() le voit : historique incomplet', S.manque(chemin, T[0] * 1000, P1m));
   const inc = S.etatIncomplet(chemin, P1m, E0 + 9 * 3600e3, T[0] * 1000);
   const ti = S.texteEtat(chemin, inc, null, 'debutant', { itv: '1 min', maintenant: E0 + 9 * 3600e3 });
-  check('« suivi en direct incomplet sur les bougies 1 min (historique chargé depuis 10:40 UTC, après le point) : il se lit en 15 min »',
-    t(ti.texte) === 'suivi en direct incomplet sur les bougies 1 min (historique chargé depuis 10:40 UTC, après le point) : il se lit en 15 min', ti.texte);
+  const h6 = Fm.heure(E0 + 6 * 3600e3);
+  check('« suivi en direct incomplet sur les bougies 1 min (historique chargé depuis ' + h6 + ', après le point) : il se lit en 15 min »',
+    t(ti.texte) === 'suivi en direct incomplet sur les bougies 1 min (historique chargé depuis ' + h6 + ', après le point) : il se lit en 15 min', ti.texte);
   check('incomplet : jamais « réalisé », « invalid… » ni « ordre » ; le scénario reste ouvert (pas d’affirmation)', !/réalisé|invalid|ordre/.test(ti.texte + ti.court + ti.mini) && S.ouvert(chemin, inc, E0 + 9 * 3600e3));
   // La page : scenSuivi() sur des bougies 1 min qui commencent après le point → « incomplet ».
   const pg = chargerPage(), run = c => vm.runInContext(c, pg.sandbox);
@@ -278,7 +291,7 @@ titre('5. Note du journal (statut du fichier) AVANT le suivi en direct');
   const enDirect = suivre(sc, bougies([[95, 89]]));         // le suivi dirait « invalidation d'abord »
   const e = S.texteEtat(sc, enDirect, F.statuts, 'debutant', { itv: '15 min' });
   t(e.texte);
-  check('statut ✅ : la note officielle passe, avec le libellé DU FICHIER et son heure', e.officiel && e.texte === 'note du journal : réalisé (journal) (1re cible touchée avant l’invalidation) · 09:15 UTC', e.texte);
+  check('statut ✅ : la note officielle passe, avec le libellé DU FICHIER et son heure', e.officiel && e.texte === 'note du journal : réalisé (journal) (1re cible touchée avant l’invalidation) · ' + Fm.heure(ms('2026-10-09T09:15Z')), e.texte);
   check('… et la ligne de l’encadré la montre', /note du journal : réalisé \(journal\)/.test(t(S.ligne(sc, e, 'debutant'))));
   const ex = t(S.explication(sc, enDirect, 'debutant', P, { itv: '15 min', statuts: F.statuts }));
   check('l’explication dit les deux : le suivi en direct (un affichage) et la note du journal', ex.some(l => /^Suivi en direct sur les bougies 15 min/.test(l) && /la note officielle est celle du journal/.test(l)) && ex.some(l => /^Note du journal : réalisé \(journal\)/.test(l)), ex);
@@ -286,14 +299,14 @@ titre('5. Note du journal (statut du fichier) AVANT le suivi en direct');
   check('statut ⏳ : le suivi en direct, jamais présenté comme une note', S.texteEtat(enCours, enDirect, null, 'debutant', {}).officiel === false);
   const r = fichier([{ forme: 'range', range: [100, 110], statut: '❌', premier_ok: 'bas', resolu_utc: '2026-10-09T09:15Z' }]);
   const sr = S.lire(r, E0).scenarios[0];
-  check('range noté ❌ : « note du journal : invalidé (sorti par le bas) · 09:15 UTC »', t(S.texteEtat(sr, null, null, 'debutant', {}).texte) === 'note du journal : invalidé (sorti par le bas) · 09:15 UTC', S.texteEtat(sr, null, null, 'debutant', {}).texte);
+  check('range noté ❌ : « note du journal : invalidé (sorti par le bas) · ' + Fm.heure(ms('2026-10-09T09:15Z')) + ' »', t(S.texteEtat(sr, null, null, 'debutant', {}).texte) === 'note du journal : invalidé (sorti par le bas) · ' + Fm.heure(ms('2026-10-09T09:15Z')), S.texteEtat(sr, null, null, 'debutant', {}).texte);
   // ❌ du journal = invalidation avant la fin de la chaîne : la 1re cible a pu être touchée d'abord.
   const noteC = (statut, premier) => S.lire(fichier([{ forme: 'chemin', cibles: [100, 110], invalidation: 90, statut, premier_ok: premier, resolu_utc: '2026-10-09T22:45Z' }]), E0).scenarios[0];
   const st = { '❌': 'invalidé d’abord' };
   check('chemin ❌ + premier_ok « oui » : « invalidé après la 1re cible (1re cible touchée d’abord) » — jamais « invalidé d’abord »',
-    t(S.texteEtat(noteC('❌', 'oui'), null, st, 'debutant', {}).texte) === 'note du journal : invalidé après la 1re cible (1re cible touchée d’abord) · 22:45 UTC', S.texteEtat(noteC('❌', 'oui'), null, st, 'debutant', {}).texte);
+    t(S.texteEtat(noteC('❌', 'oui'), null, st, 'debutant', {}).texte) === 'note du journal : invalidé après la 1re cible (1re cible touchée d’abord) · ' + Fm.heure(ms('2026-10-09T22:45Z')), S.texteEtat(noteC('❌', 'oui'), null, st, 'debutant', {}).texte);
   check('chemin ❌ + « non » : « invalidé d’abord (invalidation touchée avant la 1re cible) »',
-    t(S.texteEtat(noteC('❌', 'non'), null, st, 'debutant', {}).texte) === 'note du journal : invalidé d’abord (invalidation touchée avant la 1re cible) · 22:45 UTC');
+    t(S.texteEtat(noteC('❌', 'non'), null, st, 'debutant', {}).texte) === 'note du journal : invalidé d’abord (invalidation touchée avant la 1re cible) · ' + Fm.heure(ms('2026-10-09T22:45Z')));
   check('formes courtes : « journal : invalidé après la 1re cible » / « journal : invalidé d’abord »',
     S.texteEtat(noteC('❌', 'oui'), null, st, 'debutant', {}).court === 'journal : invalidé après la 1re cible' && S.texteEtat(noteC('❌', 'non'), null, st, 'debutant', {}).court === 'journal : invalidé d’abord');
   check('matins précédents (sans forme) : « sorti par le bas » pour un range, « invalidé après la 1re cible » pour un chemin',
@@ -391,7 +404,8 @@ titre('6 bis. Débutant : une ligne d’état marquée, un libellé court, une b
   check(`${bul.length} textes de bulle : aucun mot banni, ni UTC, ni pourcentage (pas même la marge d’une zone : dite en dollars, choix 1B), ni base du hasard`, !sales.length, sales.slice(0, 4));
   check('ligne de bulle : « 1. Le prix va vers 86 500 $ puis 87 200 $, sans toucher 85 500 $ avant — en cours (en direct) »', S.ligneDebutant(un, { cle: 'avant' }) === '1. Le prix va vers 86 500 $ puis 87 200 $, sans toucher 85 500 $ avant — en cours (en direct)', S.ligneDebutant(un, { cle: 'avant' }));
   check('origine sans jargon : « plus haut du 08/10 (83 521), EMA 20 1d » → « plus haut du 08/10, 83 521 » ; « mur de calls (modèle) » → rien', S.origineDebutant('plus haut du 08/10 (83 521), EMA 20 1d') === 'plus haut du 08/10, 83 521' && S.origineDebutant('mur de calls (modèle)') === null, [S.origineDebutant('plus haut du 08/10 (83 521), EMA 20 1d'), S.origineDebutant('mur de calls (modèle)')]);
-  check('en-tête : « Écrits par Claude, une IA, ce matin, publiés au point de ' + P.point + ' (heure de Paris). »', S.enteteDebutant(F, P, H3) === 'Écrits par Claude, une IA, ce matin, publiés au point de ' + P.point + ' (heure de Paris).', S.enteteDebutant(F, P, H3));
+  const hPoint = Fm.heure(S.pointMs(F.groupe, P.point));
+  check('en-tête : « Écrits par Claude, une IA, ce matin, publiés au point de ' + hPoint + '. » (heure de l’appareil, sans « heure de Paris »)', S.enteteDebutant(F, P, H3) === 'Écrits par Claude, une IA, ce matin, publiés au point de ' + hPoint + '.', S.enteteDebutant(F, P, H3));
   const exR = S.explicationDebutant(F.scenarios[2], null, P, {}).join(' ');
   check('range, bulle : ses bornes élargies en dollars (« sans sortir de 85 343 – 86 659 $ »), aucun « ± N % »', /sans sortir de \d{1,3}(?: \d{3})* – \d{1,3}(?: \d{3})* \$/.test(exR) && !/%/.test(exR), exR);
 }

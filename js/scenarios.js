@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// SCÉNARIOS DU MATIN — l'analyse de 07h00 (Claude, une IA), dessinée sur le graphique.
+// SCÉNARIOS DU MATIN — l'analyse du point du matin (Claude, une IA), dessinée sur le graphique.
 // ─────────────────────────────────────────────────────────────────────────────
 // La routine du matin publie previsions.json (format « previsions-1 ») sur la branche
 // `previsions` du dépôt : trois scénarios CLASSÉS du plus au moins probable, SANS pourcentage,
@@ -20,7 +20,9 @@
 // le seul chiffre de réussite montré est l'ordre du premier mouvement (bilan.ordre), avec
 // « échantillon faible » sous P.echantillonFaible matins.
 // Les phrases DÉCRIVENT : aucune ne dit d'acheter ou de vendre.
-// Tous les nombres viennent de P = PARAM.scenarios (js/app.js).
+// Tous les nombres viennent de P = PARAM.scenarios (js/app.js). Formats et heures : js/format.js
+// (Fmt) — les heures AFFICHÉES sont celles de l'appareil, sans nom de fuseau (la page le dit une
+// fois) ; les dates du fichier (emis_utc, fin_utc…) et les clés de jour restent en UTC.
 // ═══════════════════════════════════════════════════════════════════════════════
 const Scenarios = (function () {
   'use strict';
@@ -30,24 +32,50 @@ const Scenarios = (function () {
   // Les libellés du journal, si un fichier ancien n'apporte pas les siens.
   const STATUTS = { '⏳': 'en cours', '✅': 'réalisé', '❌': 'invalidé d’abord', '◐': 'partiel', '⌛': 'rien de touché', '⚠': 'ambigu' };
 
-  // ─── Formats ───
+  // ─── Formats : des alias de Fmt (js/format.js, chargé avant ce fichier ; requis en Node) ───
+  const Fm = typeof Fmt !== 'undefined' ? Fmt : require('./format.js');
+  /** « 86 013 », « 3,5 » : un prix à la précision de lecture, sans unité ni zéro de fin. */
   function chiffres(v) {
     if (!fini(v)) return '—';
-    const d = Math.abs(v) >= 1000 ? 0 : 2;
-    return v.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: d }).replace(/[\u00a0\u202f]/g, ' ');
+    const d = Fm.decimalesLecture(v), t = Fm.nombre(v, d);
+    return d > 0 ? t.replace(/(,\d*?)0+$/, '$1').replace(/,$/, '') : t;
   }
   const prix = v => (fini(v) ? chiffres(v) + ' $' : '—');
-  const nb = v => String(v).replace('.', ',');
-  const heureUTC = ms => (fini(ms) ? new Date(ms).toISOString().slice(11, 16) : '—');
-  let FMT_PARIS = null;
-  try { FMT_PARIS = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }); } catch (e) { FMT_PARIS = null; }
-  /** « 06h40 » (heure de Paris) ; null si le navigateur ne connaît pas le fuseau. */
-  function heureParis(ms) {
-    if (!fini(ms) || !FMT_PARIS) return null;
+  /** Un nombre du fichier ou d'un réglage, avec ses décimales (au plus 6) : « 0,5 », « 1,25 ». */
+  const nb = v => { if (!fini(v)) return String(v); let d = 0; while (d < 6 && Math.abs(Math.round(v * Math.pow(10, d)) - v * Math.pow(10, d)) > 1e-9) d++; return Fm.nombre(v, d); };
+  /** L'heure AFFICHÉE d'un instant : celle de l'appareil (« 14:05 », '—' si absent). */
+  const heureVue = ms => Fm.heure(ms);
+  /** La même, ou null pour un instant absent. */
+  function heureVueSi(ms) {
+    return fini(ms) ? Fm.heure(ms) : null;
+  }
+  // Pour js/app.js, qui écrit le fuseau À CÔTÉ de ces heures (« … UTC », « … Paris », « heure de
+  // Paris ») : les deux noms exportés gardent leur sens exact tant que la page n'est pas passée à
+  // l'heure de l'appareil (autre lot). Aucun texte de ce fichier ne les emploie.
+  const HEURE_UTC_EXPORT = ms => (fini(ms) ? new Date(ms).toISOString().slice(11, 16) : '—');
+  let FMT_PARIS_EXPORT = null;
+  try { FMT_PARIS_EXPORT = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }); } catch (e) { FMT_PARIS_EXPORT = null; }
+  function HEURE_PARIS_EXPORT(ms) {
+    if (!fini(ms) || !FMT_PARIS_EXPORT) return null;
     const p = {};
-    for (const x of FMT_PARIS.formatToParts(new Date(ms))) p[x.type] = x.value;
+    for (const x of FMT_PARIS_EXPORT.formatToParts(new Date(ms))) p[x.type] = x.value;
     return p.hour + 'h' + p.minute;
   }
+  // Le point du matin est une heure de la ROUTINE, à Paris (P.point, « 07h00 ») : elle est
+  // convertie en un instant, puis dite à l'heure de l'appareil.
+  let FMT_ROUTINE = null;
+  try { FMT_ROUTINE = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }); } catch (e) { FMT_ROUTINE = null; }
+  /** L'instant (ms) du point du matin du jour `groupe` (« 2026-10-09 ») ; NaN sans fuseau connu. */
+  function pointMs(groupe, point) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(groupe || ''), h = /^(\d{1,2})\D(\d{2})$/.exec(point || '');
+    if (!m || !h || !FMT_ROUTINE) return NaN;
+    const mur = Date.UTC(+m[1], +m[2] - 1, +m[3], +h[1], +h[2]);
+    const ecart = t => { const q = {}; for (const x of FMT_ROUTINE.formatToParts(new Date(t))) q[x.type] = x.value; return Date.UTC(+q.year, +q.month - 1, +q.day, +q.hour, +q.minute) - t; };
+    const t0 = mur - ecart(mur);
+    return mur - ecart(t0);
+  }
+  /** L'instant du point d'un fichier : son jour et P.point, sinon son heure d'émission. */
+  const instantPoint = (F0, P) => { const t = P && P.point && F0 ? pointMs(F0.groupe, P.point) : NaN; return fini(t) ? t : F0 && fini(F0.emis) ? F0.emis : NaN; };
   /** « 2026-10-09 » → « 09/10 ». */
   const jourGroupe = g => (/^\d{4}-\d{2}-\d{2}$/.test(g || '') ? g.slice(8, 10) + '/' + g.slice(5, 7) : String(g || '—'));
   /** « 2026-10-09T04:40Z » (ou une date ISO complète) → ms ; NaN si illisible. */
@@ -290,14 +318,15 @@ const Scenarios = (function () {
     if (mode === 'expert') return COURTS_RANG[S.rang] + ' ' + niveaux(S, true) + (S.invalidation !== null ? ' · inv ' + chiffres(S.invalidation) : '');
     return NOMS_RANG[S.rang] + ' · ' + niveaux(S, false, court === true ? 0 : court === 'complet' ? Infinity : 1);
   }
+  /** Le jour UTC d'un instant (« 2026-10-09 ») : une CLÉ (groupes du fichier), jamais affichée. */
   const jourDe = ms => new Date(ms).toISOString().slice(0, 10);
-  /** « 10:30 », précédé du jour (« 07/10 10:30 ») quand ce n'est pas le jour de `maintenant`. */
-  const quand = (t, maintenant) => (fini(maintenant) && fini(t) && jourDe(t) !== jourDe(maintenant) ? jourGroupe(jourDe(t)) + ' ' : '') + heureUTC(t);
+  /** « 10:30 », précédé du jour (« 07/10 10:30 ») quand ce n'est pas le jour de `maintenant` (appareil). */
+  const quand = (t, maintenant) => (fini(maintenant) && fini(t) && !Fm.memeJour(t, maintenant) ? Fm.jour(t) + ' ' : '') + heureVue(t);
   /** Le moment d'un toucher : une bougie de plus d'une minute ne dit pas l'instant, seulement son
-   *  créneau. « entre 10:30 et 10:45 UTC » (court : « 10:30–10:45 UTC ») ; en 1 min, « à 10:31 UTC ». */
+   *  créneau. « entre 10:30 et 10:45 » (court : « 10:30–10:45 ») ; en 1 min, « à 10:31 ». */
   function creneau(t, pasMs, maintenant, court) {
-    if (!(pasMs > 60000)) return (court ? '' : 'à ') + quand(t, maintenant) + ' UTC';
-    return court ? quand(t, maintenant) + '–' + heureUTC(t + pasMs) + ' UTC' : 'entre ' + quand(t, maintenant) + ' et ' + heureUTC(t + pasMs) + ' UTC';
+    if (!(pasMs > 60000)) return (court ? '' : 'à ') + quand(t, maintenant);
+    return court ? quand(t, maintenant) + '–' + heureVue(t + pasMs) : 'entre ' + quand(t, maintenant) + ' et ' + heureVue(t + pasMs);
   }
   /** Le statut du journal en mots, avec ce que dit premier_ok (chemin : « oui » = la 1re cible avant
    *  l'invalidation ; range : la borne qui a cédé). forme : 'chemin' | 'range' | null (déduite).
@@ -324,7 +353,7 @@ const Scenarios = (function () {
     const exp = mode === 'expert', c = ctx || {}, now = c.maintenant;
     if (S.statut !== '⏳') {
       const m = motsStatut(S.statut, S.premierOk, S.forme, statuts, exp);
-      const q = fini(S.resolu) ? ' · ' + quand(S.resolu, now) + ' UTC' : '';
+      const q = fini(S.resolu) ? ' · ' + quand(S.resolu, now) : '';
       const court = 'journal : ' + m.court;
       return { cle: 'officiel', officiel: true, texte: (exp ? 'journal : ' : 'note du journal : ') + m.long + q, court, courtD: court,
         mini: m.court, micro: m.court, miniD: m.court + ' (journal)', microD: m.court + ' (journal)' };
@@ -337,7 +366,7 @@ const Scenarios = (function () {
       case 'avant': t = (exp ? '' : 'en cours · ') + 'pas encore de bougie ' + itv + ' depuis le point'; k = 'en cours'; break;
       case 'rien': {
         // La 1re bougie comptée s'ouvre bien après le point (bougies d'une heure) : dit.
-        const tard = fini(sv.debut) && sv.debut - S.emis > 5 * 60000 ? ' depuis ' + quand(sv.debut, now) + ' UTC (bougies ' + itv + ')' : '';
+        const tard = fini(sv.debut) && sv.debut - S.emis > 5 * 60000 ? ' depuis ' + quand(sv.debut, now) + ' (bougies ' + itv + ')' : '';
         t = (exp ? 'rien de touché' : 'en cours · rien de touché') + tard; k = 'rien de touché'; break;
       }
       case 'cible': t = ordinal(sv.k) + ' cible touchée ' + cr(sv.t) + (sv.memeBougie ? ' · la suivante dans la même bougie, ordre inconnu' : ''); k = ordinal(sv.k) + ' cible ' + crC(sv.t) + (sv.memeBougie ? ' · ordre inconnu' : ''); break;
@@ -351,7 +380,7 @@ const Scenarios = (function () {
       case 'sortie': t = (sv.sortie.haut ? 'borne haute' : 'borne basse') + ' dépassée ' + cr(sv.t); k = (sv.sortie.haut ? 'sorti par le haut ' : 'sorti par le bas ') + crC(sv.t); break;
       case 'large': t = exp ? 'suivi : bougies trop larges' : 'suivi en direct indisponible sur les bougies ' + itv + ' (trop larges) : il se lit en 15 min ou 1 h'; k = 'suivi : bougies trop larges'; break;
       case 'incomplet': {
-        const ou = pasMs < 900000 ? '15 min' : '1 h', depuis = fini(sv.debut) ? quand(sv.debut, now) + ' UTC' : '—';
+        const ou = pasMs < 900000 ? '15 min' : '1 h', depuis = fini(sv.debut) ? quand(sv.debut, now) : '—';
         t = exp ? 'suivi incomplet (historique ' + itv + ' depuis ' + depuis + ')' : 'suivi en direct incomplet sur les bougies ' + itv + ' (historique chargé depuis ' + depuis + ', après le point) : il se lit en ' + ou;
         k = 'suivi incomplet'; break;
       }
@@ -371,14 +400,14 @@ const Scenarios = (function () {
     const D = x => x + (exp ? ' · direct' : ' (en direct)');
     return { cle: sv ? sv.cle : null, officiel: false, texte: t, court: k, courtD: D(k), mini, micro, miniD: D(mini), microD: D(micro) };
   }
-  /** Le titre de l'encadré : « Scénarios du matin · 09/10 07h00 Paris » ; groupe terminé (à l'heure
+  /** Le titre de l'encadré : « Scénarios du matin · 09/10 07:00 » (le point du matin, à l'heure de
+   *  l'appareil) ; groupe terminé (à l'heure
    *  de `maintenant`, pas à celle de la lecture) : « Scénarios d'hier (terminés) » (ou de la date,
    *  s'il est plus vieux qu'hier), « · semaine en cours » si la semaine court encore (semOuverte :
    *  l'état du suivi en direct, facultatif). */
   function titre(F, P, maintenant, semOuverte) {
     if (!F || F.etat !== 'ok') return 'Scénarios du matin';
-    const point = P && P.point ? ' ' + P.point + ' Paris' : '';
-    if (!estAncien(F, maintenant)) return 'Scénarios du matin · ' + jourGroupe(F.groupe) + point;
+    if (!estAncien(F, maintenant)) { const tp = instantPoint(F, P); return 'Scénarios du matin · ' + (fini(tp) ? Fm.jour(tp) + ' ' + heureVue(tp) : jourGroupe(F.groupe)); }
     const t = fini(maintenant) ? maintenant : Date.now();
     const hier = jourDe(t - 86400000), auj = jourDe(t);
     // « semaine en cours » : seulement tant que la semaine est OUVERTE — selon le suivi en direct
@@ -459,10 +488,8 @@ const Scenarios = (function () {
       out.push((exp ? 'Range ' : 'Ce scénario se lit : le prix reste ') + (exp ? chiffres(S.range[0]) + ' – ' + prix(S.range[1]) : 'entre ' + avecO(S.range[0]) + ' et ' + avecO(S.range[1]))
         + (exp ? ', aucune borne dépassée de plus de ' + m + '.' : ', sans sortir de ses bornes ± ' + m + ' (de ' + prix(S.zones.bas) + ' à ' + prix(S.zones.haut) + ') jusqu’à la fin.'));
     }
-    const finP = heureParis(S.fin);
-    const emP = heureParis(S.emis);
-    out.push((exp ? 'Émis ' : 'Émis le ') + jourGroupe(jourDe(S.emis)) + ' à ' + heureUTC(S.emis) + ' UTC' + (emP ? ' (' + emP + ' Paris)' : '') + (fini(S.prixEmission) ? (exp ? ' à ' : ', prix ') + prix(S.prixEmission) : '') + ' · fin ' + jourGroupe(jourDe(S.fin)) + ' ' + heureUTC(S.fin) + ' UTC'
-      + (finP ? ' (jusqu’à ' + finP + ' Paris)' : '') + (fini(S.horizon) ? ' · horizon ' + nb(Math.round(S.horizon * 10) / 10) + ' h' : '') + '.');
+    out.push((exp ? 'Émis ' : 'Émis le ') + Fm.jour(S.emis) + ' à ' + heureVue(S.emis) + (fini(S.prixEmission) ? (exp ? ' à ' : ', prix ') + prix(S.prixEmission) : '') + ' · fin ' + Fm.jour(S.fin) + ' ' + heureVue(S.fin)
+      + (fini(S.horizon) ? ' · horizon ' + nb(Math.round(S.horizon * 10) / 10) + ' h' : '') + '.');
     const et = texteEtat(Object.assign({}, S, { statut: '⏳' }), sv, c.statuts, mode, c);
     out.push((exp ? 'Suivi en direct (bougies ' + (c.itv || '') + ') : ' : 'Suivi en direct sur les bougies ' + (c.itv || '') + ' du graphique : ') + et.texte + '.'
       + (exp ? '' : ' Un affichage : la note officielle est celle du journal, faite le lendemain sur des bougies d’une minute.'));
@@ -477,7 +504,7 @@ const Scenarios = (function () {
   // ─── 4. Mode Débutant : une ligne, un libellé, une bulle sans jargon ──────
   // L'écran Débutant montre le scénario 1 de Claude (un libellé court près de sa zone) et UNE
   // ligne d'état (« Scénario 1 de Claude : en cours (en direct) ▸ ») ; le reste est dans la bulle,
-  // en mots simples, heures de Paris. Un état calculé par la page porte « (en direct) » ; la note
+  // en mots simples, à l'heure de l'appareil. Un état calculé par la page porte « (en direct) » ; la note
   // du journal, « (journal) ». Rien d'existant ne change.
   const MOTS_BANNIS = (typeof Guide !== 'undefined' && Guide.MOTS_BANNIS_DEBUTANT)
     || (typeof require === 'function' ? require('./guide.js').MOTS_BANNIS_DEBUTANT : []);
@@ -565,9 +592,9 @@ const Scenarios = (function () {
     const e = etatCourtDebutant(S, sv);
     return MARQUES_RANG[S.rang] + ' ' + quoi + ' — ' + e.etat + (e.marque ? ' ' + e.marque : '') + momentFerme(S, sv, maintenant);
   }
-  /** Le moment d'une fermeture calculée ici (invalidé, sorti, indécis, réalisé), en heure de Paris :
-   *  « entre 19h15 et 19h30 (heure de Paris) » ; rien pour un état ouvert ou une note du journal.
-   *  maintenant : un créneau d'un autre jour (de Paris) le dit (« hier entre 22h00 et 22h15 »). */
+  /** Le moment d'une fermeture calculée ici (invalidé, sorti, indécis, réalisé), à l'heure de
+   *  l'appareil : « entre 19:15 et 19:30 » ; rien pour un état ouvert ou une note du journal.
+   *  maintenant : un créneau d'un autre jour le dit (« hier entre 22:00 et 22:15 »). */
   function momentFerme(S, sv, maintenant) {
     if (S.statut !== '⏳' || !sv || !fini(sv.t) || !['invalide', 'sortie', 'ambigu', 'realise'].includes(sv.cle)) return '';
     return momentDebutant(sv.t, sv.pas || 0, maintenant);
@@ -580,10 +607,9 @@ const Scenarios = (function () {
     const m = o.replace(/\s*\(([^)]*)\)/g, ', $1').split(',').map(x => x.trim()).filter(x => x && propre(x));
     return m.length ? m.join(', ') : null;
   }
-  let FMT_JOUR_PARIS = null;
-  try { FMT_JOUR_PARIS = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit' }); } catch (e) { FMT_JOUR_PARIS = null; }
-  const jourParis = ms => (FMT_JOUR_PARIS && fini(ms) ? FMT_JOUR_PARIS.format(new Date(ms)) : jourGroupe(jourDe(ms)));
-  /** Le jour d'un moment t, s'il n'est pas celui de maintenant (heure de Paris) : « hier », « le 08/10 » ;
+  /** Le jour d'un instant, celui de l'appareil (« 09/10 ») ; le nom est resté. */
+  const jourParis = ms => Fm.jour(ms);
+  /** Le jour d'un moment t, s'il n'est pas celui de maintenant (appareil) : « hier », « le 08/10 » ;
    *  '' le même jour (ou sans maintenant). */
   function jourSiAutre(t, maintenant) {
     if (!fini(t) || !fini(maintenant)) return '';
@@ -591,14 +617,14 @@ const Scenarios = (function () {
     if (j === jourParis(maintenant)) return '';
     return j === jourParis(maintenant - 86400000) ? 'hier' : 'le ' + j;
   }
-  /** « vers 07h45 (heure de Paris) » ; une bougie de plus d'une minute : son créneau ; un autre jour
-   *  que celui de maintenant (après minuit) : « hier entre 22h00 et 22h15 (heure de Paris) ». */
+  /** « vers 07:45 » ; une bougie de plus d'une minute : son créneau ; un autre jour que celui de
+   *  maintenant (après minuit) : « hier entre 22:00 et 22:15 ». */
   function momentDebutant(t, pasMs, maintenant) {
-    const a = heureParis(t);
+    const a = heureVueSi(t);
     if (!a) return '';
     const j = jourSiAutre(t, maintenant), jj = j ? ' ' + j : '';
-    if (!(pasMs > 60000)) return jj + ' vers ' + a + ' (heure de Paris)';
-    return jj + ' entre ' + a + ' et ' + heureParis(t + pasMs) + ' (heure de Paris)';
+    if (!(pasMs > 60000)) return jj + ' vers ' + a;
+    return jj + ' entre ' + a + ' et ' + heureVueSi(t + pasMs);
   }
   /** L'état du suivi en direct, en mots (bulle Débutant). */
   function etatLongDebutant(S, sv, maintenant) {
@@ -619,16 +645,16 @@ const Scenarios = (function () {
     if (sv && sv.fini && ['avant', 'rien', 'cible', 'dedans'].includes(sv.cle)) t = 'terminé (' + t.replace(/^en cours, /, '') + ') ; la note du journal suivra';
     return t;
   }
-  /** La première ligne des bulles du Débutant : qui a écrit, quand (heure de Paris). */
+  /** La première ligne des bulles du Débutant : qui a écrit, quand (heure de l'appareil). */
   function enteteDebutant(F, P, maintenant) {
     if (!F || F.etat !== 'ok') return 'Scénarios du matin de Claude, une IA.';
     const t = fini(maintenant) ? maintenant : Date.now(), jour = jourParis(F.emis), auj = jourParis(t);
-    const point = P && P.point ? P.point : heureParis(F.emis);
+    const point = heureVueSi(instantPoint(F, P));
     // L'heure du POINT (la publication) ; celle de l'écriture de chaque scénario est dans sa bulle (« Écrit le … à … »).
-    return 'Écrits par Claude, une IA, ' + (jour === auj ? 'ce matin' : 'le ' + jour) + (point ? ', publiés au point de ' + point : '') + ' (heure de Paris).';
+    return 'Écrits par Claude, une IA, ' + (jour === auj ? 'ce matin' : 'le ' + jour) + (point ? ', publiés au point de ' + point : '') + '.';
   }
   /** L'explication d'un scénario en Débutant (bulle) : ce qu'il dit, ses zones, quand il a été
-   *  écrit (heure de Paris), son suivi en direct, le sens du rang. Les origines et l'énoncé de
+   *  écrit (heure de l'appareil), son suivi en direct, le sens du rang. Les origines et l'énoncé de
    *  Claude n'y passent que sans jargon (origineDebutant). La base du hasard reste en Expert. */
   function explicationDebutant(S, sv, P, ctx) {
     // Choix 1B : aucun pourcentage en Débutant, pas même la marge des zones — elles sont dites en dollars.
@@ -643,8 +669,8 @@ const Scenarios = (function () {
       out.push('Ce scénario se lit : le prix reste entre ' + avecO(S.range[0]) + ' et ' + avecO(S.range[1]) + ', sans sortir de ' + chiffres(S.zones.bas) + ' – ' + prix(S.zones.haut) + ' jusqu’à la fin.');
     }
     if (propre(S.enonce)) out.push('Les mots de Claude : « ' + S.enonce + ' ».');
-    const emP = heureParis(S.emis), finP = heureParis(S.fin);
-    out.push('Écrit le ' + jourParis(S.emis) + (emP ? ' à ' + emP : '') + (fini(S.prixEmission) ? ', quand le prix valait ' + prix(S.prixEmission) : '') + ' ; valable jusqu’au ' + jourParis(S.fin) + (finP ? ' à ' + finP : '') + ' (heures de Paris).');
+    const emP = heureVueSi(S.emis), finP = heureVueSi(S.fin);
+    out.push('Écrit le ' + jourParis(S.emis) + (emP ? ' à ' + emP : '') + (fini(S.prixEmission) ? ', quand le prix valait ' + prix(S.prixEmission) : '') + ' ; valable jusqu’au ' + jourParis(S.fin) + (finP ? ' à ' + finP : '') + '.');
     out.push('Suivi en direct sur ce graphique : ' + etatLongDebutant(S, sv, c.maintenant) + ' (un simple affichage).');
     if (S.statut !== '⏳') { const e = etatCourtDebutant(S, sv); out.push('Note du journal : ' + e.etat + '.'); }
     if (propre(S.note)) out.push('Note du journal : ' + S.note);
@@ -863,7 +889,9 @@ const Scenarios = (function () {
     const realises = jour.filter(estRealise);
     const r = { cas: null, meneur: null, seul: null, ouverts, realises, items: jour, hors: horsNiveaux(jour.map(i => i.sc), P, Q), prix: P,
       fin: finJ, reste: fini(finJ) && fini(maintenant) ? finJ - maintenant : null, tDecision: rejeu ? rejeu.tDecision : null, montre: null, remplace: false,
-      notes: jour.length > 0 && jour.every(i => i.sc.statut !== '⏳'), maintenant, frais: jour.filter(i => i.frais), pointe: null };
+      notes: jour.length > 0 && jour.every(i => i.sc.statut !== '⏳'), maintenant, frais: jour.filter(i => i.frais), pointe: null,
+      // Les réglages que les mots citent (seuil « aucun ne colle », durée du quart) : ceux du calcul.
+      colle: Q.colle, quartMin: Math.round(Q.quartMs / 60000) };
     // Le plus petit écart À LA DERNIÈRE CLÔTURE décidée (rejeu.ordre), parmi les scénarios encore
     // ouverts : figé jusqu'à la clôture suivante, comme le nom (la bougie en cours ne le change que
     // par une fermeture, un fait). Sans ordre mémorisé : le plus petit écart du moment.
@@ -902,9 +930,14 @@ const Scenarios = (function () {
   }
 
   // ─── 5 bis. Les mots de la journée ─────────────────────────────────────────
-  const dollars = v => prix(Math.round(v));
-  const virg2 = v => nb((Math.round(v * 100) / 100).toFixed(2));
-  const dec1 = v => (Math.round(v * 10) / 10).toLocaleString('fr-FR', { maximumFractionDigits: 1 }).replace(/[  ]/g, ' ');
+  const dollars = v => Fm.prix(Math.round(v), '$', 0);
+  const entier = v => Fm.nombre(Math.round(v), 0);
+  /** Le seuil « aucun ne colle » et la durée du quart (min) d'une journée (classerJour), sinon les
+   *  réglages par défaut (un objet de test sans eux). */
+  const colleDe = jour => (jour && fini(jour.colle) ? jour.colle : PJ_DEFAUT.colle);
+  const quartDe = jour => (jour && fini(jour.quartMin) ? jour.quartMin : Math.round(PJ_DEFAUT.quartMs / 60000));
+  const virg2 = v => Fm.nombre(Math.round(v * 100) / 100, 2);
+  const dec1 = v => { const r = Math.round(v * 10) / 10; return Fm.nombre(r, Number.isInteger(r) ? 0 : 1); };
   /** Le nom d'un créneau de bougie, pour un débutant : « le même quart d'heure ». */
   const memeCreneau = pasMs => (pasMs === 60000 ? 'la même minute' : pasMs === 900000 ? 'le même quart d’heure' : pasMs === 3600000 ? 'la même heure' : pasMs > 0 ? 'les mêmes ' + Math.round(pasMs / 60000) + ' minutes' : 'le même moment');
   /** Un contact seulement en mèche, pour un débutant (sans « mèche ») : compté par le journal. */
@@ -1028,7 +1061,7 @@ const Scenarios = (function () {
       const x = FF[0];
       if (x.sc.statut !== '⏳') V.push('Scén. ' + rangsFF + ' ' + etatJournal(x.sc.statut) + ' (journal) ▸', 'Scén. ' + rangsFF + ' (journal) ▸');
       else {
-        const mot = FF.length === 1 ? motFerme(x) : null, h = FF.length === 1 && fini(x.ferme.t) && !jourSiAutre(x.ferme.t, maintenant) ? heureParis(x.ferme.t) : null;
+        const mot = FF.length === 1 ? motFerme(x) : null, h = FF.length === 1 && fini(x.ferme.t) && !jourSiAutre(x.ferme.t, maintenant) ? heureVueSi(x.ferme.t) : null;
         const long = mot && mot !== 'indécis' ? mot + ' ✗' : croixFF;
         if (h) V.push('Scén. ' + rangsFF + ' ' + long + ' vers ' + h + ' (en direct) ▸');
         V.push('Scén. ' + rangsFF + ' ' + long + ' (en direct) ▸', 'Scén. ' + rangsFF + ' ' + croixFF + ' (en direct) ▸');
@@ -1050,7 +1083,7 @@ const Scenarios = (function () {
   /** Le libellé du scénario MONTRÉ (Débutant) quand il est réalisé ou fermé, toujours avec sa marque
    *  (la ligne peut avoir cédé sa place) : « Scén. 2 : zone ✓ (en direct) » (jamais « atteint » ni
    *  le niveau seul coché, A3 : c'est la ZONE qui a été touchée ; le libellé est posé sur elle) ;
-   *  « Scén. 1 ✗ vers 17h15 (en direct) » (heure de Paris du créneau du contact) ; une note du
+   *  « Scén. 1 ✗ vers 17:15 (en direct) » (heure de l'appareil du créneau du contact) ; une note du
    *  journal, « (journal) ». Un range encore ouvert dont le prix est sorti des bornes mais pas de la
    *  marge : « Scén. 1 : tient jusqu’à 80 622 $ » (le bord toléré, que la boîte seule ne montre pas).
    *  Les autres cas : libellesDebutant. */
@@ -1063,8 +1096,8 @@ const Scenarios = (function () {
     }
     if (!it.ouvert && it.ferme) {
       if (it.ferme.journal) { const e = etatJournal(S.statut); return garder(['Scén. ' + S.rang + ' ' + e + ' (journal)', 'Scén. ' + S.rang + ' (journal)']); }
-      // Un contact d'un autre jour (de Paris, après minuit) : « hier 23h30 », jamais l'heure seule.
-      const j = fini(it.ferme.t) ? jourSiAutre(it.ferme.t, maintenant) : '', h0 = fini(it.ferme.t) ? heureParis(it.ferme.t) : null;
+      // Un contact d'un autre jour (de l'appareil, après minuit) : « hier 23:30 », jamais l'heure seule.
+      const j = fini(it.ferme.t) ? jourSiAutre(it.ferme.t, maintenant) : '', h0 = fini(it.ferme.t) ? heureVueSi(it.ferme.t) : null;
       const h = h0 ? (j ? j + ' ' + h0 : 'vers ' + h0) : null, mot = motFerme(it), ind = mot === 'indécis', croix = ind ? 'indécis' : mot + ' ✗', c = ind ? 'indécis' : '✗';
       return garder((h ? ['Scén. ' + S.rang + ' ' + croix + ' ' + h + ' (en direct)', 'Scén. ' + S.rang + ' ' + c + ' ' + h + ' (en direct)'] : [])
         .concat(['Scén. ' + S.rang + ' ' + croix + ' (en direct)', 'Scén. ' + S.rang + ' ' + c + ' (en direct)']));
@@ -1084,14 +1117,14 @@ const Scenarios = (function () {
     if (!p || p.forme !== 'range') return false;
     return p.bord === 'bas' ? p.dBord < S.range[0] - S.zones.bas : p.dBord < S.zones.haut - S.range[1];
   }
-  /** « Valables jusqu'à demain 06h20 (heure de Paris) : encore 13 h 25. » */
+  /** « Valables jusqu'à demain 06:20 : encore 13 h 25. » (heure de l'appareil) */
   function texteResteDebutant(jour, maintenant) {
     if (!jour || !fini(jour.fin)) return null;
-    const h = heureParis(jour.fin), r = reste(jour.fin - maintenant);
+    const h = heureVueSi(jour.fin), r = reste(jour.fin - maintenant);
     const jF = jourParis(jour.fin), jA = jourParis(maintenant), demain = jourParis(maintenant + 86400000);
     const quand = jF === jA ? 'aujourd’hui' : jF === demain ? 'demain' : 'le ' + jF;
-    if (!r) return 'Terminés depuis ' + quand + (h ? ' ' + h : '') + ' (heure de Paris) ; ' + (jour.notes ? 'le journal les a notés.' : 'la note du journal suivra.');
-    return 'Valables jusqu’à ' + quand + (h ? ' ' + h : '') + ' (heure de Paris) : encore ' + r + '. Pas de nouvelle prévision d’ici là : la page recalcule seulement où en est chaque scénario du matin.';
+    if (!r) return 'Terminés depuis ' + quand + (h ? ' ' + h : '') + ' ; ' + (jour.notes ? 'le journal les a notés.' : 'la note du journal suivra.');
+    return 'Valables jusqu’à ' + quand + (h ? ' ' + h : '') + ' : encore ' + r + '. Pas de nouvelle prévision d’ici là : la page recalcule seulement où en est chaque scénario du matin.';
   }
   /** La ligne d'un scénario dans la bulle du Débutant : ce qu'il dit, son état, ses distances.
    *  « 3. Le prix va vers 84 500 $, sans toucher 80 400 $ avant — en cours (en direct) : encore 559 $
@@ -1107,8 +1140,8 @@ const Scenarios = (function () {
     return t + (d ? ' : ' + d : '') + '.';
   }
   /** Un scénario en peu de mots (écrans courts) : « 2. vers 80 400 $ — en cours (en direct) » ;
-   *  « 1. entre 81 000 et 83 500 $ — … » ; une fermeture calculée ici dit son créneau (l'heure de
-   *  Paris est dite par la première ligne de la bulle) et sa raison courte (raisonCourte) ; un chemin
+   *  « 1. entre 81 000 et 83 500 $ — … » ; une fermeture calculée ici dit son créneau (heure de
+   *  l'appareil) et sa raison courte (raisonCourte) ; un chemin
    *  réalisé ici, la ZONE touchée (« 3. zone de 84 500 $ touchée ✓ (en direct) … : dès 83 655 $, par
    *  un passage bref du prix »), jamais
    *  « vers 84 500 $ — réalisé ✓ » (le prix n'y est peut-être jamais allé, A3). */
@@ -1189,14 +1222,15 @@ const Scenarios = (function () {
     if (jour.cas === 'tot') return 'Trop tôt pour dire quel scénario suit le mieux le prix : il a encore peu bougé depuis le point du matin ; le classement du matin tient.';
     if (jour.cas === 'aucunNeColle') return 'Aucun scénario en cours ne colle au prix : chacun est plus près de ce qui l’invaliderait que de sa zone (pour « le prix reste entre », plus près d’une limite que du milieu). ' + regle;
     if (jour.cas === 'seul') {
-      const s = jour.seul, p = s.pos, loin = p && p.e >= 0.5;
+      const s = jour.seul, p = s.pos, loin = p && p.e >= colleDe(jour);
       // Un range décrit la fourchette où le prix EST : « plus près de ce qui l'invaliderait que de ce
       // qu'il décrit » s'y lirait comme une contradiction ; il dit sa limite la plus proche.
       const t = !loin ? '' : p.forme === 'range' ? ' Le prix est plus près de sa limite ' + (p.bord === 'haut' ? 'haute' : 'basse') + ' (' + dollars(p.niveauBord) + ', marge comprise) que du milieu de la fourchette.' : ' Le prix est plus près de ce qui l’invaliderait que de ce qu’il décrit.';
       return 'Un seul scénario est encore en cours : le ' + s.sc.rang + '.' + t;
     }
-    if (jour.cas === 'grille') return 'Sur des bougies d’une heure, la page ne dit pas quel scénario suit le mieux le prix : à voir en 15 min.';
-    if (jour.cas === 'aucun') return 'Aucun scénario du matin ne décrit ce mouvement : les trois ne tiennent plus (en direct). Pas de nouvelle prévision avant le prochain point de 07h00.';
+    // (Débutant : jamais « bougies » — la liste des mots du Guide ; tests/test_scenarios_jour.js.)
+    if (jour.cas === 'grille') return 'Sur l’intervalle d’une heure, la page ne dit pas quel scénario suit le mieux le prix : à voir en ' + quartDe(jour) + ' min.';
+    if (jour.cas === 'aucun') return 'Aucun scénario du matin ne décrit ce mouvement : les trois ne tiennent plus (en direct). Pas de nouvelle prévision avant le prochain point du matin.';
     return null;
   }
   const COMMENT_DEBUTANT = 'Comment « suit le mieux » est choisi : parmi les scénarios encore en cours, celui dont le prix est le plus près de sa prochaine zone, comparé à la distance jusqu’à ce qui l’invaliderait (pour « le prix reste entre », le plus loin des limites) ; décidé tous les quarts d’heure, seulement si un autre est nettement plus près. Au départ, c’est le scénario 1.';
@@ -1213,7 +1247,7 @@ const Scenarios = (function () {
   const nomNet = jour => !!(jour && jour.meneur && !jour.remplace && pointeDe(jour) === jour.meneur);
   function phraseJourExpert(jour, P) {
     if (!jour) return [];
-    const finU = heureUTC(jour.fin) + ' UTC';
+    const finU = heureVue(jour.fin), q = quartDe(jour) + ' min';
     const hors = jour.hors ? ' · prix au-delà de tous les niveaux du matin (' + (jour.hors.haut ? 'au-dessus de ' : 'au-dessous de ') + dollars(jour.hors.seuil) + ')' : '';
     switch (jour.cas) {
       case 'fini': return ['Terminé à ' + finU + (jour.notes ? ' · noté par le journal' : ' · note du journal à venir')];
@@ -1225,17 +1259,17 @@ const Scenarios = (function () {
         // Tout est lu à la dernière clôture de 15 min (figé jusqu'à la suivante) : jamais « pour
         // l'instant » d'une valeur qui ne suit pas chaque tick.
         const n = jour.meneur.sc.rang;
-        if (jour.remplace) return ['Nom repris : ' + n + ' (le nommé s’est fermé ; plus petit écart des restants à la dernière clôture de 15 min)' + hors,
+        if (jour.remplace) return ['Nom repris : ' + n + ' (le nommé s’est fermé ; plus petit écart des restants à la dernière clôture de ' + q + ')' + hors,
           'Nom repris : ' + n + ' (le nommé s’est fermé)', 'Nom repris : ' + n];
-        if (nomNet(jour)) return ['Plus petit écart : ' + n + ' (clôture de 15 min ; une mesure, pas une probabilité)' + hors, 'Plus petit écart : ' + n + ' (pas une probabilité)' + hors, 'Plus petit écart : ' + n + ' (pas une probabilité)', 'Écart min. : ' + n];
+        if (nomNet(jour)) return ['Plus petit écart : ' + n + ' (clôture de ' + q + ' ; une mesure, pas une probabilité)' + hors, 'Plus petit écart : ' + n + ' (pas une probabilité)' + hors, 'Plus petit écart : ' + n + ' (pas une probabilité)', 'Écart min. : ' + n];
         const m = pointeDe(jour).sc.rang;
-        return ['Plus petit écart : ' + m + ' · nom gardé : ' + n + ' (avance pas assez nette à la clôture de 15 min)' + hors,
+        return ['Plus petit écart : ' + m + ' · nom gardé : ' + n + ' (avance pas assez nette à la clôture de ' + q + ')' + hors,
           'Plus petit écart : ' + m + ' · nom gardé : ' + n + ' (revu au quart d’heure)', 'Écart min. : ' + m + ' · nom gardé : ' + n];
       }
       case 'tot': return ['Trop tôt pour départager : le classement du matin tient' + hors, 'Trop tôt pour départager'];
       case 'aucunNeColle': return ['Aucun scénario en cours ne colle au prix : chacun est plus près de sa limite que de sa zone' + hors, 'Aucun scénario ne colle au prix'];
-      case 'seul': { const s = jour.seul, loin = s.pos && s.pos.e >= 0.5 ? ' (prix plus près de sa limite que de son milieu)' : ''; return ['Seul encore en cours : ' + s.sc.rang + loin + hors, 'Seul en cours : ' + s.sc.rang + loin, 'Seul en cours : ' + s.sc.rang]; }
-      case 'grille': return ['Plus petit écart : à voir en 15 min (bougies trop larges)', 'Plus petit écart : à voir en 15 min'];
+      case 'seul': { const s = jour.seul, loin = s.pos && s.pos.e >= colleDe(jour) ? ' (prix plus près de sa limite que de son milieu)' : ''; return ['Seul encore en cours : ' + s.sc.rang + loin + hors, 'Seul en cours : ' + s.sc.rang + loin, 'Seul en cours : ' + s.sc.rang]; }
+      case 'grille': return ['Plus petit écart : à voir en ' + q + ' (bougies trop larges)', 'Plus petit écart : à voir en ' + q];
       case 'realise': { const r = jour.realises.map(i => i.sc.rang).join(', '); return [r + ' réalisé ✓ ; plus aucun scénario en cours' + hors, r + ' réalisé ✓ · plus aucun en cours']; }
       case 'aucun': return ['Aucun scénario du matin ne décrit ce mouvement' + hors, 'Aucun scénario ne décrit ce mouvement'];
       default: return [];
@@ -1254,10 +1288,10 @@ const Scenarios = (function () {
     if (p.forme === 'range') return ' · bord toléré à ' + dollars(p.dBord) + m;
     return ' · zone à ' + dollars(p.dCible) + (p.zoneInv ? ' · inv. à ' + dollars(p.dInv) : '') + m;
   }
-  /** « Reste 13 h 25 (fin 10/10 04:20 UTC) · aucune nouvelle prévision avant le prochain point ». */
+  /** « Reste 13 h 25 (fin 10/10 06:20) · aucune nouvelle prévision avant le prochain point ». */
   function ligneResteExpert(jour) {
     if (!jour || !fini(jour.fin)) return [];
-    const r = reste(jour.reste), f = jourGroupe(new Date(jour.fin).toISOString().slice(0, 10)) + ' ' + heureUTC(jour.fin) + ' UTC';
+    const r = reste(jour.reste), f = Fm.jour(jour.fin) + ' ' + heureVue(jour.fin);
     if (!r) return [];
     return ['Reste ' + r + ' (fin ' + f + ') · aucune nouvelle prévision avant le prochain point', 'Reste ' + r + ' (fin ' + f + ')', 'Reste ' + r];
   }
@@ -1270,41 +1304,43 @@ const Scenarios = (function () {
     if (p && p.forme === 'chemin') {
       out.push('prochaine zone ' + chiffres(p.cible) + (p.bordCible !== null ? ' (dès ' + dollars(p.bordCible) + ') à ' + dollars(p.dCible) : ' : prix dedans'));
       if (p.zoneInv) out.push('invalidation ' + chiffres(p.inv) + (p.bordInv !== null ? ' (dès ' + dollars(p.bordInv) + ') à ' + dollars(p.dInv) : ' : prix dedans'));
-      out.push('écart relatif ' + virg2(p.e) + ' = ' + (p.zoneInv ? chiffres(Math.round(p.dCible)) + ' / (' + chiffres(Math.round(p.dCible)) + ' + ' + chiffres(Math.round(p.dInv)) + ') (0 = sur la zone, 1 = sur l’invalidation)' : chiffres(Math.round(p.dCible)) + ' / (' + chiffres(Math.round(p.dCible)) + ' + ' + chiffres(Math.round(p.d0)) + ') (sans invalidation : distance de la référence à la zone)'));
+      out.push('écart relatif ' + virg2(p.e) + ' = ' + (p.zoneInv ? entier(p.dCible) + ' / (' + entier(p.dCible) + ' + ' + entier(p.dInv) + ') (0 = sur la zone, 1 = sur l’invalidation)' : entier(p.dCible) + ' / (' + entier(p.dCible) + ' + ' + entier(p.d0) + ') (sans invalidation : distance de la référence à la zone)'));
     } else if (p && p.forme === 'range') {
-      out.push('bord toléré le plus proche ' + chiffres(Math.round(p.niveauBord)) + ' à ' + dollars(p.dBord));
-      out.push('écart relatif ' + virg2(p.e) + ' = 1 − ' + chiffres(Math.round(p.dBord)) + ' / ' + dec1(p.demi) + ' (0 = au milieu, 1 = sur un bord)');
+      out.push('bord toléré le plus proche ' + entier(p.niveauBord) + ' à ' + dollars(p.dBord));
+      out.push('écart relatif ' + virg2(p.e) + ' = 1 − ' + entier(p.dBord) + ' / ' + dec1(p.demi) + ' (0 = au milieu, 1 = sur un bord)');
     } else if (!it.ouvert && S.statut === '⏳') {
       // Réalisé : la touche de la dernière cible est déjà dite (avec son créneau) ; pas de redite.
       const f = fermeture(S, sv), dite = f && f.type === 'realise' && touchesValides(S, sv).some(x => x.j === S.cibles.length - 1);
       const r = dite ? null : raison(S, sv, 'expert');
       if (r) out.push(r);
     }
-    const pt = pointeDe(jour);
+    const pt = pointeDe(jour), q = quartDe(jour) + ' min';
     if (jour && jour.meneur === it) {
-      if (nomNet(jour)) out.push('plus petit écart à la dernière clôture de 15 min, d’où le nom (une mesure, pas une probabilité)');
-      else if (jour.remplace) out.push('nom repris (le nommé s’est fermé ; plus petit écart des restants à la dernière clôture de 15 min ; revu à la suivante)');
-      else out.push('nom gardé (avance pas assez nette à la dernière clôture de 15 min) ; plus petit écart à cette clôture : ' + (pt ? pt.sc.rang : '—') + ' (une mesure, pas une probabilité)');
-    } else if (pointe(it, jour)) out.push('plus petit écart à la dernière clôture de 15 min ; le nom reste au ' + jour.meneur.sc.rang + ' (avance pas assez nette ; une mesure, pas une probabilité)');
+      if (nomNet(jour)) out.push('plus petit écart à la dernière clôture de ' + q + ', d’où le nom (une mesure, pas une probabilité)');
+      else if (jour.remplace) out.push('nom repris (le nommé s’est fermé ; plus petit écart des restants à la dernière clôture de ' + q + ' ; revu à la suivante)');
+      else out.push('nom gardé (avance pas assez nette à la dernière clôture de ' + q + ') ; plus petit écart à cette clôture : ' + (pt ? pt.sc.rang : '—') + ' (une mesure, pas une probabilité)');
+    } else if (pointe(it, jour)) out.push('plus petit écart à la dernière clôture de ' + q + ' ; le nom reste au ' + jour.meneur.sc.rang + ' (avance pas assez nette ; une mesure, pas une probabilité)');
     // Entre deux clôtures, les distances suivent le prix : un autre scénario peut avoir, en ce
     // moment, un écart un peu plus petit ; dit dans sa bulle, revu à la prochaine clôture.
-    if (jour && jour.cas === 'meneur' && it.ouvert && jour.ouverts[0] === it && pt && pt !== it) out.push('plus petit écart en ce moment (le nom et « ◂ » sont revus à la prochaine clôture de 15 min)');
+    if (jour && jour.cas === 'meneur' && it.ouvert && jour.ouverts[0] === it && pt && pt !== it) out.push('plus petit écart en ce moment (le nom et « ◂ » sont revus à la prochaine clôture de ' + q + ')');
     if (it.fondu !== null && it.fondu !== undefined && it.fondu > 0 && it.fondu < 1) out.push('s’efface (fondu de ' + pj(c.PJ).fonduMinutes + ' min après le créneau du contact)');
     const r = jour ? reste(jour.reste) : null;
-    if (r) out.push('reste ' + r + ' (fin ' + jourGroupe(new Date(jour.fin).toISOString().slice(0, 10)) + ' ' + heureUTC(jour.fin) + ' UTC)');
+    if (r) out.push('reste ' + r + ' (fin ' + Fm.jour(jour.fin) + ' ' + heureVue(jour.fin) + ')');
     if (!out.length) return null;
     return 'En direct (bougies ' + (c.itv || '') + ') : ' + out.join(' · ') + '.';
   }
+  /** « la 1re heure », « les 30 premières minutes » : la durée du départage (departageMinutes). */
+  const premieres = m => (m === 60 ? 'la 1re heure' : m % 60 === 0 ? 'les ' + nb(m / 60) + ' premières heures' : 'les ' + nb(m) + ' premières minutes');
   /** La règle complète (bulle de l'encadré, Expert). */
   function regleJourExpert(PJ) {
     const Q = pj(PJ);
     return ['Écart (une mesure, pas une probabilité ; comparer un range et un chemin par cet écart est une convention) : chemin = d(prochaine zone) / (d(prochaine zone) + d(invalidation)), distances aux bords des zones ; range = 1 − d(bord toléré le plus proche) / demi-largeur tolérée.',
-      'Le nom du plus petit écart se décide à chaque clôture de 15 min (bougies 1 et 5 min regroupées ; en 1 h, aucun nom) ; départ : le rang 1 du matin ; un changement demande ' + virg2(Q.ecartChangement) + ' d’avance ; la bougie en cours ne change le nom que si elle ferme le scénario nommé. « ◂ » : le plus petit écart à la dernière clôture (il peut différer du nom gardé). Entre deux clôtures, les distances suivent le prix ; le nom, « ◂ » et la phrase de l’encadré ne changent qu’à une clôture ou quand un scénario se ferme. « Trop tôt pour départager » tant que le prix reste à moins de ' + nb(Q.departageMouvementPct) + ' % du prix du point pendant la 1re heure, puis plus jamais de la journée. Un scénario invalidé s’efface en ' + Q.fonduMinutes + ' min après le créneau du contact ; sa marque ✗ reste.',
+      'Le nom du plus petit écart se décide à chaque clôture de ' + Math.round(Q.quartMs / 60000) + ' min (bougies 1 et 5 min regroupées ; en 1 h, aucun nom) ; départ : le rang 1 du matin ; un changement demande ' + virg2(Q.ecartChangement) + ' d’avance ; la bougie en cours ne change le nom que si elle ferme le scénario nommé. « ◂ » : le plus petit écart à la dernière clôture (il peut différer du nom gardé). Entre deux clôtures, les distances suivent le prix ; le nom, « ◂ » et la phrase de l’encadré ne changent qu’à une clôture ou quand un scénario se ferme. « Trop tôt pour départager » tant que le prix reste à moins de ' + nb(Q.departageMouvementPct) + ' % du prix du point pendant ' + premieres(Q.departageMinutes) + ', puis plus jamais de la journée. Un scénario invalidé s’efface en ' + Q.fonduMinutes + ' min après le créneau du contact ; sa marque ✗ reste.',
       'Aucun nom quand le plus petit écart des scénarios en cours est d’au moins ' + virg2(Q.colle) + ' (« aucun ne colle » : chacun plus près de sa limite que de sa zone ; seuil de convention). « Au-delà de tous les niveaux du matin » : le prix est à plus de ' + nb(Q.horsMarges) + ' marge' + (Q.horsMarges > 1 ? 's' : '') + ' au-delà du bord extérieur de la zone la plus extrême.',
       'Les scénarios ne s’excluent pas : leurs zones se recouvrent. Le classement du matin ne change pas. La note officielle reste celle du journal.'];
   }
 
-  return { FORMAT, RANGS, STATUTS, chiffres, prix, heureUTC, heureParis, jourGroupe, dateUTC, zone, lire, vivants, estAncien, ouvert, compte, suiviVide, pas, plier, etat, etatLarge, suivre, copie,
+  return { FORMAT, RANGS, STATUTS, chiffres, prix, heureVue, heureUTC: HEURE_UTC_EXPORT, heureParis: HEURE_PARIS_EXPORT, pointMs, instantPoint, jourGroupe, dateUTC, zone, lire, vivants, estAncien, ouvert, compte, suiviVide, pas, plier, etat, etatLarge, suivre, copie,
     niveaux, originePremiere, libelle, quand, creneau, motsStatut, texteEtat, titre, ligne, texteBilan, REGLE_BILAN, REGLE_BILAN_SUITE, explication, ligneEtats, noteLarge, manque, etatIncomplet, NOMS_RANG, COURTS_RANG, SENS_RANG,
     ETATS_COURTS_DEBUTANT, etatCourtDebutant, ligneBoiteDebutant, libelleDebutant, libellesDebutant, ligneDebutant, origineDebutant, etatLongDebutant, enteteDebutant, explicationDebutant, jourParis,
     PJ_DEFAUT, touchesValides, dansMarge, pointe, distanceZone, ouvertJour, position, fermeture, fondu, reste, grilleOk, decider, rejouerJour, horsNiveaux, classerJour, estRealise, raison, raisonCourte, pointeDe, jourSiAutre, ligneJourDebutant, libellesJourDebutant,

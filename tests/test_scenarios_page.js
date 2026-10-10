@@ -4,7 +4,8 @@
 //
 //   1. FICHIER COMPLET (1440 px débutant / expert, 1024 px et 390 px avec et sans le Guide) :
 //      4 scénarios suivis, l'encadré dans le tracé (moitié haute, dans l'écran), son titre
-//      « Scénarios du matin · JJ/MM 07h00 Paris », une ligne par scénario, « sans pourcentage »
+//      « Scénarios du matin · JJ/MM HH:MM » (le point du matin à l'heure de l'appareil, calculé avec
+//      Fmt ; ni « UTC » ni « Paris »), une ligne par scénario, « sans pourcentage »
 //      (débutant), le bilan de l'ordre et la mention « suivi en direct » ; aucun « % » en
 //      débutant ; libellé du rang 1 posé. AVEC le Guide (il place ses libellés d'abord), l'encadré
 //      peut être replié en une ligne : son explication dit alors tout ; sans le Guide, jamais ;
@@ -20,6 +21,8 @@
 const fs = require('fs'), path = require('path'), http = require('http');
 const REPO = path.resolve(__dirname, '..');
 const { previsionsFixture, previsionsAttente, estPrevisions } = require('./previsions-fixture');
+const Fm = require(path.join(REPO, 'js/format.js'));
+const Sc = require(path.join(REPO, 'js/scenarios.js'));
 
 let playwright = null;
 for (const p of ['playwright', '/opt/node22/lib/node_modules/playwright', process.env.PLAYWRIGHT_MODULE].filter(Boolean)) {
@@ -94,7 +97,7 @@ const etat = page => page.evaluate(() => {
   if (!S) return null;
   return {
     bx: b.left, by: b.top, vw: window.innerWidth, top: S.g.pad.top, ph: S.g.ph, left: S.g.pad.left, xMax: S.xMax,
-    items: S.items.map(i => ({ rang: i.sc.rang, et: i.et.texte })),
+    items: S.items.map(i => ({ rang: i.sc.rang, et: i.et.texte })), point: PARAM.scenarios.point,
     boite: S.boite ? { x: S.boite.x, y: S.boite.y, w: S.boite.w, h: S.boite.h, seule: S.boite.seule, replie: S.boite.replie, serre: S.boite.serre, lignes: S.boite.lignes.map(l => l.t) } : null,
     libelles: (S.libelles || []).slice(), mainH: geo && geo.mainH,
     // Les flèches des scénarios et les tracés du Guide (chemins conditionnels, formes).
@@ -127,7 +130,9 @@ const etat = page => page.evaluate(() => {
       const e = await etat(o.page);
       if (!e) { check(`${nom} : la couche des scénarios est préparée`, false); await o.ctx.close(); continue; }
       check(`${nom} : 4 scénarios suivis (1, 2, 3, semaine)`, e.items.map(i => i.rang).join() === '1,2,3,S', e.items);
-      const B = e.boite, jour = e.groupe.slice(8, 10) + '/' + e.groupe.slice(5, 7), titreB = 'Scénarios du matin · ' + jour + ' 07h00 Paris';
+      // Le point du matin (PARAM.scenarios.point, heure de la routine) du jour du fichier, dit à
+      // l'heure de l'appareil (Node et Chromium lisent le même fuseau).
+      const tp = Sc.pointMs(e.groupe, e.point), B = e.boite, titreB = 'Scénarios du matin · ' + Fm.jour(tp) + ' ' + Fm.heure(tp);
       // L'encadré ne couvre jamais les bougies récentes, ni des bougies au milieu du tracé : sous
       // 1400 px (bougies simulées sur toute la hauteur), il tient ou il est replié en une ligne qui
       // nomme le rang 1 si la ligne le permet, et dont l'explication dit tout ; jamais replié sur
@@ -156,7 +161,7 @@ const etat = page => page.evaluate(() => {
       // Replié en une ligne, ou serré (titre et états sur une ligne) : l'explication de l'encadré dit le reste.
       const expl = B && (B.replie || B.serre) ? (e.cibles.find(c => c.titre === titreB && c.prio === 0) || {}).texte || [] : [];
       const L = B ? (B.replie ? [B.lignes[0]].concat(expl) : B.serre ? B.lignes.concat(expl) : B.lignes) : [];
-      check(`${nom} : titre « ${titreB} »${repliable ? ' (replié : ou « Scénario 1 … »)' : ''}`, B && (B.lignes[0].startsWith(titreB) || (B.replie && /^Scénarios?( 1)?\b/.test(B.lignes[0]))), B && B.lignes[0]);
+      check(`${nom} : titre « ${titreB} »${repliable ? ' (replié : ou « Scénario 1 … »)' : ''}, sans « UTC » ni « Paris »`, B && Number.isFinite(tp) && (B.lignes[0].startsWith(titreB) || (B.replie && /^Scénarios?( 1)?\b/.test(B.lignes[0]))) && !/UTC|Paris/.test(B.lignes[0]), B && B.lignes[0]);
       check(`${nom} : l'encadré ne couvre aucune des bougies les plus récentes${B && B.replie ? ' (sauf ligne épinglée faute de place)' : ''}`,
         B && (B.replie || !e.recentes.some(c => c.x1 > B.x && c.x0 < B.x + B.w && c.y1 > B.y && c.y0 < B.y + B.h)), [B, e.recentes.slice(-3)]);
       check(`${nom} : une ligne par scénario, marquée 1., 2., 3., Semaine${B && (B.replie || B.serre) ? ' (dans l’explication de l’encadré ' + (B.replie ? 'replié' : 'serré') + ')' : ''}`, ['1. ', '2. ', '3. ', 'Semaine : '].every(m => L.some(l => l.startsWith(m))), L);
