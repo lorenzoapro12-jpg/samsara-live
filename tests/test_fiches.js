@@ -7,10 +7,13 @@
 //     le harnais change PARAM et vérifie que libellé et légende suivent, et qu'aucun libellé ni
 //     appel de calcul ne réécrit un nombre à la main ;
 //   · mode débutant / expert -> le HTML est IDENTIQUE dans les deux modes ;
-//   · une lecture n'est pas un conseil -> aucun impératif d'achat / de vente.
+//   · une lecture n'est pas un conseil -> aucun impératif d'achat / de vente, ni rebond annoncé,
+//     ni « retour vers le milieu », ni stop à placer ou position à dimensionner ;
+//   · aucun nombre avec unité recopié dans TRADERS, CALCUL, USAGES : ils sont LUS (PARAM, meta,
+//     CADENCES, la carte publiée) — le harnais change chaque source et vérifie que le texte suit.
 //
 // USAGE   node tests/test_fiches.js
-const fs = require('fs'), path = require('path'), { execFileSync } = require('child_process');
+const fs = require('fs'), path = require('path'), vm = require('vm'), { execFileSync } = require('child_process');
 const { REPO } = require('./sources');
 
 let ko = 0;
@@ -98,10 +101,13 @@ check('la formule est réservée au mode expert (dans chaque fiche)', Object.key
 
 // ── 5. Une lecture n'est pas un conseil ──────────────────────────────────────
 titre('5. « Voici comment ça se lit » n’est pas « voici quoi faire »');
-const CONSEIL = /\b(achetez|vendez|achète[rz]?\b|vends\b|il faut (?:acheter|vendre)|entrez|sortez|prenez position|signal d['’]achat|signal de vente|recommand(?:e|ons))/i;
+const CONSEIL = /\b(achetez|vendez|achète[rz]?\b|vends\b|il faut (?:acheter|vendre)|entrez|sortez|prenez position|signal d['’]achat|signal de vente|recommand(?:e|ons)|retours? vers|rebond|plac(?:er|ez?|ent)\s+(?:un|des|les|leurs?|ses|vos|votre)\s+stops?|dimensionn)/i;
 const textes = Object.entries(T.FICHES).flatMap(([k, f]) => [f.simple, f.simpleDeb, f.titreDeb, f.debat, f.limites, ...f.lectures.map(l => l.t)].filter(Boolean).map(t => [k, t]));
 const conseils = textes.filter(([, t]) => CONSEIL.test(t));
 check('aucune fiche ne dit quoi acheter ou vendre', !conseils.length, conseils);
+// Les dents de la liste : les tournures retirées des fiches (RSI, liquidité, ATR) y tombent.
+const RETIREES = ['certains attendent un retour vers le milieu', 'des zones de freinage ou de rebond', 'Sert à placer les stops', 'à dimensionner les positions', 'un rebond est attendu'];
+check('la liste attrape « retour vers le milieu », « rebond », « placer les stops », « dimensionner »', RETIREES.every(t => CONSEIL.test(t)), RETIREES.filter(t => !CONSEIL.test(t)));
 const courtes = ['funding', 'oi', 'ls', 'cvd', 'gex', 'rsi_tf', 'vix', 'prime', 'carnet'].flatMap(k => [-5, -0.5, 0.2, 1, 50, 80].map(v => T.lectureCourte(k, v)));
 check('aucune lecture courte ne dit quoi faire', courtes.every(t => !CONSEIL.test(t)));
 // Les phrases des cartes du Débutant (phraseCarte) : le même bloc réservé au Débutant, en mots
@@ -237,6 +243,92 @@ titre('9. Chaque indicateur du menu : comment les traders l’utilisent, comment
   Object.assign(T.PARAM, JSON.parse(sauveP));
   check('Ichimoku, SAR, Fibonacci, profil de volume : le dessin lit PARAM', /calcIchimoku, highs, lows, closes, PARAM\.ichimoku\.tenkan/.test(SRC_APP) && /calcSAR, highs2, lows2, closes, PARAM\.sar\.pas, PARAM\.sar\.max/.test(SRC_APP)
     && /fibLevels = PARAM\.fib\.niveaux/.test(SRC_APP) && /PARAM\.vp\.zoneValeur/.test(SRC_APP) && !/\[0, 0\.236, 0\.382/.test(SRC_APP.replace(/^.*fib: \{ niveaux.*$/m, '')));
+}
+
+// ── 10. Aucun nombre recopié : TRADERS, CALCUL, USAGES lisent PARAM, meta, CADENCES et la carte ──
+titre('10. Les nombres des textes sont LUS (PARAM, meta.champs, CADENCES, carte publiée), jamais recopiés');
+{
+  const S = require(path.join(REPO, 'js/scenarios.js')), Fm = require(path.join(REPO, 'js/format.js')), Gd = require(path.join(REPO, 'js/guide.js'));
+  // Statique : dans les trois tables, aucune chaîne n'écrit un nombre suivi d'une unité.
+  const src = SRC_FICHES.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const table = nom => { const i = src.indexOf('const ' + nom + ' = {'); if (i < 0) return null; let k = src.indexOf('{', i), n = 0; const d = k;
+    do { n += { '{': 1, '}': -1 }[src[k]] || 0; k++; } while (n && k < src.length); return src.slice(d, k); };
+  const UNITE = /\d+(?:[,.]\d+)?\s*(?:%|\$|h\b|min\b|minutes?\b|s\b|secondes?\b|bougies?\b|jours?\b|heures?\b|semaines?\b|mois\b|BTC\b|ATR\b)/;
+  const enDur = ['TRADERS', 'CALCUL', 'USAGES'].flatMap(nom => { const b = table(nom); return b === null ? [nom + ' introuvable'] : (b.match(/'(?:[^'\\\n]|\\.)*'/g) || []).filter(t => UNITE.test(t)).map(t => nom + ' : ' + t); });
+  check('TRADERS, CALCUL, USAGES : aucun nombre avec unité écrit en dur', !enDur.length, enDur);
+  check('les dents du contrôle : « 20 $ », « 8 h », « 14 bougies », « ±0,5 % », « 5 min » y tombent', ["'tranche de 20 $'", "'toutes les 8 h'", "'Wilder, 14 bougies'", "'à ±0,5 % du milieu'", "'bougie de 5 min'"].every(t => UNITE.test(t)));
+  check('js/fiches.js : ni « 07h00 » ni seuil de prime 0.03 écrits dans le code', !/07h00|\b0\.03\b/.test(src));
+  // Dynamique : chaque source change, le texte suit.
+  const calc = k => { const f = T.FICHES[k]; return typeof f.calcul === 'function' ? f.calcul(T.PARAM) : f.calcul; };
+  const meta2 = JSON.parse(JSON.stringify(META)), prm = (c, o) => Object.assign(meta2[c].params, o);
+  prm('tf.*.rsi_14', { periode: 21 }); prm('tf.*.atr_14', { periode: 9 }); prm('tf.*.support_30', { bougies: 40 }); prm('tf.*.amplitude_30_pct', { bougies: 45 });
+  prm('tf.*.volume_moyen_10_btc', { bougies: 12 }); prm('tf.*.ema20', { periode: 21 }); prm('tf.*.ema50', { periode: 55 }); prm('tf.*.ema20_sous_ema50', { courte: 9, longue: 21 });
+  prm('liquidity.bid_walls', { tranche_usd: 50, n: 4 }); prm('micro.funding_annual_pct', { echeances_par_jour: 6 }); prm('micro.oi_change_24h_pct', { fenetre_h: 12 });
+  prm('micro.cvd_24h_usd', { intervalle_min: 1 }); prm('micro.gex_usd_1pct', { mouvement_pct: 2 }); prm('micro.premium_state', { seuil_pct: 0.5 });
+  T.setData(Object.assign({}, DATA, { meta: { version: 1, champs: meta2 } }));
+  const suit = { rsi_tf: 'Wilder, 21 bougies', atr_tf: 'lissé sur 9 bougies', sr_tf: 'des 40 dernières bougies', amplitude: 'des 45 dernières bougies', volume_tf: 'des 12 dernières bougies',
+    ema_tf: 'sur 21 et 55 bougies', croisement: 'exponentielle 9 est sous la 21', murs: 'tranches de 50 $', funding: '6 fois par jour (toutes les 4 h)', oi: 'il y a 12 h', cvd: 'bougie de 1 min', gex: 'pour 2 % de prix' };
+  const rate = Object.entries(suit).filter(([k, t]) => !calc(k).includes(t)).map(([k]) => [k, calc(k)]);
+  check('meta.champs change (périodes, fenêtres, tranche, échéances, mouvement) → chaque calcul en mots suit', !rate.length, rate);
+  check('… et les textes qui citent les mêmes paramètres : les 4 murs, le funding de la fiche, le seuil de la prime (0,5 % → 0,2 % « pas d’écart notable »)', calc('murs').includes('les 4 tranches')
+    && T.FICHES.funding.simple.includes('toutes les 4 h') && /Pas d’écart notable/.test(T.lectureCourte('prime', 0.2)) && /plus cher sur Coinbase/.test(T.lectureCourte('prime', 0.6)));
+  T.setData(Object.assign({}, DATA, { meta: undefined }));
+  const sansMeta = ['rsi_tf', 'atr_tf', 'sr_tf', 'amplitude', 'volume_tf', 'ema_tf', 'croisement', 'murs', 'funding', 'oi', 'cvd', 'gex'].map(k => [k, calc(k)]).filter(([, t]) => /\d/.test(t));
+  check('fichier sans meta : ces calculs se disent en mots, sans nombre inventé', !sansMeta.length, sansMeta);
+  T.setData(Object.assign({}, DATA, { meta: { version: 1, champs: META } }));
+  // PARAM, CADENCES, la carte publiée.
+  const sauveP = JSON.stringify(T.PARAM), sauveC = Object.assign({}, T.CADENCES), itv = vm.runInContext('chartInterval', page.sandbox);
+  T.PARAM.vp.zoneValeur = 0.68; T.PARAM.fib.niveaux = [0, 0.4, 0.5, 1]; T.PARAM.sr.demiVie[itv] = 90; T.CADENCES.attendue_min = 5;
+  Object.assign(T.PARAM.scenarios.jour, { quartMs: 1800000, ecartChangement: 0.2, colle: 0.4, fonduMinutes: 30, departageMinutes: 30, departageMouvementPct: 0.25, horsMarges: 2 });
+  const journee = T.FICHES.scenarios.lectures.find(l => l.mode === 'expert' && /Pendant la journée/.test(l.t)).t;
+  const lus = { vp: T.FICHES.vp.traders.includes('68 % des échanges'), fib: T.FICHES.fib.traders.includes('(40 %, 50 %)') && T.FICHES.fib.simple.includes('(40 %, 50 %)'),
+    sr: calc('sr').includes('toutes les 90 bougies'), liq: calc('liq').includes('toutes les 5 min') && T.FICHES.liq.formule(T.PARAM).includes('toutes les 5 min') && T.FICHES.liq.limites.includes('à 5 min'),
+    journee: ['clôture de 30 min', 'avec 0,2 d’avance', 'au moins 0,4', 's’efface en 30 min', 'pendant les 30 premières minutes', 'moins de 0,25 %', 'plus de 2 marges'].every(t => journee.includes(t)),
+    usage: T.FICHES.scenarios.usage.exp.includes('clôture de 30 min') };
+  Object.assign(T.PARAM, JSON.parse(sauveP)); Object.assign(T.CADENCES, sauveC);
+  check('PARAM / CADENCES changent → usage des traders (profil, Fibonacci), demi-vie des S/R, cadence de la carte, règles de la journée des scénarios suivent', Object.values(lus).every(Boolean), lus);
+  vm.runInContext('histHeatmap = { dt: 120, dp: 50 }', page.sandbox);
+  const l2 = [T.FICHES.liq.formule(T.PARAM), calc('liq')];
+  vm.runInContext('histHeatmap = { dt: 60, dp: 20 }', page.sandbox);
+  const l1 = [T.FICHES.liq.formule(T.PARAM), calc('liq')];
+  vm.runInContext('histHeatmap = null', page.sandbox);
+  check('la grille de la carte (heatmap.json : dt, dp) est lue dans le fichier : « une colonne toutes les 2 min, … par 50 $ » ; « par minute, … par 20 $ »',
+    l2[0].includes('une colonne toutes les 2 min, une tranche de prix par 50 $') && /^Toutes les 2 min, .* de 50 \$/.test(l2[1]) && l1[0].includes('une colonne par minute, une tranche de prix par 20 $') && /^Chaque minute, .* de 20 \$/.test(l1[1]), { l1, l2 });
+  // Le point du matin : une heure de la routine (Paris), dite à l'heure de l'appareil.
+  const jourIso = new Date().toISOString().slice(0, 10), pt = T.PARAM.scenarios.point;
+  const fs1 = T.FICHES.scenarios.formule(T.PARAM);
+  T.PARAM.scenarios.point = '08h30';
+  const fs2 = T.FICHES.scenarios.formule(T.PARAM);
+  T.PARAM.scenarios.point = pt;
+  check('fiche des scénarios : « Point du matin : » à l’heure de l’appareil (Fmt.heure), lu dans PARAM.scenarios.point ; ni « Paris » ni « 07h00 »',
+    fs1.startsWith('Point du matin : ' + Fm.heure(S.pointMs(jourIso, pt)) + ',') && fs2.startsWith('Point du matin : ' + Fm.heure(S.pointMs(jourIso, '08h30')) + ',') && !/Paris|07h00|UTC/.test(fs1), [fs1.slice(0, 40), fs2.slice(0, 40)]);
+}
+
+// ── 11. Ce que la page calcule vraiment, et un seul mot pour une chose (incohérences relevées le 10/10/2026) ──
+titre('11. Les fiches disent ce que la page calcule, avec les mots de l’écran');
+{
+  const Gd = require(path.join(REPO, 'js/guide.js'));
+  const calc = k => { const f = T.FICHES[k]; return typeof f.calcul === 'function' ? f.calcul(T.PARAM) : f.calcul; };
+  check('carnet : la bande de référence, sinon la PLUS ÉTROITE publiée (comme le serveur), jamais « la plus large »', /la plus étroite publiée/.test(calc('carnet')) && !/la plus large/.test(calc('carnet')), calc('carnet'));
+  check('volume : la quantité de l’actif de base de la paire, pas « de BTC » pour toutes', /actif de base de la paire/.test(calc('volume')) && /des SOL pour SOL\/USDT/.test(calc('volume')) && !/quantité de BTC/.test(calc('volume')));
+  check('MFI : un flux est positif quand le prix typique dépasse celui de la bougie PRÉCÉDENTE (calcMFI), pas selon le sens de la bougie',
+    /bougie précédente/.test(calc('mfi')) && /bougie précédente/.test(T.FICHES.mfi.formule(T.PARAM)) && !/bougies en hausse/.test(calc('mfi')) && /tp\[j\] > tp\[j - 1\]/.test(SRC_APP));
+  check('S/R : un score de récence (demi-vie) × log du volume, pas « nombre de contacts » ni « ancienneté »', /récence/.test(calc('sr')) && /logarithme de leur volume/.test(calc('sr')) && !/nombre de contacts|ancienneté/.test(calc('sr'))
+    && /recency \* volW/.test(SRC_APP) && !/\d\.\d/.test(T.FICHES.sr.formule(T.PARAM)));
+  check('RSI : « suracheté » / « survendu » partout (plus « surachat » / « survente »), et rien n’annonce un retour', Object.values(T.FICHES).every(f => !/surachat|survente/.test([f.traders, f.simple, ...(f.lectures || []).map(l => l.t)].join(' ')))
+    && /« suracheté »/.test(T.FICHES.rsi.traders) && !CONSEIL.test(T.FICHES.rsi.traders + T.FICHES.stoch.traders + T.FICHES.liq.traders + T.FICHES.atr.traders + T.FICHES.atr_tf.traders));
+  const vix = [12, 20, 30].map(v => [T.lectureCourte('vix', v), T.phraseCarte('vix', v)]);
+  check('VIX : une seule phrase pour les mêmes repères (lecture courte = carte), sans mot technique', vix.every(([a, b]) => a === b && a && !Gd.motsBannis(a).length), vix);
+  const lq = T.FICHES.liq;
+  check('carte : un seul nom (« Ordres en attente (carte) »), plus de note sur les colonnes d’avant le 08/10, l’âge dit avec la cadence publiée', lq.titre === 'Ordres en attente (carte)' && !/08\/10/.test(lq.formule(T.PARAM))
+    && lq.limites.includes('toutes les ' + T.CADENCES.attendue_min + ' min') && !/quart d’heure|vingtaine/.test(lq.limites));
+  check('guide et scénarios : en Débutant, « + Affichage » (le menu Débutant n’a pas de catégorie)', ['guide', 'scenarios'].every(k => /« \+ Affichage » en mode Débutant/.test(T.FICHES[k].limites)));
+  check('la couche Guide en Débutant : un seul nom, du menu (LIBELLES_DEBUTANT) à la fiche et au glossaire', vm.runInContext('LIBELLES_DEBUTANT.guide', page.sandbox) === T.FICHES.guide.titreDeb);
+  check('« Et ensuite ? » : la marge de futur reçoit aussi les flèches des scénarios (elle ne disparaît pas avec le seul Guide)', /flèches des scénarios/.test(T.FICHES.guide_suite.limites) && !/ne sert qu’à dessiner ces chemins/.test(T.FICHES.guide_suite.limites));
+  const fg = T.FICHES.guide_formes, txtF = [fg.simple, fg.simpleDeb, ...fg.lectures.map(l => l.t), T.FICHES.guide.usage.exp, T.FICHES.guide.usage.deb].join(' ');
+  check('figures : « validée » (plus « confirmée »), en tirets tant qu’elles se forment, une marque par issue (✗, –, ○)', !/« confirmé »|à confirmer|confirmée|confirmations/.test(txtF) && /en tirets/.test(fg.simpleDeb) && /en tirets/.test(T.FICHES.guide.usage.exp) && /en tirets/.test(T.FICHES.guide.usage.deb)
+    && /délai écoulé –/.test(fg.simple) && /sans suite ○/.test(fg.simple) && /jamais sur un prix de clôture/.test(txtF));
+  check('repères du Guide : l’heure de lecture sans « UTC » (heure de l’appareil)', !/UTC/.test([T.FICHES.guide_niveaux.simple, T.FICHES.guide_niveaux.limites, ...T.FICHES.guide_niveaux.lectures.map(l => l.t)].join(' ').replace(/journée UTC/g, '')));
 }
 
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
