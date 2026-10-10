@@ -205,7 +205,8 @@ async function controlerEcran(o, nom, opts = {}) {
   check(`${nom} : chaque texte du registre est celui dessiné`, e.items.every(i => e.trace.includes(i.texte)), { items: e.items.map(i => i.texte), trace: e.trace });
   // 2. Limites, en caractères et dans le tracé.
   const trop = e.items.filter(i => i.texte.length > LIMITES[i.role][etroit ? 1 : 0]);
-  check(`${nom} : limites de caractères (phrase ${etroit ? 48 : 90}, repère ${etroit ? 18 : 26}, scénario 32, forme 24, ligne ${etroit ? 40 : 48})`, !trop.length, trop);
+  const lim = k => LIMITES[k][etroit ? 1 : 0];
+  check(`${nom} : limites de caractères (phrase ${lim('phrase')}, repère ${lim('niveau')}, scénario ${lim('scenario')}, forme ${lim('forme')}, ligne ${lim('boite')})`, !trop.length, trop);
   const dehors = e.items.filter(i => !i.rect || i.rect.x < 16 - 0.5 || i.rect.x + i.rect.w > e.xAxe + 0.5 || i.rect.y < 0 || i.rect.y + i.rect.h > e.mainH - 20 + 0.5);
   check(`${nom} : chaque texte tient dans le tracé, en pixels`, !dehors.length, dehors);
   // 3. Mots (et aucun pourcentage sur le tracé : choix 1B, rien qui se lise comme une probabilité).
@@ -505,8 +506,8 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       await o.ctx.close();
     }
 
-    // ── 4 h, une forme confirmée : elle entre, la ligne des scénarios cède (budget) ──
-    titre('4 h · double sommet confirmé (forme forcée)');
+    // ── 4 h, une forme validée : elle entre, la ligne des scénarios cède (budget) ──
+    titre('4 h · double sommet validé (forme forcée)');
     {
       const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
       await o.page.click('#int_4h'); await o.page.waitForTimeout(1500);
@@ -532,8 +533,8 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       });
       const roles = r.items.map(i => i.role);
       // (Amendement C1 : le libellé de la figure est posé sur le calque et dit l'état vivant au prix
-      // live ; « Double sommet confirmé » est le libellé de la clôture, le texte posé l'un des possibles.)
-      check('4 h : « Double sommet confirmé » posé, au plus 5 textes', roles.includes('forme') && r.items.length <= 5 && r.base === 'Double sommet confirmé'
+      // live ; « Double sommet validé » est le libellé de la clôture, le texte posé l'un des possibles.)
+      check('4 h : « Double sommet validé » posé, au plus 5 textes', roles.includes('forme') && r.items.length <= 5 && r.base === 'Double sommet validé'
         && r.items.some(i => i.role === 'forme' && r.possibles.includes(i.texte)), { base: r.base, items: r.items });
       if (roles.includes('scenario')) check('4 h : forme + scénario 1 posés → la ligne des scénarios cède ; sa bulle passe dans celle du libellé « Scénario 1 »', r.cede && !roles.includes('boite') && /La ligne des scénarios/.test(r.un), r);
       // (Amendement E4 : la cible s'écrit « cible théorique selon l'usage des analystes : X, non garantie ».)
@@ -547,7 +548,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
     }
 
     // ── Une figure qui se dessine encore : nommée « possible », en tirets, sa bulle dit ce qui la validerait ──
-    titre('15 min · double creux possible (forme forcée, pas encore confirmée)');
+    titre('15 min · double creux possible (forme forcée, pas encore validée)');
     {
       const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
       const r = await o.page.evaluate(() => {
@@ -567,7 +568,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         Guide.formesAffichees = f0; Guide.formesDebutant = fd0; if (GUIDE_FORMES.val) GUIDE_FORMES.val.bilan = b0; drawChart();
         return { base, possibles, items, forme: forme ? { titre: forme.titre, texte: forme.texte.join(' ') } : null };
       });
-      // (Amendement C1 : au prix live, le libellé peut dire « Ligne passée, à confirmer »…)
+      // (Amendement C1 : au prix live, le libellé peut dire « … à valider »…)
       check('« Double creux possible » posé, au plus 5 textes', r.base === 'Double creux possible' && r.items.some(i => i.role === 'forme' && r.possibles.includes(i.texte)) && r.items.length <= 5, { base: r.base, items: r.items });
       check('sa bulle : ce qu’on voit, ce qui la validerait (« serait validée si le prix finit 2 quarts d’heure de suite au-dessus de »), le bilan mesuré, aucun prix visé, aucun mot banni',
         r.forme && /^Double creux possible : le prix a rebondi deux fois vers /.test(r.forme.texte) && /serait validée si le prix finit 2 quarts d’heure de suite au-dessus de /.test(r.forme.texte)
@@ -761,8 +762,10 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         return { texte: p.innerText, ouvert: !p.hidden, replie: !!d && !d.open, h4: [...p.querySelectorAll('h4')].filter(vis).map(h => h.innerText.trim()).filter(Boolean),
           boutons: [...p.querySelectorAll('.glossaire-item')].filter(vis).map(b => b.innerText) };
       });
+      // Les noms des fiches du Guide sont ceux du menu « + Affichage » (« Repères et phrase de
+      // lecture ») ; la fiche des niveaux, « Les repères de prix » (elle ne parle que des repères).
       check('Légendes, Débutant : « Ce que montre l’écran » d’abord (phrase et repères, scénarios du matin, les cartes) ; les fiches de l’Expert repliées',
-        g.ouvert && g.replie && /^Ce que montre l’écran$/i.test(g.h4[0]) && g.h4.length === 1 && g.boutons.includes('Scénarios du matin') && g.boutons.includes('La phrase et les deux repères') && g.boutons.includes('Ordres en attente'), g);
+        g.ouvert && g.replie && /^Ce que montre l’écran$/i.test(g.h4[0]) && g.h4.length === 1 && g.boutons.includes('Scénarios du matin') && g.boutons.includes('Repères et phrase de lecture') && g.boutons.includes('Les repères de prix') && g.boutons.includes('Ordres en attente'), g);
       check('Légendes, Débutant : aucun mot banni dans ce qui est affiché', !bannis(g.texte).length && !CONSEIL.test(g.texte), bannis(g.texte));
       // Les fiches du Guide ouvertes en Débutant : leur explication est celle de l'écran Débutant.
       const fiches = [];
