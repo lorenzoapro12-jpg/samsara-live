@@ -1,0 +1,156 @@
+{
+ "format": "previsions-1",
+ "updated": "2026-10-10T06:00Z",
+ "groupe": "2026-10-10",
+ "version_methode": "v1",
+ "marge_pct": 1,
+ "emis_utc": "2026-10-10T05:59Z",
+ "prix_emission": 82844,
+ "scenarios": [
+  {
+   "id": "P0004",
+   "rang": "1",
+   "groupe": "2026-10-10",
+   "emis_utc": "2026-10-10T05:59Z",
+   "fin_utc": "2026-10-11T04:20Z",
+   "horizon_h": 22.3351,
+   "prix_emission": 82844,
+   "forme": "range",
+   "cibles": [],
+   "invalidation": null,
+   "range": [
+    82285,
+    83528
+   ],
+   "marge_pct": 1,
+   "etiquettes": [
+    "zero_gamma",
+    "structure"
+   ],
+   "origines": {
+    "82285": "plus bas du 09/10 après 07h (82 286)",
+    "83528": "plus haut du 09/10 (83 529), rejet sous 83 500"
+   },
+   "enonce": "Range de week-end entre le plus bas et le plus haut du 09/10",
+   "version_methode": "v1",
+   "base_hasard_pct": 83.9,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [],
+   "invalidation_utc": null
+  },
+  {
+   "id": "P0005",
+   "rang": "2",
+   "groupe": "2026-10-10",
+   "emis_utc": "2026-10-10T06:00Z",
+   "fin_utc": "2026-10-11T04:20Z",
+   "horizon_h": 22.3318,
+   "prix_emission": 82841,
+   "forme": "chemin",
+   "cibles": [
+    84500
+   ],
+   "invalidation": 81000,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "cvd",
+    "long_short",
+    "funding"
+   ],
+   "origines": {
+    "84500": "haut de la zone R4, Bollinger haute 4h à 84 901",
+    "81000": "support R1, Bollinger basse 4h à 81 041"
+   },
+   "enonce": "Sortie par le haut : 84 500 avant 81 000",
+   "version_methode": "v1",
+   "base_hasard_pct": 50.7,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [
+    null
+   ],
+   "invalidation_utc": null
+  },
+  {
+   "id": "P0006",
+   "rang": "3",
+   "groupe": "2026-10-10",
+   "emis_utc": "2026-10-10T06:00Z",
+   "fin_utc": "2026-10-11T04:20Z",
+   "horizon_h": 22.3287,
+   "prix_emission": 82829,
+   "forme": "chemin",
+   "cibles": [
+    81000
+   ],
+   "invalidation": 84500,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure",
+    "mur_carnet"
+   ],
+   "origines": {
+    "81000": "support R1, Bollinger basse 4h à 81 041",
+    "84500": "haut de la zone R4, Bollinger haute 4h à 84 901"
+   },
+   "enonce": "Nouvel échec sous 83 500 : 81 000 avant 84 500",
+   "version_methode": "v1",
+   "base_hasard_pct": 5.2,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [
+    null
+   ],
+   "invalidation_utc": null
+  }
+ ],
+ "precedents": [
+  {
+   "groupe": "2026-10-09",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range sous le plancher cassé : ni 80 190 ni 84 335 touchés",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Rejet du plancher cassé, retour vers 80 400 avant 84 500",
+     "statut": "⌛",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Plancher repris, 84 500 avant 80 400",
+     "statut": "⌛",
+     "premier_ok": null
+    }
+   ]
+  }
+ ],
+ "bilan": {
+  "ordre": {
+   "matins": 0,
+   "reussis": 0,
+   "regle": "chemin le mieux classé avec invalidation, première zone touchée avant l'invalidation"
+  }
+ },
+ "statuts": {
+  "⏳": "en cours",
+  "✅": "réalisé",
+  "❌": "invalidé d'abord",
+  "◐": "partiel",
+  "⌛": "rien de touché",
+  "⚠": "ambigu"
+ }
+}
