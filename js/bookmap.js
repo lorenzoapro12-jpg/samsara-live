@@ -3198,11 +3198,11 @@
     // Mémoire du carnet et rafales : chaque nombre vient de BM.PRESENCE / BM.RAFALES / l'encodage publié.
     const P = BM.PRESENCE, RF = BM.RAFALES, sp = BM.seuilPresence(R.presenceSeuil, enc), lst = a => a.map(v => BM.nombre(v, 0, 2)).join(', ');
     const seuilTxt = sp ? '≥ ' + BM.nombre(sp.qS, 2, 2) + ' BTC (intensité ≥ ' + sp.vS + ' : le cran publié qui porte le seuil choisi, ' + BM.nombre(R.presenceSeuil, 0, 2) + ' BTC)' : null;
-    tx('legMemoire', 'Pour chaque tranche de la carte publiée, la part des minutes OBSERVÉES de la fenêtre visible pendant lesquelles la tranche portait (somme des ordres) '
-      + (seuilTxt || 'au-dessus du seuil choisi') + ' s\'y trouvait — bid ou ask (mesuré, lu sur la carte publiée brute : la fusion n\'y change rien). '
+    tx('legMemoire', 'Pour chaque tranche de la carte publiée, la part des minutes OBSERVÉES de la fenêtre visible pendant lesquelles la somme des ordres de la tranche était '
+      + (seuilTxt || 'au-dessus du seuil choisi') + ' — bid ou ask (mesuré, lu sur la carte publiée brute : la fusion n\'y change rien). '
       + 'Échelle FIXE de 0 à 100 % (le pointillé marque 50 %) ; couleur du côté le plus souvent présent. Un pixel qui couvre plusieurs tranches montre la plus grande part. '
       + 'Conventions : « observée » = dans la bande déduite des cellules de la minute (un peu plus étroite que la bande lue) ; une tranche observée moins de '
-      + P.minObserveMin + ' min est hachurée. Seuils proposés : ' + lst(P.seuilsBtc) + ' BTC. Rien ne dit que ce sont les mêmes ordres d\'une minute à l\'autre. '
+      + P.minObserveMin + ' min est hachurée. Seuils proposés : ' + lst(P.seuilsBtc) + ' BTC. Un niveau de la carte peut réunir plusieurs ordres : rien ne dit que ce sont les mêmes d\'une minute à l\'autre. '
       + 'Présence passée, ni support ni résistance.' + (sp ? '' : ' Encodage non publié : aucun seuil en BTC, le calque est éteint.'));
     tx('rPresenceNote', sp ? 'Seuil appliqué : ' + seuilTxt + '.' : 'Encodage non publié par la carte : aucun seuil en BTC.');
     tx('legRafales', 'Exécutions d\'une même milliseconde, d\'un même côté, aux identifiants consécutifs (mesuré) : un trait du prix le plus bas au plus haut, ▲ achat / ▼ vente au marché. '
