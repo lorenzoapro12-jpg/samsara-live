@@ -3417,22 +3417,24 @@ function drawRangeSelector(candles, W, H) {
   
   // Débutant : la navigation seule (ni compteurs ni légende des sessions).
   if (debutant()) return;
-  // Compteur bougies sur le RS
+  // Compteur bougies sur le RS. Le nombre de bougies vues (« 50/3 000 ») est écrit en haut à
+  // gauche du tracé : le répéter ici le mettait sous la légende des sessions et hors du cadre,
+  // le cadre des bougies vues étant presque toujours collé à droite.
   ctx.fillStyle = COLORS.text; ctx.font = chartFont(8);
-  ctx.fillText(Fmt.nombre(candles.length) + ' bougies', padL + 4, rsY + 12);
+  const rsTxt = Fmt.nombre(candles.length) + ' bougies';
+  ctx.fillText(rsTxt, padL + 4, rsY + 12);
+  const rsTxtFin = padL + 4 + ctx.measureText(rsTxt).width;
   
-  // Label viewport
-  const vpLabel = Fmt.nombre(ve - vs) + '/' + Fmt.nombre(candles.length);
-  ctx.fillText(vpLabel, vrX + Math.max(0, vrW / 2 - 15), rsY + 12);
-  
-  // Légende sessions — fond opaque, droite du RS
+  // Légende sessions — fond opaque, à droite du RS ; à gauche (après le compteur) quand le cadre
+  // des bougies vues est à droite, pour ne jamais le couvrir.
   const sesColors = [
     { label: 'Asie', color: COLORS.sess[0], hours: '00-09' },
     { label: 'Europe', color: COLORS.sess[1], hours: '07-16' },
     { label: 'US', color: COLORS.sess[2], hours: '13-21' }
   ];
-  const legW = 130, legH = 14;
-  const legX = W - padR - legW - 2, legY = rsY + 4;
+  const legW = 130, legH = 14, legY = rsY + 4;
+  const libre = x => x + legW < vrX - 3 || x > vrX + vrW + 3;
+  const legX = [W - padR - legW - 2, rsTxtFin + 10].find(libre) || W - padR - legW - 2;
   ctx.fillStyle = COLORS.bulle;
   ctx.strokeStyle = COLORS.hairline;
   ctx.lineWidth = 0.5;

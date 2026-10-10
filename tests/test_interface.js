@@ -20,6 +20,8 @@
 //      et hors du compteur.
 //   5. ÂGE DE LA CARTE : à droite du compteur, sans le toucher ; au téléphone, sa forme courte
 //      (« Carte publiée il y a … ») et le compteur sans sa plage.
+//   6. SÉLECTEUR DE PLAGE : la légende des sessions ne couvre ni le cadre des bougies vues ni le
+//      compteur, que le cadre soit à droite ou à gauche ; « 50/3 000 » n'y est pas répété.
 //
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
 // USAGE   node tests/test_interface.js
@@ -484,6 +486,37 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       if (w >= 1440) check('1440 px : la forme pleine (ses deux âges) et le compteur avec sa plage', !!age && age.t === r5.age.texte && !!cpt && / → /.test(cpt.t), r5.vus);
       check(`${w} px : aucune erreur JavaScript`, !o5.erreurs.length, o5.erreurs);
       await o5.ctx.close();
+    }
+
+    // ─── 6. Le sélecteur de plage : la légende des sessions ne couvre ni le cadre ni le compteur ───
+    titre('6. Sélecteur de plage : légende des sessions à côté du cadre des bougies vues, jamais dessus');
+    for (const w of [390, 1440]) {
+      const o6 = await ouvrir(nav, BASE, { width: w, height: 844 });
+      const r6 = await o6.page.evaluate(() => {
+        const P = CanvasRenderingContext2D.prototype, ft = P.fillText, sr = P.strokeRect, rr = P.roundRect;
+        const lire = (vs, ve) => {
+          viewStart = vs; viewEnd = ve;
+          const t = [], c = [], l = [];
+          P.fillText = function (s, x, y) { if (this.canvas.id === 'chart') t.push({ t: String(s), x, y, l: this.measureText(String(s)).width }); return ft.apply(this, arguments); };
+          P.strokeRect = function (x, y, w, h) { if (this.canvas.id === 'chart') c.push({ x, y, w, h }); return sr.apply(this, arguments); };
+          P.roundRect = function (x, y, w, h) { if (this.canvas.id === 'chart') l.push({ x, y, w, h }); return rr.apply(this, arguments); };
+          try { drawChart(); } finally { P.fillText = ft; P.strokeRect = sr; P.roundRect = rr; }
+          const leg = l.find(r => r.w === 130 && r.h === 14), cadre = leg && c.find(r => r.y === leg.y - 2), rs = t.find(x => / bougies$/.test(x.t));
+          return { leg, cadre, rs, nombres: t.filter(x => /^\d[\d  ]*\/\d[\d  ]*$/.test(x.t)) };
+        };
+        const n = candles.length, droite = lire(n - 50, n), gauche = lire(0, 50);
+        lire(n - 50, n);
+        return { droite, gauche };
+      });
+      for (const [nom, r] of [['cadre à droite (les dernières bougies)', r6.droite], ['cadre à gauche (les plus anciennes)', r6.gauche]]) {
+        const { leg, cadre, rs } = r;
+        check(`${w} px · ${nom} : la légende ne couvre pas le cadre des bougies vues`,
+          !!leg && !!cadre && (leg.x + leg.w < cadre.x - 2 || leg.x > cadre.x + cadre.w + 2), { leg, cadre });
+        check(`${w} px · ${nom} : ni le compteur « ${rs ? rs.t : '—'} »`, !!leg && !!rs && (leg.x >= rs.x + rs.l + 4 || leg.x + leg.w <= rs.x - 4), { leg, rs });
+        check(`${w} px · ${nom} : « 50/3 000 » écrit une fois, en haut du tracé (pas répété sous la légende)`, r.nombres.length <= 1 && r.nombres.every(x => x.y === 13), r.nombres);
+      }
+      check(`${w} px : aucune erreur JavaScript`, !o6.erreurs.length, o6.erreurs);
+      await o6.ctx.close();
     }
   } finally { await nav.close(); serveur.close(); }
   console.log(ko ? `\n❌ INTERFACE : ${ko} contrôle(s) en échec` : '\n✅ INTERFACE : TOUS LES CONTRÔLES PASSENT');
