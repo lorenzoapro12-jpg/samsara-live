@@ -799,6 +799,169 @@ function calculTexte(f) {
   return typeof f.calcul === 'function' ? (typeof PARAM !== 'undefined' ? f.calcul(PARAM) : '') : f.calcul;
 }
 
+// ─── En trois lignes : ce que lit d'abord le Débutant ──────────────────────────────
+// Demande du 10/10/2026 : des explications qu'un adolescent comprend. Chaque fiche s'ouvre sur
+// trois lignes courtes — ce que c'est (une phrase, en gras), comment les traders s'en servent,
+// comment c'est calculé (deux phrases au plus chacune, sans formule) ; le reste (le texte entier,
+// les lectures, les limites, la formule) est replié sous « En savoir plus », ouvert en Expert.
+// Mêmes règles que TRADERS et CALCUL : l'usage courant, jamais un conseil ni une suite annoncée ;
+// les nombres lus là où le calcul les prend (PARAM, meta, CADENCES). Pour les fiches que l'écran
+// Débutant montre (GLOSSAIRE_DEBUTANT) et les calques simples, aucun mot de la liste du Guide
+// (tests/test_fiches.js) : « période » pour une bougie, « gros paquet d'ordres » pour un mur.
+// quoi : une phrase ; traders ou usage (guide, scénarios : « comment s'en servir ») ; calcul.
+// Une chaîne, ou une fonction de PARAM.
+const COURT = {
+  // ── Positionnement et dérivés (fichier de 15 min) ──
+  gex: { quoi: 'Une estimation : les vendeurs d’options vont-ils freiner les mouvements du prix, ou les accélérer ?',
+    traders: 'Positif, beaucoup s’attendent à un marché plus calme ; négatif, à des mouvements plus brusques. C’est une hypothèse sur des acteurs qu’on ne voit pas, et les spécialistes ne sont pas d’accord entre eux.',
+    calcul: 'On part de tous les contrats d’options ouverts sur la plateforme Deribit. Pour chacun, on estime ce que ses vendeurs devraient acheter ou vendre si le prix bougeait un peu, puis on additionne.' },
+  ls: { quoi: 'Chez Binance, combien de comptes parient sur la hausse du bitcoin pour un compte qui parie sur la baisse.',
+    traders: 'Beaucoup le lisent à contre-courant : quand presque tout le monde parie dans le même sens, un mouvement inverse peut forcer beaucoup de gens à fermer d’un coup. Il compte des comptes, pas de l’argent : un petit compte pèse autant qu’un gros.',
+    calcul: 'Binance compte les comptes en pari à la hausse et ceux en pari à la baisse sur son contrat sans date de fin (le « perpétuel »), puis divise les uns par les autres. Un nouveau chiffre chaque heure.' },
+  top_ls: { quoi: 'La même mesure chez les plus gros comptes de Binance, mais en argent plutôt qu’en nombre de comptes.',
+    traders: 'On le compare à celui de tous les comptes : quand les deux ne vont pas dans le même sens, beaucoup regardent ce que font les gros. Les gros comptes peuvent aussi se tromper.',
+    calcul: 'Binance additionne les paris à la hausse de ses plus gros comptes et les divise par leurs paris à la baisse. Un nouveau chiffre chaque heure.' },
+  taker: { quoi: 'Qui est le plus pressé : ceux qui achètent tout de suite au prix du moment, ou ceux qui vendent tout de suite ?',
+    traders: 'Au-dessus de 1, les acheteurs pressés dominent ; en dessous, les vendeurs pressés. On regarde si le prix suit cette pression ou s’il résiste.',
+    calcul: 'Sur le contrat perpétuel de Binance, ce qui a été acheté tout de suite est divisé par ce qui a été vendu tout de suite. Sur la dernière heure publiée.' },
+  funding: { quoi: 'Un petit paiement régulier entre ceux qui parient sur la hausse et ceux qui parient sur la baisse, pour que le prix du contrat reste collé au vrai prix.',
+    traders: 'Très positif : beaucoup parient sur la hausse avec de l’argent emprunté, et une baisse peut les forcer à vendre en chaîne. Très négatif : la même chose dans l’autre sens.',
+    calcul: () => 'Binance le fixe d’après l’écart entre le prix de son contrat perpétuel et le prix du bitcoin lui-même. Il est réglé ' + echeancesMots() + '.' },
+  oi: { quoi: 'Combien de paris sur le prix du bitcoin sont ouverts en ce moment, et si leur nombre grandit ou diminue.',
+    traders: 'Le prix et le nombre de paris qui montent ensemble : de nouveaux joueurs entrent. Une chute brutale du nombre de paris accompagne souvent une vague de fermetures forcées.',
+    calcul: () => 'Binance compte les contrats perpétuels ouverts : chacun a un acheteur et un vendeur. La variation compare le dernier chiffre à celui d’il y a ' + (heuresMeta('micro.oi_change_24h_pct') || 'une journée') + '.' },
+  cvd: { quoi: 'Qui a été le plus pressé d’échanger : les acheteurs ou les vendeurs ?',
+    traders: 'Le prix monte et les achats pressés dominent : la hausse est jugée solide. Le prix monte alors que les ventes pressées dominent : beaucoup la jugent fragile.',
+    calcul: 'On additionne tout ce qui a été acheté tout de suite au prix du moment, puis on retire tout ce qui a été vendu tout de suite. Le résultat est en dollars.' },
+  prime: { quoi: 'Le bitcoin coûte-t-il plus cher aux États-Unis, sur Coinbase, qu’ailleurs, sur Binance ?',
+    traders: 'Plus cher sur Coinbase pendant longtemps : beaucoup y lisent une forte demande américaine. Moins cher : une demande américaine faible.',
+    calcul: 'On compare le prix sur Coinbase, en dollars, au prix sur Binance, en USDT (une monnaie numérique qui vaut à peu près un dollar). L’écart est donné en pourcentage du prix.' },
+  dxy: { quoi: 'La force du dollar américain face aux grandes monnaies, l’euro surtout.',
+    traders: 'Un dollar qui monte est souvent allé avec une baisse du bitcoin et des actions, et l’inverse. Ce lien n’est pas une règle.',
+    calcul: 'Une moyenne de la valeur du dollar face à six monnaies, où l’euro compte pour plus de la moitié. Le chiffre du dernier jour, lu sur Yahoo Finance.' },
+  vix: { quoi: 'Un thermomètre de la nervosité des bourses américaines.',
+    traders: 'Quand il grimpe d’un coup, les gens vendent souvent ce qui est risqué, bitcoin compris. Bas, les marchés sont jugés calmes.',
+    calcul: 'La bourse de Chicago le calcule à partir du prix de contrats qui protègent contre de gros mouvements des grandes actions américaines. Plus ces protections coûtent cher, plus il est haut.' },
+  carnet: { quoi: 'Combien de bitcoins attendent d’être achetés, et combien attendent d’être vendus, tout près du prix.',
+    traders: 'On y cherche un côté nettement plus chargé que l’autre. Avec méfiance : un ordre peut être posé juste pour être vu, puis retiré.',
+    calcul: 'Sur Binance, on additionne les bitcoins posés à l’achat près du prix, puis ceux posés à la vente, et on compare les deux. Lu à chaque publication des infos du marché.' },
+  murs: { quoi: 'Les prix où le plus de bitcoins attendent d’être achetés ou vendus.',
+    traders: 'Ils sont surveillés quand le prix s’en approche : le gros paquet tient-il, est-il avalé, disparaît-il ? Un ordre peut être retiré à tout moment.',
+    calcul: () => { const t = prmMeta('liquidity.bid_walls', 'tranche_usd');
+      return 'On découpe les prix en tranches' + (t !== null ? ' de ' + nbF(t) + ' $' : '') + ' et on additionne les bitcoins posés dans chacune. Les murs sont les tranches les plus remplies, de chaque côté.'; } },
+  // ── Indicateurs du fichier (bloc tf) ──
+  rsi_tf: { quoi: 'Le même RSI que sur le graphique, calculé pour plusieurs durées : les hausses récentes ont-elles été plus fortes que les baisses ?',
+    traders: 'Au-dessus de 70, la hausse récente a été forte ; sous 30, la baisse récente a été forte. Comparer les durées montre si elles disent la même chose.',
+    calcul: () => 'Le serveur fait le même calcul que le graphique, sur ' + bougiesMeta('tf.*.rsi_14', 'periode', 'les dernières périodes') + ' de chaque durée. La période en cours compte : il bouge jusqu’à sa fin.' },
+  ema_tf: { quoi: 'Les moyennes du prix, calculées par le serveur pour plusieurs durées.',
+    traders: 'Comme sur le graphique : le prix au-dessus ou au-dessous, la moyenne courte au-dessus ou au-dessous de la longue. Elles sont surveillées quand le prix s’en approche.',
+    calcul: () => { const a = prmMeta('tf.*.ema20', 'periode'), b = prmMeta('tf.*.ema50', 'periode');
+      return 'Les moyennes des prix de fin' + (a !== null && b !== null ? ' des ' + nbF(a) + ' et des ' + nbF(b) + ' dernières périodes' : ' des dernières périodes') + ', les plus récents comptant davantage. La période en cours compte.'; } },
+  croisement: { quoi: 'Dit si la moyenne courte est sous la moyenne longue : un état, pas un moment.',
+    traders: 'La courte sous la longue est lue comme une tendance qui faiblit ; au-dessus, comme une tendance qui se renforce. Le célèbre « death cross » parle d’autres moyennes, en jours.',
+    calcul: () => { const a = prmMeta('tf.*.ema20_sous_ema50', 'courte'), b = prmMeta('tf.*.ema20_sous_ema50', 'longue');
+      return 'Oui si la moyenne ' + (a !== null && b !== null ? 'des ' + nbF(a) + ' dernières périodes est sous celle des ' + nbF(b) : 'courte est sous la longue') + ', sur la durée de la ligne. Lu au moment de la publication.'; } },
+  sr_tf: { quoi: 'Le plus bas et le plus haut récents du prix : sa fourchette.',
+    traders: 'Ces deux bornes sont surveillées quand le prix s’en approche. Les franchir est lu comme une sortie de la fourchette.',
+    calcul: () => { const v = prmMeta('tf.*.support_30', 'bougies');
+      return 'Le serveur prend le plus bas et le plus haut des ' + (v !== null ? nbF(v) + ' ' : '') + 'dernières périodes, pour plusieurs durées (heures, jours). La période en cours compte.'; } },
+  amplitude: { quoi: 'L’écart entre le plus haut et le plus bas récents, en pourcentage.',
+    traders: 'Il dit si le marché a été agité ou calme. Un marché très calme précède souvent un mouvement plus large, sans en dire le sens.',
+    calcul: () => 'Le plus haut moins le plus bas des ' + dernieresMeta('tf.*.amplitude_30_pct', 'bougies') + ', divisé par le plus bas. En pourcentage.' },
+  atr_tf: { quoi: 'De combien le prix bouge d’habitude pendant une période, pour plusieurs durées.',
+    traders: 'Comme sur le graphique : une règle graduée pour juger si un mouvement sort de l’ordinaire. Il ne dit pas le sens.',
+    calcul: () => 'Le même calcul que le graphique, fait par le serveur sur ' + bougiesMeta('tf.*.atr_14', 'periode', 'les dernières périodes') + ' de chaque durée.' },
+  volume_tf: { quoi: 'La quantité moyenne de bitcoins échangée par période, ces derniers temps.',
+    traders: 'Un repère : une période bien au-dessus de la moyenne est jugée importante ; un mouvement sur peu d’échanges, fragile.',
+    calcul: () => 'La moyenne des quantités échangées sur les ' + dernieresMeta('tf.*.volume_moyen_10_btc', 'bougies') + ', période en cours comprise.' },
+  // ── Indicateurs du graphique ──
+  rsi: { quoi: 'Le RSI dit si, ces derniers temps, les hausses ont été plus fortes que les baisses, sur une échelle de 0 à 100.',
+    traders: 'Au-dessus de 70 (« suracheté »), la hausse récente a été forte ; sous 30 (« survendu »), la baisse récente a été forte. Ce sont des noms, pas des annonces : le prix peut continuer dans le même sens longtemps.',
+    calcul: P => 'On compare la taille moyenne des hausses et des baisses sur les ' + P.rsi.periode + ' dernières périodes. Que des hausses donne 100, que des baisses donne 0, autant des deux donne 50.' },
+  ema: { quoi: 'Une ligne qui suit le prix moyen des dernières périodes : elle lisse les secousses pour montrer la direction.',
+    traders: 'Le prix au-dessus d’une moyenne qui monte : on parle de tendance à la hausse ; en dessous d’une moyenne qui baisse, de tendance à la baisse. Quand une moyenne courte passe au-dessus d’une longue, beaucoup y lisent un changement de direction, toujours après coup.',
+    calcul: 'On fait la moyenne des prix de fin des dernières périodes ; leur nombre est écrit dans le nom de la ligne. La moyenne « exponentielle » compte davantage les plus récents, la « simple » les compte tous pareil.' },
+  vwap: { quoi: 'Le prix moyen payé depuis le début de la journée, où les moments de gros échanges comptent davantage.',
+    traders: 'Au-dessus, ceux qui ont acheté dans la journée gagnent en moyenne ; en dessous, ils perdent. Les grands investisseurs comparent leurs prix d’achat à ce repère.',
+    calcul: P => 'Chaque prix compte d’autant plus que beaucoup a été échangé à ce prix. Le calcul repart de zéro chaque jour à ' + minuitUtcMots() + ', ou toutes les ' + P.vwap.ancrageBougies + ' périodes quand une période dure un jour.' },
+  adx: { quoi: 'L’ADX dit si le prix a une direction nette, sans dire laquelle.',
+    traders: 'Au-dessus de 25, on parle de marché en tendance ; sous 20, de marché sans direction. Deux lignes, +DI et −DI, disent quel camp pousse le plus.',
+    calcul: P => 'On regarde, période après période, de combien le haut monte et de combien le bas descend, et on en fait une moyenne sur ' + P.adx.periode + ' périodes. L’ADX mesure à quel point un côté l’emporte sur l’autre.' },
+  atr: { quoi: 'L’ATR dit de combien le prix bouge d’habitude pendant une période, sans dire dans quel sens.',
+    traders: 'Ils s’en servent comme d’une règle graduée : un mouvement de plusieurs ATR sort de l’ordinaire. Il ne dit ni le sens ni la suite.',
+    calcul: P => 'Pour chaque période, on prend l’écart entre son plus haut et son plus bas, en comptant le saut depuis la période d’avant. On en fait la moyenne sur ' + P.atr.periode + ' périodes.' },
+  volume: { quoi: 'Combien a été échangé pendant chaque période : une barre haute, beaucoup d’échanges.',
+    traders: 'Un mouvement du prix avec beaucoup d’échanges est jugé plus solide. Une hausse avec de moins en moins d’échanges est jugée essoufflée.',
+    calcul: 'Binance publie la quantité échangée pendant chaque période, dans la monnaie de la paire (des bitcoins pour BTC/USDT). La barre prend la couleur de la hausse si le prix a fini au moins aussi haut qu’au début, sinon celle de la baisse.' },
+  sr: { quoi: 'Les prix où le prix a déjà fait demi-tour : en dessous, on parle de support ; au-dessus, de résistance.',
+    traders: 'Ils regardent si le niveau tient quand le prix y revient, ou s’il cède. Beaucoup lisent un niveau franchi comme ayant changé de rôle : l’ancien plancher devient un plafond.',
+    calcul: P => 'On repère les sommets et les creux des ' + P.sr.bougies + ' dernières périodes et on regroupe ceux qui sont proches. Les groupes récents et très échangés sont gardés.' },
+  bb: { quoi: 'Une moyenne et deux bandes autour : l’enveloppe dans laquelle le prix bouge d’habitude.',
+    traders: 'Bandes serrées : marché calme, beaucoup guettent le moment où il en sortira. Toucher une bande n’est pas un signal en soi : en tendance, le prix peut la longer longtemps.',
+    calcul: P => 'Le milieu est la moyenne des ' + P.bb.periode + ' derniers prix de fin. Les bandes sont placées au-dessus et au-dessous, d’autant plus loin que ces prix ont été dispersés.' },
+  macd: { quoi: 'Le MACD compare une moyenne rapide et une moyenne lente du prix : le mouvement accélère-t-il ou ralentit-il ?',
+    traders: 'Ils regardent quand la ligne MACD passe au-dessus ou au-dessous de sa ligne signal, et quand elle passe zéro. Les barres grandissent quand le mouvement accélère.',
+    calcul: P => 'On soustrait la moyenne lente (' + P.macd.lente + ' périodes) de la moyenne rapide (' + P.macd.rapide + ' périodes). La ligne signal est la moyenne de ce résultat, et les barres montrent l’écart entre les deux.' },
+  stoch: { quoi: 'Le stochastique dit où le prix finit par rapport à ses derniers hauts et bas : 100 tout en haut, 0 tout en bas.',
+    traders: 'Au-dessus de 80, zone haute ; sous 20, zone basse ; ils regardent les croisements de ses deux lignes dans ces zones. En tendance, il peut rester collé à un bord, et une zone ne dit pas la suite.',
+    calcul: P => 'On prend le plus haut et le plus bas des ' + P.stoch.k + ' dernières périodes et on situe le dernier prix entre les deux. La deuxième ligne est la moyenne des ' + P.stoch.d + ' dernières valeurs.' },
+  ichimoku: { quoi: 'Un nuage coloré et deux lignes qui montrent la zone d’équilibre récente du prix.',
+    traders: 'Le prix au-dessus du nuage : tendance vue à la hausse ; au-dessous : à la baisse ; dedans : marché indécis. Un nuage épais est lu comme difficile à traverser.',
+    calcul: P => 'Chaque ligne est le milieu entre le plus haut et le plus bas d’un certain nombre de périodes (' + P.ichimoku.tenkan + ', ' + P.ichimoku.kijun + ' et ' + P.ichimoku.senkouB + '). Le nuage est fait de ces milieux, décalé vers la droite.' },
+  sar: { quoi: 'Des points sous les bougies quand le prix monte, au-dessus quand il baisse.',
+    traders: 'Tant que les points restent du même côté, la tendance continue pour eux ; quand ils changent de côté, beaucoup y lisent un retournement. Sans tendance, il se trompe souvent.',
+    calcul: 'À chaque période, le point se rapproche du prix, un peu plus vite à chaque nouveau record du mouvement. Quand le prix le touche, il passe de l’autre côté.' },
+  obv: { quoi: 'Un compteur qui dit si les échanges se font surtout pendant les hausses ou pendant les baisses.',
+    traders: 'Il monte avec le prix : la hausse est jugée soutenue. Le prix monte mais lui stagne : la hausse est jugée fragile.',
+    calcul: 'On part de zéro. Chaque période qui finit en hausse ajoute ses échanges, chaque période qui finit en baisse les retire.' },
+  mfi: { quoi: 'Un RSI qui tient compte des quantités échangées, de 0 à 100.',
+    traders: 'Au-dessus de 80, zone haute ; sous 20, zone basse. On cherche aussi les moments où il ne suit plus le prix.',
+    calcul: P => 'Sur les ' + P.mfi.periode + ' dernières périodes, on additionne l’argent échangé quand le prix moyen monte, et celui échangé quand il baisse. On compare les deux sur une échelle de 0 à 100.' },
+  williamsR: { quoi: 'Où se trouve le prix entre ses derniers hauts et bas : 0 tout en haut, −100 tout en bas.',
+    traders: 'Au-dessus de −20, zone haute ; sous −80, zone basse. Il sert surtout quand le prix fait des allers-retours sans direction.',
+    calcul: P => 'On prend le plus haut et le plus bas des ' + P.williamsR.periode + ' dernières périodes et on situe le dernier prix entre les deux. C’est le stochastique, retourné.' },
+  cci: { quoi: 'Le CCI dit si le prix s’est éloigné de sa moyenne récente plus que d’habitude.',
+    traders: 'Au-dessus de +100 ou sous −100, le prix s’est beaucoup éloigné de sa moyenne. Certains y voient le début d’un mouvement fort, d’autres un excès : la lecture dépend du marché.',
+    calcul: P => 'On mesure l’écart entre le prix et sa moyenne des ' + P.cci.periode + ' dernières périodes, puis on le divise par l’écart habituel. Ainsi, la plupart des valeurs restent entre −100 et +100.' },
+  ao: { quoi: 'Des barres qui disent si le prix récent est au-dessus ou au-dessous de son niveau moyen sur plus longtemps : la vitesse du mouvement.',
+    traders: 'Ils regardent quand les barres passent de l’autre côté de zéro, et certaines formes de barres. Ici, la couleur dit seulement le côté de zéro.',
+    calcul: P => 'On prend le milieu de chaque période, entre son haut et son bas. On soustrait leur moyenne sur ' + P.ao.lente + ' périodes de leur moyenne sur ' + P.ao.rapide + '.' },
+  fib: { quoi: 'Des lignes posées à des fractions fixes entre le plus haut et le plus bas visibles.',
+    traders: P => { const m = niveauxFib(P, x => x > 0.3 && x < 0.7);
+      return 'Beaucoup s’en servent pour situer jusqu’où un recul peut aller avant que le mouvement reprenne. Les niveaux du milieu' + (m.length ? ' (' + m.join(', ') + ')' : '') + ' sont les plus surveillés.'; },
+    calcul: P => 'On prend le plus haut et le plus bas de la partie visible du graphique. Les lignes sont posées à ' + niveauxFib(P).join(', ') + ' de l’écart entre les deux.' },
+  vp: { quoi: 'Des barres couchées au bord droit : combien a été échangé à chaque prix.',
+    traders: 'Le prix le plus échangé (le POC) et la zone où se font la plupart des échanges servent de repères. Le prix ralentit souvent dans les zones très échangées et traverse vite les zones creuses.',
+    calcul: P => 'On découpe les prix visibles en tranches, et chaque période ajoute ses échanges à toutes les tranches entre son bas et son haut. La zone de valeur réunit les tranches les plus remplies, jusqu’à ' + pcF(P.vp.zoneValeur) + ' % des échanges.' },
+  liq: { quoi: 'Une carte de chaleur : là où beaucoup d’ordres d’achat ou de vente attendaient, minute après minute.',
+    traders: 'Ils regardent ces gros paquets d’ordres quand le prix s’en approche : tiennent-ils, sont-ils avalés ou retirés ? La carte dit où ils étaient, pas ce que fera le prix.',
+    calcul: () => grilleLiq().pas + ', le serveur additionne les bitcoins en attente sur Binance, tranche de prix par tranche de prix. Plus la case est marquée, plus il y en avait ; la carte est publiée toutes les ' + CADENCES.attendue_min + ' min.' },
+  // ── Le Guide, les scénarios, le dessin ──
+  guide: { quoi: 'Une phrase et deux repères de prix qui décrivent ce que fait le graphique.',
+    usage: 'Lisez la phrase, puis regardez les deux repères : tant que le prix reste entre eux, rien de neuf. Touchez un texte pour le détail.',
+    calcul: 'Le site lit les prix chargés : le mouvement récent, et les prix proches où il s’est passé quelque chose (le haut d’hier, des demi-tours, de gros paquets d’ordres). Il garde le plus proche au-dessus et le plus proche en dessous.' },
+  guide_niveaux: { quoi: 'Les prix les plus proches où il s’est passé quelque chose, au-dessus et en dessous du prix.',
+    usage: 'Touchez un repère : d’où il vient, où est le prix, et le repère suivant si le prix le dépasse.',
+    calcul: 'Chaque repère vient des données : le haut ou le bas d’hier, un gros paquet d’ordres en attente, une zone de demi-tours. Des repères très proches sont réunis en une seule bande.' },
+  guide_regime: { quoi: 'Le mouvement du prix en un mot : il monte, il baisse, il hésite ou il s’agite.',
+    usage: 'Le mot est le verbe de la phrase du haut. Il décrit le passé récent, pas la suite.',
+    calcul: 'Le site regarde si le prix a pris une direction nette et si deux mesures sont d’accord sur son sens. Sinon, la phrase dit « hésite », ou « s’agite » s’il bouge fort.' },
+  guide_formes: { quoi: 'Les dessins que le prix a déjà faits : deux sommets au même prix, un triangle, un drapeau…',
+    usage: 'Une figure en tirets se dessine encore ; en trait plein, elle est validée ; barrée, elle ne tient plus. Touchez son nom : la ligne qui la valide, celle qui l’annule, et combien de fois ces figures sont allées au bout ici.',
+    calcul: 'Le site cherche seize figures avec des règles fixes, sur les périodes terminées seulement. Il compte aussi, sur tout l’historique chargé, combien sont allées au bout.' },
+  guide_suite: { quoi: 'Ce qui vient après un repère si le prix le franchit : le repère suivant.',
+    usage: 'Touchez un repère : « si le prix finit au-delà, le repère suivant est … ». Une condition, pas une prévision.',
+    calcul: 'Le repère suivant est simplement le prochain repère, plus loin du même côté. Aucun des deux côtés n’est jugé plus probable.' },
+  scenarios: { quoi: 'Chaque matin, Claude (une IA) écrit trois scénarios pour la journée, classés du plus au moins probable, sans pourcentage.',
+    usage: 'Regardez le scénario n° 1 et sa zone ; la ligne du haut dit ce qui a changé depuis le matin. Touchez-la pour les trois scénarios.',
+    calcul: P => 'Le matin à ' + pointMots(P) + ', Claude lit le marché et écrit les scénarios. Pendant la journée, le site regarde seulement si le prix touche leurs zones.' },
+  bougies: { quoi: 'Chaque petit bâton résume une période : le prix au début, le plus haut, le plus bas et le prix à la fin.',
+    usage: 'Un bâton de la couleur de la hausse : le prix a fini plus haut qu’au début ; de la couleur de la baisse : plus bas. Les traits fins au-dessus et au-dessous montrent jusqu’où le prix est allé.',
+    calcul: 'Pour chaque période, le site prend le premier prix, le plus haut, le plus bas et le dernier. Le thème change la forme du dessin, jamais les valeurs.' },
+};
+/** Un texte court lu à l'ouverture (fonction de PARAM ou chaîne). */
+const courtTexte = t => typeof t === 'function' ? (typeof PARAM !== 'undefined' ? t(PARAM) : '') : (t || '');
+
 function metaDe(cle) {
   const md = typeof marketData !== 'undefined' ? marketData : null;
   return md && md.meta && md.meta.champs ? md.meta.champs[cle] || null : null;
@@ -822,34 +985,61 @@ function fmtValF(v) {
 }
 
 /** La fiche, en HTML. IDENTIQUE dans les deux modes : seules les classes `.debutant-seul` /
- *  `.expert-seul` décident de ce qui s'affiche. */
+ *  `.expert-seul` décident de ce qui s'affiche. Trois niveaux : ce que c'est (en gras), comment
+ *  les traders s'en servent et comment c'est calculé — en trois lignes courtes pour le Débutant
+ *  (COURT), en entier pour l'Expert —, puis « En savoir plus » (lectures, limites, formule ; pour
+ *  le Débutant, aussi les textes entiers), replié en Débutant et ouvert en Expert (ouvrirFiche). */
 function ficheHtml(id) {
   const f = FICHES[id];
   if (!f) return '';
   const m = f.champ ? metaDe(f.champ) : null;
   const P = typeof PARAM !== 'undefined' ? PARAM : null;
+  const c = COURT[id] || {};
   // Nature : celle que publie le producteur (champ du fichier), sinon celle que la fiche déclare
   // (la forme des bougies est une convention), sinon « mesuré » pour un calcul de la page.
   const nature = m ? m.nature : (f.nature || (f.page ? 'mesure' : null));
   const titre = f.titreDeb ? '<span class="expert-seul">' + echapF(f.titre) + '</span><span class="debutant-seul">' + echapF(f.titreDeb) + '</span>' : echapF(f.titre);
+  // Un texte pour chaque mode, chacun dans sa classe ; le même s'ils sont égaux.
+  const deux = (exp, deb) => (deb && deb !== exp ? '<span class="expert-seul">' + echapF(exp) + '</span><span class="debutant-seul">' + echapF(deb) + '</span>' : echapF(exp));
+  const quoiDeb = courtTexte(c.quoi) || f.simpleDeb || f.simple;
   let h = '<div class="fiche-tete"><h3 class="fiche-titre">' + titre + '</h3>'
     + (nature ? '<span class="fiche-nature nature-' + echapF(nature) + '">' + motModes(NATURES[nature] || nature, NATURES_DEB[nature]) + '</span>' : '')
     + '<button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>'
-    + (f.simpleDeb ? '<p class="fiche-simple expert-seul">' + echapF(f.simple) + '</p><p class="fiche-simple debutant-seul">' + echapF(f.simpleDeb) + '</p>'
-      : '<p class="fiche-simple">' + echapF(f.simple) + '</p>');
+    + '<p class="fiche-simple expert-seul">' + echapF(f.simple) + '</p><p class="fiche-simple fiche-quoi debutant-seul"><b>' + echapF(quoiDeb) + '</b></p>';
   // État du moment dérivé du code (ex. la forme de bougie du thème courant) : même HTML dans les deux modes.
   const etat = f.etat ? f.etat() : null;
   if (etat) h += '<p class="fiche-valeur">' + echapF(etat) + '</p>';
-  if (f.traders) h += '<h4>Comment les traders l’utilisent</h4><p class="fiche-usage">' + echapF(f.traders) + '</p>';
-  else if (f.usage) h += '<h4>Comment s’en servir</h4><p class="fiche-usage">' + usageHtml(id) + '</p>';
-  if (f.calcul) h += '<h4>Comment c’est calculé</h4><p class="fiche-calcul">' + echapF(calculTexte(f)) + '</p>';
+  // Niveau 2 : l'usage et le calcul. Le Débutant lit les deux phrases de COURT, l'Expert le texte entier.
+  const tradersCourt = courtTexte(c.traders), usageCourt = courtTexte(c.usage), calculCourt = courtTexte(c.calcul), calcul = calculTexte(f);
+  if (f.traders) h += '<h4>Comment les traders l’utilisent</h4><p class="fiche-usage">' + deux(f.traders, tradersCourt) + '</p>';
+  else if (f.usage) h += '<h4>Comment s’en servir</h4><p class="fiche-usage">' + (usageCourt ? '<span class="expert-seul">' + (typeof f.usage === 'string' ? echapF(f.usage) : echapF(f.usage.exp)) + '</span><span class="debutant-seul">' + echapF(usageCourt) + '</span>' : usageHtml(id)) + '</p>';
+  else if (usageCourt) h += '<h4 class="debutant-seul">Comment s’en servir</h4><p class="fiche-usage debutant-seul">' + echapF(usageCourt) + '</p>';
+  if (calcul) h += '<h4>Comment c’est calculé</h4><p class="fiche-calcul">' + deux(calcul, calculCourt) + '</p>';
+  else if (calculCourt) h += '<h4 class="debutant-seul">Comment c’est calculé</h4><p class="fiche-calcul debutant-seul">' + echapF(calculCourt) + '</p>';
+  // La valeur publiée, avec son unité et son échelle de temps telles que le fichier les nomme : à
+  // ce niveau pour l'Expert ; pour le Débutant, sous « En savoir plus » (sa carte dit déjà la
+  // valeur en mots).
+  let valeur = '';
   if (f.champ) {
     const vals = valeursDe(f.champ);
     const md = typeof marketData !== 'undefined' ? marketData : null;
     const age = md && md.updated ? Math.max(0, Math.round((Date.now() - Date.parse(md.updated)) / 60000)) : null;
-    if (vals.length) h += '<p class="fiche-valeur">' + vals.map(([t, v]) => (t ? '<span class="fiche-tf">' + t + '</span> ' : '') + '<b>' + echapF(fmtValF(v)) + '</b>').join(' · ')
+    if (vals.length) valeur = vals.map(([t, v]) => (t ? '<span class="fiche-tf">' + t + '</span> ' : '') + '<b>' + echapF(fmtValF(v)) + '</b>').join(' · ')
       + (m && m.unite ? ' <span class="fiche-unite">' + echapF(m.unite) + '</span>' : '')
-      + (age !== null ? ' <span class="fiche-age">· publié il y a ' + age + ' min</span>' : '') + '</p>';
+      + (age !== null ? ' <span class="fiche-age">· publié il y a ' + age + ' min</span>' : '');
+  }
+  if (valeur) h += '<p class="fiche-valeur expert-seul">' + valeur + '</p>';
+  // Niveau 3 : « En savoir plus ». Le Débutant y retrouve d'abord les textes entiers (ceux que
+  // l'Expert lit plus haut), puis tout ce qui suit est commun aux deux modes.
+  h += '<details class="fiche-plus"><summary>En savoir plus</summary>';
+  const entiers = [];
+  if (f.simpleDeb && f.simpleDeb !== quoiDeb) entiers.push('<p class="fiche-simple">' + echapF(f.simpleDeb) + '</p>');
+  if (f.traders && tradersCourt && tradersCourt !== f.traders) entiers.push('<h4>Comment les traders l’utilisent, en détail</h4><p class="fiche-usage">' + echapF(f.traders) + '</p>');
+  if (f.usage && usageCourt) entiers.push('<h4>Comment s’en servir, en détail</h4><p class="fiche-usage">' + (typeof f.usage === 'string' ? echapF(f.usage) : echapF(f.usage.deb || f.usage.exp)) + '</p>');
+  if (calcul && calculCourt && calculCourt !== calcul) entiers.push('<h4>Le calcul en détail</h4><p class="fiche-calcul">' + echapF(calcul) + '</p>');
+  if (valeur) entiers.push('<p class="fiche-valeur">' + valeur + '</p>');
+  if (entiers.length) h += '<div class="debutant-seul">' + entiers.join('') + '</div>';
+  if (f.champ) {
     if (m && m.nom_trompeur) h += '<p class="fiche-alerte">Nom trompeur : ' + echapF(m.nom_trompeur) + '</p>';
     // Les dernières heures de ce champ, publication par publication (js/chronique.js) : même
     // HTML dans les deux modes ; absent tant qu'aucun historique n'est lu.
@@ -874,6 +1064,7 @@ function ficheHtml(id) {
     + '</p>' + (details.length ? '<dl>' + details.filter(d => d[1] !== undefined && d[1] !== null).map(([k, v]) => '<dt>' + echapF(k) + '</dt><dd>' + echapF(v) + '</dd>').join('') + '</dl>' : '')
     + '</div>'
     + '<p class="debutant-seul fiche-indice">La formule exacte, la fenêtre et la source sont en mode Expert.</p>'
+    + '</details>'
     + '<p class="fiche-pied">Ceci décrit comment l’indicateur se lit. Ce n’est pas une recommandation d’achat ou de vente.</p>';
   return h;
 }
@@ -884,6 +1075,9 @@ function ouvrirFiche(id, ancre) {
   const p = document.getElementById('fichePop');
   if (!p || !FICHES[id]) return;
   p.innerHTML = ficheHtml(id);
+  // « En savoir plus » : ouvert en Expert, replié en Débutant (le détail, sur demande).
+  const plus = p.querySelector('.fiche-plus');
+  if (plus) plus.open = modeCourant() === 'expert';
   p.hidden = false;
   ficheOuverte = id; ficheRetour = ancre || null;
   // Bureau : près du bouton ; téléphone : en bas de l'écran (CSS).

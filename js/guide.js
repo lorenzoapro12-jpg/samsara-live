@@ -1972,6 +1972,42 @@ const Guide = (function () {
     const dist = e.mot === 'test' ? '' : ', ' + prixRond(d, unite) + (d > 0 ? ' au-dessus' : ' en dessous') + (fini(e.dist) ? ' (' + nombre(Math.abs(e.dist), 2) + ' %)' : '');
     return 'Maintenant : ' + (f ? f(periode(itv)) : e.mot) + dist + '.';
   }
+  /** Le résumé d'un repère (bulle du Débutant, 1er toucher) : ce que c'est, en mots, sans chiffre
+   *  (le prix est dans le titre). Le détail (âge, quantités, chemin, bande) vient au 2e toucher. */
+  function quoiDebutant(r) {
+    if (!r) return '';
+    if (estOption(r)) return 'Une estimation, tirée de contrats sur le prix futur du BTC.';
+    switch (r.cle) {
+      case 'hier_haut': return 'Le prix le plus haut atteint hier.';
+      case 'hier_bas': return 'Le prix le plus bas atteint hier.';
+      case 'sem_haut': return 'Le prix le plus haut de la semaine dernière.';
+      case 'sem_bas': return 'Le prix le plus bas de la semaine dernière.';
+      case 'h24_haut': return 'Le prix le plus haut des dernières 24 heures.';
+      case 'h24_bas': return 'Le prix le plus bas des dernières 24 heures.';
+      case 'sr': return 'Un niveau où le prix a déjà fait demi-tour plusieurs fois.';
+      case 'mur_achat': return 'Beaucoup d’ordres d’achat attendent à ce prix, pour l’instant.';
+      case 'mur_vente': return 'Beaucoup d’ordres de vente attendent à ce prix, pour l’instant.';
+      default: return r.nom ? r.nom.charAt(0).toUpperCase() + r.nom.slice(1) + '.' : '';
+    }
+  }
+  /** Où est le prix par rapport à un repère, en mots, sans chiffre (résumé du Débutant). e : etatLive. */
+  function ouEstPrixDebutant(e, niv, live) {
+    if (!e || e.mot === null || !fini(live) || !niv) return '';
+    const cote = niv.p > live ? 'en dessous' : 'au-dessus';
+    switch (e.mot) {
+      case 'loin': return 'Le prix est loin, ' + cote + '.';
+      case 'proche': return 'Le prix est tout près, juste ' + cote + '.';
+      case 'test': return 'Le prix est dedans en ce moment.';
+      case 'mecheCours': return 'Le prix le traverse en ce moment.';
+      case 'meche': return 'Le prix l’a traversé un instant, puis il est revenu.';
+      case 'demiRetour': return 'Le prix l’a franchi, puis il est revenu dedans.';
+      case 'valideRetour': return 'Le prix l’a franchi, est revenu le toucher, puis est reparti.';
+      // Franchi : le côté où il est passé, pas celui du prix live (qui peut être revenu).
+      case 'demi': return 'Le prix l’a franchi une fois ; une deuxième fois le validerait.';
+      case 'valide': return 'Le prix l’a franchi, et c’est validé.';
+      default: return 'Le prix vient de le franchir, à valider.';
+    }
+  }
   /** L'origine d'une raison en mots simples, pour la bulle d'un repère. pasS : la durée d'une
    *  bougie (s), pour dire la fenêtre des zones de rebonds en jours ou en heures. */
   function origineDebutant(r, unite, maintenant, pasS) {
@@ -2496,16 +2532,24 @@ const Guide = (function () {
       abandon: '✗ ' + nom + ' annulé', sans_suite: MARQUES_FIN.expire_avant + ' ' + nom + ' sans suite', atteint: nom + ' : cible théorique atteinte', oublie: MARQUES_FIN.expire + ' ' + nom + ' : délai écoulé' })[e.cle] || nom;
   }
   /** Les mots qui n'ont pas leur place sur l'écran Débutant (noms d'indicateurs, jargon, heures UTC,
-   *  intervalles abrégés). Partagée avec les tests et js/scenarios.js. */
+   *  intervalles abrégés). UNE liste pour tout le site : le terminal, js/scenarios.js et la carte
+   *  (tests/mots_debutant.js la relit). Bornes : `\b` ne voit pas de frontière après une lettre
+   *  accentuée (« liquidité. ») ni entre une lettre et un chiffre (« EMA20 ») ; on borne donc par des
+   *  lettres Unicode (et des chiffres), sans regard en arrière (que d'anciens Safari ne lisent pas). */
+  const AVANT = '(?:^|[^\\p{L}\\p{N}])', mot = (corps, casse, apres) => new RegExp(AVANT + '(' + corps + ')' + (apres || '(?!\\p{L})'), casse ? 'u' : 'iu');
   const MOTS_BANNIS_DEBUTANT = [
-    /\b(?:ADX|EMA|SMA|ATR|RSI|MACD|VWAP|GEX|CVD|OI|SAR|POC|OBV|MFI|CCI|VIX|DXY)\b/, /[+−-]?\bDI\b/, /\bUTC\b/, /\b[RS][1-4]\b/, /\b\d+[mhd]\b/,
-    /bollinger/i, /\bstoch\w*/i, /gamma/i, /γ/, /Σ/, /\bbid\b/i, /\bask\b/i, /\bdelta\b/i, /\bfunding\b/i, /open interest/i, /\btaker\b/i,
-    /\bL\/S\b/i, /\bratio\b/i, /\bpivots?\b/i, /\bS\/R\b/i, /\bcalls?\b/i, /\bputs?\b/i, /\bstrikes?\b/i, /liquidité/i, /\bcarnet\b/i, /convention/i,
-    /\bmodèles?\b/i, /percentile/i, /\bbougies?\b/i, /\bclôtur\w*/i, /\bmèches?\b/i, /\brange\b/i, /ichimoku/i, /\bfibo\w*/i, /oscillateur\w*/i,
-    /chartisme/i, /volatilité/i,
+    mot('[+−-]?(?:ADX|DI|EMA|SMA|ATR|RSI|MACD|VWAP|GEX|CVD|OI|SAR|POC|OBV|MFI|CCI|VIX|DXY|UTC|S\\/R|L\\/S)', true),
+    mot('[RS][1-4]', true, '(?![\\p{L}\\p{N}])'), mot('\\d+[mhd]', true, '(?![\\p{L}\\p{N}])'),
+    mot('bollinger|stoch\\p{L}*|gammas?|bids?|asks?|deltas?|funding|open interest|takers?|ratios?|pivots?|calls?|puts?|strikes?|(?:il)?liquidit[ée]s?|carnets?'),
+    mot('convention\\p{L}*|mod[eè]les?|percentiles?|bougies?|clôtur\\p{L}*|mèches?|range|ichimoku|fibo\\p{L}*|oscillateur\\p{L}*|chartisme|volatilit[ée]s?'),
+    /[γΣ]/u,
   ];
   /** Les mots bannis trouvés dans t (liste vide : rien à redire). */
-  const motsBannis = t => MOTS_BANNIS_DEBUTANT.filter(re => re.test(String(t))).map(re => (String(t).match(re) || [''])[0]);
+  const motsBannis = t => {
+    const s = String(t == null ? '' : t), l = [];
+    for (const re of MOTS_BANNIS_DEBUTANT) for (const m of s.matchAll(new RegExp(re.source, re.flags + 'g'))) l.push(m[1] || m[0]);
+    return l;
+  };
   /** Un terme permis dans une bulle Débutant seulement avec son explication, dans la même bulle. */
   const EXPLIQUES_DEBUTANT = { 'repère d’options': 'une estimation, tirée des contrats d’options de la plateforme Deribit' };
 
@@ -2516,6 +2560,6 @@ const Guide = (function () {
     NOMS_DEBUTANT, raisonPrincipale, choixDebutant, reperesDe, choisirReperes, VERBE_DEBUTANT, optionsSeules, libelleDebutant, libellesDebutant, formatDebutant, AVEC_POINT, titreDebutant, nomDebutant, nomPhrase, HORIZON_DEBUTANT, HORIZON_COURT, PERIODE_DEBUTANT, phrasesDebutant, phraseDebutant,
     texteSuiteDebutant, prixRond, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
     MARQUES_FIN, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
-    MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT };
+    MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;

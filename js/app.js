@@ -448,7 +448,10 @@ const PARAM = {
     debutant: { items: 5, etroit: 520, phrase: 90, phraseEtroit: 48, niveau: 26, niveauEtroit: 18,
                 scenario: 32, forme: 26, boite: 48, boiteEtroit: 40,
                 ecartAtr: 0.5,          // deux repères à l'écran : au moins 0,5 × ATR l'un de l'autre
-                marge: 0.07 },          // échelle : 7 % de l'amplitude au-dessus et au-dessous (place des libellés)
+                marge: 0.07,            // échelle : 7 % de l'amplitude au-dessus et au-dessous (place des libellés)
+                // Bulle résumée (le détail au 2e toucher) : 4 lignes au plus, titre et ligne
+                // d'accès au détail compris, et 3 nombres au plus (demande du 10/10/2026).
+                bulleLignes: 4, bulleNombres: 3 },
   },
   // Scénarios du matin (js/scenarios.js) : les nombres de leur dessin et de leurs mots.
   scenarios: {
@@ -591,13 +594,16 @@ function apercuHtml(key) {
   if (!f) return '<p class="ind-apercu-vide">' + (debutant() ? 'Survolez ou touchez une ligne : ce qu’elle montre et comment s’en servir.'
     : 'Survolez ou touchez un indicateur : ce que c’est, comment les traders l’utilisent et comment il est calculé. Le « i » ouvre sa fiche complète.') + '</p>';
   const deb = debutant();
+  // Débutant : les trois lignes courtes de la fiche (COURT, js/fiches.js) ; Expert : les textes entiers.
+  const c = deb && typeof COURT !== 'undefined' ? COURT[id] || {} : {}, court = t => (typeof courtTexte === 'function' ? courtTexte(t) : '');
   const titre = deb && f.titreDeb ? f.titreDeb : f.titre;
-  const quoi = deb && f.simpleDeb ? f.simpleDeb : f.simple;
-  const u = f.usage, usage = !u ? '' : typeof u === 'string' ? u : (deb ? u.deb : u.exp);
-  const calcul = typeof calculTexte === 'function' ? calculTexte(f) : '';
+  const quoi = (deb && court(c.quoi)) || (deb && f.simpleDeb ? f.simpleDeb : f.simple);
+  const u = f.usage, usage = (deb && court(c.usage)) || (!u ? '' : typeof u === 'string' ? u : (deb ? u.deb : u.exp));
+  const calcul = (deb && court(c.calcul)) || (typeof calculTexte === 'function' ? calculTexte(f) : '');
+  const traders = (deb && court(c.traders)) || f.traders;
   return '<p class="ind-apercu-titre">' + echapF(titre) + '</p>'
     + '<p><b>C’est quoi ?</b> ' + echapF(quoi) + '</p>'
-    + (f.traders ? '<p><b>Comment les traders l’utilisent :</b> ' + echapF(f.traders) + '</p>'
+    + (traders ? '<p><b>Comment les traders l’utilisent :</b> ' + echapF(traders) + '</p>'
       : usage ? '<p><b>Comment s’en servir ?</b> ' + echapF(usage) + '</p>' : '')
     + (calcul ? '<p><b>Comment c’est calculé :</b> ' + echapF(calcul) + '</p>' : '')
     + '<button type="button" class="lien" onclick="event.stopPropagation();ouvrirFiche(\'' + id + '\',this)">Fiche complète ▸</button>';
@@ -952,7 +958,7 @@ canvas.addEventListener('mousemove', (e) => {
   survol();
   scheduleCalque();
 });
-canvas.addEventListener('mouseleave', () => { crossX = null; crossY = null; dessinerCalque(); });
+canvas.addEventListener('mouseleave', () => { crossX = null; crossY = null; bulleDetail = null; dessinerCalque(); });
 
 // --- Zoom molette ---
 canvas.addEventListener('wheel', (e) => {
@@ -1087,7 +1093,8 @@ window.addEventListener('mouseup', () => {
   geste(false);
   rsDragging = null;
   isPanning = false; isPriceDrag = false; 
-  canvas.style.cursor = ''; 
+  // Un clic sur une étiquette du Débutant (pour ouvrir le détail de sa bulle) garde la main.
+  canvas.style.cursor = debutant() && geo && crossX !== null && guideCibleSous(crossX, crossY, geo.mainH, true) ? 'pointer' : '';
 });
 
 // --- Double-click reset zoom ---
@@ -1100,6 +1107,12 @@ canvas.addEventListener('dblclick', () => {
 });
 
 // Tap = réticule, infobulle OHLCV et explication du Guide ; un 2e tap au même endroit les retire.
+// Débutant, une bulle en trois niveaux (demande du 10/10/2026) : son titre en gras, quelques mots
+// (guideBulle) ; toucher (ou cliquer) la même bulle une 2e fois ouvre tout le détail ; une 3e fois
+// au même endroit la ferme.
+let bulleVue = null, bulleDetail = null;   // la clé de la bulle dessinée en résumé ; celle dont le détail est ouvert
+/** La clé d'une bulle : sa cible, d'une image à l'autre (les cibles sont refaites à chaque dessin). */
+const cleBulle = c => (c.scenario ? 's:' + c.scenario + ':' : '') + (c.figure ? 'f:' + c.figure.f.type + ':' + (c.figure.f.t0 != null ? c.figure.f.t0 : c.figure.f.t) + ':' : '') + c.titre;
 function tapGraphique(clientX, clientY) {
   astuceCacher();
   const rect = canvas.getBoundingClientRect();
@@ -1107,11 +1120,16 @@ function tapGraphique(clientX, clientY) {
   const ty = clientY - rect.top;
   // Colonne de prix → ignorer
   if (tx > rect.width - 55) return;
-  // Si déjà un crosshair affiché au même endroit → le retirer
-  if (crossX !== null && Math.abs(crossX - tx) < 8 && Math.abs(crossY - ty) < 8) {
-    crossX = null; crossY = null;
+  const c = debutant() && geo ? guideCibleSous(tx, ty, geo.mainH) : null, k = c ? cleBulle(c) : null;
+  if (k && crossX !== null && bulleVue === k && bulleDetail !== k) {
+    // 2e toucher sur la bulle montrée : son détail.
+    bulleDetail = k; crossX = tx; crossY = ty;
+  } else if (crossX !== null && Math.abs(crossX - tx) < 8 && Math.abs(crossY - ty) < 8) {
+    // Si déjà un crosshair affiché au même endroit → le retirer
+    crossX = null; crossY = null; bulleDetail = null;
   } else {
     crossX = tx; crossY = ty;
+    if (k !== bulleDetail) bulleDetail = null;
   }
   dessinerCalque();
 }
@@ -3122,6 +3140,8 @@ function drawChart() {
  *  du dernier dessin du graphique (geo, geoPrix) : il ne recalcule ni échelle ni indicateur. */
 function dessinerCalque() {
   calqueDemande = false;
+  bulleVue = null;   // la bulle de cette image la reposera (guideBulle)
+  if (crossX === null) bulleDetail = null;   // plus de bulle : la prochaine recommence par son résumé
   if (!cx) return;
   const dpr = window.devicePixelRatio;
   cx.clearRect(0, 0, calque.width / dpr, calque.height / dpr);
@@ -5102,6 +5122,18 @@ function guideTexteNiveauDebutant(L, E) {
   out.push('Une description, pas une recommandation.');
   return out;
 }
+/** Le résumé de la bulle de la phrase (1er toucher) : le sens des mots employés, sans chiffre. */
+function guideResumePhraseDebutant(E, phrase) {
+  const r = (E.D && E.D.regime) || { cle: 'inconnu' }, out = [];
+  if (/touche/.test(phrase)) out.push('« Touche » : le prix est en ce moment dans la bande de ce repère.');
+  if (/est passé/.test(phrase)) out.push('« Est passé » : le prix a fini plusieurs fois de suite au-delà de ce repère.');
+  const verbe = Guide.VERBE_DEBUTANT[r.cle], dit = verbe && new RegExp('\\b' + verbe + '\\b').test(phrase);
+  const sens = { hausse: 'le prix a pris une direction nette vers le haut.', baisse: 'le prix a pris une direction nette vers le bas.', faible: 'le mouvement n’a pas de direction nette.',
+    sans: 'le mouvement n’a pas de direction nette.', incertaine: 'le prix bouge nettement, mais sans sens clair.' }[r.cle];
+  if (sens) out.push(dit ? '« ' + verbe.charAt(0).toUpperCase() + verbe.slice(1) + ' » : ' + sens : 'Le mouvement : ' + sens);
+  if (/[Rr]epère/.test(phrase)) out.push('Un repère : un prix important tout proche, au-dessus ou en dessous.');
+  return out;
+}
 /** La bulle de la phrase : le sens du verbe sur sa durée, ce que dit la variation 24 h si elle va
  *  dans l'autre sens, le calme du moment, les deux chemins. */
 function guideTextePhraseDebutant(E, phrase) {
@@ -5498,7 +5530,7 @@ function guideCalqueDebutant(E) {
   const cle = [o.prix === null, enTest ? enTest.p : '-', maxPx, o.maintenant].join('|');
   if (!E.phraseCache || E.phraseCache.cle !== cle) {
     const ph = debPhraseChoisir(cx, o, maxPx, etroit);
-    E.phraseCache = { cle, ph, texte: guideTextePhraseDebutant(E, ph.t) };
+    E.phraseCache = { cle, ph, texte: guideTextePhraseDebutant(E, ph.t), resume: guideResumePhraseDebutant(E, ph.t) };
     // Accessibilité : la phrase du graphique est aussi son nom.
     try { canvas.setAttribute('aria-label', ph.t); } catch (e) { /* hors navigateur */ }
   }
@@ -5511,7 +5543,7 @@ function guideCalqueDebutant(E) {
   cx.fillStyle = COLORS.ink1;
   cx.fillText(ph.t, x + 9, y + 14);
   cx.restore();
-  if (E.ciblePhrase) { E.ciblePhrase.rects = [{ x0: x, y0: y, x1: x + w, y1: y + h }]; E.ciblePhrase.titre = ph.t; E.ciblePhrase.texte = E.phraseCache.texte.concat(E.debNote ? [E.debNote] : []); }
+  if (E.ciblePhrase) { E.ciblePhrase.rects = [{ x0: x, y0: y, x1: x + w, y1: y + h }]; E.ciblePhrase.titre = ph.t; E.ciblePhrase.texte = E.phraseCache.texte.concat(E.debNote ? [E.debNote] : []); E.ciblePhrase.resume = E.phraseCache.resume; }
   if (E.itemPhrase) { E.itemPhrase.texte = ph.t; E.itemPhrase.rect = { x, y, w, h }; }
 }
 /** Débutant : le budget. La ligne des scénarios est la seule qui cède, et seulement quand la forme
@@ -5557,19 +5589,62 @@ function guideSurvol(W, mainH, evite) {
   if (c && debutant()) scenSurvolDebutant(c);   // la zone d'invalidation du scénario 1, sous la bulle
   if (c) guideBulle(c, W, mainH, evite);
 }
+/** Les nombres d'un texte (prix, pourcentages, heures, durées) : le plafond des bulles du Débutant
+ *  en compte trois au plus. Un rang (« n° 1 », « Scénario 2 », « 3 : en cours ») n'est pas une
+ *  quantité : un chiffre seul ne compte que suivi d'une unité (« 3 h », « 5 % »). */
+const nombresDe = t => {
+  const s = String(t).replace(/n° ?\d+/g, '');
+  let n = 0;
+  for (const m of s.matchAll(/\d+(?:[\u00a0\u202f ]\d{3})*(?:[,.:]\d+)?/g))
+    if (m[0].length > 1 || /^[\u00a0\u202f ]?(?:%|\$|h\b|min\b|j\b|BTC|fois)/.test(s.slice(m.index + 1))) n++;
+  return n;
+};
+/** Un avertissement de fin de bulle (« Une description, pas une recommandation. ») : en résumé, la
+ *  ligne d'accès au détail le redit (« pas une prévision »). */
+const estAvertissement = t => t.length < 90 && /recommandation|conseil/.test(t);
+/** Le résumé d'une bulle du Débutant (niveau 2) : ses phrases, dans l'ordre, tant que la bulle
+ *  garde 4 lignes (titre compris ; la ligne qui mène au détail en plus) et 3 nombres au plus.
+ *  Jamais une phrase coupée : celle qui ne tient pas arrête le résumé. Un résumé écrit pour la
+ *  bulle (sourceResume) donne chaque phrase en variantes, la plus complète d'abord : la première
+ *  qui tient est prise ; aucune ne tient, la phrase est passée. complet : rien n'a été laissé. */
+function resumeBulle(texte, largeur, lignesLibres, nombresLibres) {
+  const phrases = [].concat(...texte.filter(t => Array.isArray(t) || !estAvertissement(t))
+    .map(p => (Array.isArray(p) ? [p] : p.replace(/([.?!…])\s+(?=[A-ZÀÂÉÈÊÎÔÛÇ«(0-9])/g, '$1\u0000').split('\u0000'))));
+  const garde = [];
+  let n = 0;
+  for (const f of phrases) {
+    const v = (Array.isArray(f) ? f : [f]).filter(Boolean).find(x => guideLignes(cx, garde.concat([x]).join(' '), largeur).length <= lignesLibres && n + nombresDe(x) <= nombresLibres);
+    if (!v) { if (Array.isArray(f)) continue; break; }
+    garde.push(v); n += nombresDe(v);
+  }
+  return { texte: garde.length ? [garde.join(' ')] : [], complet: garde.length === phrases.length };
+}
+/** La source du résumé d'une bulle du Débutant : un repère dit ce qu'il est et où est le prix, en
+ *  mots ; une figure, ce qui se passe en ce moment puis ce qu'on voit (vivant, texte : ceux de la
+ *  bulle) ; la phrase, les scénarios et leur ligne ont le leur (c.resume) ; sinon, le texte. */
+function sourceResume(c, vivant, texte) {
+  if (c.niveau && c.niveau.niv) return [[Guide.quoiDebutant(Guide.raisonPrincipale(c.niveau.niv))], [Guide.ouEstPrixDebutant(c.niveau.live, c.niveau.niv, livePrice)]];
+  if (c.figure) {
+    const vu = (String(texte[vivant ? 1 : 0] || '').match(/^.*?\.(?=\s|$)/) || [''])[0].replace(/^[^:]{2,40} : /, ''), maj = t => t.charAt(0).toUpperCase() + t.slice(1);
+    return [[vivant], [vu ? maj(vu) : '']];
+  }
+  return c.resume ? c.resume.map(p => (Array.isArray(p) ? p : [p])) : null;
+}
 /** La bulle d'une cible, près du curseur, toujours dans le tracé. */
 function guideBulle(c, W, mainH, evite) {
   const E = guideEtat, Sc = scenEtat;
   if (Sc && Sc.cibles.includes(c)) Sc.survol = c; else E.survol = c;   // ce que la bulle explique (relu par les tests)
-  let texte = c.texte.slice();
+  // Débutant : le résumé (niveau 2) ; le détail au 2e toucher ou clic (tapGraphique). Expert : tout.
+  const cle = cleBulle(c), detail = !debutant() || bulleDetail === cle;
+  let texte = c.texte.slice(), vivant = '';
   // Une figure : son état vivant en tête, en mots du mode (« En ce moment le prix est sous … ») ;
   // en Débutant, le reste de la bulle est refait au prix live (une condition déjà franchie par la
   // bougie en cours n'est plus promise ; l'ébauche qui se défait ne promet plus de validation).
   if (c.figure && E && E.ctxF) {
     const cF = Object.assign({}, E.ctxF, { vivant: c.figure.v, live: isNum(livePrice) ? livePrice : null }), R = GUIDE_FORMES.val;
     if (debutant() && R) texte = Guide.texteFormeDebutant(c.figure.f, R.bilan[c.figure.f.type], cF, PARAM.guide, guideUnite());
-    const t = c.figure.v ? Guide.texteVivantFigure(c.figure.f, c.figure.v, cF, debutant() ? 'debutant' : 'expert', guideUnite()) : '';
-    if (t) texte.unshift(t);
+    vivant = c.figure.v ? Guide.texteVivantFigure(c.figure.f, c.figure.v, cF, debutant() ? 'debutant' : 'expert', guideUnite()) : '';
+    if (vivant) texte.unshift(vivant);
   }
   if (debutant()) {
     // L'état au prix live, en mots ; une bande faite d'options dit d'abord que c'est une estimation.
@@ -5588,6 +5663,17 @@ function guideBulle(c, W, mainH, evite) {
   cx.font = chartFont(fT, 700);
   const tl = guideLignes(cx, c.titre, bw - 20, 2);
   cx.font = chartFont(fC, 500);
+  // Le résumé du Débutant : 4 lignes et 3 nombres au plus, titre compris, puis la ligne qui mène
+  // au détail (et rappelle que ce n'est pas une prévision).
+  // Une bulle déjà courte se montre entière, sans renvoi : un 2e toucher la ferme.
+  let acces = null;
+  if (!detail) {
+    const tactile = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    const a = (tactile ? 'Touchez encore' : 'Cliquez') + ' : le détail · pas une prévision', src = sourceResume(c, vivant, texte);
+    const R = resumeBulle(src || texte, bw - 20, PARAM.guide.debutant.bulleLignes - tl.length, PARAM.guide.debutant.bulleNombres - nombresDe(c.titre));
+    if (src || !R.complet) { texte = R.texte; acces = a; }
+  }
+  bulleVue = acces ? cle : null;   // tapGraphique : un 2e toucher sur ce résumé ouvre le détail
   // La bulle tient TOUJOURS dans le tracé (téléphone : un tracé de 380 px) : sinon la version courte
   // de l'explication (texteCourt), puis les paragraphes du début, un renvoi à la fiche et le
   // dernier paragraphe (« pas une recommandation ») — jamais une phrase coupée au bord de l'écran.
@@ -5599,6 +5685,7 @@ function guideBulle(c, W, mainH, evite) {
   const aplatir = ps => { const out = []; ps.forEach((p, k) => { if (k) out.push(''); out.push(...p); }); return out; };
   // Ordre : l'explication entière, puis serrée ; puis la version courte, puis serrée ; enfin coupée.
   let paras = decouper(texte);
+  if (acces) { paras.push(decouper([acces])[0]); sep = 4; }
   if (hDe(aplatir(paras)) > hMax) sep = 5;
   if (hDe(aplatir(paras)) > hMax && c.texteCourt) { paras = decouper(c.texteCourt); sep = hC; if (hDe(aplatir(paras)) > hMax) sep = 5; }
   if (hDe(aplatir(paras)) > hMax) {
@@ -5620,8 +5707,12 @@ function guideBulle(c, W, mainH, evite) {
   if (bx + bw > W - 75) bx = Math.max(16, crossX - bw - 16);
   if (by + bh > mainH - 4) by = Math.max(4, Math.min(crossY, evite ? evite.y : crossY) - bh - 8);
   by = Math.max(4, Math.min(by, mainH - 4 - bh));
-  if (Sc && Sc.survol === c) Sc.bulle = { x: bx, y: by, w: bw, h: bh, corps: corps.slice(), police: fC };
-  else if (E && E.survol === c) E.bulle = { x: bx, y: by, w: bw, h: bh, corps: corps.slice(), police: fC };   // relue par les tests
+  // Relue par les tests : la place, le corps, et pour le résumé du Débutant ses lignes (titre
+  // compris) et ses nombres.
+  const nAcces = acces ? paras[paras.length - 1].length : 0, contenu = corps.slice(0, corps.length - nAcces);
+  const lu = { x: bx, y: by, w: bw, h: bh, corps: corps.slice(), police: fC, resume: !!acces, lignes: tl.length + contenu.filter(Boolean).length, nombres: nombresDe(tl.join(' ') + ' ' + contenu.join(' ')) };
+  if (Sc && Sc.survol === c) Sc.bulle = lu;
+  else if (E && E.survol === c) E.bulle = lu;
   // Fond du tracé d'abord : une bulle translucide laisserait lire la lecture et les étiquettes à travers.
   cx.fillStyle = COLORS.surface;
   cx.shadowColor = 'rgba(16,35,61,0.18)'; cx.shadowBlur = 14; cx.shadowOffsetY = 4;
@@ -5633,7 +5724,12 @@ function guideBulle(c, W, mainH, evite) {
   tl.forEach((l, k) => cx.fillText(l, bx + 14, by + 16 + (hT - 14) + k * hT));
   cx.font = chartFont(fC, 500); cx.fillStyle = COLORS.text;
   let yl = by + 16 + (hT - 14) + tl.length * hT + 2;
-  for (const l of corps) { if (l) cx.fillText(l, bx + 14, yl); yl += hL(l); }
+  // La ligne d'accès au détail : la dernière, de la couleur des liens.
+  corps.forEach((l, k) => {
+    if (nAcces && k === corps.length - nAcces) { cx.font = chartFont(fC, 650); cx.fillStyle = COLORS.accent2; }
+    if (l) cx.fillText(l, bx + 14, yl);
+    yl += hL(l);
+  });
   cx.restore();
 }
 
@@ -6050,7 +6146,7 @@ function scenTitre(sc, mode) {
 /** L'explication d'un scénario pour la bulle de survol. */
 function scenCible(S, it, rects, segs, zones, prio) {
   if (S.deb) {
-    const c = { rects, segs, zones, prio, coul: it.coul, scenario: it.sc.id, titre: scenTitreDebutant(it.sc), texte: scenTexteDebutant(S, it), texteCourt: scenTexteDebutant(S, it, true) };
+    const c = { rects, segs, zones, prio, coul: it.coul, scenario: it.sc.id, titre: scenTitreDebutant(it.sc), texte: scenTexteDebutant(S, it), texteCourt: scenTexteDebutant(S, it, true), resume: scenResumeDebutant(S, it) };
     S.cibles.push(c);
     return c;
   }
@@ -6654,6 +6750,26 @@ function scenTitreDebutant(sc) {
 /** La bulle d'un scénario (son libellé, sa zone, sa flèche) : qui l'a écrit et quand, ce qu'il dit
  *  en mots, son suivi en direct, puis les autres scénarios du matin ; court : la version des
  *  écrans courts. */
+/** Le résumé de la bulle d'un scénario (Débutant, 1er toucher) : ce qu'il dit et où il en est, en
+ *  une phrase, la plus complète qui tient (l'état garde sa marque « (en direct) » ou « (journal) »). */
+function scenResumeDebutant(S, it) {
+  const sc = it.sc, e = Scenarios.etatCourtDebutant(sc, it.sv), maj = t => t.charAt(0).toUpperCase() + t.slice(1);
+  const sansRang = t => maj(String(t || '').replace(/^\S+\s+/, '')).replace(/\.?$/, '.');
+  const quoi = sc.forme === 'range' ? 'Le prix reste entre ' + Scenarios.chiffres(sc.range[0]) + ' et ' + Scenarios.prix(sc.range[1]) : 'Le prix va vers ' + sc.cibles.map(Scenarios.prix).join(' puis ');
+  return [[sansRang(Scenarios.ligneDebutant(sc, it.sv, S.maintenant)), sansRang(Scenarios.ligneCourteDebutant(sc, it.sv, S.maintenant, true)), quoi + ' — ' + e.etat + (e.marque ? ' ' + e.marque : '') + '.']];
+}
+/** Le résumé de la ligne des scénarios (Débutant, 1er toucher) : ce que sont les scénarios, puis
+ *  l'état de chacun, la marque dite une fois quand elle est la même pour tous. */
+function scenResumeLigneDebutant(S) {
+  if (!S.F || S.F.etat !== 'ok' || !S.items || !S.items.length) return null;
+  const E = S.items.map(i => Object.assign({ r: i.sc.rang === 'S' ? 'semaine' : i.sc.rang }, Scenarios.etatCourtDebutant(i.sc, i.sv)));
+  const une = new Set(E.map(e => e.marque)).size === 1;
+  const tete = une ? ({ '(en direct)': 'En direct : ', '(journal)': 'Journal : ' })[E[0].marque] || '' : '';
+  // Tous dans le même état : dit une fois (« En direct : les 3 en cours. »).
+  const etats = E.length > 1 && une && new Set(E.map(e => e.etat)).size === 1 ? tete + (E.length === 2 ? 'les deux ' : 'les ' + E.length + ' ') + E[0].etat
+    : tete + E.map(e => e.r + ' ' + e.etat + (!une && e.marque ? ' ' + e.marque : '')).join(' · ');
+  return ['Des hypothèses écrites par Claude, une IA, au point du matin.', etats + '.'];
+}
 function scenTexteDebutant(S, it, court) {
   const P = PARAM.scenarios, F = S.F;
   const ex = Scenarios.explicationDebutant(it.sc, it.sv, P, { itv: S.itv, statuts: F.statuts, maintenant: S.maintenant });
@@ -6804,7 +6920,7 @@ function scenBoiteDebutant(S) {
   const titre = S.F ? Scenarios.titre(S.F, PARAM.scenarios, S.maintenant) : 'Scénarios du matin';
   const cible = { rects: [{ x0: x, y0: y, x1: x + w, y1: y + h }], prio: 0, coul: COLORS.accent, titre, texte,
     // Écran court : le bilan et le renvoi partent ; « (en direct) » et le journal restent, en une phrase.
-    texteCourt: scenTexteCourtLigne(S, texte, true) };
+    texteCourt: scenTexteCourtLigne(S, texte, true), resume: scenResumeLigneDebutant(S) };
   S.cibles.push(cible);
   // M8 : pendant le fondu d'une fermeture, « aucun ne tient plus » et une note du journal sur le
   // rang 1, c'est la LIGNE qui porte l'indication : à l'arbitrage du budget, le libellé cède. De

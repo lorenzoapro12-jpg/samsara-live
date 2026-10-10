@@ -281,20 +281,30 @@ async function viser(o, role, tactile, k) {
     return { x: b.left + it.rect.x + Math.min(it.rect.w / 2, 40), y: b.top + it.rect.y + it.rect.h / 2, texte: it.texte };
   }, [role, k]);
   if (!p) return null;
+  if (!tactile) { await o.page.mouse.move(2, 2); await o.page.waitForTimeout(50); }   // hors du graphique : aucune bulle ouverte
   await o.page.evaluate(() => { window.__dc = 0; window.__ft = []; window.__ftOn = true; });
   if (tactile) await o.page.touchscreen.tap(p.x, p.y);
   else { await o.page.mouse.move(p.x - 10, p.y - 3); await o.page.mouse.move(p.x, p.y, { steps: 3 }); }
   await o.page.waitForTimeout(150);
-  const r = await o.page.evaluate(() => {
+  const lire = () => o.page.evaluate(() => {
     window.__ftOn = false;
     const G = guideEtat, S = scenEtat;
     const c = (G && G.survol) || (S && S.survol) || null;
     const b = (G && G.survol && G.bulle) || (S && S.survol && S.bulle) || null;
     return { titre: c ? c.titre : null, prio: c ? c.prio : null, scenario: c ? c.scenario || null : null, corps: b ? b.corps.join(' ') : '', curseur: canvas.style.cursor,
       police: b ? b.police : null, dansTrace: b ? b.y >= 0 && b.y + b.h <= geo.mainH && b.x >= 0 && b.x + b.w <= canvas.width / devicePixelRatio : null,
+      resume: b ? b.resume : null, lignes: b ? b.lignes : null, nombres: b ? b.nombres : null,
       ohlcv: window.__ft.some(e => e.c === 'chartCalque' && /^(Début|Haut|Bas|Fin|Volume)$|^[OHLC] /.test(e.t)) };
   });
-  return Object.assign(r, { vise: p.texte });
+  // La bulle en trois niveaux : le résumé d'abord, puis le détail au 2e toucher (ou au clic) ;
+  // une bulle déjà courte est entière d'emblée (un 2e toucher la fermerait).
+  const r1 = await lire();
+  if (!r1.resume) return Object.assign({}, r1, { vise: p.texte, court: r1 });
+  await o.page.evaluate(() => { window.__ft = []; window.__ftOn = true; });
+  if (tactile) await o.page.touchscreen.tap(p.x, p.y); else await o.page.mouse.click(p.x, p.y);
+  await o.page.waitForTimeout(150);
+  const r = await lire();
+  return Object.assign(r, { vise: p.texte, court: r1 });
 }
 async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen.tap(x, y); else await o.page.mouse.move(2, 2); await o.page.waitForTimeout(100); }
 
@@ -393,6 +403,13 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
           if (role === 'scenario' || role === 'boite') detail = detail && /Claude[ ,(]+une IA/.test(r.corps) && !/%/.test(r.corps.replace(/±\s*[\d,]+\s*%/g, '') + r.titre);
           check(`${nom} : ${role}${k ? ' ' + (k + 1) : ''} « ${r.vise} » → sa bulle (${r.titre}), le détail attendu, sans infobulle des prix${tactile ? '' : ', curseur main'}, sans jargon ni base du hasard`,
             ok.titre && ok.ohlcv && ok.curseur && !ok.mots.length && !ok.conseil && !ok.hasard && detail, { r, ok, detail });
+          // Le résumé (1er toucher ou survol) : le même titre, 4 lignes et 3 nombres au plus, une phrase
+          // au moins quand le titre en laisse la place, et la ligne qui mène au détail.
+          const c1 = r.court;
+          if (c1.resume) check(`${nom} : ${role}${k ? ' ' + (k + 1) : ''} : le résumé d'abord (${c1.lignes} lignes, ${c1.nombres} nombres), « ${tactile ? 'Touchez encore' : 'Cliquez'} : le détail · pas une prévision »`,
+            r.resume === false && c1.titre === r.titre && c1.lignes <= 4 && c1.nombres <= 3 && new RegExp((tactile ? 'Touchez encore' : 'Cliquez') + ' : le détail · pas une prévision$').test(c1.corps)
+            && c1.corps.length < r.corps.length && !bannisBulle(c1.corps).length, c1);
+          else check(`${nom} : ${role}${k ? ' ' + (k + 1) : ''} : bulle déjà courte, entière d'emblée (${c1.lignes} lignes), sans renvoi au détail`, c1.lignes <= 6 && !/ : le détail · /.test(c1.corps), c1);
           if (role === 'niveau' && k === 0) {
             // Un chiffre publié (mur du carnet, options) garde son âge dans la bulle.
             const pub = await o.page.evaluate(() => guideEtat.niveaux.filter(L => L.niv.raisons.some(r => isFinite(r.lu))).map(L => L.etiq && L.etiq.t));
@@ -408,14 +425,19 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
           }
           if (tactile) { await o.page.evaluate(() => { crossX = crossY = null; dessinerCalque(); }); } else await quitter(o, false);
         }
-        // Le toucher (doigt) : un 2e toucher au même endroit retire la bulle.
+        // Le toucher (doigt) : le 1er toucher montre le résumé, le 2e le détail, un 3e au même
+        // endroit retire la bulle.
         if (tactile) {
           const p = await o.page.evaluate(() => { const it = debEtat.items.find(i => i.role === 'niveau'); const b = canvas.getBoundingClientRect(); return it ? { x: b.left + it.rect.x + 20, y: b.top + it.rect.y + it.rect.h / 2 } : null; });
           if (p) {
+            const etat = () => o.page.evaluate(() => ({ survol: !!guideEtat.survol, resume: guideEtat.bulle ? guideEtat.bulle.resume : null, crossX }));
             await o.page.touchscreen.tap(p.x, p.y); await o.page.waitForTimeout(150);
+            const t1 = await etat();
+            await o.page.touchscreen.tap(p.x, p.y); await o.page.waitForTimeout(150);
+            const t2 = await etat();
             await o.page.touchscreen.tap(p.x, p.y); await o.page.waitForTimeout(150);
             const r = await o.page.evaluate(() => ({ survol: guideEtat.survol, crossX }));
-            check(`${nom} : un 2e toucher au même endroit retire la bulle`, r.survol === null && r.crossX === null, r);
+            check(`${nom} : 1er toucher, le résumé ; 2e, le détail ; un 3e au même endroit retire la bulle`, t1.survol && t1.resume === true && t2.survol && t2.resume === false && r.survol === null && r.crossX === null, { t1, t2, r });
           }
         }
         // 3. Le texte de la page : cartes ouvertes (panneau au bureau, fenêtre au téléphone), puis le menu.
@@ -774,11 +796,16 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
           ouvrirFiche(id);
           const p = document.getElementById('fichePop'), vis = el => el.getClientRects().length > 0;
           const simple = [...p.querySelectorAll('.fiche-simple')].filter(vis).map(x => x.innerText).join(' '), t = [...p.querySelectorAll('.fiche-titre, .fiche-nature')].map(x => x.innerText).join(' ');
-          return { id, simple, titre: t };
+          // « En savoir plus », replié en Débutant : son explication entière, lue une fois ouvert.
+          const d = p.querySelector('details.fiche-plus'), replie = !!d && !d.open;
+          if (d) d.open = true;
+          const plus = d ? [...d.querySelectorAll('.fiche-simple')].filter(vis).map(x => x.innerText).join(' ') : '';
+          const gras = !!p.querySelector('.fiche-quoi b') && vis(p.querySelector('.fiche-quoi'));
+          return { id, simple, plus, titre: t, replie, gras };
         }, id));
       }
-      const mal = fiches.filter(f => bannis(f.simple + ' ' + f.titre).length || /badge en haut|à droite de la dernière bougie|Bollinger|Indicateurs »/.test(f.simple));
-      check('fiches du Guide en Débutant : titre, pastille et explication du Débutant (ni badge, ni chemins dessinés, ni « convention », ni jargon)', !mal.length && fiches.find(f => f.id === 'guide_regime').simple.includes('pas de badge'), mal.length ? mal : fiches.map(f => f.titre));
+      const mal = fiches.filter(f => bannis(f.simple + ' ' + f.titre).length || /badge en haut|à droite de la dernière bougie|Bollinger|Indicateurs »/.test(f.simple + ' ' + f.plus) || !f.replie || !f.gras);
+      check('fiches du Guide en Débutant : titre, pastille et explication du Débutant en gras, son détail replié (ni badge, ni chemins dessinés, ni « convention », ni jargon)', !mal.length && fiches.find(f => f.id === 'guide_regime').plus.includes('pas de badge'), mal.length ? mal : fiches.map(f => f.titre));
       await o.page.evaluate(() => { basculerMode(); ouvrirGlossaire(); });
       await o.page.waitForTimeout(200);
       const x = await o.page.evaluate(() => { const p = document.getElementById('fichePop'), vis = el => el.getClientRects().length > 0; return [...p.querySelectorAll('h4')].filter(vis).map(h => h.innerText.trim()).filter(Boolean); });
