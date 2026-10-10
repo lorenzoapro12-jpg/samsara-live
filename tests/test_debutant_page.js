@@ -426,7 +426,9 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
           if (tactile) check(`${nom} : ${role}${k ? ' ' + (k + 1) : ''} : bulle en ${r.police} px (au moins 12 au téléphone), entière dans le tracé`, r.police >= 12 && r.dansTrace, r);
           const ok = { titre: !!r.titre, ohlcv: !r.ohlcv, curseur: tactile || r.curseur === 'pointer', mots: bannisBulle(r.corps + ' ' + r.titre), conseil: CONSEIL.test(r.corps), hasard: /hasard/i.test(r.corps) };
           let detail = true;
-          if (role === 'niveau') detail = /^Maintenant : /.test(r.corps) && /\(\d+,\d\d %\)|le prix est dedans/.test(r.corps) && /Si le prix finit|Aucun repère proche/.test(r.corps)
+          // L'écart au prix en dollars (« 340 $ au-dessus. »), sans « % » : en Lisible, un pourcentage
+          // se lirait comme une chance, et l'écart en dollars le dit déjà.
+          if (role === 'niveau') detail = /^Maintenant : /.test(r.corps) && /\d\s\$\s(?:au-dessus|en dessous)\.|le prix est dedans/.test(r.corps) && !/%/.test(r.corps) && /Si le prix finit|Aucun repère proche/.test(r.corps)
             // Le titre : le nom entier du repère et le prix de son libellé.
             && nombres(r.vise).filter(x => x.length >= 4).every(x => nombres(r.titre).includes(x)) && / · \d/.test(r.titre);
           if (role === 'phrase') detail = (r.corps.match(/Si le prix finit|Aucun repère proche/g) || []).length >= 2;

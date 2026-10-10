@@ -1965,11 +1965,12 @@ const Guide = (function () {
     valide: p => 'franchi et validé (' + p[1] + ' finis au-delà)',
     valideRetour: () => 'franchi, revenu le toucher, puis reparti : validé',
   };
-  /** « Maintenant : proche du prix, 264 $ au-dessus (0,32 %). » e : etatLive ; live : le prix. */
+  /** « Maintenant : proche du prix, 264 $ au-dessus. » e : etatLive ; live : le prix. Pas de « % » :
+   *  le Lisible n'en montre aucun, et l'écart en dollars le dit déjà. */
   function texteEtatDebutant(e, niv, live, unite, itv) {
     if (!e || e.mot === null || !fini(live) || !niv) return 'Maintenant : prix en direct indisponible, distance inconnue.';
     const f = ETATS_DEBUTANT[e.mot], d = niv.p - live;
-    const dist = e.mot === 'test' ? '' : ', ' + prixRond(d, unite) + (d > 0 ? ' au-dessus' : ' en dessous') + (fini(e.dist) ? ' (' + nombre(Math.abs(e.dist), 2) + ' %)' : '');
+    const dist = e.mot === 'test' ? '' : ', ' + prixRond(d, unite) + (d > 0 ? ' au-dessus' : ' en dessous');
     return 'Maintenant : ' + (f ? f(periode(itv)) : e.mot) + dist + '.';
   }
   /** Le résumé d'un repère (bulle du Débutant, 1er toucher) : ce que c'est, en mots, sans chiffre
