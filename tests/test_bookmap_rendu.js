@@ -63,7 +63,8 @@ function simulateur() {
   S.kline = (t, now) => {
     const o = S.prix(t), c = S.prix(Math.min(t + 60e3, now)), frac = Math.min(1, (now - t) / 60e3);
     const vol = (20 + 60 * h(t / 60e3)) * frac, quote = vol * (o + c) / 2, taker = quote * (0.3 + 0.4 * h(t / 60e3 + 0.5));
-    return [t, o.toFixed(2), (Math.max(o, c) + 5).toFixed(2), (Math.min(o, c) - 5).toFixed(2), c.toFixed(2), String(vol), t + 59999, String(quote), 100, String(vol / 2), String(taker), '0'];
+    // k[9] (part achetée au taker, en BTC) cohérent avec k[10] (la même en USDT) : la carte lit les BTC.
+    return [t, o.toFixed(2), (Math.max(o, c) + 5).toFixed(2), (Math.min(o, c) - 5).toFixed(2), c.toFixed(2), String(vol), t + 59999, String(quote), 100, String(taker / ((o + c) / 2)), String(taker), '0'];
   };
   S.trade = id => { const T = BASE + id * PAS, f = h(id); return { a: id, p: (S.prix(T) + (f - 0.5) * 6).toFixed(2), q: (f * f * 3).toFixed(5), f: id, l: id, T, m: f < 0.47, M: true }; };
   S.dernierId = () => Math.floor((S.now() - BASE) / PAS);
@@ -109,7 +110,8 @@ const serveur = http.createServer((req, res) => {
 // intercept(url, chemin, S) → réponse à servir à la place, 'pendre' (jamais de réponse) ou rien ;
 // latenceHeatmap (ms) ; init (script avant la page) ; horloge (page.clock installée) ;
 // attendre: false (ne pas attendre le chargement complet) ; contexte : options du contexte
-// (deviceScaleFactor, hasTouch, isMobile).
+// (deviceScaleFactor, hasTouch, isMobile, timezoneId) ; direct / profondeur / executions : le corps
+// servi, ou { __statut: 503 } pour une source en panne.
 /** « pas une prévision » est-il dans la partie VISIBLE de la bande du résumé (ni sous la 2e ligne,
  *  ni au-delà du bord droit d'une ligne seule) ? */
 async function avertissementVisible(pg) {
@@ -149,17 +151,21 @@ async function ouvrir(nav, opts) {
         comptes.direct++;
         const corps = opts.direct && opts.direct(u);
         if (!corps) return r.fulfill({ status: 404, headers: cors }).catch(() => {});
+        if (corps.__statut) return r.fulfill({ status: corps.__statut, headers: cors }).catch(() => {});
         return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(corps) }).catch(() => {});
       }
       if (u.includes('profondeur.json')) {
         const corps = opts.profondeur && opts.profondeur();
         if (!corps) return r.fulfill({ status: 404, headers: cors }).catch(() => {});
+        if (corps.__statut) return r.fulfill({ status: corps.__statut, headers: cors }).catch(() => {});
         return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(corps) }).catch(() => {});
       }
       if (u.includes('executions.json')) {
         comptes.exec++;
         if (!opts.executions) return r.fulfill({ status: 404, headers: cors }).catch(() => {});
-        return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(opts.executions()) }).catch(() => {});
+        const corps = opts.executions();
+        if (corps && corps.__statut) return r.fulfill({ status: corps.__statut, headers: cors }).catch(() => {});
+        return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(corps) }).catch(() => {});
       }
       if (u.includes('heatmap.json')) {
         comptes.heatmap++;
@@ -245,7 +251,7 @@ async function filNoir(page, x, y) {
 
     titre('2. Chaque calque porte son âge SUR la carte');
     for (const [nom, motif] of [['carte publiée', /^Carte publiée · dernière colonne il y a /], ['carnet live', /^Carnet live · dernier il y a /],
-      ['exécutions', /^Exécutions · dernière il y a /], ['murs', /^Murs du carnet · lus il y a /], ['gamma', /^Gamma \(Deribit\) · il y a /]]) {
+      ['exécutions', /^Exécutions · dernière il y a /], ['gros paquets', /^Gros paquets \(fichier 15 min\) · lus il y a /], ['gamma', /^Gamma \(Deribit\) · il y a /]]) {
       // Les murs et le gamma partent de leur instant de lecture : on élargit la vue si besoin.
       check(`pastille d'âge : ${nom}`, e.pastilles.some(t => motif.test(t)), e.pastilles);
     }
@@ -924,7 +930,7 @@ async function filNoir(page, x, y) {
       ({ page: p30, erreurs } = await ouvrir(nav, { encodage: true, vue: { width: 844, height: 390 }, contexte: { deviceScaleFactor: 3 } }));
       const e30 = await etat(p30), H = e30.mise.chaleur.h, W = e30.mise.chaleur.w;
       const pas = e30.posees.filter(p => p.pastille);
-      const noms = ['Carte publiée', 'Live', 'Exécutions', 'Murs', 'Gamma'];
+      const noms = ['Carte publiée', 'Live', 'Exécutions', 'Gros paquets', 'Gamma'];
       check(`carte de ${W} × ${H} px : ${pas.length} pastilles (${pas.map(p => p.texte.split(' ·')[0]).join(', ')}), toutes dans la carte`,
         noms.every(n => pas.some(p => p.texte.startsWith(n))) && pas.every(p => p.y >= 0 && p.y + p.h <= H + 0.5 && p.x >= 0 && p.x + p.w <= W + 0.5), pas);
       // Première visite : l'explication couvre presque toute la carte basse. Les pastilles passent
@@ -1162,8 +1168,8 @@ async function filNoir(page, x, y) {
         await p38.mouse.move(rc.x + cible.x + 1.5, rc.y + cible.y0 + cible.h / 2 + 0.5); await p38.mouse.move(rc.x + cible.x + 1, rc.y + cible.y0 + cible.h / 2);
         await p38.waitForTimeout(300);
         const lu = await p38.evaluate(() => document.getElementById('lecture').innerText);
-        check('survol : « … 3,20 BTC (≈ … USDT) · prix moyen … · ≥ 2 ordres (prix répété) · plus longue séquence … »',
-          /Rafale \d\d:\d\d:\d\d,\d{3} · (achat|vente) au marché · 3,20 BTC \(≈ [\d\s  ]+ USDT\) · prix moyen [\d\s  ]+,\d\d · de .+ à .+ \(3 prix, 4 exécutions\) · ≥ 2 ordres \(prix répété\) · plus longue séquence 2,40 BTC/.test(lu), lu);
+        check('survol : « … 3,20 BTC (≈ … $) · prix moyen … $ · de … à … $ · ≥ 2 ordres (prix répété) · plus longue séquence … »',
+          /Rafale \d\d:\d\d:\d\d,\d{3} · (achat|vente) au marché · 3,20 BTC \(≈ [\d\s  ]+ \$\) · prix moyen [\d\s  ]+,\d\d \$ · de [\d\s  ]+,\d\d à [\d\s  ]+,\d\d \$ \(3 prix, 4 exécutions\) · ≥ 2 ordres \(prix répété\) · plus longue séquence 2,40 BTC/.test(lu), lu);
       }
       await p38.click('#btnRafales');
       await p38.waitForTimeout(1200);
@@ -1193,7 +1199,7 @@ async function filNoir(page, x, y) {
       await p39.close();
     }
 
-    titre('40. Destin des murs : traits, marques, âge, totaux ; le seuil ne remet rien à zéro ; horloge incertaine signalée');
+    titre('40. Destin des gros ordres : traits, marques, âge, totaux ; le seuil ne remet rien à zéro ; horloge incertaine signalée');
     {
       let p40;
       // Un niveau fixe de 30 BTC (prix rond sous le marché) : un trait qui dure, à survoler.
@@ -1211,11 +1217,11 @@ async function filNoir(page, x, y) {
       // Vue fine sur la dernière minute : les traits y font plus de 2 px.
       await p40.evaluate(() => { const e = window.__carte.etat(), n = e.maintenant; window.__carte.cadrer(n - 60e3, n + 5e3, e.vue.p1, e.vue.p2); });
       await p40.waitForFunction(() => { const d = window.__carte.etat().destin; return d.marques.length > 0 && d.traits > 0; }, null, { timeout: 30000 }).catch(() => {});
-      const e = await etat(p40), d = e.destin, P = e.pastillesCompletes.find(t => t.startsWith('Destin des murs')) || '';
+      const e = await etat(p40), d = e.destin, P = e.pastillesCompletes.find(t => t.startsWith('Destin des gros ordres')) || '';
       check(`niveaux suivis (${d.niveaux}), traits (${d.traits}) et marques (${d.marques.length}) dessinés`, d.niveaux > 0 && d.traits > 0 && d.marques.length > 0, d);
       const symboles = Object.values(BM.FINS_MURS).map(f => f.s);
       check('chaque marque est une marque du code (×n quand plusieurs fins tombent sur un pixel)', d.marques.every(m => symboles.includes(m.replace(/×\d+$/, ''))), d.marques.slice(0, 10));
-      check('pastille : âge de la dernière lecture, horloge Binance ± u, niveaux / cadence', /^Destin des murs · dernière lecture il y a .+ · horloge Binance ± \d+ ms · 1000 niveaux \/ 2 s/.test(P), P);
+      check('pastille : âge de la dernière lecture, horloge Binance ± u, niveaux / cadence', /^Destin des gros ordres · dernière lecture il y a .+ · horloge Binance ± \d+ ms · 1 000 niveaux \/ 2 s/.test(P), P);
       check('pastille : totaux depuis le début du suivi, au seuil choisi', /Depuis \d\d:\d\d · niveaux ≥ 5 BTC : au moins .+ BTC retirés sans échange · .+ BTC échangés à ces prix · .+ BTC incertains/.test(P), P);
       const leg = await p40.evaluate(() => document.getElementById('legDestin').textContent);
       check('légende : la limite (variations nettes, invisible entre deux lectures) tirée du code', leg.includes(BM.TEXTE_MURS) && leg.includes(BM.MURS.attenteMaxMs / 1000 + ' s'), leg.slice(0, 120));
@@ -1242,7 +1248,7 @@ async function filNoir(page, x, y) {
       let p40b;
       ({ page: p40b, erreurs } = await ouvrir(nav, { encodage: true, reglages: { calques: { destin: true } }, intercept: async (u, k) => { if (k === 'time') await new Promise(z => setTimeout(z, 1400)); return null; } }));
       await p40b.waitForTimeout(2000);
-      const Pb = (await etat(p40b)).pastillesCompletes.find(t => t.startsWith('Destin des murs')) || '';
+      const Pb = (await etat(p40b)).pastillesCompletes.find(t => t.startsWith('Destin des gros ordres')) || '';
       check(`± u > ${BM.MURS.uAlerteMs} ms : la pastille le signale`, /⚠ horloge incertaine \(± \d+ ms > 500 ms\)/.test(Pb), Pb);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p40b.close();
@@ -1333,7 +1339,7 @@ async function filNoir(page, x, y) {
     // ════ Guide : la carte dite en mots ══════════════════════════════════════
     titre('44. Guide : nourri sans « Destin », lit le carnet seul, explication refermée pour de bon, résumé sans saut, rien du présent sur une vue passée');
     {
-      // a. Un gros ordre d'achat de 30 BTC posé 14 s puis retiré, « Destin des murs » ÉTEINT : le
+      // a. Un gros ordre d'achat de 30 BTC posé 14 s puis retiré, « Destin des gros ordres » ÉTEINT : le
       //    journal du guide le dit (le crochet surTransition du suivi est branché).
       let fixe = null, debutMur = null, p44, S;
       const mur = (u, k, S) => {
@@ -1362,15 +1368,15 @@ async function filNoir(page, x, y) {
       // la touche M (ce qui contrôle aussi la bascule), puis revient en Débutant.
       await p44.keyboard.press('m'); await p44.waitForTimeout(400);
       check('touche M : la page passe en Expert', (await etat(p44)).mode === 'expert');
-      // Expert : le contrôle d'origine, intact — chaque évènement, à l'heure UTC, avec sa phrase entière.
+      // Expert : chaque évènement, à l'heure de l'appareil (comme l'axe de la carte), avec sa phrase entière.
       await p44.click('#btnJournal'); await p44.waitForTimeout(300);
       const ljx = await p44.evaluate(() => ({ liste: document.getElementById('listeJournal').innerText, note: document.getElementById('journalNote').innerText }));
-      check('panneau « Ce qui vient de se passer » (Expert) : heure UTC et phrase', /\d\d:\d\d:\d\d .+Gros ordre d'achat/.test(ljx.liste) && /UTC/.test(ljx.note), ljx.liste.slice(0, 200));
+      check('panneau « Ce qui vient de se passer » (Expert) : heure de l\'appareil et phrase, jamais « UTC »', /\d\d:\d\d:\d\d .+Gros ordre d'achat/.test(ljx.liste) && /heure de l'appareil/i.test(ljx.note) && !/UTC/.test(ljx.note + ljx.liste), ljx.liste.slice(0, 200));
       await p44.keyboard.press('Escape');
-      // a (jumeau Expert) : le même panneau, en heures UTC, la phrase experte et sa note.
+      // a (jumeau Expert) : le même panneau, à l'heure de l'appareil, la phrase experte et sa note.
       await p44.click('#btnJournal'); await p44.waitForTimeout(300);
       const ljX = await p44.evaluate(() => ({ liste: document.getElementById('listeJournal').innerText, note: document.getElementById('journalNote').innerText }));
-      check('panneau « Ce qui vient de se passer » (Expert) : heure UTC et phrase experte, note « Heures UTC… »', /\d\d:\d\d:\d\d .+Gros ordre d'achat/.test(ljX.liste) && /^Heures UTC/.test(ljX.note), { l: ljX.liste.slice(0, 200), n: ljX.note.slice(0, 80) });
+      check('panneau « Ce qui vient de se passer » (Expert) : heure de l\'appareil et phrase experte, note « Heure de l\'appareil, comme l\'axe… »', /\d\d:\d\d:\d\d .+Gros ordre d'achat/.test(ljX.liste) && /^Heure de l'appareil, comme l'axe de la carte/.test(ljX.note) && !/UTC/.test(ljX.note + ljX.liste), { l: ljX.liste.slice(0, 200), n: ljX.note.slice(0, 80) });
       await p44.keyboard.press('Escape'); await p44.waitForTimeout(200);
       // b. Le guide seul lit le carnet (chaleur live, carnet latéral, bid / ask et destin éteints).
       for (const k of ['live', 'dom', 'bidask']) await p44.click(`button[data-calque="${k}"]`);
@@ -1479,7 +1485,7 @@ async function filNoir(page, x, y) {
       const motifAge = /(?:^À|· à) jour(?: il y a (\d+ s|\d+ min))? · pas une prévision$/;
       const motifTete = /^Prix [\d\u202f\u00a0 ]+\u00a0\$, (en hausse|en baisse|stable) · /;
       const AUTRES = { bid: { dedans: 'Dans un mur d’achat', vide: 'Pas de mur au-dessous' }, ask: { dedans: 'Dans un mur de vente', vide: 'Pas de mur au-dessus' } };
-      const motifEtiq = /^(Mur d’achat|Mur de vente) · [\d  ]+ \$$/;
+      const motifEtiq = /^(Mur d’achat|Mur de vente) · \d{1,3}(?: \d{3})*\u00a0\$$/;
       const nombre = s => +String(s).replace(/[^\d,]/g, '').replace(',', '.');
       const chevauche = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
       // Les étiquettes débutantes : contrôles communs (budget, longueur, nom, côté, valeur, dans la carte,
@@ -1627,8 +1633,8 @@ async function filNoir(page, x, y) {
         morceaux.push(['indice', await p45.evaluate(() => document.getElementById('indiceTap').textContent)]);
         // Les couleurs dans l'ORDRE de la palette classique (l'orange dit plus d'ordres que le jaune) :
         // jamais « plus c'est clair », faux pour l'orange.
-        const coul = morceaux.filter(([n]) => n === 'légende' || n === 'explication').map(([n, t]) => [n, /Bleu foncé : peu d'ordres à ce prix ; puis vert, jaune, orange ; blanc : le plus d'ordres\./.test(t) && !/Plus c'est clair/.test(t)]);
-        check('légende et explication : « Bleu foncé : peu … ; puis vert, jaune, orange ; blanc : le plus d\'ordres »', coul.length === 2 && coul.every(([, ok]) => ok), coul);
+        const coul = morceaux.filter(([n]) => n === 'légende' || n === 'explication').map(([n, t]) => [n, /Bleu foncé : peu d'ordres à ce prix ; puis bleu clair, vert, jaune, orange ; blanc : le plus d'ordres\./.test(t) && !/Plus c'est clair/.test(t)]);
+        check('légende et explication : « Bleu foncé : peu … ; puis bleu clair, vert, jaune, orange ; blanc : le plus d\'ordres »', coul.length === 2 && coul.every(([, ok]) => ok), coul);
         // « Blanc » ne désigne plus deux choses : le prix est « la ligne à fil noir », jamais « la ligne blanche ».
         const lb = morceaux.filter(([n]) => n === 'légende' || n === 'explication').map(([n, t]) => [n, /Ligne à fil noir = le prix/.test(t) && !/Ligne blanche = le prix|ligne blanche =/i.test(t)]);
         check('légende et explication : « Ligne à fil noir = le prix » (jamais « Ligne blanche = le prix »)', lb.length === 2 && lb.every(([, ok]) => ok), lb);
@@ -1738,7 +1744,7 @@ async function filNoir(page, x, y) {
         check('45b. touche M : Expert (data-mode, samsara-mode), « → Débutant », Réglages, Rafales et toutes les puces visibles',
           x.mode === 'expert' && x.cle === 'expert' && x.libelle === '→ Débutant' && x.reglages && x.rafales && x.puces === 16, x);
         // Les cinq pastilles de la section 2 : murs et gamma viennent du fichier de 15 min, relu en Expert.
-        const motifs = [/^Carte publiée · /, /^Carnet live · /, /^Exécutions · /, /^Murs du carnet · /, /^Gamma \(Deribit\) · /];
+        const motifs = [/^Carte publiée · /, /^Carnet live · /, /^Exécutions · /, /^Gros paquets \(fichier 15 min\) · /, /^Gamma \(Deribit\) · /];
         await p45.waitForFunction(ms => { const p = window.__carte.etat().pastilles; return ms.every(m => p.some(t => new RegExp(m).test(t))); }, motifs.map(m => m.source), { timeout: 15000 }).catch(() => {});
         const eX5 = await etat(p45);
         check('Expert : les 5 pastilles d\'âge de la section 2 sont là, panneaux du côté et du bas rouverts', motifs.every(m => eX5.pastilles.some(t => m.test(t))) && eX.mise.dom.w > 0 && eX.mise.vol.h > 0 && eX.mise.cvd.h > 0, { p: eX5.pastilles, dom: eX.mise.dom, vol: eX.mise.vol });
@@ -2033,6 +2039,110 @@ async function filNoir(page, x, y) {
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
         await pg.close();
       }
+    }
+    // ════ 46. Une seule heure, un nom par chose, des unités partout ══════════
+    titre('46. Heure de l\'appareil (fuseau écrit une fois), rafales depuis leur vrai début, ronds avec « BTC », noms lisibles');
+    {
+      // 23 h d'exécutions publiées (executions.json) : les exécutions de la carte remontent à hier, les
+      // rafales NON (il leur faut chaque exécution). L'appareil est à UTC+5:30 (Asia/Kolkata).
+      const now = Date.now(), dt = 10, lu = Math.floor(now / 1000) - 1800, kP = Math.round(pMid / 10);
+      const seaux = [];
+      for (let k = Math.floor((lu - 23 * 3600) / dt); k * dt + dt <= lu; k += 30) seaux.push([k, kP, [500, 0, 250], [0, 1000, 0]]);
+      const fichier = () => ({ updated: new Date(now).toISOString(), dt, dp: 10, unite_btc: 0.001, format: 'seaux-1', lu_depuis: lu - 23 * 3600, lu_jusqua: lu, trous: [], seaux });
+      let pg;
+      ({ page: pg, erreurs } = await ouvrir(nav, { encodage: true, executions: fichier, contexte: { timezoneId: 'Asia/Kolkata' }, reglages: { calques: { rafales: true } } }));
+      await pg.waitForFunction(() => window.__carte.etat().pastillesCompletes.some(t => /^Rafales ≥ /.test(t)), null, { timeout: 20000 }).catch(() => {});
+      await pg.evaluate(() => { const e = window.__carte.etat(), n = e.maintenant; window.__carte.cadrer(n - 3 * 3600e3, n + 10 * 60e3, e.vue.p1, e.vue.p2); });
+      await pg.waitForTimeout(600);
+      let e = await etat(pg);
+      const loc = await pg.evaluate(([a, b]) => ({ fus: Fmt.fuseau(), raf: Fmt.jourHeure(a), exe: Fmt.jourHeure(b), jour: Fmt.memeJour(b, Date.now()) }), [e.rafales.debut, e.executions.premier]);
+      check(`46a. fuseau de l'appareil écrit UNE fois, dans l'angle de l'axe : « ${e.textes.fuseau} » (Fmt.fuseau)`, e.textes.fuseau === 'UTC+5:30' && loc.fus === 'UTC+5:30', [e.textes.fuseau, loc.fus]);
+      const Pe = e.pastillesCompletes.find(t => t.startsWith('Exécutions')) || '', Pr = e.pastillesCompletes.find(t => t.startsWith('Rafales')) || '';
+      check(`46b. exécutions « depuis ${loc.exe} » : l'heure de l'appareil, avec le jour quand c'est un autre jour`, Pe.includes('depuis ' + loc.exe + ' ') && (loc.jour || /depuis \d\d\/\d\d \d\d:\d\d/.test(Pe)) && /ronds ≥ /.test(Pe), Pe);
+      check(`46c. rafales « depuis ${loc.raf} » : la plus ancienne exécution reçue par la page, pas les 23 h publiées`, e.rafales.debut !== null && e.rafales.debut > e.executions.premier + 3600e3 && Pr.includes('depuis ' + loc.raf + ' ') && !Pr.includes('depuis ' + loc.exe + ' '), { Pr, debut: e.rafales.debut, premier: e.executions.premier });
+      check('46d. avant le début des rafales : « rafales non lues » écrit au pied de la carte (pas « aucune rafale »)', e.textesCarte.some(t => t.texte === 'rafales non lues'), e.textesCarte.map(t => t.texte).slice(0, 30));
+      // Ronds : chaque volume écrit a son « BTC » juste dessous (deux lignes dans le rond).
+      const nus = e.textesCarte.filter(t => !t.repere && /^\d[\d ]*(,\d+)?$/.test(t.texte));
+      const sansUnite = nus.filter(n => !e.textesCarte.some(u => u.texte === 'BTC' && Math.abs((u.x + u.w / 2) - (n.x + n.w / 2)) < 1 && u.y - n.y > 6 && u.y - n.y < 16));
+      check(`46e. ${nus.length} volumes écrits dans les ronds, chacun avec « BTC »`, nus.length > 0 && !sansUnite.length, { sansUnite: sansUnite.slice(0, 5), nus: nus.length });
+      // Rien ne dit « UTC » ailleurs que l'angle de l'axe : pastilles, textes de la carte, journal, légende.
+      await pg.click('#btnJournal'); await pg.waitForTimeout(300);
+      const jn = await pg.evaluate(() => ({ note: document.getElementById('journalNote').innerText, liste: document.getElementById('listeJournal').innerText }));
+      await pg.keyboard.press('Escape');
+      await pg.click('#btnLegende'); await pg.waitForTimeout(300);
+      const lg = await pg.evaluate(() => ({ texte: document.getElementById('legende').innerText, mode: document.getElementById('btnMode').textContent, zones: document.getElementById('legGuideZones').textContent,
+        resume: document.getElementById('legGuideResume').textContent, rafales: document.getElementById('legRafales').textContent, bulles: document.getElementById('legBulles').textContent }));
+      e = await etat(pg);
+      const ailleurs = e.pastillesCompletes.concat(e.textesCarte.map(t => t.texte), [jn.note, jn.liste, lg.texte, e.statut]).filter(t => /\bUTC\b/.test(t));
+      check('46f. aucune autre heure UTC : pastilles, carte, journal, légende à l\'heure de l\'appareil', !ailleurs.length && /^Heure de l'appareil, comme l'axe de la carte/.test(jn.note), { ailleurs: ailleurs.slice(0, 3), note: jn.note.slice(0, 80) });
+      check('46g. légende : bouton de mode qui dit l\'action, « 15 dernières minutes », le résumé réellement affiché, garde des rafales tirée du code',
+        lg.mode === 'Passer en Débutant' && /des 15 dernières minutes/.test(lg.zones) && /FINIT par «.pas une prévision.»/.test(lg.resume) && !/dès le début/.test(lg.resume)
+        && lg.rafales.includes('pendant ' + BM.nombre(BM.RAFALES.gardeMs / 3600e3, 0, 1) + ' h') && /bouton «.≡ Rafales.» \(en haut à droite\) en liste les 20 plus récentes/.test(lg.rafales) && /écrit dans le rond, avec «.BTC.», à partir de [\d,]+ BTC/.test(lg.bulles), lg);
+      check('46h. légende : « Plusieurs horloges », gestes complets (L, + / −, Ctrl + molette), ronds (pas « bulles ») pour les échanges, plus de note périmée « avant le 08/10 »',
+        /Plusieurs horloges sur une même surface/.test(lg.texte) && !/Trois horloges/.test(lg.texte) && /L : la légende/.test(lg.texte) && /\+ \/ − : zoom/.test(lg.texte) && /Ctrl \+ molette/.test(lg.texte) && !/\bbulles?\b/i.test(lg.texte) && !/avant le 08\/10/.test(lg.texte), lg.texte.slice(0, 200));
+      check('46i. volume et CVD en BTC (la quantité échangée, comme les ronds)', /^Volume \(BTC\) par /.test(e.textes.volume || '') && /^CVD spot \(BTC\) cumulé depuis .+ · [+−]?[\d ]+(,\d+)? BTC$/.test(e.textes.cvd || ''), [e.textes.volume, e.textes.cvd]);
+      check('46j. puces et pastilles : « Gros paquets (fichier 15 min) » et « Destin des gros ordres », plus de calque « Murs »',
+        await pg.evaluate(() => { const t = [...document.querySelectorAll('#calques button')].map(b => b.textContent); return t.includes('Gros paquets') && t.includes('Destin des gros ordres') && !t.includes('Murs') && !t.includes('Destin des murs'); })
+        && e.pastillesCompletes.some(t => /^Gros paquets \(fichier 15 min\) · lus il y a /.test(t)), e.pastillesCompletes.map(t => t.slice(0, 50)));
+      // La lecture au pointeur : prix à la cotation (au centime) ; entre la fin de la carte publiée et le début du live, « non observé ».
+      const rc = await pg.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(); return { x: r.left, y: r.top }; });
+      const viserTP = async (t, p) => { const v = e.vue, Zc = e.mise.chaleur, x = Zc.x + (t - v.t1) / (v.t2 - v.t1) * Zc.w, y = Zc.y + (v.p2 - p) / (v.p2 - v.p1) * Zc.h;
+        await pg.mouse.move(rc.x + x + 1, rc.y + y); await pg.mouse.move(rc.x + x, rc.y + y); await pg.waitForTimeout(300); return pg.evaluate(() => document.getElementById('lecture').innerText); };
+      const pV = (e.vue.p1 + e.vue.p2) / 2;
+      const l1 = await viserTP(e.maintenant - 2 * 3600e3, pV);
+      check('46k. lecture au pointeur : le prix au centime (« 86 012,50 $ ») et l\'heure de l\'appareil', /^[\d ]+,\d\d \$ · \d\d:\d\d:\d\d/.test(l1), l1.slice(0, 80));
+      if (e.finCarte && e.live && e.live.deb0 && e.live.deb0 - e.finCarte > 20e3) {
+        const lt = await viserTP((e.finCarte + e.live.deb0) / 2, pV);
+        check('46l. entre la fin de la carte publiée et le début du live : « non observé », jamais une bulle muette', /Carnet : non observé ici \(ni carte publiée, ni carnet live\)/.test(lt), lt.slice(0, 160));
+      } else check('46l. un intervalle entre la carte publiée et le live, pour le contrôle', false, [e.finCarte, e.live && e.live.deb0]);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await pg.close();
+    }
+    {
+      // Statut Expert : chaque source sous un nom lisible, jamais sa clé de code.
+      let pg;
+      ({ page: pg, erreurs } = await ouvrir(nav, { encodage: true, direct: () => ({ __statut: 503 }), profondeur: () => ({ __statut: 503 }), executions: () => ({ __statut: 503 }) }));
+      await pg.waitForFunction(() => /profondeur Coinbase/.test(window.__carte.etat().statut) && /exécutions publiées/.test(window.__carte.etat().statut), null, { timeout: 15000 }).catch(() => {});
+      const st = (await etat(pg)).statut;
+      check(`46m. statut : « carte publiée (30 dernières min) », « exécutions publiées (24 h) », « profondeur Coinbase » — jamais « direct », « historique », « profondeur » seuls (${st.slice(0, 160)})`,
+        /carte publiée \(30 dernières min\) : HTTP 503/.test(st) && /exécutions publiées \(24 h\) : HTTP 503/.test(st) && /profondeur Coinbase : HTTP 503/.test(st) && !/(^|⚠ |· )(direct|historique|profondeur) :/.test(st), st);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await pg.close();
+    }
+    {
+      // Coinbase (BTC-USD, en USD) placé en USDT comme les strikes gamma ; sa ligne dans la lecture
+      // seulement là où il se voit ; sa colonne de 5 min dite telle ; la légende dit son échelle.
+      // Colonnes alignées sur la FIN de la carte publiée du dépôt (sa date est celle du dernier heatmap.json
+      // commité) : la lecture « dans la bande Binance » tombe sur une colonne publiée.
+      const t = Math.floor(BM.finGrille(G) / 300e3), cols = [], b0 = Math.floor(pMid * 0.9 / 100), m0 = Math.floor(pMid / 100), n = m0 - b0;
+      for (let k = 30; k >= 1; k--) cols.push([t - k, b0, new Array(n).fill(120), m0, new Array(n).fill(120)]);
+      const loin = () => ({ updated: new Date().toISOString(), sym: 'BTC-USD', t0: cols[0][0] * 300, dt: 300, dp: 100, format: 'colonnes-1',
+        encodage: { ref_btc: 100, plafond: 255, agregation_tranche: 'somme', echelle: 'propre' }, colonnes: cols });
+      let pg;
+      ({ page: pg, erreurs } = await ouvrir(nav, { encodage: true, profondeur: loin }));
+      await pg.waitForTimeout(1500);
+      let e = await etat(pg);
+      const taux = e.niveaux && e.niveaux.conversion && e.niveaux.conversion.taux;
+      const P = e.pastillesCompletes.find(x => x.startsWith('Carte publiée')) || '';
+      check(`46n. Coinbase placé en USDT au cours publié (÷ ${taux}), pas sur l'axe tel quel ; pas de 5 min × 100 $ (USD)`, taux > 0 && P.includes('placé en USDT (÷ ' + BM.nombre(taux, 0, 6) + ')') && /5 min × 100 \$ \(USD\)/.test(P) && /1 min × 20 \$/.test(P) && !/60 s ×/.test(P), P);
+      const v43 = await pg.evaluate(() => window.__carte.verifierChaleur());
+      check('46o. chaleur affichée = repeint complet (Coinbase converti)', v43.differents === 0, v43);
+      // Vue large en prix : Binance ne couvre que ≈ ±1 % ; Coinbase va à −10 %.
+      await pg.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [(t - 20) * 300e3, (t - 2) * 300e3, pMid * 0.88, pMid * 1.02]);
+      await pg.waitForTimeout(500);
+      e = await etat(pg);
+      const rc = await pg.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(); return { x: r.left, y: r.top }; });
+      const viserTP = async (tt, p) => { const v = e.vue, Zc = e.mise.chaleur, x = Zc.x + (tt - v.t1) / (v.t2 - v.t1) * Zc.w, y = Zc.y + (v.p2 - p) / (v.p2 - v.p1) * Zc.h;
+        await pg.mouse.move(rc.x + x + 1, rc.y + y); await pg.mouse.move(rc.x + x, rc.y + y); await pg.waitForTimeout(300); return pg.evaluate(() => document.getElementById('lecture').innerText); };
+      const loinLu = await viserTP((t - 10.5) * 300e3, pMid * 0.92), presLu = await viserTP((t - 10.5) * 300e3, pMid * 0.9995);
+      check('46p. loin du prix (hors de la bande Binance) : la ligne Coinbase, sa colonne de 5 min dite telle (« colonne HH:MM–HH:MM (5 min) »)', /Coinbase \(USD\) [\d ]+–[\d ]+ \$ \(bid\)/.test(loinLu) && /colonne \d\d:\d\d–\d\d:\d\d \(5 min\)/.test(loinLu) && !/minute \d\d:\d\d/.test(loinLu.split('Coinbase')[1] || ''), loinLu.slice(0, 300));
+      check('46q. dans la bande Binance : la carte de Binance, pas la ligne Coinbase cachée dessous', /^Carte /m.test(presLu) && !/Coinbase/.test(presLu), presLu.slice(0, 300));
+      await pg.click('#btnLegende'); await pg.waitForTimeout(300);
+      const enc = await pg.evaluate(() => document.getElementById('encodageEtat').textContent);
+      check('46r. légende : les graduations valent pour Binance ; Coinbase a sa propre échelle (référence 100 BTC, tranches de 100 $)', /graduations de la barre valent pour la carte de Binance/.test(enc) && /Coinbase a la même palette mais sa propre échelle \(référence 100 BTC, tranches de 100 \$\)/.test(enc), enc);
+      check('46s. légende : q dit en mots (« la somme des ordres posés dans la tranche, en BTC »), jamais le texte technique du fichier (`agregation_depuis`…)', /q = la somme des ordres posés dans la tranche, en BTC/.test(enc) && !/`|agregation_|SOMME des niveaux/.test(enc), enc);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await pg.close();
     }
   } finally {
     await nav.close();
