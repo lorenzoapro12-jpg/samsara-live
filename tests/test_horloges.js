@@ -103,7 +103,7 @@ const MD = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'contre',
   vm.runInContext(`histHeatmap = { updated: '${new Date(Date.now() - 7 * 60000).toISOString()}', majA: Date.now() - 7 * 60000, sym: 'BTCUSDT',
     grille: { t0: Math.floor((Date.now() - 9 * 60000) / 60000) * 60 - 60 * 99, dt: 60, W: 100 } }`, page.sandbox);
   const c = vm.runInContext('texteAgeCouche()', page.sandbox);
-  check(`âge de la couche : « ${c.texte} »`, /^Carte publiée · dernière colonne il y a (9|10) min · publiée il y a 7 min$/.test(c.texte) && c.vieux === false);
+  check(`âge de la couche : « ${c.texte} »`, /^Ordres en attente \(carte\) · dernière colonne il y a (9|10) min · publiée il y a 7 min$/.test(c.texte) && c.vieux === false);
 
   console.log(ko ? `\n❌ HORLOGES : ${ko} contrôle(s) en échec` : '\n✅ HORLOGES : TOUS LES CONTRÔLES PASSENT');
   process.exit(ko ? 1 : 0);

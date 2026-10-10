@@ -183,12 +183,17 @@ try {
     ['Horloges : un horodatage décrit = une ligne', Object.entries(D.meta.champs).filter(([, m]) => m.nature === 'horodatage' && !m.alias_de)
       .every(([, m]) => feed.innerHTML.includes('<span class="h-nom">' + m.libelle))],
     // Repère de la publication sur le graphique : à `updated`, au prix publié, jamais sans son âge.
+    // L'heure est celle de l'appareil (le jour devant si ce n'est pas aujourd'hui), le prix au
+    // format de l'Expert (« 82 798,49 $ ») : recalculés ici sans passer par Fmt.
     ['Repère de la publication (instant, prix, âge)', (() => {
       const tu = Date.parse(D.updated) / 1000, P = { left: 16, right: 75, W: 900, top: 10, ph: 400, minP: D.btc.price - 500, maxP: D.btc.price + 500, range: 1000, t0: tu - 900 * 10, pas: 900, gap: 8 };
       vm.runInContext('activeSymbol = "BTCUSDT"', sandbox);
       const r = sandbox.reperePublication(P);
+      const d = new Date(Date.parse(D.updated)), n = new Date(), z = x => String(x).padStart(2, '0');
+      const quand = (d.toDateString() === n.toDateString() ? '' : z(d.getDate()) + '/' + z(d.getMonth() + 1) + ' ') + z(d.getHours()) + ':' + z(d.getMinutes());
+      const prixFin = D.btc.price.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/[\u00a0\u202f]/g, ' ') + ' $';
       return r && Math.abs(r.x - (16 + 80)) < 1e-6 && Math.abs(r.y - (10 + 200)) < 1e-6
-        && r.texte === 'fichier ' + D.updated.slice(11, 16) + ' UTC · prix publié ' + Math.round(D.btc.price).toLocaleString('fr-FR') + ' (' + vm.runInContext('Horloges', sandbox).texteAge(Date.now() - Date.parse(D.updated)) + ')'
+        && r.texte === 'fichier ' + quand + ' · prix publié ' + prixFin + ' (' + vm.runInContext('Horloges', sandbox).texteAge(Date.now() - Date.parse(D.updated)) + ')'
         && sandbox.reperePublication(Object.assign({}, P, { t0: tu + 900 })) === null;
     })()],
     // Débutant (le mode par défaut, stockage vide) : ce qui reste visible quand les sous-arbres
