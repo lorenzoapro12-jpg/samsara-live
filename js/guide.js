@@ -2146,6 +2146,11 @@ const Guide = (function () {
     return (avecDate(ms, ctx) ? dateVue(ms) + ' ' : '') + heureVue(ms);
   }
   const heureExpert = (ms, ctx) => heureCourte(ms, ctx);
+  /** Expert : « à 08:15 », « le 13/09 à 11:00 », « le 13/09 » (1 j). */
+  function quandExpert(ms, ctx) {
+    const hx = heureExpert(ms, ctx);
+    return ctx && ctx.pas >= 86400 ? 'le ' + hx : /^\d\d\/\d\d /.test(hx) ? 'le ' + hx.replace(/^(\d\d\/\d\d) /, '$1 à ') : 'à ' + hx;
+  }
 
   /** La marque de fin d'une figure tombée : « ✗ invalidé à 08:15 : clôture au-dessus des sommets
    *  (83 664 $) » (Expert) ; « Invalidé à 08:15 : … » (Débutant). Heure de l'appareil ; une marque
@@ -2153,10 +2158,7 @@ const Guide = (function () {
   function marqueFin(f, ctx, mode, unite) {
     if (!f || !f.fin) return '';
     const exp = mode === 'expert', ms = finMs(ctx, f.jFin), per = periode(ctx && ctx.intervalle), fam = famille(f);
-    // Expert : « à 08:15 », « le 13/09 à 11:00 », « le 13/09 » (1 j).
-    const hx = exp ? heureExpert(ms, ctx) : '';
-    const h = exp ? (ctx && ctx.pas >= 86400 ? 'le ' + hx : /^\d\d\/\d\d /.test(hx) ? 'le ' + hx.replace(/^(\d\d\/\d\d) /, '$1 à ') : 'à ' + hx)
-      : fini(ms) && heureVueSi(ms) ? quandDeb(ms, ctx) : '';
+    const h = exp ? quandExpert(ms, ctx) : fini(ms) && heureVueSi(ms) ? quandDeb(ms, ctx) : '';
     const s = f.sens, ev = (f.journal || []).filter(x => x.j === f.jFin).pop() || {}, p = fini(ev.p) ? ev.p : f.invalidation;
     if (f.ebauche && f.fin === 'abandon') {
       const pt = f.s > 0 ? 'sommet' : 'creux', pts = f.s > 0 ? 'sommets' : 'creux', ete = famille(f) === 'ete';
@@ -2531,6 +2533,150 @@ const Guide = (function () {
     return ({ ebauche: nom + ' possible', formation: nom + ' possible', dedans: nom, demi: nom + ' : sortie à valider', confirme: ['lignes', 'drapeau'].includes(famille(f)) ? nom + ' : sortie validée' : nom + ' validé', invalide: '✗ ' + nom + ' invalidé',
       abandon: '✗ ' + nom + ' annulé', sans_suite: MARQUES_FIN.expire_avant + ' ' + nom + ' sans suite', atteint: nom + ' : cible théorique atteinte', oublie: MARQUES_FIN.expire + ' ' + nom + ' : délai écoulé' })[e.cle] || nom;
   }
+
+  // ── Les figures passées (plan §8 et §5.2) : des EXEMPLES, à leur place, chacun avec son issue ──
+  // Le rejeu (detecter) garde déjà toutes les figures de l'historique chargé : elles sont relues,
+  // filtrées par la vue, sans rien recalculer. Une figure passée dit ce qui s'est passé ENSUITE (cible
+  // atteinte ou non, en combien de temps), jamais ce qu'il faudrait faire ; la vue donne le compte des
+  // réussites ET des échecs (les seules réussites feraient croire que les figures marchent toujours :
+  // sur la fixture, 43 des 92 figures validées terminées n'ont pas atteint leur cible).
+  /** La marque de l'issue d'une figure passée : celles de MARQUES_FIN (✗, –, ○), et ✓ pour une cible
+   *  atteinte (une figure EN COURS la dit en mots, « cible ✓ » : son tracé n'en porte pas). */
+  const MARQUE_ATTEINT = '✓';
+  const marqueIssue = f => (!f || !f.fin ? null : f.fin === 'atteint' ? MARQUE_ATTEINT : MARQUES_FIN[f.fin] || null);
+  /** Les trois choix du Complet ; le Lisible n'en a pas (une figure validée, quand la vue est passée). */
+  const CHOIX_PASSEES = ['non', 'validees', 'toutes'];
+  const PASSEES_MAX = 6;
+  /** Validée puis terminée : cible atteinte, invalidée, ou délai écoulé après la validation. */
+  const passeeValidee = f => !f.ebauche && fini(f.jConf) && (f.fin === 'atteint' || f.fin === 'invalide' || f.fin === 'expire');
+  /** Tombée avant d'être validée : figure invalidée ou restée sans suite, ébauche annulée. */
+  const passeeTombee = f => (f.ebauche ? f.fin === 'abandon' : f.fin === 'invalide_avant' || f.fin === 'expire_avant');
+  /** Les ébauches annulées qui ont le dernier mot sur leur identité (cleFigure) : aucune figure de même
+   *  identité (l'ébauche est revenue, puis devenue figure : c'est la figure qui dit l'issue) ni ébauche
+   *  plus tardive (revenue puis retombée : seule la dernière chute compte, une fois). Lu une fois par
+   *  rejeu, pas à chaque image. */
+  const EB_TOMBEES = new WeakMap();
+  function ebauchesTombees(res) {
+    const L = (res.ebauches && res.ebauches.liste) || [], m = EB_TOMBEES.get(res);
+    if (m && m.n === res.n && m.nf === res.formes.length && m.ne === L.length) return m.liste;
+    const fig = new Set(res.formes.map(cleFigure)), der = new Map();
+    for (const e of L) {
+      const k = cleFigure(e), d = der.get(k);
+      if (!d || !fini(e.jFin) || (fini(d.jFin) && e.jFin >= d.jFin)) der.set(k, e);
+    }
+    const liste = L.filter(e => passeeTombee(e) && fini(e.jFin) && der.get(cleFigure(e)) === e && !fig.has(cleFigure(e)));
+    EB_TOMBEES.set(res, { n: res.n, nf: res.formes.length, ne: L.length, liste });
+    return liste;
+  }
+  /** Les figures passées de la vue [vs, ve) (indices du rejeu) et leur compte. Une figure est « de la
+   *  vue » quand son issue (la bougie de sa marque) y est. choix (Complet) : 'non', 'validees' ou
+   *  'toutes' (les figures et ébauches tombées avant leur validation aussi). mode 'debutant' (Lisible),
+   *  quel que soit choix : rien quand la vue suit la dernière bougie (present), sinon la plus récente
+   *  figure validée ENTIÈRE dans la vue (de son premier point à sa marque). opts.exclure(f) : les
+   *  figures déjà montrées comme figures en cours (jamais deux fois). Le compte porte sur toute la vue.
+   *  → { liste (l'issue la plus récente d'abord ; Complet : PASSEES_MAX au plus), compte: { validees,
+   *      atteintes, invalidees, expirees, tombees }, choix, present } */
+  function figuresPassees(res, vs, ve, choix, mode, opts) {
+    const deb = mode === 'debutant', ch = deb ? 'validees' : CHOIX_PASSEES.includes(choix) ? choix : 'non';
+    const compte = { validees: 0, atteintes: 0, invalidees: 0, expirees: 0, tombees: 0 };
+    if (!res || !res.formes) return { liste: [], compte, choix: ch, present: true };
+    const j = res.n - 1, a = fini(vs) ? vs : -Infinity, z = fini(ve) ? ve : Infinity, present = z > j + 1;
+    const exclue = opts && typeof opts.exclure === 'function' ? opts.exclure : () => false;
+    const vue = f => fini(f.jFin) && f.jFin <= j && f.jFin >= a && f.jFin < z;
+    const V = res.formes.filter(f => !f.doublon && passeeValidee(f) && vue(f));
+    const T = res.formes.filter(f => !f.doublon && passeeTombee(f) && vue(f)).concat(ebauchesTombees(res).filter(vue));
+    for (const f of V) { compte.validees++; if (f.fin === 'atteint') compte.atteintes++; else if (f.fin === 'invalide') compte.invalidees++; else compte.expirees++; }
+    compte.tombees = T.length;
+    if (ch === 'non' || (deb && present)) return { liste: [], compte, choix: ch, present };
+    const ordre = (x, y) => y.jFin - x.jFin || y.debut - x.debut || TYPES.indexOf(x.type) - TYPES.indexOf(y.type);
+    const L = (ch === 'toutes' ? V.concat(T) : V).filter(f => !exclue(f)).sort(ordre);
+    return { liste: deb ? L.filter(f => f.debut >= a).slice(0, 1) : L.slice(0, PASSEES_MAX), compte, choix: ch, present };
+  }
+  /** Une durée en mots du Lisible (s en secondes), un nombre au plus : « environ 12 min », « environ
+   *  une heure », « environ 6 h », « environ un jour », « environ 3 jours ». */
+  function dureeMots(s) {
+    if (!fini(s) || s <= 0) return null;
+    if (s < 50 * 60) return 'environ ' + Math.max(1, Math.round(s / 60)) + ' min';
+    if (s < 1.5 * 3600) return 'environ une heure';
+    if (s < 20 * 3600) return 'environ ' + Math.round(s / 3600) + ' h';
+    if (s < 1.5 * 86400) return 'environ un jour';
+    return 'environ ' + Math.round(s / 86400) + ' jours';
+  }
+  /** Le temps entre la validation d'une figure et son issue, en secondes (null : jamais validée). */
+  function delaiIssue(f, ctx) {
+    if (!fini(f.jConf) || !fini(f.jFin)) return null;
+    const d = (finMs(ctx, f.jFin) - finMs(ctx, f.jConf)) / 1000;
+    return fini(d) ? d : ctx && fini(ctx.pas) ? (f.jFin - f.jConf) * ctx.pas : null;
+  }
+  /** Le compte des figures passées d'une vue, en mots (les réussites ET les échecs) : « Dans cette
+   *  vue : 5 figures validées, 2 ont atteint leur cible. » Complet, choix 'toutes' : les figures
+   *  tombées avant leur validation aussi ; montrees (tracées) moins que la vue n'en a : il le dit.
+   *  → les variantes, de la plus complète à la plus courte. */
+  function texteComptePassees(c, mode, choix, montrees) {
+    const n = c.validees, k = c.atteintes;
+    const cible = n === 1 ? (k ? 'elle a atteint sa cible' : 'elle n’a pas atteint sa cible')
+      : k === 0 ? 'aucune n’a atteint sa cible' : k === n ? (n === 2 ? 'les deux ont' : 'toutes ont') + ' atteint leur cible' : k + (k > 1 ? ' ont atteint leur cible' : ' a atteint sa cible');
+    if (mode === 'debutant') {
+      if (n <= 1) return ['C’est la seule figure validée de cette vue.'];
+      return ['Dans cette vue : ' + n + ' figures validées, ' + cible + '.', 'Vue : ' + n + ' figures validées, ' + cible + '.'];
+    }
+    const t = c.tombees, toutes = choix === 'toutes', tot = n + (toutes ? t : 0);
+    const base = n ? n + (n > 1 ? ' figures validées, ' : ' figure validée, ') + cible : 'aucune figure validée terminée';
+    const tomb = !toutes ? '' : t ? ' ; ' + t + (t > 1 ? ' tombées avant leur validation' : ' tombée avant sa validation') : ' ; aucune tombée avant sa validation';
+    const trace = fini(montrees) && montrees < tot ? ' (les ' + montrees + ' plus récentes sont tracées)' : '';
+    const court = n + ' validée' + (n > 1 ? 's' : '') + ' · ' + k + ' cible' + (k > 1 ? 's' : '') + ' atteinte' + (k > 1 ? 's' : '') + (toutes ? ' · ' + t + ' tombée' + (t > 1 ? 's' : '') + ' avant' : '');
+    return ['Figures passées · dans cette vue : ' + base + tomb + trace + '.', 'Dans cette vue : ' + base + tomb + '.', 'Vue : ' + court];
+  }
+  /** Le libellé d'une figure passée sur le tracé (Lisible, ≤ max caractères) : la marque de son
+   *  issue d'abord, puis son nom, puis l'issue en mots quand elle tient. */
+  function libellePassee(f, max) {
+    const nom = NOM_FORME_DEBUTANT[f.type], m = marqueIssue(f);
+    if (!nom || !m) return null;
+    const mots = { atteint: [' : cible atteinte', ' : cible'], invalide: [' invalidé'], invalide_avant: [' invalidé'], expire: [' : délai écoulé', ' : expiré'], expire_avant: [' sans suite'], abandon: [' annulé'] }[f.fin] || [];
+    return tenir(mots.map(x => m + ' ' + nom + x).concat([m + ' ' + nom]), max);
+  }
+  /** Les mots d'une figure passée : { titre, texte (la bulle entière), resume } — ce qu'elle était,
+   *  ce qui s'est passé ENSUITE (cible atteinte ou non, en combien de temps), le compte de la vue
+   *  (compte : les variantes de texteComptePassees), jamais un conseil ni une prévision. Lisible :
+   *  resume = ses phrases, chacune en variantes (la bulle les prend tant qu'elles tiennent : sans
+   *  « % », trois nombres au plus) ; Expert : le détail des figures (règle, objectif, bilan, journal). */
+  function texteFigurePassee(f, b, ctx, P, unite, mode, compte) {
+    const m = marqueIssue(f), d = delaiIssue(f, ctx), C = compte || [], valide = passeeValidee(f);
+    if (mode !== 'debutant') {
+      const n = valide ? f.jFin - f.jConf : null;
+      const titre = (m ? m + ' ' : '') + 'Passée · ' + NOMS_FORMES[f.type][0] + ' — ' + etatForme(f).texte;
+      const texte = ['Exemple passé : ' + (valide ? 'validé ' + quandExpert(finMs(ctx, f.jConf), ctx) + ' ; ensuite, ' : 'jamais validé ; ') + marqueFin(f, ctx, 'expert', unite)
+        + (valide && n > 0 ? ' — ' + n + ' bougie' + (n > 1 ? 's' : '') + (fini(d) ? ' (' + duree(d) + ')' : '') + ' après la validation' : '') + '.'];
+      if (C.length) texte.push(C[0]);
+      texte.push('Règle (seuils de convention) : ' + regleExpert(f, P, unite));
+      if (valide && fini(f.objectif)) texte.push('Objectif théorique (convention, non garanti) : ' + prix(f.objectif, unite) + (f.fin === 'atteint' ? ', atteint.' : ', pas atteint.'));
+      if (b) {
+        let t = texteBilan(b, ctx, P, 'expert');
+        if (CLASSIQUE[f.type]) t += ' · lecture classique (débattue) : ' + CLASSIQUE[f.type] + ' ; ici, mesuré : ↑ ' + b.haut + ' / ↓ ' + b.bas + ' sur ' + (b.haut + b.bas);
+        texte.push(t + '.');
+      }
+      const J = texteJournal(f, ctx, unite);
+      if (J) texte.push(J);
+      texte.push('Une figure passée dit ce qui s’est passé ensuite : pas une prévision ni une recommandation.');
+      return { titre, texte, resume: null };
+    }
+    const nomL = NOM_LONG_DEBUTANT[f.type], dm = dureeMots(d), apres = dm ? ' ' + dm + ' plus tard' : '';
+    const issue = { atteint: 'cible atteinte', invalide: 'invalidé avant sa cible', expire: 'délai écoulé' }[f.fin] || etatForme(f).texte;
+    const titre = (m ? m + ' ' : '') + 'Exemple passé : ' + minuscule(nomL) + ', ' + issue;
+    // Ce qui s'est passé après la validation, de la plus complète à la plus courte (un nombre au plus).
+    const ensuite = {
+      atteint: ['Après sa validation, le prix a atteint la cible' + apres + '.', 'Après sa validation, le prix a atteint la cible.'],
+      invalide: ['Après sa validation, le prix est reparti dans l’autre sens : la figure est tombée' + apres + ', sans atteindre sa cible.', 'Après sa validation, la figure est tombée sans atteindre sa cible.'],
+      expire: ['Après sa validation, le prix n’a atteint ni la cible ni le niveau qui annulait la figure : délai écoulé' + apres + '.', 'Après sa validation, ni la cible ni le niveau qui annulait la figure n’ont été atteints à temps.'],
+    }[f.fin] || [marqueFin(f, ctx, 'debutant', unite)];
+    let def = DEFINITION_FORME[f.type] || '';
+    if (famille(f) === 'lignes' && fini(f.sens)) def = def.replace(/en est sorti\./, 'en est sorti ' + (f.sens > 0 ? 'par le haut' : 'par le bas') + '.');
+    const conf = valide ? finMs(ctx, f.jConf) : NaN, qc = fini(conf) && heureVueSi(conf) ? ' ' + quandDeb(conf, ctx) : '';
+    const texte = [def, valide ? 'Figure validée' + qc + '. Cible théorique selon l’usage des analystes : ' + prix(f.objectif, unite) + ', non garantie.' : '',
+      (valide ? ensuite[0] + ' ' : '') + marqueFin(f, ctx, 'debutant', unite)]
+      .concat(C.length ? [C[0]] : [], b ? [bilanDebutant(f, b, ctx, P)] : [], ['Un exemple du passé, pas une prévision ni un conseil.']);
+    return { titre, texte: texte.filter(Boolean), resume: [ensuite, C] };
+  }
   /** Les mots qui n'ont pas leur place sur l'écran Débutant (noms d'indicateurs, jargon, heures UTC,
    *  intervalles abrégés). UNE liste pour tout le site : le terminal, js/scenarios.js et la carte
    *  (tests/mots_debutant.js la relit). Bornes : `\b` ne voit pas de frontière après une lettre
@@ -2560,6 +2706,7 @@ const Guide = (function () {
     NOMS_DEBUTANT, raisonPrincipale, choixDebutant, reperesDe, choisirReperes, VERBE_DEBUTANT, optionsSeules, libelleDebutant, libellesDebutant, formatDebutant, AVEC_POINT, titreDebutant, nomDebutant, nomPhrase, HORIZON_DEBUTANT, HORIZON_COURT, PERIODE_DEBUTANT, phrasesDebutant, phraseDebutant,
     texteSuiteDebutant, prixRond, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
     MARQUES_FIN, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
-    MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant };
+    MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant,
+    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;
