@@ -46,13 +46,26 @@ check('murs ×1 (asks) = murs publiés', JSON.stringify(T.mursFusionnes(LQ, 'ask
 regler(() => {});
 const h0 = rendre();
 const ref = LQ.bandes[String(LQ.bande_ref_pct)];
-check('carte Liquidité : bande de référence publiée, son ratio tel quel', h0.includes('Carnet ±' + LQ.bande_ref_pct + ' %') && h0.includes('>' + ref.ratio.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</b>'));
+// Nombres à la française (js/format.js) : virgule décimale, « ±0,5 % », ratio « 1,05 ».
+const fr2 = x => x.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const frB = b => String(b).replace('.', ',');
+check('carte Liquidité : bande de référence publiée, son ratio tel quel', h0.includes('Carnet ±' + frB(LQ.bande_ref_pct) + ' %') && h0.includes('>' + fr2(ref.ratio) + '</b>'));
 check('tranche des murs affichée = tranche publiée', h0.includes('par tranche de ' + LQ.wall_bin_usd + ' $'));
+// La bande vient d'un RÉGLAGE de l'Expert, masqué en Débutant : la carte « Ordres en attente »
+// du Débutant la dit, et dit quand elle a été choisie en mode Expert.
+check('Débutant, « Ordres en attente » : « à ±' + frB(LQ.bande_ref_pct) + ' % du prix », sans « bande choisie » quand rien n’est réglé',
+  h0.includes('Binance, à ±' + frB(LQ.bande_ref_pct) + ' % du prix') && !h0.includes('bande choisie en mode Expert'));
+{
+  const rg = page.sandbox.reglagesHtml();
+  check('Réglages : « référence publiée (±' + frB(LQ.bande_ref_pct) + ' %) » à la française, comme les autres bandes ; la carte du Débutant nommée',
+    rg.includes('référence publiée (±' + frB(LQ.bande_ref_pct) + ' %)') && rg.includes('du mode Débutant') && !/±\d+\.\d/.test(rg), (rg.match(/±[\d.,]+ %[^<]{0,20}/g) || []).slice(0, 6));
+}
 
 // ── 2. Un réglage change le détail, pas la valeur ────────────────────────────
 titre('2. Un réglage change le détail, jamais la valeur d’une quantité');
-const ratioDe = (h, b) => { const m = h.match(new RegExp('±' + b.replace('.', '\\.') + ' % : ([\\d.]+)')); return m && m[1]; };
+const ratioDe = (h, b) => { const m = h.match(new RegExp('±' + frB(b) + ' % : ([\\d,]+)')); return m && m[1]; };
 const autresAvant = Object.keys(LQ.bandes).map(b => ratioDe(h0, b));
+check('chaque bande publiée a son ratio lu sur la carte (« ±0,1 % : 1,23 »)', autresAvant.length > 1 && autresAvant.every(Boolean), autresAvant);
 regler(r => { r.carnet.trancheX = 5; r.carnet.murs = 3; r.carnet.murMin = 10; r.carnet.bandesPerso = [0.2, 0.3]; });
 const h1 = rendre();
 check('tranche ×5, 3 murs, seuil 10 BTC, bandes perso : les ratios publiés ne bougent pas',
@@ -63,17 +76,18 @@ const sommes = new Map();
 for (const [p, q] of LQ.profil_bids) { const P = Math.floor(p / (5 * LQ.wall_bin_usd)) * 5 * LQ.wall_bin_usd; sommes.set(P, (sommes.get(P) || 0) + q); }
 check('murs ×5 = sommes exactes de 5 tranches publiées (fusionner des sommes = sommer)',
   m5.every(([p, q]) => Math.abs(q - Math.round(sommes.get(p) * 10) / 10) < 1e-9) && m5.every(([, q]) => q >= 10) && m5.length <= 3, m5);
-check('bandes perso : marquées « ≈ » et « à 20 $ près »', /Sur le profil publié \(à 20 \$ près\) : ±0\.2 % ≈ [\d.]+/.test(h1));
+check('bandes perso : marquées « ≈ » et « à 20 $ près »', /Sur le profil publié \(à 20 \$ près\) : ±0,2 % ≈ \d+,\d\d\b/.test(h1));
 const bp = T.bandeProfil(LQ, LQ.bande_ref_pct);
 check('bande perso = bande publiée à une tranche près (même carnet)', Math.abs(bp.bid_btc - ref.bid_btc) <= Math.max(...LQ.profil_bids.map(x => x[1])) + 1e-9, [bp, ref]);
 check('bande perso au-delà de la couverture : refusée (null), jamais tronquée', T.bandeProfil(LQ, LQ.couverture_pct + 0.01) === null);
 const autre = Object.keys(LQ.bandes).find(k => k !== String(LQ.bande_ref_pct));
 regler(r => { r.carnet.bande = +autre; });
 const h2 = rendre();
-check(`bande choisie (±${autre} %) parmi les PUBLIÉES : son ratio publié tel quel`, h2.includes('Carnet ±' + autre + ' %')
-  && h2.includes('>' + LQ.bandes[autre].ratio.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</b>'));
+check(`bande choisie (±${autre} %) parmi les PUBLIÉES : son ratio publié tel quel`, h2.includes('Carnet ±' + frB(autre) + ' %')
+  && h2.includes('>' + fr2(LQ.bandes[autre].ratio) + '</b>'));
+check(`… et la carte du Débutant le dit : « à ±${frB(autre)} % du prix (bande choisie en mode Expert) »`, h2.includes('Binance, à ±' + frB(autre) + ' % du prix (bande choisie en mode Expert)'));
 regler(r => { r.carnet.bande = 0.37; });
-check('bande demandée mais NON publiée : retour à la référence publiée (rien d’inventé)', rendre().includes('Carnet ±' + LQ.bande_ref_pct + ' %'));
+check('bande demandée mais NON publiée : retour à la référence publiée (rien d’inventé)', rendre().includes('Carnet ±' + frB(LQ.bande_ref_pct) + ' %'));
 
 // ── 3. Les constantes viennent du fichier ────────────────────────────────────
 titre('3. Constantes du fichier : lues, jamais recopiées');
@@ -84,8 +98,8 @@ delete lq.profil_bids; delete lq.profil_asks;
 T.setData(etrange); regler(() => {});
 const h3 = rendre();
 check('fichier aux bandes 0,2 / 0,7 % et tranche 25 $ : la page affiche CES valeurs',
-  h3.includes('Carnet ±0.7 %') && h3.includes('±0.2 % :') && h3.includes('par tranche de 25 $'), h3.match(/Carnet ±[^<]+|tranche de [^<]+/g));
-check('… et aucune des constantes habituelles (±0,5 %, 20 $)', !h3.includes('±0.5 %') && !h3.includes('tranche de 20 $'));
+  h3.includes('Carnet ±0,7 %') && h3.includes('±0,2 % :') && h3.includes('par tranche de 25 $'), h3.match(/Carnet ±[^<]+|tranche de [^<]+/g));
+check('… et aucune des constantes habituelles (±0,5 %, 20 $)', !h3.includes('±0,5 %') && !h3.includes('±0.5 %') && !h3.includes('tranche de 20 $'));
 delete lq.wall_bin_usd;
 check('tranche absente du fichier : « non publiée », pas 20 $ par défaut', rendre().includes('(tranche non publiée)'));
 T.setData(DATA);
@@ -131,14 +145,14 @@ l1.then(async h => {
   check('profondeur et trades demandés à Binance = réglages (limit=1000)', live.appels.some(u => /depth.*limit=1000/.test(u)) && live.appels.some(u => /trades.*limit=1000/.test(u)), live.appels);
   check('le titre dit la profondeur réellement lue', /1[\s\u202f\u00a0]000 niveaux/.test(h));   // espace fine insécable (fr-FR)
   check('bande ±1 % au-delà du carnet reçu : « non couverte », pas un chiffre tronqué', /±1 % : non couverte/.test(h), h.match(/±[\d.]+ % : [^·<]+/g));
-  check('bande ±0,1 % couverte : ratio mesuré', /±0\.1 % : <b>[\d.]+<\/b>/.test(h));
-  const ratio1 = (h.match(/Ratio bid\/ask ([\d.]+)/) || [])[1];
+  check('bande ±0,1 % couverte : ratio mesuré', /±0,1 % : <b>\d+,\d\d<\/b>/.test(h));
+  const ratio1 = (h.match(/Ratio bid\/ask (\d+,\d\d)/) || [])[1];
   const h2b = await lireLive(r => { r.live.niveaux = 1000; r.live.trades = 1000; r.live.bandes = [0.05, 0.1, 1]; r.live.ratioMarque = 1.05; r.live.ratioLeger = 1.01; });
-  const ratio2 = (h2b.match(/Ratio bid\/ask ([\d.]+)/) || [])[1];
+  const ratio2 = (h2b.match(/Ratio bid\/ask (\d+,\d\d)/) || [])[1];
   check('seuils de lecture changés : le RATIO affiché est le même, seule la phrase change', ratio1 && ratio1 === ratio2, [ratio1, ratio2]);
-  const t1 = (h.match(/Taker buy ([\d.]+ %)/) || [])[1];
+  const t1 = (h.match(/Taker buy (\d+,\d %)/) || [])[1];
   const h3b = await lireLive(r => { r.live.niveaux = 1000; r.live.trades = 1000; r.live.bandes = [0.05]; r.live.takerDominant = 55; r.live.takerLeger = 51; });
-  check('seuils des achats au marché changés : la part affichée est la même', t1 && t1 === (h3b.match(/Taker buy ([\d.]+ %)/) || [])[1], [t1]);
+  check('seuils des achats au marché changés : la part affichée est la même', t1 && t1 === (h3b.match(/Taker buy (\d+,\d %)/) || [])[1], [t1]);
   await lireLive(r => { r.live.niveaux = 5000; });
   check('5 000 niveaux : demandés tels quels', live.appels.some(u => /depth.*limit=5000/.test(u)));
   fin();

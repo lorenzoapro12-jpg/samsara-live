@@ -98,6 +98,8 @@ Object.defineProperty(feed, 'innerHTML', { get: () => html, set: v => { rendus++
   check(`au plus tard ${T.CADENCES.relecture_max_min} min après la dernière lecture : relue (publication hors cadence)`, lectures.filter(x => /market-data/.test(x.url)).length === 4);
   panne = true; maintenant += T.CADENCES.relecture_max_min * MIN; await T.fetchMarket(); panne = false;
   check('un échec : l’erreur est dite à la place des cartes', /class="error"/.test(html));
+  // Le voyant passe au rouge ET son infobulle dit pourquoi (elle gardait l'âge d'avant).
+  check(`un échec : le voyant dit la panne (« ${dot.title} »), sans nom de fichier`, /^Infos du marché : lecture impossible/.test(dot.title) && !/market-data|\.json/.test(dot.title + html), dot.title);
   maintenant += MIN; await T.fetchMarket();
   check('un échec se retente au tour suivant', lectures.filter(x => /market-data/.test(x.url)).length === 6);
   check('… et les cartes reviennent, même si la publication n’a pas changé', !/class="error"/.test(html) && /demon-card/.test(html));
@@ -117,14 +119,15 @@ Object.defineProperty(feed, 'innerHTML', { get: () => html, set: v => { rendus++
   lectures.length = 0;
   await T.fetchPrice();
   check('fetchPrice demande ensuite le format MINI, et rien d’autre', lectures.length === 1 && lectures[0].url === T.urlTicker('BTCUSDT'), lectures.map(x => x.url));
-  check('prix et variation affichés depuis la réponse MINI', el('price').textContent === '$83,512.51' && el('var24').textContent === '−' + Math.abs(v).toFixed(2) + ' %', [el('price').textContent, el('var24').textContent]);
+  // Expert : le prix à la précision de cotation, au format français (js/format.js) comme le reste.
+  check('prix et variation affichés depuis la réponse MINI, au format français (« 83 512,51 $ », « −3,05 % »)', el('price').textContent === '83 512,51 $' && el('var24').textContent === '−' + Math.abs(v).toFixed(2).replace('.', ',') + ' %', [el('price').textContent, el('var24').textContent]);
   // Débutant : les mêmes valeurs, au format français, la durée de la variation dite.
   page.stockage['samsara-mode'] = 'debutant';
   await T.fetchPrice();
   check('Débutant : même prix et même variation, écrits « 83 513 $ » et « −3,05 % en 24 h »', /^83\s513\s\$$/.test(el('price').textContent) && el('var24').textContent === '−' + Math.abs(v).toFixed(2).replace('.', ',') + ' % en 24 h', [el('price').textContent, el('var24').textContent]);
   page.stockage['samsara-mode'] = 'expert';
   await T.fetchPrice();
-  check('… et de retour en Expert, le format d’avant', el('price').textContent === '$83,512.51', el('price').textContent);
+  check('… et de retour en Expert, la précision d’avant (centimes), même format', el('price').textContent === '83 512,51 $' && el('var24').textContent === '−3,05 %', el('price').textContent);
 
   titre('3. Le préchargement du script de tête : les URL exactes du démarrage');
   const scripts = scriptsApp(), tete = scripts.find(s => s.fichier === 'index.html (inline)');

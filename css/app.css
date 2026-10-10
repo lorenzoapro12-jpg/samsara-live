@@ -277,6 +277,20 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   color: var(--ink-3); background: var(--rail);
 }
 .kpis.vieux .kpi-age { color: var(--warn-ink); background: var(--warn-soft); }
+/* Au-delà du seuil, la pastille d'âge dit le mot : « en retard · 25 min » (la teinte seule ne se
+   lisait pas). Le mot est écrit ici (contenu généré) : le texte de la pastille reste l'âge seul,
+   que les structures habillent. Gare l'écrit déjà elle-même (« Retard · », themes/gare.css) et la
+   Planche le marque de son △ (indice de révision) : pas deux fois, ni la case élargie. */
+.kpi-age .age-retard { display: none; }
+.kpis.vieux .kpi-age .age-retard { display: inline; }
+.kpis.vieux .kpi-age .age-retard::before { content: 'en retard · '; }
+[data-structure="tableau"] .kpis.vieux .kpi-age .age-retard,
+[data-structure="planche"] .kpis.vieux .kpi-age .age-retard { display: none; }
+/* Sur une autre paire que BTC/USDT, la bande dit qu'elle parle du bitcoin (js/app.js). */
+.kpi-btc {
+  flex-shrink: 0; margin-right: 4px; padding: 2px 8px; border-radius: 999px;
+  font-size: 10px; font-weight: 700; white-space: nowrap; color: var(--ink-2); background: var(--rail);
+}
 /* Trace des dernières heures (js/chronique.js) : sur la ligne du libellé, dans la hauteur de
    la bande (36 px) — ni plus haute, ni beaucoup plus large. Statique : rien n'y bouge entre
    deux publications. Une ligne coupée est un trou de publication, jamais interpolé. */
@@ -373,6 +387,25 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 .indicator-bar.deborde {
   -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
   mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+}
+/* « + Indicateurs » (choisir ce qui s'affiche) n'est jamais hors de vue en Expert, où le ruban
+   défile : à 1440 px il était rogné au bord droit (x 1366–1490 pour 1427 px utiles) ; au
+   téléphone, à trois écrans à droite. Au bureau, il est épinglé au bord droit du ruban (sticky),
+   sur un fond plein qui recouvre en fondu ce qui défile dessous — le fondu du ruban est alors
+   inutile ; au téléphone, il passe en tête, avant les intervalles. Bureau 95 l'épinglait déjà
+   et la Planche le range sur la 1re rangée de sa nomenclature : leurs règles, pas celles-ci. */
+@media (min-width: 769px) {
+  :root:not([data-mode="debutant"]):not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar > .ind-dropdown {
+    position: sticky; right: 0; z-index: 1; margin-left: auto;
+  }
+  :root:not([data-mode="debutant"]):not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar.deborde > .ind-dropdown {
+    padding-left: 22px; background: linear-gradient(90deg, transparent, var(--card-solid) 18px);
+    box-shadow: 12px 0 0 var(--card-solid);
+  }
+  :root:not([data-mode="debutant"]):not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar.deborde { -webkit-mask-image: none; mask-image: none; }
+}
+@media (max-width: 768px) {
+  :root:not([data-mode="debutant"]):not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar > .ind-dropdown { order: -2; }
 }
 .indicator-bar .section-title {
   flex-shrink: 0;
@@ -541,7 +574,7 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   background: none; box-shadow: none; border-radius: 0;
 }
 
-/* ─── 7. Panneau « Marché live » ───────────────────────────────────────────── */
+/* ─── 7. Panneau « Infos du marché » ──────────────────────────────────────── */
 .feed-panel {
   z-index: 90; flex-shrink: 0;
   display: flex; width: 390px;
@@ -657,6 +690,12 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 /* Chiffre héros + tuiles */
 .hero { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .hero-val { font-size: 26px; font-weight: 700; letter-spacing: -0.6px; color: var(--ink-1); line-height: 1.15; }
+/* Le prix PUBLIÉ (carte « Fourchette des 24 h », Expert) : plus petit que le prix en direct de
+   l'en-tête (23 px, 15 px au plus petit selon le thème) — il était le plus gros chiffre du
+   panneau (26 px), deux prix contradictoires dont le plus vieux en plus grand. Son nom le précède. */
+.hero.hero-publie .hero-val { font-size: 17px; letter-spacing: -0.3px; }
+.hero.hero-publie .hero-lbl { font-size: 9.5px; font-weight: 700; letter-spacing: 0.7px; text-transform: uppercase; color: var(--ink-3); }
+@media (max-width: 800px) { .hero.hero-publie .hero-val { font-size: 14px; } }
 .tuiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .tuile { background: var(--rail); border-radius: var(--r-tile); padding: 8px 11px 9px; min-width: 0; }
 .tuile .val { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; color: var(--ink-1); line-height: 1.3; }
@@ -683,14 +722,15 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 /* Jauge RSI : zones 30 / 70 teintées, un point à la valeur */
 .rsi-meter { position: relative; flex: 1 1 70px; max-width: 130px; height: 5px; border-radius: 999px; background: var(--rail); margin: 0 4px; }
 .rsi-zone { position: absolute; top: 0; bottom: 0; width: 30%; }
-.rsi-zone.bas { left: 0; border-radius: 999px 0 0 999px; background: var(--up-soft); }
-.rsi-zone.haut { right: 0; border-radius: 0 999px 999px 0; background: var(--down-soft); }
+/* Les deux zones de la même teinte neutre : sous 30, ce n'est pas une « bonne nouvelle » (vert),
+   ni au-dessus de 70 une mauvaise (rouge) — un RSI bas n'annonce aucun rebond. */
+.rsi-zone.bas { left: 0; border-radius: 999px 0 0 999px; background: var(--warn-soft); }
+.rsi-zone.haut { right: 0; border-radius: 0 999px 999px 0; background: var(--warn-soft); }
 .rsi-dot {
   position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%;
   background: var(--accent-2); box-shadow: 0 0 0 2px var(--card-solid), 0 2px 6px rgba(0,0,0,0.2);
 }
-.rsi-meter.chaud .rsi-dot { background: var(--down); }
-.rsi-meter.froid .rsi-dot { background: var(--up); }
+.rsi-meter.chaud .rsi-dot, .rsi-meter.froid .rsi-dot { background: var(--warn); }
 .tf-row + .tf-row { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--hairline); }
 .tf-tete { display: flex; align-items: center; gap: 8px; }
 .tf-nom {
@@ -821,7 +861,9 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   border: 1px solid var(--hairline); box-shadow: var(--ombre-douce);
 }
 .modal-fermer svg { width: 15px; height: 15px; }
-.modal-corps { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+/* En bas, la place de la barre des tâches (fixe, au-dessus de tout) : elle cachait la dernière
+   ligne des modales « Infos du marché » et ⚡ au téléphone. */
+.modal-corps { flex: 1; overflow-y: auto; padding: 14px 14px calc(44px + var(--gutter)); display: flex; flex-direction: column; gap: 12px; }
 /* Les cartes ne se compriment JAMAIS dans la colonne : sinon elles sont rognées. */
 .modal-corps > * { flex-shrink: 0; }
 
@@ -928,14 +970,32 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   .header-left h1 { font-size: 15px; }
   .header-right { gap: 6px; }
   #updated { display: none; }
-  /* Les chiffres clés sont dans « Marché live » (bouton du panneau) : sur téléphone, la place
-     va au prix. */
+  /* Les chiffres clés sont dans « Infos du marché » (bouton du panneau) : sur téléphone, la
+     place va au prix. Sauf l'alerte : publication en retard, la pastille d'âge (« en retard ·
+     25 min ») reste, seule de la bande, à côté du prix — panneau fermé, elle se voit. */
   .kpis { display: none; }
+  :root:not([data-mode="debutant"]) .header > .kpis.vieux { display: flex; flex: 0 0 auto; height: auto; }
+  :root:not([data-mode="debutant"]) .header > .kpis.vieux > :not(.kpi-age) { display: none; }
+  :root:not([data-mode="debutant"]) .header > .kpis.vieux > .kpi-age { margin-left: 0; }
   .hero-prix { gap: 7px; }
   .price-badge { font-size: 17px; gap: 6px; }
   .var24 { font-size: 10.5px; padding: 2px 7px; }
   .theme-btn.ico-btn { width: 30px; height: 30px; }
   .theme-btn.ico-btn svg { width: 15px; height: 15px; }
+}
+/* Entre 481 et 1100 px, le prix et les boutons occupent déjà la rangée (à 1024 px, il restait
+   37 px à la bande) : la pastille passe sur une 2e rangée, sans rien prendre au prix — seule
+   jusqu'à 800 px, après les boutons au-delà s'ils y sont passés (sous 481 px, elle est à côté
+   du prix ; au-delà de 1100 px, dans la bande). */
+@media (min-width: 481px) and (max-width: 1100px) {
+  html:not([data-mode="debutant"]):not([data-structure]) .header:has(> .kpis.vieux) { flex-wrap: wrap; row-gap: 4px; }
+  html:not([data-mode="debutant"]):not([data-structure]) .header > .kpis.vieux { order: 3; flex: 0 0 auto; height: auto; }
+  html:not([data-mode="debutant"]):not([data-structure]) .header > .kpis.vieux > :not(.kpi-age) { display: none; }
+  html:not([data-mode="debutant"]):not([data-structure]) .header > .kpis.vieux > .kpi-age { margin-left: 0; }
+}
+@media (min-width: 481px) and (max-width: 800px) {
+  html:not([data-mode="debutant"]):not([data-structure]) .header:has(> .kpis.vieux) > .header-left { flex-basis: 0; }
+  html:not([data-mode="debutant"]):not([data-structure]) .header > .kpis.vieux { flex-basis: 100%; }
 }
 @media (max-width: 768px) {
   body { font-size: 12px; -webkit-tap-highlight-color: transparent; }
@@ -995,6 +1055,9 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   html:not([data-structure="fenetres"]) .header { flex-wrap: wrap; row-gap: 6px; }
   html:not([data-structure="fenetres"]) .header-left { flex: 1 1 100%; }
   html:not([data-structure="fenetres"]) .header-right { flex: 1 1 100%; justify-content: space-between; }
+  /* Expert : la pastille « en retard » se range à côté du prix, sur la 1re rangée (les boutons,
+     à 100 %, restent sur la 2e) ; sans elle, le prix occupe la rangée comme avant. */
+  html:not([data-mode="debutant"]):not([data-structure]) .header-left { flex: 1 1 auto; }
 }
 @media (max-width: 400px) {
   .price-badge { font-size: 15px; }
@@ -1135,9 +1198,9 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
 .kpis.vieux .kpi-deb .deb-retard { display: inline; }
 [data-mode="debutant"] #cycle .kpi, [data-mode="debutant"] #cycle .kpi-age { display: none; }
 [data-mode="debutant"] .header-right > #updated { display: none; }
-/* Les structures déplacent l'heure de publication (en UTC) hors de l'en-tête : en Débutant, son
-   âge est dit par la pastille « Infos du marché » (infobulle) ; l'heure UTC et ses étiquettes
-   restent en Expert. La légende de la Gazette nomme les « bougies » : Expert aussi. */
+/* Les structures déplacent l'heure de publication hors de l'en-tête : en Débutant, son âge est
+   dit par la pastille « Infos du marché » (infobulle) ; l'heure et ses étiquettes restent en
+   Expert. La légende de la Gazette nomme les « bougies » : Expert aussi. */
 [data-mode="debutant"] #updated, [data-mode="debutant"] .f95-pub, [data-mode="debutant"] .gare-heure,
 [data-mode="debutant"] .gazette-edition, [data-mode="debutant"] .gazette-legende { display: none !important; }
 /* Planche (cyanotype, diazo) : les chiffres clés masqués, la case du cartouche garde son fond de
@@ -1203,6 +1266,8 @@ html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { orde
 }
 @media (max-width: 400px) {
   [data-mode="debutant"] .kpi-deb { padding: 3px 7px; font-size: 10px; }
+  /* À 360 px, la flèche de la pastille « en retard · 25 min » cède aussi (2 px de trop). */
+  [data-mode="debutant"] .kpi-deb .deb-fleche { display: none; }
   html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { gap: 3px; }
   [data-mode="debutant"] .header-right .theme-btn.ico-btn { width: 26px; height: 26px; }
   [data-mode="debutant"] .mode-btn { padding: 0 6px; font-size: 9.5px; }
@@ -1220,8 +1285,10 @@ html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { orde
   /* Débutant : « Infos · en retard ▸ » (le mot « du marché » cède) ; l'en-tête tient sur une rangée. */
   [data-mode="debutant"] .kpi-deb .deb-mot { display: none; }
 }
-/* Tablette : le nom (redit dans la barre du bas) cède avant que l'en-tête passe à la ligne. */
+/* Tablette : le nom (redit dans la barre du bas) cède avant que l'en-tête passe à la ligne —
+   dès 1100 px quand la pastille s'allonge (« Infos · en retard · 25 min ▸ »). */
 @media (max-width: 900px) { html[data-mode="debutant"]:not([data-structure]) .header-left h1 { display: none; } }
+@media (max-width: 1100px) { html[data-mode="debutant"]:not([data-structure]) .header:has(> .kpis.vieux) .header-left h1 { display: none; } }
 @media (max-width: 480px) {
   /* Débutant : 1re rangée, la paire, le prix et la variation ; 2e rangée, la pastille « Infos »
      (qui cède, en entier puis en points de suspension) et les boutons (qui ne passent jamais à
@@ -1230,6 +1297,9 @@ html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { orde
   html[data-mode="debutant"]:not([data-structure="fenetres"]) .kpis { flex: 0 1 auto; min-width: 0; height: auto; }
   html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { flex: 0 0 auto; flex-wrap: nowrap; margin-left: auto; }
   [data-mode="debutant"] .kpi-deb { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  /* En retard, la pastille porte l'âge (« en retard · 25 min ») : « Infos · » cède, pour que
+     les boutons restent sur la 2e rangée (le titre et le nom accessible disent « Infos du marché »). */
+  [data-mode="debutant"] .kpi-deb .deb-quoi { display: none; }
   /* La barre : les six intervalles et « Affichage » sur une seule rangée. */
   [data-mode="debutant"] .indicator-bar { flex-wrap: nowrap; justify-content: space-between; gap: 2px; padding: 4px 6px; }
   [data-mode="debutant"] .indicator-bar label { padding: 7px 7px; }

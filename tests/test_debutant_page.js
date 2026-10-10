@@ -796,8 +796,8 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       await o.page.evaluate(() => { const k = document.querySelector('#cycle .kpi-deb'); if (k) k.click(); });
       await o.page.waitForTimeout(500);
       const t = await o.page.evaluate(() => { const box = document.getElementById(innerWidth <= 768 ? 'marketModalBody' : 'feed'); return box ? box.innerText : ''; });
-      check(`SOL · ${vue.width} : « Ces infos parlent du bitcoin (en dollars), pas de SOL/USDT. », titres « Bitcoin : … », « le bitcoin est … de sa fourchette »`,
-        /Ces infos parlent du bitcoin \(en dollars\), pas de SOL\/USDT\./.test(t) && /Bitcoin : fourchette des 24 h/i.test(t) && /le bitcoin est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(t) && !/le prix est (dans le haut|dans le bas|au milieu)/.test(t), t.slice(0, 500));
+      check(`SOL · ${vue.width} : « Ces infos parlent du bitcoin (en dollars), pas de SOL/USDT. », titres « Bitcoin : … », « le prix publié du bitcoin est … de sa fourchette »`,
+        /Ces infos parlent du bitcoin \(en dollars\), pas de SOL\/USDT\./.test(t) && /Bitcoin : fourchette des 24 h/i.test(t) && /le prix publié du bitcoin est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(t) && !/le prix (publié )?est (dans le haut|dans le bas|au milieu)/.test(t), t.slice(0, 500));
       scanTexte(`SOL · ${vue.width}, cartes ouvertes`, await texteVisible(o.page));
       check(`SOL · ${vue.width} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
@@ -931,9 +931,12 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
           const vis = el => el.getClientRects().length > 0 || getComputedStyle(el).display !== 'none';
           const m = [...document.querySelectorAll('#marketModal .modal-titre')].find(el => getComputedStyle(el).display !== 'none');
           const l = document.querySelector('#liveModal .modal-titre'), c = el => { const cs = getComputedStyle(el); return [cs.fontSize, cs.fontWeight]; };
-          return { texte: m && m.textContent, m: m && c(m), l: l && c(l) };
+          return { texte: m && m.textContent, m: m && c(m), l: l && c(l), live: l && l.firstChild && l.firstChild.textContent.trim() };
         });
-        check(`${nom} : titre des cartes « ${t.texte} », même taille et graisse que le titre du panneau live (${t.l})`, t.m && t.l && t.m[0] === t.l[0] && t.m[1] === t.l[1] && (mode === 'expert' ? t.texte === 'Marché live' : t.texte === 'Infos du marché'), t);
+        // Un seul nom dans les deux modes : « Infos du marché » (publiées toutes les 15 min) ;
+        // l'Expert disait « Marché live » pour des infos qui ne sont pas en direct. Le panneau ⚡,
+        // lui, est « En direct (à la seconde) ».
+        check(`${nom} : titre des cartes « ${t.texte} » (le même dans les deux modes), même taille et graisse que le titre du panneau ⚡ « ${t.live} » (${t.l})`, t.m && t.l && t.m[0] === t.l[0] && t.m[1] === t.l[1] && t.texte === 'Infos du marché' && t.live === 'En direct (à la seconde)', t);
         await o.ctx.close();
       }
     }
