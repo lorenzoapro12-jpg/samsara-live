@@ -343,14 +343,14 @@ let rsDragStartEnd = 0;
 
 // ============ CROSSHAIR ============
 let crossX = null, crossY = null;  // coordonnées canvas du curseur
-// Mode Débutant : le registre des textes posés sur le tracé ({ items: [{ role, texte, rect }] },
-// relu par les tests), refait à chaque dessin ; null en Expert.
+// Mode Lisible : le registre des textes posés sur le tracé ({ items: [{ role, texte, rect }] },
+// relu par les tests), refait à chaque dessin ; null en Complet.
 let debEtat = null;
-/** Le mode Débutant est-il affiché ? (le défaut : seul « expert » le quitte) */
+/** Le mode Lisible est-il affiché ? (le défaut : seul « expert » le quitte) */
 function debutant() { return (typeof modeCourant === 'function' ? modeCourant() : 'debutant') !== 'expert'; }
 
 // ============ INDICATOR STATE ============
-const overlays = { ema20: false, ema50: false, ema100: false, ema200: false, sma20: false, sma50: false, bb: false, vwap: false, ichimoku: false, sar: false, sr: false, fib: false, vp: false, liq: false, guide: guideMemorise(), scenarios: scenariosMemorise() };
+const overlays = { ema20: false, ema50: false, ema100: false, ema200: false, sma20: false, sma50: false, bb: false, vwap: false, ichimoku: false, sar: false, sr: false, fib: false, vp: false, liq: false, guide: guideMemorise(), scenarios: scenariosMemorise(), figuresPassees: false };
 // Le Guide (niveaux nommés, régime, formes, suite, lecture) est affiché par défaut ; le choix de
 // le masquer est gardé d'une visite à l'autre (navigation privée : affiché).
 function guideMemorise() { try { return localStorage.getItem('samsara-guide-v1') !== '0'; } catch (e) { return true; } }
@@ -436,7 +436,7 @@ const PARAM = {
     // Seulement quand le Guide est affiché ; elle se referme d'un pas de bougie par bougie
     // quittée à droite (un glissement ne fait pas sauter la largeur des bougies).
     futur: 0.18, futurMinPx: 56, futurMaxPx: 250, futurMaxFraction: 0.4,
-    // Mode Débutant : au plus `items` textes sur le tracé (phrase, repère du haut, repère du bas,
+    // Mode Lisible : au plus `items` textes sur le tracé (phrase, repère du haut, repère du bas,
     // scénario 1, forme, ligne des scénarios), chacun sur une ligne d'au plus N caractères ;
     // « étroit » : un tracé de moins de `etroit` px (téléphone).
     debutant: { items: 5, etroit: 520, phrase: 90, phraseEtroit: 48, niveau: 26, niveauEtroit: 18,
@@ -499,6 +499,8 @@ const INDICATORS = [
   { cat: 'Guide', items: [
     { key: 'guide', label: 'Guide : niveaux nommés, régime, formes, suite', tag: 'gd' },
     { key: 'scenarios', label: 'Scénarios du matin de Claude, une IA (' + PARAM.scenarios.point + ' Paris, BTC)', tag: 'gd' },
+    // Mode Complet : les figures validées de l'historique chargé, à leur place dans le passé.
+    { key: 'figuresPassees', label: 'Figures passées : les figures validées de l’historique', tag: 'gd' },
   ]},
   { cat: 'Overlays', items: [
     ...['ema20', 'ema50', 'ema100', 'ema200', 'sma20', 'sma50'].map(k => ({ key: k, label: k.slice(0, 3).toUpperCase() + ' ' + periodeDe(k), tag: 'ov' })),
@@ -547,16 +549,35 @@ function toggleAny(key) {
   if (lbl) lbl.classList.toggle('active', isActive(key));
 }
 
+/** Mode Complet : tout allumer d'un coup (ou tout éteindre), les mêmes effets que case par case. */
+function toutAfficher(on) {
+  for (const cat of INDICATORS) for (const { key } of cat.items) {
+    if (isActive(key) === !!on) continue;
+    if (isOverlay(key)) {
+      overlays[key] = !!on;
+      if (key === 'liq') toggleDepth(overlays.liq);
+      if (key === 'guide') guideNoter(overlays.guide);
+      if (key === 'scenarios') { scenariosNoter(overlays.scenarios); if (overlays.scenarios) fetchPrevisions(); }
+    } else activeSubs[key] = !!on;
+    const lbl = document.getElementById('lbl_' + key);
+    if (lbl) lbl.classList.toggle('active', !!on);
+  }
+  resizeCanvas(); drawChart();
+  if (on && overlays.sr) refreshRefSR().then(drawChart);
+  buildDropdown();
+  compterIndicateurs();
+}
+
 // Indicateur du menu -> sa fiche de lecture (js/fiches.js) : TOUS en ont une (tests/test_fiches.js).
 const FICHE_IND = { ema20: 'ema', ema50: 'ema', ema100: 'ema', ema200: 'ema', sma20: 'ema', sma50: 'ema', bb: 'bb', vwap: 'vwap',
   ichimoku: 'ichimoku', sar: 'sar', vol: 'volume', rsi: 'rsi', macd: 'macd', stoch: 'stoch', atr: 'atr', obv: 'obv', mfi: 'mfi',
-  williamsR: 'williamsR', cci: 'cci', adx: 'adx', ao: 'ao', sr: 'sr', fib: 'fib', vp: 'vp', liq: 'liq', guide: 'guide', scenarios: 'scenarios' };
-// Débutant : le menu « Affichage » n'a que les deux couches du Guide, en mots simples ; les outils
-// d'analyse sont en Expert (une ligne y mène).
+  williamsR: 'williamsR', cci: 'cci', adx: 'adx', ao: 'ao', sr: 'sr', fib: 'fib', vp: 'vp', liq: 'liq', guide: 'guide', scenarios: 'scenarios', figuresPassees: 'figuresPassees' };
+// Lisible : le menu « Affichage » n'a que les deux couches du Guide, en mots simples ; les outils
+// d'analyse sont en Complet (une ligne y mène).
 const LIBELLES_DEBUTANT = { guide: 'Repères et phrase de lecture', scenarios: 'Scénarios du matin de Claude, une IA (' + PARAM.scenarios.point + ' Paris, BTC)' };
 // Les catégories en mots : où l'indicateur se dessine. La clé `cat` reste le nom court (tests).
 const TITRES_CAT = { Guide: 'Guide', Overlays: 'Sur les bougies', 'Sous-graphes': 'Sous le graphique', Chartiste: 'Niveaux et zones' };
-// L'aperçu du menu : l'indicateur survolé, touché ou au clavier, et le filtre de l'Expert. Gardés
+// L'aperçu du menu : l'indicateur survolé, touché ou au clavier, et le filtre de l'Complet. Gardés
 // d'une reconstruction à l'autre (cocher une case reconstruit le menu).
 let menuApercu = null, menuFiltre = '';
 const sansAccents = t => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -583,7 +604,7 @@ function montrerApercu(key) {
   const a = document.getElementById('indApercu');
   if (a) a.innerHTML = apercuHtml(key);
 }
-/** Le filtre de l'Expert : sur le libellé, le titre de la fiche et sa catégorie, sans accents. */
+/** Le filtre de l'Complet : sur le libellé, le titre de la fiche et sa catégorie, sans accents. */
 function filtrerMenu(t) {
   menuFiltre = t;
   const q = sansAccents(t.trim());
@@ -604,10 +625,11 @@ function buildDropdown() {
   const defile = menu.scrollTop;
   let html = '<div class="ind-liste">';
   if (debutant()) {
-    for (const item of INDICATORS[0].items) html += ligneMenu(item, LIBELLES_DEBUTANT[item.key] || item.label, INDICATORS[0].cat, false);
-    html += '<button type="button" class="lien menu-expert" onclick="event.stopPropagation();basculerMode()">Autres outils d’analyse : passer en Expert ▸</button>';
+    for (const item of INDICATORS[0].items) if (LIBELLES_DEBUTANT[item.key]) html += ligneMenu(item, LIBELLES_DEBUTANT[item.key], INDICATORS[0].cat, false);
+    html += '<button type="button" class="lien menu-expert" onclick="event.stopPropagation();basculerMode()">Tout afficher, ou choisir : passer en Complet ▸</button>';
   } else {
-    html += '<div class="ind-filtre"><input type="search" id="indFiltre" placeholder="Chercher un indicateur…" aria-label="Chercher un indicateur" autocomplete="off" oninput="filtrerMenu(this.value)"></div>';
+    html += '<div class="ind-filtre"><input type="search" id="indFiltre" placeholder="Chercher un indicateur…" aria-label="Chercher un indicateur" autocomplete="off" oninput="filtrerMenu(this.value)">'
+      + '<div class="ind-tout"><button type="button" class="lien" onclick="event.stopPropagation();toutAfficher(true)">Tout afficher</button><button type="button" class="lien" onclick="event.stopPropagation();toutAfficher(false)">Tout masquer</button></div></div>';
     for (const cat of INDICATORS) {
       html += `<div class="cat-title" data-cat="${cat.cat}">${TITRES_CAT[cat.cat] || cat.cat}</div>`;
       for (const item of cat.items) html += ligneMenu(item, item.label, cat.cat, true);
@@ -627,7 +649,7 @@ function buildDropdown() {
   if (filtre && menuFiltre) { filtre.value = menuFiltre; filtrerMenu(menuFiltre); }
   menu.scrollTop = defile;
 }
-/** Les raccourcis de la barre (Expert) : au survol, ce que c'est et comment s'en servir. */
+/** Les raccourcis de la barre (Complet) : au survol, ce que c'est et comment s'en servir. */
 function titresBarre() {
   if (typeof FICHES === 'undefined') return;
   for (const l of document.querySelectorAll('#indicatorBar label[id^="lbl_"]')) {
@@ -636,7 +658,7 @@ function titresBarre() {
     l.title = f.titre + ' : ' + f.simple + (f.traders ? '\nComment les traders l’utilisent : ' + f.traders : '') + '\n(Le menu « + Indicateurs » en a la fiche complète, avec le calcul.)';
   }
 }
-/** Le bouton du menu dit combien d'indicateurs l'Expert a allumés (le Guide compris). */
+/** Le bouton du menu dit combien d'indicateurs l'Complet a allumés (le Guide compris). */
 function compterIndicateurs() {
   const c = document.getElementById('indCompte');
   if (!c) return;
@@ -655,7 +677,7 @@ function apresChangementMode(m) {
   if (menu && menu.classList.contains('open')) buildDropdown();
   if (m !== 'expert' && typeof closeLiveModal === 'function') closeLiveModal();
   guideHautMemo = null; scenFlechesMemo = null; debHautMemo = null;
-  // Le nom accessible du graphique est la phrase du Débutant : l'Expert ne l'a pas.
+  // Le nom accessible du graphique est la phrase du Lisible : l'Complet ne l'a pas.
   if (m === 'expert') { try { canvas.removeAttribute('aria-label'); } catch (e) { /* hors navigateur */ } }
   if (isNum(livePrice)) ecrirePrixEntete(livePrice, isNum(var24Courant) ? var24Courant : NaN);
   astuceMontrer();
@@ -666,7 +688,7 @@ function apresChangementMode(m) {
     if (typeof ajusterRuban === 'function') ajusterRuban();
   });
 }
-// L'astuce du Débutant, une seule fois (clé samsara-astuce-tap-v1) : « Touchez une étiquette pour le
+// L'astuce du Lisible, une seule fois (clé samsara-astuce-tap-v1) : « Touchez une étiquette pour le
 // détail » (écran tactile) ou « Survolez… » (souris). Cachée au premier toucher du graphique ou au
 // bout de 8 s. Un élément HTML, pas un texte du graphique ; posée là où elle ne couvre aucune
 // étiquette.
@@ -685,7 +707,7 @@ function astuceMontrer() {
   clearTimeout(astuceFin);
   astuceFin = setTimeout(astuceCacher, 8000);
 }
-/** En bas du tracé, à gauche ; plus haut si une étiquette du Débutant y est déjà, ou la ligne qui
+/** En bas du tracé, à gauche ; plus haut si une étiquette du Lisible y est déjà, ou la ligne qui
  *  valide la figure (testée segment par segment, pas par son rectangle englobant). Sans place libre,
  *  l'invite reste cachée pour cette image (elle ne couvre jamais un libellé ni la ligne). */
 function astucePlacer() {
@@ -798,7 +820,7 @@ async function changeSymbol(symbol, label) {
   // Le dernier prix d'une AUTRE paire ne doit ni colorer la flèche ni allumer l'éclair.
   livePrice = null; fetchPrice();
   priceScale = 1.0; pricePan = 0;
-  // Les cartes du Débutant nomment le bitcoin sur une autre paire : elles suivent la paire.
+  // Les cartes du Lisible nomment le bitcoin sur une autre paire : elles suivent la paire.
   if (marketData) {
     renderFeed();
     const mm = document.getElementById('marketModal');
@@ -907,7 +929,7 @@ canvas.addEventListener('mousemove', (e) => {
   } else if (crossX > rect.width - 75 && !isPanning && !isPriceDrag) {
     canvas.style.cursor = 'ns-resize';
   } else if (!isPanning && !isPriceDrag) {
-    // Débutant : une étiquette se désigne (main) ; un test de cible, sans redessiner le graphique.
+    // Lisible : une étiquette se désigne (main) ; un test de cible, sans redessiner le graphique.
     canvas.style.cursor = debutant() && geo && guideCibleSous(crossX, crossY, geo.mainH, true) ? 'pointer' : 'crosshair';
   }
   // Le réticule est sur le calque : le graphique lui-même n'est pas redessiné au survol.
@@ -1648,8 +1670,8 @@ function var24De(d) {
 const ECLAIR_MS = 450;
 const MQ_MOUVEMENT = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
 let eclairFin = null;
-// Le prix et la variation de l'en-tête, écrits selon le mode (mêmes valeurs) : Expert « $83,512.51 »
-// et « −0.40 % » ; Débutant « 83 513 $ » et « −0,40 % en 24 h » (le format français, la durée dite).
+// Le prix et la variation de l'en-tête, écrits selon le mode (mêmes valeurs) : Complet « $83,512.51 »
+// et « −0.40 % » ; Lisible « 83 513 $ » et « −0,40 % en 24 h » (le format français, la durée dite).
 let var24Courant = null;
 /** « −0,40 % » (avecDuree : « −0,40 % en 24 h ») ; '' sans valeur. */
 function texteVar24(v, avecDuree) {
@@ -2915,7 +2937,7 @@ let jetonsLus = false;
 const MAIN_H_MIN = 200;
 const SUB_ORDRE = ['vol', 'rsi', 'macd', 'stoch', 'atr', 'obv', 'mfi', 'williamsR', 'cci', 'adx', 'ao', 'equity'];
 function dispositionGraphique(H) {
-  // Débutant : aucun sous-graphe (le choix est gardé pour l'Expert).
+  // Lisible : aucun sous-graphe (le choix est gardé pour l'Complet).
   const actifs = debutant() ? [] : SUB_ORDRE.filter(k => activeSubs[k]);
   let total = 0;
   for (const k of actifs) total += subHeights[k] || 80;
@@ -2974,7 +2996,7 @@ function drawChart() {
   ctx.fillStyle = COLORS.ink1;
   // Taille bridée au tracé disponible : à 64 px fixes le filigrane débordait du graphe
   // sur téléphone et se faisait rogner par le bord gauche.
-  // Débutant : la paire et l'intervalle en mots (« BTC/USDT · 15 min »).
+  // Lisible : la paire et l'intervalle en mots (« BTC/USDT · 15 min »).
   const deb = debutant();
   const filigrane = deb ? (NOMS_PAIRES[activeSymbol] || activeSymbol) + '  ·  ' + Guide.nomIntervalle(chartInterval) : activeSymbol + '  ·  ' + chartInterval;
   ctx.font = chartFont(Math.min(40, Math.round((W - 16 - 75) / (filigrane.length * 0.9))), 300);
@@ -2989,10 +3011,10 @@ function drawChart() {
   resolveChart(candles, 16, 75, mainH, W);
   ctx.save(); etiquettesAFaire.forEach(f => f()); ctx.restore();
   etiquettesAFaire = [];
-  // Débutant : l'astuce (une seule fois), posée hors des étiquettes.
+  // Lisible : l'astuce (une seule fois), posée hors des étiquettes.
   if (deb) { astuceMontrer(); astucePlacer(); }
 
-  // Compteur bougies visibles + plage dates + % variation (Expert : en Débutant, la variation de
+  // Compteur bougies visibles + plage dates + % variation (Complet : en Lisible, la variation de
   // la vue contredirait celle de l'en-tête, et le régime est le verbe de la phrase).
   const vsC = Math.max(0, viewStart), veC = Math.min(candles.length, viewEnd);
   if (!deb) {
@@ -3040,7 +3062,7 @@ function dessinerCalque() {
   if (!geo) return;
   const { W, H, mainH } = geo;
   const P = geoPrix, deb = debutant();
-  // Débutant : un seul format de prix sur l'écran (« 82 442 $ ») ; Expert : « $82442.00 ».
+  // Lisible : un seul format de prix sur l'écran (« 82 442 $ ») ; Complet : « $82442.00 ».
   const prixAxe = v => (deb ? Guide.prix(v, guideUnite()) : '$' + fmtPrix(v));
   if (P) {
     const { top, ph, left, right, minP, maxP, range } = P;
@@ -3122,10 +3144,10 @@ function dessinerCalque() {
   const idx = n > 0 && crossX >= 16 ? Math.floor((crossX - 16) / pasC) : -1;
   // --- Réticule du tracé principal ---
   let bulleOHLCV = null;
-  // Débutant : une ÉTIQUETTE sous le curseur → sa bulle seule, sans réticule ni infobulle des prix
+  // Lisible : une ÉTIQUETTE sous le curseur → sa bulle seule, sans réticule ni infobulle des prix
   // (la bulle prend leur place). Sur une bande, une zone ou un tracé, le réticule et les quatre
   // valeurs de la bougie restent (les bougies récentes sont souvent dans une bande) ; la bulle se
-  // pose à côté, comme en Expert.
+  // pose à côté, comme en Complet.
   const cibleDeb = deb && crossY < mainH && P && (guideEtat || scenEtat) ? guideCibleSous(crossX, crossY, mainH, true) : null;
   if (cibleDeb) {
     if (guideEtat) guideEtat.survol = null;
@@ -3150,7 +3172,7 @@ function dessinerCalque() {
     cx.beginPath(); cx.roundRect(bX, bY, bw, 18, 9); cx.fill();
     cx.fillStyle = COLORS.surface;
     cx.fillText(priceStr, bX + 7, bY + 13);
-    // Débutant : quatre lignes en mots (« Début 82 430 $ », « Haut », « Bas », « Fin »).
+    // Lisible : quatre lignes en mots (« Début 82 430 $ », « Haut », « Bas », « Fin »).
     if (deb && idx >= 0 && idx < n) {
       const candle = candles[geo.vs + idx];
       const onRight = crossX > W / 2;
@@ -3310,7 +3332,7 @@ function drawRangeSelector(candles, W, H) {
   ctx.fillRect(vrX - 1, rsY + 4, handleW, RS_HEIGHT - 14);
   ctx.fillRect(vrX + vrW - 3, rsY + 4, handleW, RS_HEIGHT - 14);
   
-  // Débutant : la navigation seule (ni compteurs ni légende des sessions).
+  // Lisible : la navigation seule (ni compteurs ni légende des sessions).
   if (debutant()) return;
   // Compteur bougies sur le RS
   ctx.fillStyle = COLORS.text; ctx.font = chartFont(8);
@@ -3364,7 +3386,7 @@ let scaleSeq = 0, lastScale = null;
 // coup ; au-delà, marge nulle (une marge vide après le passé se lirait comme un trou).
 function margeFutur(pw, n) {
   // Les scénarios du matin dessinent aussi leurs flèches dans cette marge (Guide masqué compris).
-  // Débutant : seulement si la flèche du scénario 1 s'y dessine (le Guide n'y pose rien).
+  // Lisible : seulement si la flèche du scénario 1 s'y dessine (le Guide n'y pose rien).
   if (!((overlays.guide && !debutant()) || scenFleches()) || candles.length < 2 * PARAM.guide.atrPeriode + 2) return 0;
   const g = PARAM.guide;
   const M = Math.min(pw * g.futurMaxFraction, Math.max(g.futurMinPx, Math.min(g.futurMaxPx, pw * g.futur)));
@@ -3379,10 +3401,10 @@ function priceWindow(vs, ve) {
   if (s && s.seq === scaleSeq && s.vs === vs && s.ve === ve && s.deb === deb) return s;
   let minP = Infinity, maxP = -Infinity;
   for (let i = vs; i < ve; i++) { const c = candles[i]; if (c.high > maxP) maxP = c.high; if (c.low < minP) minP = c.low; }
-  // Débutant : la ligne qui valide la figure montrée entre dans l'échelle (Guide, amendement C5).
+  // Lisible : la ligne qui valide la figure montrée entre dans l'échelle (Guide, amendement C5).
   if (deb) { const fx = guideEchelleDebutant(vs, ve), r0 = maxP - minP; if (fx) { maxP = Math.max(maxP, Math.min(fx[1], maxP + r0 / 2)); minP = Math.min(minP, Math.max(fx[0], minP - r0 / 2)); } }
   const naturalRange = maxP - minP || 1, rawMin = minP, rawMax = maxP;
-  // Débutant : un peu de place au-dessus et au-dessous des bougies, pour que le libellé du repère
+  // Lisible : un peu de place au-dessus et au-dessous des bougies, pour que le libellé du repère
   // du haut tienne AU-DESSUS du prix (et celui du bas au-dessous) même quand le prix est au bord.
   if (deb) { maxP += naturalRange * PARAM.guide.debutant.marge; minP -= naturalRange * PARAM.guide.debutant.marge; }
   // Étendre si Bollinger actif, mais cap à ±15% du range naturel
@@ -3416,9 +3438,9 @@ function resolveChart(candles, padL, padR, chartH, W) {
   // Guide affiché : le haut du tracé est réservé à ses rangées (badge du régime, lecture du
   // moment) — les bougies ne passent plus dessous. Toutes les conversions lisent pad.top (geoPrix).
   const deb = debutant();
-  // Débutant : les rangées de la phrase et de la ligne des scénarios (debHaut).
+  // Lisible : les rangées de la phrase et de la ligne des scénarios (debHaut).
   const pad = { left: padL, right: padR, top: 10 + (deb ? debHaut(W, padL, padR) : overlays.guide ? guideHaut(W, padL, padR) : 0), bottom: 20 };
-  // Les couches d'analyse : Expert seulement (le choix reste gardé pour lui).
+  // Les couches d'analyse : Complet seulement (le choix reste gardé pour lui).
   const ov = k => overlays[k] && !deb;
   const pw = W - pad.left - pad.right;
   const ph = chartH - pad.top - pad.bottom;
@@ -3798,7 +3820,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
   // Les scénarios du matin ensuite : ils prennent la place que le Guide laisse.
   // Le libellé du rang 1 d'abord (il passe devant les libellés des niveaux du Guide).
   if (deb) {
-    // Débutant, par ordre de priorité : les deux repères, le scénario 1 et sa ligne, la forme ;
+    // Lisible, par ordre de priorité : les deux repères, le scénario 1 et sa ligne, la forme ;
     // puis l'arbitrage du budget (la ligne des scénarios cède la dernière).
     if (guide) guideDebutant(guide);
     if (scen) scenTracer(scen);
@@ -4042,7 +4064,7 @@ function guideDonnees() {
     const bb = memoized('bb', calcBollinger, K.close, PARAM.bb.periode, PARAM.bb.ecarts);
     const largeur = bb.sma.map((m, i) => (m && bb.upper[i] !== null ? (bb.upper[i] - bb.lower[i]) / m : null));
     const regime = Guide.regime({ adx: adx.adx, plusDI: adx.plusDI, minusDI: adx.minusDI, emaC, emaL, largeur }, iF, G);
-    // Débutant : un repère par prix nommé, sa petite bande (± demi) et son état sur les bougies
+    // Lisible : un repère par prix nommé, sa petite bande (± demi) et son état sur les bougies
     // closes (même règle que les bandes : un chiffre publié ne compte qu'après sa lecture).
     const reperes = Guide.reperesDe(choix, demi);
     for (const x of reperes) {
@@ -4222,9 +4244,13 @@ function guidePreparer(g) {
   }
   E.formes = exp ? Guide.formesAffichees(GUIDE_FORMES.val, G, g.vs, g.ve, 'expert') : debFormesListe(g.vs, g.ve);
   E.formeQuand = guideFormeQuand(E.formes[0]);
+  // Mode Complet, « Figures passées » : les figures validées de l'historique, après les figures du
+  // moment (E.formes[0] reste la figure de la lecture) ; E.histo les distingue (style, bulle).
+  E.histo = new Set(exp && overlays.figuresPassees ? figuresPassees(E.formes, g.vs, g.ve) : []);
+  E.formes = E.formes.concat([...E.histo]);
   E.figures = []; E.ctxF = guideCtxFigures(); E.debForme = null;
   if (debutant()) {
-    // Débutant : deux repères à l'écran, choisis au prix LIVE (debReperes) : le plus proche
+    // Lisible : deux repères à l'écran, choisis au prix LIVE (debReperes) : le plus proche
     // au-dessus et au-dessous ; chacun avec sa petite bande et le repère suivant (la bulle).
     const sel = debReperes(D);
     E.deb = true; E.debutant = debEtat; E.debSel = sel;
@@ -4250,7 +4276,7 @@ function guideBandes(E) {
     ctx.fillStyle = avecAlpha(COLORS.accent2, E.deb ? 0.08 : 0.11);
     ctx.fillRect(g.pad.left, L.yH, xMax - g.pad.left, L.yB - L.yH);
     ctx.strokeStyle = avecAlpha(COLORS.accent2, 0.6); ctx.lineWidth = 1; ctx.setLineDash([5, 4]);
-    // Débutant : un seul tiret, au prix que dit le libellé.
+    // Lisible : un seul tiret, au prix que dit le libellé.
     for (const r of E.deb ? [Guide.raisonPrincipale(L.niv)] : L.niv.raisons) { const y = yDe(r.p); ctx.beginPath(); ctx.moveTo(g.pad.left, y); ctx.lineTo(xMax, y); ctx.stroke(); }
   }
   ctx.setLineDash([]);
@@ -4310,7 +4336,7 @@ function guideTracer(E) {
   for (const f of E.formes) guideForme(E, f, surBougies);
   // Deux figures montrées, sorties validées en sens contraires sur des bougies communes : chaque bulle
   // le dit (aucune des deux ne l'emporte, aucune ne se lit seule).
-  const n = candles.length - 1, fin = f => (f.fin ? f.jFin : n), valide = f => f.jConf !== null && f.jConf !== undefined && isNum(f.sens);
+  const n = candles.length - 1, fin = f => (f.fin ? f.jFin : n), valide = f => f.jConf !== null && f.jConf !== undefined && isNum(f.sens) && !E.histo.has(f);
   for (const a of E.figures) for (const b of E.figures) {
     if (a === b || !valide(a.f) || !valide(b.f) || a.f.sens === b.f.sens || a.f.debut > fin(b.f) || b.f.debut > fin(a.f)) continue;
     const c = E.cibles.find(x => x.figure === a);
@@ -4540,6 +4566,23 @@ function guideCtxFigures() {
   return { n: R ? R.n : n - 1, intervalle: chartInterval, duree: candles[n - 2].time - candles[0].time, temps: cols().time,
     pas: n > 1 ? candles[1].time - candles[0].time : 0, maintenant: Horloges.maintenant(), j: n - 1, horizon: PARAM.guide.horizon };
 }
+/** Les figures validées de l'historique chargé dont une part est dans la vue [vs, ve) : finies
+ *  (cible atteinte, invalidée, sans suite), hors doublons et hors figures déjà montrées ; les
+ *  FIGURES_PASSEES_MAX plus récentes. Rien n'est recalculé : le même rejeu que le Guide. */
+const FIGURES_PASSEES_MAX = 24;
+function figuresPassees(deja, vs, ve) {
+  const R = GUIDE_FORMES.val;
+  if (!R || !R.formes) return [];
+  const D = new Set(deja);
+  return R.formes.filter(f => !D.has(f) && !f.doublon && !f.ebauche && isNum(f.jConf) && f.fin && f.fin !== 'devenu_triple' && f.fin !== 'abandon'
+    && isNum(f.jFin) && f.jFin >= vs && f.debut < ve)
+    .sort((a, b) => b.jFin - a.jFin).slice(0, FIGURES_PASSEES_MAX);
+}
+/** Le style d'une figure passée (Complet, « Figures passées ») : lisible quel que soit son âge
+ *  (pas de fondu), plus discret qu'une figure du moment ; la croix reste sur une figure tombée. */
+function guideStyleFigurePassee(f) {
+  return f.fin === 'atteint' ? { dash: [], lw: 1.3, a: 0.5, aplat: 0.02, age: 0, k: 1 } : { dash: [2, 3], lw: 1.2, a: 0.45, aplat: 0.015, croix: true, age: 0, k: 1 };
+}
 /** Le style d'une figure (plan §5.1) : tirets, épaisseur, alpha des traits et de l'aplat. Une
  *  figure finie s'efface au fil des bougies closes (base × (1 − âge / (garder + 1)), plancher
  *  0,15) ; l'âge ne change qu'à une clôture : rien à redessiner entre deux. */
@@ -4601,12 +4644,12 @@ function guideFigureGeo(f, iFin, suit) {
   return o;
 }
 /** Trace une figure (graphique) dans le style de son état, le même pour les deux modes ; seuls
- *  l'épaisseur des traits (Débutant : la ligne qui valide est la plus marquée, le zigzag discret)
+ *  l'épaisseur des traits (Lisible : la ligne qui valide est la plus marquée, le zigzag discret)
  *  et les étiquettes diffèrent. → { segs (survol), ys, xd, yd (dernier point), st, encre, geo } */
 function guideFigureTracer(E, f) {
   const { g, xDe: X, yDe: Y, deb } = E, R = GUIDE_FORMES.val, jClos = R.n - 1, G = PARAM.guide;
   const vivante = !f.fin, iFin = vivante ? candles.length - 1 : f.jFin;
-  const st = guideStyleFigure(f, jClos, deb ? 'debutant' : 'expert');
+  const st = E.histo && E.histo.has(f) ? guideStyleFigurePassee(f) : guideStyleFigure(f, jClos, deb ? 'debutant' : 'expert');
   // Le point en attente d'une ébauche suit la bougie en cours quand elle va plus loin que lui.
   let suit = null;
   if (vivante && f.ebauche && f.pend) {
@@ -4628,7 +4671,7 @@ function guideFigureTracer(E, f) {
     ctx.beginPath(); geo.aplat.forEach((q, k) => { const [x, y] = px(q); if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
     ctx.closePath(); ctx.fillStyle = avecAlpha(COLORS.ink1, st.aplat); ctx.fill();
   }
-  // Débutant (amendement C5) : la ligne qui valide est le trait le plus marqué, en tirets [6,3],
+  // Lisible (amendement C5) : la ligne qui valide est le trait le plus marqué, en tirets [6,3],
   // jusqu'à la bougie en cours ; le zigzag et les autres droites passent à 1 px, alpha 0,5.
   const mince = deb ? avecAlpha(COLORS.ink1, Math.min(0.5, st.a)) : encre;
   const fam = Guide.famille(f), mat = fam === 'drapeau';
@@ -4638,7 +4681,7 @@ function guideFigureTracer(E, f) {
   // L'invalidation d'une figure confirmée : un trait fin en tirets courts (ce qui la ferait tomber).
   if (geo.inval) trait(geo.inval, 1.1, [3, 3], avecAlpha(COLORS.ink1, Math.min(0.6, st.a)));
   ctx.setLineDash([]);
-  // Expert (amendement D3) : les droites d'une figure vivante prolongées de 8 bougies au plus dans
+  // Complet (amendement D3) : les droites d'une figure vivante prolongées de 8 bougies au plus dans
   // la marge de futur, dans le style de la figure, plus pâles ; un petit repère à la pointe.
   if (!deb && vivante && f.phase !== 'confirme' && E.finVue) {
     const iMax = Math.min(iFin + 8, isFinite(geo.pointe) ? geo.pointe : Infinity);
@@ -4679,7 +4722,7 @@ function guideFigureTracer(E, f) {
   const d = Guide.dernierPoint(f, G), qd = geo.creux || (geo.points.length ? geo.points[geo.points.length - 1] : geo.valide[0][1]);
   return { segs, ys, xd: X(d), yd: Y(qd[1]), st, encre, geo, croix, iFin };
 }
-/** L'objectif théorique (Expert) : en tirets à partir de la 1re clôture au-delà, pâli s'il est
+/** L'objectif théorique (Complet) : en tirets à partir de la 1re clôture au-delà, pâli s'il est
  *  atteint, jamais pour une figure tombée ; hors de l'échelle, une flèche au bord avec son prix. */
 function guideFigureObjectif(E, f, tr) {
   const { g, exp, unite, yDe, xDe: X, xFin, xMax } = E, top = g.pad.top, bas = top + g.ph, G = PARAM.guide;
@@ -4717,7 +4760,7 @@ function guideFigureObjectif(E, f, tr) {
   }
   return { p: obj, y: yObj, dansVue: false, fleche: !!r };
 }
-/** L'invalidation d'une figure confirmée et vivante (Expert) : son libellé au bout du trait
+/** L'invalidation d'une figure confirmée et vivante (Complet) : son libellé au bout du trait
  *  (« invalidation · clôture < 84 356 $ »), du côté où le prix la passerait. */
 function guideFigureInval(E, f, tr) {
   const { g, unite, yDe, xDe: X } = E, top = g.pad.top, bas = top + g.ph;
@@ -4732,7 +4775,7 @@ function guideFigureInval(E, f, tr) {
   if (r) etiquettesAFaire.push(() => { ctx.font = chartFont(8.5, 600); ctx.globalAlpha = 0.92; guidePastille(ctx, r.x, r.y, r.w, r.h, t, null); ctx.globalAlpha = 1; });
   return r;
 }
-/** Une figure en Expert : tracé commun, objectif, libellé (≤ 80 caractères, à 120 px au plus de
+/** Une figure en Complet : tracé commun, objectif, libellé (≤ 80 caractères, à 120 px au plus de
  *  son dernier point ; sinon la forme courte ; sinon pas de libellé, la bulle s'ouvre au survol du
  *  tracé), bulle (règle, niveaux du moment, bilan, journal, figures invalidées récemment). */
 function guideForme(E, f, surBougies) {
@@ -4872,12 +4915,12 @@ function guideCalque() {
   cx.restore();
 }
 
-// ─── Mode Débutant : l'écran calme ─────────────────────────────────────────
+// ─── Mode Lisible : l'écran calme ─────────────────────────────────────────
 // Sur le tracé, au plus PARAM.guide.debutant.items textes d'une ligne : la phrase (calque, elle
 // suit le prix live), le repère du haut, le repère du bas (calque : leur couleur dit leur état),
 // le libellé du scénario 1, la forme, la ligne des scénarios. Le détail est dans la bulle.
 const DEB_POLICE_PHRASE = 11.5, DEB_POLICE_LIGNE = 10.5;
-/** Les deux repères du Débutant au prix live (au dernier prix clos sans prix live) ; deux repères
+/** Les deux repères du Lisible au prix live (au dernier prix clos sans prix live) ; deux repères
  *  à moins de PARAM.guide.debutant.ecartAtr × ATR l'un de l'autre n'en font pas deux. */
 function debReperes(D) {
   const px = isNum(livePrice) ? livePrice : D.ref;
@@ -4899,7 +4942,7 @@ function debPhrases(D, maintenant) {
   const ch = debReperes(D), base = { prix: ch.prix, unite: guideUnite(), choix: D.choix, reperes: ch, regime: D.regime, maintenant, itv: chartInterval, vue: debVue() };
   return [null, ch.dessus, ch.dessous].filter((x, k) => !k || x).map(enTest => Guide.phrasesDebutant(Object.assign({}, base, { enTest })));
 }
-/** La hauteur des rangées du haut du tracé en Débutant : la phrase (si le Guide est affiché), la
+/** La hauteur des rangées du haut du tracé en Lisible : la phrase (si le Guide est affiché), la
  *  ligne des scénarios à sa droite si les deux tiennent avec 12 px d'écart sans que la phrase
  *  perde un mot, sinon sur une 2e rangée. Mémorisée (debHautMemo, relue par la ligne). */
 let debHautMemo = null;
@@ -4929,9 +4972,9 @@ function debHaut(W, padL, padR) {
   }
   return debHautMemo.rangs ? debHautMemo.rangs * 22 + 2 : 0;
 }
-/** Le chemin d'un repère du Débutant : son seuil (ce repère), sa cible (le repère suivant au-delà). */
+/** Le chemin d'un repère du Lisible : son seuil (ce repère), sa cible (le repère suivant au-delà). */
 const debChemin = (niv, suivant, sens) => (niv ? { sens, seuil: niv, cible: suivant || null, rx: niv.principale, ry: suivant ? suivant.principale : null } : null);
-/** Les raisons « tout près » d'un repère du Débutant (bulle) : celles de sa bande Expert à moins de
+/** Les raisons « tout près » d'un repère du Lisible (bulle) : celles de sa bande Complet à moins de
  *  max(demi-bande, 0,25 × ATR) de son prix, du même côté du prix live, hors des deux repères de
  *  l'écran et du repère suivant. */
 function guidePresDebutant(L, E) {
@@ -4943,8 +4986,8 @@ function guidePresDebutant(L, E) {
   return b.raisons.filter(r => isNum(r.p) && r.p !== n.p && Math.abs(r.p - n.p) <= lim && !exclus.includes(r.p)
     && (live === null || (r.p > live) === (n.p > live)));
 }
-/** Le texte d'un repère pour la bulle Débutant : chaque raison en mots, ce qui est tout près (les
- *  autres prix de sa bande Expert), son chemin (de CE repère au suivant), sa bande. */
+/** Le texte d'un repère pour la bulle Lisible : chaque raison en mots, ce qui est tout près (les
+ *  autres prix de sa bande Complet), son chemin (de CE repère au suivant), sa bande. */
 function guideTexteNiveauDebutant(L, E) {
   const out = [], R = L.niv.raisons, now = Horloges.maintenant(), pas = geoPrix && geoPrix.pas > 0 ? geoPrix.pas : 900;
   if (Guide.optionsSeules(L.niv)) {
@@ -4956,7 +4999,7 @@ function guideTexteNiveauDebutant(L, E) {
   // (publié, 24 h glissantes de Binance) peuvent différer : la bulle dit pourquoi.
   if (activeSymbol === 'BTCUSDT' && R.some(r => /^h24_/.test(r.cle)))
     out.push('La carte « Fourchette des 24 h » des infos du marché peut dire un autre chiffre : elle est publiée à heure fixe, et ses 24 h ne commencent pas à la même minute que celles de ce graphique.');
-  // « Tout près » : les autres prix de sa bande Expert À CÔTÉ de ce repère seulement — à moins
+  // « Tout près » : les autres prix de sa bande Complet À CÔTÉ de ce repère seulement — à moins
   // d'une demi-bande (au moins 0,25 × ATR), du même côté du prix, jamais l'autre repère de l'écran
   // ni le repère suivant (une bande fusionnée de 200 $ qui enjambe le prix appelait « tout près »
   // le repère de l'autre côté).
@@ -5010,14 +5053,14 @@ function guideSurBougies(E) {
     return false;
   };
 }
-/** Débutant : la cible de la phrase (son rectangle suit le texte, posé par le calque) et les deux
+/** Lisible : la cible de la phrase (son rectangle suit le texte, posé par le calque) et les deux
  *  repères — chacun posé CONTRE son trait, du côté du prix qui est le sien : celui du haut
  *  au-dessus de son trait (jamais sous la ligne du prix live), celui du bas au-dessous ; un repère
  *  hors de la vue, au bord, son libellé préfixé de ↑ ou ↓. Les deux libellés ont le même style
  *  (avec ou sans « · ») ; les pastilles sont peintes par le calque (leur couleur dit l'état). */
 function guideDebutant(E) {
   const { g, xFin, xMax, yDe } = E, P = PARAM.guide.debutant, top = g.pad.top, bas = g.pad.top + g.ph, H = 17;
-  // La ligne qui valide la 1re figure de la liste (celle que le Débutant montrera le plus souvent) :
+  // La ligne qui valide la 1re figure de la liste (celle que le Lisible montrera le plus souvent) :
   // les libellés posés avant elle (scénario 1) l'évitent.
   const f0 = E.formes[0];
   E.debSegsPrevus = f0 ? guideSegsValide(E, { geo: guideFigureGeo(f0, f0.fin ? f0.jFin : candles.length - 1, null) }) : null;
@@ -5060,7 +5103,7 @@ function guideDebutant(E) {
     debItem('niveau', t, { x: xp, y: pose.y, w, h: H });
   }
 }
-/** Débutant : ce que la page a RÉELLEMENT dessiné, par série (symbole · intervalle) : l'identité
+/** Lisible : ce que la page a RÉELLEMENT dessiné, par série (symbole · intervalle) : l'identité
  *  de la figure dessinée à chaque clôture (parJ) et à la dernière image (dernier). Guide.formesDebutant
  *  le lit : on ne barre (✗) que ce qui a été vu, la figure dessinée garde sa place tant qu'elle vit.
  *  Mémoire de page (rien de stocké) ; bornée aux 200 dernières clôtures. */
@@ -5078,14 +5121,14 @@ function debNoterFigure(id) {
   m.parJ.set(j, id); m.dernier = id;
   for (const q of m.parJ.keys()) if (q < j - 200) m.parJ.delete(q);
 }
-/** La liste ordonnée des figures du Débutant pour la vue [vs, ve). */
+/** La liste ordonnée des figures du Lisible pour la vue [vs, ve). */
 function debFormesListe(vs, ve) {
   return GUIDE_FORMES.val ? Guide.formesDebutant(GUIDE_FORMES.val, PARAM.guide, vs, ve, debMemoFigures()) : [];
 }
-/** Débutant : UNE figure (debFormesListe : la figure déjà dessinée d'abord, puis rang et dernier
+/** Lisible : UNE figure (debFormesListe : la figure déjà dessinée d'abord, puis rang et dernier
  *  point). On prend la première dont le libellé trouve sa place ; la figure dessinée à l'image d'avant
  *  (ou tombée sous les yeux du lecteur) est dessinée même sans place pour son libellé — son nom passe
- *  alors dans la bulle de la phrase. Son tracé est celui de l'Expert (la ligne qui valide la plus
+ *  alors dans la bulle de la phrase. Son tracé est celui de l'Complet (la ligne qui valide la plus
  *  marquée) ; son libellé est posé sur le CALQUE (guideCalqueFormeDebutant) : il dit l'état vivant au
  *  prix live sans redessiner le graphique, dans une place gardée pour le plus long de ses textes. */
 function guideFormesDebutant(E) {
@@ -5201,7 +5244,7 @@ function guideCroixPrix(f) {
   return f.fin === 'abandon' ? (isNum(f.pAbandon) ? f.pAbandon : isNum(ev.p) ? ev.p : f.pend && f.pend.p) : isNum(ev.p) ? ev.p
     : f.fin === 'expire_avant' && f.hautL ? (Guide.ligne(f.hautL, f.jFin) + Guide.ligne(f.basL, f.jFin)) / 2 : isNum(ev.c) ? ev.c : f.invalidation;
 }
-/** L'échelle Débutant inclut la ligne qui valide la 1re figure candidate (amendement C5), bornée
+/** L'échelle Lisible inclut la ligne qui valide la 1re figure candidate (amendement C5), bornée
  *  à la moitié de l'amplitude des bougies de chaque côté. → [lo, hi] ou null. */
 function guideEchelleDebutant(vs, ve) {
   if (!overlays.guide || !debutant() || !guideDonnees() || !GUIDE_FORMES.val) return null;
@@ -5210,13 +5253,13 @@ function guideEchelleDebutant(vs, ve) {
   const geo = guideFigureGeo(f, candles.length - 1, null), ps = geo.valide.flat().concat(geo.inval || []).map(q => q[1]).filter(isNum);
   return ps.length ? [Math.min(...ps), Math.max(...ps)] : null;
 }
-/** Les pastilles de l'état vivant d'une figure (Expert, calque), par clé de figureVivante. */
+/** Les pastilles de l'état vivant d'une figure (Complet, calque), par clé de figureVivante. */
 const PASTILLES_FIGURE = { franchi: 'au-delà · à confirmer fin de bougie', meche: 'percé en mèche · en cours', meche_close: 'percé en mèche · pas validé', menace: 'invalidation touchée · à confirmer',
   cible: 'objectif touché · à confirmer', remise: 'ébauche remise en cause · à confirmer' };
 /** Calque : l'état VIVANT de chaque figure montrée (Guide.figureVivante, au prix live et sur la
  *  bougie en cours) : le segment de la ligne qui valide passe en couleur d'avertissement sur la
- *  bougie en cours (franchi, percé en mèche) ; Expert : une pastille courte à droite du libellé ;
- *  Débutant : le libellé lui-même dit l'état (« Ligne passée, à confirmer »…). O(figures). */
+ *  bougie en cours (franchi, percé en mèche) ; Complet : une pastille courte à droite du libellé ;
+ *  Lisible : le libellé lui-même dit l'état (« Ligne passée, à confirmer »…). O(figures). */
 function guideCalqueFigures(E) {
   if (!E.figures || !E.figures.length) return;
   const K = cols(), j = candles.length - 1, cur = candles[j], S = { h: K.high, l: K.low, c: K.close }, G = PARAM.guide, g = E.g;
@@ -5247,7 +5290,7 @@ function guideCalqueFigures(E) {
   }
   cx.restore();
 }
-/** Calque, Débutant : le libellé de la figure, au prix live (amendement C1) : son nom reste, l'état
+/** Calque, Lisible : le libellé de la figure, au prix live (amendement C1) : son nom reste, l'état
  *  du moment s'y ajoute (« Biseau : sort en bas ? », « Double sommet : menacé ») ; il ne revient pas
  *  en arrière avant la clôture (figureVivante(…).etiq lit le plus haut et le plus bas de la bougie). */
 function guideCalqueFormeDebutant(E) {
@@ -5269,12 +5312,12 @@ function guideCalqueFormeDebutant(E) {
   x.texteVivant = t;
 }
 /** Les bandes des deux repères à l'écran (± 3 px) : gêne dure des libellés de la forme et du
- *  scénario 1 en Débutant. */
+ *  scénario 1 en Lisible. */
 function debSurBandes(E) {
   const Z = E && E.niveaux ? E.niveaux.filter(L => L.visible).map(L => [L.yH - 3, L.yB + 3]) : [];
   return r => Z.some(([a, b]) => r.y < b && r.y + r.h > a);
 }
-/** Une pastille d'une ligne du Débutant : fond de bulle, trait de couleur à gauche, texte. */
+/** Une pastille d'une ligne du Lisible : fond de bulle, trait de couleur à gauche, texte. */
 function guidePastilleDebutant(g, x, y, w, h, texte, coul, encre) {
   g.fillStyle = COLORS.bulle;
   g.beginPath(); g.roundRect(x, y, w, h, 4); g.fill();
@@ -5301,7 +5344,7 @@ function debPhraseChoisir(g, o, maxPx, etroit) {
   g.font = chartFont(10.5, 650);
   return { t: guideCouper(g, compacte, maxPx - 16), taille: 10.5 };
 }
-/** Calque, Débutant : l'état de chaque bande au prix live (couleur du trait, lueur de la bande
+/** Calque, Lisible : l'état de chaque bande au prix live (couleur du trait, lueur de la bande
  *  quand le prix est dedans), les deux libellés, la phrase. Ne recalcule rien d'autre. */
 function guideCalqueDebutant(E) {
   const G = PARAM.guide, cur = candles[candles.length - 1], g = E.g, P = PARAM.guide.debutant;
@@ -5357,7 +5400,7 @@ function guideCalqueDebutant(E) {
   if (E.ciblePhrase) { E.ciblePhrase.rects = [{ x0: x, y0: y, x1: x + w, y1: y + h }]; E.ciblePhrase.titre = ph.t; E.ciblePhrase.texte = E.phraseCache.texte.concat(E.debNote ? [E.debNote] : []); }
   if (E.itemPhrase) { E.itemPhrase.texte = ph.t; E.itemPhrase.rect = { x, y, w, h }; }
 }
-/** Débutant : le budget. La ligne des scénarios est la seule qui cède, et seulement quand la forme
+/** Lisible : le budget. La ligne des scénarios est la seule qui cède, et seulement quand la forme
  *  ET le libellé du scénario 1 sont posés : sa bulle passe alors dans celle du libellé. */
 function debArbitrer() {
   if (!debEtat) return;
@@ -5406,7 +5449,7 @@ function guideBulle(c, W, mainH, evite) {
   if (Sc && Sc.cibles.includes(c)) Sc.survol = c; else E.survol = c;   // ce que la bulle explique (relu par les tests)
   let texte = c.texte.slice();
   // Une figure : son état vivant en tête, en mots du mode (« En ce moment le prix est sous … ») ;
-  // en Débutant, le reste de la bulle est refait au prix live (une condition déjà franchie par la
+  // en Lisible, le reste de la bulle est refait au prix live (une condition déjà franchie par la
   // bougie en cours n'est plus promise ; l'ébauche qui se défait ne promet plus de validation).
   if (c.figure && E && E.ctxF) {
     const cF = Object.assign({}, E.ctxF, { vivant: c.figure.v, live: isNum(livePrice) ? livePrice : null }), R = GUIDE_FORMES.val;
@@ -5422,7 +5465,7 @@ function guideBulle(c, W, mainH, evite) {
     if (c.niveaux) for (const L of c.niveaux.slice().reverse()) if (L.live) texte.unshift(Guide.libelleNiveau(L.niv, 'debutant', guideUnite(), true) + ' — maintenant : ' + Guide.texteEtatLive(L.live, 'debutant') + '.');
   }
   const bw = Math.min(330, W - 32);
-  // Débutant sur téléphone : la bulle est le seul endroit du détail — un corps de 12 px (titre
+  // Lisible sur téléphone : la bulle est le seul endroit du détail — un corps de 12 px (titre
   // 13 px), lisible au doigt ; ailleurs, la taille de toujours.
   const gros = debutant() && W - 16 - 75 < PARAM.guide.debutant.etroit;
   const fT = gros ? 13 : 10, fC = gros ? 12 : 9.5, hT = gros ? 17 : 14, hC = gros ? 15.5 : 12.5;
@@ -5509,7 +5552,7 @@ function scenFleches() {
   const now = Horloges.maintenant(), d = candles[candles.length - 1], deb = debutant();
   const cle = (deb ? 'D|' : 'E|') + previsionsN + '|' + chartInterval + '|' + candles.length + '|' + candles[0].time + '|' + d.time + '|' + d.high + '|' + d.low + '|' + Math.floor(now / 60000);
   if (scenFlechesMemo && scenFlechesMemo.cle === cle) return scenFlechesMemo.val;
-  // Débutant : seule la flèche du scénario MONTRÉ se dessine (le rang 1, ou le suivant s'il est tombé).
+  // Lisible : seule la flèche du scénario MONTRÉ se dessine (le rang 1, ou le suivant s'il est tombé).
   const jr = deb ? scenJour() : null, montre = jr && jr.montre ? jr.montre.sc : null;
   const val = L.some(s => {
     if (s.forme !== 'chemin' || s.rang === 'S' || (deb && s !== montre)) return false;
@@ -5615,7 +5658,7 @@ function scenPreparer(g, guide) {
   const xDeT = ms => g.pad.left + (ms / 1000 - t0) / pasS * g.gap;
   const xFin = g.pad.left + g.gap * g.n, xMax = g.W - g.pad.right, finVue = g.ve === candles.length;
   let rects = guide ? guide.rects : null;
-  if (!rects && deb) rects = [];   // Débutant : ni badges S/R, ni repère de publication, ni ligne de la vue
+  if (!rects && deb) rects = [];   // Lisible : ni badges S/R, ni repère de publication, ni ligne de la vue
   if (!rects) {
     // Sans le Guide : les badges S/R et le texte du repère de publication gardent leur place.
     rects = srBadges.slice();
@@ -5635,7 +5678,7 @@ function scenPreparer(g, guide) {
     S.items.push({ sc, sv, et: Scenarios.texteEtat(sc, sv, F.statuts, mode, { itv: S.itv, maintenant }), coul: scenCouleur(sc.rang), ouvert: Scenarios.ouvert(sc, sv, maintenant),
       j, pos: j ? j.pos : null, fondu: j ? j.fondu : null, ferme: j ? j.ferme : null, meneur: !!(J && j && J.meneur === j) });
   }
-  // Débutant : le scénario MONTRÉ (le rang 1 tant qu'il est ouvert ou réalisé, sinon le suivant).
+  // Lisible : le scénario MONTRÉ (le rang 1 tant qu'il est ouvert ou réalisé, sinon le suivant).
   S.montre = J && J.montre ? S.items.find(i => i.j === J.montre) || null : null;
   return S;
 }
@@ -5663,17 +5706,17 @@ function scenBandes(S) {
   const top = g.pad.top, bas = top + g.ph;
   ctx.save();
   ctx.beginPath(); ctx.rect(g.pad.left, top, xMax - g.pad.left, g.ph); ctx.clip();
-  // Débutant : le scénario MONTRÉ seul (le rang 1, ou le suivant s'il est tombé), à mi-opacité ;
+  // Lisible : le scénario MONTRÉ seul (le rang 1, ou le suivant s'il est tombé), à mi-opacité ;
   // sans hachures (la zone d'invalidation n'apparaît qu'au survol, scenSurvolDebutant) ni traits du
   // point et de la fin. Un scénario invalidé (ou sorti) s'efface en PARAM.scenarios.jour.fonduMinutes
   // après le créneau du contact ; une cible touchée garde un aplat plus marqué.
   const deb = S.deb;
   for (const it of S.items.slice().reverse()) {
-    // Débutant : le montré, et le rang 1 pendant son fondu même quand un autre est montré (sa boîte
+    // Lisible : le montré, et le rang 1 pendant son fondu même quand un autre est montré (sa boîte
     // ne disparaît pas d'une minute à l'autre ; sans texte : le budget ne change pas).
     if (deb && it !== S.montre && !scenUnEnFondu(S, it)) continue;
     let fon = it.fondu === null || it.fondu === undefined ? 1 : it.fondu;
-    // Expert : un scénario fermé garde une bande pâle après son fondu (le détail reste).
+    // Complet : un scénario fermé garde une bande pâle après son fondu (le détail reste).
     if (!deb) fon = Math.max(fon, 0.3);
     if (fon <= 0) continue;
     const sc = it.sc, c = it.coul, x0 = Math.max(g.pad.left, xDeT(sc.emis)), x1 = Math.min(xMax, xDeT(sc.fin)), w = x1 - x0;
@@ -5697,9 +5740,9 @@ function scenBandes(S) {
       }
     } else {
       const y1 = yDe(sc.range[1]), y0 = yDe(sc.range[0]);
-      // Débutant : l'aplat léger des figures (guideFormeAplat), sans texte : le range se voit.
+      // Lisible : l'aplat léger des figures (guideFormeAplat), sans texte : le range se voit.
       ctx.fillStyle = avecAlpha(c, deb ? 0.09 * fon : 0.04 * a); ctx.fillRect(x0, y1, w, y0 - y1);
-      // Débutant : un range plus haut que toute la vue n'a que ses deux bords verticaux à l'écran,
+      // Lisible : un range plus haut que toute la vue n'a que ses deux bords verticaux à l'écran,
       // deux tirets sans explication : il n'est pas tracé (son libellé, en haut, le nomme).
       if (!(deb && y1 <= top && y0 >= bas)) {
         ctx.strokeStyle = avecAlpha(c, 0.8 * a); ctx.lineWidth = 1.1; ctx.setLineDash([7, 4]);
@@ -5725,7 +5768,7 @@ function scenBandes(S) {
   ctx.setLineDash([]);
   ctx.restore();
 }
-/** Le rang 1 fermé, pendant son fondu, quand un autre scénario est le montré (Débutant). */
+/** Le rang 1 fermé, pendant son fondu, quand un autre scénario est le montré (Lisible). */
 const scenUnEnFondu = (S, it) => !!(S.deb && it !== S.montre && it.sc.rang === '1' && !it.ouvert && it.fondu > 0);
 /** Les bougies visibles, gêne « douce » des étiquettes : essayées d'abord sans les couvrir. */
 function scenSurBougies(S) {
@@ -5774,7 +5817,7 @@ function scenTracer(S) {
   // Les tracés du Guide (chemins conditionnels, formes) : posés avant, ils gênent l'encadré et les flèches.
   S.obstSegs = guideEtat && overlays.guide ? [].concat(...guideEtat.cibles.map(c => c.segs || [])) : [];
   if (S.deb) {
-    // Débutant : le libellé du scénario MONTRÉ (le rang 1 ouvert ou réalisé ; sinon le suivant encore
+    // Lisible : le libellé du scénario MONTRÉ (le rang 1 ouvert ou réalisé ; sinon le suivant encore
     // ouvert ; sinon un réalisé ; sinon le rang 1 pendant son fondu) et sa flèche s'il est ouvert, ses
     // coches et sa croix (dessinées, sans texte), puis la ligne des scénarios.
     const M = S.F ? S.montre : null;
@@ -5812,9 +5855,9 @@ const scenBordFranchi = (z, ref) => (isNum(ref) && (z[0] + z[1]) / 2 < ref ? z[1
 /** Les marques des contacts d'un scénario, au point du contact (x : le milieu de la bougie du
  *  contact ; y : le bord de la zone franchi) : une COCHE par cible touchée, une CROIX pour
  *  l'invalidation ou la sortie d'un range (ou un ordre inconnu). Dessinées (7 px), jamais un texte en
- *  Débutant ; en Expert, une pastille dit le créneau : « ✓ 15:15–15:30 UTC », « ✗ S2 15:15–15:30 UTC »
- *  (posée seulement s'il y a la place). La croix reste en Expert jusqu'à la fin de la fenêtre ; en
- *  Débutant, seulement pendant le fondu du scénario montré. */
+ *  Lisible ; en Complet, une pastille dit le créneau : « ✓ 15:15–15:30 UTC », « ✗ S2 15:15–15:30 UTC »
+ *  (posée seulement s'il y a la place). La croix reste en Complet jusqu'à la fin de la fenêtre ; en
+ *  Lisible, seulement pendant le fondu du scénario montré. */
 function scenMarques(S, it, top, bas) {
   const { g, xDeT, yDe, xMax } = S, sc = it.sc, sv = it.sv;
   if (!sv || !sv.pas || !(sv.n > 0) || ['large', 'incomplet'].includes(sv.cle)) return;
@@ -5920,7 +5963,7 @@ function scenChemin(S, it, top, bas) {
   if (x1 > x0) {
     const niveaux = sc.forme === 'range' ? sc.range : sc.cibles.concat(sc.invalidation !== null ? [sc.invalidation] : []);
     for (const p of niveaux) { const y = yDe(p); if (y >= top && y <= bas) zones.push({ x0, y0: y - 4, x1, y1: y + 4 }); }
-    // Débutant : les bords verticaux tracés d'un range se survolent (ou se touchent) aussi.
+    // Lisible : les bords verticaux tracés d'un range se survolent (ou se touchent) aussi.
     if (S.deb && sc.forme === 'range') {
       const yt = Math.max(top, yDe(sc.range[1])), yb = Math.min(bas, yDe(sc.range[0]));
       if (yb > yt && !(yDe(sc.range[1]) <= top && yDe(sc.range[0]) >= bas)) for (const xe of [x0, x1]) zones.push({ x0: xe - 5, y0: yt, x1: xe + 5, y1: yb });
@@ -6005,7 +6048,7 @@ function scenChemin(S, it, top, bas) {
       if (pE && pE[1] >= top && pE[1] <= bas && !S.deb) { ctx.fillStyle = COLORS.ink1; ctx.beginPath(); ctx.arc(pE[0], pE[1], 3, 0, Math.PI * 2); ctx.fill(); }
       ctx.restore();
     }
-    // Débutant : un point sur chaque niveau, sans chiffre (un chiffre dessiné est un texte).
+    // Lisible : un point sur chaque niveau, sans chiffre (un chiffre dessiné est un texte).
     if (vis.length && S.deb) etiquettesAFaire.push(() => {
       for (const p of vis) { ctx.fillStyle = avecAlpha(c, touchees[p.k] ? 0.5 : 0.9); ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill(); }
     });
@@ -6051,7 +6094,7 @@ function scenLibelle(S, it, top, bas, surBougies) {
   const net = it.meneur && Scenarios.nomNet(S.jour), repris = it.meneur && S.jour && S.jour.remplace;
   const base = exp ? (it.meneur ? (net ? [exper + ' · plus petit écart', exper + ' · écart min.'] : [exper + (repris ? ' · nom repris' : ' · nom gardé')]) : [exper]) : [...new Set([Scenarios.libelle(sc, 'debutant', 'complet'), Scenarios.libelle(sc, 'debutant'), Scenarios.libelle(sc, 'debutant', true)])];
   const rai = exp && !it.ouvert && sc.statut === '⏳' ? Scenarios.raison(sc, it.sv, 'expert') : null, efface = it.fondu === 0;
-  // Après le fondu, l'Expert garde ses niveaux et sa raison (le détail reste) ; seul le Débutant
+  // Après le fondu, l'Complet garde ses niveaux et sa raison (le détail reste) ; seul le Lisible
   // n'a plus que l'état court.
   const variantes = it.ouvert ? base.concat(exp ? (it.meneur ? [exper] : []) : [exper])
     : efface && !exp ? [nom + ' · ' + et.miniD, nom + ' · ' + et.microD]
@@ -6149,7 +6192,7 @@ function scenBoite(S, top, bas) {
   const etroit = g.pw < P.etroit, tactile = etroit || (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches);
   const wMax = Math.floor(Math.min(P.boiteMax, (S.xMax - g.pad.left) * (etroit ? P.boiteFractionEtroit : P.boiteFraction)));
   const L = [];   // { t, f: 'titre' | 'ligne' | 'note' | 'seule', it, garde, compact, toujours }
-  let PJx = [], RE = [];   // Expert : les variantes de la phrase de la journée et du temps restant
+  let PJx = [], RE = [];   // Complet : les variantes de la phrase de la journée et du temps restant
   const heure = ms => Scenarios.heureUTC(ms) + ' UTC';
   let titreBoite, large = false;
   if (!F) {
@@ -6235,7 +6278,7 @@ function scenBoite(S, top, bas) {
     const etats = Scenarios.ligneEtats(S.items, S.mode, large);
     const J = S.jour, nomJ = exp && J && J.cas === 'meneur' ? (Scenarios.nomNet(J) ? ' · écart min. : ' : J.remplace ? ' · nom repris : ' : ' · nom gardé : ') + J.meneur.sc.rang : exp && J && J.cas === 'tot' ? ' · trop tôt pour départager' : '';
     if (etats) pousser(etats + nomJ, 'etats', 2);
-    // Expert : la phrase courte de la journée (sauf un nom, déjà dit) et le temps restant, sur une ligne.
+    // Complet : la phrase courte de la journée (sauf un nom, déjà dit) et le temps restant, sur une ligne.
     if (exp && niveau >= 0 && J) {
       const pj = J.cas === 'meneur' || J.cas === 'tot' ? null : PJx[PJx.length - 1], re = RE.length ? RE[RE.length - 1] : null;
       const tj = [pj, re].filter(Boolean).join(' · ');
@@ -6398,7 +6441,7 @@ function scenTexteBoite(S, sansBilan, court) {
     // Les lignes courtes des scénarios (niveaux, invalidation, état), le bilan, ce qui est en direct.
     const large = S.items.some(i => i.et.cle === 'large');
     const b = Scenarios.texteBilan(F.bilan, P, S.mode);
-    // Expert : la journée aussi (plus petit écart, « seul », « hors », distances, temps restant).
+    // Complet : la journée aussi (plus petit écart, « seul », « hors », distances, temps restant).
     const J = exp ? S.jour : null, PJ = J ? Scenarios.phraseJourExpert(J, PARAM.scenarios.jour) : [], RE = J ? Scenarios.ligneResteExpert(J) : [];
     return [exp ? 'États : suivi en direct sur les bougies ' + S.itv + ' (un affichage) ; note officielle : le journal, le lendemain.' : 'Les états sont un suivi EN DIRECT sur les bougies ' + S.itv + ' (un affichage) ; la note officielle est celle du journal, le lendemain.']
       .concat(PJ.length ? [PJ[Math.min(1, PJ.length - 1)] + '.'] : [])
@@ -6413,7 +6456,7 @@ function scenTexteBoite(S, sansBilan, court) {
   if (attente && previsions.note) out.push(previsions.note);
   out.push('Chaque matin vers ' + P.point + ' (Paris), Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ, à partir de son analyse du marché, et les classe du plus au moins probable selon son jugement, sans pourcentage. Chaque niveau a une origine nommée et se lit comme une zone : le niveau plus ou moins la marge.');
   if (F) out.push('Les états de cet encadré sont un suivi EN DIRECT sur les bougies ' + S.itv + ' du graphique (un affichage). La note officielle est celle du journal, faite mécaniquement le lendemain sur des bougies d’une minute.');
-  // Pendant la journée : aucune nouvelle prévision ; la règle de l'écart, en entier (Expert).
+  // Pendant la journée : aucune nouvelle prévision ; la règle de l'écart, en entier (Complet).
   if (F && exp && S.jour) out.push(...Scenarios.regleJourExpert(PARAM.scenarios.jour));
   if (F && F.bilan && F.bilan.matins > 0) {
     // La règle du fichier, si elle est écrite, nomme déjà le chemin compté : la suite seule, sans redite.
@@ -6459,7 +6502,7 @@ function scenCalque() {
   cx.restore();
 }
 
-// ─── Scénarios du matin, mode Débutant ─────────────────────────────────────
+// ─── Scénarios du matin, mode Lisible ─────────────────────────────────────
 // Sur le tracé : le libellé du scénario 1 (ouvert) près de sa zone, et UNE ligne d'état en haut à
 // droite (« Scénario 1 de Claude : en cours (en direct) ▸ ») ; tout le reste est dans la bulle,
 // en mots simples, heures de Paris.
@@ -6546,7 +6589,7 @@ function scenLibelleDebutant(S, it, top, bas) {
   // Gênes dures : les bougies les plus récentes (le prix d'à présent ne se cache jamais) et les
   // bandes des repères ; gêne douce : les autres bougies. En haut seulement : pas de glissement
   // au-delà des deux rangées du haut.
-  // … et la ligne qui valide la figure que le Débutant montrera (guideDebutant l'a prévue) : le
+  // … et la ligne qui valide la figure que le Lisible montrera (guideDebutant l'a prévue) : le
   // libellé du scénario 1 ne cache jamais l'endroit dont parle celui de la figure.
   const segsF = guideEtat && overlays.guide && guideEtat.debSegsPrevus ? guideSurSegs(guideEtat.debSegsPrevus) : null;
   const dur = r => recentes(r) || bandes(r) || (segsF ? segsF(r) : false);
@@ -6668,7 +6711,7 @@ function scenTexteCourtLigne(S, texte) {
     // une bulle coupée faute de place (375×667, des fermetures avec leur raison) les garde toujours.
     .concat(['« (en direct) » : suivi par cette page ; la note officielle est celle du journal, le lendemain. ' + texte[texte.length - 1]]);
 }
-/** M8 (arbitrage du budget Débutant) : quand la ligne porte l'indication d'une fermeture, c'est le
+/** M8 (arbitrage du budget Lisible) : quand la ligne porte l'indication d'une fermeture, c'est le
  *  libellé du scénario qui cède (sa zone reste dessinée, sans texte) ; la bulle de la ligne reprend
  *  celle du libellé. → true si le libellé a cédé. */
 function scenCederLibelle() {
@@ -6699,7 +6742,7 @@ function scenLigneDessiner(B) {
   cx.fillText(B.texte, B.x + 9, B.y + 14);
   cx.restore();
 }
-/** Survol ou toucher du scénario 1 (Débutant) : sa zone d'invalidation, hachurée sur le calque —
+/** Survol ou toucher du scénario 1 (Lisible) : sa zone d'invalidation, hachurée sur le calque —
  *  le seul moment où elle se voit (la bulle dit ce qu'elle est). */
 function scenSurvolDebutant(c) {
   const S = scenEtat;
@@ -7476,7 +7519,7 @@ function renderCycle(d) {
     + kpi('VIX', fmtNum(m.vix, 1), '', 'macro.vix')
     // L'âge avance chaque minute sans refaire la bande : majAges() réécrit les [data-age-de].
     + '<span class="kpi-age" title="Âge de la publication">' + (ageK === null ? '—' : ageDe(d.updated, ageK) + ' min') + '</span>'
-    // Débutant : une seule pastille, qui ouvre les cartes ; son âge dans l'infobulle (collé au prix
+    // Lisible : une seule pastille, qui ouvre les cartes ; son âge dans l'infobulle (collé au prix
     // en direct, « il y a 18 min » se lisait comme l'âge du prix). « en retard » au-delà du seuil.
     + '<span class="kpi-deb debutant-seul" role="button" tabindex="0" title="' + titreKpiDeb(ageK) + '" aria-label="' + ariaKpiDeb(ageK) + '">'
     + '<span class="deb-frais">Infos du marché ▸</span><span class="deb-retard">Infos<span class="deb-mot"> du marché</span> · en retard ▸</span></span>';
@@ -7529,13 +7572,13 @@ function ajusterRuban() {
 // inséré avant #feed partait dans le panneau latéral replié et restait invisible
 // (constaté au rendu : présent dans le DOM, absent de l'écran).
 // Les cartes ont le MÊME HTML dans les deux modes : un texte qui diffère est écrit deux fois,
-// chacun dans son span (modes) ; un bloc réservé à l'Expert est enveloppé (envExpert : sans
-// boîte en Expert, display: contents — la mise en page Expert ne change pas) ; un bloc du
-// Débutant seul, dans un div .debutant-seul (envDebutant).
+// chacun dans son span (modes) ; un bloc réservé à l'Complet est enveloppé (envExpert : sans
+// boîte en Complet, display: contents — la mise en page Complet ne change pas) ; un bloc du
+// Lisible seul, dans un div .debutant-seul (envDebutant).
 const modes = (exp, deb) => '<span class="expert-seul">' + exp + '</span><span class="debutant-seul">' + deb + '</span>';
 const envExpert = h => '<div class="env-exp expert-seul">' + h + '</div>';
 const envDebutant = h => '<div class="env-deb debutant-seul">' + h + '</div>';
-// Débutant : un prix au format français (« 80 394 $ »), un nombre de BTC à l'unité.
+// Lisible : un prix au format français (« 80 394 $ »), un nombre de BTC à l'unité.
 const prixDeb = v => (isNum(v) ? escHtml(Guide.prix(v, '$')) : '—');
 const btcDeb = v => (isNum(v) ? escHtml(Guide.nombre(v, v >= 10 ? 0 : 1)) + ' BTC' : '—');
 // « il y a 18 min » (l'âge est réécrit sur place chaque minute, majAges).
@@ -7587,12 +7630,12 @@ function renderFeedTo(container) {
   // retard se LISE. Le bandeau d'âge (ageBannerHtml) ne se déclenche qu'au-delà de CADENCES.vieux_min,
   // c'est-à-dire jamais dans le cas normal : d'où deux prix contradictoires à l'écran.
   const ageMin = upd ? Math.max(0, Math.round((Date.now() - upd.getTime()) / 60000)) : null;
-  // Débutant, sur une autre paire que BTCUSDT : ces cartes parlent du BITCOIN (le fichier publié ne
+  // Lisible, sur une autre paire que BTCUSDT : ces cartes parlent du BITCOIN (le fichier publié ne
   // suit que lui). Elles le disent dans leurs titres et leurs phrases (« le bitcoin », pas « le
   // prix ») — sinon on lisait « le prix est dans le haut de sa fourchette » à côté de SOL à −4 %.
   const autrePaire = activeSymbol !== 'BTCUSDT', sujet = autrePaire ? 'le bitcoin' : 'le prix';
   const btcTitre = t => (autrePaire ? 'Bitcoin : ' + t.charAt(0).toLowerCase() + t.slice(1) : t);
-  // Débutant : « Fourchette des 24 h » — un seul prix en grand à l'écran (celui du haut, en
+  // Lisible : « Fourchette des 24 h » — un seul prix en grand à l'écran (celui du haut, en
   // direct) ; le prix publié, en petit, avec son âge.
   html += mCard('📊', modes('Marché live', btcTitre('Fourchette des 24 h')), modes('Binance spot · maj ' + hhmm + ' UTC'
       + (ageMin !== null ? ' (+' + ageDe(d.updated, ageMin) + ' min — le badge du haut est live)' : ''), 'Binance · le prix du haut est en direct'), '',
@@ -7608,7 +7651,7 @@ function renderFeedTo(container) {
   // Week-end : DXY et VIX sont TOUS DEUX des dernières clôtures (marchés fermés), pas des
   // valeurs du moment — l'ancienne carte ne le disait que pour le DXY.
   const ferme = !!m.dxy_is_weekend;
-  // Débutant : « Bourses américaines », la seule tuile du VIX (le dollar est en Expert).
+  // Lisible : « Bourses américaines », la seule tuile du VIX (le dollar est en Complet).
   html += mCard('🌍', modes('Macro', 'Bourses américaines'), modes('Dollar et volatilité · Yahoo', 'Yahoo · ' + ilYaDeb(d.updated, ageMin)), '',
     '<div class="tuiles deb-une">'
     + envExpert(tuile('DXY', fmtNum(m.dxy_spot,2), ferme ? 'clôture' + (m.dxy_date ? ' du ' + escHtml(m.dxy_date) : '') : 'indice dollar', 'dxy'))
@@ -7645,8 +7688,8 @@ function renderFeedTo(container) {
   }
   indBody += '<div class="fiches-ligne">' + ['rsi_tf', 'croisement', 'ema_tf', 'sr_tf', 'amplitude', 'atr_tf'].map(f =>
     '<span class="fiche-lien">' + FICHES[f].titre.replace(/ \((fichier|graphique)[^)]*\)/, '') + infoBtn(f) + '</span>').join('') + '</div>';
-  // Débutant : « Fourchette des 5 jours » — la jauge des bougies 4 h (bas et haut de leur
-  // fenêtre, lue dans sr_window_h) et une phrase ; le reste est en Expert.
+  // Lisible : « Fourchette des 5 jours » — la jauge des bougies 4 h (bas et haut de leur
+  // fenêtre, lue dans sr_window_h) et une phrase ; le reste est en Complet.
   const t4 = tf['4h'];
   const fen4 = t4 ? (t4.sr_window_h || srH['4h']) : null;
   const fenMots = h => (h % 24 === 0 ? (h / 24) + (h / 24 > 1 ? ' jours' : ' jour') : h + ' heures');
@@ -7715,8 +7758,8 @@ function renderFeedTo(container) {
     + (isNum(x.premium_hors_usdt_pct) ? '<div class="fine" style="margin-top:4px">hors USDT <b style="color:var(--ink-1)">' + pctSigne(x.premium_hors_usdt_pct, 4)
       + '</b> · USDT = ' + fmtNum(x.usdt_usd, 5) + ' $</div>' : '')
     + lectureCourte('prime', x.premium_pct, x.premium_hors_usdt_pct) + '</div>';
-  // Débutant : « Achats et ventes » — une phrase qui porte la valeur (l'écart des achats et des
-  // ventes immédiats sur 24 h) ; le reste est en Expert.
+  // Lisible : « Achats et ventes » — une phrase qui porte la valeur (l'écart des achats et des
+  // ventes immédiats sur 24 h) ; le reste est en Complet.
   html += mCard('📡', modes('Microstructure', btcTitre('Achats et ventes')), modes('Binance Futures · Deribit · Coinbase', 'Binance, 24 h · ' + ilYaDeb(d.updated, ageMin)), '',
     envExpert(microBody) + (isNum(x.cvd_24h_usd) ? phraseCarte('cvd', x.cvd_24h_usd) : envDebutant('<div class="fine">En attente de la prochaine publication.</div>')));
 
@@ -7751,7 +7794,7 @@ function renderFeedTo(container) {
   } else {
     liqBody = '<div class="fine">Format ancien (scores d\'intensité sans unité) — en attente de la prochaine publication.</div>';
   }
-  // Débutant : « Ordres en attente » — la barre achat / vente près du prix, une phrase, et ce que
+  // Lisible : « Ordres en attente » — la barre achat / vente près du prix, une phrase, et ce que
   // vaut une photo du carnet.
   let liqDeb = '<div class="fine">En attente de la prochaine publication.</div>';
   if (lq.unit === 'BTC') {
@@ -7903,7 +7946,7 @@ function valeurContre(v) {
 }
 function contreCorps(d) {
   if (!d) return '';
-  return envDebutant('<div class="fine">Le navigateur recalcule les chiffres publiés : détail en mode Expert.</div>') + envExpert(contreCorpsExpert(d));
+  return envDebutant('<div class="fine">Le navigateur recalcule les chiffres publiés : détail en mode Complet.</div>') + envExpert(contreCorpsExpert(d));
 }
 function contreCorpsExpert(d) {
   const pub = Date.parse(d.updated), hm = isFinite(pub) ? new Date(pub).toISOString().slice(11, 16) + ' UTC' : '—';

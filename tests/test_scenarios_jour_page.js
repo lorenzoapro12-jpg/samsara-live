@@ -3,19 +3,19 @@
 // tests/scenarios-jour-harnais.js : horloge de la page réglée, bougies tronquées à l'heure dite).
 //
 //   1. 15:40 UTC (le 2 réalisé et le 3 invalidé entre 15:15 et 15:30, le 1 encore dedans) —
-//      1440 × 900 et 390 × 844, Débutant et Expert :
+//      1440 × 900 et 390 × 844, Lisible et Complet :
 //      · scenEtat.jour de la page = classerJour pur sur les mêmes bougies (cas, meneur, montré,
 //        écarts à 0,01 près, fondus) ; les deux modes donnent les mêmes valeurs ;
-//      · Débutant : au plus 5 textes, un seul libellé (celui du montré, le 1), la ligne du cas D
+//      · Lisible : au plus 5 textes, un seul libellé (celui du montré, le 1), la ligne du cas D
 //        (« En direct : zone du 2 ✓ · scén. 3 ✗ ▸ » : la fermeture fraîche du 3 y est dite aussi), sa bulle : les trois lignes numérotées, « Ce
 //        classement ne change pas pendant la journée », « pas de nouvelle prévision » ; aucun mot
 //        banni, aucun « % » ; aucune marque dessinée pour un scénario qui n'est pas montré ;
-//      · Expert : « Seul encore en cours : 1 », les distances en $ sur la ligne ouverte, les
+//      · Complet : « Seul encore en cours : 1 », les distances en $ sur la ligne ouverte, les
 //        pastilles « ✓ 15:15–15:30 UTC » (le 2) et « ✗ S3 15:15–15:30 UTC » (le 3), le fondu du 3
 //        parti de la CLÔTURE (15:30) : 0,83 ; ni « écart 0,xx » ni « en tête » (A2) ;
-//   2. 17:40 (le 1 sorti, le 2 réalisé) : Débutant, libellé « Scénario 2 : zone 80 806 $ ✓ » (A3,
-//      jamais « atteint »), ligne du cas F, une coche dessinée ; Expert, la pastille ✗ du 1 ;
-//      18:40 : le fondu du 1 est fini (0), sa pastille ✗ reste en Expert ;
+//   2. 17:40 (le 1 sorti, le 2 réalisé) : Lisible, libellé « Scénario 2 : zone 80 806 $ ✓ » (A3,
+//      jamais « atteint »), ligne du cas F, une coche dessinée ; Complet, la pastille ✗ du 1 ;
+//      18:40 : le fondu du 1 est fini (0), sa pastille ✗ reste en Complet ;
 //   3. M8 : une figure forcée pendant le fondu d'une fermeture → c'est le LIBELLÉ qui cède, la
 //      ligne reste, au plus 5 textes ;
 //   4. SOBRIÉTÉ : survol → aucun drawChart ; tick de prix → le calque seul, jour inchangé ; une
@@ -49,7 +49,7 @@ const textes = page => page.evaluate(() => {
   const W = canvas.width / devicePixelRatio, fil = (NOMS_PAIRES[activeSymbol] || activeSymbol) + '  ·  ' + Guide.nomIntervalle(chartInterval);
   return out.filter(e => e.t !== fil && e.x >= 14 && e.x < W - 75 && e.y >= 0 && e.y <= geo.mainH - 20).map(e => e.t);
 });
-/** La bulle de la ligne des scénarios (Débutant) et celle de l'encadré (Expert). */
+/** La bulle de la ligne des scénarios (Lisible) et celle de l'encadré (Complet). */
 const bulle = page => page.evaluate(() => {
   const S = scenEtat, c = S && S.cibles.find(x => /^Scénarios du matin · /.test(x.titre || '') && x.rects && x.rects.length);
   return c ? c.texte.join('\n') : '';
@@ -113,7 +113,7 @@ const capt = async (o, nom) => { if (process.env.SCEN_CAPTURES) await o.page.scr
     }
     for (const w of Object.keys(parMode)) {
       const p = parMode[w];
-      check(`15:40 · ${w} px : mêmes valeurs en Débutant et en Expert`, p.debutant && p.expert && JSON.stringify(p.debutant) === JSON.stringify(p.expert), p);
+      check(`15:40 · ${w} px : mêmes valeurs en Lisible et en Complet`, p.debutant && p.expert && JSON.stringify(p.debutant) === JSON.stringify(p.expert), p);
     }
 
     titre('17:40 puis 18:40 : le 1 sorti, le 2 réalisé');
@@ -159,7 +159,7 @@ const capt = async (o, nom) => { if (process.env.SCEN_CAPTURES) await o.page.scr
       const r = await o.page.evaluate(() => {
         const n = candles.length, G = PARAM.guide, C = i => candles[i];
         const ia = n - 34, ic = n - 24, ib = n - 14, pa = Math.max(C(ia).high, C(ib).high), pc = C(ic).low;
-        // (Figures en direct : une figure complète, et le Débutant lit sa liste dans Guide.formesDebutant.)
+        // (Figures en direct : une figure complète, et le Lisible lit sa liste dans Guide.formesDebutant.)
         const f = { type: 'double_sommet', famille: 'extremes', sens: -1, phase: 'confirme', a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, extreme: pa, hauteur: pa - pc, objectif: pc - (pa - pc),
           invalidation: pa, t: ib + G.pivot, debut: ia, depart: ib + 1, jConf: ib + G.pivot + 2, fin: null, jFin: null, journal: [] };
         const f0 = Guide.formesAffichees, fd0 = Guide.formesDebutant;

@@ -1011,7 +1011,7 @@ const Guide = (function () {
       // (fin de la boucle des ébauches).
       if (estTriple(f)) for (const g of formes) if (estDouble(g) && !g.doublon && !dbls.includes(g) && couvre(f, g) && (g.t === t || (fini(g.jConf) && g.jConf === f.jConf))) { g.doublon = true; g.doublonDe = f; const k = actives.indexOf(g); if (k >= 0) actives.splice(k, 1); }
       // Un triple qui prend la suite d'un double (figure ou ébauche) sur les mêmes creux (sommets) :
-      // il garde sa place à l'écran (départage, et la mémoire du Débutant).
+      // il garde sa place à l'écran (départage, et la mémoire du Lisible).
       if (estTriple(f)) f.deDouble = dbls.length > 0 || !!(eb && eb.deDouble) || formes.some(g => g.doublonDe === f) || vivantes.some(x => estDouble(x) && (!x.fin || x.jFin === t) && couvre(f, x));
       if (famille(f) === 'drapeau') mats.push({ i0: f.mat.i0, i1: f.mat.i1 });
       formes.push(f); cles.add(cleFigure(f)); actives.push(f);
@@ -1240,7 +1240,7 @@ const Guide = (function () {
   /** Les candidates à la clôture j (n = j + 1 bougies closes), triées par rang puis départage. */
   function candidatesA(res, P, a, z, mode, j) {
     const eb = res.ebauches || { liste: [] }, deb = mode === 'debutant';
-    // (Expert : une figure tombée reste dans la vue tant que sa ✗ y est, même si son dernier point en
+    // (Complet : une figure tombée reste dans la vue tant que sa ✗ y est, même si son dernier point en
     // est sorti à gauche — elle ne passe le filtre que si elle était montrée avant sa chute.)
     const dansVue = f => (dernierPoint(f, P) >= a || (!deb && f.fin && f.jFin <= j && f.jFin >= a)) && f.debut < z && (!deb || f.debut >= a);
     const C0 = res.formes.filter(f => !f.doublon && f.fin !== 'devenu_triple' && f.t <= j && garde(f, j, P, mode) && dansVue(f));
@@ -1271,8 +1271,8 @@ const Guide = (function () {
   /** Les figures à montrer dans la vue [vs, ve) : vivantes (dernier point dans la vue), ébauches,
    *  et finies récemment (une figure qui tombe reste lisible avec sa marque ✗). Rang, puis le
    *  dernier point le plus récent, puis le plus de points d'ancrage, puis les lignes horizontales.
-   *  Expert : au plus formesMax, jamais deux d'une même famille d'écran qui se recouvrent, jamais
-   *  deux sur le même dernier point. Débutant : la liste ordonnée des figures ENTIÈRES dans la vue
+   *  Complet : au plus formesMax, jamais deux d'une même famille d'écran qui se recouvrent, jamais
+   *  deux sur le même dernier point. Lisible : la liste ordonnée des figures ENTIÈRES dans la vue
    *  (l'écran prend la première dont le libellé trouve sa place) ; une seule est montrée.
    *  Une figure finie n'est montrée que si elle l'était à la clôture d'avant son issue (même vue,
    *  même mode) : on ne barre que ce qui a été vu ; elle GARDE alors sa place (choisir, tient).
@@ -1306,7 +1306,7 @@ const Guide = (function () {
   /** L'identité d'une figure À L'ÉCRAN : son type et son ancre (une ébauche et la figure née d'elle
    *  ont la même ; un rejeu complet la garde). */
   const idFigure = f => cleFigure(f);
-  /** Débutant : la liste ordonnée des figures à essayer (l'écran prend la première dont le libellé
+  /** Lisible : la liste ordonnée des figures à essayer (l'écran prend la première dont le libellé
    *  trouve sa place, ou à défaut dessine la première sans libellé), d'après ce que la page a
    *  RÉELLEMENT dessiné aux clôtures d'avant (memo) :
    *   memo = { parJ: Map(clôture → id dessinée ou null), dernier: id dessinée à l'image d'avant }.
@@ -1365,7 +1365,7 @@ const Guide = (function () {
     return out;
   }
   /** Les figures concurrentes d'une figure montrée : celles qui partagent son dernier point (la
-   *  bulle Expert les cite). */
+   *  bulle Complet les cite). */
   function concurrentes(res, f, P) {
     if (!res || !f) return [];
     const d = dernierPoint(f, P), j = res.n - 1;
@@ -1434,7 +1434,7 @@ const Guide = (function () {
   }
 
   // ── Les mots ──
-  // [nom (Expert), pluriel, avec article]
+  // [nom (Complet), pluriel, avec article]
   const NOMS_FORMES = {
     double_sommet: ['Double sommet', 'doubles sommets', 'un double sommet'], double_creux: ['Double creux', 'doubles creux', 'un double creux'],
     triple_sommet: ['Triple sommet', 'triples sommets', 'un triple sommet'], triple_creux: ['Triple creux', 'triples creux', 'un triple creux'],
@@ -1499,7 +1499,7 @@ const Guide = (function () {
         + ' · sans issue ' + b.expires + ' · ouv. ' + b.ouverts + (T.departs ? ' · sans forme : obj. ' + nombre(T.atteints, 0) + '/' + nombre(T.departs, 0) + ecart : '') + eb
         + (faible ? ' · échantillon faible' : '');
     }
-    // Débutant : UNE phrase de comptes, une phrase de repère, l'avertissement.
+    // Lisible : UNE phrase de comptes, une phrase de repère, l'avertissement.
     const un = noms[2].replace(/^une? /, '');
     let t = 'Mesuré sur l’historique chargé — sur les ' + nb + ' dernières bougies ' + itv + ' (' + d + ') : ';
     if (b.confirmes) {
@@ -1639,17 +1639,17 @@ const Guide = (function () {
    *  qui tient dans ses lignes (pour TOUS les prix « en test » possibles). */
   const VARIANTES_LECTURE = [{}, { court: true }, { court: true, compact: true }, { court: true, compact: true, sansForme: true }];
 
-  // ─── 7. Mode Débutant : l'écran calme ─────────────────────────────────────
-  // Le Débutant voit le prix, UNE phrase, un repère au-dessus, un au-dessous, le scénario 1 : le
-  // détail est dans la bulle (survol, toucher). Mêmes valeurs que l'Expert, d'autres mots ; aucun
+  // ─── 7. Mode Lisible : l'écran calme ─────────────────────────────────────
+  // Le Lisible voit le prix, UNE phrase, un repère au-dessus, un au-dessous, le scénario 1 : le
+  // détail est dans la bulle (survol, toucher). Mêmes valeurs que l'Complet, d'autres mots ; aucun
   // nom d'indicateur, aucune heure UTC, aucun pourcentage dans la phrase. Chaque texte d'étiquette
   // rend la PREMIÈRE variante qui tient en caractères (max) ET en pixels (mesure(t) ≤ maxPx).
   const OPTIONS_CLES = ['put_wall', 'call_wall', 'zero_gamma'];
   const estOption = r => OPTIONS_CLES.includes(r.cle);
   const optionsSeules = niv => !!niv && niv.raisons.length > 0 && niv.raisons.every(estOption);
-  /** [nom, mot (étroit), avec article] : les mots de l'écran Débutant (aucun mot technique). */
+  /** [nom, mot (étroit), avec article] : les mots de l'écran Lisible (aucun mot technique). */
   /** [nom, mot (étroit), avec article, mini (≤ 8 : téléphone avec flèche)] : les mots de l'écran
-   *  Débutant (aucun mot technique). Une zone où le prix a fait demi-tour se dit « zone de
+   *  Lisible (aucun mot technique). Une zone où le prix a fait demi-tour se dit « zone de
    *  retour » : elle peut être au-dessus ou au-dessous du prix (« rebond » ferait lire un plancher). */
   const NOMS_DEBUTANT = {
     hier_haut: ['Haut d’hier', 'Haut hier', 'le plus haut d’hier', 'Max hier'],
@@ -1670,21 +1670,21 @@ const Guide = (function () {
   /** La raison qui NOMME une bande à l'écran : celle dont le prix est le prix de la bande (le prix
    *  réel le plus proche du prix de référence), jamais une option si la bande a une autre raison. */
   function raisonPrincipale(niv) {
-    if (niv && niv.principale) return niv.principale;   // un repère du Débutant (reperesDe) : sa raison
+    if (niv && niv.principale) return niv.principale;   // un repère du Lisible (reperesDe) : sa raison
     const R = (niv && niv.raisons) || [], hors = R.filter(r => !estOption(r)), C = hors.length ? hors : R;
     return C.slice().sort((a, b) => Math.abs(a.p - niv.p) - Math.abs(b.p - niv.p) || rangRaison(a) - rangRaison(b))[0] || null;
   }
-  /** Les deux bandes de l'écran Débutant : la plus proche de chaque côté, sauf une bande faite
+  /** Les deux bandes de l'écran Lisible : la plus proche de chaque côté, sauf une bande faite
    *  seulement d'options quand ce côté en a une autre (une estimation ne passe pas devant une mesure). */
   function choixDebutant(choix) {
     const un = L => (L || []).find(n => !optionsSeules(n)) || (L || [])[0] || null;
     return { dessus: choix ? un(choix.dessus) : null, dessous: choix ? un(choix.dessous) : null };
   }
-  /** Les REPÈRES du Débutant : un par prix nommé des bandes de l'Expert (deux raisons au même prix
-   *  n'en font qu'un). Une bande de l'Expert réunit des prix proches (fusion) ; le Débutant, lui,
+  /** Les REPÈRES du Lisible : un par prix nommé des bandes de l'Complet (deux raisons au même prix
+   *  n'en font qu'un). Une bande de l'Complet réunit des prix proches (fusion) ; le Lisible, lui,
    *  montre UN prix de chaque côté du prix live : chaque repère est donc le prix d'une raison réelle,
    *  sa bande à lui (± demi), et garde sa bande d'origine (bande) pour la bulle. Les valeurs sont
-   *  celles de l'Expert : rien n'est recalculé, sauf l'état fermé de la petite bande (app.js). */
+   *  celles de l'Complet : rien n'est recalculé, sauf l'état fermé de la petite bande (app.js). */
   function reperesDe(choix, demi) {
     const out = [];
     for (const niv of choix ? choix.dessus.concat(choix.dessous) : []) {
@@ -1708,7 +1708,7 @@ const Guide = (function () {
     return out.sort((a, b) => a.p - b.p);
   }
   /** Les deux repères à l'écran, au prix LIVE : de chaque côté, le plus proche STRICTEMENT au-dessus
-   *  et au-dessous (une bande de l'Expert qui enjambe le prix donne un repère à chaque côté) ; un
+   *  et au-dessous (une bande de l'Complet qui enjambe le prix donne un repère à chaque côté) ; un
    *  repère fait seulement d'options ne passe qu'à défaut d'une mesure du même côté ; un mur d'achat
    *  n'est jamais « au-dessus », un mur de vente jamais « au-dessous » (même règle que les bandes).
    *  Deux repères distincts : s'ils sont à moins de `ecart` l'un de l'autre, le plus proche du prix
@@ -1762,7 +1762,7 @@ const Guide = (function () {
     const V = libellesDebutant(niv, o);
     return V.length ? V[formatDebutant(V, o)] : '';
   }
-  /** Le nom entier d'une raison, en mots du Débutant (« Mur de vente »). */
+  /** Le nom entier d'une raison, en mots du Lisible (« Mur de vente »). */
   const nomDebutant = r => nomsDebutant(r)[0];
   /** Son nom dans une phrase, sans article : « plus haut d’hier », « mur de vente ». */
   const nomPhrase = r => nomsDebutant(r)[2].replace(/^(?:le|la|les|une?) /, '');
@@ -1824,7 +1824,7 @@ const Guide = (function () {
   /** La phrase de lecture, ses variantes de la plus riche à la plus courte (la dernière est la
    *  forme COMPACTE). o = { prix (live), unite, choix, enTest (bande où est le prix, ou null),
    *  regime, maintenant (la vue montre le passé), itv (« 15m ») }. Jamais de %, d'heure, ni de nom
-   *  d'indicateur : le verbe vient du régime (le même objet que le badge Expert). */
+   *  d'indicateur : le verbe vient du régime (le même objet que le badge Complet). */
   const VERBE_DEBUTANT = { hausse: 'monte', baisse: 'baisse', faible: 'hésite', sans: 'hésite', incertaine: 's’agite' };
   function phrasesDebutant(o) {
     if (!fini(o.prix)) return ['Prix en direct indisponible pour l’instant.'];
@@ -1950,14 +1950,14 @@ const Guide = (function () {
       default: return n + minuscule(r.nom) + '.';
     }
   }
-  // ─── Figures, en mots : libellés (Débutant ≤ 26 caractères, Expert ≤ 80) et bulles ───
+  // ─── Figures, en mots : libellés (Lisible ≤ 26 caractères, Complet ≤ 80) et bulles ───
   // Les NIVEAUX viennent tous de niveauxFigure (ceux que la machine applique) ; la cible n'est
   // jamais écrite sans le bilan mesuré. ctx = { n, intervalle (« 15m »), duree (s), temps (heures
   // d'ouverture des bougies, s), pas (s), maintenant (ms), j (la bougie en cours) }.
   const NOM_FORME_DEBUTANT = { double_sommet: 'Double sommet', double_creux: 'Double creux', triple_sommet: 'Triple sommet', triple_creux: 'Triple creux',
     ete: 'Tête-épaules', ete_inverse: 'Tête-épaules', range: 'Rectangle', triangle_ascendant: 'Triangle', triangle_descendant: 'Triangle', triangle_symetrique: 'Triangle',
     biseau_montant: 'Biseau', biseau_descendant: 'Biseau', canal_montant: 'Canal', canal_descendant: 'Canal', drapeau: 'Drapeau', fanion: 'Fanion' };
-  /** Le nom long, en mots simples (titre de la bulle Débutant) : le sous-type dit sans flèche. */
+  /** Le nom long, en mots simples (titre de la bulle Lisible) : le sous-type dit sans flèche. */
   const NOM_LONG_DEBUTANT = { double_sommet: 'Double sommet', double_creux: 'Double creux', triple_sommet: 'Triple sommet', triple_creux: 'Triple creux',
     ete: 'Tête-épaules', ete_inverse: 'Tête-épaules à l’envers', range: 'Rectangle', triangle_ascendant: 'Triangle à plafond plat', triangle_descendant: 'Triangle à plancher plat',
     triangle_symetrique: 'Triangle qui se resserre', biseau_montant: 'Biseau qui monte', biseau_descendant: 'Biseau qui descend', canal_montant: 'Canal qui monte',
@@ -1967,7 +1967,7 @@ const Guide = (function () {
   const enHautBas = s => (s > 0 ? 'en haut' : 'en bas');
   /** Le premier libellé d'une liste qui tient en `max` caractères (26 par défaut), sinon le dernier. */
   const tenir = (V, max) => V.find(t => t.length <= (max || 26)) || V[V.length - 1];
-  /** Le libellé d'une figure en Débutant (≤ 26 caractères), à la dernière clôture : son nom, puis
+  /** Le libellé d'une figure en Lisible (≤ 26 caractères), à la dernière clôture : son nom, puis
    *  son état. Une ébauche et une figure formée portent le même « … possible » : le trait les
    *  distingue (tirets fins et point creux), et la 1re phrase de la bulle. Le côté d'une sortie se
    *  dit en mots (« Biseau : sortie en bas »). */
@@ -1992,7 +1992,7 @@ const Guide = (function () {
     const nom = NOM_FORME_DEBUTANT[f.type];
     return nom ? tenir(['Devenu ' + minuscule(nom), nom + ' possible']) : null;
   }
-  /** Les libellés VIVANTS (Débutant, posés sur le calque, au prix live, sans redessin du graphique) :
+  /** Les libellés VIVANTS (Lisible, posés sur le calque, au prix live, sans redessin du graphique) :
    *  le nom de la figure reste, l'état du moment s'y ajoute. Clé : figureVivante(…).etiq, lue sur le
    *  plus haut et le plus bas de la bougie en cours (il ne revient pas en arrière avant la clôture).
    *  → les variantes, de la plus riche à la plus courte. */
@@ -2026,7 +2026,7 @@ const Guide = (function () {
     return out;
   }
 
-  // Heures : celle de la FIN d'une bougie, partout ; le Débutant lit l'heure de Paris, l'Expert
+  // Heures : celle de la FIN d'une bougie, partout ; le Lisible lit l'heure de Paris, l'Complet
   // l'heure UTC suivie de celle de Paris.
   const tempsDe = (ctx, i) => (ctx && ctx.temps && fini(ctx.temps[i]) ? ctx.temps[i] : ctx && ctx.temps && ctx.temps.length && fini(ctx.pas) ? ctx.temps[0] + i * ctx.pas : NaN);
   const finMs = (ctx, i) => (fini(tempsDe(ctx, i)) ? (tempsDe(ctx, i) + ctx.pas) * 1000 : NaN);
@@ -2047,14 +2047,14 @@ const Guide = (function () {
     const [d, m] = j.split('/');
     return 'le ' + d + (Math.abs(maintenant - ms) > 20 * 86400000 ? '/' + String(m).padStart(2, '0') : '') + ' à ' + h;
   }
-  /** Débutant : « à 14h00 » aujourd'hui, sinon « hier à 14h00 », « demain à 02h00 », « le 7 à
+  /** Lisible : « à 14h00 » aujourd'hui, sinon « hier à 14h00 », « demain à 02h00 », « le 7 à
    *  14h00 » (heure de Paris) — une heure seule se lirait comme celle d'aujourd'hui. */
   function quandDeb(ms, ctx) {
     if (!fini(ms) || !heureParis(ms)) return '';
     const now = ctx && ctx.maintenant;
     return fini(now) ? quandParis(ms, now).replace(/^aujourd’hui /, '') : 'à ' + heureParis(ms);
   }
-  /** Expert : la date (jj/mm) s'ajoute à l'heure UTC sur des bougies de 4 h ou plus, ou quand
+  /** Complet : la date (jj/mm) s'ajoute à l'heure UTC sur des bougies de 4 h ou plus, ou quand
    *  l'instant n'est pas du même jour (UTC) que maintenant ; sur des bougies d'un jour, la date seule. */
   const dateUTC = ms => { const d = new Date(ms).toISOString(); return d.slice(8, 10) + '/' + d.slice(5, 7); };
   function avecDate(ms, ctx) {
@@ -2069,11 +2069,11 @@ const Guide = (function () {
   const heureExpert = (ms, ctx) => (fini(ms) ? heureCourteUTC(ms, ctx) + (heureParis(ms) && !(ctx && ctx.pas >= 86400) ? ' (' + heureParis(ms) + ' Paris)' : '') : '—');
 
   /** La marque de fin d'une figure tombée : « ✗ invalidé à 06:15 UTC (08h15 Paris) : clôture
-   *  au-dessus des sommets (83 664 $) » (Expert) ; « Invalidé à 08h15 (heure de Paris) : … » (Débutant). */
+   *  au-dessus des sommets (83 664 $) » (Complet) ; « Invalidé à 08h15 (heure de Paris) : … » (Lisible). */
   function marqueFin(f, ctx, mode, unite) {
     if (!f || !f.fin) return '';
     const exp = mode === 'expert', ms = finMs(ctx, f.jFin), per = periode(ctx && ctx.intervalle), fam = famille(f);
-    // Expert : « à 06:15 UTC (08h15 Paris) », « le 13/09 à 09:00 UTC (11h00 Paris) », « le 13/09 » (1 j).
+    // Complet : « à 06:15 UTC (08h15 Paris) », « le 13/09 à 09:00 UTC (11h00 Paris) », « le 13/09 » (1 j).
     const hx = exp ? heureExpert(ms, ctx) : '';
     const h = exp ? (ctx && ctx.pas >= 86400 ? 'le ' + hx : /^\d\d\/\d\d /.test(hx) ? 'le ' + hx.replace(/^(\d\d\/\d\d) /, '$1 à ') : 'à ' + hx)
       : fini(ms) && heureParis(ms) ? quandDeb(ms, ctx) + ' (heure de Paris)' : '';
@@ -2109,7 +2109,7 @@ const Guide = (function () {
     const px = raisons[2] ? '' : ' (' + prix(p, unite) + ')';
     return exp ? '✗ invalidé ' + h + ' : ' + raisons[0] + px : 'Invalidé ' + h + ' : ' + raisons[1] + px + ' ; la figure ne tient plus.';
   }
-  /** L'état court Expert : « ébauche (1 b.) », « cassure 1/2 », « ✗ invalidé 06:15 UTC »… */
+  /** L'état court Complet : « ébauche (1 b.) », « cassure 1/2 », « ✗ invalidé 06:15 UTC »… */
   function etatCourtExpert(f, ctx) {
     const e = etatForme(f);
     if (e.cle === 'invalide') return '✗ invalidé ' + heureCourteUTC(finMs(ctx, f.jFin), ctx);
@@ -2117,7 +2117,7 @@ const Guide = (function () {
     const rec = !f.fin && fini(f.tMaj) && ctx && fini(ctx.n) && ctx.n - 1 - f.tMaj <= 1 ? ' · recalé ' + heureCourteUTC(finMs(ctx, f.tMaj), ctx) : '';
     return e.court + rec;
   }
-  /** Les libellés Expert, du plus riche au plus court (≤ 80 caractères) :
+  /** Les libellés Complet, du plus riche au plus court (≤ 80 caractères) :
    *  « {Nom} · {état} · mesuré {conf}/{repérées} conf., obj. {a}/{finies} · éch. faible ». */
   function libellesFormeExpert(f, b, ctx, P) {
     const nom = NOMS_FORMES[f.type][0], e = etatCourtExpert(f, ctx), c = b ? texteBilan(b, ctx, P, 'expertCourt') : '';
@@ -2125,7 +2125,7 @@ const Guide = (function () {
     return V.filter((x, k) => x.length <= 80 || k === V.length - 1).filter((x, k, a) => a.indexOf(x) === k);
   }
 
-  /** Les mots du Débutant pour un côté : [« sous », « au-dessus de »], « dessous ». */
+  /** Les mots du Lisible pour un côté : [« sous », « au-dessus de »], « dessous ». */
   const sousSur = s => (s > 0 ? 'au-dessus de ' : 'sous ');
   const dessous = s => (s > 0 ? 'au-dessus' : 'dessous');
   /** Le nom d'une période sans article (« quart d’heure »), « de » + lui, « du » + lui, « un nouveau » + lui. */
@@ -2134,7 +2134,7 @@ const Guide = (function () {
   const duPer = per => (per[0].startsWith('un ') ? 'du ' : /^[aeiouhéè]/i.test(nomPer(per)) ? 'de l’' : 'de la ') + nomPer(per);
   const nouvellePer = per => per[0].replace(/^une /, 'une nouvelle ').replace(/^un /, 'un nouveau ');
   const majuscule = t => t.charAt(0).toUpperCase() + t.slice(1);
-  /** Ce que la figure montre, et ce qui lui manque encore (1re phrase de la bulle Débutant). */
+  /** Ce que la figure montre, et ce qui lui manque encore (1re phrase de la bulle Lisible). */
   function vuDebutant(f, ctx, unite) {
     const fam = famille(f), per = periode(ctx && ctx.intervalle), now = ctx && ctx.maintenant;
     const q = i => quandParis(debutMs(ctx, i), now);
@@ -2176,7 +2176,7 @@ const Guide = (function () {
     if (f.ebauche && !defait) vu += ' Le dernier ' + (f.s > 0 ? 'sommet' : 'creux') + pourLInstant + ' n’est pas encore acquis.';
     return vu;
   }
-  /** Les niveaux du moment, en mots du Débutant : validation, annulation (ou invalidation), cible
+  /** Les niveaux du moment, en mots du Lisible : validation, annulation (ou invalidation), cible
    *  théorique — toujours ensemble. */
   function niveauxDebutant(f, ctx, P, unite) {
     const N = niveauxFigure(f, ctx && fini(ctx.j) ? ctx.j : (ctx && ctx.n) || 0, P), per = periode(ctx && ctx.intervalle), fam = famille(f), out = [];
@@ -2231,7 +2231,7 @@ const Guide = (function () {
     if (f.ebauche) t += ' Elle est annulée si le prochain ' + (f.s > 0 ? 'sommet' : 'creux') + ' s’écarte de sa droite.';
     return t;
   }
-  /** La définition d'une figure (bulle Débutant d'une figure validée ou tombée) : ce qu'on voit,
+  /** La définition d'une figure (bulle Lisible d'une figure validée ou tombée) : ce qu'on voit,
    *  jamais un sens attendu. */
   const DEFINITION_FORME = {
     double_sommet: 'Double sommet : le prix a buté deux fois sur le même plafond, puis il est passé sous le creux entre les deux.',
@@ -2261,7 +2261,7 @@ const Guide = (function () {
       default: return 'Trop peu de cas pour comparer à un trajet quelconque.';
     }
   }
-  /** Le bilan mesuré en mots du Débutant : au plus DEUX comptes. Une ébauche : combien de débuts
+  /** Le bilan mesuré en mots du Lisible : au plus DEUX comptes. Une ébauche : combien de débuts
    *  comme celui-ci, combien sont devenus la figure. Une figure : combien de figures de ce type,
    *  combien de fois la cible a été atteinte. Jamais « confirmées » ni le partage ↑/↓ pour les
    *  figures à deux droites (il se lirait comme une probabilité de sens). */
@@ -2280,7 +2280,7 @@ const Guide = (function () {
       + (finis ? (fam === 'lignes' || fam === 'drapeau' ? ' ; après leur sortie, cible atteinte ' : ' ; une fois validés, cible atteinte ') + b.atteints + ' fois sur ' + finis + '.' : ' ; aucune n’est encore allée au bout.');
     return t + ' ' + texteEcart(b);
   }
-  /** La bulle d'une figure en Débutant : ce qu'on voit et ce qui manque, les niveaux du moment
+  /** La bulle d'une figure en Lisible : ce qu'on voit et ce qui manque, les niveaux du moment
    *  (validation, annulation, cible), le bilan mesuré, l'avertissement. ctx : voir plus haut. */
   function texteFormeDebutant(f, b, ctx, P, unite) {
     const e = etatForme(f), out = [], c = Object.assign({}, ctx || {});
@@ -2359,7 +2359,7 @@ const Guide = (function () {
       default: return '';
     }
   }
-  /** La règle d'un type, en Expert (« Règle (seuils de convention) : … »), avec les seuils lus dans P. */
+  /** La règle d'un type, en Complet (« Règle (seuils de convention) : … »), avec les seuils lus dans P. */
   function regleExpert(f, P, unite) {
     const fam = famille(f), Q = P.lignes, Dp = P.drapeau, E = P.ete, nf = x => nombre(x, x % 1 ? (x * 10 % 1 ? 2 : 1) : 0), pc = x => nombre(x * 100, 0) + ' %';
     if (fam === 'extremes') {
@@ -2377,7 +2377,7 @@ const Guide = (function () {
     return 'Régressions sur ' + nh + ' sommets et ' + nb + ' creux (chacun à ≤ ' + nf(Q.tolAtr) + ' ATR de sa droite), ' + Q.min + ' à ' + Q.fenetre + ' bougies, chaque droite sur ≥ ' + pc(Q.etalement) + ' de la figure ; plat = < ' + nf(Q.platAtr) + ' ATR et < ' + pc(Q.platW0) + ' de la largeur'
       + (/^canal/.test(f.type) ? ' ; parallèles à ' + pc(Q.paralleleMax) + ' près, pente ≥ ' + nf(Q.penteCanalAtr) + ' ATR, largeur ≤ ' + nf(Q.canalLargeurMaxAtr) + ' ATR' : ' ; resserrement ≥ ' + pc(/^biseau/.test(f.type) ? Q.biseauConvergence : P.triConvergence) + ', repéré avant ' + pc(Q.avancementMax) + ' du chemin vers la pointe') + '.';
   }
-  /** Les niveaux du moment en Expert (« Maintenant : validation = … · invalidation = … · objectif… »). */
+  /** Les niveaux du moment en Complet (« Maintenant : validation = … · invalidation = … · objectif… »). */
   function niveauxExpert(f, ctx, P, unite) {
     const j = ctx && fini(ctx.j) ? ctx.j : (ctx && ctx.n) || 0, N = niveauxFigure(f, j, P), itv = nomIntervalle(ctx && ctx.intervalle), b = bandeSortie(f);
     const obj = o => prix(o.p, unite);
@@ -2392,7 +2392,7 @@ const Guide = (function () {
   }
   const QUOI_JOURNAL = { repere: 'repéré', ebauche: 'ébauche', suivi: 'point en attente déplacé', recalage: 'recalé', demi: 'sortie 1/2', retour: 'retour', sortie_annulee: 'sortie non confirmée',
     confirme: 'confirmé', atteint: 'objectif atteint', invalide: '✗ invalidé', invalide_avant: '✗ invalidé', expire_avant: 'sans suite', expire: 'délai écoulé', devenu_triple: 'devenu un triple' };
-  /** Le journal d'une figure (Expert) : « Observé : 23:45 repéré · 01:15 sortie 1/2 · … ». */
+  /** Le journal d'une figure (Complet) : « Observé : 23:45 repéré · 01:15 sortie 1/2 · … ». */
   function texteJournal(f, ctx, unite) {
     const J = (f.journal || []).filter(x => QUOI_JOURNAL[x.quoi]);
     if (!J.length) return '';
@@ -2413,10 +2413,10 @@ const Guide = (function () {
       + ((x.quoi === 'demi' || x.quoi === 'confirme' || x.quoi === 'invalide' || x.quoi === 'invalide_avant' || x.quoi === 'atteint') && fini(x.c) ? ' (clôture ' + prix(x.c, unite) + ')' : ''));
     return 'Observé (' + (ctx && ctx.pas >= 86400 ? 'dates UTC' : 'heures UTC') + ', fin de bougie) : ' + (J.length > 8 ? '… · ' : '') + parts.join(' · ') + '.';
   }
-  /** La lecture classique (débattue) d'un type, à côté du partage mesuré des sorties (Expert). */
+  /** La lecture classique (débattue) d'un type, à côté du partage mesuré des sorties (Complet). */
   const CLASSIQUE = { biseau_montant: 'sortie par le bas', biseau_descendant: 'sortie par le haut', drapeau: 'sortie dans le sens du mât', fanion: 'sortie dans le sens du mât',
     ete: 'sortie par le bas', ete_inverse: 'sortie par le haut' };
-  /** La bulle Expert d'une figure : règle, niveaux du moment, bilan, journal, invalidées récemment,
+  /** La bulle Complet d'une figure : règle, niveaux du moment, bilan, journal, invalidées récemment,
    *  lectures concurrentes, avertissement. extra = { concurrentes: [figures], tombees: [figures] }. */
   function texteFormeExpert(f, b, ctx, P, unite, extra) {
     const x = extra || {}, out = [], itv = nomIntervalle(ctx && ctx.intervalle);
@@ -2447,7 +2447,7 @@ const Guide = (function () {
     return ({ ebauche: nom + ' possible', formation: nom + ' possible', dedans: nom, demi: nom + ' : sortie à confirmer', confirme: ['lignes', 'drapeau'].includes(famille(f)) ? nom + ' : sortie validée' : nom + ' confirmé', invalide: '✗ ' + nom + ' invalidé',
       abandon: '✗ ' + nom + ' annulé', sans_suite: nom + ' sans suite', atteint: nom + ' : cible théorique atteinte', oublie: nom + ' : délai écoulé' })[e.cle] || nom;
   }
-  /** Les mots qui n'ont pas leur place sur l'écran Débutant (noms d'indicateurs, jargon, heures UTC,
+  /** Les mots qui n'ont pas leur place sur l'écran Lisible (noms d'indicateurs, jargon, heures UTC,
    *  intervalles abrégés). Partagée avec les tests et js/scenarios.js. */
   const MOTS_BANNIS_DEBUTANT = [
     /\b(?:ADX|EMA|SMA|ATR|RSI|MACD|VWAP|GEX|CVD|OI|SAR|POC|OBV|MFI|CCI|VIX|DXY)\b/, /[+−-]?\bDI\b/, /\bUTC\b/, /\b[RS][1-4]\b/, /\b\d+[mhd]\b/,
@@ -2458,7 +2458,7 @@ const Guide = (function () {
   ];
   /** Les mots bannis trouvés dans t (liste vide : rien à redire). */
   const motsBannis = t => MOTS_BANNIS_DEBUTANT.filter(re => re.test(String(t))).map(re => (String(t).match(re) || [''])[0]);
-  /** Un terme permis dans une bulle Débutant seulement avec son explication, dans la même bulle. */
+  /** Un terme permis dans une bulle Lisible seulement avec son explication, dans la même bulle. */
   const EXPLIQUES_DEBUTANT = { 'repère d’options': 'une estimation, tirée des contrats d’options de la plateforme Deribit' };
 
   return { pctParam, nombre, prix, chiffres, pct, nomIntervalle, duree, heureUTC, niveauxDuJour, niveauxSR, niveauxPublies, choisirNiveaux, libelleNiveau,

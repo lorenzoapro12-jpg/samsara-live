@@ -37,10 +37,10 @@ function appliquerMode(m) {
   MODE_MEMOIRE = garde ? null : m;
   const b = document.getElementById('modeBtn');
   if (b) {
-    // Débutant : le bouton dit où il mène (« Débutant · passer en Expert », « Passer en Expert »
-    // sur téléphone) ; Expert : « Expert », la touche M ramène au Débutant.
-    if (m === 'expert') { b.textContent = 'Expert'; b.title = 'Mode Expert · revenir en Débutant : touche M'; }
-    else { b.innerHTML = '<span class="mode-long">Débutant · passer en Expert</span><span class="mode-court">Passer en Expert</span>'; b.title = 'Mode Débutant · passer en Expert : touche M (les valeurs ne changent pas)'; }
+    // Lisible : le bouton dit où il mène (« Lisible · passer en Complet », « Passer en Complet »
+    // sur téléphone) ; Complet : « Complet », la touche M ramène au Lisible.
+    if (m === 'expert') { b.textContent = 'Complet'; b.title = 'Mode Complet : tout afficher, ou choisir dans « + Indicateurs » · revenir en Lisible : touche M'; }
+    else { b.innerHTML = '<span class="mode-long">Lisible · passer en Complet</span><span class="mode-court">Passer en Complet</span>'; b.title = 'Mode Lisible : l’essentiel · passer en Complet (tout afficher, ou choisir) : touche M (les valeurs ne changent pas)'; }
     b.setAttribute('aria-pressed', m === 'expert' ? 'true' : 'false');
   }
   const c = document.getElementById('carteBtn');
@@ -204,7 +204,7 @@ const FICHES = {
       { s: 'usuel', t: 'Prix au-dessus de la moyenne : tendance haussière sur cet horizon ; en dessous : baissière.' },
       { s: 'usuel', t: 'EMA courte au-dessus de la longue : tendance haussière de plus court terme. Un croisement arrive toujours APRÈS le mouvement (retard par construction).' },
     ],
-    limites: 'Dépend de la profondeur chargée : voir le poids résiduel de l’amorce en mode expert.',
+    limites: 'Dépend de la profondeur chargée : voir le poids résiduel de l’amorce en mode Complet.',
   },
   croisement: {
     titre: 'EMA 20 sous EMA 50 (ex-« death cross »)', champ: 'tf.*.ema20_sous_ema50',
@@ -335,8 +335,8 @@ const FICHES = {
   // ── Le Guide du graphique (js/guide.js) : ses nombres viennent de PARAM.guide ──
   guide: {
     titre: 'Guide du graphique', page: 'guide', nature: 'convention',
-    titreDeb: 'Le graphique en Débutant',
-    simpleDeb: 'En haut du graphique, une phrase dit si le prix monte, baisse ou hésite, et depuis quand. Deux repères de prix l’encadrent : le plus proche au-dessus, le plus proche en dessous. Puis le scénario n° 1 de Claude et, s’il y en a une, une figure du graphique. Touchez (ou survolez) un texte pour le détail. Une description, jamais un conseil ; le reste est en mode Expert, et tout se masque dans « + Affichage ».',
+    titreDeb: 'Le graphique en mode Lisible',
+    simpleDeb: 'En haut du graphique, une phrase dit si le prix monte, baisse ou hésite, et depuis quand. Deux repères de prix l’encadrent : le plus proche au-dessus, le plus proche en dessous. Puis le scénario n° 1 de Claude et, s’il y en a une, une figure du graphique. Touchez (ou survolez) un texte pour le détail. Une description, jamais un conseil ; le reste est en mode Complet, et tout se masque dans « + Affichage ».',
     simple: 'Une couche qui DÉCRIT ce que montre le graphique : les niveaux de prix proches et d’où ils viennent, le régime du marché, les formes chartistes en cours avec leur bilan mesuré, deux chemins conditionnels et une phrase de résumé. Elle ne dit jamais quoi faire.',
     formule: P => 'Niveaux : au plus ' + P.guide.niveauxParCote + ' au-dessus et ' + P.guide.niveauxParCote + ' au-dessous du prix, à moins de ' + pcF(P.guide.distanceMax) + ' %. Régime : ADX ' + P.adx.periode
       + ', EMA ' + P.guide.emaCourte + '/' + P.guide.emaLongue + ', Bollinger ' + P.bb.periode + '. Formes : au plus ' + P.guide.formesMax + ' à la fois. Choix gardé dans ce navigateur (clé samsara-guide-v1).',
@@ -367,7 +367,7 @@ const FICHES = {
   guide_regime: {
     titre: 'Guide — régime du marché', page: 'guide', nature: 'convention',
     titreDeb: 'Le mouvement du prix',
-    simpleDeb: 'En mode Débutant, le mouvement n’a pas de badge : il donne le verbe de la phrase en haut du graphique. « Monte » ou « baisse » : le prix a pris une direction nette ; « hésite » : pas de direction nette ; « s’agite » : il bouge fort, sans sens clair. Le badge et ses mesures sont en mode Expert.',
+    simpleDeb: 'En mode Lisible, le mouvement n’a pas de badge : il donne le verbe de la phrase en haut du graphique. « Monte » ou « baisse » : le prix a pris une direction nette ; « hésite » : pas de direction nette ; « s’agite » : il bouge fort, sans sens clair. Le badge et ses mesures sont en mode Complet.',
     simple: 'Un badge en haut du graphique : marché en tendance (et dans quel sens), en tendance faible ou sans tendance nette ; il ajoute « compression » quand les bandes de Bollinger sont parmi les plus étroites des dernières bougies.',
     formule: P => 'ADX ' + P.adx.periode + ' ≥ ' + P.guide.adxTendance + ' : tendance (haussière si +DI > −DI et EMA ' + P.guide.emaCourte + ' > EMA ' + P.guide.emaLongue + ', baissière si les deux disent l’inverse, sinon sens incertain) ; ADX ≤ '
       + P.guide.adxSans + ' : sans tendance nette ; entre les deux : tendance faible. Compression : largeur de Bollinger (' + P.bb.periode + ', ' + P.bb.ecarts + ' σ) au plus à son ' + P.guide.bbPercentile + 'e centile des ' + P.guide.bbFenetre + ' dernières bougies ; « au plus bas depuis N bougies » n’est dit qu’à partir de N = ' + P.guide.compressionDepuisMin + '.',
@@ -392,23 +392,23 @@ const FICHES = {
         + 'Rectangle : ≥ 2 contacts par côté sur ≥ ' + g.rangeMin + ' bougies (fenêtre ' + g.rangeFenetre + '), hauteur ≤ ' + nbF(g.rangeHauteurAtr) + ' ATR. '
         + 'Triangles, biseaux, canaux : régressions sur les 2 à 4 derniers sommets et creux (chacun à ≤ ' + nbF(L.tolAtr) + ' ATR de sa droite), ' + L.min + ' à ' + L.fenetre + ' bougies, chaque droite sur ≥ ' + pcF(L.etalement) + ' % de la figure ; un côté « plat » : < ' + nbF(L.platAtr) + ' ATR et < ' + pcF(L.platW0) + ' % de la largeur ; triangles : resserrement ≥ ' + pcF(g.triConvergence) + ' % ; biseaux : ≥ ' + pcF(L.biseauConvergence) + ' %, les deux droites dans le même sens ; repérés avant ' + pcF(L.avancementMax) + ' % du chemin vers la pointe ; canaux : parallèles à ' + pcF(L.paralleleMax) + ' % près, pente ≥ ' + nbF(L.penteCanalAtr) + ' ATR, largeur ≤ ' + nbF(L.canalLargeurMaxAtr) + ' ATR, ≥ ' + L.canalMin + ' bougies ; une droite de 2 points seulement : le prix revient entre eux à moins de ' + pcF(L.approche) + ' % de la largeur (ou de la tolérance) ; aucune clôture hors de la bande de sortie avant la naissance de la figure. '
         + 'Drapeau et fanion : un mât d’au moins ' + nbF(D.matAtr) + ' ATR en ' + D.matMin + ' à ' + D.matMax + ' bougies, puis une pause de ' + D.pauseMin + ' à ' + D.pauseMax + ' bougies, recul ≤ ' + pcF(D.retrait) + ' % du mât, largeur ≤ ' + pcF(D.largeur) + ' % du mât, pas plus de ' + pcF(D.pente) + ' % du mât dans son sens ; fanion si les droites se resserrent d’au moins ' + pcF(g.triConvergence) + ' %, drapeau sinon (jusqu’à ' + pcF(D.paralleleMax) + ' % d’écartement) ; un mât ne sert qu’une fois. '
-        + 'Délais : ' + g.expiration + ' bougies pour confirmer, ' + g.horizon + ' pour atteindre l’objectif (objectif et invalidation jugés tous deux en clôture). À l’écran : au plus ' + g.formesMax + ' figures en Expert (une seule en Débutant) ; une figure invalidée reste ' + g.garderInvalide + ' bougies, une ébauche annulée ' + g.garderEbauche + ', un objectif atteint ' + g.garderFini + ' (Expert). « Échantillon faible » sous ' + g.echantillonFaible + ' cas. Repère sans forme : au plus ' + g.temoinDeparts + ' départs rejoués.';
+        + 'Délais : ' + g.expiration + ' bougies pour confirmer, ' + g.horizon + ' pour atteindre l’objectif (objectif et invalidation jugés tous deux en clôture). À l’écran : au plus ' + g.formesMax + ' figures en mode Complet (une seule en mode Lisible) ; une figure invalidée reste ' + g.garderInvalide + ' bougies, une ébauche annulée ' + g.garderEbauche + ', un objectif atteint ' + g.garderFini + ' (Complet). « Échantillon faible » sous ' + g.echantillonFaible + ' cas. Repère sans forme : au plus ' + g.temoinDeparts + ' départs rejoués.';
     },
     lectures: [
       { s: 'convention', t: 'Objectifs théoriques : la hauteur de la figure reportée depuis la ligne franchie (doubles, triples, épaule-tête-épaule, rectangle), la largeur à l’ouverture pour les triangles, biseaux et canaux, la longueur du mât pour les drapeaux et fanions. Des conventions de l’usage, non garanties.' },
       { s: 'convention', t: 'Invalidations : une clôture au-delà de l’extrême (doubles, triples), de la tête puis, une fois confirmée, de l’épaule droite (épaule-tête-épaule), retour au-delà du milieu de la figure (deux droites, rectangle), recul de plus de la moitié du mât ou retour au-delà de l’extrême de la pause — sous son plus bas après une sortie par le haut, au-dessus de son plus haut après une sortie par le bas (drapeaux).' },
-      { s: 'débattu', t: 'Le sens « attendu » d’une figure est débattu : un biseau montant se lirait à la baisse, un drapeau dans le sens du mât, un épaule-tête-épaule comme un retournement. La page ne l’affirme pas : en Expert, elle montre à côté le partage mesuré des sorties (vers le haut, vers le bas) sur l’historique chargé.' },
+      { s: 'débattu', t: 'Le sens « attendu » d’une figure est débattu : un biseau montant se lirait à la baisse, un drapeau dans le sens du mât, un épaule-tête-épaule comme un retournement. La page ne l’affirme pas : en mode Complet, elle montre à côté le partage mesuré des sorties (vers le haut, vers le bas) sur l’historique chargé.' },
       { s: 'débattu', t: 'Les figures chartistes sont subjectives dans la littérature : deux analystes ne tracent pas la même. Ici la détection suit des règles fixes, donc reproductibles ; une règle fixe n’est pas une preuve d’efficacité.' },
       { s: 'mesuré', t: 'Bilan : le même détecteur est rejoué sur tout l’historique chargé, sans regarder l’avenir. Une figure compte depuis la clôture où son dernier pivot devient connu ; on compte les figures repérées, les confirmations, les objectifs atteints avant invalidation, les invalidations, les figures encore ouvertes ; pour les ébauches, combien de débuts sont devenus une figure, puis une figure confirmée.' },
       { s: 'mesuré', t: 'L’objectif et l’invalidation ne sont pas à la même distance du point de confirmation : une partie des objectifs atteints s’explique par cette géométrie seule. D’où le repère sans forme : depuis n’importe quelle bougie, les mêmes distances (en ATR) et le même sens, la même règle ; l’écart entre les deux est jugé avec un intervalle de Wilson à 95 %. Un écart n’est pas une preuve.' },
-      { s: 'convention', t: 'Choix de la page (raisonnement) : quand un nouveau sommet ou creux touche une droite, les droites sont refaites (recalage) et la figure garde son nom et son début ; une figure invalidée reste quelques bougies, barrée et de plus en plus pâle, à sa place même si une autre figure la recouvre, pour qu’on voie qu’elle est tombée et pourquoi ; une figure confirmée porte un trait fin à son niveau d’invalidation, jusqu’à la bougie en cours (la ✗ se pose au bout s’il est franchi en clôture). Un double qui devient triple le dit (« Devenu triple creux ») et garde sa place ; double et triple sur les mêmes creux ne comptent qu’une fois au bilan. La bulle Expert cite les dernières figures invalidées (« Invalidées récemment ») et, à part, les ébauches annulées, tirées du même rejeu.' },
+      { s: 'convention', t: 'Choix de la page (raisonnement) : quand un nouveau sommet ou creux touche une droite, les droites sont refaites (recalage) et la figure garde son nom et son début ; une figure invalidée reste quelques bougies, barrée et de plus en plus pâle, à sa place même si une autre figure la recouvre, pour qu’on voie qu’elle est tombée et pourquoi ; une figure confirmée porte un trait fin à son niveau d’invalidation, jusqu’à la bougie en cours (la ✗ se pose au bout s’il est franchi en clôture). Un double qui devient triple le dit (« Devenu triple creux ») et garde sa place ; double et triple sur les mêmes creux ne comptent qu’une fois au bilan. La bulle du mode Complet cite les dernières figures invalidées (« Invalidées récemment ») et, à part, les ébauches annulées, tirées du même rejeu.' },
     ],
     limites: 'Le bilan ne porte que sur l’historique CHARGÉ (son nombre de bougies et sa durée sont indiqués) et sur l’intervalle affiché : ce n’est ni une probabilité, ni une règle générale. Les échantillons sont petits : « trop peu de cas » est fréquent. Une ébauche n’est pas une figure : son dernier sommet ou creux peut encore changer. Les figures à droites en pente ont des niveaux qui bougent à chaque bougie (la bulle dit les niveaux du moment). Fanions et épaule-tête-épaule sont rares sur les petits intervalles. Seules les figures dont le dernier point est dans la vue sont montrées.',
   },
   guide_suite: {
     titre: 'Guide — et ensuite ?', page: 'guide', nature: 'convention',
     titreDeb: 'Et après un repère ?',
-    simpleDeb: 'En mode Débutant, rien n’est dessiné pour la suite : touchez un repère (ou la phrase) pour lire « si le prix finit au-delà de ce repère, le repère suivant est … ». Une condition, pas une prévision. Les chemins dessinés sont en mode Expert.',
+    simpleDeb: 'En mode Lisible, rien n’est dessiné pour la suite : touchez un repère (ou la phrase) pour lire « si le prix finit au-delà de ce repère, le repère suivant est … ». Une condition, pas une prévision. Les chemins dessinés sont en mode Complet.',
     simple: 'Deux chemins conditionnels à droite de la dernière bougie : « si clôture au-dessus de X, prochain niveau Y » et « si clôture sous Z, prochain niveau W ».',
     formule: P => 'X et Z : le premier niveau nommé au-dessus et au-dessous du prix ; Y et W : le suivant de chaque côté. Prix DANS une bande : X et Z sont ses deux bords. Marge de dessin : ' + pcF(P.guide.futur) + ' % de la largeur du tracé, entre ' + P.guide.futurMinPx + ' et ' + P.guide.futurMaxPx + ' pixels, au plus ' + pcF(P.guide.futurMaxFraction) + ' % du tracé.',
     lectures: [
@@ -417,10 +417,23 @@ const FICHES = {
     ],
     limites: 'Une condition n’est pas une prévision. La marge à droite des bougies ne sert qu’à dessiner ces chemins ; elle disparaît quand le Guide est masqué, et se referme d’un pas de bougie par bougie quand la vue quitte la dernière bougie. Les deux chemins sont écrits dans la même forme, la plus complète qui tient pour les deux ; même la plus courte garde la condition (« si > X → Y »). Sans place pour les deux, ils sont réunis dans une seule boîte ; jamais un seul des deux.',
   },
+  // ── Les figures passées (mode Complet) : les figures validées de l'historique chargé ──
+  figuresPassees: {
+    titre: 'Figures passées', page: 'guide', nature: 'convention',
+    simple: 'Avec le Guide, les figures chartistes déjà validées puis terminées (cible atteinte, invalidée, sans suite) restent dessinées à leur place dans l’historique chargé, en trait plus discret, avec leur nom et leur issue. Elles servent à relire ce que le graphique a fait des figures passées ; rien n’est recalculé.',
+    usage: { exp: 'Faites défiler le graphique vers le passé : chaque figure validée reste à sa place, en trait plus discret, avec son issue (cible ✓, ✗ invalidée, sans suite). Survolez-la pour sa règle, ses niveaux et le bilan mesuré de son type. Masquable dans « + Indicateurs ».',
+      deb: 'Un réglage du mode Complet : les anciennes figures du graphique restent dessinées dans le passé.' },
+    formule: P => 'Le même rejeu que le Guide, sur les mêmes bougies closes ; figures confirmées (2 clôtures au-delà, ou 1 et un retour) et terminées, hors doublons et hors ébauches ; au plus 24 à la fois dans la vue, les plus récentes d’abord ; un seul style, sans fondu avec l’âge. Les figures du moment gardent leur place (au plus ' + P.guide.formesMax + ', selon le Guide).',
+    lectures: [
+      { s: 'mesuré', t: 'Chaque figure passée est celle que le Guide avait détectée à l’époque, avec son issue réelle : une relecture, jamais un exemple choisi.' },
+      { s: 'convention', t: 'Mode Complet seulement, et seulement avec le Guide affiché. Éteint par défaut : le graphique du moment reste dégagé.' },
+    ],
+    limites: 'Ne couvre que l’historique CHARGÉ et l’intervalle affiché. Une figure terminée depuis longtemps garde les niveaux qu’elle avait à sa fin. Le bilan d’un type ne change pas : il est déjà calculé sur tout l’historique chargé.',
+  },
   // ── Les scénarios du matin (js/scenarios.js) : fichier previsions.json, branche « previsions » ──
   scenarios: {
     titreDeb: 'Scénarios du matin',
-    simpleDeb: 'Chaque matin, Claude (une IA) écrit trois scénarios pour les 24 h qui suivent et les classe du plus au moins probable, sans pourcentage. L’écran Débutant montre le n° 1 (son libellé près de sa zone ; s’il ne tient plus, le suivant encore en cours) et une ligne qui dit où il en est ; touchez-les pour les trois. Une hypothèse, jamais un conseil.',
+    simpleDeb: 'Chaque matin, Claude (une IA) écrit trois scénarios pour les 24 h qui suivent et les classe du plus au moins probable, sans pourcentage. L’écran Lisible montre le n° 1 (son libellé près de sa zone ; s’il ne tient plus, le suivant encore en cours) et une ligne qui dit où il en est ; touchez-les pour les trois. Une hypothèse, jamais un conseil.',
     titre: 'Scénarios du matin', page: 'scenarios', nature: 'convention',
     simple: 'Chaque matin, Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ, à partir de son analyse du marché, et les classe du plus au moins probable, SANS pourcentage. Chaque niveau a une origine nommée (plus haut d’hier, mur d’options…) et se lit comme une zone : le niveau plus ou moins une marge. Le graphique les dessine et suit en direct ce que les bougies en font. Une description, jamais un conseil.',
     formule: P => 'Point du matin : ' + P.scenarios.point + ' (heure de Paris), BTCUSDT seulement. Zone : niveau × (1 ± marge du fichier). Une bougie touche une zone si son plus bas est sous le haut de la zone et son plus haut au-dessus du bas. Chemin : chaque cible dans une bougie plus tardive que la précédente ; invalidation touchée d’abord = invalidé. Range : sorti si une bougie dépasse une borne de plus de la marge. Suivi en direct : seules les bougies ENTIÈRES dans la fenêtre comptent, sur des bougies de ' + Math.round(P.scenarios.suiviPasMax / 60) + ' min au plus. « Échantillon faible » sous '
@@ -568,7 +581,7 @@ const FICHES = {
   liq: {
     titre: 'Liquidité (carnet publié)', page: 'liq',
     simple: 'Une carte de chaleur posée en transparence sur le graphique : là où beaucoup d’ordres d’achat ou de vente attendaient dans le carnet de Binance, minute par minute.',
-    formule: () => 'heatmap.json, publié toutes les 15 min par le serveur : une colonne par minute, une tranche de prix par 20 $ ; la chaleur d’une case est la somme des BTC posés dans la tranche (les colonnes d’avant le 08/10/2026 gardent la taille du plus gros niveau de prix). BTC/USDT seulement. En Expert, l’âge de la dernière colonne est écrit en haut à droite.',
+    formule: () => 'heatmap.json, publié toutes les 15 min par le serveur : une colonne par minute, une tranche de prix par 20 $ ; la chaleur d’une case est la somme des BTC posés dans la tranche (les colonnes d’avant le 08/10/2026 gardent la taille du plus gros niveau de prix). BTC/USDT seulement. En mode Complet, l’âge de la dernière colonne est écrit en haut à droite.',
     lectures: [
       { s: 'mesuré', t: 'Une bande marquée et horizontale : beaucoup de BTC restés en attente longtemps dans cette tranche de prix (un ou plusieurs ordres).' },
       { s: 'usuel', t: 'Les gros ordres en attente sont lus comme des zones où le prix peut ralentir ou rebondir, tant qu’ils restent posés.' },
@@ -580,10 +593,10 @@ const FICHES = {
 // ─── Valeurs et métadonnées ───────────────────────────────────────────────────
 const NATURES = { mesure: 'Mesuré', 'modèle': 'Modèle', convention: 'Convention', seuil: 'Seuil de ce code', horodatage: 'Horodatage' };
 const STATUTS = { usuel: 'Usuel', convention: 'Convention', 'débattu': 'Débattu', 'mesuré': 'Mesuré' };
-// Les mêmes pastilles en mots du Débutant (« convention » et « modèle » sont des mots de l'Expert).
+// Les mêmes pastilles en mots du Lisible (« convention » et « modèle » sont des mots de l'Complet).
 const NATURES_DEB = { 'modèle': 'Estimation', convention: 'Règle d’usage' };
 const STATUTS_DEB = { convention: 'Règle d’usage' };
-/** Un mot dit autrement en Débutant : les deux, chacun dans sa classe (même HTML dans les deux modes). */
+/** Un mot dit autrement en Lisible : les deux, chacun dans sa classe (même HTML dans les deux modes). */
 const motModes = (exp, deb) => (deb && deb !== exp ? '<span class="expert-seul">' + echapF(exp) + '</span><span class="debutant-seul">' + echapF(deb) + '</span>' : echapF(exp));
 /** Une fraction en pourcentage, à la française (0.003 → « 0,3 ») : pour les formules des fiches du Guide. */
 const pcF = x => (x * 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
@@ -591,7 +604,7 @@ const nbF = x => x.toLocaleString('fr-FR');
 const echapF = s => String(s === undefined || s === null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 // ─── Comment s'en servir : les deux couches du site (Guide, scénarios) ─────────────
 // Elles ne sont pas des indicateurs de marché : leur fiche dit comment lire l'écran du site.
-// Chaîne simple, ou { exp, deb } quand le Débutant voit un écran différent.
+// Chaîne simple, ou { exp, deb } quand le Lisible voit un écran différent.
 const USAGES = {
   guide: { exp: 'Laissez-le affiché pour savoir où vous en êtes : la phrase dit le mouvement, les bandes les prix à surveiller, et les deux chemins à droite le niveau suivant si une bougie clôture au-delà d’un niveau (une condition, pas une prévision). Une figure en pointillés se forme encore et se redessine avec le prix ; en trait plein, elle est validée (2 clôtures ou 1 et un retour) ; barrée ✗, elle ne tient plus. Survolez un libellé pour son origine et son bilan mesuré.',
     deb: 'Lisez la phrase du haut, puis regardez les deux repères : tant que le prix reste entre eux, rien de neuf. Une figure en pointillés est encore en train de se dessiner ; barrée d’une croix, elle ne tient plus. Touchez une étiquette pour le détail.' },
@@ -612,7 +625,7 @@ function usageHtml(id) {
 // — rien de propre à ce site ni à son propriétaire. Une pratique décrite n'est pas un conseil
 // (tests/test_fiches.js) ; elle ne dit pas non plus que la pratique marche.
 // CALCUL : une fonction de PARAM pour un indicateur de la page (les nombres sont ceux du calcul),
-// une chaîne pour un champ du fichier (sa formule exacte, publiée, reste en mode Expert).
+// une chaîne pour un champ du fichier (sa formule exacte, publiée, reste en mode Complet).
 const TRADERS = {
   // ── Indicateurs du graphique ──
   rsi: 'Dit si un mouvement est fort ou s’essouffle. Au-dessus de 70 (« surachat ») ou sous 30 (« survente »), certains attendent un retour vers le milieu ; en tendance, d’autres y voient un mouvement puissant. Ils guettent aussi les divergences (nouveau plus haut du prix, pas du RSI : essoufflement) et le passage de 50.',
@@ -780,7 +793,7 @@ function ficheHtml(id) {
   h += '<div class="expert-seul fiche-technique"><h4>Formule</h4><p>' + echapF(formule)
     + '</p>' + (details.length ? '<dl>' + details.filter(d => d[1] !== undefined && d[1] !== null).map(([k, v]) => '<dt>' + echapF(k) + '</dt><dd>' + echapF(v) + '</dd>').join('') + '</dl>' : '')
     + '</div>'
-    + '<p class="debutant-seul fiche-indice">La formule exacte, la fenêtre et la source sont en mode Expert.</p>'
+    + '<p class="debutant-seul fiche-indice">La formule exacte, la fenêtre et la source sont en mode Complet.</p>'
     + '<p class="fiche-pied">Ceci décrit comment l’indicateur se lit. Ce n’est pas une recommandation d’achat ou de vente.</p>';
   return h;
 }
@@ -819,8 +832,8 @@ function infoBtn(id) {
   return '<button type="button" class="info-btn" onclick="event.stopPropagation();ouvrirFiche(\'' + id + '\',this)" aria-label="Comment lire : '
     + echapF(f.titre) + '">i</button>';
 }
-/** Le glossaire : toutes les fiches, ouvert depuis l'en-tête. En Débutant, d'abord ce que
- *  montre SON écran (titres du Débutant) ; les fiches de l'Expert, repliées dessous. Même HTML
+/** Le glossaire : toutes les fiches, ouvert depuis l'en-tête. En Lisible, d'abord ce que
+ *  montre SON écran (titres du Lisible) ; les fiches de l'Complet, repliées dessous. Même HTML
  *  dans les deux modes : seules les classes .debutant-seul / .expert-seul changent. */
 const GLOSSAIRE_DEBUTANT = ['guide', 'guide_niveaux', 'scenarios', 'bougies', 'sr_tf', 'vix', 'cvd', 'carnet'];
 function ouvrirGlossaire(ancre) {
@@ -835,10 +848,10 @@ function ouvrirGlossaire(ancre) {
   const bouton = (i, t) => '<button type="button" class="glossaire-item" onclick="ouvrirFiche(\'' + i + '\')">' + echapF(t) + '</button>';
   const tous = groupes.map(([g, ids]) => '<h4>' + g + '</h4><div class="glossaire">' + ids.map(i => bouton(i, FICHES[i].titre)).join('') + '</div>').join('');
   p.innerHTML = '<div class="fiche-tete"><h3 class="fiche-titre">Légendes</h3><button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>'
-    + '<p class="fiche-simple">Comment chaque chiffre se lit — et ce qu’il ne dit pas. Mode <b><span class="expert-seul">Expert</span><span class="debutant-seul">Débutant</span></b> : '
+    + '<p class="fiche-simple">Comment chaque chiffre se lit — et ce qu’il ne dit pas. Mode <b><span class="expert-seul">Complet</span><span class="debutant-seul">Lisible</span></b> : '
     + '<button type="button" class="lien" onclick="basculerMode();ouvrirGlossaire()">changer</button>.</p>'
     + '<div class="debutant-seul"><h4>Ce que montre l’écran</h4><div class="glossaire">' + GLOSSAIRE_DEBUTANT.map(i => bouton(i, FICHES[i].titreDeb || FICHES[i].titre)).join('') + '</div>'
-    + '<details class="glossaire-plus"><summary>Fiches de l’Expert ▸</summary>' + tous + '</details></div>'
+    + '<details class="glossaire-plus"><summary>Toutes les fiches (mode Complet) ▸</summary>' + tous + '</details></div>'
     + '<div class="expert-seul">' + tous + '</div>';
   p.hidden = false;
   p.style.left = ''; p.style.top = '';
@@ -852,7 +865,7 @@ document.addEventListener('click', e => {
 
 // ─── Lecture courte (mode débutant) : ce que dit la valeur DU MOMENT, sans conseil ─────────
 // Les seuils utilisés ici sont des CONVENTIONS ; la phrase le dit quand c'en est une.
-/** Les phrases des cartes en mode Débutant (sans jargon, sans seuil inventé) : le même bloc que
+/** Les phrases des cartes en mode Lisible (sans jargon, sans seuil inventé) : le même bloc que
  *  lectureCourte, pour des cartes qui n'ont pas de fiche. cle : 'fourchette' (v : position dans
  *  la fourchette, de 0 au plus bas à 1 au plus haut ; v2 : « 24 h » ou « 5 jours » ; sujet : « le
  *  prix », ou « le bitcoin » sur une autre paire), 'vix',
@@ -872,7 +885,7 @@ function phraseCarte(cle, v, v2, sujet) {
     case 'fourchette': if (n(v)) t = 'Sur ' + (v2 || '24 h') + ', ' + (sujet || 'le prix') + ' est ' + (v >= 2 / 3 ? 'dans le haut' : v <= 1 / 3 ? 'dans le bas' : 'au milieu') + ' de sa fourchette.'; break;
     case 'vix': if (n(v)) t = v < 15 ? 'Les bourses américaines sont calmes.' : v > 25 ? 'Les bourses américaines sont nerveuses.' : 'Les bourses américaines ne sont ni calmes ni nerveuses.'; break;
     case 'cvd': if (n(v)) t = v >= 0 ? 'Sur 24 h, les achats immédiats ont dépassé les ventes immédiates de ' + dollars(v) + '.' : 'Sur 24 h, les ventes immédiates ont dépassé les achats immédiats de ' + dollars(v) + '.'; break;
-    case 'sources': if (n(v) && n(v2)) t = v >= v2 ? 'Toutes les données publiées sont arrivées.' : (v2 - v) + (v2 - v > 1 ? ' sources manquent' : ' source manque') + ' (détail en mode Expert).'; break;
+    case 'sources': if (n(v) && n(v2)) t = v >= v2 ? 'Toutes les données publiées sont arrivées.' : (v2 - v) + (v2 - v > 1 ? ' sources manquent' : ' source manque') + ' (détail en mode Complet).'; break;
     default: t = null;
   }
   return t ? '<div class="lecture-courte debutant-seul">' + echapF(t) + '</div>' : '';

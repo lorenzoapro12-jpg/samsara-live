@@ -132,9 +132,9 @@ const etat = page => page.evaluate(() => {
   await new Promise(r => serveur.listen(0, '127.0.0.1', r));
   const nav = await playwright.chromium.launch();
   try {
-    // Mode Expert : les étiquettes des bandes (heures de publication, étiquette du bord) et les
-    // chemins « Et ensuite ? » mesurés ici sont des éléments denses, réservés à l'Expert. Le
-    // Débutant (deux repères en mots, chemins dans la bulle) est vérifié dans test_debutant_page.js.
+    // Mode Complet : les étiquettes des bandes (heures de publication, étiquette du bord) et les
+    // chemins « Et ensuite ? » mesurés ici sont des éléments denses, réservés à l'Complet. Le
+    // Lisible (deux repères en mots, chemins dans la bulle) est vérifié dans test_debutant_page.js.
     for (const [vue, mode] of [[{ width: 1440, height: 900 }, 'expert'], [{ width: 1024, height: 760 }, 'expert'], [{ width: 390, height: 800 }, 'expert']]) {
       const nom = vue.width + ' px · ' + mode;
       titre(nom);
@@ -222,7 +222,7 @@ const etat = page => page.evaluate(() => {
 
     // Sans scénarios du matin, la bande à cinq raisons (deux chiffres publiés) se pose près d'elle
     // à 22:52 sur un téléphone : c'est le libellé POSÉ qui doit garder ses deux heures, pas le bord.
-    // Mode Expert : les heures de publication dans le libellé posé n'existent qu'en Expert.
+    // Mode Complet : les heures de publication dans le libellé posé n'existent qu'en Complet.
     titre('390 px · expert, sans scénarios du matin');
     const s = await ouvrir(nav, { width: 390, height: 800 }, 'expert', false, true);
     const es = await etat(s.page);

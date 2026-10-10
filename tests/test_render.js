@@ -24,7 +24,7 @@ globalThis.__TEST__ = {
                                updated: document.getElementById('updated').textContent }; }
 };`;
 
-/** Le HTML sans ses sous-arbres « expert-seul » (masqués en Débutant par display:none). */
+/** Le HTML sans ses sous-arbres « expert-seul » (masqués en Lisible par display:none). */
 function sansExpert(html) {
   const VIDES = /^(br|hr|img|input|meta|link|wbr|source)$/i;
   let out = '', i = 0;
@@ -191,8 +191,8 @@ try {
         && r.texte === 'fichier ' + D.updated.slice(11, 16) + ' UTC · prix publié ' + Math.round(D.btc.price).toLocaleString('fr-FR') + ' (' + vm.runInContext('Horloges', sandbox).texteAge(Date.now() - Date.parse(D.updated)) + ')'
         && sandbox.reperePublication(Object.assign({}, P, { t0: tu + 900 })) === null;
     })()],
-    // Débutant (le mode par défaut, stockage vide) : ce qui reste visible quand les sous-arbres
-    // .expert-seul sont masqués — un titre Débutant par carte, une phrase simple, aucun mot technique.
+    // Lisible (le mode par défaut, stockage vide) : ce qui reste visible quand les sous-arbres
+    // .expert-seul sont masqués — un titre Lisible par carte, une phrase simple, aucun mot technique.
     ...(() => {
       const Gd = require(path.join(REPO, 'js/guide.js'));
       const CONSEIL = /\b(achetez|vendez|achète[rz]?\b|vends\b|il faut (?:acheter|vendre)|entrez|sortez|prenez position|signal d['’]achat|signal de vente|recommand(?:e|ons))/i;
@@ -200,12 +200,12 @@ try {
       const deb = cartes.map(c => sansExpert('<div class="demon-card' + c));
       const titres = deb.map(c => texteDe((c.match(/<div class="demon-name">([\s\S]*?)<\/div>/) || [])[1] || ''));
       const vu = texteDe(sansExpert(feed.innerHTML)), bannis = Gd.motsBannis(vu);
-      if (bannis.length) console.log('      Débutant, mots techniques visibles :', bannis.join(', '));
+      if (bannis.length) console.log('      Lisible, mots techniques visibles :', bannis.join(', '));
       return [
-        ['Débutant : 8 cartes, chacune avec un titre Débutant (ni « Microstructure », ni « Liquidité », ni « Contre-expertise »)', cartes.length === 8 && titres.every(t => t && !/Microstructure|Liquidité|Contre-expertise|Marché live|Macro|Indicateurs|Flux/.test(t))],
-        ['Débutant : chaque carte garde un texte en mots simples', deb.every(c => texteDe(c.replace(/<div class="demon-header">[\s\S]*?<div class="demon-body">/, '')).length > 20)],
-        ['Débutant : texte visible sans mot technique (liste du Guide), sans conseil', !bannis.length && !CONSEIL.test(vu)],
-        ['Débutant : les âges écrits restent réécrits chaque minute ([data-age-de] visibles)', /data-age-de/.test(sansExpert(feed.innerHTML))],
+        ['Lisible : 8 cartes, chacune avec un titre Lisible (ni « Microstructure », ni « Liquidité », ni « Contre-expertise »)', cartes.length === 8 && titres.every(t => t && !/Microstructure|Liquidité|Contre-expertise|Marché live|Macro|Indicateurs|Flux/.test(t))],
+        ['Lisible : chaque carte garde un texte en mots simples', deb.every(c => texteDe(c.replace(/<div class="demon-header">[\s\S]*?<div class="demon-body">/, '')).length > 20)],
+        ['Lisible : texte visible sans mot technique (liste du Guide), sans conseil', !bannis.length && !CONSEIL.test(vu)],
+        ['Lisible : les âges écrits restent réécrits chaque minute ([data-age-de] visibles)', /data-age-de/.test(sansExpert(feed.innerHTML))],
       ];
     })(),
     ['Aucun motif interdit dans le RENDU', hitsFeed.length === 0],

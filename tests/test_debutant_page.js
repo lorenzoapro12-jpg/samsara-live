@@ -1,10 +1,10 @@
-// Le mode Débutant dans un vrai navigateur (Chromium, Playwright) : l'écran calme. Le prix, une
+// Le mode Lisible dans un vrai navigateur (Chromium, Playwright) : l'écran calme. Le prix, une
 // phrase, un repère au-dessus, un repère au-dessous et le scénario n° 1 de Claude ; le détail au
-// toucher ou au survol ; tout le reste derrière le bouton Expert.
+// toucher ou au survol ; tout le reste derrière le bouton Complet.
 //
 //   1. BUDGET : au plus PARAM.guide.debutant.items (5) textes sur le tracé, chacun sur une ligne,
 //      autant que d'entrées dans guideEtat.debutant.items — y compris quand des indicateurs
-//      Expert sont allumés (ils restent choisis pour l'Expert, jamais dessinés ici).
+//      Complet sont allumés (ils restent choisis pour l'Complet, jamais dessinés ici).
 //   2. LIMITES de caractères, et chaque texte DANS le tracé, en pixels (360 px compris).
 //   3. MOTS : aucun mot de la liste Guide.MOTS_BANNIS_DEBUTANT, aucun conseil, ni « UTC », ni
 //      « $82 », ni « 1.6B » — sur le graphique, dans la page (cartes ouvertes, menu ouvert), pour
@@ -14,16 +14,16 @@
 //      téléphone) ; l'en-tête en deux rangées au téléphone, « en retard » compris, rien de rogné.
 //   5. LE TEST DES 5 SECONDES : le prix (« 86 013 $ »), le verbe de la phrase, un repère de chaque
 //      côté du prix, « Scénario 1 », la variation 24 h visible au téléphone.
-//   6. ABSENTS en Débutant : compteur, pastille de la vue, régime, « Et ensuite ? », rangs 2, 3
+//   6. ABSENTS en Lisible : compteur, pastille de la vue, régime, « Et ensuite ? », rangs 2, 3
 //      et Semaine, repères numérotés, traits du point et de la fin, repère de publication, boutons
-//      et puces Expert, Grid Bot, chiffres clés. ↺ reste (retour au présent).
+//      et puces Complet, Grid Bot, chiffres clés. ↺ reste (retour au présent).
 //   7. BULLES : survol (bureau) ou toucher (téléphone) de chaque texte — la bonne cible, le
 //      détail qui a quitté l'écran (état au prix, chemins, autres scénarios, journal, bilan), pas
 //      d'infobulle des prix par-dessus, un curseur « main ».
 //   8. ASTUCE : une fois (tactile : « Touchez… » ; souris : « Survolez… »), jamais sur un texte.
-//   9. BASCULE (touche M) : l'Expert revient entier, remis en page ; retour au Débutant identique ;
+//   9. BASCULE (touche M) : l'Complet revient entier, remis en page ; retour au Lisible identique ;
 //      mêmes valeurs dans les deux modes.
-//  10. STRUCTURES de thème en Débutant : pastille « Infos du marché », manchette masquée.
+//  10. STRUCTURES de thème en Lisible : pastille « Infos du marché », manchette masquée.
 //  11. SOBRIÉTÉ : survoler une cible ne redessine pas le graphique ; au repos, rien.
 //
 // Harnais de tests/test_guide_page.js : Binance simulé, fichier publié avec murs et options près
@@ -41,7 +41,7 @@ for (const p of ['playwright', '/opt/node22/lib/node_modules/playwright', proces
   try { playwright = require(p); break; } catch (e) { /* suivant */ }
 }
 if (!playwright) {
-  console.log('  − NON EXÉCUTÉ : Playwright introuvable — le mode Débutant n\'est pas vérifié à l\'écran sur ce poste.');
+  console.log('  − NON EXÉCUTÉ : Playwright introuvable — le mode Lisible n\'est pas vérifié à l\'écran sur ce poste.');
   process.exit(0);
 }
 let ko = 0;
@@ -51,7 +51,7 @@ const titre = t => console.log(`\n── ${t} ──`);
 const CONSEIL = /\b(achetez|vendez|achète[rz]?\b|vends\b|il faut (?:acheter|vendre)|entrez|sortez|prenez position|signal d['’]achat|signal de vente|recommand(?:e|ons))/i;
 const BANNIS = Guide.MOTS_BANNIS_DEBUTANT, EXPLIQUES = Guide.EXPLIQUES_DEBUTANT;
 const bannis = t => BANNIS.filter(re => re.test(t)).map(re => t.match(re)[0]);
-// Les formats de l'Expert : « $82 », « 1.6B », « 54.8K » (A6) ; « UTC » est déjà dans la liste.
+// Les formats de l'Complet : « $82 », « 1.6B », « 54.8K » (A6) ; « UTC » est déjà dans la liste.
 const FORMATS_EXPERT = [/\$\d/, /\d[.,]\d+[KMB]\b/];
 /** Un texte de bulle : un terme technique n'y est permis qu'avec son explication (EXPLIQUES). */
 function bannisBulle(t) {
@@ -125,7 +125,7 @@ async function ouvrir(nav, o) {
     }
     return r.abort();
   });
-  // Le mode par défaut (stockage vide) est le Débutant ; le thème, la couche des scénarios.
+  // Le mode par défaut (stockage vide) est le Lisible ; le thème, la couche des scénarios.
   await page.addInitScript(([t, m, garder, sansScen]) => {
     try {
       if (!garder) localStorage.clear();
@@ -191,7 +191,7 @@ const VERBES = /\b(touche|est passé|monte|baisse|hésite|s’agite|est entre|es
 const LIMITES = { phrase: [90, 48], niveau: [26, 18], scenario: [32, 32], forme: [26, 26], boite: [48, 40] };
 const ROLES_MAX = { phrase: 1, niveau: 2, scenario: 1, forme: 1, boite: 1 };
 
-/** Les contrôles d'un écran Débutant (budget, limites, mots, chevauchements, 5 secondes, absents). */
+/** Les contrôles d'un écran Lisible (budget, limites, mots, chevauchements, 5 secondes, absents). */
 async function controlerEcran(o, nom, opts = {}) {
   const e = await dessin(o.page);
   const P = await o.page.evaluate(() => PARAM.guide.debutant);
@@ -210,7 +210,7 @@ async function controlerEcran(o, nom, opts = {}) {
   check(`${nom} : chaque texte tient dans le tracé, en pixels`, !dehors.length, dehors);
   // 3. Mots (et aucun pourcentage sur le tracé : choix 1B, rien qui se lise comme une probabilité).
   const motsT = e.items.map(i => [i.texte, bannis(i.texte), CONSEIL.test(i.texte), FORMATS_EXPERT.some(re => re.test(i.texte)), /%/.test(i.texte)]).filter(x => x[1].length || x[2] || x[3] || x[4]);
-  check(`${nom} : aucun mot banni, aucun conseil, aucun format Expert, aucun « % » sur le tracé`, !motsT.length, motsT);
+  check(`${nom} : aucun mot banni, aucun conseil, aucun format Complet, aucun « % » sur le tracé`, !motsT.length, motsT);
   // Chaque repère est posé de SON côté du prix live et contre son trait (pas au bord d'une bande lointaine).
   if (e.yLive !== null) {
     const cote = e.items.filter(i => i.role === 'niveau' && i.rect).map(i => ({ t: i.texte, p: +nombres(i.texte).filter(x => x.length >= 4)[0], r: i.rect, fl: /[↑↓]/.test(i.texte) }))
@@ -251,14 +251,14 @@ async function controlerEcran(o, nom, opts = {}) {
   });
   check(`${nom} : le prix de l'en-tête au format français (« ${dom.prix} »)`, /^\d{1,3}(?:[\s ]\d{3})*(?:,\d+)?[\s ]\$$/.test(dom.prix), dom.prix);
   check(`${nom} : la variation 24 h visible, sa durée dite (« ${dom.var24} »)`, dom.var24 && / en 24 h$/.test(dom.var24), dom.var24);
-  // 6. Absents en Débutant.
+  // 6. Absents en Lisible.
   const exp = e.trace.filter(t => /^\d+\/\d+ · /.test(t) || /^[+-]\d+\.\d+%$/.test(t) || /^fichier .* UTC/.test(t) || /^\d$/.test(t) || /^(Point|fin|Écrit à)/.test(t) || /EMA|RSI|Bollinger/.test(t));
   check(`${nom} : ni compteur, ni pastille de la vue, ni repère de publication, ni repères ①②, ni traits du point et de la fin`, !exp.length, exp);
   check(`${nom} : ni badge du régime, ni « Et ensuite ? » (guideEtat.chemins vide)`, !e.cibles.some(c => /^Tendance/.test(c.titre || '')) && !e.chemins, { chemins: e.chemins, cibles: e.cibles.map(c => c.titre) });
   // Le scénario MONTRÉ (rang 1 tant qu'il est ouvert ou réalisé ; sinon le suivant encore ouvert —
   // contrat de la journée, plan-scenarios.md M7) : son libellé seul, jamais deux.
   if (e.scen) check(`${nom} : un seul libellé de scénario, celui du scénario montré (${e.scen.montre || '1'}) ; ni nom du point et de la fin`, e.scen.libelles.length <= 1 && e.scen.libelles.every(l => l.rang === (e.scen.montre || '1')) && !e.scen.cibles.some(c => c.prio === 3), e.scen);
-  check(`${nom} : boutons Expert, puces d'indicateurs, Grid Bot et chiffres clés masqués ; ↺ visible ; la pastille « Infos du marché » dit l'âge (infobulle)`,
+  check(`${nom} : boutons Complet, puces d'indicateurs, Grid Bot et chiffres clés masqués ; ↺ visible ; la pastille « Infos du marché » dit l'âge (infobulle)`,
     !dom.caches.length && dom.puces === 0 && dom.kpis === 0 && dom.reset && /il y a \d+ min/.test(dom.kpiDeb || ''), dom);
   check(`${nom} : aucun sous-graphe (${e.sous.join(', ') || 'aucun'})`, !e.sous.length, e.sous);
   return e;
@@ -268,7 +268,7 @@ async function controlerEcran(o, nom, opts = {}) {
 const texteVisible = page => page.evaluate(() => document.body.innerText);
 function scanTexte(nom, t) {
   const b = bannis(t), c = CONSEIL.test(t), f = FORMATS_EXPERT.filter(re => re.test(t)).map(re => t.match(re)[0]);
-  check(`${nom} : texte visible sans mot banni, sans conseil, sans format Expert`, !b.length && !c && !f.length, { bannis: b, conseil: c, formats: f });
+  check(`${nom} : texte visible sans mot banni, sans conseil, sans format Complet`, !b.length && !c && !f.length, { bannis: b, conseil: c, formats: f });
 }
 
 /** Survol (souris) ou toucher (doigt) du centre d'un texte du registre → la cible et sa bulle. */
@@ -313,7 +313,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         const e = await controlerEcran(o, nom);
         if (prev === 'ouvert') check(`${nom} : le scénario 1 en cours a son libellé sur le tracé (« ${(e.items.find(i => i.role === 'scenario') || {}).texte} »)`,
           e.items.some(i => i.role === 'scenario' && /^(?:[↑↓] )?Scénario 1 : /.test(i.texte) && (i.texte.match(/[↑↓]/g) || []).length <= 1), e.items);
-        // Indicateurs Expert allumés : toujours choisis pour l'Expert, jamais dessinés ici.
+        // Indicateurs Complet allumés : toujours choisis pour l'Complet, jamais dessinés ici.
         const e2 = await o.page.evaluate(() => {
           Object.assign(overlays, { ema20: true, bb: true, sr: true, fib: true, vp: true }); activeSubs.rsi = true;
           resizeCanvas(); window.__ft = []; window.__ftOn = true; drawChart(); window.__ftOn = false;
@@ -323,14 +323,14 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         });
         check(`${nom} : EMA, Bollinger, S/R, Fibonacci, profil et RSI allumés — toujours ≤ 5 textes, aucun « EMA » ni « RSI », pas de sous-graphe RSI`,
           e2.n <= 5 && !e2.textes.some(t => /EMA|RSI|POC|Fib|BB/.test(t)) && !e2.sous.includes('rsi'), e2);
-        // La couche de chaleur (carnet) allumée en Expert : jamais dessinée en Débutant (test_interface
-        // vérifie, en Expert, qu'elle est refaite au changement de thème).
+        // La couche de chaleur (carnet) allumée en Complet : jamais dessinée en Lisible (test_interface
+        // vérifie, en Complet, qu'elle est refaite au changement de thème).
         const chaleur = await o.page.evaluate(async () => {
           await fetchHeatmap(); const avant = heatLayer; overlays.liq = true; drawChart();
           const r = { donnees: !!(histHeatmap && histHeatmap.grille), couche: !!heatLayer && heatLayer !== avant };
           overlays.liq = false; drawChart(); return r;
         });
-        check(`${nom} : couche de chaleur allumée en Expert, pas dessinée ici (données lues : ${chaleur.donnees})`, !chaleur.couche, chaleur);
+        check(`${nom} : couche de chaleur allumée en Complet, pas dessinée ici (données lues : ${chaleur.donnees})`, !chaleur.couche, chaleur);
         // 4. L'en-tête et la barre d'outils.
         const mise = await o.page.evaluate(() => {
           // La pastille dans sa forme la plus longue (« Infos · en retard ▸ ») : c'est elle qui, à
@@ -425,14 +425,14 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
           const box = document.getElementById(innerWidth <= 768 ? 'marketModalBody' : 'feed');
           return { n: box ? [...box.querySelectorAll('.demon-card')].filter(vis).length : 0, titres: box ? [...box.querySelectorAll('.demon-name')].map(x => x.innerText) : [] };
         });
-        check(`${nom} : la pastille « Infos du marché » ouvre les 8 cartes, chacune avec son titre Débutant`, cartes.n === 8 && cartes.titres.every(t => t && !/Microstructure|Liquidité|Contre-expertise/.test(t)), cartes);
+        check(`${nom} : la pastille « Infos du marché » ouvre les 8 cartes, chacune avec son titre Lisible`, cartes.n === 8 && cartes.titres.every(t => t && !/Microstructure|Liquidité|Contre-expertise/.test(t)), cartes);
         scanTexte(`${nom}, cartes ouvertes`, await texteVisible(o.page));
         await o.page.evaluate(() => { if (innerWidth <= 768) closeMarketModal(); else toggleFeed(); });
         await o.page.waitForTimeout(450);
         await o.page.click('#indDropdownBtn'); await o.page.waitForTimeout(200);
         const menu = await o.page.evaluate(() => document.getElementById('indMenu').innerText);
-        check(`${nom} : le menu « Affichage » n'a que les couches du Guide et le lien vers l'Expert (ni « oscillateur », ni « chartisme »)`,
-          /Repères et phrase de lecture/.test(menu) && /passer en Expert/.test(menu) && !/oscillateur|chartisme|EMA|RSI/i.test(menu), menu);
+        check(`${nom} : le menu « Affichage » n'a que les couches du Guide et le lien vers l'Complet (ni « oscillateur », ni « chartisme »)`,
+          /Repères et phrase de lecture/.test(menu) && /passer en Complet/.test(menu) && !/oscillateur|chartisme|EMA|RSI/i.test(menu), menu);
         scanTexte(`${nom}, menu ouvert`, await texteVisible(o.page));
         await o.page.keyboard.press('Escape');
         check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
@@ -462,7 +462,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       await o.ctx.close();
     }
 
-    // ── Hier, absent, attente : les lignes du Débutant (A17) ──
+    // ── Hier, absent, attente : les lignes du Lisible (A17) ──
     titre('Lignes des scénarios : hier, absent, attente');
     for (const [prev, re] of [['hier', /^Scénarios (d’hier|du \d\d\/\d\d) : terminés ▸$/], ['absent', /^Scénarios du matin : indisponibles$/], ['attente', /^Scénarios du matin : /]]) {
       const o = await ouvrir(nav, { vue: { width: 1440, height: 900 }, prev });
@@ -517,7 +517,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         // invalidation, clôture de confirmation — car la bulle lit ses niveaux dans niveauxFigure.)
         const f = { type: 'double_sommet', famille: 'extremes', sens: -1, phase: 'confirme', a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, extreme: pa, hauteur: pa - pc, objectif: pc - (pa - pc),
           invalidation: pa, t: ib + G.pivot, debut: ia, depart: ib + 1, jConf: ib + G.pivot + 2, fin: null, jFin: null, journal: [] };
-        // (Revue des figures : le Débutant lit sa liste dans Guide.formesDebutant — la forme forcée y
+        // (Revue des figures : le Lisible lit sa liste dans Guide.formesDebutant — la forme forcée y
         // passe aussi.)
         const f0 = Guide.formesAffichees, fd0 = Guide.formesDebutant, b0 = GUIDE_FORMES.val && GUIDE_FORMES.val.bilan;
         Guide.formesAffichees = () => [f]; Guide.formesDebutant = () => [f];
@@ -555,7 +555,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         const ia = n - 34, ic = n - 24, ib = n - 14, pa = Math.min(C(ia).low, C(ib).low), pc = C(ic).high;
         const f = { type: 'double_creux', famille: 'extremes', sens: 1, a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, extreme: pa, hauteur: pc - pa, objectif: pc + (pc - pa),
           invalidation: pa, t: ib + G.pivot, debut: ia, depart: ib + 1, phase: 'formation', fin: null, jFin: null, demi: false, journal: [] };
-        // (Revue des figures : le Débutant lit sa liste dans Guide.formesDebutant — la forme forcée y
+        // (Revue des figures : le Lisible lit sa liste dans Guide.formesDebutant — la forme forcée y
         // passe aussi.)
         const f0 = Guide.formesAffichees, fd0 = Guide.formesDebutant, b0 = GUIDE_FORMES.val && GUIDE_FORMES.val.bilan;
         Guide.formesAffichees = () => [f]; Guide.formesDebutant = () => [f];
@@ -605,7 +605,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
     }
 
     // ── ↺ : revenir au présent ──
-    titre('↺ en Débutant : glisser vers le passé, revenir au présent');
+    titre('↺ en Lisible : glisser vers le passé, revenir au présent');
     {
       const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
       const b = await o.page.evaluate(() => canvas.getBoundingClientRect());
@@ -619,7 +619,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
     }
 
     // ── Bascule : touche M ──
-    titre('Bascule Débutant ↔ Expert (touche M)');
+    titre('Bascule Lisible ↔ Complet (touche M)');
     {
       const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
       const d1 = await dessin(o.page);
@@ -634,25 +634,25 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
           kpisDom: document.querySelectorAll('#cycle .kpi').length, aria: c.getAttribute('aria-label') };
       });
       check('M → data-mode="expert"', exp.mode === 'expert' && x.mode === 'expert', exp);
-      check('Expert : le badge du régime, « Et ensuite ? » (2 boîtes ou une commune), le compteur', x.cibles.some(c => /^Tendance|^Sans tendance|^Régime/.test(c.titre || '')) && x.chemins && x.chemins.boites.length >= 1 && x.trace.some(t => /^\d+\/\d+ · /.test(t)), { cibles: x.cibles.map(c => c.titre), chemins: x.chemins, trace: x.trace.slice(0, 8) });
-      check('Expert : au moins 3 bandes nommées, l\'encadré des scénarios de plusieurs lignes (« Scénarios du matin · »), les libellés des rangs 2 et 3 ou leurs lignes',
+      check('Complet : le badge du régime, « Et ensuite ? » (2 boîtes ou une commune), le compteur', x.cibles.some(c => /^Tendance|^Sans tendance|^Régime/.test(c.titre || '')) && x.chemins && x.chemins.boites.length >= 1 && x.trace.some(t => /^\d+\/\d+ · /.test(t)), { cibles: x.cibles.map(c => c.titre), chemins: x.chemins, trace: x.trace.slice(0, 8) });
+      check('Complet : au moins 3 bandes nommées, l\'encadré des scénarios de plusieurs lignes (« Scénarios du matin · »), les libellés des rangs 2 et 3 ou leurs lignes',
         x.cibles.filter(c => c.prio === 1).length >= 2 && x.scen && x.scen.boite && !x.scen.boite.deb && x.scen.boite.lignes.length > 1 && /^Scénarios du matin · /.test(x.scen.boite.lignes[0])
         && (x.scen.libelles.some(l => l.rang === '2') || x.scen.boite.lignes.some(l => /^2\b|2\./.test(l)) || x.scen.boite.lignes.some(l => /\| 2/.test(l)) || x.scen.boite.lignes.length >= 3), x.scen);
-      check('Expert : le repère de publication est dessiné', x.tous.some(t => /fichier .*UTC/.test(t)), x.tous.filter(t => /UTC/.test(t)));
-      check('Expert : les 8 chiffres clés dans la bande (au moins 3 de largeur > 0 à cette taille), le Grid Bot, les puces d\'indicateurs, le bouton ⚡', exp.kpisDom === 8 && exp.kpis >= 3 && exp.strat && exp.puces === 12 && exp.liveBtn, exp);
-      check('Expert : le graphique n\'a plus pour nom la phrase du Débutant (aria-label retiré)', exp.aria === null, exp.aria);
-      check('Expert : le graphique remis en page (taille du canvas = son conteneur × devicePixelRatio)', exp.taille[0] === exp.attendu[0] && exp.taille[1] === exp.attendu[1], exp);
-      check('Expert : un sous-graphe (Volume) revient', x.sous.includes('vol'), x.sous);
+      check('Complet : le repère de publication est dessiné', x.tous.some(t => /fichier .*UTC/.test(t)), x.tous.filter(t => /UTC/.test(t)));
+      check('Complet : les 8 chiffres clés dans la bande (au moins 3 de largeur > 0 à cette taille), le Grid Bot, les puces d\'indicateurs, le bouton ⚡', exp.kpisDom === 8 && exp.kpis >= 3 && exp.strat && exp.puces === 12 && exp.liveBtn, exp);
+      check('Complet : le graphique n\'a plus pour nom la phrase du Lisible (aria-label retiré)', exp.aria === null, exp.aria);
+      check('Complet : le graphique remis en page (taille du canvas = son conteneur × devicePixelRatio)', exp.taille[0] === exp.attendu[0] && exp.taille[1] === exp.attendu[1], exp);
+      check('Complet : un sous-graphe (Volume) revient', x.sous.includes('vol'), x.sous);
       check('mêmes valeurs dans les deux modes : niveaux choisis, régime, états des scénarios', JSON.stringify(d1.valeurs) === JSON.stringify(x.valeurs) && JSON.stringify(d1.scen.items) === JSON.stringify(x.scen.items), { deb: [d1.valeurs, d1.scen.items], exp: [x.valeurs, x.scen.items] });
       await o.page.keyboard.press('m'); await o.page.waitForTimeout(400);
       const d2 = await dessin(o.page);
-      check('2e M → retour au Débutant, les mêmes textes', d2.mode === 'debutant' && JSON.stringify(d2.items.map(i => i.texte)) === JSON.stringify(d1.items.map(i => i.texte)), { avant: d1.items.map(i => i.texte), apres: d2.items.map(i => i.texte) });
+      check('2e M → retour au Lisible, les mêmes textes', d2.mode === 'debutant' && JSON.stringify(d2.items.map(i => i.texte)) === JSON.stringify(d1.items.map(i => i.texte)), { avant: d1.items.map(i => i.texte), apres: d2.items.map(i => i.texte) });
       check('bascule : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
 
     // ── Sobriété : survoler une cible ne redessine pas le graphique ; au repos, rien ──
-    titre('Sobriété en Débutant');
+    titre('Sobriété en Lisible');
     {
       const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
       await o.page.evaluate(() => {
@@ -678,14 +678,14 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       await o.ctx.close();
     }
 
-    // ── Prix DANS une bande de l'Expert (plusieurs prix fusionnés) : un repère de chaque côté ──
+    // ── Prix DANS une bande de l'Complet (plusieurs prix fusionnés) : un repère de chaque côté ──
     // Constat de revue : la bande « du haut » était nommée par un prix situé SOUS le prix, et son
     // libellé posé au bord de la bande, loin du trait qu'il nommait.
     titre('Prix dans une bande fusionnée : un repère au-dessus, un au-dessous, contre leurs traits');
     for (const [vue, tactile, itv] of [[{ width: 1440, height: 900 }, false, '1h'], [{ width: 390, height: 844 }, true, '1h'], [{ width: 1440, height: 900 }, false, '1m']]) {
       const o = await ouvrir(nav, { vue, tactile });
       await o.page.click('#int_' + itv); await o.page.waitForTimeout(1500);
-      // Le prix live posé entre deux prix d'une même bande de l'Expert (s'il en existe une).
+      // Le prix live posé entre deux prix d'une même bande de l'Complet (s'il en existe une).
       const pose = await o.page.evaluate(() => {
         const D = guideDonnees();
         const b = D && D.choix.dessus.concat(D.choix.dessous).find(n => n.raisons.length >= 2 && n.pMax - n.pMin > 1);
@@ -748,10 +748,10 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       await o.ctx.close();
     }
 
-    // ── Les Légendes (« ? ») en Débutant : d'abord ce que montre l'écran, sans jargon ──
+    // ── Les Légendes (« ? ») en Lisible : d'abord ce que montre l'écran, sans jargon ──
     // Constat de revue : elles s'ouvraient sur « GEX », « Funding », « CVD »… et leurs fiches du
-    // Guide décrivaient l'écran Expert (badge, chemins).
-    titre('Légendes en Débutant (390 px)');
+    // Guide décrivaient l'écran Complet (badge, chemins).
+    titre('Légendes en Lisible (390 px)');
     {
       const o = await ouvrir(nav, { vue: { width: 390, height: 844 }, tactile: true });
       await o.page.click('#legendesBtn'); await o.page.waitForTimeout(250);
@@ -761,10 +761,10 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         return { texte: p.innerText, ouvert: !p.hidden, replie: !!d && !d.open, h4: [...p.querySelectorAll('h4')].filter(vis).map(h => h.innerText.trim()).filter(Boolean),
           boutons: [...p.querySelectorAll('.glossaire-item')].filter(vis).map(b => b.innerText) };
       });
-      check('Légendes, Débutant : « Ce que montre l’écran » d’abord (phrase et repères, scénarios du matin, les cartes) ; les fiches de l’Expert repliées',
+      check('Légendes, Lisible : « Ce que montre l’écran » d’abord (phrase et repères, scénarios du matin, les cartes) ; les fiches de l’Complet repliées',
         g.ouvert && g.replie && /^Ce que montre l’écran$/i.test(g.h4[0]) && g.h4.length === 1 && g.boutons.includes('Scénarios du matin') && g.boutons.includes('La phrase et les deux repères') && g.boutons.includes('Ordres en attente'), g);
-      check('Légendes, Débutant : aucun mot banni dans ce qui est affiché', !bannis(g.texte).length && !CONSEIL.test(g.texte), bannis(g.texte));
-      // Les fiches du Guide ouvertes en Débutant : leur explication est celle de l'écran Débutant.
+      check('Légendes, Lisible : aucun mot banni dans ce qui est affiché', !bannis(g.texte).length && !CONSEIL.test(g.texte), bannis(g.texte));
+      // Les fiches du Guide ouvertes en Lisible : leur explication est celle de l'écran Lisible.
       const fiches = [];
       for (const id of ['guide', 'guide_regime', 'guide_suite', 'guide_niveaux', 'scenarios']) {
         fiches.push(await o.page.evaluate(id => {
@@ -775,16 +775,16 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         }, id));
       }
       const mal = fiches.filter(f => bannis(f.simple + ' ' + f.titre).length || /badge en haut|à droite de la dernière bougie|Bollinger|Indicateurs »/.test(f.simple));
-      check('fiches du Guide en Débutant : titre, pastille et explication du Débutant (ni badge, ni chemins dessinés, ni « convention », ni jargon)', !mal.length && fiches.find(f => f.id === 'guide_regime').simple.includes('pas de badge'), mal.length ? mal : fiches.map(f => f.titre));
+      check('fiches du Guide en Lisible : titre, pastille et explication du Lisible (ni badge, ni chemins dessinés, ni « convention », ni jargon)', !mal.length && fiches.find(f => f.id === 'guide_regime').simple.includes('pas de badge'), mal.length ? mal : fiches.map(f => f.titre));
       await o.page.evaluate(() => { basculerMode(); ouvrirGlossaire(); });
       await o.page.waitForTimeout(200);
       const x = await o.page.evaluate(() => { const p = document.getElementById('fichePop'), vis = el => el.getClientRects().length > 0; return [...p.querySelectorAll('h4')].filter(vis).map(h => h.innerText.trim()).filter(Boolean); });
-      check('Légendes, Expert : tous les groupes, à plat, comme avant', x.length === 7 && /^Positionnement et dérivés$/i.test(x[0]), x);
+      check('Légendes, Complet : tous les groupes, à plat, comme avant', x.length === 7 && /^Positionnement et dérivés$/i.test(x[0]), x);
       check('Légendes : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
 
-    // ── Autre paire : les cartes du Débutant parlent du bitcoin, et le disent ──
+    // ── Autre paire : les cartes du Lisible parlent du bitcoin, et le disent ──
     titre('SOL/USDT : les infos du marché nomment le bitcoin');
     for (const [vue, tactile] of [[{ width: 1440, height: 900 }, false], [{ width: 390, height: 844 }, true]]) {
       const o = await ouvrir(nav, { vue, tactile });
@@ -903,7 +903,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       const e1 = await etat();
       await o.page.keyboard.press('m'); await o.page.waitForTimeout(400);
       const e2 = await etat();
-      check('stockage bloqué : Débutant au départ ; M → Expert partout (page ET graphique) ; 2e M → Débutant', e0.html === 'debutant' && e0.deb && e1.html === 'expert' && !e1.deb && e1.items === null && e2.html === 'debutant' && e2.deb && e2.items > 0, { e0, e1, e2 });
+      check('stockage bloqué : Lisible au départ ; M → Complet partout (page ET graphique) ; 2e M → Lisible', e0.html === 'debutant' && e0.deb && e1.html === 'expert' && !e1.deb && e1.items === null && e2.html === 'debutant' && e2.deb && e2.items > 0, { e0, e1, e2 });
       await o.page.clock.runFor(9000); await o.page.waitForTimeout(100);
       const a1 = await o.page.evaluate(() => { drawChart(); astuceMontrer(); return !document.getElementById('astuceTap').hidden; });
       check('stockage bloqué : l’astuce, cachée au bout de 8 s, ne revient pas au dessin suivant', !a1, a1);
@@ -955,7 +955,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
     }
 
     // ── Les 11 thèmes : texte visible ; les structures gardent la pastille ──
-    titre('Thèmes et structures en Débutant');
+    titre('Thèmes et structures en Lisible');
     const THEMES = ['aero', 'aero-nuit', 'kala', 'neon', 'codex', 'bureau95', 'bureau95-contraste', 'gare', 'gazette', 'cyanotype', 'diazo'];
     for (const [theme, vue, tactile] of THEMES.map(t => [t, { width: 1440, height: 900 }, false]).concat([['aero', { width: 390, height: 844 }, true], ['gazette', { width: 390, height: 844 }, true]])) {
       const nom = theme + ' · ' + vue.width;

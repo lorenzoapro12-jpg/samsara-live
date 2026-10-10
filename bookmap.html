@@ -17,7 +17,7 @@
     <a class="retour" href="index.html" title="Revenir au terminal">← Terminal</a>
     <h1>Carte <span class="sous expert-seul">BTC/USDT · carnet, exécutions, murs, gamma</span><span class="sous debutant-seul">BTC/USDT · ordres en attente et échanges</span></h1>
     <!-- Le mode (débutant / expert) : le même que le terminal. Libellé long à partir de 1024 px. -->
-    <button type="button" class="bouton bouton-mode" id="btnModeBarre" title="Changer de mode (touche M) : le même réglage que le terminal, le changer ici le change aussi là-bas"><span class="mode-long">Débutant · passer en Expert</span><span class="mode-court">Passer en Expert</span><span class="mode-mini">→ Expert</span></button>
+    <button type="button" class="bouton bouton-mode" id="btnModeBarre" title="Changer de mode (touche M) : le même réglage que le terminal, le changer ici le change aussi là-bas"><span class="mode-long">Lisible · passer en Complet</span><span class="mode-court">Passer en Complet</span><span class="mode-mini">→ Complet</span></button>
   </div>
   <nav class="calques" id="calques" aria-label="Calques affichés"></nav>
   <div class="barre-droite">
@@ -161,7 +161,7 @@
     <h3>Gestes</h3>
     <p>Glisser : déplacer la carte. <span class="geste-souris">Molette ou deux doigts : zoomer ; double-clic : revenir à la vue par défaut.</span><span class="geste-doigt">Deux doigts : zoomer ; double appui : revenir à la vue par défaut.</span></p>
     <p>Toucher ou survoler un élément : son détail. Au doigt, un appui bref le montre et le même appui l'enlève ; un appui long le fait suivre le doigt.</p>
-    <p><button type="button" class="bouton" id="btnIntroDebutant">Comment lire cette carte</button> <button type="button" class="bouton bouton-mode" id="btnModeDebutant">Passer en Expert</button></p>
+    <p><button type="button" class="bouton" id="btnIntroDebutant">Comment lire cette carte</button> <button type="button" class="bouton bouton-mode" id="btnModeDebutant">Passer en Complet</button></p>
     <p class="note">La carte décrit des ordres en attente et des échanges passés, pas une recommandation : un ordre peut être retiré avant d'être touché, et un rond ne dit pas qui a acheté.</p>
   </div>
   <div class="expert-seul">
@@ -208,7 +208,7 @@
     <dt>Limites</dt><dd id="legGuideLimites"></dd>
   </dl>
   <h3>Gestes</h3>
-  <p>Glisser : déplacer. Molette : zoom dans le temps (sur l'axe des prix, ou avec Maj : zoom des prix). Pincer à deux doigts. Glisser sur un axe : l'étirer. Double-clic ou R : vue par défaut. F : suivre le présent. Flèches : se déplacer. Échap : fermer un panneau. ? : comment lire cette carte. G : le guide sur la carte. J : le journal. M : mode débutant / expert (le même que le terminal : le changer ici le change aussi là-bas).</p>
+  <p>Glisser : déplacer. Molette : zoom dans le temps (sur l'axe des prix, ou avec Maj : zoom des prix). Pincer à deux doigts. Glisser sur un axe : l'étirer. Double-clic ou R : vue par défaut. F : suivre le présent. Flèches : se déplacer. Échap : fermer un panneau. ? : comment lire cette carte. G : le guide sur la carte. J : le journal. M : mode Lisible / Complet (le même que le terminal : le changer ici le change aussi là-bas).</p>
   <p>Au doigt : un appui bref épingle la lecture là où il tombe (le même appui l'enlève) ; un appui long l'affiche et la fait suivre le doigt sans déplacer la carte.</p>
   <p class="note">Les heures de l'axe sont celles de l'appareil (le fuseau est écrit dans l'angle, sous l'axe des prix) ; « maintenant » est l'heure de Binance, recalée.</p>
   <p class="note">Ce que la carte montre est une lecture du carnet, pas une recommandation : un mur peut être retiré avant d'être touché, et une bulle ne dit pas qui a acheté.</p>

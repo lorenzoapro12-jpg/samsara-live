@@ -175,9 +175,9 @@ async function ouvrir(nav, opts) {
   });
   if (opts.init) await page.addInitScript(opts.init);
   await page.addInitScript(() => { try { localStorage.clear(); } catch (e) { /* */ } });
-  // Mode : les contrôles historiques portent sur la carte complète (mode Expert) ;
-  // les contrôles du mode Débutant passent opts.mode = 'debutant' (section 45).
-  // (Débutant : aucune clé — c'est le défaut de la page, comme un terminal qui n'a jamais changé de mode.)
+  // Mode : les contrôles historiques portent sur la carte complète (mode Complet) ;
+  // les contrôles du mode Lisible passent opts.mode = 'debutant' (section 45).
+  // (Lisible : aucune clé — c'est le défaut de la page, comme un terminal qui n'a jamais changé de mode.)
   if (opts.mode !== 'debutant') await page.addInitScript(() => { try { localStorage.setItem('samsara-mode', 'expert'); } catch (e) { /* */ } });
   if (opts.reglages) await page.addInitScript(r => { localStorage.setItem('samsara-carte-v1', JSON.stringify(r)); }, opts.reglages);
   // stockage : clés posées APRÈS le nettoyage (mode du terminal, explication déjà vue…).
@@ -681,7 +681,7 @@ async function filNoir(page, x, y) {
       await p23.close();
       const sans = JSON.parse(JSON.stringify(md)); delete sans.micro.usdt_usd;
       const page2 = await nav.newPage({ viewport: { width: 1440, height: 860 } });
-      // Les niveaux gamma ne sont dessinés qu'en mode Expert.
+      // Les niveaux gamma ne sont dessinés qu'en mode Complet.
       await page2.addInitScript(() => { try { localStorage.setItem('samsara-mode', 'expert'); } catch (e) { /* */ } });
       await page2.route('**/*', r => {
         const u = r.request().url(), h = new URL(u).host, cors = { 'access-control-allow-origin': '*' };
@@ -871,18 +871,18 @@ async function filNoir(page, x, y) {
       await pg.waitForTimeout(1500);          // sans donnée : le battement (1 s) met le canevas à sa taille
       const d = await pg.evaluate(() => { const c = document.getElementById('carte'), b = document.querySelector('.barre').getBoundingClientRect(); return { barre: b.height, cw: c.clientWidth, ch: c.clientHeight, bw: c.width, bh: c.height, defil: document.documentElement.scrollWidth - innerWidth }; });
       const etire = Math.abs(d.bw / d.cw - d.bh / d.ch) > 0.02;
-      check(`${mode === 'expert' ? 'Expert' : 'Débutant'}, ${w} × ${h} (densité ${dpr}) : en-tête ${Math.round(d.barre)} px, canevas ${d.cw} × ${d.ch} CSS → ${d.bw} × ${d.bh}, ${etire ? 'ÉTIRÉ' : 'non étiré'}`,
+      check(`${mode === 'expert' ? 'Complet' : 'Lisible'}, ${w} × ${h} (densité ${dpr}) : en-tête ${Math.round(d.barre)} px, canevas ${d.cw} × ${d.ch} CSS → ${d.bw} × ${d.bh}, ${etire ? 'ÉTIRÉ' : 'non étiré'}`,
         d.barre <= 82 && !etire && d.defil <= 0 && d.ch >= Math.min(400, h - 120), d);
       if (mode === 'expert' && w >= 1280) {
-        // Le bouton de mode (« → Débutant ») ne pousse pas les puces des calques hors de la bande : autant
-        // de puces entièrement visibles qu'avant le mode Débutant (mesuré sur c532402 : 10 à 1280 px, 11 à
+        // Le bouton de mode (« → Lisible ») ne pousse pas les puces des calques hors de la bande : autant
+        // de puces entièrement visibles qu'avant le mode Lisible (mesuré sur c532402 : 10 à 1280 px, 11 à
         // 1366, 12 à 1440 et à 1680). Il est posé au début de la bande du résumé, qui lui garde sa place.
         const n = await pg.evaluate(() => { const c = document.getElementById('calques'), r = c.getBoundingClientRect(); return [...c.querySelectorAll('.puce')].filter(p => { const b = p.getBoundingClientRect(); return b.left >= r.left - 0.5 && b.right <= r.right + 0.5; }).length; });
         const min = { 1280: 10, 1366: 11, 1440: 12, 1680: 12 }[w];
         const bm = await pg.evaluate(() => { const b = document.getElementById('btnModeBarre'), r = b.getBoundingClientRect(), z = document.getElementById('resumeCarte'), q = z.getBoundingClientRect(), x = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
           return { texte: b.innerText, visible: b.offsetParent !== null && r.width > 0, dessus: x === b || b.contains(x), haut: r.top, bas: r.bottom, zt: q.top, zb: q.bottom, gauche: r.right - q.left, pad: parseFloat(getComputedStyle(z).paddingLeft) }; });
-        check(`Expert, ${w} px : ${n} puces de calques entièrement visibles (= ${min}, comme avant), « → Débutant » visible et cliquable au début de la bande du résumé, la bande lui garde sa place`,
-          n >= min && bm.texte === '→ Débutant' && bm.visible && bm.dessus && bm.haut >= bm.zt - 0.5 && bm.bas <= bm.zb + 0.5 && bm.pad >= bm.gauche, { n, bm });
+        check(`Complet, ${w} px : ${n} puces de calques entièrement visibles (= ${min}, comme avant), « → Lisible » visible et cliquable au début de la bande du résumé, la bande lui garde sa place`,
+          n >= min && bm.texte === '→ Lisible' && bm.visible && bm.dessus && bm.haut >= bm.zt - 0.5 && bm.bas <= bm.zb + 0.5 && bm.pad >= bm.gauche, { n, bm });
       }
       await pg.close();
     }
@@ -1301,8 +1301,8 @@ async function filNoir(page, x, y) {
       check('la pastille de la carte dit la source et l\'échelle propre', /au-delà : carnet Coinbase ±10 %.+échelle propre/.test(P43), P43);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p43.close();
-      // Débutant : la profondeur Coinbase n'est pas peinte (sa propre échelle de couleur ne se compare
-      // pas à la chaleur Binance) ; elle reste en Expert (09/10/2026).
+      // Lisible : la profondeur Coinbase n'est pas peinte (sa propre échelle de couleur ne se compare
+      // pas à la chaleur Binance) ; elle reste en Complet (09/10/2026).
       let p43d;
       ({ page: p43d, erreurs } = await ouvrir(nav, { encodage: true, profondeur: loin, mode: 'debutant' }));
       await p43d.waitForTimeout(1500);
@@ -1353,24 +1353,24 @@ async function filNoir(page, x, y) {
       check('gros ordre posé puis retiré, « Destin » éteint : au journal du guide (« Gros ordre d\'achat de 30,0 BTC … retiré … (un seul prix) »)', j44.some(j => /^Gros ordre d'achat de 30,0 BTC.* (retiré|disparu).+un seul prix/.test(j.texte) || /^Gros ordre d'achat de .+ BTC.* retiré.+un seul prix/.test(j.texte)), j44);
       await p44.click('#btnJournal'); await p44.waitForTimeout(300);
       const lj = await p44.evaluate(() => document.getElementById('listeJournal').innerText);
-      // Débutant : l'ordre était posé à 15 $ du prix (moins d'une tranche de 20 $) : il est dit dans la ligne
+      // Lisible : l'ordre était posé à 15 $ du prix (moins d'une tranche de 20 $) : il est dit dans la ligne
       // regroupée « Près du prix du moment … » (BM.journalDebutant), sans symbole, à l'heure de l'appareil.
-      check('panneau « Ce qui vient de se passer » (Débutant) : heure de l\'appareil et phrase en clair (sans symbole), jamais « UTC » ; l\'ordre posé au prix du moment est regroupé',
+      check('panneau « Ce qui vient de se passer » (Lisible) : heure de l\'appareil et phrase en clair (sans symbole), jamais « UTC » ; l\'ordre posé au prix du moment est regroupé',
         /\d\d:\d\d:\d\d Près du prix du moment.: \d+ gros ordres? d'achat (posés?|disparus?)/.test(lj) && !/UTC/.test(lj) && !/un seul prix/.test(lj), lj.slice(0, 200));
       await p44.keyboard.press('Escape');
-      // b et c portent sur les puces des calques (cachées en Débutant) : la page passe en Expert par
-      // la touche M (ce qui contrôle aussi la bascule), puis revient en Débutant.
+      // b et c portent sur les puces des calques (cachées en Lisible) : la page passe en Complet par
+      // la touche M (ce qui contrôle aussi la bascule), puis revient en Lisible.
       await p44.keyboard.press('m'); await p44.waitForTimeout(400);
-      check('touche M : la page passe en Expert', (await etat(p44)).mode === 'expert');
-      // Expert : le contrôle d'origine, intact — chaque évènement, à l'heure UTC, avec sa phrase entière.
+      check('touche M : la page passe en Complet', (await etat(p44)).mode === 'expert');
+      // Complet : le contrôle d'origine, intact — chaque évènement, à l'heure UTC, avec sa phrase entière.
       await p44.click('#btnJournal'); await p44.waitForTimeout(300);
       const ljx = await p44.evaluate(() => ({ liste: document.getElementById('listeJournal').innerText, note: document.getElementById('journalNote').innerText }));
-      check('panneau « Ce qui vient de se passer » (Expert) : heure UTC et phrase', /\d\d:\d\d:\d\d .+Gros ordre d'achat/.test(ljx.liste) && /UTC/.test(ljx.note), ljx.liste.slice(0, 200));
+      check('panneau « Ce qui vient de se passer » (Complet) : heure UTC et phrase', /\d\d:\d\d:\d\d .+Gros ordre d'achat/.test(ljx.liste) && /UTC/.test(ljx.note), ljx.liste.slice(0, 200));
       await p44.keyboard.press('Escape');
-      // a (jumeau Expert) : le même panneau, en heures UTC, la phrase experte et sa note.
+      // a (jumeau Complet) : le même panneau, en heures UTC, la phrase experte et sa note.
       await p44.click('#btnJournal'); await p44.waitForTimeout(300);
       const ljX = await p44.evaluate(() => ({ liste: document.getElementById('listeJournal').innerText, note: document.getElementById('journalNote').innerText }));
-      check('panneau « Ce qui vient de se passer » (Expert) : heure UTC et phrase experte, note « Heures UTC… »', /\d\d:\d\d:\d\d .+Gros ordre d'achat/.test(ljX.liste) && /^Heures UTC/.test(ljX.note), { l: ljX.liste.slice(0, 200), n: ljX.note.slice(0, 80) });
+      check('panneau « Ce qui vient de se passer » (Complet) : heure UTC et phrase experte, note « Heures UTC… »', /\d\d:\d\d:\d\d .+Gros ordre d'achat/.test(ljX.liste) && /^Heures UTC/.test(ljX.note), { l: ljX.liste.slice(0, 200), n: ljX.note.slice(0, 80) });
       await p44.keyboard.press('Escape'); await p44.waitForTimeout(200);
       // b. Le guide seul lit le carnet (chaleur live, carnet latéral, bid / ask et destin éteints).
       for (const k of ['live', 'dom', 'bidask']) await p44.click(`button[data-calque="${k}"]`);
@@ -1385,7 +1385,7 @@ async function filNoir(page, x, y) {
       const g44 = (await etat(p44)).guide;
       check('vue passée : aucune étiquette de mur ni de zone (elles décrivent le présent)', g44.present === false && !g44.etiquettes.some(t => /^(Mur|À surveiller|Ordres|Le prix est|Zone|Bid|Ask)/.test(t)), g44);
       await p44.keyboard.press('m'); await p44.waitForTimeout(400);
-      check('touche M encore : retour en Débutant', (await etat(p44)).mode === 'debutant');
+      check('touche M encore : retour en Lisible', (await etat(p44)).mode === 'debutant');
       // d. Explication : ouverte à la première visite ; « J'ai compris » la referme et s'en souvient.
       check('« Comment lire cette carte » : ouverte à la première visite', e0.guide.intro === true);
       await p44.click('#guideIntroOk'); await p44.waitForTimeout(300);
@@ -1431,7 +1431,7 @@ async function filNoir(page, x, y) {
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
         await pg.close();
       }
-      // e (jumeau Expert) : la bande en chiffres est là dès l'ouverture, la carte ne change pas de taille.
+      // e (jumeau Complet) : la bande en chiffres est là dès l'ouverture, la carte ne change pas de taille.
       for (const [w, h] of [[800, 900], [1024, 768]]) {
         let pg;
         ({ page: pg, erreurs } = await ouvrir(nav, { encodage: true, vue: { width: w, height: h }, attendre: false }));
@@ -1439,7 +1439,7 @@ async function filNoir(page, x, y) {
         const avant = await pg.evaluate(() => document.getElementById('carte').clientHeight);
         await pg.waitForFunction(() => window.__carte && /^carnet live il y a /.test(window.__carte.etat().guide.resume), null, { timeout: 15000 }).catch(() => {});
         const d = await pg.evaluate(() => { const c = document.getElementById('carte'), r = document.getElementById('resumeCarte'); return { ch: c.clientHeight, barre: document.querySelector('.barre').getBoundingClientRect().height, visible: !r.hidden, texte: r.textContent, defil: document.documentElement.scrollWidth - innerWidth }; });
-        check(`Expert, ${w} × ${h} : résumé en chiffres affiché sans changer la taille de la carte (${avant} → ${d.ch} px), en-tête ${Math.round(d.barre)} px ≤ 82`,
+        check(`Complet, ${w} × ${h} : résumé en chiffres affiché sans changer la taille de la carte (${avant} → ${d.ch} px), en-tête ${Math.round(d.barre)} px ≤ 82`,
           d.visible && /^carnet live il y a /.test(d.texte) && d.ch === avant && d.ch >= Math.min(400, h - 120) && d.barre <= 82 && d.defil <= 0, d);
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
         await pg.close();
@@ -1449,8 +1449,8 @@ async function filNoir(page, x, y) {
     // ════ Mode débutant : l'écran calme ══════════════════════════════════════
     // Le même simulateur, plus 90 BTC d'achats 60 $ sous le milieu et 90 BTC de ventes 60 $ au-dessus
     // (sur trois prix voisins ; le seuil d'un mur est relatif au carnet lu) : un repère existe des deux côtés. Les contrôles des sections 1 à 44
-    // (mode Expert) gardent tout le reste mot pour mot.
-    titre('45. Mode débutant : un écran calme, le détail au toucher, l\'Expert derrière le bouton');
+    // (mode Complet) gardent tout le reste mot pour mot.
+    titre('45. Mode débutant : un écran calme, le détail au toucher, l\'Complet derrière le bouton');
     {
       const MD = require('./mots_debutant.js');
       const CONSEIL = /\b(achetez|vendez|ach[eè]te[rz]?|vends|il faut (?:acheter|vendre)|entrez|sortez|prenez position|signal d['’]achat|signal de vente|recommand(?:e|ons))\b/i;
@@ -1525,7 +1525,7 @@ async function filNoir(page, x, y) {
       check(`en-tête : exactement ← Terminal, mode, Guide, Suivre, Journal, Légende (+ le titre) — ${vis.join(', ')}`,
         vis.length === 6 && ['retour', 'btnModeBarre', 'btnSuivre', 'btnJournal', 'btnLegende'].every(k => vis.some(v => v.includes(k))) && vis.some(v => /puce/.test(v)), vis);
       const barre = await p45.evaluate(() => ({ h: document.querySelector('.barre').getBoundingClientRect().height, defil: document.documentElement.scrollWidth - innerWidth, titre: document.querySelector('.barre h1').innerText, mode: document.getElementById('btnModeBarre').innerText }));
-      check(`en-tête sur une rangée (${Math.round(barre.h)} px ≤ 46), aucun défilement, bouton « Débutant · passer en Expert »`, barre.h <= 46 && barre.defil <= 0 && barre.mode === 'Débutant · passer en Expert', barre);
+      check(`en-tête sur une rangée (${Math.round(barre.h)} px ≤ 46), aucun défilement, bouton « Lisible · passer en Complet »`, barre.h <= 46 && barre.defil <= 0 && barre.mode === 'Lisible · passer en Complet', barre);
       {
         const bm = await p45.evaluate(() => { const b = document.getElementById('btnModeBarre'), cs = getComputedStyle(b); return { pressed: b.getAttribute('aria-pressed'), fond: cs.backgroundColor }; });
         check('bouton de mode : il dit l\'action, sans état « enfoncé » (pas d\'aria-pressed, fond transparent)', bm.pressed === null && /rgba\(0, 0, 0, 0\)|transparent/.test(bm.fond), bm);
@@ -1607,7 +1607,7 @@ async function filNoir(page, x, y) {
         });
         check(`textes sur la carte comptés au canevas (${r.canevas.length}) = textesCarte (${r.textes.length}), ≤ 2`, r.canevas.length === r.textes.length && r.canevas.length <= 2 && r.images > 0, r);
       }
-      // Mots interdits dans tout le texte visible en Débutant.
+      // Mots interdits dans tout le texte visible en Lisible.
       {
         const morceaux = [];
         morceaux.push(['en-tête', await p45.evaluate(() => document.querySelector('.barre').innerText)]);
@@ -1619,7 +1619,7 @@ async function filNoir(page, x, y) {
         await p45.click('#btnJournal'); await p45.waitForTimeout(300);
         const jn = await p45.evaluate(() => ({ note: document.getElementById('journalNote').innerText, liste: document.getElementById('listeJournal').innerText }));
         morceaux.push(['journal (note)', jn.note], ['journal (liste)', jn.liste]);
-        check('journal en Débutant : heure de l\'appareil, jamais « UTC », sans les symboles de la carte Expert (✕ ◐ ● ▲ ▼), jamais « (un seul prix) »', !/UTC/.test(jn.note + jn.liste) && /heure de cet appareil/.test(jn.note) && !/[✕◐●▲▼]/.test(jn.liste) && !/un seul prix/.test(jn.liste), jn);
+        check('journal en Lisible : heure de l\'appareil, jamais « UTC », sans les symboles de la carte Complet (✕ ◐ ● ▲ ▼), jamais « (un seul prix) »', !/UTC/.test(jn.note + jn.liste) && /heure de cet appareil/.test(jn.note) && !/[✕◐●▲▼]/.test(jn.liste) && !/un seul prix/.test(jn.liste), jn);
         await p45.keyboard.press('Escape');
         await p45.keyboard.press('?'); await p45.waitForTimeout(400);
         morceaux.push(['explication', await p45.evaluate(() => document.getElementById('guideIntro').innerText)]);
@@ -1636,7 +1636,7 @@ async function filNoir(page, x, y) {
         check(`mots interdits : aucun dans ${morceaux.map(m => m[0]).join(', ')}`, !mal.length, mal);
         // A10 : « bulle » désigne le détail au toucher ; les échanges sont des « ronds ».
         const bul = morceaux.filter(([, t]) => /\bbulles?\b/i.test(t)).map(([n]) => n);
-        check('le mot « bulle » n\'est jamais employé pour les échanges en Débutant (on dit « ronds »)', !bul.length, bul);
+        check('le mot « bulle » n\'est jamais employé pour les échanges en Lisible (on dit « ronds »)', !bul.length, bul);
         global.__morceaux45 = morceaux;
       }
       // Détail au survol : une étiquette donne sa phrase entière ; la chaleur donne la ligne « Âges ».
@@ -1687,7 +1687,7 @@ async function filNoir(page, x, y) {
         await p45.evaluate(([a, b, c2, d]) => window.__carte.cadrer(a, b, c2, d), [tc - 60e3, tc + 60e3, pc - 100, pc + 100]);
         await p45.waitForTimeout(500);
         const luE = await viser(p45), mE = luE.match(/mesuré : ([\d,]+) BTC/);
-        check(`même case du carnet live : ${mD && mD[2]} BTC (Débutant) = ${mE && mE[1]} BTC (Expert)`, mD && mE && mD[2] === mE[1], [luD, luE]);
+        check(`même case du carnet live : ${mD && mD[2]} BTC (Lisible) = ${mE && mE[1]} BTC (Complet)`, mD && mE && mD[2] === mE[1], [luD, luE]);
         await p45.evaluate(([a, b, c2, d]) => window.__carte.cadrer(a, b, c2, d), [tc - 60e3, tc + 60e3, pb - 100, pb + 100]);
         await p45.waitForTimeout(500);
         const bE = await p45.evaluate(() => window.__carte.bulles());
@@ -1704,7 +1704,7 @@ async function filNoir(page, x, y) {
           const zD = (await p45.evaluate(() => window.__carte.bulles())).find(z => cle(z) === cle(commun)), rD = await canvasRect(p45);
           await p45.mouse.move(rD.x + zD.x + 1, rD.y + zD.y); await p45.mouse.move(rD.x + zD.x, rD.y + zD.y); await p45.waitForTimeout(300);
           const lD = await lecture(p45), xD = lD.match(/Échangé ici : ([\d,]+) BTC acheté, ([\d,]+) BTC vendu/);
-          check(`même bulle d'échanges : ${xD && xD[1]} / ${xD && xD[2]} BTC (Débutant) = ${xE && xE[1]} / ${xE && xE[2]} BTC (Expert)`, xD && xE && xD[1] === xE[1] && xD[2] === xE[2], [lD, lE]);
+          check(`même bulle d'échanges : ${xD && xD[1]} / ${xD && xD[2]} BTC (Lisible) = ${xE && xE[1]} / ${xE && xE[2]} BTC (Complet)`, xD && xE && xD[1] === xE[1] && xD[2] === xE[2], [lD, lE]);
         }
         if (e.mode !== (await etat(p45)).mode) { await p45.keyboard.press('m'); await p45.waitForTimeout(400); }
         await p45.keyboard.press('f'); await p45.waitForTimeout(800);
@@ -1714,9 +1714,9 @@ async function filNoir(page, x, y) {
         const h0 = (await bande(p45)).h, cv0 = await p45.evaluate(() => document.getElementById('carte').getBoundingClientRect().toJSON());
         await p45.click('#resumeCarte'); await p45.waitForTimeout(400);
         const o = await bande(p45), lignes = o.texte.replace(/[\u202f\u00a0]/g, ' ').split('\n');
-        check('résumé ouvert : la ligne + 6 lignes (variation chiffrée, ordres lus, deux côtés, 3 âges, le scénario au Terminal, « pas une prévision » et « mode Expert »)',
+        check('résumé ouvert : la ligne + 6 lignes (variation chiffrée, ordres lus, deux côtés, 3 âges, le scénario au Terminal, « pas une prévision » et « mode Complet »)',
           lignes.length === 7 && /^Prix : de .+ \$ à .+ \$ en 15 min \([+−]\d/.test(lignes[1]) && /^Ordres en attente lus il y a /.test(lignes[2]) && /^Au-dessus : .+ Au-dessous : /.test(lignes[3])
-            && /^Âges : couleurs récentes .+, plus anciennes .+ · ronds .+ · ligne du prix /.test(lignes[4]) && /^Le scénario du matin de Claude est sur le Terminal/.test(lignes[5]) && /pas une prévision.+mode Expert/.test(lignes[6]) && o.h > h0, { lignes, h0, h: o.h });
+            && /^Âges : couleurs récentes .+, plus anciennes .+ · ronds .+ · ligne du prix /.test(lignes[4]) && /^Le scénario du matin de Claude est sur le Terminal/.test(lignes[5]) && /pas une prévision.+mode Complet/.test(lignes[6]) && o.h > h0, { lignes, h0, h: o.h });
         const cv1 = await p45.evaluate(() => document.getElementById('carte').getBoundingClientRect().toJSON());
         check(`résumé ouvert PAR-DESSUS la carte : la carte ne bouge pas (${Math.round(cv0.top)}/${Math.round(cv0.height)} → ${Math.round(cv1.top)}/${Math.round(cv1.height)} px)`, cv0.top === cv1.top && cv0.height === cv1.height, { cv0, cv1 });
         const mal = interdits(o.texte);
@@ -1735,20 +1735,20 @@ async function filNoir(page, x, y) {
           reglages: document.getElementById('btnReglages').offsetParent !== null, rafales: document.getElementById('btnRafales').offsetParent !== null,
           puces: [...document.querySelectorAll('.calques .puce')].filter(p => p.offsetParent !== null).length, ch: document.getElementById('carte').clientHeight }));
         const eX = await etat(p45);
-        check('45b. touche M : Expert (data-mode, samsara-mode), « → Débutant », Réglages, Rafales et toutes les puces visibles',
-          x.mode === 'expert' && x.cle === 'expert' && x.libelle === '→ Débutant' && x.reglages && x.rafales && x.puces === 16, x);
-        // Les cinq pastilles de la section 2 : murs et gamma viennent du fichier de 15 min, relu en Expert.
+        check('45b. touche M : Complet (data-mode, samsara-mode), « → Lisible », Réglages, Rafales et toutes les puces visibles',
+          x.mode === 'expert' && x.cle === 'expert' && x.libelle === '→ Lisible' && x.reglages && x.rafales && x.puces === 16, x);
+        // Les cinq pastilles de la section 2 : murs et gamma viennent du fichier de 15 min, relu en Complet.
         const motifs = [/^Carte publiée · /, /^Carnet live · /, /^Exécutions · /, /^Murs du carnet · /, /^Gamma \(Deribit\) · /];
         await p45.waitForFunction(ms => { const p = window.__carte.etat().pastilles; return ms.every(m => p.some(t => new RegExp(m).test(t))); }, motifs.map(m => m.source), { timeout: 15000 }).catch(() => {});
         const eX5 = await etat(p45);
-        check('Expert : les 5 pastilles d\'âge de la section 2 sont là, panneaux du côté et du bas rouverts', motifs.every(m => eX5.pastilles.some(t => m.test(t))) && eX.mise.dom.w > 0 && eX.mise.vol.h > 0 && eX.mise.cvd.h > 0, { p: eX5.pastilles, dom: eX.mise.dom, vol: eX.mise.vol });
-        check('45h. pas de régression Expert : « Σ … BTC » posés, axe gradué, volume et CVD écrits', eX.posees.some(p => /Σ/.test(p.texte)) && (eX.textes.axePrix || []).length > 3 && !!eX.textes.volume && !!eX.textes.cvd, { posees: eX.posees.map(p => p.texte).slice(0, 12), v: eX.textes.volume, c: eX.textes.cvd });
+        check('Complet : les 5 pastilles d\'âge de la section 2 sont là, panneaux du côté et du bas rouverts', motifs.every(m => eX5.pastilles.some(t => m.test(t))) && eX.mise.dom.w > 0 && eX.mise.vol.h > 0 && eX.mise.cvd.h > 0, { p: eX5.pastilles, dom: eX.mise.dom, vol: eX.mise.vol });
+        check('45h. pas de régression Complet : « Σ … BTC » posés, axe gradué, volume et CVD écrits', eX.posees.some(p => /Σ/.test(p.texte)) && (eX.textes.axePrix || []).length > 3 && !!eX.textes.volume && !!eX.textes.cvd, { posees: eX.posees.map(p => p.texte).slice(0, 12), v: eX.textes.volume, c: eX.textes.cvd });
         check(`la hauteur du canevas suit la bande (${c0} → ${x.ch} px)`, Math.abs(x.ch - c0) < 40, [c0, x.ch]);
         await p45.click('#btnReglages'); await p45.waitForTimeout(200);
         await p45.keyboard.press('Escape'); await p45.click('#btnReglages'); await p45.waitForTimeout(200);
         await p45.click('#btnModeBarre'); await p45.waitForTimeout(1500);
         const eD = await etat(p45), rg = await p45.evaluate(() => document.getElementById('reglages').hidden);
-        check('bouton de mode : retour en Débutant, budget de 45a tenu, panneau Réglages refermé', eD.mode === 'debutant' && eD.textesCarte.filter(t => !t.repere).length <= 2 && !eD.posees.some(p => p.pastille) && rg, { mode: eD.mode, tc: eD.textesCarte, rg });
+        check('bouton de mode : retour en Lisible, budget de 45a tenu, panneau Réglages refermé', eD.mode === 'debutant' && eD.textesCarte.filter(t => !t.repere).length <= 2 && !eD.posees.some(p => p.pastille) && rg, { mode: eD.mode, tc: eD.textesCarte, rg });
         await p45.evaluate(() => { localStorage.setItem('samsara-mode', 'expert'); window.dispatchEvent(new StorageEvent('storage', { key: 'samsara-mode', newValue: 'expert' })); });
         await p45.waitForTimeout(800);
         check('le terminal change de mode (autre onglet) : la carte suit', (await etat(p45)).mode === 'expert');
@@ -1766,7 +1766,7 @@ async function filNoir(page, x, y) {
         await p45.keyboard.press('f'); await p45.waitForTimeout(800);
         check('touche F : « Suivre » n\'est plus rappelé', !(await p45.evaluate(() => document.getElementById('btnSuivre').classList.contains('accent'))));
       }
-      // ── 45j. Guide caché en Débutant : la bande dit comment revenir ───────
+      // ── 45j. Guide caché en Lisible : la bande dit comment revenir ───────
       {
         await p45.waitForTimeout(600);
         const c0 = await p45.evaluate(() => document.getElementById('carte').clientHeight);
@@ -1810,7 +1810,7 @@ async function filNoir(page, x, y) {
         }
         await p45.keyboard.press('f'); await p45.waitForTimeout(800);
       }
-      // ── A13. Statut d'erreur en Débutant (429) ─────────────────────────────
+      // ── A13. Statut d'erreur en Lisible (429) ─────────────────────────────
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p45.close();
       {
@@ -1820,7 +1820,7 @@ async function filNoir(page, x, y) {
         limite = true;
         await p13.waitForFunction(() => /trop de demandes/.test(window.__carte.etat().statut), null, { timeout: 6000 }).catch(() => {});
         const st = (await etat(p13)).statut;
-        check('A13. 429 en Débutant : « Binance : trop de demandes, lectures en pause — reprise dans N s », sans mot technique', /Binance : trop de demandes, lectures en pause — reprise dans \d+ s/.test(st) && !interdits(st).length && !/HTTP|fichier/.test(st), st);
+        check('A13. 429 en Lisible : « Binance : trop de demandes, lectures en pause — reprise dans N s », sans mot technique', /Binance : trop de demandes, lectures en pause — reprise dans \d+ s/.test(st) && !interdits(st).length && !/HTTP|fichier/.test(st), st);
         limite = false;
         await p13.waitForFunction(() => !/trop de demandes/.test(window.__carte.etat().statut), null, { timeout: 10000 }).catch(() => {});
         check('reprise : statut effacé', !/trop de demandes/.test((await etat(p13)).statut));
@@ -1834,10 +1834,10 @@ async function filNoir(page, x, y) {
         ({ page: pg, erreurs } = await ouvrir(nav, { encodage: true, mode: 'debutant', vue: { width: 1024, height: 768 }, stockage: VU, intercept: deuxCotes }));
         await pg.waitForFunction(() => window.__carte.etat().debutant.etiquettes.length >= 1 && window.__carte.etat().debutant.tendance, null, { timeout: 15000 }).catch(() => {});
         const g = await etat(pg), b = await bande(pg), h = await pg.evaluate(() => ({ h: document.querySelector('.barre').getBoundingClientRect().height, mode: document.getElementById('btnModeBarre').innerText }));
-        check(`45c. 1024 × 768 : en-tête sur une rangée (${Math.round(h.h)} px), « Débutant · passer en Expert », résumé sur une ligne (${b.texte.length} ≤ 100)`, h.h <= 46 && h.mode === 'Débutant · passer en Expert' && b.sw <= b.cw + 1 && b.h <= 26.5 && b.texte.length <= 100 && motifAge.test(b.texte) && motifTete.test(b.texte), { h, b });
+        check(`45c. 1024 × 768 : en-tête sur une rangée (${Math.round(h.h)} px), « Lisible · passer en Complet », résumé sur une ligne (${b.texte.length} ≤ 100)`, h.h <= 46 && h.mode === 'Lisible · passer en Complet' && b.sw <= b.cw + 1 && b.h <= 26.5 && b.texte.length <= 100 && motifAge.test(b.texte) && motifTete.test(b.texte), { h, b });
         controlerEtiquettes(g, '1024 × 768');
         await pg.setViewportSize({ width: 1023, height: 768 }); await pg.waitForTimeout(400);
-        check('1023 px : « Passer en Expert »', (await pg.evaluate(() => document.getElementById('btnModeBarre').innerText)) === 'Passer en Expert');
+        check('1023 px : « Passer en Complet »', (await pg.evaluate(() => document.getElementById('btnModeBarre').innerText)) === 'Passer en Complet');
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
         await pg.close();
       }
@@ -1918,7 +1918,7 @@ async function filNoir(page, x, y) {
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
         await pg.close();
       }
-      // ── 45f. Première visite en Débutant ──────────────────────────────────
+      // ── 45f. Première visite en Lisible ──────────────────────────────────
       {
         let pg;
         ({ page: pg, erreurs } = await ouvrir(nav, { encodage: true, mode: 'debutant', intercept: deuxCotes }));
@@ -1932,7 +1932,7 @@ async function filNoir(page, x, y) {
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
         await pg.close();
       }
-      // ── 45i. Couches éteintes en Expert : toujours là en Débutant ─────────
+      // ── 45i. Couches éteintes en Complet : toujours là en Lisible ─────────
       {
         let pg;
         const calques = { publiee: true, live: false, executions: false, prix: false, guide: true };
@@ -1945,10 +1945,10 @@ async function filNoir(page, x, y) {
           res.push(await pixel(pg, x, y));
         }
         const blancs = res.filter(px => px.every(c => c > 225)).length, nb = (await pg.evaluate(() => window.__carte.bulles())).length;
-        check(`45i. prix, échanges, carnet éteints en Expert : en Débutant la ligne de prix (${blancs}/3 pixels blancs) et les ronds (${nb}) sont là, le carnet est lu`, blancs >= 2 && nb > 0 && g.live && g.live.n >= 1, { res, nb, live: g.live });
+        check(`45i. prix, échanges, carnet éteints en Complet : en Lisible la ligne de prix (${blancs}/3 pixels blancs) et les ronds (${nb}) sont là, le carnet est lu`, blancs >= 2 && nb > 0 && g.live && g.live.n >= 1, { res, nb, live: g.live });
         await pg.keyboard.press('m'); await pg.waitForTimeout(800);
         const g2 = await etat(pg), ap = await pg.evaluate(() => ['prix', 'executions', 'live'].map(k => document.querySelector(`button[data-calque="${k}"]`).getAttribute('aria-pressed')));
-        check('… et en Expert ils restent éteints (puces non pressées, réglage intact)', ap.every(a => a === 'false') && !g2.reglages.calques.prix && !g2.reglages.calques.executions && !g2.reglages.calques.live, { ap, c: g2.reglages.calques });
+        check('… et en Complet ils restent éteints (puces non pressées, réglage intact)', ap.every(a => a === 'false') && !g2.reglages.calques.prix && !g2.reglages.calques.executions && !g2.reglages.calques.live, { ap, c: g2.reglages.calques });
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
         await pg.close();
       }
@@ -2016,20 +2016,20 @@ async function filNoir(page, x, y) {
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
         await pg.close();
       }
-      // ── 45n. Palette « bid / ask teintés » en Débutant : la légende sans « Bid » ni « Ask » ──
+      // ── 45n. Palette « bid / ask teintés » en Lisible : la légende sans « Bid » ni « Ask » ──
       {
         let pg;
         ({ page: pg, erreurs } = await ouvrir(nav, { encodage: true, mode: 'debutant', stockage: VU, intercept: deuxCotes, reglages: { palette: 'cote' } }));
         await pg.click('#btnLegende'); await pg.waitForTimeout(300);
         const lg = await pg.evaluate(() => ({ texte: document.getElementById('legende').innerText, rampes: [...document.querySelectorAll('#barreCouleurs .rampe-nom')].map(e => e.textContent) }));
         const mal = interdits(lg.texte);
-        check(`45n. palette « cote » en Débutant : rampes « ${lg.rampes.join(' », « ')} », légende sans mot technique`, lg.rampes.join('|') === 'Achats en attente|Ventes en attente' && !mal.length, { mal, rampes: lg.rampes });
+        check(`45n. palette « cote » en Lisible : rampes « ${lg.rampes.join(' », « ')} », légende sans mot technique`, lg.rampes.join('|') === 'Achats en attente|Ventes en attente' && !mal.length, { mal, rampes: lg.rampes });
         check('45n. la légende dit les couleurs de cette palette (turquoise / rouge)', /Achats en turquoise, ventes en rouge/.test(lg.texte), lg.texte.slice(0, 300));
         await pg.keyboard.press('Escape');
         await pg.keyboard.press('m'); await pg.waitForTimeout(500);
         await pg.click('#btnLegende'); await pg.waitForTimeout(300);
         const rx = await pg.evaluate(() => [...document.querySelectorAll('#barreCouleurs .rampe-nom')].map(e => e.textContent));
-        check('… et en Expert, les noms Bid / Ask restent', rx.join('|') === 'Bid (achats posés)|Ask (ventes posées)', rx);
+        check('… et en Complet, les noms Bid / Ask restent', rx.join('|') === 'Bid (achats posés)|Ask (ventes posées)', rx);
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
         await pg.close();
       }

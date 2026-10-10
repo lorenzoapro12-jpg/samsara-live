@@ -107,8 +107,8 @@ async function ouvrir(nav, theme, vue) {
     if (h === 'raw.githubusercontent.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, u.includes('heatmap') ? 'heatmap.json' : 'market-data.json')) });
     return r.abort();
   });
-// Mode Expert : ce test mesure les éléments denses (chiffres clés, menus, sous-graphes…), masqués
-  // en Débutant (le mode par défaut) ; leur version Débutant est vérifiée dans test_debutant_page.js.
+// Mode Complet : ce test mesure les éléments denses (chiffres clés, menus, sous-graphes…), masqués
+  // en Lisible (le mode par défaut) ; leur version Lisible est vérifiée dans test_debutant_page.js.
   await page.addInitScript(t => { try { localStorage.clear(); localStorage.setItem('samsara-mode', 'expert'); localStorage.setItem('samsara-theme', t); } catch (e) { /* */ } }, theme);
   // Observateurs (MutationObserver, ResizeObserver) : chaque instance est notée, avec son état
   // (branché par observe(), débranché par disconnect()). Une structure qui en laisse un branché

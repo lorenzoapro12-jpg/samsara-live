@@ -1841,7 +1841,7 @@
     if (dit(a.autre)) ag.push('autre plateforme ' + BM.age(a.autre));
     const l4 = 'Âges : ' + (ag.length ? ag.join(' · ') : 'rien de lu encore') + '.';
     return [l1, l2, l3, l4, 'Le scénario du matin de Claude est sur le Terminal (bouton «' + NB + '←' + NB + 'Terminal' + NB + '»).',
-      'Une photo de l\'instant, pas une prévision. Tout le détail technique : mode Expert.'].map(BM.typo);
+      'Une photo de l\'instant, pas une prévision. Tout le détail technique : mode Complet.'].map(BM.typo);
   };
 
   /** L'histoire d'une tranche (k, de `pas` $, côté 'b' ou 'a') dans le carnet live gardé
@@ -1921,7 +1921,7 @@
    *  m = { cote: 'bid'|'ask', p, pas, q, depuis (instant), auMoins, raison, publiee, variation
    *  (BM.variationMur), note ('prix' | 'bande' | null : rien à comparer, et pourquoi), source:
    *  'live'|'publie', luA (instant de lecture du fichier), periment (carnet live pas lu en ce moment) }.
-   *  Débutant : une ligne ; la 2e seulement quand le mur a une histoire (il grossit, diminue, est là
+   *  Lisible : une ligne ; la 2e seulement quand le mur a une histoire (il grossit, diminue, est là
    *  depuis longtemps, ou n'a rien à quoi se comparer). */
   BM.texteMur = function (m, mode, maintenant, o) {
     o = Object.assign({}, BM.GUIDE, o);
@@ -2042,7 +2042,7 @@
       incertain: [taille + ' disparu à ' + px + ', échanges incertains' + (vie ? ' : ' + vie + ' au cours de sa vie' : '') + (plus ? ' ; on ne sait pas si ses derniers ' + BM.btc(x.q0) + ' BTC ont été échangés' : '') + ' (un seul prix)',
         nom + ' disparu à ' + hc + ' (échanges incertains)', '? ' + mot + ' : échanges incertains ' + hc],
     }[type];
-    // Débutant : des dollars entiers, chaque quantité avec son unité, et jamais « ses derniers 0,000 BTC ».
+    // Lisible : des dollars entiers, chaque quantité avec son unité, et jamais « ses derniers 0,000 BTC ».
     const o2 = ordreMot(x.cote), pxD = BM.prix(x.p) + DOL;
     const D = {
       retire: o2 + ' retiré à ' + pxD + (ech > 0.0005 ? ' (' + BM.btc(qMax) + ' BTC, dont ' + BM.btc(ech) + ' BTC échangés avant)' : ', sans échange (' + BM.btc(qMax) + ' BTC)'),
@@ -2130,7 +2130,7 @@
       repasse: [nom + ' : une clôture 1 min ' + dela + ' le niveau (' + h1 + ' UTC), puis retour ' + deca + ' à ' + h2 + ' UTC — pas «' + NB + 'cassé' + NB + '» selon la règle de travail', 'Clôture au-delà puis retour (' + h2 + ' UTC)', SG.meche.s + ' retour ' + coteMot(x.cote) + ' ' + BM.prix(x.p) + ' ' + h2],
     }[x.verdict];
     const t = (x.verdict === 'meche' ? x.m1 : x.m2).fin;
-    // Débutant : le fait (« deux minutes de suite »), pas le mot « cassé » de la règle de travail.
+    // Lisible : le fait (« deux minutes de suite »), pas le mot « cassé » de la règle de travail.
     const niv = BM.prix(b ? x.p : x.p + x.pas) + DOL, l1 = BM.heure(x.m1.t), l2 = x.m2 ? BM.heure(x.m2.t) : '';
     const D = {
       meche: 'Simple passage : la minute de ' + l1 + ' finit ' + (b ? 'au-dessus de ' : 'sous ') + niv,

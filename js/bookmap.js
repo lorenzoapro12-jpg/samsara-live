@@ -90,7 +90,7 @@
   //    réglage expert, invisible en débutant, ne vide pas l'écran. R.calques n'est jamais modifié.
   //  · estVu : seules les couches de VOIT_DEBUTANT sont dessinées en débutant ; l'expert les a toutes.
   const FORCE_DEBUTANT = new Set(['publiee', 'live', 'executions', 'prix']);
-  // La profondeur Coinbase (« loin ») reste en Expert : ses couleurs ont leur propre échelle et ne se
+  // La profondeur Coinbase (« loin ») reste en Complet : ses couleurs ont leur propre échelle et ne se
   // comparent pas à la chaleur Binance (choix de Lorenzo, 09/10/2026).
   const VOIT_DEBUTANT = new Set(['guide', 'publiee', 'live', 'executions', 'prix']);
   const estLu = k => !!R.calques[k] || (MODE === 'debutant' && FORCE_DEBUTANT.has(k));
@@ -922,10 +922,10 @@
     if (estVu('murs')) murs();
     if (estVu('gamma')) gamma();
     if (estVu('bidask')) bidAsk();
-    // Débutant : la ligne de prix passe AU-DESSUS des ronds (elle ne se perd pas dessous).
+    // Lisible : la ligne de prix passe AU-DESSUS des ronds (elle ne se perd pas dessous).
     if (estVu('prix') && !deb) lignePrix();
     if (estVu('executions')) bulles();
-    // Débutant : les cadres des repères (une zone « allumée » est remplie) passent SOUS la ligne de prix.
+    // Lisible : les cadres des repères (une zone « allumée » est remplie) passent SOUS la ligne de prix.
     if (deb) { ETIQ_DIFF = []; if (R.calques.guide) guideFond(); else { GU.cadres = []; GU.marques = []; GU.etiquettes = []; } }
     if (estVu('prix') && deb) lignePrix();
     if (estVu('rafales')) rafales(); else RAF.items = [];
@@ -934,7 +934,7 @@
     reperesEtAges();
     dessinerPastilles();
     // Le guide écrit APRÈS les pastilles d'âge : elles gardent leur place, ses mots les évitent.
-    // (Débutant : placés avec les cadres, dans guideFond ; dessinés ici, par-dessus tout.)
+    // (Lisible : placés avec les cadres, dans guideFond ; dessinés ici, par-dessus tout.)
     if (deb) { for (const d of ETIQ_DIFF) d(); ETIQ_DIFF = []; }
     else { GU.etiquettes = []; if (R.calques.guide) guideTextes(); }
     guideReperes();
@@ -1001,7 +1001,7 @@
   function pastille(lignes, x, y, coul, align, court) { AGES.push({ lignes, court, coul }); if (!debutant()) fileP.push([lignes, x, y, coul, align, court]); }
   // AGES : les lignes de toutes les pastilles du rendu, dans les DEUX modes (mêmes chaînes). En mode
   // débutant elles ne sont pas dessinées : leur âge passe dans la ligne du haut et dans le détail au
-  // toucher (« Âges »), leurs lignes complètes en mode Expert.
+  // toucher (« Âges »), leurs lignes complètes en mode Complet.
   let AGES = [];
   function dessinerPastilles() { for (const a of fileP) poserPastille(...a); fileP = []; }
   /** Une pastille est TOUJOURS dans la carte (aucun âge ne disparaît) : à l'endroit voulu, sinon
@@ -1051,7 +1051,7 @@
     let horlogeTexte = E.horloge.texte();
     // Maintenant
     const xn = X(now);
-    // Débutant : un trait plus net (2 px, plein) — il est nommé « maintenant » sous l'axe du temps.
+    // Lisible : un trait plus net (2 px, plein) — il est nommé « maintenant » sous l'axe du temps.
     ctx.fillStyle = C.accent; ctx.globalAlpha = exp ? 0.8 : 1; ctx.fillRect(Math.round(xn) - (exp ? 0 : 1), 0, exp ? 1 : 2, Z.chaleur.h); ctx.globalAlpha = 1;
     // Carte publiée : jusqu'où elle va, et de quand elle date.
     if (estLu('publiee') && E.pub) {
@@ -1273,7 +1273,7 @@
     }
     // Un trait sombre plus large SOUS la ligne la détache de la chaleur (une ombre floue coûtait
     // ≈ 1,5 ms par image au navigateur).
-    // Débutant : un trait qu'aucune couleur de la chaleur ne prend — blanc, plus épais, avec un fil
+    // Lisible : un trait qu'aucune couleur de la chaleur ne prend — blanc, plus épais, avec un fil
     // noir au milieu (« la ligne à fil noir ») : une bande d'ordres claire et droite ne se confond
     // plus avec le prix.
     const deb = debutant();
@@ -1300,7 +1300,7 @@
       TRI = { cle, g: E.exec.regrouper(E.vue.t1, E.vue.t2, pasT, pasP).filter(b => b.achat + b.vente >= R.bulleMin).sort((a, b) => (a.achat + a.vente) - (b.achat + b.vente)) };
     }
     const g = TRI.g;
-    // Débutant : couleur et taille seules (ni arc, ni nombre), plus pâles, et plus petites sur un
+    // Lisible : couleur et taille seules (ni arc, ni nombre), plus pâles, et plus petites sur un
     // écran étroit. Le rayon dessiné est gardé : la lecture au pointeur vise la bulle vue.
     const deb = debutant(), echelle = deb && (Z.etroit || Z.chaleur.h < 400) ? Math.min(R.bulleEchelle, 0.6) : R.bulleEchelle;
     for (const b of g) {
@@ -1573,28 +1573,28 @@
     if (!m) { try { localStorage.setItem(MODE_CLE, MODE); } catch (e) { /* navigation privée : le mode vaut pour cette page */ } }
     document.documentElement.setAttribute('data-mode', MODE);
     majBoutonMode();
-    // Débutant : les panneaux experts ouverts se ferment (leurs boutons sont cachés).
+    // Lisible : les panneaux experts ouverts se ferment (leurs boutons sont cachés).
     if (debutant()) for (const id of ['reglages', 'rafalesPanneau']) { const el = document.getElementById(id); if (el && !el.hidden) fermerPanneaux(); }
     GU.cleJournal = null; GU.slots.clear(); RESUME_FORME.cle = null; RECT = null; INTRO_RECT = null; LISTE_RAF = null;
     majBoutonSuivre(); majHauteurBarre(); majLegende(); remplirIntro(); majIndice(); majPanneauJournal();
-    // Débutant : la chaleur live est toujours lue (FORCE_DEBUTANT) — relue tout de suite.
+    // Lisible : la chaleur live est toujours lue (FORCE_DEBUTANT) — relue tout de suite.
     if (boucleCarnet && debutant()) boucleCarnet.reveiller();
     dessiner();
   }
   /** Les boutons de mode : un libellé qui dit l'ACTION (le mode visé), jamais un état « enfoncé »
-   *  (pas d'aria-pressed : « Débutant » enfoncé se lirait « je suis en Débutant »), et l'infobulle
-   *  de la puce Guide. Expert : « → Débutant » à toutes les largeurs (css). */
+   *  (pas d'aria-pressed : « Lisible » enfoncé se lirait « je suis en Lisible »), et l'infobulle
+   *  de la puce Guide. Complet : « → Lisible » à toutes les largeurs (css). */
   function majBoutonMode() {
     const exp = MODE === 'expert', b = document.getElementById('btnModeBarre');
     if (b) {
       b.removeAttribute('aria-pressed');
-      b.querySelector('.mode-long').textContent = exp ? 'Expert · passer en Débutant' : 'Débutant · passer en Expert';
-      b.querySelector('.mode-court').textContent = exp ? 'Passer en Débutant' : 'Passer en Expert';
-      const m = b.querySelector('.mode-mini'); if (m) m.textContent = exp ? '→ Débutant' : '→ Expert';
-      if (exp) b.setAttribute('aria-label', 'Passer en Débutant'); else b.removeAttribute('aria-label');
+      b.querySelector('.mode-long').textContent = exp ? 'Complet · passer en Lisible' : 'Lisible · passer en Complet';
+      b.querySelector('.mode-court').textContent = exp ? 'Passer en Lisible' : 'Passer en Complet';
+      const m = b.querySelector('.mode-mini'); if (m) m.textContent = exp ? '→ Lisible' : '→ Complet';
+      if (exp) b.setAttribute('aria-label', 'Passer en Lisible'); else b.removeAttribute('aria-label');
     }
     const d = document.getElementById('btnModeDebutant');
-    if (d) d.textContent = exp ? 'Passer en Débutant' : 'Passer en Expert';
+    if (d) d.textContent = exp ? 'Passer en Lisible' : 'Passer en Complet';
     const g = document.querySelector('button[data-calque="guide"]');
     if (g) g.title = exp ? 'Le guide : la carte dite en mots, le résumé et le journal (touche G)' : 'Afficher ou cacher la phrase du haut et les repères «\u00a0Mur d’achat\u00a0» / «\u00a0Mur de vente\u00a0» (touche G)';
   }
@@ -1797,24 +1797,24 @@
       // Zones à surveiller : un cadre net (2 px, halo sombre) sur une largeur fixe avant « maintenant »,
       // prolongé jusqu'au bord (l'avenir hachuré) et marqué au bord droit, côté axe des prix.
       const x0c = Math.max(0, xn - Math.min(170, Math.max(110, W * 0.16)));
-      // Débutant : seulement le cadre que nomme un repère (la zone de son côté, ou celle où est le
+      // Lisible : seulement le cadre que nomme un repère (la zone de son côté, ou celle où est le
       // prix) — jamais un cadre muet, ni une zone que le prix a dépassée de l'autre côté.
       const N = deb ? niveauxDebutant() : null;
       for (const cote of ['bid', 'ask']) {
         const z = GU.zones[cote];
         if (!z || (deb && !(N[cote] && N[cote].z === z))) continue;
-        // Débutant : le cadre est assez large pour son étiquette (téléphone : 110 px ne suffisaient pas,
+        // Lisible : le cadre est assez large pour son étiquette (téléphone : 110 px ne suffisaient pas,
         // elle débordait sur la ligne de prix récente et partait loin de son cadre).
         const x0 = deb ? Math.max(0, Math.min(x0c, xn - largeurTexte(N[cote].etiquette, 11, true) - 26)) : x0c;
         const ya = Math.round(Y(z.pHaut)), yb = Math.round(Y(z.pBas));
         if (yb < 0 || ya > H || yb - ya < 2) continue;
         const coul = cote === 'bid' ? C.murBid : C.murAsk, dedans = deb ? !!N[cote].dedans : GU.C.mid >= z.pBas && GU.C.mid <= z.pHaut;
-        // Débutant : le prix DANS la zone l'« allume » (trait plus épais, fond plus dense) — un état dit
+        // Lisible : le prix DANS la zone l'« allume » (trait plus épais, fond plus dense) — un état dit
         // par la couleur, pas par des mots.
         GU.cadres.push({ z, x0, x1: xn, ya, yb, dedans, coul, allume: deb && dedans });
       }
     }
-    // Débutant : les mots d'abord (leur place est prise, leur dessin attend la fin du rendu), puis
+    // Lisible : les mots d'abord (leur place est prise, leur dessin attend la fin du rendu), puis
     // seulement les cadres qu'une étiquette nomme — jamais un cadre muet, même au zoom.
     if (deb) {
       GU.etiquettes = []; DIFFERE = [];
@@ -1833,9 +1833,9 @@
     if (GU.present && carnetFrais() && GU.C) {
       const x0 = Math.max(0, xn - Math.min(170, Math.max(110, W * 0.16)));
       // Vie des murs nommés : un trait à leur prix, depuis quand ils portent au moins le seuil « mur ».
-      // Débutant : seulement le mur de repli (le côté sans zone), celui que son repère nomme.
+      // Lisible : seulement le mur de repli (le côté sans zone), celui que son repère nomme.
       for (const m of deb ? mursRepli() : mursAffiches()) {
-        // Débutant : un mur de repli dont la série n'est pas connue est marqué sur la largeur des cadres
+        // Lisible : un mur de repli dont la série n'est pas connue est marqué sur la largeur des cadres
         // (sans point de départ : rien n'est daté).
         const connu = m.depuis !== null && m.depuis !== undefined;
         if (m.source !== 'live' || (!connu && !deb)) continue;
@@ -1848,7 +1848,7 @@
       }
     }
     // Marques du journal : un symbole à l'instant et au prix de chaque évènement, une seule par case
-    // de quelques pixels (×n au survol, la phrase de chacun). Expert seulement : en débutant, le
+    // de quelques pixels (×n au survol, la phrase de chacun). Complet seulement : en débutant, le
     // panneau Journal les garde.
     if (deb) return;
     const evs = GU.journal.dans(E.vue.t1, E.vue.t2), pts = [];
@@ -2288,14 +2288,14 @@
     GU.cleJournal = cle;
     const G = BM.GUIDE, debut = E.murs.totaux[0].depuis;
     if (debutant()) {
-      // Débutant : les phrases simples de chaque évènement (mêmes quantités, mêmes prix), à l'heure
+      // Lisible : les phrases simples de chaque évènement (mêmes quantités, mêmes prix), à l'heure
       // de l'appareil (celle de l'axe) ; les niveaux d'une estimation (options) ne sont pas listés ;
       // les gros ordres posés ou retirés AU PRIX du moment, regroupés (BM.journalDebutant) : le
       // va-et-vient au prix ne remplit plus la liste.
       const l = BM.journalDebutant(GU.journal.liste, fourchettePrix).slice(-G.journalMax).reverse(), depuis = debut !== null ? BM.heure(axe(debut)) : null;
       document.getElementById('journalNote').textContent = 'Ce qui s\'est passé' + (depuis ? ' depuis ' + depuis : '') + ', le plus récent en haut (heure de cet appareil). Le journal décrit ; il n\'explique pas et ne prévoit rien.';
       document.getElementById('listeJournal').innerHTML = !R.calques.guide ? '<li>Guide caché : le journal ne se remplit pas (bouton «\u00a0Guide\u00a0»).</li>'
-        // Sans les symboles de la carte Expert (✕ ◐ ? +), qu'aucun texte débutant n'explique : l'heure, la phrase, et « (2 fois) ».
+        // Sans les symboles de la carte Complet (✕ ◐ ? +), qu'aucun texte débutant n'explique : l'heure, la phrase, et « (2 fois) ».
         : l.length ? l.map(ev => '<li><time>' + BM.heure(ev.t, true) + '</time> ' + echap(BM.typo(ev.texte)) + (ev.n > 1 ? ' (' + ev.n + '\u00a0fois)' : '') + '</li>').join('')
           : '<li>Rien de notable' + (depuis ? ' depuis ' + depuis : '') + ' : aucun gros ordre posé ou retiré, aucune grosse vague d\'échanges. C\'est courant quand le marché est calme.</li>';
       return;
@@ -2345,7 +2345,7 @@
   /** Un mot de couleur et sa pastille, insécables. */
   const couleurMot = (mot, v) => '<span class="mot-couleur">' + mot + ' ' + pastilleCss(v) + '</span>';
   function itemsIntro() {
-    // Débutant : 3 points, ce qu'il voit — couleurs, ligne du prix (à fil noir) et ronds, les deux repères.
+    // Lisible : 3 points, ce qu'il voit — couleurs, ligne du prix (à fil noir) et ronds, les deux repères.
     if (debutant()) return [
       ['Couleurs = ordres d\'achat ou de vente en attente.', couleursDebutant() + ' Un ordre peut être retiré à tout moment. Hachures : rien n\'a été lu là.'],
       ['Ligne à fil noir = le prix, jusqu\'au trait jaune «\u00a0maintenant\u00a0». Ronds = échanges réels.', couleurMot('Vert', '--up') + ' : surtout des acheteurs qui ont pris des ventes en attente. ' + couleurMot('Rouge', '--down') + ' : surtout des vendeurs qui ont pris des achats en attente. Plus gros = plus de BTC.'],
@@ -2368,15 +2368,15 @@
     const vus = new Set(GU.reperes.map(r => r.n)), ouvert = !introEl.hidden, survol = window.matchMedia && window.matchMedia('(hover: hover)').matches;
     const deb = debutant();
     document.getElementById('guideIntroListe').innerHTML = itemsIntro().map(([t, d], i) => '<li><span class="num">' + (i + 1) + '</span><span><b>' + t + '</b> <span class="detail' + (i === 2 || deb ? ' garde' : '') + '">' + d + '</span>'
-      // (Débutant : seulement « pas d'exemple » — l'explication se pose loin du prix et des repères.)
+      // (Lisible : seulement « pas d'exemple » — l'explication se pose loin du prix et des repères.)
       + (ouvert && R.calques.guide && !vus.has(i + 1) && !(deb && (GU.caches.has(i + 1) || GU.sansPlace.has(i + 1))) ? ' <i>' + (GU.caches.has(i + 1) ? '(caché sous ce cadre)' : GU.sansPlace.has(i + 1) ? '(visible, mais sans place libre pour son numéro)' : '(pas d\'exemple dans cette vue)') + '</i>' : '') + '</span></li>').join('');
     if (deb) {
-      document.getElementById('guideIntroNote').textContent = (survol ? 'Touchez ou survolez' : 'Touchez') + ' un repère pour le détail. Tout voir : bouton «\u00a0Passer en Expert\u00a0»' + (survol ? ' (touche M).' : '.');
+      document.getElementById('guideIntroNote').textContent = (survol ? 'Touchez ou survolez' : 'Touchez') + ' un repère pour le détail. Tout voir : bouton «\u00a0Passer en Complet\u00a0»' + (survol ? ' (touche M).' : '.');
       return;
     }
     document.getElementById('guideIntroNote').textContent = (R.calques.guide ? 'Les numéros montrent un exemple réel de chacun. Vert ou turquoise : côté achat ; rouge ou rose : côté vente. Rond : échangé ; rectangle : en attente.' : 'Calque Guide éteint : pas de numéros sur la carte.')
       + ' Le Guide écrit aussi les murs, les zones à surveiller, un résumé (en haut) et le Journal. '
-      + 'Mode ' + (MODE === 'expert' ? 'expert : chiffres seuls' : 'débutant : des phrases') + ' (bouton dans la Légende' + (survol ? ' ou touche M' : '') + ' ; change aussi le terminal).'
+      + 'Mode ' + (MODE === 'expert' ? 'Complet : les chiffres seuls' : 'Lisible : des phrases') + ' (bouton dans la Légende' + (survol ? ' ou touche M' : '') + ' ; change aussi le terminal).'
       + (survol ? ' Touches : ? ce guide, G guide, J journal, L légende.' : '');
   }
   function rectIntro() {
@@ -2389,7 +2389,7 @@
     }
     return INTRO_RECT;
   }
-  /** Débutant, écran étroit ou bas : l'explication se pose sur la MOITIÉ de la carte loin de la
+  /** Lisible, écran étroit ou bas : l'explication se pose sur la MOITIÉ de la carte loin de la
    *  rangée du prix (en bas quand le prix est au milieu ou plus haut, sinon en haut), sans la
    *  dépasser : le prix et les deux repères restent visibles pendant qu'on la lit ; elle défile. */
   function placerIntro() {
@@ -2419,7 +2419,7 @@
     const avant = cleRep();
     GU.reperes = []; GU.caches = new Set(); GU.sansPlace = new Set();
     if (!introEl || introEl.hidden || !R.calques.guide) { if (avant !== '||') remplirIntro(); return; }   // calque Guide éteint : rien de peint
-    // Débutant : 1 = la chaleur, 2 = la ligne de prix (puis un rond), 3 = un repère (cadre de zone,
+    // Lisible : 1 = la chaleur, 2 = la ligne de prix (puis un rond), 3 = un repère (cadre de zone,
     // sinon le trait du mur de repli).
     const deb = debutant();
     const W = Z.chaleur.w, H = Z.chaleur.h, now = maintenant(), xn = Math.min(W, X(now)), ri = rectIntro(), cibles = [];
@@ -2512,7 +2512,7 @@
     const s = E.souris;
     CROIX_VUE = false;
     if (!s || s.zone !== 'chaleur') return;
-    // Débutant : sur un repère (étiquette, cadre, trait), pas de croix — elle barrerait son nom.
+    // Lisible : sur un repère (étiquette, cadre, trait), pas de croix — elle barrerait son nom.
     if (debutant() && R.calques.guide && guideEnDebutant(s.x, s.y)) return;
     ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(Math.round(s.x) + 0.5, 0); ctx.lineTo(Math.round(s.x) + 0.5, Z.chaleur.h);
@@ -2558,8 +2558,8 @@
       texte(BM.prix(q, dec), a.x + 6, y, C.ink3, 10.5);
     }
     if (p) {
-      // Débutant : le prix se lit d'un coup d'œil — plus grand (13 px), sans décimale ; la valeur
-      // exacte est dans le détail au toucher et en Expert.
+      // Lisible : le prix se lit d'un coup d'œil — plus grand (13 px), sans décimale ; la valeur
+      // exacte est dans le détail au toucher et en Complet.
       const deb = debutant(), taille = deb ? 13 : 11, hb = deb ? 22 : 18;
       ctx.fillStyle = C.prix; arrondi(a.x + 1, yPrix - hb / 2, a.w - 2, hb, 4); ctx.fill();
       TEXTES.prix = deb ? BM.prix(p, 0) : ajuster([BM.prix(p, 1), BM.prix(p, 0)], a.w - 7, 11, true);
@@ -2588,10 +2588,10 @@
     // graduations de 00:00 à 21:00 du même jour, et sa première, 00:00, doit dire lequel.
     const jours = ticks.length && BM.jour(E.vue.t1) !== BM.jour(E.vue.t2);
     // Les heures sont LOCALES (celles de l'appareil) : le fuseau est écrit dans l'angle, sous l'axe
-    // des prix — en Expert ; le débutant n'a pas ce mot (son journal dit « heure de cet appareil »).
+    // des prix — en Complet ; le débutant n'a pas ce mot (son journal dit « heure de cet appareil »).
     TEXTES.fuseau = debutant() ? '' : fuseau(E.vue.t2);
     const xf = TEXTES.fuseau ? Z.axeP.x + Z.axeP.w / 2 - largeurTexte(TEXTES.fuseau, 9.5) / 2 - 6 : Infinity;
-    // Débutant : le trait « maintenant » est nommé sous lui, sur l'axe (les heures qu'il couvrirait
+    // Lisible : le trait « maintenant » est nommé sous lui, sur l'axe (les heures qu'il couvrirait
     // ne sont pas écrites).
     let nm = null;
     if (debutant()) {
@@ -2867,7 +2867,7 @@
         x = Math.max(8, Math.min(vw - bw - 8, px - bw / 2));
         y = py - bh - 28;
         if (y < 8) y = py + 28;
-        // Débutant : la bulle ne cache jamais la rangée du prix (sa pastille sur l'axe) ; elle passe de
+        // Lisible : la bulle ne cache jamais la rangée du prix (sa pastille sur l'axe) ; elle passe de
         // l'autre côté du doigt, sinon juste au-dessus ou au-dessous de cette rangée.
         const pr = debutant() && E.vue ? dernierPrix() : null;
         if (pr) {
@@ -3050,7 +3050,7 @@
     const b = $('btnSuivre');
     if (!b) return;
     b.setAttribute('aria-pressed', E.suivre ? 'true' : 'false');
-    // Débutant : la carte ne suit plus le présent — « Suivre » le rappelle d'un bord accent.
+    // Lisible : la carte ne suit plus le présent — « Suivre » le rappelle d'un bord accent.
     b.classList.toggle('accent', debutant() && !E.suivre);
   }
   /** Ferme les panneaux ; `rendreFocus` : le bouton qui avait ouvert le panneau reprend la main. */
@@ -3072,7 +3072,7 @@
     if (b) b.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
   }
   // Les puces des calques : [clé, nom, ce que c'est et comment s'en servir]. Le texte s'affiche au
-  // survol de la puce et dans la Légende (Expert), pour le toucher. Une manière de regarder,
+  // survol de la puce et dans la Légende (Complet), pour le toucher. Une manière de regarder,
   // jamais quoi faire.
   const NOMS_CALQUES = [
     ['guide', 'Guide', 'Les murs, les zones et les événements racontés en mots, avec le résumé du haut et le journal. Laissez-le allumé pour lire la carte sans tout décoder.'],
@@ -3098,13 +3098,32 @@
     z.addEventListener('wheel', e => {
       if (z.scrollWidth > z.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { z.scrollLeft += e.deltaY; e.preventDefault(); }
     }, { passive: false });
+    // Mode Complet : une puce allume tous les calques d'un coup ; tous allumés, elle rend la vue de base.
+    const tout = document.createElement('button');
+    tout.type = 'button'; tout.className = 'puce puce-tout'; tout.dataset.calque = 'tout';
+    const majTout = () => {
+      const tous = NOMS_CALQUES.every(([k]) => R.calques[k]);
+      tout.textContent = tous ? 'Vue de base' : 'Tout afficher';
+      tout.title = tous ? 'Revenir aux calques affichés par défaut' : 'Allumer tous les calques (chaque puce reste au choix)';
+    };
+    tout.addEventListener('click', () => {
+      const tous = NOMS_CALQUES.every(([k]) => R.calques[k]);
+      for (const [k] of NOMS_CALQUES) R.calques[k] = tous ? !!DEFAUTS.calques[k] : true;
+      for (const p of z.querySelectorAll('.puce[data-calque]:not([data-calque="tout"])')) p.setAttribute('aria-pressed', R.calques[p.dataset.calque] ? 'true' : 'false');
+      sauver(); majTout();
+      if (boucleCarnet) boucleCarnet.reveiller();
+      if (R.calques.guide) { GU.cleJournal = null; oublierGuide(); remplirIntro(); }
+      dessiner();
+    });
+    majTout();
+    z.appendChild(tout);
     for (const [k, nom, aide] of NOMS_CALQUES) {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'puce'; b.textContent = nom; b.dataset.calque = k; b.title = nom + ' : ' + aide;
       b.setAttribute('aria-pressed', R.calques[k] ? 'true' : 'false');
       b.addEventListener('click', () => {
         R.calques[k] = !R.calques[k]; b.setAttribute('aria-pressed', R.calques[k] ? 'true' : 'false');
-        sauver();
+        sauver(); majTout();
         // Le carnet n'est lu que pour ses calques : rallumé, il repart tout de suite.
         if (boucleCarnet && ['live', 'dom', 'bidask', 'destin', 'guide'].includes(k) && R.calques[k]) boucleCarnet.reveiller();
         // Le guide rallumé repart d'une lecture fraîche (ses murs, son journal reprennent).
@@ -3225,8 +3244,8 @@
     // BM.SYMBOLES_GUIDE.
     const GD = BM.GUIDE, n2 = v => BM.nombre(v, 0, 2), pc = v => Math.round(v * 100) + ' %', NB = ' ', SG = BM.SYMBOLES_GUIDE;
     const fus = BM.fuseau(new Date().getTimezoneOffset());
-    tx('legGuideMode', 'Mode ' + (MODE === 'expert' ? 'expert : les chiffres seuls' : 'débutant : des phrases') + '. C\'est le même réglage que le terminal : le changer ici (bouton, ou touche M) le change aussi là-bas.');
-    tx('btnMode', 'Mode : ' + (MODE === 'expert' ? 'expert (chiffres)' : 'débutant (phrases)'));
+    tx('legGuideMode', 'Mode ' + (MODE === 'expert' ? 'Complet : les chiffres seuls, tous les calques au choix' : 'Lisible : des phrases') + '. C\'est le même réglage que le terminal : le changer ici (bouton, ou touche M) le change aussi là-bas.');
+    tx('btnMode', 'Mode : ' + (MODE === 'expert' ? 'Complet (chiffres)' : 'Lisible (phrases)'));
     tx('legPaletteDeb', couleursDebutant());
     tx('legSensDeb', '«' + NB + 'En hausse' + NB + '» ou «' + NB + 'en baisse' + NB + '» : le prix a bougé de plus de ' + n2(GD.tendancePct) + ' % depuis ' + BM.age(GD.tendanceMs) + ' ; «' + NB + 'stable' + NB + '» revient sous ' + n2(GD.tendanceRetourPct) + ' %, et le mot change au plus une fois par ' + (GD.tendanceGardeMs === 60e3 ? 'minute' : BM.age(GD.tendanceGardeMs)) + '.');
     tx('legGuide', 'Il relit ce que la carte montre et l\'écrit en mots ; il ne mesure rien de neuf, et ne dit ni pourquoi ni ce qui va suivre. Mesuré : lu dans les données ; convention : un seuil choisi par ce code ; modèle : les niveaux d\'options. '
@@ -3239,7 +3258,7 @@
       + 'Quand le prix y entre, elle reste dessinée, pour voir si ses ordres sont échangés ou retirés. Une zone dessinée le reste tant qu\'elle porte au moins ' + n2(GD.zoneMinBtc) + ' BTC et ' + pc(GD.zoneSortiePart) + ' du seuil d\'entrée du moment ; en dessous, encore ' + GD.zoneGarde + ' lectures, puis elle s\'efface. '
       + 'Le plus gros mur nommé dans une zone est dit dans sa phrase (le même carnet n\'est pas écrit deux fois). Mode débutant : ' + (GD.textesDebutant === 2 ? 'deux' : GD.textesDebutant) + ' repères au plus, un de chaque côté du prix (la zone de ce côté, sinon le mur le plus proche), d\'au plus ' + BM.ETIQUETTE_MAX + ' signes ; jamais sur la ligne de prix des ' + BM.age(GD.tendanceMs) + ' dernières ni sur la rangée du prix ; seulement avec un carnet live frais.');
     tx('legGuideResume', 'Le DERNIER carnet live seul (prix de référence : milieu meilleur bid / meilleur ask de cette lecture) : ordres posés à ±' + n2(GD.bandePct) + ' % du prix, moins si le carnet lu ne va pas si loin (il le dit) ; «' + NB + 'à peu près autant' + NB + '» sous ' + n2(GD.rapportNet) + ' fois (convention). '
-      + 'Une photo de l\'instant, pas une prévision : plus d\'ordres d\'un côté ne dit pas où ira le prix. Moins de ' + BM.nombre(ETROIT_PX, 0, 0) + NB + 'px de large, carte basse, ou phrase qui ne tient pas dans la bande : la version courte, «' + NB + 'photo, pas une prévision' + NB + '» dès le début ; un appui déplie la phrase. Expert : les chiffres seuls. '
+      + 'Une photo de l\'instant, pas une prévision : plus d\'ordres d\'un côté ne dit pas où ira le prix. Moins de ' + BM.nombre(ETROIT_PX, 0, 0) + NB + 'px de large, carte basse, ou phrase qui ne tient pas dans la bande : la version courte, «' + NB + 'photo, pas une prévision' + NB + '» dès le début ; un appui déplie la phrase. Mode Complet : les chiffres seuls. '
       + 'Mode débutant : une ligne, d\'abord le sens du prix — «' + NB + 'en hausse / en baisse / stable sur ' + BM.age(GD.tendanceMs) + NB + '» : le dernier prix comparé à la moyenne des clôtures de ' + GD.tendanceRefMin + ' minutes centrées sur ' + BM.age(GD.tendanceMs) + ' plus tôt ; «' + NB + 'en hausse / en baisse' + NB + '» au-delà de ±' + BM.nombre(GD.tendancePct, 0, 2) + ' %, de retour à «' + NB + 'stable' + NB + '» sous ±' + BM.nombre(GD.tendanceRetourPct, 0, 2) + ' %, un mot tenu au moins ' + BM.age(GD.tendanceGardeMs) + ' (convention) ; une minute manquante : rien n\'est écrit —, précédé du dernier prix ; puis le côté le plus chargé (même seuil, tenu ' + BM.age(GD.sensGardeMs) + ' avant de changer de mot) quand les deux côtés ont un repère, sinon le côté sans repère ; et l\'âge de la plus vieille valeur : «' + NB + 'à jour' + NB + '» sous ' + BM.age(GD.ageFraisMs) + ', puis en secondes entières.');
     tx('legGuideJournal', 'Bouton Journal (touche J), heures UTC. Gros ordres : au moins ' + n2(BM.MURS.seuilsBtc[E.murs.indice(seuilJournal())]) + ' BTC à un même prix (réglage «' + NB + 'Destin des murs' + NB + '», ' + n2(GD.journalMurBtc) + ' BTC au moins) apparus (restés ' + GD.vieMinMs / 1000 + ' s ; un ordre vu en entrant dans la bande lue n\'est pas «' + NB + 'apparu' + NB + '»), retirés, absorbés. '
       + '«' + NB + 'Absorbé' + NB + '» = entièrement échangé ; un ordre retiré pour l\'essentiel puis touché est dit «' + NB + 'retiré pour l\'essentiel' + NB + '» (échanges sous ' + pc(GD.absorbePart) + ' de sa plus grande taille). '
@@ -3270,8 +3289,8 @@
         : nom + ' : limite de requêtes atteinte (HTTP ' + (p.statut || 429) + ') — lectures suspendues, reprise dans ' + BM.age(a));
     }
     const deb = debutant();
-    // Débutant : seulement les sources de ce qui est dessiné, sous les noms appris ; le fichier de
-    // 15 min (murs et niveaux d'options) ne nourrit que des couches Expert.
+    // Lisible : seulement les sources de ce qui est dessiné, sous les noms appris ; le fichier de
+    // 15 min (murs et niveaux d'options) ne nourrit que des couches Complet.
     // Les noms appris (A13) : « historique de la carte », « échanges », « ordres en attente », « prix » —
     // deux sources du même nom ne font qu'une ligne.
     const noms = deb ? { carte: 'historique de la carte', direct: 'historique de la carte', historique: 'échanges', bougies: 'prix', executions: 'échanges', carnet: 'ordres en attente', horloge: 'heure de Binance' }

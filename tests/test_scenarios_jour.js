@@ -8,9 +8,9 @@
 //   3. rejouerJour sur le 08/10 réel (niveaux modèle) : changements exacts, même nom en 1 min
 //      regroupées et en 15 min (M6), propriété « pas de clignotement » sur des ticks d'une minute (A1) ;
 //   4. fondu (depuis la clôture de la bougie du contact, M10), reste ;
-//   5. lignes Débutant (A à I, M4) : longueurs, « (en direct) » / « (journal) », aucun mot banni,
+//   5. lignes Lisible (A à I, M4) : longueurs, « (en direct) » / « (journal) », aucun mot banni,
 //      aucun %, aucun conseil ; libellé réalisé « zone … ✓ » (A3) ;
-//   6. textes Expert : « Plus petit écart : N (clôture de 15 min …) », « nom gardé » quand l'hystérésis garde un autre nom à la clôture, jamais « écart 0,xx » ni « en tête » (A2) ;
+//   6. textes Complet : « Plus petit écart : N (clôture de 15 min …) », « nom gardé » quand l'hystérésis garde un autre nom à la clôture, jamais « écart 0,xx » ni « en tête » (A2) ;
 //   7. raison() (chemin, range, ambigu, mèche) ; pas() avec la clôture (contact en mèche) ;
 //   8. coût : rejeu de 3000 bougies 1 min, classement + bougie en cours.
 // USAGE   node tests/test_scenarios_jour.js
@@ -99,7 +99,7 @@ titre('2. decider / classerJour : les règles de la journée');
   const rjOk = { grille: true, sortiTot: true, prec: a.id, cas: 'meneur', tDecision: T0 + 5 * 3600e3 };
   let J = S.classerJour(one, 102500, F, T0 + 5 * 3600e3, rjOk, PJ);
   check('M5 : un seul scénario ouvert → « seul », jamais un nom de « suit le mieux »', J.cas === 'seul' && J.seul && J.seul.sc === b && !J.meneur, J.cas);
-  check('M5 : « seul » en Expert : « Seul encore en cours : 2 »', /^Seul encore en cours : 2/.test(S.phraseJourExpert(J)[0]), S.phraseJourExpert(J));
+  check('M5 : « seul » en Complet : « Seul encore en cours : 2 »', /^Seul encore en cours : 2/.test(S.phraseJourExpert(J)[0]), S.phraseJourExpert(J));
   const Fa = fichier([{ forme: 'range', range: [99500, 100500] }, { forme: 'chemin', cibles: [104000], invalidation: 100800 }, D]);
   const [xa, xb, xc] = Fa.scenarios;
   mem = { prec: xa.id, sortiTot: true };
@@ -122,10 +122,10 @@ titre('2. decider / classerJour : les règles de la journée');
   check('le scénario de la semaine n’entre jamais dans le classement', J.items.length === 3 && J.ouverts.every(i => i.sc.rang !== 'S') && (!J.meneur || J.meneur.sc.rang !== 'S'), J.ouverts.map(i => i.sc.rang));
   // fini
   J = S.classerJour(items(), 100000, F, T0 + 86400e3, rjOk, PJ);
-  check('après la fin → « fini » ; Expert « Terminé à 04:20 UTC · note du journal à venir » (M12)', J.cas === 'fini' && S.phraseJourExpert(J)[0] === 'Terminé à 04:20 UTC · note du journal à venir', [J.cas, S.phraseJourExpert(J)]);
+  check('après la fin → « fini » ; Complet « Terminé à 04:20 UTC · note du journal à venir » (M12)', J.cas === 'fini' && S.phraseJourExpert(J)[0] === 'Terminé à 04:20 UTC · note du journal à venir', [J.cas, S.phraseJourExpert(J)]);
   // grille
   J = S.classerJour(items(), 100800, F, T0 + 5 * 3600e3, { grille: false }, PJ);
-  check('bougies d’une heure (pas de grille de 15 min) : aucun nom ; Expert « à voir en 15 min » (M6)', J.cas === 'grille' && !J.meneur && /à voir en 15 min/.test(S.phraseJourExpert(J)[0]), J.cas);
+  check('bougies d’une heure (pas de grille de 15 min) : aucun nom ; Complet « à voir en 15 min » (M6)', J.cas === 'grille' && !J.meneur && /à voir en 15 min/.test(S.phraseJourExpert(J)[0]), J.cas);
   // la bougie en cours ferme le nommé : le suivant tout de suite
   J = S.classerJour([it(a, Object.assign(sv('sortie'), { t: T0 + 5 * 3600e3, sortie: { haut: true } })), it(b, sv('rien')), it(c, sv('rien'))], 102100, F, T0 + 5 * 3600e3 + 60e3, rjOk, PJ);
   check('A1 : la bougie en cours ferme le scénario nommé → le suivant est nommé tout de suite (sans hystérésis)', J.remplace && J.meneur && J.meneur.sc === b || J.cas === 'aucunNeColle', [J.cas, J.meneur && J.meneur.sc.rang]);
@@ -211,7 +211,7 @@ check('17:30 : le 1 sorti (bougie 17:15–17:30) → plus aucun ouvert', a1730 &
   const J = S.classerJour(items, k.C[n - 1], F06, now, S.rejouerJour(F06, F06.scenarios, k.T, k.H, k.L, k.C, n - 1, Q, PJ), PJ);
   const l48 = S.ligneJourDebutant(F06, J, items, now, 48, {}), l40 = S.ligneJourDebutant(F06, J, items, now, 40, {});
   check(`06/10, 02:20 UTC le 07/10 : « aucun » ; ligne G « ${l48} » / « ${l40} »`, J.cas === 'aucun' && l48 === 'Aucun scénario ne tient plus (en direct) ▸' && l40 === 'Scénarios : aucun ne tient (en direct) ▸', [J.cas, l48, l40]);
-  check('06/10 : Expert « Aucun scénario du matin ne décrit ce mouvement »', /^Aucun scénario du matin ne décrit ce mouvement/.test(S.phraseJourExpert(J)[0]), S.phraseJourExpert(J));
+  check('06/10 : Complet « Aucun scénario du matin ne décrit ce mouvement »', /^Aucun scénario du matin ne décrit ce mouvement/.test(S.phraseJourExpert(J)[0]), S.phraseJourExpert(J));
 }
 
 // ── 4. Fondu, reste ──
@@ -222,8 +222,8 @@ titre('4. fondu, reste');
   check('reste : « 13 h 25 », « 1 h 00 », « 47 min », null après la fin', S.reste((13 * 60 + 25) * 60e3 + 5000) === '13 h 25' && S.reste(3600e3) === '1 h 00' && S.reste(47 * 60e3 + 3000) === '47 min' && S.reste(0) === null && S.reste(-1) === null);
 }
 
-// ── 5. Lignes Débutant ──
-titre('5. Lignes Débutant (cas A à I) : longueurs, marques, mots');
+// ── 5. Lignes Lisible ──
+titre('5. Lignes Lisible (cas A à I) : longueurs, marques, mots');
 {
   const lignes = [];
   const pousser = (nom, F, J, items, now) => { for (const max of [48, 40]) lignes.push({ nom: nom + ' · ' + max, max, t: S.ligneJourDebutant(F, J, items, now, max, {}), montre: J && J.montre ? J.montre.sc.rang : null }); };
@@ -269,8 +269,8 @@ titre('5. Lignes Débutant (cas A à I) : longueurs, marques, mots');
   }
 }
 
-// ── 6. Textes Expert ──
-titre('6. Textes Expert : une mesure, jamais un indice en liste ni « en tête »');
+// ── 6. Textes Complet ──
+titre('6. Textes Complet : une mesure, jamais un indice en liste ni « en tête »');
 {
   const n = X08.k15.findIndex(k => k[0] === Date.parse('2026-10-08T14:00Z'));
   const now = Date.parse('2026-10-08T14:05Z');
@@ -294,14 +294,14 @@ titre('6. Textes Expert : une mesure, jamais un indice en liste ni « en tête �
     && /^ · bord toléré à [\d ]+ \$ ◂$/.test(sufG[0]) && !/◂/.test(sufG[1]), [suf, sufG]);
   check(`temps restant : « ${re[0]} »`, /^Reste 14 h 15 \(fin 09\/10 04:20 UTC\) · aucune nouvelle prévision avant le prochain point$/.test(re[0]), re);
   const bulle = S.ligneJourExpert(J.items[1], J, { itv: '15 min', maintenant: now });
-  check('bulle Expert : l’indice SEULEMENT avec sa formule et son nom complet', /écart relatif 0,\d\d = [\d ]+ \/ \([\d ]+ \+ [\d ]+\) \(0 = sur la zone, 1 = sur l’invalidation\)/.test(bulle) && /une mesure, pas une probabilité/.test(bulle), bulle);
+  check('bulle Complet : l’indice SEULEMENT avec sa formule et son nom complet', /écart relatif 0,\d\d = [\d ]+ \/ \([\d ]+ \+ [\d ]+\) \(0 = sur la zone, 1 = sur l’invalidation\)/.test(bulle) && /une mesure, pas une probabilité/.test(bulle), bulle);
   const regle = S.regleJourExpert(PJ).join(' ');
   check('règle (bulle de l’encadré) : formule, décision à la clôture de 15 min, 0,12, départ au rang 1, « trop tôt », convention, pas une probabilité',
     /d\(prochaine zone\) \/ \(d\(prochaine zone\) \+ d\(invalidation\)\)/.test(regle) && /clôture de 15 min/.test(regle) && /0,12/.test(regle) && /rang 1 du matin/.test(regle) && /plus jamais/.test(regle) && /convention/.test(regle) && /pas une probabilité/.test(regle), regle);
   const deb = [S.phraseMeneurDebutant(J), S.COMMENT_DEBUTANT, S.texteResteDebutant(J, now)].concat(J.items.map(i => S.ligneDebutantJour(i, J)), J.items.map(i => S.ligneDebutantJour(i, J, true)));
-  check('bulles Débutant de la journée : aucun mot banni, aucun %, aucun conseil, jamais « probable »', deb.every(t => t && !bannis(t).length && !/%/.test(t) && !CONSEIL.test(t) && !/probable/.test(t)), deb.filter(t => !t || bannis(t).length || /%|probable/.test(t) || CONSEIL.test(t)));
-  check('Débutant : « une règle de calcul, pas une prévision ni une chance de réussite » ; « décidé tous les quarts d’heure »', /pas une prévision ni une chance de réussite/.test(deb[0]) && /tous les quarts d’heure/.test(deb[0]) && /tous les quarts d’heure/.test(deb[1]), deb.slice(0, 2));
-  check('Débutant (A3) : « du début de sa zone (… $, autour de … $) », jamais « de sa zone (84 500 $) »', /jusqu’au début de sa zone \([\d ]+ \$, autour de [\d ]+ \$\)/.test(S.ligneDebutantJour(J.items[1], J)), S.ligneDebutantJour(J.items[1], J));
+  check('bulles Lisible de la journée : aucun mot banni, aucun %, aucun conseil, jamais « probable »', deb.every(t => t && !bannis(t).length && !/%/.test(t) && !CONSEIL.test(t) && !/probable/.test(t)), deb.filter(t => !t || bannis(t).length || /%|probable/.test(t) || CONSEIL.test(t)));
+  check('Lisible : « une règle de calcul, pas une prévision ni une chance de réussite » ; « décidé tous les quarts d’heure »', /pas une prévision ni une chance de réussite/.test(deb[0]) && /tous les quarts d’heure/.test(deb[0]) && /tous les quarts d’heure/.test(deb[1]), deb.slice(0, 2));
+  check('Lisible (A3) : « du début de sa zone (… $, autour de … $) », jamais « de sa zone (84 500 $) »', /jusqu’au début de sa zone \([\d ]+ \$, autour de [\d ]+ \$\)/.test(S.ligneDebutantJour(J.items[1], J)), S.ligneDebutantJour(J.items[1], J));
 }
 
 // ── 7. raison(), pas() avec la clôture ──
@@ -317,9 +317,9 @@ titre('7. raison() et contacts en mèche');
   const sv2 = S.etat(b, e2, T0 + Q), sv1 = Object.assign({}, svI, { mecheInv: false, meche: [] });
   check('pas() sans clôture : l’ancien comportement exact (aucune mèche affirmée)', JSON.stringify(Object.assign({}, sv2, { meche: [] })) === JSON.stringify(sv1) && sv2.mecheInv === false);
   const rx = S.raison(b, svI, 'expert'), rd = S.raison(b, svI, 'debutant');
-  check(`chemin, Expert : « ${rx} »`, /^zone 97 000 touchée avant 103 000 \(en mèche : contact, règle du journal\)$/.test(rx), rx);
+  check(`chemin, Complet : « ${rx} »`, /^zone 97 000 touchée avant 103 000 \(en mèche : contact, règle du journal\)$/.test(rx), rx);
   // Changé délibérément (revue) : un contact seulement en mèche est qualifié aussi pour une invalidation et une sortie.
-  check(`chemin, Débutant : « ${rd} »`, /^le prix a touché la zone de 97 000 \$ \(à partir de 97 970 \$\) avant de toucher la zone de 103 000 \$, par un passage bref du prix : le journal compte ce passage/.test(rd), rd);
+  check(`chemin, Lisible : « ${rd} »`, /^le prix a touché la zone de 97 000 \$ \(à partir de 97 970 \$\) avant de toucher la zone de 103 000 \$, par un passage bref du prix : le journal compte ce passage/.test(rd), rd);
   const er = S.suiviVide(Q); S.pas(a, er, 0, T0, 102100, 100000, 101000);
   const svR = S.etat(a, er, T0 + Q);
   const rrx = S.raison(a, svR, 'expert'), rrd = S.raison(a, svR, 'debutant');
@@ -329,9 +329,9 @@ titre('7. raison() et contacts en mèche');
   check(`ambigu : « ${rax} » / « ${rad} »`, svA.cle === 'ambigu' && /ordre inconnu/.test(rax) && /^non tranché : .* le même quart d’heure, et l’ordre est inconnu ; le journal tranchera avec les minutes$/.test(rad), [svA.cle, rax, rad]);
   const ec = S.suiviVide(Q); S.pas(b, ec, 0, T0, 103000, 100000, 101000);
   const svC = S.etat(b, ec, T0 + Q), rcd = S.raison(b, svC, 'debutant');
-  check(`réalisé en passage bref, Débutant : « ${rcd} »`, svC.cle === 'realise' && svC.meche[0] === true && /passage bref du prix : le journal compte ce passage, alors que pour les figures, la page attend que le prix s’y maintienne/.test(rcd), [svC.meche, rcd]);
+  check(`réalisé en passage bref, Lisible : « ${rcd} »`, svC.cle === 'realise' && svC.meche[0] === true && /passage bref du prix : le journal compte ce passage, alors que pour les figures, la page attend que le prix s’y maintienne/.test(rcd), [svC.meche, rcd]);
   const tousD = [rd, rrd, rad, rcd];
-  check('Débutant : ni « mèche », ni « bougie », ni « UTC », ni « range », ni « clôture »', tousD.every(t => !/mèche|bougie|UTC|range|clôtur/i.test(t) && !bannis(t).length), tousD);
+  check('Lisible : ni « mèche », ni « bougie », ni « UTC », ni « range », ni « clôture »', tousD.every(t => !/mèche|bougie|UTC|range|clôtur/i.test(t) && !bannis(t).length), tousD);
 }
 
 // ── 8. Coût ──

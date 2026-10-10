@@ -871,7 +871,7 @@ titre('7g. Mode débutant : la convention du « sens du prix » vient des consta
 {
   const GD = BM.GUIDE, src = fs.readFileSync(path.join(REPO, 'js/bookmap.js'), 'utf8');
   check(`fenêtre de tendance (${GD.tendanceMs / 60e3} min) et seuil « stable » (${GD.tendancePct} %) positifs`, GD.tendanceMs > 0 && GD.tendancePct > 0 && GD.tendanceMs % 60e3 === 0, [GD.tendanceMs, GD.tendancePct]);
-  // La légende (Expert) qui dit la convention la tire des constantes : jamais un « 15 min » ou un « 0,1 % » écrit en dur.
+  // La légende (Complet) qui dit la convention la tire des constantes : jamais un « 15 min » ou un « 0,1 % » écrit en dur.
   const l = src.split('\n').filter(x => /Mode débutant : une ligne, d\\'abord le sens du prix/.test(x));
   check('légende : la convention de tendance est tirée de BM.GUIDE (tendanceMs, tendancePct), rien en dur',
     l.length === 1 && /BM\.age\(GD\.tendanceMs\)/.test(l[0]) && /GD\.tendancePct/.test(l[0]) && !/15 min|0,1 %/.test(l[0]), l);
@@ -879,7 +879,7 @@ titre('7g. Mode débutant : la convention du « sens du prix » vient des consta
   // celle qui borne le dessin (guideTextesDebutant), pas un chiffre recopié.
   const fn = (src.match(/function guideTextesDebutant\(\) \{[\s\S]*?\n  \}\n/) || [''])[0];
   check(`repères débutants : BM.GUIDE.textesDebutant = 2, et c'est lui qui borne guideTextesDebutant`, GD.textesDebutant === 2 && /G\.textesDebutant/.test(fn) && /GD\.textesDebutant/.test(src), fn.slice(0, 80));
-  check('guideTextes (Expert) ne porte plus de branche débutante morte', !/function guideTextes\(\) \{[\s\S]*?textesDebutant[\s\S]*?\n  \}\n/.test((src.match(/function guideTextes\(\) \{[\s\S]*?\n  \}\n/) || [''])[0]));
+  check('guideTextes (Complet) ne porte plus de branche débutante morte', !/function guideTextes\(\) \{[\s\S]*?textesDebutant[\s\S]*?\n  \}\n/.test((src.match(/function guideTextes\(\) \{[\s\S]*?\n  \}\n/) || [''])[0]));
   const T = BM.tendancePrix([{ t: 0, c: 100 }], null, 30e3, { tendanceMs: 0 });
   check('tendancePrix suit la constante passée (fenêtre de 0 : la minute en cours)', T && T.sens === 'stable', T);
 }

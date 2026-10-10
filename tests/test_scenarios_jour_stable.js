@@ -2,18 +2,18 @@
 // sur le 09/10/2026 RÉEL (vrai previsions.json, bougies BTCUSDT 15 min et 1 min) puis sa suite
 // SYNTHÉTIQUE marquée (tests/scenarios-jour-0910.js) :
 //
-//   1. stabilité : minute par minute (bougie 15 min en cours faite des minutes), la ligne Débutant
-//      (48 et 40 caractères), la phrase de l'encadré Expert, « ◂ » et l'état du nom (plus petit
+//   1. stabilité : minute par minute (bougie 15 min en cours faite des minutes), la ligne Lisible
+//      (48 et 40 caractères), la phrase de l'encadré Complet, « ◂ » et l'état du nom (plus petit
 //      écart / nom gardé / nom repris) ne changent dans une bougie que si un FAIT change (un contact,
 //      une fermeture, la fin du « frais » d'un fait) — jamais par un aller-retour d'écart ;
 //   2. nom gardé à la clôture (16:05) : ligne cas A ; « Plus petit écart : 1 · nom gardé : 3 » ; « ◂ »
-//      sur le 1 ; bulles Débutant et Expert qui disent les deux, au dernier quart d'heure décidé ;
+//      sur le 1 ; bulles Lisible et Complet qui disent les deux, au dernier quart d'heure décidé ;
 //   3. fait frais (19:08, synthétique : la zone du 3 et l'invalidation du 2 touchées dans la même
 //      bougie) : la ligne dit les deux ; plus « frais » après fonduMinutes ;
-//   4. contact en mèche : toute bulle Débutant qui dit la réalisation dit « zone » et « passage
+//   4. contact en mèche : toute bulle Lisible qui dit la réalisation dit « zone » et « passage
 //      bref » ; jamais « vers 84 500 $ — réalisé ✓ » ; la raison courte d'une invalidation ;
 //   5. après minuit (heure de Paris) : « hier » devant les créneaux de la veille ;
-//   6. mots : « Trop tôt pour dire quel scénario suit le mieux le prix » ; Expert : pas de redite de
+//   6. mots : « Trop tôt pour dire quel scénario suit le mieux le prix » ; Complet : pas de redite de
 //      la touche d'un chemin réalisé ; « sorti par le haut » comme état ; « ◂ » expliqué.
 // USAGE   node tests/test_scenarios_jour_stable.js
 const S = require('../js/scenarios.js');
@@ -86,15 +86,15 @@ titre('2. Nom gardé à la clôture de 16:00 (09/10 réel, 16:05)');
   const un = J.items.find(i => i.sc.rang === '1'), trois = J.items.find(i => i.sc.rang === '3');
   check(`le 3 nommé, le 1 au plus petit écart à 16:00 (avance < 0,12) : nom gardé`, J.cas === 'meneur' && J.meneur === trois && J.pointe === un && !S.nomNet(J), [J.cas, J.meneur && J.meneur.sc.rang, J.pointe && J.pointe.sc.rang]);
   const L = S.ligneJourDebutant(x.F, J, x.items, x.now, 48, {});
-  check(`ligne Débutant : cas A « ${L} » (le nom gardé est dans les bulles)`, L === 'Scénario du matin : en cours (en direct) ▸', L);
+  check(`ligne Lisible : cas A « ${L} » (le nom gardé est dans les bulles)`, L === 'Scénario du matin : en cours (en direct) ▸', L);
   const ph = S.phraseJourExpert(J);
-  check(`encadré Expert : « ${ph[0]} »`, ph[0] === 'Plus petit écart : 1 · nom gardé : 3 (avance pas assez nette à la clôture de 15 min)' && !ph.some(t => /pour l’instant/.test(t)), ph);
+  check(`encadré Complet : « ${ph[0]} »`, ph[0] === 'Plus petit écart : 1 · nom gardé : 3 (avance pas assez nette à la clôture de 15 min)' && !ph.some(t => /pour l’instant/.test(t)), ph);
   check('« ◂ » sur le 1 (plus petit écart de la clôture), pas sur le 3', / ◂$/.test(S.suffixeExpert(un, J)) && !/◂/.test(S.suffixeExpert(trois, J)));
   const b3 = S.ligneJourExpert(trois, J, { itv: '15 min', maintenant: x.now }), b1 = S.ligneJourExpert(un, J, { itv: '15 min', maintenant: x.now });
-  check('bulle Expert du 3 : « nom gardé (avance pas assez nette …) ; plus petit écart à cette clôture : 1 »', /nom gardé \(avance pas assez nette à la dernière clôture de 15 min\) ; plus petit écart à cette clôture : 1/.test(b3), b3);
-  check('bulle Expert du 1 : « plus petit écart à la dernière clôture de 15 min ; le nom reste au 3 »', /plus petit écart à la dernière clôture de 15 min ; le nom reste au 3/.test(b1), b1);
+  check('bulle Complet du 3 : « nom gardé (avance pas assez nette …) ; plus petit écart à cette clôture : 1 »', /nom gardé \(avance pas assez nette à la dernière clôture de 15 min\) ; plus petit écart à cette clôture : 1/.test(b3), b3);
+  check('bulle Complet du 1 : « plus petit écart à la dernière clôture de 15 min ; le nom reste au 3 »', /plus petit écart à la dernière clôture de 15 min ; le nom reste au 3/.test(b1), b1);
   const d = S.phraseMeneurDebutant(J), dc = S.phraseNomDebutant(J, null, true);
-  check(`bulle Débutant : « ${d.slice(0, 150)}… »`, /^Le nom reste au scénario 3 : au dernier quart d’heure décidé, le prix était un peu plus près de ce que décrit le scénario 1/.test(d) && !/depuis/.test(d), d);
+  check(`bulle Lisible : « ${d.slice(0, 150)}… »`, /^Le nom reste au scénario 3 : au dernier quart d’heure décidé, le prix était un peu plus près de ce que décrit le scénario 1/.test(d) && !/depuis/.test(d), d);
   check(`bulle courte : « ${dc} »`, /le 1 était un peu plus près/.test(dc), dc);
 }
 
@@ -117,7 +117,7 @@ titre('3. Fait frais : la ligne le dit, et le garde une heure (suite synthétiqu
   check('lignes : sans mot banni, sans %, sans conseil', tous.every(t => !Guide.motsBannis(t).length && !/%/.test(t) && !CONSEIL.test(t)), tous);
 }
 
-titre('4. Contact en mèche : les bulles Débutant disent « zone » et « passage bref »');
+titre('4. Contact en mèche : les bulles Lisible disent « zone » et « passage bref »');
 {
   const at = journee(synth, new Map());
   for (const q of ['2026-10-09T19:16Z', '2026-10-09T20:06Z', '2026-10-09T21:30Z']) {
@@ -148,11 +148,11 @@ titre('6. Mots');
   check(`05:10, « trop tôt » : « ${t} »`, x.J.cas === 'tot' && /^Trop tôt pour dire quel scénario suit le mieux le prix : /.test(t), t);
   const y = journee(synth, new Map())(Date.parse('2026-10-09T20:30Z')), trois = y.J.items.find(i => i.sc.rang === '3'), un = y.J.items.find(i => i.sc.rang === '1');
   const b3 = S.ligneJourExpert(trois, y.J, { itv: '15 min', maintenant: y.now });
-  check(`Expert, le 3 réalisé : la touche dite une fois (« ${b3} »)`, /cible touchée en mèche/.test(b3) && !/zone 84 500 touchée/.test(b3), b3);
+  check(`Complet, le 3 réalisé : la touche dite une fois (« ${b3} »)`, /cible touchée en mèche/.test(b3) && !/zone 84 500 touchée/.test(b3), b3);
   const et = S.texteEtat(un.sc, un.sv, null, 'expert', { itv: '15 min', maintenant: y.now });
-  check(`Expert, état court du 1 sorti : « ${et.court} »`, /^sorti par le haut \d\d:\d\d–\d\d:\d\d UTC$/.test(et.court), et.court);
+  check(`Complet, état court du 1 sorti : « ${et.court} »`, /^sorti par le haut \d\d:\d\d–\d\d:\d\d UTC$/.test(et.court), et.court);
   const regle = S.regleJourExpert(PJ).join(' ');
-  check('règle Expert : « ◂ » expliqué (plus petit écart à la dernière clôture)', /« ◂ » : le plus petit écart à la dernière clôture/.test(regle), regle.slice(0, 300));
+  check('règle Complet : « ◂ » expliqué (plus petit écart à la dernière clôture)', /« ◂ » : le plus petit écart à la dernière clôture/.test(regle), regle.slice(0, 300));
 }
 
 console.log(ko ? `\n❌ SCÉNARIOS, JOURNÉE STABLE (REVUE 2) : ${ko} contrôle(s) en échec` : '\n✅ SCÉNARIOS, JOURNÉE STABLE (REVUE 2) : TOUS LES CONTRÔLES PASSENT');

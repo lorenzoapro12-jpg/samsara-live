@@ -2,16 +2,16 @@
 // Playwright ; le 09/10/2026 RÉEL rejoué par tests/scenarios-jour-harnais.js, puis sa suite
 // SYNTHÉTIQUE marquée, tests/scenarios-jour-0910.js) :
 //
-//   1. dans la bougie de 16:00 (15 min), minute par minute : la ligne Débutant, la phrase de
-//      l'encadré Expert, la place de « ◂ » et l'état du libellé du nommé ne changent pas ;
+//   1. dans la bougie de 16:00 (15 min), minute par minute : la ligne Lisible, la phrase de
+//      l'encadré Complet, la place de « ◂ » et l'état du libellé du nommé ne changent pas ;
 //   2. 19:08 (synthétique) : le 3 réalisé et le 2 invalidé dans la bougie, une figure du Guide
 //      posée — la ligne garde sa place (le libellé cède), au plus 5 textes (1440 et 390) ;
 //   3. 20:06 (synthétique, contact en mèche) : la bulle de la ligne survolée est la LONGUE (elle tient
 //      à 1440 × 900) et dit « zone » et « passage bref » ; la bulle courte aussi ;
-//   4. Expert, téléphone : la bulle de l'encadré replié dit la journée (« Seul en cours », « Reste ») ;
-//   5. 1 h, Débutant : le libellé du range est sur sa boîte (au moins à moitié dedans ; jamais au
+//   4. Complet, téléphone : la bulle de l'encadré replié dit la journée (« Seul en cours », « Reste ») ;
+//   5. 1 h, Lisible : le libellé du range est sur sa boîte (au moins à moitié dedans ; jamais au
 //      milieu du tracé, au-dessus des bougies d'avant le point) ;
-//   6. Expert : la coche du 3 et la croix du 2 au même contact ne se recouvrent pas ; sans flèche
+//   6. Complet : la coche du 3 et la croix du 2 au même contact ne se recouvrent pas ; sans flèche
 //      pour le nommé, aucune autre flèche.
 // USAGE   node tests/test_scenarios_jour_stable_page.js
 const H = require('./scenarios-jour-harnais');
@@ -68,7 +68,7 @@ async function survoler(o, rect, doigt) {
       const r = await o.page.evaluate(() => {
         const n = candles.length, G = PARAM.guide, C = i => candles[i];
         const ia = n - 34, ic = n - 24, ib = n - 14, pa = Math.max(C(ia).high, C(ib).high), pc = C(ic).low;
-        // (Figures en direct : une figure complète, et le Débutant lit sa liste dans Guide.formesDebutant.)
+        // (Figures en direct : une figure complète, et le Lisible lit sa liste dans Guide.formesDebutant.)
         const f = { type: 'double_sommet', famille: 'extremes', sens: -1, phase: 'confirme', a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, extreme: pa, hauteur: pa - pc, objectif: pc - (pa - pc),
           invalidation: pa, t: ib + G.pivot, debut: ia, depart: ib + 1, jConf: ib + G.pivot + 2, fin: null, jFin: null, journal: [] };
         window.__f0 = Guide.formesAffichees; window.__fd0 = Guide.formesDebutant;
@@ -102,7 +102,7 @@ async function survoler(o, rect, doigt) {
       await o.ctx.close();
     }
 
-    titre('4. Expert, téléphone : l’encadré replié dit la journée');
+    titre('4. Complet, téléphone : l’encadré replié dit la journée');
     {
       const h = H.harnais(synth, '2026-10-09T19:16:00Z');
       const o = await H.ouvrir(nav, h, { vue: { width: 390, height: 844 }, mode: 'expert', tactile: true });
@@ -113,7 +113,7 @@ async function survoler(o, rect, doigt) {
       await o.ctx.close();
     }
 
-    titre('5. 1 h, Débutant : le libellé du range sur sa boîte');
+    titre('5. 1 h, Lisible : le libellé du range sur sa boîte');
     for (const quand of ['2026-10-09T15:00:00Z', '2026-10-09T18:00:00Z']) {
       const h = H.harnais(reel, quand);
       const o = await H.ouvrir(nav, h, { vue: { width: 1440, height: 900 }, mode: 'debutant' });
@@ -127,7 +127,7 @@ async function survoler(o, rect, doigt) {
       await o.ctx.close();
     }
 
-    titre('6. Expert : marques lisibles, flèches');
+    titre('6. Complet : marques lisibles, flèches');
     {
       const h = H.harnais(synth, '2026-10-09T19:08:00Z');
       const o = await H.ouvrir(nav, h, { vue: { width: 1440, height: 900 }, mode: 'expert' });

@@ -8,10 +8,10 @@
 //   2. A1 : le nom ne change qu'à une clôture de 15 min (jamais pendant la bougie en cours, sauf
 //      si elle ferme le scénario nommé) ; autant de changements affichés que de changements du
 //      calcul pur aux clôtures ; les écarts, eux, bougent avec le prix ;
-//   3. la ligne Débutant suit : « En direct : le 2 (80 806 $) suit mieux le prix ▸ » quand le 2 est
+//   3. la ligne Lisible suit : « En direct : le 2 (80 806 $) suit mieux le prix ▸ » quand le 2 est
 //      nommé, le cas A quand le montré (le 1) l'est ; toujours « (en direct) » ou « En direct : » ;
 //   4. journée « aucun » (06/10, niveaux modèle asymétriques), le 07/10 à 02:20 UTC : ligne G
-//      « Aucun scénario ne tient plus (en direct) ▸ », Expert « Aucun scénario du matin ne décrit
+//      « Aucun scénario ne tient plus (en direct) ▸ », Complet « Aucun scénario du matin ne décrit
 //      ce mouvement ».
 // SCEN_CAPTURES=dossier : écrit aussi les captures de relecture (rejeu-HHMM-mode-largeur.png), hors
 // assertions, à regarder une à une.
@@ -34,7 +34,7 @@ const hm = t => new Date(t).toISOString().slice(11, 16);
 const VIVANTE = [82300, 81900, 81750, 82200];   // la clôture de la bougie en cours, de tick en tick
 const TICKS = [1, 5, 9, 13];                      // minutes dans le quart d'heure
 
-/** La ligne des scénarios (Débutant), posée ou cédée (alors dans la bulle du libellé). */
+/** La ligne des scénarios (Lisible), posée ou cédée (alors dans la bulle du libellé). */
 const ligne = page => page.evaluate(() => {
   const B = scenEtat && scenEtat.boite;
   return B ? { texte: B.texte || null, cede: !!B.cede, un: scenEtat.cibleUn ? scenEtat.cibleUn.texte.join('\n') : '' } : null;
@@ -99,7 +99,7 @@ const ligne = page => page.evaluate(() => {
       } else {
         const ph = await o.page.evaluate(() => scenEtat.boite && scenEtat.boite.lignes.map(l => l.t));
         // Changé délibérément (figures en direct) : les libellés des figures prennent de la place en
-        // Expert ; l'encadré peut passer à sa forme serrée, qui nomme aussi (« … · écart min. : 1 »).
+        // Complet ; l'encadré peut passer à sa forme serrée, qui nomme aussi (« … · écart min. : 1 »).
         check(`${mode} ${vue.width} : l'encadré nomme le ${noms[noms.length - 1]} (« Plus petit écart pour l’instant : ${noms[noms.length - 1]} … », « … nom gardé : ${noms[noms.length - 1]} » quand un autre est un peu plus près, ou en forme serrée « … · écart min. : ${noms[noms.length - 1]} »)`, ph && ph.some(l => new RegExp('^(Plus petit écart pour l’instant : |Plus petit écart : |Écart min\\. : )' + noms[noms.length - 1] + '\\b|(nom gardé|nom repris| · écart min\\.) : ' + noms[noms.length - 1] + '\\b').test(l)), ph);
       }
       check(`${mode} ${vue.width} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);

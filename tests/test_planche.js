@@ -106,8 +106,8 @@ async function ouvrir(nav, theme, vue, retardPublication) {
     }
     return r.abort();
   });
-  // Mode Expert : ce test mesure les éléments denses (chiffres clés, heure de publication, couche de
-  // chaleur, étiquettes de l'axe…), masqués en Débutant (le mode par défaut) ; leur version Débutant
+  // Mode Complet : ce test mesure les éléments denses (chiffres clés, heure de publication, couche de
+  // chaleur, étiquettes de l'axe…), masqués en Lisible (le mode par défaut) ; leur version Lisible
   // est vérifiée dans test_debutant_page.js.
   await page.addInitScript(t => { try { localStorage.clear(); localStorage.setItem('samsara-mode', 'expert'); localStorage.setItem('samsara-theme', t); } catch (e) { /* */ } }, theme);
   // Observateurs VIVANTS (observe sans disconnect), comptés par type ; textes du canvas relevés.

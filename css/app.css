@@ -1027,7 +1027,7 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
   margin-top: 6px; padding: 5px 8px; border-radius: 8px; font-size: 11px; line-height: 1.4;
   color: var(--ink-2); background: var(--rail); border-left: 2px solid var(--accent);
 }
-/* Débutant, autre paire que BTCUSDT : les infos du marché parlent du bitcoin (js/app.js). */
+/* Lisible, autre paire que BTCUSDT : les infos du marché parlent du bitcoin (js/app.js). */
 .deb-btc {
   margin: 0 0 8px; padding: 6px 9px; border-radius: 8px; font-size: 11.5px; line-height: 1.4;
   color: var(--ink-1); background: var(--rail); border-left: 2px solid var(--warn);
@@ -1109,8 +1109,8 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
 .puce-case.indispo { opacity: 0.45; cursor: not-allowed; }
 @media (max-width: 768px) { .reglages-pop { right: 8px !important; left: 8px !important; top: auto !important; bottom: 8px; width: auto; } }
 
-/* ─── Mode Débutant : l'écran calme ──────────────────────────────────────────────
-   Le HTML est le même dans les deux modes ; ici, seulement ce qui se montre. En Débutant :
+/* ─── Mode Lisible : l'écran calme ──────────────────────────────────────────────
+   Le HTML est le même dans les deux modes ; ici, seulement ce qui se montre. En Lisible :
    le prix, sa variation 24 h (durée dite), une pastille « Infos du marché ▸ » à la place des
    chiffres clés, et les boutons utiles. Sans flou, sans animation infinie. */
 .kpi-deb {
@@ -1125,9 +1125,9 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
 .kpis.vieux .kpi-deb .deb-retard { display: inline; }
 [data-mode="debutant"] #cycle .kpi, [data-mode="debutant"] #cycle .kpi-age { display: none; }
 [data-mode="debutant"] .header-right > #updated { display: none; }
-/* Les structures déplacent l'heure de publication (en UTC) hors de l'en-tête : en Débutant, son
+/* Les structures déplacent l'heure de publication (en UTC) hors de l'en-tête : en Lisible, son
    âge est dit par la pastille « Infos du marché » (infobulle) ; l'heure UTC et ses étiquettes
-   restent en Expert. La légende de la Gazette nomme les « bougies » : Expert aussi. */
+   restent en Complet. La légende de la Gazette nomme les « bougies » : Complet aussi. */
 [data-mode="debutant"] #updated, [data-mode="debutant"] .f95-pub, [data-mode="debutant"] .gare-heure,
 [data-mode="debutant"] .gazette-edition, [data-mode="debutant"] .gazette-legende { display: none !important; }
 /* Planche (cyanotype, diazo) : les chiffres clés masqués, la case du cartouche garde son fond de
@@ -1138,16 +1138,20 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
 :root[data-mode="debutant"] .plan-cartouche > .plan-sources { contain: none; white-space: nowrap; }
 :root[data-mode="debutant"] .plan-pied .indicator-bar > .ind-dropdown { margin-left: 0; }
 [data-mode="debutant"] .gazette-manchette { display: none; }
-/* Le bouton de mode : où il mène (« Débutant · passer en Expert »), plus court sur téléphone. */
+/* Le bouton de mode : où il mène (« Lisible · passer en Complet »), plus court sur téléphone. */
 .mode-court { display: none; }
 @media (max-width: 480px) { .mode-long { display: none; } .mode-court { display: inline; } }
-/* Le menu « Affichage » du Débutant : ses deux cases, puis le lien vers l'Expert. */
+/* Le menu « Affichage » du Lisible : ses deux cases, puis le lien vers l'Complet. */
 .ind-dropdown-menu .menu-expert {
   display: block; width: calc(100% - 12px); margin: 6px; padding: 6px 10px; text-align: left;
   font: inherit; font-size: 11.5px; font-weight: 600; color: var(--accent-2);
   background: var(--rail); border: 1px solid var(--hairline); border-radius: 8px; cursor: pointer;
 }
 .ind-dropdown-menu .menu-expert:hover { border-color: var(--accent); }
+/* Mode Complet : « Tout afficher » et « Tout masquer », sous le champ de recherche du menu. */
+.ind-filtre .ind-tout { display: flex; gap: 10px; margin-top: 6px; }
+.ind-filtre .ind-tout .lien { font-size: 11.5px; font-weight: 600; color: var(--accent-2); background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; }
+.ind-filtre .ind-tout .lien:hover { text-decoration: underline; }
 /* L'astuce, une seule fois : en bas du tracé, au-dessus du graphique (pas un texte du canvas). */
 .astuce-tap {
   position: absolute; z-index: 3; left: 20px; bottom: 60px; padding: 5px 11px; border-radius: 999px;
@@ -1168,7 +1172,7 @@ html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { orde
 }
 [data-mode="debutant"] .indicator-bar { flex-wrap: wrap; overflow-x: visible; row-gap: 4px; }
 @media (max-width: 800px) {
-  /* La pastille reste : c'est l'accès aux cartes du Débutant. */
+  /* La pastille reste : c'est l'accès aux cartes du Lisible. */
   [data-mode="debutant"] .kpis { display: flex; }
 }
 @media (max-width: 480px) {
@@ -1197,8 +1201,8 @@ html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { orde
   [data-mode="debutant"] .header-right .theme-btn.ico-btn { width: 26px; height: 26px; }
   [data-mode="debutant"] .mode-btn { padding: 0 6px; font-size: 9.5px; }
 }
-/* Cartes : un bloc réservé à l'Expert est enveloppé sans boîte (même mise en page qu'avant) ;
-   en Débutant, une carte d'une seule tuile la montre en entier. */
+/* Cartes : un bloc réservé à l'Complet est enveloppé sans boîte (même mise en page qu'avant) ;
+   en Lisible, une carte d'une seule tuile la montre en entier. */
 .env-exp { display: contents; }
 [data-mode="debutant"] .tuiles.deb-une { grid-template-columns: minmax(0, 1fr); }
 
@@ -1207,13 +1211,13 @@ html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { orde
    faisait une bulle : sur écran étroit, des coins de carte. */
 @media (max-width: 1100px) {
   .header, .indicator-bar { border-radius: min(var(--r-bar), 22px); }
-  /* Débutant : « Infos · en retard ▸ » (le mot « du marché » cède) ; l'en-tête tient sur une rangée. */
+  /* Lisible : « Infos · en retard ▸ » (le mot « du marché » cède) ; l'en-tête tient sur une rangée. */
   [data-mode="debutant"] .kpi-deb .deb-mot { display: none; }
 }
 /* Tablette : le nom (redit dans la barre du bas) cède avant que l'en-tête passe à la ligne. */
 @media (max-width: 900px) { html[data-mode="debutant"]:not([data-structure]) .header-left h1 { display: none; } }
 @media (max-width: 480px) {
-  /* Débutant : 1re rangée, la paire, le prix et la variation ; 2e rangée, la pastille « Infos »
+  /* Lisible : 1re rangée, la paire, le prix et la variation ; 2e rangée, la pastille « Infos »
      (qui cède, en entier puis en points de suspension) et les boutons (qui ne passent jamais à
      une 3e rangée). */
   html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-left { order: 1; }

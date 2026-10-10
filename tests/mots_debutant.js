@@ -1,8 +1,8 @@
-// Mots qu'un débutant ne doit pas lire sur son écran (mode Débutant), partagés par les tests.
+// Mots qu'un débutant ne doit pas lire sur son écran (mode Lisible), partagés par les tests.
 //
-// La règle du propriétaire : en mode Débutant, l'écran se lit sans connaître le vocabulaire
-// des marchés ; tout le détail technique reste derrière le bouton « Expert ». Ces trois motifs
-// cherchent ce vocabulaire dans le texte VISIBLE en Débutant (pas dans le code, pas dans le
+// La règle du propriétaire : en mode Lisible, l'écran se lit sans connaître le vocabulaire
+// des marchés ; tout le détail technique reste derrière le bouton « Complet ». Ces trois motifs
+// cherchent ce vocabulaire dans le texte VISIBLE en Lisible (pas dans le code, pas dans le
 // détail demandé par un appui quand un test le dit).
 //
 // Frontières : `\b` de JavaScript ne voit pas de frontière après une lettre accentuée

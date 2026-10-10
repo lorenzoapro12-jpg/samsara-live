@@ -353,8 +353,8 @@ titre('6. Choix « 1B » : classement sans pourcentage, la base du hasard en exp
   check('aucun libellé ne commence par « $ »', textes.every(x => !/^\$/.test(x)));
 }
 
-// ── 6 bis. Débutant : la ligne, le libellé, la bulle (A1) ──
-titre('6 bis. Débutant : une ligne d’état marquée, un libellé court, une bulle sans jargon');
+// ── 6 bis. Lisible : la ligne, le libellé, la bulle (A1) ──
+titre('6 bis. Lisible : une ligne d’état marquée, un libellé court, une bulle sans jargon');
 {
   const G = require(path.join(REPO, 'js/guide.js')), DEB = dansPage('PARAM.guide.debutant');
   const F = S.lire(copie(FIX), H3), un = F.scenarios.find(x => x.rang === '1');

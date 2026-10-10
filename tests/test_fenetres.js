@@ -83,8 +83,8 @@ async function ouvrir(nav, theme, vue) {
     if (h === 'raw.githubusercontent.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: u.includes('heatmap') ? fs.readFileSync(path.join(REPO, 'heatmap.json')) : publicationVieille() });
     return r.abort();
   });
-// Mode Expert : ce test mesure les éléments denses (chiffres clés, menus, sous-graphes…), masqués
-  // en Débutant (le mode par défaut) ; leur version Débutant est vérifiée dans test_debutant_page.js.
+// Mode Complet : ce test mesure les éléments denses (chiffres clés, menus, sous-graphes…), masqués
+  // en Lisible (le mode par défaut) ; leur version Lisible est vérifiée dans test_debutant_page.js.
   await page.addInitScript(t => { try { localStorage.clear(); localStorage.setItem('samsara-mode', 'expert'); localStorage.setItem('samsara-theme', t); } catch (e) { /* */ } }, theme);
   await page.goto(`http://127.0.0.1:${serveur.address().port}/index.html`);
   await page.waitForTimeout(2000);
@@ -126,7 +126,7 @@ const dedans = (a, b, m = 0.5) => a && b && a.g >= b.g - m && a.d <= b.d + m && 
       let b = await boites(p);
       check('barre des tâches pleine largeur, collée au bas de l\'écran', b.barre && b.barre.g === 0 && Math.abs(b.barre.d - b.L) < 0.5 && Math.abs(b.barre.b - b.H) < 0.5, b.barre);
       check('Démarrer en tête de la barre ; lancement rapide = les six boutons d\'accès, dans l\'ordre ; zone : point live, publication, horloge',
-        // (le bouton ↺ porte désormais un id, resetBtn : la pastille Débutant le désigne)
+        // (le bouton ↺ porte désormais un id, resetBtn : la pastille Lisible le désigne)
         place.premier === 'themeBtn' && JSON.stringify(place.lancement) === JSON.stringify(['feedBtn', 'liveBtn', 'resetBtn', 'carteBtn', 'reglagesBtn', 'legendesBtn']) && place.zone, place);
       // Démarrer : enfoncé tant que son menu est ouvert ; le menu au-dessus du bouton.
       const ombre = () => p.evaluate(() => getComputedStyle(document.getElementById('themeBtn')).boxShadow);

@@ -38,8 +38,8 @@ let publication = Object.assign({}, DATA, { updated: new Date(maintenant - 2 * M
 const lectures = [];
 let panne = false;
 const page = chargerPage({
-  // En Expert : le contrôle du format du prix (« $83,512.51 », « −3.05 % ») garde toute sa force ;
-  // le mode Débutant écrit les mêmes valeurs autrement (« 83 513 $ », « −3,05 % en 24 h »),
+  // En Complet : le contrôle du format du prix (« $83,512.51 », « −3.05 % ») garde toute sa force ;
+  // le mode Lisible écrit les mêmes valeurs autrement (« 83 513 $ », « −3,05 % en 24 h »),
   // contrôlé à part plus bas.
   stockage: { 'samsara-mode': 'expert' },
   // requestAnimationFrame immédiat : l'onde du voyant se repose deux images plus tard.
@@ -118,13 +118,13 @@ Object.defineProperty(feed, 'innerHTML', { get: () => html, set: v => { rendus++
   await T.fetchPrice();
   check('fetchPrice demande ensuite le format MINI, et rien d’autre', lectures.length === 1 && lectures[0].url === T.urlTicker('BTCUSDT'), lectures.map(x => x.url));
   check('prix et variation affichés depuis la réponse MINI', el('price').textContent === '$83,512.51' && el('var24').textContent === '−' + Math.abs(v).toFixed(2) + ' %', [el('price').textContent, el('var24').textContent]);
-  // Débutant : les mêmes valeurs, au format français, la durée de la variation dite.
+  // Lisible : les mêmes valeurs, au format français, la durée de la variation dite.
   page.stockage['samsara-mode'] = 'debutant';
   await T.fetchPrice();
-  check('Débutant : même prix et même variation, écrits « 83 513 $ » et « −3,05 % en 24 h »', /^83\s513\s\$$/.test(el('price').textContent) && el('var24').textContent === '−' + Math.abs(v).toFixed(2).replace('.', ',') + ' % en 24 h', [el('price').textContent, el('var24').textContent]);
+  check('Lisible : même prix et même variation, écrits « 83 513 $ » et « −3,05 % en 24 h »', /^83\s513\s\$$/.test(el('price').textContent) && el('var24').textContent === '−' + Math.abs(v).toFixed(2).replace('.', ',') + ' % en 24 h', [el('price').textContent, el('var24').textContent]);
   page.stockage['samsara-mode'] = 'expert';
   await T.fetchPrice();
-  check('… et de retour en Expert, le format d’avant', el('price').textContent === '$83,512.51', el('price').textContent);
+  check('… et de retour en Complet, le format d’avant', el('price').textContent === '$83,512.51', el('price').textContent);
 
   titre('3. Le préchargement du script de tête : les URL exactes du démarrage');
   const scripts = scriptsApp(), tete = scripts.find(s => s.fichier === 'index.html (inline)');

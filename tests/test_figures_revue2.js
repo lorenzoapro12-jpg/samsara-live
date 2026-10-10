@@ -1,7 +1,7 @@
 // Les figures après la 2e revue (octobre 2026), sur des bougies BTCUSDT réelles enregistrées
 // (tests/fixtures/bougies-revue-figures.json : 15 min et 1 h jusqu'au 09/10/2026 20:00 UTC).
 // CE QUI EST VÉRIFIÉ
-//   1. Expert : une figure montrée qui tombe reste montrée, barrée, à la clôture suivante — même
+//   1. Complet : une figure montrée qui tombe reste montrée, barrée, à la clôture suivante — même
 //      quand une figure mieux rangée du même groupe la recouvre (15 min, 08/10 13:45 UTC : le double
 //      creux tombe, le double sommet le recouvre).
 //   2. Figures à deux droites : une droite de 2 points seulement est approchée par le prix entre
@@ -9,14 +9,14 @@
 //      biseau montant du 08/10 14:00 UTC en 1 h, tenu par 2 sommets jamais revisités, n'est plus vu).
 //   3. Bilan : un double et un triple sur les mêmes creux ne comptent pas deux fois le même
 //      mouvement (15 min, 09/10 02:00 UTC).
-//   4. Double devenu triple : en Débutant, le triple prend la place du double dessiné (« Devenu
-//      triple creux », une fois, et la bulle le dit) ; en Expert, il passe devant une figure du
+//   4. Double devenu triple : en Lisible, le triple prend la place du double dessiné (« Devenu
+//      triple creux », une fois, et la bulle le dit) ; en Complet, il passe devant une figure du
 //      même dernier point (1 h, 06/10 10:00 UTC).
 //   5. Mots : la ✗ dit le côté et le prix (« au-dessus de 85 447 $ (le milieu de la figure) »,
 //      « clôture > 84 670 $ (haut de la pause) ») ; jamais « au bout de la pause » ; une mèche seule
 //      ne dit pas « sort en bas ? » ; « cible atteinte » garde le nom ; la 1re clôture dehors est dite
 //      avec le seuil de SA bougie ; « Figure validée » ; « 500 j, soit 1,4 an » ; les ébauches
-//      annulées à part des figures invalidées (Expert).
+//      annulées à part des figures invalidées (Complet).
 //   6. Tracé : une figure confirmée porte son trait d'invalidation (de la validation à la bougie en
 //      cours, ou à sa chute : la ✗ au bout).
 //   7. Rejeu à froid par tranches = rejeu complet ; tranches mesurées (affiché).
@@ -61,8 +61,8 @@ function rejouer(K, i0, i1, f) {
   return res;
 }
 
-// ── 1. ✗ gardée en Expert ──
-titre('1. Expert : une figure montrée qui tombe est barrée à la clôture suivante');
+// ── 1. ✗ gardée en Complet ──
+titre('1. Complet : une figure montrée qui tombe est barrée à la clôture suivante');
 {
   const K = FX['15m'], iC = idx(K, '2026-10-08T13:45');
   const st = { tombees: 0, sansCroix: 0, cas: null, ex: [] };
@@ -148,7 +148,7 @@ titre('4. Double devenu triple : le triple prend la place, et le dit une fois');
   });
   check('06/10 10:00 UTC : le double creux dessiné devient le triple creux, en tête, « Devenu triple creux »', !!cas && /^double_creux/.test(cas.avant) && /^triple_creux/.test(cas.apres) && cas.premier && cas.lib === 'Devenu triple creux', cas);
   check('… la bulle le dit (« le double creux est devenu un triple creux »), sans mot banni', !!cas && /le double creux est devenu un triple creux/.test(cas.bulle || '') && !G.motsBannis(cas.bulle || '').length, cas && cas.bulle);
-  check('… et l’Expert montre le triple creux (il passe devant la figure du même dernier point)', !!exp && exp.includes('triple_creux'), exp);
+  check('… et l’Complet montre le triple creux (il passe devant la figure du même dernier point)', !!exp && exp.includes('triple_creux'), exp);
   // Après : le libellé redevient celui de l'état (dit une fois).
   const R2 = G.detecter(serie(K.slice(0, iT + 3)), P);
   const tr = R2.formes.concat(R2.ebauches.liste).find(x => /^triple_creux/.test(x.type) && x.deDouble);
@@ -162,8 +162,8 @@ titre('5. Mots : côté et prix de la ✗, mèche, cible, 1re clôture dehors, d
   const lignes = { type: 'biseau_montant', sens: -1, fin: 'invalide', jFin: 150, raison: 'milieu', invalidation: 85447, journal: [{ j: 150, quoi: 'invalide', p: 85447, c: 85500 }] };
   const drap = { type: 'drapeau', sens: -1, fin: 'invalide', jFin: 150, raison: 'pause', invalidation: 84670, mat: { h: 900 }, journal: [{ j: 150, quoi: 'invalide', p: 84670, c: 84700 }] };
   const dD = G.marqueFin(lignes, ctx, 'debutant', '$'), dE = G.marqueFin(lignes, ctx, 'expert', '$'), fD = G.marqueFin(drap, ctx, 'debutant', '$'), fE = G.marqueFin(drap, ctx, 'expert', '$');
-  check('✗ Débutant : « le prix a fini une heure au-dessus de 85 447 $ (le milieu de la figure) »', /le prix a fini une heure au-dessus de 85 447 \$ \(le milieu de la figure\)/.test(dD) && !/revenu au milieu/.test(dD), dD);
-  check('✗ Expert : « clôture > 84 670 $ (haut de la pause) », jamais « au bout de la pause »', /clôture > 84 670 \$ \(haut de la pause\)/.test(fE) && !/au bout/.test(fE + fD + dE) && /au-dessus de 84 670 \$ \(le haut de la pause\)/.test(fD), [fE, fD, dE]);
+  check('✗ Lisible : « le prix a fini une heure au-dessus de 85 447 $ (le milieu de la figure) »', /le prix a fini une heure au-dessus de 85 447 \$ \(le milieu de la figure\)/.test(dD) && !/revenu au milieu/.test(dD), dD);
+  check('✗ Complet : « clôture > 84 670 $ (haut de la pause) », jamais « au bout de la pause »', /clôture > 84 670 \$ \(haut de la pause\)/.test(fE) && !/au bout/.test(fE + fD + dE) && /au-dessus de 84 670 \$ \(le haut de la pause\)/.test(fD), [fE, fD, dE]);
   check('… sans prix répété', (dD.match(/85 447/g) || []).length === 1 && (fE.match(/84 670/g) || []).length === 1, [dD, fE]);
   check('état : « invalidé (clôture repassée au-dessus de son milieu) », « … au-dessus du haut de la pause »', G.etatForme(lignes).texte === 'invalidé (clôture repassée au-dessus de son milieu)' && G.etatForme(drap).texte === 'invalidé (clôture au-dessus du haut de la pause)', [G.etatForme(lignes).texte, G.etatForme(drap).texte]);
   // Mèche seule : la bougie en cours est passée sous la borne basse, le prix est revenu dedans.
@@ -185,10 +185,10 @@ titre('5. Mots : côté et prix de la ✗, mèche, cible, 1re clôture dehors, d
   const tC = G.texteFormeDebutant(fc, null, ctx, P, '$').join(' ');
   check('confirmée : « Figure validée … » (accord avec « figure »)', /Figure validée /.test(tC) && !/(^|\. )Validée /.test(tC), tC);
   check('durée de l’historique : « 500 j, soit 1,4 an », sans parenthèses imbriquées', G.duree(500 * 86400) === '500 j, soit 1,4 an' && G.duree(1000 * 86400) === '1 000 j, soit 2,7 ans', [G.duree(500 * 86400), G.duree(1000 * 86400)]);
-  // Expert : les ébauches annulées à part des figures invalidées.
+  // Complet : les ébauches annulées à part des figures invalidées.
   const eb = { type: 'double_sommet', ebauche: true, s: -1, fin: 'abandon', jFin: 140, raison: 'depasse', pAbandon: 85100, abandonP: 85050, journal: [] };
   const tx = G.texteFormeExpert(fc, null, ctx, P, '$', { tombees: [lignes, eb] }).join(' ');
-  check('Expert : « Invalidées récemment » ne cite que des figures ; les ébauches annulées ont leur ligne', /Invalidées récemment \(ce graphique\) : Biseau montant/.test(tx) && !/Invalidées récemment[^.]*ébauche/.test(tx) && /Ébauches annulées récemment \(jamais devenues des figures\) : Double sommet/.test(tx), tx);
+  check('Complet : « Invalidées récemment » ne cite que des figures ; les ébauches annulées ont leur ligne', /Invalidées récemment \(ce graphique\) : Biseau montant/.test(tx) && !/Invalidées récemment[^.]*ébauche/.test(tx) && /Ébauches annulées récemment \(jamais devenues des figures\) : Double sommet/.test(tx), tx);
 }
 
 // ── 6. Trait d'invalidation ──

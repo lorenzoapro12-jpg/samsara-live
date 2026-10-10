@@ -12,13 +12,13 @@
 //      (A3) un retour remis à zéro quand la sortie est annulée ;
 //   4. aucun regard vers l'avenir, pour les 16 types et les ébauches, issues comprises ;
 //   5. bilan : comptes cohérents, ébauches → figures → confirmées, témoin, aucun « % » ;
-//   6. mots : libellés Débutant ≤ PARAM.guide.debutant.forme et sans mot banni ; Expert ≤ 80 ; bulles
+//   6. mots : libellés Lisible ≤ PARAM.guide.debutant.forme et sans mot banni ; Complet ≤ 80 ; bulles
 //      avec validation, invalidation, cible « non garantie » et « Mesuré sur » ; mêmes valeurs dans les
-//      deux modes ; heure de Paris en Débutant, jamais « UTC » ; aucun conseil ni intention ; (C7) des
+//      deux modes ; heure de Paris en Lisible, jamais « UTC » ; aucun conseil ni intention ; (C7) des
 //      définitions sans sens attendu ;
 //   7. états vivants (figureVivante) : « franchi », « percé en mèche », jamais un changement d'état ;
 //      (A1) une ébauche ne naît qu'à une clôture ;
-//   8. sélection : Débutant entière dans la vue et rangée, Expert ≤ formesMax sans recouvrement d'une
+//   8. sélection : Lisible entière dans la vue et rangée, Complet ≤ formesMax sans recouvrement d'une
 //      même famille, une figure tombée montrée garderInvalide bougies puis plus ;
 //   9. temps : rejeu des 3 000 bougies ≤ 60 ms (moyenne de 5 après un appel), figureVivante ≤ 1 ms.
 // USAGE   node tests/test_figures.js
@@ -238,16 +238,16 @@ titre('5. Bilan : comptes, ébauches, témoin, aucun pourcentage');
   check('ébauches : devenues ≤ ébauches, confirmées ≤ devenues, pour chaque type', G.TYPES.every(k => b[k].ebauches.devenues <= b[k].ebauches.n && b[k].ebauches.confirmees <= b[k].ebauches.devenues));
   check('un témoin (repère sans forme) pour chaque type confirmé', G.TYPES.every(k => !b[k].confirmes || b[k].temoin.departs > 0));
   const tx = G.TYPES.flatMap(k => ['expert', 'expertCourt', 'debutant'].map(m => G.texteBilan(b[k], ctx, P, m)));
-  // Le seul « % » permis : le niveau de l'intervalle de Wilson (Expert), jamais un taux ni une probabilité.
+  // Le seul « % » permis : le niveau de l'intervalle de Wilson (Complet), jamais un taux ni une probabilité.
   const pc = x => /%/.test(x.replace(/Wilson 95 %/g, ''));
-  check('« échantillon faible » sous ' + P.echantillonFaible + ' cas, aucun « % » dans les bilans (hors « Wilson 95 % » en Expert)', G.TYPES.filter(k => b[k].confirmes < P.echantillonFaible).every(k => /faible/.test(G.texteBilan(b[k], ctx, P, 'expert')))
+  check('« échantillon faible » sous ' + P.echantillonFaible + ' cas, aucun « % » dans les bilans (hors « Wilson 95 % » en Complet)', G.TYPES.filter(k => b[k].confirmes < P.echantillonFaible).every(k => /faible/.test(G.texteBilan(b[k], ctx, P, 'expert')))
     && !tx.some(pc) && !G.TYPES.some(k => /%/.test(G.texteBilan(b[k], ctx, P, 'debutant'))), tx.filter(pc));
 }
 
 // ── 6. Mots ──
 titre('6. Mots : libellés, bulles, mêmes valeurs, heures');
 {
-  // Tous les libellés Débutant, pour chaque type et chaque état (et les libellés vivants).
+  // Tous les libellés Lisible, pour chaque type et chaque état (et les libellés vivants).
   const etats = [{ ebauche: true, s: 1, pend: { i: 0, p: 1, reste: 1 } }, { phase: 'formation' }, { demi: true, demiSens: 1 }, { demi: true, demiSens: -1 }, { phase: 'confirme', sens: 1 }, { phase: 'confirme', sens: -1 },
     { fin: 'invalide' }, { fin: 'invalide_avant' }, { ebauche: true, fin: 'abandon', s: 1 }, { fin: 'expire_avant', raison: 'pointe' }, { fin: 'atteint' }, { fin: 'expire' }];
   const lib = new Set();
@@ -256,7 +256,7 @@ titre('6. Mots : libellés, bulles, mêmes valeurs, heures');
   // Les libellés vivants (nom + état du moment) de chaque type et de chaque état vivant.
   for (const type of G.TYPES) for (const e of etats.filter(x => !x.fin)) for (const l of G.libellesPossiblesDebutant(Object.assign({ type, sens: 1, abandonP: 1 }, e))) lib.add(l);
   const L0 = [...lib], trop = L0.filter(l => l.length > DEB.forme), sales = L0.filter(l => G.motsBannis(l).length || CONSEIL.test(l) || /%/.test(l));
-  check(`${L0.length} libellés Débutant distincts : ≤ ${DEB.forme} caractères, aucun mot banni, aucun conseil`, L0.length >= 40 && !trop.length && !sales.length, { trop, sales });
+  check(`${L0.length} libellés Lisible distincts : ≤ ${DEB.forme} caractères, aucun mot banni, aucun conseil`, L0.length >= 40 && !trop.length && !sales.length, { trop, sales });
   // Bulles, sur les figures montrées à 40 instants de la fixture, dans les deux modes.
   const pb = [];
   let nb = 0, nbEx = 0;
@@ -281,7 +281,7 @@ titre('6. Mots : libellés, bulles, mêmes valeurs, heures');
       if (vivante) {
         nbEx++;
         const N = G.niveauxFigure(f, ctx.j, P);
-        // Débutant : validation, cible « non garantie » ; annulation quand la figure en a une.
+        // Lisible : validation, cible « non garantie » ; annulation quand la figure en a une.
         if (!/validée|sortie compte|Validée/.test(deb)) pb.push(['validation', f.type, e]);
         if (!f.ebauche && !/cibles? théoriques?/i.test(deb)) pb.push(['cible', f.type, e]);
         if (!f.ebauche && !/non garanties?/.test(deb)) pb.push(['non garantie', f.type, e]);
@@ -297,7 +297,7 @@ titre('6. Mots : libellés, bulles, mêmes valeurs, heures');
       }
     }
   }
-  check(`${nb} bulles (${nbEx} figures vivantes) à 40 instants : « Mesuré sur », validation, invalidation, cible « non garantie », mêmes valeurs dans les deux modes, heure de Paris en Débutant, ni mot banni ni conseil ni sens attendu`, nb > 40 && !pb.length, pb.slice(0, 8));
+  check(`${nb} bulles (${nbEx} figures vivantes) à 40 instants : « Mesuré sur », validation, invalidation, cible « non garantie », mêmes valeurs dans les deux modes, heure de Paris en Lisible, ni mot banni ni conseil ni sens attendu`, nb > 40 && !pb.length, pb.slice(0, 8));
   const defs = Object.values(G.DEFINITION_FORME);
   check(`C7 : les ${defs.length} définitions ne disent ni « annonce », ni « souvent suivi », ni « devrait », ni « signal »`, defs.length === 16 && !defs.some(d => C7.test(d)), defs.filter(d => C7.test(d)));
 }
@@ -313,15 +313,15 @@ titre('7. États vivants (figureVivante) ; une ébauche ne naît qu’à une cl�
   const v1 = G.figureVivante(f, Sv, j, { high: x.ligne + 50, low: x.seuil - 30 }, x.seuil - 20, P);
   const v2 = G.figureVivante(f, Sv, j, { high: x.ligne + 50, low: x.seuil - 30 }, x.ligne + 10, P);
   const t1 = G.texteVivantFigure(f, v1, ctx, 'expert', '$'), t2 = G.texteVivantFigure(f, v2, ctx, 'expert', '$');
-  // (Comportement changé exprès : le libellé Débutant garde le nom de la figure et ne revient pas en
+  // (Comportement changé exprès : le libellé Lisible garde le nom de la figure et ne revient pas en
   // arrière avant la clôture — il ne clignote plus quand le prix oscille autour de la ligne.)
-  check('prix live au-delà de la ligne de cou : « franchi », « à confirmer à la fin de la bougie » ; Débutant « Double sommet à confirmer » (le nom reste)', v1.cle === 'franchi' && v1.etiq === 'sortie' && /à confirmer à la fin de la bougie/.test(t1) && G.libelleVivantDebutant(f, v1) === 'Double sommet à confirmer', [v1.cle, t1, G.libelleVivantDebutant(f, v1)]);
+  check('prix live au-delà de la ligne de cou : « franchi », « à confirmer à la fin de la bougie » ; Lisible « Double sommet à confirmer » (le nom reste)', v1.cle === 'franchi' && v1.etiq === 'sortie' && /à confirmer à la fin de la bougie/.test(t1) && G.libelleVivantDebutant(f, v1) === 'Double sommet à confirmer', [v1.cle, t1, G.libelleVivantDebutant(f, v1)]);
   // (Changé exprès, revue des figures 2 : « sort en bas ? » se lisait alors que le prix était revenu
   // dedans ; la mèche seule a son propre libellé, qui garde le nom et ne dit pas « sort ».)
-  check('mèche seule (la bougie en cours y est allée, le prix est revenu) : « percé en mèche » ; Débutant : « Double sommet : revenu » (pas le libellé d’au-delà), le nom reste', v2.cle === 'meche' && v2.etiq === 'meche' && /percé en mèche/.test(t2)
+  check('mèche seule (la bougie en cours y est allée, le prix est revenu) : « percé en mèche » ; Lisible : « Double sommet : revenu » (pas le libellé d’au-delà), le nom reste', v2.cle === 'meche' && v2.etiq === 'meche' && /percé en mèche/.test(t2)
     && G.libelleVivantDebutant(f, v2) === 'Double sommet : revenu' && G.libelleVivantDebutant(f, v2) !== G.libelleVivantDebutant(f, v1), [v2.cle, t2, G.libelleVivantDebutant(f, v2)]);
   const tD = G.texteVivantFigure(f, v2, ctx, 'debutant', '$');
-  check('… en Débutant : « Cela ne compte pas : seule la fin de … compte », l’heure de Paris, aucun mot banni', /Cela ne compte pas : seule la fin d/.test(tD) && /\d\dh\d\d/.test(tD) && !G.motsBannis(tD).length, tD);
+  check('… en Lisible : « Cela ne compte pas : seule la fin de … compte », l’heure de Paris, aucun mot banni', /Cela ne compte pas : seule la fin d/.test(tD) && /\d\dh\d\d/.test(tD) && !G.motsBannis(tD).length, tD);
   check('un état vivant ne change jamais la figure (phase, demi, journal)', JSON.stringify(f) === avant);
   // A1 : chaque ébauche naît à une clôture, avec au moins ebaucheDroiteMin bougie close à droite de son extrême.
   const eb = R.ebauches.liste;
@@ -337,7 +337,7 @@ titre('7. États vivants (figureVivante) ; une ébauche ne naît qu’à une cl�
 }
 
 // ── 8. Sélection ──
-titre('8. Sélection : Débutant, Expert, figure tombée');
+titre('8. Sélection : Lisible, Complet, figure tombée');
 {
   const pb = [];
   for (let n = 400; n <= NN; n += 37) {
@@ -357,7 +357,7 @@ titre('8. Sélection : Débutant, Expert, figure tombée');
       if (G.dernierPoint(f, P) === G.dernierPoint(g, P)) pb.push(['même dernier point', n]);
     }
   }
-  check('Débutant : figures entières dans la vue, rangées ; Expert : ≤ ' + P.formesMax + ', jamais deux d’une même famille d’écran qui se recouvrent ni sur le même dernier point (sauf une figure tombée sous les yeux, qui garde sa place)', !pb.length, pb.slice(0, 5));
+  check('Lisible : figures entières dans la vue, rangées ; Complet : ≤ ' + P.formesMax + ', jamais deux d’une même famille d’écran qui se recouvrent ni sur le même dernier point (sauf une figure tombée sous les yeux, qui garde sa place)', !pb.length, pb.slice(0, 5));
   const inv = { fin: 'invalide', jFin: 100, type: 'double_sommet', journal: [] }, eb = { ebauche: true, type: 'double_sommet', journal: [] };
   check('une figure invalidée depuis moins de 2 clôtures (rang 2) passe devant une ébauche (rang 4) ; plus tard, derrière (rang 5)', G.rangFigure(inv, 101) === 2 && G.rangFigure(eb, 101) === 4 && G.rangFigure(inv, 103) === 5);
   // invalide_avant : montrée garderInvalide bougies, puis plus.

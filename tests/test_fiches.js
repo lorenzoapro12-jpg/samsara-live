@@ -104,7 +104,7 @@ const conseils = textes.filter(([, t]) => CONSEIL.test(t));
 check('aucune fiche ne dit quoi acheter ou vendre', !conseils.length, conseils);
 const courtes = ['funding', 'oi', 'ls', 'cvd', 'gex', 'rsi_tf', 'vix', 'prime', 'carnet'].flatMap(k => [-5, -0.5, 0.2, 1, 50, 80].map(v => T.lectureCourte(k, v)));
 check('aucune lecture courte ne dit quoi faire', courtes.every(t => !CONSEIL.test(t)));
-// Les phrases des cartes du Débutant (phraseCarte) : le même bloc réservé au Débutant, en mots
+// Les phrases des cartes du Lisible (phraseCarte) : le même bloc réservé au Lisible, en mots
 // simples (aucun mot de la liste du Guide), sans conseil.
 {
   const Gd = require(path.join(REPO, 'js/guide.js'));
@@ -114,25 +114,25 @@ check('aucune lecture courte ne dit quoi faire', courtes.every(t => !CONSEIL.tes
     && /de 3,4 millions \$\./.test(T.phraseCarte('cvd', 3356931)) && /de 1,2 million \$\./.test(T.phraseCarte('cvd', -1.2e6)) && /de 845 000 \$\./.test(T.phraseCarte('cvd', 845000)) && !/\d{1,3}(?: \d{3}){2}/.test(ph[6] + ph[7] + T.phraseCarte('cvd', 3356931)) && /2 sources manquent/.test(ph[9]) && /1 source manque/.test(ph[10]), [ph[0], ph[6], ph[9]]);
   check('valeur absente ou clé inconnue : aucune phrase (rien d’inventé)', T.phraseCarte('vix', null) === '' && T.phraseCarte('fourchette', NaN) === '' && T.phraseCarte('inconnue', 1) === '' && T.phraseCarte('sources', 3) === '');
 }
-// Le glossaire en Débutant : d'abord ce que montre SON écran, avec un titre et une explication du
-// Débutant, sans mot technique (constat de revue : il s'ouvrait sur GEX, funding, CVD…).
+// Le glossaire en Lisible : d'abord ce que montre SON écran, avec un titre et une explication du
+// Lisible, sans mot technique (constat de revue : il s'ouvrait sur GEX, funding, CVD…).
 {
   const Gd = require(path.join(REPO, 'js/guide.js'));
   const G = T.GLOSSAIRE_DEBUTANT || [];
   const manque = G.filter(k => !T.FICHES[k] || !T.FICHES[k].titreDeb || !T.FICHES[k].simpleDeb);
-  check(`glossaire Débutant : ${G.length} fiches (guide, repères, scénarios, dessin des prix, les cartes), chacune avec titreDeb et simpleDeb`, G.length >= 6 && !manque.length && ['guide_niveaux', 'scenarios'].every(k => G.includes(k)), manque);
+  check(`glossaire Lisible : ${G.length} fiches (guide, repères, scénarios, dessin des prix, les cartes), chacune avec titreDeb et simpleDeb`, G.length >= 6 && !manque.length && ['guide_niveaux', 'scenarios'].every(k => G.includes(k)), manque);
   const sales = Object.entries(T.FICHES).filter(([, f]) => f.titreDeb || f.simpleDeb).map(([k, f]) => [k, Gd.motsBannis((f.titreDeb || '') + ' ' + (f.simpleDeb || ''))]).filter(([, b]) => b.length);
-  check('titres et explications du Débutant : aucun mot de la liste du Guide', !sales.length, sales);
-  check('guide, guide_regime, guide_suite : une explication du Débutant qui décrit l’écran Débutant (ni badge, ni chemins dessinés, « + Affichage »)', ['guide', 'guide_regime', 'guide_suite'].every(k => T.FICHES[k].simpleDeb)
+  check('titres et explications du Lisible : aucun mot de la liste du Guide', !sales.length, sales);
+  check('guide, guide_regime, guide_suite : une explication du Lisible qui décrit l’écran Lisible (ni badge, ni chemins dessinés, « + Affichage »)', ['guide', 'guide_regime', 'guide_suite'].every(k => T.FICHES[k].simpleDeb)
     && /« \+ Affichage »/.test(T.FICHES.guide.simpleDeb) && /pas de badge/.test(T.FICHES.guide_regime.simpleDeb) && /rien n’est dessiné/.test(T.FICHES.guide_suite.simpleDeb));
   const fg = T.ficheHtml('guide_regime');
-  check('fiche avec texte du Débutant : les deux explications, chacune dans sa classe ; les deux titres de même', /<p class="fiche-simple expert-seul">/.test(fg) && /<p class="fiche-simple debutant-seul">/.test(fg) && /<span class="debutant-seul">Le mouvement du prix<\/span>/.test(fg));
-  // Autre paire : les cartes du Débutant nomment le bitcoin (le fichier ne suit que lui).
+  check('fiche avec texte du Lisible : les deux explications, chacune dans sa classe ; les deux titres de même', /<p class="fiche-simple expert-seul">/.test(fg) && /<p class="fiche-simple debutant-seul">/.test(fg) && /<span class="debutant-seul">Le mouvement du prix<\/span>/.test(fg));
+  // Autre paire : les cartes du Lisible nomment le bitcoin (le fichier ne suit que lui).
   const sym = T.activeSymbol;
   T.activeSymbol = 'SOLUSDT';
   const dS = rendre(null), eS = rendre('expert');
   T.activeSymbol = sym;
-  check('SOL/USDT : cartes identiques dans les deux modes ; le Débutant dit « Ces infos parlent du bitcoin », « Bitcoin : fourchette des 24 h », « le bitcoin est … de sa fourchette »', dS === eS && /Ces infos parlent du bitcoin \(en dollars\), pas de SOL\/USDT\./.test(dS)
+  check('SOL/USDT : cartes identiques dans les deux modes ; le Lisible dit « Ces infos parlent du bitcoin », « Bitcoin : fourchette des 24 h », « le bitcoin est … de sa fourchette »', dS === eS && /Ces infos parlent du bitcoin \(en dollars\), pas de SOL\/USDT\./.test(dS)
     && /Bitcoin : fourchette des 24 h/.test(dS) && /le bitcoin est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(dS) && !/le prix est (dans le haut|dans le bas|au milieu)/.test(dS), dS.slice(0, 400));
   const dB = rendre(null);
   check('BTC/USDT : « le prix », pas de mention « Ces infos parlent du bitcoin » ; haut et bas publiés dits « publié »', !/Ces infos parlent du bitcoin/.test(dB) && /le prix est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(dB) && /Haut publié/.test(dB) && /Bas publié/.test(dB));
@@ -205,11 +205,11 @@ titre('9. Chaque indicateur du menu : comment les traders l’utilisent, comment
   const items = T.INDICATORS.flatMap(c => c.items);
   const sansFiche = items.filter(i => !T.FICHE_IND[i.key] || !T.FICHES[T.FICHE_IND[i.key]]).map(i => i.key);
   check(`les ${items.length} indicateurs du menu ont une fiche`, !sansFiche.length, sansFiche);
-  const COUCHES = ['guide', 'scenarios'];
+  const COUCHES = ['guide', 'scenarios', 'figuresPassees'];
   const marche = items.filter(i => !COUCHES.includes(i.key));
   const manque = marche.filter(i => { const f = T.FICHES[T.FICHE_IND[i.key]]; return !f || !f.traders || !f.calcul; }).map(i => i.key);
   check(`les ${marche.length} indicateurs de marché : « Comment les traders l’utilisent » et « Comment c’est calculé »`, !manque.length, manque);
-  check('les deux couches du site (Guide, scénarios) : une ligne « Comment s’en servir »', COUCHES.every(k => T.FICHES[k].usage));
+  check('les couches du site (Guide, scénarios, figures passées) : une ligne « Comment s’en servir »', COUCHES.every(k => T.FICHES[k].usage));
   const champs = Object.entries(T.FICHES).filter(([, f]) => f.champ);
   const champsSans = champs.filter(([, f]) => !f.traders || !f.calcul).map(([k]) => k);
   check(`les ${champs.length} champs du fichier : usage des traders et calcul en mots`, !champsSans.length, champsSans);
@@ -219,7 +219,7 @@ titre('9. Chaque indicateur du menu : comment les traders l’utilisent, comment
   const perso = Object.entries(T.FICHES).filter(([k]) => k).map(([k]) => [k, T.ficheHtml(k)]).filter(([, h]) => /propriétaire|dans ce projet|nos données|ses propres données/i.test(h)).map(([k]) => k);
   check('aucune explication personnalisée (étude du propriétaire, « dans ce projet »)', !perso.length, perso);
   const debSales = COUCHES.map(k => [k, Gd.motsBannis(T.FICHES[k].usage.deb)]).filter(([, b]) => b.length);
-  check('les lignes du Débutant (guide, scénarios) : aucun mot de la liste du Guide', !debSales.length, debSales);
+  check('les lignes du Lisible (guide, scénarios, figures passées) : aucun mot de la liste du Guide', !debSales.length, debSales);
   check('la fiche affiche « Comment les traders l’utilisent » et « Comment c’est calculé » (dans les deux modes)', /Comment les traders l’utilisent/.test(T.ficheHtml('rsi')) && /Comment c’est calculé/.test(T.ficheHtml('rsi'))
     && !/expert-seul[^>]*>[^<]*Comment c’est calculé/.test(T.ficheHtml('rsi')) && /Comment s’en servir/.test(T.ficheHtml('guide')));
   check('le calcul en mots suit PARAM (RSI 14 → 21)', (() => { const v = T.PARAM.rsi.periode; T.PARAM.rsi.periode = 21; const ok = T.ficheHtml('rsi').includes('à la Wilder » sur 21 bougies'); T.PARAM.rsi.periode = v; return ok; })());
@@ -227,7 +227,7 @@ titre('9. Chaque indicateur du menu : comment les traders l’utilisent, comment
   const apDeb = T.apercuHtml('guide'), apVide = T.apercuHtml(null);
   MODE.v = 'expert';
   const apExp = T.apercuHtml('ichimoku');
-  check('aperçu du menu : titre, « C’est quoi ? », usage des traders, calcul, lien vers la fiche ; en Débutant, ses mots à lui', /C’est quoi \?/.test(apExp) && /Comment les traders l’utilisent/.test(apExp) && /Comment c’est calculé/.test(apExp) && /ouvrirFiche\('ichimoku'/.test(apExp)
+  check('aperçu du menu : titre, « C’est quoi ? », usage des traders, calcul, lien vers la fiche ; en Lisible, ses mots à lui', /C’est quoi \?/.test(apExp) && /Comment les traders l’utilisent/.test(apExp) && /Comment c’est calculé/.test(apExp) && /ouvrirFiche\('ichimoku'/.test(apExp)
     && apDeb.includes(T.FICHES.guide.titreDeb) && apDeb.includes(T.FICHES.guide.usage.deb.slice(0, 30)) && !Gd.motsBannis(apDeb.replace(/<[^>]+>/g, ' ')).length && !Gd.motsBannis(apVide.replace(/<[^>]+>/g, ' ')).length, { apDeb, apExp });
   // Les dents : les formules des nouvelles fiches suivent PARAM.
   const sauveP = JSON.stringify(T.PARAM);

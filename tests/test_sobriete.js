@@ -79,8 +79,8 @@ async function ouvrir(nav, theme, o = {}) {
       body: u.includes('heatmap') ? fs.readFileSync(path.join(REPO, 'heatmap.json')) : JSON.stringify(Object.assign({ updated: etat.maj }, MARCHE, { updated: etat.maj })) });
     return r.abort();
   });
-  // Mode Expert : ce test mesure les éléments denses (chiffres clés, heure de publication, couche de
-  // chaleur, étiquettes de l'axe…), masqués en Débutant (le mode par défaut) ; leur version Débutant
+  // Mode Complet : ce test mesure les éléments denses (chiffres clés, heure de publication, couche de
+  // chaleur, étiquettes de l'axe…), masqués en Lisible (le mode par défaut) ; leur version Lisible
   // est vérifiée dans test_debutant_page.js.
   await page.addInitScript(([t, garder]) => { try { if (!garder) localStorage.clear(); localStorage.setItem('samsara-mode', 'expert'); localStorage.setItem('samsara-theme', t); } catch (e) { /* */ } }, [theme, !!o.garderStockage]);
   // Compteurs : dessins du graphique, mutations, classes du voyant. Posés avant app.js.

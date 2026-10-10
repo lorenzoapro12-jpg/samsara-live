@@ -3,13 +3,13 @@
 //
 //   1. 13:50 UTC, trois scénarios ouverts en 15 min ; clic sur 4 h puis 1 jour, et 1 min dont
 //      l'historique ne remonte pas jusqu'au point (« incomplet ») : jamais « Aucun scénario … »
-//      (encadré, ligne, bulles), cas « nonSuivi », Débutant : un libellé pour le rang 1, la ligne
+//      (encadré, ligne, bulles), cas « nonSuivi », Lisible : un libellé pour le rang 1, la ligne
 //      n'est pas prioritaire ;
-//   2. 13:50, une figure du Guide prend la place de la ligne (Débutant, 1440 × 900 et 390 × 844) :
+//   2. 13:50, une figure du Guide prend la place de la ligne (Lisible, 1440 × 900 et 390 × 844) :
 //      la bulle DESSINÉE du libellé (scenEtat.bulle.corps) nomme le scénario 2 ;
-//   3. 17:40, Débutant : le rang 1 sorti garde sa croix dessinée (sans texte) pendant son fondu
+//   3. 17:40, Lisible : le rang 1 sorti garde sa croix dessinée (sans texte) pendant son fondu
 //      alors que le 2 est montré ; au plus 5 textes ;
-//   4. Expert : 08/10 18:40, le libellé du 1 (fondu fini) garde ses niveaux ; 07/10 02:20 (journée
+//   4. Complet : 08/10 18:40, le libellé du 1 (fondu fini) garde ses niveaux ; 07/10 02:20 (journée
 //      du 06/10) : aucune coche sur un scénario après son invalidation.
 // USAGE   node tests/test_scenarios_jour_revue_page.js
 const H = require('./scenarios-jour-harnais');
@@ -25,7 +25,7 @@ const check = (nom, ok, det) => { if (!ok) ko++; console.log(`  ${ok ? '✓' : '
 const titre = t => console.log(`\n── ${t} ──`);
 const AUCUN = /Aucun scénario|ne tient plus|aucun ne tient/i;
 
-/** Tous les textes des scénarios : lignes de l'encadré, ligne Débutant, libellés, bulles. */
+/** Tous les textes des scénarios : lignes de l'encadré, ligne Lisible, libellés, bulles. */
 const textes = page => page.evaluate(() => {
   const S = scenEtat;
   if (!S) return [];
@@ -74,7 +74,7 @@ const textes = page => page.evaluate(() => {
       const r = await o.page.evaluate(() => {
         const n = candles.length, G = PARAM.guide, C = i => candles[i];
         const ia = n - 34, ic = n - 24, ib = n - 14, pa = Math.max(C(ia).high, C(ib).high), pc = C(ic).low;
-        // (Figures en direct : une figure complète, et le Débutant lit sa liste dans Guide.formesDebutant.)
+        // (Figures en direct : une figure complète, et le Lisible lit sa liste dans Guide.formesDebutant.)
         const f = { type: 'double_sommet', famille: 'extremes', sens: -1, phase: 'confirme', a: { i: ia, p: pa }, b: { i: ib, p: pa }, cou: { i: ic, p: pc }, niveau: pc, extreme: pa, hauteur: pa - pc, objectif: pc - (pa - pc),
           invalidation: pa, t: ib + G.pivot, debut: ia, depart: ib + 1, jConf: ib + G.pivot + 2, fin: null, jFin: null, journal: [] };
         window.__f0 = Guide.formesAffichees; window.__fd0 = Guide.formesDebutant;
@@ -95,7 +95,7 @@ const textes = page => page.evaluate(() => {
       await o.ctx.close();
     }
 
-    titre('3. 17:40, Débutant : le rang 1 sorti garde sa croix pendant son fondu');
+    titre('3. 17:40, Lisible : le rang 1 sorti garde sa croix pendant son fondu');
     for (const vue of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
       const h = H.harnais(X, '2026-10-08T17:40:00Z');
       const o = await H.ouvrir(nav, h, { vue, mode: 'debutant', tactile: vue.width < 500 });
@@ -107,7 +107,7 @@ const textes = page => page.evaluate(() => {
       await o.ctx.close();
     }
 
-    titre('4. Expert : niveaux gardés après le fondu ; aucune coche après une invalidation');
+    titre('4. Complet : niveaux gardés après le fondu ; aucune coche après une invalidation');
     {
       const h = H.harnais(X, '2026-10-08T18:40:00Z');
       const o = await H.ouvrir(nav, h, { vue: { width: 1440, height: 900 }, mode: 'expert' });

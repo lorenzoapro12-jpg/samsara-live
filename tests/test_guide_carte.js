@@ -542,7 +542,7 @@ titre('13. Mode débutant : phrase du haut, étiquettes, sens du prix, journal e
   const dS = det.map(sp);
   check('résumé ouvert : 6 lignes (prix, ordres en attente, les deux côtés, âges dont l\'autre plateforme, scénario au Terminal, photo pas prévision)', det.length === 6 && /^Prix : de 100.000 \$ à 100.120 \$ en 15 min \(\+0,12 %\)/.test(dS[0]) && /120 BTC à l'achat, 60,0 BTC à la vente/.test(dS[1])
     && /^Au-dessus : Mur de vente · 100.060 \$ \(36,1 BTC entre 100.060 et 100.080 \$\)\. Au-dessous : rien de nettement plus chargé/.test(dS[2]) && /^Âges : couleurs récentes 2,0 s, plus anciennes 2 min · ronds 1,5 s · ligne du prix 10 s · autre plateforme 4 min\.$/.test(dS[3])
-    && /^Le scénario du matin de Claude est sur le Terminal/.test(dS[4]) && /pas une prévision.+mode Expert/.test(dS[5]), dS);
+    && /^Le scénario du matin de Claude est sur le Terminal/.test(dS[4]) && /pas une prévision.+mode Complet/.test(dS[5]), dS);
   check('résumé ouvert : jamais « : » en tête de ligne (espace insécable avant)', det.every(l => !/ [:;?!]/.test(l)), det);
   const detD = BM.detailCarteDebutant({ tendance: th, r: eqs[0][0], luMs: 2000, niveaux: { ask: { etiquette: BM.etiquetteDedans('ask'), q: 92, pBas: 100040, pHaut: 100100, dedans: true }, bid: null }, ages: {} });
   debTextes.push(...detD);

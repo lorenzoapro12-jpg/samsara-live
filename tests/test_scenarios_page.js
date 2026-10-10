@@ -114,8 +114,8 @@ const etat = page => page.evaluate(() => {
   await new Promise(r => serveur.listen(0, '127.0.0.1', r));
   const nav = await playwright.chromium.launch();
   try {
-    // Mode Expert : l'encadré complet (titre, une ligne par rang, bilan) et les libellés de chaque
-    // rang sont des éléments denses, réservés à l'Expert. En Débutant, une seule ligne d'état et le
+    // Mode Complet : l'encadré complet (titre, une ligne par rang, bilan) et les libellés de chaque
+    // rang sont des éléments denses, réservés à l'Complet. En Lisible, une seule ligne d'état et le
     // libellé du rang 1 : vérifiés dans test_debutant_page.js (classement de Claude sans
     // pourcentage, base du hasard absente, bulle au survol et au toucher).
     for (const [vue, mode, sansGuide] of [[{ width: 1440, height: 900 }, 'expert'], [{ width: 1024, height: 760 }, 'expert'],
@@ -163,8 +163,8 @@ const etat = page => page.evaluate(() => {
       check(`${nom} : encadré dans le tracé ${B && B.replie ? '' : '(dans sa moitié haute) '}et dans l'écran`, B && B.x >= e.left && B.x + B.w <= e.xMax + 0.5 && B.y >= e.top
         && B.y + B.h <= e.top + (B.replie ? e.ph : e.ph / 2 + 0.5) && e.bx + B.x + B.w <= e.vw, [B, e.left, e.xMax, e.top, e.ph]);
       const texte = L.join(' ');
-      // Branches « debutant » : ce fichier n'ouvre plus l'encadré dense qu'en Expert (le Débutant
-      // n'a plus d'encadré, une seule ligne). Leurs équivalents Débutant sont dans
+      // Branches « debutant » : ce fichier n'ouvre plus l'encadré dense qu'en Complet (le Lisible
+      // n'a plus d'encadré, une seule ligne). Leurs équivalents Lisible sont dans
       // tests/test_debutant_page.js : bulles du libellé et de la ligne (« Claude, une IA »,
       // « sans pourcentage », aucun « % »), aucun « % » sur le tracé, ligne marquée « (en direct) ».
       if (mode === 'debutant') {
@@ -197,8 +197,8 @@ const etat = page => page.evaluate(() => {
 
     titre('Doigt (390 px, écran tactile) : un tap sur le libellé du rang 1 (ou sur l’encadré replié)');
     {
-      // Mode Expert : le libellé du rang 1 du fichier complet (déjà invalidé) et l'encadré replié
-      // n'existent qu'en Expert ; le toucher en Débutant est vérifié dans test_debutant_page.js.
+      // Mode Complet : le libellé du rang 1 du fichier complet (déjà invalidé) et l'encadré replié
+      // n'existent qu'en Complet ; le toucher en Lisible est vérifié dans test_debutant_page.js.
       const t = await ouvrir(nav, { width: 390, height: 800 }, 'expert', 'complet', true);
       const e = await etat(t.page);
       const c = e && (e.cibles.find(q => q.prio === 1 && q.rects.length && /\(rang\s1\)/.test(q.titre))
@@ -218,8 +218,8 @@ const etat = page => page.evaluate(() => {
     }
 
     titre('Rang 1 fermé (invalidé en direct), téléphone : son état reste dit ; la bulle tient dans l’écran');
-    // Mode Expert : le libellé d'état du rang 1 et l'encadré (« · direct ») sont ceux de l'Expert ; en
-    // Débutant, la ligne « Scénario 1 : invalidé ✗ (en direct) ▸ » et sa bulle dans le tracé sont
+    // Mode Complet : le libellé d'état du rang 1 et l'encadré (« · direct ») sont ceux de l'Complet ; en
+    // Lisible, la ligne « Scénario 1 : invalidé ✗ (en direct) ▸ » et sa bulle dans le tracé sont
     // vérifiées dans test_debutant_page.js (1440, 390 et 375 px).
     for (const [vue, mode, tactile] of [[{ width: 390, height: 800 }, 'expert', true], [{ width: 375, height: 667 }, 'expert', true], [{ width: 1024, height: 760 }, 'expert', false]]) {
       const nom = vue.width + '×' + vue.height + ' · ' + mode;
@@ -262,7 +262,7 @@ const etat = page => page.evaluate(() => {
       const e4 = await etat(o.page);
       check('clic sur 4h : pas de suivi sur des bougies trop larges (dit tel quel), aucune erreur', !o.erreurs.length && e4 && e4.items.filter(i => i.rang !== '3' || true).some(i => /bougies 4 h \(trop larges\)/.test(i.et)), [o.erreurs, e4 && e4.items]);
       await o.ctx.close();
-      // Mode Expert : le titre de l'encadré complet est de l'Expert ; la ligne Débutant
+      // Mode Complet : le titre de l'encadré complet est de l'Complet ; la ligne Lisible
       // (« Scénarios d’hier : terminés ▸ ») est vérifiée dans test_debutant_page.js.
       const h = await ouvrir(nav, { width: 1440, height: 900 }, 'expert', 'hier');
       const eh = await etat(h.page);
@@ -277,8 +277,8 @@ const etat = page => page.evaluate(() => {
     titre('Fichier d’attente, fichier absent : une ligne');
     {
       const note = JSON.parse(previsionsAttente()).note;
-      // Mode Expert : les lignes « attente » et « absent » ci-dessous sont celles de l'Expert (heure
-      // UTC) ; leurs lignes Débutant sont vérifiées dans test_debutant_page.js.
+      // Mode Complet : les lignes « attente » et « absent » ci-dessous sont celles de l'Complet (heure
+      // UTC) ; leurs lignes Lisible sont vérifiées dans test_debutant_page.js.
       const a = await ouvrir(nav, { width: 1440, height: 900 }, 'expert', 'attente');
       const e = await etat(a.page);
       check('attente : une seule ligne « Scénarios du matin : » + la note du fichier', e && e.boite && e.boite.seule && e.boite.lignes.length === 1

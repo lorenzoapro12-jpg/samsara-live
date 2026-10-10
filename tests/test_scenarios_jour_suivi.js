@@ -6,15 +6,15 @@
 //   2. la bougie en cours ferme le scénario nommé : le remplaçant est choisi UNE fois (ordre de la
 //      dernière clôture), il ne change pas d'un tick à l'autre quand la clôture oscille ;
 //   3. « fini » : « noté par le journal » / « le journal les a notés » quand les statuts sont là ;
-//   4. honnêteté du nom : sur toutes les minutes du 08/10, la ligne Débutant ne dit « le N suit
+//   4. honnêteté du nom : sur toutes les minutes du 08/10, la ligne Lisible ne dit « le N suit
 //      mieux » que si N avait le plus petit écart à la DERNIÈRE CLÔTURE de 15 min (changé
 //      délibérément au round 2 : « net » se décide à la clôture, comme le nom ; les noms gardés à la
 //      clôture et la stabilité dans une bougie : test_scenarios_jour_stable.js, sur le 09/10) ; la
-//      bulle Expert ne dit plus jamais « pour l'instant » ;
+//      bulle Complet ne dit plus jamais « pour l'instant » ;
 //   5. les coches : la chaîne stricte avant l'invalidation, aucune après (06/10, le 2 invalidé à
 //      13:30 puis touché le 07/10), aucune sur une note ❌ du journal ;
 //   6. une note ❌ du journal sans heure de résolution ne s'efface pas d'un coup ;
-//   7. libellés Débutant d'un état : toujours « (en direct) » ou « (journal) », ≤ 32 caractères ;
+//   7. libellés Lisible d'un état : toujours « (en direct) » ou « (journal) », ≤ 32 caractères ;
 //      un range dont le prix est dans la marge : « tient jusqu’à … $ » ; la ligne ne montre jamais
 //      ⚠ comme ✗, et une réalisation notée par le journal porte « (journal) » ;
 //   8. bulles : l'heure d'une fermeture (heure de Paris) ; « seul » sur un range dit sa limite ;
@@ -60,10 +60,10 @@ titre('1. 4 h, 1 jour, historique incomplet : « nonSuivi », jamais « aucun »
     const J = S.classerJour(items, 82000, F08, now, { grille: false }, PJ);
     const textes = [].concat(S.phraseJourExpert(J), [S.phraseMeneurDebutant(J) || '', S.ligneJourDebutant(F08, J, items, now, 48, {}), S.ligneJourDebutant(F08, J, items, now, 40, {})]);
     check(`${nom} : cas « nonSuivi », montré = le rang 1, aucun nom`, J.cas === 'nonSuivi' && J.montre && J.montre.sc.rang === '1' && !J.meneur, [J.cas, J.montre && J.montre.sc.rang]);
-    check(`${nom} : ni « Aucun scénario », ni « ne tient plus », ni phrase Expert de la journée`, !textes.some(t => /Aucun scénario|ne tient plus|aucun ne tient/i.test(t)) && !S.phraseJourExpert(J).length && !S.phraseMeneurDebutant(J), textes);
-    check(`${nom} : la ligne Débutant reste celle d'avant le suivi (« … à voir en 15 min ou 1 h » ou « données manquantes »)`, /à voir en 15 min ou 1 h|données manquantes/.test(textes[textes.length - 2]), textes.slice(-2));
+    check(`${nom} : ni « Aucun scénario », ni « ne tient plus », ni phrase Complet de la journée`, !textes.some(t => /Aucun scénario|ne tient plus|aucun ne tient/i.test(t)) && !S.phraseJourExpert(J).length && !S.phraseMeneurDebutant(J), textes);
+    check(`${nom} : la ligne Lisible reste celle d'avant le suivi (« … à voir en 15 min ou 1 h » ou « données manquantes »)`, /à voir en 15 min ou 1 h|données manquantes/.test(textes[textes.length - 2]), textes.slice(-2));
     const lib = S.libellesJourDebutant(J.montre, 32, null);
-    check(`${nom} : un libellé Débutant pour le rang 1 (« ${lib[0]} »)`, /^Scén(ario|\.) 1\b/.test(lib[0]) && !/✗|✓/.test(lib[0]), lib);
+    check(`${nom} : un libellé Lisible pour le rang 1 (« ${lib[0]} »)`, /^Scén(ario|\.) 1\b/.test(lib[0]) && !/✗|✓/.test(lib[0]), lib);
   }
   // Un scénario déjà noté ❌ par le journal, les deux autres non suivis : toujours « nonSuivi ».
   const fj = JSON.parse(JSON.stringify(X08.fichier)); fj.scenarios[0].statut = '❌'; fj.scenarios[0].resolu_utc = '2026-10-08T12:00Z';
@@ -88,11 +88,11 @@ titre('2. La bougie en cours ferme le nommé : un remplaçant, figé jusqu’à 
     noms.push(J.meneur ? J.meneur.sc.rang : null);
     lignes.push(S.ligneJourDebutant(F, J, items, T0 + 5 * 3600e3 + 5 * 60e3, 48, {}));
     exp.push(S.phraseJourExpert(J)[0]);
-    if (p === 100000) check('remplace : marqué, et la phrase Débutant le dit (« nommé à la place … »)', J.remplace && /à la place du scénario qui vient de se fermer|vient de se fermer/.test(S.phraseMeneurDebutant(J)), S.phraseMeneurDebutant(J));
+    if (p === 100000) check('remplace : marqué, et la phrase Lisible le dit (« nommé à la place … »)', J.remplace && /à la place du scénario qui vient de se fermer|vient de se fermer/.test(S.phraseMeneurDebutant(J)), S.phraseMeneurDebutant(J));
   }
   check(`le nom ne change pas d’un tick à l’autre (${noms.join(' ')})`, noms.every(n => n && n === noms[0]), noms);
-  check('la ligne Débutant ne change pas de nom d’un tick à l’autre', new Set(lignes.map(t => (t.match(/le (\d)/) || [])[1] || '-')).size === 1, lignes);
-  check('l’encadré Expert garde le même nom repris', new Set(exp.map(t => (t.match(/nom repris : (\d)|écart pour l’instant : (\d) \(/) || []).slice(1).join(''))).size <= 2 && exp.every(t => !/Plus petit écart pour l’instant : (\d) \(/.test(t) || t.includes(': ' + noms[0] + ' (')), exp);
+  check('la ligne Lisible ne change pas de nom d’un tick à l’autre', new Set(lignes.map(t => (t.match(/le (\d)/) || [])[1] || '-')).size === 1, lignes);
+  check('l’encadré Complet garde le même nom repris', new Set(exp.map(t => (t.match(/nom repris : (\d)|écart pour l’instant : (\d) \(/) || []).slice(1).join(''))).size <= 2 && exp.every(t => !/Plus petit écart pour l’instant : (\d) \(/.test(t) || t.includes(': ' + noms[0] + ' (')), exp);
   // Sans ordre (rejeu ancien) : le plus petit rang encore ouvert, déterministe.
   const J0 = S.classerJour([it(a, sv('sortie', 0, { t: T0, sortie: { haut: true } })), it(b, sv('rien')), it(c, sv('rien'))], 99800, F, T0 + 5 * 3600e3, { grille: true, sortiTot: true, prec: a.id, cas: 'meneur' }, PJ);
   check('sans ordre mémorisé : le plus petit rang encore ouvert (le 2)', J0.meneur && J0.meneur.sc.rang === '2' && J0.remplace, [J0.meneur && J0.meneur.sc.rang]);
@@ -104,8 +104,8 @@ titre('3. « fini » : le journal a-t-il déjà noté ?');
   fj.scenarios.forEach((x, i) => { x.statut = ['✅', '✅', '❌'][i]; });
   const Fn = S.lire(fj, T0), now = Date.parse('2026-10-09T04:40Z');
   const J = S.classerJour(Fn.scenarios.map(sc => ({ sc, sv: S.etat(sc, S.suiviVide(Q), now) })), 82000, Fn, now, null, PJ);
-  check(`statuts notés : Expert « ${S.phraseJourExpert(J)[0]} »`, J.cas === 'fini' && /^Terminé à \d\d:\d\d UTC · noté par le journal$/.test(S.phraseJourExpert(J)[0]), S.phraseJourExpert(J));
-  check(`statuts notés : Débutant « ${S.texteResteDebutant(J, now)} »`, /le journal les a notés\.$/.test(S.texteResteDebutant(J, now)) && !/suivra/.test(S.texteResteDebutant(J, now)), S.texteResteDebutant(J, now));
+  check(`statuts notés : Complet « ${S.phraseJourExpert(J)[0]} »`, J.cas === 'fini' && /^Terminé à \d\d:\d\d UTC · noté par le journal$/.test(S.phraseJourExpert(J)[0]), S.phraseJourExpert(J));
+  check(`statuts notés : Lisible « ${S.texteResteDebutant(J, now)} »`, /le journal les a notés\.$/.test(S.texteResteDebutant(J, now)) && !/suivra/.test(S.texteResteDebutant(J, now)), S.texteResteDebutant(J, now));
   const J2 = S.classerJour(F08.scenarios.map(sc => ({ sc, sv: S.etat(sc, S.suiviVide(Q), now) })), 82000, F08, now, null, PJ);
   check('statuts encore ⏳ : « note du journal à venir » / « la note du journal suivra »', /note du journal à venir$/.test(S.phraseJourExpert(J2)[0]) && /la note du journal suivra\.$/.test(S.texteResteDebutant(J2, now)), [S.phraseJourExpert(J2), S.texteResteDebutant(J2, now)]);
 }
@@ -136,16 +136,16 @@ titre('4. Honnêteté du nom, sur toutes les minutes du 08/10 (bougie 15 min en 
       if (/pour l’instant/.test(b) || (/plus petit écart à la dernière clôture/.test(b) && x.sc.rang !== premier)) fauxE.push([hm(t), x.sc.rang, premier]);
     }
   }
-  check(`ligne Débutant : « le N suit mieux » seulement pour le plus petit écart de la dernière clôture (${n} minutes, dont ${gardes} à nom gardé)`, !faux.length, faux.slice(0, 5));
-  check('bulle Expert : jamais « pour l’instant » ; « plus petit écart à la dernière clôture » seulement pour lui', !fauxE.length, fauxE.slice(0, 5));
+  check(`ligne Lisible : « le N suit mieux » seulement pour le plus petit écart de la dernière clôture (${n} minutes, dont ${gardes} à nom gardé)`, !faux.length, faux.slice(0, 5));
+  check('bulle Complet : jamais « pour l’instant » ; « plus petit écart à la dernière clôture » seulement pour lui', !fauxE.length, fauxE.slice(0, 5));
   for (const hh of ['14:05', '14:10']) {
     const x = instant(F08, k15, '2026-10-08T' + hh + 'Z'), J = x.J, m = J.meneur, p0 = J.ouverts[0];
     const L48 = S.ligneJourDebutant(F08, J, x.items, x.now, 48, {}), bm = S.ligneJourExpert(m, J, { itv: '15 min', maintenant: x.now }), b0 = S.ligneJourExpert(p0, J, { itv: '15 min', maintenant: x.now });
     // Le 2 avait le plus petit écart à 14:00 ; le 1 est un peu plus près en ce moment : la ligne et
     // « ◂ » restent au 2 jusqu'à 14:15 ; la bulle du 1 dit qu'il est plus près en ce moment.
     check(`${hh} : le 2 nommé et au plus petit écart à 14:00, le ${p0.sc.rang} plus près en ce moment → ligne « ${L48} » (figée jusqu’à 14:15)`, m && m !== p0 && S.nomNet(J) && L48 === 'En direct : le 2 (80 806 $) suit mieux le prix ▸', [L48, m && m.sc.rang, p0.sc.rang]);
-    check(`${hh} : bulle Expert du nommé : « plus petit écart à la dernière clôture de 15 min, d’où le nom »`, /plus petit écart à la dernière clôture de 15 min, d’où le nom/.test(bm) && !/pour l’instant/.test(bm), bm);
-    check(`${hh} : bulle Expert du ${p0.sc.rang} : « plus petit écart en ce moment (… revus à la prochaine clôture …) »`, /plus petit écart en ce moment \(le nom et « ◂ » sont revus à la prochaine clôture de 15 min\)/.test(b0), b0);
+    check(`${hh} : bulle Complet du nommé : « plus petit écart à la dernière clôture de 15 min, d’où le nom »`, /plus petit écart à la dernière clôture de 15 min, d’où le nom/.test(bm) && !/pour l’instant/.test(bm), bm);
+    check(`${hh} : bulle Complet du ${p0.sc.rang} : « plus petit écart en ce moment (… revus à la prochaine clôture …) »`, /plus petit écart en ce moment \(le nom et « ◂ » sont revus à la prochaine clôture de 15 min\)/.test(b0), b0);
     check(`${hh} : « ◂ » sur le 2 (plus petit écart à la clôture), pas sur le ${p0.sc.rang}`, S.pointe(m, J) && !S.pointe(p0, J) && / ◂$/.test(S.suffixeExpert(m, J)) && !/◂/.test(S.suffixeExpert(p0, J)));
   }
 }
@@ -185,7 +185,7 @@ titre('6. Note ❌ du journal sans heure de résolution : pas d’effacement d�
   check('avec resolu_utc : fondu depuis lui (0,75 à +15 min)', proche(J3.items[0].fondu, 0.75, 1e-9) && J3.items[0].ferme.journal && J3.items[0].ferme.t === pub, J3.items[0]);
 }
 
-titre('7. Libellés et ligne Débutant : marques, ⚠, journal, marge d’un range');
+titre('7. Libellés et ligne Lisible : marques, ⚠, journal, marge d’un range');
 {
   const F = fichier([R, U, D]);
   const [a, b, c] = F.scenarios;
@@ -233,7 +233,7 @@ titre('7. Libellés et ligne Débutant : marques, ⚠, journal, marge d’un ran
   check('range dans ses bornes : le libellé habituel « reste … »', !S.dansMarge(xin.J.items[0]) && /reste/.test(S.libellesJourDebutant(xin.J.items[0], 32, null)[0]), S.libellesJourDebutant(xin.J.items[0], 32, null));
 }
 
-titre('8. Bulles Débutant : heure des fermetures, « seul » d’un range, version courte');
+titre('8. Bulles Lisible : heure des fermetures, « seul » d’un range, version courte');
 {
   const x = instant(F08, k15, '2026-10-08T15:40Z');
   const l3 = S.ligneDebutantJour(x.J.items[2], x.J), l3c = S.ligneDebutantJour(x.J.items[2], x.J, true);

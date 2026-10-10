@@ -335,7 +335,7 @@ const d = 0.4;
   check('bilan : mêmes comptes en débutant et en expert, « mesuré » dit dans les deux', exp.includes(b.double_creux.confirmes + ' conf.') && deb.includes(String(b.double_creux.confirmes)) && /Mesuré sur l’historique chargé/.test(deb) && /^Mesuré · /.test(exp), { exp, deb });
   const td = G.texteBilan(b.double_creux, { n: C.length, intervalle: '15m', duree: C.length * 900 }, P, 'debutant');
   check('bilan débutant : formes repérées, issues, et le repère sans forme en comptes (aucun %)', /repérés?/.test(t(td)) && (!b.double_creux.confirmes || /Repère sans forme/.test(td)) && !/%/.test(td), td);
-  // Débutant : la phrase du cahier des charges d'abord, courte (une bulle de téléphone la lit).
+  // Lisible : la phrase du cahier des charges d'abord, courte (une bulle de téléphone la lit).
   const bx = { type: 'double_sommet', formes: 31, confirmes: 14, atteints: 6, invalides: 7, expires: 1, ouverts: 0, temoin: { departs: 4614, atteints: 2335 } };
   const tb = t(G.texteBilan(bx, { n: 2980, intervalle: '15m', duree: 31 * 86400 }, P, 'debutant'));
   check('bilan débutant : « Sur les 2 980 dernières bougies 15 min (31 j) : 14 … confirmés …, objectif théorique atteint 6 fois avant invalidation … Échantillon faible. » — court', /sur les 2 980 dernières bougies 15 min \(31 j\) : 14 doubles sommets confirmés/.test(tb)
@@ -442,7 +442,7 @@ titre('7. Dans la page : paramètres, menu, fiche, choix gardé, marge de futur'
   check('Guide affiché par défaut', dansPage('overlays.guide') === true);
   const masque = chargerPage({ stockage: { 'samsara-guide-v1': '0' } });
   check('masqué une fois, il le reste (samsara-guide-v1)', vm.runInContext('overlays.guide', masque.sandbox) === false);
-  // En Expert : le Guide y ouvre la marge de futur (ses chemins « Et ensuite ? ») ; en Débutant, seule
+  // En Complet : le Guide y ouvre la marge de futur (ses chemins « Et ensuite ? ») ; en Lisible, seule
   // la flèche du scénario 1 l'ouvre (contrôlé juste après).
   page.stockage['samsara-mode'] = 'expert';
   const marge = dansPage('candles = Array.from({ length: 60 }, (_, i) => ({ time: i * 900, open: 1, high: 2, low: 0.5, close: 1, volume: 1 })); viewStart = 10; viewEnd = 60;'
@@ -454,7 +454,7 @@ titre('7. Dans la page : paramètres, menu, fiche, choix gardé, marge de futur'
   page.stockage['samsara-mode'] = 'debutant';
   const margeDeb = dansPage('viewStart = 10; viewEnd = 60; overlays.guide = true; [margeFutur(1000, 50), pasBougie(1000, 50) * 50]');
   dansPage('candles = []; viewEnd = 0; viewStart = 0;');
-  check('Débutant : le Guide n’ouvre pas de marge de futur (pas de chemins dessinés), sans flèche de scénario la marge est nulle', margeDeb[0] === 0 && margeDeb[1] === 1000, margeDeb);
+  check('Lisible : le Guide n’ouvre pas de marge de futur (pas de chemins dessinés), sans flèche de scénario la marge est nulle', margeDeb[0] === 0 && margeDeb[1] === 1000, margeDeb);
   check('marge de futur : bougies + marge = largeur du tracé ; Guide masqué, ou vue loin de la dernière bougie : marge nulle, le pas d’avant', Math.abs(marge[0] - 1000) < 1e-9 && marge[1] > 0 && marge[2] === 1000 && marge[3] === 0 && marge[4] === 0, marge);
   check('glisser d’une bougie hors de la fin : le pas des bougies varie de ≤ 1/n à chaque cran (avant : +22 % d’un coup) et rejoint le pas sans marge', sauts.every(x => x >= -1e-9 && x <= 1 / 50 + 1e-9) && Math.abs(pas[pas.length - 1] - 1000 / 50) < 1e-9, { pas, sauts });
   check('plafond de la marge dans PARAM.guide (futurMaxFraction), dit par la fiche « et ensuite ? »', P.futurMaxFraction > 0 && T.ficheHtml('guide_suite').includes(String(P.futurMaxFraction * 100).replace('.', ',') + ' %'));
@@ -479,8 +479,8 @@ titre('7. Dans la page : paramètres, menu, fiche, choix gardé, marge de futur'
   check('aucune minuterie dans le Guide (rien ne tourne au repos)', !/setInterval|setTimeout/.test(src) && !/setInterval|setTimeout/.test(appSrc.slice(appSrc.indexOf('// GUIDE — le dessin'), appSrc.indexOf('// Étiquettes d\'overlays posées'))));
 }
 
-// ── 7b. Débutant : les textes courts de l'écran ──
-titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simples');
+// ── 7b. Lisible : les textes courts de l'écran ──
+titre('7b. Lisible : libellés, phrase, forme, suite — courts, en mots simples');
 {
   const DEB = dansPage('PARAM.guide.debutant');
   const Rd = (cle, p, extra) => Object.assign({ cle, p, nom: cle, court: cle, art: 'le ' + cle, origine: '', nature: 'mesuré', detail: '', detailCourt: '' }, extra || {});
@@ -496,7 +496,7 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
   const mots = libs.filter(([cle, , , b]) => { const N = G.NOMS_DEBUTANT[cle === 'put_wall' ? 'options' : cle]; return !b.includes(N[1]) && !b.includes(N[3]); });
   check('prix BTC (5 chiffres), étroit : le mot d’origine reste (« ↓Bas hier 85 640 $ », « ↑Max hier 85 640 $ »), flèche collée, toujours avec « $ »', !mots.length && libs.find(l => l[0] === 'hier_bas' && l[1] === '↓')[3] === '↓Bas hier 85 640 $'
     && libs.find(l => l[0] === 'hier_haut' && l[1] === '↑')[3] === '↑Max hier 85 640 $' && libs.every(l => / \$$/.test(l[2]) && / \$$/.test(l[3])), mots.concat(libs.filter(l => !/ \$$/.test(l[3]))));
-  check('libellé d’un repère : aucun mot banni du Débutant', libs.every(l => !G.motsBannis(l[2]).length && !G.motsBannis(l[3]).length), libs.filter(l => G.motsBannis(l[2] + ' ' + l[3]).length));
+  check('libellé d’un repère : aucun mot banni du Lisible', libs.every(l => !G.motsBannis(l[2]).length && !G.motsBannis(l[3]).length), libs.filter(l => G.motsBannis(l[2] + ' ' + l[3]).length));
   // 2. La raison qui nomme une bande : jamais une option quand une mesure est dans la bande ; sinon la plus proche du prix de la bande.
   const nOpt = { p: 85600, pMin: 85600, pMax: 85640, raisons: [Rd('put_wall', 85600, { strike: 85600 }), Rd('hier_bas', 85640)] };
   const nDeux = { p: 85640, pMin: 85600, pMax: 85640, raisons: [Rd('sr', 85600), Rd('hier_bas', 85640)] };
@@ -504,7 +504,7 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     && G.raisonPrincipale(N(Rd('call_wall', 87000, { strike: 87000 }))).cle === 'call_wall' && G.raisonPrincipale(null) === null, [G.raisonPrincipale(nOpt).cle, G.raisonPrincipale(nDeux).cle]);
   check('choixDebutant : une bande faite seulement d’options passe après une mesure du même côté', G.choixDebutant({ dessus: [N(Rd('call_wall', 86500, { strike: 86500 })), N(Rd('hier_haut', 86700))], dessous: [] }).dessus.raisons[0].cle === 'hier_haut'
     && G.choixDebutant({ dessus: [N(Rd('call_wall', 86500, { strike: 86500 }))], dessous: [] }).dessus.raisons[0].cle === 'call_wall' && G.choixDebutant(null).dessus === null);
-  // 2 bis. Les repères du Débutant, choisis au prix LIVE (constat de revue : une bande fusionnée qui
+  // 2 bis. Les repères du Lisible, choisis au prix LIVE (constat de revue : une bande fusionnée qui
   // enjambait le prix nommait « au-dessus » un prix situé en dessous).
   {
     const bA = N(Rd('hier_bas', 85600), Rd('sr', 85602), Rd('put_wall', 85643, { strike: 85643 })), bB = N(Rd('h24_bas', 85887), Rd('hier_haut', 86133));
@@ -599,7 +599,7 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     && fo[8][1] === 'Double sommet : cible ✓' && fo[9][1] === 'Triangle sans suite' && fo.every(([, l]) => !l || l.length <= DEB.forme) && !fo.some(([, l]) => /[↑↓]/.test(l || '')), fo);
   // 4 bis. La bulle d'une figure qui se dessine : ce qu'on voit, ce qui la validerait (2 périodes
   // finies de suite), ce qui l'annulerait, sa cible conditionnelle (« cible théorique … non
-  // garantie »), toujours avec le bilan mesuré ; mots du Débutant seulement. (Plan figures §9.3 :
+  // garantie »), toujours avec le bilan mesuré ; mots du Lisible seulement. (Plan figures §9.3 :
   // « jamais un prix visé » devient « cible conditionnelle, toujours avec le bilan mesuré » ; figures
   // complètes, comme le détecteur les rend ; wording des amendements C2 et C4.)
   {

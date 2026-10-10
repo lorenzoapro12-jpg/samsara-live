@@ -9,19 +9,19 @@
 //      tard, sans tracer ses droites à travers la jambe d'entrée.
 //   4. Ébauche : son abandon se juge sur le plus haut / le plus bas de la bougie (pas la clôture) ;
 //      le calque dit « remise » dès que la mèche passe, et le dit encore si le prix revient ; la bulle
-//      Débutant dit qu'elle sera annulée « même si le prix redescend ».
+//      Lisible dit qu'elle sera annulée « même si le prix redescend ».
 //   5. Invalidation en 2 clôtures (sortie contraire d'un drapeau) : le calque le dit (« 2 … de suite »,
 //      « ce sera la 1re »), au lieu d'annoncer une invalidation à la prochaine clôture.
-//   6. Heures : sur 4 h et 1 j, une fin d'un autre jour porte sa date (Débutant « le 7 à … », « hier à
-//      … » ; Expert jj/mm) ; les heures du jour restent courtes ; le journal 1 j ne montre pas « 00:00 ».
+//   6. Heures : sur 4 h et 1 j, une fin d'un autre jour porte sa date (Lisible « le 7 à … », « hier à
+//      … » ; Complet jj/mm) ; les heures du jour restent courtes ; le journal 1 j ne montre pas « 00:00 ».
 //   7. « Récemment tombées » : bornées dans le temps (horizon).
-//   8. Débutant : on ne barre (✗) que la figure dessinée à la clôture d'avant son issue (mémoire de
+//   8. Lisible : on ne barre (✗) que la figure dessinée à la clôture d'avant son issue (mémoire de
 //      page) ; une figure jamais dessinée ne revient pas barrée ; la figure dessinée garde sa place.
-//   9. Libellés Débutant vivants : tous gardent le nom de la figure, ≤ PARAM.guide.debutant.forme,
+//   9. Libellés Lisible vivants : tous gardent le nom de la figure, ≤ PARAM.guide.debutant.forme,
 //      sans mot banni.
 //  10. PAGE (Chromium) : clôture après clôture dans une même page, la figure dessinée qui tombe est
 //      barrée à l'image suivante, aucune ✗ pour une figure jamais dessinée, un libellé à chaque
-//      figure dessinée ; Expert : chaque figure montrée a son nom posé.
+//      figure dessinée ; Complet : chaque figure montrée a son nom posé.
 //  11. PAGE : revenir sur un intervalle déjà vu REPREND le rejeu (pas de rejeu complet) ; le rejeu à
 //      froid (1er appel dans un processus neuf) est mesuré et affiché.
 // USAGE   node tests/test_figures_suivi.js
@@ -124,10 +124,10 @@ titre('4. Ébauche : abandon jugé sur la mèche, dit dès qu’elle passe et en
     check(`mèche ${s > 0 ? 'au-dessus' : 'sous'} du niveau d’abandon (${G.prix(e.abandonP, '$')}), prix revenu : « remise » (calque et libellé)`, vP.cle === 'remise' && vP.etiq === 'remise', { cle: vP.cle, etiq: vP.etiq });
     check('mèche juste en deçà du niveau : pas de « remise »', vN.cle !== 'remise' && vN.etiq !== 'remise', { cle: vN.cle, etiq: vN.etiq });
     const tD = G.texteVivantFigure(e, vP, Object.assign(ctxA(j), { live: dedans }), 'debutant', '$'), tE = G.texteVivantFigure(e, vP, Object.assign(ctxA(j), { live: dedans }), 'expert', '$');
-    check('bulle Débutant : « sera annulée, même si le prix redescend (remonte) », sans mot banni', /sera annulée, même si le prix (redescend|remonte)/.test(tD) && !G.motsBannis(tD).length, tD);
-    check('Expert : « annulée à la clôture … même si le prix revient »', /annulée à la clôture .* même si le prix revient/.test(tE), tE);
+    check('bulle Lisible : « sera annulée, même si le prix redescend (remonte) », sans mot banni', /sera annulée, même si le prix (redescend|remonte)/.test(tD) && !G.motsBannis(tD).length, tD);
+    check('Complet : « annulée à la clôture … même si le prix revient »', /annulée à la clôture .* même si le prix revient/.test(tE), tE);
     const lib = G.libelleVivantDebutant(e, vP, DEB.forme);
-    check(`libellé Débutant « ${lib} » : garde le nom, ≤ ${DEB.forme} caractères`, lib && lib.startsWith(G.NOM_FORME_DEBUTANT[e.type]) && lib.length <= DEB.forme, lib);
+    check(`libellé Lisible « ${lib} » : garde le nom, ≤ ${DEB.forme} caractères`, lib && lib.startsWith(G.NOM_FORME_DEBUTANT[e.type]) && lib.length <= DEB.forme, lib);
   }
 }
 titre('5. Drapeau : l’invalidation en 2 clôtures est dite comme telle');
@@ -143,8 +143,8 @@ titre('5. Drapeau : l’invalidation en 2 clôtures est dite comme telle');
     const v = G.figureVivante(f, { h: H, l: L, c: C }, j, { high: Math.max(au, C[j - 1]), low: Math.min(au, C[j - 1]) }, au, P);
     const tD = G.texteVivantFigure(f, v, ctxA(j), 'debutant', '$'), tE = G.texteVivantFigure(f, v, ctxA(j), 'expert', '$');
     check('le calque lit « menace » avec 2 clôtures nécessaires', v.cle === 'menace' && v.clotures === 2, { cle: v.cle, clotures: v.clotures });
-    check('Débutant : « Il faut 2 … de suite … ce sera la 1re »', /Il faut 2 .* de suite .* ce sera la 1re/.test(tD) && !/Cela ne compte que si/.test(tD), tD);
-    check('Expert : « 2 clôtures de suite nécessaires (ce serait la 1re) »', /2 clôtures de suite nécessaires \(ce serait la 1re\)/.test(tE), tE);
+    check('Lisible : « Il faut 2 … de suite … ce sera la 1re »', /Il faut 2 .* de suite .* ce sera la 1re/.test(tD) && !/Cela ne compte que si/.test(tD), tD);
+    check('Complet : « 2 clôtures de suite nécessaires (ce serait la 1re) »', /2 clôtures de suite nécessaires \(ce serait la 1re\)/.test(tE), tE);
   }
 }
 
@@ -159,14 +159,14 @@ titre('6. Heures : la date quand l’instant n’est pas aujourd’hui');
     const ctx = { n: f.jFin + 30, j: f.jFin + 30, intervalle: nomItv, temps, pas, horizon: P.horizon, maintenant: fin + 5 * 86400000 };
     const d = G.marqueFin(f, ctx, 'debutant', '$'), e = G.marqueFin(f, ctx, 'expert', '$'), jr = new Date(fin).toISOString();
     const jour = String(+G.quandParis(fin, ctx.maintenant).replace(/^le (\d+).*$/, '$1'));
-    check(`${nomItv}, 5 jours après : Débutant « Invalidé le ${jour} à … (heure de Paris) »`, /^Invalidé le \d+ à \d\dh\d\d \(heure de Paris\)/.test(d), d.slice(0, 80));
-    check(`${nomItv}, 5 jours après : Expert porte la date ${jr.slice(8, 10)}/${jr.slice(5, 7)}`, e.includes(jr.slice(8, 10) + '/' + jr.slice(5, 7)), e.slice(0, 80));
+    check(`${nomItv}, 5 jours après : Lisible « Invalidé le ${jour} à … (heure de Paris) »`, /^Invalidé le \d+ à \d\dh\d\d \(heure de Paris\)/.test(d), d.slice(0, 80));
+    check(`${nomItv}, 5 jours après : Complet porte la date ${jr.slice(8, 10)}/${jr.slice(5, 7)}`, e.includes(jr.slice(8, 10) + '/' + jr.slice(5, 7)), e.slice(0, 80));
     const hier = G.marqueFin(f, Object.assign({}, ctx, { maintenant: fin + 86400000 }), 'debutant', '$');
     check(`${nomItv}, le lendemain : « hier à … » ou la date`, /^Invalidé (hier à|le \d+ à) \d\dh\d\d/.test(hier), hier.slice(0, 60));
     if (pas === 86400) {
       const ex = G.texteFormeExpert(f, R.bilan[f.type], ctx, P, '$');
       const tx = Array.isArray(ex) ? ex.join(' ') : String(ex);
-      check('1 j : le journal Expert ne montre pas « 00:00 » pour chaque évènement', !/\b00:00\b/.test(tx), tx.slice(0, 300));
+      check('1 j : le journal Complet ne montre pas « 00:00 » pour chaque évènement', !/\b00:00\b/.test(tx), tx.slice(0, 300));
     }
   }
   const ctxJour = { n: f.jFin + 2, j: f.jFin + 2, intervalle: '15m', temps: T, pas: 900, horizon: P.horizon, maintenant: (T[f.jFin] + 1800) * 1000 };
@@ -185,8 +185,8 @@ titre('7. « Récemment tombées » : bornées dans le temps');
   check(`${vu} figure(s) citée(s) : toutes tombées depuis au plus ${P.horizon} bougies`, ok && vu > 0, vu);
 }
 
-// ── 8. Débutant : la mémoire de ce qui a été dessiné ──
-titre('8. Débutant : on ne barre que ce qui a été dessiné');
+// ── 8. Lisible : la mémoire de ce qui a été dessiné ──
+titre('8. Lisible : on ne barre que ce qui a été dessiné');
 {
   const R = SERIES['15m'].R, VUE = 50;
   let cas = null;
@@ -212,7 +212,7 @@ titre('8. Débutant : on ne barre que ce qui a été dessiné');
 }
 
 // ── 9. Libellés vivants ──
-titre('9. Libellés Débutant : le nom de la figure gardé, ≤ ' + DEB.forme + ' caractères, sans mot banni');
+titre('9. Libellés Lisible : le nom de la figure gardé, ≤ ' + DEB.forme + ' caractères, sans mot banni');
 {
   const R = SERIES['15m'].R, mauvais = [];
   let n = 0;
@@ -306,10 +306,10 @@ const derouler = (page, i0, i1) => page.evaluate(([K, i0, i1]) => {
         const o = await ouvrir(nav, mode, w, h);
         const r = await derouler(o.page, i0, N - 1);
         if (mode === 'debutant') {
-          check(`Débutant ${w} px, ${r.inst} clôtures : ${r.avecFigure} avec une figure, chacune avec son libellé`, r.inst > 300 && r.avecFigure > 0 && r.sansLibelle === 0, r);
+          check(`Lisible ${w} px, ${r.inst} clôtures : ${r.avecFigure} avec une figure, chacune avec son libellé`, r.inst > 300 && r.avecFigure > 0 && r.sansLibelle === 0, r);
           check(`… ${r.tombees} figure(s) dessinée(s) tombée(s) : toutes barrées à l’image suivante`, r.nonBarree === 0, r.ex);
           check('… aucune ✗ pour une figure jamais dessinée', r.barreeJamaisVue === 0, r.ex);
-        } else check(`Expert, ${r.inst} clôtures : ${r.figuresExpert} figures montrées, chacune avec son nom posé`, r.figuresExpert > 0 && r.expertSansNom === 0, r.ex);
+        } else check(`Complet, ${r.inst} clôtures : ${r.figuresExpert} figures montrées, chacune avec son nom posé`, r.figuresExpert > 0 && r.expertSansNom === 0, r.ex);
         check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
         await o.ctx.close();
       }
