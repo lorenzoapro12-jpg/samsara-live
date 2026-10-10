@@ -184,13 +184,26 @@ const recompte = page => page.evaluate(() => {
 /** Les cibles atteintes que dit la ligne du compte (le reste des validées les a manquées) : en
  *  mots (« aucune n’a », « toutes ont », « les deux ont », « elle a ») ou le 2e nombre. */
 const lireAtteintes = (t, nb) => (/aucune n’a|elle n’a pas/.test(t) ? 0 : /toutes ont|les deux ont/.test(t) ? nb[0] : /elle a atteint/.test(t) ? 1 : nb[1]);
-/** Choisit dans le menu (bouton « Indicateurs », liste « Figures passées »), puis le referme. */
+/** Le choix que montre le panneau : la case « Figures passées » (décochée : 'non'), puis, cochée, la
+ *  liste « validées seulement / toutes ». */
+const VALEUR_MENU = () => { const c = document.getElementById('figPassees'), q = document.getElementById('figPasseesQuelles'); return !c ? null : !c.checked ? 'non' : q ? q.value : null; };
+/** Toucher (ou survoler) hors du graphique, là où rien ne répond : le milieu du prix de l'en-tête. Le coin de
+ *  l'écran ne convient plus au doigt : la zone de toucher de la paire (40 px de haut) en est tout près, et
+ *  Chromium y ramène un toucher voisin (le menu des paires s'ouvrait). */
+async function ailleurs(o) {
+  if (!o.tactile) return o.page.mouse.move(2, 2);
+  const r = await o.page.evaluate(() => { const q = document.getElementById('price').getBoundingClientRect(); return { x: q.left + q.width / 2, y: q.top + q.height / 2 }; });
+  await o.page.touchscreen.tap(r.x, r.y).catch(() => {});
+}
+/** Choisit dans le panneau « Choisir l'affichage » comme un utilisateur (la case, puis la liste), puis le referme. */
 async function choisir(o, v) {
   await o.page.click('#indDropdownBtn');
   await o.page.waitForTimeout(200);
-  await o.page.selectOption('#figPassees', v);
-  const lu = await o.page.evaluate(() => ({ choix: figuresPasseesChoix, stocke: localStorage.getItem('samsara-figures-passees-v1'), select: document.getElementById('figPassees').value,
-    texte: document.querySelector('label.ind-passees').innerText }));
+  const coche = await o.page.evaluate(() => document.getElementById('figPassees').checked);
+  if (coche !== (v !== 'non')) { await o.page.click('#figPassees'); await o.page.waitForTimeout(150); }
+  if (v !== 'non') await o.page.selectOption('#figPasseesQuelles', v);
+  const lu = await o.page.evaluate(f => ({ choix: figuresPasseesChoix, stocke: localStorage.getItem('samsara-figures-passees-v1'), select: (0, eval)('(' + f + ')')(),
+    texte: document.querySelector('label.ind-passees').innerText }), VALEUR_MENU.toString());
   await o.page.click('#indDropdownBtn');   // le referme
   await o.page.waitForTimeout(250);
   return lu;
@@ -247,7 +260,7 @@ async function choisir(o, v) {
         check(`${o.tactile ? '2e toucher' : 'clic'} : le DÉTAIL — la définition, la validation, l’issue, le compte de la vue, « pas une prévision ni un conseil » ; sans « % » ni mot banni`,
           b2 && b2.id === p.deb.id && !b2.resume && /Figure validée/.test(b2.corps) && cptDans(b2.corps) && /pas une prévision ni un conseil/.test(b2.corps.replace(/\s+/g, ' '))
           && !/%/.test(b2.titre + b2.corps) && !G.motsBannis(b2.titre + ' ' + b2.corps).length && !MODES_ECRITS.test(b2.corps), b2 && b2.corps.slice(0, 500));
-        if (o.tactile) await o.page.touchscreen.tap(5, 5).catch(() => {}); else await o.page.mouse.move(2, 2);
+        await ailleurs(o);
       }
       // Retour au présent.
       const p2 = await vue(o.page, n - largeur, n);
@@ -317,7 +330,7 @@ async function choisir(o, v) {
           check(`bulle « ${b && b.titre} » : ce qui s’est passé ensuite, le compte de la vue, « pas une prévision ni une recommandation », entière dans le tracé`,
             b && b.id === pt.id && /^Exemple passé : (validé|jamais validé)/.test(b.texte) && sansBlancs(b.texte).includes(sansBlancs(V[0])) && /pas une prévision ni une recommandation/.test(b.texte)
             && !MODES_ECRITS.test(b.titre + b.texte) && b.b.y >= 0 && b.b.y + b.b.h <= b.mainH, b && { titre: b.titre, texte: b.texte.slice(0, 400), b: b.b });
-          if (o.tactile) await o.page.touchscreen.tap(5, 5).catch(() => {}); else await o.page.mouse.move(2, 2);
+          await ailleurs(o);
         }
         if (o.tactile) check(`${w} px : pas de défilement horizontal`, p.scroll <= 0, p.scroll);
       }
@@ -326,7 +339,7 @@ async function choisir(o, v) {
       await attendre(o.page, K.length);
       const r = await vue(o.page, v[0], v[1]);
       await o.page.click('#indDropdownBtn'); await o.page.waitForTimeout(200);
-      const sel = await o.page.evaluate(() => document.getElementById('figPassees') && document.getElementById('figPassees').value);
+      const sel = await o.page.evaluate(f => (0, eval)('(' + f + ')')(), VALEUR_MENU.toString());
       check(`rechargement : « toutes » est relu (samsara-figures-passees-v1), dans le menu et sur le graphique (${r.liste.length} figures passées)`, r.choix === 'toutes' && sel === 'toutes' && r.liste.length >= 1 && r.memePur && !!r.ligne, { choix: r.choix, sel, n: r.liste.length });
       check(`${w} px : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();

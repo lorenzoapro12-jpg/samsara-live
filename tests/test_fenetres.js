@@ -3,7 +3,7 @@
 // tests/test_structures.js garantit, pour TOUT thème, qu'aucune valeur ni aucun âge ne disparaît et
 // que la structure se défait nœud pour nœud. Ici, ce que cette structure promet en propre :
 //   1. la BARRE DES TÂCHES, pleine largeur en bas : Démarrer (le menu des thèmes, qui s'ouvre
-//      AU-DESSUS et laisse le bouton enfoncé tant qu'il est ouvert), le lancement rapide (les six
+//      AU-DESSUS et laisse le bouton enfoncé tant qu'il est ouvert), le lancement rapide (les cinq
 //      boutons d'accès de l'en-tête, dans leur ordre), la zone de notification (point live, heure de
 //      publication, horloge) ;
 //   2. la FENÊTRE du graphique : barre de titre, barre d'outils, zone client, barre d'état, de haut
@@ -125,9 +125,10 @@ const dedans = (a, b, m = 0.5) => a && b && a.g >= b.g - m && a.d <= b.d + m && 
       });
       let b = await boites(p);
       check('barre des tâches pleine largeur, collée au bas de l\'écran', b.barre && b.barre.g === 0 && Math.abs(b.barre.d - b.L) < 0.5 && Math.abs(b.barre.b - b.H) < 0.5, b.barre);
-      check('Démarrer en tête de la barre ; lancement rapide = les six boutons d\'accès, dans l\'ordre ; zone : point live, publication, horloge',
-        // (le bouton ↺ porte désormais un id, resetBtn : la pastille Débutant le désigne)
-        place.premier === 'themeBtn' && JSON.stringify(place.lancement) === JSON.stringify(['feedBtn', 'liveBtn', 'resetBtn', 'carteBtn', 'reglagesBtn', 'legendesBtn']) && place.zone, place);
+      check('Démarrer en tête de la barre ; lancement rapide = les cinq boutons d\'accès, dans l\'ordre ; zone : point live, publication, horloge',
+        // (le bouton ↺ porte désormais un id, resetBtn : la pastille Débutant le désigne ; plus de
+        // bouton Réglages : ce sont les « Réglages fins » du panneau « Choisir l'affichage »)
+        place.premier === 'themeBtn' && JSON.stringify(place.lancement) === JSON.stringify(['feedBtn', 'liveBtn', 'resetBtn', 'carteBtn', 'legendesBtn']) && place.zone, place);
       // Démarrer : enfoncé tant que son menu est ouvert ; le menu au-dessus du bouton.
       const ombre = () => p.evaluate(() => getComputedStyle(document.getElementById('themeBtn')).boxShadow);
       const repos = await ombre();
@@ -152,7 +153,7 @@ const dedans = (a, b, m = 0.5) => a && b && a.g >= b.g - m && a.d <= b.d + m && 
       check(`publication en retard (« ${retard.texte} ») : les minutes restent, l'icône d'avertissement s'ajoute`,
         retard.vieux && /\d+ min/.test(retard.texte) && /^url\("data:image\/svg/.test(retard.icone), retard);
       // 5. Fenêtre active : le marché live au survol
-      await p.keyboard.press('f'); await p.waitForTimeout(400);
+      await p.keyboard.press('i'); await p.waitForTimeout(400);
       await p.mouse.move(700, 450); await p.waitForTimeout(100);
       const fond = s => p.evaluate(s => getComputedStyle(document.querySelector(s)).backgroundImage + ' ' + getComputedStyle(document.querySelector(s)).backgroundColor, s);
       const inactive = await fond('#feedPanel > .f95-titre'), graphique = await fond('.chart-container > .f95-titre');
@@ -175,9 +176,9 @@ const dedans = (a, b, m = 0.5) => a && b && a.g >= b.g - m && a.d <= b.d + m && 
       titre(`${theme} — largeur de la fenêtre (1100 × 800) : le marché live s'ouvre puis se replie`);
       const o2 = await ouvrir(nav, theme, { width: 1100, height: 800 });
       const avant = await boites(o2.page);
-      await o2.page.keyboard.press('f'); await o2.page.waitForTimeout(150);      // < 350 ms, le délai de toggleFeed
+      await o2.page.keyboard.press('i'); await o2.page.waitForTimeout(150);      // < 350 ms, le délai de toggleFeed
       const pendant = await boites(o2.page);
-      await o2.page.keyboard.press('f'); await o2.page.waitForTimeout(150);
+      await o2.page.keyboard.press('i'); await o2.page.waitForTimeout(150);
       const apres = await boites(o2.page);
       check(`ouvert : la barre d'état rétrécit, ${avant.nKpis} → ${pendant.nKpis} chiffres clés, aucun coupé`,
         pendant.cycle.l < avant.cycle.l && pendant.nKpis < avant.nKpis && pendant.deborde <= 1 && pendant.kpis.every(k => dedans(k, pendant.cycle)),
@@ -193,7 +194,7 @@ const dedans = (a, b, m = 0.5) => a && b && a.g >= b.g - m && a.d <= b.d + m && 
         const o3 = await ouvrir(nav, theme, vue);
         const t = await boites(o3.page);
         check(`barre des tâches de 40 px ; Démarrer et les ${t.boutons.length} boutons du lancement font au moins 32 × 34 px`,
-          Math.abs(t.barre.t - 40) < 0.5 && t.demarrer.l >= 32 && t.demarrer.t >= 34 && t.boutons.length === 6 && t.boutons.every(x => x.l >= 32 && x.t >= 34), { barre: t.barre, demarrer: t.demarrer, boutons: t.boutons });
+          Math.abs(t.barre.t - 40) < 0.5 && t.demarrer.l >= 32 && t.demarrer.t >= 34 && t.boutons.length === 5 && t.boutons.every(x => x.l >= 32 && x.t >= 34), { barre: t.barre, demarrer: t.demarrer, boutons: t.boutons });
         check('rien ne déborde ni ne se chevauche : Démarrer | lancement rapide | zone de notification',
           t.demarrer.d <= t.lancement.g + 0.5 && t.lancement.d <= t.zone.g + 0.5 && t.zone.d <= t.L + 0.5 && t.demarrer.g >= -0.5, { demarrer: t.demarrer, lancement: t.lancement, zone: t.zone, L: t.L });
         check('le prix entier dans l\'en-tête, sans chevaucher le bouton de mode', dedans(t.prix, t.entete) && t.prix.d <= t.mode.g + 0.5, { prix: t.prix, mode: t.mode, entete: t.entete });

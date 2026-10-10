@@ -418,11 +418,12 @@ titre('7. Dans la page : paramètres, menu, fiche, choix gardé, lecture du fich
   check(`les ${lus.length} paramètres lus par js/scenarios.js sont dans PARAM.scenarios`, lus.length > 0 && lus.every(k => k in P), lus.filter(k => !(k in P)));
   const html = fs.readFileSync(path.join(REPO, 'index.html'), 'utf8');
   check('js/scenarios.js chargé (defer) avant js/app.js', /<script defer src="js\/scenarios\.js"><\/script>[\s\S]*<script defer src="js\/app\.js"><\/script>/.test(html));
-  const T = page.T, cat = T.INDICATORS.find(c => c.cat === 'Guide');
+  const T = page.T, cat = T.INDICATORS.find(c => c.items.some(i => i.key === 'scenarios'));
   const item = cat && cat.items.find(i => i.key === 'scenarios');
   // L'heure du point dans le libellé : celle de l'appareil (Fmt.heure), ni « Paris » ni « 07h00 ».
   const hMenu = Fm.heure(S.pointMs(new Date().toISOString().slice(0, 10), P.point));
-  check(`menu : « Scénarios du matin … (${hMenu}) » dans la catégorie Guide (heure de l’appareil), avec sa fiche`, item && /^Scénarios du matin/.test(item.label) && item.label.endsWith('(' + hMenu + ')') && !/Paris|\dh\d/.test(item.label) && T.FICHE_IND.scenarios === 'scenarios', item);
+  check(`panneau : « Scénarios du matin … (${hMenu}) » juste après le Guide, dans la question « Où le prix peut réagir ? » (heure de l’appareil), avec sa fiche`, item && /^Scénarios du matin/.test(item.label) && item.label.endsWith('(' + hMenu + ')') && !/Paris|\dh\d/.test(item.label) && T.FICHE_IND.scenarios === 'scenarios'
+    && cat.cat === 'reaction' && cat.items[1] === item, item);
   const f = T.ficheHtml('scenarios');
   check('fiche « scenarios » : Claude (une IA), sans pourcentage, ordre du premier mouvement, suivi en direct / journal, pas une recommandation',
     /Claude \(une IA\)/.test(f) && /SANS pourcentage/.test(f) && /Ordre du premier mouvement/.test(f) && /SUIVI EN DIRECT/.test(f) && /note officielle est celle du journal/.test(f) && /pas une recommandation/.test(f));

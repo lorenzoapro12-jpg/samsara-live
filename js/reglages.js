@@ -97,22 +97,10 @@ function bandeLive(depth, px, pct) {
 }
 
 // ─── Panneau ──────────────────────────────────────────────────────────────────
+// Plus de bouton « Réglages » dans l'en-tête : ces réglages sont les « Réglages fins », repliés en
+// bas du panneau « Choisir l'affichage » du Complet (buildDropdown, js/app.js), qui y pose
+// reglagesHtml() sous son propre titre.
 const echapR = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-function ouvrirReglages(ancre) {
-  const p = document.getElementById('reglagesPop');
-  if (!p) return;
-  p.innerHTML = reglagesHtml();
-  p.hidden = false;
-  const f = p.querySelector('.fiche-fermer');
-  if (f && f.focus) f.focus();
-  reglagesRetour = ancre || null;
-}
-let reglagesRetour = null;
-function fermerReglages() {
-  const p = document.getElementById('reglagesPop');
-  if (p) p.hidden = true;
-  if (reglagesRetour && reglagesRetour.focus) reglagesRetour.focus();
-}
 function choix(id, valeurs, actuel, fmt) {
   return '<select id="' + id + '" onchange="changerReglage(this)">' + valeurs.map(v =>
     '<option value="' + echapR(v) + '"' + (String(v) === String(actuel) ? ' selected' : '') + '>' + echapR(fmt ? fmt(v) : v) + '</option>').join('') + '</select>';
@@ -125,8 +113,7 @@ function reglagesHtml() {
   const nf = (v, d) => Number(v).toLocaleString('fr-FR', { maximumFractionDigits: d === undefined ? 2 : d });
   const enc = typeof histHeatmap !== 'undefined' && histHeatmap && histHeatmap.encodage;
   const btcDe = v => enc ? ' (≈ ' + nf(enc.ref_btc * Math.pow(v / enc.plafond, 2), 3) + ' BTC)' : '';
-  return '<div class="fiche-tete"><h3 class="fiche-titre">Réglages d’affichage</h3><button type="button" class="fiche-fermer" onclick="fermerReglages()" aria-label="Fermer">×</button></div>'
-    + '<p class="fiche-simple">Un réglage change le niveau de détail, jamais une valeur : un chiffre affiché garde sa valeur, il porte sa bande ou sa tranche.</p>'
+  return '<p class="fiche-simple">Un réglage change le niveau de détail, jamais une valeur : un chiffre affiché garde sa valeur, il porte sa bande ou sa tranche.</p>'
     // ⚡
     + '<h4>Panneau ⚡ « En direct (à la seconde) » — lu par la page sur Binance</h4>'
     + '<label class="reglage">Profondeur du carnet ' + choix('r_live_niveaux', LIVE_NIVEAUX, R.live.niveaux, v => nf(v, 0) + ' niveaux') + '</label>'
@@ -146,7 +133,7 @@ function reglagesHtml() {
     + '<h4>Carte « Liquidité » — infos du marché, publiées toutes les ' + CADENCES.attendue_min + ' min</h4>'
     + (pub.length ? '<label class="reglage">Bande du ratio ' + choix('r_carnet_bande', ['auto'].concat(pub), R.carnet.bande === null ? 'auto' : R.carnet.bande,
         v => v === 'auto' ? 'référence publiée (±' + nf(lq.bande_ref_pct) + ' %)' : '±' + nf(v) + ' % (publiée)')
-        + ' <span class="fine">(aussi celle de la carte « Ordres en attente » du mode Débutant)</span></label>'
+        + ' <span class="fine">(aussi celle de la carte « Ordres en attente » du mode Lisible)</span></label>'
       : '<p class="fine">Aucune bande publiée par ce fichier.</p>')
     + (prof
       ? '<div class="reglage">Bandes calculées sur le profil publié <span class="fine">(à la tranche de ' + tr + ' $ près, jusqu’à ±' + nf(lq.couverture_pct) + ' %)</span><div class="puces">'
@@ -191,7 +178,8 @@ function reinitReglages() {
   REGLAGES = JSON.parse(JSON.stringify(REGLAGES_DEFAUT));
   sauverReglages();
   appliquerReglages();
-  ouvrirReglages();
+  // Le panneau qui les montre est reconstruit (ses « Réglages fins » restent ouverts).
+  if (typeof buildDropdown === 'function') buildDropdown();
 }
 /** Réaffiche ce que les réglages touchent. Rien n'est recalculé côté serveur. */
 function appliquerReglages() {
@@ -204,4 +192,3 @@ function appliquerReglages() {
   if (lm && lm.style.display === 'flex' && typeof renderLive === 'function') renderLive();
   if (typeof drawChart === 'function') drawChart();
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { const p = document.getElementById('reglagesPop'); if (p && !p.hidden) fermerReglages(); } });

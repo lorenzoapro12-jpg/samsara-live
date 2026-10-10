@@ -161,7 +161,9 @@ const MESURES = () => {
     prixRecouvert: boutons.filter(b => coupe(prix, r(b))).map(b => b.id || b.className),
     cartoucheVisible: !!cart && getComputedStyle(cart).display !== 'none' && r(cart).height > 20,
     majVisible: getComputedStyle($('updated')).display !== 'none' && r($('updated')).width > 0,
-    intervalleEnTete: r($('int_1m')).left < r($('lbl_ema20')).left,
+    // L'intervalle avant la légende des calques allumés (sa 1re puce : le Guide, par défaut).
+    legende: [...barre.querySelectorAll('label[data-calque]')].map(l => l.dataset.calque),
+    intervalleEnTete: !!barre.querySelector('label[data-calque]') && r($('int_1m')).left < r(barre.querySelector('label[data-calque]')).left,
   };
 };
 
@@ -194,7 +196,7 @@ const MESURES = () => {
     check('structure « planche » posée', ch.structure === 'planche', ch.structure);
     check('pied de planche entre le graphique et le Grid Bot, ruban dedans', ch.piedOuIlFaut && ch.rubanDansPied, ch);
     check('chiffres clés et heure de publication dans le cartouche', ch.cartouche === 'plan-cartouche / plan-cartouche', ch.cartouche);
-    check('rien n\'est inséré dans le ruban (6 <span>, comme la base)', ch.spansDuRuban === 6, ch.spansDuRuban);
+    check('rien n\'est inséré dans le ruban (4 <span>, comme la base : « À l’écran », Intervalle et leurs séparateurs)', ch.spansDuRuban === 4, ch.spansDuRuban);
     check('24 repères de zone et 4 de centrage, cadre fixe sous le contenu (z-index −1)', ch.reperes === 24 && ch.centrage === 4 && ch.cadre === 'fixed -1', ch);
     check('<html> sans fond (le cadre en z-index −1 resterait dessous)', ch.fondHtml);
     check('sources du cartouche lues dans la publication', ch.sources === ch.attendu, ch);
@@ -283,9 +285,25 @@ const MESURES = () => {
       check(`${nom} · 8 chiffres clés, aucun masqué ; pas de défilement horizontal ; canvas dans son cadre`,
         m.kpis === 8 && m.kpisMasques === 0 && m.debord <= 0 && m.canvasDansCadre && Math.abs(m.ecartCanvas) <= 1, m);
       if (w >= 1280) {
-        check(`${nom} · nomenclature en 2 rangées (menu « Indicateurs » sur la première), pied ≤ 95 px, cartouche en 5 colonnes`,
-          m.lignes === 2 && m.menuEnPremiereLigne && m.pied <= 95 && m.colonnes === 5, m);
+        check(`${nom} · nomenclature en 2 rangées (la légende et « Choisir l’affichage » sur la première), pied ≤ 95 px, cartouche en 5 colonnes`,
+          m.lignes === 2 && m.menuEnPremiereLigne && m.pied <= 95 && m.colonnes === 5 && m.legende.join() === 'guide,scenarios,vol', m);
         check(`${nom} · « Vue A » dans la marge basse, sous le tracé`, m.vueSousLeTrace === true, m);
+        // « Tout afficher » : la légende garde la 1re rangée avec le bouton — autant de puces que la
+        // place en laisse, les autres comptées dans « + N autres » ; toujours 2 rangées, pied ≤ 95 px.
+        // À 1440 px, la fenêtre est ensuite ramenée à 1280 × 720 : la légende est reposée.
+        await o.page.evaluate(() => toutAfficher()); await o.page.waitForTimeout(400);
+        for (const vue of w > 1280 ? [null, { width: 1280, height: 720 }] : [null]) {
+          if (vue) { await o.page.setViewportSize(vue); await o.page.waitForTimeout(500); }
+          const mt = await o.page.evaluate(MESURES);
+          const lg = await o.page.evaluate(() => {
+            const on = CALQUES.filter(i => isOverlay(i.key) ? overlays[i.key] && disponible(i) : activeSubs[i.key]).length;
+            const plus = document.getElementById('lbl__plus');
+            return { on, puces: document.querySelectorAll('#indicatorBar label[data-calque]').length, plus: plus ? plus.textContent : null };
+          });
+          check(`${nom}${vue ? ' → 1280 × 720' : ''} · « Tout afficher » (${lg.on} calques) : ${lg.puces} puces et « ${lg.plus} » sur la 1re rangée avec le bouton ; 2 rangées, pied ${mt.pied} px (≤ 95), canvas dans son cadre`,
+            mt.lignes === 2 && mt.menuEnPremiereLigne && mt.pied <= 95 && mt.canvasDansCadre && Math.abs(mt.ecartCanvas) <= 1 && mt.debord <= 0
+            && lg.puces >= 1 && lg.puces <= 6 && lg.plus === `+ ${lg.on - lg.puces} autre${lg.on - lg.puces > 1 ? 's' : ''} ▸`, { mt, lg });
+        }
       } else if (w > 768) {
         check(`${nom} · nomenclature sur une rangée qui défile, cartouche dessous`, m.lignes === 1 && m.cartoucheVisible, m);
       } else {

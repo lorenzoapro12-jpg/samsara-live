@@ -95,8 +95,18 @@ check('le mode est bien lu différemment', (MODE.v = null, T.modeCourant()) === 
 check('cartes du marché : HTML identique en débutant et en expert', deb === exp && deb.length > 1000, { deb: deb.length, exp: exp.length });
 const fichesIdentiques = Object.keys(T.FICHES).every(k => { MODE.v = null; const a = T.ficheHtml(k); MODE.v = 'expert'; return a === T.ficheHtml(k); });
 check('chaque fiche : HTML identique dans les deux modes', fichesIdentiques);
-check('les lectures courtes sont réservées au mode débutant', (deb.match(/lecture-courte/g) || []).length > 3
-  && (deb.match(/class="lecture-courte debutant-seul"/g) || []).length === (deb.match(/lecture-courte/g) || []).length);
+// Plan, mode Complet : les phrases de lecture en mots reviennent à côté des chiffres. Chaque bloc de
+// chiffres du Complet (funding, OI, L/S, CVD, GEX, prime, RSI 4 h, carnet ; VIX dans sa tuile commune)
+// porte sa phrase, sans classe de mode ; les phrases propres aux cartes du Lisible (phraseCarte)
+// restent réservées au Lisible. Aucune autre forme.
+{
+  const exp = (deb.match(/<div class="env-exp expert-seul">[\s\S]*?(?=<div class="env-deb debutant-seul">|<\/section>|$)/g) || []).join('');
+  const libres = deb.match(/class="lecture-courte"/g) || [], lisible = deb.match(/class="lecture-courte debutant-seul"/g) || [];
+  const dansExp = exp.match(/class="lecture-courte"/g) || [];
+  check(`lectures courtes : ${libres.length} phrases à côté des chiffres, visibles dans les deux modes (${dansExp.length} dans les blocs du Complet), ${lisible.length} propres au Lisible ; aucune autre forme`,
+    libres.length >= 9 && dansExp.length >= 8 && lisible.length >= 1 && libres.length + lisible.length === (deb.match(/lecture-courte/g) || []).length,
+    { libres: libres.length, dansExp: dansExp.length, lisible: lisible.length });
+}
 check('la formule est réservée au mode expert (dans chaque fiche)', Object.keys(T.FICHES).every(k => /class="expert-seul fiche-technique"/.test(T.ficheHtml(k))));
 
 // ── 5. Une lecture n'est pas un conseil ──────────────────────────────────────
@@ -136,8 +146,8 @@ check('ratio affiché « 1,00 » (L/S, carnet) : « Autant de… », jamais « P
   check(`glossaire Débutant : ${G.length} fiches (guide, repères, scénarios, dessin des prix, les cartes), chacune avec titreDeb et simpleDeb`, G.length >= 6 && !manque.length && ['guide_niveaux', 'scenarios'].every(k => G.includes(k)), manque);
   const sales = Object.entries(T.FICHES).filter(([, f]) => f.titreDeb || f.simpleDeb).map(([k, f]) => [k, Gd.motsBannis((f.titreDeb || '') + ' ' + (f.simpleDeb || ''))]).filter(([, b]) => b.length);
   check('titres et explications du Débutant : aucun mot de la liste du Guide', !sales.length, sales);
-  check('guide, guide_regime, guide_suite : une explication du Débutant qui décrit l’écran Débutant (ni badge, ni chemins dessinés, « + Affichage »)', ['guide', 'guide_regime', 'guide_suite'].every(k => T.FICHES[k].simpleDeb)
-    && /« \+ Affichage »/.test(T.FICHES.guide.simpleDeb) && /pas de badge/.test(T.FICHES.guide_regime.simpleDeb) && /rien n’est dessiné/.test(T.FICHES.guide_suite.simpleDeb));
+  check('guide, guide_regime, guide_suite : une explication du Débutant qui décrit l’écran Débutant (ni badge, ni chemins dessinés, « Choisir l’affichage »)', ['guide', 'guide_regime', 'guide_suite'].every(k => T.FICHES[k].simpleDeb)
+    && /« Choisir l’affichage »/.test(T.FICHES.guide.simpleDeb) && !/« \+ (Affichage|Indicateurs) »/.test(T.FICHES.guide.simpleDeb) && /pas de badge/.test(T.FICHES.guide_regime.simpleDeb) && /rien n’est dessiné/.test(T.FICHES.guide_suite.simpleDeb));
   const fg = T.ficheHtml('guide_regime');
   check('fiche avec texte du Débutant : les deux explications, chacune dans sa classe (celle du Débutant en gras, son texte entier sous « En savoir plus ») ; les deux titres de même', /<p class="fiche-simple expert-seul">/.test(fg) && /<p class="fiche-simple fiche-quoi debutant-seul"><b>/.test(fg)
     && fg.slice(fg.indexOf('<details class="fiche-plus">')).includes(esc(T.FICHES.guide_regime.simpleDeb)) && /<span class="debutant-seul">Le mouvement du prix<\/span>/.test(fg));
@@ -328,11 +338,13 @@ titre('11. Les fiches disent ce que la page calcule, avec les mots de l’écran
   check('RSI : « suracheté » / « survendu » partout (plus « surachat » / « survente »), et rien n’annonce un retour', Object.values(T.FICHES).every(f => !/surachat|survente/.test([f.traders, f.simple, ...(f.lectures || []).map(l => l.t)].join(' ')))
     && /« suracheté »/.test(T.FICHES.rsi.traders) && !CONSEIL.test(T.FICHES.rsi.traders + T.FICHES.stoch.traders + T.FICHES.liq.traders + T.FICHES.atr.traders + T.FICHES.atr_tf.traders));
   const vix = [12, 20, 30].map(v => [T.lectureCourte('vix', v), T.phraseCarte('vix', v)]);
-  check('VIX : une seule phrase pour les mêmes repères (lecture courte = carte), sans mot technique', vix.every(([a, b]) => a === b && a && !Gd.motsBannis(a).length), vix);
+  const texteDe = h => h.replace(/<[^>]+>/g, '');
+  check('VIX : une seule phrase pour les mêmes repères (lecture courte = carte), sans mot technique', vix.every(([a, b]) => a && texteDe(a) === texteDe(b) && !Gd.motsBannis(a).length), vix);
   const lq = T.FICHES.liq;
   check('carte : un seul nom (« Ordres en attente (carte) »), plus de note sur les colonnes d’avant le 08/10, l’âge dit avec la cadence publiée', lq.titre === 'Ordres en attente (carte)' && !/08\/10/.test(lq.formule(T.PARAM))
     && lq.limites.includes('toutes les ' + T.CADENCES.attendue_min + ' min') && !/quart d’heure|vingtaine/.test(lq.limites));
-  check('guide et scénarios : en Débutant, « + Affichage » (le menu Débutant n’a pas de catégorie)', ['guide', 'scenarios'].every(k => /« \+ Affichage » en mode Débutant/.test(T.FICHES[k].limites)));
+  check('guide et scénarios : masquables dans « Choisir l’affichage », dans les deux modes (plus de « + Indicateurs » ni de « + Affichage »)', ['guide', 'scenarios'].every(k => /Masquable dans « Choisir l’affichage », dans les deux modes/.test(T.FICHES[k].limites)
+    && !/« \+ (Affichage|Indicateurs) »/.test(T.FICHES[k].limites)));
   check('la couche Guide en Débutant : un seul nom, du menu (LIBELLES_DEBUTANT) à la fiche et au glossaire', vm.runInContext('LIBELLES_DEBUTANT.guide', page.sandbox) === T.FICHES.guide.titreDeb);
   check('« Et ensuite ? » : la marge de futur reçoit aussi les flèches des scénarios (elle ne disparaît pas avec le seul Guide)', /flèches des scénarios/.test(T.FICHES.guide_suite.limites) && !/ne sert qu’à dessiner ces chemins/.test(T.FICHES.guide_suite.limites));
   const fg = T.FICHES.guide_formes, txtF = [fg.simple, fg.simpleDeb, ...fg.lectures.map(l => l.t), T.FICHES.guide.usage.exp, T.FICHES.guide.usage.deb].join(' ');

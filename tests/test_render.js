@@ -233,8 +233,18 @@ try {
     ['Vouvoiement : « Vérifié par votre navigateur », aucun « ton / ta / tes / tu »', /Vérifié par votre navigateur/.test(feed.innerHTML) && !/\b(?:ton|ta|tes|tu|toi)\b/i.test(texteDe(feed.innerHTML))],
     // Flux : il compte les blocs de la DERNIÈRE publication — ni « live », ni « sources à jour ».
     ['Flux : « N/N blocs publiés », jamais « blocs live » ni « sources à jour »', /\d+\/\d+ blocs publiés/.test(feed.innerHTML) && !/blocs live|sources à jour|Toutes les données publiées sont arrivées/.test(feed.innerHTML)],
-    // Un ratio affiché « 1,00 » n'a pas de couleur (il était rouge, comme un penchant vendeur).
-    ['Ratio affiché 1,00 : sans couleur ; 1,01 / 0,99 colorés', sandbox.clsCote(1.004, 1, 2) === '' && sandbox.clsCote(0.996, 1, 2) === '' && sandbox.clsCote(1.006, 1, 2) === 'stat-pos' && sandbox.clsCote(0.994, 1, 2) === 'stat-neg'],
+    // Le vert et le rouge disent seulement « le prix monte / descend » (plan, § 2) : le funding, l'OI,
+    // le CVD (chiffres clés et cartes), la prime et le ratio du carnet n'en portent plus (un ratio de
+    // 1,00 en rouge se lisait comme un penchant vendeur ; un CVD négatif en rouge, comme « mal »). Les
+    // seules couleurs hausse / baisse des cartes : la variation du prix sur 24 h et l'état EMA 20 / 50.
+    (() => {
+      const h = feed.innerHTML, k = (store.cycle && store.cycle.innerHTML) || '';
+      const couleurs = [...h.matchAll(/class="[^"]*\b(?:stat-pos|stat-neg|chip pos|chip neg|badge-hausser|badge-baissier)\b[^"]*"[^>]*>([^<]*)/g)].map(m => m[1]);
+      const hors = couleurs.filter(t => !/ en 24 h$|^EMA 20 /.test(t));
+      const kpiCol = (k.match(/<span class="kpi"[^>]*>(?:(?!<\/span><\/span>|<span class="kpi").)*?<b class=/g) || []).length;
+      return ['Vert et rouge réservés au prix : funding, OI, CVD (chiffres clés et cartes), prime, ratio du carnet sans couleur hausse / baisse',
+        k.includes('Funding an.') && k.includes('CVD 24h') && !kpiCol && couleurs.some(t => / en 24 h$/.test(t)) && !hors.length && /dv-fill/.test(h)];
+    })(),
     ['Aucun motif interdit dans le RENDU', hitsFeed.length === 0],
     ['Aucun motif interdit dans la SOURCE publiée', hitsSrc.length === 0],
   ];

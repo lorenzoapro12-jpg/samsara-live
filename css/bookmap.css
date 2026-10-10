@@ -63,7 +63,7 @@ body {
 .retour { color: var(--ink-2); text-decoration: none; font-size: 12.5px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--bord); }
 .retour:hover, .retour:focus-visible { color: var(--ink-1); background: var(--surface-2); }
 .calques { display: flex; flex-wrap: nowrap; gap: 4px; flex: 1 1 0; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
-.barre-droite { display: flex; gap: 6px; flex: 0 0 auto; margin-left: auto; }
+.barre-droite { display: flex; gap: 6px; flex: 0 0 auto; }
 @media (max-width: 1599px) { .barre .sous { display: none; } }
 @media (max-width: 1279px) { .calques { order: 3; flex: 1 1 100%; } }
 /* Marge intérieure de 8 px (comme sous 640 px) : les noms justes (« Gros paquets », « ≡ Rafales ») sont
@@ -218,41 +218,60 @@ input[type="range"] { accent-color: var(--carte-live); }
   * { scroll-behavior: auto !important; }
 }
 
-/* ─── Mode débutant / expert ───
-   Le mode est posé sur <html data-mode> par la page avant le premier rendu (le même réglage que le
-   terminal). Débutant : un écran calme — titre, mode, Guide, Suivre, Journal, Légende ; le reste
-   (puces des calques, Réglages, Rafales) est derrière le bouton de mode, inchangé. */
-/* Débutant est le DÉFAUT de la feuille (aucun attribut encore posé) : rien d'expert ne s'affiche
-   avant que la page ait lu le mode, même un instant. */
+/* ─── Mode Lisible / Complet ───
+   Le mode est posé sur <html data-mode> avant le premier rendu (script de tête de bookmap.html ; le
+   même réglage que le terminal, gardé 'debutant' / 'expert'). Lisible : un écran calme — titre, Guide,
+   mode, Suivre, Journal, Légende ; le reste (puces des calques, Réglages, Rafales) est en Complet. */
+/* Lisible est le DÉFAUT de la feuille (aucun attribut, ou une valeur inconnue) : rien du mode Complet
+   ne s'affiche avant que la page ait lu le mode, même un instant. */
 html:not([data-mode="expert"]) .expert-seul, [data-mode="expert"] .debutant-seul { display: none !important; }
 html:not([data-mode="expert"]) .calques .puce:not([data-calque="guide"]) { display: none; }
 html:not([data-mode="expert"]) .calques { flex: 0 0 auto; order: 0; overflow: visible; -webkit-mask-image: none; mask-image: none; }
-/* Le bouton de mode dit l'ACTION (le mode visé), jamais un état : pas de fond « enfoncé », le même
-   bord accent dans les deux modes. */
+/* L'interrupteur « Lisible | Complet », le même que celui du terminal (css/app.css) et au même
+   endroit : à droite de l'en-tête, devant les boutons de la page (sa marge gauche prend la place
+   libre ; une rangée qui passe à la ligne se range aussi à droite). Deux segments dans un cadre au
+   bord accent ; l'actif est surligné (il suit data-mode dès le premier rendu ; aria-pressed, posé
+   par la page, le dit aux lecteurs d'écran). */
+.barre { justify-content: flex-end; }
+.barre-gauche { margin-right: auto; }
+html:not([data-mode="expert"]) .barre-gauche { margin-right: 0; }
+.mode-bascule {
+  display: inline-flex; align-items: center; flex: 0 0 auto; gap: 1px; padding: 1px; margin-left: auto;
+  border: 1px solid rgba(255, 209, 102, 0.55); border-radius: 8px;
+}
+.mode-bascule .mode-btn {
+  font: inherit; font-size: 12px; line-height: 1.25; color: var(--ink-2); background: transparent; white-space: nowrap;
+  border: 0; border-radius: 6px; padding: 3px 8px; cursor: pointer;
+}
+.mode-bascule .mode-btn[aria-pressed="false"]:hover { color: var(--ink-1); background: var(--surface-2); }
+.mode-bascule .mode-btn:focus-visible { outline: 2px solid var(--carte-live); outline-offset: 1px; }
+html:not([data-mode="expert"]) .mode-btn[data-mode-choix="debutant"],
+html[data-mode="expert"] .mode-btn[data-mode-choix="expert"] { color: var(--accent); background: rgba(255, 209, 102, 0.16); cursor: default; }
+/* Le bouton de la légende (« Passer en Complet ») dit l'ACTION : le même bord accent. */
 .bouton-mode { border-color: rgba(255, 209, 102, 0.55); color: var(--ink-1); }
 .bouton-mode:hover, .bouton-mode:focus-visible { border-color: var(--accent); }
-.bouton-mode .mode-court, .bouton-mode .mode-mini { display: none; }
-@media (max-width: 1023px) {
-  .bouton-mode .mode-long { display: none; }
-  .bouton-mode .mode-court { display: inline; }
-}
-/* Expert : « → Débutant » à toutes les largeurs — les puces des calques gardent leur place, et
-   l'en-tête garde ses deux rangées jusqu'au téléphone couché (667 px). */
-[data-mode="expert"] .bouton-mode .mode-long, [data-mode="expert"] .bouton-mode .mode-court { display: none; }
-[data-mode="expert"] .bouton-mode .mode-mini { display: inline; }
-@media (max-width: 719px) { [data-mode="expert"] .barre-gauche { gap: 6px; } }
-/* Expert, en-tête sur UNE rangée (≥ 1280 px) : le bouton de mode quitte la rangée (elle a déjà toute sa
-   largeur, les puces des calques la prennent comme avant le mode Débutant) et se pose au début de la
-   bande du résumé, sous « ← Terminal » — là où il était, une rangée plus bas, loin des panneaux qui
-   s'ouvrent à droite ; la bande lui garde sa place (marge gauche). Bande cachée (Guide éteint) : il
-   revient dans la rangée. */
+@media (max-width: 719px) { .mode-bascule .mode-btn { padding: 3px 6px; } }
+/* Complet, en-tête sur UNE rangée (≥ 1280 px) : la rangée a déjà toute sa largeur (les puces des
+   calques la prennent, autant qu'avant le mode Lisible) ; l'interrupteur se pose une rangée plus
+   bas, au même bord droit, au bout de la bande du résumé, qui lui garde sa place (marge droite).
+   Les panneaux s'ouvrent sous lui (--haut-barre le compte, js/bookmap.js). Bande cachée (Guide
+   éteint) : il revient dans la rangée. */
 @media (min-width: 1280px) {
   .barre { position: relative; }
-  [data-mode="expert"] .barre:has(+ .resume-carte:not([hidden])) .bouton-mode { position: absolute; left: 12px; top: calc(100% + 9px); z-index: 8; background: var(--surface); }
-  [data-mode="expert"] .barre:has(+ .resume-carte:not([hidden])) + .resume-carte { padding-left: 116px; }
+  [data-mode="expert"] .barre:has(+ .resume-carte:not([hidden])) .mode-bascule { position: absolute; right: 12px; top: calc(100% + 8px); z-index: 8; background: var(--surface); }
+  [data-mode="expert"] .barre:has(+ .resume-carte:not([hidden])) + .resume-carte { padding-right: 160px; }
 }
 /* Téléphone couché en Expert (568 px) : la première rangée garde ses huit boutons. */
 @media (max-width: 640px) { [data-mode="expert"] .barre-droite { gap: 4px; } [data-mode="expert"] .barre .bouton { padding: 4px 6px; } }
+/* Complet, de 481 à 640 px (téléphone couché) : la 1re rangée est pleine (← Terminal, le titre et les
+   boutons de la page) ; l'interrupteur se pose une rangée plus bas, au même bord droit, au bout des
+   puces des calques (comme au-delà de 1280 px, au bout de la bande du résumé). L'en-tête garde deux
+   rangées. La base des puces dépasse ce qui reste de la 1re rangée : elles passent à la ligne, et
+   l'interrupteur les y suit. */
+@media (min-width: 481px) and (max-width: 640px) {
+  [data-mode="expert"] .mode-bascule { order: 4; margin-left: 0; }
+  [data-mode="expert"] .calques { flex: 1 1 calc(100% - 140px); }
+}
 /* « Suivre » rappelé (bord accent, sans animation) quand la carte montre le passé en mode débutant. */
 .bouton.accent { border-color: var(--accent); color: var(--ink-1); }
 /* La ligne du haut : UNE ligne de hauteur fixe (la carte ne change pas de taille quand elle arrive) ;
@@ -288,3 +307,70 @@ html:not([data-mode="expert"]) .statut { bottom: 26px; white-space: nowrap; over
 .geste-doigt { display: none; }
 @media (pointer: coarse) { .geste-souris { display: none; } .geste-doigt { display: inline; } }
 @media (max-width: 479px) { #gradBarre span.mi { display: none; } }
+
+/* ─── « Choisir l'affichage » ───
+   Un seul panneau : « Tout afficher » et « Revenir au départ » en tête, puis les calques rangés par
+   question, chacun avec sa phrase « C'est quoi ? » (petite, grise : du détail), et tout en bas, replié,
+   les réglages fins (Complet). Le bouton dit son nom entier, « Affichage » quand la place manque :
+   jamais coupé. */
+.bouton-affichage .aff-court { display: none; }
+/* Où le nom entier ne tient pas (mesuré : 121 px contre 73) — Complet : sous 800 px (à 650, la barre
+   passait sur trois rangées) et dès 1280 px, où les puces des calques partagent la rangée (une puce de
+   moins à 1280, 1366 et 1680 px) ; Lisible : sous 360 px. */
+@media (max-width: 799px), (min-width: 1280px) {
+  [data-mode="expert"] .bouton-affichage .aff-long { display: none; }
+  [data-mode="expert"] .bouton-affichage .aff-court { display: inline; }
+}
+@media (max-width: 359px) {
+  .bouton-affichage .aff-long { display: none; }
+  .bouton-affichage .aff-court { display: inline; }
+}
+.affichage .aff-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
+.affichage .aff-actions .bouton { flex: 1 1 auto; padding: 7px 10px; color: var(--ink-1); }
+.panneau-flottant .aff-note { margin: 6px 0 2px; }
+.aff-groupe { padding: 2px 10px 8px; }
+.aff-groupe legend { color: var(--ink-1); font-weight: 600; font-size: 12.5px; }
+.aff-calque { margin-top: 4px; }
+.aff-calque label { flex-direction: row; align-items: center; gap: 8px; margin: 0; min-height: 28px; color: var(--ink-1); font-size: 12.5px; cursor: pointer; }
+.aff-calque input { flex-shrink: 0; width: 16px; height: 16px; margin: 0; accent-color: var(--carte-live); cursor: pointer; }
+.aff-calque input:disabled { cursor: default; }
+.aff-toujours { margin-left: auto; font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.panneau-flottant .aff-quoi { margin: 0 0 2px 24px; font-size: 11.5px; line-height: 1.4; color: var(--ink-3); }
+.aff-qq { color: var(--ink-2); font-weight: 600; }
+.reglages-fins { margin-top: 12px; border-top: 1px solid var(--bord); padding-top: 4px; }
+.reglages-fins > summary { cursor: pointer; padding: 6px 0; font-size: 13px; font-weight: 600; color: var(--ink-1); }
+.reglages-fins > summary:focus-visible { outline: 2px solid var(--carte-live); outline-offset: 1px; }
+
+/* ─── Lisible : la mini-clé des couleurs (js : placerMiniCle) ───
+   Petite, permanente, dans un coin libre de la carte ; inerte au pointeur (les gestes vont à la carte).
+   Fond plein, comme la bulle du Lisible : une rangée jaune de la chaleur ne transparaît pas sous ses mots. */
+.mini-cle {
+  position: absolute; z-index: 3; left: 8px; top: 8px; pointer-events: none;
+  display: flex; flex-direction: column; gap: 3px; padding: 4px 8px 5px;
+  background: var(--surface); border: 1px solid var(--bord); border-radius: 8px;
+  font-size: 11px; line-height: 1.25; color: var(--ink-2); white-space: nowrap;
+}
+.mini-cle[hidden] { display: none; }
+.mc-ligne { display: flex; align-items: center; gap: 5px; }
+.mc-ligne b { min-width: 3.3em; color: var(--ink-1); font-weight: 600; }
+.mc-rampe { flex-shrink: 0; width: 56px; height: 8px; border-radius: 2px; background-size: 100% 100%; image-rendering: pixelated; outline: 1px solid var(--bord); }
+.mc-sens { font-size: 10.5px; color: var(--ink-3); }
+
+/* ─── Au doigt (pointer: coarse) : des cibles d'au moins 40 × 40 px dans la barre ───
+   « ← Terminal », chaque bouton et chaque puce : 32 px de haut et 40 de large au moins, et un ::before
+   transparent, centré, qui porte la zone de toucher à 40 px de côté (4 px au-dessus et au-dessous, dans
+   la marge de la barre et dans l'écart de 9 px entre ses rangées : 1 px entre les zones, qui ne se
+   couvrent pas). Les puces de Complet sont dans une rangée qui défile, qui les rognerait : elle a 4 px de
+   marge haute et basse. Le bouton de mode (un autre chantier) ne change pas. Lisible à 390 px : la barre
+   fait 82 px (deux rangées, ≤ 82). */
+@media (pointer: coarse) {
+  .barre { padding-top: 4px; padding-bottom: 4px; row-gap: 9px; }
+  .barre .retour, .barre .puce, .barre .bouton:not(.bouton-mode) {
+    position: relative; flex-shrink: 0; min-width: 40px; min-height: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .barre .retour::before, .barre .puce::before, .barre .bouton:not(.bouton-mode)::before {
+    content: ''; position: absolute; inset: min(0px, calc(50% - 20px));
+  }
+  [data-mode="expert"] .calques { padding-top: 4px; padding-bottom: 4px; }
+}

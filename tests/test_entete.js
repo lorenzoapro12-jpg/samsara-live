@@ -10,18 +10,23 @@
 //      45 s, « 21 min » et « en retard » partout (voyant, pastille, bandeau des cartes).
 //   3. VOYANT avant la première lecture : neutre (pas vert), et il dit ce qu'il attend.
 //   4. NOMS : la barre des tâches dit la paire comme l'en-tête (« SOL/USDT », pas « SOLUSDT ») ;
-//      boutons « Infos du marché (F) » et « En direct (à la seconde) ».
+//      boutons « Infos du marché (I) » et « En direct (à la seconde) ».
 //   5. LA MÊME VARIATION 24 h dans l'en-tête et dans le panneau ⚡ (ouverture → dernier prix).
 //   6. L'HEURE de l'appareil, le fuseau dit une fois (titre de l'horloge) ; aucun « UTC » dans
 //      l'en-tête ; l'heure de publication écrite à l'heure de l'appareil.
-//   7. « + Indicateurs » à l'écran en Expert, ruban plein (tous les indicateurs allumés) : à
-//      1440 px, épinglé au bord droit, ruban défilé au début comme à la fin ; à 390 px, en tête.
-//   8. RACCOURCIS : une touche tapée dans un champ, ou avec Ctrl, ne déclenche rien.
+//   7. « Choisir l'affichage » à l'écran en Complet, ruban plein (« Tout afficher » : sa légende
+//      au plus long) : à 1440 px, dans le ruban et l'écran ; à 1024 px (le ruban défile), épinglé
+//      au bord droit, ruban défilé au début comme à la fin ; à 390 px, en tête.
+//   8. RACCOURCIS : une touche tapée dans un champ (ou un texte éditable), ou avec Ctrl, ne
+//      déclenche rien. I les infos du marché ; R et F la vue au présent (les touches de la carte).
 //   9. GEX sans couleur hausse / baisse dans les chiffres clés ; cartes : prix publié plus petit
 //      que le prix en direct, jauge RSI sans vert ni rouge ; bandeau d'âge qui avance.
 //  10. TÉLÉPHONE : la barre du bas ne cache pas la dernière ligne des modales.
 //  11. BOUTONS DE L'EN-TÊTE, de 360 à 1440 px, dans neuf thèmes et les deux modes : ni sur le
-//      prix, ni hors de l'écran, ni cachés ; « + Indicateurs » à l'écran (Planche comprise).
+//      prix, ni hors de l'écran, ni cachés ; « Choisir l'affichage » à l'écran (Planche comprise).
+//  12. AU DOIGT (écran tactile, 360 et 390 px, aero et kala, deux modes) : chaque bouton de
+//      l'en-tête et chaque intervalle du ruban couvre un carré de 40 × 40 px ; aucune zone sur
+//      l'interrupteur de mode ni « Choisir l'affichage » ; le nom d'un bouton-icône dit à l'appui.
 //
 // Binance simulé (prix 86 012,50, ouverture 85 700 : +0,36 % ; Binance arrondit à +0,365), le
 // fichier publié du dépôt avec l'heure de publication réglée par contrôle ; horloge fixée au
@@ -226,7 +231,7 @@ const lireEntete = page => page.evaluate(() => {
       await p.waitForTimeout(800);
       const sol = await p.evaluate(() => ({ tache: document.getElementById('taskbarPair').textContent, tete: (document.getElementById('paireNom') || {}).textContent }));
       check(`barre des tâches : « ${noms.tache} » puis « ${sol.tache} », comme l’en-tête (« ${sol.tete} »)`, noms.tache === 'BTC/USDT' && sol.tache === 'SOL/USDT' && sol.tete === 'SOL/USDT', sol);
-      check(`boutons : « ${noms.feed} » ; « ${noms.live.slice(0, 40)}… »`, noms.feed === 'Infos du marché (F)' && /^En direct \(à la seconde\)/.test(noms.live), noms);
+      check(`boutons : « ${noms.feed} » ; « ${noms.live.slice(0, 40)}… »`, noms.feed === 'Infos du marché (I)' && /^En direct \(à la seconde\)/.test(noms.live), noms);
       await p.evaluate(() => changeSymbol('BTCUSDT', document.getElementById('sym_BTCUSDT')));
       await p.waitForTimeout(800);
 
@@ -244,16 +249,38 @@ const lireEntete = page => page.evaluate(() => {
       check(`variation 24 h : en-tête « ${v.tete} », panneau ⚡ « ${v.live} » — la même (ouverture → dernier prix)`, v.tete === '+0,36 %' && v.live === v.tete + ' en 24 h', v);
       await p.evaluate(() => { const m = document.getElementById('liveModal'); if (typeof closeLiveModal === 'function') closeLiveModal(); else m.style.display = 'none'; });
 
-      // Raccourcis : rien depuis un champ, rien avec Ctrl ; la touche seule, oui.
+      // Raccourcis : rien depuis un champ ni un texte éditable, rien avec Ctrl ; la touche seule, oui.
+      // Les infos du marché sont sur I (F suit le présent, comme sur la carte).
       await p.evaluate(() => { const i = document.createElement('input'); i.id = '__champ'; document.body.appendChild(i); i.focus(); });
-      await p.keyboard.press('f');
+      await p.keyboard.press('i');
       const dansChamp = await p.evaluate(() => feedVisible);
-      await p.evaluate(() => { document.getElementById('__champ').blur(); document.body.focus(); });
-      await p.keyboard.press('Control+f');
+      await p.evaluate(() => { document.getElementById('__champ').blur(); const d = document.createElement('div'); d.id = '__edit'; d.contentEditable = 'true'; d.textContent = 'note'; document.body.appendChild(d); d.focus(); });
+      await p.keyboard.press('i');
+      const dansEdit = await p.evaluate(() => feedVisible);
+      await p.evaluate(() => { document.getElementById('__edit').blur(); document.body.focus(); });
+      await p.keyboard.press('Control+i');
       const avecCtrl = await p.evaluate(() => feedVisible);
-      await p.keyboard.press('f');
+      await p.keyboard.press('i');
       const seule = await p.evaluate(() => feedVisible);
-      check(`raccourci « F » : tapé dans un champ, rien (${dansChamp}) ; Ctrl+F, rien (${avecCtrl}) ; seul, le panneau s’ouvre (${seule})`, !dansChamp && !avecCtrl && seule);
+      check(`raccourci « I » : tapé dans un champ, rien (${dansChamp}) ; dans un texte éditable, rien (${dansEdit}) ; Ctrl+I, rien (${avecCtrl}) ; seul, le panneau s’ouvre (${seule})`, !dansChamp && !dansEdit && !avecCtrl && seule);
+      await p.keyboard.press('i'); await p.waitForTimeout(450);
+      // R et F : la vue revient au présent (dernière bougie à droite, zoom de départ) ; jamais depuis un
+      // champ, jamais avec Ctrl ; F n'ouvre plus les infos du marché.
+      const recule = () => p.evaluate(() => { const n = viewEnd - viewStart; viewEnd = Math.max(n, candles.length - 60); viewStart = viewEnd - n; drawChart(); return viewEnd === candles.length; });
+      const auPresent = () => p.evaluate(() => viewEnd === candles.length);
+      for (const k of ['r', 'f']) {
+        const r0 = await recule();
+        await p.evaluate(() => { document.getElementById('__champ').focus(); });
+        await p.keyboard.press(k);
+        const champ = await auPresent();
+        await p.evaluate(() => { document.getElementById('__champ').blur(); document.body.focus(); });
+        await p.keyboard.press(k === 'r' ? 'Alt+r' : 'Control+f');   // Ctrl+R recharge : Alt pour R
+        const mod = await auPresent();
+        const feed0 = await p.evaluate(() => feedVisible);
+        await p.keyboard.press(k); await p.waitForTimeout(150);
+        const seul = await auPresent(), feed1 = await p.evaluate(() => feedVisible);
+        check(`raccourci « ${k.toUpperCase()} » : dans un champ, rien ; avec ${k === 'r' ? 'Alt' : 'Ctrl'}, rien ; seul, la vue revient au présent ; les infos du marché ne bougent pas`, !r0 && !champ && !mod && seul && feed0 === feed1, { r0, champ, mod, seul, feed0, feed1 });
+      }
 
       // GEX : aucune teinte hausse / baisse dans les chiffres clés.
       const gex = await p.evaluate(() => { const k = [...document.querySelectorAll('#cycle .kpi')].find(x => /GEX/.test(x.querySelector('i').textContent)); const b = k && k.querySelector('b'); return b && { cls: b.className, texte: b.textContent }; });
@@ -277,15 +304,18 @@ const lireEntete = page => page.evaluate(() => {
       await o.ctx.close();
     }
 
-    // ── 7. « + Indicateurs » toujours à l'écran ────────────────────────────────
-    titre('5. « + Indicateurs » à l’écran en Expert, ruban plein : épinglé au bureau, en tête au téléphone');
-    for (const w of [1440, 390]) {
+    // ── 7. « Choisir l'affichage » toujours à l'écran ─────────────────────────
+    titre('5. « Choisir l’affichage » à l’écran en Complet, ruban plein : épinglé au bureau, en tête au téléphone');
+    for (const w of [1440, 1024, 390]) {
       const o = await ouvrir(nav, { vue: { width: w, height: w <= 480 ? 844 : 900 }, mode: 'expert' });
       const p = o.page;
-      await p.evaluate(() => { for (const l of document.querySelectorAll('#indicatorBar label[id^="lbl_"]')) if (!l.classList.contains('active')) l.click(); });
+      // Ruban plein : tout allumé, la légende du ruban au plus long (ses puces et « + N autres »).
+      const legende = await p.evaluate(() => { toutAfficher(); return document.querySelectorAll('#indicatorBar label.puce-calque').length; });
       await p.waitForTimeout(500);
+      check(`${w} px : « Tout afficher » remplit la légende du ruban (${legende} puces)`, legende >= 6, legende);
       // Au bureau, il est épinglé au bord droit (ruban défilé au début comme à la fin) ; au
-      // téléphone, il est en TÊTE du ruban (avant les intervalles) : visible à l'ouverture.
+      // téléphone, il est en TÊTE du ruban (avant les intervalles) : visible à l'ouverture. À 1440 px
+      // la légende (au plus 7 puces) tient sans défiler ; à 1024 et 390 px, le ruban défile.
       for (const bout of w > 768 ? ['début', 'fin'] : ['début']) {
         const r = await p.evaluate(fin => {
           const bar = document.getElementById('indicatorBar'), btn = document.getElementById('indDropdownBtn');
@@ -295,8 +325,8 @@ const lireEntete = page => page.evaluate(() => {
           const cible = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
           return { deborde: bar.scrollWidth > bar.clientWidth, b: [Math.round(b.left), Math.round(b.right)], z: [Math.round(z.left), Math.round(z.right)], vw: innerWidth, dessus: !!cible && btn.contains(cible) };
         }, bout === 'fin');
-        check(`${w} px, ruban défilé au ${bout} : « + Indicateurs » entier dans le ruban et l’écran (x ${r.b[0]}–${r.b[1]}, ruban ${r.z[0]}–${r.z[1]}), rien par-dessus`,
-          r.deborde && r.b[0] >= r.z[0] && r.b[1] <= r.z[1] && r.b[1] <= r.vw && r.dessus, r);
+        check(`${w} px, ruban ${r.deborde ? 'défilé au ' + bout : 'sans défilement'} : « Choisir l’affichage » entier dans le ruban et l’écran (x ${r.b[0]}–${r.b[1]}, ruban ${r.z[0]}–${r.z[1]}), rien par-dessus`,
+          (w === 1440 || r.deborde) && r.b[0] >= r.z[0] && r.b[1] <= r.z[1] && r.b[1] <= r.vw && r.dessus, r);
       }
       await o.ctx.close();
     }
@@ -322,10 +352,11 @@ const lireEntete = page => page.evaluate(() => {
     // ── 7. Les boutons de l'en-tête, à toute largeur : ni sur le prix, ni hors de l'écran ──
     // Constaté le 10/10 : en Expert, entre 481 et 660 px, les boutons se posaient sur le prix ;
     // dans les thèmes à structure (Néon, Codex, Gare, Planche), entre 801 et 1000 px, Réglages,
-    // Légendes et Thème sortaient de l'écran ; dans la Planche, « + Indicateurs » restait au bout
+    // Légendes et Thème sortaient de l'écran ; dans la Planche, le bouton du panneau (alors
+    // « + Indicateurs », aujourd'hui « Choisir l'affichage ») restait au bout
     // de sa nomenclature qui défile, hors de l'écran, jusqu'à 1279 px. Une page par thème et par
     // mode, redimensionnée de largeur en largeur ; publication en retard (pastille à placer aussi).
-    titre('7. Boutons de l’en-tête et « + Indicateurs » : ni sur le prix, ni hors de l’écran, de 360 à 1440 px');
+    titre('7. Boutons de l’en-tête et « Choisir l’affichage » : ni sur le prix, ni hors de l’écran, de 360 à 1440 px');
     const LARGEURS = [360, 390, 412, 481, 540, 600, 660, 720, 800, 801, 850, 900, 950, 1000, 1100, 1279, 1280, 1440];
     for (const theme of ['aero', 'kala', 'neon', 'codex', 'gare', 'gazette', 'cyanotype', 'diazo', 'bureau95']) {
       for (const mode of ['debutant', 'expert']) {
@@ -334,12 +365,13 @@ const lireEntete = page => page.evaluate(() => {
         for (const w of LARGEURS) {
           await o.page.setViewportSize({ width: w, height: 900 });
           await o.page.waitForTimeout(120);
-          const f = await o.page.evaluate(() => {
+          const f = await o.page.evaluate(mode => {
             const r = e => e.getBoundingClientRect();
             const vis = e => { const s = getComputedStyle(e); return s.display !== 'none' && s.visibility !== 'hidden' && r(e).width > 0 && r(e).height > 0; };
             const prix = document.getElementById('price'), rp = r(prix), out = [];
             const coupe = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
-            const boutons = [...document.querySelectorAll('.header button, .header .ico-btn, #dot, .header .kpi-deb, .header .kpi-age, #indDropdownBtn')].filter(b => vis(b) && !b.contains(prix) && !prix.contains(b));
+            // L'interrupteur de mode compté où qu'il soit (la Gazette le pose dans le folio, sous l'en-tête).
+            const boutons = [...new Set(document.querySelectorAll('.header button, .header .ico-btn, #dot, .header .kpi-deb, .header .kpi-age, #indDropdownBtn, #modeBtn button'))].filter(b => vis(b) && !b.contains(prix) && !prix.contains(b));
             for (const b of boutons) {
               const rb = r(b), nom = b.id || b.className.split(' ')[0];
               if (vis(prix) && coupe(rp, rb)) out.push(nom + ' sur le prix');
@@ -349,13 +381,109 @@ const lireEntete = page => page.evaluate(() => {
               else if (!x || !(b.contains(x) || x.contains(b))) out.push(nom + ' caché');
             }
             if (document.documentElement.scrollWidth > innerWidth) out.push('défilement horizontal');
+            // L'interrupteur « Lisible | Complet » : ses deux segments visibles, leur texte entier, celui
+            // du mode enfoncé, et aucun autre bouton de l'en-tête dessus.
+            const segs = [...document.querySelectorAll('#modeBtn [data-mode-choix]')];
+            if (segs.map(x => x.textContent.trim()).join('|') !== 'Lisible|Complet' || !segs.every(vis)) out.push('interrupteur incomplet');
+            else {
+              for (const x of segs) if (x.scrollWidth > x.clientWidth + 1) out.push('« ' + x.textContent.trim() + ' » rogné');
+              if (segs.map(x => x.getAttribute('aria-pressed')).join() !== (mode === 'expert' ? 'false,true' : 'true,false')) out.push('interrupteur : mauvais segment enfoncé');
+              const ri = r(document.getElementById('modeBtn'));
+              for (const b of boutons) if (!document.getElementById('modeBtn').contains(b) && coupe(ri, r(b))) out.push((b.id || b.className.split(' ')[0]) + ' sur l’interrupteur');
+            }
             return out;
-          });
+          }, mode);
           for (const x of f) fautes.push(w + ' px : ' + x);
         }
-        check(`${theme.padEnd(9)} · ${mode.padEnd(8)} : de 360 à 1440 px, aucun bouton sur le prix ni hors de l’écran`, !fautes.length, fautes.slice(0, 6));
+        check(`${theme.padEnd(9)} · ${mode.padEnd(8)} : de 360 à 1440 px, aucun bouton sur le prix ni hors de l’écran ; l’interrupteur « Lisible | Complet » entier, le bon segment enfoncé, sous aucun bouton`, !fautes.length, fautes.slice(0, 6));
         await o.ctx.close();
       }
+    }
+
+    // ── 8. Au doigt : des cibles d'au moins 40 × 40 px ──────────────────────────
+    // Écran tactile (pointer: coarse), 360 et 390 px, deux modes, aero et kala, publication en retard
+    // (la pastille la plus longue). Chaque bouton de l'en-tête et chaque intervalle du ruban : tout
+    // le carré de 40 × 40 px centré sur lui (17 × 17 points jusqu'à ±19,5 px : le point du bord est au
+    // milieu du dernier pixel) le touche, lui (la pastille
+    // « Infos du marché » : elle ou la bande qui la porte, même action). Les deux segments de
+    // l'interrupteur de mode et « Choisir l'affichage » ont leur propre mesure : pas de taille exigée ici,
+    // mais aucune zone voisine ne les couvre (chaque point de leur cadre les touche, eux ou leur groupe). Puis le nom d'un bouton-icône,
+    // dit à l'appui du doigt : chaque bouton sans mot visible a un nom en mots (aria-label), qui
+    // s'affiche sous lui à l'appui, entier dans l'écran, et s'efface après le relâcher.
+    titre('8. Au doigt (360 et 390 px, écran tactile) : chaque bouton de l’en-tête et du ruban, une cible de 40 × 40 px au moins ; le nom d’un bouton-icône dit à l’appui');
+    for (const theme of ['aero', 'kala']) for (const mode of ['debutant', 'expert']) for (const w of [360, 390]) {
+      const o = await ouvrir(nav, { vue: { width: w, height: 800 }, mode, theme, ageS: 25 * 60 });
+      const nom = `${theme} · ${mode} · ${w}`;
+      const m = await o.page.evaluate(() => {
+        const vis = e => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
+        const AUTRES = ['modeBtn', 'indDropdownBtn'], autre = b => AUTRES.includes(b.id) || !!b.closest('#modeBtn');
+        const tous = [...document.querySelectorAll('.header button, .header a, .header [role="button"], .indicator-bar label[id^="int_"], #indDropdownBtn')].filter(vis);
+        const cycle = document.getElementById('cycle');
+        const nomDe = b => b.id || b.className.split(' ')[0];
+        const cibles = tous.filter(b => !autre(b)).map(b => {
+          // Un intervalle hors de la partie visible du ruban (Complet : il défile) : amené à l'écran d'abord.
+          if (b.closest('.indicator-bar')) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          const a = h => !!h && (b.contains(h) || (b.classList.contains('kpi-deb') && h === cycle));
+          const rates = [];
+          for (let i = -8; i <= 8; i++) for (let j = -8; j <= 8; j++) { const h = document.elementFromPoint(cx + i * 19.5 / 8, cy + j * 19.5 / 8); if (!a(h)) rates.push([Math.round(i * 19.5 / 8), Math.round(j * 19.5 / 8), h ? nomDe(h) : 'rien']); }
+          // L'étendue de la zone sur les deux axes (au demi-pixel), pour le rapport.
+          const ext = (dx, dy) => { let d = 0; while (d < 60 && a(document.elementFromPoint(cx + dx * (d + 0.5), cy + dy * (d + 0.5)))) d += 0.5; return d; };
+          return { id: nomDe(b), dessin: [Math.round(r.width), Math.round(r.height)], zone: [ext(-1, 0) + ext(1, 0), ext(0, -1) + ext(0, 1)], rates: rates.length, ex: rates.slice(0, 3) };
+        });
+        // L'interrupteur et « Choisir l'affichage » : aucun point de leur cadre (grille de 2 px) ne touche un
+        // autre élément qu'eux — ou que leur conteneur, dans les coins arrondis.
+        const autres = tous.filter(autre).map(b => {
+          if (b.closest('.indicator-bar')) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          const r = b.getBoundingClientRect(), pris = new Set();
+          for (let x = r.left + 1; x < r.right - 0.5; x += 2) for (let y = r.top + 1; y < r.bottom - 0.5; y += 2) { const h = document.elementFromPoint(x, y); if (!h || !(b.contains(h) || h.contains(b))) pris.add(h ? nomDe(h) : 'rien'); }
+          return { id: b.id || b.dataset.modeChoix || nomDe(b), rates: pris.size, par: [...pris] };
+        });
+        const hd = document.querySelector('.header');
+        return { cibles, autres, page: document.documentElement.scrollWidth - innerWidth, tete: [hd.scrollWidth, hd.clientWidth], hTete: Math.round(hd.getBoundingClientRect().height),
+          geo: ['.header-left', '#cycle', '.header-right'].map(s => { const q = document.querySelector(s).getBoundingClientRect(); return s + ' ' + [q.left, q.top, q.right, q.bottom].map(Math.round).join(','); }) };
+      });
+      const petits = m.cibles.filter(c => c.rates);
+      check(`${nom} : ${m.cibles.length} cibles (${m.cibles.map(c => c.id + ' ' + c.zone.join('×')).join(', ')}) — chacune couvre un carré de 40 × 40 px`,
+        m.cibles.length >= (mode === 'debutant' ? 12 : 13) && !petits.length, { petits, geo: m.geo });
+      check(`${nom} : les deux segments de l’interrupteur et « Choisir l’affichage » restent entiers sous le doigt (aucune zone voisine sur eux)`,
+        m.autres.length >= 3 && m.autres.every(x => !x.rates), m.autres);
+      check(`${nom} : ni la page ni l’en-tête ne débordent (en-tête ${m.hTete} px)`, m.page <= 0 && m.tete[0] <= m.tete[1] + 1, m);
+      // Le nom à l'appui : chaque bouton sans mot visible, un nom en mots ; à l'appui, il s'affiche.
+      const icones = await o.page.evaluate(() => [...document.querySelectorAll('.header button, .header a')].filter(b => b.getClientRects().length && getComputedStyle(b).visibility !== 'hidden' && !b.innerText.trim())
+        .map(b => ({ id: b.id, nom: b.getAttribute('aria-label') || '' })));
+      check(`${nom} : ${icones.length} boutons-icônes, chacun un nom en mots (${icones.map(i => '« ' + i.nom + ' »').join(', ')})`,
+        icones.length >= 4 && icones.every(i => /^[A-ZÀ-Ÿ][a-zà-ÿ’' ()]+[a-zà-ÿ)]$/.test(i.nom) && i.nom.length >= 6), icones);
+      const dits = [];
+      for (const i of icones) {
+        // L'appui seul (pointerdown tactile, sans relâcher : la carte du carnet ne s'ouvre pas).
+        const r = await o.page.evaluate(id => {
+          const b = document.getElementById(id), q = b.getBoundingClientRect();
+          b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', isPrimary: true, clientX: q.left + q.width / 2, clientY: q.top + q.height / 2 }));
+          const n = document.getElementById('nomAppui'), rn = n && n.getBoundingClientRect();
+          const res = n && { texte: n.textContent, vu: !n.hidden && rn.width > 0, dans: rn.left >= 0 && rn.right <= innerWidth && rn.top >= 0 && rn.bottom <= innerHeight, pres: Math.abs(rn.left + rn.width / 2 - (q.left + q.width / 2)) < rn.width / 2 + q.width / 2 + 1 && (rn.top >= q.bottom || rn.bottom <= q.top), muet: n.getAttribute('aria-hidden') === 'true' };
+          b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch', isPrimary: true }));
+          return res;
+        }, i.id);
+        dits.push({ id: i.id, r });
+        if (!r || r.texte !== i.nom || !r.vu || !r.dans || !r.pres || !r.muet) break;
+      }
+      check(`${nom} : à l’appui, chaque bouton-icône dit son nom sous lui, entier dans l’écran (bulle muette pour un lecteur d’écran)`,
+        dits.length === icones.length && dits.every((d, k) => d.r && d.r.texte === icones[k].nom && d.r.vu && d.r.dans && d.r.pres && d.r.muet), dits.slice(-2));
+      await o.page.waitForTimeout(1400);
+      const parti = await o.page.evaluate(() => { const n = document.getElementById('nomAppui'); return !n || n.hidden; });
+      check(`${nom} : 1,2 s après le relâcher, le nom s’efface`, parti, parti);
+      if (w === 390 && mode === 'debutant') {
+        // Un vrai toucher : le nom s'affiche ET l'action a lieu (Légendes s'ouvre).
+        const b = await o.page.evaluate(() => { const q = document.getElementById('legendesBtn').getBoundingClientRect(); return { x: q.left + q.width / 2, y: q.top + q.height / 2 }; });
+        await o.page.touchscreen.tap(b.x, b.y);
+        await o.page.waitForTimeout(300);
+        const t = await o.page.evaluate(() => { const n = document.getElementById('nomAppui'), g = document.getElementById('fichePop'), ti = g && g.querySelector('.fiche-titre');
+          return { nom: n && !n.hidden ? n.textContent : null, ouvert: !!g && g.getClientRects().length > 0 && getComputedStyle(g).visibility !== 'hidden' && !!ti && ti.textContent === 'Légendes' }; });
+        check(`${nom} : un vrai toucher sur Légendes : « ${t.nom} » s’affiche et les légendes s’ouvrent`, t.nom === 'Légendes' && t.ouvert, t);
+      }
+      check(`${nom} : aucune erreur de script`, !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
     }
   } finally {
     await nav.close();

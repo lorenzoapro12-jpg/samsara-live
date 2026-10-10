@@ -1,7 +1,7 @@
 // L'interface de la page, vérifiée dans un vrai navigateur (Chromium, Playwright) : ce qui ne
 // se juge qu'à l'écran — où un menu s'ouvre, ce que le graphique dessine.
 //
-//   1. MENUS : Indicateurs, Thème, Paire s'ouvrent dans l'écran — sous leur bouton, ou au-dessus
+//   1. MENUS : « Choisir l'affichage », Thème, Paire s'ouvrent dans l'écran — sous leur bouton, ou au-dessus
 //      quand la place manque en dessous (bouton dans une barre basse : Néon, barres des tâches),
 //      bornés à 8 px des bords, défilants s'ils sont plus hauts que l'écran.
 //   2. CROCHETS DU GRAPHIQUE (jetons de thème lus par lireJetons) : sans jeton, le graphique
@@ -11,9 +11,9 @@
 //      refaite quand le thème change (son id est dans la clé du cache).
 //   3. DISPOSITION : sur un canvas bas, les sous-graphes sont réduits et ne débordent jamais
 //      sur le sélecteur de plage ; sur un canvas haut, ils gardent leur hauteur. Le tracé du prix
-//      garde 60 % de la hauteur utile ; chaque sous-graphe logé est tracé (jamais un cadre vide) ;
-//      ceux qui n'ont plus de place sont annoncés par une ligne, pas dessinés.
-//   4. LE TRACÉ DE L'EXPERT : un nom par chose (ruban, menu, titres), le format de la page
+//      garde 60 % de la hauteur utile ; au plus 3 sous-graphes dessinés, chacun tracé (jamais un
+//      cadre vide) ; les autres sont rangés en onglets, pas dessinés.
+//   4. LE TRACÉ DE L'EXPERT : un nom par chose (légende du ruban, panneau, titres), le format de la page
 //      (« 86 012,50 $ », « +0,65 % »), l'unité de la paire (« SOL » sur BTC/SOL), l'heure de
 //      l'appareil (fuseau d'Auckland), le CCI à ±100 sur ses lignes, l'ATR lisible à 2,5 $, une
 //      étiquette par ligne, la légende S/R par intervalle, les couches d'une seule paire grisées
@@ -22,6 +22,12 @@
 //      (« Carte publiée il y a … ») et le compteur sans sa plage.
 //   6. SÉLECTEUR DE PLAGE : la légende des sessions ne couvre ni le cadre des bougies vues ni le
 //      compteur, que le cadre soit à droite ou à gauche ; « 50/3 000 » n'y est pas répété.
+//   7. « CHOISIR L'AFFICHAGE » (Complet) : tête (« Tout afficher », « Revenir au départ »,
+//      préréglages), calques rangés par question, chaque ligne avec sa phrase, son importance (une
+//      forme ET un mot) et sa fiche ; chaque préréglage, la sélection gardée d'une visite à l'autre,
+//      « Revenir au départ » ; « Tout afficher » : au plus 3 sous-graphes, les autres en onglets
+//      qu'un clic échange, le prix à 60 % ; la légende du ruban (calques allumés, la croix masque).
+//   8. LE PANNEAU TIENT DANS L'ÉCRAN, à 360, 390 et 1440 px, dans neuf thèmes et les deux modes.
 //
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
 // USAGE   node tests/test_interface.js
@@ -81,7 +87,8 @@ async function ouvrir(nav, theme, vue, fuseau) {
   });
 // Mode Expert : ce test mesure les éléments denses (chiffres clés, menus, sous-graphes…), masqués
   // en Débutant (le mode par défaut) ; leur version Débutant est vérifiée dans test_debutant_page.js.
-  await page.addInitScript(t => { try { localStorage.clear(); localStorage.setItem('samsara-mode', 'expert'); localStorage.setItem('samsara-theme', t); } catch (e) { /* */ } }, theme);
+  // (Un rechargement voulu, marqué dans la session — section 7 —, garde le stockage.)
+  await page.addInitScript(t => { try { if (sessionStorage.getItem('__garder') === '1') return; localStorage.clear(); localStorage.setItem('samsara-mode', 'expert'); localStorage.setItem('samsara-theme', t); } catch (e) { /* */ } }, theme);
   // Traces du canvas du graphique, relevées seulement quand un contrôle les demande
   // (window.__traits / window.__textes) : style et tirets de chaque trait, texte et ordonnée.
   await page.addInitScript(() => {
@@ -112,7 +119,7 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
   const nav = await playwright.chromium.launch();
   try {
     titre('1. Menus : dans l\'écran, au-dessus du bouton quand la place manque en dessous');
-    const MENUS = [['Indicateurs', '#indDropdownBtn', 'indMenu'], ['Thème', '#themeBtn', 'themeMenu'], ['Paire', '#paireBtn', 'paireMenu']];
+    const MENUS = [['Affichage', '#indDropdownBtn', 'indMenu'], ['Thème', '#themeBtn', 'themeMenu'], ['Paire', '#paireBtn', 'paireMenu']];
     for (const t of THEMES) {
       const o = await ouvrir(nav, t.id, { width: 1440, height: 900 });
       for (const [nom, b, id] of MENUS) {
@@ -247,7 +254,7 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
     check('aucune erreur JavaScript', !o2.erreurs.length, o2.erreurs);
     await o2.ctx.close();
 
-    titre('3. Disposition : le prix garde 60 %, chaque sous-graphe logé est tracé, les autres annoncés, rien sur le sélecteur de plage');
+    titre('3. Disposition : le prix garde 60 %, au plus 3 sous-graphes dessinés (chacun tracé), les autres en onglets, rien sur le sélecteur de plage');
     const TOUS = ['vol', 'rsi', 'macd', 'stoch', 'atr', 'obv', 'mfi', 'williamsR', 'cci', 'adx', 'ao'];
     for (const [nom, vue, subs] of [['canvas bas', { width: 1440, height: 700 }, ['rsi', 'macd']], ['canvas haut', { width: 1440, height: 1500 }, ['rsi', 'macd']],
                                     ['canvas très bas, 5 sous-graphes', { width: 1280, height: 560 }, ['rsi', 'macd', 'stoch', 'atr']],
@@ -259,33 +266,41 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
         resizeCanvas(); window.__textes = []; drawChart();
         const W = canvas.width / devicePixelRatio, H = canvas.height / devicePixelRatio, d = dispositionGraphique(H), textes = window.__textes; window.__textes = null;
         const actifs = SUB_ORDRE.filter(k => activeSubs[k]);
-        let total = 0; for (const k of actifs) total += subHeights[k];
+        // Ce que demandent les sous-graphes à dessiner (les SOUS_MAX premiers), et la rangée d'onglets s'il en reste.
+        let total = 0; for (const k of actifs.slice(0, SOUS_MAX)) total += subHeights[k];
+        const bande = actifs.length > SOUS_MAX ? LIGNE_ONGLETS : 0;
         const titres = d.sous.map(s => ({ cle: s.cle, y: s.y, h: s.h, titre: (textes.find(x => x.t === subTitle(s.cle)) || {}).y }));
         const dispo = H - 4 - RS_HEIGHT, mainMin = Math.max(Math.min(MAIN_H_MIN, dispo), Math.ceil(dispo * MAIN_PART_MIN));
-        return { W, H, RS: RS_HEIGHT, mainH: d.mainH, dispo, mainMin, part: d.mainH / dispo, total, actifs, titres, SUB_H_MIN,
-          sansPlace: d.sansPlace, ySansPlace: d.ySansPlace, ligne: textes.filter(x => /sous-graphes? sans place/.test(x.t)),
-          titresCaches: d.sansPlace.filter(k => textes.some(x => x.t === subTitle(k))), serre: dispo - total < mainMin };
+        // La rangée d'onglets (HTML posé sur le canvas) : ses boutons et sa boîte, en coordonnées du canvas.
+        const og = document.getElementById('ongletsSous'), rc = canvas.getBoundingClientRect(), ro = og.getBoundingClientRect();
+        const vu = !og.hidden && getComputedStyle(og).display !== 'none';
+        return { W, H, RS: RS_HEIGHT, mainH: d.mainH, dispo, mainMin, part: d.mainH / dispo, total, bande, actifs, titres, SUB_H_MIN, SOUS_MAX,
+          enOnglets: d.onglets, onglets: { vu, cles: vu ? [...og.querySelectorAll('button[data-sous]')].map(b => b.dataset.sous) : [], haut: ro.top - rc.top, bas: ro.bottom - rc.top, gauche: ro.left - rc.left, droite: ro.right - rc.left },
+          ligne: textes.filter(x => /sans place/.test(x.t)), titresCaches: d.onglets.filter(k => textes.some(x => x.t === subTitle(k))), serre: dispo - total - bande < mainMin,
+          // Place pour un sous-graphique au moins (SUB_H_MIN px), une fois le prix servi et la rangée d'onglets posée s'il en reste.
+          unLoge: actifs.length > 0 && dispo - mainMin - (actifs.length > 1 ? LIGNE_ONGLETS : 0) >= SUB_H_MIN };
       }, subs);
       const fin = r.titres.length ? r.titres[r.titres.length - 1].y + r.titres[r.titres.length - 1].h : r.mainH + 4;
       const titresDedans = r.titres.every(s => s.titre === undefined || s.titre < r.H - r.RS);
       const traces = r.titres.filter(s => s.titre !== undefined).length;
-      const n = r.sansPlace.length, L = r.ligne[0];
+      const n = r.enOnglets.length, O = r.onglets;
       check(`${nom} (${r.H} px, ${r.actifs.length} sous-graphes demandant ${r.total} px) : tout tient au-dessus du sélecteur de plage, le prix garde ${Math.round(r.part * 100)} % (≥ 60 %)`,
         fin <= r.H - r.RS + 0.5 && titresDedans && r.mainH >= r.mainMin - 0.5 && r.mainH >= Math.min(200, r.dispo) && r.part >= 0.6 - 1e-9, r);
       check(`${nom} : chaque sous-graphe logé est tracé, sur ${r.SUB_H_MIN} px au moins (${traces}/${r.titres.length} titres)`,
         traces === r.titres.length && r.titres.every(s => s.h >= r.SUB_H_MIN - 1e-9), r.titres);
-      check(`${nom} : logés + annoncés = demandés, les premiers de l'ordre logés (${r.titres.length} + ${n} = ${r.actifs.length})`,
-        r.titres.map(s => s.cle).concat(r.sansPlace).join() === r.actifs.join(), { loges: r.titres.map(s => s.cle), sansPlace: r.sansPlace });
-      if (n) check(`${nom} : « + ${n} sous-graphe${n > 1 ? 's' : ''} sans place… » dit une fois, entre le dernier sous-graphe logé et le sélecteur, dans la largeur ; aucun titre de ceux-là`,
-        r.ligne.length === 1 && L.t === '+ ' + n + ' sous-graphe' + (n > 1 ? 's' : '') + ' sans place : agrandissez la fenêtre ou décochez-en'
-          && L.y >= fin && L.y <= r.H - r.RS && L.x >= 0 && L.x + L.w <= r.W && !r.titresCaches.length, r);
-      else check(`${nom} : tous logés, aucune ligne « sans place »`, !r.ligne.length, r.ligne);
+      check(`${nom} : au plus ${r.SOUS_MAX} sous-graphes dessinés à la fois (${r.titres.length}) ; au moins un dès que la place le permet (${r.unLoge ? 'elle le permet' : 'elle ne le permet pas'})`,
+        r.SOUS_MAX === 3 && r.titres.length <= 3 && (r.unLoge ? r.titres.length >= 1 : r.titres.length === 0), { cles: r.titres.map(s => s.cle), unLoge: r.unLoge });
+      check(`${nom} : dessinés + en onglets = demandés, les premiers de l'ordre dessinés (${r.titres.length} + ${n} = ${r.actifs.length})`,
+        r.titres.map(s => s.cle).concat(r.enOnglets).join() === r.actifs.join(), { loges: r.titres.map(s => s.cle), onglets: r.enOnglets });
+      if (n) check(`${nom} : ${n} onglet${n > 1 ? 's' : ''} (${r.enOnglets.join(', ')}), un bouton chacun, entre le dernier sous-graphe et le sélecteur, dans la largeur ; aucun titre de ceux-là, plus de ligne « sans place »`,
+        O.vu && O.cles.join() === r.enOnglets.join() && O.haut >= fin - 0.5 && O.bas <= r.H - r.RS + 0.5 && O.gauche >= 0 && O.droite <= r.W + 0.5 && !r.titresCaches.length && !r.ligne.length, r);
+      else check(`${nom} : tous dessinés, aucune rangée d'onglets ni ligne « sans place »`, !O.vu && !r.ligne.length, { onglets: O, ligne: r.ligne });
       if (r.serre && r.titres.length) {
         check(`${nom} : les sous-graphes logés sont réduits dans la même proportion`,
           new Set(r.titres.map(s => (s.h / ({ vol: 110, rsi: 120, macd: 120, stoch: 120, atr: 110, obv: 110, mfi: 120, williamsR: 120, cci: 120, adx: 120, ao: 110 })[s.cle]).toFixed(6))).size === 1, r.titres);
       } else if (!r.serre) {
         check(`${nom} (${r.H} px) : la place suffit, chaque sous-graphe garde sa hauteur, le tracé principal prend le reste`,
-          r.titres.every(s => s.h === ({ vol: 110, rsi: 120, macd: 120 })[s.cle]) && r.mainH === r.H - 4 - r.RS - r.total && traces === r.titres.length && titresDedans, r);
+          r.titres.every(s => s.h === ({ vol: 110, rsi: 120, macd: 120 })[s.cle]) && r.mainH === r.H - 4 - r.RS - r.total - r.bande && traces === r.titres.length && titresDedans, r);
       }
       check(`${nom} : aucune erreur JavaScript`, !o3.erreurs.length, o3.erreurs);
       await o3.ctx.close();
@@ -305,19 +320,27 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
         return vus;
       });
 
-      // Noms (points 18, 34, 35, 36, 46, 109) : le ruban, le menu et les titres disent la même chose.
+      // Noms (points 18, 34, 35, 36, 46, 109) : la légende du ruban, le panneau et les titres disent la même chose.
       const noms = await p4.evaluate(() => {
-        const txt = el => el.textContent.trim(), menu = {};
-        for (const cat of INDICATORS) for (const it of cat.items) menu[it.key] = it.label;
-        return { sections: [...document.querySelectorAll('#indicatorBar > .section-title')].map(txt), titres: TITRES_CAT, menu,
-          puces: [...document.querySelectorAll('#indicatorBar label[id^="lbl_"]')].map(l => ({ cle: l.id.slice(4), t: txt(l) })),
+        const txt = el => el.textContent.trim(), menu = {}, courts = {};
+        for (const cat of INDICATORS) for (const it of cat.items) { menu[it.key] = it.label; courts[it.key] = it.court; }
+        toutAfficher();   // la légende au plus long (6 puces et « + N autres »)
+        const r = { sections: [...document.querySelectorAll('#indicatorBar > .section-title')].map(txt), titres: INDICATORS.map(c => c.titre), menu, courts,
+          puces: [...document.querySelectorAll('#indicatorBar label[data-calque]')].map(l => ({ cle: l.dataset.calque, t: txt(l.querySelector('.ind-label')) })),
           sous: SUB_ORDRE.map(k => ({ cle: k, titre: subTitle(k), menu: menu[k] })), jour: txt(document.getElementById('int_1d')),
           equity: 'equity' in activeSubs || SUB_ORDRE.includes('equity') || INDICATORS.some(c => c.items.some(i => i.key === 'equity')) };
+        revenirAuDepart();
+        return r;
       });
-      check('ruban et menu : les mêmes catégories (« Sur les bougies », « Sous le graphique »), plus « Overlays » ni « Sous-graphes »',
-        noms.sections.includes(noms.titres.Overlays) && noms.sections.includes(noms.titres['Sous-graphes']) && !noms.sections.some(s => /^(Overlays|Sous-graphes)$/i.test(s)), noms.sections);
-      check(`chaque puce du ruban (${noms.puces.length}) est le nom du menu, paramètres ôtés (« EMA 20 », « Stochastique »)`,
-        noms.puces.length > 0 && noms.puces.every(p => { const m = noms.menu[p.cle] || ''; return m === p.t || m.startsWith(p.t + ' ') || m.includes(' ' + p.t + ' '); }), { puces: noms.puces, menu: noms.menu });
+      check('panneau : les calques rangés par question, plus par endroit ; ruban : « À l’écran » (la légende) et « Intervalle », plus « Overlays » ni « Sous-graphes »',
+        JSON.stringify(noms.titres) === JSON.stringify(['Dans quel sens ?', 'Ça s’essouffle ?', 'Qui échange ?', 'Où le prix peut réagir ?', 'Ça bouge beaucoup ?'])
+        && JSON.stringify(noms.sections) === JSON.stringify(['À l’écran', 'Intervalle']) && !noms.sections.concat(noms.titres).some(s => /^(Overlays|Sous-graphes|Sur les bougies|Sous le graphique)$/i.test(s)), noms);
+      // Le nom court (légende, onglets) est le nom du panneau, paramètres ôtés : tous les calques, et chaque puce affichée.
+      const court = (m, c) => !!c && (m === c || m.startsWith(c + ' ') || m.includes(' ' + c + ' ') || m.endsWith(' ' + c));
+      const sansCourt = Object.keys(noms.menu).filter(k => !court(noms.menu[k], noms.courts[k]));
+      check(`chaque calque a un nom court qui est le nom du panneau, paramètres ôtés (« EMA 20 », « Stochastique », « Ichimoku »)`, !sansCourt.length, sansCourt.map(k => [noms.menu[k], noms.courts[k]]));
+      check(`chaque puce de la légende (${noms.puces.length}) dit le nom court de son calque`,
+        noms.puces.length === 6 && noms.puces.every(p => p.t === noms.courts[p.cle] && court(noms.menu[p.cle] || '', p.t)), { puces: noms.puces });
       check('menu en français, un nom par couche : « Retracements de Fibonacci », « Profil de volume », « Nuage Ichimoku », « ADX / DMI (14) », « Ordres en attente (carte) »',
         noms.menu.fib === 'Retracements de Fibonacci' && noms.menu.vp === 'Profil de volume' && noms.menu.ichimoku === 'Nuage Ichimoku' && /^ADX \/ DMI \(\d+\)$/.test(noms.menu.adx) && noms.menu.liq === 'Ordres en attente (carte)', noms.menu);
       check('chaque sous-graphe a pour titre son nom du menu (« ADX / DMI (14) », pas « ADX (14) »)', noms.sous.every(s => s.titre === s.menu), noms.sous);
@@ -325,7 +348,10 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       check('le sous-graphe d\'équité du Grid Bot, qu\'aucune case n\'allumait, n\'existe plus', !noms.equity);
 
       // Formats et unités (points 25, 26, 27, 42) sur BTC/USDT : S/R, Fibonacci, profil de volume, sous-graphes en prix.
-      await p4.evaluate(async () => { for (const k of ['sr', 'fib', 'vp']) overlays[k] = true; for (const k of ['atr', 'obv', 'cci']) activeSubs[k] = true; resizeCanvas(); await refreshRefSR(); });
+      // Cochés dans le panneau (toggleAny) : les trois derniers sous-graphes cochés sont dessinés (au
+      // plus 3 à la fois), le Volume passe en onglet.
+      await p4.evaluate(async () => { for (const k of ['sr', 'fib', 'vp']) overlays[k] = true; for (const k of ['atr', 'obv', 'cci']) toggleAny(k); resizeCanvas(); await refreshRefSR(); });
+      check('ATR, OBV et CCI cochés : les trois dessinés', JSON.stringify(await p4.evaluate(() => geo.sous.map(s => s.cle))) === JSON.stringify(['atr', 'obv', 'cci']));
       const t1 = await releve();
       const anglais = t1.filter(x => /\$\s?\d|\d,\d{3}\.\d|\d{4,}\.\d/.test(x.t)).map(x => x.t);
       check('aucun prix au format anglais ni « $ » devant le nombre, sur le graphique et son calque', !anglais.length, [...new Set(anglais)].slice(0, 12));
@@ -433,7 +459,7 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
         const attendre = ms => new Promise(r => setTimeout(r, ms));
         const lire = () => { const c = document.getElementById('indCompte'); return c.hidden ? 0 : +c.textContent; };
         const ligne = k => { const e = document.querySelector('#indMenu label[data-ind="' + k + '"]'); return e && { indispo: e.classList.contains('indispo'), coupee: e.querySelector('input').disabled, dit: (e.querySelector('.ind-seul') || {}).textContent || '' }; };
-        const marche = () => INDICATORS.filter(c => c.cat !== 'Guide').flatMap(c => c.items).filter(i => isActive(i.key)).length;
+        const marche = () => INDICATORS.flatMap(c => c.items).filter(i => !['guide', 'scenarios'].includes(i.key) && isActive(i.key)).length;
         for (const k of ['guide', 'scenarios']) if (!isActive(k)) toggleAny(k);
         if (overlays.liq) toggleAny('liq');
         compterIndicateurs();   // les couches allumées plus haut sans passer par le menu
@@ -517,6 +543,193 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       }
       check(`${w} px : aucune erreur JavaScript`, !o6.erreurs.length, o6.erreurs);
       await o6.ctx.close();
+    }
+
+    // ─── 7. Le panneau « Choisir l'affichage » (Complet) ───
+    titre('7. « Choisir l’affichage » : préréglages, mémoire, « Revenir au départ », « Tout afficher » en onglets, légende du ruban');
+    {
+      const o7 = await ouvrir(nav, BASE, { width: 1440, height: 900 });
+      const p7 = o7.page, pause = ms => p7.waitForTimeout(ms);
+      const SITE = ['guide', 'scenarios'];
+      // L'état affiché : calques de marché allumés, sous-graphiques, couches du site, ce qui est
+      // dessiné (au plus 3 sous-graphiques) ou rangé en onglets, la légende du ruban et le panneau.
+      const etat = () => p7.evaluate(SITE => {
+        const vis = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+        const H = canvas.height / devicePixelRatio, d = dispositionGraphique(H), dispo = H - 4 - RS_HEIGHT, og = document.getElementById('ongletsSous');
+        let garde = null; try { garde = JSON.parse(localStorage.getItem('samsara-affichage-v1')); } catch (e) { garde = 'illisible'; }
+        // La légende attendue : chaque calque allumé qui dessine sur la paire (posés sur les bougies,
+        // puis sous-graphiques, dans l'ordre du panneau) ; au-delà de 7, 6 puces et « + N autres ».
+        const items = INDICATORS.flatMap(c => c.items), dessine = i => !i.paires || i.paires.includes(activeSymbol);
+        const on = items.filter(i => i.key in overlays && overlays[i.key] && dessine(i)).concat(items.filter(i => !(i.key in overlays) && activeSubs[i.key])).map(i => i.key);
+        const attendue = !on.length ? ['lbl__vide'] : on.length > 7 ? on.slice(0, 6).concat('lbl__plus') : on;
+        return {
+          ov: Object.keys(overlays).filter(k => !SITE.includes(k) && overlays[k]).sort(), sg: Object.keys(activeSubs).filter(k => activeSubs[k]).sort(),
+          site: SITE.map(k => overlays[k]), on: on.length,
+          dessines: geo ? geo.sous.map(s => s.cle) : [], disposition: d.sous.map(s => s.cle), onglets: d.onglets, part: d.mainH / dispo,
+          boutonsOnglets: vis(og) ? [...og.querySelectorAll('button[data-sous]')].map(b => b.dataset.sous) : [],
+          puces: [...document.querySelectorAll('#indicatorBar label.puce-calque')].filter(vis).map(l => l.dataset.calque || l.id), attendue,
+          noms: [...document.querySelectorAll('#indicatorBar label[data-calque]')].filter(vis).map(l => ({ cle: l.dataset.calque, t: l.querySelector('.ind-label').textContent, x: !!l.querySelector('.puce-x'), court: (items.find(i => i.key === l.dataset.calque) || {}).court })),
+          presse: [...document.querySelectorAll('#indMenu .aff-preset[aria-pressed="true"]')].map(b => b.dataset.preset),
+          cases: [...document.querySelectorAll('#indMenu label[data-ind] input')].filter(c => c.checked !== isActive(c.closest('label').dataset.ind)).map(c => c.closest('label').dataset.ind),
+          ouvert: document.getElementById('indMenu').classList.contains('open'), aria: document.getElementById('indDropdownBtn').getAttribute('aria-expanded'),
+          garde, compte: document.getElementById('indCompte').hidden ? 0 : +document.getElementById('indCompte').textContent,
+        };
+      }, SITE);
+      const meme = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+      const legendeOk = e => meme(e.puces, e.attendue) && e.noms.every(n => n.t === n.court && n.x);
+
+      // A. Sans clé : les réglages d'origine, et le panneau.
+      let e = await etat();
+      check('sans clé gardée : les réglages d’origine (le Volume seul ; Guide et scénarios affichés), rien de gardé',
+        meme(e.ov, []) && meme(e.sg, ['vol']) && meme(e.site, [true, true]) && e.garde === null && meme(e.dessines, ['vol']), e);
+      check(`légende du ruban : les seuls calques allumés, nom court et croix (${e.puces.join(', ')})`, legendeOk(e) && meme(e.puces, ['guide', 'scenarios', 'vol']), e);
+      await p7.click('#indDropdownBtn'); await pause(200);
+      e = await etat();
+      check('le bouton ouvre le panneau (aria-expanded="true") ; l’origine est « L’essentiel »', e.ouvert && e.aria === 'true' && meme(e.presse, ['essentiel']), e);
+      const pan = await p7.evaluate(() => {
+        const m = document.getElementById('indMenu'), txt = el => el.textContent.trim();
+        const fond = (el) => { const s = getComputedStyle(el, '::before'); return { couleur: s.backgroundColor, image: s.backgroundImage, bord: parseFloat(s.borderTopWidth), forme: s.borderRadius }; };
+        const cats = [...m.querySelectorAll('.cat-title[data-cat]')].map(c => ({ cat: c.dataset.cat, titre: txt(c), cles: [...m.querySelectorAll('label[data-cat="' + c.dataset.cat + '"]')].map(l => l.dataset.ind) }));
+        const lignes = [...m.querySelectorAll('label[data-ind]')].map(l => {
+          const imp = l.querySelector('.aff-imp');
+          return { cle: l.dataset.ind, nom: txt(l.querySelector('.aff-nom')), quoi: txt(l.querySelector('.aff-quoi')), imp: imp && txt(imp), classe: imp && [...imp.classList].find(c => c.startsWith('imp-')),
+            forme: imp && fond(imp), fiche: !!l.querySelector('.info-btn'), coche: !!l.querySelector('input[type="checkbox"]') };
+        });
+        const fins = m.querySelector('details.aff-fins');
+        return { boutons: [...m.querySelectorAll('.aff-boutons button')].map(txt), presets: [...m.querySelectorAll('.aff-preset')].map(txt), cats, lignes,
+          filtre: !!m.querySelector('#indFiltre'), apercu: !!m.querySelector('#indApercu'),
+          fins: fins && { ouvert: fins.open, titre: txt(fins.querySelector('summary')), reglages: fins.querySelectorAll('.reglage').length, dernier: fins === m.querySelector('.ind-liste').lastElementChild } };
+      });
+      check('tête du panneau : « Tout afficher », « Revenir au départ », puis les six préréglages en mots',
+        meme(pan.boutons, ['Tout afficher', 'Revenir au départ']) && meme(pan.presets, ['L’essentiel', 'La tendance', 'L’élan', 'Le volume', 'Le carnet', 'Tout']), pan);
+      const QUESTIONS = [['Dans quel sens ?', ['ema20', 'ema50', 'ema100', 'ema200', 'sma20', 'sma50', 'ichimoku', 'sar', 'vwap']],
+        ['Ça s’essouffle ?', ['rsi', 'macd', 'stoch', 'williamsR', 'cci', 'mfi', 'ao']], ['Qui échange ?', ['vol', 'obv', 'vp']],
+        ['Où le prix peut réagir ?', ['guide', 'scenarios', 'sr', 'fib', 'liq', 'figuresPassees']], ['Ça bouge beaucoup ?', ['atr', 'bb', 'adx']]];
+      check('les calques rangés par question, dans l’ordre (« Dans quel sens ? », « Ça s’essouffle ? », « Qui échange ? », « Où le prix peut réagir ? », « Ça bouge beaucoup ? »)',
+        meme(pan.cats.map(c => [c.titre, c.cles.slice().sort()]), QUESTIONS.map(([t, k]) => [t, k.slice().sort()])) && pan.cats.find(c => c.cat === 'reaction').cles[0] === 'guide', pan.cats);
+      const MOTS = { 'imp-courant': 'courant', 'imp-utile': 'utile', 'imp-special': 'spécialisé' };
+      const mal = pan.lignes.filter(l => !l.coche || !l.nom || !/^[A-ZÀ-Ý].{8,}[.!?]$/.test(l.quoi) || !l.fiche || MOTS[l.classe] !== l.imp);
+      check(`chaque ligne (${pan.lignes.length}) : case, nom, phrase « C’est quoi ? », importance en MOT (courant, utile, spécialisé) et bouton de fiche`, pan.lignes.length === 28 && !mal.length, mal);
+      const formes = Object.keys(MOTS).map(c => (pan.lignes.find(l => l.classe === c) || {}).forme);
+      const plein = f => f && !/rgba\(0, 0, 0, 0\)|transparent/.test(f.couleur), dessin = f => f && /gradient/.test(f.image);
+      check('l’importance a aussi une FORME, jamais la couleur seule : disque plein (courant), demi-disque (utile), anneau (spécialisé)',
+        formes.every(f => f && f.bord > 0) && plein(formes[0]) && !dessin(formes[0]) && dessin(formes[1]) && !plein(formes[2]) && !dessin(formes[2]), formes);
+      check('la recherche et l’aperçu gardés ; « Réglages fins » repliés tout en bas, avec les réglages d’affichage',
+        pan.filtre && pan.apercu && pan.fins && !pan.fins.ouvert && pan.fins.titre === 'Réglages fins' && pan.fins.reglages >= 8 && pan.fins.dernier, pan.fins);
+      check('chaque case dit si son calque est allumé', !e.cases.length, e.cases);
+
+      // B. Les préréglages : chacun REMPLACE la sélection ; Guide et scénarios restent comme ils sont
+      // (sauf « L'essentiel ») ; « Tout » allume tout. Gardés sous samsara-affichage-v1.
+      await p7.evaluate(() => toggleAny('guide'));   // le Guide masqué par l'utilisateur : les préréglages le laissent masqué
+      const MARCHE = await p7.evaluate(SITE => Object.keys(overlays).filter(k => !SITE.includes(k)).sort(), SITE);
+      const TOUS_SG = await p7.evaluate(() => Object.keys(activeSubs).sort());
+      const PRESETS = [['tendance', ['ema20', 'ema200', 'ema50', 'ichimoku'], [], [false, true]], ['elan', [], ['macd', 'rsi', 'stoch'], [false, true]],
+        ['volume', ['vp', 'vwap'], ['obv', 'vol'], [false, true]], ['carnet', ['liq', 'sr'], [], [false, true]], ['essentiel', [], ['vol'], [true, true]], ['tout', MARCHE, TOUS_SG, [true, true]]];
+      for (const [id, ov, sg, site] of PRESETS) {
+        await p7.click(`#indMenu .aff-preset[data-preset="${id}"]`); await pause(250);
+        e = await etat();
+        check(`préréglage « ${id} » : la sélection remplacée (${ov.length} sur les bougies, ${sg.length} dessous), Guide et scénarios ${id === 'essentiel' || id === 'tout' ? 'allumés' : 'laissés comme ils étaient'}, gardée ; panneau ouvert, son bouton enfoncé`,
+          meme(e.ov, ov) && meme(e.sg, sg) && meme(e.site, site) && e.garde && meme(e.garde.ov.slice().sort(), ov) && meme(e.garde.sg.slice().sort(), sg)
+          && e.ouvert && meme(e.presse, [id]) && !e.cases.length, e);
+        check(`préréglage « ${id} » : la légende ne montre que les calques allumés (${e.puces.join(', ')})`, legendeOk(e), e);
+      }
+      // C. « Tout » = « Tout afficher » : au plus 3 sous-graphiques dessinés, les autres en onglets ;
+      // un onglet montre le sien à la place d'un autre ; le prix garde 60 %.
+      check(`« Tout » : ${e.dessines.length} sous-graphiques dessinés (≤ 3), ${e.onglets.length} en onglets, le prix garde ${Math.round(e.part * 100)} %`,
+        e.dessines.length === 3 && meme(e.dessines, e.disposition) && e.dessines.length + e.onglets.length === 11 && meme(e.boutonsOnglets, e.onglets) && e.part >= 0.6 - 1e-9, e);
+      check(`« Tout » : la légende garde 6 puces et « + ${e.on - 6} autres » (le ruban ne déborde pas de puces)`, e.puces.length === 7 && e.puces[6] === 'lbl__plus', e.puces);
+      await p7.evaluate(() => document.getElementById('indMenu').classList.remove('open'));
+      let avant = e;
+      for (const k of ['adx', 'cci']) {
+        await p7.click(`#ongletsSous button[data-sous="${k}"]`); await pause(250);
+        e = await etat();
+        const sorti = avant.dessines.filter(x => !e.dessines.includes(x));
+        check(`onglet « ${k} » : dessiné à la place d’un autre (${sorti.join(', ')}, passé en onglet) ; toujours 3, le prix garde ${Math.round(e.part * 100)} %`,
+          e.dessines.includes(k) && e.dessines.length === 3 && sorti.length === 1 && e.onglets.includes(sorti[0]) && !e.onglets.includes(k)
+          && meme(e.boutonsOnglets, e.onglets) && e.part >= 0.6 - 1e-9 && (k !== 'cci' || e.dessines.includes('adx')), { avant: avant.dessines, apres: e.dessines, onglets: e.onglets });
+        avant = e;
+      }
+      await p7.click('#lbl__plus'); await pause(200);
+      check('« + N autres » ouvre le panneau', (await etat()).ouvert);
+
+      // D. Mémoire : rouvert, la page reprend la sélection gardée.
+      await p7.click('#indMenu .aff-preset[data-preset="volume"]'); await pause(200);
+      await p7.evaluate(() => sessionStorage.setItem('__garder', '1'));
+      await p7.reload(); await pause(1800);
+      e = await etat();
+      check('rouvert : la sélection gardée (« Le volume » : VWAP, profil de volume, Volume, OBV), sa légende', meme(e.ov, ['vp', 'vwap']) && meme(e.sg, ['obv', 'vol']) && legendeOk(e), e);
+      await p7.click('#indDropdownBtn'); await pause(200);
+      check('rouvert : le panneau dit le préréglage reproduit', meme((await etat()).presse, ['volume']));
+
+      // E. « Revenir au départ » : les réglages d'origine, la clé effacée ; rouvert, toujours eux.
+      await p7.click('#indMenu .aff-boutons .aff-btn:not(.aff-tout)'); await pause(250);
+      e = await etat();
+      check('« Revenir au départ » : le Volume seul, Guide et scénarios affichés, clé effacée', meme(e.ov, []) && meme(e.sg, ['vol']) && meme(e.site, [true, true]) && e.garde === null && meme(e.presse, ['essentiel']) && legendeOk(e), e);
+      await p7.reload(); await pause(1800);
+      e = await etat();
+      check('« Revenir au départ », rouvert : toujours les réglages d’origine', meme(e.ov, []) && meme(e.sg, ['vol']) && e.garde === null, e);
+
+      // F. Plus de sous-graphiques cochés qu'il n'en tient : la même règle (le dernier coché se montre).
+      await p7.click('#indDropdownBtn'); await pause(200);
+      for (const k of ['rsi', 'macd', 'stoch']) {
+        await p7.click(`#indMenu label[data-ind="${k}"] input`); await pause(200);
+        e = await etat();
+        check(`« ${k} » coché : dessiné tout de suite (${e.dessines.join(', ')}), au plus 3, le prix garde ${Math.round(e.part * 100)} %`, e.dessines.includes(k) && e.dessines.length <= 3 && e.part >= 0.6 - 1e-9, e);
+      }
+      check('4 sous-graphiques cochés : les 3 derniers dessinés, le Volume en onglet', meme(e.dessines.slice().sort(), ['macd', 'rsi', 'stoch']) && meme(e.onglets, ['vol']) && meme(e.boutonsOnglets, ['vol']), e);
+
+      // G. La légende : la croix (ou Entrée) masque ; rien d'allumé, une phrase invite à choisir.
+      await p7.evaluate(() => { document.getElementById('indMenu').classList.remove('open'); toggleAny('ema50'); });
+      await p7.click('#lbl_ema50 .puce-x'); await pause(200);
+      e = await etat();
+      check('la croix d’une puce masque son calque (EMA 50), sans ouvrir le panneau ; la case et la clé suivent', !e.ov.includes('ema50') && !e.puces.includes('ema50') && !e.ouvert && e.garde && !e.garde.ov.includes('ema50') && legendeOk(e), e);
+      await p7.focus('#lbl_rsi'); await p7.keyboard.press('Enter'); await pause(200);
+      e = await etat();
+      check('au clavier : Entrée sur une puce masque son calque (RSI)', !e.sg.includes('rsi') && !e.puces.includes('rsi') && legendeOk(e), e);
+      await p7.evaluate(() => { for (const k of ['guide', 'scenarios', 'macd', 'stoch', 'vol']) if (isActive(k)) toggleAny(k); });
+      e = await etat();
+      const vide = await p7.evaluate(() => (document.getElementById('lbl__vide') || {}).textContent || '');
+      check(`rien d’allumé : une phrase invite à choisir (« ${vide} »)`, meme(e.puces, ['lbl__vide']) && /^Rien d’allumé : choisissez ce qui s’affiche/.test(vide) && e.compte === 0, { e, vide });
+      await p7.click('#lbl__vide'); await pause(200);
+      check('… et l’ouvre : le panneau', (await etat()).ouvert);
+      // H. Le ruban du Lisible ne change pas : les intervalles et le bouton, aucune puce.
+      await p7.evaluate(() => { document.getElementById('indMenu').classList.remove('open'); revenirAuDepart(); basculerMode(); });
+      await pause(400);
+      const lis = await p7.evaluate(() => {
+        const vis = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+        return { labels: [...document.querySelectorAll('#indicatorBar label')].filter(vis).map(l => l.id), bouton: vis(document.getElementById('indDropdownBtn')), mode: modeCourant() };
+      });
+      check('Lisible : le ruban garde ses six intervalles et le bouton, sans légende', lis.mode === 'debutant' && meme(lis.labels, ['int_1m', 'int_5m', 'int_15m', 'int_1h', 'int_4h', 'int_1d']) && lis.bouton, lis);
+      check('aucune erreur JavaScript', !o7.erreurs.length, o7.erreurs);
+      await o7.ctx.close();
+    }
+
+    // ─── 8. Le panneau tient dans l'écran ───
+    titre('8. « Choisir l’affichage » tient dans l’écran, à 360, 390 et 1440 px, dans les neuf thèmes et les deux modes');
+    for (const th of ['aero', 'kala', 'neon', 'codex', 'gare', 'gazette', 'cyanotype', 'diazo', 'bureau95']) {
+      const o8 = await ouvrir(nav, th, { width: 1440, height: 900 });
+      const fautes = [];
+      for (const mode of ['expert', 'debutant']) {
+        if (mode === 'debutant') await o8.page.evaluate(() => basculerMode());
+        for (const [w, h] of [[360, 740], [390, 844], [1440, 900]]) {
+          await o8.page.setViewportSize({ width: w, height: h }); await o8.page.waitForTimeout(150);
+          const m = await menu(o8.page, '#indDropdownBtn', 'indMenu');
+          if (!dansLEcran(m)) fautes.push(`${mode} ${w} px : hors de l’écran ${JSON.stringify(m)}`);
+          if (mode === 'expert') { await o8.page.evaluate(() => { const d = document.getElementById('affFins'); if (d) d.open = true; }); await o8.page.waitForTimeout(80); }
+          const r = await o8.page.evaluate(() => {
+            const m = document.getElementById('indMenu'), rm = m.getBoundingClientRect(), b = document.getElementById('indDropdownBtn');
+            const vis = el => el && el.getClientRects().length > 0 && getComputedStyle(el).display !== 'none';
+            const dehors = [...m.querySelectorAll('label[data-ind], .aff-tete button, .aff-fins select, .aff-fins input')].filter(vis)
+              .filter(el => { const r = el.getBoundingClientRect(); return r.left < rm.left - 0.5 || r.right > rm.right + 0.5; }).map(el => el.dataset.ind || el.id || el.textContent.trim().slice(0, 20));
+            return { large: m.scrollWidth - m.clientWidth, dehors, court: vis(b.querySelector('.aff-court')), long: vis(b.querySelector('.aff-long')), coupe: b.scrollWidth - b.clientWidth, L: innerWidth };
+          });
+          if (r.large > 1 || r.dehors.length) fautes.push(`${mode} ${w} px : déborde de côté (${r.large} px) ${r.dehors.slice(0, 4).join(', ')}`);
+          if (r.coupe > 1 || (w <= 480 ? !r.court || r.long : r.court || !r.long)) fautes.push(`${mode} ${w} px : bouton « ${w <= 480 ? 'Affichage' : 'Choisir l’affichage'} » attendu entier ${JSON.stringify(r)}`);
+        }
+      }
+      check(`${th.padEnd(9)} : panneau entier dans l’écran, sans débord de côté (réglages fins ouverts compris) ; bouton entier, « Affichage » au téléphone`, !fautes.length, fautes.slice(0, 4));
+      check(`${th.padEnd(9)} : aucune erreur JavaScript`, !o8.erreurs.length, o8.erreurs);
+      await o8.ctx.close();
     }
   } finally { await nav.close(); serveur.close(); }
   console.log(ko ? `\n❌ INTERFACE : ${ko} contrôle(s) en échec` : '\n✅ INTERFACE : TOUS LES CONTRÔLES PASSENT');

@@ -39,7 +39,9 @@ const CIBLES = [
   ['chiffres clés', '#cycle .kpi:not([hidden])', 'tous'], ['âge des chiffres clés', '#cycle .kpi-age'],
   ['graphique', '#chart'], ['ruban d’outils', '#indicatorBar'],
   ['cartes du marché', '#feed .demon-card', 'tous'], ['bandeau d’âge du marché', '#feed .age-banner', 'tous'],
-  ['bouton thème', '#themeBtn'], ['bouton ⚡', '#liveBtn'], ['bouton mode', '#modeBtn'], ['bouton réglages', '#reglagesBtn'],
+  // (Les réglages d'affichage n'ont plus de bouton dans l'en-tête : ce sont les « Réglages fins »
+  // du panneau « Choisir l'affichage », dont le bouton doit rester visible.)
+  ['bouton thème', '#themeBtn'], ['bouton ⚡', '#liveBtn'], ['bouton mode', '#modeBtn'], ['bouton « Choisir l’affichage »', '#indDropdownBtn'],
   ['bouton légendes', '#legendesBtn'], ['lien carte', '#carteBtn'], ['horloge', '#taskbarClock'],
   // Horloges (js/horloges.js) et Contre-expertise (js/contre-expertise.js) : leurs âges aussi.
   ['carte Horloges', '#feed .carte-horloges'], ['âges des horloges', '#feed .carte-horloges .h-age', 'tous'],
@@ -130,7 +132,7 @@ async function ouvrir(nav, theme, vue) {
   });
   await page.goto(`http://127.0.0.1:${serveur.address().port}/index.html`);
   await page.waitForTimeout(2200);
-  await page.keyboard.press('f');            // bureau : panneau ouvert ; téléphone : la fenêtre du marché
+  await page.keyboard.press('i');            // touche I. Bureau : panneau ouvert ; téléphone : la fenêtre du marché
   await page.waitForTimeout(900);
   return { ctx, page, erreurs };
 }
@@ -175,7 +177,7 @@ async function visibles(page) {
 async function squelette(page) {
   return page.evaluate(() => {
     const sig = el => el.tagName + (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).filter(c => !/^(on|open|active|collapsed|entree|deborde|ping|calme|vieux|price-up|price-down|pos|neg)$/.test(c)).sort().join('.') : '');
-    const parcours = (el, d) => d > 4 ? [] : [sig(el)].concat(...[...el.children].filter(c => !['SCRIPT', 'svg'].includes(c.tagName) && !c.closest('#feed,#marketModalBody,#liveModalBody,#indMenu,#themeMenu,#stratStats,#stratParams,#stratHelp,#cycle,#fichePop,#reglagesPop'))
+    const parcours = (el, d) => d > 4 ? [] : [sig(el)].concat(...[...el.children].filter(c => !['SCRIPT', 'svg'].includes(c.tagName) && !c.closest('#feed,#marketModalBody,#liveModalBody,#indMenu,#themeMenu,#stratStats,#stratParams,#stratHelp,#cycle,#fichePop'))
       .map(c => parcours(c, d + 1).map(s => '  '.repeat(d + 1) + s)));
     return parcours(document.body, 0).join('\n');
   });

@@ -9,6 +9,13 @@
      elle ne charge aucun code. Elle n'interroge que Binance et GitHub Raw (contrat réseau :
      tests/test_contrat.py). -->
 <link rel="stylesheet" href="css/bookmap.css">
+<script>
+  /* Le mode (Lisible / Complet ; gardé 'debutant' / 'expert', le même que le terminal), posé AVANT le
+     premier rendu, comme dans index.html : un visiteur en Complet ne voit pas un instant l'écran
+     Lisible. Lisible par défaut, et quand le stockage est bloqué. */
+  try { document.documentElement.setAttribute('data-mode', localStorage.getItem('samsara-mode') === 'expert' ? 'expert' : 'debutant'); }
+  catch (e) { document.documentElement.setAttribute('data-mode', 'debutant'); }
+</script>
 </head>
 <body>
 
@@ -16,13 +23,15 @@
   <div class="barre-gauche">
     <a class="retour" href="index.html" title="Revenir au terminal">← Terminal</a>
     <h1>Carte <span class="sous expert-seul">BTC/USDT · carnet, exécutions, murs, gamma</span><span class="sous debutant-seul">BTC/USDT · ordres en attente et échanges</span></h1>
-    <!-- Le mode (débutant / expert) : le même que le terminal. Libellé long à partir de 1024 px. -->
-    <button type="button" class="bouton bouton-mode" id="btnModeBarre" title="Changer de mode (touche M) : le même réglage que le terminal, le changer ici le change aussi là-bas"><span class="mode-long">Débutant · passer en Expert</span><span class="mode-court">Passer en Expert</span><span class="mode-mini">→ Expert</span></button>
   </div>
   <nav class="calques" id="calques" aria-label="Calques affichés"></nav>
+  <!-- L'interrupteur de mode, le même que celui du terminal (index.html) et au même endroit : à droite de
+       l'en-tête, devant les boutons de la page. Le segment actif est enfoncé (aria-pressed). -->
+  <div class="mode-bascule" id="btnModeBarre" role="group" aria-label="Mode d'affichage" title="Mode d'affichage (touche M) : Lisible, l'essentiel ; Complet, tout le détail. Le même réglage que le terminal : le changer ici le change aussi là-bas."><button type="button" class="mode-btn" data-mode-choix="debutant">Lisible</button><button type="button" class="mode-btn" data-mode-choix="expert">Complet</button></div>
   <div class="barre-droite">
-    <button type="button" class="bouton" id="btnSuivre" aria-pressed="true" title="Suivre le présent (F) — double-clic sur la carte : vue par défaut">Suivre</button>
-    <button type="button" class="bouton expert-seul" id="btnReglages" aria-controls="reglages" aria-expanded="false" title="Réglages d'affichage">Réglages</button>
+    <button type="button" class="bouton" id="btnSuivre" aria-pressed="true" title="Suivre le présent (F) — R ou double-clic sur la carte : la vue de départ">Suivre</button>
+    <!-- Un seul panneau pour choisir ce que montre la carte (les deux modes) : « Affichage » quand la place manque. -->
+    <button type="button" class="bouton bouton-affichage" id="btnAffichage" aria-controls="affichage" aria-expanded="false" title="Choisir ce que montre la carte : tout afficher, revenir au départ, chaque calque expliqué"><span class="aff-long">Choisir l'affichage</span><span class="aff-court">Affichage</span></button>
     <button type="button" class="bouton" id="btnJournal" aria-controls="journalPanneau" aria-expanded="false" title="Ce qui vient de se passer : gros ordres posés, retirés ou échangés, murs, grosses vagues d'échanges (J)">Journal</button>
     <button type="button" class="bouton expert-seul" id="btnRafales" aria-controls="rafalesPanneau" aria-expanded="false" aria-label="Rafales : la liste des dernières" title="La liste des dernières rafales au marché (le calque, lui, est la puce « Rafales »)">≡ Rafales</button>
     <button type="button" class="bouton" id="btnLegende" aria-controls="legende" aria-expanded="false" title="Ce que montre la carte (L)">Légende</button>
@@ -45,88 +54,103 @@
   </section>
   <!-- Téléphone, mode débutant : une seule fois, après l'explication. -->
   <div class="indice-tap" id="indiceTap" hidden>Touchez pour le détail</div>
+  <!-- Lisible : la mini-clé des couleurs, toujours là, dans un coin de la carte libre du prix et des
+       repères (js : placerMiniCle) ; la Légende garde l'explication entière. -->
+  <div class="mini-cle debutant-seul" id="miniCle" hidden></div>
 </main>
 
 <div class="lecture" id="lecture" role="tooltip" hidden></div>
 
-<section class="panneau-flottant" id="reglages" hidden aria-label="Réglages">
-  <div class="panneau-tete"><h2>Réglages</h2><button type="button" class="fermer" data-fermer aria-label="Fermer">×</button></div>
-  <p class="note">Un réglage change le NIVEAU DE DÉTAIL ou la couleur, jamais une valeur : la lecture au pointeur donne toujours le chiffre mesuré.</p>
-  <fieldset>
-    <legend>Couleurs</legend>
-    <label>Palette
-      <select id="rPalette">
-        <option value="classique">Classique (bleu → cyan → vert → jaune → orange → blanc)</option>
-        <option value="cividis">Cividis (lisible en daltonisme)</option>
-        <option value="cote">Bid / ask teintés</option>
-      </select>
-    </label>
-    <!-- Un curseur a SON libellé (for) : dans <label>, l'<output> placé avant lui prenait le nom. -->
-    <div class="champ">
-      <label for="rSeuil">Seuil bas</label> <output id="rSeuilVal" for="rSeuil"></output>
-      <input type="range" id="rSeuil" min="0" max="120" step="1" aria-describedby="rSeuilVal">
-    </div>
-    <div class="champ">
-      <label for="rSaturation">Saturation</label> <output id="rSaturationVal" for="rSaturation"></output>
-      <input type="range" id="rSaturation" min="20" max="255" step="1" aria-describedby="rSaturationVal">
-    </div>
-  </fieldset>
-  <fieldset>
-    <legend>Carte publiée — fusionner, jamais affiner</legend>
-    <label>Colonnes
-      <select id="rFusionT"><option value="1">1 min (publiée)</option><option value="5">5 min</option><option value="15">15 min</option><option value="60">1 h</option></select>
-    </label>
-    <label>Tranches
-      <select id="rFusionP"><option value="1">20 $ (publiée)</option><option value="2">40 $</option><option value="5">100 $</option><option value="10">200 $</option></select>
-    </label>
-    <p class="note">Fusion par MAXIMUM : une cellule fusionnée montre la case la plus chargée de son bloc. Une somme d'intensités n'aurait pas d'unité.</p>
-  </fieldset>
-  <fieldset>
-    <legend>Carnet live (lu par la page sur Binance)</legend>
-    <label>Profondeur
-      <select id="rNiveaux">
-        <option value="100">100 niveaux / 1 s</option>
-        <option value="500">500 niveaux / 1 s</option>
-        <option value="1000">1 000 niveaux / 2 s</option>
-        <option value="5000">5 000 niveaux / 10 s</option>
-      </select>
-    </label>
-    <label>Tranche
-      <select id="rDpLive"><option value="1">1 $</option><option value="5">5 $</option><option value="10">10 $</option><option value="20">20 $ (comme la carte publiée)</option></select>
-    </label>
-    <p class="note">Changer la profondeur ou la tranche repart d'un carnet live vide.</p>
-  </fieldset>
-  <fieldset>
-    <legend>Exécutions</legend>
-    <label>Rond à partir de (BTC)
-      <select id="rBulleMin"><option value="0">tout</option><option value="0.1">0,1</option><option value="0.5">0,5</option><option value="1">1</option><option value="5">5</option><option value="20">20</option></select>
-    </label>
-    <label>Taille des ronds
-      <select id="rBulleEchelle"><option value="0.6">petite</option><option value="1">normale</option><option value="1.6">grande</option></select>
-    </label>
-  </fieldset>
-  <fieldset>
-    <legend>Mémoire du carnet (carte publiée)</legend>
-    <!-- Les choix viennent de BM.PRESENCE (js/bookmap-calc.js) : écrits par la page, jamais recopiés ici. -->
-    <!-- Le libellé dit ce que le seuil compte : la SOMME de la tranche (encodage « somme »), sinon son plus gros niveau (js/bookmap.js, majLegende). -->
-    <label><span id="rPresenceLib">Somme de la tranche d'au moins</span>
-      <select id="rPresence"></select>
-    </label>
-    <p class="note" id="rPresenceNote"></p>
-  </fieldset>
-  <fieldset>
-    <legend>Rafales au marché</legend>
-    <label>Afficher à partir de
-      <select id="rRafaleMin"></select>
-    </label>
-  </fieldset>
-  <fieldset>
-    <legend>Destin des gros ordres (carnet live)</legend>
-    <label>Suivre les niveaux d'au moins
-      <select id="rMurs"></select>
-    </label>
-  </fieldset>
-  <button type="button" class="bouton" id="rDefauts">Réglages par défaut</button>
+<section class="panneau-flottant affichage" id="affichage" hidden aria-labelledby="affichageTitre">
+  <div class="panneau-tete"><h2 id="affichageTitre">Choisir l'affichage</h2><button type="button" class="fermer" data-fermer aria-label="Fermer">×</button></div>
+  <div class="aff-actions">
+    <button type="button" class="bouton" id="affTout">Tout afficher</button>
+    <button type="button" class="bouton" id="affDepart">Revenir au départ</button>
+  </div>
+  <p class="note aff-note" id="affNote"></p>
+  <!-- Les calques rangés par question, chacun avec sa phrase « C'est quoi ? » : remplis par js/bookmap.js
+       (construireAffichage). En Lisible, seulement ce que le Lisible montre. -->
+  <div class="aff-groupes" id="affGroupes"></div>
+  <!-- Les réglages fins (Complet) : les mêmes champs qu'avant, la même clé de stockage (samsara-carte-v1). -->
+  <details class="reglages-fins expert-seul" id="reglagesFins">
+    <summary>Réglages fins</summary>
+    <p class="note">Un réglage change le NIVEAU DE DÉTAIL ou la couleur, jamais une valeur : la lecture au pointeur donne toujours le chiffre mesuré.</p>
+    <fieldset>
+      <legend>Couleurs</legend>
+      <label>Palette
+        <select id="rPalette">
+          <option value="classique">Classique (bleu → cyan → vert → jaune → orange → blanc)</option>
+          <option value="cividis">Cividis (lisible en daltonisme)</option>
+          <option value="cote">Bid / ask teintés</option>
+        </select>
+      </label>
+      <!-- Un curseur a SON libellé (for) : dans <label>, l'<output> placé avant lui prenait le nom. -->
+      <div class="champ">
+        <label for="rSeuil">Seuil bas</label> <output id="rSeuilVal" for="rSeuil"></output>
+        <input type="range" id="rSeuil" min="0" max="120" step="1" aria-describedby="rSeuilVal">
+      </div>
+      <div class="champ">
+        <label for="rSaturation">Saturation</label> <output id="rSaturationVal" for="rSaturation"></output>
+        <input type="range" id="rSaturation" min="20" max="255" step="1" aria-describedby="rSaturationVal">
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Carte publiée — fusionner, jamais affiner</legend>
+      <label>Colonnes
+        <select id="rFusionT"><option value="1">1 min (publiée)</option><option value="5">5 min</option><option value="15">15 min</option><option value="60">1 h</option></select>
+      </label>
+      <label>Tranches
+        <select id="rFusionP"><option value="1">20 $ (publiée)</option><option value="2">40 $</option><option value="5">100 $</option><option value="10">200 $</option></select>
+      </label>
+      <p class="note">Fusion par MAXIMUM : une cellule fusionnée montre la case la plus chargée de son bloc. Une somme d'intensités n'aurait pas d'unité.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Carnet live (lu par la page sur Binance)</legend>
+      <label>Profondeur
+        <select id="rNiveaux">
+          <option value="100">100 niveaux / 1 s</option>
+          <option value="500">500 niveaux / 1 s</option>
+          <option value="1000">1 000 niveaux / 2 s</option>
+          <option value="5000">5 000 niveaux / 10 s</option>
+        </select>
+      </label>
+      <label>Tranche
+        <select id="rDpLive"><option value="1">1 $</option><option value="5">5 $</option><option value="10">10 $</option><option value="20">20 $ (comme la carte publiée)</option></select>
+      </label>
+      <p class="note">Changer la profondeur ou la tranche repart d'un carnet live vide.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Exécutions</legend>
+      <label>Rond à partir de (BTC)
+        <select id="rBulleMin"><option value="0">tout</option><option value="0.1">0,1</option><option value="0.5">0,5</option><option value="1">1</option><option value="5">5</option><option value="20">20</option></select>
+      </label>
+      <label>Taille des ronds
+        <select id="rBulleEchelle"><option value="0.6">petite</option><option value="1">normale</option><option value="1.6">grande</option></select>
+      </label>
+    </fieldset>
+    <fieldset>
+      <legend>Mémoire du carnet (carte publiée)</legend>
+      <!-- Les choix viennent de BM.PRESENCE (js/bookmap-calc.js) : écrits par la page, jamais recopiés ici. -->
+      <!-- Le libellé dit ce que le seuil compte : la SOMME de la tranche (encodage « somme »), sinon son plus gros niveau (js/bookmap.js, majLegende). -->
+      <label><span id="rPresenceLib">Somme de la tranche d'au moins</span>
+        <select id="rPresence"></select>
+      </label>
+      <p class="note" id="rPresenceNote"></p>
+    </fieldset>
+    <fieldset>
+      <legend>Rafales au marché</legend>
+      <label>Afficher à partir de
+        <select id="rRafaleMin"></select>
+      </label>
+    </fieldset>
+    <fieldset>
+      <legend>Destin des gros ordres (carnet live)</legend>
+      <label>Suivre les niveaux d'au moins
+        <select id="rMurs"></select>
+      </label>
+    </fieldset>
+    <button type="button" class="bouton" id="rDefauts">Réglages par défaut</button>
+  </details>
 </section>
 
 <section class="panneau-flottant" id="rafalesPanneau" hidden aria-label="Rafales au marché">
@@ -153,7 +177,7 @@
       <dt>Ligne à fil noir = le prix</dt>
       <dd>Une ligne blanche avec un fil noir au milieu, qui zigzague jusqu'au trait jaune « maintenant » (nommé sous l'axe du temps). Les bandes claires et droites sont des ordres en attente, pas le prix.</dd>
       <dt>Ronds = échanges réels</dt>
-      <dd>Vert : surtout des acheteurs qui ont pris des ventes en attente. Rouge : surtout des vendeurs qui ont pris des achats en attente. Plus gros = plus de BTC.</dd>
+      <dd>Vert, avec ▲ dans les plus gros : surtout des acheteurs qui ont pris des ventes en attente. Rouge, avec ▼ : surtout des vendeurs qui ont pris des achats en attente. Plus gros = plus de BTC.</dd>
       <dt>« Mur d’achat » sous le prix, « Mur de vente » au-dessus</dt>
       <dd>Le prix le plus proche où nettement plus d'ordres attendent qu'ailleurs, en ce moment. Ils peuvent être retirés avant que le prix y arrive. «&nbsp;Dans un mur…&nbsp;» : le prix y est entré (son cadre s'allume). «&nbsp;Pas de mur au-dessus&nbsp;» (ou au-dessous) : rien de nettement plus chargé de ce côté.</dd>
       <dt>La phrase du haut</dt>
@@ -162,7 +186,7 @@
     <h3>Gestes</h3>
     <p>Glisser : déplacer la carte. <span class="geste-souris">Molette ou deux doigts : zoomer ; double-clic : revenir à la vue par défaut.</span><span class="geste-doigt">Deux doigts : zoomer ; double appui : revenir à la vue par défaut.</span></p>
     <p>Toucher ou survoler un élément : son détail. Au doigt, un appui bref le montre et le même appui l'enlève ; un appui long le fait suivre le doigt.</p>
-    <p><button type="button" class="bouton" id="btnIntroDebutant">Comment lire cette carte</button> <button type="button" class="bouton bouton-mode" id="btnModeDebutant">Passer en Expert</button></p>
+    <p><button type="button" class="bouton" id="btnIntroDebutant">Comment lire cette carte</button> <button type="button" class="bouton bouton-mode" id="btnModeDebutant">Passer en Complet</button></p>
     <p class="note">La carte décrit des ordres en attente et des échanges passés, pas une recommandation : un ordre peut être retiré avant d'être touché, et un rond ne dit pas qui a acheté.</p>
   </div>
   <div class="expert-seul">
@@ -197,7 +221,7 @@
     <dd>À droite, la <b>somme</b> des ordres du dernier carnet live par tranche. À gauche, le profil des exécutions visibles. En bas, le volume (achats au-dessus, ventes au-dessous), regroupé par <span id="legVolume">1, 2, 3, 5, 10…</span> min selon le zoom — le titre du panneau dit la durée — et le CVD : achats au marché moins ventes au marché, cumulés depuis le bord gauche de la vue ; après des bougies non lues (hachurées), il repart de 0 et le dit.</dd>
   </dl>
   <h3>Guide : la carte en mots</h3>
-  <p><button type="button" class="bouton" id="btnIntro">Comment lire cette carte (?)</button> <button type="button" class="bouton" id="btnMode">Passer en Débutant</button></p>
+  <p><button type="button" class="bouton" id="btnIntro">Comment lire cette carte (?)</button> <button type="button" class="bouton" id="btnMode">Passer en Lisible</button></p>
   <p class="note" id="legGuideMode"></p>
   <dl class="leg-guide">
     <dt>Le guide</dt><dd id="legGuide"></dd>
@@ -209,7 +233,8 @@
     <dt>Limites</dt><dd id="legGuideLimites"></dd>
   </dl>
   <h3>Gestes</h3>
-  <p>Glisser : déplacer. Molette : zoom dans le temps (sur l'axe des prix, ou avec Maj : zoom des prix). Pincer à deux doigts. Glisser sur un axe : l'étirer. Ctrl + molette : zoom du temps et des prix ensemble. + / − : zoom dans le temps. Double-clic ou R : vue par défaut. F : suivre le présent. Flèches : se déplacer. Échap : fermer un panneau. ? : comment lire cette carte. G : le guide sur la carte. J : le journal. L : la légende. M : mode débutant / expert (le même que le terminal : le changer ici le change aussi là-bas).</p>
+  <p>Glisser : déplacer. Molette : zoom dans le temps (sur l'axe des prix, ou avec Maj : zoom des prix). Pincer à deux doigts. Glisser sur un axe : l'étirer. Ctrl + molette : zoom du temps et des prix ensemble. + / − : zoom dans le temps. Flèches : se déplacer. Échap : fermer un panneau.</p>
+  <p>Touches, les mêmes que sur le terminal : M : changer de mode, Lisible / Complet (le même réglage que le terminal : le changer ici le change aussi là-bas). ? : comment lire cette carte. R ou double-clic : revenir à la vue de départ. F : suivre le présent. Et sur la carte : G : le guide. J : le journal. L : la légende.</p>
   <p>Au doigt : un appui bref épingle la lecture là où il tombe (le même appui l'enlève) ; un appui long l'affiche et la fait suivre le doigt sans déplacer la carte.</p>
   <p class="note">Toutes les heures de la carte (axe, pastilles, journal, marques) sont celles de l'appareil ; le fuseau est écrit une fois, dans l'angle sous l'axe des prix. « Maintenant » est l'heure de Binance, recalée.</p>
   <p class="note">Ce que la carte montre est une lecture du carnet, pas une recommandation : un mur peut être retiré avant d'être touché, et un rond ne dit pas qui a acheté.</p>

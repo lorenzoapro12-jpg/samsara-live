@@ -21,8 +21,11 @@
 //      détail qui a quitté l'écran (état au prix, chemins, autres scénarios, journal, bilan), pas
 //      d'infobulle des prix par-dessus, un curseur « main ».
 //   8. ASTUCE : une fois (tactile : « Touchez… » ; souris : « Survolez… »), jamais sur un texte.
-//   9. BASCULE (touche M) : l'Expert revient entier, remis en page ; retour au Débutant identique ;
-//      mêmes valeurs dans les deux modes.
+//   9. BASCULE (touche M, ou l'interrupteur « Lisible | Complet ») : l'Expert revient entier, remis
+//      en page ; retour au Débutant identique ; mêmes valeurs dans les deux modes. Le segment du
+//      mode actif est enfoncé (aria-pressed) ; le cliquer ne fait rien. Le mode changé sur la carte
+//      (autre onglet) suit ici ; sans data-mode (ou une valeur inconnue), la feuille montre le
+//      Lisible, jamais les deux variantes à la fois.
 //  10. STRUCTURES de thème en Débutant : pastille « Infos du marché », manchette masquée.
 //  11. SOBRIÉTÉ : survoler une cible ne redessine pas le graphique ; au repos, rien.
 //
@@ -41,7 +44,7 @@ for (const p of ['playwright', '/opt/node22/lib/node_modules/playwright', proces
   try { playwright = require(p); break; } catch (e) { /* suivant */ }
 }
 if (!playwright) {
-  console.log('  − NON EXÉCUTÉ : Playwright introuvable — le mode Débutant n\'est pas vérifié à l\'écran sur ce poste.');
+  console.log('  − NON EXÉCUTÉ : Playwright introuvable — le mode Lisible n\'est pas vérifié à l\'écran sur ce poste.');
   process.exit(0);
 }
 let ko = 0;
@@ -75,6 +78,15 @@ function binance(url) {
   if (u.pathname.endsWith('/ticker/24hr')) return { lastPrice: '86012.5', openPrice: '85700', priceChangePercent: '0.4', highPrice: '87000', lowPrice: '85000', bidPrice: '86012.4', askPrice: '86012.6', quoteVolume: '1e9', count: '100' };
   return {};
 }
+// La carte des ordres en attente (heatmap.json) calée sur l'horloge et les prix simulés (86 000 ± 400) :
+// celle du dépôt est republiée toutes les 15 min, à une autre heure et à d'autres prix. Douze heures de
+// colonnes d'une minute, vingt tranches de 20 $ de chaque côté du prix (section des calques simples).
+function chaleurAlignee() {
+  const dt = 60, dp = 20, fin = Math.floor(maintenant() / 1000 / dt), n = 12 * 60, colonnes = [];
+  const serie = m => Array.from({ length: 20 }, (_, i) => 60 + ((m + i) % 7) * 25);
+  for (let m = fin - n + 1; m <= fin; m++) colonnes.push([m, 4280, serie(m), 4301, serie(m * 3)]);
+  return JSON.stringify({ updated: LU, sym: 'BTCUSDT', t0: (fin - n + 1) * dt, dt, dp, format: 'colonnes-1', colonnes });
+}
 const LU = new Date(Math.floor(maintenant() / 60000) * 60000).toISOString().replace('.000Z', '+00:00');
 const md = JSON.parse(fs.readFileSync(path.join(REPO, 'market-data.json'), 'utf8'));
 md.updated = LU;
@@ -91,7 +103,8 @@ const serveur = http.createServer((req, res) => {
 });
 
 /** o = { vue, theme, tactile, prev ('complet' | 'ouvert' | 'ferme' | 'attente' | 'absent' | 'hier' | 'aucun'),
- *  mode ('debutant' par défaut), garder (ne pas vider le stockage : rechargement) }. */
+ *  mode ('debutant' par défaut), garder (ne pas vider le stockage : rechargement),
+ *  chaleur (la carte des ordres en attente calée sur l'heure et les prix simulés) }. */
 async function ouvrir(nav, o) {
   const tactile = !!o.tactile;
   const ctx = o.ctx || await nav.newContext(Object.assign({ viewport: o.vue, deviceScaleFactor: 1 }, tactile ? { hasTouch: true, isMobile: true } : {}));
@@ -119,7 +132,7 @@ async function ouvrir(nav, o) {
           : previsionsFixture(Object.assign({ maintenant: maintenant() }, prev === 'hier' ? { ilYaMs: 26 * 3600e3 } : prev === 'ferme' ? { modifier: ferme } : prev === 'ouvert' ? { modifier: ouvert }
             : prev === 'range' ? { modifier: range(84500, 87500) } : prev === 'range2' ? { modifier: range(85700, 86350) } : {})) });
       }
-      if (u.includes('heatmap')) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, 'heatmap.json')) });
+      if (u.includes('heatmap')) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: o.chaleur ? chaleurAlignee() : fs.readFileSync(path.join(REPO, 'heatmap.json')) });
       if (/\/master\/market-data\.json/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: MD });
       return r.fulfill({ status: 404, headers: cors, body: '' });
     }
@@ -185,6 +198,26 @@ const dessin = page => page.evaluate(() => {
   };
 });
 const chevauche = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+/** L'interrupteur de mode de l'en-tête (#modeBtn, le même que celui de la carte) : son rôle, son
+ *  nom, ses deux segments (texte, mode, aria-pressed, entier dans l'écran, cliquable — au-dessus
+ *  de tout —, et leur apparence : fond, couleur, ombre, bordure). */
+const interrupteur = page => page.evaluate(() => {
+  const b = document.getElementById('modeBtn');
+  if (!b) return null;
+  const sous = e => { const q = e.getBoundingClientRect(); if (!q.width || !q.height) return false; const x = document.elementFromPoint(Math.min(innerWidth - 1, q.left + q.width / 2), Math.min(innerHeight - 1, q.top + q.height / 2)); return !!x && (x === e || e.contains(x)); };
+  const segs = [...b.querySelectorAll('button')].map(s => {
+    const q = s.getBoundingClientRect(), cs = getComputedStyle(s);
+    return { texte: s.textContent.trim(), mode: s.getAttribute('data-mode-choix'), presse: s.getAttribute('aria-pressed'),
+      entier: q.width > 0 && s.scrollWidth <= s.clientWidth + 1 && q.left >= -0.5 && q.right <= innerWidth + 0.5 && q.top >= -0.5 && q.bottom <= innerHeight + 0.5, dessus: sous(s),
+      aspect: [cs.backgroundColor, cs.backgroundImage, cs.color, cs.boxShadow, cs.borderTopColor, cs.borderTopStyle, cs.fontWeight, cs.textDecorationLine].join(' / ') };
+  });
+  return { role: b.getAttribute('role'), nom: b.getAttribute('aria-label'), segs, visible: b.getClientRects().length > 0 && getComputedStyle(b).visibility !== 'hidden' };
+});
+/** « Lisible » puis « Complet », entiers et cliquables, celui du mode m seul enfoncé, et surligné
+ *  (son apparence diffère de celle de l'autre segment). */
+const interrupteurJuste = (x, m) => !!x && x.visible && x.role === 'group' && x.nom === 'Mode d\'affichage'
+  && x.segs.map(s => s.texte + ':' + s.mode).join('|') === 'Lisible:debutant|Complet:expert'
+  && x.segs.every(s => s.presse === String(s.mode === m) && s.entier && s.dessus) && x.segs[0].aspect !== x.segs[1].aspect;
 const nombres = t => (t.match(/\d{1,3}(?:[\s  ]\d{3})+|\d+/g) || []).map(x => x.replace(/[\s  ]/g, ''));
 const VERBES = /\b(touche|est passé|monte|baisse|hésite|s’agite|est entre|est sous|est au-dessus|est sans repère|indisponible)\b/;
 // forme : PARAM.guide.debutant.forme (26) — plan figures §5.3 et amendement C1 (« Cible touchée, à confirmer », 26).
@@ -245,7 +278,7 @@ async function controlerEcran(o, nom, opts = {}) {
   const dom = await o.page.evaluate(() => {
     const vis = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
     return { prix: document.getElementById('price').textContent, var24: vis(document.getElementById('var24')) ? document.getElementById('var24').textContent : null,
-      caches: ['liveBtn', 'feedBtn', 'reglagesBtn', 'stratSection'].filter(id => vis(document.getElementById(id))),
+      caches: ['liveBtn', 'feedBtn', 'stratSection'].filter(id => vis(document.getElementById(id))),
       puces: [...document.querySelectorAll('#indicatorBar label[id^="lbl_"]')].filter(vis).length,
       kpis: [...document.querySelectorAll('#cycle .kpi')].filter(vis).length, reset: vis(document.getElementById('resetBtn')),
       kpiDeb: vis(document.querySelector('#cycle .kpi-deb')) ? document.querySelector('#cycle .kpi-deb').getAttribute('title') : null };
@@ -261,7 +294,9 @@ async function controlerEcran(o, nom, opts = {}) {
   if (e.scen) check(`${nom} : un seul libellé de scénario, celui du scénario montré (${e.scen.montre || '1'}) ; ni nom du point et de la fin`, e.scen.libelles.length <= 1 && e.scen.libelles.every(l => l.rang === (e.scen.montre || '1')) && !e.scen.cibles.some(c => c.prio === 3), e.scen);
   check(`${nom} : boutons Expert, puces d'indicateurs, Grid Bot et chiffres clés masqués ; ↺ visible ; la pastille « Infos du marché » dit l'âge (infobulle)`,
     !dom.caches.length && dom.puces === 0 && dom.kpis === 0 && dom.reset && /il y a \d+ min/.test(dom.kpiDeb || ''), dom);
-  check(`${nom} : aucun sous-graphe (${e.sous.join(', ') || 'aucun'})`, !e.sous.length, e.sous);
+  // Le Volume, calque simple du Lisible : son seul sous-graphe, quand il est allumé (opts.calques).
+  if (opts.calques) check(`${nom} : un seul sous-graphe, le Volume (${e.sous.join(', ') || 'aucun'})`, e.sous.join() === 'vol', e.sous);
+  else check(`${nom} : aucun sous-graphe (${e.sous.join(', ') || 'aucun'})`, !e.sous.length, e.sous);
   return e;
 }
 
@@ -454,8 +489,9 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         await o.page.waitForTimeout(450);
         await o.page.click('#indDropdownBtn'); await o.page.waitForTimeout(200);
         const menu = await o.page.evaluate(() => document.getElementById('indMenu').innerText);
-        check(`${nom} : le menu « Affichage » n'a que les couches du Guide et le lien vers l'Expert (ni « oscillateur », ni « chartisme »)`,
-          /Repères et phrase de lecture/.test(menu) && /passer en Expert/.test(menu) && !/oscillateur|chartisme|EMA|RSI/i.test(menu), menu);
+        check(`${nom} : le panneau « Choisir l'affichage » n'a que les couches du Guide, trois calques simples (Volume, Moyennes, Ordres en attente) et le lien vers le Complet (ni « oscillateur », ni « chartisme »)`,
+          /Repères et phrase de lecture/.test(menu) && /passer en Complet/.test(menu) && ['Volume', 'Moyennes', 'Ordres en attente'].every(n => menu.includes(n))
+          && !/oscillateur|chartisme|EMA|RSI|Réglages fins|Tout afficher/i.test(menu), menu);
         scanTexte(`${nom}, menu ouvert`, await texteVisible(o.page));
         await o.page.keyboard.press('Escape');
         check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
@@ -599,32 +635,101 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       await o.ctx.close();
     }
 
-    // ── L'astuce : une fois ──
-    titre('Astuce : une fois, jamais sur un texte');
+    // ── La clé « ? » et l'astuce : la clé toujours là en Lisible, l'astuce une fois ──
+    // La clé est un bouton (hors du budget des 5 textes) posé dans un coin du tracé, jamais sur un
+    // texte, ni sur la ligne qui valide une figure, ni sur la ligne du prix ; elle ouvre la fiche du
+    // Guide. L'astuce (« Touchez / Survolez une étiquette pour le détail ») l'accompagne la toute
+    // première fois, puis s'efface ; la clé reste.
+    titre('Clé « ? » et astuce : la clé toujours là en Lisible, l’astuce une fois, jamais sur un texte');
+    /** La clé et l'astuce telles qu'elles se voient (coordonnées du canvas). */
+    const lireCle = page => page.evaluate(() => {
+      const a = document.getElementById('astuceTap'), k = document.getElementById('cleAide'), ph = document.getElementById('astucePhrase');
+      const c = canvas.getBoundingClientRect(), ra = a.getBoundingClientRect(), rk = k.getBoundingClientRect();
+      const vis = el => !!el && !el.hidden && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden' && el.getBoundingClientRect().width > 0;
+      const R = r => ({ x: r.left - c.left, y: r.top - c.top, w: r.width, h: r.height });
+      const boite = R(ra), cle = R(rk), P = geoPrix;
+      const coupe = (r, i) => r.x < i.x + i.w && r.x + r.w > i.x && r.y < i.y + i.h && r.y + r.h > i.y;
+      const segs = (debEtat && debEtat.eviteSegs) || [];
+      const surSeg = segs.some(s => { for (let t = 0; t <= 1; t += 0.02) { const x = s[0] + (s[2] - s[0]) * t, y = s[1] + (s[3] - s[1]) * t; if (x >= boite.x && x <= boite.x + boite.w && y >= boite.y && y <= boite.y + boite.h) return true; } return false; });
+      const yL = yPrixLive(), h = elementFromPointCle();
+      function elementFromPointCle() { const x = document.elementFromPoint(rk.left + rk.width / 2, rk.top + rk.height / 2); return x && (x === k || k.contains(x)); }
+      return {
+        cle: vis(k) && vis(a), bouton: k.tagName === 'BUTTON', nom: k.getAttribute('aria-label') || '', dessous: h, phrase: vis(ph) ? ph.textContent : null,
+        boite, r: cle, dansTrace: !!P && boite.x >= 0 && boite.x + boite.w <= P.W - P.right + 0.5 && boite.y >= P.top - 0.5 && boite.y + boite.h <= P.top + P.ph + 0.5,
+        surTexte: debEtat ? debEtat.items.filter(i => i.rect && coupe(boite, i.rect)).map(i => i.texte) : ['(pas de Lisible)'],
+        surSeg, yPrix: yL, surPrix: yL !== null && yL >= boite.y - 4 && yL <= boite.y + boite.h + 4,
+        stockee: (() => { try { return localStorage.getItem('samsara-astuce-tap-v1'); } catch (e) { return 'bloqué'; } })(),
+      };
+    });
+    const cleBienPosee = c => c.cle && c.bouton && c.dessous && c.dansTrace && !c.surTexte.length && !c.surSeg && !c.surPrix;
     {
+      // Tactile (390 px), 1re visite : l'astuce « Touchez… », sur aucun texte ; cachée au toucher ; la clé reste.
       const ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
       await ctx.clock.install({ time: maintenant() });
       const o = await ouvrir(nav, { ctx, tactile: true });
-      const a = await o.page.evaluate(() => {
-        const el = document.getElementById('astuceTap'), b = el.getBoundingClientRect(), c = canvas.getBoundingClientRect();
-        const r = { x: b.left - c.left, y: b.top - c.top, w: b.width, h: b.height };
-        return { vis: !el.hidden && b.width > 0, texte: el.textContent, chevauche: debEtat.items.filter(i => i.rect && r.x < i.rect.x + i.rect.w && r.x + r.w > i.rect.x && r.y < i.rect.y + i.rect.h && r.y + r.h > i.rect.y).map(i => i.texte) };
-      });
-      check('tactile, 1re visite : « Touchez une étiquette pour le détail », sur aucun texte', a.vis && a.texte === 'Touchez une étiquette pour le détail' && !a.chevauche.length, a);
+      const a = await lireCle(o.page);
+      check('tactile, 1re visite : « Touchez une étiquette pour le détail » à côté de la clé « ? », sur aucun texte ni aucune ligne', a.phrase === 'Touchez une étiquette pour le détail' && cleBienPosee(a), a);
       const b = await o.page.evaluate(() => canvas.getBoundingClientRect());
-      await o.page.touchscreen.tap(b.left + 30, b.top + b.height - 60); await o.page.waitForTimeout(200);
-      const apres = await o.page.evaluate(() => ({ cache: document.getElementById('astuceTap').hidden, cle: localStorage.getItem('samsara-astuce-tap-v1') }));
-      check('… cachée au premier toucher ; la clé samsara-astuce-tap-v1 vaut « 1 »', apres.cache && apres.cle === '1', apres);
+      await o.page.touchscreen.tap(b.left + b.width / 2, b.top + b.height - 60); await o.page.waitForTimeout(200);
+      const apres = await lireCle(o.page);
+      check('… l’astuce cachée au premier toucher du graphique ; la clé samsara-astuce-tap-v1 vaut « 1 » ; la clé « ? » reste, sur aucun texte', apres.phrase === null && apres.stockee === '1' && cleBienPosee(apres), apres);
       await o.page.close();
       const o2 = await ouvrir(nav, { ctx, tactile: true, garder: true });
-      check('… au rechargement, elle ne revient pas', await o2.page.evaluate(() => document.getElementById('astuceTap').hidden), null);
+      const a2 = await lireCle(o2.page);
+      check('… au rechargement, l’astuce ne revient pas ; la clé, si', a2.phrase === null && cleBienPosee(a2), a2);
       await ctx.close();
+      // Souris (1440 px) : « Survolez… », une fois, cachée au bout de 8 s ; la clé reste.
       const o3 = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
-      const a3 = await o3.page.evaluate(() => ({ vis: !document.getElementById('astuceTap').hidden, texte: document.getElementById('astuceTap').textContent }));
-      check('souris : « Survolez une étiquette pour le détail », une fois', a3.vis && a3.texte === 'Survolez une étiquette pour le détail', a3);
+      const a3 = await lireCle(o3.page);
+      check('souris : « Survolez une étiquette pour le détail », une fois, à côté de la clé', a3.phrase === 'Survolez une étiquette pour le détail' && cleBienPosee(a3), a3);
       await o3.page.clock.runFor(9000); await o3.page.waitForTimeout(100);
-      check('… cachée au bout de 8 s', await o3.page.evaluate(() => document.getElementById('astuceTap').hidden), null);
+      const a4 = await lireCle(o3.page);
+      check('… l’astuce cachée au bout de 8 s ; la clé reste, sur aucun texte', a4.phrase === null && a4.stockee === '1' && cleBienPosee(a4), a4);
       await o3.ctx.close();
+    }
+    {
+      // La clé, à 360, 390 (au doigt) et 1440 px : un bouton nommé en mots, sous le doigt, dans le tracé,
+      // sur aucun texte ni aucune ligne ; la ligne du prix amenée dessus la fait changer de place ; elle
+      // ouvre la fiche du Guide (clic, toucher, Entrée), Échap la ferme et rend la main à la clé.
+      for (const [vue, tactile] of [[{ width: 360, height: 740 }, true], [{ width: 390, height: 844 }, true], [{ width: 1440, height: 900 }, false]]) {
+        const o = await ouvrir(nav, { vue, tactile });
+        const nom = vue.width + ' px' + (tactile ? ' (doigt)' : '');
+        const c = await lireCle(o.page);
+        check(`${nom} : la clé « ? » est là — un bouton nommé « ${c.nom} », sous le doigt, dans le tracé, sur aucun texte (${c.surTexte.length}), ni la ligne d’une figure, ni la ligne du prix`,
+          cleBienPosee(c) && /^[A-ZÀ-Ÿ][a-zà-ÿ ’']{8,}$/.test(c.nom), c);
+        if (tactile) check(`${nom} : au doigt, sa cible fait au moins 40 × 40 px (${Math.round(c.r.w)} × ${Math.round(c.r.h)})`, c.r.w >= 40 && c.r.h >= 40, c.r);
+        // Le prix live amené au milieu de la clé : elle change de place, toujours hors des textes.
+        const p = await o.page.evaluate(() => { const P = geoPrix, k = document.getElementById('cleAide').getBoundingClientRect(), cv = canvas.getBoundingClientRect();
+          const y = k.top - cv.top + k.height / 2; return P.minP + P.range * (1 - (y - P.top) / P.ph); });
+        await o.page.evaluate(v => { livePrice = v; dessinerCalque(); }, p);
+        await o.page.waitForTimeout(100);
+        const c2 = await lireCle(o.page);
+        check(`${nom} : la ligne du prix amenée sur la clé (y ${Math.round(c.r.y + c.r.h / 2)}) : la clé change de place (y ${Math.round(c2.r.y)}), hors de la ligne et des textes`,
+          Math.abs(c2.yPrix - (c.r.y + c.r.h / 2)) < 2 && c2.r.y !== c.r.y && cleBienPosee(c2), { avant: c.r, apres: c2 });
+        // Elle ouvre la fiche du Guide.
+        if (tactile) await o.page.tap('#cleAide'); else await o.page.click('#cleAide');
+        await o.page.waitForTimeout(250);
+        const f1 = await o.page.evaluate(() => ({ fiche: ficheOuverte, vue: !document.getElementById('fichePop').hidden, titre: (document.querySelector('#fichePop .fiche-titre') || {}).textContent }));
+        await o.page.keyboard.press('Escape'); await o.page.waitForTimeout(150);
+        const f2 = await o.page.evaluate(() => ({ fiche: ficheOuverte, focus: document.activeElement && document.activeElement.id }));
+        check(`${nom} : ${tactile ? 'un toucher' : 'un clic'} sur la clé ouvre la fiche du Guide (« ${f1.titre} ») ; Échap la ferme et rend la main à la clé`,
+          f1.fiche === 'guide' && f1.vue && f2.fiche === null && f2.focus === 'cleAide', { f1, f2 });
+        if (!tactile) {
+          await o.page.focus('#cleAide'); await o.page.keyboard.press('Enter'); await o.page.waitForTimeout(250);
+          const f3 = await o.page.evaluate(() => ficheOuverte);
+          await o.page.keyboard.press('Escape');
+          check(`${nom} : au clavier, Entrée sur la clé ouvre la même fiche`, f3 === 'guide', f3);
+        }
+        check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+        await o.ctx.close();
+      }
+      // Complet : ni clé ni astuce.
+      for (const [vue, tactile] of [[{ width: 390, height: 844 }, true], [{ width: 1440, height: 900 }, false]]) {
+        const o = await ouvrir(nav, { vue, tactile, mode: 'expert' });
+        const c = await o.page.evaluate(() => { const a = document.getElementById('astuceTap'), k = document.getElementById('cleAide'); return { conteneur: !a.hidden && a.getClientRects().length > 0, cle: k.getClientRects().length > 0 }; });
+        check(`Complet, ${vue.width} px : ni clé « ? » ni astuce`, !c.conteneur && !c.cle, c);
+        await o.ctx.close();
+      }
     }
 
     // ── ↺ : revenir au présent ──
@@ -642,35 +747,215 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
     }
 
     // ── Bascule : touche M ──
-    titre('Bascule Débutant ↔ Expert (touche M)');
+    titre('Bascule Lisible ↔ Complet (touche M, interrupteur de l\'en-tête)');
     {
       const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
       const d1 = await dessin(o.page);
+      const it0 = await interrupteur(o.page);
+      check('interrupteur « Lisible | Complet » (groupe « Mode d\'affichage ») : Lisible enfoncé et surligné au départ, les deux segments entiers et cliquables', interrupteurJuste(it0, 'debutant'), it0);
       await o.page.keyboard.press('m'); await o.page.waitForTimeout(400);
       const x = await dessin(o.page);
       const exp = await o.page.evaluate(() => {
         const vis = el => !!el && el.getClientRects().length > 0;
         const c = canvas, box = c.parentElement.getBoundingClientRect();
         return { mode: document.documentElement.getAttribute('data-mode'), kpis: [...document.querySelectorAll('#cycle .kpi')].filter(k => k.getBoundingClientRect().width > 0).length,
-          strat: vis(document.getElementById('stratSection')), puces: [...document.querySelectorAll('#indicatorBar label[id^="lbl_"]')].filter(vis).length,
+          strat: vis(document.getElementById('stratSection')), puces: [...document.querySelectorAll('#indicatorBar label[id^="lbl_"]')].filter(vis).map(l => l.dataset.calque || l.id),
           taille: [c.width, c.height], attendu: [Math.round(c.clientWidth * devicePixelRatio), Math.round(c.clientHeight * devicePixelRatio)], liveBtn: vis(document.getElementById('liveBtn')),
           kpisDom: document.querySelectorAll('#cycle .kpi').length, aria: c.getAttribute('aria-label') };
       });
       check('M → data-mode="expert"', exp.mode === 'expert' && x.mode === 'expert', exp);
+      const it1 = await interrupteur(o.page);
+      check('M → l\'interrupteur suit : Complet enfoncé et surligné, Lisible non', interrupteurJuste(it1, 'expert'), it1);
       check('Expert : le badge du régime, « Et ensuite ? » (2 boîtes ou une commune), le compteur', x.cibles.some(c => /^Tendance|^Sans tendance|^Régime/.test(c.titre || '')) && x.chemins && x.chemins.boites.length >= 1 && x.trace.some(t => /^\d[\d ]*\/\d[\d ]* · /.test(t)), { cibles: x.cibles.map(c => c.titre), chemins: x.chemins, trace: x.trace.slice(0, 8) });
       check('Expert : au moins 3 bandes nommées, l\'encadré des scénarios de plusieurs lignes (« Scénarios du matin · »), les libellés des rangs 2 et 3 ou leurs lignes',
         x.cibles.filter(c => c.prio === 1).length >= 2 && x.scen && x.scen.boite && !x.scen.boite.deb && x.scen.boite.lignes.length > 1 && /^Scénarios du matin · /.test(x.scen.boite.lignes[0])
         && (x.scen.libelles.some(l => l.rang === '2') || x.scen.boite.lignes.some(l => /^2\b|2\./.test(l)) || x.scen.boite.lignes.some(l => /\| 2/.test(l)) || x.scen.boite.lignes.length >= 3), x.scen);
       check('Expert : le repère de publication est dessiné', x.tous.some(t => /^fichier .* · prix publié /.test(t)), x.tous.filter(t => /fichier/.test(t)));
-      check('Expert : les 8 chiffres clés dans la bande (au moins 3 de largeur > 0 à cette taille), le Grid Bot, les puces d\'indicateurs, le bouton ⚡', exp.kpisDom === 8 && exp.kpis >= 3 && exp.strat && exp.puces === 12 && exp.liveBtn, exp);
+      check('Expert : les 8 chiffres clés dans la bande (au moins 3 de largeur > 0 à cette taille), le Grid Bot, la légende des calques allumés (Guide, Scénarios, Volume), le bouton ⚡', exp.kpisDom === 8 && exp.kpis >= 3 && exp.strat && exp.puces.join() === 'guide,scenarios,vol' && exp.liveBtn, exp);
       check('Expert : le graphique n\'a plus pour nom la phrase du Débutant (aria-label retiré)', exp.aria === null, exp.aria);
       check('Expert : le graphique remis en page (taille du canvas = son conteneur × devicePixelRatio)', exp.taille[0] === exp.attendu[0] && exp.taille[1] === exp.attendu[1], exp);
       check('Expert : un sous-graphe (Volume) revient', x.sous.includes('vol'), x.sous);
       check('mêmes valeurs dans les deux modes : niveaux choisis, régime, états des scénarios', JSON.stringify(d1.valeurs) === JSON.stringify(x.valeurs) && JSON.stringify(d1.scen.items) === JSON.stringify(x.scen.items), { deb: [d1.valeurs, d1.scen.items], exp: [x.valeurs, x.scen.items] });
+      // Le segment du mode actif ne fait rien : ni changement de mode, ni écriture, ni redessin du Lisible.
+      await o.page.evaluate(() => { window.__ecrits = []; const f = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { window.__ecrits.push(k + '=' + v); return f.apply(this, arguments); }; });
+      await o.page.click('#modeBtn [data-mode-choix="expert"]'); await o.page.waitForTimeout(300);
+      const actif = await o.page.evaluate(() => ({ mode: document.documentElement.getAttribute('data-mode'), deb: debutant(), items: debEtat ? debEtat.items.length : null, ecrits: window.__ecrits.slice() }));
+      check('clic sur « Complet » (le mode actif) : rien ne change (mode, stockage, graphique)', actif.mode === 'expert' && !actif.deb && actif.items === null && !actif.ecrits.some(e => /^samsara-mode=/.test(e)) && interrupteurJuste(await interrupteur(o.page), 'expert'), actif);
       await o.page.keyboard.press('m'); await o.page.waitForTimeout(400);
       const d2 = await dessin(o.page);
       check('2e M → retour au Débutant, les mêmes textes', d2.mode === 'debutant' && JSON.stringify(d2.items.map(i => i.texte)) === JSON.stringify(d1.items.map(i => i.texte)), { avant: d1.items.map(i => i.texte), apres: d2.items.map(i => i.texte) });
+      check('2e M → Lisible enfoncé de nouveau', interrupteurJuste(await interrupteur(o.page), 'debutant'));
+      // L'autre segment change de mode, comme M : Complet, puis Lisible, les mêmes textes.
+      await o.page.click('#modeBtn [data-mode-choix="expert"]'); await o.page.waitForTimeout(400);
+      const c1 = await o.page.evaluate(() => ({ mode: document.documentElement.getAttribute('data-mode'), deb: debutant(), items: debEtat ? debEtat.items.length : null, stocke: localStorage.getItem('samsara-mode') }));
+      const itC = await interrupteur(o.page);
+      check('clic sur « Complet » : le mode Complet partout (page, graphique, stockage « expert »), Complet enfoncé', c1.mode === 'expert' && !c1.deb && c1.items === null && c1.stocke === 'expert' && interrupteurJuste(itC, 'expert'), { c1, itC });
+      await o.page.click('#modeBtn [data-mode-choix="debutant"]'); await o.page.waitForTimeout(400);
+      const d3 = await dessin(o.page);
+      const l1 = await o.page.evaluate(() => ({ deb: debutant(), stocke: localStorage.getItem('samsara-mode') }));
+      check('clic sur « Lisible » : retour au Lisible (stockage « debutant »), les mêmes textes, Lisible enfoncé', d3.mode === 'debutant' && l1.deb && l1.stocke === 'debutant' && JSON.stringify(d3.items.map(i => i.texte)) === JSON.stringify(d1.items.map(i => i.texte)) && interrupteurJuste(await interrupteur(o.page), 'debutant'), { l1, apres: d3.items.map(i => i.texte) });
       check('bascule : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
+    // ── Les trois calques simples du Lisible ──
+    // Volume, Moyennes (EMA 20 et 50, sans étiquette) et Ordres en attente (BTC/USDT) : éteints par
+    // défaut, cochés dans le panneau, dessinés SANS texte de plus sur le tracé (budget de cinq, mots
+    // simples), gardés sous samsara-lisible-v1, à part des choix du Complet.
+    titre('Lisible : Volume, Moyennes et Ordres en attente');
+    for (const [vue, tactile] of [[{ width: 1440, height: 900 }, false], [{ width: 390, height: 844 }, true]]) {
+      const nom = vue.width + ' px · trois calques';
+      const o = await ouvrir(nav, { vue, tactile, prev: 'ouvert', chaleur: true });
+      const d0 = await dessin(o.page);
+      check(`${nom} : éteints par défaut, rien de gardé ; l'écran du Lisible inchangé (aucun sous-graphe)`,
+        !d0.sous.length && await o.page.evaluate(() => localStorage.getItem('samsara-lisible-v1') === null && !lisible.vol && !lisible.moyennes && !lisible.liq), d0.sous);
+      await o.page.click('#indDropdownBtn'); await o.page.waitForTimeout(200);
+      for (const k of ['vol', 'moyennes', 'liq']) { await o.page.click(`#indMenu label[data-ind="l_${k}"] input`); await o.page.waitForTimeout(150); }
+      const coche = await o.page.evaluate(() => ({ cases: ['vol', 'moyennes', 'liq'].map(k => document.querySelector(`#indMenu label[data-ind="l_${k}"] input`).checked),
+        garde: localStorage.getItem('samsara-lisible-v1'), complet: localStorage.getItem('samsara-affichage-v1'), ouvert: document.getElementById('indMenu').classList.contains('open') }));
+      check(`${nom} : les trois cases cochées dans le panneau (resté ouvert), gardées sous samsara-lisible-v1 ; les choix du Complet intacts`,
+        coche.cases.every(Boolean) && coche.ouvert && JSON.stringify(JSON.parse(coche.garde)) === JSON.stringify({ vol: true, moyennes: true, liq: true }) && coche.complet === null, coche);
+      scanTexte(`${nom}, panneau ouvert`, await texteVisible(o.page));
+      await o.page.evaluate(() => document.getElementById('indMenu').classList.remove('open'));
+      await o.page.waitForFunction(() => histHeatmap && histHeatmap.grille, null, { timeout: 5000 }).catch(() => {});
+      const e = await controlerEcran(o, nom, { calques: true });
+      const trace = await o.page.evaluate(() => {
+        const lignes = [], images = [], d = drawLine, di = CanvasRenderingContext2D.prototype.drawImage;
+        const ema = k => memoized(k, calcEMA, cols().close, periodeDe(k));
+        drawLine = function (...a) { lignes.push({ ema20: a[0] === ema('ema20'), ema50: a[0] === ema('ema50'), etiquette: a[10] || null, couleur: a[6] }); return d.apply(this, a); };
+        CanvasRenderingContext2D.prototype.drawImage = function (...a) { if (this.canvas.id === 'chart') images.push(!!heatLayer && a[0] === heatLayer.cv); return di.apply(this, a); };
+        try { drawChart(); } finally { drawLine = d; CanvasRenderingContext2D.prototype.drawImage = di; }
+        const dispo = canvas.height / devicePixelRatio - 4 - RS_HEIGHT;
+        return { lignes: lignes.filter(l => l.ema20 || l.ema50), chaleur: images.filter(Boolean).length, part: geo.mainH / dispo, sous: geo.sous.map(s => s.cle) };
+      });
+      check(`${nom} : les Moyennes dessinées (EMA 20 et EMA 50), sans étiquette ni nom sur le tracé`,
+        trace.lignes.length === 2 && trace.lignes.some(l => l.ema20) && trace.lignes.some(l => l.ema50) && trace.lignes.every(l => l.etiquette === null && /^rgba\(/.test(l.couleur)), trace.lignes);
+      check(`${nom} : les Ordres en attente dessinés (la couche de chaleur posée sur le tracé)`, trace.chaleur >= 1, trace);
+      check(`${nom} : le Volume dessiné sous le prix, qui garde ${Math.round(trace.part * 100)} % (≥ 60 %)`, trace.sous.join() === 'vol' && trace.part >= 0.6 - 1e-9, trace);
+      const tous = e.tous.filter(t => bannis(t).length || CONSEIL.test(t));
+      check(`${nom} : aucun mot banni ni conseil dans tout ce que le graphique écrit (titre du Volume compris : « ${e.tous.find(t => /^Volume/.test(t)) || '—'} »)`,
+        !tous.length && e.tous.some(t => /^Volume : (bitcoins|\w+) échangés$/.test(t)), tous);
+      // Rouvert : les trois calques sont gardés ; le Complet ne les dessine pas (ses choix à lui).
+      const o2 = await ouvrir(nav, { vue, tactile, prev: 'ouvert', ctx: o.ctx, garder: true, chaleur: true });
+      const r2 = await o2.page.evaluate(() => {
+        const avant = { vol: lisible.vol, moyennes: lisible.moyennes, liq: lisible.liq, sous: geo.sous.map(s => s.cle) };
+        const lignes = [], d = drawLine, ema = k => memoized(k, calcEMA, cols().close, periodeDe(k));
+        drawLine = function (...a) { if (a[0] === ema('ema20') || a[0] === ema('ema50')) lignes.push(a[10] || null); return d.apply(this, a); };
+        basculerMode(); resizeCanvas(); drawChart();
+        const complet = { mode: modeCourant(), lignes: lignes.length, ema20: overlays.ema20, liq: overlays.liq, depth: !!depthTimer };
+        lignes.length = 0; basculerMode(); resizeCanvas(); drawChart();
+        drawLine = d;
+        return { avant, complet, retour: { mode: modeCourant(), lignes: lignes.length, sous: geo.sous.map(s => s.cle), depth: !!depthTimer } };
+      });
+      check(`${nom} : rouvert, les trois calques sont gardés et dessinés`, r2.avant.vol && r2.avant.moyennes && r2.avant.liq && r2.avant.sous.join() === 'vol', r2.avant);
+      check(`${nom} : en Complet, ni ses moyennes ni ses ordres en attente (choix du Lisible gardés à part) ; de retour en Lisible, redessinés`,
+        r2.complet.mode === 'expert' && r2.complet.lignes === 0 && !r2.complet.ema20 && !r2.complet.liq && !r2.complet.depth
+        && r2.retour.mode === 'debutant' && r2.retour.lignes === 2 && r2.retour.sous.join() === 'vol' && r2.retour.depth, r2);
+      // Sur une autre paire, les ordres en attente ne dessinent rien : leur case est grisée et le dit.
+      const sol = await o2.page.evaluate(async () => {
+        changeSymbol('SOLUSDT', document.getElementById('sym_SOLUSDT'));
+        await new Promise(r => setTimeout(r, 1200));
+        buildDropdown();
+        const l = document.querySelector('#indMenu label[data-ind="l_liq"]');
+        const r = { indispo: l.classList.contains('indispo'), coupee: l.querySelector('input').disabled, dit: (l.querySelector('.ind-seul') || {}).textContent || '',
+          vol: (document.querySelector('#indMenu label[data-ind="l_vol"] .aff-quoi') || {}).textContent };
+        changeSymbol('BTCUSDT', document.getElementById('sym_BTCUSDT'));
+        await new Promise(r => setTimeout(r, 1200));
+        return r;
+      });
+      check(`${nom} : SOL/USDT, « Ordres en attente » grisé, non cochable, « BTC/USDT seulement » ; le Volume compte des SOL`,
+        sol.indispo && sol.coupee && sol.dit === 'BTC/USDT seulement' && / SOL ont été échangés/.test(sol.vol || ''), sol);
+      check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length && !o2.erreurs.length, o.erreurs.concat(o2.erreurs));
+      await o.ctx.close();
+    }
+
+    // ── Le mode changé sur la carte (autre onglet, même navigateur) suit dans le terminal ──
+    // Sans réécrire le stockage (la carte vient de l'écrire) ; et dans l'autre sens, la carte suit.
+    titre('Le mode suit la carte (autre onglet)');
+    {
+      const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
+      await o.page.evaluate(() => { window.__ecrits = []; const f = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { window.__ecrits.push(k + '=' + v); return f.apply(this, arguments); }; });
+      const pc = await o.ctx.newPage(), errCarte = [];
+      pc.on('pageerror', e => errCarte.push(e.message));
+      await pc.route('**/*', r => (new URL(r.request().url()).host.startsWith('127.0.0.1') ? r.continue() : r.abort()));
+      await pc.goto(`http://127.0.0.1:${serveur.address().port}/bookmap.html`);
+      await pc.waitForTimeout(800);
+      const carte = () => pc.evaluate(() => ({ mode: document.documentElement.getAttribute('data-mode'), presse: [...document.querySelectorAll('#btnModeBarre [data-mode-choix]')].map(s => s.getAttribute('data-mode-choix') + ':' + s.getAttribute('aria-pressed')).join('|') }));
+      const terminal = () => o.page.evaluate(() => ({ mode: document.documentElement.getAttribute('data-mode'), deb: debutant(), items: debEtat ? debEtat.items.length : null,
+        presse: [...document.querySelectorAll('#modeBtn [data-mode-choix]')].map(s => s.getAttribute('data-mode-choix') + ':' + s.getAttribute('aria-pressed')).join('|'), ecrits: window.__ecrits.filter(e => /^samsara-mode=/.test(e)) }));
+      const c0 = await carte();
+      check('la carte, ouverte à côté, est en Lisible comme le terminal (même réglage)', c0.mode === 'debutant' && c0.presse === 'debutant:true|expert:false', c0);
+      await pc.click('#btnModeBarre [data-mode-choix="expert"]');
+      await o.page.waitForFunction(() => document.documentElement.getAttribute('data-mode') === 'expert', null, { timeout: 5000 }).catch(() => {});
+      await o.page.waitForTimeout(300);
+      const t1 = await terminal();
+      check('« Complet » cliqué sur la carte : le terminal passe en Complet (data-mode, debutant(), graphique redessiné, Complet enfoncé) sans réécrire le stockage',
+        t1.mode === 'expert' && !t1.deb && t1.items === null && t1.presse === 'debutant:false|expert:true' && !t1.ecrits.length, t1);
+      await pc.keyboard.press('m');
+      await o.page.waitForFunction(() => document.documentElement.getAttribute('data-mode') === 'debutant', null, { timeout: 5000 }).catch(() => {});
+      await o.page.waitForTimeout(300);
+      const t2 = await terminal();
+      check('M sur la carte : le terminal revient en Lisible (data-mode, debutant(), le Lisible redessiné, Lisible enfoncé), sans écrire', t2.mode === 'debutant' && t2.deb && t2.items > 0 && t2.presse === 'debutant:true|expert:false' && !t2.ecrits.length, t2);
+      // Dans l'autre sens : le terminal change, la carte suit.
+      await o.page.click('#modeBtn [data-mode-choix="expert"]');
+      await pc.waitForFunction(() => document.documentElement.getAttribute('data-mode') === 'expert', null, { timeout: 5000 }).catch(() => {});
+      const c1 = await carte();
+      check('« Complet » cliqué sur le terminal : la carte suit (Complet enfoncé)', c1.mode === 'expert' && c1.presse === 'debutant:false|expert:true', c1);
+      check('aucune erreur JavaScript (terminal et carte)', !o.erreurs.length && !errCarte.length, { t: o.erreurs, c: errCarte });
+      await o.ctx.close();
+    }
+
+    // ── Sans data-mode (ou une valeur inconnue) : la feuille montre le Lisible, jamais les deux ──
+    // La feuille ne lit plus data-mode="debutant" : tout ce qui n'est pas « expert » est le Lisible.
+    // L'état de chaque élément (display, visibility) et la mise en page de l'en-tête sont relevés dans
+    // la même tâche, l'attribut changé seulement le temps de la lecture (le script ne le voit pas).
+    titre('Feuille : le Lisible par défaut (data-mode absent ou inconnu)');
+    {
+      const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
+      const r = await o.page.evaluate(() => {
+        const h = document.documentElement, tous = [...document.body.querySelectorAll('*')];
+        const releve = () => {
+          const etat = tous.map(e => { const cs = getComputedStyle(e); return cs.display + ' ' + cs.visibility; });
+          const tete = [...document.querySelectorAll('.header *')].filter(e => e.getClientRects().length).map(e => { const q = e.getBoundingClientRect(); return [q.left, q.top, q.width, q.height].map(Math.round).join(','); });
+          const seg = [...document.querySelectorAll('#modeBtn [data-mode-choix]')].map(s => { const cs = getComputedStyle(s); return cs.backgroundColor + ' ' + cs.color + ' ' + cs.boxShadow; });
+          const vis = sel => [...document.querySelectorAll(sel)].filter(e => e.getClientRects().length > 0).length;
+          return { etat, tete, seg, expertSeul: vis('.expert-seul'), debutantSeul: vis('.debutant-seul') };
+        };
+        const avec = v => { if (v === null) h.removeAttribute('data-mode'); else h.setAttribute('data-mode', v); return releve(); };
+        const ref = avec('debutant'), exp = avec('expert');
+        const diff = (a, b) => a.etat.reduce((n, x, i) => n + (x !== b.etat[i]), 0) + (a.tete.join('|') !== b.tete.join('|')) + (a.seg.join('|') !== b.seg.join('|'));
+        const out = { ref: { expertSeul: ref.expertSeul, debutantSeul: ref.debutantSeul }, diffExpert: diff(ref, exp), variantes: {} };
+        for (const [nom, v] of [['absent', null], ['lisible', 'lisible'], ['inconnu', 'xyz'], ['vide', '']]) {
+          const x = avec(v);
+          out.variantes[nom] = { diff: diff(ref, x), expertSeul: x.expertSeul, debutantSeul: x.debutantSeul, tete: x.tete.join('|') === ref.tete.join('|'), seg: x.seg.join('|') === ref.seg.join('|') };
+        }
+        h.setAttribute('data-mode', 'debutant');
+        return out;
+      });
+      check(`témoin : data-mode="expert" change bien l'écran (${r.diffExpert} différences) ; en Lisible, aucun .expert-seul visible, des .debutant-seul visibles`, r.diffExpert > 5 && r.ref.expertSeul === 0 && r.ref.debutantSeul > 0, r);
+      for (const [nom, v] of Object.entries(r.variantes))
+        check(`data-mode ${nom} : exactement l'écran du Lisible (tous les éléments, l'en-tête, Lisible surligné), jamais les variantes Complet`, v.diff === 0 && v.expertSeul === 0 && v.debutantSeul === r.ref.debutantSeul && v.tete && v.seg, v);
+      check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
+    // ── Les touches, dites dans les Légendes (une ligne, les mêmes que sur la carte) ──
+    titre('Touches : M, ?, R, F, I');
+    {
+      const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
+      await o.page.keyboard.press('?'); await o.page.waitForTimeout(200);
+      const l = await o.page.evaluate(() => { const p = document.getElementById('fichePop'), t = p && p.querySelector('.fiche-touches'); return { ouvert: !!p && !p.hidden, titre: p && (p.querySelector('.fiche-titre') || {}).textContent, ligne: t && t.getClientRects().length ? t.innerText : null, h: t ? t.getBoundingClientRect().height : 0 }; });
+      check(`? ouvre les Légendes, avec la ligne des touches (« ${l.ligne} »)`, l.ouvert && l.titre === 'Légendes' && /\bM change de mode \(Lisible \/ Complet\)/.test(l.ligne || '') && /\? cette aide/.test(l.ligne || '') && /\bR revient à la vue de départ/.test(l.ligne || '') && /\bF suit le présent/.test(l.ligne || '') && /\bI les infos du marché/.test(l.ligne || '') && !bannis(l.ligne || '').length, l);
+      await o.page.keyboard.press('Escape');
+      // R et F : la vue revient au présent (la dernière bougie à droite), comme sur la carte.
+      for (const k of ['r', 'f']) {
+        await o.page.evaluate(() => { const n = viewEnd - viewStart; viewEnd = Math.max(n, candles.length - 60); viewStart = viewEnd - n; drawChart(); });
+        const avant = await o.page.evaluate(() => viewEnd === candles.length);
+        await o.page.keyboard.press(k); await o.page.waitForTimeout(150);
+        const apres = await o.page.evaluate(() => viewEnd === candles.length);
+        check(`${k.toUpperCase()} (Lisible) : la vue revient au présent (la dernière bougie)`, !avant && apres, { avant, apres });
+      }
+      check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
 
@@ -784,7 +1069,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         return { texte: p.innerText, ouvert: !p.hidden, replie: !!d && !d.open, h4: [...p.querySelectorAll('h4')].filter(vis).map(h => h.innerText.trim()).filter(Boolean),
           boutons: [...p.querySelectorAll('.glossaire-item')].filter(vis).map(b => b.innerText) };
       });
-      // Les noms des fiches du Guide sont ceux du menu « + Affichage » (« Repères et phrase de
+      // Les noms des fiches du Guide sont ceux du panneau « Choisir l'affichage » (« Repères et phrase de
       // lecture ») ; la fiche des niveaux, « Les repères de prix » (elle ne parle que des repères).
       check('Légendes, Débutant : « Ce que montre l’écran » d’abord (phrase et repères, scénarios du matin, les cartes) ; les fiches de l’Expert repliées',
         g.ouvert && g.replie && /^Ce que montre l’écran$/i.test(g.h4[0]) && g.h4.length === 1 && g.boutons.includes('Scénarios du matin') && g.boutons.includes('Repères et phrase de lecture') && g.boutons.includes('Les repères de prix') && g.boutons.includes('Ordres en attente'), g);
@@ -927,7 +1212,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         for (const k of ['getItem', 'setItem', 'removeItem', 'clear']) Storage.prototype[k] = bloque;
       });
       const o = await ouvrir(nav, { ctx });
-      const etat = () => o.page.evaluate(() => ({ html: document.documentElement.getAttribute('data-mode'), deb: debutant(), items: debEtat ? debEtat.items.length : null, astuce: !document.getElementById('astuceTap').hidden }));
+      const etat = () => o.page.evaluate(() => ({ html: document.documentElement.getAttribute('data-mode'), deb: debutant(), items: debEtat ? debEtat.items.length : null, astuce: !document.getElementById('astucePhrase').hidden, cle: !document.getElementById('astuceTap').hidden }));
       const e0 = await etat();
       await o.page.keyboard.press('m'); await o.page.waitForTimeout(400);
       const e1 = await etat();
@@ -935,8 +1220,10 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       const e2 = await etat();
       check('stockage bloqué : Débutant au départ ; M → Expert partout (page ET graphique) ; 2e M → Débutant', e0.html === 'debutant' && e0.deb && e1.html === 'expert' && !e1.deb && e1.items === null && e2.html === 'debutant' && e2.deb && e2.items > 0, { e0, e1, e2 });
       await o.page.clock.runFor(9000); await o.page.waitForTimeout(100);
-      const a1 = await o.page.evaluate(() => { drawChart(); astuceMontrer(); return !document.getElementById('astuceTap').hidden; });
-      check('stockage bloqué : l’astuce, cachée au bout de 8 s, ne revient pas au dessin suivant', !a1, a1);
+      const a1 = await o.page.evaluate(() => { drawChart(); astuceMontrer(); const a = document.getElementById('astuceTap'), ph = document.getElementById('astucePhrase');
+        return { phrase: !ph.hidden && ph.getClientRects().length > 0, cle: !a.hidden && document.getElementById('cleAide').getClientRects().length > 0 }; });
+      check('stockage bloqué : l’astuce, cachée au bout de 8 s, ne revient pas au dessin suivant ; la clé « ? » reste', !a1.phrase && a1.cle, a1);
+      check('stockage bloqué : la clé « ? » est là en Débutant, partie en Expert, revenue au retour', e0.cle && !e1.cle && e2.cle, { e0, e1, e2 });
       check('stockage bloqué : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await ctx.close();
     }
@@ -984,6 +1271,8 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       check(`${theme} · ${w} : la phrase entière, jamais coupée (« ${r.phrase} »)`, r.phrase && !/…$/.test(r.phrase) && /\.$/.test(r.phrase), r.phrase);
       check(`${theme} · ${w} : prix, variation 24 h (« ${r.var24} »), bouton de mode et pastille visibles, sans chevauchement ni débordement`,
         !r.ch.length && r.debord <= 1 && ['#price', '#var24', '#modeBtn', '#cycle .kpi-deb'].every(q => r.vus.includes(q)) && r.v24.right <= r.vw + 0.5, r);
+      const it = await interrupteur(o.page);
+      check(`${theme} · ${w} : interrupteur « Lisible | Complet » entier, dans l'écran, cliquable, Lisible enfoncé et surligné`, interrupteurJuste(it, 'debutant'), it);
       await o.ctx.close();
     }
 
@@ -999,12 +1288,13 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         const k = document.querySelector('#cycle .kpi-deb'), cy = document.getElementById('cycle'), hd = document.querySelector('.header'), mb = document.getElementById('modeBtn');
         const parent = cy.parentElement, pr = parent.getBoundingClientRect();
         return { kpi: vis(k) ? k.getAttribute('title') : null, cadre: [Math.round(pr.width), Math.round(pr.height)], manchette: [...document.querySelectorAll('.gazette-manchette')].some(vis),
-          mode: vis(mb) ? mb.innerText : null, tete: [hd.scrollWidth, hd.clientWidth], structure: document.documentElement.getAttribute('data-structure'),
+          mode: vis(mb), tete: [hd.scrollWidth, hd.clientWidth], structure: document.documentElement.getAttribute('data-structure'),
           page: [document.documentElement.scrollWidth, document.documentElement.clientWidth], canvas: Math.round(canvas.getBoundingClientRect().height), vh: innerHeight };
       });
       check(`${nom} : pas de défilement de côté ; le graphique garde au moins la moitié de la hauteur (${s.canvas} px sur ${s.vh})`, s.page[0] <= s.page[1] + 1 && s.canvas >= s.vh * 0.5, s);
-      check(`${nom} : pastille « Infos du marché » visible (âge en infobulle), son cadre non vide, manchette masquée, bouton de mode visible, en-tête sans débordement`,
-        /il y a \d+ min/.test(s.kpi || '') && s.cadre[0] > 0 && s.cadre[1] > 0 && !s.manchette && /expert/i.test(s.mode || '') && s.tete[0] <= s.tete[1] + 1, s);
+      const it = await interrupteur(o.page);
+      check(`${nom} : pastille « Infos du marché » visible (âge en infobulle), son cadre non vide, manchette masquée, interrupteur « Lisible | Complet » entier et cliquable (Lisible enfoncé et surligné), en-tête sans débordement`,
+        /il y a \d+ min/.test(s.kpi || '') && s.cadre[0] > 0 && s.cadre[1] > 0 && !s.manchette && s.mode && interrupteurJuste(it, 'debutant') && s.tete[0] <= s.tete[1] + 1, { s, it });
       check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }

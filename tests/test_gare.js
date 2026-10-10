@@ -262,7 +262,7 @@ const SOUFFLE = 'new Promise(r => setTimeout(() => requestAnimationFrame(() => r
 
     const dispo = async vue => {
       const x = await ouvrir(nav, vue);
-      await x.page.keyboard.press('f'); await x.page.waitForTimeout(900);
+      await x.page.keyboard.press('i'); await x.page.waitForTimeout(900);
       const r = await x.page.evaluate(() => {
         const rect = s => { const b = document.querySelector(s).getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom, h: b.height }; };
         return { sens: getComputedStyle(document.querySelector('.main-area')).flexDirection, feed: getComputedStyle(document.getElementById('feed')).flexDirection,
