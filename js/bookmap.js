@@ -42,10 +42,10 @@
   const API = 'https://api.binance.com/api/v3/';
   const SYMBOLE = 'BTCUSDT';
 
-  // ─── Mode : débutant (par défaut) ou expert ─────────────────────────────────
+  // ─── Mode : Lisible (par défaut) ou Complet — gardé 'debutant' / 'expert' ───
   // Le même que le terminal (même clé, même origine) : le changer ici le change là-bas. Il est posé
-  // sur <html> AVANT le premier rendu : la feuille cache d'emblée ce qui est expert. Le mode change ce
-  // qui est MONTRÉ, jamais une valeur.
+  // sur <html> AVANT le premier rendu, par le script de tête de bookmap.html (la feuille cache d'emblée
+  // ce qui est du mode Complet) ; reposé ici. Le mode change ce qui est MONTRÉ, jamais une valeur.
   const MODE_CLE = 'samsara-mode', INTRO_CLE = 'samsara-carte-intro-v1', INDICE_CLE = 'samsara-carte-indice-v1';
   function lireMode() { try { return localStorage.getItem(MODE_CLE) === 'expert' ? 'expert' : 'debutant'; } catch (e) { return 'debutant'; } }
   let MODE = lireMode();
@@ -1587,9 +1587,10 @@
   }
 
   // ─── Guide : la carte dite en mots ─────────────────────────────────────────
-  // Le mode est celui du terminal (même clé, même origine) : débutant, un écran calme et des phrases ;
-  // expert, toutes les couches et les chiffres. Le mode change ce qui est MONTRÉ, jamais une valeur.
-  // Le changer ici (touche M, bouton de l'en-tête ou de la légende) le change aussi dans le terminal.
+  // Le mode est celui du terminal (même clé, même origine) : Lisible, un écran calme et des phrases ;
+  // Complet, toutes les couches et les chiffres. Le mode change ce qui est MONTRÉ, jamais une valeur.
+  // Le changer ici (touche M, interrupteur de l'en-tête ou bouton de la légende) le change aussi dans
+  // le terminal.
   // Les calculs : BM.GUIDE et suivants.
   function changerMode(m) {
     MODE = m || (MODE === 'expert' ? 'debutant' : 'expert');
@@ -1604,20 +1605,16 @@
     if (boucleCarnet && debutant()) boucleCarnet.reveiller();
     dessiner();
   }
-  /** Les boutons de mode : un libellé qui dit l'ACTION (le mode visé), jamais un état « enfoncé »
-   *  (pas d'aria-pressed : « Débutant » enfoncé se lirait « je suis en Débutant »), et l'infobulle
-   *  de la puce Guide. Expert : « → Débutant » à toutes les largeurs (css). */
+  /** Un segment de l'interrupteur : celui du mode actif ne fait rien, l'autre change de mode. */
+  function choisirMode(m) { if (m !== MODE) changerMode(); }
+  /** L'interrupteur « Lisible | Complet » dit l'ÉTAT, comme celui du terminal : le segment du mode
+   *  actif est enfoncé (aria-pressed), l'autre y mène. Les boutons de la légende disent l'ACTION
+   *  (« Passer en Complet »). Et l'infobulle de la puce Guide. */
   function majBoutonMode() {
     const exp = MODE === 'expert', b = document.getElementById('btnModeBarre');
-    if (b) {
-      b.removeAttribute('aria-pressed');
-      b.querySelector('.mode-long').textContent = exp ? 'Expert · passer en Débutant' : 'Débutant · passer en Expert';
-      b.querySelector('.mode-court').textContent = exp ? 'Passer en Débutant' : 'Passer en Expert';
-      const m = b.querySelector('.mode-mini'); if (m) m.textContent = exp ? '→ Débutant' : '→ Expert';
-      if (exp) b.setAttribute('aria-label', 'Passer en Débutant'); else b.removeAttribute('aria-label');
-    }
+    if (b) for (const s of b.querySelectorAll('[data-mode-choix]')) s.setAttribute('aria-pressed', s.getAttribute('data-mode-choix') === MODE ? 'true' : 'false');
     const d = document.getElementById('btnModeDebutant');
-    if (d) d.textContent = exp ? 'Passer en Débutant' : 'Passer en Expert';
+    if (d) d.textContent = exp ? 'Passer en Lisible' : 'Passer en Complet';
     const g = document.querySelector('button[data-calque="guide"]');
     if (g) g.title = exp ? 'Le guide : la carte dite en mots, le résumé et le journal (touche G)' : 'Afficher ou cacher les repères «\u00a0Mur d’achat\u00a0» / «\u00a0Mur de vente\u00a0» (touche G) ; cachés, la phrase du haut dit comment les revoir';
     const j = document.getElementById('btnJournal');
@@ -2399,12 +2396,12 @@
       // (Débutant : seulement « pas d'exemple » — l'explication se pose loin du prix et des repères.)
       + (ouvert && R.calques.guide && !vus.has(i + 1) && !(deb && (GU.caches.has(i + 1) || GU.sansPlace.has(i + 1))) ? ' <i>' + (GU.caches.has(i + 1) ? '(caché sous ce cadre)' : GU.sansPlace.has(i + 1) ? '(visible, mais sans place libre pour son numéro)' : '(pas d\'exemple dans cette vue)') + '</i>' : '') + '</span></li>').join('');
     if (deb) {
-      document.getElementById('guideIntroNote').textContent = (survol ? 'Touchez ou survolez' : 'Touchez') + ' un repère pour le détail. Tout voir : bouton «\u00a0Passer en Expert\u00a0»' + (survol ? ' (touche M).' : '.');
+      document.getElementById('guideIntroNote').textContent = (survol ? 'Touchez ou survolez' : 'Touchez') + ' un repère pour le détail. Tout voir : «\u00a0Complet\u00a0», en haut à droite' + (survol ? ' (touche M).' : '.');
       return;
     }
     document.getElementById('guideIntroNote').textContent = (R.calques.guide ? 'Les numéros montrent un exemple réel de chacun. Vert ou turquoise : côté achat ; rouge ou rose : côté vente. Rond : échangé ; rectangle : en attente.' : 'Calque Guide éteint : pas de numéros sur la carte.')
       + ' Le Guide écrit aussi les murs, les zones à surveiller, un résumé (en haut) et le Journal. '
-      + 'Mode ' + (MODE === 'expert' ? 'expert : chiffres seuls' : 'débutant : des phrases') + ' (bouton de mode en haut' + (survol ? ', ou touche M' : '') + ' ; change aussi le terminal).'
+      + 'Mode ' + (MODE === 'expert' ? 'Complet : chiffres seuls' : 'Lisible : des phrases') + ' (interrupteur en haut' + (survol ? ', ou touche M' : '') + ' ; change aussi le terminal).'
       + (survol ? ' Touches : ? ce guide, G guide, J journal, L légende.' : '');
   }
   function rectIntro() {
@@ -3046,9 +3043,17 @@
     }
     // Ctrl / Cmd / Alt + touche : un raccourci du navigateur (chercher, zoom, historique), pas de la carte.
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.target && /input|select|textarea/i.test(e.target.tagName)) return;
+    // Une saisie (champ, liste, texte éditable) garde ses touches — même règle que le terminal. Les
+    // touches communes aux deux pages : M le mode, ? l'aide de la page, R la vue de départ, F le présent.
+    if (e.target && (/input|select|textarea/i.test(e.target.tagName) || e.target.isContentEditable)) return;
+    const k = e.key.toLowerCase();
+    // Le mode et l'aide répondent même avant la première lecture (la vue n'existe pas encore).
+    if (k === 'm' || k === '?') {
+      if (k === 'm') changerMode(); else if (introEl && !introEl.hidden) fermerIntro(); else ouvrirIntro();
+      e.preventDefault(); if (E.vue && Z) dessiner(); return;
+    }
     if (!E.vue || !Z) return;
-    const k = e.key.toLowerCase(), v = E.vue;
+    const v = E.vue;
     // Flèches : un dixième de la vue, arrondi au pixel (le calque publié se décale).
     const pasX = Math.round(Z.chaleur.w * 0.1) * (v.t2 - v.t1) / Z.chaleur.w, pasY = Math.round(Z.chaleur.h * 0.1) * (v.p2 - v.p1) / Z.chaleur.h;
     if (k === 'f') basculerSuivre();
@@ -3058,18 +3063,21 @@
     else if (k === 'arrowup' || k === 'arrowdown') { const d = pasY * (k === 'arrowup' ? 1 : -1); v.p1 += d; v.p2 += d; lacher(); }
     else if (k === 'arrowleft' || k === 'arrowright') { const d = pasX * (k === 'arrowright' ? 1 : -1); v.t1 += d; v.t2 += d; lacher(); }
     else if (k === 'l') basculerPanneau('legende');
-    else if (k === '?') { if (introEl && !introEl.hidden) fermerIntro(); else ouvrirIntro(); }
     else if (k === 'g') { const b = document.querySelector('button[data-calque="guide"]'); if (b) b.click(); }
     else if (k === 'j') { GU.cleJournal = null; basculerPanneau('journalPanneau'); majPanneauJournal(); }
-    else if (k === 'm') changerMode();
     else return;
     e.preventDefault();
     dessiner();
   });
   // Taille du canevas ou de la barre changée : position et mise en page relues (la barre peut passer
-  // sur deux lignes ; les panneaux s'ouvrent sous sa hauteur RÉELLE).
-  const barre = document.querySelector('.barre');
-  function majHauteurBarre() { if (barre) document.documentElement.style.setProperty('--haut-barre', Math.ceil(barre.getBoundingClientRect().bottom) + 'px'); }
+  // sur deux lignes ; les panneaux s'ouvrent sous sa hauteur RÉELLE — et sous l'interrupteur de mode
+  // quand il est posé sous la rangée, au bout de la bande du résumé : un panneau ne le couvre pas).
+  const barre = document.querySelector('.barre'), basculeMode = document.getElementById('btnModeBarre');
+  function majHauteurBarre() {
+    if (!barre) return;
+    const bas = Math.max(barre.getBoundingClientRect().bottom, basculeMode && basculeMode.offsetParent !== null ? basculeMode.getBoundingClientRect().bottom : 0);
+    document.documentElement.style.setProperty('--haut-barre', Math.ceil(bas) + 'px');
+  }
   const surTaille = () => { RECT = null; INTRO_RECT = null; majHauteurBarre(); dessiner(); };
   if (window.ResizeObserver) { const ro = new ResizeObserver(surTaille); ro.observe(cv); if (barre) ro.observe(barre); }
   window.addEventListener('resize', surTaille);
@@ -3160,7 +3168,7 @@
     $('btnJournal').addEventListener('click', () => { GU.cleJournal = null; basculerPanneau('journalPanneau'); majPanneauJournal(); });
     $('btnIntro').addEventListener('click', () => { fermerPanneaux(); ouvrirIntro(); });
     $('btnMode').addEventListener('click', () => changerMode());
-    $('btnModeBarre').addEventListener('click', () => changerMode());
+    for (const s of document.querySelectorAll('#btnModeBarre [data-mode-choix]')) s.addEventListener('click', () => choisirMode(s.getAttribute('data-mode-choix')));
     $('btnModeDebutant').addEventListener('click', () => changerMode());
     $('btnIntroDebutant').addEventListener('click', () => { fermerPanneaux(); ouvrirIntro(); });
     $('resumeCarte').addEventListener('click', () => { $('resumeCarte').classList.toggle('ouvert'); RECT = null; majResume(); dessiner(); });
@@ -3258,8 +3266,8 @@
     // dernière lecture (couverture, âge de la carte publiée) ; les symboles de BM.FINS_MURS et
     // BM.SYMBOLES_GUIDE.
     const GD = BM.GUIDE, n2 = v => BM.nombre(v, 0, 2), pc = v => Math.round(v * 100) + ' %', NB = ' ', SG = BM.SYMBOLES_GUIDE;
-    tx('legGuideMode', 'Mode ' + (MODE === 'expert' ? 'expert : les chiffres seuls' : 'débutant : des phrases') + '. C\'est le même réglage que le terminal : le changer ici (bouton, ou touche M) le change aussi là-bas.');
-    tx('btnMode', MODE === 'expert' ? 'Passer en Débutant' : 'Passer en Expert');
+    tx('legGuideMode', 'Mode ' + (MODE === 'expert' ? 'Complet : les chiffres seuls' : 'Lisible : des phrases') + '. C\'est le même réglage que le terminal : le changer ici (interrupteur, ou touche M) le change aussi là-bas.');
+    tx('btnMode', MODE === 'expert' ? 'Passer en Lisible' : 'Passer en Complet');
     tx('legPaletteDeb', couleursDebutant());
     tx('legSensDeb', '«' + NB + 'En hausse' + NB + '» ou «' + NB + 'en baisse' + NB + '» : le prix a bougé de plus de ' + n2(GD.tendancePct) + ' % depuis ' + BM.age(GD.tendanceMs) + ' ; «' + NB + 'stable' + NB + '» revient sous ' + n2(GD.tendanceRetourPct) + ' %, et le mot change au plus une fois par ' + (GD.tendanceGardeMs === 60e3 ? 'minute' : BM.age(GD.tendanceGardeMs)) + '.');
     tx('legGuide', 'Il relit ce que la carte montre et l\'écrit en mots ; il ne mesure rien de neuf, et ne dit ni pourquoi ni ce qui va suivre. Mesuré : lu dans les données ; convention : un seuil choisi par ce code ; modèle : les niveaux d\'options. '
@@ -3270,10 +3278,10 @@
       + 'Au-delà du carnet live gardé, la carte publiée prend le relais si elle s\'arrête moins de ' + GD.trouMaxMs / 60e3 + ' min avant lui. «' + NB + 'Grossit' + NB + '» / «' + NB + 'diminue' + NB + '» : variation sur ' + BM.age(GD.fenetreMs) + ', dite au-delà de ' + n2(GD.varMinBtc) + ' BTC et de ' + pc(GD.varMinPart) + ' de la taille d\'avant (convention).');
     tx('legGuideZones', GD.zoneTranches + ' tranches de ' + GD.trancheUsd + NB + '$ consécutives sommées, d\'au moins ' + n2(GD.zoneMinBtc) + ' BTC et ' + n2(GD.zoneFacteur) + ' fois la zone médiane du même côté (convention), la plus proche du prix hors de sa tranche. Un cadre avant «' + NB + 'maintenant' + NB + '», une marque au bord droit. '
       + 'Quand le prix y entre, elle reste dessinée, pour voir si ses ordres sont échangés ou retirés. Une zone dessinée le reste tant qu\'elle porte au moins ' + n2(GD.zoneMinBtc) + ' BTC et ' + pc(GD.zoneSortiePart) + ' du seuil d\'entrée du moment ; en dessous, encore ' + GD.zoneGarde + ' lectures, puis elle s\'efface. '
-      + 'Le plus gros mur nommé dans une zone est dit dans sa phrase (le même carnet n\'est pas écrit deux fois). Mode débutant : ' + (GD.textesDebutant === 2 ? 'deux' : GD.textesDebutant) + ' repères au plus, un de chaque côté du prix (la zone de ce côté, sinon le mur le plus proche), d\'au plus ' + BM.ETIQUETTE_MAX + ' signes ; jamais sur la ligne de prix des ' + BM.nombre(GD.tendanceMs / 60e3, 0, 1) + ' dernières minutes ni sur la rangée du prix ; seulement avec un carnet live frais.');
+      + 'Le plus gros mur nommé dans une zone est dit dans sa phrase (le même carnet n\'est pas écrit deux fois). Mode Lisible : ' + (GD.textesDebutant === 2 ? 'deux' : GD.textesDebutant) + ' repères au plus, un de chaque côté du prix (la zone de ce côté, sinon le mur le plus proche), d\'au plus ' + BM.ETIQUETTE_MAX + ' signes ; jamais sur la ligne de prix des ' + BM.nombre(GD.tendanceMs / 60e3, 0, 1) + ' dernières minutes ni sur la rangée du prix ; seulement avec un carnet live frais.');
     tx('legGuideResume', 'Le DERNIER carnet live seul (prix de référence : milieu meilleur bid / meilleur ask de cette lecture) : ordres posés à ±' + n2(GD.bandePct) + ' % du prix, moins si le carnet lu ne va pas si loin (il le dit) ; «' + NB + 'à peu près autant' + NB + '» sous ' + n2(GD.rapportNet) + ' fois (convention). '
-      + 'Une photo de l\'instant, pas une prévision : plus d\'ordres d\'un côté ne dit pas où ira le prix. Expert : les chiffres seuls — l\'âge du carnet live, le rapport achat / vente et ses deux quantités, puis, de chaque côté, la tranche la plus proche du prix qui porte au moins le seuil «' + NB + 'mur' + NB + '» (ou «' + NB + 'aucune' + NB + '»). '
-      + 'Mode débutant : une ligne, d\'abord le sens du prix — «' + NB + 'en hausse / en baisse / stable sur ' + BM.age(GD.tendanceMs) + NB + '» : le dernier prix comparé à la moyenne des clôtures de ' + GD.tendanceRefMin + ' minutes centrées sur ' + BM.age(GD.tendanceMs) + ' plus tôt ; «' + NB + 'en hausse / en baisse' + NB + '» au-delà de ±' + BM.nombre(GD.tendancePct, 0, 2) + ' %, de retour à «' + NB + 'stable' + NB + '» sous ±' + BM.nombre(GD.tendanceRetourPct, 0, 2) + ' %, un mot tenu au moins ' + BM.age(GD.tendanceGardeMs) + ' (convention) ; une minute manquante : rien n\'est écrit —, précédé du dernier prix ; puis le côté le plus chargé (même seuil, tenu ' + BM.age(GD.sensGardeMs) + ' avant de changer de mot) quand les deux côtés ont un repère, sinon le côté sans repère ; et l\'âge de la plus vieille valeur : «' + NB + 'à jour' + NB + '» sous ' + BM.age(GD.ageFraisMs) + ', puis en secondes entières ; elle FINIT par «' + NB + 'pas une prévision' + NB + '». Moins de ' + BM.nombre(ETROIT_PX, 0, 0) + NB + 'px de large, ou ligne qui ne tient pas dans la bande : la version courte (le prix et son sens, l\'âge, «' + NB + 'pas une prévision' + NB + '») ; un appui ouvre le détail.');
+      + 'Une photo de l\'instant, pas une prévision : plus d\'ordres d\'un côté ne dit pas où ira le prix. Complet : les chiffres seuls — l\'âge du carnet live, le rapport achat / vente et ses deux quantités, puis, de chaque côté, la tranche la plus proche du prix qui porte au moins le seuil «' + NB + 'mur' + NB + '» (ou «' + NB + 'aucune' + NB + '»). '
+      + 'Mode Lisible : une ligne, d\'abord le sens du prix — «' + NB + 'en hausse / en baisse / stable sur ' + BM.age(GD.tendanceMs) + NB + '» : le dernier prix comparé à la moyenne des clôtures de ' + GD.tendanceRefMin + ' minutes centrées sur ' + BM.age(GD.tendanceMs) + ' plus tôt ; «' + NB + 'en hausse / en baisse' + NB + '» au-delà de ±' + BM.nombre(GD.tendancePct, 0, 2) + ' %, de retour à «' + NB + 'stable' + NB + '» sous ±' + BM.nombre(GD.tendanceRetourPct, 0, 2) + ' %, un mot tenu au moins ' + BM.age(GD.tendanceGardeMs) + ' (convention) ; une minute manquante : rien n\'est écrit —, précédé du dernier prix ; puis le côté le plus chargé (même seuil, tenu ' + BM.age(GD.sensGardeMs) + ' avant de changer de mot) quand les deux côtés ont un repère, sinon le côté sans repère ; et l\'âge de la plus vieille valeur : «' + NB + 'à jour' + NB + '» sous ' + BM.age(GD.ageFraisMs) + ', puis en secondes entières ; elle FINIT par «' + NB + 'pas une prévision' + NB + '». Moins de ' + BM.nombre(ETROIT_PX, 0, 0) + NB + 'px de large, ou ligne qui ne tient pas dans la bande : la version courte (le prix et son sens, l\'âge, «' + NB + 'pas une prévision' + NB + '») ; un appui ouvre le détail.');
     tx('legGuideJournal', 'Bouton Journal (touche J), à l\'heure de l\'appareil. Gros ordres : au moins ' + n2(BM.MURS.seuilsBtc[E.murs.indice(seuilJournal())]) + ' BTC à un même prix (réglage «' + NB + 'Destin des gros ordres' + NB + '», ' + n2(GD.journalMurBtc) + ' BTC au moins) apparus (restés ' + GD.vieMinMs / 1000 + ' s ; un ordre vu en entrant dans la bande lue n\'est pas «' + NB + 'apparu' + NB + '»), retirés, absorbés. '
       + '«' + NB + 'Absorbé' + NB + '» = entièrement échangé ; un ordre retiré pour l\'essentiel puis touché est dit «' + NB + 'retiré pour l\'essentiel' + NB + '» (échanges sous ' + pc(GD.absorbePart) + ' de sa plus grande taille). '
       + 'Murs nommés (stables ' + GD.nommeLectures + ' lectures) : apparus (la tranche elle-même a grossi d\'au moins ' + n2(GD.varMinBtc) + ' BTC et ' + pc(GD.varMinPart) + ', pas seulement le seuil qui a baissé), fondus, ou passés par le prix (guettés aussi quand le prix s\'en approche et qu\'ils ne sont plus nommés) ; la suite d\'un passage suit la règle de travail du propriétaire (non mesurée) : cassé après deux clôtures 1 min au-delà, percé en mèche si la bougie clôture de l\'autre côté. '

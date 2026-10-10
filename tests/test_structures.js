@@ -132,7 +132,7 @@ async function ouvrir(nav, theme, vue) {
   });
   await page.goto(`http://127.0.0.1:${serveur.address().port}/index.html`);
   await page.waitForTimeout(2200);
-  await page.keyboard.press('f');            // bureau : panneau ouvert ; téléphone : la fenêtre du marché
+  await page.keyboard.press('i');            // touche I. Bureau : panneau ouvert ; téléphone : la fenêtre du marché
   await page.waitForTimeout(900);
   return { ctx, page, erreurs };
 }

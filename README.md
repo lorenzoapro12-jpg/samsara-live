@@ -188,7 +188,7 @@ littérature se contredit (GEX, ratio L/S, DXY), la contradiction elle-même.
 - La **formule** d'un champ du fichier est lue dans `meta.champs` (publiée par `publish.py`) ;
   celle d'un indicateur du graphique est construite avec `PARAM` (`js/app.js`), les paramètres
   mêmes du calcul. Aucune formule n'est rédigée à côté du code.
-- Le mode **Débutant / Expert** (bouton, touche M) n'est qu'une classe : le HTML est identique
+- Le mode **Lisible / Complet** (interrupteur de l'en-tête, touche M ; gardé `debutant` / `expert`) n'est qu'une classe : le HTML est identique
   dans les deux modes, seul le niveau de détail affiché change — jamais une valeur.
 - Une fiche dit comment l'indicateur **se lit**, jamais quoi acheter ou vendre.
 

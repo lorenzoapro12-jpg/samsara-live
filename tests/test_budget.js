@@ -170,7 +170,7 @@ async function mesurer(nav, theme, injection, bc) {
   await page.goto(`http://127.0.0.1:${serveur.address().port}/index.html`);
   if (injection) await page.addStyleTag({ content: injection });
   await page.waitForTimeout(2500);
-  await page.keyboard.press('f');                       // panneau du marché ouvert : la page complète
+  await page.keyboard.press('i');                       // panneau du marché ouvert (touche I) : la page complète
   await page.waitForTimeout(1500);
   const cdp = await ctx.newCDPSession(page);
   await cdp.send('Performance.enable');

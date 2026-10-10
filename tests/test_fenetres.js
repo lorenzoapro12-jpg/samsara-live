@@ -153,7 +153,7 @@ const dedans = (a, b, m = 0.5) => a && b && a.g >= b.g - m && a.d <= b.d + m && 
       check(`publication en retard (« ${retard.texte} ») : les minutes restent, l'icône d'avertissement s'ajoute`,
         retard.vieux && /\d+ min/.test(retard.texte) && /^url\("data:image\/svg/.test(retard.icone), retard);
       // 5. Fenêtre active : le marché live au survol
-      await p.keyboard.press('f'); await p.waitForTimeout(400);
+      await p.keyboard.press('i'); await p.waitForTimeout(400);
       await p.mouse.move(700, 450); await p.waitForTimeout(100);
       const fond = s => p.evaluate(s => getComputedStyle(document.querySelector(s)).backgroundImage + ' ' + getComputedStyle(document.querySelector(s)).backgroundColor, s);
       const inactive = await fond('#feedPanel > .f95-titre'), graphique = await fond('.chart-container > .f95-titre');
@@ -176,9 +176,9 @@ const dedans = (a, b, m = 0.5) => a && b && a.g >= b.g - m && a.d <= b.d + m && 
       titre(`${theme} — largeur de la fenêtre (1100 × 800) : le marché live s'ouvre puis se replie`);
       const o2 = await ouvrir(nav, theme, { width: 1100, height: 800 });
       const avant = await boites(o2.page);
-      await o2.page.keyboard.press('f'); await o2.page.waitForTimeout(150);      // < 350 ms, le délai de toggleFeed
+      await o2.page.keyboard.press('i'); await o2.page.waitForTimeout(150);      // < 350 ms, le délai de toggleFeed
       const pendant = await boites(o2.page);
-      await o2.page.keyboard.press('f'); await o2.page.waitForTimeout(150);
+      await o2.page.keyboard.press('i'); await o2.page.waitForTimeout(150);
       const apres = await boites(o2.page);
       check(`ouvert : la barre d'état rétrécit, ${avant.nKpis} → ${pendant.nKpis} chiffres clés, aucun coupé`,
         pendant.cycle.l < avant.cycle.l && pendant.nKpis < avant.nKpis && pendant.deborde <= 1 && pendant.kpis.every(k => dedans(k, pendant.cycle)),

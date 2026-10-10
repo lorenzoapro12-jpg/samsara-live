@@ -21,8 +21,11 @@
 //      détail qui a quitté l'écran (état au prix, chemins, autres scénarios, journal, bilan), pas
 //      d'infobulle des prix par-dessus, un curseur « main ».
 //   8. ASTUCE : une fois (tactile : « Touchez… » ; souris : « Survolez… »), jamais sur un texte.
-//   9. BASCULE (touche M) : l'Expert revient entier, remis en page ; retour au Débutant identique ;
-//      mêmes valeurs dans les deux modes.
+//   9. BASCULE (touche M, ou l'interrupteur « Lisible | Complet ») : l'Expert revient entier, remis
+//      en page ; retour au Débutant identique ; mêmes valeurs dans les deux modes. Le segment du
+//      mode actif est enfoncé (aria-pressed) ; le cliquer ne fait rien. Le mode changé sur la carte
+//      (autre onglet) suit ici ; sans data-mode (ou une valeur inconnue), la feuille montre le
+//      Lisible, jamais les deux variantes à la fois.
 //  10. STRUCTURES de thème en Débutant : pastille « Infos du marché », manchette masquée.
 //  11. SOBRIÉTÉ : survoler une cible ne redessine pas le graphique ; au repos, rien.
 //
@@ -41,7 +44,7 @@ for (const p of ['playwright', '/opt/node22/lib/node_modules/playwright', proces
   try { playwright = require(p); break; } catch (e) { /* suivant */ }
 }
 if (!playwright) {
-  console.log('  − NON EXÉCUTÉ : Playwright introuvable — le mode Débutant n\'est pas vérifié à l\'écran sur ce poste.');
+  console.log('  − NON EXÉCUTÉ : Playwright introuvable — le mode Lisible n\'est pas vérifié à l\'écran sur ce poste.');
   process.exit(0);
 }
 let ko = 0;
@@ -195,6 +198,26 @@ const dessin = page => page.evaluate(() => {
   };
 });
 const chevauche = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+/** L'interrupteur de mode de l'en-tête (#modeBtn, le même que celui de la carte) : son rôle, son
+ *  nom, ses deux segments (texte, mode, aria-pressed, entier dans l'écran, cliquable — au-dessus
+ *  de tout —, et leur apparence : fond, couleur, ombre, bordure). */
+const interrupteur = page => page.evaluate(() => {
+  const b = document.getElementById('modeBtn');
+  if (!b) return null;
+  const sous = e => { const q = e.getBoundingClientRect(); if (!q.width || !q.height) return false; const x = document.elementFromPoint(Math.min(innerWidth - 1, q.left + q.width / 2), Math.min(innerHeight - 1, q.top + q.height / 2)); return !!x && (x === e || e.contains(x)); };
+  const segs = [...b.querySelectorAll('button')].map(s => {
+    const q = s.getBoundingClientRect(), cs = getComputedStyle(s);
+    return { texte: s.textContent.trim(), mode: s.getAttribute('data-mode-choix'), presse: s.getAttribute('aria-pressed'),
+      entier: q.width > 0 && s.scrollWidth <= s.clientWidth + 1 && q.left >= -0.5 && q.right <= innerWidth + 0.5 && q.top >= -0.5 && q.bottom <= innerHeight + 0.5, dessus: sous(s),
+      aspect: [cs.backgroundColor, cs.backgroundImage, cs.color, cs.boxShadow, cs.borderTopColor, cs.borderTopStyle, cs.fontWeight, cs.textDecorationLine].join(' / ') };
+  });
+  return { role: b.getAttribute('role'), nom: b.getAttribute('aria-label'), segs, visible: b.getClientRects().length > 0 && getComputedStyle(b).visibility !== 'hidden' };
+});
+/** « Lisible » puis « Complet », entiers et cliquables, celui du mode m seul enfoncé, et surligné
+ *  (son apparence diffère de celle de l'autre segment). */
+const interrupteurJuste = (x, m) => !!x && x.visible && x.role === 'group' && x.nom === 'Mode d\'affichage'
+  && x.segs.map(s => s.texte + ':' + s.mode).join('|') === 'Lisible:debutant|Complet:expert'
+  && x.segs.every(s => s.presse === String(s.mode === m) && s.entier && s.dessus) && x.segs[0].aspect !== x.segs[1].aspect;
 const nombres = t => (t.match(/\d{1,3}(?:[\s  ]\d{3})+|\d+/g) || []).map(x => x.replace(/[\s  ]/g, ''));
 const VERBES = /\b(touche|est passé|monte|baisse|hésite|s’agite|est entre|est sous|est au-dessus|est sans repère|indisponible)\b/;
 // forme : PARAM.guide.debutant.forme (26) — plan figures §5.3 et amendement C1 (« Cible touchée, à confirmer », 26).
@@ -655,10 +678,12 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
     }
 
     // ── Bascule : touche M ──
-    titre('Bascule Débutant ↔ Expert (touche M)');
+    titre('Bascule Lisible ↔ Complet (touche M, interrupteur de l\'en-tête)');
     {
       const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
       const d1 = await dessin(o.page);
+      const it0 = await interrupteur(o.page);
+      check('interrupteur « Lisible | Complet » (groupe « Mode d\'affichage ») : Lisible enfoncé et surligné au départ, les deux segments entiers et cliquables', interrupteurJuste(it0, 'debutant'), it0);
       await o.page.keyboard.press('m'); await o.page.waitForTimeout(400);
       const x = await dessin(o.page);
       const exp = await o.page.evaluate(() => {
@@ -670,6 +695,8 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
           kpisDom: document.querySelectorAll('#cycle .kpi').length, aria: c.getAttribute('aria-label') };
       });
       check('M → data-mode="expert"', exp.mode === 'expert' && x.mode === 'expert', exp);
+      const it1 = await interrupteur(o.page);
+      check('M → l\'interrupteur suit : Complet enfoncé et surligné, Lisible non', interrupteurJuste(it1, 'expert'), it1);
       check('Expert : le badge du régime, « Et ensuite ? » (2 boîtes ou une commune), le compteur', x.cibles.some(c => /^Tendance|^Sans tendance|^Régime/.test(c.titre || '')) && x.chemins && x.chemins.boites.length >= 1 && x.trace.some(t => /^\d[\d ]*\/\d[\d ]* · /.test(t)), { cibles: x.cibles.map(c => c.titre), chemins: x.chemins, trace: x.trace.slice(0, 8) });
       check('Expert : au moins 3 bandes nommées, l\'encadré des scénarios de plusieurs lignes (« Scénarios du matin · »), les libellés des rangs 2 et 3 ou leurs lignes',
         x.cibles.filter(c => c.prio === 1).length >= 2 && x.scen && x.scen.boite && !x.scen.boite.deb && x.scen.boite.lignes.length > 1 && /^Scénarios du matin · /.test(x.scen.boite.lignes[0])
@@ -680,9 +707,24 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       check('Expert : le graphique remis en page (taille du canvas = son conteneur × devicePixelRatio)', exp.taille[0] === exp.attendu[0] && exp.taille[1] === exp.attendu[1], exp);
       check('Expert : un sous-graphe (Volume) revient', x.sous.includes('vol'), x.sous);
       check('mêmes valeurs dans les deux modes : niveaux choisis, régime, états des scénarios', JSON.stringify(d1.valeurs) === JSON.stringify(x.valeurs) && JSON.stringify(d1.scen.items) === JSON.stringify(x.scen.items), { deb: [d1.valeurs, d1.scen.items], exp: [x.valeurs, x.scen.items] });
+      // Le segment du mode actif ne fait rien : ni changement de mode, ni écriture, ni redessin du Lisible.
+      await o.page.evaluate(() => { window.__ecrits = []; const f = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { window.__ecrits.push(k + '=' + v); return f.apply(this, arguments); }; });
+      await o.page.click('#modeBtn [data-mode-choix="expert"]'); await o.page.waitForTimeout(300);
+      const actif = await o.page.evaluate(() => ({ mode: document.documentElement.getAttribute('data-mode'), deb: debutant(), items: debEtat ? debEtat.items.length : null, ecrits: window.__ecrits.slice() }));
+      check('clic sur « Complet » (le mode actif) : rien ne change (mode, stockage, graphique)', actif.mode === 'expert' && !actif.deb && actif.items === null && !actif.ecrits.some(e => /^samsara-mode=/.test(e)) && interrupteurJuste(await interrupteur(o.page), 'expert'), actif);
       await o.page.keyboard.press('m'); await o.page.waitForTimeout(400);
       const d2 = await dessin(o.page);
       check('2e M → retour au Débutant, les mêmes textes', d2.mode === 'debutant' && JSON.stringify(d2.items.map(i => i.texte)) === JSON.stringify(d1.items.map(i => i.texte)), { avant: d1.items.map(i => i.texte), apres: d2.items.map(i => i.texte) });
+      check('2e M → Lisible enfoncé de nouveau', interrupteurJuste(await interrupteur(o.page), 'debutant'));
+      // L'autre segment change de mode, comme M : Complet, puis Lisible, les mêmes textes.
+      await o.page.click('#modeBtn [data-mode-choix="expert"]'); await o.page.waitForTimeout(400);
+      const c1 = await o.page.evaluate(() => ({ mode: document.documentElement.getAttribute('data-mode'), deb: debutant(), items: debEtat ? debEtat.items.length : null, stocke: localStorage.getItem('samsara-mode') }));
+      const itC = await interrupteur(o.page);
+      check('clic sur « Complet » : le mode Complet partout (page, graphique, stockage « expert »), Complet enfoncé', c1.mode === 'expert' && !c1.deb && c1.items === null && c1.stocke === 'expert' && interrupteurJuste(itC, 'expert'), { c1, itC });
+      await o.page.click('#modeBtn [data-mode-choix="debutant"]'); await o.page.waitForTimeout(400);
+      const d3 = await dessin(o.page);
+      const l1 = await o.page.evaluate(() => ({ deb: debutant(), stocke: localStorage.getItem('samsara-mode') }));
+      check('clic sur « Lisible » : retour au Lisible (stockage « debutant »), les mêmes textes, Lisible enfoncé', d3.mode === 'debutant' && l1.deb && l1.stocke === 'debutant' && JSON.stringify(d3.items.map(i => i.texte)) === JSON.stringify(d1.items.map(i => i.texte)) && interrupteurJuste(await interrupteur(o.page), 'debutant'), { l1, apres: d3.items.map(i => i.texte) });
       check('bascule : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
@@ -755,6 +797,96 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       check(`${nom} : SOL/USDT, « Ordres en attente » grisé, non cochable, « BTC/USDT seulement » ; le Volume compte des SOL`,
         sol.indispo && sol.coupee && sol.dit === 'BTC/USDT seulement' && / SOL ont été échangés/.test(sol.vol || ''), sol);
       check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length && !o2.erreurs.length, o.erreurs.concat(o2.erreurs));
+      await o.ctx.close();
+    }
+
+    // ── Le mode changé sur la carte (autre onglet, même navigateur) suit dans le terminal ──
+    // Sans réécrire le stockage (la carte vient de l'écrire) ; et dans l'autre sens, la carte suit.
+    titre('Le mode suit la carte (autre onglet)');
+    {
+      const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
+      await o.page.evaluate(() => { window.__ecrits = []; const f = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { window.__ecrits.push(k + '=' + v); return f.apply(this, arguments); }; });
+      const pc = await o.ctx.newPage(), errCarte = [];
+      pc.on('pageerror', e => errCarte.push(e.message));
+      await pc.route('**/*', r => (new URL(r.request().url()).host.startsWith('127.0.0.1') ? r.continue() : r.abort()));
+      await pc.goto(`http://127.0.0.1:${serveur.address().port}/bookmap.html`);
+      await pc.waitForTimeout(800);
+      const carte = () => pc.evaluate(() => ({ mode: document.documentElement.getAttribute('data-mode'), presse: [...document.querySelectorAll('#btnModeBarre [data-mode-choix]')].map(s => s.getAttribute('data-mode-choix') + ':' + s.getAttribute('aria-pressed')).join('|') }));
+      const terminal = () => o.page.evaluate(() => ({ mode: document.documentElement.getAttribute('data-mode'), deb: debutant(), items: debEtat ? debEtat.items.length : null,
+        presse: [...document.querySelectorAll('#modeBtn [data-mode-choix]')].map(s => s.getAttribute('data-mode-choix') + ':' + s.getAttribute('aria-pressed')).join('|'), ecrits: window.__ecrits.filter(e => /^samsara-mode=/.test(e)) }));
+      const c0 = await carte();
+      check('la carte, ouverte à côté, est en Lisible comme le terminal (même réglage)', c0.mode === 'debutant' && c0.presse === 'debutant:true|expert:false', c0);
+      await pc.click('#btnModeBarre [data-mode-choix="expert"]');
+      await o.page.waitForFunction(() => document.documentElement.getAttribute('data-mode') === 'expert', null, { timeout: 5000 }).catch(() => {});
+      await o.page.waitForTimeout(300);
+      const t1 = await terminal();
+      check('« Complet » cliqué sur la carte : le terminal passe en Complet (data-mode, debutant(), graphique redessiné, Complet enfoncé) sans réécrire le stockage',
+        t1.mode === 'expert' && !t1.deb && t1.items === null && t1.presse === 'debutant:false|expert:true' && !t1.ecrits.length, t1);
+      await pc.keyboard.press('m');
+      await o.page.waitForFunction(() => document.documentElement.getAttribute('data-mode') === 'debutant', null, { timeout: 5000 }).catch(() => {});
+      await o.page.waitForTimeout(300);
+      const t2 = await terminal();
+      check('M sur la carte : le terminal revient en Lisible (data-mode, debutant(), le Lisible redessiné, Lisible enfoncé), sans écrire', t2.mode === 'debutant' && t2.deb && t2.items > 0 && t2.presse === 'debutant:true|expert:false' && !t2.ecrits.length, t2);
+      // Dans l'autre sens : le terminal change, la carte suit.
+      await o.page.click('#modeBtn [data-mode-choix="expert"]');
+      await pc.waitForFunction(() => document.documentElement.getAttribute('data-mode') === 'expert', null, { timeout: 5000 }).catch(() => {});
+      const c1 = await carte();
+      check('« Complet » cliqué sur le terminal : la carte suit (Complet enfoncé)', c1.mode === 'expert' && c1.presse === 'debutant:false|expert:true', c1);
+      check('aucune erreur JavaScript (terminal et carte)', !o.erreurs.length && !errCarte.length, { t: o.erreurs, c: errCarte });
+      await o.ctx.close();
+    }
+
+    // ── Sans data-mode (ou une valeur inconnue) : la feuille montre le Lisible, jamais les deux ──
+    // La feuille ne lit plus data-mode="debutant" : tout ce qui n'est pas « expert » est le Lisible.
+    // L'état de chaque élément (display, visibility) et la mise en page de l'en-tête sont relevés dans
+    // la même tâche, l'attribut changé seulement le temps de la lecture (le script ne le voit pas).
+    titre('Feuille : le Lisible par défaut (data-mode absent ou inconnu)');
+    {
+      const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
+      const r = await o.page.evaluate(() => {
+        const h = document.documentElement, tous = [...document.body.querySelectorAll('*')];
+        const releve = () => {
+          const etat = tous.map(e => { const cs = getComputedStyle(e); return cs.display + ' ' + cs.visibility; });
+          const tete = [...document.querySelectorAll('.header *')].filter(e => e.getClientRects().length).map(e => { const q = e.getBoundingClientRect(); return [q.left, q.top, q.width, q.height].map(Math.round).join(','); });
+          const seg = [...document.querySelectorAll('#modeBtn [data-mode-choix]')].map(s => { const cs = getComputedStyle(s); return cs.backgroundColor + ' ' + cs.color + ' ' + cs.boxShadow; });
+          const vis = sel => [...document.querySelectorAll(sel)].filter(e => e.getClientRects().length > 0).length;
+          return { etat, tete, seg, expertSeul: vis('.expert-seul'), debutantSeul: vis('.debutant-seul') };
+        };
+        const avec = v => { if (v === null) h.removeAttribute('data-mode'); else h.setAttribute('data-mode', v); return releve(); };
+        const ref = avec('debutant'), exp = avec('expert');
+        const diff = (a, b) => a.etat.reduce((n, x, i) => n + (x !== b.etat[i]), 0) + (a.tete.join('|') !== b.tete.join('|')) + (a.seg.join('|') !== b.seg.join('|'));
+        const out = { ref: { expertSeul: ref.expertSeul, debutantSeul: ref.debutantSeul }, diffExpert: diff(ref, exp), variantes: {} };
+        for (const [nom, v] of [['absent', null], ['lisible', 'lisible'], ['inconnu', 'xyz'], ['vide', '']]) {
+          const x = avec(v);
+          out.variantes[nom] = { diff: diff(ref, x), expertSeul: x.expertSeul, debutantSeul: x.debutantSeul, tete: x.tete.join('|') === ref.tete.join('|'), seg: x.seg.join('|') === ref.seg.join('|') };
+        }
+        h.setAttribute('data-mode', 'debutant');
+        return out;
+      });
+      check(`témoin : data-mode="expert" change bien l'écran (${r.diffExpert} différences) ; en Lisible, aucun .expert-seul visible, des .debutant-seul visibles`, r.diffExpert > 5 && r.ref.expertSeul === 0 && r.ref.debutantSeul > 0, r);
+      for (const [nom, v] of Object.entries(r.variantes))
+        check(`data-mode ${nom} : exactement l'écran du Lisible (tous les éléments, l'en-tête, Lisible surligné), jamais les variantes Complet`, v.diff === 0 && v.expertSeul === 0 && v.debutantSeul === r.ref.debutantSeul && v.tete && v.seg, v);
+      check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
+    // ── Les touches, dites dans les Légendes (une ligne, les mêmes que sur la carte) ──
+    titre('Touches : M, ?, R, F, I');
+    {
+      const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
+      await o.page.keyboard.press('?'); await o.page.waitForTimeout(200);
+      const l = await o.page.evaluate(() => { const p = document.getElementById('fichePop'), t = p && p.querySelector('.fiche-touches'); return { ouvert: !!p && !p.hidden, titre: p && (p.querySelector('.fiche-titre') || {}).textContent, ligne: t && t.getClientRects().length ? t.innerText : null, h: t ? t.getBoundingClientRect().height : 0 }; });
+      check(`? ouvre les Légendes, avec la ligne des touches (« ${l.ligne} »)`, l.ouvert && l.titre === 'Légendes' && /\bM change de mode \(Lisible \/ Complet\)/.test(l.ligne || '') && /\? cette aide/.test(l.ligne || '') && /\bR revient à la vue de départ/.test(l.ligne || '') && /\bF suit le présent/.test(l.ligne || '') && /\bI les infos du marché/.test(l.ligne || '') && !bannis(l.ligne || '').length, l);
+      await o.page.keyboard.press('Escape');
+      // R et F : la vue revient au présent (la dernière bougie à droite), comme sur la carte.
+      for (const k of ['r', 'f']) {
+        await o.page.evaluate(() => { const n = viewEnd - viewStart; viewEnd = Math.max(n, candles.length - 60); viewStart = viewEnd - n; drawChart(); });
+        const avant = await o.page.evaluate(() => viewEnd === candles.length);
+        await o.page.keyboard.press(k); await o.page.waitForTimeout(150);
+        const apres = await o.page.evaluate(() => viewEnd === candles.length);
+        check(`${k.toUpperCase()} (Lisible) : la vue revient au présent (la dernière bougie)`, !avant && apres, { avant, apres });
+      }
+      check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
 
@@ -1068,6 +1200,8 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       check(`${theme} · ${w} : la phrase entière, jamais coupée (« ${r.phrase} »)`, r.phrase && !/…$/.test(r.phrase) && /\.$/.test(r.phrase), r.phrase);
       check(`${theme} · ${w} : prix, variation 24 h (« ${r.var24} »), bouton de mode et pastille visibles, sans chevauchement ni débordement`,
         !r.ch.length && r.debord <= 1 && ['#price', '#var24', '#modeBtn', '#cycle .kpi-deb'].every(q => r.vus.includes(q)) && r.v24.right <= r.vw + 0.5, r);
+      const it = await interrupteur(o.page);
+      check(`${theme} · ${w} : interrupteur « Lisible | Complet » entier, dans l'écran, cliquable, Lisible enfoncé et surligné`, interrupteurJuste(it, 'debutant'), it);
       await o.ctx.close();
     }
 
@@ -1083,12 +1217,13 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         const k = document.querySelector('#cycle .kpi-deb'), cy = document.getElementById('cycle'), hd = document.querySelector('.header'), mb = document.getElementById('modeBtn');
         const parent = cy.parentElement, pr = parent.getBoundingClientRect();
         return { kpi: vis(k) ? k.getAttribute('title') : null, cadre: [Math.round(pr.width), Math.round(pr.height)], manchette: [...document.querySelectorAll('.gazette-manchette')].some(vis),
-          mode: vis(mb) ? mb.innerText : null, tete: [hd.scrollWidth, hd.clientWidth], structure: document.documentElement.getAttribute('data-structure'),
+          mode: vis(mb), tete: [hd.scrollWidth, hd.clientWidth], structure: document.documentElement.getAttribute('data-structure'),
           page: [document.documentElement.scrollWidth, document.documentElement.clientWidth], canvas: Math.round(canvas.getBoundingClientRect().height), vh: innerHeight };
       });
       check(`${nom} : pas de défilement de côté ; le graphique garde au moins la moitié de la hauteur (${s.canvas} px sur ${s.vh})`, s.page[0] <= s.page[1] + 1 && s.canvas >= s.vh * 0.5, s);
-      check(`${nom} : pastille « Infos du marché » visible (âge en infobulle), son cadre non vide, manchette masquée, bouton de mode visible, en-tête sans débordement`,
-        /il y a \d+ min/.test(s.kpi || '') && s.cadre[0] > 0 && s.cadre[1] > 0 && !s.manchette && /expert/i.test(s.mode || '') && s.tete[0] <= s.tete[1] + 1, s);
+      const it = await interrupteur(o.page);
+      check(`${nom} : pastille « Infos du marché » visible (âge en infobulle), son cadre non vide, manchette masquée, interrupteur « Lisible | Complet » entier et cliquable (Lisible enfoncé et surligné), en-tête sans débordement`,
+        /il y a \d+ min/.test(s.kpi || '') && s.cadre[0] > 0 && s.cadre[1] > 0 && !s.manchette && s.mode && interrupteurJuste(it, 'debutant') && s.tete[0] <= s.tete[1] + 1, { s, it });
       check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }

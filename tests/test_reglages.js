@@ -54,11 +54,11 @@ check('tranche des murs affichée = tranche publiée', h0.includes('par tranche 
 // La bande vient d'un RÉGLAGE de l'Expert, masqué en Débutant : la carte « Ordres en attente »
 // du Débutant la dit, et dit quand elle a été choisie en mode Expert.
 check('Débutant, « Ordres en attente » : « à ±' + frB(LQ.bande_ref_pct) + ' % du prix », sans « bande choisie » quand rien n’est réglé',
-  h0.includes('Binance, à ±' + frB(LQ.bande_ref_pct) + ' % du prix') && !h0.includes('bande choisie en mode Expert'));
+  h0.includes('Binance, à ±' + frB(LQ.bande_ref_pct) + ' % du prix') && !h0.includes('bande choisie en mode Complet'));
 {
   const rg = page.sandbox.reglagesHtml();
   check('Réglages : « référence publiée (±' + frB(LQ.bande_ref_pct) + ' %) » à la française, comme les autres bandes ; la carte du Débutant nommée',
-    rg.includes('référence publiée (±' + frB(LQ.bande_ref_pct) + ' %)') && rg.includes('du mode Débutant') && !/±\d+\.\d/.test(rg), (rg.match(/±[\d.,]+ %[^<]{0,20}/g) || []).slice(0, 6));
+    rg.includes('référence publiée (±' + frB(LQ.bande_ref_pct) + ' %)') && rg.includes('du mode Lisible') && !rg.includes('Débutant') && !/±\d+\.\d/.test(rg), (rg.match(/±[\d.,]+ %[^<]{0,20}/g) || []).slice(0, 6));
 }
 {
   // Plus de bouton « Réglages » dans l'en-tête : ce sont les « Réglages fins », repliés en bas du
@@ -107,7 +107,7 @@ regler(r => { r.carnet.bande = +autre; });
 const h2 = rendre();
 check(`bande choisie (±${autre} %) parmi les PUBLIÉES : son ratio publié tel quel`, h2.includes('Carnet ±' + frB(autre) + ' %')
   && h2.includes('>' + fr2(LQ.bandes[autre].ratio) + '</b>'));
-check(`… et la carte du Débutant le dit : « à ±${frB(autre)} % du prix (bande choisie en mode Expert) »`, h2.includes('Binance, à ±' + frB(autre) + ' % du prix (bande choisie en mode Expert)'));
+check(`… et la carte du Débutant le dit : « à ±${frB(autre)} % du prix (bande choisie en mode Complet) »`, h2.includes('Binance, à ±' + frB(autre) + ' % du prix (bande choisie en mode Complet)'));
 regler(r => { r.carnet.bande = 0.37; });
 check('bande demandée mais NON publiée : retour à la référence publiée (rien d’inventé)', rendre().includes('Carnet ±' + frB(LQ.bande_ref_pct) + ' %'));
 

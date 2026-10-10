@@ -198,14 +198,18 @@ function sonderRefraction() {
 // Une touche seule : Ctrl / Cmd / Alt + touche reste au navigateur (Ctrl+R recharge, Ctrl+F
 // cherche), et une saisie (champ, liste déroulante, texte éditable) garde ses touches — les
 // flèches d'une liste du Grid Bot changeaient la vue du graphique. Même règle que la carte.
+// Une même touche veut dire la même chose sur les deux pages : M le mode, ? l'aide de la page,
+// R la vue de départ, F suivre le présent — ici, la même vue que R (la dernière bougie à droite) ;
+// les infos du marché passent sur I (F les ouvrait). La liste, dite à l'écran : RACCOURCIS_TERMINAL
+// (js/fiches.js, les Légendes).
 window.addEventListener('keydown', (e) => {
   const cible = e.target || {};
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (cible.tagName === 'INPUT' || cible.tagName === 'TEXTAREA' || cible.tagName === 'SELECT' || cible.isContentEditable) return;
-  if (e.key === 'f' || e.key === 'F') { toggleFeed(); e.preventDefault(); }
+  if (e.key === 'i' || e.key === 'I') { toggleFeed(); e.preventDefault(); }
   if (e.key === 'd' || e.key === 'D') { themeJumeau(); e.preventDefault(); }
   if (e.key === 't' || e.key === 'T') { themeSuivant(); e.preventDefault(); }
-  if (e.key === 'r' || e.key === 'R') { resetView(); e.preventDefault(); }
+  if (e.key === 'r' || e.key === 'R' || e.key === 'f' || e.key === 'F') { resetView(); e.preventDefault(); }
   if (e.key === 'm' || e.key === 'M') { basculerMode(); e.preventDefault(); }
   if (e.key === '?') { ouvrirGlossaire(); e.preventDefault(); }
   if (e.key === 'Escape') { document.getElementById('indMenu').classList.remove('open'); document.getElementById('themeMenu').classList.remove('open'); document.getElementById('paireMenu').classList.remove('open'); }
@@ -8447,7 +8451,7 @@ function renderFeedTo(container) {
     const cle = (RC.bande !== null && bandes[String(RC.bande)]) ? String(RC.bande) : String(lq.bande_ref_pct);
     // La bande vient d'un RÉGLAGE (masqué en Débutant) : le sous-titre la dit, et dit qu'elle a
     // été choisie en mode Expert — sinon un réglage changeait ces BTC sans que rien ne le dise.
-    liqSousDeb = 'Binance, à ' + bandeTxt(cle) + ' du prix' + (RC.bande !== null && cle === String(RC.bande) ? ' (bande choisie en mode Expert)' : '');
+    liqSousDeb = 'Binance, à ' + bandeTxt(cle) + ' du prix' + (RC.bande !== null && cle === String(RC.bande) ? ' (bande choisie en mode Complet)' : '');
     const bt = bandes[cle] || { ratio: lq.ratio_bid_ask, bid_btc: lq.total_bid, ask_btc: lq.total_ask };
     liqDeb = splitHtml(bt.bid_btc, bt.ask_btc, 'À l’achat&nbsp;<b>' + btcDeb(bt.bid_btc) + '</b>', 'À la vente&nbsp;<b>' + btcDeb(bt.ask_btc) + '</b>')
       + lectureCourte('carnet', bt.ratio)
@@ -8617,7 +8621,7 @@ function valeurContre(v) {
 }
 function contreCorps(d) {
   if (!d) return '';
-  return envDebutant('<div class="fine">Le navigateur recalcule les chiffres publiés : détail en mode Expert.</div>') + envExpert(contreCorpsExpert(d));
+  return envDebutant('<div class="fine">Le navigateur recalcule les chiffres publiés : détail en mode Complet.</div>') + envExpert(contreCorpsExpert(d));
 }
 function contreCorpsExpert(d) {
   const pub = Date.parse(d.updated), hm = isFinite(pub) ? Fmt.jourHeure(pub) : '—';

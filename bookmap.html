@@ -9,6 +9,13 @@
      elle ne charge aucun code. Elle n'interroge que Binance et GitHub Raw (contrat réseau :
      tests/test_contrat.py). -->
 <link rel="stylesheet" href="css/bookmap.css">
+<script>
+  /* Le mode (Lisible / Complet ; gardé 'debutant' / 'expert', le même que le terminal), posé AVANT le
+     premier rendu, comme dans index.html : un visiteur en Complet ne voit pas un instant l'écran
+     Lisible. Lisible par défaut, et quand le stockage est bloqué. */
+  try { document.documentElement.setAttribute('data-mode', localStorage.getItem('samsara-mode') === 'expert' ? 'expert' : 'debutant'); }
+  catch (e) { document.documentElement.setAttribute('data-mode', 'debutant'); }
+</script>
 </head>
 <body>
 
@@ -16,12 +23,13 @@
   <div class="barre-gauche">
     <a class="retour" href="index.html" title="Revenir au terminal">← Terminal</a>
     <h1>Carte <span class="sous expert-seul">BTC/USDT · carnet, exécutions, murs, gamma</span><span class="sous debutant-seul">BTC/USDT · ordres en attente et échanges</span></h1>
-    <!-- Le mode (débutant / expert) : le même que le terminal. Libellé long à partir de 1024 px. -->
-    <button type="button" class="bouton bouton-mode" id="btnModeBarre" title="Changer de mode (touche M) : le même réglage que le terminal, le changer ici le change aussi là-bas"><span class="mode-long">Débutant · passer en Expert</span><span class="mode-court">Passer en Expert</span><span class="mode-mini">→ Expert</span></button>
   </div>
   <nav class="calques" id="calques" aria-label="Calques affichés"></nav>
+  <!-- L'interrupteur de mode, le même que celui du terminal (index.html) et au même endroit : à droite de
+       l'en-tête, devant les boutons de la page. Le segment actif est enfoncé (aria-pressed). -->
+  <div class="mode-bascule" id="btnModeBarre" role="group" aria-label="Mode d'affichage" title="Mode d'affichage (touche M) : Lisible, l'essentiel ; Complet, tout le détail. Le même réglage que le terminal : le changer ici le change aussi là-bas."><button type="button" class="mode-btn" data-mode-choix="debutant">Lisible</button><button type="button" class="mode-btn" data-mode-choix="expert">Complet</button></div>
   <div class="barre-droite">
-    <button type="button" class="bouton" id="btnSuivre" aria-pressed="true" title="Suivre le présent (F) — double-clic sur la carte : vue par défaut">Suivre</button>
+    <button type="button" class="bouton" id="btnSuivre" aria-pressed="true" title="Suivre le présent (F) — R ou double-clic sur la carte : la vue de départ">Suivre</button>
     <button type="button" class="bouton expert-seul" id="btnReglages" aria-controls="reglages" aria-expanded="false" title="Réglages d'affichage">Réglages</button>
     <button type="button" class="bouton" id="btnJournal" aria-controls="journalPanneau" aria-expanded="false" title="Ce qui vient de se passer : gros ordres posés, retirés ou échangés, murs, grosses vagues d'échanges (J)">Journal</button>
     <button type="button" class="bouton expert-seul" id="btnRafales" aria-controls="rafalesPanneau" aria-expanded="false" aria-label="Rafales : la liste des dernières" title="La liste des dernières rafales au marché (le calque, lui, est la puce « Rafales »)">≡ Rafales</button>
@@ -162,7 +170,7 @@
     <h3>Gestes</h3>
     <p>Glisser : déplacer la carte. <span class="geste-souris">Molette ou deux doigts : zoomer ; double-clic : revenir à la vue par défaut.</span><span class="geste-doigt">Deux doigts : zoomer ; double appui : revenir à la vue par défaut.</span></p>
     <p>Toucher ou survoler un élément : son détail. Au doigt, un appui bref le montre et le même appui l'enlève ; un appui long le fait suivre le doigt.</p>
-    <p><button type="button" class="bouton" id="btnIntroDebutant">Comment lire cette carte</button> <button type="button" class="bouton bouton-mode" id="btnModeDebutant">Passer en Expert</button></p>
+    <p><button type="button" class="bouton" id="btnIntroDebutant">Comment lire cette carte</button> <button type="button" class="bouton bouton-mode" id="btnModeDebutant">Passer en Complet</button></p>
     <p class="note">La carte décrit des ordres en attente et des échanges passés, pas une recommandation : un ordre peut être retiré avant d'être touché, et un rond ne dit pas qui a acheté.</p>
   </div>
   <div class="expert-seul">
@@ -197,7 +205,7 @@
     <dd>À droite, la <b>somme</b> des ordres du dernier carnet live par tranche. À gauche, le profil des exécutions visibles. En bas, le volume (achats au-dessus, ventes au-dessous), regroupé par <span id="legVolume">1, 2, 3, 5, 10…</span> min selon le zoom — le titre du panneau dit la durée — et le CVD : achats au marché moins ventes au marché, cumulés depuis le bord gauche de la vue ; après des bougies non lues (hachurées), il repart de 0 et le dit.</dd>
   </dl>
   <h3>Guide : la carte en mots</h3>
-  <p><button type="button" class="bouton" id="btnIntro">Comment lire cette carte (?)</button> <button type="button" class="bouton" id="btnMode">Passer en Débutant</button></p>
+  <p><button type="button" class="bouton" id="btnIntro">Comment lire cette carte (?)</button> <button type="button" class="bouton" id="btnMode">Passer en Lisible</button></p>
   <p class="note" id="legGuideMode"></p>
   <dl class="leg-guide">
     <dt>Le guide</dt><dd id="legGuide"></dd>
@@ -209,7 +217,8 @@
     <dt>Limites</dt><dd id="legGuideLimites"></dd>
   </dl>
   <h3>Gestes</h3>
-  <p>Glisser : déplacer. Molette : zoom dans le temps (sur l'axe des prix, ou avec Maj : zoom des prix). Pincer à deux doigts. Glisser sur un axe : l'étirer. Ctrl + molette : zoom du temps et des prix ensemble. + / − : zoom dans le temps. Double-clic ou R : vue par défaut. F : suivre le présent. Flèches : se déplacer. Échap : fermer un panneau. ? : comment lire cette carte. G : le guide sur la carte. J : le journal. L : la légende. M : mode débutant / expert (le même que le terminal : le changer ici le change aussi là-bas).</p>
+  <p>Glisser : déplacer. Molette : zoom dans le temps (sur l'axe des prix, ou avec Maj : zoom des prix). Pincer à deux doigts. Glisser sur un axe : l'étirer. Ctrl + molette : zoom du temps et des prix ensemble. + / − : zoom dans le temps. Flèches : se déplacer. Échap : fermer un panneau.</p>
+  <p>Touches, les mêmes que sur le terminal : M : changer de mode, Lisible / Complet (le même réglage que le terminal : le changer ici le change aussi là-bas). ? : comment lire cette carte. R ou double-clic : revenir à la vue de départ. F : suivre le présent. Et sur la carte : G : le guide. J : le journal. L : la légende.</p>
   <p>Au doigt : un appui bref épingle la lecture là où il tombe (le même appui l'enlève) ; un appui long l'affiche et la fait suivre le doigt sans déplacer la carte.</p>
   <p class="note">Toutes les heures de la carte (axe, pastilles, journal, marques) sont celles de l'appareil ; le fuseau est écrit une fois, dans l'angle sous l'axe des prix. « Maintenant » est l'heure de Binance, recalée.</p>
   <p class="note">Ce que la carte montre est une lecture du carnet, pas une recommandation : un mur peut être retiré avant d'être touché, et un rond ne dit pas qui a acheté.</p>
