@@ -60,6 +60,28 @@ check('Débutant, « Ordres en attente » : « à ±' + frB(LQ.bande_ref_pct) + 
   check('Réglages : « référence publiée (±' + frB(LQ.bande_ref_pct) + ' %) » à la française, comme les autres bandes ; la carte du Débutant nommée',
     rg.includes('référence publiée (±' + frB(LQ.bande_ref_pct) + ' %)') && rg.includes('du mode Débutant') && !/±\d+\.\d/.test(rg), (rg.match(/±[\d.,]+ %[^<]{0,20}/g) || []).slice(0, 6));
 }
+{
+  // Plus de bouton « Réglages » dans l'en-tête : ce sont les « Réglages fins », repliés en bas du
+  // panneau « Choisir l'affichage » du Complet — le même contenu, la même clé, les mêmes effets.
+  const vm = require('vm');
+  const exp = chargerPage({ stockage: { 'samsara-mode': 'expert' } });
+  exp.T.setData(DATA);
+  vm.runInContext('buildDropdown()', exp.sandbox);
+  const panneau = exp.T.el('indMenu').innerHTML, rg = exp.sandbox.reglagesHtml();
+  check('Complet : les réglages sont les « Réglages fins », repliés, en bas du panneau « Choisir l’affichage », avec tout leur contenu',
+    /<details class="aff-fins"[^>]*><summary>Réglages fins<\/summary>/.test(panneau) && !/<details class="aff-fins"[^>]* open/.test(panneau)
+    && panneau.includes(rg) && rg.includes('r_live_niveaux') && rg.includes('r_heat_seuil') && panneau.indexOf('aff-fins') > panneau.lastIndexOf('data-ind='), panneau.slice(-300));
+  const deb = chargerPage();
+  vm.runInContext('buildDropdown()', deb.sandbox);
+  check('Lisible : pas de réglages fins dans le panneau', !deb.T.el('indMenu').innerHTML.includes('Réglages fins') && !deb.T.el('indMenu').innerHTML.includes('r_live_niveaux'));
+  const html = fs.readFileSync(path.join(REPO, 'index.html'), 'utf8');
+  check('plus de bouton ni de bulle « Réglages » dans l’en-tête (#reglagesBtn, #reglagesPop)', !/id="reglages(Btn|Pop)"/.test(html));
+  // (Le bac n'a pas de canvas : le dessin du graphique, que appliquerReglages demande, est neutralisé.)
+  vm.runInContext('drawChart = () => {}; REGLAGES.carnet.murs = 12; sauverReglages(); reinitReglages()', exp.sandbox);
+  check('même clé (samsara-reglages-v1) ; « Réglages par défaut » les remet et reconstruit le panneau',
+    vm.runInContext('REGLAGES_CLE', exp.sandbox) === 'samsara-reglages-v1' && JSON.parse(exp.stockage['samsara-reglages-v1']).carnet.murs === T.REGLAGES_DEFAUT.carnet.murs
+    && exp.T.el('indMenu').innerHTML.includes('Réglages fins'), exp.stockage['samsara-reglages-v1']);
+}
 
 // ── 2. Un réglage change le détail, pas la valeur ────────────────────────────
 titre('2. Un réglage change le détail, jamais la valeur d’une quantité');

@@ -14,14 +14,15 @@
 //   5. LA MÊME VARIATION 24 h dans l'en-tête et dans le panneau ⚡ (ouverture → dernier prix).
 //   6. L'HEURE de l'appareil, le fuseau dit une fois (titre de l'horloge) ; aucun « UTC » dans
 //      l'en-tête ; l'heure de publication écrite à l'heure de l'appareil.
-//   7. « + Indicateurs » à l'écran en Expert, ruban plein (tous les indicateurs allumés) : à
-//      1440 px, épinglé au bord droit, ruban défilé au début comme à la fin ; à 390 px, en tête.
+//   7. « Choisir l'affichage » à l'écran en Complet, ruban plein (« Tout afficher » : sa légende
+//      au plus long) : à 1440 px, dans le ruban et l'écran ; à 1024 px (le ruban défile), épinglé
+//      au bord droit, ruban défilé au début comme à la fin ; à 390 px, en tête.
 //   8. RACCOURCIS : une touche tapée dans un champ, ou avec Ctrl, ne déclenche rien.
 //   9. GEX sans couleur hausse / baisse dans les chiffres clés ; cartes : prix publié plus petit
 //      que le prix en direct, jauge RSI sans vert ni rouge ; bandeau d'âge qui avance.
 //  10. TÉLÉPHONE : la barre du bas ne cache pas la dernière ligne des modales.
 //  11. BOUTONS DE L'EN-TÊTE, de 360 à 1440 px, dans neuf thèmes et les deux modes : ni sur le
-//      prix, ni hors de l'écran, ni cachés ; « + Indicateurs » à l'écran (Planche comprise).
+//      prix, ni hors de l'écran, ni cachés ; « Choisir l'affichage » à l'écran (Planche comprise).
 //
 // Binance simulé (prix 86 012,50, ouverture 85 700 : +0,36 % ; Binance arrondit à +0,365), le
 // fichier publié du dépôt avec l'heure de publication réglée par contrôle ; horloge fixée au
@@ -277,15 +278,18 @@ const lireEntete = page => page.evaluate(() => {
       await o.ctx.close();
     }
 
-    // ── 7. « + Indicateurs » toujours à l'écran ────────────────────────────────
-    titre('5. « + Indicateurs » à l’écran en Expert, ruban plein : épinglé au bureau, en tête au téléphone');
-    for (const w of [1440, 390]) {
+    // ── 7. « Choisir l'affichage » toujours à l'écran ─────────────────────────
+    titre('5. « Choisir l’affichage » à l’écran en Complet, ruban plein : épinglé au bureau, en tête au téléphone');
+    for (const w of [1440, 1024, 390]) {
       const o = await ouvrir(nav, { vue: { width: w, height: w <= 480 ? 844 : 900 }, mode: 'expert' });
       const p = o.page;
-      await p.evaluate(() => { for (const l of document.querySelectorAll('#indicatorBar label[id^="lbl_"]')) if (!l.classList.contains('active')) l.click(); });
+      // Ruban plein : tout allumé, la légende du ruban au plus long (ses puces et « + N autres »).
+      const legende = await p.evaluate(() => { toutAfficher(); return document.querySelectorAll('#indicatorBar label.puce-calque').length; });
       await p.waitForTimeout(500);
+      check(`${w} px : « Tout afficher » remplit la légende du ruban (${legende} puces)`, legende >= 6, legende);
       // Au bureau, il est épinglé au bord droit (ruban défilé au début comme à la fin) ; au
-      // téléphone, il est en TÊTE du ruban (avant les intervalles) : visible à l'ouverture.
+      // téléphone, il est en TÊTE du ruban (avant les intervalles) : visible à l'ouverture. À 1440 px
+      // la légende (au plus 7 puces) tient sans défiler ; à 1024 et 390 px, le ruban défile.
       for (const bout of w > 768 ? ['début', 'fin'] : ['début']) {
         const r = await p.evaluate(fin => {
           const bar = document.getElementById('indicatorBar'), btn = document.getElementById('indDropdownBtn');
@@ -295,8 +299,8 @@ const lireEntete = page => page.evaluate(() => {
           const cible = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
           return { deborde: bar.scrollWidth > bar.clientWidth, b: [Math.round(b.left), Math.round(b.right)], z: [Math.round(z.left), Math.round(z.right)], vw: innerWidth, dessus: !!cible && btn.contains(cible) };
         }, bout === 'fin');
-        check(`${w} px, ruban défilé au ${bout} : « + Indicateurs » entier dans le ruban et l’écran (x ${r.b[0]}–${r.b[1]}, ruban ${r.z[0]}–${r.z[1]}), rien par-dessus`,
-          r.deborde && r.b[0] >= r.z[0] && r.b[1] <= r.z[1] && r.b[1] <= r.vw && r.dessus, r);
+        check(`${w} px, ruban ${r.deborde ? 'défilé au ' + bout : 'sans défilement'} : « Choisir l’affichage » entier dans le ruban et l’écran (x ${r.b[0]}–${r.b[1]}, ruban ${r.z[0]}–${r.z[1]}), rien par-dessus`,
+          (w === 1440 || r.deborde) && r.b[0] >= r.z[0] && r.b[1] <= r.z[1] && r.b[1] <= r.vw && r.dessus, r);
       }
       await o.ctx.close();
     }
@@ -322,10 +326,11 @@ const lireEntete = page => page.evaluate(() => {
     // ── 7. Les boutons de l'en-tête, à toute largeur : ni sur le prix, ni hors de l'écran ──
     // Constaté le 10/10 : en Expert, entre 481 et 660 px, les boutons se posaient sur le prix ;
     // dans les thèmes à structure (Néon, Codex, Gare, Planche), entre 801 et 1000 px, Réglages,
-    // Légendes et Thème sortaient de l'écran ; dans la Planche, « + Indicateurs » restait au bout
+    // Légendes et Thème sortaient de l'écran ; dans la Planche, le bouton du panneau (alors
+    // « + Indicateurs », aujourd'hui « Choisir l'affichage ») restait au bout
     // de sa nomenclature qui défile, hors de l'écran, jusqu'à 1279 px. Une page par thème et par
     // mode, redimensionnée de largeur en largeur ; publication en retard (pastille à placer aussi).
-    titre('7. Boutons de l’en-tête et « + Indicateurs » : ni sur le prix, ni hors de l’écran, de 360 à 1440 px');
+    titre('7. Boutons de l’en-tête et « Choisir l’affichage » : ni sur le prix, ni hors de l’écran, de 360 à 1440 px');
     const LARGEURS = [360, 390, 412, 481, 540, 600, 660, 720, 800, 801, 850, 900, 950, 1000, 1100, 1279, 1280, 1440];
     for (const theme of ['aero', 'kala', 'neon', 'codex', 'gare', 'gazette', 'cyanotype', 'diazo', 'bureau95']) {
       for (const mode of ['debutant', 'expert']) {

@@ -159,7 +159,8 @@ chargées). Même origine, aucune ressource externe. `fonts/fabriquer.py` les re
 
 ## Réglages d'affichage
 
-Bouton **Réglages** de l'en-tête. Ils changent le niveau de DÉTAIL, jamais une valeur : un
+« **Réglages fins** », à déplier en bas du panneau « Choisir l'affichage » (mode Complet ; plus de
+bouton Réglages dans l'en-tête). Ils changent le niveau de DÉTAIL, jamais une valeur : un
 chiffre affiché garde sa valeur et porte sa bande ou sa tranche.
 
 - **Panneau ⚡ « En direct (à la seconde) »** (lu par la page sur Binance, donc libre) : profondeur du carnet (100 à

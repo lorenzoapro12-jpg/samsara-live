@@ -440,8 +440,13 @@ titre('7. Dans la page : paramètres, menu, fiche, choix gardé, marge de futur'
   check(`les ${lus.length} paramètres lus par js/guide.js sont dans PARAM.guide (js/app.js)`, lus.every(k => k in P), lus.filter(k => !(k in P)));
   const html = fs.readFileSync(path.join(REPO, 'index.html'), 'utf8');
   check('js/guide.js chargé (defer) AVANT js/app.js, qui reste le dernier', /<script defer src="js\/guide\.js"><\/script>[\s\S]*<script defer src="js\/app\.js"><\/script>\s*<\/head>/.test(html));
-  const T = page.T, cat = T.INDICATORS.find(c => c.cat === 'Guide');
-  check('menu « + Indicateurs » : catégorie « Guide », avec sa fiche — EN TÊTE du menu (interrupteur d’une couche affichée par défaut, visible sans défiler)', cat && cat.items.some(i => i.key === 'guide') && T.FICHE_IND.guide === 'guide' && T.INDICATORS[0] === cat);
+  // Le panneau « Choisir l'affichage » range ses calques par question : le Guide est EN TÊTE de la
+  // sienne, et en tête du panneau du Lisible (couche affichée par défaut, visible sans défiler) ; en
+  // Complet, sa puce du ruban le masque d'un clic (tests/test_interface.js).
+  const T = page.T, cat = T.INDICATORS.find(c => c.items.some(i => i.key === 'guide'));
+  check('panneau « Choisir l’affichage » : le Guide EN TÊTE de sa question (« Où le prix peut réagir ? »), avec sa fiche ; en tête du panneau du Lisible',
+    cat && cat.cat === 'reaction' && cat.titre === 'Où le prix peut réagir ?' && cat.items[0].key === 'guide' && T.FICHE_IND.guide === 'guide'
+    && vm.runInContext('COUCHES_SITE[0]', page.sandbox) === 'guide', cat && cat.items.map(i => i.key));
   const fiches = ['guide', 'guide_niveaux', 'guide_regime', 'guide_formes', 'guide_suite'];
   check('fiches du Guide définies, chacune « pas une recommandation »', fiches.every(k => T.FICHES[k] && /pas une recommandation/.test(T.ficheHtml(k))));
   check('la fiche des formes dit « débattu » et « mesuré » (sa lecture est discutée, son bilan compté)', T.FICHES.guide_formes.lectures.some(l => l.s === 'débattu') && T.FICHES.guide_formes.lectures.some(l => l.s === 'mesuré'));

@@ -180,7 +180,7 @@ STRUCTURES.fenetres = {
     c.deplacer($('themeBtn'), tl, tl.firstChild);
     const lr = c.conteneur('div', 'f95-lancement', tl, $('themeBtn').nextSibling, 'Lancement rapide');
     for (const el of [$('feedBtn'), $('liveBtn'), document.querySelector('.header-right [onclick="resetView()"]'),
-                      $('carteBtn'), $('reglagesBtn'), $('legendesBtn')]) c.deplacer(el, lr);
+                      $('carteBtn'), $('legendesBtn')]) c.deplacer(el, lr);
     const tache = c.conteneur('div', 'f95-tache', tl, null, 'Tâche active');
     for (const el of etiquettes) c.deplacer(el, tache);
     const zone = c.conteneur('div', 'f95-zone', tr, tr.firstChild, 'Zone de notification');
@@ -444,8 +444,8 @@ STRUCTURES.une = {
 // clés en cases, l'âge devient l'« indice de révision », l'heure la « date de révision » ; le
 // graphique est la « Vue A », les cartes du marché des « Détail A, B… » (en CSS). Le nuage de
 // révision entoure le cartouche 90 s quand une NOUVELLE publication arrive.
-// ⚠️ Rien n'est inséré DANS #indicatorBar : la règle téléphone de css/app.css compte ses <span>
-// (span:nth-of-type(5|6)) pour remonter l'intervalle ; le titre de la nomenclature est son frère.
+// ⚠️ Rien n'est inséré DANS #indicatorBar : la règle du ruban de css/app.css compte ses <span>
+// (span:nth-of-type(3|4)) pour mettre l'intervalle en tête ; le titre de la nomenclature est son frère.
 STRUCTURES.planche = {
   nom: 'Planche',
   revisionMs: 90000,   // durée du nuage de révision après une nouvelle publication

@@ -75,6 +75,15 @@ function binance(url) {
   if (u.pathname.endsWith('/ticker/24hr')) return { lastPrice: '86012.5', openPrice: '85700', priceChangePercent: '0.4', highPrice: '87000', lowPrice: '85000', bidPrice: '86012.4', askPrice: '86012.6', quoteVolume: '1e9', count: '100' };
   return {};
 }
+// La carte des ordres en attente (heatmap.json) calée sur l'horloge et les prix simulés (86 000 ± 400) :
+// celle du dépôt est republiée toutes les 15 min, à une autre heure et à d'autres prix. Douze heures de
+// colonnes d'une minute, vingt tranches de 20 $ de chaque côté du prix (section des calques simples).
+function chaleurAlignee() {
+  const dt = 60, dp = 20, fin = Math.floor(maintenant() / 1000 / dt), n = 12 * 60, colonnes = [];
+  const serie = m => Array.from({ length: 20 }, (_, i) => 60 + ((m + i) % 7) * 25);
+  for (let m = fin - n + 1; m <= fin; m++) colonnes.push([m, 4280, serie(m), 4301, serie(m * 3)]);
+  return JSON.stringify({ updated: LU, sym: 'BTCUSDT', t0: (fin - n + 1) * dt, dt, dp, format: 'colonnes-1', colonnes });
+}
 const LU = new Date(Math.floor(maintenant() / 60000) * 60000).toISOString().replace('.000Z', '+00:00');
 const md = JSON.parse(fs.readFileSync(path.join(REPO, 'market-data.json'), 'utf8'));
 md.updated = LU;
@@ -91,7 +100,8 @@ const serveur = http.createServer((req, res) => {
 });
 
 /** o = { vue, theme, tactile, prev ('complet' | 'ouvert' | 'ferme' | 'attente' | 'absent' | 'hier' | 'aucun'),
- *  mode ('debutant' par défaut), garder (ne pas vider le stockage : rechargement) }. */
+ *  mode ('debutant' par défaut), garder (ne pas vider le stockage : rechargement),
+ *  chaleur (la carte des ordres en attente calée sur l'heure et les prix simulés) }. */
 async function ouvrir(nav, o) {
   const tactile = !!o.tactile;
   const ctx = o.ctx || await nav.newContext(Object.assign({ viewport: o.vue, deviceScaleFactor: 1 }, tactile ? { hasTouch: true, isMobile: true } : {}));
@@ -119,7 +129,7 @@ async function ouvrir(nav, o) {
           : previsionsFixture(Object.assign({ maintenant: maintenant() }, prev === 'hier' ? { ilYaMs: 26 * 3600e3 } : prev === 'ferme' ? { modifier: ferme } : prev === 'ouvert' ? { modifier: ouvert }
             : prev === 'range' ? { modifier: range(84500, 87500) } : prev === 'range2' ? { modifier: range(85700, 86350) } : {})) });
       }
-      if (u.includes('heatmap')) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, 'heatmap.json')) });
+      if (u.includes('heatmap')) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: o.chaleur ? chaleurAlignee() : fs.readFileSync(path.join(REPO, 'heatmap.json')) });
       if (/\/master\/market-data\.json/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: MD });
       return r.fulfill({ status: 404, headers: cors, body: '' });
     }
@@ -245,7 +255,7 @@ async function controlerEcran(o, nom, opts = {}) {
   const dom = await o.page.evaluate(() => {
     const vis = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
     return { prix: document.getElementById('price').textContent, var24: vis(document.getElementById('var24')) ? document.getElementById('var24').textContent : null,
-      caches: ['liveBtn', 'feedBtn', 'reglagesBtn', 'stratSection'].filter(id => vis(document.getElementById(id))),
+      caches: ['liveBtn', 'feedBtn', 'stratSection'].filter(id => vis(document.getElementById(id))),
       puces: [...document.querySelectorAll('#indicatorBar label[id^="lbl_"]')].filter(vis).length,
       kpis: [...document.querySelectorAll('#cycle .kpi')].filter(vis).length, reset: vis(document.getElementById('resetBtn')),
       kpiDeb: vis(document.querySelector('#cycle .kpi-deb')) ? document.querySelector('#cycle .kpi-deb').getAttribute('title') : null };
@@ -261,7 +271,9 @@ async function controlerEcran(o, nom, opts = {}) {
   if (e.scen) check(`${nom} : un seul libellé de scénario, celui du scénario montré (${e.scen.montre || '1'}) ; ni nom du point et de la fin`, e.scen.libelles.length <= 1 && e.scen.libelles.every(l => l.rang === (e.scen.montre || '1')) && !e.scen.cibles.some(c => c.prio === 3), e.scen);
   check(`${nom} : boutons Expert, puces d'indicateurs, Grid Bot et chiffres clés masqués ; ↺ visible ; la pastille « Infos du marché » dit l'âge (infobulle)`,
     !dom.caches.length && dom.puces === 0 && dom.kpis === 0 && dom.reset && /il y a \d+ min/.test(dom.kpiDeb || ''), dom);
-  check(`${nom} : aucun sous-graphe (${e.sous.join(', ') || 'aucun'})`, !e.sous.length, e.sous);
+  // Le Volume, calque simple du Lisible : son seul sous-graphe, quand il est allumé (opts.calques).
+  if (opts.calques) check(`${nom} : un seul sous-graphe, le Volume (${e.sous.join(', ') || 'aucun'})`, e.sous.join() === 'vol', e.sous);
+  else check(`${nom} : aucun sous-graphe (${e.sous.join(', ') || 'aucun'})`, !e.sous.length, e.sous);
   return e;
 }
 
@@ -454,8 +466,9 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         await o.page.waitForTimeout(450);
         await o.page.click('#indDropdownBtn'); await o.page.waitForTimeout(200);
         const menu = await o.page.evaluate(() => document.getElementById('indMenu').innerText);
-        check(`${nom} : le menu « Affichage » n'a que les couches du Guide et le lien vers l'Expert (ni « oscillateur », ni « chartisme »)`,
-          /Repères et phrase de lecture/.test(menu) && /passer en Expert/.test(menu) && !/oscillateur|chartisme|EMA|RSI/i.test(menu), menu);
+        check(`${nom} : le panneau « Choisir l'affichage » n'a que les couches du Guide, trois calques simples (Volume, Moyennes, Ordres en attente) et le lien vers le Complet (ni « oscillateur », ni « chartisme »)`,
+          /Repères et phrase de lecture/.test(menu) && /passer en Complet/.test(menu) && ['Volume', 'Moyennes', 'Ordres en attente'].every(n => menu.includes(n))
+          && !/oscillateur|chartisme|EMA|RSI|Réglages fins|Tout afficher/i.test(menu), menu);
         scanTexte(`${nom}, menu ouvert`, await texteVisible(o.page));
         await o.page.keyboard.press('Escape');
         check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
@@ -652,7 +665,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         const vis = el => !!el && el.getClientRects().length > 0;
         const c = canvas, box = c.parentElement.getBoundingClientRect();
         return { mode: document.documentElement.getAttribute('data-mode'), kpis: [...document.querySelectorAll('#cycle .kpi')].filter(k => k.getBoundingClientRect().width > 0).length,
-          strat: vis(document.getElementById('stratSection')), puces: [...document.querySelectorAll('#indicatorBar label[id^="lbl_"]')].filter(vis).length,
+          strat: vis(document.getElementById('stratSection')), puces: [...document.querySelectorAll('#indicatorBar label[id^="lbl_"]')].filter(vis).map(l => l.dataset.calque || l.id),
           taille: [c.width, c.height], attendu: [Math.round(c.clientWidth * devicePixelRatio), Math.round(c.clientHeight * devicePixelRatio)], liveBtn: vis(document.getElementById('liveBtn')),
           kpisDom: document.querySelectorAll('#cycle .kpi').length, aria: c.getAttribute('aria-label') };
       });
@@ -662,7 +675,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         x.cibles.filter(c => c.prio === 1).length >= 2 && x.scen && x.scen.boite && !x.scen.boite.deb && x.scen.boite.lignes.length > 1 && /^Scénarios du matin · /.test(x.scen.boite.lignes[0])
         && (x.scen.libelles.some(l => l.rang === '2') || x.scen.boite.lignes.some(l => /^2\b|2\./.test(l)) || x.scen.boite.lignes.some(l => /\| 2/.test(l)) || x.scen.boite.lignes.length >= 3), x.scen);
       check('Expert : le repère de publication est dessiné', x.tous.some(t => /^fichier .* · prix publié /.test(t)), x.tous.filter(t => /fichier/.test(t)));
-      check('Expert : les 8 chiffres clés dans la bande (au moins 3 de largeur > 0 à cette taille), le Grid Bot, les puces d\'indicateurs, le bouton ⚡', exp.kpisDom === 8 && exp.kpis >= 3 && exp.strat && exp.puces === 12 && exp.liveBtn, exp);
+      check('Expert : les 8 chiffres clés dans la bande (au moins 3 de largeur > 0 à cette taille), le Grid Bot, la légende des calques allumés (Guide, Scénarios, Volume), le bouton ⚡', exp.kpisDom === 8 && exp.kpis >= 3 && exp.strat && exp.puces.join() === 'guide,scenarios,vol' && exp.liveBtn, exp);
       check('Expert : le graphique n\'a plus pour nom la phrase du Débutant (aria-label retiré)', exp.aria === null, exp.aria);
       check('Expert : le graphique remis en page (taille du canvas = son conteneur × devicePixelRatio)', exp.taille[0] === exp.attendu[0] && exp.taille[1] === exp.attendu[1], exp);
       check('Expert : un sous-graphe (Volume) revient', x.sous.includes('vol'), x.sous);
@@ -671,6 +684,77 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       const d2 = await dessin(o.page);
       check('2e M → retour au Débutant, les mêmes textes', d2.mode === 'debutant' && JSON.stringify(d2.items.map(i => i.texte)) === JSON.stringify(d1.items.map(i => i.texte)), { avant: d1.items.map(i => i.texte), apres: d2.items.map(i => i.texte) });
       check('bascule : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
+    // ── Les trois calques simples du Lisible ──
+    // Volume, Moyennes (EMA 20 et 50, sans étiquette) et Ordres en attente (BTC/USDT) : éteints par
+    // défaut, cochés dans le panneau, dessinés SANS texte de plus sur le tracé (budget de cinq, mots
+    // simples), gardés sous samsara-lisible-v1, à part des choix du Complet.
+    titre('Lisible : Volume, Moyennes et Ordres en attente');
+    for (const [vue, tactile] of [[{ width: 1440, height: 900 }, false], [{ width: 390, height: 844 }, true]]) {
+      const nom = vue.width + ' px · trois calques';
+      const o = await ouvrir(nav, { vue, tactile, prev: 'ouvert', chaleur: true });
+      const d0 = await dessin(o.page);
+      check(`${nom} : éteints par défaut, rien de gardé ; l'écran du Lisible inchangé (aucun sous-graphe)`,
+        !d0.sous.length && await o.page.evaluate(() => localStorage.getItem('samsara-lisible-v1') === null && !lisible.vol && !lisible.moyennes && !lisible.liq), d0.sous);
+      await o.page.click('#indDropdownBtn'); await o.page.waitForTimeout(200);
+      for (const k of ['vol', 'moyennes', 'liq']) { await o.page.click(`#indMenu label[data-ind="l_${k}"] input`); await o.page.waitForTimeout(150); }
+      const coche = await o.page.evaluate(() => ({ cases: ['vol', 'moyennes', 'liq'].map(k => document.querySelector(`#indMenu label[data-ind="l_${k}"] input`).checked),
+        garde: localStorage.getItem('samsara-lisible-v1'), complet: localStorage.getItem('samsara-affichage-v1'), ouvert: document.getElementById('indMenu').classList.contains('open') }));
+      check(`${nom} : les trois cases cochées dans le panneau (resté ouvert), gardées sous samsara-lisible-v1 ; les choix du Complet intacts`,
+        coche.cases.every(Boolean) && coche.ouvert && JSON.stringify(JSON.parse(coche.garde)) === JSON.stringify({ vol: true, moyennes: true, liq: true }) && coche.complet === null, coche);
+      scanTexte(`${nom}, panneau ouvert`, await texteVisible(o.page));
+      await o.page.evaluate(() => document.getElementById('indMenu').classList.remove('open'));
+      await o.page.waitForFunction(() => histHeatmap && histHeatmap.grille, null, { timeout: 5000 }).catch(() => {});
+      const e = await controlerEcran(o, nom, { calques: true });
+      const trace = await o.page.evaluate(() => {
+        const lignes = [], images = [], d = drawLine, di = CanvasRenderingContext2D.prototype.drawImage;
+        const ema = k => memoized(k, calcEMA, cols().close, periodeDe(k));
+        drawLine = function (...a) { lignes.push({ ema20: a[0] === ema('ema20'), ema50: a[0] === ema('ema50'), etiquette: a[10] || null, couleur: a[6] }); return d.apply(this, a); };
+        CanvasRenderingContext2D.prototype.drawImage = function (...a) { if (this.canvas.id === 'chart') images.push(!!heatLayer && a[0] === heatLayer.cv); return di.apply(this, a); };
+        try { drawChart(); } finally { drawLine = d; CanvasRenderingContext2D.prototype.drawImage = di; }
+        const dispo = canvas.height / devicePixelRatio - 4 - RS_HEIGHT;
+        return { lignes: lignes.filter(l => l.ema20 || l.ema50), chaleur: images.filter(Boolean).length, part: geo.mainH / dispo, sous: geo.sous.map(s => s.cle) };
+      });
+      check(`${nom} : les Moyennes dessinées (EMA 20 et EMA 50), sans étiquette ni nom sur le tracé`,
+        trace.lignes.length === 2 && trace.lignes.some(l => l.ema20) && trace.lignes.some(l => l.ema50) && trace.lignes.every(l => l.etiquette === null && /^rgba\(/.test(l.couleur)), trace.lignes);
+      check(`${nom} : les Ordres en attente dessinés (la couche de chaleur posée sur le tracé)`, trace.chaleur >= 1, trace);
+      check(`${nom} : le Volume dessiné sous le prix, qui garde ${Math.round(trace.part * 100)} % (≥ 60 %)`, trace.sous.join() === 'vol' && trace.part >= 0.6 - 1e-9, trace);
+      const tous = e.tous.filter(t => bannis(t).length || CONSEIL.test(t));
+      check(`${nom} : aucun mot banni ni conseil dans tout ce que le graphique écrit (titre du Volume compris : « ${e.tous.find(t => /^Volume/.test(t)) || '—'} »)`,
+        !tous.length && e.tous.some(t => /^Volume : (bitcoins|\w+) échangés$/.test(t)), tous);
+      // Rouvert : les trois calques sont gardés ; le Complet ne les dessine pas (ses choix à lui).
+      const o2 = await ouvrir(nav, { vue, tactile, prev: 'ouvert', ctx: o.ctx, garder: true, chaleur: true });
+      const r2 = await o2.page.evaluate(() => {
+        const avant = { vol: lisible.vol, moyennes: lisible.moyennes, liq: lisible.liq, sous: geo.sous.map(s => s.cle) };
+        const lignes = [], d = drawLine, ema = k => memoized(k, calcEMA, cols().close, periodeDe(k));
+        drawLine = function (...a) { if (a[0] === ema('ema20') || a[0] === ema('ema50')) lignes.push(a[10] || null); return d.apply(this, a); };
+        basculerMode(); resizeCanvas(); drawChart();
+        const complet = { mode: modeCourant(), lignes: lignes.length, ema20: overlays.ema20, liq: overlays.liq, depth: !!depthTimer };
+        lignes.length = 0; basculerMode(); resizeCanvas(); drawChart();
+        drawLine = d;
+        return { avant, complet, retour: { mode: modeCourant(), lignes: lignes.length, sous: geo.sous.map(s => s.cle), depth: !!depthTimer } };
+      });
+      check(`${nom} : rouvert, les trois calques sont gardés et dessinés`, r2.avant.vol && r2.avant.moyennes && r2.avant.liq && r2.avant.sous.join() === 'vol', r2.avant);
+      check(`${nom} : en Complet, ni ses moyennes ni ses ordres en attente (choix du Lisible gardés à part) ; de retour en Lisible, redessinés`,
+        r2.complet.mode === 'expert' && r2.complet.lignes === 0 && !r2.complet.ema20 && !r2.complet.liq && !r2.complet.depth
+        && r2.retour.mode === 'debutant' && r2.retour.lignes === 2 && r2.retour.sous.join() === 'vol' && r2.retour.depth, r2);
+      // Sur une autre paire, les ordres en attente ne dessinent rien : leur case est grisée et le dit.
+      const sol = await o2.page.evaluate(async () => {
+        changeSymbol('SOLUSDT', document.getElementById('sym_SOLUSDT'));
+        await new Promise(r => setTimeout(r, 1200));
+        buildDropdown();
+        const l = document.querySelector('#indMenu label[data-ind="l_liq"]');
+        const r = { indispo: l.classList.contains('indispo'), coupee: l.querySelector('input').disabled, dit: (l.querySelector('.ind-seul') || {}).textContent || '',
+          vol: (document.querySelector('#indMenu label[data-ind="l_vol"] .aff-quoi') || {}).textContent };
+        changeSymbol('BTCUSDT', document.getElementById('sym_BTCUSDT'));
+        await new Promise(r => setTimeout(r, 1200));
+        return r;
+      });
+      check(`${nom} : SOL/USDT, « Ordres en attente » grisé, non cochable, « BTC/USDT seulement » ; le Volume compte des SOL`,
+        sol.indispo && sol.coupee && sol.dit === 'BTC/USDT seulement' && / SOL ont été échangés/.test(sol.vol || ''), sol);
+      check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length && !o2.erreurs.length, o.erreurs.concat(o2.erreurs));
       await o.ctx.close();
     }
 
@@ -784,7 +868,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         return { texte: p.innerText, ouvert: !p.hidden, replie: !!d && !d.open, h4: [...p.querySelectorAll('h4')].filter(vis).map(h => h.innerText.trim()).filter(Boolean),
           boutons: [...p.querySelectorAll('.glossaire-item')].filter(vis).map(b => b.innerText) };
       });
-      // Les noms des fiches du Guide sont ceux du menu « + Affichage » (« Repères et phrase de
+      // Les noms des fiches du Guide sont ceux du panneau « Choisir l'affichage » (« Repères et phrase de
       // lecture ») ; la fiche des niveaux, « Les repères de prix » (elle ne parle que des repères).
       check('Légendes, Débutant : « Ce que montre l’écran » d’abord (phrase et repères, scénarios du matin, les cartes) ; les fiches de l’Expert repliées',
         g.ouvert && g.replie && /^Ce que montre l’écran$/i.test(g.h4[0]) && g.h4.length === 1 && g.boutons.includes('Scénarios du matin') && g.boutons.includes('Repères et phrase de lecture') && g.boutons.includes('Les repères de prix') && g.boutons.includes('Ordres en attente'), g);

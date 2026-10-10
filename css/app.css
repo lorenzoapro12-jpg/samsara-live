@@ -206,7 +206,7 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   background: var(--brand); -webkit-background-clip: text; background-clip: text;
   color: transparent; -webkit-text-fill-color: transparent;
 }
-/* Capsules : sélecteur de paire, boutons ronds, bouton « Indicateurs ». */
+/* Capsules : sélecteur de paire, boutons ronds, bouton « Choisir l'affichage ». */
 .paire-btn, .theme-btn, .ind-dropdown-btn {
   background: var(--capsule); color: var(--ink-1);
   border: 1px solid transparent; border-radius: var(--r-bar);
@@ -388,7 +388,7 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
   mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
 }
-/* « + Indicateurs » (choisir ce qui s'affiche) n'est jamais hors de vue en Expert, où le ruban
+/* « Choisir l'affichage » n'est jamais hors de vue en Complet, où le ruban
    défile : à 1440 px il était rogné au bord droit (x 1366–1490 pour 1427 px utiles) ; au
    téléphone, à trois écrans à droite. Au bureau, il est épinglé au bord droit du ruban (sticky),
    sur un fond plein qui recouvre en fondu ce qui défile dessous — le fondu du ruban est alors
@@ -419,6 +419,13 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 @media (max-width: 768px) {
   :root:not([data-mode="debutant"]):not([data-structure="fenetres"]) .indicator-bar > .ind-dropdown { order: -2; }
 }
+/* L'intervalle en tête du ruban, à toutes les largeurs : la légende des calques allumés (Complet)
+   change de longueur, les intervalles gardent leur place ; la légende est suivie du bouton. Titres
+   et `sep` sont des span frères : 1-2 « À l'écran » (la légende), 3-4 Intervalle. Si l'ordre des
+   span du ruban change, réaligner ce sélecteur (la Planche, à partir de 1280 px, range le ruban
+   par ses propres règles, plus précises). */
+.indicator-bar > span:nth-of-type(3), .indicator-bar > span:nth-of-type(4),
+.indicator-bar > label[id^="int_"] { order: -1; }
 .indicator-bar .section-title {
   flex-shrink: 0;
   font-size: 9px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase;
@@ -448,9 +455,19 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   content: ''; flex-shrink: 0; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%;
   background: var(--dot); box-shadow: 0 0 0 2px var(--dot-anneau);
 }
+/* La légende du Complet (majLegende, js/app.js) : une puce par calque allumé — sa couleur, son
+   nom court, une croix (un clic le masque). Rien d'allumé : une phrase invite à choisir. */
+.indicator-bar label.puce-calque { gap: 5px; }
+.puce-calque .puce-x { font-size: 13px; line-height: 1; font-weight: 400; color: var(--ink-3); }
+.puce-calque:hover .puce-x, .puce-calque:focus-visible .puce-x { color: var(--ink-1); }
+.indicator-bar label.puce-calque:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.indicator-bar label.puce-plus { color: var(--accent-2); }
+.indicator-bar label.legende-vide { background: transparent; border: 1px dashed var(--hairline); color: var(--ink-2); font-weight: 500; }
 
-/* Bouton et menu « Indicateurs » */
+/* Bouton et panneau « Choisir l'affichage » (« Affichage » quand la place manque, jamais coupé) */
 .ind-dropdown { display: inline-block; flex-shrink: 0; }
+.aff-court { display: none; }
+@media (max-width: 480px) { .aff-long { display: none; } .aff-court { display: inline; } }
 .ind-dropdown-btn {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 4px 13px 4px 10px; cursor: pointer; white-space: nowrap;
@@ -477,24 +494,72 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 }
 .ind-dropdown-menu label:hover { background: var(--rail); }
 .ind-dropdown-menu label input { margin: 0; accent-color: var(--accent); }
-.ind-dropdown-menu label .tag {
-  margin-left: auto; padding: 2px 6px; border-radius: 4px;
-  font-size: 8px; font-weight: 700; background: var(--rail);
+/* Une ligne : la case, le nom et sa phrase « C'est quoi ? », (Complet) l'importance, le « i ». */
+.ind-dropdown-menu label.aff-ligne { align-items: flex-start; padding-top: 6px; padding-bottom: 6px; }
+.ind-dropdown-menu label.aff-ligne input { margin-top: 2px; flex-shrink: 0; }
+.aff-texte { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.aff-nom { font-weight: 600; }
+.aff-quoi { font-size: 11px; line-height: 1.35; font-weight: 400; color: var(--ink-2); }
+.ind-dropdown-menu label.aff-ligne:hover .aff-quoi { color: inherit; }
+.ind-dropdown-menu label.aff-ligne .info-btn { flex-shrink: 0; margin-top: 1px; }
+/* L'importance : une FORME et un MOT, jamais la couleur seule — disque plein « courant »,
+   demi-disque « utile », anneau « spécialisé ». */
+.aff-imp {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; margin-top: 1px; padding: 1px 7px 1px 5px;
+  border-radius: 999px; background: var(--rail); color: var(--ink-2);
+  font-size: 9.5px; font-weight: 650; line-height: 15px; white-space: nowrap;
 }
-.tag-ov { color: var(--accent); }
-.tag-sg { color: var(--warn-ink); }
-.tag-ch { color: var(--accent-2); }
-.tag-gd { color: var(--ink-2); }
+.aff-imp::before {
+  content: ''; flex-shrink: 0; width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%;
+  border: 1.5px solid currentColor;
+}
+.aff-imp.imp-courant::before { background: currentColor; }
+.aff-imp.imp-utile::before { background: linear-gradient(90deg, currentColor 50%, transparent 50%); }
+.aff-imp.imp-special::before { background: transparent; }
+/* La tête du Complet : « Tout afficher », « Revenir au départ », puis les préréglages. */
+.aff-tete { padding: 6px 12px 4px; }
+.aff-boutons, .aff-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.aff-presets { margin-top: 7px; }
+.aff-presets-titre { margin-right: 2px; font-size: 9px; font-weight: 700; letter-spacing: 0.9px; text-transform: uppercase; color: var(--ink-3); }
+.aff-btn, .aff-preset {
+  font: inherit; font-size: 11.5px; font-weight: 650; padding: 4px 11px; border-radius: 999px; cursor: pointer;
+  color: var(--ink-1); background: var(--rail); border: 1px solid var(--hairline);
+}
+.aff-btn.aff-tout { color: var(--card-solid); background: var(--accent); border-color: transparent; }
+.aff-preset { font-size: 11px; font-weight: 600; color: var(--ink-2); background: transparent; }
+.aff-preset[aria-pressed="true"] { color: var(--pill-actif-ink); background: var(--pill-actif); border-color: transparent; font-weight: 700; }
+.aff-btn:hover, .aff-preset:hover, .aff-btn:focus-visible, .aff-preset:focus-visible { border-color: var(--accent); outline: none; }
+.aff-tete ~ .ind-filtre { margin-top: 0; padding-top: 6px; }
+/* « Réglages fins », repliés en bas du Complet : les réglages d'affichage (js/reglages.js). */
+.aff-fins { margin: 10px 6px 2px; border-top: 1px solid var(--hairline); }
+.aff-fins > summary {
+  padding: 9px 10px 5px; cursor: pointer; font-size: 9px; font-weight: 700; letter-spacing: 0.9px;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.aff-fins > summary:hover, .aff-fins > summary:focus-visible { color: var(--ink-1); outline: none; }
+.aff-fins-corps { padding: 0 10px 8px; font-size: 12px; line-height: 1.45; color: var(--ink-2); }
+.aff-fins-corps .fiche-simple { margin: 4px 0 6px; font-size: 11.5px; color: var(--ink-2); }
+.aff-fins-corps h4 { margin: 12px 0 4px; font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; color: var(--ink-3); }
+.aff-fins-corps .fine { font-size: 10.5px; color: var(--ink-3); }
+/* Ses <label> ne sont pas des lignes du panneau : ni leur boîte, ni leur survol. */
+.ind-dropdown-menu .aff-fins label.reglage {
+  display: flex; flex-direction: column; align-items: stretch; gap: 4px; margin: 8px 0; padding: 0;
+  border-radius: 0; font-size: 12px; color: var(--ink-2); cursor: default; background: none;
+}
+.ind-dropdown-menu .aff-fins label.reglage:hover { background: none; color: var(--ink-2); }
+.ind-dropdown-menu .aff-fins label.puce-case { display: inline-flex; gap: 4px; margin: 0; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; }
+.ind-dropdown-menu .aff-fins label.puce-case:hover { color: var(--ink-1); background: var(--rail); }
 /* Une couche qui ne dessine rien sur la paire affichée : grisée, et elle dit pourquoi. */
 .ind-dropdown-menu label.indispo { color: var(--ink-3); cursor: default; }
 .ind-dropdown-menu label .ind-seul { font-size: 10px; font-weight: 600; color: var(--ink-3); white-space: nowrap; }
 /* « Figures passées » (Complet) : un choix à trois états, sa phrase dessous, en petit. */
-.ind-dropdown-menu label.ind-passees { flex-wrap: wrap; row-gap: 3px; }
+/* « Figures passées » (Complet) : une ligne du panneau sans case (un choix à trois états sous sa
+   phrase), son texte aligné sur celui des lignes à case (case de 13 px + 8 px d'écart). */
+.ind-dropdown-menu label.ind-passees { padding-left: 31px; }
 .ind-passees select {
-  max-width: 100%; padding: 2px 6px; border-radius: 8px; font: inherit; font-size: 11.5px;
+  align-self: flex-start; max-width: 100%; margin-top: 4px; padding: 2px 6px; border-radius: 8px; font: inherit; font-size: 11.5px;
   color: var(--ink-1); background: var(--rail); border: 1px solid var(--hairline);
 }
-.ind-passees .ind-note { flex-basis: 100%; font-size: 10.5px; line-height: 1.35; color: var(--ink-3); }
 @media (pointer: coarse) { .ind-passees select { min-height: 40px; } }
 /* L'aperçu du menu : ce que c'est et comment s'en servir, pour la ligne survolée ou touchée.
    Collé en bas du menu (qui défile), toujours visible. */
@@ -519,10 +584,13 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 }
 .ind-filtre input:focus { outline: none; border-color: var(--accent); }
 .ind-aucun { margin: 6px 16px; font-size: 11.5px; color: var(--ink-3); }
-/* Bureau : l'aperçu à droite de la liste, la liste garde toute sa hauteur. */
+/* Bureau : l'aperçu à droite de la liste, la liste garde toute sa hauteur. Le Complet est plus
+   large (chaque ligne a sa phrase et son importance) ; le Lisible, plus court. */
 @media (min-width: 769px) {
-  .ind-dropdown-menu.open { display: grid; grid-template-columns: minmax(250px, auto) 330px; align-items: start; }
-  .ind-dropdown-menu { max-width: min(700px, calc(100vw - 16px)); }
+  .ind-dropdown-menu.open { display: grid; grid-template-columns: minmax(0, 1fr) 290px; align-items: start; }
+  .ind-dropdown-menu { width: min(780px, calc(100vw - 16px)); max-width: min(780px, calc(100vw - 16px)); }
+  .ind-dropdown-menu.aff-lisible { width: min(640px, calc(100vw - 16px)); }
+  .ind-dropdown-menu.aff-lisible.open { grid-template-columns: minmax(0, 1fr) 260px; }
   .ind-apercu { position: sticky; top: 0; bottom: auto; margin: -8px 0 -8px; min-height: 100%; max-height: none; box-sizing: border-box;
     padding: 14px 16px; border-top: 0; border-left: 1px solid var(--hairline); }
 }
@@ -1054,13 +1122,10 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
   .indicator-bar .section-title { font-size: 8px; }
   .indicator-bar .sep { height: 18px; margin: 0 3px; }
   .ind-dropdown-btn { padding: 7px 10px; }
-  .ind-dropdown-menu { min-width: 220px; max-height: 72vh; font-size: 11px; }
+  .ind-dropdown-menu { min-width: 220px; width: min(440px, calc(100vw - 16px)); max-height: 72vh; font-size: 11px; }
   .ind-apercu { max-height: 30vh; }
-  /* L'intervalle remonte en tête (au pouce, il était à trois écrans à droite). Titres et
-     `sep` sont des span frères : 1-2 Overlays, 3-4 Sous-graphes, 5-6 Intervalle. Si l'ordre
-     des span du ruban change, réaligner ce sélecteur. (La paire est dans l'en-tête.) */
-  .indicator-bar > span:nth-of-type(5), .indicator-bar > span:nth-of-type(6),
-  .indicator-bar > label[id^="int_"] { order: -1; }
+  /* L'intervalle est en tête du ruban à toutes les largeurs (règle plus haut) : au pouce, il était
+     à trois écrans à droite. (La paire est dans l'en-tête.) */
 
   .main-area { flex-direction: column; }
   .chart-container { height: 100%; }
@@ -1224,8 +1289,7 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
   .mode-btn { min-width: 0; padding: 0 7px; font-size: 10px; }
 }
 
-/* ─── Réglages d'affichage (js/reglages.js) ─── */
-.reglages-pop { left: auto; right: 16px; top: 64px; width: min(440px, calc(100vw - 24px)); }
+/* ─── Réglages d'affichage (js/reglages.js), dans les « Réglages fins » du panneau ─── */
 .reglage { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; font-size: 12px; color: var(--ink-2); }
 .reglage select, .ligne-reglage input {
   font: inherit; font-size: 12px; color: var(--ink-1); background: var(--rail);
@@ -1240,7 +1304,6 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
 }
 .puce-case input { margin: 0; accent-color: var(--accent); }
 .puce-case.indispo { opacity: 0.45; cursor: not-allowed; }
-@media (max-width: 768px) { .reglages-pop { right: 8px !important; left: 8px !important; top: auto !important; bottom: 8px; width: auto; } }
 
 /* ─── Mode Débutant : l'écran calme ──────────────────────────────────────────────
    Le HTML est le même dans les deux modes ; ici, seulement ce qui se montre. En Débutant :
@@ -1277,13 +1340,30 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
 /* Bureau 95 garde l'en-tête sur une rangée : sous 560 px, le libellé long du bouton de mode
    couvrait le prix (« 86 013 » sans son « $ ») ; le court y tient. */
 @media (max-width: 560px) { html[data-structure="fenetres"] .mode-long { display: none; } html[data-structure="fenetres"] .mode-court { display: inline; } }
-/* Le menu « Affichage » du Débutant : ses deux cases, puis le lien vers l'Expert. */
+/* Le panneau du Lisible : ses cases (couches du site, trois calques simples), puis le lien vers le Complet. */
 .ind-dropdown-menu .menu-expert {
   display: block; width: calc(100% - 12px); margin: 6px; padding: 6px 10px; text-align: left;
   font: inherit; font-size: 11.5px; font-weight: 600; color: var(--accent-2);
   background: var(--rail); border: 1px solid var(--hairline); border-radius: 8px; cursor: pointer;
 }
 .ind-dropdown-menu .menu-expert:hover { border-color: var(--accent); }
+/* Les onglets des sous-graphiques sans place (dispositionGraphique, js/app.js) : posés sur le
+   canvas, au-dessus du sélecteur de plage ; un clic en montre un à la place d'un autre. Ils
+   défilent s'ils ne tiennent pas. Un élément HTML, pas un texte du graphique. */
+.onglets-sous {
+  position: absolute; z-index: 3; display: flex; align-items: center; gap: 4px; box-sizing: border-box;
+  overflow-x: auto; scrollbar-width: none; white-space: nowrap; font-size: 10.5px; color: var(--ink-3);
+}
+.onglets-sous::-webkit-scrollbar { display: none; }
+.onglets-sous[hidden] { display: none; }
+.onglets-titre { flex-shrink: 0; margin-right: 2px; font-weight: 600; }
+.onglet-sous {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; min-height: 22px; padding: 2px 9px;
+  font: inherit; font-size: 10.5px; font-weight: 650; color: var(--ink-1); cursor: pointer;
+  background: var(--pill); border: 1px solid var(--hairline); border-radius: 999px;
+}
+.onglet-sous::before { content: ''; flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--dot); }
+.onglet-sous:hover, .onglet-sous:focus-visible { border-color: var(--accent); outline: none; }
 /* L'astuce, une seule fois : en bas du tracé, au-dessus du graphique (pas un texte du canvas). */
 .astuce-tap {
   position: absolute; z-index: 3; left: 20px; bottom: 60px; padding: 5px 11px; border-radius: 999px;
@@ -1363,7 +1443,7 @@ html[data-mode="debutant"]:not([data-structure="fenetres"]) .header-right { orde
   /* En retard, la pastille porte l'âge (« en retard · 25 min ») : « Infos · » cède, pour que
      les boutons restent sur la 2e rangée (le titre et le nom accessible disent « Infos du marché »). */
   [data-mode="debutant"] .kpi-deb .deb-quoi { display: none; }
-  /* La barre : les six intervalles et « Affichage » sur une seule rangée. */
+  /* La barre : les six intervalles et « Affichage » (libellé court) sur une seule rangée. */
   [data-mode="debutant"] .indicator-bar { flex-wrap: nowrap; justify-content: space-between; gap: 2px; padding: 4px 6px; }
   [data-mode="debutant"] .indicator-bar label { padding: 7px 7px; }
   [data-mode="debutant"] .ind-dropdown-btn { padding: 7px 9px; gap: 3px; }
