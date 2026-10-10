@@ -559,6 +559,9 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   color: var(--ink-1); background: var(--rail); border: 1px solid var(--hairline);
 }
 @media (pointer: coarse) { .ind-passees select { min-height: 40px; } }
+/* « Aide à la lecture » (Complet) : deux cases, séparées des calques par un filet — ce ne sont pas
+   des indicateurs (ni importance ni fiche). */
+.ind-dropdown-menu .aff-aide-titre { margin: 8px 6px 0; padding-top: 10px; border-top: 1px solid var(--hairline); }
 /* L'aperçu du menu : ce que c'est et comment s'en servir, pour la ligne survolée ou touchée.
    Collé en bas du menu (qui défile), toujours visible. */
 .ind-dropdown-menu { max-width: min(380px, calc(100vw - 16px)); }
