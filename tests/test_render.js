@@ -152,28 +152,41 @@ try {
   // la variation tombait sur un x,xx5 — un faux rouge dépendant de la donnée vivante.
   const fmt = (v, d = 2) => Number(v).toLocaleString('en-US',
     { minimumFractionDigits: d, maximumFractionDigits: d });
+  // Formats français de la page (js/format.js) recalculés ICI, indépendamment : virgule
+  // décimale, espace pour les milliers, moins typographique, unité après le nombre.
+  const fr = (v, d = 2) => (v < 0 && Number(Math.abs(v).toFixed(d)) !== 0 ? '−' : '') + Math.abs(Number(v)).toLocaleString('fr-FR',
+    { minimumFractionDigits: d, maximumFractionDigits: d }).replace(/[\u00a0\u202f]/g, ' ');
+  const frS = (v, d = 2) => (v > 0 && Number(v.toFixed(d)) !== 0 ? '+' : '') + fr(v, d);
+  const usdFr = v => fr(Math.round(v), 0) + ' $';
   const checks = [
-    ['Prix BTC réel', feed.innerHTML.includes(usd(D.btc.price))],
-    ['Variation 24h', feed.innerHTML.includes(fmt(D.btc.change_24h_pct))],
-    ['L/S réel', feed.innerHTML.includes(String(D.micro.ls_ratio))],
-    ['Funding réel', feed.innerHTML.includes(fmt(D.micro.funding_annual_pct))],
-    ['OI réel', feed.innerHTML.includes(Math.round(D.micro.oi_btc).toLocaleString('en-US'))],
-    ['DXY réel', feed.innerHTML.includes(fmt(D.macro.dxy_spot))],
-    ['Support 4h réel', feed.innerHTML.includes(usd(D.tf['4h'].support_30))],
+    ['Prix BTC réel', feed.innerHTML.includes(usdFr(D.btc.price))],
+    ['Variation 24h', feed.innerHTML.includes(frS(D.btc.change_24h_pct) + ' % en 24 h')],
+    ['L/S réel', feed.innerHTML.includes('L/S&nbsp;<b style="color:var(--ink-1)">' + fr(D.micro.ls_ratio, 2) + '</b>')],
+    // Funding annualisé à 1 décimale, comme le chiffre clé du haut (même précision partout).
+    ['Funding réel', feed.innerHTML.includes(frS(D.micro.funding_annual_pct, 1) + ' % annualisé')],
+    ['OI réel', texteDe(feed.innerHTML).includes(fr(Math.round(D.micro.oi_btc), 0) + ' BTC')],
+    ['DXY réel', feed.innerHTML.includes(fr(D.macro.dxy_spot))],
+    ['Support 4h réel', feed.innerHTML.includes(usdFr(D.tf['4h'].support_30))],
+    // Aucun nombre au format anglais visible (« 82,798 », « 1.53 ») ni prix « $82 » en tête.
+    ['Nombres à la française (aucun « 82,798 » ni « $82 »)', !/\d,\d{3}\b(?![\d,])|\$\d/.test(texteDe(feed.innerHTML).replace(/\b(?:BTC|ETH|SOL|XRP|USDT|USD)\b/g, ''))],
     // L'état EMA20 / EMA50 du TF, sous son vrai nom : le badge disait « DEATH CROSS », nom
     // d'un croisement de SMA50 / SMA200 en daily — un autre objet (voir indicateurs.py).
     ['État EMA20 / EMA50 4h', feed.innerHTML.includes((D.tf['4h'].ema20_sous_ema50 ?? D.tf['4h'].death_cross_4h) ? 'EMA20 &lt; EMA50' : 'EMA20 &gt; EMA50')
       && !/DEATH CROSS|GOLDEN CROSS/.test(feed.innerHTML)],
-    ['Mur bid dominant (prix complet)', feed.innerHTML.includes('$' + usd(D.liquidity.bid_walls[0][0]))],
+    ['Mur bid dominant (prix complet)', feed.innerHTML.includes(usdFr(D.liquidity.bid_walls[0][0]))],
     ['Murs en BTC', /BTC<\/span>/.test(feed.innerHTML) && D.liquidity.unit === 'BTC'],
-    ['Ratio carnet sur sa bande', feed.innerHTML.includes('±' + D.liquidity.bande_ref_pct + ' %')],
-    ['GEX', feed.innerHTML.includes(D.micro.gex_state)],
+    ['Ratio carnet sur sa bande', feed.innerHTML.includes('±' + String(D.liquidity.bande_ref_pct).replace('.', ',') + ' %')],
+    // Le régime GEX en mots (« long γ » / « short γ », comme le chiffre clé), jamais le code brut
+    // du fichier (LONG_GAMMA), et sans couleur hausse / baisse (le GEX ne dit pas la direction).
+    ['GEX', D.micro.gex_state && feed.innerHTML.includes(D.micro.gex_usd_1pct > 0 ? '>long γ<' : '>short γ<') && !feed.innerHTML.includes(D.micro.gex_state)
+      && !/<b>GEX<\/b>[\s\S]{0,300}?(?:badge-haussier|badge-baissier|var\(--up\)|var\(--down\))[\s\S]{0,200}?\/ 1 %/.test(feed.innerHTML)],
     // GEX en USD / 1 % : l'ancien calcul publiait des BTC sous des seuils en dollars.
-    ['GEX en USD / 1 %', /GEX<\/b>[\s\S]*?[+−]\$[\d.]+[MBK]<\/b> \/ 1 %/.test(feed.innerHTML)],
+    ['GEX en USD / 1 %', /GEX<\/b>[\s\S]*?[+−]\d+(?:,\d+)? (?:k|M|Md) \$<\/b> \/ 1 %/.test(feed.innerHTML)],
     // CVD fenêtré : l'ancien était un cumul depuis le premier démarrage du daemon.
     // Chaque fenêtre est nommée ET porte sa valeur signée (barres divergentes depuis le 04/10).
-    ['CVD 1h / 4h / 24h', ['1h', '4h', '24h'].every(w => new RegExp('dv-lbl">' + w + '</span>[\\s\\S]*?dv-val"><span[^>]*>[+−]?\\$[\\d.]+[KMB]?</span>').test(feed.innerHTML))],
-    ['OI Δ24h glissant', feed.innerHTML.includes('Δ24h ' + (D.micro.oi_change_24h_pct > 0 ? '+' : '') + fmt(D.micro.oi_change_24h_pct) + '%')],
+    ['CVD 1h / 4h / 24h', ['1h', '4h', '24h'].every(w => new RegExp('dv-lbl">' + w + '</span>[\\s\\S]*?dv-val"><span[^>]*>[+−]?\\d+(?:,\\d+)?(?: k| M| Md)? \\$</span>').test(feed.innerHTML))],
+    // 1 décimale, comme le chiffre clé « OI 24h » du haut.
+    ['OI Δ24h glissant', feed.innerHTML.includes('Δ24h ' + frS(D.micro.oi_change_24h_pct, 1) + ' %')],
     // S/R : fenêtre réelle (30 bougies), plus l'ancien « 16 j » faux pour les trois TF.
     ['Fenêtre S/R réelle', /min\/max 5 j/.test(feed.innerHTML) && /min\/max 30 h/.test(feed.innerHTML) && !/16 j/.test(feed.innerHTML)],
     ['Tous blocs ok', new RegExp(Object.keys(D.status).length+'/'+Object.keys(D.status).length+' blocs').test(feed.innerHTML)],
@@ -208,6 +221,15 @@ try {
         ['Débutant : les âges écrits restent réécrits chaque minute ([data-age-de] visibles)', /data-age-de/.test(sansExpert(feed.innerHTML))],
       ];
     })(),
+    // Ni note de développeur (nom de fichier, version, débogage, capitales d'insistance), ni code
+    // brut du fichier (LONG_GAMMA, NEGATIVE) : des mots, dans les deux modes.
+    ['Aucune note de développeur ni code brut dans les cartes', !/market-data|\.json|\.py\b|meta\.champs|PÉRISSABLE|Piège mesuré|LONG_GAMMA|SHORT_GAMMA|\bNEGATIVE\b|\bPOSITIVE\b|\bNEUTRAL\b/.test(texteDe(feed.innerHTML))],
+    // Vouvoiement partout (« Vérifié par ton navigateur » tutoyait).
+    ['Vouvoiement : « Vérifié par votre navigateur », aucun « ton / ta / tes / tu »', /Vérifié par votre navigateur/.test(feed.innerHTML) && !/\b(?:ton|ta|tes|tu|toi)\b/i.test(texteDe(feed.innerHTML))],
+    // Flux : il compte les blocs de la DERNIÈRE publication — ni « live », ni « sources à jour ».
+    ['Flux : « N/N blocs publiés », jamais « blocs live » ni « sources à jour »', /\d+\/\d+ blocs publiés/.test(feed.innerHTML) && !/blocs live|sources à jour|Toutes les données publiées sont arrivées/.test(feed.innerHTML)],
+    // Un ratio affiché « 1,00 » n'a pas de couleur (il était rouge, comme un penchant vendeur).
+    ['Ratio affiché 1,00 : sans couleur ; 1,01 / 0,99 colorés', sandbox.clsCote(1.004, 1, 2) === '' && sandbox.clsCote(0.996, 1, 2) === '' && sandbox.clsCote(1.006, 1, 2) === 'stat-pos' && sandbox.clsCote(0.994, 1, 2) === 'stat-neg'],
     ['Aucun motif interdit dans le RENDU', hitsFeed.length === 0],
     ['Aucun motif interdit dans la SOURCE publiée', hitsSrc.length === 0],
   ];

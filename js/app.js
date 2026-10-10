@@ -194,8 +194,13 @@ function sonderRefraction() {
 }
 
 // ============ SHORTCUTS UX ============
+// Une touche seule : Ctrl / Cmd / Alt + touche reste au navigateur (Ctrl+R recharge, Ctrl+F
+// cherche), et une saisie (champ, liste déroulante, texte éditable) garde ses touches — les
+// flèches d'une liste du Grid Bot changeaient la vue du graphique. Même règle que la carte.
 window.addEventListener('keydown', (e) => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  const cible = e.target || {};
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (cible.tagName === 'INPUT' || cible.tagName === 'TEXTAREA' || cible.tagName === 'SELECT' || cible.isContentEditable) return;
   if (e.key === 'f' || e.key === 'F') { toggleFeed(); e.preventDefault(); }
   if (e.key === 'd' || e.key === 'D') { themeJumeau(); e.preventDefault(); }
   if (e.key === 't' || e.key === 'T') { themeSuivant(); e.preventDefault(); }
@@ -790,8 +795,9 @@ async function changeSymbol(symbol, label) {
   document.querySelectorAll('label[id^="sym_"]').forEach(l => l.classList.remove('active'));
   label.classList.add('active');
   activeSymbol = symbol;
+  // Le même nom qu'en tête (« SOL/USDT »), jamais le symbole brut de l'API (« SOLUSDT »).
   const tp = document.getElementById('taskbarPair');
-  if (tp) tp.textContent = symbol;
+  if (tp) tp.textContent = NOMS_PAIRES[symbol] || symbol;
   const pn = document.getElementById('paireNom');
   if (pn) pn.textContent = NOMS_PAIRES[symbol] || symbol;
   document.getElementById('paireMenu').classList.remove('open');
@@ -1648,25 +1654,26 @@ function var24De(d) {
 const ECLAIR_MS = 450;
 const MQ_MOUVEMENT = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
 let eclairFin = null;
-// Le prix et la variation de l'en-tête, écrits selon le mode (mêmes valeurs) : Expert « $83,512.51 »
-// et « −0.40 % » ; Débutant « 83 513 $ » et « −0,40 % en 24 h » (le format français, la durée dite).
+// Le prix et la variation de l'en-tête, écrits selon le mode (mêmes valeurs), au format commun
+// (js/format.js) : Expert « 83 512,51 $ » (précision de cotation) et « −0,40 % » ; Débutant
+// « 83 513 $ » (arrondi de lecture) et « −0,40 % en 24 h » (la durée dite).
 let var24Courant = null;
-/** « −0,40 % » (avecDuree : « −0,40 % en 24 h ») ; '' sans valeur. */
+/** « −0,40 % » (avecDuree : « −0,40 % en 24 h ») ; '' sans valeur. Deux décimales : la même
+ *  précision dans l'en-tête et dans le panneau ⚡. */
 function texteVar24(v, avecDuree) {
   if (!isNum(v)) return '';
-  const t = (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(2).replace('.', ',') + ' %';
+  const t = Fmt.pct(v, 2);
   return avecDuree ? t + ' en 24 h' : t;
 }
 function ecrirePrixEntete(price, var24) {
   const el = document.getElementById('price');
   if (el && isNum(price)) {
-    const dec = pxDec(price);
-    const t = debutant() ? Guide.prix(price, guideUnite()) : '$' + price.toLocaleString('en-US', {minimumFractionDigits: dec, maximumFractionDigits: dec});
+    const t = debutant() ? Guide.prix(price, guideUnite()) : Fmt.prix(price, guideUnite(), 'fin');
     el.textContent = t;   // écrit à chaque lecture, comme avant : l'horloge part dans la même tâche
   }
   const v = document.getElementById('var24');
   if (v) {
-    v.textContent = !isFinite(var24) ? '' : debutant() ? texteVar24(var24, true) : (var24 > 0 ? '+' : var24 < 0 ? '−' : '') + Math.abs(var24).toFixed(2) + ' %';
+    v.textContent = !isFinite(var24) ? '' : texteVar24(var24, debutant());
     v.className = 'var24' + (var24 > 0 ? ' pos' : var24 < 0 ? ' neg' : '');
   }
 }
@@ -1710,11 +1717,15 @@ async function fetchPrice() {
 // L'horloge de la barre des tâches avance dans la MÊME tâche que le prix, donc la même image :
 // un rendu par seconde au lieu de deux (5 à 11 ms/s mesurés), et rien quand l'onglet est caché
 // (la lecture du prix n'y part pas). Avant : sa propre minuterie, jamais suspendue.
-const FMT_HMS = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+// C'est l'heure de l'APPAREIL, comme toutes les heures de la page : son infobulle est le seul
+// endroit du terminal qui dit le fuseau (« heure de l'appareil (UTC+2) »), recalculé à chaque
+// tour (un changement d'heure d'été le suit), réécrit seulement s'il change.
 let minuteCalque = 0;
 function horloge() {
-  const c = document.getElementById('taskbarClock'), t = FMT_HMS.format(new Date());
+  const c = document.getElementById('taskbarClock'), maintenant = Date.now(), t = Fmt.heureSec(maintenant);
   if (c && c.textContent !== t) c.textContent = t;
+  const fz = Fmt.fuseauMots(maintenant);
+  if (c && c.title !== fz) c.title = fz;
   majHorloges();
   // Le calque porte un âge en minutes (couche « Liquidité ») : redessiné à chaque minute
   // même quand le prix, lui, ne bouge pas.
@@ -2327,7 +2338,7 @@ registerStrategy('bb_grid', {
 registerStrategy('rsi_grid', {
   label: 'Grille RSI',
   params: {
-    ...gridParams(10, 0.8, 4, '0 = auto (-5% prix)', '0 = auto (+5% prix)'),
+    ...gridParams(10, 0.8, 4, '0 = auto (prix − 5 %)', '0 = auto (prix + 5 %)'),
     oversold: { value: 30, min: 15, max: 45, step: 1, label: 'Seuil survente', advanced: true },
     rsiPeriod: { value: 14, min: 5, max: 30, step: 1, label: 'Période RSI', advanced: true },
     exitRsi: { value: 50, min: 40, max: 70, step: 1, label: 'Seuil sortie RSI', advanced: true },
@@ -2405,7 +2416,7 @@ registerStrategy('sr_grid', {
 // ─── Dumb Grid (fixed intervals, no TA) ───
 registerStrategy('dumb_grid', {
   label: 'Grille Fixe (benchmark)',
-  params: gridParams(10, 0.5, 3, '0 = auto (-5%)', '0 = auto (+5%)'),
+  params: gridParams(10, 0.5, 3, '0 = auto (prix − 5 %)', '0 = auto (prix + 5 %)'),
   trigger(candles, idx) {
     if (idx < 2) return 'idle';
     return 'enter';
@@ -7061,7 +7072,7 @@ function getSubIndicatorValue(key, idx) {
   } catch(e) { return null; }
 }
 
-// ═══════════════ MARCHÉ LIVE (market-data.json) ═══════════════
+// ═══════════════ INFOS DU MARCHÉ (market-data.json, publié toutes les 15 min) ═══════════════
 // Un tour par CADENCES.publication_lue : le fichier n'est relu que s'il est dû (lectureDue), en
 // revalidation (`no-cache` : 304 tant qu'il n'a pas changé). Le `?t=` d'avant n'apportait rien
 // — le CDN ignore la requête (même copie, même âge, vérifié) — et forçait 8,6 Ko par minute.
@@ -7087,53 +7098,70 @@ async function fetchMarket(force) {
   } catch(e) {
     marcheLu = 0; marcheEnErreur = true;            // à retenter au prochain tour
     Horloges.noter('marche', e);
-    document.getElementById('dot').style.background = 'var(--down)';
-    const td = document.getElementById('taskbarDot');
-    if (td) td.style.background = 'var(--down)';
-    const feed = document.getElementById('feed');
     const c = Horloges.classer({ erreur: e });
-    feed.innerHTML = '<div class="error">⚠️ market-data.json : ' + escHtml(c.libelle || e.message) + '</div>';
+    // Le voyant passe au rouge ET dit pourquoi (son infobulle disait encore l'âge d'avant).
+    const pourquoi = 'Infos du marché : lecture impossible (' + (c.libelle || e.message) + '), nouvel essai dans ' + Math.round(CADENCES.publication_lue / 1000) + ' s';
+    const dot = document.getElementById('dot');
+    if (dot) { dot.style.background = 'var(--down)'; dot.title = pourquoi; }
+    const td = document.getElementById('taskbarDot');
+    if (td) { td.style.background = 'var(--down)'; td.title = pourquoi; }
+    const feed = document.getElementById('feed');
+    // (Le fichier lu est market-data.json : son nom n'est pas affiché, ce n'est pas un mot du lecteur.)
+    feed.innerHTML = '<div class="error">⚠️ Infos du marché illisibles : ' + escHtml(c.libelle || e.message) + '</div>';
   }
 }
 // ─── ÂGE DE LA DONNÉE ────────────────────────────────────────────────
 // Un HTTP 200 ne prouve RIEN sur la fraîcheur : une source morte reste servie indéfiniment et
 // le point restait vert. C'est la panne du 16/08 — un consommateur a lu 13 cycles de données
 // gelées sans qu'aucun voyant ne bronche. Seuils de js/cadences.js : au-delà de vieux_min, une
-// publication manquée ; de fige_min, deux.
+// publication manquée ; de fige_min, deux. UN seul seuil pour tout ce qui le dit (voyant, barre
+// des tâches, bandeau d'âge, pastille « en retard », teinte des chiffres clés) : l'âge ARRONDI à
+// la minute, celui qui s'affiche — entre 20,0 et 20,5 min, le voyant passait à l'orange et le
+// bandeau disait « il y a 20 min » pendant que la pastille disait encore « Infos du marché ▸ ».
 function etatPublication(updated) {
   const ageMin = updated ? (Date.now() - Date.parse(updated)) / 60000 : null;
-  const etat = ageMin === null || !isFinite(ageMin) ? 'inconnu'
-             : ageMin > CADENCES.fige_min ? 'fige'
-             : ageMin > CADENCES.vieux_min ? 'retard' : 'ok';
-  return { ageMin: etat === 'inconnu' ? null : ageMin, etat };
+  const min = ageMin === null || !isFinite(ageMin) ? null : Math.max(0, Math.round(ageMin));
+  const etat = min === null ? 'inconnu'
+             : min > CADENCES.fige_min ? 'fige'
+             : min > CADENCES.vieux_min ? 'retard' : 'ok';
+  return { ageMin: etat === 'inconnu' ? null : ageMin, min, etat };
 }
 let etatAffiche = null;
+/** Le titre du voyant et de la barre des tâches : ce qu'il mesure (l'âge des infos du marché,
+ *  publiées toutes les N min — pas le prix, lu à la seconde) et son état. */
+function titreVoyant(min, etat) {
+  if (min === null) return 'Infos du marché : heure de publication inconnue';
+  return 'Infos du marché publiées il y a ' + min + ' min (attendues toutes les ' + CADENCES.attendue_min + ' min)'
+    + (etat === 'fige' ? ' : la publication s’est arrêtée' : etat === 'retard' ? ' : en retard' : '') + '. Le prix du haut est lu à la seconde.';
+}
 /** Âge de la publication affichée, à chaque tour : voyant (teinte, titre), barre des tâches,
- *  âges écrits dans la page ([data-age-de], posés par renderFeedTo), teinte « vieux » des
- *  chiffres clés. Un seuil franchi change le bandeau d'âge des cartes : elles sont refaites.
- *  `nouvelle` : une publication vient d'arriver — une onde du voyant, une seule. */
+ *  âges écrits dans la page ([data-age-de], posés par renderFeedTo), teinte « vieux » et
+ *  pastille « en retard » de l'en-tête. Un seuil franchi change le bandeau d'âge des cartes :
+ *  elles sont refaites. `nouvelle` : une publication vient d'arriver — une onde du voyant, une seule. */
 function majAges(nouvelle) {
   if (!marketData) return;
-  const { ageMin, etat } = etatPublication(marketData.updated);
+  const { min, etat } = etatPublication(marketData.updated);
   if (!nouvelle && etatAffiche !== null && etat !== etatAffiche) renderFeed();
   etatAffiche = etat;
   const teinte = { ok: 'var(--up)', retard: 'var(--warn)', fige: 'var(--down)', inconnu: 'var(--ink-3)' }[etat];
+  const titre = titreVoyant(min, etat);
   const dot = document.getElementById('dot');
   if (dot) {
     dot.style.background = teinte;
     dot.classList.toggle('calme', etat !== 'ok');        // ne pas onduler sur du figé
     if (nouvelle && etat === 'ok') onde(dot);
-    dot.title = ageMin === null
-      ? 'Âge de la donnée inconnu (champ updated absent)'
-      : `Dernière publication il y a ${Math.round(ageMin)} min`;
+    dot.title = titre;
   }
   const td = document.getElementById('taskbarDot');
-  if (td) td.style.background = teinte;
-  if (ageMin !== null && document.querySelectorAll) {
-    const n = String(Math.max(0, Math.round(ageMin)));
+  if (td) { td.style.background = teinte; td.title = titre; }
+  if (min !== null && document.querySelectorAll) {
+    const n = String(min);
     for (const el of document.querySelectorAll('[data-age-de]')) if (el.textContent !== n) el.textContent = n;
     const cy = document.getElementById('cycle');
-    if (cy) cy.classList.toggle('vieux', Math.round(ageMin) > CADENCES.vieux_min);
+    if (cy && cy.classList.contains('vieux') !== (etat === 'retard' || etat === 'fige')) {
+      cy.classList.toggle('vieux', etat === 'retard' || etat === 'fige');
+      ajusterKpis();       // la pastille d'âge s'allonge (« en retard · ») : la bande se remesure
+    }
     const kd = cy && cy.querySelector ? cy.querySelector('.kpi-deb') : null;
     if (kd && kd.title !== titreKpiDeb(n)) { kd.title = titreKpiDeb(n); kd.setAttribute('aria-label', ariaKpiDeb(n)); }
   }
@@ -7160,24 +7188,33 @@ function onde(dot) {
 
 function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 const isNum = v => (v !== null && v !== undefined && !isNaN(v));
-const fmtNum = (v,d=2) => isNum(v) ? Number(v).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}) : '—';
-const fmtUsd = v => isNum(v) ? '$' + Math.round(v).toLocaleString('en-US') : '—';
-const fmtBig = v => { if(!isNum(v)) return '—'; const a=Math.abs(v);
-  if(a>=1e9) return '$'+(v/1e9).toFixed(2)+'B'; if(a>=1e6) return '$'+(v/1e6).toFixed(2)+'M';
-  if(a>=1e3) return '$'+(v/1e3).toFixed(1)+'K'; return '$'+v.toFixed(2); };
-const pctSpan = v => { if(!isNum(v)) return '—'; const c = v>0?'stat-pos':(v<0?'stat-neg':''); return '<span class="'+c+'">'+(v>0?'+':'')+fmtNum(v)+'%</span>'; };
+// Les formats des cartes, de la bande des chiffres clés, du panneau ⚡ et du Grid Bot : ceux de
+// js/format.js (Fmt), à la française dans les deux modes — « 86 013 $ », « −1,6 % », « 96,94 M $ »,
+// le moins typographique, l'unité après le nombre. Ces alias ne font que déléguer.
+const fmtNum = (v, d = 2) => (isNum(v) ? Fmt.nombre(Number(v), d) : '—');
+/** Un prix arrondi pour la lecture (« 86 013 $ ») : les prix du fichier publié. */
+const fmtUsd = v => (isNum(v) ? Fmt.prix(Number(v)) : '—');
+/** Un montant en dollars abrégé : « 1,68 Md $ », « 96,94 M $ », « 54,8 k $ ». */
+const fmtBig = v => (isNum(v) ? Fmt.compact(Number(v), Math.abs(v) >= 1e6 ? 2 : 1) + ' $' : '—');
+/** Une bande autour du prix, avec ses décimales à elle : « ±0,1 % », « ±0,25 % », « ±1 % » —
+ *  comme dans les Réglages (le titre disait « ±0.1 % » à côté de « ±0,1 % »). */
+const bandeTxt = b => '±' + Fmt.nombre(+b, (String(b).split('.')[1] || '').length) + ' %';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// LECTURE LIVE — bouton ⚡ (ajouté le 02/10/2026)
+// EN DIRECT (À LA SECONDE) — bouton ⚡ (ajouté le 02/10/2026)
 // ─────────────────────────────────────────────────────────────────────────────
 // POURQUOI CETTE VUE EXISTE. Le dashboard a DEUX cadences, et ça a été pris pour une panne :
 //   · le badge de prix en haut -> api.binance.com ticker/price, rafraîchi à la SECONDE ;
-//   · les cartes « Marché live » -> market-data.json, fichier réécrit toutes les 15 MINUTES.
+//   · les cartes « Infos du marché » -> market-data.json, fichier réécrit toutes les 15 MINUTES.
+// D'où les noms : « en direct » est réservé à ce qui est relu à la seconde (ce panneau, le prix
+// du haut) ; le fichier publié s'appelle « Infos du marché » (il s'appelait « Marché live »).
 // L'utilisateur a signalé deux fois un « écart entre le prix réel OKX et ce qu'affiche le dashboard ».
 // Mesuré le 02/10 à 11:07 UTC : badge 86 422,0 contre OKX spot 86 423,0 — soit 1,0 pt, pas
 // d'écart. Mais la CARTE affichait 86 330,1 (publiée 4,7 min plus tôt) — soit −92,9 pts. Écart
 // réel, dû au seul retard de publication. Sur un cycle complet il atteint 300 à 400 pts.
-// Ici, tout ce qui PEUT être live l'est vraiment, et le reste s'affiche avec son âge.
+// Ici, tout ce qui PEUT être en direct l'est vraiment, et le reste s'affiche avec son âge.
+// Ce panneau lit toujours BTCUSDT (comme le fichier publié, qui ne parle que du bitcoin) : sur
+// une autre paire, une note le dit en tête du panneau.
 //
 // ⚠️ NE JAMAIS appeler ici une source autre que Binance. Les autres (OKX, Deribit, Yahoo) sont
 // agrégées côté serveur dans market-data.json ; appelées depuis la page, elles échoueraient en
@@ -7205,15 +7242,23 @@ function closeLiveModal() {
 function liveRank(p, lo, hi) {
   return hi > lo ? Math.max(0, Math.min(100, (p - lo) / (hi - lo) * 100)) : 0;
 }
-// Même composant que les cartes « Marché live » : rail, remplissage, point.
+// Même composant que les cartes « Infos du marché » : rail, remplissage, point.
 function liveBar(pct) {
   return '<div class="track"><div class="track-rail"><span class="track-fill" style="width:' + pct.toFixed(1)
     + '%"></span><span class="track-dot" style="left:' + pct.toFixed(1) + '%"></span></div></div>';
 }
-const fmtPx = v => isNum(v) ? Number(v).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—';
+const fmtPx = v => isNum(v) ? Fmt.nombre(Number(v), 1) : '—';
 // 2 décimales : un spread Binance BTCUSDT vaut souvent 0,01 $ — arrondi à 1 décimale il
-// s'affiche « 0.0 pts », c'est-à-dire « pas de spread », ce qui est faux.
-const fmtPx2 = v => isNum(v) ? Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+// s'affiche « 0,0 pts », c'est-à-dire « pas de spread », ce qui est faux.
+const fmtPx2 = v => isNum(v) ? Fmt.nombre(Number(v), 2) : '—';
+// La classe d'un rapport autour de son milieu (1 pour un ratio, 0,5 pour une part), jugée sur la
+// valeur AFFICHÉE (dec décimales) : au milieu, aucune couleur — un ratio de 1,00 s'affichait en
+// rouge, comme un penchant vendeur.
+function clsCote(v, milieu, dec) {
+  if (!isFinite(v)) return '';
+  const r = dec === undefined ? v : Number(Number(v).toFixed(dec));
+  return r > milieu ? 'stat-pos' : r < milieu ? 'stat-neg' : '';
+}
 
 async function renderLive() {
   const box = document.getElementById('liveModalBody');
@@ -7240,7 +7285,9 @@ async function renderLive() {
   const bid = parseFloat(t24.bidPrice), ask = parseFloat(t24.askPrice);
   const sprd = ask - bid;
   const hi = parseFloat(t24.highPrice), lo = parseFloat(t24.lowPrice);
-  const chg = parseFloat(t24.priceChangePercent);
+  // La variation 24 h calculée comme dans l'en-tête ((dernier − ouverture) / ouverture) : le
+  // priceChangePercent arrondi de Binance donnait « +0,37 % » ici pour « +0,36 % » en haut.
+  const chg = var24De(t24);
   const rank = liveRank(px, lo, hi);
   // ── carnet : profondeur réellement posée autour du prix ──
   // 500 niveaux Binance ne couvrent que ≈ ±0,13 % du prix (mesuré le 04/10/2026). La carte
@@ -7266,79 +7313,87 @@ async function renderLive() {
   // ── tout le reste : lu dans le fichier de 15 min, avec son âge affiché ──
   const md = marketData || {}, mi = md.micro || {}, bf = md.btc || {};
   const ageMin = md.updated ? Math.round((Date.now() - Date.parse(md.updated)) / 60000) : null;
-  if (clk) clk.textContent = '· ' + new Date().toISOString().slice(11, 19) + ' UTC · aller-retour ' + lat + ' ms';
+  // L'heure de l'appareil, comme toutes les heures de la page (le fuseau est dit une fois, dans
+  // l'infobulle de l'horloge de la barre du bas).
+  if (clk) clk.textContent = '· ' + Fmt.heureSec(Date.now()) + ' · aller-retour ' + lat + ' ms';
 
   const pos = 'stat-pos', neg = 'stat-neg';
   let html = '';
   carteEntree = !(box.dataset && box.dataset.vu);
+  // Sur une autre paire, ce panneau parle toujours du bitcoin : il le dit, dans les deux modes.
+  if (activeSymbol !== 'BTCUSDT') {
+    html += '<div class="deb-btc">Ces lectures parlent du bitcoin (BTC/USDT), pas de '
+      + escHtml(NOMS_PAIRES[activeSymbol] || activeSymbol) + '.</div>';
+  }
 
-  // 1 — PRIX LIVE
-  html += mCard('⚡', 'Prix live', 'Binance spot · à la seconde · aller-retour ' + lat + ' ms', '',
-    '<div style="font-size:22px;font-weight:800;letter-spacing:-0.5px">' + fmtUsd(px)
-    + ' <span style="font-size:14px" class="' + (chg > 0 ? pos : neg) + '">' + (chg > 0 ? '+' : '') + fmtNum(chg) + '% 24h</span></div>'
+  // 1 — PRIX EN DIRECT
+  html += mCard('⚡', 'Prix en direct', 'Binance spot · à la seconde · aller-retour ' + lat + ' ms', '',
+    '<div style="font-size:22px;font-weight:800;letter-spacing:-0.5px">' + Fmt.prix(px, '$', 'fin')
+    + ' <span style="font-size:14px" class="' + signCls(chg) + '">' + Fmt.pct(chg, 2) + ' en 24 h</span></div>'
     + '<div style="margin-top:6px;font-size:12px;font-variant-numeric:tabular-nums">Bid <b>' + fmtPx2(bid) + '</b> · Ask <b>' + fmtPx2(ask)
-    + '</b> · spread <b>' + sprd.toFixed(2) + ' pts</b> (' + (sprd / px * 10000).toFixed(2) + ' bp)</div>');
+    + '</b> · spread <b>' + fmtPx2(sprd) + ' pts</b> (' + fmtNum(sprd / px * 10000, 2) + ' bp)</div>');
 
-  // 2 — RANGE 24 H
-  html += mCard('📊', 'Range 24 h', 'haut / bas des 24 h · position du spot', '',
+  // 2 — FOURCHETTE DES 24 H
+  html += mCard('📊', 'Fourchette des 24 h', 'haut / bas des 24 h · position du spot', '',
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">Haut <b>' + fmtPx(hi) + '</b> · Bas <b>' + fmtPx(lo)
     + '</b></div>' + liveBar(rank)
-    + '<div style="margin-top:5px;font-size:12px">Position dans le range : <b>' + rank.toFixed(1) + ' %</b>'
+    + '<div style="margin-top:5px;font-size:12px">Position dans la fourchette : <b>' + fmtNum(rank, 1) + ' %</b>'
     + ' · amplitude <b>' + fmtNum((hi / lo - 1) * 100) + ' %</b></div>'
     + '<div style="margin-top:5px;font-size:11px;color:var(--ink-2)">Volume 24 h <b>' + fmtBig(parseFloat(t24.quoteVolume))
-    + '</b> · ' + parseInt(t24.count, 10).toLocaleString('fr-FR') + ' trades</div>');
+    + '</b> · ' + Fmt.nombre(parseInt(t24.count, 10)) + ' trades</div>');
 
-  // 3 — CARNET LIVE ±1 %
+  // 3 — CARNET EN DIRECT ±x %
   // Seuils de LECTURE (réglables) : ils choisissent la phrase, jamais le ratio affiché.
   const carnetTxt = !isFinite(ratio) ? (m0.couverte === false ? 'bande non couverte par le carnet reçu' : '—')
-    : ratio >= RL.ratioMarque ? 'déséquilibre ACHETEUR marqué' : ratio >= RL.ratioLeger ? 'léger penchant acheteur'
-    : ratio <= 1 / RL.ratioMarque ? 'déséquilibre VENDEUR marqué' : ratio <= 1 / RL.ratioLeger ? 'léger penchant vendeur' : 'équilibré';
-  const autresBandes = mesures.slice(1).map(([b, m]) => '±' + b + ' % : ' + (!m ? '—' : m.couverte ? '<b>' + m.ratio.toFixed(2) + '</b>' : 'non couverte')).join(' · ');
-  html += mCard('💧', 'Carnet live ±' + BANDE + ' %', 'Binance spot · ' + RL.niveaux.toLocaleString('fr-FR') + ' niveaux, vus jusqu\'à ±'
-    + (isFinite(couv) ? couv.toFixed(2) : '—') + ' % · instantané', '',
+    : ratio >= RL.ratioMarque ? 'déséquilibre acheteur marqué' : ratio >= RL.ratioLeger ? 'léger penchant acheteur'
+    : ratio <= 1 / RL.ratioMarque ? 'déséquilibre vendeur marqué' : ratio <= 1 / RL.ratioLeger ? 'léger penchant vendeur' : 'équilibré';
+  const autresBandes = mesures.slice(1).map(([b, m]) => bandeTxt(b) + ' : ' + (!m ? '—' : m.couverte ? '<b>' + fmtNum(m.ratio, 2) + '</b>' : 'non couverte')).join(' · ');
+  html += mCard('💧', 'Carnet en direct ' + bandeTxt(BANDE), 'Binance spot · ' + Fmt.nombre(RL.niveaux) + ' niveaux, vus jusqu\'à ±'
+    + (isFinite(couv) ? fmtNum(couv, 2) : '—') + ' % · instantané', '',
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">Bids <b>' + fmtNum(bv, 1) + ' BTC</b> · Asks <b>' + fmtNum(av, 1) + ' BTC</b></div>'
-    + '<div style="margin-top:6px;font-size:15px;font-weight:800" class="' + (ratio >= 1 ? pos : neg) + '">Ratio bid/ask '
-    + (isFinite(ratio) ? ratio.toFixed(2) : '—') + '</div>'
+    + '<div style="margin-top:6px;font-size:15px;font-weight:800" class="' + clsCote(ratio, 1, 2) + '">Ratio bid/ask '
+    + (isFinite(ratio) ? fmtNum(ratio, 2) : '—') + '</div>'
     + (autresBandes ? '<div style="margin-top:4px;font-size:11.5px;font-variant-numeric:tabular-nums">' + autresBandes + '</div>' : '')
     + '<div style="margin-top:4px;font-size:11px;color:var(--ink-2)">' + carnetTxt
-    + ' — un carnet est PÉRISSABLE : valable quelques minutes, et un mur peut être retiré</div>');
+    + ' — un carnet ne vaut que quelques minutes, et un mur peut être retiré</div>');
 
-  // 4 — TAPE LIVE
+  // 4 — TAPE EN DIRECT
   const tD = RL.takerDominant / 100, tL = RL.takerLeger / 100;
   const tapeTxt = !isFinite(taker) ? '—'
     : taker >= tD ? 'acheteurs agressifs dominants' : taker >= tL ? 'léger penchant acheteur'
     : taker <= 1 - tD ? 'vendeurs agressifs dominants' : taker <= 1 - tL ? 'léger penchant vendeur' : 'partagé';
-  html += mCard('🌊', 'Tape live', RL.trades + ' derniers trades · fenêtre ' + (spanS === null ? '—' : spanS + ' s') + ' · agression, pas intention', '',
+  html += mCard('🌊', 'Tape en direct', RL.trades + ' derniers trades · fenêtre ' + (spanS === null ? '—' : spanS + ' s') + ' · agression, pas intention', '',
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">Achats au taker <b>' + fmtNum(buy, 1) + ' BTC</b> · Ventes <b>' + fmtNum(sell, 1) + ' BTC</b></div>'
-    + '<div style="margin-top:6px;font-size:15px;font-weight:800" class="' + (taker >= 0.5 ? pos : neg) + '">Taker buy '
-    + (isFinite(taker) ? (taker * 100).toFixed(1) + ' %' : '—') + '</div>'
-    + '<div style="margin-top:4px;font-size:12px">Delta net <b class="' + (delta >= 0 ? pos : neg) + '">'
-    + (delta >= 0 ? '+' : '') + fmtNum(delta, 1) + ' BTC</b> — ' + tapeTxt + '</div>');
+    + '<div style="margin-top:6px;font-size:15px;font-weight:800" class="' + clsCote(taker, 0.5, 3) + '">Taker buy '
+    + (isFinite(taker) ? fmtNum(taker * 100, 1) + ' %' : '—') + '</div>'
+    + '<div style="margin-top:4px;font-size:12px">Delta net <b class="' + signCls(delta) + '">'
+    + Fmt.signe(delta, x => Fmt.nombre(x, 1)) + ' BTC</b> — ' + tapeTxt + '</div>');
 
-  // 5 — CE QUI N'EST PAS LIVE ICI, ET POURQUOI
+  // 5 — CE QUI N'EST PAS EN DIRECT ICI, ET POURQUOI
+  // Mêmes précisions que les chiffres clés et les cartes : funding 4 décimales sur 8 h, 1 une
+  // fois annualisé, L/S 2, variation 24 h 2.
   const ageTxt = ageMin === null ? 'inconnu' : ageMin + ' min';
-  html += mCard('🕐', "ce qui n'est PAS live ici", 'lu dans le fichier publié — âge ' + ageTxt, '',
+  html += mCard('🕐', 'Ce qui n’est pas en direct ici', 'lu dans les infos du marché publiées — âge ' + ageTxt, '',
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">'
     + 'Perp (mark) <b>' + (isNum(mi.mark_price) ? fmtPx(mi.mark_price) : '—') + '</b>'
     // ⚠️ Le basis se calcule entre le perp ET le spot DU MÊME INSTANT du fichier. Soustraire
-    // ce perp (daté) au spot LIVE fabriquait un basis de −207 pts au lieu de −45. C'est
-    // exactement le péché que ce panneau est censé rendre impossible.
-    + ' · basis <b>' + (isNum(mi.mark_price) && isNum(bf.price) ? (mi.mark_price - bf.price).toFixed(1) + ' pts' : '—') + '</b>'
-    + ' <span style="color:var(--ink-2)">(perp et spot du même instant du fichier)</span><br>'
-    + 'Dérive du spot depuis la publication <b>' + (isNum(bf.price) ? (px - bf.price).toFixed(1) + ' pts' : '—') + '</b>'
-    + ' · funding <b>' + (isNum(mi.funding_rate_pct) ? fmtNum(mi.funding_rate_pct, 5) + ' %/8h' : '—') + '</b>'
-    + ' · annualisé <b>' + (isNum(mi.funding_annual_pct) ? fmtNum(mi.funding_annual_pct, 1) + ' %' : '—') + '</b><br>'
+    // ce perp (daté) au spot LIVE fabriquait un basis de −207 pts au lieu de −45 (mesuré le
+    // 02/10). C'est exactement le péché que ce panneau est censé rendre impossible.
+    + ' · basis <b>' + (isNum(mi.mark_price) && isNum(bf.price) ? Fmt.signe(mi.mark_price - bf.price, x => Fmt.nombre(x, 1)) + ' pts' : '—') + '</b>'
+    + ' <span style="color:var(--ink-2)">(perp et spot du même instant de la publication)</span><br>'
+    + 'Dérive du spot depuis la publication <b>' + (isNum(bf.price) ? Fmt.signe(px - bf.price, x => Fmt.nombre(x, 1)) + ' pts' : '—') + '</b>'
+    + ' · funding <b>' + (isNum(mi.funding_rate_pct) ? Fmt.pct(mi.funding_rate_pct, 4) + ' / 8 h' : '—') + '</b>'
+    + ' · annualisé <b>' + (isNum(mi.funding_annual_pct) ? Fmt.pct(mi.funding_annual_pct, 1) : '—') + '</b><br>'
     + 'OI <b>' + (isNum(mi.oi_btc) ? fmtNum(mi.oi_btc, 0) + ' BTC' : '—') + '</b>'
-    + ' · L/S retail <b>' + (isNum(mi.ls_ratio) ? fmtNum(mi.ls_ratio, 3) : '—') + '</b>'
-    + ' · variation 24 h (fichier) <b>' + (isNum(bf.change_24h_pct) ? fmtNum(bf.change_24h_pct) + ' %' : '—') + '</b></div>'
+    + ' · L/S retail <b>' + (isNum(mi.ls_ratio) ? fmtNum(mi.ls_ratio, 2) : '—') + '</b>'
+    + ' · variation 24 h (publiée) <b>' + (isNum(bf.change_24h_pct) ? Fmt.pct(bf.change_24h_pct, 2) : '—') + '</b></div>'
     + '<div style="margin-top:8px;font-size:11px;color:var(--ink-2);line-height:1.45">'
-    + '<b>Piège mesuré le 02/10 :</b> soustraire le perp du fichier au spot live affichait un basis de '
-    + '<b>−207 pts</b> quand le vrai basis valait <b>−45 pts</b>. Deux cadences différentes ne se soustraient '
-    + 'jamais — c&#39;est l&#39;erreur exacte que ce panneau existe pour éviter.<br><br>'
-    + 'Ces blocs viennent de market-data.json (cron, ' + CADENCES.attendue_min + ' min) : cette page n\'interroge que Binance '
-    + 'en direct, les autres sources (OKX, Deribit, Yahoo) sont agrégées côté serveur et arrivent avec '
-    + 'leurs ' + CADENCES.attendue_min + ' minutes. Pour comparer honnêtement, ce prix-ci est du <b>spot Binance</b> : compare-le '
-    + 'à ton <b>spot</b> OKX, jamais à un swap — le basis perp/spot fait 20 à 50 pts et ce n&#39;est pas '
+    + 'Le basis se lit entre le perp et le spot publiés au même instant. Deux cadences différentes ne se soustraient '
+    + 'jamais : le perp publié retranché du spot en direct donnerait un écart faux de plusieurs centaines de points.<br><br>'
+    + 'Ces blocs viennent des infos du marché, publiées toutes les ' + CADENCES.attendue_min + ' min : cette page n\'interroge que Binance '
+    + 'en direct, les autres sources (OKX, Deribit, Yahoo) sont rassemblées avant la publication et arrivent avec '
+    + 'leurs ' + CADENCES.attendue_min + ' minutes. Pour comparer honnêtement, ce prix-ci est du <b>spot Binance</b> : comparez-le '
+    + 'à votre <b>spot</b> OKX, jamais à un swap — le basis perp/spot fait 20 à 50 pts et ce n&#39;est pas '
     + 'une panne.</div>');
 
   carteEntree = false;
@@ -7384,11 +7439,12 @@ function crossTag(sous) {
   if (sous === false) return '<span class="badge badge-hausser" title="État sur ce TF, pas un croisement daté">EMA20 &gt; EMA50</span>';
   return '<span class="badge" style="background:var(--rail);color:var(--ink-3)">n/d</span>';
 }
-// Montant signé lisible : « −$6.83M » plutôt que « $-6.83M ».
-const fmtSigned = v => !isNum(v) ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + fmtBig(Math.abs(v));
+// Montant signé lisible : « −6,83 M $ » (moins typographique, unité après le nombre).
+const fmtSigned = v => !isNum(v) ? '—' : Fmt.signe(Number(v), fmtBig);
 const signCls = v => v > 0 ? 'stat-pos' : (v < 0 ? 'stat-neg' : '');
 const chipCls = v => 'chip' + (v > 0 ? ' pos' : v < 0 ? ' neg' : '');
-const pctSigne = (v, d) => !isNum(v) ? '—' : (v > 0 ? '+' : '') + fmtNum(v, d === undefined ? 2 : d) + '%';
+// « +0,30 % », « −1,6 % » : signe, virgule, espace avant « % » (Fmt.pct), 2 décimales par défaut.
+const pctSigne = (v, d) => !isNum(v) ? '—' : Fmt.pct(Number(v), d === undefined ? 2 : d);
 const pct1 = v => isNum(v) ? Math.max(0, Math.min(100, v)).toFixed(1) : null;
 
 // ═══ Composants visuels des cartes ═══
@@ -7428,7 +7484,7 @@ function axePrix(points) {
   if (ps.length < 2) return '';
   const lo = ps[0].p, hi = ps[ps.length - 1].p, marge = (hi - lo) * 0.14 || 1;
   const pos = v => ((v - lo + marge) / (hi - lo + 2 * marge) * 100).toFixed(1);
-  const k = v => '$' + (v / 1000).toFixed(1) + 'k';
+  const k = v => Fmt.compact(v, 1) + ' $';          // « 86,0 k $ »
   return '<div class="axe"><div class="axe-rail"></div>' + ps.map((x, i) =>
     '<span class="axe-pt ' + x.cls + (i % 2 ? ' bas' : ' haut') + '" style="left:' + pos(x.p) + '%"><i></i><b><em>' + x.lbl + '</em>' + k(x.p) + '</b></span>'
   ).join('') + '</div>';
@@ -7466,20 +7522,32 @@ function renderCycle(d) {
   const t4 = tf['4h'] || {};
   const oiK = isNum(x.oi_change_24h_pct) ? x.oi_change_24h_pct : x.oi_change_1d_pct;
   const ageK = upd ? Math.max(0, Math.round((Date.now() - upd.getTime()) / 60000)) : null;
-  cy.innerHTML = kpi('RSI 4h', fmtNum(t4.rsi_14, 1), '', 'tf.4h.rsi_14')
+  // Mêmes précisions que les cartes et le panneau ⚡ (funding annualisé 1 décimale, OI 1, L/S 2).
+  // Le GEX n'a pas de couleur : il ne dit ni la direction ni le moment (fiche « gex »).
+  // Sur une autre paire, la bande dit qu'elle parle du bitcoin (Expert ; hors des .kpi, elle ne
+  // cède jamais sa place à ajusterKpis).
+  cy.innerHTML = (activeSymbol !== 'BTCUSDT' ? '<span class="kpi-btc expert-seul" title="Ces chiffres clés sont ceux du bitcoin, pas de '
+      + escHtml(NOMS_PAIRES[activeSymbol] || activeSymbol) + '">Bitcoin</span>' : '')
+    + kpi('RSI 4h', fmtNum(t4.rsi_14, 1), '', 'tf.4h.rsi_14')
     + kpi('Funding an.', pctSigne(x.funding_annual_pct, 1), signCls(x.funding_annual_pct), 'micro.funding_annual_pct')
     + kpi('OI 24h', pctSigne(oiK, 1), signCls(oiK), 'micro.oi_change_24h_pct')
     + kpi('CVD 24h', fmtSigned(x.cvd_24h_usd), signCls(x.cvd_24h_usd), 'micro.cvd_24h_usd')
-    + kpi('GEX', isNum(x.gex_usd_1pct) ? (x.gex_usd_1pct > 0 ? 'long γ' : 'short γ') : '—', signCls(x.gex_usd_1pct), 'micro.gex_usd_1pct')
+    + kpi('GEX', isNum(x.gex_usd_1pct) ? (x.gex_usd_1pct > 0 ? 'long γ' : 'short γ') : '—', '', 'micro.gex_usd_1pct')
     + kpi('L/S', fmtNum(x.ls_ratio, 2), '', 'micro.ls_ratio')
     + kpi('DXY', fmtNum(m.dxy_spot, 2), '', 'macro.dxy_spot')
     + kpi('VIX', fmtNum(m.vix, 1), '', 'macro.vix')
     // L'âge avance chaque minute sans refaire la bande : majAges() réécrit les [data-age-de].
-    + '<span class="kpi-age" title="Âge de la publication">' + (ageK === null ? '—' : ageDe(d.updated, ageK) + ' min') + '</span>'
+    // Au-delà du seuil, la pastille dit « en retard » (CSS .kpis.vieux) : elle reste visible au
+    // téléphone, seule de la bande (les chiffres clés y sont masqués).
+    + '<span class="kpi-age" title="Âge des infos du marché (publiées toutes les ' + CADENCES.attendue_min + ' min)">'
+    + (ageK === null ? '—' : '<span class="age-retard">en retard · </span>' + ageDe(d.updated, ageK) + ' min') + '</span>'
     // Débutant : une seule pastille, qui ouvre les cartes ; son âge dans l'infobulle (collé au prix
-    // en direct, « il y a 18 min » se lisait comme l'âge du prix). « en retard » au-delà du seuil.
+    // en direct, « il y a 18 min » se lisait comme l'âge du prix). « en retard » au-delà du seuil,
+    // avec l'âge qui avance : c'est alors l'âge d'une publication manquée, il se lit.
     + '<span class="kpi-deb debutant-seul" role="button" tabindex="0" title="' + titreKpiDeb(ageK) + '" aria-label="' + ariaKpiDeb(ageK) + '">'
-    + '<span class="deb-frais">Infos du marché ▸</span><span class="deb-retard">Infos<span class="deb-mot"> du marché</span> · en retard ▸</span></span>';
+    // (Au téléphone, « Infos · » cède : « en retard · 25 min ▸ » tient à côté des boutons.)
+    + '<span class="deb-frais">Infos du marché ▸</span><span class="deb-retard"><span class="deb-quoi">Infos<span class="deb-mot"> du marché</span> · </span>en retard'
+    + (ageK === null ? '' : ' · ' + ageDe(d.updated, ageK) + ' min') + '<span class="deb-fleche"> ▸</span></span></span>';
   cy.classList.toggle('vieux', ageK !== null && ageK > CADENCES.vieux_min);
   const cad = chronique.cadence();
   cy.title = 'Dernière publication (cadence ' + (cad ? 'mesurée ' + Math.round(cad / 60000) : 'attendue ' + CADENCES.attendue_min) + ' min) — cliquer pour le détail';
@@ -7488,14 +7556,21 @@ function renderCycle(d) {
 // Le nom accessible commence par le texte visible (« Infos du marché »), l'âge ensuite.
 const ariaKpiDeb = min => 'Infos du marché — ' + titreKpiDeb(min);
 // Au clavier : Entrée ou Espace sur la pastille ouvre les cartes (comme le clic sur #cycle).
+// La bande se remesure quand SA largeur change : le prix et la variation 24 h s'écrivent après
+// elle (publication arrivée avant le prix : à 1440 px, L/S et DXY restaient rognés et l'âge
+// invisible jusqu'à un appel manuel à ajusterKpis), une police arrive, la fenêtre change. Rien
+// au repos : l'observateur ne rappelle que sur un changement de taille (sa largeur ne dépend
+// pas de ce qu'ajusterKpis masque : pas de boucle).
 (function () {
   const cy = typeof document !== 'undefined' && document.getElementById ? document.getElementById('cycle') : null;
   if (cy && cy.addEventListener) cy.addEventListener('keydown', e => {
     if (!(e.target && e.target.classList && e.target.classList.contains('kpi-deb'))) return;
     if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); e.stopPropagation(); toggleFeed(); }
   });
+  if (cy && typeof ResizeObserver !== 'undefined') new ResizeObserver(() => ajusterKpis()).observe(cy);
 })();
-const titreKpiDeb = min => (min === null ? 'Infos publiées : âge inconnu' : 'Infos publiées il y a ' + min + ' min') + ' (toutes les ' + CADENCES.attendue_min + ' min). Le prix du haut est en direct.';
+const titreKpiDeb = min => (min === null ? 'Infos publiées : âge inconnu' : 'Infos publiées il y a ' + min + ' min') + ' (toutes les ' + CADENCES.attendue_min + ' min'
+  + (min !== null && min > CADENCES.vieux_min ? ' : en retard' : '') + '). Le prix du haut est en direct.';
 function renderFeed() { renderFeedTo(document.getElementById('feed')); }
 // Un âge en minutes, réécrit sur place à chaque tour par majAges().
 const ageDe = (updated, min) => '<span data-age-de="' + escHtml(updated) + '">' + min + '</span>';
@@ -7510,7 +7585,9 @@ function ajusterKpis() {
   const items = Array.from(cy.querySelectorAll('.kpi'));
   items.forEach(k => { k.hidden = false; k.classList.add('sans-trace'); });
   const deborde = () => cy.scrollWidth > cy.clientWidth + 1;
-  for (let i = items.length - 1; i > 0 && deborde(); i--) items[i].hidden = true;
+  // Jusqu'au premier compris : la pastille d'âge (« en retard · 25 min ») passe avant tout
+  // chiffre — à 1024 px, elle était rognée derrière le RSI, jamais masqué.
+  for (let i = items.length - 1; i >= 0 && deborde(); i--) items[i].hidden = true;
   for (const k of items) {
     if (k.hidden || !k.querySelector('.chron-spark')) continue;
     k.classList.remove('sans-trace');
@@ -7545,17 +7622,21 @@ const positionDans = (v, lo, hi) => (isNum(v) && isNum(lo) && isNum(hi) && hi > 
 function ageBannerHtml(d) {
   const upd = d && d.updated ? Date.parse(d.updated) : NaN;
   if (isNaN(upd)) {
-    return '<div class="age-banner" style="display:block">' + modes('Âge de la donnée inconnu — champ <b>updated</b> absent', 'Âge des infos du marché inconnu.') + '</div>';
+    // (Le champ `updated` de market-data.json est absent : son nom n'est pas un mot du lecteur.)
+    return '<div class="age-banner" style="display:block">' + modes('Heure de publication inconnue : l’âge des infos du marché ne peut pas être dit', 'Âge des infos du marché inconnu.') + '</div>';
   }
-  const age = (Date.now() - upd) / 60000;
-  if (age <= CADENCES.vieux_min) return '';
-  const fige = age > CADENCES.fige_min;
+  // L'âge ARRONDI, comme le voyant et la pastille (etatPublication) : un seul seuil partout. Les
+  // minutes sont réécrites sur place chaque minute (ageDe, majAges) : le bandeau ne se fige plus
+  // à l'âge de son dernier rendu.
+  const min = Math.max(0, Math.round((Date.now() - upd) / 60000));
+  if (min <= CADENCES.vieux_min) return '';
+  const fige = min > CADENCES.fige_min, n = ageDe(d.updated, min);
   return '<div class="age-banner' + (fige ? '' : ' retard') + '" style="display:block">'
     + (fige
-        ? modes('Données figées depuis ' + Math.round(age) + ' min — le cron de publication ne tourne plus',
-          'Données figées depuis ' + Math.round(age) + ' min : la publication s’est arrêtée.')
-        : modes('Dernière publication il y a ' + Math.round(age) + ' min (cadence attendue : ' + CADENCES.attendue_min + ' min)',
-          'Dernière publication il y a ' + Math.round(age) + ' min (attendue toutes les ' + CADENCES.attendue_min + ' min).'))
+        ? modes('Données figées depuis ' + n + ' min — la publication s’est arrêtée',
+          'Données figées depuis ' + n + ' min : la publication s’est arrêtée.')
+        : modes('Dernière publication il y a ' + n + ' min (cadence attendue : ' + CADENCES.attendue_min + ' min)',
+          'Dernière publication il y a ' + n + ' min (attendue toutes les ' + CADENCES.attendue_min + ' min).'))
     + '</div>';
 }
 
@@ -7564,14 +7645,15 @@ function renderFeedTo(container) {
   const d = marketData, b = d.btc||{}, m = d.macro||{}, tf = d.tf||{},
         x = d.micro||{}, lq = d.liquidity||{}, st = d.status||{};
   const upd = d.updated ? new Date(d.updated) : null;
-  // Le libellé annonce « UTC » : il faut donc formater EN UTC. Sans `timeZone`,
-  // c'était l'heure locale du poste (Paris, +2 h en été) affichée sous l'étiquette UTC.
-  const hhmm = upd ? upd.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'UTC'}) : '—';
+  // L'heure de publication à l'heure de l'APPAREIL, comme l'horloge de la barre du bas (qui dit le
+  // fuseau dans son infobulle) : en haut une heure UTC sans étiquette, en bas l'heure locale — à
+  // Paris en été, « 20:48 » et « 22:52 » pour le même instant. Le jour s'ajoute s'il a changé.
+  const hhmm = upd ? Fmt.jourHeure(upd.getTime()) : '—';
 
   // L'heure d'abord : elle élargit la droite de l'en-tête, et la bande se mesure ensuite —
   // dans l'autre ordre, des chiffres clés restaient « affichés » mais coupés (mesuré à 1440 px).
   const up = document.getElementById('updated');
-  if (up) up.textContent = hhmm;
+  if (up) { up.textContent = hhmm; up.title = 'Heure de la dernière publication des infos du marché'; }
   renderCycle(d);
 
   let html = '';
@@ -7590,19 +7672,24 @@ function renderFeedTo(container) {
   // Débutant, sur une autre paire que BTCUSDT : ces cartes parlent du BITCOIN (le fichier publié ne
   // suit que lui). Elles le disent dans leurs titres et leurs phrases (« le bitcoin », pas « le
   // prix ») — sinon on lisait « le prix est dans le haut de sa fourchette » à côté de SOL à −4 %.
-  const autrePaire = activeSymbol !== 'BTCUSDT', sujet = autrePaire ? 'le bitcoin' : 'le prix';
+  // Les phrases de fourchette sont calculées sur le prix PUBLIÉ (jusqu'à 15 min d'âge), pas sur
+  // celui du haut : elles le nomment (« le prix publié »), sinon un prix du haut au-dessus du
+  // « Haut publié » côtoyait « le prix est au milieu de sa fourchette ».
+  const autrePaire = activeSymbol !== 'BTCUSDT', sujet = autrePaire ? 'le prix publié du bitcoin' : 'le prix publié';
+  // Expert aussi : sur une autre paire, chaque titre de carte qui parle du bitcoin le dit.
   const btcTitre = t => (autrePaire ? 'Bitcoin : ' + t.charAt(0).toLowerCase() + t.slice(1) : t);
-  // Débutant : « Fourchette des 24 h » — un seul prix en grand à l'écran (celui du haut, en
-  // direct) ; le prix publié, en petit, avec son âge.
-  html += mCard('📊', modes('Marché live', btcTitre('Fourchette des 24 h')), modes('Binance spot · maj ' + hhmm + ' UTC'
-      + (ageMin !== null ? ' (+' + ageDe(d.updated, ageMin) + ' min — le badge du haut est live)' : ''), 'Binance · le prix du haut est en direct'), '',
-    envExpert('<div class="hero"><span class="hero-val">' + fmtUsd(b.price) + '</span>'
-    + '<span class="' + chipCls(b.change_24h_pct) + '">' + pctSigne(b.change_24h_pct) + ' 24h</span></div>')
+  // « Fourchette des 24 h » dans les deux modes (l'Expert disait « Marché live » : ce n'est pas
+  // du direct). Un seul prix en grand à l'écran, celui du haut, en direct ; le prix publié, plus
+  // petit (Expert) ou en ligne (Débutant), avec son âge.
+  html += mCard('📊', btcTitre('Fourchette des 24 h'), modes('Binance spot · publié à ' + hhmm
+      + (ageMin !== null ? ' (il y a ' + ageDe(d.updated, ageMin) + ' min — le prix du haut est en direct)' : ''), 'Binance · le prix du haut est en direct'), '',
+    envExpert('<div class="hero hero-publie"><span class="hero-lbl">Prix publié</span><span class="hero-val">' + fmtUsd(b.price) + '</span>'
+    + '<span class="' + chipCls(b.change_24h_pct) + '">' + pctSigne(b.change_24h_pct) + ' en 24 h</span></div>')
     + envDebutant('<div class="fine">' + (autrePaire ? 'Prix du bitcoin publié ' : 'Prix publié ') + ilYaDeb(d.updated, ageMin) + ' : <b style="color:var(--ink-1)">' + prixDeb(b.price) + '</b></div>')
     + trackHtml(b.price, b.low_24h, b.high_24h, modes('Bas&nbsp;<b>' + fmtUsd(b.low_24h) + '</b>', 'Bas publié&nbsp;<b>' + prixDeb(b.low_24h) + '</b>'),
       modes('Haut&nbsp;<b>' + fmtUsd(b.high_24h) + '</b>', 'Haut publié&nbsp;<b>' + prixDeb(b.high_24h) + '</b>'))
     + phraseCarte('fourchette', positionDans(b.price, b.low_24h, b.high_24h), '24 h', sujet)
-    + envExpert('<div class="fine" style="margin-top:8px">Volume 24h&nbsp;<b style="color:var(--ink-1)">' + fmtBig(b.quote_volume_24h_usd) + '</b></div>'));
+    + envExpert('<div class="fine" style="margin-top:8px">Volume 24 h&nbsp;<b style="color:var(--ink-1)">' + fmtBig(b.quote_volume_24h_usd) + '</b></div>'));
 
   // ── 2. MACRO ──
   // Week-end : DXY et VIX sont TOUS DEUX des dernières clôtures (marchés fermés), pas des
@@ -7611,7 +7698,7 @@ function renderFeedTo(container) {
   // Débutant : « Bourses américaines », la seule tuile du VIX (le dollar est en Expert).
   html += mCard('🌍', modes('Macro', 'Bourses américaines'), modes('Dollar et volatilité · Yahoo', 'Yahoo · ' + ilYaDeb(d.updated, ageMin)), '',
     '<div class="tuiles deb-une">'
-    + envExpert(tuile('DXY', fmtNum(m.dxy_spot,2), ferme ? 'clôture' + (m.dxy_date ? ' du ' + escHtml(m.dxy_date) : '') : 'indice dollar', 'dxy'))
+    + envExpert(tuile('DXY', fmtNum(m.dxy_spot,2), ferme ? 'clôture' + (m.dxy_date ? ' du ' + escHtml(dateSeule(m.dxy_date)) : '') : 'indice dollar', 'dxy'))
     + tuile(modes('VIX', 'Nervosité des bourses'), modes(fmtNum(m.vix,1), isNum(m.vix) ? escHtml(Guide.nombre(m.vix, 1)) : '—'),
       modes(ferme ? 'clôture' : 'volatilité implicite S&amp;P', ferme ? 'dernière séance' : ''), 'vix', phraseCarte('vix', m.vix))
     + '</div>');
@@ -7632,15 +7719,15 @@ function renderFeedTo(container) {
     // n'existe pas dans l'ancien format : on y affiche alors l'écart ABSOLU, et on le dit.
     const e20 = isNum(t.ema20) ? t.ema20 : t.ema20_4h, e50 = isNum(t.ema50) ? t.ema50 : t.ema50_4h;
     const sous = typeof t.ema20_sous_ema50 === 'boolean' ? t.ema20_sous_ema50 : t.death_cross_4h;
-    const ecart = isNum(t.ema_ecart_pct) ? 'écart ' + pctSigne(t.ema_ecart_pct) : 'écart absolu ' + fmtNum(t.ema_gap_pct,2) + '%';
+    const ecart = isNum(t.ema_ecart_pct) ? 'écart ' + pctSigne(t.ema_ecart_pct) : 'écart absolu ' + fmtNum(t.ema_gap_pct,2) + ' %';
     const ampl = isNum(t.amplitude_30_pct) ? t.amplitude_30_pct : t.range_24h_pct;
     indBody += '<div class="tf-row"><div class="tf-tete"><span class="tf-nom">' + (tfLabel[k]||k) + '</span>'
       + '<span class="tf-rsi">RSI&nbsp;<b>' + fmtNum(t.rsi_14,1) + '</b></span>' + rsiMeter(t.rsi_14) + crossTag(sous) + '</div>'
       // Canal S/R : où le dernier cours se situe entre le support et la résistance de la fenêtre.
       + trackHtml(t.last_close, t.support_30, t.resistance_30, 'S&nbsp;<b>' + fmtUsd(t.support_30) + '</b>', 'R&nbsp;<b>' + fmtUsd(t.resistance_30) + '</b>')
       + '<div class="tf-pied">EMA20 ' + fmtUsd(e20) + ' · EMA50 ' + fmtUsd(e50)
-      + ' (' + ecart + ') · amplitude ' + fmtNum(ampl,2) + '% (min/max ' + fen + ')'
-      + (isNum(t.atr_14) ? '<span class="expert-seul"> · ATR ' + fmtUsd(t.atr_14) + ' (' + fmtNum(t.atr_14_pct,2) + '%)</span>' : '') + '</div>'
+      + ' (' + ecart + ') · amplitude ' + fmtNum(ampl,2) + ' % (min/max ' + fen + ')'
+      + (isNum(t.atr_14) ? '<span class="expert-seul"> · ATR ' + fmtUsd(t.atr_14) + ' (' + fmtNum(t.atr_14_pct,2) + ' %)</span>' : '') + '</div>'
       + (k === '4h' ? lectureCourte('rsi_tf', t.rsi_14) : '') + '</div>';
   }
   indBody += '<div class="fiches-ligne">' + ['rsi_tf', 'croisement', 'ema_tf', 'sr_tf', 'amplitude', 'atr_tf'].map(f =>
@@ -7653,7 +7740,7 @@ function renderFeedTo(container) {
   const fenCourt = h => (h % 24 === 0 ? (h / 24) + ' j' : h + ' h');
   const indDeb = t4 ? trackHtml(t4.last_close, t4.support_30, t4.resistance_30, 'Bas ' + fenCourt(fen4) + '&nbsp;<b>' + prixDeb(t4.support_30) + '</b>', 'Haut ' + fenCourt(fen4) + '&nbsp;<b>' + prixDeb(t4.resistance_30) + '</b>')
     + phraseCarte('fourchette', positionDans(t4.last_close, t4.support_30, t4.resistance_30), fenMots(fen4), sujet) : '<div class="fine">En attente de la prochaine publication.</div>';
-  html += mCard('📈', modes('Indicateurs', btcTitre('Fourchette des ' + (fen4 ? fenMots(fen4) : '5 jours'))), modes('Binance 4h/1h/1d · RSI Wilder · bougie en cours incluse', 'Publié ' + ilYaDeb(d.updated, ageMin)), '',
+  html += mCard('📈', modes(btcTitre('Indicateurs'), btcTitre('Fourchette des ' + (fen4 ? fenMots(fen4) : '5 jours'))), modes('Binance 4 h / 1 h / 1 j · RSI Wilder · bougie en cours incluse', 'Publié ' + ilYaDeb(d.updated, ageMin)), '',
     envExpert(indBody) + envDebutant(indDeb));
 
   // ── 4. MICROSTRUCTURE ──
@@ -7664,7 +7751,7 @@ function renderFeedTo(container) {
   // daemon depuis son premier démarrage (des mois de flux) : il n'a pas de sens ici, on ne
   // l'affiche pas comme une lecture du moment.
   const cvdTxt = (v, tb) => '<span class="' + signCls(v) + '">' + fmtSigned(v) + '</span>'
-    + (isNum(tb) ? ' <span class="mute">' + fmtNum(tb,1) + '% achat</span>' : '');
+    + (isNum(tb) ? ' <span class="mute">' + fmtNum(tb,1) + ' % achat</span>' : '');
   const cvdHtml = isNum(x.cvd_1h_usd)
     ? divergeRows([{ lbl: '1h', v: x.cvd_1h_usd, txt: cvdTxt(x.cvd_1h_usd, x.taker_buy_1h_pct) },
                    { lbl: '4h', v: x.cvd_4h_usd, txt: cvdTxt(x.cvd_4h_usd, x.taker_buy_4h_pct) },
@@ -7676,11 +7763,14 @@ function renderFeedTo(container) {
   if (isNum(x.gex_usd_1pct)) {
     const zg = isNum(x.zero_gamma)
       ? 'zéro γ <b style="color:var(--ink-1)">' + fmtUsd(x.zero_gamma) + '</b> (spot '
-        + (x.spot_vs_zero_gamma_pct > 0 ? '+' : '') + fmtNum(x.spot_vs_zero_gamma_pct,1) + '%)'
+        + pctSigne(x.spot_vs_zero_gamma_pct, 1) + ')'
       : 'zéro γ hors ±15 %';
-    gexHtml = '<div class="bloc"><div class="bloc-titre"><span class="ligne"><b>GEX</b>' + infoBtn('gex') + ' <span class="badge '
-      + (x.gex_usd_1pct > 0 ? 'badge-hausser' : 'badge-baissier') + '">' + escHtml(x.gex_state||'—') + '</span></span>'
-      + '<span><b class="' + signCls(x.gex_usd_1pct) + '">' + fmtSigned(x.gex_usd_1pct) + '</b> / 1 %</span></div>'
+    // Le badge dit l'état avec le mot des chiffres clés (« long γ » / « short γ », pas le code
+    // LONG_GAMMA du fichier), sans couleur hausse / baisse : le GEX ne dit ni la direction ni le
+    // moment (fiche « gex »). Le montant signé, de même, sans couleur.
+    gexHtml = '<div class="bloc"><div class="bloc-titre"><span class="ligne"><b>GEX</b>' + infoBtn('gex') + ' <span class="badge" style="background:var(--rail);color:var(--ink-2)" title="'
+      + (x.gex_usd_1pct > 0 ? 'régime long gamma (convention)">long γ' : 'régime short gamma (convention)">short γ') + '</span></span>'
+      + '<span><b>' + fmtSigned(x.gex_usd_1pct) + '</b> / 1 %</span></div>'
       + axePrix([{ p: x.put_wall, cls: 'put', lbl: 'put' }, { p: x.zero_gamma, cls: 'zg', lbl: '0γ' },
                  { p: x.spot_deribit, cls: 'spot', lbl: 'spot' }, { p: x.call_wall, cls: 'call', lbl: 'call' }])
       + '<div class="fine">' + zg + ' · call wall ' + fmtUsd(x.call_wall) + ' · put wall ' + fmtUsd(x.put_wall)
@@ -7692,23 +7782,26 @@ function renderFeedTo(container) {
   }
   const premCls = /NEGATIVE/.test(x.premium_state || '') ? 'badge badge-baissier'
                 : /POSITIVE/.test(x.premium_state || '') ? 'badge badge-hausser' : 'badge';
-  const oiTxt = isNum(x.oi_btc) ? x.oi_btc.toLocaleString('en-US',{maximumFractionDigits:0}) : '—';
+  // L'état de la prime en mots (le fichier publie un code : NEGATIVE, EXTREME_POSITIVE…).
+  const MOTS_PRIME = { POSITIVE: 'positive', NEGATIVE: 'négative', EXTREME_POSITIVE: 'très positive', EXTREME_NEGATIVE: 'très négative', NEUTRAL: 'neutre' };
+  const premMot = x.premium_state ? (MOTS_PRIME[x.premium_state] || String(x.premium_state).toLowerCase().replace(/_/g, ' ')) : '—';
+  const oiTxt = isNum(x.oi_btc) ? Fmt.nombre(Number(x.oi_btc), 0) : '—';
   let microBody = '<div class="tuiles">'
-    + tuile('Funding / 8 h', fmtNum(x.funding_rate_pct,4) + '%', fmtNum(x.funding_annual_pct,2) + '% annualisé', 'funding', lectureCourte('funding', x.funding_rate_pct))
+    + tuile('Funding / 8 h', pctSigne(x.funding_rate_pct, 4), pctSigne(x.funding_annual_pct, 1) + ' annualisé', 'funding', lectureCourte('funding', x.funding_rate_pct))
     + tuile('Open interest', oiTxt + ' <span style="font-size:11px;font-weight:600;color:var(--ink-3)">BTC</span>',
-            fmtBig(x.oi_usd) + '<div class="ligne" style="margin-top:4px"><span class="' + chipCls(oi24) + '">Δ24h ' + pctSigne(oi24) + '</span>'
-            + '<span class="' + chipCls(x.oi_change_5d_pct) + '">Δ5j ' + pctSigne(x.oi_change_5d_pct) + '</span></div>', 'oi', lectureCourte('oi', oi24))
+            fmtBig(x.oi_usd) + '<div class="ligne" style="margin-top:4px"><span class="' + chipCls(oi24) + '">Δ24h ' + pctSigne(oi24, 1) + '</span>'
+            + '<span class="' + chipCls(x.oi_change_5d_pct) + '">Δ5j ' + pctSigne(x.oi_change_5d_pct, 1) + '</span></div>', 'oi', lectureCourte('oi', oi24))
     + '</div>'
     + '<div class="bloc"><div class="bloc-titre"><span class="lbl">Comptes long / short' + infoBtn('ls') + '</span>'
-    + '<span class="fine">L/S&nbsp;<b style="color:var(--ink-1)">' + fmtNum(x.ls_ratio,4) + '</b></span></div>'
-    + splitHtml(x.long_pct, x.short_pct, 'Long&nbsp;<b>' + fmtNum(x.long_pct,1) + '%</b>', 'Short&nbsp;<b>' + fmtNum(x.short_pct,1) + '%</b>')
-    + '<div class="ligne" style="margin-top:7px"><span class="chip">Top traders ' + fmtNum(x.top_ls_ratio,4) + infoBtn('top_ls') + '</span>'
-    + '<span class="chip">Taker B/S ' + fmtNum(x.taker_ratio,4) + infoBtn('taker') + '</span></div>' + lectureCourte('ls', x.ls_ratio) + '</div>'
+    + '<span class="fine">L/S&nbsp;<b style="color:var(--ink-1)">' + fmtNum(x.ls_ratio,2) + '</b></span></div>'
+    + splitHtml(x.long_pct, x.short_pct, 'Long&nbsp;<b>' + fmtNum(x.long_pct,1) + ' %</b>', 'Short&nbsp;<b>' + fmtNum(x.short_pct,1) + ' %</b>')
+    + '<div class="ligne" style="margin-top:7px"><span class="chip">Top traders ' + fmtNum(x.top_ls_ratio,2) + infoBtn('top_ls') + '</span>'
+    + '<span class="chip">Taker B/S ' + fmtNum(x.taker_ratio,2) + infoBtn('taker') + '</span></div>' + lectureCourte('ls', x.ls_ratio) + '</div>'
     + '<div class="bloc"><div class="bloc-titre"><span class="lbl">CVD spot' + infoBtn('cvd') + '</span><span class="fine">achats − ventes au taker</span></div>'
     + cvdHtml + lectureCourte('cvd', x.cvd_24h_usd) + '</div>'
     + gexHtml
-    + '<div class="bloc"><div class="ligne"><span class="lbl">Prime Coinbase' + infoBtn('prime') + '</span><b>' + fmtNum(x.premium_pct,4) + '%</b>'
-    + '<span class="' + premCls + '"' + (premCls === 'badge' ? ' style="background:var(--rail);color:var(--ink-2)"' : '') + '>' + escHtml(x.premium_state||'—') + '</span>'
+    + '<div class="bloc"><div class="ligne"><span class="lbl">Prime Coinbase' + infoBtn('prime') + '</span><b>' + pctSigne(x.premium_pct, 4) + '</b>'
+    + '<span class="' + premCls + '"' + (premCls === 'badge' ? ' style="background:var(--rail);color:var(--ink-2)"' : '') + '>' + escHtml(premMot) + '</span>'
     + '<span class="fine">' + (x.us_demand ? 'au-dessus du seuil « demande US » (0,03 %, USDT inclus)' : 'sous le seuil « demande US » (0,03 %, USDT inclus)') + '</span></div>'
     // Hors USDT (publish.py ≥ 4.0) : des dollars contre des dollars. La prime usuelle contient
     // l'écart USDT/USD — mesuré le 06/10/2026, il en expliquait la totalité.
@@ -7717,7 +7810,7 @@ function renderFeedTo(container) {
     + lectureCourte('prime', x.premium_pct, x.premium_hors_usdt_pct) + '</div>';
   // Débutant : « Achats et ventes » — une phrase qui porte la valeur (l'écart des achats et des
   // ventes immédiats sur 24 h) ; le reste est en Expert.
-  html += mCard('📡', modes('Microstructure', btcTitre('Achats et ventes')), modes('Binance Futures · Deribit · Coinbase', 'Binance, 24 h · ' + ilYaDeb(d.updated, ageMin)), '',
+  html += mCard('📡', modes(btcTitre('Microstructure'), btcTitre('Achats et ventes')), modes('Binance Futures · Deribit · Coinbase', 'Binance, 24 h · ' + ilYaDeb(d.updated, ageMin)), '',
     envExpert(microBody) + (isNum(x.cvd_24h_usd) ? phraseCarte('cvd', x.cvd_24h_usd) : envDebutant('<div class="fine">En attente de la prochaine publication.</div>')));
 
   // ── 5. LIQUIDITÉ ──
@@ -7732,11 +7825,12 @@ function renderFeedTo(container) {
     const cle = (RC.bande !== null && bandes[String(RC.bande)]) ? String(RC.bande) : String(lq.bande_ref_pct);
     const bt = bandes[cle] || { ratio: lq.ratio_bid_ask, bid_btc: lq.total_bid, ask_btc: lq.total_ask };
     const autres = Object.keys(bandes).sort((a, b) => a - b)
-      .map(k => '±' + k + ' % : ' + fmtNum(bandes[k].ratio,2)).join(' · ');
+      .map(k => bandeTxt(k) + ' : ' + fmtNum(bandes[k].ratio,2)).join(' · ');
     const perso = RC.bandesPerso.map(b => [b, bandeProfil(lq, b)]).filter(([, r]) => r)
-      .map(([b, r]) => '±' + b + ' % ≈ ' + fmtNum(r.ratio,2)).join(' · ');
-    liqBody = '<div class="bloc-titre"><span class="lbl">Carnet ±' + cle + ' %' + infoBtn('carnet') + '</span>'
-      + '<span class="fine">Ratio <b>bid/ask</b> ±' + cle + ' % : <b class="' + (bt.ratio>1?'stat-pos':'stat-neg') + '">'
+      .map(([b, r]) => bandeTxt(b) + ' ≈ ' + fmtNum(r.ratio,2)).join(' · ');
+    // Le ratio au milieu (1,00 affiché) n'a pas de couleur : il était rouge, comme un penchant vendeur.
+    liqBody = '<div class="bloc-titre"><span class="lbl">Carnet ' + bandeTxt(cle) + infoBtn('carnet') + '</span>'
+      + '<span class="fine">Ratio <b>bid/ask</b> ' + bandeTxt(cle) + ' : <b class="' + clsCote(bt.ratio, 1, 2) + '">'
       + fmtNum(bt.ratio,2) + '</b></span></div>'
       + splitHtml(bt.bid_btc, bt.ask_btc, 'Bids&nbsp;<b>' + fmtNum(bt.bid_btc,1) + ' BTC</b>', 'Asks&nbsp;<b>' + fmtNum(bt.ask_btc,1) + ' BTC</b>')
       + '<div class="fine" style="margin-top:4px">' + autres + ' · carnet vu jusqu\'à ±' + fmtNum(lq.couverture_pct,2) + ' %</div>'
@@ -7753,16 +7847,19 @@ function renderFeedTo(container) {
   }
   // Débutant : « Ordres en attente » — la barre achat / vente près du prix, une phrase, et ce que
   // vaut une photo du carnet.
-  let liqDeb = '<div class="fine">En attente de la prochaine publication.</div>';
+  let liqDeb = '<div class="fine">En attente de la prochaine publication.</div>', liqSousDeb = 'Binance, près du prix';
   if (lq.unit === 'BTC') {
     const bandes = lq.bandes || {}, RC = REGLAGES.carnet;
     const cle = (RC.bande !== null && bandes[String(RC.bande)]) ? String(RC.bande) : String(lq.bande_ref_pct);
+    // La bande vient d'un RÉGLAGE (masqué en Débutant) : le sous-titre la dit, et dit qu'elle a
+    // été choisie en mode Expert — sinon un réglage changeait ces BTC sans que rien ne le dise.
+    liqSousDeb = 'Binance, à ' + bandeTxt(cle) + ' du prix' + (RC.bande !== null && cle === String(RC.bande) ? ' (bande choisie en mode Expert)' : '');
     const bt = bandes[cle] || { ratio: lq.ratio_bid_ask, bid_btc: lq.total_bid, ask_btc: lq.total_ask };
     liqDeb = splitHtml(bt.bid_btc, bt.ask_btc, 'À l’achat&nbsp;<b>' + btcDeb(bt.bid_btc) + '</b>', 'À la vente&nbsp;<b>' + btcDeb(bt.ask_btc) + '</b>')
       + lectureCourte('carnet', bt.ratio)
       + '<div class="fine" style="margin-top:6px">Une photo : ces ordres peuvent être retirés à tout moment.</div>';
   }
-  html += mCard('💧', modes('Liquidité', btcTitre('Ordres en attente')), modes('Carnet Binance spot · BTC posés', 'Binance, près du prix · relevés ' + ilYaDeb(d.updated, ageMin)), '',
+  html += mCard('💧', modes(btcTitre('Liquidité'), btcTitre('Ordres en attente')), modes('Carnet Binance spot · BTC posés', liqSousDeb + ' · relevés ' + ilYaDeb(d.updated, ageMin)), '',
     envExpert(liqBody) + envDebutant(liqDeb));
 
   // ── 6. ÉTAT DU FLUX ──
@@ -7770,28 +7867,42 @@ function renderFeedTo(container) {
   const errs = d.errors || [];
   const NOMS_BLOCS = { btc_spot: 'Spot', indicators: 'Indicateurs', macro: 'Macro', micro_futures: 'Futures',
                        cvd: 'CVD', gex: 'GEX', premium: 'Prime', liquidity: 'Carnet' };
+  // Cette carte compte les BLOCS de la dernière publication (`status` du fichier) : ni des sources,
+  // ni du direct (« 8/8 blocs live », « 8/8 sources à jour »). Elle ne juge pas l'âge — le bandeau
+  // et le voyant le font —, mais le dit : sous-titre « il y a N min », et « en retard » au-delà
+  // du seuil (même seuil arrondi qu'eux, etatPublication).
+  const vieille = ['retard', 'fige'].includes(etatPublication(d.updated).etat);
+  // L'état de chaque bloc en mots (le fichier écrit « ok », « vide », « incomplet:… », « error: … »).
+  const motEtat = v => v === 'ok' ? 'publié' : v === 'vide' ? 'aucun résultat'
+    : /^incomplet:/.test(v) ? 'incomplet (absents : ' + v.slice(10).split(',').join(', ') + ')'
+    : /^error:/.test(v) ? 'en erreur (' + v.slice(6).trim() + ')' : String(v);
   let stBody = '<div class="hero"><span class="hero-val ' + (errs.length ? 'stat-neg' : '') + '" style="font-size:19px">'
-    + nOk + '/' + nTot + ' blocs live</span></div>'
+    + nOk + '/' + nTot + ' blocs publiés</span></div>'
     + '<div class="etats">' + Object.entries(st).map(([k, v]) => '<span class="etat' + (v === 'ok' ? '' : ' ko') + '" title="'
-      + escHtml(k + ' : ' + v) + '">' + (v === 'ok' ? '✓ ' : '✗ ') + escHtml(NOMS_BLOCS[k] || k) + '</span>').join('') + '</div>'
+      + escHtml((NOMS_BLOCS[k] || k) + ' : ' + motEtat(v)).replace(/"/g, '&quot;') + '">' + (v === 'ok' ? '✓ ' : '✗ ') + escHtml(NOMS_BLOCS[k] || k) + '</span>').join('') + '</div>'
     + (errs.length ? '<div class="stat-neg" style="margin-top:8px;font-size:11px">' + errs.map(escHtml).join('<br>') + '</div>' : '')
-    + '<div class="fine" style="margin-top:8px">' + escHtml(d.generator||'') + '<br>Sources : ' + escHtml(d.source||'—') + '</div>';
-  html += mCard('🔌', modes('Flux', 'Sources'), modes('Pas d\'erreur silencieuse', 'État de la publication'), '',
-    envExpert(stBody) + envDebutant('<div class="hero"><span class="hero-val' + (nOk < nTot ? ' stat-neg' : '') + '" style="font-size:19px">' + nOk + '/' + nTot + ' sources à jour</span></div>')
+    // (Le nom et la version du programme de publication — `generator` — ne sont plus affichés :
+    // une note de développeur, pas une information du lecteur.)
+    + '<div class="fine" style="margin-top:8px">Sources : ' + escHtml(nomsSources(d.source)) + '</div>';
+  const ageFlux = 'il y a ' + (ageMin === null ? '—' : ageDe(d.updated, ageMin)) + ' min' + (vieille ? ' · en retard' : '');
+  html += mCard('🔌', modes('Flux', 'Publication'), modes('Blocs de la dernière publication · ' + ageFlux, 'Dernière publication · ' + ageFlux), '',
+    envExpert(stBody) + envDebutant('<div class="hero"><span class="hero-val' + (nOk < nTot ? ' stat-neg' : '') + '" style="font-size:19px">' + nOk + '/' + nTot + ' infos publiées</span></div>')
     + phraseCarte('sources', nOk, nTot));
 
   // ── 7. HORLOGES ── chaque instant que la page affiche, son âge (js/horloges.js)
-  html += mCard('⏱', modes('Horloges', 'Heures des données'), modes('Chaque instant affiché, son âge · UTC', 'Publication ' + ilYaDeb(d.updated, ageMin) + ' · prix en direct.'), '',
+  html += mCard('⏱', modes('Horloges', 'Heures des données'), modes('Chaque instant affiché, son âge', 'Publication ' + ilYaDeb(d.updated, ageMin) + ' · prix en direct.'), '',
     envExpert(horlogesHtml(d)) + envDebutant('<div class="fine">Les infos du marché sont publiées toutes les ' + CADENCES.attendue_min + ' min ; le prix en haut de l’écran est relu chaque seconde.</div>'));
   // ── 8. CONTRE-EXPERTISE ── la publication recalculée ici (js/contre-expertise.js)
-  html += mCard('🔎', modes('Contre-expertise', 'Vérification'), modes('Vérifié par ton navigateur · Binance spot', 'Recalculé par le navigateur'), contreDroite(d), contreCorps(d));
+  html += mCard('🔎', modes('Contre-expertise', 'Vérification'), modes('Vérifié par votre navigateur · Binance spot', 'Recalculé par le navigateur'), contreDroite(d), contreCorps(d));
   carteEntree = false;
   if (container.dataset) container.dataset.vu = '1';
 
   // Le bandeau d'âge voyage AVEC les cartes : il apparaît donc dans le conteneur
   // réellement affiché, quel qu'il soit.
+  // Sur une autre paire, la note « bitcoin » s'affiche dans les DEUX modes (elle n'existait qu'en
+  // Débutant : l'Expert sur SOL lisait les chiffres du bitcoin sans que rien ne le dise).
   container.innerHTML = ageBannerHtml(d)
-    + (autrePaire ? envDebutant('<div class="deb-btc">Ces infos parlent du bitcoin (en dollars), pas de ' + escHtml(NOMS_PAIRES[activeSymbol] || activeSymbol) + '.</div>') : '') + html;
+    + (autrePaire ? '<div class="deb-btc">Ces infos parlent du bitcoin (en dollars), pas de ' + escHtml(NOMS_PAIRES[activeSymbol] || activeSymbol) + '.</div>' : '') + html;
   brancherContre(container);
 }
 
@@ -7844,13 +7955,21 @@ function lancerChronique() {
 // avancent sans refaire la carte : majHorloges() réécrit les [data-horloge-t] / [data-horloge-src]
 // au rythme du prix (même image que l'horloge de la barre), et ne refait le bloc « page » que
 // si l'état d'une source change (panne, retour, écart d'horloge).
-const FMT_UTC = t => new Date(t).toISOString().slice(11, 19);
+// Les instants à l'heure de l'APPAREIL (ils étaient en UTC, sous un sous-titre « · UTC »), à la
+// seconde ; le jour devant quand ce n'est pas aujourd'hui.
+const FMT_INSTANT = t => (Fmt.memeJour(t, Date.now()) ? '' : Fmt.jour(t) + ' ') + Fmt.heureSec(t);
+// Une date SEULE (« 2026-10-09 », clôture du DXY) : réécrite « 09/10 » comme les autres jours de
+// la page, sans passer par une heure (minuit UTC deviendrait la veille à l'ouest de Greenwich).
+const dateSeule = s => { const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(s || ''); return m ? m[3] + '/' + m[2] : s; };
+// Les sources de la publication (« binance · deribit ») sous leur nom (« Binance · Deribit »).
+const NOMS_SOURCES = { binance: 'Binance', deribit: 'Deribit', coinbase: 'Coinbase', yahoo: 'Yahoo' };
+const nomsSources = s => (s ? String(s).replace(/[a-z]+/g, w => NOMS_SOURCES[w] || w) : '—');
 function horlogesPageHtml() {
   const lignes = Horloges.dePage({ marche: marketData, chaleur: histHeatmap, cadenceMesureeMs: chronique.cadence() }), t = Horloges.maintenant();
   const ecart = Horloges.texteEcart();
   return (ecart ? '<div class="horloge-ecart">' + escHtml(ecart) + '</div>' : '')
     + lignes.map(l => '<div class="horloge-ligne' + (l.classe ? ' ko' : '') + '"><span class="h-nom">' + escHtml(l.libelle) + '</span>'
-      + '<span class="h-quand">' + (l.t ? FMT_UTC(l.t) : '—') + '</span>'
+      + '<span class="h-quand">' + (l.t ? FMT_INSTANT(l.t) : '—') + '</span>'
       + '<span class="h-age" data-horloge-t="' + (l.t || '') + '">' + Horloges.texteAge(l.t ? t - l.t : null) + '</span>'
       + (l.classe ? '<span class="h-panne">' + escHtml(l.panne) + '</span>' : '')
       + (l.seuil ? '<span class="h-seuil">' + escHtml(l.seuil) + '</span>' : '') + '</div>').join('');
@@ -7859,13 +7978,14 @@ function horlogesHtml(d) {
   const t = Horloges.maintenant();
   const fichier = Horloges.duFichier(d).map(l => '<div class="horloge-ligne"><span class="h-nom">' + escHtml(l.libelle)
     // Une date seule (dxy_date) se montre telle quelle : « 00:00:00 » inventerait une heure.
-    + '</span><span class="h-quand">' + (l.t && !/^\d{4}-\d\d-\d\d$/.test(l.valeur) ? FMT_UTC(l.t) : escHtml(String(l.valeur))) + '</span>'
+    + '</span><span class="h-quand">' + (l.t && !/^\d{4}-\d\d-\d\d$/.test(l.valeur) ? FMT_INSTANT(l.t) : escHtml(dateSeule(String(l.valeur)))) + '</span>'
     + '<span class="h-age" data-horloge-t="' + (l.t || '') + '">' + Horloges.texteAge(l.t ? t - l.t : null) + '</span>'
     + '<span class="h-src">' + escHtml(l.source || '') + '</span></div>').join('');
   return '<div class="bloc-titre"><span class="lbl">Cette page</span><span class="fine">dernier succès · panne nommée</span></div>'
     + '<div class="horloges-page">' + horlogesPageHtml() + '</div>'
-    + '<div class="bloc-titre" style="margin-top:10px"><span class="lbl">Le fichier publié</span><span class="fine">champs « horodatage » de meta.champs</span></div>'
-    + (fichier || '<div class="fine">format antérieur : aucun horodatage décrit</div>');
+    // (La liste vient des champs de type « horodatage » décrits dans meta.champs.)
+    + '<div class="bloc-titre" style="margin-top:10px"><span class="lbl">Les infos publiées</span><span class="fine">heures écrites dans la publication</span></div>'
+    + (fichier || '<div class="fine">publication d’un format antérieur : aucune heure décrite</div>');
 }
 let sigHorloges = '';
 function majHorloges() {
@@ -7906,14 +8026,14 @@ function contreCorps(d) {
   return envDebutant('<div class="fine">Le navigateur recalcule les chiffres publiés : détail en mode Expert.</div>') + envExpert(contreCorpsExpert(d));
 }
 function contreCorpsExpert(d) {
-  const pub = Date.parse(d.updated), hm = isFinite(pub) ? new Date(pub).toISOString().slice(11, 16) + ' UTC' : '—';
+  const pub = Date.parse(d.updated), hm = isFinite(pub) ? Fmt.jourHeure(pub) : '—';
   if (contre.pour !== d.updated || !contre.res) {
     return '<div class="age-banner verif" style="display:block">publication ' + hm + ' · ' + (contre.enCours === d.updated ? 'vérification en cours…' : 'pas encore vérifiée') + '</div>'
       + '<div class="fine">Recalculée ici depuis Binance quand cette carte est à l’écran, une fois par publication.</div>';
   }
   const r = contre.res;
-  let html = '<div class="age-banner verif" style="display:block">publication ' + hm + ' · vérifiée à ' + FMT_UTC(contre.a)
-    + ' UTC (<span data-horloge-t="' + contre.a + '">' + Horloges.texteAge(Horloges.maintenant() - contre.a) + '</span>)</div>';
+  let html = '<div class="age-banner verif" style="display:block">publication ' + hm + ' · vérifiée à ' + FMT_INSTANT(contre.a)
+    + ' (<span data-horloge-t="' + contre.a + '">' + Horloges.texteAge(Horloges.maintenant() - contre.a) + '</span>)</div>';
   if (r.note) html += '<div class="fine">' + escHtml(r.note) + '</div>';
   const groupes = new Map();
   for (const l of r.lignes) { if (!groupes.has(l.groupe)) groupes.set(l.groupe, []); groupes.get(l.groupe).push(l); }
@@ -8053,15 +8173,19 @@ function renderStratHelp() {
   if (!p) {
     html += '<div class="strat-auto">Aperçu de la grille : en attente des bougies…</div>';
   } else {
-    const f = v => '$' + v.toLocaleString('fr-FR', { maximumFractionDigits: 2 });
-    const sig = p.signal === 'enter' ? '<span class="stat-pos">signal armé</span>'
-      : p.signal === 'exit' ? '<span class="stat-neg">signal de sortie</span>'
+    // Le prix au format commun, unité APRÈS le nombre (« 83 512,50 $ », « 1,2345 SOL ») — il
+    // s'écrivait « $83 512,5 ». Le signal sans couleur : « armé » dit seulement que la condition
+    // d'entrée de la grille est remplie (pour la grille RSI, un RSI sous le seuil) — ni une bonne
+    // nouvelle, ni l'annonce d'un rebond.
+    const f = v => Fmt.prix(v, guideUnite(), 'fin');
+    const sig = p.signal === 'enter' ? 'signal armé'
+      : p.signal === 'exit' ? 'signal de sortie'
       : p.signal === 'idle' ? 'signal pas encore armé' : 'pas de signal sur cette bougie';
     const tp = (btUserParams.tpPct !== undefined) ? btUserParams.tpPct : strat.params.tpPct.value;
     const sl = (btUserParams.slPct !== undefined) ? btUserParams.slPct : strat.params.slPct.value;
     html += '<div class="strat-auto">' + (p.manual ? 'Bornes saisies à la main' : 'Auto') + ' : '
       + f(p.lo) + ' → ' + f(p.hi) + ' · ' + p.n + ' niveaux · pas de ' + f(p.step)
-      + ' · TP +' + tp + ' % / SL −' + sl + ' % · ' + sig + '</div>';
+      + ' · TP +' + Fmt.nombre(+tp, decimalesDe(tp)) + ' % / SL −' + Fmt.nombre(+sl, decimalesDe(sl)) + ' % · ' + sig + '</div>';
   }
   el.innerHTML = html;
 }
@@ -8198,27 +8322,31 @@ function updateForwardStats() {
   if (!btResult) return;
   const div = document.getElementById('stratStats');
   div.style.display = 'block';
-  const pnlStr = btResult.totalPnl >= 0 ? '+' + btResult.totalPnl.toFixed(2) : btResult.totalPnl.toFixed(2);
+  const pnlStr = Fmt.signe(btResult.totalPnl, x => Fmt.nombre(x, 2));
   div.innerHTML =
     '<div>🔄 <b>Forward</b> | Trades: <span class="stat-val">' + btResult.tradeCount + '</span></div>' +
-    '<div>P&L live: <span class="' + (btResult.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' USDT</span></div>' +
-    '<div>Return: <span class="' + (btResult.totalReturn >= 0 ? 'stat-pos' : 'stat-neg') + '">' + btResult.totalReturn.toFixed(2) + '%</span></div>';
+    '<div>P&L en direct: <span class="' + (btResult.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' USDT</span></div>' +
+    '<div>Return: <span class="' + (btResult.totalReturn >= 0 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.pct(btResult.totalReturn, 2) + '</span></div>';
 }
 
+// Un nombre du Grid Bot publié en texte par runBacktest (« 1.234 », « ∞ ») : au format commun.
+function nombreBot(t, dec) { return isFinite(parseFloat(t)) ? Fmt.nombre(parseFloat(t), dec) : String(t); }
+// Les décimales d'un réglage tel qu'il a été saisi (« 0.5 » → 1) : « TP +0,5 % ».
+function decimalesDe(v) { return (String(v).split('.')[1] || '').length; }
 // Durée d'une bougie en minutes : traduit la fenêtre testée en « 8 h » / « 3,2 j ».
 const INTERVAL_MIN = { '1m': 1, '5m': 5, '15m': 15, '1h': 60, '4h': 240, '1d': 1440 };
 
 function showStratStats(result) {
   const div = document.getElementById('stratStats');
   div.style.display = 'block';
-  const pnlStr = (result.totalPnl >= 0 ? '+' : '') + result.totalPnl.toFixed(2);
+  const pnlStr = Fmt.signe(result.totalPnl, x => Fmt.nombre(x, 2));
   // Verdict : le seul juge qui compte est « garder le BTC » sur la MÊME période. Une grille qui
   // gagne 0,40 % quand le BTC fait 3 % a perdu du terrain, malgré un P&L positif.
   const c0 = candles[result.startIdx], c1 = candles[result.endIdx];
   const hold = (c0 && c1 && c0.close) ? (c1.close - c0.close) / c0.close * 100 : null;
   const ret = result.totalReturn;
   const mins = (result.endIdx - result.startIdx + 1) * (INTERVAL_MIN[chartInterval] || 15);
-  const durStr = mins >= 1440 ? (mins / 1440).toFixed(1) + ' j' : mins >= 60 ? (mins / 60).toFixed(1) + ' h' : mins + ' min';
+  const durStr = mins >= 1440 ? Fmt.nombre(mins / 1440, 1) + ' j' : mins >= 60 ? Fmt.nombre(mins / 60, 1) + ' h' : mins + ' min';
   let html = '';
   if (hold !== null) {
     const v = (ret > 0 && ret > hold) ? ['stat-pos', '✅ gagne et bat le marché']
@@ -8226,14 +8354,14 @@ function showStratStats(result) {
       : (ret > hold) ? ['stat-val', '⚠️ perd, mais moins que le marché']
       : ['stat-neg', '❌ perd alors que garder le BTC montait'];
     html += '<div class="verdict"><span class="' + v[0] + '">' + v[1] + '</span> — '
-      + (ret >= 0 ? '+' : '') + ret.toFixed(2) + ' % en ' + durStr + ', BTC '
-      + (hold >= 0 ? '+' : '') + hold.toFixed(2) + ' % sur la même période</div>';
+      + Fmt.pct(ret, 2) + ' en ' + durStr + ', BTC '
+      + Fmt.pct(hold, 2) + ' sur la même période</div>';
   }
   html +=
-    '<div>Trades: <span class="stat-val">' + result.tradeCount + '</span> | Win: <span title="Part des trades clôturés en profit" class="' + (result.winRate >= 50 ? 'stat-pos' : 'stat-neg') + '">' + result.winRate.toFixed(1) + '%</span></div>' +
-    '<div>P&L: <span title="Profit ou perte en USDT, frais 0,1 % déjà déduits" class="' + (result.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' USDT</span> (' + (ret >= 0 ? '+' : '') + ret.toFixed(2) + ' %)</div>' +
-    '<div>Perte max: <span title="Plus forte baisse depuis un sommet du capital (drawdown)" class="stat-neg">' + result.maxDrawdownPct.toFixed(1) + '%</span> | Sharpe: <span title="Rendement par unité de risque, annualisé. Au-delà de 1 c\'est bon ; sur une fenêtre courte il ne veut rien dire." class="stat-val">' + result.sharpe + '</span></div>' +
-    '<div>Gains/pertes: <span title="Total des gains divisé par le total des pertes. Au-dessus de 1, la grille gagne." class="stat-val">' + result.profitFactor + '</span> | Gain moyen: <span title="Gain moyen par trade gagnant" class="stat-pos">' + result.avgWin.toFixed(2) + '</span> | Perte moyenne: <span title="Perte moyenne par trade perdant" class="stat-neg">' + result.avgLoss.toFixed(2) + '</span></div>';
+    '<div>Trades: <span class="stat-val">' + result.tradeCount + '</span> | Win: <span title="Part des trades clôturés en profit" class="' + (result.winRate >= 50 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.nombre(result.winRate, 1) + ' %</span></div>' +
+    '<div>P&L: <span title="Profit ou perte en USDT, frais 0,1 % déjà déduits" class="' + (result.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' USDT</span> (' + Fmt.pct(ret, 2) + ')</div>' +
+    '<div>Perte max: <span title="Plus forte baisse depuis un sommet du capital (drawdown)" class="stat-neg">' + Fmt.nombre(result.maxDrawdownPct, 1) + ' %</span> | Sharpe: <span title="Rendement par unité de risque, annualisé. Au-delà de 1 c\'est bon ; sur une fenêtre courte il ne veut rien dire." class="stat-val">' + nombreBot(result.sharpe, 3) + '</span></div>' +
+    '<div>Gains/pertes: <span title="Total des gains divisé par le total des pertes. Au-dessus de 1, la grille gagne." class="stat-val">' + nombreBot(result.profitFactor, 2) + '</span> | Gain moyen: <span title="Gain moyen par trade gagnant" class="stat-pos">' + Fmt.nombre(result.avgWin, 2) + '</span> | Perte moyenne: <span title="Perte moyenne par trade perdant" class="stat-neg">' + Fmt.nombre(result.avgLoss, 2) + '</span></div>';
   if (result.tradeCount < 10) html += '<div class="strat-note">' + result.tradeCount + ' trade(s) : trop peu pour conclure — visez 30, ou élargissez la période avec les champs « Du » / « Au ».</div>';
   div.innerHTML = html;
 }
@@ -8347,19 +8475,19 @@ function showWalkForward() {
 
   for (const seg of wf.segments) {
     html += '<div style="margin-bottom:4px;font-size:10px">';
-    html += '<b>S' + seg.segment + '</b> In: <span class="stat-val">' + seg.inSample.return.toFixed(2) + '%</span> (Sharpe ' + seg.inSample.sharpe.toFixed(2) + ') ';
-    html += '→ Out: <span class="' + (seg.outSample.return >= 0 ? 'stat-pos' : 'stat-neg') + '">' + seg.outSample.return.toFixed(2) + '%</span> (Sharpe ' + seg.outSample.sharpe.toFixed(2) + ')';
+    html += '<b>S' + seg.segment + '</b> In: <span class="stat-val">' + Fmt.pct(seg.inSample.return, 2) + '</span> (Sharpe ' + Fmt.nombre(seg.inSample.sharpe, 2) + ') ';
+    html += '→ Out: <span class="' + (seg.outSample.return >= 0 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.pct(seg.outSample.return, 2) + '</span> (Sharpe ' + Fmt.nombre(seg.outSample.sharpe, 2) + ')';
     html += '</div>';
   }
 
-  html += '<div style="margin-top:6px"><b>Degradation Ratio:</b> <span class="' + (wf.degradationRatio >= 0.7 ? 'stat-pos' : 'stat-neg') + '">' + wf.degradationRatio.toFixed(3) + '</span></div>';
+  html += '<div style="margin-top:6px"><b>Degradation Ratio:</b> <span class="' + (wf.degradationRatio >= 0.7 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.nombre(wf.degradationRatio, 3) + '</span></div>';
   html += '<div style="font-size:10px;color:var(--ink-2)">' + wf.interpretation + '</div>';
 
   // Sensitivity
   if (wf.sensitivity && wf.sensitivity.length > 0) {
-    html += '<div style="margin-top:6px;font-size:10px"><b>Sensibilité gridLevels ±20%:</b></div>';
+    html += '<div style="margin-top:6px;font-size:10px"><b>Sensibilité au nombre de niveaux ±20 % :</b></div>';
     for (const s of wf.sensitivity) {
-      html += '<span style="margin-right:8px">' + s.value + ': <span class="' + (s.return >= 0 ? 'stat-pos' : 'stat-neg') + '">' + s.return.toFixed(2) + '%</span></span>';
+      html += '<span style="margin-right:8px">' + s.value + ': <span class="' + (s.return >= 0 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.pct(s.return, 2) + '</span></span>';
     }
   }
 

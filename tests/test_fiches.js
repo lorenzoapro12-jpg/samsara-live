@@ -104,6 +104,12 @@ const conseils = textes.filter(([, t]) => CONSEIL.test(t));
 check('aucune fiche ne dit quoi acheter ou vendre', !conseils.length, conseils);
 const courtes = ['funding', 'oi', 'ls', 'cvd', 'gex', 'rsi_tf', 'vix', 'prime', 'carnet'].flatMap(k => [-5, -0.5, 0.2, 1, 50, 80].map(v => T.lectureCourte(k, v)));
 check('aucune lecture courte ne dit quoi faire', courtes.every(t => !CONSEIL.test(t)));
+// Un ratio de 1 (tel qu'affiché, « 1,00 ») n'est ni « plus d'acheteurs » ni « plus de vendeurs ».
+check('ratio affiché « 1,00 » (L/S, carnet) : « Autant de… », jamais « Plus de… » ; 1,01 et 0,99 gardent leur sens',
+  ['ls', 'carnet'].every(k => [1, 0.999, 1.004].every(v => /Autant de/.test(T.lectureCourte(k, v)) && !/Plus de/.test(T.lectureCourte(k, v))))
+  && /Plus de comptes acheteurs/.test(T.lectureCourte('ls', 1.01)) && /Plus de comptes vendeurs/.test(T.lectureCourte('ls', 0.99))
+  && /à l’achat qu’à la vente/.test(T.lectureCourte('carnet', 1.01)) && /^<div[^>]*>Plus de BTC posés à la vente/.test(T.lectureCourte('carnet', 0.99)),
+  ['ls', 'carnet'].map(k => T.lectureCourte(k, 1)));
 // Les phrases des cartes du Débutant (phraseCarte) : le même bloc réservé au Débutant, en mots
 // simples (aucun mot de la liste du Guide), sans conseil.
 {
@@ -111,7 +117,8 @@ check('aucune lecture courte ne dit quoi faire', courtes.every(t => !CONSEIL.tes
   const ph = [['fourchette', 0, '24 h'], ['fourchette', 0.5, '5 jours'], ['fourchette', 0.9], ['vix', 12], ['vix', 20], ['vix', 30], ['cvd', 1.2e8], ['cvd', -3.4e7], ['sources', 9, 9], ['sources', 7, 9], ['sources', 8, 9]].map(a => T.phraseCarte(...a));
   check(`${ph.length} phrases des cartes : chacune « lecture-courte debutant-seul », sans conseil ni mot technique`, ph.every(h => /^<div class="lecture-courte debutant-seul">[^<]+<\/div>$/.test(h) && !CONSEIL.test(h) && !Gd.motsBannis(h).length), ph);
   check('fourchette : « Sur 24 h, le prix est dans le bas de sa fourchette. » ; écart achats/ventes arrondi en millions (« 120 millions $ », « 34 millions $ », jamais un nombre à 7 chiffres)', /^<div[^>]*>Sur 24 h, le prix est dans le bas de sa fourchette\.<\/div>$/.test(ph[0]) && /de 120 millions \$\./.test(ph[6]) && /de 34 millions \$\./.test(ph[7])
-    && /de 3,4 millions \$\./.test(T.phraseCarte('cvd', 3356931)) && /de 1,2 million \$\./.test(T.phraseCarte('cvd', -1.2e6)) && /de 845 000 \$\./.test(T.phraseCarte('cvd', 845000)) && !/\d{1,3}(?: \d{3}){2}/.test(ph[6] + ph[7] + T.phraseCarte('cvd', 3356931)) && /2 sources manquent/.test(ph[9]) && /1 source manque/.test(ph[10]), [ph[0], ph[6], ph[9]]);
+    && /de 3,4 millions \$\./.test(T.phraseCarte('cvd', 3356931)) && /de 1,2 million \$\./.test(T.phraseCarte('cvd', -1.2e6)) && /de 845 000 \$\./.test(T.phraseCarte('cvd', 845000)) && !/\d{1,3}(?: \d{3}){2}/.test(ph[6] + ph[7] + T.phraseCarte('cvd', 3356931)) && /2 infos manquent dans la dernière publication/.test(ph[9]) && /1 info manque dans la dernière publication/.test(ph[10])
+    && /La dernière publication est complète\./.test(ph[8]) && !/sont arrivées|sources? manque/.test(ph.join(' ')), [ph[0], ph[6], ph[8], ph[9]]);
   check('valeur absente ou clé inconnue : aucune phrase (rien d’inventé)', T.phraseCarte('vix', null) === '' && T.phraseCarte('fourchette', NaN) === '' && T.phraseCarte('inconnue', 1) === '' && T.phraseCarte('sources', 3) === '');
 }
 // Le glossaire en Débutant : d'abord ce que montre SON écran, avec un titre et une explication du
@@ -132,10 +139,12 @@ check('aucune lecture courte ne dit quoi faire', courtes.every(t => !CONSEIL.tes
   T.activeSymbol = 'SOLUSDT';
   const dS = rendre(null), eS = rendre('expert');
   T.activeSymbol = sym;
-  check('SOL/USDT : cartes identiques dans les deux modes ; le Débutant dit « Ces infos parlent du bitcoin », « Bitcoin : fourchette des 24 h », « le bitcoin est … de sa fourchette »', dS === eS && /Ces infos parlent du bitcoin \(en dollars\), pas de SOL\/USDT\./.test(dS)
-    && /Bitcoin : fourchette des 24 h/.test(dS) && /le bitcoin est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(dS) && !/le prix est (dans le haut|dans le bas|au milieu)/.test(dS), dS.slice(0, 400));
+  // La phrase dit « le prix publié » : le prix du haut de la page est en direct, celui de la
+  // carte est celui de la publication (les deux pouvaient se contredire sans le dire).
+  check('SOL/USDT : cartes identiques dans les deux modes ; le Débutant dit « Ces infos parlent du bitcoin », « Bitcoin : fourchette des 24 h », « le prix publié du bitcoin est … de sa fourchette »', dS === eS && /Ces infos parlent du bitcoin \(en dollars\), pas de SOL\/USDT\./.test(dS)
+    && /Bitcoin : fourchette des 24 h/.test(dS) && /le prix publié du bitcoin est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(dS) && !/le prix (publié )?est (dans le haut|dans le bas|au milieu)/.test(dS), dS.slice(0, 400));
   const dB = rendre(null);
-  check('BTC/USDT : « le prix », pas de mention « Ces infos parlent du bitcoin » ; haut et bas publiés dits « publié »', !/Ces infos parlent du bitcoin/.test(dB) && /le prix est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(dB) && /Haut publié/.test(dB) && /Bas publié/.test(dB));
+  check('BTC/USDT : « le prix publié », pas de mention « Ces infos parlent du bitcoin » ; haut et bas publiés dits « publié »', !/Ces infos parlent du bitcoin/.test(dB) && /le prix publié est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(dB) && !/bitcoin est (dans le haut|dans le bas|au milieu)/.test(dB) && /Haut publié/.test(dB) && /Bas publié/.test(dB));
 }
 check('chaque fiche se termine par « ce n’est pas une recommandation »', Object.keys(T.FICHES).every(k => /pas une recommandation/.test(T.ficheHtml(k))));
 

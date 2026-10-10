@@ -872,7 +872,10 @@ function phraseCarte(cle, v, v2, sujet) {
     case 'fourchette': if (n(v)) t = 'Sur ' + (v2 || '24 h') + ', ' + (sujet || 'le prix') + ' est ' + (v >= 2 / 3 ? 'dans le haut' : v <= 1 / 3 ? 'dans le bas' : 'au milieu') + ' de sa fourchette.'; break;
     case 'vix': if (n(v)) t = v < 15 ? 'Les bourses américaines sont calmes.' : v > 25 ? 'Les bourses américaines sont nerveuses.' : 'Les bourses américaines ne sont ni calmes ni nerveuses.'; break;
     case 'cvd': if (n(v)) t = v >= 0 ? 'Sur 24 h, les achats immédiats ont dépassé les ventes immédiates de ' + dollars(v) + '.' : 'Sur 24 h, les ventes immédiates ont dépassé les achats immédiats de ' + dollars(v) + '.'; break;
-    case 'sources': if (n(v) && n(v2)) t = v >= v2 ? 'Toutes les données publiées sont arrivées.' : (v2 - v) + (v2 - v > 1 ? ' sources manquent' : ' source manque') + ' (détail en mode Expert).'; break;
+    // Elle compte les blocs de la DERNIÈRE publication (status), pas des sources ni leur âge
+    // (le bandeau d'âge le dit) : « Toutes les données publiées sont arrivées » se lisait au-dessus
+    // de « Données figées depuis 45 min ».
+    case 'sources': if (n(v) && n(v2)) t = v >= v2 ? 'La dernière publication est complète.' : (v2 - v) + (v2 - v > 1 ? ' infos manquent' : ' info manque') + ' dans la dernière publication (détail en mode Expert).'; break;
     default: t = null;
   }
   return t ? '<div class="lecture-courte debutant-seul">' + echapF(t) + '</div>' : '';
@@ -880,12 +883,15 @@ function phraseCarte(cle, v, v2, sujet) {
 
 function lectureCourte(id, v, v2) {
   const n = x => typeof x === 'number' && isFinite(x);
+  const r2 = x => Math.round(x * 100) / 100;   // un ratio comme il s'affiche (« 1,00 »)
   const pct = x => (x > 0 ? '+' : '') + x.toLocaleString('fr-FR', { maximumFractionDigits: 2 }) + ' %';
   let t = null;
   switch (id) {
     case 'funding': if (n(v)) t = v > 0 ? 'Les acheteurs à levier paient les vendeurs.' : v < 0 ? 'Les vendeurs à découvert paient les acheteurs.' : 'Aucun paiement entre acheteurs et vendeurs.'; break;
     case 'oi': if (n(v)) t = v > 0 ? 'Plus de positions à levier ouvertes qu’il y a 24 h (' + pct(v) + ').' : v < 0 ? 'Moins de positions à levier ouvertes qu’il y a 24 h (' + pct(v) + ').' : 'Autant de positions à levier ouvertes qu’il y a 24 h.'; break;
-    case 'ls': if (n(v)) t = (v > 1 ? 'Plus de comptes acheteurs que vendeurs' : 'Plus de comptes vendeurs qu’acheteurs') + ' — des comptes, pas des montants.'; break;
+    // Le ratio jugé tel qu'il s'affiche (2 décimales) : à 1,00, ni plus d'acheteurs ni plus de
+    // vendeurs (la phrase disait « plus de vendeurs » à 1 exactement).
+    case 'ls': if (n(v)) t = (r2(v) > 1 ? 'Plus de comptes acheteurs que vendeurs' : r2(v) < 1 ? 'Plus de comptes vendeurs qu’acheteurs' : 'Autant de comptes acheteurs que vendeurs') + ' — des comptes, pas des montants.'; break;
     case 'cvd': if (n(v)) t = v > 0 ? 'Sur 24 h, les achats au marché ont dominé.' : 'Sur 24 h, les ventes au marché ont dominé.'; break;
     case 'gex': if (n(v)) t = v > 0 ? 'Régime « long gamma » selon la convention ; lecture usuelle : mouvements amortis.' : 'Régime « short gamma » selon la convention ; lecture usuelle : mouvements amplifiés.'; break;
     case 'rsi_tf': if (n(v)) t = v >= 70 ? 'Zone haute (au-dessus de 70) : la hausse récente a été forte.' : v <= 30 ? 'Zone basse (sous 30) : la baisse récente a été forte.' : 'Zone neutre (entre 30 et 70).'; break;
@@ -896,7 +902,7 @@ function lectureCourte(id, v, v2) {
         : (x > 0 ? 'Le BTC est plus cher sur Coinbase que sur Binance (souvent lu comme une demande américaine plus forte).' : 'Le BTC est moins cher sur Coinbase que sur Binance (souvent lu comme une demande américaine plus faible).');
       break;
     }
-    case 'carnet': if (n(v)) t = v > 1 ? 'Plus de BTC posés à l’achat qu’à la vente près du prix.' : 'Plus de BTC posés à la vente qu’à l’achat près du prix.'; break;
+    case 'carnet': if (n(v)) t = r2(v) > 1 ? 'Plus de BTC posés à l’achat qu’à la vente près du prix.' : r2(v) < 1 ? 'Plus de BTC posés à la vente qu’à l’achat près du prix.' : 'Autant de BTC posés à l’achat qu’à la vente près du prix.'; break;
     default: t = null;
   }
   return t ? '<div class="lecture-courte debutant-seul">' + echapF(t) + '</div>' : '';

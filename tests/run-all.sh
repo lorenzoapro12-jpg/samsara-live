@@ -124,6 +124,9 @@ node test_fenetres.js || ko=1
 etape "9b. Interface dans Chromium : menus dans l'écran, crochets du graphique, sous-graphes sans débordement (non exécuté sans Playwright)"
 node test_interface.js || ko=1
 
+etape "9b°. En-tête dans Chromium, panneau fermé : « en retard » et son âge dans les deux modes (1440 à 360 px), un seul seuil (l'âge arrondi), voyant avant la lecture, noms, variation 24 h, heure de l'appareil, raccourcis, « + Indicateurs » à l'écran (non exécuté sans Playwright)"
+node test_entete.js || ko=1
+
 etape "9b'. Guide du graphique dans Chromium : chaque bande nommée, heures gardées à 390 px, deux chemins ensemble, survol et tap (non exécuté sans Playwright)"
 node test_guide_page.js || ko=1
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Saṃsāra — Marché live</title>
+<title>Saṃsāra — Terminal BTC</title>
 <script src="js/binance-repli.js"></script>
 <script>
 /* Les lectures du premier écran partent ICI, avant les feuilles et les scripts : lancées par
@@ -103,15 +103,17 @@
   <!-- Chiffres clés de la dernière PUBLICATION (market-data.json, 15 min) — avec leur âge. -->
   <div class="kpis" id="cycle" onclick="toggleFeed()" title="Dernière publication — cliquer pour le détail"></div>
   <div class="header-right">
-    <span id="updated"></span>
-    <button class="theme-btn ico-btn expert-seul" onclick="toggleFeed()" id="feedBtn" title="Marché live (F)" aria-label="Marché live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
-    <button class="theme-btn ico-btn expert-seul" onclick="openLiveModal()" id="liveBtn" title="Lecture LIVE — Binance, à la seconde" aria-label="Lecture live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></button>
+    <span id="updated" title="Heure de la dernière publication des infos du marché"></span>
+    <button class="theme-btn ico-btn expert-seul" onclick="toggleFeed()" id="feedBtn" title="Infos du marché (F)" aria-label="Infos du marché"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
+    <button class="theme-btn ico-btn expert-seul" onclick="openLiveModal()" id="liveBtn" title="En direct (à la seconde) — Binance" aria-label="En direct (à la seconde)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></button>
     <button class="theme-btn ico-btn" onclick="resetView()" id="resetBtn" title="Réinitialiser le zoom (R)" aria-label="Réinitialiser le zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg></button>
     <a class="theme-btn ico-btn" href="bookmap.html" id="carteBtn" title="Carte du carnet (bookmap) — page à côté" aria-label="Carte du carnet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M8 4v16M14 4v16"/></svg></a>
     <button class="theme-btn mode-btn" onclick="basculerMode()" id="modeBtn" title="Niveau de détail : débutant ou expert (M) — les valeurs ne changent pas" aria-pressed="false">Débutant</button>
     <button class="theme-btn ico-btn expert-seul" onclick="ouvrirReglages(this)" id="reglagesBtn" title="Réglages d'affichage : bandes, tranches, profondeur, seuils" aria-label="Réglages d'affichage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
     <button class="theme-btn ico-btn" onclick="ouvrirGlossaire(this)" id="legendesBtn" title="Légendes : comment lire chaque indicateur (?)" aria-label="Légendes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></button>
-    <span class="refresh-dot" id="dot" title="Flux temps réel actif"></span>
+    <!-- Le voyant mesure l'âge des infos du marché (pas le prix, lu à la seconde) : gris et calme
+         tant qu'aucune publication n'a été lue (il était vert, « Flux temps réel actif »). -->
+    <span class="refresh-dot calme" id="dot" style="background:var(--ink-3)" title="Infos du marché : en attente de la première lecture"></span>
     <button class="theme-btn ico-btn" onclick="ouvrirThemes(event)" id="themeBtn" title="Thème (T : suivant · D : clair / sombre)" aria-label="Choisir le thème" aria-haspopup="menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.7-.8 1.7-1.7 0-.9-.7-1.3-.7-2.2 0-.9.8-1.6 1.7-1.6H17a4 4 0 0 0 4-4C21 6.8 17 3 12 3z"/><circle cx="7.5" cy="11.5" r="1.1"/><circle cx="10" cy="7.3" r="1.1"/><circle cx="14.6" cy="7.3" r="1.1"/></svg></button>
   </div>
 </div>
@@ -162,7 +164,7 @@
 <div class="chart-container"><div class="gloss-bubble"></div><div class="lg-ring"></div><div class="lg-ring-cotes"></div><canvas id="chart"></canvas><canvas id="chartCalque" class="calque" aria-hidden="true"></canvas><div id="astuceTap" class="astuce-tap debutant-seul" role="status" hidden></div></div>
 
 <div class="feed-panel collapsed" id="feedPanel">
-  <div class="feed-panel-handle" onclick="toggleFeed()" id="feedHandle"><span class="expert-seul">Marché live</span><span class="debutant-seul">Infos du marché</span></div>
+  <div class="feed-panel-handle" onclick="toggleFeed()" id="feedHandle">Infos du marché</div>
   <div class="feed-panel-body">
     <div class="feed" id="feed">
       <div class="loading">📊 En attente des données…</div>
@@ -218,10 +220,10 @@
   </div>
 </div>
 
-<!-- Mobile : modal Marché live -->
+<!-- Mobile : modal « Infos du marché » (publiées toutes les 15 min) -->
 <div id="marketModal" class="modal" style="display:none;z-index:1000">
   <div class="modal-tete">
-    <span class="modal-titre expert-seul">Marché live</span><span class="modal-titre debutant-seul">Infos du marché</span>
+    <span class="modal-titre">Infos du marché</span>
     <button onclick="closeMarketModal()" class="modal-fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
   <div id="marketModalBody" class="modal-corps">
@@ -229,11 +231,11 @@
   </div>
 </div>
 
-<!-- Mobile : modal LECTURE LIVE (bouton ⚡) — n'affiche que ce qui peut être interrogé en direct
+<!-- Mobile : modal EN DIRECT (À LA SECONDE) (bouton ⚡) — n'affiche que ce qui peut être interrogé en direct
      par cette page (Binance). Les autres sources sont agrégées côté serveur, avec leur retard. -->
 <div id="liveModal" class="modal" style="display:none;z-index:1001">
   <div class="modal-tete">
-    <span class="modal-titre">Lecture live <span id="liveClock"></span></span>
+    <span class="modal-titre">En direct (à la seconde) <span id="liveClock"></span></span>
     <button onclick="closeLiveModal()" class="modal-fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
   <div id="liveModalBody" class="modal-corps">
@@ -253,7 +255,7 @@
     <span id="taskbarPair">BTC/USDT</span>
   </div>
   <div class="taskbar-right">
-    <span class="taskbar-dot" id="taskbarDot" style="background:var(--up)"></span>
+    <span class="taskbar-dot" id="taskbarDot" style="background:var(--ink-3)" title="Infos du marché : en attente de la première lecture"></span>
     <span id="taskbarClock">--:--:--</span>
   </div>
 </div>
