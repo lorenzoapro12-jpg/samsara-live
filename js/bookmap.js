@@ -1187,7 +1187,7 @@
       texte(t, tx, ty, coul, 10, 'left', true);
       reserver(tx - 1, ty - 7, tw + 2, 14, t);
     }
-    pastille(['Gros paquets (fichier 15 min) · lus il y a ' + BM.age(now - n.mursA), 'Σ par tranche de ' + BM.nombre(tr, 0, 2) + ' $ : les plus grosses du fichier, sans seuil'],
+    pastille(['Gros paquets · lus il y a ' + BM.age(now - n.mursA), 'fichier de 15 min · Σ par tranche de ' + BM.nombre(tr, 0, 2) + ' $'],
       x0 + 6, 60, C.murBid, 'left', 'Gros paquets · ' + BM.age(now - n.mursA));
   }
   function gamma() {
@@ -2386,7 +2386,7 @@
       ['Bandes claires = ordres en attente (le carnet).', 'Plus la couleur avance dans la palette (' + paletteMots() + '), plus il y a d\'ordres posés dans la tranche. Ce sont des intentions : un ordre peut être retiré.'],
       ['Ligne blanche = le prix.', 'La clôture de chaque minute ; à la seconde (après la dernière minute close, et partout quand on zoome), le prix moyen des échanges pondéré par le volume.'],
       ['Ronds = échanges réellement exécutés.', couleurMot('Vert', '--up') + ' : achat au marché (l\'acheteur a pris le prix d\'un vendeur) ; ' + couleurMot('rouge', '--down') + ' : vente au marché (l\'inverse). Chaque échange a un acheteur et un vendeur : la couleur dit seulement qui a pris le prix de l\'autre. Plus gros rond, plus gros volume.'],
-      ['Rectangles « Σ … BTC » = les gros paquets du fichier de 15 min.', 'Σ veut dire « somme » : tous les ordres posés dans une tranche de ' + tr + ' $ ; les plus grosses tranches du fichier, sans seuil. Fichier' + (n && n.mursA ? ' lu à ' + BM.jourHeure(n.mursA, maintenant()) : '') + ' ; ' + couleurMot('turquoise', '--carte-mur-bid') + ' côté achat, ' + couleurMot('rose', '--carte-mur-ask') + ' côté vente.'],
+      ['Rectangles « Σ … BTC » = les gros paquets (fichier de 15 min).', 'Σ veut dire « somme » : tous les ordres posés dans une tranche de ' + tr + ' $ (les plus grosses, sans seuil)' + (n && n.mursA ? ', lus à ' + BM.jourHeure(n.mursA, maintenant()) : '') + ' ; ' + couleurMot('turquoise', '--carte-mur-bid') + ' côté achat, ' + couleurMot('rose', '--carte-mur-ask') + ' côté vente.'],
       ['Tirets ' + couleurMot('violets', '--carte-gamma') + ' = niveaux d\'options (modèle).', gam + ' : calculés d\'après les options Deribit sous une hypothèse, pas observés.'],
     ];
   }
@@ -2404,7 +2404,7 @@
     }
     document.getElementById('guideIntroNote').textContent = (R.calques.guide ? 'Les numéros montrent un exemple réel de chacun. Vert ou turquoise : côté achat ; rouge ou rose : côté vente. Rond : échangé ; rectangle : en attente.' : 'Calque Guide éteint : pas de numéros sur la carte.')
       + ' Le Guide écrit aussi les murs, les zones à surveiller, un résumé (en haut) et le Journal. '
-      + 'Mode ' + (MODE === 'expert' ? 'expert : chiffres seuls' : 'débutant : des phrases') + ' (bouton de mode en haut de la page, à côté du titre' + (survol ? ', ou touche M' : '') + ' ; change aussi le terminal).'
+      + 'Mode ' + (MODE === 'expert' ? 'expert : chiffres seuls' : 'débutant : des phrases') + ' (bouton de mode en haut' + (survol ? ', ou touche M' : '') + ' ; change aussi le terminal).'
       + (survol ? ' Touches : ? ce guide, G guide, J journal, L légende.' : '');
   }
   function rectIntro() {

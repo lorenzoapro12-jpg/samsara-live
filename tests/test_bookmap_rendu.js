@@ -251,7 +251,7 @@ async function filNoir(page, x, y) {
 
     titre('2. Chaque calque porte son âge SUR la carte');
     for (const [nom, motif] of [['carte publiée', /^Carte publiée · dernière colonne il y a /], ['carnet live', /^Carnet live · dernier il y a /],
-      ['exécutions', /^Exécutions · dernière il y a /], ['gros paquets', /^Gros paquets \(fichier 15 min\) · lus il y a /], ['gamma', /^Gamma \(Deribit\) · il y a /]]) {
+      ['exécutions', /^Exécutions · dernière il y a /], ['gros paquets', /^Gros paquets · lus il y a /], ['gamma', /^Gamma \(Deribit\) · il y a /]]) {
       // Les murs et le gamma partent de leur instant de lecture : on élargit la vue si besoin.
       check(`pastille d'âge : ${nom}`, e.pastilles.some(t => motif.test(t)), e.pastilles);
     }
@@ -1744,7 +1744,7 @@ async function filNoir(page, x, y) {
         check('45b. touche M : Expert (data-mode, samsara-mode), « → Débutant », Réglages, Rafales et toutes les puces visibles',
           x.mode === 'expert' && x.cle === 'expert' && x.libelle === '→ Débutant' && x.reglages && x.rafales && x.puces === 16, x);
         // Les cinq pastilles de la section 2 : murs et gamma viennent du fichier de 15 min, relu en Expert.
-        const motifs = [/^Carte publiée · /, /^Carnet live · /, /^Exécutions · /, /^Gros paquets \(fichier 15 min\) · /, /^Gamma \(Deribit\) · /];
+        const motifs = [/^Carte publiée · /, /^Carnet live · /, /^Exécutions · /, /^Gros paquets · lus il y a /, /^Gamma \(Deribit\) · /];
         await p45.waitForFunction(ms => { const p = window.__carte.etat().pastilles; return ms.every(m => p.some(t => new RegExp(m).test(t))); }, motifs.map(m => m.source), { timeout: 15000 }).catch(() => {});
         const eX5 = await etat(p45);
         check('Expert : les 5 pastilles d\'âge de la section 2 sont là, panneaux du côté et du bas rouverts', motifs.every(m => eX5.pastilles.some(t => m.test(t))) && eX.mise.dom.w > 0 && eX.mise.vol.h > 0 && eX.mise.cvd.h > 0, { p: eX5.pastilles, dom: eX.mise.dom, vol: eX.mise.vol });
@@ -2081,9 +2081,9 @@ async function filNoir(page, x, y) {
       check('46h. légende : « Plusieurs horloges », gestes complets (L, + / −, Ctrl + molette), ronds (pas « bulles ») pour les échanges, plus de note périmée « avant le 08/10 »',
         /Plusieurs horloges sur une même surface/.test(lg.texte) && !/Trois horloges/.test(lg.texte) && /L : la légende/.test(lg.texte) && /\+ \/ − : zoom/.test(lg.texte) && /Ctrl \+ molette/.test(lg.texte) && !/\bbulles?\b/i.test(lg.texte) && !/avant le 08\/10/.test(lg.texte), lg.texte.slice(0, 200));
       check('46i. volume et CVD en BTC (la quantité échangée, comme les ronds)', /^Volume \(BTC\) par /.test(e.textes.volume || '') && /^CVD spot \(BTC\) cumulé depuis .+ · [+−]?[\d ]+(,\d+)? BTC$/.test(e.textes.cvd || ''), [e.textes.volume, e.textes.cvd]);
-      check('46j. puces et pastilles : « Gros paquets (fichier 15 min) » et « Destin des gros ordres », plus de calque « Murs »',
+      check('46j. puces et pastilles : « Gros paquets » (fichier de 15 min) et « Destin des gros ordres », plus de calque « Murs »',
         await pg.evaluate(() => { const t = [...document.querySelectorAll('#calques button')].map(b => b.textContent); return t.includes('Gros paquets') && t.includes('Destin des gros ordres') && !t.includes('Murs') && !t.includes('Destin des murs'); })
-        && e.pastillesCompletes.some(t => /^Gros paquets \(fichier 15 min\) · lus il y a /.test(t)), e.pastillesCompletes.map(t => t.slice(0, 50)));
+        && e.pastillesCompletes.some(t => /^Gros paquets · lus il y a .+ \| fichier de 15 min · Σ par tranche de 20 \$$/.test(t)), e.pastillesCompletes.map(t => t.slice(0, 50)));
       // La lecture au pointeur : prix à la cotation (au centime) ; entre la fin de la carte publiée et le début du live, « non observé ».
       const rc = await pg.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(); return { x: r.left, y: r.top }; });
       const viserTP = async (t, p) => { const v = e.vue, Zc = e.mise.chaleur, x = Zc.x + (t - v.t1) / (v.t2 - v.t1) * Zc.w, y = Zc.y + (v.p2 - p) / (v.p2 - v.p1) * Zc.h;
