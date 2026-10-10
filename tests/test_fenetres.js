@@ -160,11 +160,14 @@ const dedans = (a, b, m = 0.5) => a && b && a.g >= b.g - m && a.d <= b.d + m && 
       const active = await fond('#feedPanel > .f95-titre');
       check('fenêtre active : le graphique l\'est ; le marché live s\'allume au survol, s\'éteint sinon',
         inactive !== active && active === graphique, { inactive, active, graphique });
-      // L'info-bulle du graphique place « O … » et « H … » à 60 px d'écart (abscisses fixes de
-      // drawChart) : la police du canvas doit y loger un prix à cinq chiffres et deux décimales.
+      // L'info-bulle du graphique place « H … » à une colonne mesurée (colonneOHLC, 60 px au moins)
+      // de « O … » : la police du canvas doit y loger un prix à cinq chiffres et deux décimales, au
+      // format de la page (« O 99 999,99 »), avec 3 px d'air.
       const colonne = await p.evaluate(() => { const g = document.createElement('canvas').getContext('2d'); g.font = chartFont(10, 600);
-        return { police: g.font, largeur: g.measureText('O ' + fmtPrix(99999.99)).width }; });
-      check(`info-bulle : « O 99999.99 » tient dans sa colonne de 60 px (${colonne.largeur.toFixed(1)} px)`, colonne.largeur <= 57, colonne);
+        const t = ['O ' + Fmt.cote(99999.99), 'L ' + Fmt.cote(99999.99)];
+        return { police: g.font, textes: t, largeur: Math.max(...t.map(x => g.measureText(x).width)), colonne: colonneOHLC(g, t) }; });
+      check(`info-bulle : « ${colonne.textes[0]} » tient dans sa colonne de ${colonne.colonne} px (${colonne.largeur.toFixed(1)} px)`,
+        colonne.textes[0] === 'O 99 999,99' && colonne.largeur <= colonne.colonne - 3, colonne);
       check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();
 

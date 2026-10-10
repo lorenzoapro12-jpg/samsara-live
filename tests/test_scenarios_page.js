@@ -278,7 +278,7 @@ const etat = page => page.evaluate(() => {
     {
       const note = JSON.parse(previsionsAttente()).note;
       // Mode Expert : les lignes « attente » et « absent » ci-dessous sont celles de l'Expert (heure
-      // UTC) ; leurs lignes Débutant sont vérifiées dans test_debutant_page.js.
+      // de l'appareil) ; leurs lignes Débutant sont vérifiées dans test_debutant_page.js.
       const a = await ouvrir(nav, { width: 1440, height: 900 }, 'expert', 'attente');
       const e = await etat(a.page);
       check('attente : une seule ligne « Scénarios du matin : » + la note du fichier', e && e.boite && e.boite.seule && e.boite.lignes.length === 1
@@ -288,7 +288,7 @@ const etat = page => page.evaluate(() => {
       await a.ctx.close();
       const z = await ouvrir(nav, { width: 390, height: 800 }, 'expert', 'absent');
       const ez = await etat(z.page);
-      check('absent (404) : « Scénarios du matin : pas de fichier lisible (HH:MM UTC) »', ez && ez.boite && ez.boite.seule && /^Scénarios du matin : pas de fichier lisible \(\d\d:\d\d UTC\)$/.test(ez.boite.lignes[0]), ez && ez.boite);
+      check('absent (404) : « Scénarios du matin : pas de fichier lisible (HH:MM) », à l\'heure de l\'appareil', ez && ez.boite && ez.boite.seule && /^Scénarios du matin : pas de fichier lisible \(\d\d:\d\d\)$/.test(ez.boite.lignes[0]), ez && ez.boite);
       check('absent : aucune erreur JavaScript', !z.erreurs.length, z.erreurs);
       await z.ctx.close();
     }

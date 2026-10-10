@@ -440,6 +440,9 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 .tag-sg { color: var(--warn-ink); }
 .tag-ch { color: var(--accent-2); }
 .tag-gd { color: var(--ink-2); }
+/* Une couche qui ne dessine rien sur la paire affichée : grisée, et elle dit pourquoi. */
+.ind-dropdown-menu label.indispo { color: var(--ink-3); cursor: default; }
+.ind-dropdown-menu label .ind-seul { font-size: 10px; font-weight: 600; color: var(--ink-3); white-space: nowrap; }
 /* L'aperçu du menu : ce que c'est et comment s'en servir, pour la ligne survolée ou touchée.
    Collé en bas du menu (qui défile), toujours visible. */
 .ind-dropdown-menu { max-width: min(380px, calc(100vw - 16px)); }
@@ -477,6 +480,13 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 .ind-compte[hidden] { display: none !important; }
 /* Planche : le pied est compté au pixel (deux rangées) ; le compte y reste dans le menu, pas sur le bouton. */
 .plan-pied .ind-compte { display: none !important; }
+/* Planche, bureau : les noms du ruban (« Sur les bougies », « EMA 20 », « Stochastique », « 1 j »)
+   sont plus longs que les abréviations d'avant ; les pastilles de la nomenclature sont resserrées
+   pour qu'elle garde ses deux rangées (le thème lui compte ≈ 690 px à côté du cartouche). */
+@media (min-width: 1280px) {
+  :root[data-structure="planche"] .plan-pied .indicator-bar label { padding-left: 3px; padding-right: 3px; }
+  :root[data-structure="planche"] .plan-pied .indicator-bar label[style*="--dot"] .ind-label::before { margin-right: 4px; }
+}
 
 /* ─── 6. Graphique ──────────────────────────────────────────────────────────── */
 .main-area { display: flex; flex: 1; min-height: 0; gap: var(--gap); overflow: hidden; }

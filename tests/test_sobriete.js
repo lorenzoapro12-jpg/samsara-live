@@ -187,7 +187,7 @@ async function ouvrir(nav, theme, o = {}) {
       livePrice = P.maxP - P.range / GRILLE_N * 2;              // pile sur le 3e libellé
       prixSurGraphique();
       CanvasRenderingContext2D.prototype.fillText = f;
-      const attendu = '$' + fmtPrix(P.maxP - P.range / GRILLE_N * 2), libelles = vus.filter(v => v.t.startsWith('$'));
+      const attendu = Fmt.prix(P.maxP - P.range / GRILLE_N * 2, '$', 'fin'), libelles = vus.filter(v => /^\d[\d ]*,\d\d \$$/.test(v.t));
       livePrice = avant; prixSurGraphique();
       return { omis: !libelles.some(v => v.t === attendu && Math.abs(v.y - (P.top + P.ph / GRILLE_N * 2 + 3)) < 0.5), etiquette: libelles.some(v => v.t === attendu), n: libelles.length, dessins: window.__t.dessins - d0 };
     });
@@ -230,7 +230,7 @@ async function ouvrir(nav, theme, o = {}) {
     });
     // Ses DEUX âges : la dernière colonne et la publication (js/horloges.js, texteAge).
     check(`la couche porte son âge sur le graphique (« ${ageCouche.attendu} »)`, ageCouche.vus.includes(ageCouche.attendu)
-      && /^Carte publiée · dernière colonne (il y a .+|< 5 s) · publiée (il y a .+|< 5 s)$/.test(ageCouche.attendu), ageCouche);
+      && /^Ordres en attente \(carte\) · dernière colonne (il y a .+|< 5 s) · publiée (il y a .+|< 5 s)$/.test(ageCouche.attendu), ageCouche);
     const z = await k.page.evaluate(() => {
       const cles = [];
       for (const v of [50, 3000, 50, 3000, 50]) { viewStart = Math.max(0, candles.length - v); viewEnd = candles.length; drawChart(); cles.push(heatLayer && heatLayer.cle); }

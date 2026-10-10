@@ -359,8 +359,8 @@ function guideNoter(on) { try { localStorage.setItem('samsara-guide-v1', on ? '1
 // de les masquer est gardé de la même façon (clé samsara-scenarios-v1).
 function scenariosMemorise() { try { return localStorage.getItem('samsara-scenarios-v1') !== '0'; } catch (e) { return true; } }
 function scenariosNoter(on) { try { localStorage.setItem('samsara-scenarios-v1', on ? '1' : '0'); } catch (e) { /* navigation privée */ } }
-const activeSubs = { vol: true, rsi: false, macd: false, stoch: false, atr: false, obv: false, mfi: false, williamsR: false, cci: false, adx: false, ao: false, equity: false };
-const subHeights = { vol: 110, rsi: 120, macd: 120, stoch: 120, atr: 110, obv: 110, mfi: 120, williamsR: 120, cci: 120, adx: 120, ao: 110, equity: 140 };
+const activeSubs = { vol: true, rsi: false, macd: false, stoch: false, atr: false, obv: false, mfi: false, williamsR: false, cci: false, adx: false, ao: false };
+const subHeights = { vol: 110, rsi: 120, macd: 120, stoch: 120, atr: 110, obv: 110, mfi: 120, williamsR: 120, cci: 120, adx: 120, ao: 110 };
 
 // ============ PARAMÈTRES DES INDICATEURS : une seule source ============
 // Le calcul, le libellé (menu, titre de sous-graphe) et la légende (js/fiches.js) lisent CES
@@ -487,24 +487,30 @@ const ETIQ = {
   mfi: () => 'MFI — Money Flow Index (' + PARAM.mfi.periode + ')',
   williamsR: () => 'Williams %R (' + PARAM.williamsR.periode + ')',
   cci: () => 'CCI (' + PARAM.cci.periode + ')',
-  adx: () => 'ADX/DMI (' + PARAM.adx.periode + ')',
-  bb: () => 'Bollinger (' + PARAM.bb.periode + ', ' + PARAM.bb.ecarts + ' σ)',
+  adx: () => 'ADX / DMI (' + PARAM.adx.periode + ')',
+  bb: () => 'Bandes de Bollinger (' + PARAM.bb.periode + ', ' + PARAM.bb.ecarts + ' σ)',
   ao: () => 'Awesome Oscillator (' + PARAM.ao.rapide + ',' + PARAM.ao.lente + ')',
 };
 
-// Registre de tous les indicateurs pour la dropdown
+// La couche de heatmap.json sur le graphique : UN nom, du menu à l'âge écrit sur le tracé (elle
+// s'est appelée Liquidité, Depth, Heatmap du graphique et Carte publiée).
+const NOM_ORDRES_CARTE = 'Ordres en attente (carte)';
+// Registre de tous les indicateurs pour la dropdown. Un seul nom par chose : le libellé du menu
+// est celui de la fiche (js/fiches.js), du ruban et du tracé, en français.
+// `paires` : les seules paires où la couche dessine quelque chose (BTCUSDT : heatmap.json et
+// previsions.json ne parlent que de lui) — ailleurs, la case est grisée et le dit.
 const INDICATORS = [
   // Le Guide d'abord : la seule couche affichée par défaut, son interrupteur reste visible
   // sans faire défiler le menu.
   { cat: 'Guide', items: [
     { key: 'guide', label: 'Guide : niveaux nommés, régime, formes, suite', tag: 'gd' },
-    { key: 'scenarios', label: 'Scénarios du matin de Claude, une IA (' + PARAM.scenarios.point + ' Paris, BTC)', tag: 'gd' },
+    { key: 'scenarios', label: 'Scénarios du matin de Claude, une IA (' + PARAM.scenarios.point + ' Paris)', tag: 'gd', paires: ['BTCUSDT'] },
   ]},
   { cat: 'Overlays', items: [
     ...['ema20', 'ema50', 'ema100', 'ema200', 'sma20', 'sma50'].map(k => ({ key: k, label: k.slice(0, 3).toUpperCase() + ' ' + periodeDe(k), tag: 'ov' })),
     { key: 'bb', label: ETIQ.bb(), tag: 'ov' },
     { key: 'vwap', label: 'VWAP', tag: 'ov' },
-    { key: 'ichimoku', label: 'Ichimoku Cloud', tag: 'ov' },
+    { key: 'ichimoku', label: 'Nuage Ichimoku', tag: 'ov' },
     { key: 'sar', label: 'Parabolic SAR', tag: 'ov' },
   ]},
   { cat: 'Sous-graphes', items: [
@@ -521,12 +527,14 @@ const INDICATORS = [
     { key: 'ao', label: ETIQ.ao(), tag: 'sg' },
   ]},
   { cat: 'Chartiste', items: [
-    { key: 'sr', label: 'Supports/Résistances', tag: 'ch' },
-    { key: 'fib', label: 'Fibonacci Retracement', tag: 'ch' },
-    { key: 'vp', label: 'Volume Profile', tag: 'ch' },
-    { key: 'liq', label: 'Liquidité (Depth)', tag: 'ch' }
+    { key: 'sr', label: 'Supports / résistances', tag: 'ch' },
+    { key: 'fib', label: 'Retracements de Fibonacci', tag: 'ch' },
+    { key: 'vp', label: 'Profil de volume', tag: 'ch' },
+    { key: 'liq', label: NOM_ORDRES_CARTE, tag: 'ch', paires: ['BTCUSDT'] }
   ]},
 ];
+/** La couche dessine-t-elle quelque chose sur la paire affichée ? */
+const disponible = item => !item.paires || item.paires.includes(activeSymbol);
 
 function isOverlay(key) { return key in overlays; }
 function isActive(key) { return (overlays[key] || activeSubs[key]) || false; }
@@ -553,7 +561,7 @@ const FICHE_IND = { ema20: 'ema', ema50: 'ema', ema100: 'ema', ema200: 'ema', sm
   williamsR: 'williamsR', cci: 'cci', adx: 'adx', ao: 'ao', sr: 'sr', fib: 'fib', vp: 'vp', liq: 'liq', guide: 'guide', scenarios: 'scenarios' };
 // Débutant : le menu « Affichage » n'a que les deux couches du Guide, en mots simples ; les outils
 // d'analyse sont en Expert (une ligne y mène).
-const LIBELLES_DEBUTANT = { guide: 'Repères et phrase de lecture', scenarios: 'Scénarios du matin de Claude, une IA (' + PARAM.scenarios.point + ' Paris, BTC)' };
+const LIBELLES_DEBUTANT = { guide: 'Repères et phrase de lecture', scenarios: 'Scénarios du matin de Claude, une IA (' + PARAM.scenarios.point + ' Paris)' };
 // Les catégories en mots : où l'indicateur se dessine. La clé `cat` reste le nom court (tests).
 const TITRES_CAT = { Guide: 'Guide', Overlays: 'Sur les bougies', 'Sous-graphes': 'Sous le graphique', Chartiste: 'Niveaux et zones' };
 // L'aperçu du menu : l'indicateur survolé, touché ou au clavier, et le filtre de l'Expert. Gardés
@@ -597,7 +605,10 @@ function ligneMenu(item, libelle, cat, tag) {
   const checked = isActive(item.key) ? ' checked' : '';
   const fiche = FICHE_IND[item.key], f = fiche && typeof FICHES !== 'undefined' ? FICHES[fiche] : null;
   const cherche = libelle + ' ' + (f ? f.titre : '') + ' ' + (TITRES_CAT[cat] || cat);
-  return `<label data-ind="${item.key}" data-cat="${cat}" data-cherche="${echapF(cherche)}"><input type="checkbox"${checked} onchange="toggleAny('${item.key}')">${libelle}${fiche ? infoBtn(fiche) : ''}${tag ? `<span class="tag tag-${item.tag}" title="${echapF(TITRES_CAT[cat] || cat)}">${item.tag.toUpperCase()}</span>` : ''}</label>`;
+  // Sur une autre paire, la couche ne dessinerait rien : case grisée (le choix est gardé) et dit.
+  const dispo = disponible(item), seul = dispo ? '' : ' disabled';
+  const note = dispo ? '' : ' <span class="ind-seul">' + item.paires.map(p => NOMS_PAIRES[p] || p).join(', ') + ' seulement</span>';
+  return `<label data-ind="${item.key}" data-cat="${cat}" data-cherche="${echapF(cherche)}"${dispo ? '' : ' class="indispo"'}><input type="checkbox"${checked}${seul} onchange="toggleAny('${item.key}')">${libelle}${note}${fiche ? infoBtn(fiche) : ''}${tag ? `<span class="tag tag-${item.tag}" title="${echapF(TITRES_CAT[cat] || cat)}">${item.tag.toUpperCase()}</span>` : ''}</label>`;
 }
 function buildDropdown() {
   const menu = document.getElementById('indMenu');
@@ -636,11 +647,13 @@ function titresBarre() {
     l.title = f.titre + ' : ' + f.simple + (f.traders ? '\nComment les traders l’utilisent : ' + f.traders : '') + '\n(Le menu « + Indicateurs » en a la fiche complète, avec le calcul.)';
   }
 }
-/** Le bouton du menu dit combien d'indicateurs l'Expert a allumés (le Guide compris). */
+/** Le bouton du menu dit combien d'indicateurs de MARCHÉ l'Expert a allumés et voit sur cette
+ *  paire : ni le Guide ni les scénarios (les couches du site, « pas des indicateurs de marché »
+ *  selon leurs fiches), ni une couche cochée qui ne dessine rien ici. */
 function compterIndicateurs() {
   const c = document.getElementById('indCompte');
   if (!c) return;
-  const n = INDICATORS.reduce((s, cat) => s + cat.items.filter(i => isActive(i.key)).length, 0);
+  const n = INDICATORS.filter(cat => cat.cat !== 'Guide').reduce((s, cat) => s + cat.items.filter(i => isActive(i.key) && disponible(i)).length, 0);
   c.textContent = n ? String(n) : '';
   c.hidden = !n;
 }
@@ -778,6 +791,10 @@ async function changeInterval(interval, label) {
 }
 
 const NOMS_PAIRES = { BTCUSDT: 'BTC/USDT', SOLUSDT: 'SOL/USDT', XRPUSDT: 'XRP/USDT', TAOUSDT: 'TAO/USDT', BTCSOL: 'BTC/SOL' };
+/** L'intervalle en Expert, écrit comme dans le ruban : « 15m », « 4h », « 1 j » (jamais « 1D »), « 1 sem. ». */
+const nomTf = tf => ({ '1d': '1 j', '1w': '1 sem.' })[tf] || tf;
+/** L'actif de base de la paire affichée, l'unité du volume : BTC (BTC/USDT et BTC/SOL), SOL, XRP, TAO. */
+const uniteVolume = () => (NOMS_PAIRES[activeSymbol] || activeSymbol).split('/')[0];
 function ouvrirPaires(e) {
   if (e) e.stopPropagation();
   const m = document.getElementById('paireMenu'), b = document.getElementById('paireBtn');
@@ -798,6 +815,9 @@ async function changeSymbol(symbol, label) {
   // Le dernier prix d'une AUTRE paire ne doit ni colorer la flèche ni allumer l'éclair.
   livePrice = null; fetchPrice();
   priceScale = 1.0; pricePan = 0;
+  // Les couches d'une seule paire (Ordres en attente, scénarios) : grisées ou rendues, comptées ou non.
+  compterIndicateurs();
+  if (document.getElementById('indMenu').classList.contains('open')) buildDropdown();
   // Les cartes du Débutant nomment le bitcoin sur une autre paire : elles suivent la paire.
   if (marketData) {
     renderFeed();
@@ -1609,8 +1629,9 @@ function getMultiTFLevels() {
       if (Math.abs(d.price - lvl.price) / Math.max(d.price, lvl.price) < PARAM.sr.fusionTf) {
         d.score += lvl.score;
         d.touches += lvl.touches;
-        // MAX, pas MIN : un niveau present sur le TF courant ET le daily heritait tier 0 -> « Mineur » pointille.
-        d.tier = Math.max(d.tier, lvl.tier);
+        // MAX, pas MIN : un niveau present sur le TF courant ET le daily heritait tier 0 -> trait du TF
+        // courant. Le badge dit le TF du style retenu (avant : le style du daily, le badge « ·15m »).
+        if (lvl.tier > d.tier) { d.tier = lvl.tier; d.tf = lvl.tf; }
         merged = true; break;
       }
     }
@@ -1716,7 +1737,7 @@ function horloge() {
   const c = document.getElementById('taskbarClock'), t = FMT_HMS.format(new Date());
   if (c && c.textContent !== t) c.textContent = t;
   majHorloges();
-  // Le calque porte un âge en minutes (couche « Liquidité ») : redessiné à chaque minute
+  // Le calque porte un âge en minutes (couche « Ordres en attente (carte) ») : redessiné à chaque minute
   // même quand le prix, lui, ne bouge pas.
   const m = Math.floor(Date.now() / 60000);
   if (m !== minuteCalque) { minuteCalque = m; if (geo) scheduleCalque(); }
@@ -2056,8 +2077,9 @@ function calcATR(highs, lows, closes, period) {
 function calcVWAP(highs, lows, closes, volumes, times, interval, ancrageS, ancrageBougies) {
   const out = new Array(closes.length).fill(null);
   // Ancrage : un cumul depuis la PREMIERE bougie chargee (3000 = 125 jours en 1h) donne une
-  // moyenne longue, pas un VWAP. Intraday -> reset a chaque jour UTC (vrai VWAP de session) ;
-  // en 4h/1d/1w, pas de session intraday ou s'ancrer -> l'ancrage est recale toutes les 20 bougies.
+  // moyenne longue, pas un VWAP. Tout intervalle plus court que ancrageS (1 jour), 4h compris,
+  // est remis à zéro à chaque jour UTC (vrai VWAP de session) ; en 1d/1w, pas de session où
+  // s'ancrer -> l'ancrage est recalé toutes les ancrageBougies (20) bougies.
   const sec = { '1m':60,'3m':180,'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400,'1d':86400,'1w':604800 }[interval];
   const bucket = !sec ? 0 : (sec < ancrageS ? ancrageS : sec * ancrageBougies);
   let cumPV = 0, cumV = 0, b = null;
@@ -2798,7 +2820,6 @@ const COLORS = {
   rsi: '#8e5bd8', macd: '#d79a00', macd_signal: '#ff6b35',
   stoch_k: '#d79a00', stoch_d: '#ff6b35', atr: '#00a693',
   obv: '#ff9800', mfi: '#9c27b0', williamsR: '#00a5bd', cci: '#ff5722', adx: '#d79a00',
-  equity_total: '#e0a800',
   candleUp: '#0d9672', candleDown: '#e5484d', surUp: '#ffffff', surDown: '#ffffff',
   grid: 'rgba(127,127,127,0.12)', text: '#45597a',
   bougieForme: 'pleine', bougieRayon: 2, grilleTirets: []
@@ -2811,7 +2832,7 @@ const COLORS = {
 // --bougie-rayon : rayon des coins des corps et des barres de volume (0 = angles vifs).
 // --grille-tirets : motif de la grille (ex. « 8 3 2 3 », trait mixte) ; « none » = trait plein.
 // --police-graphique : famille du texte du canvas (repli : --font).
-// --chaleur-bid / --chaleur-ask : encre de la couche « Liquidité » (voir HEAT_RAMPE).
+// --chaleur-bid / --chaleur-ask : encre de la couche « Ordres en attente (carte) » (voir HEAT_RAMPE).
 // --up-sur / --down-sur : encre du texte posé SUR une marque de hausse / de baisse (l'étiquette du
 // dernier prix) ; blanc par défaut. Un thème dont la hausse est claire (Cyanotype : traits blancs)
 // y écrivait du blanc sur du blanc — tests/test_palette.py mesure ce couple.
@@ -2825,9 +2846,11 @@ const FORMES_BOUGIE = {
 // Identité des overlays : chaque ligne porte son étiquette en bout de tracé (et un point dans
 // le ruban) — elle ne repose jamais sur la couleur seule. tests/test_palette.py échoue si un
 // overlay sous 3:1 sur le fond du graphique n'a pas d'étiquette ici.
-// L'étiquette EST la clé (ema20 -> EMA20), dont la période est aussi tirée pour le calcul.
+// L'étiquette est le nom du menu et du ruban (ema20 -> « EMA 20 », la période tirée de la clé,
+// comme pour le calcul). VWAP, Bollinger et les deux lignes d'Ichimoku portent la leur aussi.
 // Gardée littérale : tests/test_palette.py la lit dans la source.
-const ETIQ_OVERLAYS = { ema20: 'EMA20', ema50: 'EMA50', ema100: 'EMA100', ema200: 'EMA200', sma20: 'SMA20', sma50: 'SMA50' };
+const ETIQ_OVERLAYS = { ema20: 'EMA 20', ema50: 'EMA 50', ema100: 'EMA 100', ema200: 'EMA 200', sma20: 'SMA 20', sma50: 'SMA 50',
+                        vwap: 'VWAP', tenkan: 'Tenkan (rapide)', kijun: 'Kijun (lente)' };
 // Une seule famille de caractères pour tout le graphique : celle du thème pour le graphique
 // (jeton --police-graphique), à défaut celle de l'interface (--font).
 let POLICE_GRAPHIQUE = "'Segoe UI Variable Text','Segoe UI Variable',-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,'Segoe UI',Roboto,sans-serif";
@@ -2857,11 +2880,11 @@ function lireJetons() {
   COLORS.vwap = v('--ov-vwap', COLORS.vwap); COLORS.sar = v('--ov-sar', COLORS.sar);
   COLORS.ichi_tenkan = v('--ov-ichi-t', COLORS.ichi_tenkan); COLORS.ichi_kijun = v('--ov-ichi-k', COLORS.ichi_kijun);
   const S = { rsi: 'rsi', macd: 'macd', macd_signal: 'signal', stoch_k: 'stoch-k', stoch_d: 'stoch-d', atr: 'atr',
-              obv: 'obv', mfi: 'mfi', williamsR: 'wr', cci: 'cci', adx: 'adx', equity_total: 'equity' };
+              obv: 'obv', mfi: 'mfi', williamsR: 'wr', cci: 'cci', adx: 'adx' };
   for (const [k, j] of Object.entries(S)) COLORS[k] = v('--s-' + j, COLORS[k]);
   const up = v('--up', COLORS.candleUp), down = v('--down', COLORS.candleDown);
   COLORS.candleUp = up; COLORS.candleDown = down;
-  COLORS.adx_plusDI = COLORS.trade_buy = COLORS.grid_buy_filled = COLORS.equity_realized = up;
+  COLORS.adx_plusDI = COLORS.trade_buy = COLORS.grid_buy_filled = up;
   COLORS.adx_minusDI = COLORS.trade_sell = down;
   COLORS.grid_buy_pending = avecAlpha(up, 0.5); COLORS.grid_sl = avecAlpha(down, 0.5);
   COLORS.ink1 = v('--ink-1', '#10233d'); COLORS.text = v('--ink-2', '#45597a'); COLORS.ink3 = v('--ink-3', '#5f6e8c');
@@ -2907,24 +2930,54 @@ function peindrePastilles() {
 let jetonsLus = false;
 
 // Disposition verticale du canvas : tracé principal, puis sous-graphes empilés, puis le
-// sélecteur de plage (RS_HEIGHT) en bas. Le tracé principal garde MAIN_H_MIN px ; quand le canvas
-// est trop bas pour loger les sous-graphes à leur hauteur (subHeights), ils sont réduits
-// PROPORTIONNELLEMENT. Avant : mainH bridé à 200 px, les sous-graphes s'empilaient dessous et
-// débordaient sur le sélecteur de plage, puis hors du canvas (fenêtre basse). Un sous-graphe
-// réduit sous la hauteur utile de resolveSub n'est pas tracé.
+// sélecteur de plage (RS_HEIGHT) en bas. Le tracé du prix garde au moins MAIN_PART_MIN (60 %)
+// de la hauteur utile (et MAIN_H_MIN px) ; quand le canvas est trop bas pour loger les
+// sous-graphes à leur hauteur (subHeights), ils sont réduits PROPORTIONNELLEMENT, jamais sous
+// SUB_H_MIN. Ceux qui ne tiennent plus (les derniers de SUB_ORDRE) ne sont pas logés : une ligne
+// (LIGNE_SANS_PLACE) les annonce au-dessus du sélecteur de plage. Avant : neuf sous-graphes
+// réduits sous la hauteur de tracé de resolveSub laissaient des cadres vides, titre compris, et
+// le prix n'avait plus que 200 px sur un écran de 900.
 const MAIN_H_MIN = 200;
-const SUB_ORDRE = ['vol', 'rsi', 'macd', 'stoch', 'atr', 'obv', 'mfi', 'williamsR', 'cci', 'adx', 'ao', 'equity'];
+const MAIN_PART_MIN = 0.6;
+const SUB_H_MIN = 60;          // 30 px de tracé une fois ôtés le titre et la marge (resolveSub)
+const LIGNE_SANS_PLACE = 16;
+const SUB_ORDRE = ['vol', 'rsi', 'macd', 'stoch', 'atr', 'obv', 'mfi', 'williamsR', 'cci', 'adx', 'ao'];
 function dispositionGraphique(H) {
   // Débutant : aucun sous-graphe (le choix est gardé pour l'Expert).
   const actifs = debutant() ? [] : SUB_ORDRE.filter(k => activeSubs[k]);
-  let total = 0;
-  for (const k of actifs) total += subHeights[k] || 80;
   const dispo = H - 4 - RS_HEIGHT;
-  const mainH = Math.max(Math.min(MAIN_H_MIN, dispo), dispo - total);
-  const k = total > 0 ? Math.min(1, Math.max(0, dispo - mainH) / total) : 1;
+  const mainMin = Math.max(Math.min(MAIN_H_MIN, dispo), Math.ceil(dispo * MAIN_PART_MIN));
+  const haut = cle => subHeights[cle] || 80;
+  // Le plus de sous-graphes (dans l'ordre) qui gardent chacun SUB_H_MIN px une fois réduits.
+  let n = actifs.length, k = 1;
+  for (; n > 0; n--) {
+    let total = 0; for (let i = 0; i < n; i++) total += haut(actifs[i]);
+    const place = dispo - mainMin - (n < actifs.length ? LIGNE_SANS_PLACE : 0);
+    k = Math.min(1, Math.max(0, place) / total);
+    if (actifs.slice(0, n).every(cle => haut(cle) * k >= SUB_H_MIN)) break;
+  }
+  const loges = actifs.slice(0, n), sansPlace = actifs.slice(n);
+  let somme = 0;
+  const hs = loges.map(cle => { const h = haut(cle) * (n ? k : 1); somme += h; return h; });
+  // Assez de place : le tracé du prix prend le reste ; sinon il garde sa part minimale.
+  const mainH = dispo - somme - (sansPlace.length ? LIGNE_SANS_PLACE : 0);
   let y = mainH + 4;
-  const sous = actifs.map(cle => { const h = (subHeights[cle] || 80) * k, s = { cle, y, h }; y += h; return s; });
-  return { mainH, sous };
+  const sous = loges.map((cle, i) => { const s = { cle, y, h: hs[i] }; y += hs[i]; return s; });
+  return { mainH, sous, sansPlace, ySansPlace: sansPlace.length ? y : null };
+}
+/** La ligne qui annonce les sous-graphes sans place (dispositionGraphique) : discrète, au-dessus
+ *  du sélecteur de plage, à la place qu'ils auraient prise. */
+function dessinerSansPlace(d, W) {
+  if (!d.sansPlace.length) return;
+  const n = d.sansPlace.length, texte = '+ ' + n + ' sous-graphe' + (n > 1 ? 's' : '') + ' sans place : agrandissez la fenêtre ou décochez-en';
+  ctx.save();
+  ctx.fillStyle = COLORS.ink3; ctx.font = chartFont(10);
+  // Au téléphone, la phrase entière rentre dans la largeur (police réduite, jamais sous 8 px).
+  const w = ctx.measureText(texte).width;
+  if (w > W - 26) ctx.font = chartFont(Math.max(8, Math.floor(100 * (W - 26) / w) / 10));
+  ctx.textBaseline = 'middle';
+  ctx.fillText(texte, 18, d.ySansPlace + LIGNE_SANS_PLACE / 2);
+  ctx.restore();
 }
 
 // ─── Deux canvas : le GRAPHIQUE et son CALQUE ───────────────────────────────
@@ -2955,7 +3008,7 @@ function drawChart() {
   ctx.clearRect(0, 0, W, H);
   if (candles.length < 2) {
     ctx.save(); ctx.fillStyle = COLORS.ink3 || '#5f6e8c'; ctx.font = chartFont(12, 600); ctx.textAlign = 'center';
-    ctx.fillText(debutant() ? 'Chargement ' + (NOMS_PAIRES[activeSymbol] || activeSymbol) + ' · ' + Guide.nomIntervalle(chartInterval) + '…' : 'Chargement ' + activeSymbol + ' · ' + chartInterval + '…', (W - 50) / 2, H / 2); ctx.restore();
+    ctx.fillText('Chargement ' + (NOMS_PAIRES[activeSymbol] || activeSymbol) + ' · ' + (debutant() ? Guide.nomIntervalle(chartInterval) : nomTf(chartInterval)) + '…', (W - 50) / 2, H / 2); ctx.restore();
     dessinerCalque();
     return;
   }
@@ -2974,9 +3027,10 @@ function drawChart() {
   ctx.fillStyle = COLORS.ink1;
   // Taille bridée au tracé disponible : à 64 px fixes le filigrane débordait du graphe
   // sur téléphone et se faisait rogner par le bord gauche.
-  // Débutant : la paire et l'intervalle en mots (« BTC/USDT · 15 min »).
+  // La paire sous son nom (« BTC/USDT », comme l'en-tête) ; l'intervalle en mots en Débutant
+  // (« 15 min »), comme le ruban en Expert (« 15m », « 1 j »).
   const deb = debutant();
-  const filigrane = deb ? (NOMS_PAIRES[activeSymbol] || activeSymbol) + '  ·  ' + Guide.nomIntervalle(chartInterval) : activeSymbol + '  ·  ' + chartInterval;
+  const filigrane = (NOMS_PAIRES[activeSymbol] || activeSymbol) + '  ·  ' + (deb ? Guide.nomIntervalle(chartInterval) : nomTf(chartInterval));
   ctx.font = chartFont(Math.min(40, Math.round((W - 16 - 75) / (filigrane.length * 0.9))), 300);
   if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -2999,15 +3053,14 @@ function drawChart() {
   ctx.fillStyle = COLORS.text; ctx.font = chartFont(10);
   const firstC = candles[vsC], lastC = candles[Math.max(0, veC - 1)];
   const pctChange = firstC && lastC ? ((lastC.close - firstC.close) / firstC.close * 100) : 0;
-  const pctStr = pctChange >= 0 ? '+' + pctChange.toFixed(2) + '%' : pctChange.toFixed(2) + '%';
+  // Le format de la page (« +0,42 % », moins typographique), celui de la variation de l'en-tête.
+  const pctStr = Fmt.pct(pctChange, 2);
   const pctColor = pctChange >= 0 ? COLORS.upInk : COLORS.downInk;
-  const fmtDate = ts => {
-    const d = new Date(ts * 1000);
-    return FMT_D2.format(d) + ' ' + FMT_HM.format(d);
-  };
+  // Jour et heure de l'appareil (js/format.js), comme les graduations de l'axe des temps.
+  const fmtDate = ts => Fmt.jour(ts * 1000) + ' ' + Fmt.heure(ts * 1000);
   const rangeStr = firstC ? fmtDate(firstC.time) + ' → ' + fmtDate(lastC.time) : '';
   ctx.fillStyle = COLORS.ink3;
-  ctx.fillText(`${veC - vsC}/${candles.length} · ${rangeStr}`, 18, 13);
+  ctx.fillText(`${Fmt.nombre(veC - vsC)}/${Fmt.nombre(candles.length)} · ${rangeStr}`, 18, 13);
   // Variation de la vue : une pastille teintée, texte à l'encre signée (lisible), pas la marque.
   ctx.font = chartFont(10, 650);
   const pw0 = ctx.measureText(pctStr).width + 12;
@@ -3021,12 +3074,13 @@ function drawChart() {
   
   // Empiler les sous-graphes
   for (const s of dispo.sous) s.trace = resolveSub(candles, s.y, s.h, W, s.cle) !== false;
+  dessinerSansPlace(dispo, W);
 
   // Range Selector — mini timeline en bas
   if (candles.length > 5) {
     drawRangeSelector(candles, W, H);
   }
-  geo = { W, H, mainH, sous: dispo.sous, vs: vsC, ve: veC };
+  geo = { W, H, mainH, sous: dispo.sous, basSous: dispo.ySansPlace === null ? H - RS_HEIGHT : dispo.ySansPlace, vs: vsC, ve: veC };
   dessinerCalque();
 }
 
@@ -3040,8 +3094,9 @@ function dessinerCalque() {
   if (!geo) return;
   const { W, H, mainH } = geo;
   const P = geoPrix, deb = debutant();
-  // Débutant : un seul format de prix sur l'écran (« 82 442 $ ») ; Expert : « $82442.00 ».
-  const prixAxe = v => (deb ? Guide.prix(v, guideUnite()) : '$' + fmtPrix(v));
+  // Un seul format de prix (js/format.js), l'unité de la paire après le nombre (« $ », « SOL » sur
+  // BTC/SOL) : Débutant, l'arrondi de lecture (« 82 442 $ ») ; Expert, la cotation (« 82 442,00 $ »).
+  const prixAxe = v => Fmt.prix(v, guideUnite(), deb ? undefined : 'fin');
   if (P) {
     const { top, ph, left, right, minP, maxP, range } = P;
     // Libellés de l'axe des prix ; celui que l'étiquette du dernier prix recouvrirait est omis.
@@ -3082,7 +3137,7 @@ function dessinerCalque() {
       cx.fillText(lpStr, bx + 6, y + 4);
     }
   }
-  // Âge de la couche « Liquidité » (heatmap.json, publiée au quart d'heure) : aucun calque n'est
+  // Âge de la couche « Ordres en attente (carte) » (heatmap.json, publiée au quart d'heure) : aucun calque n'est
   // lu sans son instant — DEUX ici : la dernière colonne (son début : l'instantané a été lu dans
   // la minute qui suit, l'âge dit n'est jamais plus jeune que le vrai) et la publication.
   // Sur le calque, il avance avec l'horloge du prix (minuteCalque), sans redessin.
@@ -3144,7 +3199,7 @@ function dessinerCalque() {
     const priceStr = prixAxe(priceAtCursor);
     cx.font = chartFont(11, 650);
     const bw = cx.measureText(priceStr).width + 14;
-    const bX = W - 75 + (75 - bw) / 2;
+    const bX = Math.min(W - 2 - bw, W - 75 + (75 - bw) / 2);   // plus large que la colonne : recalé, jamais hors du canvas
     const bY = Math.max(2, Math.min(mainH - 20, crossY - 9));
     cx.fillStyle = COLORS.ink1;
     cx.beginPath(); cx.roundRect(bX, bY, bw, 18, 9); cx.fill();
@@ -3170,40 +3225,45 @@ function dessinerCalque() {
       cx.restore();
       bulleOHLCV = { x: tX, y: tY, w: 135, h: 90 };
     } else if (idx >= 0 && idx < n) {
-    // Infobulle OHLCV — 2 colonnes
+    // Infobulle OHLCV — 2 colonnes. Les prix à la précision de cotation, au format de la page
+    // (« O 86 012,50 », l'unité est sur l'axe juste à droite) ; le volume dans l'actif de base.
       const candle = candles[geo.vs + idx];
       const cColor = candle.close >= candle.open ? COLORS.candleUp : COLORS.candleDown;
-      const onRight = crossX > W / 2;
-      const tX = onRight ? Math.max(16, crossX - 145) : Math.min(W - 160, crossX + 12);
-      const tY = Math.max(30, Math.min(mainH - 85, crossY - 65));
       cx.save();
+      cx.font = chartFont(10, 600);
+      const cel = [['O', candle.open], ['H', candle.high], ['L', candle.low], ['C', candle.close]].map(([m, v]) => m + ' ' + Fmt.cote(v));
+      const volStr = 'Volume ' + Fmt.compact(candle.volume) + ' ' + uniteVolume();
+      const col = colonneOHLC(cx, [cel[0], cel[2]]);
+      const tw = Math.max(135, 16 + col + Math.ceil(Math.max(cx.measureText(cel[1]).width, cx.measureText(cel[3]).width)) + 10, Math.ceil(cx.measureText(volStr).width) + 26);
+      const onRight = crossX > W / 2;
+      const tX = onRight ? Math.max(16, crossX - tw - 10) : Math.min(W - tw - 25, crossX + 12);
+      const tY = Math.max(30, Math.min(mainH - 85, crossY - 65));
       cx.fillStyle = COLORS.bulle;
       cx.shadowColor = 'rgba(16,35,61,0.18)'; cx.shadowBlur = 14; cx.shadowOffsetY = 4;
-      cx.beginPath(); cx.roundRect(tX, tY, 135, 72, 10); cx.fill();
+      cx.beginPath(); cx.roundRect(tX, tY, tw, 72, 10); cx.fill();
       cx.shadowColor = 'transparent'; cx.shadowBlur = 0; cx.shadowOffsetY = 0;
       // Filet de la couleur de la bougie à gauche : la direction se lit sans encadrer la donnée.
       cx.fillStyle = cColor; cx.beginPath(); cx.roundRect(tX + 6, tY + 10, 3, 52, 1.5); cx.fill();
-      cx.fillStyle = COLORS.ink1; cx.font = chartFont(10, 600);
-      cx.fillText('O ' + fmtPrix(candle.open), tX + 16, tY + 20);
-      cx.fillText('H ' + fmtPrix(candle.high), tX + 76, tY + 20);
-      cx.fillText('L ' + fmtPrix(candle.low), tX + 16, tY + 38);
-      cx.fillText('C ' + fmtPrix(candle.close), tX + 76, tY + 38);
-      const volStr = candle.volume >= 1000 ? (candle.volume / 1000).toFixed(1) + 'K' : candle.volume.toFixed(0);
+      cx.fillStyle = COLORS.ink1;
+      cx.fillText(cel[0], tX + 16, tY + 20);
+      cx.fillText(cel[1], tX + 16 + col, tY + 20);
+      cx.fillText(cel[2], tX + 16, tY + 38);
+      cx.fillText(cel[3], tX + 16 + col, tY + 38);
       cx.fillStyle = COLORS.ink3;
-      cx.fillText('Volume ' + volStr, tX + 16, tY + 57);
+      cx.fillText(volStr, tX + 16, tY + 57);
       cx.restore();
-      bulleOHLCV = { x: tX, y: tY, w: 135, h: 72 };
+      bulleOHLCV = { x: tX, y: tY, w: tw, h: 72 };
     }
     // Guide et scénarios : ce que désigne le curseur (bande, forme, chemin, régime, zone,
     // encadré), expliqué sur le calque.
     if (guideEtat || scenEtat) guideSurvol(W, mainH, bulleOHLCV);
   }
   // --- Réticule des sous-graphes : une verticale à travers eux, la valeur de chacun ---
-  if (crossY > mainH && idx >= 0 && idx < n) {
+  if (crossY > mainH && crossY < geo.basSous && idx >= 0 && idx < n) {
     const realIdx = geo.vs + idx;
     cx.strokeStyle = COLORS.reticule;
     cx.lineWidth = 0.5;
-    cx.beginPath(); cx.moveTo(crossX, mainH + 2); cx.lineTo(crossX, H - RS_HEIGHT); cx.stroke();
+    cx.beginPath(); cx.moveTo(crossX, mainH + 2); cx.lineTo(crossX, geo.basSous); cx.stroke();
     for (const { cle: key, y: sY, trace } of geo.sous) {
       if (!trace) continue;   // trop réduit pour être tracé : pas de badge orphelin
       const val = getSubIndicatorValue(key, realIdx);
@@ -3211,7 +3271,7 @@ function dessinerCalque() {
         const txt = subLabel(key) + ' ' + val;
         cx.font = chartFont(9);
         const tw = cx.measureText(txt).width + 12;
-        const tx = W - 75 + (75 - tw) / 2;
+        const tx = Math.min(W - 2 - tw, W - 75 + (75 - tw) / 2);   // plus large que la colonne : recalé, jamais hors du canvas
         const ty = sY + 4;
         cx.fillStyle = COLORS.bulle;
         cx.strokeStyle = subColor(key); cx.lineWidth = 0.8;
@@ -3222,12 +3282,17 @@ function dessinerCalque() {
     }
   }
 }
-/** Âge de la couche « Liquidité » : « Carte publiée · dernière colonne il y a X · publiée il y a Y ». */
+/** L'écart entre les deux colonnes de l'infobulle OHLC (Expert) : la plus large valeur de la 1re
+ *  colonne + 10 px, au moins 60 px — une colonne fixe de 60 px ne logeait plus « O 99 999,99 »
+ *  au format français. g porte déjà la police de l'infobulle. */
+function colonneOHLC(g, textes) { return Math.max(60, Math.ceil(Math.max(...textes.map(t => g.measureText(t).width))) + 10); }
+/** Âge de la couche « Ordres en attente (carte) » : « Ordres en attente (carte) · dernière colonne
+ *  il y a X · publiée il y a Y » — le nom du menu, pas un autre. */
 function texteAgeCouche() {
   const h = histHeatmap, g = h && h.grille, t = Horloges.maintenant();
   if (!g || !h.majA) return { texte: '', vieux: false };
   const derniere = (g.t0 + (g.W - 1) * g.dt) * 1000;
-  return { texte: 'Carte publiée · dernière colonne ' + Horloges.texteAge(t - derniere) + ' · publiée ' + Horloges.texteAge(t - h.majA),
+  return { texte: NOM_ORDRES_CARTE + ' · dernière colonne ' + Horloges.texteAge(t - derniere) + ' · publiée ' + Horloges.texteAge(t - h.majA),
     vieux: (t - h.majA) / 60000 > CADENCES.vieux_min };
 }
 /** Le repère de la publication dans la géométrie P du dernier dessin : { x, y, texte } ou null
@@ -3241,8 +3306,8 @@ function reperePublication(P) {
   const x = P.left + (tu / 1000 - P.t0) / P.pas * P.gap;
   if (x < P.left || x > P.W - P.right) return null;
   const px = d.btc.price, y = px >= P.minP && px <= P.maxP ? P.top + P.ph * (1 - (px - P.minP) / P.range) : null;
-  const hm = new Date(tu).toISOString().slice(11, 16);
-  return { x, y, texte: 'fichier ' + hm + ' UTC · prix publié ' + Math.round(px).toLocaleString('fr-FR') + ' (' + Horloges.texteAge(Horloges.maintenant() - tu) + ')' };
+  // L'heure de l'appareil (le jour s'il n'est pas aujourd'hui) et le prix au format de l'Expert.
+  return { x, y, texte: 'fichier ' + Fmt.jourHeure(tu) + ' · prix publié ' + Fmt.prix(px, '$', 'fin') + ' (' + Horloges.texteAge(Horloges.maintenant() - tu) + ')' };
 }
 // Le calque, à la prochaine image (une seule par image, quel que soit le nombre d'événements).
 let calqueDemande = false;
@@ -3314,10 +3379,10 @@ function drawRangeSelector(candles, W, H) {
   if (debutant()) return;
   // Compteur bougies sur le RS
   ctx.fillStyle = COLORS.text; ctx.font = chartFont(8);
-  ctx.fillText(candles.length + ' bougies', padL + 4, rsY + 12);
+  ctx.fillText(Fmt.nombre(candles.length) + ' bougies', padL + 4, rsY + 12);
   
   // Label viewport
-  const vpLabel = (ve - vs) + '/' + candles.length;
+  const vpLabel = Fmt.nombre(ve - vs) + '/' + Fmt.nombre(candles.length);
   ctx.fillText(vpLabel, vrX + Math.max(0, vrW / 2 - 15), rsY + 12);
   
   // Légende sessions — fond opaque, droite du RS
@@ -3342,11 +3407,9 @@ function drawRangeSelector(candles, W, H) {
   });
 }
 
-// Formateurs Intl créés UNE fois : `toLocaleXString(locale, options)` reconstruit un
-// formatter à chaque appel — 7 à 10 % des échantillons du profileur selon l'état
-// (libellés d'axe + plage datée, plusieurs fois par frame).
-const FMT_D2 = new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit' });
-const FMT_HM = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
+// Les dates et heures du tracé (axe des temps, plage datée) : Fmt.jour / Fmt.heure (js/format.js),
+// formateurs Intl créés UNE fois — `toLocaleXString(locale, options)` reconstruisait un formatter
+// à chaque appel (7 à 10 % des échantillons du profileur, plusieurs fois par frame).
 
 // Échelle de prix d'une fenêtre [vs,ve) — SOURCE UNIQUE. resolveChart l'applique, le
 // crosshair la relit dans la MÊME frame (avant : formule recopiée ⇒ un slice, deux spreads
@@ -3513,9 +3576,10 @@ function resolveChart(candles, padL, padR, chartH, W) {
   // Bollinger
   if (ov('bb') && candles.length >= 20) {
     const bb = memoized('bb', calcBollinger, closes, PARAM.bb.periode, PARAM.bb.ecarts);
-    drawLine(bb.upper, minP, range, pad, gap, ph, COLORS.bb_upper, [3, 3], 1, vs);
-    drawLine(bb.sma, minP, range, pad, gap, ph, COLORS.bb_mid, [], 1, vs);
-    drawLine(bb.lower, minP, range, pad, gap, ph, COLORS.bb_lower, [3, 3], 1, vs);
+    const sig = Fmt.nombre(PARAM.bb.ecarts, PARAM.bb.ecarts % 1 ? 1 : 0) + ' σ';
+    drawLine(bb.upper, minP, range, pad, gap, ph, COLORS.bb_upper, [3, 3], 1, vs, 'Bollinger +' + sig);
+    drawLine(bb.sma, minP, range, pad, gap, ph, COLORS.bb_mid, [], 1, vs, 'Bollinger (milieu)');
+    drawLine(bb.lower, minP, range, pad, gap, ph, COLORS.bb_lower, [3, 3], 1, vs, 'Bollinger ' + Fmt.MOINS + sig);
     // Fill between
     ctx.save(); ctx.globalAlpha = 0.08;
     ctx.fillStyle = COLORS.bb_mid; ctx.beginPath();
@@ -3545,15 +3609,15 @@ function resolveChart(candles, padL, padR, chartH, W) {
   // VWAP
   if (ov('vwap')) {
     const vwap = memoized('vwap', calcVWAP, cols().high, cols().low, closes, cols().vol, cols().time, chartInterval, PARAM.vwap.ancrageIntradayS, PARAM.vwap.ancrageBougies);
-    drawLine(vwap, minP, range, pad, gap, ph, COLORS.vwap, [], 1.5, vs);
+    drawLine(vwap, minP, range, pad, gap, ph, COLORS.vwap, [], 1.5, vs, ETIQ_OVERLAYS.vwap);
   }
 
   // Ichimoku
   if (ov('ichimoku') && candles.length >= PARAM.ichimoku.senkouB) {
     const highs = cols().high, lows = cols().low;
     const ichi = memoized('ichimoku', calcIchimoku, highs, lows, closes, PARAM.ichimoku.tenkan, PARAM.ichimoku.kijun, PARAM.ichimoku.senkouB);
-    drawLine(ichi.tenkan, minP, range, pad, gap, ph, COLORS.ichi_tenkan, [], 1, vs);
-    drawLine(ichi.kijun, minP, range, pad, gap, ph, COLORS.ichi_kijun, [], 1, vs);
+    drawLine(ichi.tenkan, minP, range, pad, gap, ph, COLORS.ichi_tenkan, [], 1, vs, ETIQ_OVERLAYS.tenkan);
+    drawLine(ichi.kijun, minP, range, pad, gap, ph, COLORS.ichi_kijun, [], 1, vs, ETIQ_OVERLAYS.kijun);
     // Kumo : un remplissage PAR SEGMENT de signe constant (A >= B vert haussier, sinon rouge baissier).
     const kx = i => pad.left + gap * (i - vs) + gap/2;
     const ky = v => Math.max(pad.top, Math.min(pad.top + ph, pad.top + ph * (1 - (v - minP) / range)));
@@ -3600,20 +3664,24 @@ function resolveChart(candles, padL, padR, chartH, W) {
   // --- Supports / Résistances (Multi-TF) ---
   srBadges = [];
   if (ov('sr')) {
-    const levels = getMultiTFLevels();
-    // Tier → style visuel
+    const levels = getMultiTFLevels(), unite = guideUnite();
+    // Tier → style visuel. Le tier est l'INTERVALLE D'ORIGINE du niveau (0 : l'intervalle affiché ;
+    // 1, 2 : les intervalles de référence, getRefIntervals), pas une importance mesurée : la
+    // légende les nomme par leur intervalle (« 15m · 1h · 4h »), et seulement ceux qui existent
+    // (en 1 j, une seule référence : pas de 3e style annoncé).
+    const tfs = [chartInterval].concat(getRefIntervals(chartInterval));
     const styles = [
-      { name: 'Mineur', color: COLORS.sr[0], bg: avecAlpha(COLORS.sr[0], 0.10), dash: [4, 5], width: 1 },
-      { name: 'Interm.', color: COLORS.sr[1], bg: avecAlpha(COLORS.sr[1], 0.12), dash: [10, 5], width: 1.8 },
-      { name: 'Majeur',  color: COLORS.sr[2], bg: avecAlpha(COLORS.sr[2], 0.16), dash: [],       width: 2.5 }
-    ];
+      { name: nomTf(tfs[0]), color: COLORS.sr[0], bg: avecAlpha(COLORS.sr[0], 0.10), dash: [4, 5], width: 1 },
+      { name: nomTf(tfs[1]), color: COLORS.sr[1], bg: avecAlpha(COLORS.sr[1], 0.12), dash: [10, 5], width: 1.8 },
+      { name: nomTf(tfs[2]), color: COLORS.sr[2], bg: avecAlpha(COLORS.sr[2], 0.16), dash: [],       width: 2.5 }
+    ].slice(0, tfs.length);
     
     for (const lvl of levels.slice(0, 6)) {
       if (lvl.price < minP - range*0.05 || lvl.price > maxP + range*0.05) continue;
-      const s = styles[Math.min(lvl.tier, 2)];
+      const s = styles[Math.min(lvl.tier, styles.length - 1)];
       const y = pad.top + ph * (1 - (lvl.price - minP) / range);
       
-      // Zone colorée pour niveaux majeurs
+      // Zone colorée pour les niveaux du plus long intervalle de référence (tier 2)
       if (lvl.tier >= 2) {
         const zoneH = Math.max(3, ph * 0.0016);
         ctx.fillStyle = s.bg;
@@ -3627,9 +3695,8 @@ function resolveChart(candles, padL, padR, chartH, W) {
       ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
       ctx.setLineDash([]);
       
-      // Badge droite — fond opaque coloré
-      const priceStr = '$' + lvl.price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-      const badgeText = priceStr + ' ·' + lvl.tf;
+      // Badge droite — fond opaque coloré : le prix au format de la page, puis l'intervalle d'origine.
+      const badgeText = Fmt.prix(lvl.price, unite, 'fin') + ' · ' + nomTf(lvl.tf);
       ctx.font = chartFont(9, lvl.tier >= 2 ? 700 : 500);
       const tw = ctx.measureText(badgeText).width + 14;
       const bx = W - pad.right - tw - 4, by = y - 10;
@@ -3648,20 +3715,24 @@ function resolveChart(candles, padL, padR, chartH, W) {
       ctx.fillStyle = COLORS.ink1;
       ctx.fillText(badgeText, bx + 7, by + 14);
       
-      // Prix à gauche aussi pour les majeurs
+      // Prix à gauche aussi pour ces niveaux du plus long intervalle
       if (lvl.tier >= 2) {
         ctx.fillStyle = s.color;
         ctx.font = chartFont(9, 650);
-        const leftStr = '$' + lvl.price.toFixed(2);
+        const leftStr = Fmt.prix(lvl.price, unite, 'fin');
         ctx.fillText(leftStr, pad.left + 3, y - 5);
       }
     }
     
-    // Mini-légende en haut à gauche (sous le compteur)
+    // Mini-légende en haut à gauche (sous le compteur) : « S/R par intervalle », un trait par
+    // intervalle d'origine.
     const legY = 38;
     ctx.font = chartFont(8);
+    ctx.fillStyle = COLORS.text;
+    ctx.fillText('S/R par intervalle :', 18, legY + 4);
+    const lx0 = 18 + ctx.measureText('S/R par intervalle :').width + 8;
     styles.forEach((s, i) => {
-      const lx = 18 + i * 75;
+      const lx = lx0 + i * 62;
       ctx.fillStyle = s.color;
       ctx.fillRect(lx, legY, 18, 3);
       ctx.fillStyle = COLORS.text;
@@ -3685,7 +3756,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
       ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle = avecAlpha(COLORS.fib, 0.9); ctx.font = chartFont(8);
-      const label = (lvl * 100).toFixed(1) + '% $' + price.toFixed(2);
+      const label = Fmt.pct(lvl * 100, 1, false) + ' · ' + Fmt.prix(price, guideUnite(), 'fin');
       const lw = ctx.measureText(label).width;
       ctx.fillText(label, W - pad.right - lw - 4, y - 3);
     }
@@ -3731,7 +3802,9 @@ function resolveChart(candles, padL, padR, chartH, W) {
     }
     ctx.setLineDash([]);
     ctx.fillStyle = COLORS.ink1; ctx.font = chartFont(8);
-    ctx.fillText('POC $' + (minP + (pocBin + 0.5) * binH).toFixed(0), W - pad.right + 4, pad.top + 9);
+    // Le milieu de la tranche la plus chargée : arrondi de lecture (une tranche fait ≈ 100 $, des
+    // centimes y seraient une précision inventée).
+    ctx.fillText('POC ' + Fmt.prix(minP + (pocBin + 0.5) * binH, guideUnite()), W - pad.right + 4, pad.top + 9);
   }
 
   // Guide : bandes des niveaux nommés, SOUS les bougies (le reste du Guide est tracé après elles).
@@ -3759,7 +3832,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
     tracerBougie(ctx, pad.left + gap * i, candleW, yO, yC, yH, yL, c.close >= c.open);
   }
   
-  // --- Heatmap Liquidité (Bookmap : grille native -> un seul drawImage) ---
+  // --- Ordres en attente (carte) : heatmap.json (grille native -> un seul drawImage) ---
   // `histHeatmap.sym` n'était JAMAIS comparé au symbole affiché : le carnet BTC se
   // dessinait tel quel sur les graphes ETH, SOL, XRP, TAO et sur le ratio BTC/SOL.
   if (ov('liq') && histHeatmap && histHeatmap.grille && histHeatmap.sym === activeSymbol) {
@@ -3817,18 +3890,19 @@ function resolveChart(candles, padL, padR, chartH, W) {
   ctx.fillStyle = COLORS.text; ctx.font = chartFont(9);
   const tickAvailW = W - pad.left - pad.right;
   const intraday = ['1m','5m','15m','1h','4h'].includes(chartInterval);
+  // Jour et heure de l'appareil (js/format.js) ; le fuseau est dit une fois, à l'horloge de la barre.
   const fmtTick = t => {
-    if (chartInterval === '1d' || chartInterval === '1w') return FMT_D2.format(t);
+    if (chartInterval === '1d' || chartInterval === '1w') return Fmt.jour(t);
     // Intraday étroit : garder l'heure seule (la plage datée est en haut à gauche)
-    if (intraday && tickAvailW < 420) return FMT_HM.format(t);
-    return FMT_D2.format(t) + ' ' + FMT_HM.format(t);
+    if (intraday && tickAvailW < 420) return Fmt.heure(t);
+    return Fmt.jour(t) + ' ' + Fmt.heure(t);
   };
-  const tickW = ctx.measureText(fmtTick(new Date(visible[0].time * 1000))).width;
+  const tickW = ctx.measureText(fmtTick(visible[0].time * 1000)).width;
   const numLabels = Math.min(6, Math.max(2, Math.floor(tickAvailW / (tickW + 18))));
   for (let j = 0; j < numLabels; j++) {
     const idx = Math.round((visible.length - 1) * j / (numLabels - 1));
     if (idx >= visible.length) continue;
-    const label = fmtTick(new Date(visible[idx].time * 1000));
+    const label = fmtTick(visible[idx].time * 1000);
     const lw = ctx.measureText(label).width;
     // Centré sur la bougie, puis contraint à l'intérieur du tracé
     const tx = Math.max(pad.left, Math.min(W - pad.right - lw, pad.left + gap * idx - lw / 2));
@@ -3862,7 +3936,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
           ctx.strokeStyle = isWin ? COLORS.trade_buy : COLORS.trade_sell; ctx.lineWidth = 1;
           ctx.beginPath(); ctx.moveTo(xx, xy + 10); ctx.lineTo(xx, xy - 6); ctx.stroke();
           // PnL label
-          const pnlStr = (trade.pnlPct >= 0 ? '+' : '') + trade.pnlPct.toFixed(2) + '%';
+          const pnlStr = Fmt.pct(trade.pnlPct, 2);
           ctx.fillStyle = isWin ? COLORS.candleUp : COLORS.candleDown;
           ctx.font = chartFont(8);
           ctx.fillText(pnlStr, xx + 6, xy - 4);
@@ -3886,7 +3960,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
         ctx.beginPath(); ctx.moveTo(pad.left, ly); ctx.lineTo(W - pad.right, ly); ctx.stroke();
         ctx.setLineDash([]);
         // Label
-        const label = 'BUY $' + level.price.toFixed(2);
+        const label = 'Achat ' + Fmt.prix(level.price, guideUnite(), 'fin');
         ctx.fillStyle = COLORS.grid_buy_pending; ctx.font = chartFont(8);
         ctx.fillText(label, pad.left + 4, ly - 3);
       } else if (level.status === 'filled') {
@@ -3901,7 +3975,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
           ctx.beginPath(); ctx.moveTo(pad.left, tpy); ctx.lineTo(W - pad.right, tpy); ctx.stroke();
           ctx.setLineDash([]);
           ctx.fillStyle = COLORS.grid_tp; ctx.font = chartFont(7);
-          ctx.fillText('TP ' + ((level.tp/level.price - 1)*100).toFixed(2) + '%', pad.left + 4, tpy - 2);
+          ctx.fillText('TP ' + Fmt.pct((level.tp / level.price - 1) * 100, 2), pad.left + 4, tpy - 2);
         }
         // SL line (red dashed)
         if (level.sl && level.sl < maxP + range * 0.2 && level.sl > minP - range * 0.2) {
@@ -4145,13 +4219,14 @@ function texteRepere(rep, P, lw) {
   return rep.x + 6 + lw > xMax ? Math.max(P.left + 2, rep.x - 6 - lw) : rep.x + 6;
 }
 
-/** L'âge de l'issue d'une forme finie, pour la phrase : « il y a 17 bougies 1 jour (21/09) ». */
+/** L'âge de l'issue d'une forme finie, pour la phrase : « il y a 17 bougies 1 jour (21/09) ».
+ *  Jour et heure de l'appareil (js/format.js), sans fuseau écrit. */
 function guideFormeQuand(f) {
   if (!f || !f.fin || !candles[f.jFin]) return null;
-  const k = (candles.length - 2) - f.jFin, iso = new Date(candles[f.jFin].time * 1000).toISOString();
+  const k = (candles.length - 2) - f.jFin, ms = candles[f.jFin].time * 1000;
   const pas = candles.length > 1 ? candles[1].time - candles[0].time : 0;
-  const jour = iso.slice(8, 10) + '/' + iso.slice(5, 7), heure = iso.slice(11, 16);
-  const date = pas >= 86400 ? jour : k * pas >= 20 * 3600 ? jour + ' ' + heure + ' UTC' : heure + ' UTC';
+  const jour = Fmt.jour(ms), heure = Fmt.heure(ms);
+  const date = pas >= 86400 ? jour : k * pas >= 20 * 3600 ? jour + ' ' + heure : heure;
   return { bougies: k, itv: chartInterval, date };
 }
 /** Ce que la lecture du moment dit, hors prix « en test » et hors variante. */
@@ -4261,7 +4336,7 @@ function guideBandes(E) {
 function guideTexteNiveau(L, exp) {
   const R = L.niv.raisons, G = PARAM.guide, unite = guideUnite(), itv = Guide.nomIntervalle(chartInterval);
   const une = r => {
-    if (exp) return r.court + ' ' + Guide.prixR(r, unite) + ' — ' + r.nature + (r.lu ? ' · ' + Guide.heureUTC(r.lu) + ' UTC' : '');
+    if (exp) return r.court + ' ' + Guide.prixR(r, unite) + ' — ' + r.nature + (r.lu ? ' · lu à ' + Fmt.jourHeure(r.lu) : '');
     let t = r.nom + ' (' + Guide.prixR(r, unite) + ') : ' + r.origine + ' — ' + r.nature + '.';
     // Un mur d'options est un prix d'exercice ; le zéro gamma, un prix calculé par le modèle. Le
     // taux est écrit à 4 décimales : la conversion affichée refait le prix placé.
@@ -4366,11 +4441,14 @@ function guideLibellesNiveaux(E, top, bas, surBougies) {
     const pose = guidePlacer(E.rects, x, wL, h, essais, top, bas, vers, wR, 2, r => ordre(r) || entre(r) || surBougies(r))
       || guidePlacer(E.rects, x, wL, h, essais, top, bas, vers, wR, 4, r => ordre(r) || entre(r));
     const zones = [{ x0: g.pad.left, y0: L.yH - 3, x1: xMax, y1: L.yB + 3 }];
-    if (!pose) { E.sansPlace.push(L); E.cibles.push({ rects: [], zones, prio: 1, niveau: L, titre: Guide.libelleNiveau(L.niv, 'debutant', E.unite), texte: guideTexteNiveau(L, E.exp) }); continue; }
+    // La bulle d'un niveau parle la langue du mode, titre compris (le titre était en mots du Débutant
+    // au-dessus d'un corps en abrégés de l'Expert).
+    const titreN = Guide.libelleNiveau(L.niv, E.exp ? 'expert' : 'debutant', E.unite);
+    if (!pose) { E.sansPlace.push(L); E.cibles.push({ rects: [], zones, prio: 1, niveau: L, titre: titreN, texte: guideTexteNiveau(L, E.exp) }); continue; }
     yPrec = pose.y;
     L.etiq = { x, y: pose.y, w: wL, h: H, wR, lignes, enLigne, sansEtat };
     etiquettesAFaire.push(() => { ctx.font = chartFont(9, 600); guidePastilleL(ctx, x, pose.y, wL, lignes, COLORS.accent2, H); });
-    E.cibles.push({ rects: [{ x0: x, y0: pose.y, x1: x + wR, y1: pose.y + h }], zones, prio: 1, niveau: L, titre: Guide.libelleNiveau(L.niv, 'debutant', E.unite), texte: guideTexteNiveau(L, E.exp) });
+    E.cibles.push({ rects: [{ x0: x, y0: pose.y, x1: x + wR, y1: pose.y + h }], zones, prio: 1, niveau: L, titre: titreN, texte: guideTexteNiveau(L, E.exp) });
   }
 }
 
@@ -4406,7 +4484,7 @@ function guideBords(E, top, bas) {
     etiquettesAFaire.push(() => { ctx.font = chartFont(9, 600); guidePastilleL(ctx, x, pose.y, w, lignes, COLORS.accent2, H); });
     const Ls = hors.concat(sans);
     E.cibles.push({ rects: [guideZone(pose)], prio: 1, niveaux: Ls, lignes,
-      titre: (hors.length ? (sens > 0 ? 'Au-dessus' : 'Au-dessous') + ' de la vue' : 'Bandes du graphique') + ' : ' + Ls.map(L => Guide.libelleNiveau(L.niv, 'debutant', unite, true)).join(' | '),
+      titre: (hors.length ? (sens > 0 ? 'Au-dessus' : 'Au-dessous') + ' de la vue' : 'Bandes du graphique') + ' : ' + Ls.map(L => Guide.libelleNiveau(L.niv, exp ? 'expert' : 'debutant', unite, true)).join(' | '),
       texte: [].concat(...Ls.map(L => guideTexteNiveau(L, exp).slice(0, L.niv.raisons.length))) });
   }
 }
@@ -5418,8 +5496,9 @@ function guideBulle(c, W, mainH, evite) {
     // L'état au prix live, en mots ; une bande faite d'options dit d'abord que c'est une estimation.
     if (c.niveau && c.niveau.live) texte.splice(c.optionsSeules ? 1 : 0, 0, Guide.texteEtatDebutant(c.niveau.live, c.niveau.niv, livePrice, guideUnite(), chartInterval));
   } else {
-    if (c.niveau && c.niveau.live) texte.unshift('Maintenant : ' + Guide.texteEtatLive(c.niveau.live, 'debutant') + '.');
-    if (c.niveaux) for (const L of c.niveaux.slice().reverse()) if (L.live) texte.unshift(Guide.libelleNiveau(L.niv, 'debutant', guideUnite(), true) + ' — maintenant : ' + Guide.texteEtatLive(L.live, 'debutant') + '.');
+    // Expert : l'état au prix live dans les mots de l'Expert, comme le titre et le corps de la bulle.
+    if (c.niveau && c.niveau.live) texte.unshift('Maintenant : ' + Guide.texteEtatLive(c.niveau.live, 'expert') + '.');
+    if (c.niveaux) for (const L of c.niveaux.slice().reverse()) if (L.live) texte.unshift(Guide.libelleNiveau(L.niv, 'expert', guideUnite(), true) + ' — maintenant : ' + Guide.texteEtatLive(L.live, 'expert') + '.');
   }
   const bw = Math.min(330, W - 32);
   // Débutant sur téléphone : la bulle est le seul endroit du détail — un corps de 12 px (titre
@@ -6096,16 +6175,16 @@ function scenLibelle(S, it, top, bas, surBougies) {
  *  au bas du tracé), sous la forme la plus complète qui trouve une place. */
 function scenReperes(S, top, bas) {
   const { g, F, xDeT, xMax, exp } = S, P = PARAM.scenarios;
-  const H = 14, hU = t => Scenarios.heureUTC(t) + ' UTC', hP = t => Scenarios.heureParis(t), jour = t => Scenarios.jourGroupe(new Date(t).toISOString().slice(0, 10));
-  const pE = hP(F.emis) ? ' (' + hP(F.emis) + ' Paris)' : '', pF = hP(F.fin) ? ' (' + hP(F.fin) + ' Paris)' : '';
+  // Heures et jours de l'appareil (js/format.js) : une seule heure par instant, sans fuseau écrit.
+  const H = 14, hU = t => Fmt.heure(t), jour = t => Fmt.jour(t);
   // Le temps restant, relu à chaque dessin (aucune minuterie : sans nouvelle donnée, il avance au dessin suivant).
   const resteF = Scenarios.reste(F.fin - S.maintenant);
   const sem = isNum(F.finSemaine) && F.finSemaine !== F.fin && S.items.some(i => i.sc.rang === 'S') ? ' Le scénario de la semaine court jusqu’au ' + jour(F.finSemaine) + ' à ' + hU(F.finSemaine) + '.' : '';
   for (const [t, noms, expl] of [
-    [F.emis, exp ? ['Point · ' + hU(F.emis), hU(F.emis)] : ['Point de ' + P.point + ' Paris · écrit à ' + hU(F.emis) + pE, 'Écrit à ' + hU(F.emis) + pE, 'Point · ' + hU(F.emis), hU(F.emis)],
-      'Le moment où les scénarios du point de ' + P.point + ' (Paris) ont été écrits : le ' + jour(F.emis) + ' à ' + hU(F.emis) + pE + (isNum(F.prixEmission) ? ', prix ' + Scenarios.prix(F.prixEmission) : '') + '. Les zones partent de là.'],
-    [F.fin, (resteF ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin) + ' · reste ' + resteF, 'fin · ' + hU(F.fin) + ' · reste ' + resteF] : []).concat(exp ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)] : ['fin des scénarios du jour · ' + jour(F.fin) + ' ' + hU(F.fin) + pF, 'fin du jour · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)]),
-      'Fin de la fenêtre des scénarios 1 à 3 : ' + jour(F.fin) + ' à ' + hU(F.fin) + (hP(F.fin) ? ' (' + hP(F.fin) + ' Paris)' : '') + '. Le journal les note ensuite, le matin même.' + sem]]) {
+    [F.emis, exp ? ['Point · ' + hU(F.emis), hU(F.emis)] : ['Point de ' + P.point + ' Paris · écrit à ' + hU(F.emis), 'Écrit à ' + hU(F.emis), 'Point · ' + hU(F.emis), hU(F.emis)],
+      'Le moment où les scénarios du point de ' + P.point + ' (Paris) ont été écrits : le ' + jour(F.emis) + ' à ' + hU(F.emis) + (isNum(F.prixEmission) ? ', prix ' + Scenarios.prix(F.prixEmission) : '') + '. Les zones partent de là.'],
+    [F.fin, (resteF ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin) + ' · reste ' + resteF, 'fin · ' + hU(F.fin) + ' · reste ' + resteF] : []).concat(exp ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)] : ['fin des scénarios du jour · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin du jour · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)]),
+      'Fin de la fenêtre des scénarios 1 à 3 : ' + jour(F.fin) + ' à ' + hU(F.fin) + '. Le journal les note ensuite, le matin même.' + sem]]) {
     const x = xDeT(t);
     if (!(x >= g.pad.left && x <= xMax)) continue;
     ctx.font = chartFont(8.5, 650);
@@ -6150,7 +6229,7 @@ function scenBoite(S, top, bas) {
   const wMax = Math.floor(Math.min(P.boiteMax, (S.xMax - g.pad.left) * (etroit ? P.boiteFractionEtroit : P.boiteFraction)));
   const L = [];   // { t, f: 'titre' | 'ligne' | 'note' | 'seule', it, garde, compact, toujours }
   let PJx = [], RE = [];   // Expert : les variantes de la phrase de la journée et du temps restant
-  const heure = ms => Scenarios.heureUTC(ms) + ' UTC';
+  const heure = ms => Fmt.jourHeure(ms);   // l'heure de l'appareil (le jour s'il n'est pas aujourd'hui)
   let titreBoite, large = false;
   if (!F) {
     let t;
@@ -6430,10 +6509,11 @@ function scenTexteBoite(S, sansBilan, court) {
     out.push('Matins précédents (note du journal) : ' + p.join(' | ') + '.');
   }
   const src = F || (attente ? previsions : null);
-  const jourH = t => Scenarios.jourGroupe(new Date(t).toISOString().slice(0, 10)) + ' à ' + Scenarios.heureUTC(t) + ' UTC';
-  if (src) out.push((isNum(src.updated) ? 'Fichier publié le ' + jourH(src.updated) + ', relu' : 'Fichier relu') + ' à ' + Scenarios.heureUTC(src.luA) + ' UTC'
-    + (previsionsEchec ? ' ; dernière relecture impossible (' + scenRaison(previsionsEchec.raison) + ', ' + Scenarios.heureUTC(previsionsEchec.a) + ' UTC)' : '') + '.');
-  else if (previsionsEchec) out.push('Dernière lecture : ' + scenRaison(previsionsEchec.raison) + ' à ' + Scenarios.heureUTC(previsionsEchec.a) + ' UTC. Rien n’est dessiné tant qu’aucun fichier lisible n’est arrivé.');
+  // Jours et heures de l'appareil (js/format.js).
+  const jourH = t => Fmt.jour(t) + ' à ' + Fmt.heure(t);
+  if (src) out.push((isNum(src.updated) ? 'Fichier publié le ' + jourH(src.updated) + ', relu' : 'Fichier relu') + ' à ' + Fmt.jourHeure(src.luA)
+    + (previsionsEchec ? ' ; dernière relecture impossible (' + scenRaison(previsionsEchec.raison) + ', ' + Fmt.jourHeure(previsionsEchec.a) + ')' : '') + '.');
+  else if (previsionsEchec) out.push('Dernière lecture : ' + scenRaison(previsionsEchec.raison) + ' à ' + Fmt.jourHeure(previsionsEchec.a) + '. Rien n’est dessiné tant qu’aucun fichier lisible n’est arrivé.');
   out.push(exp ? 'Description, pas une recommandation.' : 'Une description, pas une recommandation : rien ici ne dit quoi faire.');
   return out;
 }
@@ -6600,8 +6680,8 @@ function scenTexteLigneDebutant(S) {
     const attente = previsions && previsions.etat === 'attente';
     if (attente) out.push(previsions.note || 'En attente du prochain point.');
     else {
-      const e = previsionsEchec, h = e ? Guide.heureParis(e.a) : null;
-      out.push('Le fichier des scénarios n’a pas pu être lu' + (e ? ' (' + scenRaison(e.raison) + (h ? ', ' + h + ', heure de Paris' : '') + ')' : '') + '. Rien n’est dessiné tant qu’aucun fichier lisible n’est arrivé.');
+      const e = previsionsEchec, h = e ? Fmt.jourHeure(e.a) : null;
+      out.push('Le fichier des scénarios n’a pas pu être lu' + (e ? ' (' + scenRaison(e.raison) + (h ? ', ' + h : '') + ')' : '') + '. Rien n’est dessiné tant qu’aucun fichier lisible n’est arrivé.');
     }
     out.push(chaque, fin);
     return out;
@@ -6761,14 +6841,18 @@ function drawLine(data, minP, range, pad, gap, ph, color, dash, width, dataOffse
   }
 }
 
-// Titre + badge sous-graphe
+// Titre d'un sous-graphe : le nom du menu (« Stochastique rapide (14,3) », « ADX / DMI (14) »),
+// pas une abréviation à part (« STOCH », « ADX (14) ») — un seul nom par chose.
 function subTitle(key) {
-  const map = { vol:'VOLUME', rsi: ETIQ.rsi().toUpperCase(), macd: ETIQ.macd(), stoch: 'STOCH (' + PARAM.stoch.k + ',' + PARAM.stoch.d + ')',
-                atr: ETIQ.atr(), obv:'OBV', mfi: 'MFI (' + PARAM.mfi.periode + ')', williamsR: '%R (' + PARAM.williamsR.periode + ')',
-                cci: ETIQ.cci(), adx: 'ADX (' + PARAM.adx.periode + ')', ao: 'AO (' + PARAM.ao.rapide + ',' + PARAM.ao.lente + ')', equity:'GRID EQUITY' };
-  return map[key] || key.toUpperCase();
+  const map = { vol: 'Volume', rsi: ETIQ.rsi(), macd: ETIQ.macd(), stoch: ETIQ.stoch(), atr: ETIQ.atr(), obv: 'OBV — On-Balance Volume',
+                mfi: ETIQ.mfi(), williamsR: ETIQ.williamsR(), cci: ETIQ.cci(), adx: ETIQ.adx(), ao: ETIQ.ao() };
+  return map[key] || key;
 }
 
+// Les sous-graphes en unités de PRIX (MACD, ATR, AO) : la précision de cotation de la paire (2
+// décimales sur BTC, 4 sur XRP), sur l'axe comme dans le badge du réticule — « $0.0 » sur les trois
+// graduations de l'ATR de XRP, c'était une décimale pour un ATR de 0,005.
+const decimalesCote = () => Fmt.decimalesPrix(candles.length ? candles[candles.length - 1].close : NaN);
 // Grille + labels d'échelle pour sous-graphes (o: {levels, min, max | span, f})
 function subGrid(y0, pad, ph, W, o) {
   ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 0.5;
@@ -6777,7 +6861,7 @@ function subGrid(y0, pad, ph, W, o) {
     const y = o.span ? y0 + pad.top + ph/2 - (l / o.span) * ph : y0 + pad.top + ph * (1 - (l - (o.min || 0)) / ((o.max || 100) - (o.min || 0)));
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
     ctx.fillStyle = COLORS.axis || COLORS.text; ctx.font = chartFont(10, 650);
-    ctx.textAlign = 'right'; ctx.fillText(o.f ? o.f(l) : l, W - 8, y + 3); ctx.textAlign = 'left';
+    ctx.textAlign = 'right'; ctx.fillText(o.f ? o.f(l) : Fmt.nombre(l), W - 8, y + 3); ctx.textAlign = 'left';
   });
   ctx.setLineDash([]);
 }
@@ -6810,8 +6894,7 @@ function resolveSub(candles, y0, subH, W, key) {
     for (let i = vs; i < ve; i++) if (candles[i].volume > maxV) maxV = candles[i].volume;
     maxV = maxV || 1;
     // Grid + échelle
-    const fmtV = v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : v.toFixed(0);
-    subGrid(y0, pad, ph, W, { levels: [0, maxV/2, maxV], min: 0, max: maxV, f: fmtV });
+    subGrid(y0, pad, ph, W, { levels: [0, maxV/2, maxV], min: 0, max: maxV, f: v => Fmt.compact(v) });
     // Volume bars
     const barW = Math.max(1, gap * 0.7);
     for (let i = vs; i < ve; i++) {
@@ -6853,7 +6936,8 @@ function resolveSub(candles, y0, subH, W, key) {
     const absMax = absMaxFenetre([macd.macdLine, macd.signal, macd.histogram], vs, ve) || 1;
     const scale = (ph / 2) / absMax;
     const midY = y0 + pad.top + ph / 2;
-    subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: v => v.toFixed(2) });
+    const dc = decimalesCote();
+    subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: v => Fmt.nombre(v, dc) });
     // Histogram
     const barW = Math.max(1, gap * 0.6);
     for (let i = vs; i < ve; i++) {
@@ -6878,7 +6962,8 @@ function resolveSub(candles, y0, subH, W, key) {
     // Échelle sur TOUT l'historique (comme avant) : calculée une fois par état des données.
     const maxA = memoized('sub_atr_max', a => { let m = -Infinity; for (const v of a) if (v !== null && v > m) m = v; return m; }, atr) || 1;
     const scale = ph / maxA;
-    subGrid(y0, pad, ph, W, { levels: [0, maxA/2, maxA], min: 0, max: maxA, f: v => '$' + v.toFixed(1) });
+    const dc = decimalesCote(), unite = guideUnite();
+    subGrid(y0, pad, ph, W, { levels: [0, maxA/2, maxA], min: 0, max: maxA, f: v => Fmt.prix(v, unite, dc) });
     drawLineAt(atr, y0 + pad.top + ph, scale, pad, gap, COLORS.atr, [], 1.5, vs);
   } else if (key === 'obv') {
     const closes = cols().close, volumes = cols().vol;
@@ -6886,8 +6971,9 @@ function resolveSub(candles, y0, subH, W, key) {
     const absMax = absMaxFenetre([obv], vs, ve) || 1;
     const scale = (ph / 2) / absMax;
     const midY = y0 + pad.top + ph / 2;
-    const fmtOBV = v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : v.toFixed(0);
-    subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: fmtOBV });
+    // L'axe et le badge du réticule au même format (« 54,8 k », « −2,3 M ») : avant, l'axe en K ou M
+    // selon la taille, le badge toujours en millions (« 0.05M » à côté de « 50.0K »).
+    subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: v => Fmt.compact(v) });
     drawLineAt(obv, midY, scale, pad, gap, COLORS.obv, [], 1.5, vs);
   } else if (key === 'mfi') {
     const closes = cols().close, highs = cols().high, lows = cols().low, vols = cols().vol;
@@ -6900,8 +6986,13 @@ function resolveSub(candles, y0, subH, W, key) {
   } else if (key === 'cci') {
     const closes = cols().close, highs = cols().high, lows = cols().low;
     const cci = memoized('sub_cci', calcCCI, highs, lows, closes, PARAM.cci.periode);
-    subGrid(y0, pad, ph, W, { levels: [100, 0, -100], span: 200 });
+    // Échelle ±200 sur la hauteur du panneau (ph/400 par unité) : les lignes ±100 sont donc au quart
+    // de la hauteur, là où la courbe vaut ±100 (avant : posées aux bords avec un span de 200, elles
+    // marquaient en fait ±200). Au-delà de ±200, la courbe est coupée au bord du panneau.
+    subGrid(y0, pad, ph, W, { levels: [100, 0, -100], span: 400 });
+    ctx.save(); ctx.beginPath(); ctx.rect(pad.left, y0 + pad.top, pw, ph); ctx.clip();
     drawLineAt(cci, y0 + pad.top + ph/2, ph/400, pad, gap, COLORS.cci, [], 1.5, vs);
+    ctx.restore();
   } else if (key === 'adx') {
     const closes = cols().close, highs = cols().high, lows = cols().low;
     const adxData = memoized('sub_adx', calcADX, highs, lows, closes, PARAM.adx.periode);
@@ -6915,8 +7006,8 @@ function resolveSub(candles, y0, subH, W, key) {
     // Échelle sur TOUT l'historique (comme avant) : calculée une fois par état des données.
     const absMax = memoized('sub_ao_max', a => absMaxFenetre([a], 0, a.length), ao) || 1;
     const scale = (ph / 2) / absMax;
-    const midY = y0 + pad.top + ph / 2;
-    subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: v => v.toFixed(2) });
+    const midY = y0 + pad.top + ph / 2, dc = decimalesCote();
+    subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: v => Fmt.nombre(v, dc) });
     const barW = Math.max(1, gap * 0.6);
     for (let i = vs; i < ve; i++) {
       if (ao[i] === null) continue;
@@ -6925,68 +7016,6 @@ function resolveSub(candles, y0, subH, W, key) {
       ctx.fillStyle = avecAlpha(ao[i] >= 0 ? COLORS.candleUp : COLORS.candleDown, 0.55);
       ctx.fillRect(x + gap*0.2, Math.min(midY, midY - h), barW, Math.abs(h));
     }
-  } else if (key === 'equity') {
-    // Equity curve sub-chart — shows total equity (gold) + realized PnL (green)
-    if (!btResult || !btResult.equityCurve || btResult.equityCurve.length < 2) {
-      ctx.fillStyle = COLORS.text; ctx.font = chartFont(10);
-      ctx.fillText('Pas de backtest — lancez un backtest', pad.left + 10, y0 + pad.top + ph/2);
-      return;
-    }
-    const eq = btResult.equityCurve;
-    const startCap = btResult.capital;
-    const allTotals = eq.map(e => e.total);
-    const minEq = Math.min(...allTotals);
-    const maxEq = Math.max(...allTotals);
-    const rangeEq = maxEq - minEq || 1;
-
-    // Grid + échelle $
-    const eqFmt = v => '$' + v.toLocaleString('en-US', {maximumFractionDigits: 0});
-    subGrid(y0, pad, ph, W, { levels: [minEq, minEq + rangeEq / 2, maxEq], min: minEq, max: maxEq, f: eqFmt });
-    // Capital baseline
-    const capY = y0 + pad.top + ph * (1 - (startCap - minEq) / rangeEq);
-    ctx.strokeStyle = avecAlpha(COLORS.ink3, 0.5); ctx.lineWidth = 0.5;
-    ctx.setLineDash([3, 6]);
-    ctx.beginPath(); ctx.moveTo(pad.left, capY); ctx.lineTo(W - pad.right, capY); ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Draw equity curve — total (gold)
-    ctx.strokeStyle = COLORS.equity_total; ctx.lineWidth = 1.8;
-    ctx.beginPath(); let started = false;
-    let firstEqIdx = eq[0].idx, lastEqIdx = eq[eq.length - 1].idx;
-    for (let j = 0; j < eq.length; j++) {
-      const e = eq[j];
-      if (e.idx < vs || e.idx > ve) continue;
-      const x = pad.left + gap * (e.idx - vs) + gap/2;
-      const y = y0 + pad.top + ph * (1 - (e.total - minEq) / rangeEq);
-      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-
-    // Draw realized PnL (green)
-    ctx.strokeStyle = COLORS.equity_realized; ctx.lineWidth = 1.2;
-    ctx.beginPath(); started = false;
-    for (let j = 0; j < eq.length; j++) {
-      const e = eq[j];
-      if (e.idx < vs || e.idx > ve) continue;
-      const x = pad.left + gap * (e.idx - vs) + gap/2;
-      const realizedTotal = startCap + e.realized;
-      const y = y0 + pad.top + ph * (1 - (realizedTotal - minEq) / rangeEq);
-      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-
-    // Labels
-    const retPct = ((allTotals[allTotals.length-1] - startCap) / startCap * 100);
-    const retStr = (retPct >= 0 ? '+' : '') + retPct.toFixed(2) + '%';
-    ctx.fillStyle = retPct >= 0 ? COLORS.upInk : COLORS.downInk;
-    ctx.font = chartFont(10, 650);
-    ctx.fillText(retStr, pad.left + 4, y0 + pad.top + 12);
-
-    // Legend
-    ctx.fillStyle = COLORS.equity_total; ctx.font = chartFont(9);
-    ctx.fillText('─ Equity', pad.left + 65, y0 + pad.top + 12);
-    ctx.fillStyle = COLORS.equity_realized;
-    ctx.fillText('─ Realized', pad.left + 125, y0 + pad.top + 12);
   }
 }
 
@@ -7032,11 +7061,11 @@ function drawBandSub(y0, pad, ph, W, gap, data, color, vs, ve, levels, dataMin, 
 
 // Helpers pour le crosshair des sous-graphes
 function subLabel(key) {
-  const map = { vol:'Vol', rsi:'RSI', macd:'MACD', stoch:'%K', atr:'ATR', obv:'OBV', mfi:'MFI', williamsR:'%R', cci:'CCI', adx:'ADX', ao:'AO', equity:'Equity' };
+  const map = { vol:'Vol', rsi:'RSI', macd:'MACD', stoch:'%K', atr:'ATR', obv:'OBV', mfi:'MFI', williamsR:'%R', cci:'CCI', adx:'ADX', ao:'AO' };
   return map[key] || key;
 }
 function subColor(key) {
-  const map = { vol:COLORS.ink3, rsi:COLORS.rsi, macd:COLORS.macd, stoch:COLORS.stoch_k, atr:COLORS.atr, obv:COLORS.obv, mfi:COLORS.mfi, williamsR:COLORS.williamsR, cci:COLORS.cci, adx:COLORS.adx, ao:COLORS.candleUp, equity:COLORS.equity_total };
+  const map = { vol:COLORS.ink3, rsi:COLORS.rsi, macd:COLORS.macd, stoch:COLORS.stoch_k, atr:COLORS.atr, obv:COLORS.obv, mfi:COLORS.mfi, williamsR:COLORS.williamsR, cci:COLORS.cci, adx:COLORS.adx, ao:COLORS.candleUp };
   return map[key] || COLORS.ink3;
 }
 function getSubIndicatorValue(key, idx) {
@@ -7045,17 +7074,18 @@ function getSubIndicatorValue(key, idx) {
   const { close: closes, high: highs, low: lows, vol: vols } = cols();
   try {
     switch(key) {
-      case 'vol': return c[idx].volume >= 1000 ? (c[idx].volume/1000).toFixed(1)+'K' : c[idx].volume.toFixed(0);
-      case 'rsi': { const v = memoized('gsi_rsi', calcRSI, closes, PARAM.rsi.periode); return v[idx] !== null ? v[idx].toFixed(1) : null; }
-      case 'macd': { const v = memoized('gsi_macd', calcMACD, closes, PARAM.macd.rapide, PARAM.macd.lente, PARAM.macd.signal); return v.macdLine[idx] !== null ? v.macdLine[idx].toFixed(2) : null; }
-      case 'stoch': { const v = memoized('gsi_stoch', calcStoch, highs, lows, closes, PARAM.stoch.k, PARAM.stoch.d); return v.k[idx] !== null ? v.k[idx].toFixed(1) : null; }
-      case 'atr': { const v = memoized('gsi_atr', calcATR, highs, lows, closes, PARAM.atr.periode); return v[idx] !== null ? v[idx].toFixed(1) : null; }
-      case 'obv': { const v = memoized('gsi_obv', calcOBV, closes, vols); return v[idx] !== null ? (v[idx]/1e6).toFixed(2)+'M' : null; }
-      case 'mfi': { const v = memoized('gsi_mfi', calcMFI, highs, lows, closes, vols, PARAM.mfi.periode); return v[idx] !== null ? v[idx].toFixed(1) : null; }
-      case 'williamsR': { const v = memoized('gsi_wr', calcWilliamsR, highs, lows, closes, PARAM.williamsR.periode); return v[idx] !== null ? v[idx].toFixed(1) : null; }
-      case 'cci': { const v = memoized('gsi_cci', calcCCI, highs, lows, closes, PARAM.cci.periode); return v[idx] !== null ? v[idx].toFixed(1) : null; }
-      case 'adx': { const v = memoized('gsi_adx', calcADX, highs, lows, closes, PARAM.adx.periode); return v.adx[idx] !== null ? v.adx[idx].toFixed(1) : null; }
-      case 'ao': { const v = memoized('gsi_ao', calcAO, highs, lows, PARAM.ao.rapide, PARAM.ao.lente); return v[idx] !== null ? v[idx].toFixed(2) : null; }
+      // Les formats de l'axe de chaque sous-graphe (js/format.js) : « 54,8 k », « 45,3 », « −0,0012 ».
+      case 'vol': return Fmt.compact(c[idx].volume);
+      case 'rsi': { const v = memoized('gsi_rsi', calcRSI, closes, PARAM.rsi.periode); return v[idx] !== null ? Fmt.nombre(v[idx], 1) : null; }
+      case 'macd': { const v = memoized('gsi_macd', calcMACD, closes, PARAM.macd.rapide, PARAM.macd.lente, PARAM.macd.signal); return v.macdLine[idx] !== null ? Fmt.nombre(v.macdLine[idx], decimalesCote()) : null; }
+      case 'stoch': { const v = memoized('gsi_stoch', calcStoch, highs, lows, closes, PARAM.stoch.k, PARAM.stoch.d); return v.k[idx] !== null ? Fmt.nombre(v.k[idx], 1) : null; }
+      case 'atr': { const v = memoized('gsi_atr', calcATR, highs, lows, closes, PARAM.atr.periode); return v[idx] !== null ? Fmt.prix(v[idx], guideUnite(), decimalesCote()) : null; }
+      case 'obv': { const v = memoized('gsi_obv', calcOBV, closes, vols); return v[idx] !== null ? Fmt.compact(v[idx]) : null; }
+      case 'mfi': { const v = memoized('gsi_mfi', calcMFI, highs, lows, closes, vols, PARAM.mfi.periode); return v[idx] !== null ? Fmt.nombre(v[idx], 1) : null; }
+      case 'williamsR': { const v = memoized('gsi_wr', calcWilliamsR, highs, lows, closes, PARAM.williamsR.periode); return v[idx] !== null ? Fmt.nombre(v[idx], 1) : null; }
+      case 'cci': { const v = memoized('gsi_cci', calcCCI, highs, lows, closes, PARAM.cci.periode); return v[idx] !== null ? Fmt.nombre(v[idx], 1) : null; }
+      case 'adx': { const v = memoized('gsi_adx', calcADX, highs, lows, closes, PARAM.adx.periode); return v.adx[idx] !== null ? Fmt.nombre(v.adx[idx], 1) : null; }
+      case 'ao': { const v = memoized('gsi_ao', calcAO, highs, lows, PARAM.ao.rapide, PARAM.ao.lente); return v[idx] !== null ? Fmt.nombre(v[idx], decimalesCote()) : null; }
       default: return null;
     }
   } catch(e) { return null; }

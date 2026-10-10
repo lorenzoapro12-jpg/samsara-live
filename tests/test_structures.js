@@ -47,7 +47,7 @@ const CIBLES = [
   // Chronique (js/chronique.js) : la trace de chaque chiffre clé affiché.
   ['traces des chiffres clés', '#cycle .kpi:not([hidden]):not(.sans-trace) .chron-spark', 'tous'],
 ];
-/** Les âges écrits sur le CALQUE du graphique (couche « Liquidité », repère de la publication) :
+/** Les âges écrits sur le CALQUE du graphique (couche « Ordres en attente (carte) », repère de la publication) :
  *  du texte de canvas, que la visibilité ne voit pas — on relève ce que le calque écrit. */
 async function agesDuCalque(page) {
   return page.evaluate(async () => {
@@ -60,7 +60,7 @@ async function agesDuCalque(page) {
     CanvasRenderingContext2D.prototype.fillText = function (t) { if (this.canvas.id === 'chartCalque') vus.push(String(t)); return f.apply(this, arguments); };
     dessinerCalque();
     CanvasRenderingContext2D.prototype.fillText = f;
-    return { couche: vus.some(t => /^Carte publiée · dernière colonne .+ · publiée .+/.test(t)), repere: vus.some(t => /^fichier \d\d:\d\d UTC · prix publié .+ \((il y a .+|< 5 s)\)$/.test(t)), vus };
+    return { couche: vus.some(t => /^Ordres en attente \(carte\) · dernière colonne .+ · publiée .+/.test(t)), repere: vus.some(t => /^fichier (\d\d\/\d\d )?\d\d:\d\d · prix publié \d[\d ]*,\d\d \$ \((il y a .+|< 5 s)\)$/.test(t)), vus };
   });
 }
 

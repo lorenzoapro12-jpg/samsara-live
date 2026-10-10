@@ -460,7 +460,14 @@ STRUCTURES.planche = {
     c.deplacer($('indicatorBar'), pied);
     const cart = c.conteneur('div', 'plan-cartouche', pied, null, 'Cartouche : dernière publication');
     c.decor('span', 'plan-titre plan-nom', cart, null, 'Saṃsāra · planche 1/1');
-    c.decor('span', 'plan-titre plan-unite', cart, null, 'Unité : USD');
+    // L'unité des prix : la devise de cotation de la paire affichée (« USDT », « SOL » sur
+    // BTC/SOL), relue dans #paireNom à chaque changement de paire. Elle était écrite « USD » en dur.
+    const pn = $('paireNom');
+    const unite = c.decor('span', 'plan-titre plan-unite', cart, null, 'Unité : USDT');
+    const lireUnite = () => { const q = pn ? pn.textContent.split('/')[1] : ''; unite.textContent = 'Unité : ' + ((q || '').trim() || 'USDT'); };
+    lireUnite();
+    const obsUnite = pn && typeof MutationObserver !== 'undefined' ? new MutationObserver(lireUnite) : null;
+    if (obsUnite) obsUnite.observe(pn, { childList: true, characterData: true, subtree: true });
     // Provenance : les sources que la publication déclare (market-data.json, champ `source`).
     const src = c.decor('span', 'plan-titre plan-sources', cart, null, 'Sources : —');
     c.deplacer($('cycle'), cart);
@@ -507,7 +514,7 @@ STRUCTURES.planche = {
       });
     }) : null;
     if (ro) ro.observe(cc);
-    return () => { if (obs) obs.disconnect(); if (ro) ro.disconnect(); cancelAnimationFrame(image); clearTimeout(minuterie); c.defaire(); };
+    return () => { if (obs) obs.disconnect(); if (obsUnite) obsUnite.disconnect(); if (ro) ro.disconnect(); cancelAnimationFrame(image); clearTimeout(minuterie); c.defaire(); };
   },
 };
 

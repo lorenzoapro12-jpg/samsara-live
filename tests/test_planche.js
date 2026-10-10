@@ -7,7 +7,8 @@
 //   2. CHANTIER : le pied de planche (nomenclature = le ruban, cartouche = chiffres clés et heure)
 //      est posé entre le graphique et le Grid Bot ; rien n'est inséré DANS le ruban (la règle
 //      téléphone compte ses <span>) ; 24 repères de zone et 4 de centrage, dans un cadre fixe SOUS
-//      le contenu — et <html> n'a pas de fond (sinon le cadre passerait dessous).
+//      le contenu — et <html> n'a pas de fond (sinon le cadre passerait dessous). L'unité du
+//      cartouche est la devise de cotation de la paire (USDT ; SOL sur BTC/SOL), relue au changement.
 //   3. MISE EN PAGE à 1440 × 900, 1280 × 720, 1024 × 768, 800 × 900 et 390 × 800 : aucun chiffre
 //      clé masqué, pas de défilement horizontal, le canvas tient dans son cadre ; sur bureau, la
 //      nomenclature tient en DEUX rangées et le pied en moins de 100 px ; « Vue A » est sous le
@@ -214,7 +215,7 @@ const MESURES = () => {
     const tag = await o.page.evaluate(() => {
       const cs = getComputedStyle(document.documentElement), norm = c => { const x = document.createElement('canvas').getContext('2d'); x.fillStyle = c; return x.fillStyle; };
       window.__textes.length = 0; drawChart(); dessinerCalque();   // l'étiquette du prix vit sur le calque (chartCalque)
-      const t = window.__textes.filter(e => /^\$86012\.5/.test(e.t));
+      const t = window.__textes.filter(e => /^86 012,50 \$$/.test(e.t));
       return { styles: [...new Set(t.map(e => e.s))], surUp: norm(cs.getPropertyValue('--up-sur').trim()), surDown: norm(cs.getPropertyValue('--down-sur').trim()), up: norm(cs.getPropertyValue('--up').trim()) };
     });
     check('étiquette du dernier prix écrite en --up-sur / --down-sur, jamais à la couleur de la barre',
@@ -242,6 +243,18 @@ const MESURES = () => {
     check('nuage : dessin statique, sans animation, inerte', nuage.dessin.content !== 'none' && nuage.dessin.anim === 'none' && nuage.dessin.pe === 'none', nuage.dessin);
     check('nuage retiré après sa durée (90 s par défaut)', nuage.retire && nuage.duree === 90000, nuage);
 
+    // ─── 2 bis. Unité du cartouche : la devise de cotation de la paire, relue au changement ───
+    const unite = await o.page.evaluate(async () => {
+      const u = () => (document.querySelector('.plan-unite') || {}).textContent, pause = ms => new Promise(r => setTimeout(r, ms));
+      const avant = u();
+      changeSymbol('BTCSOL', document.getElementById('sym_BTCSOL')); await pause(300);
+      const sol = u();
+      changeSymbol('BTCUSDT', document.getElementById('sym_BTCUSDT')); await pause(1500);
+      return { avant, sol, apres: u() };
+    });
+    check('unité du cartouche = devise de cotation de la paire : « Unité : USDT », « Unité : SOL » sur BTC/SOL, puis « USDT » au retour',
+      unite.avant === 'Unité : USDT' && unite.sol === 'Unité : SOL' && unite.apres === 'Unité : USDT', unite);
+
     // ─── 8. Démontage, jumeau ───
     titre('8. Démontage : observateurs débranchés ; le jumeau garde la structure');
     const dem = await o.page.evaluate(async () => {
@@ -254,7 +267,7 @@ const MESURES = () => {
       await new Promise(r => setTimeout(r, 50));
       return { sans, avec, jumeau, apres, restes: document.querySelectorAll('[class*="plan-"], .revise').length };
     });
-    check('la planche branche ses observateurs (1 MutationObserver, 1 ResizeObserver)', dem.avec.mo === dem.sans.mo + 1 && dem.avec.ro === dem.sans.ro + 1, dem);
+    check('la planche branche ses observateurs (2 MutationObserver : l\'heure et la paire ; 1 ResizeObserver)', dem.avec.mo === dem.sans.mo + 2 && dem.avec.ro === dem.sans.ro + 1, dem);
     check('quitter la planche les débranche tous', dem.apres.mo === dem.sans.mo && dem.apres.ro === dem.sans.ro, dem);
     check('quitter la planche retire tout son décor et ses conteneurs', dem.restes === 0, dem.restes);
     check('cyanotype → diazo (touche D) : même structure, pas reconstruite', dem.jumeau.meme && dem.jumeau.structure === 'planche' && dem.jumeau.n.mo === dem.avec.mo, dem.jumeau);
