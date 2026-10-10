@@ -19,6 +19,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const REPO = path.resolve(__dirname, '..');
 const G = require(path.join(REPO, 'js/guide.js'));
+const Fm = require(path.join(REPO, 'js/format.js'));
 const { chargerPage } = require('./bac');
 
 let ko = 0;
@@ -82,7 +83,7 @@ titre('2. Niveaux nommés : leur origine en mots');
   const md = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'contre', 'publication.json'), 'utf8'));
   const pub = G.niveauxPublies(md), achat = pub.find(x => x.cle === 'mur_achat'), put = pub.find(x => x.cle === 'put_wall');
   const plusGros = md.liquidity.bid_walls.reduce((a, b) => (b[1] > a[1] ? b : a));
-  const hm = md.liquidity.snapshot_at.slice(11, 16);
+  const hm = Fm.heure(Date.parse(md.liquidity.snapshot_at));   // l'heure de lecture, à l'heure de l'appareil
   check('mur d’achat = la plus grosse tranche publiée, au milieu de sa tranche, « lu à " + hm + " »'.replace('" + hm + "', hm),
     achat && achat.p === plusGros[0] + md.liquidity.wall_bin_usd / 2 && t(achat.detail).includes('lu à ' + hm) && /BTC/.test(achat.detail), achat);
   check('mur de puts, de calls, zéro gamma : nature « modèle », dite dans le libellé', ['put_wall', 'call_wall', 'zero_gamma'].every(k => { const x = pub.find(y => y.cle === k); return x && x.nature === 'modèle' && /modèle/.test(x.detail); }));
@@ -102,7 +103,7 @@ titre('2. Niveaux nommés : leur origine en mots');
   const deux = { p: put.p, pMin: put.p, pMax: put.p + 30, raisons: [put, h24] }, seul = { p: achat.p, pMin: achat.p, pMax: achat.p, raisons: [achat] };
   const etroits = ['debutant', 'expert'].flatMap(m => ['mini', 'micro', true].flatMap(v => [G.libelleNiveau(deux, m, '$', v), G.libelleNiveau(seul, m, '$', v)]));
   etroits.forEach(t);
-  check('formes étroites des libellés (mini, micro, courte ; deux modes) : chaque chiffre publié garde son heure', etroits.every(x => x.includes(hm) || x.includes(G.heureUTC(Date.parse(md.updated)))), etroits);
+  check('formes étroites des libellés (mini, micro, courte ; deux modes) : chaque chiffre publié garde son heure', etroits.every(x => x.includes(hm) || x.includes(Fm.heure(Date.parse(md.updated)))), etroits);
   check('… et chaque raison son origine (mur, bas 24 h) : « 2 raisons » seul ne suffit plus', etroits.every(x => /mur|Mur|put|Put/i.test(x)) && etroits.filter(x => x.includes('–')).every(x => /24 h/.test(x)), etroits);
   const micro = G.libelleNiveau(seul, 'debutant', '$', 'micro');
   check('forme micro : l’heure juste après le prix publié (« ' + micro + ' »)', new RegExp('^' + G.prix(achat.p).replace(/[$]/g, '\\$') + ' ' + hm + ' ').test(micro), micro);
@@ -230,9 +231,9 @@ const d = 0.4;
   check('double sommet détecté, ligne de cou au creux entre les deux sommets', !!f0 && Math.abs(f0.niveau - (104 - d)) < 0.6, f0 && { niveau: f0.niveau, etat: G.etatForme(f0) });
   check('… « en formation » tant qu’aucune clôture n’est sous la ligne de cou', f0 && G.etatForme(f0).cle === 'formation', f0 && G.etatForme(f0));
   const f1 = run([...lin(106, 102.5, 2)]).formes.find(f => f.type === 'double_sommet');
-  check('1 clôture sous la ligne de cou : « cassure … à confirmer (1/2 clôtures) »', f1 && G.etatForme(f1).cle === 'demi', f1 && G.etatForme(f1));
+  check('1 clôture sous la ligne de cou : « cassure … à valider (1/2 clôtures) »', f1 && G.etatForme(f1).cle === 'demi', f1 && G.etatForme(f1));
   const f2 = run([...lin(106, 102.5, 2), 102]).formes.find(f => f.type === 'double_sommet');
-  check('2 clôtures sous la ligne de cou : « confirmé »', f2 && G.etatForme(f2).cle === 'confirme' && /2 clôtures sous la ligne de cou/.test(t(G.etatForme(f2).texte)), f2 && G.etatForme(f2));
+  check('2 clôtures sous la ligne de cou : « validé »', f2 && G.etatForme(f2).cle === 'confirme' && /2 clôtures sous la ligne de cou/.test(t(G.etatForme(f2).texte)), f2 && G.etatForme(f2));
   check('objectif théorique = ligne de cou − hauteur (convention)', f2 && Math.abs(f2.objectif - (f2.niveau - (f2.extreme - f2.niveau))) < 1e-9);
   const f3 = run([...lin(106, 102.5, 2), 102, ...lin(102, 95, 6)]).formes.find(f => f.type === 'double_sommet');
   check('… puis le prix touche l’objectif : « objectif théorique atteint »', f3 && f3.fin === 'atteint', f3 && G.etatForme(f3));
@@ -290,7 +291,7 @@ const d = 0.4;
   const r0 = run([]), f0 = G.formesAffichees(r0, P).find(f => f.type === 'range') || r0.formes.find(f => f.type === 'range' && !f.fin);
   check('range détecté : « le prix est dedans »', f0 && G.etatForme(f0).cle === 'dedans', f0 && { haut: f0.haut, bas: f0.bas, etat: G.etatForme(f0) });
   const r1 = run([103.5]), f1 = r1.formes.find(f => f.type === 'range' && f.t === (f0 && f0.t));
-  check('1 clôture au-dessus : « sortie à confirmer (1/2 clôtures au-dessus) »', f1 && G.etatForme(f1).cle === 'demi' && /1\/2 clôtures au-dessus/.test(t(G.etatForme(f1).texte)), f1 && G.etatForme(f1));
+  check('1 clôture au-dessus : « sortie à valider (1/2 clôtures au-dessus) »', f1 && G.etatForme(f1).cle === 'demi' && /1\/2 clôtures au-dessus/.test(t(G.etatForme(f1).texte)), f1 && G.etatForme(f1));
   const r2 = run([103.5, 104]), f2 = r2.formes.find(f => f.type === 'range' && f.t === (f0 && f0.t));
   check('2 clôtures au-dessus : « sortie validée », objectif = borne + hauteur', f2 && G.etatForme(f2).cle === 'confirme' && Math.abs(f2.objectif - (f2.niveau + f2.hauteur)) < 1e-9, f2 && G.etatForme(f2));
 }
@@ -332,17 +333,21 @@ const d = 0.4;
   // le contrôle des mêmes comptes porte sur un type à extrêmes présent dans la fixture.)
   const exp = G.texteBilan(b.double_creux, { n: C.length, intervalle: '15m', duree: C.length * 900 }, P, 'expert'), deb = G.texteBilan(b.double_creux, { n: C.length, intervalle: '15m', duree: C.length * 900 }, P, 'debutant');
   t(exp); t(deb);
-  check('bilan : mêmes comptes en débutant et en expert, « mesuré » dit dans les deux', exp.includes(b.double_creux.confirmes + ' conf.') && deb.includes(String(b.double_creux.confirmes)) && /Mesuré sur l’historique chargé/.test(deb) && /^Mesuré · /.test(exp), { exp, deb });
+  check('bilan : mêmes comptes en débutant et en expert, « mesuré » dit dans les deux', exp.includes(b.double_creux.confirmes + ' valid.') && deb.includes(String(b.double_creux.confirmes)) && /Mesuré sur l’historique chargé/.test(deb) && /^Mesuré · /.test(exp), { exp, deb });
   const td = G.texteBilan(b.double_creux, { n: C.length, intervalle: '15m', duree: C.length * 900 }, P, 'debutant');
   check('bilan débutant : formes repérées, issues, et le repère sans forme en comptes (aucun %)', /repérés?/.test(t(td)) && (!b.double_creux.confirmes || /Repère sans forme/.test(td)) && !/%/.test(td), td);
   // Débutant : la phrase du cahier des charges d'abord, courte (une bulle de téléphone la lit).
   const bx = { type: 'double_sommet', formes: 31, confirmes: 14, atteints: 6, invalides: 7, expires: 1, ouverts: 0, temoin: { departs: 4614, atteints: 2335 } };
   const tb = t(G.texteBilan(bx, { n: 2980, intervalle: '15m', duree: 31 * 86400 }, P, 'debutant'));
-  check('bilan débutant : « Sur les 2 980 dernières bougies 15 min (31 j) : 14 … confirmés …, objectif théorique atteint 6 fois avant invalidation … Échantillon faible. » — court', /sur les 2 980 dernières bougies 15 min \(31 j\) : 14 doubles sommets confirmés/.test(tb)
+  check('bilan débutant : « Sur les 2 980 dernières bougies 15 min (31 j) : 14 … validés …, objectif théorique atteint 6 fois avant invalidation … Échantillon faible. » — court', /sur les 2 980 dernières bougies 15 min \(31 j\) : 14 doubles sommets validés/.test(tb)
     && /objectif théorique atteint 6 fois avant invalidation/.test(tb) && /2 335 fois sur 4 614/.test(tb) && /Échantillon faible\.$/.test(tb) && tb.split(' ').length <= 60, [tb.split(' ').length, tb]);
   const ec = t(G.texteBilan(bx, { n: 2980, intervalle: '15m', duree: 31 * 86400 }, P, 'expertCourt'));
-  // (Plan figures, amendement D1 : libellé ≤ 80 caractères, « mesuré {conf}/{repérées} conf., obj. {a}/{finies} ».)
-  check('étiquette expert : les comptes et « éch. faible » d’abord (une coupure en bout de ligne n’ôte que la durée)', /^mesuré 14\/31 conf\., obj\. 6\/14 · éch\. faible/.test(ec), ec);
+  // (Plan figures, amendement D1 : libellé ≤ 80 caractères, « mesuré {validés}/{repérées} valid., obj. {a}/{finies} ».)
+  check('étiquette expert : les comptes et « éch. faible » d’abord (une coupure en bout de ligne n’ôte que la durée)', /^mesuré 14\/31 valid\., obj\. 6\/14 · éch\. faible/.test(ec), ec);
+  // Un double devenu triple ne peut plus être validé : il sort du dénominateur de l'étiquette,
+  // comme la bulle le dit (« dont N devenus triples »).
+  const ec4 = t(G.texteBilan(Object.assign({}, bx, { devenusTriples: 4 }), { n: 2980, intervalle: '15m', duree: 31 * 86400 }, P, 'expertCourt'));
+  check('étiquette expert : les doubles devenus triples hors du dénominateur (« mesuré 14/27 valid. » pour 31 repérés dont 4 devenus triples)', /^mesuré 14\/27 valid\./.test(ec4), ec4);
   // Une forme dont le début est sorti à gauche de la vue, mais dont le dernier pivot est dedans : montrée.
   const vive = tout.formes.find(f => !f.doublon && f.t - P.pivot - f.debut >= 2);
   if (vive) {
@@ -380,7 +385,7 @@ titre('6. Et ensuite ? et lecture du moment : des niveaux nommés, aucune direct
   check('élisions : du, des, d’un, d’une, d’', G.deArt('le zéro gamma') === 'du zéro gamma' && G.deArt('un mur') === 'd’un mur' && G.deArt('une zone') === 'd’une zone' && G.deArt('les murs') === 'des murs');
   // Niveaux publiés : la phrase et les chemins disent l'heure de lecture et « modèle ».
   const md = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'contre', 'publication.json'), 'utf8'));
-  const pub = G.niveauxPublies(md), hm = md.liquidity.snapshot_at.slice(11, 16);
+  const pub = G.niveauxPublies(md), hm = Fm.heure(Date.parse(md.liquidity.snapshot_at));   // heure de l'appareil
   const zg = pub.find(r => r.cle === 'zero_gamma'), pw = pub.find(r => r.cle === 'put_wall'), mur = pub.find(r => r.cle === 'mur_achat');
   const unNiv = r => ({ p: r.p, pMin: r.p, pMax: r.p, raisons: [r] });
   const lp = t(G.lecture({ prix: Math.max(zg.p, pw.p) + 50, unite: '$', choix: { dessus: [], dessous: [unNiv(pw), unNiv(zg)] }, regime: null }));
@@ -408,7 +413,11 @@ titre('6. Et ensuite ? et lecture du moment : des niveaux nommés, aucune direct
   vs.forEach(x => { t(x[2].join(' ')); t(x[3].join(' ')); });
   check('chaque variante d’un chemin garde la condition (« Si clôture … », « si > … », « si < … »)', vs.every(x => /^(Si clôt|si [<>])/.test(x[2][0]) && /^(Si clôt|si [<>])/.test(x[3][0])), vs.map(x => x[2][0]));
   const mini = G.texteSuite(sd.bas, 'debutant', '$', '15m', P, 'mini');
-  check('variante mini : l’heure d’un chiffre publié collée à CE chiffre (« si < 81 670 (21:03) → 80 394 »), pas au niveau suivant', mini[0] === 'si < 81 670 (21:03)' && mini[1] === '→ 80 394', mini);
+  const h2103 = Fm.heure(Date.UTC(2026, 9, 8, 21, 3));   // la lecture du mur, à l'heure de l'appareil
+  // Les noms exportés que js/app.js fait suivre de « UTC » ou « heure de Paris » gardent leur sens exact.
+  check('noms exportés pour la page : heureUTC = l’heure UTC (« 21:03 »), heureParis = l’heure de Paris (« 23h03 ») ; les textes du Guide n’en usent pas', G.heureUTC(Date.UTC(2026, 9, 8, 21, 3)) === '21:03' && G.heureParis(Date.UTC(2026, 9, 8, 21, 3)) === '23h03' && G.heureParis(NaN) === null
+    && !/\bheureUTC\(|\bheureParis\(/.test(fs.readFileSync(path.join(REPO, 'js/guide.js'), 'utf8')));
+  check(`variante mini : l’heure d’un chiffre publié collée à CE chiffre (« si < 81 670 (${h2103}) → 80 394 »), pas au niveau suivant`, mini[0] === 'si < 81 670 (' + h2103 + ')' && mini[1] === '→ 80 394', mini);
   const aucun = ['plein', 'court', 'mini'].map(v => G.texteSuite(null, 'debutant', '$', '15m', P, v, -1).join(' '));
   aucun.forEach(t);
   check('côté sans niveau nommé : dit dans chaque variante', aucun.every(x => /aucun niveau/.test(x)), aucun);
@@ -419,7 +428,7 @@ titre('6. Et ensuite ? et lecture du moment : des niveaux nommés, aucune direct
   check('forme invalidée il y a 17 bougies 1 jour : « a été invalidé il y a 17 bougies 1 jour (21/09) » ; la veille : « vient d’être invalidé »', p17 === 'un double sommet a été invalidé il y a 17 bougies 1 jour (21/09)' && /vient d’être invalidé/.test(p1), [p17, p1]);
   // Lecture compacte (téléphone) : les prix et leurs heures, la compression dite.
   const lc = t(G.lecture({ prix: 81686, unite: '$', choix: choixDans, enTest: bande, regime: { cle: 'baisse', compression: true }, forme: null, court: true, compact: true }));
-  check('lecture compacte : « Prix 81 686 $ dans la bande 81 670 (lu à 21:03) – 81 891 $. Volatilité comprimée. »', lc === 'Prix 81 686 $ dans la bande 81 670 (lu à 21:03) – 81 891 $. Volatilité comprimée.', lc);
+  check(`lecture compacte : « Prix 81 686 $ dans la bande 81 670 (lu à ${h2103}) – 81 891 $. Volatilité comprimée. »`, lc === 'Prix 81 686 $ dans la bande 81 670 (lu à ' + h2103 + ') – 81 891 $. Volatilité comprimée.', lc);
   check('lecture courte (sans le sens du régime) : la compression reste dite', /volatilité comprimée/i.test(G.lecture({ prix: 81500, unite: '$', choix: choixDans, regime: { cle: 'baisse', compression: true }, court: true })));
 }
 
@@ -525,9 +534,13 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     const enT = s1.dessus, court = [];
     for (const cle of ['hausse', 'baisse', 'faible', 'incertaine']) court.push([cle, G.phraseDebutant({ prix: 86120, unite: '$', reperes: s1, enTest: enT, regime: { cle }, itv: '15m' }, DEB.phraseEtroit)]);
     check('phrase au téléphone, prix dans un repère : le verbe du mouvement reste (« Depuis 3 h, le prix monte et touche 86 133 $. »)', court.every(([cle, t]) => t.length <= DEB.phraseEtroit && t.includes(G.VERBE_DEBUTANT[cle]) && /touche/.test(t)), court);
-    // Sur 1 jour, durée + « touche » ne tiennent pas en 48 : la durée reste, le prix touché part.
-    const jour = ['hausse', 'baisse'].map(cle => G.phraseDebutant({ prix: 86120, unite: '$', reperes: s1, enTest: enT, regime: { cle }, itv: '1d' }, DEB.phraseEtroit));
-    check('téléphone, 1 jour, prix dans un repère : « Sur 2 semaines, le prix monte. » (la durée avant le prix touché)', jour[0] === 'Sur 2 semaines, le prix monte.' && jour[1] === 'Sur 2 semaines, le prix baisse.', jour);
+    // Sur 1 jour, quand durée + « touche » ne tiennent pas : la durée reste, le prix touché part.
+    // (« Sur 14 jours » est plus court que l'ancien « Sur 2 semaines » : la phrase entière tient
+    // en 48 ; la priorité se vérifie sous la longueur de la phrase entière, à 46.)
+    const jour = ['hausse', 'baisse'].map(cle => G.phraseDebutant({ prix: 86120, unite: '$', reperes: s1, enTest: enT, regime: { cle }, itv: '1d' }, 46));
+    const jour48 = ['hausse', 'baisse'].map(cle => G.phraseDebutant({ prix: 86120, unite: '$', reperes: s1, enTest: enT, regime: { cle }, itv: '1d' }, DEB.phraseEtroit));
+    check('téléphone, 1 jour, prix dans un repère : « Sur 14 jours, le prix monte. » (la durée avant le prix touché) ; en 48, la phrase entière', jour[0] === 'Sur 14 jours, le prix monte.' && jour[1] === 'Sur 14 jours, le prix baisse.'
+      && jour48.every(x => x.length <= DEB.phraseEtroit && x.indexOf('Sur 14 jours, ') === 0 && /touche 86 133 \$\.$/.test(x)), jour.concat(jour48));
   }
   // 3. La phrase : un verbe, ni %, ni heure, ni nom d'indicateur ; « hésite » seulement sans tendance.
   const haut = N(Rd('hier_haut', 86398)), bas = N(Rd('mur_achat', 85900));
@@ -561,8 +574,13 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
       const e = G.phraseDebutant(o, DEB.phraseEtroit), l = G.phraseDebutant(o, DEB.phrase);
       duree.push({ itv, cle, e, l, ok: e.length <= DEB.phraseEtroit && [G.HORIZON_DEBUTANT[itv], G.HORIZON_COURT[itv]].some(h => e.indexOf(h + ', ') === 0) && l.indexOf(G.HORIZON_DEBUTANT[itv] + ', ') === 0 && e.includes(G.VERBE_DEBUTANT[cle]) });
     }
-    check('téléphone (48) : « Depuis 3 h, le prix monte. Au-dessus : 86 398 $. » — un sens garde toujours sa durée, sur chaque intervalle', duree.every(x => x.ok)
-      && duree.some(x => x.e === 'Depuis 3 h, le prix monte. Au-dessus : 86 398 $.'), duree.filter(x => !x.ok).slice(0, 4));
+    check('téléphone (48) : « Sur 3 h 30, le prix monte. Au-dessus : 86 398 $. » — un sens garde toujours sa durée, sur chaque intervalle', duree.every(x => x.ok)
+      && duree.some(x => x.e === 'Sur 3 h 30, le prix monte. Au-dessus : 86 398 $.'), duree.filter(x => !x.ok).slice(0, 4));
+    // La durée courte est celle que dit la bulle de la phrase (« sur les 14 derniers quarts d'heure
+    // (environ 3 h 30) ») : PARAM.adx.periode bougies, environ (incohérence 96 : « Depuis 3 h »).
+    const PAS = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 }, nAdx = dansPage('PARAM.adx.periode');
+    const ecartH = Object.keys(PAS).filter(k => G.HORIZON_COURT[k].replace(/^(Sur|Depuis) /, '') !== String(G.environ(nAdx * PAS[k])).replace(/^environ /, '')).map(k => [k, G.HORIZON_COURT[k], G.environ(nAdx * PAS[k])]);
+    check('durées courtes = environ(PARAM.adx.periode × pas), la durée de la bulle, sur chaque intervalle ; jamais « Depuis » devant des heures et minutes', !ecartH.length && Object.keys(PAS).every(k => G.HORIZON_COURT[k]) && !Object.values(G.HORIZON_COURT).some(h => /^Depuis \d+ h \d/.test(h)), ecartH);
     const Hs = Object.values(G.HORIZON_COURT).filter(h => G.motsBannis(h).length || h.length > 14);
     check('durées courtes : ≤ 14 caractères, sans mot banni (« 3 h », jamais « 3h »)', !Hs.length, Hs);
   }
@@ -586,17 +604,26 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     check('zone de retour : « Zone de retour · 82 681 $ » (26), « Retour 82 681 $ » (18), jamais « Demi-tour »', Z[0] === 'Zone de retour · 82 681 $' && Z[1] === 'Retour 82 681 $' && !JSON.stringify(G.NOMS_DEBUTANT).includes('Demi-tour')
       && t(G.libelleDebutant(Object.assign({}, z, { raisons: [Rd('sr', 749.15)] }), { max: DEB.niveau, unite: 'SOL' })) === 'Zone retour · 749,15 SOL', Z);
   }
-  // 4. La forme : confirmée, invalidée, et aussi pendant qu'elle se dessine (« possible », « Prix
-  //    dans un … », « à confirmer ») ; ≤ 26 caractères. (Plan figures §5.3 et amendement C6 : une
+  // 4. La forme : validée, invalidée, et aussi pendant qu'elle se dessine (« possible », « Prix
+  //    dans un … », « à valider ») ; ≤ 26 caractères. (Plan figures §5.3 et amendement C6 : une
   //    figure invalidée porte « ✗ » ; la cible atteinte et la figure sans suite sont nommées.)
   const fo = [['double_sommet', { phase: 'confirme', sens: -1 }], ['double_creux', { fin: 'invalide', sens: 1 }], ['triangle_symetrique', { phase: 'confirme', sens: 1 }], ['range', { phase: 'confirme', sens: -1 }],
     ['double_sommet', {}], ['triangle_symetrique', { demi: true, demiSens: 1 }], ['range', {}], ['double_creux', { demi: true }], ['double_sommet', { fin: 'atteint' }], ['triangle_symetrique', { fin: 'expire_avant' }]]
     .map(([type, e]) => [type, t(G.libelleFormeDebutant(Object.assign({ type, sens: 1 }, e)) || '') || null]);
   // (Changé exprès : le côté d'une sortie se dit en mots, jamais par une flèche seule ; le nom reste.)
-  check('forme : « Double sommet confirmé », « ✗ Double creux invalidé », « Triangle : sortie en haut », « Rectangle : sortie en bas » ; en train de se dessiner : « Double sommet possible », « Triangle : sort en haut ? », « Prix dans un rectangle », « Double creux à confirmer » ; issues : « Double sommet : cible ✓ » (la forme longue dépasse : le nom reste — changé exprès, revue des figures 2), « Triangle sans suite »',
-    fo[0][1] === 'Double sommet confirmé' && fo[1][1] === '✗ Double creux invalidé' && fo[2][1] === 'Triangle : sortie en haut' && fo[3][1] === 'Rectangle : sortie en bas'
-    && fo[4][1] === 'Double sommet possible' && fo[5][1] === 'Triangle : sort en haut ?' && fo[6][1] === 'Prix dans un rectangle' && fo[7][1] === 'Double creux à confirmer'
-    && fo[8][1] === 'Double sommet : cible ✓' && fo[9][1] === 'Triangle sans suite' && fo.every(([, l]) => !l || l.length <= DEB.forme) && !fo.some(([, l]) => /[↑↓]/.test(l || '')), fo);
+  check('forme : « Double sommet validé », « ✗ Double creux invalidé », « Triangle : sortie en haut », « Rectangle : sortie en bas » ; en train de se dessiner : « Double sommet possible », « Triangle : sort en haut ? », « Prix dans un rectangle », « Double creux à valider » ; issues : « Double sommet : cible ✓ » (la forme longue dépasse : le nom reste — changé exprès, revue des figures 2), « ○ Triangle sans suite »',
+    fo[0][1] === 'Double sommet validé' && fo[1][1] === '✗ Double creux invalidé' && fo[2][1] === 'Triangle : sortie en haut' && fo[3][1] === 'Rectangle : sortie en bas'
+    && fo[4][1] === 'Double sommet possible' && fo[5][1] === 'Triangle : sort en haut ?' && fo[6][1] === 'Prix dans un rectangle' && fo[7][1] === 'Double creux à valider'
+    && fo[8][1] === 'Double sommet : cible ✓' && fo[9][1] === '○ Triangle sans suite' && fo.every(([, l]) => !l || l.length <= DEB.forme) && !fo.some(([, l]) => /[↑↓]/.test(l || '')), fo);
+  {
+    // Une marque par issue (incohérence 119) : ✗ seulement pour une figure invalidée ou annulée ;
+    // « – » pour un délai écoulé après la validation ; « ○ » pour une figure restée sans suite.
+    const issue = (fin, e) => G.libelleFormeDebutant(Object.assign({ type: 'double_sommet', sens: -1, fin }, e || {})) || '';
+    const L = { invalide: issue('invalide'), invalide_avant: issue('invalide_avant'), abandon: issue('abandon', { ebauche: true }), expire: issue('expire'), expire_avant: issue('expire_avant') };
+    check('une marque par issue : ✗ invalidée / annulée, « – » délai écoulé, « ○ » sans suite ; jamais ✗ pour une figure qui n’a pas été défaite', /^✗ /.test(L.invalide) && /^✗ /.test(L.invalide_avant) && /^✗ .*annulé/.test(L.abandon)
+      && /^– /.test(L.expire) && !/✗/.test(L.expire) && /^○ .*sans suite/.test(L.expire_avant) && !/✗/.test(L.expire_avant)
+      && G.MARQUES_FIN.invalide === '✗' && G.MARQUES_FIN.abandon === '✗' && G.MARQUES_FIN.expire === '–' && G.MARQUES_FIN.expire_avant === '○' && !('atteint' in G.MARQUES_FIN), L);
+  }
   // 4 bis. La bulle d'une figure qui se dessine : ce qu'on voit, ce qui la validerait (2 périodes
   // finies de suite), ce qui l'annulerait, sa cible conditionnelle (« cible théorique … non
   // garantie »), toujours avec le bilan mesuré ; mots du Débutant seulement. (Plan figures §9.3 :
@@ -611,8 +638,8 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     const ec = [[ds, '15m'], [dc, '1h'], [rg, '15m'], [tr, '4h']].map(([f, itv]) => t(G.texteFormeDebutant(f, b, { duree: 5 * 86400, itv, j: 41 }, P, '$').join(' ')));
     check('en train de se dessiner : « Double sommet possible : le prix a buté deux fois entre 86 350 et 86 400 $. La figure serait validée si le prix finit 2 quarts d’heure de suite sous 85 700 $ (le creux entre les sommets). »',
       /^Double sommet possible : le prix a buté deux fois entre 86 350 et 86 400 \$\. La figure serait validée si le prix finit 2 quarts d’heure de suite sous 85 700 \$ \(le creux entre les sommets\)\./.test(ec[0]), ec[0]);
-    check('… à confirmer : « s’il finit encore une heure au-dessus, la figure sera validée » ; rectangle : « entre 82 900 et 83 500 $ » ; sortie : « s’il revient franchement dedans, la sortie ne compte pas »',
-      /^Double creux à confirmer : .*s’il finit encore une heure au-dessus, la figure sera validée\./.test(ec[1]) && /Prix dans un rectangle : il fait des allers-retours entre 82 900 et 83 500 \$/.test(ec[2])
+    check('… à valider : « s’il finit encore une heure au-dessus, la figure sera validée » ; rectangle : « entre 82 900 et 83 500 $ » ; sortie : « s’il revient franchement dedans, la sortie ne compte pas »',
+      /^Double creux à valider : .*s’il finit encore une heure au-dessus, la figure sera validée\./.test(ec[1]) && /Prix dans un rectangle : il fait des allers-retours entre 82 900 et 83 500 \$/.test(ec[2])
       && /^Triangle qui se resserre : .*Le prix vient de sortir par le bas \(.*s’il revient franchement dedans, la sortie ne compte pas\./.test(ec[3]), ec);
     check('… toujours la cible théorique (« non garantie ») avec le bilan mesuré, l’annulation dite pour les doubles, jamais « vise », aucun mot banni, aucun conseil, « pas une prévision ni un conseil »',
       ec.every(x => /Mesuré sur/.test(x) && /cibles? théoriques? selon l’usage des analystes : \d/.test(x) && /non garanties?/.test(x) && !/vise/.test(x) && !G.motsBannis(x).length && !CONSEIL.test(x.replace('pas une prévision ni un conseil', '')) && /pas une prévision ni un conseil/.test(x))

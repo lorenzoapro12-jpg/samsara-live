@@ -4542,7 +4542,10 @@ function guideCtxFigures() {
 }
 /** Le style d'une figure (plan §5.1) : tirets, épaisseur, alpha des traits et de l'aplat. Une
  *  figure finie s'efface au fil des bougies closes (base × (1 − âge / (garder + 1)), plancher
- *  0,15) ; l'âge ne change qu'à une clôture : rien à redessiner entre deux. */
+ *  0,15) ; l'âge ne change qu'à une clôture : rien à redessiner entre deux.
+ *  marque : celle de son issue, la même que dans ses mots (Guide.MARQUES_FIN) — la croix n'est
+ *  dessinée que pour une figure invalidée ou annulée (✗), jamais pour un délai écoulé (–) ni une
+ *  figure sans suite (○), que leurs libellés disent. */
 function guideStyleFigure(f, jClos, mode) {
   const G = PARAM.guide;
   if (f.fin) {
@@ -4551,8 +4554,9 @@ function guideStyleFigure(f, jClos, mode) {
     const k = 1 - age / (garder + 1), base = f.fin === 'atteint' ? 0.35 : 0.75;
     const a = Math.max(0.15, base * k);
     // k : la part qui reste (1 à la chute) ; le libellé pâlit avec le tracé (plancher lisible, 0,45).
+    const marque = Guide.MARQUES_FIN[f.fin] || null;
     return f.fin === 'atteint' ? { dash: [], lw: 1.6, a, aplat: 0.03 * a / base, age, k }
-      : { dash: [2, 3], lw: 1.4, a, aplat: 0.03 * a / base, croix: true, age, k };
+      : { dash: [2, 3], lw: 1.4, a, aplat: 0.03 * a / base, croix: marque === '✗', marque, age, k };
   }
   if (f.ebauche) return { dash: [3, 3], lw: 1.4, a: 0.55, aplat: 0.04, age: 0 };
   if (f.phase === 'confirme') return { dash: [], lw: 1.8, a: 0.75, aplat: 0.09, age: 0 };
@@ -5063,7 +5067,9 @@ function guideDebutant(E) {
 /** Débutant : ce que la page a RÉELLEMENT dessiné, par série (symbole · intervalle) : l'identité
  *  de la figure dessinée à chaque clôture (parJ) et à la dernière image (dernier). Guide.formesDebutant
  *  le lit : on ne barre (✗) que ce qui a été vu, la figure dessinée garde sa place tant qu'elle vit.
- *  Mémoire de page (rien de stocké) ; bornée aux 200 dernières clôtures. */
+ *  Clôtures et identités sont des DATES de bougie (Guide.idFigure avec les heures) : l'arrivée des
+ *  pages anciennes, ajoutées au début, décale les indices, pas les dates. Mémoire de page (rien de
+ *  stocké) ; bornée aux 200 dernières clôtures notées. */
 const DEB_FIGURES = new Map();
 function debMemoFigures() {
   const cle = activeSymbol + '|' + chartInterval;
@@ -5072,15 +5078,15 @@ function debMemoFigures() {
   return m;
 }
 function debNoterFigure(id) {
-  const R = GUIDE_FORMES.val;
-  if (!R) return;
-  const m = debMemoFigures(), j = R.n - 1;
-  m.parJ.set(j, id); m.dernier = id;
-  for (const q of m.parJ.keys()) if (q < j - 200) m.parJ.delete(q);
+  const R = GUIDE_FORMES.val, t = cols().time[R ? R.n - 1 : -1];
+  if (!R || !isNum(t)) return;
+  const m = debMemoFigures();
+  m.parJ.set(t, id); m.dernier = id;
+  for (const q of m.parJ.keys()) { if (m.parJ.size <= 200) break; m.parJ.delete(q); }
 }
 /** La liste ordonnée des figures du Débutant pour la vue [vs, ve). */
 function debFormesListe(vs, ve) {
-  return GUIDE_FORMES.val ? Guide.formesDebutant(GUIDE_FORMES.val, PARAM.guide, vs, ve, debMemoFigures()) : [];
+  return GUIDE_FORMES.val ? Guide.formesDebutant(GUIDE_FORMES.val, PARAM.guide, vs, ve, debMemoFigures(), cols().time) : [];
 }
 /** Débutant : UNE figure (debFormesListe : la figure déjà dessinée d'abord, puis rang et dernier
  *  point). On prend la première dont le libellé trouve sa place ; la figure dessinée à l'image d'avant
@@ -5099,10 +5105,10 @@ function guideFormesDebutant(E) {
     if (!t || t.length > P.forme) return;
     // La 1re de la liste, si c'est celle déjà à l'écran ou une figure qui vient de tomber sous les
     // yeux du lecteur : dessinée, avec ou sans place pour son libellé.
-    const garder = k === 0 && (devenu || Guide.idFigure(f) === memo.dernier || (f.fin && f.jFin <= GUIDE_FORMES.val.n - 1));
+    const garder = k === 0 && (devenu || Guide.idFigure(f, cols().time) === memo.dernier || (f.fin && f.jFin <= GUIDE_FORMES.val.n - 1));
     if (guideFormeDebutant(E, f, t, garder)) fait = f;
   });
-  debNoterFigure(fait ? Guide.idFigure(fait) : null);
+  debNoterFigure(fait ? Guide.idFigure(fait, cols().time) : null);
 }
 /** La place du libellé d'une figure, près de ce qu'il nomme : contre la ligne qui la valide, du
  *  côté où le prix sortirait (une sortie à confirmer : de son côté ; un drapeau : contre la pause,
@@ -5195,11 +5201,12 @@ function guideFormeDebutant(E, f, t, garder) {
   E.debForme = entree;
   return true;
 }
-/** Le prix de la croix d'une figure tombée (le niveau qui l'a fait tomber). */
+/** Le prix de la croix d'une figure tombée : le NIVEAU qui l'a fait tomber (noté au journal), sinon
+ *  son niveau d'invalidation — jamais le prix de clôture, qui n'est pas un niveau de la figure. */
 function guideCroixPrix(f) {
   const ev = (f.journal || []).filter(x => x.j === f.jFin).pop() || {};
   return f.fin === 'abandon' ? (isNum(f.pAbandon) ? f.pAbandon : isNum(ev.p) ? ev.p : f.pend && f.pend.p) : isNum(ev.p) ? ev.p
-    : f.fin === 'expire_avant' && f.hautL ? (Guide.ligne(f.hautL, f.jFin) + Guide.ligne(f.basL, f.jFin)) / 2 : isNum(ev.c) ? ev.c : f.invalidation;
+    : f.fin === 'expire_avant' && f.hautL ? (Guide.ligne(f.hautL, f.jFin) + Guide.ligne(f.basL, f.jFin)) / 2 : f.invalidation;
 }
 /** L'échelle Débutant inclut la ligne qui valide la 1re figure candidate (amendement C5), bornée
  *  à la moitié de l'amplitude des bougies de chaque côté. → [lo, hi] ou null. */

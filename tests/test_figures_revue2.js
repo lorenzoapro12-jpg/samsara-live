@@ -189,6 +189,13 @@ titre('5. Mots : côté et prix de la ✗, mèche, cible, 1re clôture dehors, d
   const eb = { type: 'double_sommet', ebauche: true, s: -1, fin: 'abandon', jFin: 140, raison: 'depasse', pAbandon: 85100, abandonP: 85050, journal: [] };
   const tx = G.texteFormeExpert(fc, null, ctx, P, '$', { tombees: [lignes, eb] }).join(' ');
   check('Expert : « Invalidées récemment » ne cite que des figures ; les ébauches annulées ont leur ligne', /Invalidées récemment \(ce graphique\) : Biseau montant/.test(tx) && !/Invalidées récemment[^.]*ébauche/.test(tx) && /Ébauches annulées récemment \(jamais devenues des figures\) : Double sommet/.test(tx), tx);
+  // Une figure restée sans suite (sortie jamais validée) n'a pas été invalidée : elle a sa propre
+  // ligne, jamais sous « Invalidées récemment » (incohérence 120).
+  const ss = Object.assign({}, lignes, { fin: 'expire_avant' });
+  const tx2 = G.texteFormeExpert(fc, null, ctx, P, '$', { tombees: [lignes, ss, eb] }).join(' ');
+  const inv2 = (tx2.match(/Invalidées récemment \(ce graphique\) : [^.]*\./) || [''])[0];
+  check('Expert : une figure « sans suite » sous « Sans suite récemment », jamais sous « Invalidées récemment »', /Invalidées récemment \(ce graphique\) : Biseau montant/.test(tx2) && (inv2.match(/Biseau montant/g) || []).length === 1 && !/sans suite/.test(inv2)
+    && /Sans suite récemment \(ce graphique, sorties jamais validées\) : Biseau montant/.test(tx2), tx2);
 }
 
 // ── 6. Trait d'invalidation ──

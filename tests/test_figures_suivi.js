@@ -14,9 +14,11 @@
 //      « ce sera la 1re »), au lieu d'annoncer une invalidation à la prochaine clôture.
 //   6. Heures : sur 4 h et 1 j, une fin d'un autre jour porte sa date (Débutant « le 7 à … », « hier à
 //      … » ; Expert jj/mm) ; les heures du jour restent courtes ; le journal 1 j ne montre pas « 00:00 ».
+//      Toutes à l'heure de l'appareil (Fmt.heure), sans « UTC » ni « heure de Paris ».
 //   7. « Récemment tombées » : bornées dans le temps (horizon).
 //   8. Débutant : on ne barre (✗) que la figure dessinée à la clôture d'avant son issue (mémoire de
-//      page) ; une figure jamais dessinée ne revient pas barrée ; la figure dessinée garde sa place.
+//      page) ; une figure jamais dessinée ne revient pas barrée ; la figure dessinée garde sa place ;
+//      la mémoire tient par les DATES des bougies : l'historique ancien ajouté au début ne la fausse pas.
 //   9. Libellés Débutant vivants : tous gardent le nom de la figure, ≤ PARAM.guide.debutant.forme,
 //      sans mot banni.
 //  10. PAGE (Chromium) : clôture après clôture dans une même page, la figure dessinée qui tombe est
@@ -28,6 +30,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm'), http = require('http'), { execFileSync } = require('child_process');
 const REPO = path.resolve(__dirname, '..');
 const G = require(path.join(REPO, 'js/guide.js'));
+const Fm = require(path.join(REPO, 'js/format.js'));
 const { chargerPage } = require('./bac');
 
 let ko = 0;
@@ -158,11 +161,11 @@ titre('6. Heures : la date quand l’instant n’est pas aujourd’hui');
     const temps = T.map((_, i) => t0 + i * pas), fin = (temps[f.jFin] + pas) * 1000;
     const ctx = { n: f.jFin + 30, j: f.jFin + 30, intervalle: nomItv, temps, pas, horizon: P.horizon, maintenant: fin + 5 * 86400000 };
     const d = G.marqueFin(f, ctx, 'debutant', '$'), e = G.marqueFin(f, ctx, 'expert', '$'), jr = new Date(fin).toISOString();
-    const jour = String(+G.quandParis(fin, ctx.maintenant).replace(/^le (\d+).*$/, '$1'));
-    check(`${nomItv}, 5 jours après : Débutant « Invalidé le ${jour} à … (heure de Paris) »`, /^Invalidé le \d+ à \d\dh\d\d \(heure de Paris\)/.test(d), d.slice(0, 80));
-    check(`${nomItv}, 5 jours après : Expert porte la date ${jr.slice(8, 10)}/${jr.slice(5, 7)}`, e.includes(jr.slice(8, 10) + '/' + jr.slice(5, 7)), e.slice(0, 80));
+    const jour = String(new Date(fin).getDate()), hFin = Fm.heure(fin);
+    check(`${nomItv}, 5 jours après : Débutant « Invalidé le ${jour} à ${hFin} » (heure de l’appareil, sans fuseau écrit)`, d.indexOf('Invalidé le ' + jour + ' à ' + hFin + ' :') === 0 && !/UTC|Paris/.test(d + e), d.slice(0, 80));
+    check(`${nomItv}, 5 jours après : Expert porte la date ${Fm.jour(fin)}`, e.includes(Fm.jour(fin)), e.slice(0, 80));
     const hier = G.marqueFin(f, Object.assign({}, ctx, { maintenant: fin + 86400000 }), 'debutant', '$');
-    check(`${nomItv}, le lendemain : « hier à … » ou la date`, /^Invalidé (hier à|le \d+ à) \d\dh\d\d/.test(hier), hier.slice(0, 60));
+    check(`${nomItv}, le lendemain : « hier à ${hFin} » ou la date`, (hier.indexOf('Invalidé hier à ' + hFin + ' :') === 0 || hier.indexOf('Invalidé le ' + jour + ' à ' + hFin + ' :') === 0) && !/UTC|Paris/.test(hier), hier.slice(0, 60));
     if (pas === 86400) {
       const ex = G.texteFormeExpert(f, R.bilan[f.type], ctx, P, '$');
       const tx = Array.isArray(ex) ? ex.join(' ') : String(ex);
@@ -171,7 +174,8 @@ titre('6. Heures : la date quand l’instant n’est pas aujourd’hui');
   }
   const ctxJour = { n: f.jFin + 2, j: f.jFin + 2, intervalle: '15m', temps: T, pas: 900, horizon: P.horizon, maintenant: (T[f.jFin] + 1800) * 1000 };
   const court = G.marqueFin(f, ctxJour, 'debutant', '$');
-  check('15 min, une demi-heure après : « Invalidé à HHhMM » sans date', /^Invalidé à \d\dh\d\d \(heure de Paris\)/.test(court), court.slice(0, 60));
+  const hCourt = Fm.heure((T[f.jFin] + 900) * 1000);
+  check(`15 min, une demi-heure après : « Invalidé à ${hCourt} » sans date ni fuseau`, court.indexOf('Invalidé à ' + hCourt + ' :') === 0 && !/UTC|Paris/.test(court), court.slice(0, 60));
 }
 
 // ── 7. Récemment tombées ──
@@ -203,12 +207,44 @@ titre('8. Débutant : on ne barre que ce qui a été dessiné');
   for (let j = 600; j < R.n - 1 && !garde; j += 11) {
     const Rn = Object.assign({}, R, { n: j + 1 }), L = G.formesDebutant(Rn, P, j + 2 - VUE, j + 2, {});
     const vivantes = L.filter(f => !f.fin || f.jFin > j);
-    if (vivantes.length >= 2 && G.rangFigure(vivantes[1], j) === G.rangFigure(vivantes[0], j)) {
+    if (vivantes.length >= 2 && G.rangFigure(vivantes[1], j, P) === G.rangFigure(vivantes[0], j, P)) {
       const id = G.idFigure(vivantes[1]), L2 = G.formesDebutant(Rn, P, j + 2 - VUE, j + 2, { parJ: new Map([[j - 1, id]]), dernier: id });
       garde = { ok: L2[0] === vivantes[1], j };
     }
   }
   check('une figure vivante déjà dessinée garde sa place devant une autre de même rang', garde && garde.ok, garde);
+  // L'historique ancien arrive APRÈS l'ouverture (pages ajoutées au début) : les indices des
+  // bougies se décalent de K, pas leurs dates. La mémoire du Débutant, notée par dates
+  // (Guide.idFigure avec les heures, parJ par heure de clôture), retient la même figure avant et
+  // après ; une identité par indice ne la retrouverait jamais (incohérence 126).
+  const K = 400, Ts = T.slice(K);
+  const Rs = G.detecter({ h: H.slice(K), l: L.slice(K), c: C.slice(K), atr: S.atr.slice(K), n: S.n - K }, P);
+  let essais = 0, pareil = 0, parIndice = 0;
+  const ecarts = [];
+  for (let j = K + 600; j < R.n - 1; j += 47) {
+    const avant = Object.assign({}, Rs, { n: j + 1 - K }), apres = Object.assign({}, R, { n: j + 1 });
+    const L0 = G.formesDebutant(avant, P, j + 2 - VUE - K, j + 2 - K, {}, Ts);
+    if (!L0.length) continue;
+    const id = G.idFigure(L0[0], Ts), memo = { parJ: new Map([[Ts[j - 1 - K], id]]), dernier: id };
+    const L1 = G.formesDebutant(apres, P, j + 2 - VUE, j + 2, memo, T);
+    essais++;
+    if (L1.length && G.idFigure(L1[0], T) === id) pareil++; else if (ecarts.length < 3) ecarts.push({ j, avant: id, apres: L1[0] ? G.idFigure(L1[0], T) : null });
+    if (L1.length && G.idFigure(L0[0]) === G.idFigure(L1[0])) parIndice++;
+  }
+  check(`historique ajouté au début (${K} bougies) : la figure dessinée reste la même à ${essais} clôtures (identité par date) ; par indice, elle ne se retrouverait jamais`, essais >= 10 && pareil === essais && parIndice === 0, { essais, pareil, parIndice, ecarts });
+  // Une figure tombée, dessinée à la clôture d'avant sa chute, notée par date : barrée dans les deux repères d'indices.
+  let casT = null;
+  for (const f of R.formes.filter(x => (x.fin === 'invalide' || x.fin === 'invalide_avant') && x.jFin > K + 600)) {
+    const j = f.jFin, id = G.idFigure(f, T), memo = { parJ: new Map([[T[j - 1], id]]), dernier: id };
+    if (G.formesDebutant(Object.assign({}, R, { n: j + 1 }), P, j + 2 - VUE, j + 2, memo, T)[0] === f) { casT = { f }; break; }
+  }
+  check('une figure tombée dessinée la clôture d’avant trouvée après les ' + K + ' premières bougies', !!casT);
+  if (casT) {
+    const cas = casT, j = cas.f.jFin, id = G.idFigure(cas.f, T), memo = { parJ: new Map([[T[j - 1], id]]), dernier: id };
+    const Lf = G.formesDebutant(Object.assign({}, R, { n: j + 1 }), P, j + 2 - VUE, j + 2, memo, T);
+    const Ls = G.formesDebutant(Object.assign({}, Rs, { n: j + 1 - K }), P, j + 2 - VUE - K, j + 2 - K, memo, Ts);
+    check('… une figure tombée sous les yeux reste barrée, avant comme après l’arrivée de l’historique', Lf[0] === cas.f && Ls.length > 0 && G.idFigure(Ls[0], Ts) === id && Ls[0].fin === cas.f.fin, [Lf[0] && G.idFigure(Lf[0], T), Ls[0] && G.idFigure(Ls[0], Ts), id]);
+  }
 }
 
 // ── 9. Libellés vivants ──
@@ -284,7 +320,9 @@ const derouler = (page, i0, i1) => page.evaluate(([K, i0, i1]) => {
     if (x && !x.pose) out.sansLibelle++;
     if (prev && prev.f.fin && !['devenue', 'triple', 'devenu_triple'].includes(prev.f.fin) && prev.f.jFin === n - 1) {
       out.tombees++;
-      if (!(d === prev.f && (x.tr.croix || /✗|atteinte|sans suite/i.test(x.t) || prev.f.fin === 'atteint'))) { out.nonBarree++; if (out.ex.length < 4) out.ex.push({ i, tombee: prev.f.type + '/' + prev.f.fin, maintenant: d ? x.t : null }); }
+      const fin = prev.f.fin, defaite = ['invalide', 'invalide_avant', 'abandon'].includes(fin);
+      const marque = defaite ? !!x && x.tr.croix && /✗/.test(x.t) : fin === 'atteint' ? !!x && !x.tr.croix : fin === 'expire' ? !!x && !x.tr.croix && /^– /.test(x.t) : fin === 'expire_avant' ? !!x && !x.tr.croix && /^○ /.test(x.t) : false;
+      if (!(d === prev.f && marque)) { out.nonBarree++; if (out.ex.length < 4) out.ex.push({ i, tombee: prev.f.type + '/' + prev.f.fin, maintenant: d ? x.t : null }); }
     }
     if (d && d.fin && (!prev || prev.id !== id)) { out.barreeJamaisVue++; if (out.ex.length < 4) out.ex.push({ i, jamaisVue: d.type + '/' + d.fin }); }
     prev = d ? { f: d, id } : null;
