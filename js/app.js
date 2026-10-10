@@ -364,6 +364,12 @@ function guideNoter(on) { try { localStorage.setItem('samsara-guide-v1', on ? '1
 // de les masquer est gardé de la même façon (clé samsara-scenarios-v1).
 function scenariosMemorise() { try { return localStorage.getItem('samsara-scenarios-v1') !== '0'; } catch (e) { return true; } }
 function scenariosNoter(on) { try { localStorage.setItem('samsara-scenarios-v1', on ? '1' : '0'); } catch (e) { /* navigation privée */ } }
+// Les figures passées (plan §8), en Complet : 'non' (par défaut), 'validees' ou 'toutes'
+// (Guide.CHOIX_PASSEES) ; le choix est gardé d'une visite à l'autre (clé samsara-figures-passees-v1).
+// Le Lisible n'a pas de choix : une figure validée, quand la vue est dans le passé.
+const FIG_PASSEES_CLE = 'samsara-figures-passees-v1';
+function figuresPasseesMemorise() { try { const v = localStorage.getItem(FIG_PASSEES_CLE); return Guide.CHOIX_PASSEES.includes(v) ? v : 'non'; } catch (e) { return 'non'; } }
+let figuresPasseesChoix = figuresPasseesMemorise();
 const activeSubs = { vol: true, rsi: false, macd: false, stoch: false, atr: false, obv: false, mfi: false, williamsR: false, cci: false, adx: false, ao: false };
 const subHeights = { vol: 110, rsi: 120, macd: 120, stoch: 120, atr: 110, obv: 110, mfi: 120, williamsR: 120, cci: 120, adx: 120, ao: 110 };
 
@@ -645,6 +651,7 @@ function buildDropdown() {
     for (const cat of INDICATORS) {
       html += `<div class="cat-title" data-cat="${cat.cat}">${TITRES_CAT[cat.cat] || cat.cat}</div>`;
       for (const item of cat.items) html += ligneMenu(item, item.label, cat.cat, true);
+      if (cat.cat === 'Guide') html += ligneFiguresPassees();
     }
     html += '<p class="ind-aucun" hidden>Aucun indicateur ne correspond.</p>';
   }
@@ -660,6 +667,23 @@ function buildDropdown() {
   const filtre = document.getElementById('indFiltre');
   if (filtre && menuFiltre) { filtre.value = menuFiltre; filtrerMenu(menuFiltre); }
   menu.scrollTop = defile;
+}
+/** L'entrée « Figures passées » du Complet (plan §8) : une seule entrée, autonome (son HTML, son
+ *  choix, sa clé de stockage), qui se déplace telle quelle d'un menu à l'autre. Trois choix : non
+ *  (par défaut), les figures validées seulement, toutes (y compris celles tombées avant leur
+ *  validation) ; chacune garde sa marque d'issue et le compte de la vue est dit sur le graphique. */
+const CHOIX_PASSEES_MOTS = { non: 'non', validees: 'validées seulement', toutes: 'toutes, y compris celles tombées' };
+function ligneFiguresPassees() {
+  const options = Guide.CHOIX_PASSEES.map(v => `<option value="${v}"${v === figuresPasseesChoix ? ' selected' : ''}>${CHOIX_PASSEES_MOTS[v]}</option>`).join('');
+  const note = 'Les figures déjà finies, à leur place : ✓ cible atteinte, ✗ invalidée ou annulée, – délai écoulé, ○ sans suite. Des exemples, pas des prévisions.';
+  return `<label class="ind-passees" data-ind="figuresPassees" data-cat="Guide" data-cherche="${echapF('Figures passées anciennes figures chartistes exemples issue ' + note)}">`
+    + `<span>Figures passées</span><select id="figPassees" aria-label="Figures passées" onchange="choisirFiguresPassees(this.value)">${options}</select>`
+    + `<span class="tag tag-gd" title="${echapF(TITRES_CAT.Guide)}">GD</span><span class="ind-note">${echapF(note)}</span></label>`;
+}
+function choisirFiguresPassees(v) {
+  figuresPasseesChoix = Guide.CHOIX_PASSEES.includes(v) ? v : 'non';
+  try { localStorage.setItem(FIG_PASSEES_CLE, figuresPasseesChoix); } catch (e) { /* navigation privée */ }
+  drawChart();
 }
 /** Les raccourcis de la barre (Expert) : au survol, ce que c'est et comment s'en servir. */
 function titresBarre() {
@@ -1112,7 +1136,8 @@ canvas.addEventListener('dblclick', () => {
 // au même endroit la ferme.
 let bulleVue = null, bulleDetail = null;   // la clé de la bulle dessinée en résumé ; celle dont le détail est ouvert
 /** La clé d'une bulle : sa cible, d'une image à l'autre (les cibles sont refaites à chaque dessin). */
-const cleBulle = c => (c.scenario ? 's:' + c.scenario + ':' : '') + (c.figure ? 'f:' + c.figure.f.type + ':' + (c.figure.f.t0 != null ? c.figure.f.t0 : c.figure.f.t) + ':' : '') + c.titre;
+const cleBulle = c => (c.scenario ? 's:' + c.scenario + ':' : '') + (c.figure ? 'f:' + c.figure.f.type + ':' + (c.figure.f.t0 != null ? c.figure.f.t0 : c.figure.f.t) + ':' : '')
+  + (c.passee ? 'p:' + c.passee.id + ':' : '') + c.titre;
 function tapGraphique(clientX, clientY) {
   astuceCacher();
   const rect = canvas.getBoundingClientRect();
@@ -3937,8 +3962,12 @@ function resolveChart(candles, padL, padR, chartH, W) {
     // puis l'arbitrage du budget (la ligne des scénarios cède la dernière).
     if (guide) guideDebutant(guide);
     if (scen) scenTracer(scen);
+    // La figure passée (vue dans le passé) sous la figure en cours ; son libellé en dernier, s'il
+    // reste une place dans le budget des textes.
+    if (guide) guidePassees(guide);
     if (guide) guideFormesDebutant(guide);
     debArbitrer();
+    if (guide) guidePasseeLibelle(guide);
   } else {
     if (scen) scenAvantGuide(scen);
     if (guide) guideTracer(guide);
@@ -4358,6 +4387,8 @@ function guidePreparer(g) {
       mini: Guide.libelleNiveau(niv, mode, unite, 'mini'), micro: Guide.libelleNiveau(niv, mode, unite, 'micro') });
   }
   E.formes = exp ? Guide.formesAffichees(GUIDE_FORMES.val, G, g.vs, g.ve, 'expert') : debFormesListe(g.vs, g.ve);
+  // Les figures passées de la vue (plan §8), relues dans le rejeu : jamais une figure en cours.
+  E.passees = GUIDE_FORMES.val ? Guide.figuresPassees(GUIDE_FORMES.val, g.vs, g.ve, figuresPasseesChoix, exp ? 'expert' : 'debutant', { exclure: f => E.formes.includes(f) }) : null;
   E.formeQuand = guideFormeQuand(E.formes[0]);
   E.figures = []; E.ctxF = guideCtxFigures(); E.debForme = null;
   if (debutant()) {
@@ -4439,9 +4470,13 @@ function guideTracer(E) {
     return false;
   };
   ctx.font = chartFont(9, 600);
+  // Le compte des figures passées, quand le choix du menu les montre : sa place est gardée d'abord.
+  guidePasseesCompte(E);
   guideLibellesNiveaux(E, top, bas, surBougies);
   guideBords(E, top, bas);
   guideChemins(E, top, bas, surBougies);
+  // Les figures passées (plan §8), sous les figures en cours.
+  guidePassees(E);
   // Les figures (au plus formesMax) : une figure tombée reste lisible un moment avec sa marque ✗,
   // de plus en plus pâle (guideStyleFigure).
   for (const f of E.formes) guideForme(E, f, surBougies);
@@ -4744,13 +4779,21 @@ function guideFigureGeo(f, iFin, suit) {
     ? [[f.jConf, f.invalidation], [iFin, f.invalidation]] : null;
   return o;
 }
+/** Le style d'une figure PASSÉE (plan §8) : un contour léger, en points ronds, sans aplat, ses
+ *  points petits, et la marque de son issue (Guide.marqueIssue : ✓ cible atteinte, ✗ invalidée ou
+ *  annulée, – délai écoulé, ○ sans suite) bien lisible — jamais le style d'une figure en cours. */
+function guideStylePassee(f) {
+  const marque = Guide.marqueIssue(f);
+  return { dash: [0.1, 3.4], lw: 1.9, a: 0.6, aplat: 0, age: 0, marque, croix: marque === '✗', aMarque: 0.85, passee: true };
+}
 /** Trace une figure (graphique) dans le style de son état, le même pour les deux modes ; seuls
  *  l'épaisseur des traits (Débutant : la ligne qui valide est la plus marquée, le zigzag discret)
- *  et les étiquettes diffèrent. → { segs (survol), ys, xd, yd (dernier point), st, encre, geo } */
-function guideFigureTracer(E, f) {
+ *  et les étiquettes diffèrent. passee : une figure passée (guideStylePassee), un seul style de
+ *  trait pour toutes ses droites. → { segs (survol), ys, xd, yd (dernier point), st, encre, geo } */
+function guideFigureTracer(E, f, passee) {
   const { g, xDe: X, yDe: Y, deb } = E, R = GUIDE_FORMES.val, jClos = R.n - 1, G = PARAM.guide;
   const vivante = !f.fin, iFin = vivante ? candles.length - 1 : f.jFin;
-  const st = guideStyleFigure(f, jClos, deb ? 'debutant' : 'expert');
+  const st = passee ? guideStylePassee(f) : guideStyleFigure(f, jClos, deb ? 'debutant' : 'expert');
   // Le point en attente d'une ébauche suit la bougie en cours quand elle va plus loin que lui.
   let suit = null;
   if (vivante && f.ebauche && f.pend) {
@@ -4768,7 +4811,9 @@ function guideFigureTracer(E, f) {
   };
   ctx.save();
   ctx.beginPath(); ctx.rect(g.pad.left, g.pad.top, E.xMax - g.pad.left, g.ph); ctx.clip();
-  if (geo.aplat.length > 2) {
+  // Une figure passée : des points ronds (tirets de longueur nulle), jamais les tirets d'une figure en cours.
+  if (passee) ctx.lineCap = 'round';
+  if (geo.aplat.length > 2 && st.aplat > 0) {
     ctx.beginPath(); geo.aplat.forEach((q, k) => { const [x, y] = px(q); if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
     ctx.closePath(); ctx.fillStyle = avecAlpha(COLORS.ink1, st.aplat); ctx.fill();
   }
@@ -4776,11 +4821,14 @@ function guideFigureTracer(E, f) {
   // jusqu'à la bougie en cours ; le zigzag et les autres droites passent à 1 px, alpha 0,5.
   const mince = deb ? avecAlpha(COLORS.ink1, Math.min(0.5, st.a)) : encre;
   const fam = Guide.famille(f), mat = fam === 'drapeau';
-  for (const z of geo.zig) trait(z, deb ? 1 : mat ? 1.2 : st.lw, mat ? [2, 3] : deb ? (f.fin ? [2, 3] : []) : st.dash, mince);
-  for (const v of geo.valide) trait(v, st.lw, deb && !f.fin ? (f.phase === 'confirme' ? [] : [6, 3]) : st.dash, encre);
-  for (const v of geo.autres) trait(v, deb ? 1 : st.lw, deb && !f.fin ? [6, 3] : st.dash, mince);
+  if (passee) for (const v of geo.zig.concat(geo.valide, geo.autres)) trait(v, st.lw, st.dash, encre);
+  else {
+    for (const z of geo.zig) trait(z, deb ? 1 : mat ? 1.2 : st.lw, mat ? [2, 3] : deb ? (f.fin ? [2, 3] : []) : st.dash, mince);
+    for (const v of geo.valide) trait(v, st.lw, deb && !f.fin ? (f.phase === 'confirme' ? [] : [6, 3]) : st.dash, encre);
+    for (const v of geo.autres) trait(v, deb ? 1 : st.lw, deb && !f.fin ? [6, 3] : st.dash, mince);
+  }
   // L'invalidation d'une figure confirmée : un trait fin en tirets courts (ce qui la ferait tomber).
-  if (geo.inval) trait(geo.inval, 1.1, [3, 3], avecAlpha(COLORS.ink1, Math.min(0.6, st.a)));
+  if (geo.inval) trait(geo.inval, passee ? 1.3 : 1.1, passee ? st.dash : [3, 3], avecAlpha(COLORS.ink1, Math.min(0.6, st.a)));
   ctx.setLineDash([]);
   // Expert (amendement D3) : les droites d'une figure vivante prolongées de 8 bougies au plus dans
   // la marge de futur, dans le style de la figure, plus pâles ; un petit repère à la pointe.
@@ -4800,7 +4848,7 @@ function guideFigureTracer(E, f) {
       }
     }
   }
-  for (const q of geo.points) { const [x, y] = px(q); ys.push(y); ctx.beginPath(); ctx.arc(x, y, deb ? 3.5 : 3, 0, Math.PI * 2); ctx.fillStyle = encre; ctx.fill(); }
+  for (const q of geo.points) { const [x, y] = px(q); ys.push(y); ctx.beginPath(); ctx.arc(x, y, passee ? 2 : deb ? 3.5 : 3, 0, Math.PI * 2); ctx.fillStyle = encre; ctx.fill(); }
   for (const q of geo.petits) { const [x, y] = px(q); ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fillStyle = mince; ctx.fill(); }
   // Le point en attente : un cercle creux de 7 px.
   if (geo.creux && !f.fin) {
@@ -4810,19 +4858,22 @@ function guideFigureTracer(E, f) {
   }
   // La marque de son issue (Guide.MARQUES_FIN, la même que dans ses mots), sur la bougie de fin, au
   // niveau de la figure qu'elle concerne (guideMarquePrix) : ✗ invalidée ou annulée, – délai écoulé,
-  // ○ sans suite. Sans niveau, pas de marque — jamais au prix de clôture. Le « – » et le « ○ » ont
-  // un liseré du fond : posés sur une ligne en pointillés, ils s'en détachent.
+  // ○ sans suite ; une figure passée, ✓ à sa cible atteinte. Sans niveau, pas de marque — jamais au
+  // prix de clôture. Le « – », le « ○ » et le « ✓ » ont un liseré du fond : posés sur une ligne en
+  // pointillés, ils s'en détachent.
   let croix = null, marque = null;
   if (st.marque) {
     const p = guideMarquePrix(f);
     if (isNum(p)) {
-      const x = X(f.jFin), y = Y(p), r = 5, enc = avecAlpha(COLORS.ink1, Math.max(0.5, st.a));
+      const x = X(f.jFin), y = Y(p), r = 5, enc = avecAlpha(COLORS.ink1, Math.max(st.aMarque || 0.5, st.a));
       if (st.marque === '✗') {
         ctx.strokeStyle = enc; ctx.lineWidth = 1.6;
         ctx.beginPath(); ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke();
         croix = { x, y };
       } else if (st.marque === '–') {
         for (const [c, lw] of [[COLORS.surface, 5], [enc, 2.4]]) { ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(x - r - 1, y); ctx.lineTo(x + r + 1, y); ctx.stroke(); }
+      } else if (st.marque === '✓') {
+        for (const [c, lw] of [[COLORS.surface, 4.5], [enc, 1.9]]) { ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(x - r, y); ctx.lineTo(x - r / 3, y + r * 0.7); ctx.lineTo(x + r, y - r * 0.8); ctx.stroke(); }
       } else {
         ctx.beginPath(); ctx.arc(x, y, r - 0.5, 0, Math.PI * 2); ctx.fillStyle = COLORS.surface; ctx.fill();
         ctx.strokeStyle = enc; ctx.lineWidth = 1.6; ctx.stroke();
@@ -5367,18 +5418,92 @@ function guideFormeDebutant(E, f, t, garder) {
   E.debForme = entree;
   return true;
 }
-/** Le prix de la marque de fin d'une figure (Guide.MARQUES_FIN), ou null — jamais le prix de
- *  clôture, qui n'est pas un niveau de la figure : sans niveau, pas de marque sur le tracé.
+
+// ─── Les figures passées (plan §8) : des exemples, à leur place, sous la figure en cours ───
+// Relues dans le rejeu déjà fait (E.passees : Guide.figuresPassees, filtrées par la vue). Lisible :
+// une seule, la plus récente figure validée entière dans la vue, seulement quand la vue est dans
+// le passé ; son libellé prend une place du budget des textes, s'il en reste une (guidePasseeLibelle).
+// Complet, selon le choix du menu (ligneFiguresPassees) : au plus 6, sans libellé (la marque de
+// leur issue et une bulle au survol), et une ligne discrète du compte de la vue (guidePasseesCompte).
+// Chacune dit ce qui s'est passé ENSUITE, jamais quoi faire ; le compte dit les échecs aussi.
+/** Trace les figures passées de la vue (avant les figures en cours : dessous) et pose leurs cibles. */
+function guidePassees(E) {
+  const Pz = E.passees, R = GUIDE_FORMES.val;
+  E.passeeDeb = null;
+  if (!Pz || !R || !Pz.liste.length) return;
+  const G = PARAM.guide, mode = E.exp ? 'expert' : 'debutant';
+  const compte = Guide.texteComptePassees(Pz.compte, mode, Pz.choix, Pz.liste.length);
+  for (const f of Pz.liste) {
+    const tr = guideFigureTracer(E, f, true), T = Guide.texteFigurePassee(f, R.bilan[f.type], E.ctxF, G, E.unite, mode, compte);
+    // Survol : son tracé, et un carré autour de sa marque (une zone : jamais devant une étiquette).
+    const zones = tr.marque ? [{ x0: tr.marque.x - 8, y0: tr.marque.y - 8, x1: tr.marque.x + 8, y1: tr.marque.y + 8 }] : [];
+    const cible = { rects: [], segs: tr.segs, zones, prio: 4, passee: { f, id: Guide.idFigure(f, cols().time), marque: tr.st.marque }, titre: T.titre, texte: T.texte, resume: T.resume };
+    E.cibles.push(cible);
+    if (E.deb) E.passeeDeb = { f, tr, cible };
+  }
+}
+/** Complet : la ligne du compte des figures passées de la vue (« Dans cette vue : 5 figures
+ *  validées, 2 ont atteint leur cible »), discrète, en bas à gauche du tracé ; la plus complète qui
+ *  tient. Posée tant que le choix du menu montre les figures passées, même sans figure dans la vue. */
+function guidePasseesCompte(E) {
+  const Pz = E.passees;
+  if (!Pz || E.deb || Pz.choix === 'non') return;
+  const { g } = E, top = g.pad.top, bas = top + g.ph, h = 14, x0 = g.pad.left + 4, xMax = (E.marge ? E.xFin : E.xMax) - 4;
+  const V = Guide.texteComptePassees(Pz.compte, 'expert', Pz.choix, Pz.liste.length);
+  ctx.font = chartFont(9, 600);
+  const t = V.find(v => ctx.measureText(v).width + 12 <= xMax - x0) || guideCouper(ctx, V[V.length - 1], xMax - x0 - 12);
+  const w = ctx.measureText(t).width + 12;
+  const r = guidePlacer(E.rects, x0, w, h, [bas - h - 8], top, bas, -1, 0, 8);
+  if (!r) return;
+  Pz.ligne = { texte: t, rect: { x: r.x, y: r.y, w: r.w, h: r.h } };
+  etiquettesAFaire.push(() => {
+    ctx.font = chartFont(9, 600);
+    ctx.globalAlpha = 0.85; ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 4); ctx.fill(); ctx.globalAlpha = 1;
+    ctx.fillStyle = COLORS.ink3; ctx.fillText(t, r.x + 6, r.y + r.h - 4);
+  });
+  E.cibles.push({ rects: [guideZone(r)], prio: 4, titre: 'Figures passées', texte: [V[1] || V[0],
+    'Chaque figure passée garde la marque de son issue : ✓ cible atteinte, ✗ invalidée ou annulée, – délai écoulé après la validation, ○ sans suite. Survolez ou touchez sa marque : ce qui s’est passé ensuite.',
+    'Des exemples du passé, réussis ou non : pas une prévision ni une recommandation.'] });
+}
+/** Lisible : le libellé de la figure passée (« ✓ Double creux : cible »), près de sa marque, s'il
+ *  reste une place dans le budget des textes (PARAM.guide.debutant.items) une fois tout le reste
+ *  posé ; sinon elle garde son tracé et sa marque, et sa bulle s'ouvre sur le tracé. */
+function guidePasseeLibelle(E) {
+  const x = E.passeeDeb, P = PARAM.guide.debutant;
+  if (!x || !debEtat || debEtat.items.length >= P.items) return;
+  const t = Guide.libellePassee(x.f, P.forme);
+  if (!t) return;
+  const { g } = E, top = g.pad.top, bas = top + g.ph, H = 17;
+  ctx.font = chartFont(10, 600);
+  const w = ctx.measureText(t).width + 14;
+  const m = x.tr.marque, places = debPlacesFigure(E, x.f, x.tr.geo, w, H, m ? { x: m.x, y: m.y } : null);
+  const surBougies = guideSurBougies(E), bandes = debSurBandes(E), surSegs = guideSurSegs(x.tr.segs);
+  let pose = null;
+  for (const [ev, gl] of [[r => bandes(r) || surSegs(r) || surBougies(r), 2], [r => bandes(r) || surSegs(r), 2], [bandes, 8]]) {
+    for (const pl of places) if ((pose = guidePlacer(E.rects, pl.x, w, H, pl.essais, top, bas, pl.vers, 0, gl, ev))) break;
+    if (pose) break;
+  }
+  if (!pose) return;
+  x.cible.rects = [guideZone(pose)];
+  x.item = debItem('passee', t, { x: pose.x, y: pose.y, w, h: H });
+  // Une pastille de figure passée : le trait de gauche et le texte en encre 2 (jamais la couleur
+  // d'avertissement d'une figure en cours).
+  etiquettesAFaire.push(() => { ctx.font = chartFont(10, 600); guidePastilleDebutant(ctx, pose.x, pose.y, w, H, t, COLORS.ink3, COLORS.text); });
+}
+/** Le prix de la marque de fin d'une figure (Guide.marqueIssue : MARQUES_FIN, et ✓), ou null — jamais
+ *  le prix de clôture, qui n'est pas un niveau de la figure : sans niveau, pas de marque sur le tracé.
+ *    ✓ cible atteinte (figure passée) : sa cible ;
  *    ✗ invalidée ou annulée : le niveau qui l'a fait tomber (guideCroixPrix) ;
  *    – délai écoulé (validée, ni objectif ni invalidation à temps) : la ligne qui l'a validée, à sa
  *      dernière bougie (la ligne de cou d'une épaule-tête-épaule suit sa pente) ;
  *    ○ sans suite (jamais validée) : le milieu de ses deux droites à sa dernière bougie, sinon la
  *      ligne qui l'aurait validée (la ligne de cou). */
 function guideMarquePrix(f) {
-  const m = Guide.MARQUES_FIN[f.fin];
+  const m = Guide.marqueIssue(f);
   if (!m || !isNum(f.jFin)) return null;
   let p;
-  if (m === '✗') p = guideCroixPrix(f);
+  if (m === '✓') p = f.objectif;
+  else if (m === '✗') p = guideCroixPrix(f);
   else if (m === '○' && f.hautL && f.basL) p = (Guide.ligne(f.hautL, f.jFin) + Guide.ligne(f.basL, f.jFin)) / 2;
   else p = Guide.famille(f) === 'ete' && f.couL ? Guide.ligne(f.couL, f.jFin) : f.niveau;
   return isNum(p) && isFinite(p) ? p : null;

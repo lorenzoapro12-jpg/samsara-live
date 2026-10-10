@@ -73,6 +73,9 @@ node test_guide.js || ko=1
 etape "2j'. Figures chartistes : 16 types, ébauches, niveaux annoncés = niveaux appliqués (±ε), sans regard vers l'avenir (15 min et 1 min), mots, sélection, temps — hors ligne"
 node test_figures.js || ko=1
 
+etape "2j''. Figures passées : Lisible une seule (validée, entière dans la vue, la plus récente, rien au présent), Complet non / validées / toutes (≤ 6), compte des réussites et des échecs en mots, identité par les dates — hors ligne"
+node test_figures_passees.js || ko=1
+
 etape "2k. Scénarios du matin : lecture du fichier, suivi des zones dans l'ordre, range, note du journal d'abord, aucun pourcentage en débutant, mots sans conseil — hors ligne"
 node test_scenarios.js || ko=1
 
@@ -165,6 +168,9 @@ node test_figures_suivi.js || ko=1
 
 etape "9b⁗''. Figures, 2e revue : ✗ gardée en Expert, droites de 2 points approchées, un mouvement compté une fois, double devenu triple, mots (côté de la ✗, mèche, cible), trait d'invalidation, rejeu à froid par tranches (page non exécutée sans Playwright)"
 node test_figures_revue2.js || ko=1
+
+etape "9b⁗'''. Figures passées dans Chromium : Lisible rien au présent, une seule dans le passé avec sa marque (budget de 5 textes, résumé puis détail, sans mot banni), effacée au retour ; Complet non / validées / toutes, ≤ 6, ligne du compte, choix gardé au rechargement ; 1440 et 390 (non exécuté sans Playwright)"
+node test_figures_passees_page.js || ko=1
 
 etape "9c. Sobriété dans Chromium : éclair, horloge, onde, calque, verre, chargement, chaleur (non exécuté sans Playwright)"
 node test_sobriete.js || ko=1
