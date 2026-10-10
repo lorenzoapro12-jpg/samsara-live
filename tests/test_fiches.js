@@ -222,7 +222,7 @@ titre('9. Chaque indicateur du menu : comment les traders l’utilisent, comment
   check('les lignes du Débutant (guide, scénarios) : aucun mot de la liste du Guide', !debSales.length, debSales);
   check('la fiche affiche « Comment les traders l’utilisent » et « Comment c’est calculé » (dans les deux modes)', /Comment les traders l’utilisent/.test(T.ficheHtml('rsi')) && /Comment c’est calculé/.test(T.ficheHtml('rsi'))
     && !/expert-seul[^>]*>[^<]*Comment c’est calculé/.test(T.ficheHtml('rsi')) && /Comment s’en servir/.test(T.ficheHtml('guide')));
-  check('le calcul en mots suit PARAM (RSI 14 → 21)', (() => { const v = T.PARAM.rsi.periode; T.PARAM.rsi.periode = 21; const ok = T.ficheHtml('rsi').includes('21 dernières variations'); T.PARAM.rsi.periode = v; return ok; })());
+  check('le calcul en mots suit PARAM (RSI 14 → 21)', (() => { const v = T.PARAM.rsi.periode; T.PARAM.rsi.periode = 21; const ok = T.ficheHtml('rsi').includes('à la Wilder » sur 21 bougies'); T.PARAM.rsi.periode = v; return ok; })());
   MODE.v = null;
   const apDeb = T.apercuHtml('guide'), apVide = T.apercuHtml(null);
   MODE.v = 'expert';

@@ -2348,15 +2348,15 @@
     // Débutant : 3 points, ce qu'il voit — couleurs, ligne du prix (à fil noir) et ronds, les deux repères.
     if (debutant()) return [
       ['Couleurs = ordres d\'achat ou de vente en attente.', couleursDebutant() + ' Un ordre peut être retiré à tout moment. Hachures : rien n\'a été lu là.'],
-      ['Ligne à fil noir = le prix, jusqu\'au trait jaune «\u00a0maintenant\u00a0». Ronds = échanges réels.', couleurMot('Vert', '--up') + ' : un acheteur a pris une vente en attente. ' + couleurMot('Rouge', '--down') + ' : un vendeur a pris un achat en attente. Plus gros = plus de BTC.'],
-      ['«\u00a0Mur d’achat\u00a0» sous le prix, «\u00a0Mur de vente\u00a0» au-dessus : là où le plus d\'ordres attendent en ce moment.', 'La phrase du haut décrit l\'instant : ce n\'est pas une prévision.'],
+      ['Ligne à fil noir = le prix, jusqu\'au trait jaune «\u00a0maintenant\u00a0». Ronds = échanges réels.', couleurMot('Vert', '--up') + ' : surtout des acheteurs qui ont pris des ventes en attente. ' + couleurMot('Rouge', '--down') + ' : surtout des vendeurs qui ont pris des achats en attente. Plus gros = plus de BTC.'],
+      ['«\u00a0Mur d’achat\u00a0» sous le prix, «\u00a0Mur de vente\u00a0» au-dessus : le prix le plus proche où nettement plus d\'ordres attendent qu\'ailleurs.', 'La phrase du haut décrit l\'instant : ce n\'est pas une prévision.'],
     ];
     const n = E.niv, tr = (n && n.tranche) || BM.GUIDE.trancheUsd;
     // Les niveaux d'options montrés : tirés du fichier (court + nom), pas d'une liste écrite à la main.
     const gam = n && n.gamma && n.gamma.length ? [...new Map(n.gamma.map(g => [g.court, g.nom])).entries()].map(([c, nom]) => c + ' ' + nom.charAt(0).toLowerCase() + nom.slice(1)).join(', ') : 'aucun niveau dans le fichier lu';
     return [
-      ['Bandes claires = ordres en attente (le carnet).', 'Plus c\'est clair (' + paletteMots() + '), plus il y a d\'ordres posés à ce prix. Ce sont des intentions : un ordre peut être retiré.'],
-      ['Ligne blanche = le prix.', 'Le dernier prix échangé de chaque minute (de chaque seconde quand on zoome).'],
+      ['Bandes claires = ordres en attente (le carnet).', 'Plus la couleur avance dans la palette (' + paletteMots() + '), plus il y a d\'ordres posés dans la tranche. Ce sont des intentions : un ordre peut être retiré.'],
+      ['Ligne blanche = le prix.', 'La clôture de chaque minute ; à la seconde (après la dernière minute close, et partout quand on zoome), le prix moyen des échanges pondéré par le volume.'],
       ['Bulles = échanges réellement exécutés.', couleurMot('Vert', '--up') + ' : achat au marché (l\'acheteur a pris le prix d\'un vendeur) ; ' + couleurMot('rouge', '--down') + ' : vente au marché (l\'inverse). Chaque échange a un acheteur et un vendeur : la couleur dit seulement qui a pris le prix de l\'autre. Plus grosse bulle, plus gros volume.'],
       ['Rectangles « Σ … BTC » = les plus gros murs publiés.', 'Σ veut dire « somme » : tous les ordres posés dans une tranche de ' + tr + ' $. Fichier de 15 min' + (n && n.mursA ? ' lu à ' + BM.heureUtc(n.mursA) + ' UTC' : '') + ' ; ' + couleurMot('turquoise', '--carte-mur-bid') + ' côté achat, ' + couleurMot('rose', '--carte-mur-ask') + ' côté vente.'],
       ['Tirets ' + couleurMot('violets', '--carte-gamma') + ' = niveaux d\'options (modèle).', gam + ' : calculés d\'après les options Deribit sous une hypothèse, pas observés.'],
@@ -3076,20 +3076,20 @@
   // jamais quoi faire.
   const NOMS_CALQUES = [
     ['guide', 'Guide', 'Les murs, les zones et les événements racontés en mots, avec le résumé du haut et le journal. Laissez-le allumé pour lire la carte sans tout décoder.'],
-    ['publiee', 'Carte publiée', 'L’historique du carnet publié par le serveur toutes les 15 min, une colonne par minute. Sert à voir où de gros ordres sont restés posés pendant des heures.'],
+    ['publiee', 'Carte publiée', 'L’historique du carnet publié par le serveur (24 h toutes les 15 min, les 30 dernières minutes chaque minute), une colonne par minute. Sert à voir où de gros ordres sont restés posés pendant des heures.'],
     ['live', 'Carnet live', 'Le carnet Binance lu par la page toutes les quelques secondes, depuis son ouverture. Sert à voir les ordres qui apparaissent ou disparaissent en ce moment.'],
     ['executions', 'Exécutions', 'Les échanges réels au marché, en ronds : vert quand les achats dominent, rouge quand ce sont les ventes. Sert à voir où, et avec quelle force, le prix a été poussé.'],
     ['prix', 'Prix', 'La ligne du prix (clôtures 1 min, puis prix moyen de chaque seconde). C’est le repère de tout le reste : à garder allumé.'],
     ['bidask', 'Bid / ask', 'Le meilleur prix d’achat (bid) et de vente (ask) à chaque lecture du carnet. Sert, en zoom serré, à voir l’écart entre acheteurs et vendeurs.'],
     ['murs', 'Murs', 'Les tranches de 20 $ les plus chargées d’ordres à la dernière publication (fichier de 15 min). Sert à repérer les prix où de gros ordres attendent ; ils peuvent être retirés.'],
     ['gamma', 'Gamma', 'Des niveaux tirés des options Deribit : mur de calls, mur de puts, zéro gamma. Un modèle, pas une mesure : à lire comme des repères possibles.'],
-    ['profil', 'Profil', 'À gauche, le volume échangé à chaque prix de la vue. Les prix très échangés sont souvent des zones où le prix ralentit.'],
+    ['profil', 'Profil', 'À gauche, le volume échangé à chaque prix de la vue. Lecture répandue : les prix très échangés seraient des zones où le prix ralentit.'],
     ['dom', 'Carnet latéral', 'À droite, la somme des ordres du dernier carnet live, par tranche. Sert à voir de quel côté les ordres s’accumulent maintenant.'],
     ['volume', 'Volume', 'En bas, les achats (au-dessus) et les ventes (au-dessous) au marché par période. Sert à juger si un mouvement est soutenu par des échanges.'],
     ['cvd', 'CVD', 'Achats au marché moins ventes au marché, cumulés depuis le bord gauche de la vue. Une courbe qui monte : les acheteurs pressés dominent sur la période.'],
-    ['memoire', 'Mémoire', 'Au bord droit : à chaque prix, la part du temps visible où un gros ordre y était posé. Sert à distinguer une zone souvent chargée d’un ordre fugace ; une présence passée, ni support ni résistance.'],
+    ['memoire', 'Mémoire', 'Au bord droit : à chaque prix, la part du temps visible où la tranche portait au moins le seuil choisi (somme des ordres posés). Sert à distinguer une zone souvent chargée d’un ordre fugace ; une présence passée, ni support ni résistance.'],
     ['rafales', 'Rafales', 'Des traits verticaux là où un gros volume s’est échangé d’un même côté dans la même milliseconde. Sert à repérer les accélérations brutales.'],
-    ['destin', 'Destin des murs', 'Ce que devient chaque gros ordre du carnet live quand il disparaît : retiré, échangé, en partie… Sert à voir si les murs tiennent quand le prix arrive.'],
+    ['destin', 'Destin des murs', 'Ce que devient chaque gros niveau de prix du carnet live (un ou plusieurs ordres) quand il disparaît : retiré, échangé, en partie… Sert à voir si les murs tiennent quand le prix arrive.'],
     ['loin', 'Profondeur Coinbase', 'Le carnet complet de Coinbase sur ±10 % (5 min × 100 $). Sert à voir les gros ordres loin du prix, hors de la bande lue chez Binance.'],
   ];
   function construireBarre() {
@@ -3198,15 +3198,15 @@
     // Mémoire du carnet et rafales : chaque nombre vient de BM.PRESENCE / BM.RAFALES / l'encodage publié.
     const P = BM.PRESENCE, RF = BM.RAFALES, sp = BM.seuilPresence(R.presenceSeuil, enc), lst = a => a.map(v => BM.nombre(v, 0, 2)).join(', ');
     const seuilTxt = sp ? '≥ ' + BM.nombre(sp.qS, 2, 2) + ' BTC (intensité ≥ ' + sp.vS + ' : le cran publié qui porte le seuil choisi, ' + BM.nombre(R.presenceSeuil, 0, 2) + ' BTC)' : null;
-    tx('legMemoire', 'Pour chaque tranche de la carte publiée, la part des minutes OBSERVÉES de la fenêtre visible pendant lesquelles un niveau '
+    tx('legMemoire', 'Pour chaque tranche de la carte publiée, la part des minutes OBSERVÉES de la fenêtre visible pendant lesquelles la tranche portait (somme des ordres) '
       + (seuilTxt || 'au-dessus du seuil choisi') + ' s\'y trouvait — bid ou ask (mesuré, lu sur la carte publiée brute : la fusion n\'y change rien). '
       + 'Échelle FIXE de 0 à 100 % (le pointillé marque 50 %) ; couleur du côté le plus souvent présent. Un pixel qui couvre plusieurs tranches montre la plus grande part. '
       + 'Conventions : « observée » = dans la bande déduite des cellules de la minute (un peu plus étroite que la bande lue) ; une tranche observée moins de '
-      + P.minObserveMin + ' min est hachurée. Seuils proposés : ' + lst(P.seuilsBtc) + ' BTC. « Un niveau » : rien ne dit que c\'est le même ordre d\'une minute à l\'autre. '
+      + P.minObserveMin + ' min est hachurée. Seuils proposés : ' + lst(P.seuilsBtc) + ' BTC. Rien ne dit que ce sont les mêmes ordres d\'une minute à l\'autre. '
       + 'Présence passée, ni support ni résistance.' + (sp ? '' : ' Encodage non publié : aucun seuil en BTC, le calque est éteint.'));
     tx('rPresenceNote', sp ? 'Seuil appliqué : ' + seuilTxt + '.' : 'Encodage non publié par la carte : aucun seuil en BTC.');
     tx('legRafales', 'Exécutions d\'une même milliseconde, d\'un même côté, aux identifiants consécutifs (mesuré) : un trait du prix le plus bas au plus haut, ▲ achat / ▼ vente au marché. '
-      + 'Affichées à partir du seuil choisi (' + lst(RF.seuilsBtc) + ' BTC) ; gardées à partir de ' + BM.nombre(RF.gardeBtc, 0, 2) + ' BTC pendant ' + RF.gardeMs / 3600e3 + ' h, comme les exécutions. '
+      + 'Affichées à partir du seuil choisi (' + lst(RF.seuilsBtc) + ' BTC) ; gardées à partir de ' + BM.nombre(RF.gardeBtc, 0, 2) + ' BTC pendant 24 h, comme les exécutions. '
       + '« ≥ k ordres » : chaque exécution est un ordre preneur rempli à un prix, et un ordre ne parcourt les prix que dans un sens ; chaque prix répété ou recul en prouve donc un de plus. '
       + 'Mais ' + BM.TEXTE_RAFALES + '. Une rafale ne dit pas qui a acheté. Le panneau « Rafales » liste les ' + RF.liste + ' dernières.');
     tx('rafalesNote', 'Les ' + RF.liste + ' dernières rafales ≥ ' + BM.nombre(R.rafaleMin, 0, 2) + ' BTC, la plus récente d\'abord. ' + BM.TEXTE_RAFALES[0].toUpperCase() + BM.TEXTE_RAFALES.slice(1) + '.');
