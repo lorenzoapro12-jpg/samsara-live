@@ -856,8 +856,10 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 .dv-bar { position: relative; height: 8px; background: var(--rail); border-radius: 999px; }
 .dv-axe { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--ink-3); opacity: 0.45; }
 .dv-fill { position: absolute; top: 0; bottom: 0; }
-.dv-fill.pos { background: var(--up); border-radius: 0 999px 999px 0; }
-.dv-fill.neg { background: var(--down); border-radius: 999px 0 0 999px; }
+/* Le CVD n'est ni « bien » ni « mal » : une seule teinte neutre, le côté de l'axe dit le signe (le
+   vert et le rouge disent seulement « le prix monte / descend »). */
+.dv-fill.pos { background: var(--ink-3); border-radius: 0 999px 999px 0; }
+.dv-fill.neg { background: var(--ink-3); border-radius: 999px 0 0 999px; }
 .dv-val { font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 
 /* Mini-axe de prix (GEX) : put wall · zéro γ · spot · call wall */

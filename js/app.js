@@ -7909,14 +7909,6 @@ const fmtPx = v => isNum(v) ? Fmt.nombre(Number(v), 1) : '—';
 // 2 décimales : un spread Binance BTCUSDT vaut souvent 0,01 $ — arrondi à 1 décimale il
 // s'affiche « 0,0 pts », c'est-à-dire « pas de spread », ce qui est faux.
 const fmtPx2 = v => isNum(v) ? Fmt.nombre(Number(v), 2) : '—';
-// La classe d'un rapport autour de son milieu (1 pour un ratio, 0,5 pour une part), jugée sur la
-// valeur AFFICHÉE (dec décimales) : au milieu, aucune couleur — un ratio de 1,00 s'affichait en
-// rouge, comme un penchant vendeur.
-function clsCote(v, milieu, dec) {
-  if (!isFinite(v)) return '';
-  const r = dec === undefined ? v : Number(Number(v).toFixed(dec));
-  return r > milieu ? 'stat-pos' : r < milieu ? 'stat-neg' : '';
-}
 
 async function renderLive() {
   const box = document.getElementById('liveModalBody');
@@ -7975,7 +7967,6 @@ async function renderLive() {
   // l'infobulle de l'horloge de la barre du bas).
   if (clk) clk.textContent = '· ' + Fmt.heureSec(Date.now()) + ' · aller-retour ' + lat + ' ms';
 
-  const pos = 'stat-pos', neg = 'stat-neg';
   let html = '';
   carteEntree = !(box.dataset && box.dataset.vu);
   // Sur une autre paire, ce panneau parle toujours du bitcoin : il le dit, dans les deux modes.
@@ -8009,7 +8000,7 @@ async function renderLive() {
   html += mCard('💧', 'Carnet en direct ' + bandeTxt(BANDE), 'Binance spot · ' + Fmt.nombre(RL.niveaux) + ' niveaux, vus jusqu\'à ±'
     + (isFinite(couv) ? fmtNum(couv, 2) : '—') + ' % · instantané', '',
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">Bids <b>' + fmtNum(bv, 1) + ' BTC</b> · Asks <b>' + fmtNum(av, 1) + ' BTC</b></div>'
-    + '<div style="margin-top:6px;font-size:15px;font-weight:800" class="' + clsCote(ratio, 1, 2) + '">Ratio bid/ask '
+    + '<div style="margin-top:6px;font-size:15px;font-weight:800">Ratio bid/ask '
     + (isFinite(ratio) ? fmtNum(ratio, 2) : '—') + '</div>'
     + (autresBandes ? '<div style="margin-top:4px;font-size:11.5px;font-variant-numeric:tabular-nums">' + autresBandes + '</div>' : '')
     + '<div style="margin-top:4px;font-size:11px;color:var(--ink-2)">' + carnetTxt
@@ -8022,9 +8013,9 @@ async function renderLive() {
     : taker <= 1 - tD ? 'vendeurs agressifs dominants' : taker <= 1 - tL ? 'léger penchant vendeur' : 'partagé';
   html += mCard('🌊', 'Tape en direct', RL.trades + ' derniers trades · fenêtre ' + (spanS === null ? '—' : spanS + ' s') + ' · agression, pas intention', '',
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">Achats au taker <b>' + fmtNum(buy, 1) + ' BTC</b> · Ventes <b>' + fmtNum(sell, 1) + ' BTC</b></div>'
-    + '<div style="margin-top:6px;font-size:15px;font-weight:800" class="' + clsCote(taker, 0.5, 3) + '">Taker buy '
+    + '<div style="margin-top:6px;font-size:15px;font-weight:800">Taker buy '
     + (isFinite(taker) ? fmtNum(taker * 100, 1) + ' %' : '—') + '</div>'
-    + '<div style="margin-top:4px;font-size:12px">Delta net <b class="' + signCls(delta) + '">'
+    + '<div style="margin-top:4px;font-size:12px">Delta net <b>'
     + Fmt.signe(delta, x => Fmt.nombre(x, 1)) + ' BTC</b> — ' + tapeTxt + '</div>');
 
   // 5 — CE QUI N'EST PAS EN DIRECT ICI, ET POURQUOI
@@ -8181,15 +8172,16 @@ function renderCycle(d) {
   const oiK = isNum(x.oi_change_24h_pct) ? x.oi_change_24h_pct : x.oi_change_1d_pct;
   const ageK = upd ? Math.max(0, Math.round((Date.now() - upd.getTime()) / 60000)) : null;
   // Mêmes précisions que les cartes et le panneau ⚡ (funding annualisé 1 décimale, OI 1, L/S 2).
-  // Le GEX n'a pas de couleur : il ne dit ni la direction ni le moment (fiche « gex »).
+  // Le vert et le rouge disent seulement « le prix monte / descend » (plan, § 2) : le funding, l'OI,
+  // le CVD et le GEX n'ont pas de couleur — un signe n'est ni « bien » ni « mal ».
   // Sur une autre paire, la bande dit qu'elle parle du bitcoin (Expert ; hors des .kpi, elle ne
   // cède jamais sa place à ajusterKpis).
   cy.innerHTML = (activeSymbol !== 'BTCUSDT' ? '<span class="kpi-btc expert-seul" title="Ces chiffres clés sont ceux du bitcoin, pas de '
       + escHtml(NOMS_PAIRES[activeSymbol] || activeSymbol) + '">Bitcoin</span>' : '')
     + kpi('RSI 4h', fmtNum(t4.rsi_14, 1), '', 'tf.4h.rsi_14')
-    + kpi('Funding an.', pctSigne(x.funding_annual_pct, 1), signCls(x.funding_annual_pct), 'micro.funding_annual_pct')
-    + kpi('OI 24h', pctSigne(oiK, 1), signCls(oiK), 'micro.oi_change_24h_pct')
-    + kpi('CVD 24h', fmtSigned(x.cvd_24h_usd), signCls(x.cvd_24h_usd), 'micro.cvd_24h_usd')
+    + kpi('Funding an.', pctSigne(x.funding_annual_pct, 1), '', 'micro.funding_annual_pct')
+    + kpi('OI 24h', pctSigne(oiK, 1), '', 'micro.oi_change_24h_pct')
+    + kpi('CVD 24h', fmtSigned(x.cvd_24h_usd), '', 'micro.cvd_24h_usd')
     + kpi('GEX', isNum(x.gex_usd_1pct) ? (x.gex_usd_1pct > 0 ? 'long γ' : 'short γ') : '—', '', 'micro.gex_usd_1pct')
     + kpi('L/S', fmtNum(x.ls_ratio, 2), '', 'micro.ls_ratio')
     + kpi('DXY', fmtNum(m.dxy_spot, 2), '', 'macro.dxy_spot')
@@ -8409,7 +8401,7 @@ function renderFeedTo(container) {
   // CVD : fenêtré (bougies 5 min Binance). Un fichier de l'ancien format porte le CUMUL du
   // daemon depuis son premier démarrage (des mois de flux) : il n'a pas de sens ici, on ne
   // l'affiche pas comme une lecture du moment.
-  const cvdTxt = (v, tb) => '<span class="' + signCls(v) + '">' + fmtSigned(v) + '</span>'
+  const cvdTxt = (v, tb) => '<span>' + fmtSigned(v) + '</span>'
     + (isNum(tb) ? ' <span class="mute">' + fmtNum(tb,1) + ' % achat</span>' : '');
   const cvdHtml = isNum(x.cvd_1h_usd)
     ? divergeRows([{ lbl: '1h', v: x.cvd_1h_usd, txt: cvdTxt(x.cvd_1h_usd, x.taker_buy_1h_pct) },
@@ -8439,8 +8431,6 @@ function renderFeedTo(container) {
   } else {
     gexHtml = '<div class="bloc"><b>GEX</b> <span class="fine">— en attente du nouveau format</span></div>';
   }
-  const premCls = /NEGATIVE/.test(x.premium_state || '') ? 'badge badge-baissier'
-                : /POSITIVE/.test(x.premium_state || '') ? 'badge badge-hausser' : 'badge';
   // L'état de la prime en mots (le fichier publie un code : NEGATIVE, EXTREME_POSITIVE…).
   const MOTS_PRIME = { POSITIVE: 'positive', NEGATIVE: 'négative', EXTREME_POSITIVE: 'très positive', EXTREME_NEGATIVE: 'très négative', NEUTRAL: 'neutre' };
   const premMot = x.premium_state ? (MOTS_PRIME[x.premium_state] || String(x.premium_state).toLowerCase().replace(/_/g, ' ')) : '—';
@@ -8448,8 +8438,8 @@ function renderFeedTo(container) {
   let microBody = '<div class="tuiles">'
     + tuile('Funding / 8 h', pctSigne(x.funding_rate_pct, 4), pctSigne(x.funding_annual_pct, 1) + ' annualisé', 'funding', lectureCourte('funding', x.funding_rate_pct))
     + tuile('Open interest', oiTxt + ' <span style="font-size:11px;font-weight:600;color:var(--ink-3)">BTC</span>',
-            fmtBig(x.oi_usd) + '<div class="ligne" style="margin-top:4px"><span class="' + chipCls(oi24) + '">Δ24h ' + pctSigne(oi24, 1) + '</span>'
-            + '<span class="' + chipCls(x.oi_change_5d_pct) + '">Δ5j ' + pctSigne(x.oi_change_5d_pct, 1) + '</span></div>', 'oi', lectureCourte('oi', oi24))
+            fmtBig(x.oi_usd) + '<div class="ligne" style="margin-top:4px"><span class="chip">Δ24h ' + pctSigne(oi24, 1) + '</span>'
+            + '<span class="chip">Δ5j ' + pctSigne(x.oi_change_5d_pct, 1) + '</span></div>', 'oi', lectureCourte('oi', oi24))
     + '</div>'
     + '<div class="bloc"><div class="bloc-titre"><span class="lbl">Comptes long / short' + infoBtn('ls') + '</span>'
     + '<span class="fine">L/S&nbsp;<b style="color:var(--ink-1)">' + fmtNum(x.ls_ratio,2) + '</b></span></div>'
@@ -8460,7 +8450,7 @@ function renderFeedTo(container) {
     + cvdHtml + lectureCourte('cvd', x.cvd_24h_usd) + '</div>'
     + gexHtml
     + '<div class="bloc"><div class="ligne"><span class="lbl">Prime Coinbase' + infoBtn('prime') + '</span><b>' + pctSigne(x.premium_pct, 4) + '</b>'
-    + '<span class="' + premCls + '"' + (premCls === 'badge' ? ' style="background:var(--rail);color:var(--ink-2)"' : '') + '>' + escHtml(premMot) + '</span>'
+    + '<span class="badge" style="background:var(--rail);color:var(--ink-2)">' + escHtml(premMot) + '</span>'
     + '<span class="fine">' + (x.us_demand ? 'au-dessus du seuil « demande US » (0,03 %, USDT inclus)' : 'sous le seuil « demande US » (0,03 %, USDT inclus)') + '</span></div>'
     // Hors USDT (publish.py ≥ 4.0) : des dollars contre des dollars. La prime usuelle contient
     // l'écart USDT/USD — mesuré le 06/10/2026, il en expliquait la totalité.
@@ -8489,7 +8479,7 @@ function renderFeedTo(container) {
       .map(([b, r]) => bandeTxt(b) + ' ≈ ' + fmtNum(r.ratio,2)).join(' · ');
     // Le ratio au milieu (1,00 affiché) n'a pas de couleur : il était rouge, comme un penchant vendeur.
     liqBody = '<div class="bloc-titre"><span class="lbl">Carnet ' + bandeTxt(cle) + infoBtn('carnet') + '</span>'
-      + '<span class="fine">Ratio <b>bid/ask</b> ' + bandeTxt(cle) + ' : <b class="' + clsCote(bt.ratio, 1, 2) + '">'
+      + '<span class="fine">Ratio <b>bid/ask</b> ' + bandeTxt(cle) + ' : <b>'
       + fmtNum(bt.ratio,2) + '</b></span></div>'
       + splitHtml(bt.bid_btc, bt.ask_btc, 'Bids&nbsp;<b>' + fmtNum(bt.bid_btc,1) + ' BTC</b>', 'Asks&nbsp;<b>' + fmtNum(bt.ask_btc,1) + ' BTC</b>')
       + '<div class="fine" style="margin-top:4px">' + autres + ' · carnet vu jusqu\'à ±' + fmtNum(lq.couverture_pct,2) + ' %</div>'
