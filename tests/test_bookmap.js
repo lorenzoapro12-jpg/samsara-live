@@ -930,15 +930,118 @@ titre('7g. Mode débutant : la convention du « sens du prix » vient des consta
 }
 
 // ── 8. Isolement : la carte ne touche pas au terminal ─────────────────────────
-titre('8. Isolement : une page à côté, qui ne partage aucun code avec le terminal');
+titre('8. Isolement : une page à côté, qui ne partage aucun code avec le terminal (hors les cœurs communs)');
 const html = fs.readFileSync(path.join(REPO, 'bookmap.html'), 'utf8');
 const charges = [...html.matchAll(/\b(?:src|href)="([^"#]+)"/g)].map(m => m[1]).filter(u => !/^https?:/.test(u));
-check('bookmap.html ne charge que ses fichiers (+ le repli Binance commun, les formats communs et le lien retour vers le terminal)',
-  charges.every(u => ['css/bookmap.css', 'js/binance-repli.js', 'js/format.js', 'js/bookmap-calc.js', 'js/bookmap.js', 'index.html'].includes(u)), charges);
+check('bookmap.html ne charge que ses fichiers (+ les cœurs communs : repli Binance, formats, liaison ; et le lien retour vers le terminal)',
+  charges.every(u => ['css/bookmap.css', 'js/binance-repli.js', 'js/format.js', 'js/liaison.js', 'js/bookmap-calc.js', 'js/bookmap.js', 'index.html'].includes(u)), charges);
 check('les formats communs (js/format.js) sont chargés AVANT les calculs de la carte', charges.indexOf('js/format.js') >= 0 && charges.indexOf('js/format.js') < charges.indexOf('js/bookmap-calc.js'), charges);
+check('la liaison (js/liaison.js) est chargée AVANT le script de tête qui pose le thème, et avant js/bookmap.js',
+  html.indexOf('src="js/liaison.js"') > 0 && html.indexOf('src="js/liaison.js"') < html.indexOf('Liaison.poserTheme') && html.indexOf('src="js/liaison.js"') < html.indexOf('src="js/bookmap.js"'));
 check('aucun script du terminal chargé', !/js\/app\.js/.test(html) && !/themes\//.test(html));
 const index = fs.readFileSync(path.join(REPO, 'index.html'), 'utf8');
 check('le terminal ne charge aucun fichier de la carte', !/bookmap/.test(index.replace(/<a [^>]*href="bookmap\.html"[^>]*>/g, '')));
+check('le terminal charge la liaison AVANT js/app.js', /<script defer src="js\/liaison\.js"><\/script>[\s\S]*<script defer src="js\/app\.js"><\/script>/.test(index));
+{
+  // La liaison est un cœur PUR : ni réseau, ni stockage, ni adresse, ni DOM de lui-même (chaque page l'appelle).
+  const src = fs.readFileSync(path.join(REPO, 'js/liaison.js'), 'utf8').replace(/\/\/.*$/gm, '');
+  check('js/liaison.js : aucun appel réseau, aucun accès au stockage, à l\'adresse ni au document de lui-même', !/fetch\(|XMLHttpRequest|localStorage|location\.|document\./.test(src));
+}
+
+// ── 9. Liaison avec le terminal : le prix passé par l'adresse, le thème ─────────
+titre('9. Liaison : le prix passé par l\'adresse est lu, VALIDÉ, jamais injecté ; le thème décrit est validé');
+{
+  const L = require('../js/liaison.js');
+  check('« #prix=83450 », « prix=83450.5 », « #a=1&prix=83450&x=1 » : lus (un nombre)', L.lirePrix('#prix=83450') === 83450 && L.lirePrix('prix=83450.5') === 83450.5 && L.lirePrix('#a=1&prix=83450&x=1') === 83450);
+  const mauvais = ['', '#', '#prix=', '#prix=abc', '#prix=-83450', '#prix=+83450', '#prix=8e4', '#prix=83 450', '#prix=83,450', '#prix=0', '#prix=0.0',
+    '#prix=83450<script>', '#prix=<img src=x onerror=alert(1)>', '#prix=83450"', '#prix=1.2.3', '#prix=NaN', '#prix=Infinity', '#prix=0x1F', '#prix=99999999',
+    '#prix=' + '1'.repeat(200), '#prixx=83450', '#PRIX=83450', '#prix=83450%3Cb%3E', null, undefined, 83450, {}];
+  const acceptes = mauvais.filter(m => L.lirePrix(m) !== null);
+  check(`${mauvais.length} adresses mal formées ou piégées (signe, exposant, espace, virgule, balise, guillemet, hexadécimal, trop long…) : toutes ignorées`, !acceptes.length, acceptes);
+  check('plausible : à moins de 10 % du prix du moment (83 450 près de 86 000 : oui ; 70 000 : non ; prix du moment inconnu : non)',
+    L.plausible(83450, 86000) && L.plausible(86000 * 1.099, 86000) && L.plausible(86000 * 0.901, 86000) && !L.plausible(86000 * 1.1001, 86000) && !L.plausible(70000, 86000) && !L.plausible(83450, null) && !L.plausible(83450, NaN) && !L.plausible(NaN, 86000) && !L.plausible(-1, 86000));
+  check('l\'adresse écrite : « bookmap.html#prix=83450.12 » (au centime), relue au même prix ; pas d\'adresse pour un non-prix',
+    L.adresse('bookmap.html', 83450.123) === 'bookmap.html#prix=83450.12' && L.lirePrix(L.adresse('index.html', 83450.12).split('#')[1]) === 83450.12
+    && L.adresse('index.html', 86000) === 'index.html#prix=86000' && L.adresse('x', NaN) === null && L.adresse('x', -5) === null && L.adresse('x', '86000') === null);
+  const t = L.lireTheme(L.decrireTheme('aero', 'clair', ' #0B84B0'));
+  check('thème décrit puis relu : { id, mode, accent } (accent normalisé « #0b84b0 »)', t && t.id === 'aero' && t.mode === 'clair' && t.accent === '#0b84b0', t);
+  check('thème illisible ou inconnu : null (JSON cassé, mode inconnu, identifiant piégé, tableau)', [null, '', '{', '[]', '{"id":"aero","mode":"gris"}', '{"id":"<b>","mode":"clair"}', '{"id":"aero"}', JSON.stringify({ id: 'a'.repeat(50), mode: 'clair' })].every(x => L.lireTheme(x) === null));
+  const t2 = L.lireTheme('{"id":"kala","mode":"sombre","accent":"url(javascript:x)"}');
+  check('une couleur d\'accent illisible est oubliée (null), le thème gardé', t2 && t2.mode === 'sombre' && t2.accent === null, t2);
+  check('teinte : « rgba(11, 132, 176, 0.16) »', L.teinte('#0b84b0', 0.16) === 'rgba(11, 132, 176, 0.16)' && L.teinte('#fff', 1) === 'rgba(255, 255, 255, 1)' && L.teinte('rouge', 1) === null);
+  // Le terminal décrit son thème depuis SON registre (les <link data-theme-id data-mode> d'index.html) : pas de deuxième liste.
+  const app = fs.readFileSync(path.join(REPO, 'js/app.js'), 'utf8');
+  const pub = (app.match(/function publierThemeCarte\(\) \{[\s\S]*?\n\}\n/) || [''])[0];
+  check('le terminal décrit son thème depuis son registre (themeCourant : id, mode) et ses jetons (--accent), à l\'ouverture et à chaque changement',
+    /themeCourant\(\)/.test(pub) && /t\.mode/.test(pub) && /--accent/.test(pub) && /lireJetons\(\);[^\n]*publierThemeCarte\(\)/.test(app) && /\n  liaisonCarte\(\);/.test(app) && /function liaisonCarte\(\) \{[\s\S]*?publierThemeCarte\(\)/.test(app), pub.slice(0, 200));
+  check('aucune liste de thèmes clairs / sombres dans la carte (bookmap.html, js/bookmap.js, css/bookmap.css)',
+    ['bookmap.html', 'js/bookmap.js', 'css/bookmap.css'].every(f => !/aero|kala|gazette|bureau95|cyanotype|diazo|codex|neon|gare\b/i.test(fs.readFileSync(path.join(REPO, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, ''))));
+}
+
+// ── 10. Palette claire et mots des couleurs ──────────────────────────────────
+titre('10. Carte claire : palette ordonnée et lisible sur le fond ; les mots des couleurs suivent la palette affichée');
+{
+  const css = fs.readFileSync(path.join(REPO, 'css/bookmap.css'), 'utf8');
+  const bloc = sel => { const i = css.indexOf(sel + ' {'); return i < 0 ? '' : css.slice(i, css.indexOf('}', i)); };
+  const jeton = (b, n) => { const m = new RegExp(n + ':\\s*#([0-9a-f]{6})', 'i').exec(b); return m ? [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16)) : null; };
+  const fonds = { sombre: jeton(bloc(':root'), '--carte-fond'), clair: jeton(bloc(':root[data-theme-mode="clair"]'), '--carte-fond') };
+  check(`fonds de la carte lus dans la feuille : sombre ${JSON.stringify(fonds.sombre)}, clair ${JSON.stringify(fonds.clair)} (clair : luminance > 0,8)`,
+    !!fonds.sombre && !!fonds.clair && BM.luminance(fonds.clair) > 0.8 && BM.luminance(fonds.sombre) < 0.02, fonds);
+  // Ce qui est dessiné PAR-DESSUS la chaleur claire (ronds, repères, gamma, sources, trait « maintenant »,
+  // prix) : un contraste d'au moins 3 avec le fond clair (WCAG, éléments non textuels).
+  {
+    const B = bloc(':root[data-theme-mode="clair"]');
+    const traces = ['--up', '--down', '--carte-mur-bid', '--carte-mur-ask', '--carte-gamma', '--carte-live', '--carte-publie', '--carte-accent', '--carte-prix', '--ink-3'];
+    const faibles = traces.map(n => [n, jeton(B, n)]).filter(([, c]) => !c || BM.contraste(c, fonds.clair) < 3).map(([n, c]) => [n, c && BM.contraste(c, fonds.clair).toFixed(2)]);
+    check(`carte claire : ronds, repères, gamma, sources, trait « maintenant », prix et hachures (${traces.length} couleurs) — contraste ≥ 3 sur le fond clair`, !faibles.length, faibles);
+    // Les hachures « non observé » : au moins aussi visibles sur la carte claire que sur la sombre.
+    const hach = b => BM.contraste(jeton(b, '--carte-hachure'), jeton(b, '--carte-non-observe'));
+    check(`hachures « non observé » : contraste ${hach(B).toFixed(2)} en clair, au moins celui du sombre (${hach(bloc(':root')).toFixed(2)})`, hach(B) >= hach(bloc(':root')));
+  }
+  const rampe = pts => Array.from({ length: 256 }, (_, i) => BM.couleurPalette(pts, i / 255));
+  for (const [nom, pts] of Object.entries(BM.PALETTES.clair)) {
+    const r = rampe(pts), L = r.map(BM.luminance), f = fonds.clair || [244, 246, 250];
+    const monte = L.findIndex((l, i) => i && l > L[i - 1] + 1e-12);
+    const bas = BM.contraste(r[0], f), haut = BM.contraste(r[255], f), sat = Math.max(...r[255]) - Math.min(...r[255]);
+    check(`claire « ${nom} » : ordonnée (la luminance descend avec la quantité, sur les 256 couleurs) ; peu ≈ le fond (contraste ${bas.toFixed(2)} ≤ 1,25) ; beaucoup foncé et saturé (contraste ${haut.toFixed(1)} ≥ 7, écart des canaux ${sat} ≥ 50)`,
+      monte < 0 && bas <= 1.25 && haut >= 7 && sat >= 50, { monte, bas, haut, haut0: r[255] });
+  }
+  for (const nom of ['classique', 'cividis', 'bid', 'ask']) {
+    const s = BM.PALETTES.sombre[nom], f = fonds.sombre;
+    check(`sombre « ${nom} » : peu ≈ son fond sombre, beaucoup clair (contraste ≥ 7)`, BM.contraste(BM.couleurPalette(s, 1), f) >= 7 && BM.luminance(BM.couleurPalette(s, 0)) < 0.05);
+  }
+  check('les palettes sombres sont celles d\'avant (classique : bleu nuit → … → blanc, mêmes points)',
+    JSON.stringify(BM.PALETTES.sombre.classique) === JSON.stringify([[0, [12, 20, 60]], [0.18, [20, 60, 160]], [0.38, [0, 170, 220]], [0.58, [90, 230, 120]], [0.76, [250, 230, 60]], [0.9, [255, 130, 30]], [1, [255, 250, 240]]]));
+  // Les mots : ceux du ton affiché, jamais ceux de l'autre.
+  const S = BM.motsCouleurs('sombre'), K = BM.motsCouleurs('clair');
+  check('sombre : « Bleu foncé : peu d’ordres … blanc : le plus d’ordres », trait « jaune », bandes « claires », ligne « blanche » (et un ton inconnu : sombre)',
+    /^Bleu foncé : peu d'ordres à ce prix ; puis bleu clair, vert, jaune, orange ; blanc : le plus d'ordres\.$/.test(BM.phrasePalette('classique', 'sombre')) && S.maintenant === 'jaune' && S.bandes === 'claires' && S.prix === 'blanche' && S.arc === 'blanc'
+    && BM.motsCouleurs(undefined) === S && BM.motsCouleurs('gris') === S);
+  check('clair : « Bleu très pâle : peu d’ordres … bleu nuit : le plus d’ordres », trait « orange », bandes « foncées », ligne « noire » — aucun « bleu foncé : peu d’ordres », aucun « blanc : le plus »',
+    /^Bleu très pâle : peu d'ordres/.test(BM.phrasePalette('classique', 'clair')) && /bleu nuit : le plus d'ordres\.$/.test(BM.phrasePalette('classique', 'clair'))
+    && K.maintenant === 'orange' && K.bandes === 'foncées' && K.prix === 'noire' && K.arc === 'noir'
+    && Object.values(K.palette).every(t => !/Bleu foncé : peu|blanc : le plus|clair, le plus|sombre, peu/.test(t)), K.palette);
+  check('teintés : « sombre, peu … clair, le plus » (sombre) ; « pâle, peu … foncé, le plus » (clair)',
+    /sombre, peu d'ordres à ce prix ; clair, le plus d'ordres/.test(BM.phrasePalette('cote', 'sombre')) && /pâle, peu d'ordres à ce prix ; foncé, le plus d'ordres/.test(BM.phrasePalette('cote', 'clair')));
+  check('cividis : « Bleu foncé … jaune : le plus » (sombre) ; « Jaune pâle … bleu nuit : le plus » (clair)',
+    /^Bleu foncé : peu d'ordres à ce prix ; puis gris ; jaune : le plus d'ordres\.$/.test(BM.phrasePalette('cividis', 'sombre')) && /^Jaune pâle : peu d'ordres à ce prix ; puis jaune, gris ; bleu nuit : le plus d'ordres\.$/.test(BM.phrasePalette('cividis', 'clair')));
+  // Les mots suivent les COULEURS : la couleur nommée « peu » est la plus proche de son nom parmi les noms dits, de même pour « le plus ».
+  const nommee = { 'bleu foncé': [12, 30, 90], 'bleu très pâle': [222, 234, 247], 'bleu nuit': [10, 25, 80], 'blanc': [255, 255, 255], 'jaune pâle': [242, 237, 210], 'jaune': [250, 225, 70] };
+  const dist = (c, m) => Math.hypot(...c.map((v, i) => v - nommee[m][i]));
+  const proche = (c, mots) => mots.reduce((a, m) => (dist(c, m) < dist(c, a) ? m : a));
+  for (const t of BM.TONS) for (const nom of ['classique', 'cividis']) {
+    const ph = BM.phrasePalette(nom, t), peu = /^(.+?) : peu/.exec(ph)[1].toLowerCase(), plus = /; ([^;]+?) : le plus/.exec(ph)[1].toLowerCase();
+    const c0 = BM.couleurPalette(BM.PALETTES[t][nom], 0), c1 = BM.couleurPalette(BM.PALETTES[t][nom], 1), mots = Object.keys(nommee).filter(m => m !== 'bleu nuit' || t === 'clair').filter(m => m !== 'bleu foncé' || t === 'sombre');
+    check(`${t} « ${nom} » : « ${peu} » est bien la couleur du peu (${JSON.stringify(c0)}), « ${plus} » celle du plus (${JSON.stringify(c1)})`, proche(c0, mots) === peu && proche(c1, mots) === plus, { c0, c1, peu, plus, p0: proche(c0, mots), p1: proche(c1, mots) });
+  }
+  check('options de la palette : nommées par ton (classique claire : « bleu très pâle → bleu → bleu nuit »)', /bleu très pâle → bleu → bleu nuit/.test(K.options.classique) && /bleu → cyan → vert → jaune → orange → blanc/.test(S.options.classique));
+  // Plus aucune phrase de couleur écrite en dur dans la carte : elles viennent de BM.MOTS_COULEURS.
+  const src = fs.readFileSync(path.join(REPO, 'js/bookmap.js'), 'utf8');
+  check('js/bookmap.js : plus de « Bleu foncé : peu », « trait jaune », « Bandes claires », « Ligne blanche » écrits en dur', !/Bleu foncé : peu|trait jaune|Bandes claires|'Ligne blanche/.test(src));
+  const lg = fs.readFileSync(path.join(REPO, 'bookmap.html'), 'utf8');
+  check('bookmap.html : les mots de couleur de la légende sont marqués (data-mot : maintenant, bandes, prix, arc), réécrits au ton affiché',
+    ['maintenant', 'bandes', 'prix', 'arc'].every(k => new RegExp('data-mot="' + k + '"').test(lg)) && /trait <span data-mot="maintenant">jaune<\/span>/.test(lg) && /bandes <span data-mot="bandes">claires<\/span>/.test(lg));
+}
 
 console.log(ko ? `\n❌ CARTE : ${ko} contrôle(s) en échec` : '\n✅ CARTE : TOUS LES CONTRÔLES PASSENT');
 process.exit(ko ? 1 : 0);

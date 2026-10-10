@@ -2,7 +2,9 @@
    Saṃsāra — Carte (bookmap) : l'interface. Les calculs sont dans js/bookmap-calc.js.
 
    La page est AUTONOME : elle ne partage aucun code avec le terminal (index.html, js/app.js),
-   qu'elle ne modifie pas. Elle lit deux fichiers publiés (heatmap.json, market-data.json)
+   qu'elle ne modifie pas — hors les cœurs communs (formats, repli Binance, et js/liaison.js : le
+   prix passé par l'adresse, « Voir sur le graphique ▸ », et le thème du terminal, qu'elle suit).
+   Elle lit deux fichiers publiés (heatmap.json, market-data.json)
    et interroge Binance elle-même — rien d'autre (contrat réseau : tests/test_contrat.py).
    Depuis le 08/10/2026, un troisième fichier publié, executions.json (executions.py, service
    permanent du VPS), porte 24 h d'exécutions : la carte les montre AVANT ce que la page a lu.
@@ -50,6 +52,14 @@
   function lireMode() { try { return localStorage.getItem(MODE_CLE) === 'expert' ? 'expert' : 'debutant'; } catch (e) { return 'debutant'; } }
   let MODE = lireMode();
   document.documentElement.setAttribute('data-mode', MODE);
+  // ─── Thème : le TON du terminal (clair / sombre) et sa couleur d'accent ───
+  // Décrit par le terminal (js/liaison.js, clé Liaison.CLE_THEME), posé sur <html data-theme-mode>
+  // par le script de tête de bookmap.html avant le premier rendu ; suivi ici quand il change dans un
+  // autre onglet (suivreTheme). Le ton choisit les jetons de la feuille, la palette de la chaleur
+  // (BM.PALETTES) et les MOTS qui disent les couleurs (BM.MOTS_COULEURS) : ils vont ensemble.
+  const ton = () => BM.ton(document.documentElement.getAttribute('data-theme-mode'));
+  const motsCouleurs = () => BM.motsCouleurs(ton());
+  function lireTheme() { try { return Liaison.lireTheme(localStorage.getItem(Liaison.CLE_THEME)); } catch (e) { return null; } }
 
   // ─── Réglages : changent le DÉTAIL, jamais une valeur affichée ──────────────
   const CLE = 'samsara-carte-v1';
@@ -610,10 +620,34 @@
     const now = maintenant(), p = dernierPrix() || 86000;
     const largeur = 3 * 3600e3;
     E.vue = { t1: now - largeur * 0.93, t2: now + largeur * 0.07, p1: p * (1 - 0.009), p2: p * (1 + 0.009) };
-    E.suivre = true;
+    E.suivre = true; E.tenir = false;
     majBoutonSuivre();
     dessiner();
   }
+  // ─── Le prix venu du terminal (« Voir sur la carte ▸ » : bookmap.html#prix=83450, js/liaison.js) ───
+  // La carte s'ouvre centrée sur ce prix (et assez haute pour montrer aussi le prix du moment), ce
+  // prix marqué : un trait en tirets de la couleur des repères sur la chaleur, son étiquette sur
+  // l'axe des prix — hors de la chaleur : le budget des mots du Lisible (2) n'en compte pas. La vue
+  // suit le présent dans le temps mais ne se recentre plus sur le prix (E.tenir) jusqu'au retour à
+  // la vue de départ (R, double-clic) ou au bouton Suivre. Le prix est VALIDÉ (Liaison.lirePrix :
+  // des chiffres seulement ; Liaison.plausible : à moins de 10 % du prix lu ici) ; sinon il est
+  // ignoré, sans un mot, et la carte s'ouvre comme d'habitude.
+  let MARQUE = null;         // { p, posee } — posee : la vue s'est centrée dessus
+  function lireMarque() {
+    const p = Liaison.lirePrix(location.hash);
+    MARQUE = p === null ? null : { p, posee: false };
+  }
+  function poserMarque() {
+    if (!MARQUE || MARQUE.posee) return;
+    const ref = dernierPrix();
+    if (!ref) return;
+    if (!Liaison.plausible(MARQUE.p, ref)) { MARQUE = null; return; }
+    const now = maintenant(), largeur = 3 * 3600e3, d = Math.max(MARQUE.p * 0.009, Math.abs(ref - MARQUE.p) * 1.25);
+    E.vue = { t1: now - largeur * 0.93, t2: now + largeur * 0.07, p1: MARQUE.p - d, p2: MARQUE.p + d };
+    E.suivre = true; E.tenir = true; MARQUE.posee = true;
+    majBoutonSuivre();
+  }
+  window.addEventListener('hashchange', () => { lireMarque(); dessiner(); });
   /** Suivre le présent : la vue avance par PIXELS ENTIERS (et se recentre sur le prix par pixels
    *  entiers) — le calque publié se décale alors sur lui-même au lieu d'être repeint.
    *  Sans saccade : quand le prix sort de la moitié centrale, la vue GLISSE vers lui en quelques
@@ -625,7 +659,7 @@
     if (!E.suivre || !E.vue || !Z) { glisse = null; return; }
     const v = E.vue, L = v.t2 - v.t1, tpp = L / Math.max(1, Z.chaleur.w), k = Math.trunc((maintenant() + L * 0.07 - v.t2) / tpp);
     if (k) { v.t1 += k * tpp; v.t2 += k * tpp; }
-    const p = dernierPrix();
+    const p = E.tenir ? null : dernierPrix();     // tenue sur le prix venu du terminal : pas de recentrage
     if (p) {
       const H = v.p2 - v.p1, pp = H / Math.max(1, Z.chaleur.h), bas = v.p1 + H * 0.25, haut = v.p2 - H * 0.25;
       if (!glisse && (p < bas || p > haut)) glisse = { t: performance.now() };
@@ -670,7 +704,11 @@
     Object.assign(C, {
       fond: v('--carte-fond', '#090c14'), nonObs: v('--carte-non-observe', '#0e121c'), hachure: v('--carte-hachure', '#232a3d'),
       ink1: v('--ink-1', '#eef2ff'), ink2: v('--ink-2', '#aab3cc'), ink3: v('--ink-3', '#7d87a3'),
-      up: v('--up', '#22c39a'), down: v('--down', '#ff5a7a'), accent: v('--accent', '#ffd166'),
+      // L'accent DESSINÉ (« maintenant », repères numérotés, prix venu du terminal) : celui de la carte,
+      // pas celui du thème (un accent bleu se confondrait avec la chaleur, un turquoise avec les achats).
+      up: v('--up', '#22c39a'), down: v('--down', '#ff5a7a'), accent: v('--carte-accent', '#ffd166'), surAccent: v('--carte-sur-accent', '#0b0b12'),
+      prixTexte: v('--carte-prix-texte', '#0b0b12'), prixHalo: v('--carte-prix-halo', 'rgba(0,0,0,0.6)'), surGamma: v('--carte-sur-gamma', '#0b0b12'),
+      croix: v('--carte-croix', 'rgba(255,255,255,0.35)'),
       prix: v('--carte-prix', '#ffffff'), grille: v('--carte-grille', 'rgba(255,255,255,0.06)'),
       pastille: v('--carte-pastille', 'rgba(9,12,20,0.86)'), murBid: v('--carte-mur-bid', '#3ee6b5'),
       murAsk: v('--carte-mur-ask', '#ff7a93'), gamma: v('--carte-gamma', '#c9a7ff'), live: v('--carte-live', '#7cc4ff'),
@@ -680,14 +718,8 @@
 
   // Palettes : 256 couleurs RGBA (Uint32, petit-boutiste = ABGR). Le contraste (seuil bas,
   // saturation) ne fait que choisir QUELLE couleur reçoit une intensité ; la lecture au
-  // pointeur donne toujours la valeur, quel que soit le réglage.
-  const PALETTES = {
-    classique: [[0, [12, 20, 60]], [0.18, [20, 60, 160]], [0.38, [0, 170, 220]], [0.58, [90, 230, 120]],
-      [0.76, [250, 230, 60]], [0.9, [255, 130, 30]], [1, [255, 250, 240]]],
-    cividis: [[0, [0, 32, 77]], [0.25, [67, 78, 108]], [0.5, [125, 124, 120]], [0.75, [188, 175, 111]], [1, [255, 233, 69]]],
-    bid: [[0, [8, 40, 44]], [0.5, [20, 170, 150]], [1, [190, 255, 235]]],
-    ask: [[0, [50, 12, 20]], [0.5, [220, 70, 70]], [1, [255, 225, 200]]],
-  };
+  // pointeur donne toujours la valeur, quel que soit le réglage. Celles du ton de la carte
+  // (BM.PALETTES : sombre, ou claire pour un thème clair du terminal).
   function rgb(c) {
     const m = c.match(/^#([0-9a-f]{6})$/i);
     if (m) { const n = parseInt(m[1], 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
@@ -697,16 +729,12 @@
   }
   const u32 = (r, g, b, a) => ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
   function lut(nom) {
-    const pts = PALETTES[nom], out = new Uint32Array(256), fond = rgb(C.fond);
+    const pts = BM.PALETTES[ton()][nom], out = new Uint32Array(256), fond = rgb(C.fond);
     const { bas, haut } = BM.bornesContraste(R.seuilBas, R.saturation);
     for (let v = 0; v < 256; v++) {
       if (v === 0 || v < bas) { out[v] = u32(fond[0], fond[1], fond[2], 255); continue; }
-      const x = Math.min(1, Math.max(0, (v - bas) / (haut - bas)));
-      let i = 0;
-      while (i < pts.length - 2 && x > pts[i + 1][0]) i++;
-      const [x0, c0] = pts[i], [x1, c1] = pts[i + 1], f = (x - x0) / (x1 - x0 || 1);
-      const k = j => Math.round(c0[j] + (c1[j] - c0[j]) * f);
-      out[v] = u32(k(0), k(1), k(2), 255);
+      const k = BM.couleurPalette(pts, (v - bas) / (haut - bas));
+      out[v] = u32(k[0], k[1], k[2], 255);
     }
     return out;
   }
@@ -894,6 +922,7 @@
     mettreEnPage();
     if (!Z) return;
     if (!E.vue && dernierPrix()) vueParDefaut();
+    if (MARQUE && !MARQUE.posee) poserMarque();
     if (!E.vue) {                  // rien à montrer encore : le canevas a déjà sa taille et son fond
       ctx.setTransform(Z.sx, 0, 0, Z.sy, 0, 0); ctx.fillStyle = C.panneau; ctx.fillRect(0, 0, Z.w, Z.h);
       return;
@@ -928,6 +957,7 @@
     if (estVu('murs')) murs();
     if (estVu('gamma')) gamma();
     if (estVu('bidask')) bidAsk();
+    if (MARQUE && MARQUE.posee) traitMarque();
     // Débutant : la ligne de prix passe AU-DESSUS des ronds (elle ne se perd pas dessous).
     if (estVu('prix') && !deb) lignePrix();
     if (estVu('executions')) bulles(); else FORMES_SENS = { achat: 0, vente: 0 };
@@ -1265,6 +1295,18 @@
     });
     vider();
   }
+  /** Le prix venu du terminal (MARQUE) : un trait en tirets sur toute la largeur, de la couleur des
+   *  repères, sur un trait du fond opposé (la chaleur ne le mange pas). Un tracé, pas un texte : son
+   *  étiquette est sur l'axe des prix (axePrix). */
+  function traitMarque() {
+    const y = Math.round(Y(MARQUE.p)) + 0.5;
+    if (y < 0 || y > Z.chaleur.h) return;
+    ctx.save(); ctx.setLineDash([8, 5]);
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(Z.chaleur.w, y);
+    ctx.strokeStyle = C.prixHalo; ctx.lineWidth = 4; ctx.stroke();
+    ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.stroke();
+    ctx.restore();
+  }
   let LIGNE = { cle: null, chemin: null };
   function lignePrix() {
     const ms = E.minutes;
@@ -1297,10 +1339,12 @@
     // ≈ 1,5 ms par image au navigateur).
     // Débutant : un trait qu'aucune couleur de la chaleur ne prend — blanc, plus épais, avec un fil
     // noir au milieu (« la ligne à fil noir ») : une bande d'ordres claire et droite ne se confond
-    // plus avec le prix.
+    // plus avec le prix. Le même sur une carte claire (son bord sombre le détache du fond) : la
+    // légende le dit dans les deux tons. Complet : la couleur du prix du ton (blanche sur la carte
+    // sombre, noire sur la claire) sur un trait large du fond opposé.
     const deb = debutant();
-    ctx.strokeStyle = deb ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.6)'; ctx.lineWidth = deb ? 7 : 3.6; ctx.stroke(LIGNE.chemin);
-    ctx.strokeStyle = C.prix; ctx.lineWidth = deb ? 4.6 : 1.6; ctx.stroke(LIGNE.chemin);
+    ctx.strokeStyle = deb ? 'rgba(0,0,0,0.7)' : C.prixHalo; ctx.lineWidth = deb ? 7 : 3.6; ctx.stroke(LIGNE.chemin);
+    ctx.strokeStyle = deb ? '#ffffff' : C.prix; ctx.lineWidth = deb ? 4.6 : 1.6; ctx.stroke(LIGNE.chemin);
     if (deb) { ctx.strokeStyle = '#0b0b12'; ctx.lineWidth = 1.4; ctx.stroke(LIGNE.chemin); }
     ctx.restore();
   }
@@ -1734,8 +1778,22 @@
     // Coordonnées de la chaleur → celles de la scène (le canevas la couvre, la chaleur y est décalée de Z.chaleur).
     if (pos) { const l = (Z.chaleur.x + pos.x) + 'px', t = (Z.chaleur.y + pos.y) + 'px'; if (miniEl.style.left !== l) miniEl.style.left = l; if (miniEl.style.top !== t) miniEl.style.top = t; }
   }
-  // Le mode changé dans le terminal (autre onglet) : suivi ici.
-  window.addEventListener('storage', e => { if (e.key === MODE_CLE || e.key === null) changerMode(lireMode()); });
+  // Le mode et le thème changés dans le terminal (autre onglet) : suivis ici.
+  window.addEventListener('storage', e => {
+    if (e.key === MODE_CLE || e.key === null) changerMode(lireMode());
+    if (e.key === Liaison.CLE_THEME || e.key === null) suivreTheme();
+  });
+  /** Le thème décrit par le terminal, posé sur <html> (js/liaison.js) ; puis tout ce qui tient sa
+   *  couleur hors de la feuille est relu : couleurs du canevas, motif « non observé », palettes (les
+   *  calques gardés sont repeints), mots des couleurs, légende, explication, affichage. */
+  function suivreTheme() {
+    Liaison.poserTheme(document.documentElement, lireTheme());
+    lireCouleurs();
+    for (const L of [PUB, LIVE, COMP, LOIN, RESERVE]) L.x.__motif = null;
+    ctx.__motif = null; MEM.peint = null; COMP.cle = null;
+    majMotsCouleurs(); majLegende(); remplirIntro(); construireAffichage();
+    dessiner();
+  }
   const echap = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const couleurEv = ev => (ev.type === 'rafale' ? (ev.achat ? C.up : C.down) : ev.type === 'options' ? C.gamma : ev.cote === 'b' ? C.murBid : C.murAsk);
   /** Le dernier carnet live est-il encore valable (moins de 3 cadences + 1 s) ? Sinon le guide ne
@@ -2069,6 +2127,10 @@
   /** Le prix de référence des repères débutants : celui de la pastille de l'axe (le dernier
    *  échange), sinon le milieu du carnet lu. */
   const prixRef = () => dernierPrix() || (GU.C ? GU.C.mid : null);
+  /** Le prix qu'un repère (mur ou zone de pBas à pHaut) passe au graphique du terminal (« Voir sur le
+   *  graphique ▸ ») : son bord le plus proche du prix, celui que dit son étiquette ; son milieu quand
+   *  le prix y est. */
+  const prixLien = (cote, pBas, pHaut) => { const px = prixRef(); return px >= pBas && px <= pHaut ? (pBas + pHaut) / 2 : cote === 'bid' ? pHaut : pBas; };
   /** Les repères débutants, un par côté : la zone à surveiller de ce côté (« Dans un mur … » quand
    *  le prix y est : son cadre est allumé), sinon le mur le plus proche du prix (BM.murPlusProche),
    *  sinon rien. P : le bord de l'amas le plus proche du prix (là où il commence). Seulement avec un
@@ -2186,7 +2248,7 @@
         if (b) GU.etiquettes.push(Object.assign(b, { texte: t, cote, prix: null, source: 'vide', long: texteVideDebutant(cote) }));
         continue;
       }
-      if (b) GU.etiquettes.push(Object.assign(b, { texte: n.etiquette, cote, prix: n.P, source: n.source, dedans: !!n.dedans, long: texteNiveauDebutant(n, now) }));
+      if (b) GU.etiquettes.push(Object.assign(b, { texte: n.etiquette, cote, prix: n.P, source: n.source, dedans: !!n.dedans, long: texteNiveauDebutant(n, now), lien: prixLien(cote, n.pBas, n.pHaut) }));
     }
   }
   /** L'étiquette d'une zone (débutant), À CÔTÉ de son cadre : d'abord à la hauteur du cadre (au plus
@@ -2251,7 +2313,7 @@
       const yc = (f.ya + f.yb) / 2, b = poserBoite(vs, f.x0 + 6, yc, 'left', coul, 70, [f.x0 + 6, f.x0 - 150, f.x0 - 300], 'zone' + z.cote);
       if (!b) continue;
       for (const m of dz) dansZone.add(m);
-      GU.etiquettes.push(Object.assign(b, { texte: vs[0].join(' '), long: nomZ.toLowerCase() + ' (zone chargée) ' + ou + ' : ' + BM.btc(z.q) + ' BTC d\'ordres ' + mot + ' en attente' + (w ? ', ' + dont : '') + ' (dernier carnet live, mesuré ; seuils : convention). Les ordres peuvent être retirés à tout moment.' }));
+      GU.etiquettes.push(Object.assign(b, { texte: vs[0].join(' '), lien: prixLien(z.cote, z.pBas, z.pHaut), long: nomZ.toLowerCase() + ' (zone chargée) ' + ou + ' : ' + BM.btc(z.q) + ' BTC d\'ordres ' + mot + ' en attente' + (w ? ', ' + dont : '') + ' (dernier carnet live, mesuré ; seuils : convention). Les ordres peuvent être retirés à tout moment.' }));
     }
     // Murs en mots : bord droit dans une colonne fixe juste avant « maintenant » (une largeur
     // d'étiquette au plus vers la gauche) ; faute de place, la version courte, jamais plus loin.
@@ -2262,7 +2324,7 @@
       const t = BM.texteMur(m, MODE, now), coul = m.cote === 'bid' ? C.murBid : C.murAsk;
       const b = poserBoite([t.lignes, [t.court]], xn, y, 'right', coul, 34, [xn - 10, xn - 10 - Math.min(230, W * 0.2)], (m.source === 'live' ? 'mur' : 'pub') + m.cote + m.p);
       const lieu = 'tranche ' + BM.prix(m.p) + '–' + BM.prix(m.p + m.pas) + ' $ (somme des ordres de la tranche)';
-      if (b) GU.etiquettes.push(Object.assign(b, { texte: t.lignes.join(' · '), long: t.lignes.join(' · ') + ' · ' + lieu + (m.source === 'live' ? ' · carnet live (mesuré)' + (m.publiee ? ', puis carte publiée' : '') + ' : beaucoup d\'ordres ' + (m.cote === 'bid' ? 'd\'achat' : 'de vente') + ' en attente ici ; ils peuvent être retirés à tout moment' : ' · fichier de 15 min') }));
+      if (b) GU.etiquettes.push(Object.assign(b, { texte: t.lignes.join(' · '), lien: prixLien(m.cote, m.p, m.p + m.pas), long: t.lignes.join(' · ') + ' · ' + lieu + (m.source === 'live' ? ' · carnet live (mesuré)' + (m.publiee ? ', puis carte publiée' : '') + ' : beaucoup d\'ordres ' + (m.cote === 'bid' ? 'd\'achat' : 'de vente') + ' en attente ici ; ils peuvent être retirés à tout moment' : ' · fichier de 15 min') }));
     }
     // Places gardées des murs qui ne sont plus nommés : oubliées.
     const vus = new Set(affiches.map(m => (m.source === 'live' ? 'mur' : 'pub') + m.cote + m.p));
@@ -2290,19 +2352,19 @@
    *  posée : chaque cadre dessiné a sa phrase), ou le trait de son mur de repli. { titre (le texte
    *  de l'étiquette), texte (sa phrase entière) } ou null. */
   function guideEnDebutant(x, y) {
-    for (const e of GU.etiquettes) if (x >= e.x && x <= e.x + e.w && y >= e.y && y <= e.y + e.h) return { titre: e.texte, texte: e.long };
+    for (const e of GU.etiquettes) if (x >= e.x && x <= e.x + e.w && y >= e.y && y <= e.y + e.h) return { titre: e.texte, texte: e.long, lien: e.lien };
     const de = (cote, src) => GU.etiquettes.find(q => q.cote === cote && q.source === src);
     const N = GU.present && carnetFrais() ? niveauxDebutant() : { bid: null, ask: null };
     for (const f of GU.cadres) if (x >= f.x0 && x <= f.x1 && y >= f.ya - 2 && y <= f.yb + 2) {
       const e = de(f.z.cote, 'zone');
-      if (e) return { titre: e.texte, texte: e.long };
+      if (e) return { titre: e.texte, texte: e.long, lien: e.lien };
       const n = N[f.z.cote] && N[f.z.cote].z === f.z ? N[f.z.cote]
         : { cote: f.z.cote, source: 'zone', dedans: f.dedans, pBas: f.z.pBas, pHaut: f.z.pHaut, q: f.z.q, z: f.z, etiquette: f.dedans ? BM.etiquetteDedans(f.z.cote) : BM.etiquetteNiveau(f.z.cote, f.z.cote === 'bid' ? f.z.pHaut : f.z.pBas) };
-      return { titre: n.etiquette, texte: texteNiveauDebutant(n, maintenant()) };
+      return { titre: n.etiquette, texte: texteNiveauDebutant(n, maintenant()), lien: prixLien(f.z.cote, f.z.pBas, f.z.pHaut) };
     }
     for (const m of GU.present && carnetFrais() ? mursRepli() : []) {
       const ym = Y(m.p + m.pas / 2), e = de(m.cote, 'mur');
-      if (e && Math.abs(y - ym) <= 4 && x <= X(maintenant()) + 4) return { titre: e.texte, texte: e.long };
+      if (e && Math.abs(y - ym) <= 4 && x <= X(maintenant()) + 4) return { titre: e.texte, texte: e.long, lien: e.lien };
     }
     return null;
   }
@@ -2449,13 +2511,16 @@
     majIndice();
     dessiner();
   }
-  /** Mode débutant : les couleurs de la chaleur DANS L'ORDRE de la palette (PALETTES) — « plus
-   *  clair » serait faux pour l'orange de la palette classique, plus sombre que le jaune mais qui
-   *  dit plus d'ordres. */
-  function couleursDebutant() {
-    if (R.palette === 'cote') return 'Achats en turquoise, ventes en rouge : sombre, peu d\'ordres à ce prix ; clair, le plus d\'ordres.';
-    if (R.palette === 'cividis') return 'Bleu foncé : peu d\'ordres à ce prix ; puis gris ; jaune : le plus d\'ordres.';
-    return 'Bleu foncé : peu d\'ordres à ce prix ; puis bleu clair, vert, jaune, orange ; blanc : le plus d\'ordres.';
+  /** Mode débutant : les couleurs de la chaleur DANS L'ORDRE de la palette affichée — celle du
+   *  ton de la carte (BM.MOTS_COULEURS, à côté de BM.PALETTES) : « bleu foncé : peu d'ordres » sur
+   *  la carte sombre, « bleu très pâle : peu d'ordres » sur la claire. */
+  function couleursDebutant() { return BM.phrasePalette(R.palette, ton()); }
+  /** Les mots de couleur de la page qui ne sont pas écrits par le code (légende : data-mot) et les
+   *  noms des palettes (Réglages) : ceux du ton affiché. */
+  function majMotsCouleurs() {
+    const m = motsCouleurs();
+    for (const el of document.querySelectorAll('[data-mot]')) { const t = m[el.getAttribute('data-mot')]; if (t && el.textContent !== t) el.textContent = t; }
+    for (const o of document.querySelectorAll('#rPalette option')) { const t = m.options[o.value]; if (t && o.textContent !== t) o.textContent = t; }
   }
   /** Les mots des couleurs de la chaleur : ceux de la palette choisie (le texte de son option). */
   function paletteMots() {
@@ -2470,15 +2535,15 @@
     // Débutant : 3 points, ce qu'il voit — couleurs, ligne du prix (à fil noir) et ronds, les deux repères.
     if (debutant()) return [
       ['Couleurs = ordres d\'achat ou de vente en attente.', couleursDebutant() + ' Un ordre peut être retiré à tout moment. Hachures : ce qui n\'a pas été lu là (les ordres en attente, ou les échanges), et l\'avenir, à droite de «\u00a0maintenant\u00a0».'],
-      ['Ligne à fil noir = le prix, jusqu\'au trait jaune «\u00a0maintenant\u00a0». Ronds = échanges réels.', couleurMot('Vert', '--up') + ' ▲ : surtout des acheteurs qui ont pris des ventes en attente. ' + couleurMot('Rouge', '--down') + ' ▼ : surtout des vendeurs qui ont pris des achats en attente. Plus gros = plus de BTC.'],
+      ['Ligne à fil noir = le prix, jusqu\'au trait ' + motsCouleurs().maintenant + ' «\u00a0maintenant\u00a0». Ronds = échanges réels.', couleurMot('Vert', '--up') + ' ▲ : surtout des acheteurs qui ont pris des ventes en attente. ' + couleurMot('Rouge', '--down') + ' ▼ : surtout des vendeurs qui ont pris des achats en attente. Plus gros = plus de BTC.'],
       ['«\u00a0Mur d’achat\u00a0» sous le prix, «\u00a0Mur de vente\u00a0» au-dessus : le prix le plus proche où nettement plus d\'ordres attendent qu\'ailleurs.', 'La phrase du haut décrit l\'instant : ce n\'est pas une prévision.'],
     ];
     const n = E.niv, tr = (n && n.tranche) || BM.GUIDE.trancheUsd;
     // Les niveaux d'options montrés : tirés du fichier (court + nom), pas d'une liste écrite à la main.
     const gam = n && n.gamma && n.gamma.length ? [...new Map(n.gamma.map(g => [g.court, g.nom])).entries()].map(([c, nom]) => c + ' ' + nom.charAt(0).toLowerCase() + nom.slice(1)).join(', ') : 'aucun niveau dans le fichier lu';
     return [
-      ['Bandes claires = ordres en attente (le carnet).', 'Plus la couleur avance dans la palette (' + paletteMots() + '), plus il y a d\'ordres posés dans la tranche. Ce sont des intentions : un ordre peut être retiré.'],
-      ['Ligne blanche = le prix.', 'La clôture de chaque minute ; à la seconde (après la dernière minute close, et partout quand on zoome), le prix moyen des échanges pondéré par le volume.'],
+      ['Bandes ' + motsCouleurs().bandes + ' = ordres en attente (le carnet).', 'Plus la couleur avance dans la palette (' + paletteMots() + '), plus il y a d\'ordres posés dans la tranche. Ce sont des intentions : un ordre peut être retiré.'],
+      ['Ligne ' + motsCouleurs().prix + ' = le prix.', 'La clôture de chaque minute ; à la seconde (après la dernière minute close, et partout quand on zoome), le prix moyen des échanges pondéré par le volume.'],
       ['Ronds = échanges réellement exécutés.', couleurMot('Vert', '--up') + ' : achat au marché (l\'acheteur a pris le prix d\'un vendeur) ; ' + couleurMot('rouge', '--down') + ' : vente au marché (l\'inverse). Chaque échange a un acheteur et un vendeur : la couleur dit seulement qui a pris le prix de l\'autre. Plus gros rond, plus gros volume.'],
       ['Rectangles « Σ … BTC » = les gros paquets (fichier de 15 min).', 'Σ veut dire « somme » : tous les ordres posés dans une tranche de ' + tr + ' $ (les plus grosses, sans seuil)' + (n && n.mursA ? ', lus à ' + BM.jourHeure(n.mursA, maintenant()) : '') + ' ; ' + couleurMot('turquoise', '--carte-mur-bid') + ' côté achat, ' + couleurMot('rose', '--carte-mur-ask') + ' côté vente.'],
       ['Tirets ' + couleurMot('violets', '--carte-gamma') + ' = niveaux d\'options (modèle).', gam + ' : calculés d\'après les options Deribit sous une hypothèse, pas observés.'],
@@ -2616,7 +2681,7 @@
       ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.arc(pos[0], pos[1], 9.5, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
-      texte(String(k), pos[0], pos[1] + 0.5, '#0b0b12', 11, 'center', true);
+      texte(String(k), pos[0], pos[1] + 0.5, C.surAccent, 11, 'center', true);
       TEXTES_CARTE[TEXTES_CARTE.length - 1].repere = true;
       reserver(pos[0] - 10, pos[1] - 10, 20, 20, String(k));
       GU.reperes.push({ n: k, x: pos[0], y: pos[1], cx, cy });
@@ -2636,7 +2701,7 @@
     if (!s || s.zone !== 'chaleur') return;
     // Débutant : sur un repère (étiquette, cadre, trait), pas de croix — elle barrerait son nom.
     if (debutant() && R.calques.guide && guideEnDebutant(s.x, s.y)) return;
-    ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+    ctx.save(); ctx.strokeStyle = C.croix; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(Math.round(s.x) + 0.5, 0); ctx.lineTo(Math.round(s.x) + 0.5, Z.chaleur.h);
     ctx.moveTo(0, Math.round(s.y) + 0.5); ctx.lineTo(Z.chaleur.w, Math.round(s.y) + 0.5); ctx.stroke(); ctx.restore();
     CROIX_VUE = true;
@@ -2658,7 +2723,7 @@
         if (y > 6 && y < a.h - 6) {
           ctx.fillStyle = C.gamma; ctx.fillRect(a.x, y - 7, a.w, 14);
           const t = ajuster([g.court + ' ' + BM.prix(g.p), g.court + ' ' + kilo(g.p), g.court + ' ' + kiloCourt(g.p)], a.w - 6, 10, true);
-          texte(t, a.x + 4, y, '#0b0b12', largeurTexte(t, 10, true) <= a.w - 6 ? 10 : 8.5, 'left', true); reserve.push(y);
+          texte(t, a.x + 4, y, C.surGamma, largeurTexte(t, 10, true) <= a.w - 6 ? 10 : 8.5, 'left', true); reserve.push(y);
         } else if ((y <= 6 && haut < 3) || (y >= a.h - 6 && bas < 3)) {
           // Hors champ : fléché, en milliers ; la valeur reste écrite (corps réduit s'il le faut).
           const f = y <= 6 ? '↑' : '↓', yy = y <= 6 ? 9 + 13 * haut++ : a.h - 9 - 13 * bas++;
@@ -2670,6 +2735,15 @@
     }
     const p = dernierPrix(), yPrix = p ? Math.max(8, Math.min(a.h - 8, Y(p))) : -99;
     reserve.push(yPrix);
+    // Le prix venu du terminal : son étiquette, de la couleur de son trait, sous celle du prix.
+    const yM = MARQUE && MARQUE.posee ? Y(MARQUE.p) : null;
+    if (yM !== null && yM >= 0 && yM <= a.h) {
+      const tM = ajuster([BM.prix(MARQUE.p, debutant() ? 0 : 2), BM.prix(MARQUE.p, 0), kilo(MARQUE.p)], a.w - 8, 10.5, true);
+      ctx.fillStyle = C.accent; arrondi(a.x + 1, yM - 9, a.w - 2, 18, 4); ctx.fill();
+      texte(tM, a.x + 5, yM, C.surAccent, 10.5, 'left', true);
+      reserve.push(yM);
+      TEXTES.marque = tM;
+    } else TEXTES.marque = '';
     const pas = BM.pasRond((E.vue.p2 - E.vue.p1) / Math.max(4, a.h / 70));
     const dec = BM.decimales(pas);          // 2,5 $ s'écrit 2,5 — pas « 3 »
     const graduations = TEXTES.axePrix = [];
@@ -2685,7 +2759,7 @@
       const deb = debutant(), taille = deb ? 13 : 11, hb = deb ? 22 : 18;
       ctx.fillStyle = C.prix; arrondi(a.x + 1, yPrix - hb / 2, a.w - 2, hb, 4); ctx.fill();
       TEXTES.prix = deb ? BM.prix(p, 0) : ajuster([BM.prix(p, 2), BM.prix(p, 0)], a.w - 7, 11, true);
-      texte(TEXTES.prix, a.x + 5, yPrix, '#0b0b12', deb && largeurTexte(TEXTES.prix, 13, true) > a.w - 7 ? 12 : taille, 'left', true);
+      texte(TEXTES.prix, a.x + 5, yPrix, C.prixTexte, deb && largeurTexte(TEXTES.prix, 13, true) > a.w - 7 ? 12 : taille, 'left', true);
     }
   }
   const kilo = p => BM.nombre(p / 1000, 0, 1) + ' k';
@@ -2842,15 +2916,49 @@
 
   // ─── Lecture au pointeur : la VALEUR, quel que soit le réglage ──────────────
   const bulleInfo = document.getElementById('lecture');
-  let lectureHtml = null, lectureTaille = null;
+  // Deux parties : le texte (réécrit quand il change : les âges, chaque seconde) et le lien d'un
+  // repère vers le graphique du terminal, « Voir sur le graphique ▸ » — un élément GARDÉ, changé
+  // seulement quand son adresse change : un clic n'est jamais coupé par une réécriture.
+  const lectureCorps = document.createElement('div'), lectureLien = document.createElement('a');
+  lectureLien.className = 'lecture-lien'; lectureLien.textContent = 'Voir sur le graphique ▸'; lectureLien.hidden = true;
+  bulleInfo.append(lectureCorps, lectureLien);
+  let lectureHtml = null, lectureTaille = null, lectureAdresse = null;
   // Largeur maximale de la bulle de lecture : lue dans la feuille (--lecture-max), pas recopiée.
   const LECTURE_MAX = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lecture-max')) || 440;
   function cacherLecture() { if (!bulleInfo.hidden) bulleInfo.hidden = true; lectureHtml = null; }
+  /** Le pointeur est-il sur le trait du prix venu du terminal ? */
+  const surMarque = y => !!(MARQUE && MARQUE.posee && E.vue && Math.abs(y - Y(MARQUE.p)) <= 5);
+  /** Le prix que le graphique du terminal marquera depuis l'élément sous le pointeur (« Voir sur le
+   *  graphique ▸ ») : un mur ou une zone du Guide (prixLien), ou le prix venu du terminal. */
+  function lienSous(s) {
+    if (R.calques.guide) {
+      const g = debutant() ? guideEnDebutant(s.x, s.y) : GU.etiquettes.find(e => s.x >= e.x && s.x <= e.x + e.w && s.y >= e.y && s.y <= e.y + e.h);
+      if (g && g.lien) return g.lien;
+    }
+    return surMarque(s.y) ? MARQUE.p : null;
+  }
+  /** La souris va-t-elle vers la lecture qui porte un lien ? Elle y est, ou la demi-droite de
+   *  l'ancre de la lecture (E.souris) à travers le pointeur la touche : la lecture reste alors en
+   *  place (sinon, collée au pointeur, elle fuirait devant lui). */
+  function versLecture(x, y) {
+    const s = E.souris;
+    if (!s || s.tactile || bulleInfo.hidden || lectureLien.hidden) return false;
+    const b = bulleInfo.getBoundingClientRect(), r = rect();
+    const lo = [b.left - r.left - 6, b.top - r.top - 6], hi = [b.right - r.left + 6, b.bottom - r.top + 6], o = [s.x, s.y], d = [x - s.x, y - s.y];
+    let s0 = 1, s1 = Infinity;
+    for (let k = 0; k < 2; k++) {
+      if (Math.abs(d[k]) < 1e-9) { if (o[k] < lo[k] || o[k] > hi[k]) return false; continue; }
+      let u = (lo[k] - o[k]) / d[k], v = (hi[k] - o[k]) / d[k];
+      if (u > v) [u, v] = [v, u];
+      s0 = Math.max(s0, u); s1 = Math.min(s1, v);
+    }
+    return s0 <= s1;
+  }
   function lectureSouris() {
     const s = E.souris;
     // Pendant un glissement à la souris, la croix suit le pointeur et la lecture attend le lâcher.
     if (!s || s.zone !== 'chaleur' || s.geste) { cacherLecture(); return; }
-    if (debutant()) { placerLecture(lignesDebutant(s), s); return; }
+    if (debutant()) { placerLecture(lignesDebutant(s), s, lienSous(s)); return; }
     const t = T(s.x), p = Pr(s.y), l = [];
     l.push('<b>' + BM.prix(p, 2) + ' $</b> · ' + BM.heure(t, true));
     // Le PIXEL sous le pointeur, tel que la peinture le calcule : mêmes colonnes, mêmes tranches,
@@ -2905,7 +3013,8 @@
     if (estVu('destin')) { const dn = destinEn(s.x, s.y); if (dn) l.push(texteDestin(dn)); }
     if (R.calques.guide) { const gd = guideEn(s.x, s.y); if (gd) l.push(echap(gd).replace(/\n/g, '<br>')); }
     { const pa = pastilleEn(s.x, s.y); if (pa) l.push(echap(pa)); }
-    placerLecture(l, s);
+    if (surMarque(s.y)) l.push('Prix venu du graphique du Terminal : ' + BM.prix(MARQUE.p, 2) + ' $ (trait en tirets)');
+    placerLecture(l, s, lienSous(s));
   }
   /** La bulle d'exécutions sous le pointeur : la bulle SURVOLÉE (la plus haute qui le contient, au
    *  rayon dessiné), sinon le seau sous le pointeur — la même grille de seaux que le dessin. */
@@ -2926,6 +3035,8 @@
     // ni de case sous le doigt, qui diraient un autre prix et une autre quantité que l'étiquette.
     const gd = R.calques.guide ? guideEnDebutant(s.x, s.y) : null;
     if (gd) return ['<b>' + echap(gd.titre) + '</b>', echap(BM.typo(gd.texte)), '<span class="lecture-ages">' + echap(BM.typo(agesDebutant(now))) + '</span>'];
+    // Sur le trait du prix venu du terminal : ce qu'il est.
+    if (surMarque(s.y)) return ['<b>Prix choisi sur le graphique · ' + BM.prix(MARQUE.p, 0) + NB + '$</b>', echap(BM.typo('Le trait en tirets reste à ce prix, venu du Terminal ; il ne suit pas le prix du moment.'))];
     l.push('<b>' + BM.prix(p, 0) + NB + '$</b> · ' + BM.heure(t, true));
     const tpp = (E.vue.t2 - E.vue.t1) / Z.chaleur.w, pp = (E.vue.p2 - E.vue.p1) / Z.chaleur.h;
     const ix = Math.floor(s.x), iy = Math.floor(s.y), ta = E.vue.t1 + ix * tpp;
@@ -2980,9 +3091,10 @@
    *  (une mesure après innerHTML force une mise en page à chaque mouvement) : elle bascule à gauche
    *  ou au-dessus du pointeur par un translate(-100 %) quand sa largeur maximale (LECTURE_MAX) ou
    *  une hauteur prudente ne tiendraient pas. Au doigt (un appui, rare), elle est mesurée. */
-  function placerLecture(l, s) {
-    const html = l.join('<br>');
-    if (html !== lectureHtml) { bulleInfo.innerHTML = html; bulleInfo.hidden = false; lectureHtml = html; lectureTaille = null; }
+  function placerLecture(l, s, lien) {
+    const html = l.join('<br>'), adresse = lien ? Liaison.adresse('index.html', lien) : null;
+    if (html !== lectureHtml) { lectureCorps.innerHTML = html; bulleInfo.hidden = false; lectureHtml = html; lectureTaille = null; }
+    if (adresse !== lectureAdresse) { lectureAdresse = adresse; lectureLien.hidden = !adresse; if (adresse) lectureLien.href = adresse; lectureTaille = null; }
     const r = rect(), vw = window.innerWidth, vh = window.innerHeight, px = r.left + s.x, py = r.top + s.y;
     if (s.tactile || vw < 2 * LECTURE_MAX) {
       if (!lectureTaille) lectureTaille = [bulleInfo.offsetWidth, bulleInfo.offsetHeight];
@@ -3065,6 +3177,8 @@
   });
   cv.addEventListener('pointermove', e => {
     const { x, y } = position(e), tactile = e.pointerType === 'touch';
+    // Vers le lien de la lecture (« Voir sur le graphique ▸ ») : elle reste où elle est.
+    if (!tactile && !geste && versLecture(x, y)) return;
     if (pointeurs.has(e.pointerId)) pointeurs.set(e.pointerId, { x, y });
     // La souris : la croix suit TOUJOURS le pointeur, geste ou non.
     if (!tactile) E.souris = { x, y, zone: zoneDe(x, y), geste: !!(geste && geste.bouge) };
@@ -3118,7 +3232,9 @@
   cv.addEventListener('pointerup', fin);
   cv.addEventListener('pointercancel', fin);
   // Le doigt « quitte » la carte à chaque lever : la lecture épinglée reste.
-  cv.addEventListener('pointerleave', e => { if (e.pointerType === 'touch' || geste) return; E.souris = null; dessiner(); });
+  cv.addEventListener('pointerleave', e => { if (e.pointerType === 'touch' || geste || (e.relatedTarget && bulleInfo.contains(e.relatedTarget))) return; E.souris = null; dessiner(); });
+  // Le pointeur quitte le lien de la lecture ailleurs que vers la carte : la lecture s'en va.
+  lectureLien.addEventListener('pointerleave', e => { if (e.pointerType === 'touch' || e.relatedTarget === cv) return; E.souris = null; dessiner(); });
   cv.addEventListener('wheel', e => {
     if (!E.vue || !Z) return;
     e.preventDefault();
@@ -3182,7 +3298,7 @@
 
   // ─── Barre, réglages, légende ──────────────────────────────────────────────
   const $ = id => document.getElementById(id);
-  function basculerSuivre() { E.suivre = !E.suivre; if (E.suivre) suivreMaintenant(); majBoutonSuivre(); dessiner(); }
+  function basculerSuivre() { E.suivre = !E.suivre; if (E.suivre) { E.tenir = false; suivreMaintenant(); } majBoutonSuivre(); dessiner(); }
   function majBoutonSuivre() {
     const b = $('btnSuivre');
     if (!b) return;
@@ -3282,12 +3398,13 @@
   };
   // Lisible : seulement ce que l'écran montre, en mots du Lisible. Le Guide se choisit ; les couleurs,
   // les ronds et la ligne du prix sont toujours là (FORCE_DEBUTANT) : leur case le dit, sans bouger.
-  // [clé (null : toujours là), nom, « C'est quoi ? » (null : les couleurs de la palette choisie), « toujours … »]
+  // [clé (null : toujours là), nom, « C'est quoi ? » (null : les couleurs de la palette choisie ; une
+  // fonction : un texte qui nomme une couleur, écrit au ton affiché), « toujours … »]
   const QUESTIONS_LISIBLE = [
     ['Que dit la carte, en mots ?', [['guide', 'Repères en mots (Guide)', 'Les prix proches où nettement plus d’ordres attendent qu’ailleurs : « Mur d’achat » sous le prix, « Mur de vente » au-dessus, et la phrase du haut. Un ordre peut être retiré à tout moment.']]],
     ['Où attendent les ordres ?', [[null, 'Les couleurs', null, 'toujours affichées']]],
     ['Qu’est-ce qui s’échange ?', [[null, 'Les ronds', 'Les échanges réels : vert ▲, surtout des achats ; rouge ▼, surtout des ventes. Plus gros, plus échangé.', 'toujours affichés']]],
-    ['D’où vient le prix ?', [[null, 'La ligne à fil noir', 'Le prix, minute après minute, jusqu’au trait jaune « maintenant ».', 'toujours affichée']]],
+    ['D’où vient le prix ?', [[null, 'La ligne à fil noir', () => 'Le prix, minute après minute, jusqu’au trait ' + motsCouleurs().maintenant + ' « maintenant ».', 'toujours affichée']]],
   ];
   const NOM_CALQUE = Object.fromEntries(NOMS_CALQUES.map(([k, nom]) => [k, nom]));
   function construireAffichage() {
@@ -3300,7 +3417,7 @@
         + ' aria-describedby="' + id + '"> <span class="aff-nom">' + echap(nom) + '</span>' + (toujours ? ' <span class="aff-toujours">' + toujours + '</span>' : '') + '</label>'
         + '<p class="aff-quoi" id="' + id + '"><span class="aff-qq">C’est quoi ?</span> ' + echap(quoi) + '</p></div>';
     };
-    const groupes = debutant() ? QUESTIONS_LISIBLE.map(([q, l]) => [q, l.map(([k, nom, quoi, toujours]) => ligne(k, nom, quoi || couleursDebutant(), toujours))])
+    const groupes = debutant() ? QUESTIONS_LISIBLE.map(([q, l]) => [q, l.map(([k, nom, quoi, toujours]) => ligne(k, nom, typeof quoi === 'function' ? quoi() : quoi || couleursDebutant(), toujours))])
       : QUESTIONS.map(([q, ks]) => [q, ks.map(k => ligne(k, NOM_CALQUE[k], C_EST_QUOI[k]))]);
     z.innerHTML = groupes.map(([q, l]) => '<fieldset class="aff-groupe"><legend>' + echap(q) + '</legend>' + l.join('') + '</fieldset>').join('');
     for (const c of z.querySelectorAll('input[data-calque]')) c.addEventListener('change', () => { poserCalque(c.dataset.calque, c.checked); apresCalques(); });
@@ -3524,7 +3641,9 @@
   lireCouleurs();
   construireBarre();
   majBoutonMode();
+  majMotsCouleurs();
   majLegende();
+  lireMarque();
   // Première visite : « Comment lire cette carte » s'ouvre (refermée, elle ne revient que sur demande).
   if (!introVue()) ouvrirIntro(); else majIndice();
   demarrer();
@@ -3564,12 +3683,17 @@
       mise: Z && { w: Z.w, h: Z.h, dpr: Z.dpr, sx: Z.sx, sy: Z.sy, chaleur: Object.assign({}, Z.chaleur), masques: Z.masques.slice(), court: Z.court, etroit: Z.etroit,
         dom: Object.assign({}, Z.dom), vol: Object.assign({}, Z.vol), cvd: Object.assign({}, Z.cvd), axeP: Object.assign({}, Z.axeP) },
       mode: MODE,
+      // Le thème suivi (ton, accent du cadre, couleurs du canevas) et le prix venu du terminal.
+      theme: { ton: ton(), terminal: document.documentElement.getAttribute('data-theme-terminal'), accentCadre: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
+        fond: C.fond, accent: C.accent, prix: C.prix, mots: Object.assign({}, motsCouleurs(), { palette: couleursDebutant() }) },
+      marque: MARQUE && { p: MARQUE.p, posee: MARQUE.posee, y: Z && E.vue ? Y(MARQUE.p) : null, tenir: !!E.tenir },
+      lien: { visible: !bulleInfo.hidden && !lectureLien.hidden, adresse: lectureAdresse },
       // Les textes écrits SUR la chaleur au dernier rendu (le budget de l'écran débutant), et les lignes
       // de toutes les pastilles d'âge (dessinées en expert seulement : mêmes chaînes dans les deux modes).
       textesCarte: TEXTES_CARTE.map(t => Object.assign({}, t)),
       ages: AGES.map(a => a.lignes.join(' | ')),
       debutant: { resume: Object.assign({}, RESUME_DEB, { tendance: undefined }), tendance: RESUME_DEB.tendance && Object.assign({}, RESUME_DEB.tendance),
-        etiquettes: GU.etiquettes.map(x => ({ texte: x.texte, cote: x.cote || null, prix: x.prix === undefined ? null : x.prix, source: x.source || null, dedans: !!x.dedans, x: x.x, y: x.y, w: x.w, h: x.h, long: x.long })),
+        etiquettes: GU.etiquettes.map(x => ({ texte: x.texte, cote: x.cote || null, prix: x.prix === undefined ? null : x.prix, source: x.source || null, dedans: !!x.dedans, x: x.x, y: x.y, w: x.w, h: x.h, long: x.long, lien: x.lien === undefined ? null : x.lien })),
         yPrix: Z && E.vue && dernierPrix() ? Y(dernierPrix()) : null,
         cadres: GU.cadres.map(f => ({ cote: f.z.cote, x0: f.x0, x1: f.x1, ya: f.ya, yb: f.yb, dedans: f.dedans })),
         niveaux: Z ? (n => ({ bid: n.bid && { P: n.bid.P, source: n.bid.source, dedans: !!n.bid.dedans, pBas: n.bid.pBas, pHaut: n.bid.pHaut }, ask: n.ask && { P: n.ask.P, source: n.ask.source, dedans: !!n.ask.dedans, pBas: n.ask.pBas, pHaut: n.ask.pHaut } }))(niveauxDebutant()) : null,
@@ -3585,7 +3709,7 @@
         seuil: GU.seuil && Object.assign({}, GU.seuil), present: GU.present, nommes: GU.nommes.size, suites: GU.suites.length, caches: [...GU.caches],
         affiches: Z ? mursAffiches().map(m => ({ cote: m.cote, p: m.p, q: m.q, source: m.source })) : [],
         zones: { bid: GU.zones.bid && Object.assign({}, GU.zones.bid), ask: GU.zones.ask && Object.assign({}, GU.zones.ask) },
-        etiquettes: GU.etiquettes.map(x => x.texte), etiquettesPos: GU.etiquettes.map(x => ({ x: x.x, y: x.y, w: x.w, h: x.h, texte: x.texte })), reperes: GU.reperes.map(r => ({ n: r.n, x: r.x, y: r.y })),
+        etiquettes: GU.etiquettes.map(x => x.texte), etiquettesPos: GU.etiquettes.map(x => ({ x: x.x, y: x.y, w: x.w, h: x.h, texte: x.texte, lien: x.lien === undefined ? null : x.lien })), reperes: GU.reperes.map(r => ({ n: r.n, x: r.x, y: r.y })),
         journal: GU.journal.derniers(BM.GUIDE.journalMax).map(x => ({ t: x.t, type: x.type, texte: x.texte, n: x.n })), evenements: GU.journal.liste.length, marques: GU.marques.length },
       rafales: { n: E.raf.liste.length, version: E.raf.version, debut: E.raf.debut, arriereFini: !!(E.execArriere && E.execArriere.fini), dessinees: RAF.items.map(it => ({ x: it.x, y0: it.y0, h: it.h, q: it.r.q8 / 1e8, T: it.r.T, achat: it.r.achat, ordres: it.r.ordres })) },
     }),

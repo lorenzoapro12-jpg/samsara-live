@@ -24,7 +24,7 @@ function appliquerTheme(id) {
   // La STRUCTURE d'abord (elle déplace le graphique et redimensionne le canvas), puis tout ce
   // qui porte une couleur par thème hors du CSS : relu une fois, ici, pas à chaque image.
   appliquerStructure(themeCourant().structure);
-  lireJetons(); majLegende(); verreDuTheme(); remplirMenuThemes();
+  lireJetons(); majLegende(); verreDuTheme(); remplirMenuThemes(); publierThemeCarte();
   drawChart();
   redessinerApresPolices();
 }
@@ -1245,6 +1245,8 @@ function scheduleDraw() {
 }
 canvas.addEventListener('mousemove', (e) => {
   const rect = canvas.getBoundingClientRect();
+  // Vers le lien « Voir sur la carte ▸ » de la bulle : elle reste où elle est (liaison avec la carte).
+  if (versLienBulle(e.clientX - rect.left, e.clientY - rect.top)) return;
   crossX = e.clientX - rect.left;
   crossY = e.clientY - rect.top;
   
@@ -1438,6 +1440,9 @@ function tapGraphique(clientX, clientY) {
   const ty = clientY - rect.top;
   // Colonne de prix → ignorer
   if (tx > rect.width - 55) return;
+  // Le lien « Voir sur la carte ▸ » de la bulle ouverte : il navigue (rien d'autre ne le fait).
+  const L = lienBulle && lienBulle.rect;
+  if (L && tx >= L.x && tx <= L.x + L.w && ty >= L.y && ty <= L.y + L.h) { location.href = lienBulle.url; return; }
   const c = debutant() && geo ? guideCibleSous(tx, ty, geo.mainH) : null, k = c ? cleBulle(c) : null;
   if (k && crossX !== null && bulleVue === k && bulleDetail !== k) {
     // 2e toucher sur la bulle montrée : son détail.
@@ -3379,7 +3384,7 @@ function drawChart() {
   const H = canvas.height / window.devicePixelRatio;
   // Palette : jetons du thème, lus UNE fois (lireJetons) — pas un getComputedStyle par image.
   if (!jetonsLus) { lireJetons(); jetonsLus = true; }
-  geo = null; geoPrix = null; guideEtat = null; scenEtat = null;
+  geo = null; geoPrix = null; guideEtat = null; scenEtat = null; ciblesPrix = [];
   
   ctx.clearRect(0, 0, W, H);
   if (candles.length < 2) {
@@ -3476,6 +3481,7 @@ function drawChart() {
 function dessinerCalque() {
   calqueDemande = false;
   bulleVue = null;   // la bulle de cette image la reposera (guideBulle)
+  lienBulle = null; cibleMarque = null;   // liaison avec la carte : reposés par cette image
   if (crossX === null) bulleDetail = null;   // plus de bulle : la prochaine recommence par son résumé
   if (!cx) return;
   const dpr = window.devicePixelRatio;
@@ -3488,8 +3494,10 @@ function dessinerCalque() {
   const prixAxe = v => Fmt.prix(v, guideUnite(), deb ? undefined : 'fin');
   if (P) {
     const { top, ph, left, right, minP, maxP, range } = P;
-    // Libellés de l'axe des prix ; celui que l'étiquette du dernier prix recouvrirait est omis.
-    const masque = masqueEtiquettes(livePrice, top, ph, minP, maxP, range);
+    // Libellés de l'axe des prix ; celui que l'étiquette du dernier prix recouvrirait est omis (et
+    // celui que recouvrirait l'étiquette du prix venu de la carte).
+    const pm = prixMarqueCarte();
+    const masque = masqueEtiquettes(livePrice, top, ph, minP, maxP, range) | masqueEtiquettes(pm, top, ph, minP, maxP, range);
     cx.fillStyle = COLORS.axis || COLORS.text;
     cx.font = chartFont(11);
     for (let i = 0; i <= GRILLE_N; i++) {
@@ -3499,6 +3507,7 @@ function dessinerCalque() {
     // Dernier prix : la ligne (un trait large et pâle sous un pointillé : elle se trouve d'un
     // coup d'œil) et l'étiquette sur l'axe, à la couleur de la bougie EN COURS — l'étiquette dit
     // aussi le sens du moment.
+    if (pm !== null && pm >= minP && pm <= maxP) dessinerMarqueCarte(P, pm, W, prixAxe);
     if (livePrice && livePrice >= minP && livePrice <= maxP) {
       const y = top + ph * (1 - (livePrice - minP) / range);
       const enCours = candles[candles.length - 1];
@@ -3651,7 +3660,7 @@ function dessinerCalque() {
     }
     // Guide et scénarios : ce que désigne le curseur (bande, forme, chemin, régime, zone,
     // encadré), expliqué sur le calque.
-    if (guideEtat || scenEtat) guideSurvol(W, mainH, bulleOHLCV);
+    if (guideEtat || scenEtat || ciblesPrix.length || cibleMarque) guideSurvol(W, mainH, bulleOHLCV);
   }
   // --- Réticule des sous-graphes : une verticale à travers eux, la valeur de chacun ---
   if (crossY > mainH && crossY < geo.basSous && idx >= 0 && idx < n) {
@@ -3870,6 +3879,9 @@ function priceWindow(vs, ve) {
     maxP = Math.max(maxP, Math.min(ext[1], rawMax + maxExt));
     minP = Math.min(minP, Math.max(ext[0], rawMin - maxExt));
   }
+  // Le prix venu de la carte (#prix=…) entre dans l'échelle : il reste visible dans la vue.
+  const pm = prixMarqueCarte();
+  if (pm !== null) { const m = (maxP - minP) * 0.04; maxP = Math.max(maxP, pm + m); minP = Math.min(minP, pm - m); }
   // Échelle verticale manuelle (molette / glisser sur l'axe)
   const midP = (maxP + minP) / 2, halfRange = ((maxP - minP) / 2) * priceScale;
   minP = midP - halfRange + pricePan * naturalRange;
@@ -4108,6 +4120,10 @@ function resolveChart(candles, padL, padR, chartH, W) {
       const tw = ctx.measureText(badgeText).width + 14;
       const bx = W - pad.right - tw - 4, by = y - 10;
       srBadges.push({ x: bx, y: by, w: tw, h: 20 });
+      // Sa bulle (liaison avec la carte : elle porte « Voir sur la carte ▸ »).
+      ciblesPrix.push({ rects: [{ x0: bx, y0: by, x1: bx + tw, y1: by + 20 }], segs: [[pad.left, y, W - pad.right, y]], prio: 1, prix: lvl.price, coul: s.color,
+        titre: 'Support / résistance · ' + Fmt.prix(lvl.price, unite, 'fin') + ' · ' + nomTf(lvl.tf),
+        texte: ['Un prix où le marché a déjà fait demi-tour (sommets et creux des bougies ' + nomTf(lvl.tf) + ', regroupés quand ils sont proches).', 'Un niveau ne dit pas ce que fera le prix.'] });
       
       // Fond badge
       // Fond opaque (la bulle du thème) puis la teinte du niveau : lisible sur les bougies.
@@ -6016,15 +6032,16 @@ function debArbitrer() {
  *  de son tracé ; jamais la zone des bougies entière (l'infobulle OHLCV y reste seule). Un test
  *  pur : rien n'est dessiné ni posé (le gestionnaire de souris le lit pour le curseur). */
 function guideCibleSous(x, y, mainH, etiquettesSeules) {
-  const E = guideEtat && overlays.guide ? guideEtat : null, Sc = scenEtat;
-  if (!(E || Sc) || x === null || y === null || y > mainH) return null;
+  // (Et les cibles hors Guide qui portent un prix : supports / résistances, prix venu de la carte.)
+  const E = guideEtat && overlays.guide ? guideEtat : null, Sc = scenEtat, Pc = cibleMarque ? ciblesPrix.concat([cibleMarque]) : ciblesPrix;
+  if (!(E || Sc || Pc.length) || x === null || y === null || y > mainH) return null;
   const dansR = q => (q.rects || []).some(r => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1);
   const surS = q => (q.segs || []).some(s => guideDistSeg(x, y, s) <= 6);
   const surZ = q => (q.zones || []).some(r => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1);
   // Une étiquette d'abord, puis un tracé (forme, chemin, flèche), puis une bande ou une zone.
   // Les cibles du Guide et des scénarios du matin : une seule liste, une seule bulle.
   let c = null, rang = Infinity;
-  for (const q of (E ? E.cibles : []).concat(Sc ? Sc.cibles : [])) {
+  for (const q of (E ? E.cibles : []).concat(Sc ? Sc.cibles : [], Pc)) {
     const r = dansR(q) ? q.prio : etiquettesSeules ? Infinity : surS(q) ? 10 + q.prio : surZ(q) ? 20 + q.prio : Infinity;
     if (r < rang) { rang = r; c = q; }
   }
@@ -6088,7 +6105,7 @@ function sourceResume(c, vivant, texte) {
 function guideBulle(c, W, mainH, evite) {
   const E = guideEtat, Sc = scenEtat;
   apprLu(c);   // la marque « nouveau » de sa nature s'efface ; la bulle d'un message le fait durer
-  if (Sc && Sc.cibles.includes(c)) Sc.survol = c; else E.survol = c;   // ce que la bulle explique (relu par les tests)
+  if (Sc && Sc.cibles.includes(c)) Sc.survol = c; else if (E && E.cibles.includes(c)) E.survol = c;   // ce que la bulle explique (relu par les tests)
   // Débutant : le résumé (niveau 2) ; le détail au 2e toucher ou clic (tapGraphique). Expert : tout.
   const cle = cleBulle(c), detail = !debutant() || bulleDetail === cle;
   let texte = c.texte.slice(), vivant = '';
@@ -6134,7 +6151,10 @@ function guideBulle(c, W, mainH, evite) {
   // dernier paragraphe (« pas une recommandation ») — jamais une phrase coupée au bord de l'écran.
   // Entre deux paragraphes, une ligne vide ; serrée (5 px) quand la place manque.
   let sep = hC;
-  const hMax = mainH - 8, hL = l => (l === '' ? sep : hC);
+  // « Voir sur la carte ▸ » (liaison avec la carte) : une ligne réservée au bas de la bulle, hors du
+  // résumé compté ; plus haute au doigt (une cible de 32 px).
+  const adresse = adresseCarte(c), hLien = adresse ? (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 32 : hC + 9) : 0;
+  const hMax = mainH - 8 - hLien, hL = l => (l === '' ? sep : hC);
   const hDe = ls => tl.length * hT + ls.reduce((a, l) => a + hL(l), 0) + 16;
   const decouper = ts => { const out = []; for (const t of ts) out.push(guideLignes(cx, t, bw - 20)); return out; };
   const aplatir = ps => { const out = []; ps.forEach((p, k) => { if (k) out.push(''); out.push(...p); }); return out; };
@@ -6156,7 +6176,7 @@ function guideBulle(c, W, mainH, evite) {
     while (paras.length > 1 && hDe(aplatir(paras)) > hMax) paras.shift();
   }
   const corps = aplatir(paras);
-  const bh = Math.min(hDe(corps), Math.max(hMax, 40));
+  const bh = Math.min(hDe(corps), Math.max(hMax, 40)) + hLien;
   // Sous le curseur, et sous l'infobulle OHLCV si elle est là ; au-dessus quand la place manque.
   let bx = crossX + 16, by = Math.max(crossY + 18, evite ? evite.y + evite.h + 6 : 0);
   if (bx + bw > W - 75) bx = Math.max(16, crossX - bw - 16);
@@ -6185,7 +6205,103 @@ function guideBulle(c, W, mainH, evite) {
     if (l) cx.fillText(l, bx + 14, yl);
     yl += hL(l);
   });
+  if (adresse) poserLienCarte(adresse, cle, bx, by, bw, bh, hLien, fC);
   cx.restore();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIAISON AVEC LA CARTE (bookmap.html) — le cœur commun : js/liaison.js
+// ─────────────────────────────────────────────────────────────────────────────
+// • « Voir sur la carte ▸ » : la bulle d'un repère de prix (les repères du Guide, les supports /
+//   résistances du Complet, le prix venu de la carte) porte ce lien en dernière ligne, hors de son
+//   résumé compté. Toucher le repère ouvre sa bulle, comme avant ; seul le lien navigue
+//   (bookmap.html#prix=…). La carte ne montre que BTC/USDT : sur une autre paire, pas de lien.
+//   À la souris, la bulle reste en place pendant qu'on va vers elle (versLienBulle).
+// • « Voir sur le graphique ▸ » (la carte) ouvre index.html#prix=… : ce prix, validé (Liaison),
+//   est marqué d'un trait en tirets et de son étiquette sur l'axe des prix, et gardé dans l'échelle
+//   (priceWindow) — sur BTC/USDT seulement. Le terminal s'ouvre toujours sur BTC/USDT, à son
+//   intervalle par défaut : le lien ne change pas l'intervalle. Un prix mal écrit, ou à plus de
+//   10 % du prix du moment, est ignoré sans un mot.
+// • Le thème est décrit pour la carte (publierThemeCarte) : à l'ouverture et à chaque changement.
+let marqueCarte = null;    // { p, ok } : le prix venu de la carte ; ok : jugé plausible
+let ciblesPrix = [];       // cibles hors Guide qui portent un prix (supports / résistances) : refaites à chaque dessin
+let cibleMarque = null;    // la cible du trait du prix venu de la carte (calque)
+let lienBulle = null;      // le lien de la bulle dessinée : { rect, url, cle, bulle, ancre }
+function liaisonCarte() {
+  marqueCarte = (p => (p === null ? null : { p, ok: false }))(Liaison.lirePrix(location.hash));
+  publierThemeCarte();
+  window.addEventListener('hashchange', () => { marqueCarte = (p => (p === null ? null : { p, ok: false }))(Liaison.lirePrix(location.hash)); drawChart(); });
+}
+function publierThemeCarte() {
+  const t = themeCourant();
+  try { localStorage.setItem(Liaison.CLE_THEME, Liaison.decrireTheme(t.id, t.mode, getComputedStyle(document.documentElement).getPropertyValue('--accent'))); } catch (e) {}
+}
+/** Le prix venu de la carte, s'il se montre ici (BTC/USDT, à moins de 10 % de la dernière bougie) ; sinon null. */
+function prixMarqueCarte() {
+  if (!marqueCarte || activeSymbol !== 'BTCUSDT' || candles.length < 2) return null;
+  if (!marqueCarte.ok) {
+    if (!Liaison.plausible(marqueCarte.p, candles[candles.length - 1].close)) { marqueCarte = null; return null; }
+    marqueCarte.ok = true;
+  }
+  return marqueCarte.p;
+}
+/** L'adresse de « Voir sur la carte ▸ » pour la cible c : son prix (repère du Guide, ou c.prix),
+ *  sur BTC/USDT seulement, plausible ; sinon null. */
+function adresseCarte(c) {
+  const p = isNum(c.prix) ? c.prix : c.niveau && c.niveau.niv && isNum(c.niveau.niv.p) ? c.niveau.niv.p : null;
+  const ref = isNum(livePrice) ? livePrice : candles.length ? candles[candles.length - 1].close : null;
+  return activeSymbol === 'BTCUSDT' && Liaison.plausible(p, ref) ? Liaison.adresse('bookmap.html', p) : null;
+}
+/** La ligne du lien, au bas de la bulle (bx, by, bw, bh), sous un filet ; sa zone de clic gardée. */
+function poserLienCarte(adresse, cle, bx, by, bw, bh, hLien, fC) {
+  const y0 = by + bh - hLien;
+  cx.fillStyle = COLORS.hairline; cx.fillRect(bx + 14, y0, bw - 28, 1);
+  cx.font = chartFont(fC, 650); cx.fillStyle = COLORS.accent2;
+  cx.fillText('Voir sur la carte ▸', bx + 14, y0 + hLien / 2 + fC * 0.36);
+  lienBulle = { rect: { x: bx, y: y0 - 2, w: bw, h: hLien + 8 }, url: adresse, cle, bulle: { x: bx, y: by, w: bw, h: bh }, ancre: { x: crossX, y: crossY } };
+}
+/** La souris va-t-elle vers le lien de la bulle ? Sur le lien, ou sortie de son repère dans la
+ *  direction de la bulle (la demi-droite de l'ancre à travers le pointeur touche la bulle) : la
+ *  bulle reste alors où elle est — collée au pointeur, elle fuirait devant lui. */
+function versLienBulle(x, y) {
+  const L = lienBulle;
+  if (!L || crossX === null || !geo) return false;
+  const r = L.rect;
+  if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) { canvas.style.cursor = 'pointer'; return true; }
+  const c = guideCibleSous(x, y, geo.mainH, debutant());
+  if (c && cleBulle(c) === L.cle) return false;     // encore sur le repère : la bulle le suit, comme avant
+  const b = L.bulle, lo = [b.x - 6, b.y - 6], hi = [b.x + b.w + 6, b.y + b.h + 6], o = [L.ancre.x, L.ancre.y], d = [x - o[0], y - o[1]];
+  let s0 = 1, s1 = Infinity;
+  for (let k = 0; k < 2; k++) {
+    if (Math.abs(d[k]) < 1e-9) { if (o[k] < lo[k] || o[k] > hi[k]) return false; continue; }
+    let u = (lo[k] - o[k]) / d[k], v = (hi[k] - o[k]) / d[k];
+    if (u > v) [u, v] = [v, u];
+    s0 = Math.max(s0, u); s1 = Math.min(s1, v);
+  }
+  if (s0 > s1) return false;
+  canvas.style.cursor = 'default';
+  return true;
+}
+/** Le prix venu de la carte, sur le calque : un trait en tirets de la couleur des liens, son
+ *  étiquette sur l'axe des prix (hors du tracé : aucun texte de plus sur le graphique), et sa
+ *  cible (la bulle dit ce qu'il est). */
+function dessinerMarqueCarte(P, pm, W, prixAxe) {
+  const y = P.top + P.ph * (1 - (pm - P.minP) / P.range), x0 = P.left, x1 = W - P.right;
+  cx.save();
+  cx.strokeStyle = COLORS.surface; cx.lineWidth = 3.5; cx.setLineDash([8, 5]);
+  cx.beginPath(); cx.moveTo(x0, y); cx.lineTo(x1, y); cx.stroke();
+  cx.strokeStyle = COLORS.accent2; cx.lineWidth = 1.6; cx.stroke();
+  cx.setLineDash([]);
+  const t = prixAxe(pm);
+  cx.font = chartFont(10, 700);
+  const lw = cx.measureText(t).width + 10, bx = Math.min(x1 + 2, W - 3 - lw);
+  cx.fillStyle = COLORS.accent2; cx.beginPath(); cx.roundRect(bx, y - 9, lw, 18, 4); cx.fill();
+  cx.fillStyle = COLORS.surface; cx.fillText(t, bx + 5, y + 4);
+  cx.restore();
+  // Le trait lui-même est sa cible (une bande de 10 px) : le Lisible n'ouvre une bulle que sur une
+  // étiquette, et ce trait n'en a pas sur le tracé.
+  cibleMarque = { rects: [{ x0, y0: y - 5, x1, y1: y + 5 }], segs: [[x0, y, x1, y]], prio: 1, prix: pm, coul: COLORS.accent2, titre: 'Prix venu de la carte · ' + t,
+    texte: ['Le prix choisi sur la carte des ordres. Le trait reste à ce prix ; il ne suit pas le prix du moment.', 'Une description, pas une recommandation.'] };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -9475,6 +9591,7 @@ function showWalkForward() {
   div.innerHTML = html;
 }
 async function init() {
+  liaisonCarte();                 // le prix venu de la carte (#prix=…), le thème décrit pour elle
   appliquerMode(modeCourant());   // libellé du bouton ; la classe est déjà posée par index.html
   lireJetons(); jetonsLus = true;
   redessinerApresPolices();

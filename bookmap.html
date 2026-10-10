@@ -6,15 +6,21 @@
 <title>Saṃsāra — Carte des ordres</title>
 <meta name="description" content="Carte de liquidité BTC/USDT : carnet publié, carnet live, exécutions, gros paquets et gamma, chacun avec son âge.">
 <!-- La carte est une page À CÔTÉ du terminal (index.html), qu'elle ne modifie pas et dont
-     elle ne charge aucun code. Elle n'interroge que Binance et GitHub Raw (contrat réseau :
-     tests/test_contrat.py). -->
+     elle ne charge aucun code (seuls les cœurs communs : formats, repli Binance, liaison). Elle
+     n'interroge que Binance et GitHub Raw (contrat réseau : tests/test_contrat.py). -->
 <link rel="stylesheet" href="css/bookmap.css">
+<!-- La liaison avec le terminal (prix passé par l'adresse, thème) : le seul code commun avec lui,
+     avec les formats et le repli Binance. Chargée ici, AVANT le premier rendu : le thème est posé. -->
+<script src="js/liaison.js"></script>
 <script>
   /* Le mode (Lisible / Complet ; gardé 'debutant' / 'expert', le même que le terminal), posé AVANT le
      premier rendu, comme dans index.html : un visiteur en Complet ne voit pas un instant l'écran
      Lisible. Lisible par défaut, et quand le stockage est bloqué. */
   try { document.documentElement.setAttribute('data-mode', localStorage.getItem('samsara-mode') === 'expert' ? 'expert' : 'debutant'); }
   catch (e) { document.documentElement.setAttribute('data-mode', 'debutant'); }
+  /* Le thème du terminal (clair / sombre, couleur d'accent), décrit par lui (js/liaison.js), posé lui
+     aussi avant le premier rendu : une carte claire ne s'affiche pas un instant sombre. */
+  try { Liaison.poserTheme(document.documentElement, Liaison.lireTheme(localStorage.getItem(Liaison.CLE_THEME))); } catch (e) {}
 </script>
 </head>
 <body>
@@ -168,14 +174,15 @@
 <section class="panneau-flottant large" id="legende" hidden aria-label="Légende">
   <div class="panneau-tete"><h2>Ce que montre la carte</h2><button type="button" class="fermer" data-fermer aria-label="Fermer">×</button></div>
   <div class="barre-couleurs"><div id="barreCouleurs"></div><div class="grad" id="gradBarre"></div></div>
-  <!-- Mode débutant : l'essentiel, les mêmes mots que l'explication de première visite. -->
+  <!-- Mode débutant : l'essentiel, les mêmes mots que l'explication de première visite. Les mots de
+       couleur (data-mot) sont ceux de la carte AFFICHÉE, claire ou sombre : réécrits par js/bookmap.js. -->
   <div class="debutant-seul" id="legendeDebutant">
     <h3>L'essentiel</h3>
     <dl>
       <dt>Couleurs = ordres d'achat ou de vente en attente</dt>
       <dd><span id="legPaletteDeb">Bleu foncé : peu d'ordres à ce prix ; puis bleu clair, vert, jaune, orange ; blanc : le plus d'ordres.</span> Un ordre peut être retiré à tout moment. Hachures : ce qui n'a pas été lu là (les ordres en attente, ou les échanges), et l'avenir, à droite de «&nbsp;maintenant&nbsp;».</dd>
       <dt>Ligne à fil noir = le prix</dt>
-      <dd>Une ligne blanche avec un fil noir au milieu, qui zigzague jusqu'au trait jaune « maintenant » (nommé sous l'axe du temps). Les bandes claires et droites sont des ordres en attente, pas le prix.</dd>
+      <dd>Une ligne blanche avec un fil noir au milieu, qui zigzague jusqu'au trait <span data-mot="maintenant">jaune</span> « maintenant » (nommé sous l'axe du temps). Les bandes <span data-mot="bandes">claires</span> et droites sont des ordres en attente, pas le prix.</dd>
       <dt>Ronds = échanges réels</dt>
       <dd>Vert, avec ▲ dans les plus gros : surtout des acheteurs qui ont pris des ventes en attente. Rouge, avec ▼ : surtout des vendeurs qui ont pris des achats en attente. Plus gros = plus de BTC.</dd>
       <dt>« Mur d’achat » sous le prix, « Mur de vente » au-dessus</dt>
@@ -204,9 +211,9 @@
     <dt>Non observé (hachures)</dt>
     <dd>Aucun carnet lu à cet endroit : hors de la bande que le carnet couvre (≈ ±1 % pour 5 000 niveaux, bien moins pour 1 000), ou entre la fin de la carte publiée et l'ouverture de la page ; à droite de «&nbsp;maintenant&nbsp;», l'avenir. Ce n'est pas « aucun ordre ». Les exécutions non lues ont leur hachure (plus marquée, «&nbsp;exécutions non lues&nbsp;»), les rafales non lues une bande au pied de la carte.</dd>
     <dt>Prix</dt>
-    <dd>La ligne blanche : clôtures 1 min (Binance), puis le prix moyen pondéré par le volume (VWAP) des exécutions de chaque seconde — après la dernière clôture, et partout où les exécutions sont lues dès qu'une minute fait au moins <span id="legPrixSeconde">6</span> px. Coupée là où rien n'est lu. Les traits fins verticaux sont les plus hauts / plus bas de chaque minute. Les marches vertes et rouges sont le meilleur bid et le meilleur ask, à chaque lecture du carnet live.</dd>
+    <dd>La ligne <span data-mot="prix">blanche</span> : clôtures 1 min (Binance), puis le prix moyen pondéré par le volume (VWAP) des exécutions de chaque seconde — après la dernière clôture, et partout où les exécutions sont lues dès qu'une minute fait au moins <span id="legPrixSeconde">6</span> px. Coupée là où rien n'est lu. Les traits fins verticaux sont les plus hauts / plus bas de chaque minute. Les marches vertes et rouges sont le meilleur bid et le meilleur ask, à chaque lecture du carnet live.</dd>
     <dt>Exécutions (ronds)</dt>
-    <dd>Volumes échangés <b>au marché</b>, regroupés par période (1 s au plus fin, selon le zoom ; 10 s × 10 $ pour l'historique publié avant l'ouverture de la page) et par tranche de prix : vert si les achats au marché dominent, rouge si ce sont les ventes ; l'arc blanc intérieur est la part achetée. Seaux ancrés sur l'horloge et sur le prix. <span id="legBulles">Surface ∝ volume, entre deux bornes.</span> Les intervalles non lus sont hachurés : ce n'est pas « aucune exécution ».</dd>
+    <dd>Volumes échangés <b>au marché</b>, regroupés par période (1 s au plus fin, selon le zoom ; 10 s × 10 $ pour l'historique publié avant l'ouverture de la page) et par tranche de prix : vert si les achats au marché dominent, rouge si ce sont les ventes ; l'arc <span data-mot="arc">blanc</span> intérieur est la part achetée. Seaux ancrés sur l'horloge et sur le prix. <span id="legBulles">Surface ∝ volume, entre deux bornes.</span> Les intervalles non lus sont hachurés : ce n'est pas « aucune exécution ».</dd>
     <dt>Rafales au marché (traits verticaux)</dt>
     <dd id="legRafales"></dd>
     <dt>Destin des gros ordres (traits horizontaux, ✕ ● ◐ ?)</dt>

@@ -1431,6 +1431,76 @@
   /** Contraste de la palette : seuil bas et saturation APPLIQUÉS (la saturation ne peut pas
    *  descendre sous le seuil + 1). La légende écrit ces valeurs-là, pas celles des curseurs. */
   BM.bornesContraste = function (seuilBas, saturation) { return { bas: seuilBas, haut: Math.max(seuilBas + 1, saturation) }; };
+
+  // ─── Palettes de la chaleur, selon le TON de la carte (celui du thème du terminal) ───
+  // Points [position 0..1, [r, g, b]], interpolés (BM.couleurPalette) ; 256 couleurs par la page.
+  // Sombre (défaut, sans thème décrit) : la quantité monte vers le CLAIR. Claire (thème clair du
+  // terminal) : peu d'ordres ≈ la couleur du fond, beaucoup = foncé et saturé — la luminance y
+  // DESCEND toujours avec la quantité, et le haut tranche sur le fond (tests/test_bookmap.js).
+  // « bid » et « ask » : la palette « teintés » (une rampe par côté).
+  BM.PALETTES = {
+    sombre: {
+      classique: [[0, [12, 20, 60]], [0.18, [20, 60, 160]], [0.38, [0, 170, 220]], [0.58, [90, 230, 120]],
+        [0.76, [250, 230, 60]], [0.9, [255, 130, 30]], [1, [255, 250, 240]]],
+      cividis: [[0, [0, 32, 77]], [0.25, [67, 78, 108]], [0.5, [125, 124, 120]], [0.75, [188, 175, 111]], [1, [255, 233, 69]]],
+      bid: [[0, [8, 40, 44]], [0.5, [20, 170, 150]], [1, [190, 255, 235]]],
+      ask: [[0, [50, 12, 20]], [0.5, [220, 70, 70]], [1, [255, 225, 200]]],
+    },
+    clair: {
+      classique: [[0, [226, 236, 247]], [0.4, [185, 212, 238]], [0.6, [127, 176, 222]], [0.75, [74, 134, 200]], [0.88, [37, 89, 166]], [1, [11, 31, 92]]],
+      cividis: [[0, [242, 238, 214]], [0.25, [216, 196, 112]], [0.5, [146, 140, 118]], [0.75, [72, 84, 112]], [1, [0, 32, 77]]],
+      bid: [[0, [216, 240, 233]], [0.5, [38, 160, 136]], [1, [4, 66, 58]]],
+      ask: [[0, [248, 226, 226]], [0.5, [212, 74, 84]], [1, [104, 14, 30]]],
+    },
+  };
+  BM.TONS = ['sombre', 'clair'];
+  /** Le ton connu (« clair » ou « sombre », le défaut). */
+  BM.ton = t => (t === 'clair' ? 'clair' : 'sombre');
+  /** La couleur [r, g, b] d'une palette (ses points) en x ∈ [0, 1]. */
+  BM.couleurPalette = function (pts, x) {
+    const v = Math.min(1, Math.max(0, x));
+    let i = 0;
+    while (i < pts.length - 2 && v > pts[i + 1][0]) i++;
+    const [x0, c0] = pts[i], [x1, c1] = pts[i + 1], f = (v - x0) / (x1 - x0 || 1);
+    return [0, 1, 2].map(j => Math.round(c0[j] + (c1[j] - c0[j]) * f));
+  };
+  /** Luminance relative (WCAG 2) d'une couleur [r, g, b] ; contraste de deux couleurs (1 à 21). */
+  BM.luminance = function (c) {
+    const l = v => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); };
+    return 0.2126 * l(c[0]) + 0.7152 * l(c[1]) + 0.0722 * l(c[2]);
+  };
+  BM.contraste = (a, b) => { const x = BM.luminance(a), y = BM.luminance(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  // Les MOTS des couleurs, par ton : ce que l'explication de première visite, la légende, les
+  // options de la palette et le guide disent de la carte AFFICHÉE — jamais « bleu foncé : peu
+  // d'ordres » sur une carte claire. Dans l'ordre de la palette (« plus clair » serait faux pour
+  // l'orange de la palette classique sombre, plus sombre que le jaune mais qui dit plus d'ordres).
+  //   palette : la phrase des couleurs (Lisible) ; options : le nom de chaque palette (Réglages) ;
+  //   maintenant : le trait « maintenant » ; bandes : les bandes d'ordres ; prix : la ligne du prix
+  //   du Complet ; arc : l'arc de la part achetée dans les ronds du Complet.
+  BM.MOTS_COULEURS = {
+    sombre: {
+      palette: {
+        classique: 'Bleu foncé : peu d\'ordres à ce prix ; puis bleu clair, vert, jaune, orange ; blanc : le plus d\'ordres.',
+        cividis: 'Bleu foncé : peu d\'ordres à ce prix ; puis gris ; jaune : le plus d\'ordres.',
+        cote: 'Achats en turquoise, ventes en rouge : sombre, peu d\'ordres à ce prix ; clair, le plus d\'ordres.',
+      },
+      options: { classique: 'Classique (bleu → cyan → vert → jaune → orange → blanc)', cividis: 'Cividis (lisible en daltonisme)', cote: 'Bid / ask teintés' },
+      maintenant: 'jaune', bandes: 'claires', prix: 'blanche', arc: 'blanc',
+    },
+    clair: {
+      palette: {
+        classique: 'Bleu très pâle : peu d\'ordres à ce prix ; puis bleu, de plus en plus foncé ; bleu nuit : le plus d\'ordres.',
+        cividis: 'Jaune pâle : peu d\'ordres à ce prix ; puis jaune, gris ; bleu nuit : le plus d\'ordres.',
+        cote: 'Achats en turquoise, ventes en rouge : pâle, peu d\'ordres à ce prix ; foncé, le plus d\'ordres.',
+      },
+      options: { classique: 'Classique (bleu très pâle → bleu → bleu nuit)', cividis: 'Cividis (lisible en daltonisme)', cote: 'Bid / ask teintés' },
+      maintenant: 'orange', bandes: 'foncées', prix: 'noire', arc: 'noir',
+    },
+  };
+  /** Les mots des couleurs du ton t. */
+  BM.motsCouleurs = t => BM.MOTS_COULEURS[BM.ton(t)];
+  /** La phrase des couleurs de la chaleur (Lisible) pour la palette et le ton affichés. */
+  BM.phrasePalette = (palette, t) => { const m = BM.motsCouleurs(t).palette; return m[palette] || m.classique; };
   /** Réglages lus du stockage local, VALIDÉS : une valeur hors des listes permises (palette
    *  renommée, fusion 3, tranche 0, « abc »…) est remplacée par le défaut — elle n'est ni
    *  appliquée en silence, ni fatale à la page. regles : { clé: { liste, nombre } | { min, max,
