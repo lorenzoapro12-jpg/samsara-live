@@ -2,12 +2,17 @@
    Saṃsāra — Carte (bookmap) : les CALCULS, sans DOM ni réseau.
    Chargé par bookmap.html avant js/bookmap.js ; chargé tel quel par tests/test_bookmap.js.
 
-   CE QUE LA CARTE SUPERPOSE — trois horloges sur une même surface
-   ────────────────────────────────────────────────────────────────
+   CE QUE LA CARTE SUPERPOSE — plusieurs horloges sur une même surface
+   ────────────────────────────────────────────────────────────────────
    · la carte PUBLIÉE (heatmap.json) : une colonne par minute, une tranche par 20 $, publiée
-     toutes les 15 min — elle a donc jusqu'à ~16 min de retard sur le présent ;
-   · les MURS et le GAMMA (market-data.json) : un instantané par quart d'heure ;
-   · le carnet LIVE et les EXÉCUTIONS, lus par la page elle-même sur Binance, à la seconde.
+     toutes les 15 min, relue par la page toutes les 5 min (et derrière le cache du serveur de
+     fichiers) — sans le complément de la branche `direct`, plus de 20 min de retard au pire ;
+   · les GROS PAQUETS et le GAMMA (market-data.json) : un instantané par quart d'heure ;
+   · le carnet LIVE et les EXÉCUTIONS, lus par la page elle-même sur Binance, à la seconde ;
+   · les exécutions publiées (executions.json, 24 h) et la profondeur Coinbase (profondeur.json).
+   Le texte de la carte n'appelle « mur » qu'une chose : une tranche ou une zone nettement plus
+   chargée du carnet live (repères « Mur d'achat / de vente »). Les plus grosses tranches du
+   fichier de 15 min sont des « gros paquets », les niveaux à un seul prix des « gros ordres ».
    Chaque calque porte son âge SUR la carte : aucun chiffre n'y est lu sans son instant. L'axe du
    temps est à l'heure de BINANCE (BM.Horloge) ; chaque lecture est placée à son instant réel.
    Ce qui n'a pas été lu (minutes, exécutions, carnet) est « non lu » — hachuré et dit —, jamais
@@ -26,6 +31,9 @@
 (function (racine) {
   'use strict';
   const BM = {};
+  // Les formats communs du site (js/format.js) : nombres à la française, moins « − », heure de
+  // l'appareil. Chargé avant ce fichier par bookmap.html ; dans Node, lu à côté.
+  const F = typeof Fmt !== 'undefined' ? Fmt : require('./format.js');
 
   // ─── Grille : la structure commune à la carte publiée et au carnet live ──────
   // Colonne-majeure : la cellule (c, h) est à c·H + h. Une colonne est contiguë, ce qui
@@ -728,12 +736,13 @@
   };
 
   // ─── Bougies 1 min : volume et CVD ─────────────────────────────────────────
-  /** Klines Binance -> minutes. Le delta est EXACT : Binance publie, pour chaque bougie, la
-   *  part achetée au taker (k[10], en USDT) ; delta = achats − ventes = 2·k[10] − k[7]. */
+  /** Klines Binance -> minutes. Volumes en BTC (l'actif échangé, comme les ronds et les rafales).
+   *  Le delta est EXACT : Binance publie, pour chaque bougie, le volume (k[5]) et la part achetée au
+   *  taker (k[9]) ; delta = achats − ventes = 2·k[9] − k[5]. */
   BM.minutes = function (klines) {
     return (klines || []).map(k => ({
       t: +k[0], fin: +k[6] + 1, o: +k[1], h: +k[2], l: +k[3], c: +k[4],
-      vol: +k[7], achat: +k[10], vente: +k[7] - +k[10], delta: 2 * +k[10] - +k[7],
+      vol: +k[5], achat: +k[9], vente: +k[5] - +k[9], delta: 2 * +k[9] - +k[5],
     }));
   };
   /** Fusionne de nouvelles minutes dans une série triée par t : une minute relue REMPLACE
@@ -848,7 +857,7 @@
   /** Texte de l'écart quand il dépasse `seuil` ms (1 s) ; null sinon. */
   BM.Horloge.prototype.texte = function (seuil) {
     if (this.u === null || Math.abs(this.ecart) <= (seuil === undefined ? 1000 : seuil)) return null;
-    const s = v => (v / 1000).toFixed(1).replace('.', ',') + ' s', u = this.u < 1000 ? Math.round(this.u) + ' ms' : s(this.u);
+    const s = v => BM.nombre(v / 1000, 1, 1) + ' s', u = this.u < 1000 ? Math.round(this.u) + ' ms' : s(this.u);
     return 'horloge locale ' + (this.ecart > 0 ? 'en retard' : 'en avance') + ' de ' + s(Math.abs(this.ecart)) + ' ± ' + u + ' : recalée sur Binance';
   };
 
@@ -987,7 +996,9 @@
    *  est une borne basse PROUVÉE ; deux ordres qui avancent l'un après l'autre sont, eux,
    *  indiscernables d'un seul : le nombre exact n'est pas publié.
    *  q8 : la quantité en unités de 1e-8 BTC (entier exact) — la conservation se contrôle au bit. */
-  BM.RAFALES = { seuilsBtc: [1, 2, 5, 10, 25], defautBtc: 2, gardeBtc: 0.5, gardeMs: 6 * 3600e3, liste: 20 };
+  // gardeMs : les rafales (comme les exécutions lues) sont oubliées après 24 h — la purge de la page
+  // (js/bookmap.js) et la légende lisent cette valeur.
+  BM.RAFALES = { seuilsBtc: [1, 2, 5, 10, 25], defautBtc: 2, gardeBtc: 0.5, gardeMs: 24 * 3600e3, liste: 20 };
   BM.TEXTE_RAFALES = 'une rafale peut réunir plusieurs ordres ; ≥ k est prouvé, le nombre exact n\'est pas publié';
   const q8De = s => Math.round(+s * 1e8);
   /** Une exécution seule, comme rafale. */
@@ -1033,12 +1044,16 @@
   /** Les rafales d'une séance : alimentées vers l'avant (le direct) et vers l'arrière (pages du
    *  remplissage arrière, chacune triée mais plus ancienne que tout ce qui est déjà là). Les deux
    *  bords restent OUVERTS (une page suivante peut les prolonger, même petits) ; une rafale close
-   *  sous `gardeBtc` est oubliée, comme les exécutions après `gardeMs`. */
+   *  sous `gardeBtc` est oubliée, comme les exécutions après `gardeMs`.
+   *  `debut` : l'instant de la plus ancienne exécution REÇUE ici (null : aucune) — les rafales ne
+   *  sont connues qu'à partir de là. Les seaux publiés (executions.json) n'en donnent aucune : ce
+   *  n'est donc pas le début des exécutions de la carte. */
   BM.Rafales = function (garde) {
     this.garde8 = Math.round((garde === undefined ? BM.RAFALES.gardeBtc : garde) * 1e8);
     this.liste = [];            // triée par identifiant (donc par instant)
     this.arriereFini = false;
     this.version = 0;
+    this.debut = null;
   };
   const RF = BM.Rafales.prototype;
   /** Une rafale close sous le seuil de garde s'en va ; un bord ouvert reste (même petit). */
@@ -1050,6 +1065,7 @@
   };
   /** Direct : une exécution PLUS RÉCENTE que toutes les autres. */
   RF.ajouter = function (t) {
+    if (this.debut === null || t.T < this.debut) this.debut = t.T;
     const u = BM.rafaleUnitaire(t), L = this.liste, d = L[L.length - 1];
     if (d && d.prix && BM.rafalesContigues(d, u)) BM.fusionnerRafales(d, u);
     else {
@@ -1064,6 +1080,7 @@
    *  rafale est fusionnée avec la première gardée quand les identifiants se suivent et que T et m
    *  sont égaux : une rafale coupée par la limite d'une page n'est pas comptée deux fois. */
   RF.ajouterAncien = function (trades) {
+    for (const t of trades) if (this.debut === null || t.T < this.debut) this.debut = t.T;
     const L = this.liste, p0 = L[0];
     const page = BM.grouperRafales(p0 ? trades.filter(t => t.a < p0.aDeb) : trades);
     if (!page.length) return;
@@ -1083,8 +1100,9 @@
     this.arriereFini = true;
     if (this.liste.length > 1 && this.liste[0].prix) { this.fermer(0); this.version++; }
   };
-  /** Oublie les rafales d'avant `avantMs`. */
+  /** Oublie les rafales d'avant `avantMs` (le début de ce qui est connu avance d'autant). */
   RF.purger = function (avantMs) {
+    if (this.debut !== null && this.debut < avantMs) this.debut = avantMs;
     let k = 0;
     while (k < this.liste.length - 1 && this.liste[k].T < avantMs) k++;
     if (k) {
@@ -1113,7 +1131,7 @@
     return out;
   };
 
-  // ─── Destin des murs : ce que deviennent les gros niveaux du carnet ──────────
+  // ─── Destin des gros ordres : ce que deviennent les gros niveaux du carnet ──────────
   // Un carnet REST ne porte pas d'heure : la lecture i décrit un instant tᵢ quelque part dans
   // [sᵢ, rᵢ] (envoi, réception, heure LOCALE), placé à l'heure Binance par l'écart ± u de
   // BM.Horloge. Entre deux lectures i et j, à un prix p exact et d'un côté :
@@ -1350,7 +1368,7 @@
   // ─── Âges et formats ───────────────────────────────────────────────────────
   BM.age = function (ms) {
     if (!(ms >= 0)) return '—';
-    if (ms < 10000) return (ms / 1000).toFixed(1).replace('.', ',') + ' s';
+    if (ms < 10000) return BM.nombre(ms / 1000, 1, 1) + ' s';
     if (ms < 60000) return Math.round(ms / 1000) + ' s';
     const m = Math.floor(ms / 60000);
     if (m < 60) return m + ' min';
@@ -1362,19 +1380,25 @@
     const d = new Date(ms);
     return ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'][d.getDay()] + ' ' + String(d.getDate()).padStart(2, '0');
   };
-  BM.heure = function (ms, sec) {
-    const d = new Date(ms);
-    const p = n => String(n).padStart(2, '0');
-    return p(d.getHours()) + ':' + p(d.getMinutes()) + (sec ? ':' + p(d.getSeconds()) : '');
-  };
+  /** L'heure de l'APPAREIL (« 14:05 », « 14:05:12 ») : celle de Fmt, partout sur la carte (axe,
+   *  pastilles, journal, marques). Le fuseau est écrit une fois, dans l'angle de l'axe du temps. */
+  BM.heure = (ms, sec) => (sec ? F.heureSec(ms) : F.heure(ms));
+  /** « 14:05 » aujourd'hui, « 09/10 14:05 » un autre jour (Fmt.jourHeure) : un « depuis » d'hier ne
+   *  se lit jamais comme d'aujourd'hui. ref : l'instant de comparaison (maintenant par défaut) ;
+   *  sec : avec les secondes. */
+  BM.jourHeure = (ms, ref, sec) => (!sec ? F.jourHeure(ms, ref)
+    : !isFinite(ms) ? '—' : (F.memeJour(ms, isFinite(ref) ? ref : Date.now()) ? '' : F.jour(ms) + ' ') + F.heureSec(ms));
   // Formateurs gardés : toLocaleString(…, options) en construit un à CHAQUE appel (≈ 1 ms par image
-  // pour les graduations et les pastilles). Mêmes chaînes.
-  const FORMATS = new Map();
+  // pour les graduations et les pastilles). Les MÊMES chaînes que Fmt.nombre (contrôlé par
+  // tests/test_bookmap.js) : espaces simples, moins « − », jamais « −0 ».
+  const FORMATS = new Map(), ESP_INTL = /[\u00a0\u202f]/g;
   BM.nombre = function (v, min, max) {
+    if (typeof v !== 'number' || !isFinite(v)) return '—';
     const k = min * 32 + max;
     let f = FORMATS.get(k);
     if (!f) FORMATS.set(k, f = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: min, maximumFractionDigits: max }));
-    return f.format(v);
+    const t = f.format(Math.abs(v)).replace(ESP_INTL, ' ');
+    return (v < 0 && /[1-9]/.test(t) ? F.MOINS : '') + t;
   };
   BM.prix = function (p, dec) {
     if (p === null || p === undefined || !isFinite(p)) return '—';
@@ -1382,10 +1406,8 @@
   };
   BM.btc = function (q) {
     if (!isFinite(q)) return '≥ ' + q;
-    if (q >= 100) return BM.nombre(Math.round(q), 0, 0);
-    if (q >= 10) return q.toFixed(1).replace('.', ',');
-    if (q >= 1) return q.toFixed(2).replace('.', ',');
-    return q.toFixed(3).replace('.', ',');
+    const a = Math.abs(q), d = a >= 100 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 3;
+    return BM.nombre(q, d, d);
   };
   /** Décimales qu'il faut pour écrire un pas EXACTEMENT (2,5 → 1 ; 0,25 → 2 ; 20 → 0) : une
    *  graduation de 2,5 $ écrite sans décimale montre un prix qui n'est pas le sien. */
@@ -1396,14 +1418,15 @@
   /** Bulles d'exécutions : surface ∝ volume, ENTRE deux bornes — rayon plancher (lisible) et
    *  plafond (une bulle ne couvre pas la carte). Les bornes en BTC se déduisent de ces constantes ;
    *  la légende les écrit (BM.bornesBulles), elle ne promet pas une proportion qui n'existe pas. */
-  BM.BULLES = { rMin: 1, rMax: 28, k: 3.2 };
+  // rTexte : le rayon (px) à partir duquel le volume est écrit dans le rond, avec son unité.
+  BM.BULLES = { rMin: 1, rMax: 28, k: 3.2, rTexte: 12 };
   BM.rayonBulle = function (q, echelle) {
     return Math.min(BM.BULLES.rMax, Math.max(BM.BULLES.rMin, BM.BULLES.k * Math.sqrt(q) * (echelle || 1)));
   };
   /** Volumes (BTC) entre lesquels la surface d'une bulle est proportionnelle à son volume. */
   BM.bornesBulles = function (echelle) {
     const k = BM.BULLES.k * (echelle || 1);
-    return { min: Math.pow(BM.BULLES.rMin / k, 2), max: Math.pow(BM.BULLES.rMax / k, 2) };
+    return { min: Math.pow(BM.BULLES.rMin / k, 2), max: Math.pow(BM.BULLES.rMax / k, 2), texte: Math.pow(BM.BULLES.rTexte / k, 2) };
   };
   /** Contraste de la palette : seuil bas et saturation APPLIQUÉS (la saturation ne peut pas
    *  descendre sous le seuil + 1). La légende écrit ces valeurs-là, pas celles des curseurs. */
@@ -1453,7 +1476,8 @@
   //  · Ce qui n'a pas été observé (hors de la bande lue, lecture manquée) n'est jamais compté 0 :
   //    la série s'arrête et le texte dit « au moins », ou « rien à comparer ».
   //  · Chaque seuil ci-dessous est une CONVENTION de ce code : la légende l'écrit (tirée d'ici).
-  //  · Les heures du guide sont en UTC, et le disent.
+  //  · Les heures du guide sont celles de l'appareil (BM.heure), comme l'axe : le fuseau n'est écrit
+  //    qu'une fois, dans l'angle de l'axe du temps.
   BM.GUIDE = {
     trancheUsd: 20,          // tranche des murs « en mots » : celle de la carte publiée et des murs du fichier
     murMinBtc: 10,           // une tranche n'est « mur » qu'à 10 BTC au moins…
@@ -1511,18 +1535,6 @@
   };
   const NB = ' ';       // espace insécable : « 81 000 $ » ne se coupe pas avant le $
   const DOL = NB + '$';
-  /** Heure UTC « 14:05 » (ou « 14:05:12 ») : le guide écrit ses heures en UTC. */
-  BM.heureUtc = function (ms, sec) {
-    const d = new Date(ms), p = n => String(n).padStart(2, '0');
-    return p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + (sec ? ':' + p(d.getUTCSeconds()) : '');
-  };
-  /** Le décalage de l'appareil sur UTC, en mots (« UTC+2 », « UTC−3:30 », « UTC »). */
-  BM.fuseau = function (decalageMin) {
-    const m = -decalageMin;
-    if (!m) return 'UTC';
-    const a = Math.abs(m);
-    return 'UTC' + (m < 0 ? '−' : '+') + Math.floor(a / 60) + (a % 60 ? ':' + String(a % 60).padStart(2, '0') : '');
-  };
   /** Un écart signé : « −0,20 % », « +0,12 % ». */
   BM.pourcent = function (x, dec) {
     if (!isFinite(x)) return '—';
@@ -1648,9 +1660,12 @@
     const mb = murs && murs.bid, ma = murs && murs.ask, seuil = murs && murs.seuil;
     const pct = BM.nombre(r.bande, 0, 2) + ' %', usd = BM.prix(r.usd);
     if (mode === 'expert') {
-      const ec = m => BM.pourcent(m.ecartPct);
+      // Ce que BM.murPlusProche rend, dit tel quel : la tranche la plus proche du prix qui porte au
+      // moins le seuil de la lecture (pas les gros paquets du fichier, ni les zones).
+      const ec = m => BM.pourcent(m.ecartPct), sq = isFinite(seuil) ? ' ≥ ' + BM.btc(seuil) + ' BTC' : '';
+      const proche = (cote, m) => 'tranche ' + cote + sq + ' la plus proche ' + (m ? tranche(m.p, m.pas) + ' (' + ec(m) + ')' : ': aucune');
       return ['carnet live ' + age, '±' + pct + (r.reduite ? ' (bande lue)' : '') + ' : achat / vente ' + (r.rapport === null ? '—' : '×' + BM.nombre(r.rapport, 2, 2)) + ' (' + BM.btc(r.qB) + ' / ' + BM.btc(r.qA) + ' BTC)',
-        'mur achat ' + (mb ? tranche(mb.p, mb.pas) + ' (' + ec(mb) + ')' : '—'), 'mur vente ' + (ma ? tranche(ma.p, ma.pas) + ' (' + ec(ma) + ')' : '—'),
+        proche('bid', mb), proche('ask', ma),
       ].join(' · ');
     }
     if (o.court) {
@@ -1771,7 +1786,9 @@
     return { long, court };
   };
   /** Le nom d'un repère sur la carte (≤ 24 signes) : « Mur d’achat · 82 480 $ » sous le prix,
-   *  « Mur de vente · 82 600 $ » au-dessus — les mêmes noms que le terminal. Le prix est le bord de
+   *  « Mur de vente · 82 600 $ » au-dessus. Le nom est celui du terminal, PAS sa définition : ici,
+   *  c'est le carnet LIVE lu par la page (zone ou tranche nettement plus chargée), là-bas la tranche
+   *  la plus chargée du fichier de 15 min — la bulle du repère le dit. Le prix est le bord de
    *  l'amas le plus proche du prix actuel (là où il commence). */
   BM.ETIQUETTE_MAX = 24;
   BM.etiquetteNiveau = function (cote, p) {
@@ -1926,10 +1943,12 @@
   BM.texteMur = function (m, mode, maintenant, o) {
     o = Object.assign({}, BM.GUIDE, o);
     const achat = m.cote === 'bid', nom = achat ? 'Mur d\'achat' : 'Mur de vente', q = BM.btc(m.q) + ' BTC', ba = achat ? 'Bid' : 'Ask';
+    // Une grosse tranche du FICHIER de 15 min (calque « Gros paquets ») : pas un « mur », qui ne se
+    // dit que du carnet live.
     if (m.source === 'publie') {
-      const lu = 'lu à ' + BM.heureUtc(m.luA) + ' UTC';
-      return mode === 'expert' ? { lignes: [ba + ' publié ' + q + ' · ' + lu], court: ba + ' publié · ' + q }
-        : { lignes: [nom + ' publié · ' + q + ' · ' + lu, 'fichier de 15 min (' + (m.periment ? 'carnet live pas lu en ce moment' : 'carnet live pas encore lu') + ')'], court: nom + ' publié · ' + q };
+      const lu = 'lu à ' + BM.jourHeure(m.luA, maintenant), paquet = 'Gros paquet ' + (achat ? 'd\'achats' : 'de ventes');
+      return mode === 'expert' ? { lignes: ['Gros paquet ' + ba.toLowerCase() + ' ' + q + ' · fichier 15 min ' + lu], court: 'Gros paquet ' + ba.toLowerCase() + ' · ' + q }
+        : { lignes: [paquet + ' · ' + q + ' · ' + lu, 'fichier de 15 min (' + (m.periment ? 'carnet live pas lu en ce moment' : 'carnet live pas encore lu') + ')'], court: paquet + ' · ' + q };
     }
     const ms = m.depuis !== null && m.depuis !== undefined ? Math.max(0, maintenant - m.depuis) : null;
     const v = m.variation || null, fen = BM.age(o.fenetreMs);
@@ -2001,7 +2020,7 @@
   };
 
   // Évènements du journal : { t (instant, heure de la carte), type, cote ('b'|'a'|null), p, q, s
-  // (symbole), texte (journal, sans heure), carte (libellé sur la carte, avec l'heure UTC), court
+  // (symbole), texte (journal, sans heure), carte (libellé sur la carte, avec l'heure de l'appareil), court
   // (≤ 40 signes), cle (dédoublonnage) }.
   // Deux sortes de « gros » : un GROS ORDRE est un niveau au prix exact (un seul prix) suivi par
   // BM.SuiviMurs ; un MUR est une tranche de 20 $ du carnet live nommée sur la carte. Les mots
@@ -2022,7 +2041,7 @@
   BM.evenementFinMur = function (x, o) {
     o = Object.assign({}, BM.GUIDE, o);
     if (!['retire', 'echange', 'partiel', 'incertain'].includes(x.fin)) return null;
-    const nom = nomOrdre(x.cote), mot = coteMot(x.cote), hc = BM.heureUtc(x.t) + ' UTC', px = BM.prixExact(x.p) + DOL;
+    const nom = nomOrdre(x.cote), mot = coteMot(x.cote), hc = BM.heure(x.t), px = BM.prixExact(x.p) + DOL;
     const qMax = Math.max(x.qMax || 0, x.q0 || 0), ech = x.echange !== undefined && x.echange !== null ? x.echange : (x.xN || 0), ret = x.retire || 0;
     const plus = qMax > x.q0 + 0.0005, taille = nom + ' de ' + BM.btc(qMax) + ' BTC' + (plus ? ' (sa plus grande taille lue)' : '');
     // Sa vie avant la fin : ce qui en a été retiré (au moins) et échangé, quand il y en a.
@@ -2057,7 +2076,7 @@
   /** Un gros ordre qui atteint le seuil du journal. x = { cote, p, q, t, grossi (il était là avant,
    *  plus petit) }. */
   BM.evenementApparu = function (x) {
-    const nom = nomOrdre(x.cote), q = BM.btc(x.q) + ' BTC', hc = BM.heureUtc(x.t) + ' UTC';
+    const nom = nomOrdre(x.cote), q = BM.btc(x.q) + ' BTC', hc = BM.heure(x.t);
     return { t: x.t, type: 'apparu', cote: x.cote, p: x.p, q: x.q, s: BM.SYMBOLES_GUIDE.apparu.s,
       texte: x.grossi ? nom + ' : ' + q + ' à ' + BM.prixExact(x.p) + DOL + ' (un seul prix ; il y en avait moins avant)' : nom + ' apparu : ' + q + ' à ' + BM.prixExact(x.p) + DOL + ' (un seul prix)',
       carte: nom + ' apparu à ' + hc + ' (' + q + ')', court: '+ ' + coteMot(x.cote) + ' ' + q + ' ' + hc,
@@ -2066,22 +2085,22 @@
   /** Un mur NOMMÉ (tranche du carnet live) passé au-dessus du seuil sous les yeux de la page.
    *  x = { cote: 'b'|'a', p, pas, q, t }. */
   BM.evenementMurApparu = function (x) {
-    const nom = nomMur(x.cote), q = BM.btc(x.q) + ' BTC', hc = BM.heureUtc(x.t) + ' UTC';
+    const nom = nomMur(x.cote), q = BM.btc(x.q) + ' BTC', hc = BM.heure(x.t);
     return { t: x.t, type: 'murApparu', cote: x.cote, p: x.p + x.pas / 2, q: x.q, s: BM.SYMBOLES_GUIDE.apparu.s,
       texte: nom + ' apparu : ' + q + ' entre ' + BM.prix(x.p) + ' et ' + BM.prix(x.p + x.pas) + DOL + ' (tranche de ' + x.pas + DOL + ', carnet live)',
       carte: nom + ' apparu à ' + hc + ' (' + q + ')', court: '+ mur ' + coteMot(x.cote) + ' ' + q + ' ' + hc,
-      debutant: (x.cote === 'b' ? 'Beaucoup d\'achats en attente apparus' : 'Beaucoup de ventes en attente apparues') + ' entre ' + BM.prix(x.p) + ' et ' + BM.prix(x.p + x.pas) + DOL + ' (' + q + ')', cle: 'murApparu' + x.cote + Math.round(x.p) };
+      debutant: nom + ' apparu entre ' + BM.prix(x.p) + ' et ' + BM.prix(x.p + x.pas) + DOL + ' (' + q + ')', cle: 'murApparu' + x.cote + Math.round(x.p) };
   };
   /** Un mur NOMMÉ qui fond sans que le prix l'atteigne. x = { cote, p, pas, q0, q1, dureeMs,
    *  echange (BTC échangés dans la tranche, null si non lus), t }. */
   BM.evenementMurFondu = function (x) {
-    const nom = nomMur(x.cote), hc = BM.heureUtc(x.t) + ' UTC';
+    const nom = nomMur(x.cote), hc = BM.heure(x.t);
     const ech = x.echange === null || x.echange === undefined ? 'échanges non lus' : x.echange > 0.0005 ? BM.btc(x.echange) + ' BTC échangés à ces prix' : 'aucun échange à ces prix';
     return { t: x.t, type: 'fondu', cote: x.cote, p: x.p + x.pas / 2, q: x.q0, s: BM.SYMBOLES_GUIDE.fondu.s,
       texte: nom + ' ' + tranche(x.p, x.pas) + ' : de ' + BM.btc(x.q0) + ' à ' + BM.btc(x.q1) + ' BTC en ' + (x.dureeMs < 60e3 ? 'moins d\'une minute' : BM.age(x.dureeMs)) + ' (' + ech + ' ; le prix n\'y est pas allé)',
       carte: nom + ' fondu à ' + hc + ' (' + BM.btc(x.q0) + ' → ' + BM.btc(x.q1) + ' BTC)', court: '− mur ' + coteMot(x.cote) + ' fondu ' + hc,
       // « retirés » seulement quand on sait qu'aucun échange n'a eu lieu à ces prix ; sinon « en baisse ».
-      debutant: (x.cote === 'b' ? 'Achats en attente ' : 'Ventes en attente ') + (x.echange === 0 ? (x.cote === 'b' ? 'retirés' : 'retirées') : 'en baisse') + ' entre ' + BM.prix(x.p) + ' et ' + BM.prix(x.p + x.pas) + DOL + ' : de ' + BM.btc(x.q0) + ' à ' + BM.btc(x.q1) + ' BTC, sans que le prix y aille',
+      debutant: nom + (x.echange === 0 ? ' retiré' : ' en baisse') + ' entre ' + BM.prix(x.p) + ' et ' + BM.prix(x.p + x.pas) + DOL + ' : de ' + BM.btc(x.q0) + ' à ' + BM.btc(x.q1) + ' BTC, sans que le prix y aille',
       cle: 'fondu' + x.cote + Math.round(x.p) };
   };
   /** Une rafale au marché (BM.lireRafale). */
@@ -2089,7 +2108,7 @@
     const mot = r.achat ? 'd\'achats' : 'de ventes', q = BM.btc(r.q) + ' BTC', S = BM.SYMBOLES_GUIDE[r.achat ? 'rafaleAchat' : 'rafaleVente'].s;
     return { t: r.T, type: 'rafale', cote: null, achat: r.achat, p: r.vwap, q: r.q, s: S,
       texte: 'Rafale ' + mot + ' au marché : ' + q + ' d\'un seul coup (même milliseconde), ' + (r.pMax > r.pMin ? 'de ' + BM.prix(r.pMin) + ' à ' + BM.prix(r.pMax) : 'à ' + BM.prix(r.pMin)) + DOL,
-      carte: 'Rafale ' + mot + ' à ' + BM.heureUtc(r.T, true) + ' UTC : ' + q, court: S + ' rafale ' + mot + ' ' + q,
+      carte: 'Rafale ' + mot + ' à ' + BM.heure(r.T, true) + ' : ' + q, court: S + ' rafale ' + mot + ' ' + q,
       debutant: 'Grosse vague ' + mot + ' : ' + q + ' d\'un coup, vers ' + BM.prix(r.vwap) + DOL, cle: 'rafale' + r.aDeb };
   };
   /** Le prix (live) passe un mur nommé. x = { cote: 'b'|'a', p (bas de la tranche), pas, q (taille
@@ -2102,8 +2121,8 @@
     return { t: x.t, type: 'traverse', cote: x.cote, p: sous ? x.p : x.p + x.pas, q: x.q, s: S,
       texte: 'Le prix (live) passe ' + lieu + ' ' + tranche(x.p, x.pas) + ' (' + BM.btc(x.q) + ' BTC ' + (x.qAvant !== null && x.qAvant !== undefined ? 'quand il était nommé, ' + BM.btc(x.qAvant) + ' BTC à la lecture d\'avant' : 'à la lecture d\'avant') + '). Percé, pas «' + NB + 'cassé' + NB + '» : il faudrait deux clôtures 1 min '
         + (sous ? 'sous' : 'au-dessus de') + ' ce niveau, ou une clôture puis un retour testé (règle de travail, non mesurée).',
-      carte: 'Prix passé ' + lieu + ' à ' + BM.heureUtc(x.t) + ' UTC', court: S + (sous ? ' sous mur achat ' : ' sur mur vente ') + BM.prix(x.p) + ' ' + BM.heureUtc(x.t),
-      debutant: 'Le prix passe ' + (sous ? 'sous les achats en attente à ' + BM.prix(x.p) : 'au-dessus des ventes en attente à ' + BM.prix(x.p + x.pas)) + DOL, cle: 'traverse' + x.cote + Math.round(x.p) };
+      carte: 'Prix passé ' + lieu + ' à ' + BM.heure(x.t), court: S + (sous ? ' sous mur achat ' : ' sur mur vente ') + BM.prix(x.p) + ' ' + BM.heure(x.t),
+      debutant: 'Le prix passe ' + (sous ? 'sous le mur d\'achat à ' + BM.prix(x.p) : 'au-dessus du mur de vente à ' + BM.prix(x.p + x.pas)) + DOL, cle: 'traverse' + x.cote + Math.round(x.p) };
   };
   /** La suite d'un passage (BM.evenementTraverse) d'après les bougies 1 min CLOSES : 'meche' (la
    *  bougie du passage a clôturé en deçà du niveau), 'casse' (elle et la suivante ont clôturé
@@ -2122,12 +2141,12 @@
   /** L'évènement de la suite d'un passage. x = { cote, p, pas, verdict, m1, m2 }. */
   BM.evenementSuite = function (x) {
     if (!x || !['meche', 'casse', 'repasse'].includes(x.verdict)) return null;
-    const b = x.cote === 'b', nom = nomMur(x.cote) + ' ' + tranche(x.p, x.pas), h1 = BM.heureUtc(x.m1.t), h2 = x.m2 ? BM.heureUtc(x.m2.t) : '';
+    const b = x.cote === 'b', nom = nomMur(x.cote) + ' ' + tranche(x.p, x.pas), h1 = BM.heure(x.m1.t), h2 = x.m2 ? BM.heure(x.m2.t) : '';
     const dela = b ? 'sous' : 'au-dessus de', deca = b ? 'au-dessus' : 'en dessous', SG = BM.SYMBOLES_GUIDE;
     const T = {
-      meche: [nom + ' percé en mèche : la bougie de ' + h1 + ' UTC a clôturé ' + deca + ' (règle de travail, non mesurée)', 'Percé en mèche (bougie de ' + h1 + ' UTC)', SG.meche.s + ' mèche ' + coteMot(x.cote) + ' ' + BM.prix(x.p) + ' ' + h1],
-      casse: [nom + ' cassé selon la règle de travail : deux clôtures 1 min ' + dela + ' le niveau (' + h1 + ' et ' + h2 + ' UTC ; règle non mesurée)', 'Cassé selon la règle (' + h1 + ', ' + h2 + ' UTC)', SG.casse.s + ' cassé ' + coteMot(x.cote) + ' ' + BM.prix(x.p) + ' ' + h2],
-      repasse: [nom + ' : une clôture 1 min ' + dela + ' le niveau (' + h1 + ' UTC), puis retour ' + deca + ' à ' + h2 + ' UTC — pas «' + NB + 'cassé' + NB + '» selon la règle de travail', 'Clôture au-delà puis retour (' + h2 + ' UTC)', SG.meche.s + ' retour ' + coteMot(x.cote) + ' ' + BM.prix(x.p) + ' ' + h2],
+      meche: [nom + ' percé en mèche : la bougie de ' + h1 + ' a clôturé ' + deca + ' (règle de travail, non mesurée)', 'Percé en mèche (bougie de ' + h1 + ')', SG.meche.s + ' mèche ' + coteMot(x.cote) + ' ' + BM.prix(x.p) + ' ' + h1],
+      casse: [nom + ' cassé selon la règle de travail : deux clôtures 1 min ' + dela + ' le niveau (' + h1 + ' et ' + h2 + ' ; règle non mesurée)', 'Cassé selon la règle (' + h1 + ', ' + h2 + ')', SG.casse.s + ' cassé ' + coteMot(x.cote) + ' ' + BM.prix(x.p) + ' ' + h2],
+      repasse: [nom + ' : une clôture 1 min ' + dela + ' le niveau (' + h1 + '), puis retour ' + deca + ' à ' + h2 + ' — pas «' + NB + 'cassé' + NB + '» selon la règle de travail', 'Clôture au-delà puis retour (' + h2 + ')', SG.meche.s + ' retour ' + coteMot(x.cote) + ' ' + BM.prix(x.p) + ' ' + h2],
     }[x.verdict];
     const t = (x.verdict === 'meche' ? x.m1 : x.m2).fin;
     // Débutant : le fait (« deux minutes de suite »), pas le mot « cassé » de la règle de travail.
@@ -2144,8 +2163,8 @@
   BM.evenementOptions = function (x) {
     const nom = x.nom.charAt(0).toLowerCase() + x.nom.slice(1), S = BM.SYMBOLES_GUIDE.options.s;
     return { t: x.t + 30e3, type: 'options', cote: null, p: x.pAxe, q: null, s: S,
-      texte: 'Le prix atteint le niveau d\'options «' + NB + nom + NB + '» ' + BM.prix(x.p) + DOL + ' (modèle ; fichier lu à ' + BM.heureUtc(x.luA) + ' UTC)',
-      carte: 'Prix au niveau d\'options ' + x.court + ' (bougie de ' + BM.heureUtc(x.t) + ' UTC, modèle)', court: S + ' ' + x.court + ' ' + BM.prix(x.p) + ' ' + BM.heureUtc(x.t) + ' UTC',
+      texte: 'Le prix atteint le niveau d\'options «' + NB + nom + NB + '» ' + BM.prix(x.p) + DOL + ' (modèle ; fichier lu à ' + BM.heure(x.luA) + ')',
+      carte: 'Prix au niveau d\'options ' + x.court + ' (bougie de ' + BM.heure(x.t) + ', modèle)', court: S + ' ' + x.court + ' ' + BM.prix(x.p) + ' ' + BM.heure(x.t),
       debutant: null, cle: 'options' + x.court + x.p };      // mode débutant : non listé (niveau d'une estimation)
   };
   /** Le journal : évènements triés par instant ; un même évènement (même clé) dans la minute est

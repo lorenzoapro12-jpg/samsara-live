@@ -27,9 +27,29 @@ const G = BM.GUIDE;
 const carnet = (bids, asks) => BM.agregerCarnet({ bids: bids.map(([p, q]) => [String(p), String(q)]), asks: asks.map(([p, q]) => [String(p), String(q)]) }, 10);
 
 // ── 1. Formats ───────────────────────────────────────────────────────────────
-titre('1. Formats : heures UTC, signe, durées');
+titre('1. Formats : heures de l\'appareil, signe, durées');
 const t0 = Date.UTC(2026, 9, 8, 14, 5, 7);
-check('heure UTC (pas locale) : 14:05 et 14:05:07', BM.heureUtc(t0) === '14:05' && BM.heureUtc(t0, true) === '14:05:07', [BM.heureUtc(t0), BM.heureUtc(t0, true)]);
+{
+  // Les heures du guide sont celles de l'APPAREIL (comme l'axe du temps) : plus d'UTC nulle part.
+  const d = new Date(t0), p = n => String(n).padStart(2, '0');
+  check('heure de l\'appareil (pas UTC) : HH:MM et HH:MM:SS locales', BM.heure(t0) === p(d.getHours()) + ':' + p(d.getMinutes()) && BM.heure(t0, true) === p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()) && BM.heureUtc === undefined, [BM.heure(t0), BM.heure(t0, true)]);
+  // Sous un fuseau à demi-heure (Asia/Kolkata, UTC+5:30), dans un autre processus : 14:05:07 UTC s'écrit
+  // 19:35:07, partout (journal, carte, court), et aucun texte ne dit « UTC ». (Le script nomme les formats
+  // « Fx » : un « const Fmt » de premier niveau serait vu, encore non initialisé, par bookmap-calc.js.)
+  const { execFileSync } = require('child_process');
+  const script = 'const BM = require(' + JSON.stringify(path.join(REPO, 'js/bookmap-calc.js')) + '), Fx = require(' + JSON.stringify(path.join(REPO, 'js/format.js')) + '), t = ' + t0 + ';'
+    + 'const evs = [BM.evenementRafale({ T: t, achat: true, q: 12, vwap: 80998, pMin: 80998, pMax: 80998, aDeb: 8 }), BM.evenementTraverse({ cote: "b", p: 99980, pas: 20, q: 16, t }),'
+    + ' BM.evenementOptions({ nom: "Mur de gamma", court: "GW", p: 81000, pAxe: 81003, t, luA: t }), BM.evenementMurApparu({ cote: "a", p: 100100, pas: 20, q: 31, t }),'
+    + ' BM.evenementFinMur({ fin: "retire", cote: "a", p: 100100, q0: 12.5, qMax: 12.5, xN: 0, t }), BM.evenementApparu({ cote: "a", p: 100100, q: 25, t }), BM.evenementMurFondu({ cote: "b", p: 99940, pas: 20, q0: 25, q1: 6, dureeMs: 40e3, echange: 3, t })];'
+    + 'const tr = { cote: "b", p: 99980, pas: 20, t }, m1 = { t, fin: t + 60e3, c: 99970 }, m2 = { t: t + 60e3, fin: t + 120e3, c: 99960 };'
+    + 'evs.push(BM.evenementSuite(Object.assign({}, tr, { verdict: "casse", m1, m2 })));'
+    + 'const pub = BM.texteMur({ cote: "ask", p: 100020, pas: 20, q: 55, source: "publie", luA: t }, "expert", t + 60e3);'
+    + 'console.log(JSON.stringify({ h: BM.heure(t, true), f: Fx.fuseau(t), textes: evs.flatMap(e => [e.texte, e.carte, e.court, e.debutant || ""]).concat(pub.lignes, [pub.court]) }));';
+  let r = null;
+  try { r = JSON.parse(execFileSync(process.execPath, ['-e', script], { env: Object.assign({}, process.env, { TZ: 'Asia/Kolkata' }) }).toString()); } catch (e) { r = { erreur: String(e) }; }
+  check('fuseau UTC+5:30 : 14:05:07 UTC s\'écrit 19:35:07 ; journal, carte et gros paquets à cette heure, jamais « UTC »',
+    r && r.h === '19:35:07' && r.f === 'UTC+5:30' && r.textes.some(x => /19:35:07/.test(x)) && r.textes.filter(x => /19:35/.test(x)).length >= 8 && !r.textes.some(x => /UTC|14:05/.test(x)), r);
+}
 check('écart signé avec le vrai signe moins', BM.pourcent(-0.2) === '−0,20 %' && BM.pourcent(0.123) === '+0,12 %', [BM.pourcent(-0.2), BM.pourcent(0.123)]);
 check('écart absent → « — », jamais 0', BM.pourcent(NaN) === '—' && BM.duree(null) === '—' && BM.duree(undefined) === '—');
 check('durée sous une minute : en mots, pas « 5,3 s »', BM.duree(5300) === 'moins d\'une minute' && BM.duree(125e3) === BM.age(125e3));
@@ -201,11 +221,15 @@ check('entré dans la bande lue : « là depuis au moins 1 min », « vient d\'e
 const tSt = BM.texteMur(cas[5], 'debutant', now);
 check('stable et récent (2 min) : une seule ligne (pas d\'histoire à dire)', tSt.lignes.length === 1 && tSt.lignes[0] === 'Mur de vente · 21,2 BTC · là depuis 2 min', tSt);
 const tP = BM.texteMur(cas[6], 'debutant', now);
-check('mur publié : « lu à HH:MM UTC » (fichier de 15 min), court « Mur de vente publié · 55,0 BTC »', tP.lignes[0].includes('lu à ' + BM.heureUtc(t0) + ' UTC') && tP.court === 'Mur de vente publié · 55,0 BTC', tP);
+check('gros paquet du fichier de 15 min (pas un « mur ») : « lu à » + jour et heure de l\'appareil, court « Gros paquet de ventes · 55,0 BTC »', tP.lignes[0].includes('lu à ' + BM.jourHeure(t0, now)) && /^Gros paquet de ventes · 55,0 BTC · lu à \d\d\/\d\d \d\d:\d\d$/.test(tP.lignes[0]) && tP.court === 'Gros paquet de ventes · 55,0 BTC' && !/[Mm]ur/.test(tP.lignes.join(' ') + tP.court), tP);
+{
+  const tPe = BM.texteMur(cas[6], 'expert', now);
+  check('gros paquet en Expert : « Gros paquet ask 55,0 BTC · fichier 15 min lu à … », jamais « mur » ni « publié » seul', /^Gros paquet ask 55,0 BTC · fichier 15 min lu à /.test(tPe.lignes[0]) && tPe.court === 'Gros paquet ask · 55,0 BTC' && !/[Mm]ur/.test(tPe.lignes.join(' ') + tPe.court), tPe);
+}
 check('le plancher « Mur » en BTC est celui de BM.GUIDE (10)', G.murMinBtc === 10 && G.trancheUsd === 20);
 
 // ── 9. Évènements ────────────────────────────────────────────────────────────
-titre('9. Évènements du journal : phrases, heure UTC, court ≤ 40 signes ; « gros ordre » (un prix) ≠ « mur » (une tranche)');
+titre('9. Évènements du journal : phrases, heure de l\'appareil, court ≤ 40 signes ; « gros ordre » (un prix) ≠ « mur » (une tranche)');
 const evs = [
   ...['retire', 'echange', 'partiel', 'incertain'].map(fin => BM.evenementFinMur({ fin, cote: 'b', p: 99987.5, q0: fin === 'echange' ? 12.5 : 0.34, qMax: 12.5, xN: fin === 'echange' ? 13 : 2, echange: fin === 'echange' ? 13 : fin === 'partiel' ? 8 : 0, retire: 0, t: t0 })),
   BM.evenementFinMur({ fin: 'retire', cote: 'a', p: 100100, q0: 12.5, qMax: 12.5, xN: 0, t: t0 }),
@@ -219,7 +243,7 @@ const evs = [
 ];
 for (const ev of evs) {
   garder(ev);
-  check(`${ev.type} ${ev.cote || ''} : court ≤ 40 signes, heure UTC sur la carte, symbole`, ev.court.length <= 40 && !/^\$/.test(ev.court) && /\d\d:\d\d(?::\d\d)? UTC/.test(ev.carte) && ev.s && ev.cle, ev);
+  check(`${ev.type} ${ev.cote || ''} : court ≤ 40 signes, heure de l'appareil sur la carte (sans « UTC »), symbole`, ev.court.length <= 40 && !/^\$/.test(ev.court) && (ev.carte.includes(BM.heure(t0)) || ev.carte.includes(BM.heure(t0, true))) && !/UTC/.test(ev.texte + ev.carte + ev.court) && ev.s && ev.cle, ev);
 }
 check('fin hors classement (« toujours là », « interrompu ») : pas d\'évènement', BM.evenementFinMur({ fin: 'la', cote: 'b', p: 1, q0: 1, t: 1 }) === null && BM.evenementFinMur({ fin: 'interrompu', cote: 'b', p: 1, q0: 1, t: 1 }) === null);
 check('retiré : la phrase COMMENCE par la plus grande taille lue, puis le reste à la fin', /^Gros ordre d'achat de 12,5 BTC \(sa plus grande taille lue\) à 99 987,50 \$ retiré : ses derniers 0,340 BTC partis sans échange/.test(sp(evs[0].texte)) && /^Gros ordre de vente de 12,5 BTC retiré sans échange à 100 100 \$ \(un seul prix\)$/.test(sp(evs[4].texte)), [evs[0].texte, evs[4].texte]);
@@ -234,7 +258,7 @@ check('absorbé : les BTC ÉCHANGÉS, « entièrement échangé »', /absorbé \
 check('« gros ordre » au prix exact : « (un seul prix) » ; « mur » : une tranche', evs.slice(0, 6).every(e => /^Gros ordre d/.test(e.texte) && /un seul prix/.test(e.texte)) && /^Mur de vente apparu : 31,0 BTC entre 100 100 et 100 120.\$/.test(sp(evs[10].texte)), evs.map(e => e.texte));
 check('rafale : « d\'un seul coup (même milliseconde) », un seul prix s\'il n\'y en a qu\'un', /d'un seul coup \(même milliseconde\), de 80 936 à 80 943 \$/.test(sp(evs[6].texte)) && /, à 80.998 \$/.test(sp(evs[7].texte)), [evs[6].texte, evs[7].texte]);
 check('prix qui passe un mur : prix live, « percé, pas cassé », la règle de travail dite', /^Le prix \(live\) passe sous le mur d'achat/.test(evs[8].texte) && /Percé, pas « cassé »/.test(sp(evs[8].texte)) && /deux clôtures 1 min/.test(evs[8].texte) && /règle de travail, non mesurée/.test(evs[8].texte), evs[8].texte);
-check('niveau d\'options : « niveau d\'options « mur de gamma » », « modèle » et « lu à »', /niveau d'options « mur de gamma » 81 000 \$ \(modèle ; fichier lu à \d\d:\d\d UTC\)/.test(sp(evs[9].texte)) && evs[9].t === t0 + 30e3, evs[9]);
+check('niveau d\'options : « niveau d\'options « mur de gamma » », « modèle » et « lu à »', /niveau d'options « mur de gamma » 81 000 \$ \(modèle ; fichier lu à \d\d:\d\d\)/.test(sp(evs[9].texte)) && sp(evs[9].texte).includes('lu à ' + BM.heure(t0 - 900e3) + ')') && evs[9].t === t0 + 30e3, evs[9]);
 check('mur fondu : de 25 à 6 BTC, les échanges dits, « le prix n\'y est pas allé »', /de 25,0 à 6,00 BTC en moins d'une minute \(3,00 BTC échangés à ces prix ; le prix n'y est pas allé\)/.test(evs[11].texte), evs[11].texte);
 check('symboles du journal = ceux de BM.FINS_MURS et BM.SYMBOLES_GUIDE (rien de renommé)', evs[0].s === BM.FINS_MURS.retire.s && evs[1].s === BM.FINS_MURS.echange.s && evs[5].s === BM.SYMBOLES_GUIDE.apparu.s && evs[8].s === BM.SYMBOLES_GUIDE.sous.s);
 // Retiré pour l'essentiel PUIS touché : jamais « absorbé ». Le suivi réel (BM.SuiviMurs), lecture par lecture.
@@ -277,7 +301,7 @@ titre('9b. suiteTraverse : percé en mèche, cassé après deux clôtures, retou
   check('bougies manquantes au-delà de 5 min : « inconnu » (rien n\'est inventé)', BM.suiteTraverse(tr, [], tr.t + 6 * 60e3).verdict === 'inconnu');
   const ec = BM.evenementSuite(Object.assign({}, tr, BM.suiteTraverse(tr, mn([99970, 99960]), fin2))), em = BM.evenementSuite(Object.assign({}, tr, BM.suiteTraverse(tr, mn([99985]), fin2)));
   garder(ec, em);
-  check('textes : « cassé selon la règle de travail : deux clôtures 1 min sous le niveau (HH:MM et HH:MM UTC…) » ; « percé en mèche »', /cassé selon la règle de travail : deux clôtures 1 min sous le niveau \(\d\d:\d\d et \d\d:\d\d UTC ; règle non mesurée\)/.test(ec.texte) && /percé en mèche : la bougie de \d\d:\d\d UTC a clôturé au-dessus/.test(em.texte) && ec.court.length <= 40 && em.court.length <= 40, [ec, em]);
+  check('textes : « cassé selon la règle de travail : deux clôtures 1 min sous le niveau (HH:MM et HH:MM UTC…) » ; « percé en mèche »', /cassé selon la règle de travail : deux clôtures 1 min sous le niveau \(\d\d:\d\d et \d\d:\d\d ; règle non mesurée\)/.test(ec.texte) && /percé en mèche : la bougie de \d\d:\d\d a clôturé au-dessus/.test(em.texte) && !/UTC/.test(ec.texte + ec.carte + em.texte + em.carte) && ec.court.length <= 40 && em.court.length <= 40, [ec, em]);
 }
 
 // ── 9c. Lectures contiguës ───────────────────────────────────────────────────
@@ -338,7 +362,13 @@ const gardes = [];
 for (let i = 0; i < 5; i++) { zg = BM.zonesChargees(C4, zg); gardes.push(zg.bid ? zg.bid.garde : null); }
 check(`zone repassée sous les seuils (27 BTC) : gardée ${G.zoneGarde} lectures, puis oubliée (pas de clignotement)`, gardes.join() === [1, 2, 3, null, null].slice(0, G.zoneGarde + 2).join(), gardes);
 check('carnet sans bande : rien', BM.zonesChargees({ pas: 20, b: new Map(), a: new Map(), mid: 1, bas: null, haut: null }, null).bid === null);
-check('fuseau de l\'appareil en mots : UTC+2, UTC−3:30, UTC', BM.fuseau(-120) === 'UTC+2' && BM.fuseau(210) === 'UTC−3:30' && BM.fuseau(0) === 'UTC');
+{
+  // Le fuseau n'a plus qu'UNE écriture, celle de js/format.js (dans l'angle de l'axe du temps) : la carte n'en a plus à elle.
+  const { execFileSync } = require('child_process');
+  const fus = tz => execFileSync(process.execPath, ['-e', 'console.log(require(' + JSON.stringify(path.join(REPO, 'js/format.js')) + ').fuseau(' + t0 + '))'], { env: Object.assign({}, process.env, { TZ: tz }) }).toString().trim();
+  const f = ['Europe/Paris', 'America/St_Johns', 'UTC'].map(fus);
+  check('fuseau de l\'appareil en mots, écrit par Fmt.fuseau seul : UTC+2, UTC−2:30, UTC (jamais « UTC+0 »)', BM.fuseau === undefined && f.join('|') === 'UTC+2|UTC−2:30|UTC', f);
+}
 
 // ── 11b. Murs nommés d'une lecture à l'autre ─────────────────────────────────
 titre('11b. suivreNommes + seuil lissé : un passage progressif est vu, un seuil qui bouge ne fait ni « apparu » ni clignotement ; une zone finit par s\'effacer');
@@ -484,7 +514,7 @@ titre('13. Mode débutant : phrase du haut, étiquettes, sens du prix, journal e
   let okE = true; const malE = [];
   for (const p of [9990, 10000, 82480, 82480.5, 99999, 100000, 123456.78, 250000]) for (const c of ['bid', 'ask']) {
     const e = BM.etiquetteNiveau(c, p); debTextes.push(e);
-    if (!(e.length <= BM.ETIQUETTE_MAX && /^(Mur d’achat|Mur de vente) · [\d\u202f\u00a0]+\u00a0\$$/.test(e) && !/^\s*\$/.test(e))) { okE = false; malE.push(e); }
+    if (!(e.length <= BM.ETIQUETTE_MAX && /^(Mur d’achat|Mur de vente) · \d{1,3}(?: \d{3})*\u00a0\$$/.test(e) && !/^\s*\$/.test(e))) { okE = false; malE.push(e); }
   }
   check(`étiquettes de 9 990 à 250 000 $, deux côtés : ≤ ${BM.ETIQUETTE_MAX} signes, « Mur d’achat / de vente · P $ »`, okE, malE);
   check('le côté décide du nom (achat sous le prix, vente au-dessus)', /^Mur d’achat/.test(BM.etiquetteNiveau('bid', 82480)) && /^Mur de vente/.test(BM.etiquetteNiveau('ask', 82600)));
@@ -561,7 +591,8 @@ titre('13. Mode débutant : phrase du haut, étiquettes, sens du prix, journal e
   const trj = { cote: 'a', p: 82600, pas: 20, t: tj };
   const m1 = { t: tj, fin: tj + 60e3, c: 82630 }, m2 = { t: tj + 60e3, fin: tj + 120e3, c: 82640 }, m2r = { t: tj + 60e3, fin: tj + 120e3, c: 82610 };
   evs.push(BM.evenementSuite(Object.assign({}, trj, { verdict: 'meche', m1: { t: tj, fin: tj + 60e3, c: 82610 } })), BM.evenementSuite(Object.assign({}, trj, { verdict: 'casse', m1, m2 })), BM.evenementSuite(Object.assign({}, trj, { verdict: 'repasse', m1, m2: m2r })));
-  const nombres = s => (s.replace(/\b\d\d:\d\d(:\d\d)?\b/g, '').match(/\d[\d\u202f\u00a0]*(?:,\d+)?/g) || []).map(x => x.replace(/[\u202f\u00a0]/g, ''));
+  // Un nombre à la française : groupes de 3 chiffres séparés d'une espace (simple, Fmt), décimales après la virgule.
+  const nombres = s => (s.replace(/\b\d\d:\d\d(:\d\d)?\b/g, '').match(/\d(?:[\d\u202f\u00a0]| (?=\d{3}(?!\d)))*(?:,\d+)?/g) || []).map(x => x.replace(/[ \u202f\u00a0]/g, ''));
   let okJ = true; const malJ = [], types = new Set();
   for (const ev of evs) {
     types.add(ev.type);
@@ -596,7 +627,7 @@ titre('13. Mode débutant : phrase du haut, étiquettes, sens du prix, journal e
     const gb = tx.find(t => /gros ordres? d'achat posés?, \d+ disparus?/.test(t)), ga = tx.find(t => /gros ordre de vente posé, 1 disparu/.test(t));
     check(`journal débutant : 8 évènements → ${jd.length} lignes ; au prix, regroupés par côté (« ${gb} », « ${ga} »)`,
       jd.length === 4 && /^Près du prix du moment : 3 gros ordres d'achat posés, 2 disparus \(\d\d:\d\d–\d\d:\d\d\)$/.test(gb || '') && /^Près du prix du moment : 1 gros ordre de vente posé, 1 disparu \(\d\d:\d\d(–\d\d:\d\d)?\)$/.test(ga || ''), tx);
-    check('journal débutant : un gros ordre à plus d\'une tranche du prix et un mur nommé gardent leur phrase', tx.some(t => /^Gros ordre d'achat posé : 14,5 BTC à 82.420 \$$/.test(t)) && tx.some(t => /^Beaucoup de ventes en attente apparues entre 82.540 et 82.560/.test(t)), tx);
+    check('journal débutant : un gros ordre à plus d\'une tranche du prix et un mur nommé gardent leur phrase', tx.some(t => /^Gros ordre d'achat posé : 14,5 BTC à 82.420 \$$/.test(t)) && tx.some(t => /^Mur de vente apparu entre 82.540 et 82.560/.test(t)), tx);
     check('journal débutant : jamais « (un seul prix) », et rangé du plus ancien au plus récent', !tx.some(t => /un seul prix/.test(t)) && jd.every((x, i) => !i || jd[i - 1].t <= x.t), jd);
     check('journal débutant : prix inconnu à cet instant : la phrase est gardée telle quelle', BM.journalDebutant(liste.slice(0, 2), () => null).length === 2);
     debTextes.push(...tx);
