@@ -14,7 +14,7 @@
 //   5. bilan : comptes cohérents, ébauches → figures → confirmées, témoin, aucun « % » ;
 //   6. mots : libellés Débutant ≤ PARAM.guide.debutant.forme et sans mot banni ; Expert ≤ 80 ; bulles
 //      avec validation, invalidation, cible « non garantie » et « Mesuré sur » ; mêmes valeurs dans les
-//      deux modes ; heure de Paris en Débutant, jamais « UTC » ; aucun conseil ni intention ; (C7) des
+//      deux modes ; l'heure de l'appareil (Fmt.heure), jamais « UTC » ni « Paris » ; aucun conseil ni intention ; (C7) des
 //      définitions sans sens attendu ;
 //   7. états vivants (figureVivante) : « franchi », « percé en mèche », jamais un changement d'état ;
 //      (A1) une ébauche ne naît qu'à une clôture ;
@@ -25,6 +25,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const REPO = path.resolve(__dirname, '..');
 const G = require(path.join(REPO, 'js/guide.js'));
+const Fm = require(path.join(REPO, 'js/format.js'));
 const { chargerPage } = require('./bac');
 
 let ko = 0;
@@ -266,7 +267,7 @@ titre('6. Mots : libellés, bulles, mêmes valeurs, heures');
     const vus = G.formesAffichees(r, P, n - 60, n + 1, 'expert').concat(G.formesAffichees(r, P, n - 60, n + 1, 'debutant').slice(0, 1));
     for (const f of vus) {
       nb++;
-      const b = r.bilan[f.type], deb = G.texteFormeDebutant(f, b, ctx, P, '$').join(' '), exp = G.texteFormeExpert(f, b, ctx, P, '$', { concurrentes: G.concurrentes(r, f, P), tombees: G.tombees(r, 3) }).join(' ');
+      const b = r.bilan[f.type], deb = G.texteFormeDebutant(f, b, ctx, P, '$').join(' '), exp = G.texteFormeExpert(f, b, ctx, P, '$', { concurrentes: G.concurrentes(r, f, P), tombees: G.tombees(r, 3, P.horizon) }).join(' ');
       const lE = G.libellesFormeExpert(f, b, ctx, P);
       const e = G.etatForme(f).cle, vivante = !f.fin;
       const def = f.ebauche || f.phase !== 'confirme' ? null : null;
@@ -275,7 +276,7 @@ titre('6. Mots : libellés, bulles, mêmes valeurs, heures');
       if (G.motsBannis(deb).length) pb.push(['mot banni', f.type, G.motsBannis(deb)]);
       if (CONSEIL.test(deb) || CONSEIL.test(exp.replace(/pas une recommandation/, '')) || ACCUSE.test(deb + exp)) pb.push(['conseil', f.type]);
       if (C7.test(deb) || C7.test(exp)) pb.push(['C7', f.type, (deb + exp).match(C7)[0]]);
-      if (/UTC/.test(deb)) pb.push(['UTC en débutant', f.type]);
+      if (/UTC|Paris/.test(deb)) pb.push(['UTC ou Paris en débutant', f.type]);
       if (/undefined|NaN|—/.test(deb + exp)) pb.push(['valeur manquante', f.type, e, (deb + ' ¦ ' + exp).match(/.{0,80}(?:undefined|NaN|—).{0,40}/g)]);
       if (!lE.length || lE[0].length > 80 && lE[lE.length - 1].length > 80) pb.push(['libellé expert > 80', lE[0]]);
       if (vivante) {
@@ -291,13 +292,14 @@ titre('6. Mots : libellés, bulles, mêmes valeurs, heures');
         const niv = N.confirme ? [N.invals[0].p, N.objectifs[0].p] : N.sorties.map(x => x.seuil).concat(N.invals.filter(v => v.clotures === 1).map(v => v.p));
         for (const p of niv) if (!f.ebauche && (!deb.includes(prixDe(p).replace(' $', '')) || !exp.includes(prixDe(p).replace(' $', '')))) pb.push(['même valeur', f.type, e, prixDe(p)]);
       } else {
-        const m = G.marqueFin(f, ctx, 'debutant', '$'), mx = G.marqueFin(f, ctx, 'expert', '$');
-        if (['invalide', 'abandon'].includes(e) && !/\d\dh\d\d \(heure de Paris\)/.test(m)) pb.push(['heure de Paris', f.type, m]);
-        if (['invalide', 'abandon'].includes(e) && !/\d\d:\d\d UTC \(\d\dh\d\d Paris\)/.test(mx)) pb.push(['heure expert', f.type, mx]);
+        // L'heure de la chute : celle de l'appareil (fin de la bougie jFin), dans les deux modes, sans fuseau écrit.
+        const m = G.marqueFin(f, ctx, 'debutant', '$'), mx = G.marqueFin(f, ctx, 'expert', '$'), hFin = Fm.heure((T[f.jFin] + ctx.pas) * 1000);
+        if (['invalide', 'abandon'].includes(e) && (!m.includes('à ' + hFin) || /UTC|Paris/.test(m))) pb.push(['heure de l’appareil', f.type, m, hFin]);
+        if (['invalide', 'abandon'].includes(e) && (!mx.includes(hFin) || /UTC|Paris/.test(mx))) pb.push(['heure expert', f.type, mx, hFin]);
       }
     }
   }
-  check(`${nb} bulles (${nbEx} figures vivantes) à 40 instants : « Mesuré sur », validation, invalidation, cible « non garantie », mêmes valeurs dans les deux modes, heure de Paris en Débutant, ni mot banni ni conseil ni sens attendu`, nb > 40 && !pb.length, pb.slice(0, 8));
+  check(`${nb} bulles (${nbEx} figures vivantes) à 40 instants : « Mesuré sur », validation, invalidation, cible « non garantie », mêmes valeurs dans les deux modes, heure de l’appareil sans fuseau écrit, ni mot banni ni conseil ni sens attendu`, nb > 40 && !pb.length, pb.slice(0, 8));
   const defs = Object.values(G.DEFINITION_FORME);
   check(`C7 : les ${defs.length} définitions ne disent ni « annonce », ni « souvent suivi », ni « devrait », ni « signal »`, defs.length === 16 && !defs.some(d => C7.test(d)), defs.filter(d => C7.test(d)));
 }
@@ -315,13 +317,14 @@ titre('7. États vivants (figureVivante) ; une ébauche ne naît qu’à une cl�
   const t1 = G.texteVivantFigure(f, v1, ctx, 'expert', '$'), t2 = G.texteVivantFigure(f, v2, ctx, 'expert', '$');
   // (Comportement changé exprès : le libellé Débutant garde le nom de la figure et ne revient pas en
   // arrière avant la clôture — il ne clignote plus quand le prix oscille autour de la ligne.)
-  check('prix live au-delà de la ligne de cou : « franchi », « à confirmer à la fin de la bougie » ; Débutant « Double sommet à confirmer » (le nom reste)', v1.cle === 'franchi' && v1.etiq === 'sortie' && /à confirmer à la fin de la bougie/.test(t1) && G.libelleVivantDebutant(f, v1) === 'Double sommet à confirmer', [v1.cle, t1, G.libelleVivantDebutant(f, v1)]);
+  check('prix live au-delà de la ligne de cou : « franchi », « à valider à la fin de la bougie » ; Débutant « Double sommet à valider » (le nom reste)', v1.cle === 'franchi' && v1.etiq === 'sortie' && /à valider à la fin de la bougie/.test(t1) && G.libelleVivantDebutant(f, v1) === 'Double sommet à valider', [v1.cle, t1, G.libelleVivantDebutant(f, v1)]);
   // (Changé exprès, revue des figures 2 : « sort en bas ? » se lisait alors que le prix était revenu
   // dedans ; la mèche seule a son propre libellé, qui garde le nom et ne dit pas « sort ».)
   check('mèche seule (la bougie en cours y est allée, le prix est revenu) : « percé en mèche » ; Débutant : « Double sommet : revenu » (pas le libellé d’au-delà), le nom reste', v2.cle === 'meche' && v2.etiq === 'meche' && /percé en mèche/.test(t2)
     && G.libelleVivantDebutant(f, v2) === 'Double sommet : revenu' && G.libelleVivantDebutant(f, v2) !== G.libelleVivantDebutant(f, v1), [v2.cle, t2, G.libelleVivantDebutant(f, v2)]);
   const tD = G.texteVivantFigure(f, v2, ctx, 'debutant', '$');
-  check('… en Débutant : « Cela ne compte pas : seule la fin de … compte », l’heure de Paris, aucun mot banni', /Cela ne compte pas : seule la fin d/.test(tD) && /\d\dh\d\d/.test(tD) && !G.motsBannis(tD).length, tD);
+  const hBougie = Fm.heure((T[j] + ctx.pas) * 1000);
+  check('… en Débutant : « Cela ne compte pas : seule la fin de … compte », l’heure de l’appareil (Fmt.heure, fin de la bougie en cours), aucun mot banni', /Cela ne compte pas : seule la fin d/.test(tD) && tD.includes('à ' + hBougie) && !/UTC|Paris/.test(tD + t1) && !G.motsBannis(tD).length, [tD, hBougie]);
   check('un état vivant ne change jamais la figure (phase, demi, journal)', JSON.stringify(f) === avant);
   // A1 : chaque ébauche naît à une clôture, avec au moins ebaucheDroiteMin bougie close à droite de son extrême.
   const eb = R.ebauches.liste;
@@ -344,7 +347,7 @@ titre('8. Sélection : Débutant, Expert, figure tombée');
     const res = Object.assign({}, R, { n }), j = n - 1, vs = n - 50, ve = n + 1;
     const D = G.formesAffichees(res, P, vs, ve, 'debutant'), X = G.formesAffichees(res, P, vs, ve, 'expert');
     if (D.some(f => f.debut < vs)) pb.push(['débutant hors vue', n]);
-    for (let k = 1; k < D.length; k++) if (G.rangFigure(D[k], j) < G.rangFigure(D[k - 1], j)) pb.push(['rang', n]);
+    for (let k = 1; k < D.length; k++) if (G.rangFigure(D[k], j, P) < G.rangFigure(D[k - 1], j, P)) pb.push(['rang', n]);
     if (X.length > P.formesMax) pb.push(['expert > formesMax', n]);
     const fin = f => (f.fin && f.jFin <= j ? f.jFin : j);
     // (Changé exprès, revue des figures 2 : une figure TOMBÉE qui était montrée à la clôture d'avant
@@ -359,7 +362,11 @@ titre('8. Sélection : Débutant, Expert, figure tombée');
   }
   check('Débutant : figures entières dans la vue, rangées ; Expert : ≤ ' + P.formesMax + ', jamais deux d’une même famille d’écran qui se recouvrent ni sur le même dernier point (sauf une figure tombée sous les yeux, qui garde sa place)', !pb.length, pb.slice(0, 5));
   const inv = { fin: 'invalide', jFin: 100, type: 'double_sommet', journal: [] }, eb = { ebauche: true, type: 'double_sommet', journal: [] };
-  check('une figure invalidée depuis moins de 2 clôtures (rang 2) passe devant une ébauche (rang 4) ; plus tard, derrière (rang 5)', G.rangFigure(inv, 101) === 2 && G.rangFigure(eb, 101) === 4 && G.rangFigure(inv, 103) === 5);
+  check('une figure invalidée depuis moins de 2 clôtures (rang 2) passe devant une ébauche (rang 4) ; plus tard, derrière (rang 5)', G.rangFigure(inv, 101, P) === 2 && G.rangFigure(eb, 101, P) === 4 && G.rangFigure(inv, 103, P) === 5);
+  // La durée de rang d'une cible atteinte est P.garderInvalide (incohérence 127 : « age <= 6 » écrit dans le code).
+  const att = { fin: 'atteint', jFin: 100, type: 'double_sommet', journal: [] }, P3 = Object.assign({}, P, { garderInvalide: 3 });
+  check('cible atteinte : rang 5 pendant P.garderInvalide clôtures, puis 6 — lu dans P (garderInvalide = 3 → rang 6 dès 4 clôtures)', G.rangFigure(att, 100 + P.garderInvalide, P) === 5 && G.rangFigure(att, 101 + P.garderInvalide, P) === 6
+    && G.rangFigure(att, 103, P3) === 5 && G.rangFigure(att, 104, P3) === 6);
   // invalide_avant : montrée garderInvalide bougies, puis plus.
   let vu = null;
   for (const f of R.formes.filter(x => x.fin === 'invalide_avant' && x.jFin + P.garderInvalide + 2 < NN)) {

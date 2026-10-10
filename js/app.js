@@ -194,8 +194,13 @@ function sonderRefraction() {
 }
 
 // ============ SHORTCUTS UX ============
+// Une touche seule : Ctrl / Cmd / Alt + touche reste au navigateur (Ctrl+R recharge, Ctrl+F
+// cherche), et une saisie (champ, liste déroulante, texte éditable) garde ses touches — les
+// flèches d'une liste du Grid Bot changeaient la vue du graphique. Même règle que la carte.
 window.addEventListener('keydown', (e) => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  const cible = e.target || {};
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (cible.tagName === 'INPUT' || cible.tagName === 'TEXTAREA' || cible.tagName === 'SELECT' || cible.isContentEditable) return;
   if (e.key === 'f' || e.key === 'F') { toggleFeed(); e.preventDefault(); }
   if (e.key === 'd' || e.key === 'D') { themeJumeau(); e.preventDefault(); }
   if (e.key === 't' || e.key === 'T') { themeSuivant(); e.preventDefault(); }
@@ -359,8 +364,8 @@ function guideNoter(on) { try { localStorage.setItem('samsara-guide-v1', on ? '1
 // de les masquer est gardé de la même façon (clé samsara-scenarios-v1).
 function scenariosMemorise() { try { return localStorage.getItem('samsara-scenarios-v1') !== '0'; } catch (e) { return true; } }
 function scenariosNoter(on) { try { localStorage.setItem('samsara-scenarios-v1', on ? '1' : '0'); } catch (e) { /* navigation privée */ } }
-const activeSubs = { vol: true, rsi: false, macd: false, stoch: false, atr: false, obv: false, mfi: false, williamsR: false, cci: false, adx: false, ao: false, equity: false };
-const subHeights = { vol: 110, rsi: 120, macd: 120, stoch: 120, atr: 110, obv: 110, mfi: 120, williamsR: 120, cci: 120, adx: 120, ao: 110, equity: 140 };
+const activeSubs = { vol: true, rsi: false, macd: false, stoch: false, atr: false, obv: false, mfi: false, williamsR: false, cci: false, adx: false, ao: false };
+const subHeights = { vol: 110, rsi: 120, macd: 120, stoch: 120, atr: 110, obv: 110, mfi: 120, williamsR: 120, cci: 120, adx: 120, ao: 110 };
 
 // ============ PARAMÈTRES DES INDICATEURS : une seule source ============
 // Le calcul, le libellé (menu, titre de sous-graphe) et la légende (js/fiches.js) lisent CES
@@ -433,7 +438,8 @@ const PARAM = {
     temoinDeparts: 30000,
     // Marge de « futur » à droite de la dernière bougie (chemins conditionnels) : une fraction
     // de la largeur du tracé, bornée en pixels, jamais plus de `futurMaxFraction` du tracé.
-    // Seulement quand le Guide est affiché ; elle se referme d'un pas de bougie par bougie
+    // Elle s'ouvre quand quelque chose s'y dessine : le Guide (hors Débutant) ou la flèche d'un
+    // scénario du matin (voir margeFutur) ; elle se referme d'un pas de bougie par bougie
     // quittée à droite (un glissement ne fait pas sauter la largeur des bougies).
     futur: 0.18, futurMinPx: 56, futurMaxPx: 250, futurMaxFraction: 0.4,
     // Mode Débutant : au plus `items` textes sur le tracé (phrase, repère du haut, repère du bas,
@@ -446,7 +452,7 @@ const PARAM = {
   },
   // Scénarios du matin (js/scenarios.js) : les nombres de leur dessin et de leurs mots.
   scenarios: {
-    point: '07h00',               // le nom du point du matin (heure de Paris de la routine)
+    point: '07h00',               // l'heure du point du matin dans la routine (à Paris) ; affichée à l'heure de l'appareil (heurePointMatin)
     echantillonFaible: 20,        // « échantillon faible » sous 20 matins notés (bilan de l'ordre)
     // L'encadré : en haut à droite du tracé, au plus `boiteMax` px de large et `boiteFraction` du
     // tracé (téléphone : `boiteFractionEtroit`) ; jamais au-delà de la moitié haute du tracé.
@@ -487,24 +493,41 @@ const ETIQ = {
   mfi: () => 'MFI — Money Flow Index (' + PARAM.mfi.periode + ')',
   williamsR: () => 'Williams %R (' + PARAM.williamsR.periode + ')',
   cci: () => 'CCI (' + PARAM.cci.periode + ')',
-  adx: () => 'ADX/DMI (' + PARAM.adx.periode + ')',
-  bb: () => 'Bollinger (' + PARAM.bb.periode + ', ' + PARAM.bb.ecarts + ' σ)',
+  adx: () => 'ADX / DMI (' + PARAM.adx.periode + ')',
+  bb: () => 'Bandes de Bollinger (' + PARAM.bb.periode + ', ' + PARAM.bb.ecarts + ' σ)',
   ao: () => 'Awesome Oscillator (' + PARAM.ao.rapide + ',' + PARAM.ao.lente + ')',
 };
 
-// Registre de tous les indicateurs pour la dropdown
+// La couche de heatmap.json sur le graphique : UN nom, du menu à l'âge écrit sur le tracé (elle
+// s'est appelée Liquidité, Depth, Heatmap du graphique et Carte publiée).
+const NOM_ORDRES_CARTE = 'Ordres en attente (carte)';
+// Registre de tous les indicateurs pour la dropdown. Un seul nom par chose : le libellé du menu
+// est celui de la fiche (js/fiches.js), du ruban et du tracé, en français.
+// `paires` : les seules paires où la couche dessine quelque chose (BTCUSDT : heatmap.json et
+// previsions.json ne parlent que de lui) — ailleurs, la case est grisée et le dit.
+/** L'heure du point du matin, à l'heure de l'APPAREIL (« 07:00 » sur un appareil à Paris), ou
+ *  null : PARAM.scenarios.point est une heure de la routine (à Paris), convertie en l'instant du
+ *  point du jour de `t` (maintenant par défaut) par js/scenarios.js — la conversion de la fiche
+ *  (js/fiches.js, pointMots). Aucun fuseau écrit à côté (il est dit une fois, à l'horloge). */
+function heurePointMatin(t) {
+  const j = new Date(Number.isFinite(t) ? t : Date.now()).toISOString().slice(0, 10);
+  const ms = typeof Scenarios !== 'undefined' && Scenarios.pointMs ? Scenarios.pointMs(j, PARAM.scenarios.point) : NaN;
+  return Number.isFinite(ms) ? Fmt.heure(ms) : null;
+}
+/** « Scénarios du matin de Claude, une IA (07:00) » : relu à chaque construction du menu. */
+const libelleScenarios = () => { const h = heurePointMatin(); return 'Scénarios du matin de Claude, une IA' + (h ? ' (' + h + ')' : ''); };
 const INDICATORS = [
   // Le Guide d'abord : la seule couche affichée par défaut, son interrupteur reste visible
   // sans faire défiler le menu.
   { cat: 'Guide', items: [
     { key: 'guide', label: 'Guide : niveaux nommés, régime, formes, suite', tag: 'gd' },
-    { key: 'scenarios', label: 'Scénarios du matin de Claude, une IA (' + PARAM.scenarios.point + ' Paris, BTC)', tag: 'gd' },
+    { key: 'scenarios', get label() { return libelleScenarios(); }, tag: 'gd', paires: ['BTCUSDT'] },
   ]},
   { cat: 'Overlays', items: [
     ...['ema20', 'ema50', 'ema100', 'ema200', 'sma20', 'sma50'].map(k => ({ key: k, label: k.slice(0, 3).toUpperCase() + ' ' + periodeDe(k), tag: 'ov' })),
     { key: 'bb', label: ETIQ.bb(), tag: 'ov' },
     { key: 'vwap', label: 'VWAP', tag: 'ov' },
-    { key: 'ichimoku', label: 'Ichimoku Cloud', tag: 'ov' },
+    { key: 'ichimoku', label: 'Nuage Ichimoku', tag: 'ov' },
     { key: 'sar', label: 'Parabolic SAR', tag: 'ov' },
   ]},
   { cat: 'Sous-graphes', items: [
@@ -521,12 +544,14 @@ const INDICATORS = [
     { key: 'ao', label: ETIQ.ao(), tag: 'sg' },
   ]},
   { cat: 'Chartiste', items: [
-    { key: 'sr', label: 'Supports/Résistances', tag: 'ch' },
-    { key: 'fib', label: 'Fibonacci Retracement', tag: 'ch' },
-    { key: 'vp', label: 'Volume Profile', tag: 'ch' },
-    { key: 'liq', label: 'Liquidité (Depth)', tag: 'ch' }
+    { key: 'sr', label: 'Supports / résistances', tag: 'ch' },
+    { key: 'fib', label: 'Retracements de Fibonacci', tag: 'ch' },
+    { key: 'vp', label: 'Profil de volume', tag: 'ch' },
+    { key: 'liq', label: NOM_ORDRES_CARTE, tag: 'ch', paires: ['BTCUSDT'] }
   ]},
 ];
+/** La couche dessine-t-elle quelque chose sur la paire affichée ? */
+const disponible = item => !item.paires || item.paires.includes(activeSymbol);
 
 function isOverlay(key) { return key in overlays; }
 function isActive(key) { return (overlays[key] || activeSubs[key]) || false; }
@@ -553,7 +578,7 @@ const FICHE_IND = { ema20: 'ema', ema50: 'ema', ema100: 'ema', ema200: 'ema', sm
   williamsR: 'williamsR', cci: 'cci', adx: 'adx', ao: 'ao', sr: 'sr', fib: 'fib', vp: 'vp', liq: 'liq', guide: 'guide', scenarios: 'scenarios' };
 // Débutant : le menu « Affichage » n'a que les deux couches du Guide, en mots simples ; les outils
 // d'analyse sont en Expert (une ligne y mène).
-const LIBELLES_DEBUTANT = { guide: 'Repères et phrase de lecture', scenarios: 'Scénarios du matin de Claude, une IA (' + PARAM.scenarios.point + ' Paris, BTC)' };
+const LIBELLES_DEBUTANT = { guide: 'Repères et phrase de lecture', get scenarios() { return libelleScenarios(); } };
 // Les catégories en mots : où l'indicateur se dessine. La clé `cat` reste le nom court (tests).
 const TITRES_CAT = { Guide: 'Guide', Overlays: 'Sur les bougies', 'Sous-graphes': 'Sous le graphique', Chartiste: 'Niveaux et zones' };
 // L'aperçu du menu : l'indicateur survolé, touché ou au clavier, et le filtre de l'Expert. Gardés
@@ -597,7 +622,10 @@ function ligneMenu(item, libelle, cat, tag) {
   const checked = isActive(item.key) ? ' checked' : '';
   const fiche = FICHE_IND[item.key], f = fiche && typeof FICHES !== 'undefined' ? FICHES[fiche] : null;
   const cherche = libelle + ' ' + (f ? f.titre : '') + ' ' + (TITRES_CAT[cat] || cat);
-  return `<label data-ind="${item.key}" data-cat="${cat}" data-cherche="${echapF(cherche)}"><input type="checkbox"${checked} onchange="toggleAny('${item.key}')">${libelle}${fiche ? infoBtn(fiche) : ''}${tag ? `<span class="tag tag-${item.tag}" title="${echapF(TITRES_CAT[cat] || cat)}">${item.tag.toUpperCase()}</span>` : ''}</label>`;
+  // Sur une autre paire, la couche ne dessinerait rien : case grisée (le choix est gardé) et dit.
+  const dispo = disponible(item), seul = dispo ? '' : ' disabled';
+  const note = dispo ? '' : ' <span class="ind-seul">' + item.paires.map(p => NOMS_PAIRES[p] || p).join(', ') + ' seulement</span>';
+  return `<label data-ind="${item.key}" data-cat="${cat}" data-cherche="${echapF(cherche)}"${dispo ? '' : ' class="indispo"'}><input type="checkbox"${checked}${seul} onchange="toggleAny('${item.key}')">${libelle}${note}${fiche ? infoBtn(fiche) : ''}${tag ? `<span class="tag tag-${item.tag}" title="${echapF(TITRES_CAT[cat] || cat)}">${item.tag.toUpperCase()}</span>` : ''}</label>`;
 }
 function buildDropdown() {
   const menu = document.getElementById('indMenu');
@@ -636,11 +664,13 @@ function titresBarre() {
     l.title = f.titre + ' : ' + f.simple + (f.traders ? '\nComment les traders l’utilisent : ' + f.traders : '') + '\n(Le menu « + Indicateurs » en a la fiche complète, avec le calcul.)';
   }
 }
-/** Le bouton du menu dit combien d'indicateurs l'Expert a allumés (le Guide compris). */
+/** Le bouton du menu dit combien d'indicateurs de MARCHÉ l'Expert a allumés et voit sur cette
+ *  paire : ni le Guide ni les scénarios (les couches du site, « pas des indicateurs de marché »
+ *  selon leurs fiches), ni une couche cochée qui ne dessine rien ici. */
 function compterIndicateurs() {
   const c = document.getElementById('indCompte');
   if (!c) return;
-  const n = INDICATORS.reduce((s, cat) => s + cat.items.filter(i => isActive(i.key)).length, 0);
+  const n = INDICATORS.filter(cat => cat.cat !== 'Guide').reduce((s, cat) => s + cat.items.filter(i => isActive(i.key) && disponible(i)).length, 0);
   c.textContent = n ? String(n) : '';
   c.hidden = !n;
 }
@@ -778,6 +808,10 @@ async function changeInterval(interval, label) {
 }
 
 const NOMS_PAIRES = { BTCUSDT: 'BTC/USDT', SOLUSDT: 'SOL/USDT', XRPUSDT: 'XRP/USDT', TAOUSDT: 'TAO/USDT', BTCSOL: 'BTC/SOL' };
+/** L'intervalle en Expert, écrit comme dans le ruban : « 15m », « 4h », « 1 j » (jamais « 1D »), « 1 sem. ». */
+const nomTf = tf => ({ '1d': '1 j', '1w': '1 sem.' })[tf] || tf;
+/** L'actif de base de la paire affichée, l'unité du volume : BTC (BTC/USDT et BTC/SOL), SOL, XRP, TAO. */
+const uniteVolume = () => (NOMS_PAIRES[activeSymbol] || activeSymbol).split('/')[0];
 function ouvrirPaires(e) {
   if (e) e.stopPropagation();
   const m = document.getElementById('paireMenu'), b = document.getElementById('paireBtn');
@@ -790,14 +824,18 @@ async function changeSymbol(symbol, label) {
   document.querySelectorAll('label[id^="sym_"]').forEach(l => l.classList.remove('active'));
   label.classList.add('active');
   activeSymbol = symbol;
+  // Le même nom qu'en tête (« SOL/USDT »), jamais le symbole brut de l'API (« SOLUSDT »).
   const tp = document.getElementById('taskbarPair');
-  if (tp) tp.textContent = symbol;
+  if (tp) tp.textContent = NOMS_PAIRES[symbol] || symbol;
   const pn = document.getElementById('paireNom');
   if (pn) pn.textContent = NOMS_PAIRES[symbol] || symbol;
   document.getElementById('paireMenu').classList.remove('open');
   // Le dernier prix d'une AUTRE paire ne doit ni colorer la flèche ni allumer l'éclair.
   livePrice = null; fetchPrice();
   priceScale = 1.0; pricePan = 0;
+  // Les couches d'une seule paire (Ordres en attente, scénarios) : grisées ou rendues, comptées ou non.
+  compterIndicateurs();
+  if (document.getElementById('indMenu').classList.contains('open')) buildDropdown();
   // Les cartes du Débutant nomment le bitcoin sur une autre paire : elles suivent la paire.
   if (marketData) {
     renderFeed();
@@ -1609,8 +1647,9 @@ function getMultiTFLevels() {
       if (Math.abs(d.price - lvl.price) / Math.max(d.price, lvl.price) < PARAM.sr.fusionTf) {
         d.score += lvl.score;
         d.touches += lvl.touches;
-        // MAX, pas MIN : un niveau present sur le TF courant ET le daily heritait tier 0 -> « Mineur » pointille.
-        d.tier = Math.max(d.tier, lvl.tier);
+        // MAX, pas MIN : un niveau present sur le TF courant ET le daily heritait tier 0 -> trait du TF
+        // courant. Le badge dit le TF du style retenu (avant : le style du daily, le badge « ·15m »).
+        if (lvl.tier > d.tier) { d.tier = lvl.tier; d.tf = lvl.tf; }
         merged = true; break;
       }
     }
@@ -1628,7 +1667,6 @@ async function refreshRefSR() {
 // Décimales selon l'ordre de grandeur du prix. 3 décimales fixes (badge, axe, infobulle)
 // affichaient un 0 inventé sur BTC (cotation au centime) et tronquaient XRP (0,0001 $).
 function pxDec(v) { const a = Math.abs(v); return a >= 10 ? 2 : a >= 1 ? 4 : 6; }
-function fmtPrix(v) { return v.toFixed(pxDec(v)); }
 
 // Prix ET variation 24 h dans la MÊME requête (ticker/24hr) : les deux chiffres du bloc héros
 // ont donc toujours le même horodatage — rien à soustraire entre deux cadences. Format MINI :
@@ -1648,25 +1686,26 @@ function var24De(d) {
 const ECLAIR_MS = 450;
 const MQ_MOUVEMENT = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
 let eclairFin = null;
-// Le prix et la variation de l'en-tête, écrits selon le mode (mêmes valeurs) : Expert « $83,512.51 »
-// et « −0.40 % » ; Débutant « 83 513 $ » et « −0,40 % en 24 h » (le format français, la durée dite).
+// Le prix et la variation de l'en-tête, écrits selon le mode (mêmes valeurs), au format commun
+// (js/format.js) : Expert « 83 512,51 $ » (précision de cotation) et « −0,40 % » ; Débutant
+// « 83 513 $ » (arrondi de lecture) et « −0,40 % en 24 h » (la durée dite).
 let var24Courant = null;
-/** « −0,40 % » (avecDuree : « −0,40 % en 24 h ») ; '' sans valeur. */
+/** « −0,40 % » (avecDuree : « −0,40 % en 24 h ») ; '' sans valeur. Deux décimales : la même
+ *  précision dans l'en-tête et dans le panneau ⚡. */
 function texteVar24(v, avecDuree) {
   if (!isNum(v)) return '';
-  const t = (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(2).replace('.', ',') + ' %';
+  const t = Fmt.pct(v, 2);
   return avecDuree ? t + ' en 24 h' : t;
 }
 function ecrirePrixEntete(price, var24) {
   const el = document.getElementById('price');
   if (el && isNum(price)) {
-    const dec = pxDec(price);
-    const t = debutant() ? Guide.prix(price, guideUnite()) : '$' + price.toLocaleString('en-US', {minimumFractionDigits: dec, maximumFractionDigits: dec});
+    const t = debutant() ? Guide.prix(price, guideUnite()) : Fmt.prix(price, guideUnite(), 'fin');
     el.textContent = t;   // écrit à chaque lecture, comme avant : l'horloge part dans la même tâche
   }
   const v = document.getElementById('var24');
   if (v) {
-    v.textContent = !isFinite(var24) ? '' : debutant() ? texteVar24(var24, true) : (var24 > 0 ? '+' : var24 < 0 ? '−' : '') + Math.abs(var24).toFixed(2) + ' %';
+    v.textContent = !isFinite(var24) ? '' : texteVar24(var24, debutant());
     v.className = 'var24' + (var24 > 0 ? ' pos' : var24 < 0 ? ' neg' : '');
   }
 }
@@ -1710,13 +1749,18 @@ async function fetchPrice() {
 // L'horloge de la barre des tâches avance dans la MÊME tâche que le prix, donc la même image :
 // un rendu par seconde au lieu de deux (5 à 11 ms/s mesurés), et rien quand l'onglet est caché
 // (la lecture du prix n'y part pas). Avant : sa propre minuterie, jamais suspendue.
-const FMT_HMS = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+// C'est l'heure de l'APPAREIL, comme toutes les heures de la page : son infobulle est le seul
+// endroit du terminal qui dit le fuseau (« heure de l'appareil (UTC+2) »), recalculé à chaque
+// tour (un changement d'heure d'été le suit), réécrit seulement s'il change.
 let minuteCalque = 0;
+let compteurFin = 0;   // bord droit du compteur de la vue (rangée du haut, Expert) : l'âge de la carte s'arrête avant
 function horloge() {
-  const c = document.getElementById('taskbarClock'), t = FMT_HMS.format(new Date());
+  const c = document.getElementById('taskbarClock'), maintenant = Date.now(), t = Fmt.heureSec(maintenant);
   if (c && c.textContent !== t) c.textContent = t;
+  const fz = Fmt.fuseauMots(maintenant);
+  if (c && c.title !== fz) c.title = fz;
   majHorloges();
-  // Le calque porte un âge en minutes (couche « Liquidité ») : redessiné à chaque minute
+  // Le calque porte un âge en minutes (couche « Ordres en attente (carte) ») : redessiné à chaque minute
   // même quand le prix, lui, ne bouge pas.
   const m = Math.floor(Date.now() / 60000);
   if (m !== minuteCalque) { minuteCalque = m; if (geo) scheduleCalque(); }
@@ -2056,8 +2100,9 @@ function calcATR(highs, lows, closes, period) {
 function calcVWAP(highs, lows, closes, volumes, times, interval, ancrageS, ancrageBougies) {
   const out = new Array(closes.length).fill(null);
   // Ancrage : un cumul depuis la PREMIERE bougie chargee (3000 = 125 jours en 1h) donne une
-  // moyenne longue, pas un VWAP. Intraday -> reset a chaque jour UTC (vrai VWAP de session) ;
-  // en 4h/1d/1w, pas de session intraday ou s'ancrer -> l'ancrage est recale toutes les 20 bougies.
+  // moyenne longue, pas un VWAP. Tout intervalle plus court que ancrageS (1 jour), 4h compris,
+  // est remis à zéro à chaque jour UTC (vrai VWAP de session) ; en 1d/1w, pas de session où
+  // s'ancrer -> l'ancrage est recalé toutes les ancrageBougies (20) bougies.
   const sec = { '1m':60,'3m':180,'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400,'1d':86400,'1w':604800 }[interval];
   const bucket = !sec ? 0 : (sec < ancrageS ? ancrageS : sec * ancrageBougies);
   let cumPV = 0, cumV = 0, b = null;
@@ -2286,8 +2331,8 @@ function gridParams(levels, tp, sl, loHint, hiHint) {
     gridLevels: { value: levels, min: 2, max: 500, step: 1, label: 'Niveaux' },
     priceLow: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix inférieur', hint: loHint },
     priceHigh: { value: 0, min: 0, max: 999999, step: 1, label: 'Prix supérieur', hint: hiHint },
-    tpPct: { value: tp, min: 0.1, max: 5, step: 0.1, label: 'Take Profit %' },
-    slPct: { value: sl, min: 0.5, max: 10, step: 0.5, label: 'Stop Loss %' },
+    tpPct: { value: tp, min: 0.1, max: 5, step: 0.1, label: 'Prise de gain %', hint: 'Prise de gain (take profit) : la vente d’un niveau à ce % au-dessus de son achat' },
+    slPct: { value: sl, min: 0.5, max: 10, step: 0.5, label: 'Stop de perte %', hint: 'Stop de perte (stop loss) : la vente forcée d’un niveau à ce % sous son achat' },
   };
 }
 // Borne manuelle si > 0, sinon la borne auto calculee par la strategie
@@ -2327,7 +2372,7 @@ registerStrategy('bb_grid', {
 registerStrategy('rsi_grid', {
   label: 'Grille RSI',
   params: {
-    ...gridParams(10, 0.8, 4, '0 = auto (-5% prix)', '0 = auto (+5% prix)'),
+    ...gridParams(10, 0.8, 4, '0 = auto (prix − 5 %)', '0 = auto (prix + 5 %)'),
     oversold: { value: 30, min: 15, max: 45, step: 1, label: 'Seuil survente', advanced: true },
     rsiPeriod: { value: 14, min: 5, max: 30, step: 1, label: 'Période RSI', advanced: true },
     exitRsi: { value: 50, min: 40, max: 70, step: 1, label: 'Seuil sortie RSI', advanced: true },
@@ -2349,12 +2394,12 @@ registerStrategy('rsi_grid', {
 
 // ─── EMA Pullback Grid Strategy ───
 registerStrategy('ema_grid', {
-  label: 'Grille EMA Pullback',
+  label: 'Grille replis sur EMA',
   params: {
     ...gridParams(10, 0.5, 3, '0 = auto (EMA)', '0 = auto (prix courant)'),
     emaPeriod: { value: 50, min: 10, max: 200, step: 10, label: 'Période EMA', advanced: true },
-    pullbackPct: { value: 2, min: 0.5, max: 10, step: 0.5, label: 'Pullback min %', advanced: true },
-    trendMinBars: { value: 5, min: 3, max: 20, step: 1, label: 'Bars tendance min', advanced: true },
+    pullbackPct: { value: 2, min: 0.5, max: 10, step: 0.5, label: 'Repli min %', advanced: true },
+    trendMinBars: { value: 5, min: 3, max: 20, step: 1, label: 'Bougies de tendance min', advanced: true },
   },
   trigger(candles, idx, params, indicators) {
     if (idx < params.emaPeriod + params.trendMinBars) return 'idle';
@@ -2404,8 +2449,8 @@ registerStrategy('sr_grid', {
 
 // ─── Dumb Grid (fixed intervals, no TA) ───
 registerStrategy('dumb_grid', {
-  label: 'Grille Fixe (benchmark)',
-  params: gridParams(10, 0.5, 3, '0 = auto (-5%)', '0 = auto (+5%)'),
+  label: 'Grille fixe (témoin)',
+  params: gridParams(10, 0.5, 3, '0 = auto (prix − 5 %)', '0 = auto (prix + 5 %)'),
   trigger(candles, idx) {
     if (idx < 2) return 'idle';
     return 'enter';
@@ -2798,7 +2843,6 @@ const COLORS = {
   rsi: '#8e5bd8', macd: '#d79a00', macd_signal: '#ff6b35',
   stoch_k: '#d79a00', stoch_d: '#ff6b35', atr: '#00a693',
   obv: '#ff9800', mfi: '#9c27b0', williamsR: '#00a5bd', cci: '#ff5722', adx: '#d79a00',
-  equity_total: '#e0a800',
   candleUp: '#0d9672', candleDown: '#e5484d', surUp: '#ffffff', surDown: '#ffffff',
   grid: 'rgba(127,127,127,0.12)', text: '#45597a',
   bougieForme: 'pleine', bougieRayon: 2, grilleTirets: []
@@ -2811,7 +2855,7 @@ const COLORS = {
 // --bougie-rayon : rayon des coins des corps et des barres de volume (0 = angles vifs).
 // --grille-tirets : motif de la grille (ex. « 8 3 2 3 », trait mixte) ; « none » = trait plein.
 // --police-graphique : famille du texte du canvas (repli : --font).
-// --chaleur-bid / --chaleur-ask : encre de la couche « Liquidité » (voir HEAT_RAMPE).
+// --chaleur-bid / --chaleur-ask : encre de la couche « Ordres en attente (carte) » (voir HEAT_RAMPE).
 // --up-sur / --down-sur : encre du texte posé SUR une marque de hausse / de baisse (l'étiquette du
 // dernier prix) ; blanc par défaut. Un thème dont la hausse est claire (Cyanotype : traits blancs)
 // y écrivait du blanc sur du blanc — tests/test_palette.py mesure ce couple.
@@ -2825,9 +2869,11 @@ const FORMES_BOUGIE = {
 // Identité des overlays : chaque ligne porte son étiquette en bout de tracé (et un point dans
 // le ruban) — elle ne repose jamais sur la couleur seule. tests/test_palette.py échoue si un
 // overlay sous 3:1 sur le fond du graphique n'a pas d'étiquette ici.
-// L'étiquette EST la clé (ema20 -> EMA20), dont la période est aussi tirée pour le calcul.
+// L'étiquette est le nom du menu et du ruban (ema20 -> « EMA 20 », la période tirée de la clé,
+// comme pour le calcul). VWAP, Bollinger et les deux lignes d'Ichimoku portent la leur aussi.
 // Gardée littérale : tests/test_palette.py la lit dans la source.
-const ETIQ_OVERLAYS = { ema20: 'EMA20', ema50: 'EMA50', ema100: 'EMA100', ema200: 'EMA200', sma20: 'SMA20', sma50: 'SMA50' };
+const ETIQ_OVERLAYS = { ema20: 'EMA 20', ema50: 'EMA 50', ema100: 'EMA 100', ema200: 'EMA 200', sma20: 'SMA 20', sma50: 'SMA 50',
+                        vwap: 'VWAP', tenkan: 'Tenkan (rapide)', kijun: 'Kijun (lente)' };
 // Une seule famille de caractères pour tout le graphique : celle du thème pour le graphique
 // (jeton --police-graphique), à défaut celle de l'interface (--font).
 let POLICE_GRAPHIQUE = "'Segoe UI Variable Text','Segoe UI Variable',-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,'Segoe UI',Roboto,sans-serif";
@@ -2857,11 +2903,11 @@ function lireJetons() {
   COLORS.vwap = v('--ov-vwap', COLORS.vwap); COLORS.sar = v('--ov-sar', COLORS.sar);
   COLORS.ichi_tenkan = v('--ov-ichi-t', COLORS.ichi_tenkan); COLORS.ichi_kijun = v('--ov-ichi-k', COLORS.ichi_kijun);
   const S = { rsi: 'rsi', macd: 'macd', macd_signal: 'signal', stoch_k: 'stoch-k', stoch_d: 'stoch-d', atr: 'atr',
-              obv: 'obv', mfi: 'mfi', williamsR: 'wr', cci: 'cci', adx: 'adx', equity_total: 'equity' };
+              obv: 'obv', mfi: 'mfi', williamsR: 'wr', cci: 'cci', adx: 'adx' };
   for (const [k, j] of Object.entries(S)) COLORS[k] = v('--s-' + j, COLORS[k]);
   const up = v('--up', COLORS.candleUp), down = v('--down', COLORS.candleDown);
   COLORS.candleUp = up; COLORS.candleDown = down;
-  COLORS.adx_plusDI = COLORS.trade_buy = COLORS.grid_buy_filled = COLORS.equity_realized = up;
+  COLORS.adx_plusDI = COLORS.trade_buy = COLORS.grid_buy_filled = up;
   COLORS.adx_minusDI = COLORS.trade_sell = down;
   COLORS.grid_buy_pending = avecAlpha(up, 0.5); COLORS.grid_sl = avecAlpha(down, 0.5);
   COLORS.ink1 = v('--ink-1', '#10233d'); COLORS.text = v('--ink-2', '#45597a'); COLORS.ink3 = v('--ink-3', '#5f6e8c');
@@ -2907,24 +2953,54 @@ function peindrePastilles() {
 let jetonsLus = false;
 
 // Disposition verticale du canvas : tracé principal, puis sous-graphes empilés, puis le
-// sélecteur de plage (RS_HEIGHT) en bas. Le tracé principal garde MAIN_H_MIN px ; quand le canvas
-// est trop bas pour loger les sous-graphes à leur hauteur (subHeights), ils sont réduits
-// PROPORTIONNELLEMENT. Avant : mainH bridé à 200 px, les sous-graphes s'empilaient dessous et
-// débordaient sur le sélecteur de plage, puis hors du canvas (fenêtre basse). Un sous-graphe
-// réduit sous la hauteur utile de resolveSub n'est pas tracé.
+// sélecteur de plage (RS_HEIGHT) en bas. Le tracé du prix garde au moins MAIN_PART_MIN (60 %)
+// de la hauteur utile (et MAIN_H_MIN px) ; quand le canvas est trop bas pour loger les
+// sous-graphes à leur hauteur (subHeights), ils sont réduits PROPORTIONNELLEMENT, jamais sous
+// SUB_H_MIN. Ceux qui ne tiennent plus (les derniers de SUB_ORDRE) ne sont pas logés : une ligne
+// (LIGNE_SANS_PLACE) les annonce au-dessus du sélecteur de plage. Avant : neuf sous-graphes
+// réduits sous la hauteur de tracé de resolveSub laissaient des cadres vides, titre compris, et
+// le prix n'avait plus que 200 px sur un écran de 900.
 const MAIN_H_MIN = 200;
-const SUB_ORDRE = ['vol', 'rsi', 'macd', 'stoch', 'atr', 'obv', 'mfi', 'williamsR', 'cci', 'adx', 'ao', 'equity'];
+const MAIN_PART_MIN = 0.6;
+const SUB_H_MIN = 60;          // 30 px de tracé une fois ôtés le titre et la marge (resolveSub)
+const LIGNE_SANS_PLACE = 16;
+const SUB_ORDRE = ['vol', 'rsi', 'macd', 'stoch', 'atr', 'obv', 'mfi', 'williamsR', 'cci', 'adx', 'ao'];
 function dispositionGraphique(H) {
   // Débutant : aucun sous-graphe (le choix est gardé pour l'Expert).
   const actifs = debutant() ? [] : SUB_ORDRE.filter(k => activeSubs[k]);
-  let total = 0;
-  for (const k of actifs) total += subHeights[k] || 80;
   const dispo = H - 4 - RS_HEIGHT;
-  const mainH = Math.max(Math.min(MAIN_H_MIN, dispo), dispo - total);
-  const k = total > 0 ? Math.min(1, Math.max(0, dispo - mainH) / total) : 1;
+  const mainMin = Math.max(Math.min(MAIN_H_MIN, dispo), Math.ceil(dispo * MAIN_PART_MIN));
+  const haut = cle => subHeights[cle] || 80;
+  // Le plus de sous-graphes (dans l'ordre) qui gardent chacun SUB_H_MIN px une fois réduits.
+  let n = actifs.length, k = 1;
+  for (; n > 0; n--) {
+    let total = 0; for (let i = 0; i < n; i++) total += haut(actifs[i]);
+    const place = dispo - mainMin - (n < actifs.length ? LIGNE_SANS_PLACE : 0);
+    k = Math.min(1, Math.max(0, place) / total);
+    if (actifs.slice(0, n).every(cle => haut(cle) * k >= SUB_H_MIN)) break;
+  }
+  const loges = actifs.slice(0, n), sansPlace = actifs.slice(n);
+  let somme = 0;
+  const hs = loges.map(cle => { const h = haut(cle) * (n ? k : 1); somme += h; return h; });
+  // Assez de place : le tracé du prix prend le reste ; sinon il garde sa part minimale.
+  const mainH = dispo - somme - (sansPlace.length ? LIGNE_SANS_PLACE : 0);
   let y = mainH + 4;
-  const sous = actifs.map(cle => { const h = (subHeights[cle] || 80) * k, s = { cle, y, h }; y += h; return s; });
-  return { mainH, sous };
+  const sous = loges.map((cle, i) => { const s = { cle, y, h: hs[i] }; y += hs[i]; return s; });
+  return { mainH, sous, sansPlace, ySansPlace: sansPlace.length ? y : null };
+}
+/** La ligne qui annonce les sous-graphes sans place (dispositionGraphique) : discrète, au-dessus
+ *  du sélecteur de plage, à la place qu'ils auraient prise. */
+function dessinerSansPlace(d, W) {
+  if (!d.sansPlace.length) return;
+  const n = d.sansPlace.length, texte = '+ ' + n + ' sous-graphe' + (n > 1 ? 's' : '') + ' sans place : agrandissez la fenêtre ou décochez-en';
+  ctx.save();
+  ctx.fillStyle = COLORS.ink3; ctx.font = chartFont(10);
+  // Au téléphone, la phrase entière rentre dans la largeur (police réduite, jamais sous 8 px).
+  const w = ctx.measureText(texte).width;
+  if (w > W - 26) ctx.font = chartFont(Math.max(8, Math.floor(100 * (W - 26) / w) / 10));
+  ctx.textBaseline = 'middle';
+  ctx.fillText(texte, 18, d.ySansPlace + LIGNE_SANS_PLACE / 2);
+  ctx.restore();
 }
 
 // ─── Deux canvas : le GRAPHIQUE et son CALQUE ───────────────────────────────
@@ -2955,7 +3031,7 @@ function drawChart() {
   ctx.clearRect(0, 0, W, H);
   if (candles.length < 2) {
     ctx.save(); ctx.fillStyle = COLORS.ink3 || '#5f6e8c'; ctx.font = chartFont(12, 600); ctx.textAlign = 'center';
-    ctx.fillText(debutant() ? 'Chargement ' + (NOMS_PAIRES[activeSymbol] || activeSymbol) + ' · ' + Guide.nomIntervalle(chartInterval) + '…' : 'Chargement ' + activeSymbol + ' · ' + chartInterval + '…', (W - 50) / 2, H / 2); ctx.restore();
+    ctx.fillText('Chargement ' + (NOMS_PAIRES[activeSymbol] || activeSymbol) + ' · ' + (debutant() ? Guide.nomIntervalle(chartInterval) : nomTf(chartInterval)) + '…', (W - 50) / 2, H / 2); ctx.restore();
     dessinerCalque();
     return;
   }
@@ -2974,9 +3050,10 @@ function drawChart() {
   ctx.fillStyle = COLORS.ink1;
   // Taille bridée au tracé disponible : à 64 px fixes le filigrane débordait du graphe
   // sur téléphone et se faisait rogner par le bord gauche.
-  // Débutant : la paire et l'intervalle en mots (« BTC/USDT · 15 min »).
+  // La paire sous son nom (« BTC/USDT », comme l'en-tête) ; l'intervalle en mots en Débutant
+  // (« 15 min »), comme le ruban en Expert (« 15m », « 1 j »).
   const deb = debutant();
-  const filigrane = deb ? (NOMS_PAIRES[activeSymbol] || activeSymbol) + '  ·  ' + Guide.nomIntervalle(chartInterval) : activeSymbol + '  ·  ' + chartInterval;
+  const filigrane = (NOMS_PAIRES[activeSymbol] || activeSymbol) + '  ·  ' + (deb ? Guide.nomIntervalle(chartInterval) : nomTf(chartInterval));
   ctx.font = chartFont(Math.min(40, Math.round((W - 16 - 75) / (filigrane.length * 0.9))), 300);
   if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -2995,19 +3072,29 @@ function drawChart() {
   // Compteur bougies visibles + plage dates + % variation (Expert : en Débutant, la variation de
   // la vue contredirait celle de l'en-tête, et le régime est le verbe de la phrase).
   const vsC = Math.max(0, viewStart), veC = Math.min(candles.length, viewEnd);
+  compteurFin = 0;
   if (!deb) {
   ctx.fillStyle = COLORS.text; ctx.font = chartFont(10);
   const firstC = candles[vsC], lastC = candles[Math.max(0, veC - 1)];
   const pctChange = firstC && lastC ? ((lastC.close - firstC.close) / firstC.close * 100) : 0;
-  const pctStr = pctChange >= 0 ? '+' + pctChange.toFixed(2) + '%' : pctChange.toFixed(2) + '%';
+  // Le format de la page (« +0,42 % », moins typographique), celui de la variation de l'en-tête.
+  const pctStr = Fmt.pct(pctChange, 2);
   const pctColor = pctChange >= 0 ? COLORS.upInk : COLORS.downInk;
-  const fmtDate = ts => {
-    const d = new Date(ts * 1000);
-    return FMT_D2.format(d) + ' ' + FMT_HM.format(d);
-  };
+  // Jour et heure de l'appareil (js/format.js), comme les graduations de l'axe des temps.
+  const fmtDate = ts => Fmt.jour(ts * 1000) + ' ' + Fmt.heure(ts * 1000);
   const rangeStr = firstC ? fmtDate(firstC.time) + ' → ' + fmtDate(lastC.time) : '';
   ctx.fillStyle = COLORS.ink3;
-  ctx.fillText(`${veC - vsC}/${candles.length} · ${rangeStr}`, 18, 13);
+  // L'âge de la carte (calque, à droite de la même rangée) passe avant la plage, déjà lisible sur
+  // l'axe des temps : sur un écran étroit, le compteur la laisse si l'âge le plus court n'y tient pas.
+  let cTxt = `${Fmt.nombre(veC - vsC)}/${Fmt.nombre(candles.length)} · ${rangeStr}`;
+  const ageC = ageCoucheAffiche() ? texteAgeCouche().variantes.slice(-1)[0] : '';
+  if (ageC && geoPrix) {
+    const fin = W - geoPrix.right - 8, larg = s => ctx.measureText(s).width;
+    ctx.save(); ctx.font = chartFont(9, 650); const la = larg(ageC); ctx.restore();
+    if (18 + larg(cTxt) + 14 + la > fin) cTxt = `${Fmt.nombre(veC - vsC)}/${Fmt.nombre(candles.length)}`;
+  }
+  ctx.fillText(cTxt, 18, 13);
+  compteurFin = 18 + ctx.measureText(cTxt).width;
   // Variation de la vue : une pastille teintée, texte à l'encre signée (lisible), pas la marque.
   ctx.font = chartFont(10, 650);
   const pw0 = ctx.measureText(pctStr).width + 12;
@@ -3021,12 +3108,13 @@ function drawChart() {
   
   // Empiler les sous-graphes
   for (const s of dispo.sous) s.trace = resolveSub(candles, s.y, s.h, W, s.cle) !== false;
+  dessinerSansPlace(dispo, W);
 
   // Range Selector — mini timeline en bas
   if (candles.length > 5) {
     drawRangeSelector(candles, W, H);
   }
-  geo = { W, H, mainH, sous: dispo.sous, vs: vsC, ve: veC };
+  geo = { W, H, mainH, sous: dispo.sous, basSous: dispo.ySansPlace === null ? H - RS_HEIGHT : dispo.ySansPlace, vs: vsC, ve: veC };
   dessinerCalque();
 }
 
@@ -3040,8 +3128,9 @@ function dessinerCalque() {
   if (!geo) return;
   const { W, H, mainH } = geo;
   const P = geoPrix, deb = debutant();
-  // Débutant : un seul format de prix sur l'écran (« 82 442 $ ») ; Expert : « $82442.00 ».
-  const prixAxe = v => (deb ? Guide.prix(v, guideUnite()) : '$' + fmtPrix(v));
+  // Un seul format de prix (js/format.js), l'unité de la paire après le nombre (« $ », « SOL » sur
+  // BTC/SOL) : Débutant, l'arrondi de lecture (« 82 442 $ ») ; Expert, la cotation (« 82 442,00 $ »).
+  const prixAxe = v => Fmt.prix(v, guideUnite(), deb ? undefined : 'fin');
   if (P) {
     const { top, ph, left, right, minP, maxP, range } = P;
     // Libellés de l'axe des prix ; celui que l'étiquette du dernier prix recouvrirait est omis.
@@ -3082,15 +3171,17 @@ function dessinerCalque() {
       cx.fillText(lpStr, bx + 6, y + 4);
     }
   }
-  // Âge de la couche « Liquidité » (heatmap.json, publiée au quart d'heure) : aucun calque n'est
+  // Âge de la couche « Ordres en attente (carte) » (heatmap.json, publiée au quart d'heure) : aucun calque n'est
   // lu sans son instant — DEUX ici : la dernière colonne (son début : l'instantané a été lu dans
   // la minute qui suit, l'âge dit n'est jamais plus jeune que le vrai) et la publication.
   // Sur le calque, il avance avec l'horloge du prix (minuteCalque), sans redessin.
-  if (P && overlays.liq && !deb && histHeatmap && histHeatmap.grille && histHeatmap.sym === activeSymbol && histHeatmap.majA) {
+  // La forme la plus longue qui tient à droite du compteur (compteurFin), sans le toucher.
+  if (P && !deb && ageCoucheAffiche()) {
+    const A = texteAgeCouche(), xd = W - P.right - 8;
     cx.save();
     cx.font = chartFont(9, 650); cx.textAlign = 'right';
-    cx.fillStyle = texteAgeCouche().vieux ? COLORS.warn : COLORS.ink3;
-    cx.fillText(texteAgeCouche().texte, W - P.right - 8, 13);
+    cx.fillStyle = A.vieux ? COLORS.warn : COLORS.ink3;
+    cx.fillText(A.variantes.find(t => cx.measureText(t).width <= xd - compteurFin - 14) || A.variantes[A.variantes.length - 1], xd, 13);
     cx.restore();
   }
   // Repère de la publication (market-data.json) : un trait vertical pointillé à `updated`, un
@@ -3144,7 +3235,7 @@ function dessinerCalque() {
     const priceStr = prixAxe(priceAtCursor);
     cx.font = chartFont(11, 650);
     const bw = cx.measureText(priceStr).width + 14;
-    const bX = W - 75 + (75 - bw) / 2;
+    const bX = Math.min(W - 2 - bw, W - 75 + (75 - bw) / 2);   // plus large que la colonne : recalé, jamais hors du canvas
     const bY = Math.max(2, Math.min(mainH - 20, crossY - 9));
     cx.fillStyle = COLORS.ink1;
     cx.beginPath(); cx.roundRect(bX, bY, bw, 18, 9); cx.fill();
@@ -3170,40 +3261,45 @@ function dessinerCalque() {
       cx.restore();
       bulleOHLCV = { x: tX, y: tY, w: 135, h: 90 };
     } else if (idx >= 0 && idx < n) {
-    // Infobulle OHLCV — 2 colonnes
+    // Infobulle OHLCV — 2 colonnes. Les prix à la précision de cotation, au format de la page
+    // (« O 86 012,50 », l'unité est sur l'axe juste à droite) ; le volume dans l'actif de base.
       const candle = candles[geo.vs + idx];
       const cColor = candle.close >= candle.open ? COLORS.candleUp : COLORS.candleDown;
-      const onRight = crossX > W / 2;
-      const tX = onRight ? Math.max(16, crossX - 145) : Math.min(W - 160, crossX + 12);
-      const tY = Math.max(30, Math.min(mainH - 85, crossY - 65));
       cx.save();
+      cx.font = chartFont(10, 600);
+      const cel = [['O', candle.open], ['H', candle.high], ['L', candle.low], ['C', candle.close]].map(([m, v]) => m + ' ' + Fmt.cote(v));
+      const volStr = 'Volume ' + Fmt.compact(candle.volume) + ' ' + uniteVolume();
+      const col = colonneOHLC(cx, [cel[0], cel[2]]);
+      const tw = Math.max(135, 16 + col + Math.ceil(Math.max(cx.measureText(cel[1]).width, cx.measureText(cel[3]).width)) + 10, Math.ceil(cx.measureText(volStr).width) + 26);
+      const onRight = crossX > W / 2;
+      const tX = onRight ? Math.max(16, crossX - tw - 10) : Math.min(W - tw - 25, crossX + 12);
+      const tY = Math.max(30, Math.min(mainH - 85, crossY - 65));
       cx.fillStyle = COLORS.bulle;
       cx.shadowColor = 'rgba(16,35,61,0.18)'; cx.shadowBlur = 14; cx.shadowOffsetY = 4;
-      cx.beginPath(); cx.roundRect(tX, tY, 135, 72, 10); cx.fill();
+      cx.beginPath(); cx.roundRect(tX, tY, tw, 72, 10); cx.fill();
       cx.shadowColor = 'transparent'; cx.shadowBlur = 0; cx.shadowOffsetY = 0;
       // Filet de la couleur de la bougie à gauche : la direction se lit sans encadrer la donnée.
       cx.fillStyle = cColor; cx.beginPath(); cx.roundRect(tX + 6, tY + 10, 3, 52, 1.5); cx.fill();
-      cx.fillStyle = COLORS.ink1; cx.font = chartFont(10, 600);
-      cx.fillText('O ' + fmtPrix(candle.open), tX + 16, tY + 20);
-      cx.fillText('H ' + fmtPrix(candle.high), tX + 76, tY + 20);
-      cx.fillText('L ' + fmtPrix(candle.low), tX + 16, tY + 38);
-      cx.fillText('C ' + fmtPrix(candle.close), tX + 76, tY + 38);
-      const volStr = candle.volume >= 1000 ? (candle.volume / 1000).toFixed(1) + 'K' : candle.volume.toFixed(0);
+      cx.fillStyle = COLORS.ink1;
+      cx.fillText(cel[0], tX + 16, tY + 20);
+      cx.fillText(cel[1], tX + 16 + col, tY + 20);
+      cx.fillText(cel[2], tX + 16, tY + 38);
+      cx.fillText(cel[3], tX + 16 + col, tY + 38);
       cx.fillStyle = COLORS.ink3;
-      cx.fillText('Volume ' + volStr, tX + 16, tY + 57);
+      cx.fillText(volStr, tX + 16, tY + 57);
       cx.restore();
-      bulleOHLCV = { x: tX, y: tY, w: 135, h: 72 };
+      bulleOHLCV = { x: tX, y: tY, w: tw, h: 72 };
     }
     // Guide et scénarios : ce que désigne le curseur (bande, forme, chemin, régime, zone,
     // encadré), expliqué sur le calque.
     if (guideEtat || scenEtat) guideSurvol(W, mainH, bulleOHLCV);
   }
   // --- Réticule des sous-graphes : une verticale à travers eux, la valeur de chacun ---
-  if (crossY > mainH && idx >= 0 && idx < n) {
+  if (crossY > mainH && crossY < geo.basSous && idx >= 0 && idx < n) {
     const realIdx = geo.vs + idx;
     cx.strokeStyle = COLORS.reticule;
     cx.lineWidth = 0.5;
-    cx.beginPath(); cx.moveTo(crossX, mainH + 2); cx.lineTo(crossX, H - RS_HEIGHT); cx.stroke();
+    cx.beginPath(); cx.moveTo(crossX, mainH + 2); cx.lineTo(crossX, geo.basSous); cx.stroke();
     for (const { cle: key, y: sY, trace } of geo.sous) {
       if (!trace) continue;   // trop réduit pour être tracé : pas de badge orphelin
       const val = getSubIndicatorValue(key, realIdx);
@@ -3211,7 +3307,7 @@ function dessinerCalque() {
         const txt = subLabel(key) + ' ' + val;
         cx.font = chartFont(9);
         const tw = cx.measureText(txt).width + 12;
-        const tx = W - 75 + (75 - tw) / 2;
+        const tx = Math.min(W - 2 - tw, W - 75 + (75 - tw) / 2);   // plus large que la colonne : recalé, jamais hors du canvas
         const ty = sY + 4;
         cx.fillStyle = COLORS.bulle;
         cx.strokeStyle = subColor(key); cx.lineWidth = 0.8;
@@ -3222,14 +3318,23 @@ function dessinerCalque() {
     }
   }
 }
-/** Âge de la couche « Liquidité » : « Carte publiée · dernière colonne il y a X · publiée il y a Y ». */
+/** L'écart entre les deux colonnes de l'infobulle OHLC (Expert) : la plus large valeur de la 1re
+ *  colonne + 10 px, au moins 60 px — une colonne fixe de 60 px ne logeait plus « O 99 999,99 »
+ *  au format français. g porte déjà la police de l'infobulle. */
+function colonneOHLC(g, textes) { return Math.max(60, Math.ceil(Math.max(...textes.map(t => g.measureText(t).width))) + 10); }
+/** Âge de la couche « Ordres en attente (carte) » : « Ordres en attente (carte) · dernière colonne
+ *  il y a X · publiée il y a Y » — le nom du menu, pas un autre. variantes : de la plus longue à la
+ *  plus courte (« Carte publiée il y a Y »), pour un écran étroit ; l'âge de publication reste. */
 function texteAgeCouche() {
   const h = histHeatmap, g = h && h.grille, t = Horloges.maintenant();
-  if (!g || !h.majA) return { texte: '', vieux: false };
-  const derniere = (g.t0 + (g.W - 1) * g.dt) * 1000;
-  return { texte: 'Carte publiée · dernière colonne ' + Horloges.texteAge(t - derniere) + ' · publiée ' + Horloges.texteAge(t - h.majA),
+  if (!g || !h.majA) return { texte: '', variantes: [''], vieux: false };
+  const derniere = (g.t0 + (g.W - 1) * g.dt) * 1000, pub = ' · publiée ' + Horloges.texteAge(t - h.majA);
+  const texte = NOM_ORDRES_CARTE + ' · dernière colonne ' + Horloges.texteAge(t - derniere) + pub;
+  return { texte, variantes: [texte, NOM_ORDRES_CARTE + pub, 'Carte publiée ' + Horloges.texteAge(t - h.majA)],
     vieux: (t - h.majA) / 60000 > CADENCES.vieux_min };
 }
+/** L'âge de la couche est écrit sur le tracé (Expert, couche cochée, carte de la paire affichée). */
+const ageCoucheAffiche = () => overlays.liq && !debutant() && !!histHeatmap && !!histHeatmap.grille && histHeatmap.sym === activeSymbol && !!histHeatmap.majA;
 /** Le repère de la publication dans la géométrie P du dernier dessin : { x, y, texte } ou null
  *  (autre paire que celle du fichier, ou instant hors de la vue). Le prix publié est celui de
  *  BTCUSDT : sur une autre paire, il n'a pas de place. */
@@ -3241,8 +3346,8 @@ function reperePublication(P) {
   const x = P.left + (tu / 1000 - P.t0) / P.pas * P.gap;
   if (x < P.left || x > P.W - P.right) return null;
   const px = d.btc.price, y = px >= P.minP && px <= P.maxP ? P.top + P.ph * (1 - (px - P.minP) / P.range) : null;
-  const hm = new Date(tu).toISOString().slice(11, 16);
-  return { x, y, texte: 'fichier ' + hm + ' UTC · prix publié ' + Math.round(px).toLocaleString('fr-FR') + ' (' + Horloges.texteAge(Horloges.maintenant() - tu) + ')' };
+  // L'heure de l'appareil (le jour s'il n'est pas aujourd'hui) et le prix au format de l'Expert.
+  return { x, y, texte: 'fichier ' + Fmt.jourHeure(tu) + ' · prix publié ' + Fmt.prix(px, '$', 'fin') + ' (' + Horloges.texteAge(Horloges.maintenant() - tu) + ')' };
 }
 // Le calque, à la prochaine image (une seule par image, quel que soit le nombre d'événements).
 let calqueDemande = false;
@@ -3312,22 +3417,24 @@ function drawRangeSelector(candles, W, H) {
   
   // Débutant : la navigation seule (ni compteurs ni légende des sessions).
   if (debutant()) return;
-  // Compteur bougies sur le RS
+  // Compteur bougies sur le RS. Le nombre de bougies vues (« 50/3 000 ») est écrit en haut à
+  // gauche du tracé : le répéter ici le mettait sous la légende des sessions et hors du cadre,
+  // le cadre des bougies vues étant presque toujours collé à droite.
   ctx.fillStyle = COLORS.text; ctx.font = chartFont(8);
-  ctx.fillText(candles.length + ' bougies', padL + 4, rsY + 12);
+  const rsTxt = Fmt.nombre(candles.length) + ' bougies';
+  ctx.fillText(rsTxt, padL + 4, rsY + 12);
+  const rsTxtFin = padL + 4 + ctx.measureText(rsTxt).width;
   
-  // Label viewport
-  const vpLabel = (ve - vs) + '/' + candles.length;
-  ctx.fillText(vpLabel, vrX + Math.max(0, vrW / 2 - 15), rsY + 12);
-  
-  // Légende sessions — fond opaque, droite du RS
+  // Légende sessions — fond opaque, à droite du RS ; à gauche (après le compteur) quand le cadre
+  // des bougies vues est à droite, pour ne jamais le couvrir.
   const sesColors = [
     { label: 'Asie', color: COLORS.sess[0], hours: '00-09' },
     { label: 'Europe', color: COLORS.sess[1], hours: '07-16' },
     { label: 'US', color: COLORS.sess[2], hours: '13-21' }
   ];
-  const legW = 130, legH = 14;
-  const legX = W - padR - legW - 2, legY = rsY + 4;
+  const legW = 130, legH = 14, legY = rsY + 4;
+  const libre = x => x + legW < vrX - 3 || x > vrX + vrW + 3;
+  const legX = [W - padR - legW - 2, rsTxtFin + 10].find(libre) || W - padR - legW - 2;
   ctx.fillStyle = COLORS.bulle;
   ctx.strokeStyle = COLORS.hairline;
   ctx.lineWidth = 0.5;
@@ -3342,11 +3449,9 @@ function drawRangeSelector(candles, W, H) {
   });
 }
 
-// Formateurs Intl créés UNE fois : `toLocaleXString(locale, options)` reconstruit un
-// formatter à chaque appel — 7 à 10 % des échantillons du profileur selon l'état
-// (libellés d'axe + plage datée, plusieurs fois par frame).
-const FMT_D2 = new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit' });
-const FMT_HM = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
+// Les dates et heures du tracé (axe des temps, plage datée) : Fmt.jour / Fmt.heure (js/format.js),
+// formateurs Intl créés UNE fois — `toLocaleXString(locale, options)` reconstruisait un formatter
+// à chaque appel (7 à 10 % des échantillons du profileur, plusieurs fois par frame).
 
 // Échelle de prix d'une fenêtre [vs,ve) — SOURCE UNIQUE. resolveChart l'applique, le
 // crosshair la relit dans la MÊME frame (avant : formule recopiée ⇒ un slice, deux spreads
@@ -3513,9 +3618,10 @@ function resolveChart(candles, padL, padR, chartH, W) {
   // Bollinger
   if (ov('bb') && candles.length >= 20) {
     const bb = memoized('bb', calcBollinger, closes, PARAM.bb.periode, PARAM.bb.ecarts);
-    drawLine(bb.upper, minP, range, pad, gap, ph, COLORS.bb_upper, [3, 3], 1, vs);
-    drawLine(bb.sma, minP, range, pad, gap, ph, COLORS.bb_mid, [], 1, vs);
-    drawLine(bb.lower, minP, range, pad, gap, ph, COLORS.bb_lower, [3, 3], 1, vs);
+    const sig = Fmt.nombre(PARAM.bb.ecarts, PARAM.bb.ecarts % 1 ? 1 : 0) + ' σ';
+    drawLine(bb.upper, minP, range, pad, gap, ph, COLORS.bb_upper, [3, 3], 1, vs, 'Bollinger +' + sig);
+    drawLine(bb.sma, minP, range, pad, gap, ph, COLORS.bb_mid, [], 1, vs, 'Bollinger (milieu)');
+    drawLine(bb.lower, minP, range, pad, gap, ph, COLORS.bb_lower, [3, 3], 1, vs, 'Bollinger ' + Fmt.MOINS + sig);
     // Fill between
     ctx.save(); ctx.globalAlpha = 0.08;
     ctx.fillStyle = COLORS.bb_mid; ctx.beginPath();
@@ -3545,15 +3651,15 @@ function resolveChart(candles, padL, padR, chartH, W) {
   // VWAP
   if (ov('vwap')) {
     const vwap = memoized('vwap', calcVWAP, cols().high, cols().low, closes, cols().vol, cols().time, chartInterval, PARAM.vwap.ancrageIntradayS, PARAM.vwap.ancrageBougies);
-    drawLine(vwap, minP, range, pad, gap, ph, COLORS.vwap, [], 1.5, vs);
+    drawLine(vwap, minP, range, pad, gap, ph, COLORS.vwap, [], 1.5, vs, ETIQ_OVERLAYS.vwap);
   }
 
   // Ichimoku
   if (ov('ichimoku') && candles.length >= PARAM.ichimoku.senkouB) {
     const highs = cols().high, lows = cols().low;
     const ichi = memoized('ichimoku', calcIchimoku, highs, lows, closes, PARAM.ichimoku.tenkan, PARAM.ichimoku.kijun, PARAM.ichimoku.senkouB);
-    drawLine(ichi.tenkan, minP, range, pad, gap, ph, COLORS.ichi_tenkan, [], 1, vs);
-    drawLine(ichi.kijun, minP, range, pad, gap, ph, COLORS.ichi_kijun, [], 1, vs);
+    drawLine(ichi.tenkan, minP, range, pad, gap, ph, COLORS.ichi_tenkan, [], 1, vs, ETIQ_OVERLAYS.tenkan);
+    drawLine(ichi.kijun, minP, range, pad, gap, ph, COLORS.ichi_kijun, [], 1, vs, ETIQ_OVERLAYS.kijun);
     // Kumo : un remplissage PAR SEGMENT de signe constant (A >= B vert haussier, sinon rouge baissier).
     const kx = i => pad.left + gap * (i - vs) + gap/2;
     const ky = v => Math.max(pad.top, Math.min(pad.top + ph, pad.top + ph * (1 - (v - minP) / range)));
@@ -3600,20 +3706,24 @@ function resolveChart(candles, padL, padR, chartH, W) {
   // --- Supports / Résistances (Multi-TF) ---
   srBadges = [];
   if (ov('sr')) {
-    const levels = getMultiTFLevels();
-    // Tier → style visuel
+    const levels = getMultiTFLevels(), unite = guideUnite();
+    // Tier → style visuel. Le tier est l'INTERVALLE D'ORIGINE du niveau (0 : l'intervalle affiché ;
+    // 1, 2 : les intervalles de référence, getRefIntervals), pas une importance mesurée : la
+    // légende les nomme par leur intervalle (« 15m · 1h · 4h »), et seulement ceux qui existent
+    // (en 1 j, une seule référence : pas de 3e style annoncé).
+    const tfs = [chartInterval].concat(getRefIntervals(chartInterval));
     const styles = [
-      { name: 'Mineur', color: COLORS.sr[0], bg: avecAlpha(COLORS.sr[0], 0.10), dash: [4, 5], width: 1 },
-      { name: 'Interm.', color: COLORS.sr[1], bg: avecAlpha(COLORS.sr[1], 0.12), dash: [10, 5], width: 1.8 },
-      { name: 'Majeur',  color: COLORS.sr[2], bg: avecAlpha(COLORS.sr[2], 0.16), dash: [],       width: 2.5 }
-    ];
+      { name: nomTf(tfs[0]), color: COLORS.sr[0], bg: avecAlpha(COLORS.sr[0], 0.10), dash: [4, 5], width: 1 },
+      { name: nomTf(tfs[1]), color: COLORS.sr[1], bg: avecAlpha(COLORS.sr[1], 0.12), dash: [10, 5], width: 1.8 },
+      { name: nomTf(tfs[2]), color: COLORS.sr[2], bg: avecAlpha(COLORS.sr[2], 0.16), dash: [],       width: 2.5 }
+    ].slice(0, tfs.length);
     
     for (const lvl of levels.slice(0, 6)) {
       if (lvl.price < minP - range*0.05 || lvl.price > maxP + range*0.05) continue;
-      const s = styles[Math.min(lvl.tier, 2)];
+      const s = styles[Math.min(lvl.tier, styles.length - 1)];
       const y = pad.top + ph * (1 - (lvl.price - minP) / range);
       
-      // Zone colorée pour niveaux majeurs
+      // Zone colorée pour les niveaux du plus long intervalle de référence (tier 2)
       if (lvl.tier >= 2) {
         const zoneH = Math.max(3, ph * 0.0016);
         ctx.fillStyle = s.bg;
@@ -3627,9 +3737,8 @@ function resolveChart(candles, padL, padR, chartH, W) {
       ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
       ctx.setLineDash([]);
       
-      // Badge droite — fond opaque coloré
-      const priceStr = '$' + lvl.price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-      const badgeText = priceStr + ' ·' + lvl.tf;
+      // Badge droite — fond opaque coloré : le prix au format de la page, puis l'intervalle d'origine.
+      const badgeText = Fmt.prix(lvl.price, unite, 'fin') + ' · ' + nomTf(lvl.tf);
       ctx.font = chartFont(9, lvl.tier >= 2 ? 700 : 500);
       const tw = ctx.measureText(badgeText).width + 14;
       const bx = W - pad.right - tw - 4, by = y - 10;
@@ -3648,20 +3757,24 @@ function resolveChart(candles, padL, padR, chartH, W) {
       ctx.fillStyle = COLORS.ink1;
       ctx.fillText(badgeText, bx + 7, by + 14);
       
-      // Prix à gauche aussi pour les majeurs
+      // Prix à gauche aussi pour ces niveaux du plus long intervalle
       if (lvl.tier >= 2) {
         ctx.fillStyle = s.color;
         ctx.font = chartFont(9, 650);
-        const leftStr = '$' + lvl.price.toFixed(2);
+        const leftStr = Fmt.prix(lvl.price, unite, 'fin');
         ctx.fillText(leftStr, pad.left + 3, y - 5);
       }
     }
     
-    // Mini-légende en haut à gauche (sous le compteur)
+    // Mini-légende en haut à gauche (sous le compteur) : « S/R par intervalle », un trait par
+    // intervalle d'origine.
     const legY = 38;
     ctx.font = chartFont(8);
+    ctx.fillStyle = COLORS.text;
+    ctx.fillText('S/R par intervalle :', 18, legY + 4);
+    const lx0 = 18 + ctx.measureText('S/R par intervalle :').width + 8;
     styles.forEach((s, i) => {
-      const lx = 18 + i * 75;
+      const lx = lx0 + i * 62;
       ctx.fillStyle = s.color;
       ctx.fillRect(lx, legY, 18, 3);
       ctx.fillStyle = COLORS.text;
@@ -3685,7 +3798,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
       ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle = avecAlpha(COLORS.fib, 0.9); ctx.font = chartFont(8);
-      const label = (lvl * 100).toFixed(1) + '% $' + price.toFixed(2);
+      const label = Fmt.pct(lvl * 100, 1, false) + ' · ' + Fmt.prix(price, guideUnite(), 'fin');
       const lw = ctx.measureText(label).width;
       ctx.fillText(label, W - pad.right - lw - 4, y - 3);
     }
@@ -3731,7 +3844,9 @@ function resolveChart(candles, padL, padR, chartH, W) {
     }
     ctx.setLineDash([]);
     ctx.fillStyle = COLORS.ink1; ctx.font = chartFont(8);
-    ctx.fillText('POC $' + (minP + (pocBin + 0.5) * binH).toFixed(0), W - pad.right + 4, pad.top + 9);
+    // Le milieu de la tranche la plus chargée : arrondi de lecture (une tranche fait ≈ 100 $, des
+    // centimes y seraient une précision inventée).
+    ctx.fillText('POC ' + Fmt.prix(minP + (pocBin + 0.5) * binH, guideUnite()), W - pad.right + 4, pad.top + 9);
   }
 
   // Guide : bandes des niveaux nommés, SOUS les bougies (le reste du Guide est tracé après elles).
@@ -3759,7 +3874,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
     tracerBougie(ctx, pad.left + gap * i, candleW, yO, yC, yH, yL, c.close >= c.open);
   }
   
-  // --- Heatmap Liquidité (Bookmap : grille native -> un seul drawImage) ---
+  // --- Ordres en attente (carte) : heatmap.json (grille native -> un seul drawImage) ---
   // `histHeatmap.sym` n'était JAMAIS comparé au symbole affiché : le carnet BTC se
   // dessinait tel quel sur les graphes ETH, SOL, XRP, TAO et sur le ratio BTC/SOL.
   if (ov('liq') && histHeatmap && histHeatmap.grille && histHeatmap.sym === activeSymbol) {
@@ -3817,18 +3932,19 @@ function resolveChart(candles, padL, padR, chartH, W) {
   ctx.fillStyle = COLORS.text; ctx.font = chartFont(9);
   const tickAvailW = W - pad.left - pad.right;
   const intraday = ['1m','5m','15m','1h','4h'].includes(chartInterval);
+  // Jour et heure de l'appareil (js/format.js) ; le fuseau est dit une fois, à l'horloge de la barre.
   const fmtTick = t => {
-    if (chartInterval === '1d' || chartInterval === '1w') return FMT_D2.format(t);
+    if (chartInterval === '1d' || chartInterval === '1w') return Fmt.jour(t);
     // Intraday étroit : garder l'heure seule (la plage datée est en haut à gauche)
-    if (intraday && tickAvailW < 420) return FMT_HM.format(t);
-    return FMT_D2.format(t) + ' ' + FMT_HM.format(t);
+    if (intraday && tickAvailW < 420) return Fmt.heure(t);
+    return Fmt.jour(t) + ' ' + Fmt.heure(t);
   };
-  const tickW = ctx.measureText(fmtTick(new Date(visible[0].time * 1000))).width;
+  const tickW = ctx.measureText(fmtTick(visible[0].time * 1000)).width;
   const numLabels = Math.min(6, Math.max(2, Math.floor(tickAvailW / (tickW + 18))));
   for (let j = 0; j < numLabels; j++) {
     const idx = Math.round((visible.length - 1) * j / (numLabels - 1));
     if (idx >= visible.length) continue;
-    const label = fmtTick(new Date(visible[idx].time * 1000));
+    const label = fmtTick(visible[idx].time * 1000);
     const lw = ctx.measureText(label).width;
     // Centré sur la bougie, puis contraint à l'intérieur du tracé
     const tx = Math.max(pad.left, Math.min(W - pad.right - lw, pad.left + gap * idx - lw / 2));
@@ -3862,7 +3978,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
           ctx.strokeStyle = isWin ? COLORS.trade_buy : COLORS.trade_sell; ctx.lineWidth = 1;
           ctx.beginPath(); ctx.moveTo(xx, xy + 10); ctx.lineTo(xx, xy - 6); ctx.stroke();
           // PnL label
-          const pnlStr = (trade.pnlPct >= 0 ? '+' : '') + trade.pnlPct.toFixed(2) + '%';
+          const pnlStr = Fmt.pct(trade.pnlPct, 2);
           ctx.fillStyle = isWin ? COLORS.candleUp : COLORS.candleDown;
           ctx.font = chartFont(8);
           ctx.fillText(pnlStr, xx + 6, xy - 4);
@@ -3886,7 +4002,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
         ctx.beginPath(); ctx.moveTo(pad.left, ly); ctx.lineTo(W - pad.right, ly); ctx.stroke();
         ctx.setLineDash([]);
         // Label
-        const label = 'BUY $' + level.price.toFixed(2);
+        const label = 'Achat ' + Fmt.prix(level.price, guideUnite(), 'fin');
         ctx.fillStyle = COLORS.grid_buy_pending; ctx.font = chartFont(8);
         ctx.fillText(label, pad.left + 4, ly - 3);
       } else if (level.status === 'filled') {
@@ -3901,7 +4017,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
           ctx.beginPath(); ctx.moveTo(pad.left, tpy); ctx.lineTo(W - pad.right, tpy); ctx.stroke();
           ctx.setLineDash([]);
           ctx.fillStyle = COLORS.grid_tp; ctx.font = chartFont(7);
-          ctx.fillText('TP ' + ((level.tp/level.price - 1)*100).toFixed(2) + '%', pad.left + 4, tpy - 2);
+          ctx.fillText('TP ' + Fmt.pct((level.tp / level.price - 1) * 100, 2), pad.left + 4, tpy - 2);
         }
         // SL line (red dashed)
         if (level.sl && level.sl < maxP + range * 0.2 && level.sl > minP - range * 0.2) {
@@ -4145,13 +4261,14 @@ function texteRepere(rep, P, lw) {
   return rep.x + 6 + lw > xMax ? Math.max(P.left + 2, rep.x - 6 - lw) : rep.x + 6;
 }
 
-/** L'âge de l'issue d'une forme finie, pour la phrase : « il y a 17 bougies 1 jour (21/09) ». */
+/** L'âge de l'issue d'une forme finie, pour la phrase : « il y a 17 bougies 1 jour (21/09) ».
+ *  Jour et heure de l'appareil (js/format.js), sans fuseau écrit. */
 function guideFormeQuand(f) {
   if (!f || !f.fin || !candles[f.jFin]) return null;
-  const k = (candles.length - 2) - f.jFin, iso = new Date(candles[f.jFin].time * 1000).toISOString();
+  const k = (candles.length - 2) - f.jFin, ms = candles[f.jFin].time * 1000;
   const pas = candles.length > 1 ? candles[1].time - candles[0].time : 0;
-  const jour = iso.slice(8, 10) + '/' + iso.slice(5, 7), heure = iso.slice(11, 16);
-  const date = pas >= 86400 ? jour : k * pas >= 20 * 3600 ? jour + ' ' + heure + ' UTC' : heure + ' UTC';
+  const jour = Fmt.jour(ms), heure = Fmt.heure(ms);
+  const date = pas >= 86400 ? jour : k * pas >= 20 * 3600 ? jour + ' ' + heure : heure;
   return { bougies: k, itv: chartInterval, date };
 }
 /** Ce que la lecture du moment dit, hors prix « en test » et hors variante. */
@@ -4261,7 +4378,7 @@ function guideBandes(E) {
 function guideTexteNiveau(L, exp) {
   const R = L.niv.raisons, G = PARAM.guide, unite = guideUnite(), itv = Guide.nomIntervalle(chartInterval);
   const une = r => {
-    if (exp) return r.court + ' ' + Guide.prixR(r, unite) + ' — ' + r.nature + (r.lu ? ' · ' + Guide.heureUTC(r.lu) + ' UTC' : '');
+    if (exp) return r.court + ' ' + Guide.prixR(r, unite) + ' — ' + r.nature + (r.lu ? ' · lu à ' + Fmt.jourHeure(r.lu) : '');
     let t = r.nom + ' (' + Guide.prixR(r, unite) + ') : ' + r.origine + ' — ' + r.nature + '.';
     // Un mur d'options est un prix d'exercice ; le zéro gamma, un prix calculé par le modèle. Le
     // taux est écrit à 4 décimales : la conversion affichée refait le prix placé.
@@ -4366,11 +4483,14 @@ function guideLibellesNiveaux(E, top, bas, surBougies) {
     const pose = guidePlacer(E.rects, x, wL, h, essais, top, bas, vers, wR, 2, r => ordre(r) || entre(r) || surBougies(r))
       || guidePlacer(E.rects, x, wL, h, essais, top, bas, vers, wR, 4, r => ordre(r) || entre(r));
     const zones = [{ x0: g.pad.left, y0: L.yH - 3, x1: xMax, y1: L.yB + 3 }];
-    if (!pose) { E.sansPlace.push(L); E.cibles.push({ rects: [], zones, prio: 1, niveau: L, titre: Guide.libelleNiveau(L.niv, 'debutant', E.unite), texte: guideTexteNiveau(L, E.exp) }); continue; }
+    // La bulle d'un niveau parle la langue du mode, titre compris (le titre était en mots du Débutant
+    // au-dessus d'un corps en abrégés de l'Expert).
+    const titreN = Guide.libelleNiveau(L.niv, E.exp ? 'expert' : 'debutant', E.unite);
+    if (!pose) { E.sansPlace.push(L); E.cibles.push({ rects: [], zones, prio: 1, niveau: L, titre: titreN, texte: guideTexteNiveau(L, E.exp) }); continue; }
     yPrec = pose.y;
     L.etiq = { x, y: pose.y, w: wL, h: H, wR, lignes, enLigne, sansEtat };
     etiquettesAFaire.push(() => { ctx.font = chartFont(9, 600); guidePastilleL(ctx, x, pose.y, wL, lignes, COLORS.accent2, H); });
-    E.cibles.push({ rects: [{ x0: x, y0: pose.y, x1: x + wR, y1: pose.y + h }], zones, prio: 1, niveau: L, titre: Guide.libelleNiveau(L.niv, 'debutant', E.unite), texte: guideTexteNiveau(L, E.exp) });
+    E.cibles.push({ rects: [{ x0: x, y0: pose.y, x1: x + wR, y1: pose.y + h }], zones, prio: 1, niveau: L, titre: titreN, texte: guideTexteNiveau(L, E.exp) });
   }
 }
 
@@ -4406,7 +4526,7 @@ function guideBords(E, top, bas) {
     etiquettesAFaire.push(() => { ctx.font = chartFont(9, 600); guidePastilleL(ctx, x, pose.y, w, lignes, COLORS.accent2, H); });
     const Ls = hors.concat(sans);
     E.cibles.push({ rects: [guideZone(pose)], prio: 1, niveaux: Ls, lignes,
-      titre: (hors.length ? (sens > 0 ? 'Au-dessus' : 'Au-dessous') + ' de la vue' : 'Bandes du graphique') + ' : ' + Ls.map(L => Guide.libelleNiveau(L.niv, 'debutant', unite, true)).join(' | '),
+      titre: (hors.length ? (sens > 0 ? 'Au-dessus' : 'Au-dessous') + ' de la vue' : 'Bandes du graphique') + ' : ' + Ls.map(L => Guide.libelleNiveau(L.niv, exp ? 'expert' : 'debutant', unite, true)).join(' | '),
       texte: [].concat(...Ls.map(L => guideTexteNiveau(L, exp).slice(0, L.niv.raisons.length))) });
   }
 }
@@ -4542,7 +4662,10 @@ function guideCtxFigures() {
 }
 /** Le style d'une figure (plan §5.1) : tirets, épaisseur, alpha des traits et de l'aplat. Une
  *  figure finie s'efface au fil des bougies closes (base × (1 − âge / (garder + 1)), plancher
- *  0,15) ; l'âge ne change qu'à une clôture : rien à redessiner entre deux. */
+ *  0,15) ; l'âge ne change qu'à une clôture : rien à redessiner entre deux.
+ *  marque : celle de son issue, la même que dans ses mots (Guide.MARQUES_FIN), dessinée au bout de
+ *  la figure (guideFigureTracer, guideMarquePrix) : la croix (croix: true) seulement pour une figure
+ *  invalidée ou annulée (✗) ; un délai écoulé a son « – », une figure sans suite son « ○ ». */
 function guideStyleFigure(f, jClos, mode) {
   const G = PARAM.guide;
   if (f.fin) {
@@ -4551,8 +4674,9 @@ function guideStyleFigure(f, jClos, mode) {
     const k = 1 - age / (garder + 1), base = f.fin === 'atteint' ? 0.35 : 0.75;
     const a = Math.max(0.15, base * k);
     // k : la part qui reste (1 à la chute) ; le libellé pâlit avec le tracé (plancher lisible, 0,45).
+    const marque = Guide.MARQUES_FIN[f.fin] || null;
     return f.fin === 'atteint' ? { dash: [], lw: 1.6, a, aplat: 0.03 * a / base, age, k }
-      : { dash: [2, 3], lw: 1.4, a, aplat: 0.03 * a / base, croix: true, age, k };
+      : { dash: [2, 3], lw: 1.4, a, aplat: 0.03 * a / base, croix: marque === '✗', marque, age, k };
   }
   if (f.ebauche) return { dash: [3, 3], lw: 1.4, a: 0.55, aplat: 0.04, age: 0 };
   if (f.phase === 'confirme') return { dash: [], lw: 1.8, a: 0.75, aplat: 0.09, age: 0 };
@@ -4664,20 +4788,31 @@ function guideFigureTracer(E, f) {
     ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fillStyle = COLORS.surface; ctx.fill();
     ctx.strokeStyle = avecAlpha(COLORS.ink1, 0.85); ctx.lineWidth = 1.4; ctx.stroke();
   }
-  // La marque ✗ d'une figure tombée : sur la bougie de fin, au niveau qui l'a fait tomber.
-  let croix = null;
-  if (st.croix) {
-    const p = guideCroixPrix(f);
+  // La marque de son issue (Guide.MARQUES_FIN, la même que dans ses mots), sur la bougie de fin, au
+  // niveau de la figure qu'elle concerne (guideMarquePrix) : ✗ invalidée ou annulée, – délai écoulé,
+  // ○ sans suite. Sans niveau, pas de marque — jamais au prix de clôture. Le « – » et le « ○ » ont
+  // un liseré du fond : posés sur une ligne en pointillés, ils s'en détachent.
+  let croix = null, marque = null;
+  if (st.marque) {
+    const p = guideMarquePrix(f);
     if (isNum(p)) {
-      const x = X(f.jFin), y = Y(p), r = 5;
-      ctx.strokeStyle = avecAlpha(COLORS.ink1, Math.max(0.5, st.a)); ctx.lineWidth = 1.6;
-      ctx.beginPath(); ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke();
-      croix = { x, y }; ys.push(y);
+      const x = X(f.jFin), y = Y(p), r = 5, enc = avecAlpha(COLORS.ink1, Math.max(0.5, st.a));
+      if (st.marque === '✗') {
+        ctx.strokeStyle = enc; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke();
+        croix = { x, y };
+      } else if (st.marque === '–') {
+        for (const [c, lw] of [[COLORS.surface, 5], [enc, 2.4]]) { ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(x - r - 1, y); ctx.lineTo(x + r + 1, y); ctx.stroke(); }
+      } else {
+        ctx.beginPath(); ctx.arc(x, y, r - 0.5, 0, Math.PI * 2); ctx.fillStyle = COLORS.surface; ctx.fill();
+        ctx.strokeStyle = enc; ctx.lineWidth = 1.6; ctx.stroke();
+      }
+      marque = { t: st.marque, x, y, p }; ys.push(y);
     }
   }
   ctx.restore();
   const d = Guide.dernierPoint(f, G), qd = geo.creux || (geo.points.length ? geo.points[geo.points.length - 1] : geo.valide[0][1]);
-  return { segs, ys, xd: X(d), yd: Y(qd[1]), st, encre, geo, croix, iFin };
+  return { segs, ys, xd: X(d), yd: Y(qd[1]), st, encre, geo, croix, marque, iFin };
 }
 /** L'objectif théorique (Expert) : en tirets à partir de la 1re clôture au-delà, pâli s'il est
  *  atteint, jamais pour une figure tombée ; hors de l'échelle, une flèche au bord avec son prix. */
@@ -4973,21 +5108,24 @@ function guideTextePhraseDebutant(E, phrase) {
   const D = E.D, r = D.regime || { cle: 'inconnu' }, G = PARAM.guide, itv = chartInterval, now = Horloges.maintenant();
   const per = Guide.PERIODE_DEBUTANT[itv] || ['une période', '2 périodes', 'cette période', 'périodes'];
   const pas = geoPrix && geoPrix.pas > 0 ? geoPrix.pas : 900, n = PARAM.adx.periode;
-  const sur = 'sur les ' + n + (/^une /.test(per[0]) ? ' dernières ' : ' derniers ') + per[3] + (Guide.environ(n * pas) ? ' (' + Guide.environ(n * pas) + ')' : '');
+  // La fenêtre de l'ADX (lissé deux fois : les bougies plus anciennes comptent un peu aussi).
+  const sur = 'surtout sur les ' + n + (/^une /.test(per[0]) ? ' dernières ' : ' derniers ') + per[3] + (Guide.environ(n * pas) ? ' (' + Guide.environ(n * pas) + ')' : '');
+  // « Monte » et « Baisse » demandent aussi la moyenne courte du bon côté de la longue (Guide.regime).
+  const long = ', et la tendance plus longue va dans le même sens';
   const out = [];
   if (/touche/.test(phrase)) out.push('« Touche » : le prix est en ce moment dans la bande de ce repère.');
   if (/est passé/.test(phrase)) out.push('« Est passé » : ' + per[1] + ' de suite ont fini au-delà de ce repère (la règle de la page pour dire « franchi »).');
   // Le sens du verbe, seulement s'il est dans la phrase affichée (sinon : ce que dit le mouvement).
   const verbe = Guide.VERBE_DEBUTANT[r.cle], dit = verbe && new RegExp('\\b' + verbe + '\\b').test(phrase);
   out.push((dit ? {
-    hausse: '« Monte » : ' + sur + ', le prix a pris une direction nette vers le haut.',
-    baisse: '« Baisse » : ' + sur + ', le prix a pris une direction nette vers le bas.',
+    hausse: '« Monte » : ' + sur + ', le prix a pris une direction nette vers le haut' + long + '.',
+    baisse: '« Baisse » : ' + sur + ', le prix a pris une direction nette vers le bas' + long + '.',
     faible: '« Hésite » : ' + sur + ', le mouvement n’a pas de direction nette.',
     sans: '« Hésite » : ' + sur + ', le mouvement n’a pas de direction nette.',
     incertaine: '« S’agite » : ' + sur + ', le prix bouge nettement, mais sans sens clair.',
   } : {
-    hausse: 'Le mouvement : ' + sur + ', le prix a pris une direction nette vers le haut.',
-    baisse: 'Le mouvement : ' + sur + ', le prix a pris une direction nette vers le bas.',
+    hausse: 'Le mouvement : ' + sur + ', le prix a pris une direction nette vers le haut' + long + '.',
+    baisse: 'Le mouvement : ' + sur + ', le prix a pris une direction nette vers le bas' + long + '.',
     faible: 'Le mouvement : ' + sur + ', le prix n’a pas de direction nette.',
     sans: 'Le mouvement : ' + sur + ', le prix n’a pas de direction nette.',
     incertaine: 'Le mouvement : ' + sur + ', le prix bouge nettement, mais sans sens clair.',
@@ -5063,7 +5201,9 @@ function guideDebutant(E) {
 /** Débutant : ce que la page a RÉELLEMENT dessiné, par série (symbole · intervalle) : l'identité
  *  de la figure dessinée à chaque clôture (parJ) et à la dernière image (dernier). Guide.formesDebutant
  *  le lit : on ne barre (✗) que ce qui a été vu, la figure dessinée garde sa place tant qu'elle vit.
- *  Mémoire de page (rien de stocké) ; bornée aux 200 dernières clôtures. */
+ *  Clôtures et identités sont des DATES de bougie (Guide.idFigure avec les heures) : l'arrivée des
+ *  pages anciennes, ajoutées au début, décale les indices, pas les dates. Mémoire de page (rien de
+ *  stocké) ; bornée aux 200 dernières clôtures notées. */
 const DEB_FIGURES = new Map();
 function debMemoFigures() {
   const cle = activeSymbol + '|' + chartInterval;
@@ -5072,15 +5212,15 @@ function debMemoFigures() {
   return m;
 }
 function debNoterFigure(id) {
-  const R = GUIDE_FORMES.val;
-  if (!R) return;
-  const m = debMemoFigures(), j = R.n - 1;
-  m.parJ.set(j, id); m.dernier = id;
-  for (const q of m.parJ.keys()) if (q < j - 200) m.parJ.delete(q);
+  const R = GUIDE_FORMES.val, t = cols().time[R ? R.n - 1 : -1];
+  if (!R || !isNum(t)) return;
+  const m = debMemoFigures();
+  m.parJ.set(t, id); m.dernier = id;
+  for (const q of m.parJ.keys()) { if (m.parJ.size <= 200) break; m.parJ.delete(q); }
 }
 /** La liste ordonnée des figures du Débutant pour la vue [vs, ve). */
 function debFormesListe(vs, ve) {
-  return GUIDE_FORMES.val ? Guide.formesDebutant(GUIDE_FORMES.val, PARAM.guide, vs, ve, debMemoFigures()) : [];
+  return GUIDE_FORMES.val ? Guide.formesDebutant(GUIDE_FORMES.val, PARAM.guide, vs, ve, debMemoFigures(), cols().time) : [];
 }
 /** Débutant : UNE figure (debFormesListe : la figure déjà dessinée d'abord, puis rang et dernier
  *  point). On prend la première dont le libellé trouve sa place ; la figure dessinée à l'image d'avant
@@ -5099,10 +5239,10 @@ function guideFormesDebutant(E) {
     if (!t || t.length > P.forme) return;
     // La 1re de la liste, si c'est celle déjà à l'écran ou une figure qui vient de tomber sous les
     // yeux du lecteur : dessinée, avec ou sans place pour son libellé.
-    const garder = k === 0 && (devenu || Guide.idFigure(f) === memo.dernier || (f.fin && f.jFin <= GUIDE_FORMES.val.n - 1));
+    const garder = k === 0 && (devenu || Guide.idFigure(f, cols().time) === memo.dernier || (f.fin && f.jFin <= GUIDE_FORMES.val.n - 1));
     if (guideFormeDebutant(E, f, t, garder)) fait = f;
   });
-  debNoterFigure(fait ? Guide.idFigure(fait) : null);
+  debNoterFigure(fait ? Guide.idFigure(fait, cols().time) : null);
 }
 /** La place du libellé d'une figure, près de ce qu'il nomme : contre la ligne qui la valide, du
  *  côté où le prix sortirait (une sortie à confirmer : de son côté ; un drapeau : contre la pause,
@@ -5195,11 +5335,28 @@ function guideFormeDebutant(E, f, t, garder) {
   E.debForme = entree;
   return true;
 }
-/** Le prix de la croix d'une figure tombée (le niveau qui l'a fait tomber). */
+/** Le prix de la marque de fin d'une figure (Guide.MARQUES_FIN), ou null — jamais le prix de
+ *  clôture, qui n'est pas un niveau de la figure : sans niveau, pas de marque sur le tracé.
+ *    ✗ invalidée ou annulée : le niveau qui l'a fait tomber (guideCroixPrix) ;
+ *    – délai écoulé (validée, ni objectif ni invalidation à temps) : la ligne qui l'a validée, à sa
+ *      dernière bougie (la ligne de cou d'une épaule-tête-épaule suit sa pente) ;
+ *    ○ sans suite (jamais validée) : le milieu de ses deux droites à sa dernière bougie, sinon la
+ *      ligne qui l'aurait validée (la ligne de cou). */
+function guideMarquePrix(f) {
+  const m = Guide.MARQUES_FIN[f.fin];
+  if (!m || !isNum(f.jFin)) return null;
+  let p;
+  if (m === '✗') p = guideCroixPrix(f);
+  else if (m === '○' && f.hautL && f.basL) p = (Guide.ligne(f.hautL, f.jFin) + Guide.ligne(f.basL, f.jFin)) / 2;
+  else p = Guide.famille(f) === 'ete' && f.couL ? Guide.ligne(f.couL, f.jFin) : f.niveau;
+  return isNum(p) && isFinite(p) ? p : null;
+}
+/** Le prix de la croix d'une figure tombée : le NIVEAU qui l'a fait tomber (noté au journal), sinon
+ *  son niveau d'invalidation — jamais le prix de clôture, qui n'est pas un niveau de la figure. */
 function guideCroixPrix(f) {
   const ev = (f.journal || []).filter(x => x.j === f.jFin).pop() || {};
   return f.fin === 'abandon' ? (isNum(f.pAbandon) ? f.pAbandon : isNum(ev.p) ? ev.p : f.pend && f.pend.p) : isNum(ev.p) ? ev.p
-    : f.fin === 'expire_avant' && f.hautL ? (Guide.ligne(f.hautL, f.jFin) + Guide.ligne(f.basL, f.jFin)) / 2 : isNum(ev.c) ? ev.c : f.invalidation;
+    : f.fin === 'expire_avant' && f.hautL ? (Guide.ligne(f.hautL, f.jFin) + Guide.ligne(f.basL, f.jFin)) / 2 : f.invalidation;
 }
 /** L'échelle Débutant inclut la ligne qui valide la 1re figure candidate (amendement C5), bornée
  *  à la moitié de l'amplitude des bougies de chaque côté. → [lo, hi] ou null. */
@@ -5287,7 +5444,7 @@ function guidePastilleDebutant(g, x, y, w, h, texte, coul, encre) {
 function debPhraseChoisir(g, o, maxPx, etroit) {
   const P = PARAM.guide.debutant, max = etroit ? P.phraseEtroit : P.phrase, V = Guide.phrasesDebutant(o);
   const pleines = V.slice(0, -1), compacte = V[V.length - 1];
-  // Chaque variante à 11,5 px puis à 10,5 px avant la suivante : au téléphone, « Depuis 3 h, le
+  // Chaque variante à 11,5 px puis à 10,5 px avant la suivante : au téléphone, « Sur 3 h 30, le
   // prix monte et touche 86 133 $. » en 10,5 px plutôt que de perdre « touche » (ou la durée).
   for (const t of pleines) {
     if (t.length > max) continue;
@@ -5418,8 +5575,9 @@ function guideBulle(c, W, mainH, evite) {
     // L'état au prix live, en mots ; une bande faite d'options dit d'abord que c'est une estimation.
     if (c.niveau && c.niveau.live) texte.splice(c.optionsSeules ? 1 : 0, 0, Guide.texteEtatDebutant(c.niveau.live, c.niveau.niv, livePrice, guideUnite(), chartInterval));
   } else {
-    if (c.niveau && c.niveau.live) texte.unshift('Maintenant : ' + Guide.texteEtatLive(c.niveau.live, 'debutant') + '.');
-    if (c.niveaux) for (const L of c.niveaux.slice().reverse()) if (L.live) texte.unshift(Guide.libelleNiveau(L.niv, 'debutant', guideUnite(), true) + ' — maintenant : ' + Guide.texteEtatLive(L.live, 'debutant') + '.');
+    // Expert : l'état au prix live dans les mots de l'Expert, comme le titre et le corps de la bulle.
+    if (c.niveau && c.niveau.live) texte.unshift('Maintenant : ' + Guide.texteEtatLive(c.niveau.live, 'expert') + '.');
+    if (c.niveaux) for (const L of c.niveaux.slice().reverse()) if (L.live) texte.unshift(Guide.libelleNiveau(L.niv, 'expert', guideUnite(), true) + ' — maintenant : ' + Guide.texteEtatLive(L.live, 'expert') + '.');
   }
   const bw = Math.min(330, W - 32);
   // Débutant sur téléphone : la bulle est le seul endroit du détail — un corps de 12 px (titre
@@ -5812,7 +5970,7 @@ const scenBordFranchi = (z, ref) => (isNum(ref) && (z[0] + z[1]) / 2 < ref ? z[1
 /** Les marques des contacts d'un scénario, au point du contact (x : le milieu de la bougie du
  *  contact ; y : le bord de la zone franchi) : une COCHE par cible touchée, une CROIX pour
  *  l'invalidation ou la sortie d'un range (ou un ordre inconnu). Dessinées (7 px), jamais un texte en
- *  Débutant ; en Expert, une pastille dit le créneau : « ✓ 15:15–15:30 UTC », « ✗ S2 15:15–15:30 UTC »
+ *  Débutant ; en Expert, une pastille dit le créneau : « ✓ 15:15–15:30 », « ✗ S2 15:15–15:30 » (heure de l’appareil)
  *  (posée seulement s'il y a la place). La croix reste en Expert jusqu'à la fin de la fenêtre ; en
  *  Débutant, seulement pendant le fondu du scénario montré. */
 function scenMarques(S, it, top, bas) {
@@ -6030,7 +6188,7 @@ function scenChemin(S, it, top, bas) {
 }
 /** Le libellé d'un scénario, près du trait de son premier niveau (le haut d'un range), à gauche
  *  de la marge de futur ; un niveau hors de la vue est nommé au bord, avec sa flèche. Fermé, il dit
- *  aussi son état court (« · invalidation d'abord 13:30–13:45 UTC (en direct) »). */
+ *  aussi son état court (« · invalidation d'abord 13:30–13:45 (en direct) »). */
 function scenLibelle(S, it, top, bas, surBougies) {
   const { g, yDe, xFin, xMax, exp } = S, sc = it.sc, H = 15;
   if (S.xDeT(sc.fin) < g.pad.left) return 'hors';      // fenêtre finie avant la vue : rien à nommer
@@ -6096,16 +6254,21 @@ function scenLibelle(S, it, top, bas, surBougies) {
  *  au bas du tracé), sous la forme la plus complète qui trouve une place. */
 function scenReperes(S, top, bas) {
   const { g, F, xDeT, xMax, exp } = S, P = PARAM.scenarios;
-  const H = 14, hU = t => Scenarios.heureUTC(t) + ' UTC', hP = t => Scenarios.heureParis(t), jour = t => Scenarios.jourGroupe(new Date(t).toISOString().slice(0, 10));
-  const pE = hP(F.emis) ? ' (' + hP(F.emis) + ' Paris)' : '', pF = hP(F.fin) ? ' (' + hP(F.fin) + ' Paris)' : '';
+  // Heures et jours de l'appareil (js/format.js) : une seule heure par instant, sans fuseau écrit.
+  const H = 14, hU = t => Fmt.heure(t), jour = t => Fmt.jour(t);
+  // Le point du matin (une heure de la routine, à Paris) dit à l'heure de l'appareil, comme le titre
+  // de l'encadré (Scenarios.titre) : « Point de 07:00 » sur un appareil à Paris.
+  const tP = Scenarios.instantPoint(F, P), dePoint = isNum(tP) ? ' de ' + hU(tP) : '';
   // Le temps restant, relu à chaque dessin (aucune minuterie : sans nouvelle donnée, il avance au dessin suivant).
   const resteF = Scenarios.reste(F.fin - S.maintenant);
   const sem = isNum(F.finSemaine) && F.finSemaine !== F.fin && S.items.some(i => i.sc.rang === 'S') ? ' Le scénario de la semaine court jusqu’au ' + jour(F.finSemaine) + ' à ' + hU(F.finSemaine) + '.' : '';
   for (const [t, noms, expl] of [
-    [F.emis, exp ? ['Point · ' + hU(F.emis), hU(F.emis)] : ['Point de ' + P.point + ' Paris · écrit à ' + hU(F.emis) + pE, 'Écrit à ' + hU(F.emis) + pE, 'Point · ' + hU(F.emis), hU(F.emis)],
-      'Le moment où les scénarios du point de ' + P.point + ' (Paris) ont été écrits : le ' + jour(F.emis) + ' à ' + hU(F.emis) + pE + (isNum(F.prixEmission) ? ', prix ' + Scenarios.prix(F.prixEmission) : '') + '. Les zones partent de là.'],
-    [F.fin, (resteF ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin) + ' · reste ' + resteF, 'fin · ' + hU(F.fin) + ' · reste ' + resteF] : []).concat(exp ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)] : ['fin des scénarios du jour · ' + jour(F.fin) + ' ' + hU(F.fin) + pF, 'fin du jour · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)]),
-      'Fin de la fenêtre des scénarios 1 à 3 : ' + jour(F.fin) + ' à ' + hU(F.fin) + (hP(F.fin) ? ' (' + hP(F.fin) + ' Paris)' : '') + '. Le journal les note ensuite, le matin même.' + sem]]) {
+    // L'heure du point (celle du titre de l'encadré) n'est pas celle de l'écriture : le trait est
+    // posé à l'écriture, son nom le dit (« Point · 07:59 » contredisait « Scénarios du matin · 07:00 »).
+    [F.emis, exp ? ['Point' + dePoint + ' · écrit ' + hU(F.emis), 'Écrit · ' + hU(F.emis), hU(F.emis)] : ['Point' + dePoint + ' · écrit à ' + hU(F.emis), 'Écrit à ' + hU(F.emis), hU(F.emis)],
+      'Le moment où les scénarios du point' + dePoint + ' ont été écrits : le ' + jour(F.emis) + ' à ' + hU(F.emis) + (isNum(F.prixEmission) ? ', prix ' + Scenarios.prix(F.prixEmission) : '') + '. Les zones partent de là.'],
+    [F.fin, (resteF ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin) + ' · reste ' + resteF, 'fin · ' + hU(F.fin) + ' · reste ' + resteF] : []).concat(exp ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)] : ['fin des scénarios du jour · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin du jour · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)]),
+      'Fin de la fenêtre des scénarios 1 à 3 : ' + jour(F.fin) + ' à ' + hU(F.fin) + '. Le journal les note ensuite, le matin même.' + sem]]) {
     const x = xDeT(t);
     if (!(x >= g.pad.left && x <= xMax)) continue;
     ctx.font = chartFont(8.5, 650);
@@ -6150,7 +6313,7 @@ function scenBoite(S, top, bas) {
   const wMax = Math.floor(Math.min(P.boiteMax, (S.xMax - g.pad.left) * (etroit ? P.boiteFractionEtroit : P.boiteFraction)));
   const L = [];   // { t, f: 'titre' | 'ligne' | 'note' | 'seule', it, garde, compact, toujours }
   let PJx = [], RE = [];   // Expert : les variantes de la phrase de la journée et du temps restant
-  const heure = ms => Scenarios.heureUTC(ms) + ' UTC';
+  const heure = ms => Fmt.jourHeure(ms);   // l'heure de l'appareil (le jour s'il n'est pas aujourd'hui)
   let titreBoite, large = false;
   if (!F) {
     let t;
@@ -6411,7 +6574,8 @@ function scenTexteBoite(S, sansBilan, court) {
   }
   const attente = !F && previsions && previsions.etat === 'attente';
   if (attente && previsions.note) out.push(previsions.note);
-  out.push('Chaque matin vers ' + P.point + ' (Paris), Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ, à partir de son analyse du marché, et les classe du plus au moins probable selon son jugement, sans pourcentage. Chaque niveau a une origine nommée et se lit comme une zone : le niveau plus ou moins la marge.');
+  const hP = heurePointMatin();
+  out.push('Chaque matin' + (hP ? ' vers ' + hP : '') + ', Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ, à partir de son analyse du marché, et les classe du plus au moins probable selon son jugement, sans pourcentage. Chaque niveau a une origine nommée et se lit comme une zone : le niveau plus ou moins la marge.');
   if (F) out.push('Les états de cet encadré sont un suivi EN DIRECT sur les bougies ' + S.itv + ' du graphique (un affichage). La note officielle est celle du journal, faite mécaniquement le lendemain sur des bougies d’une minute.');
   // Pendant la journée : aucune nouvelle prévision ; la règle de l'écart, en entier (Expert).
   if (F && exp && S.jour) out.push(...Scenarios.regleJourExpert(PARAM.scenarios.jour));
@@ -6430,10 +6594,11 @@ function scenTexteBoite(S, sansBilan, court) {
     out.push('Matins précédents (note du journal) : ' + p.join(' | ') + '.');
   }
   const src = F || (attente ? previsions : null);
-  const jourH = t => Scenarios.jourGroupe(new Date(t).toISOString().slice(0, 10)) + ' à ' + Scenarios.heureUTC(t) + ' UTC';
-  if (src) out.push((isNum(src.updated) ? 'Fichier publié le ' + jourH(src.updated) + ', relu' : 'Fichier relu') + ' à ' + Scenarios.heureUTC(src.luA) + ' UTC'
-    + (previsionsEchec ? ' ; dernière relecture impossible (' + scenRaison(previsionsEchec.raison) + ', ' + Scenarios.heureUTC(previsionsEchec.a) + ' UTC)' : '') + '.');
-  else if (previsionsEchec) out.push('Dernière lecture : ' + scenRaison(previsionsEchec.raison) + ' à ' + Scenarios.heureUTC(previsionsEchec.a) + ' UTC. Rien n’est dessiné tant qu’aucun fichier lisible n’est arrivé.');
+  // Jours et heures de l'appareil (js/format.js).
+  const jourH = t => Fmt.jour(t) + ' à ' + Fmt.heure(t);
+  if (src) out.push((isNum(src.updated) ? 'Fichier publié le ' + jourH(src.updated) + ', relu' : 'Fichier relu') + ' à ' + Fmt.jourHeure(src.luA)
+    + (previsionsEchec ? ' ; dernière relecture impossible (' + scenRaison(previsionsEchec.raison) + ', ' + Fmt.jourHeure(previsionsEchec.a) + ')' : '') + '.');
+  else if (previsionsEchec) out.push('Dernière lecture : ' + scenRaison(previsionsEchec.raison) + ' à ' + Fmt.jourHeure(previsionsEchec.a) + '. Rien n’est dessiné tant qu’aucun fichier lisible n’est arrivé.');
   out.push(exp ? 'Description, pas une recommandation.' : 'Une description, pas une recommandation : rien ici ne dit quoi faire.');
   return out;
 }
@@ -6462,7 +6627,7 @@ function scenCalque() {
 // ─── Scénarios du matin, mode Débutant ─────────────────────────────────────
 // Sur le tracé : le libellé du scénario 1 (ouvert) près de sa zone, et UNE ligne d'état en haut à
 // droite (« Scénario 1 de Claude : en cours (en direct) ▸ ») ; tout le reste est dans la bulle,
-// en mots simples, heures de Paris.
+// en mots simples, heures de l'appareil.
 /** Le texte de la ligne des scénarios pour un tracé de largeur pw, ou null (couche masquée, autre
  *  paire). Lu par debHaut AVANT la mise en page (la rangée du haut en dépend). */
 function scenLigneDebutant(pw) {
@@ -6595,13 +6760,14 @@ function scenLibelleDebutant(S, it, top, bas) {
 function scenTexteLigneDebutant(S) {
   const F = S.F, P = PARAM.scenarios, out = [];
   const fin = 'Une hypothèse de Claude (une IA), pas une promesse ni un conseil.';
-  const chaque = 'Chaque matin vers ' + P.point + ' (heure de Paris), Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ et les classe du plus au moins probable, sans pourcentage.';
+  const hP = heurePointMatin();
+  const chaque = 'Chaque matin' + (hP ? ' vers ' + hP : '') + ', Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ et les classe du plus au moins probable, sans pourcentage.';
   if (!F) {
     const attente = previsions && previsions.etat === 'attente';
     if (attente) out.push(previsions.note || 'En attente du prochain point.');
     else {
-      const e = previsionsEchec, h = e ? Guide.heureParis(e.a) : null;
-      out.push('Le fichier des scénarios n’a pas pu être lu' + (e ? ' (' + scenRaison(e.raison) + (h ? ', ' + h + ', heure de Paris' : '') + ')' : '') + '. Rien n’est dessiné tant qu’aucun fichier lisible n’est arrivé.');
+      const e = previsionsEchec, h = e ? Fmt.jourHeure(e.a) : null;
+      out.push('Le fichier des scénarios n’a pas pu être lu' + (e ? ' (' + scenRaison(e.raison) + (h ? ', ' + h : '') + ')' : '') + '. Rien n’est dessiné tant qu’aucun fichier lisible n’est arrivé.');
     }
     out.push(chaque, fin);
     return out;
@@ -6761,14 +6927,18 @@ function drawLine(data, minP, range, pad, gap, ph, color, dash, width, dataOffse
   }
 }
 
-// Titre + badge sous-graphe
+// Titre d'un sous-graphe : le nom du menu (« Stochastique rapide (14,3) », « ADX / DMI (14) »),
+// pas une abréviation à part (« STOCH », « ADX (14) ») — un seul nom par chose.
 function subTitle(key) {
-  const map = { vol:'VOLUME', rsi: ETIQ.rsi().toUpperCase(), macd: ETIQ.macd(), stoch: 'STOCH (' + PARAM.stoch.k + ',' + PARAM.stoch.d + ')',
-                atr: ETIQ.atr(), obv:'OBV', mfi: 'MFI (' + PARAM.mfi.periode + ')', williamsR: '%R (' + PARAM.williamsR.periode + ')',
-                cci: ETIQ.cci(), adx: 'ADX (' + PARAM.adx.periode + ')', ao: 'AO (' + PARAM.ao.rapide + ',' + PARAM.ao.lente + ')', equity:'GRID EQUITY' };
-  return map[key] || key.toUpperCase();
+  const map = { vol: 'Volume', rsi: ETIQ.rsi(), macd: ETIQ.macd(), stoch: ETIQ.stoch(), atr: ETIQ.atr(), obv: 'OBV — On-Balance Volume',
+                mfi: ETIQ.mfi(), williamsR: ETIQ.williamsR(), cci: ETIQ.cci(), adx: ETIQ.adx(), ao: ETIQ.ao() };
+  return map[key] || key;
 }
 
+// Les sous-graphes en unités de PRIX (MACD, ATR, AO) : la précision de cotation de la paire (2
+// décimales sur BTC, 4 sur XRP), sur l'axe comme dans le badge du réticule — « $0.0 » sur les trois
+// graduations de l'ATR de XRP, c'était une décimale pour un ATR de 0,005.
+const decimalesCote = () => Fmt.decimalesPrix(candles.length ? candles[candles.length - 1].close : NaN);
 // Grille + labels d'échelle pour sous-graphes (o: {levels, min, max | span, f})
 function subGrid(y0, pad, ph, W, o) {
   ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 0.5;
@@ -6777,7 +6947,7 @@ function subGrid(y0, pad, ph, W, o) {
     const y = o.span ? y0 + pad.top + ph/2 - (l / o.span) * ph : y0 + pad.top + ph * (1 - (l - (o.min || 0)) / ((o.max || 100) - (o.min || 0)));
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
     ctx.fillStyle = COLORS.axis || COLORS.text; ctx.font = chartFont(10, 650);
-    ctx.textAlign = 'right'; ctx.fillText(o.f ? o.f(l) : l, W - 8, y + 3); ctx.textAlign = 'left';
+    ctx.textAlign = 'right'; ctx.fillText(o.f ? o.f(l) : Fmt.nombre(l), W - 8, y + 3); ctx.textAlign = 'left';
   });
   ctx.setLineDash([]);
 }
@@ -6810,8 +6980,7 @@ function resolveSub(candles, y0, subH, W, key) {
     for (let i = vs; i < ve; i++) if (candles[i].volume > maxV) maxV = candles[i].volume;
     maxV = maxV || 1;
     // Grid + échelle
-    const fmtV = v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : v.toFixed(0);
-    subGrid(y0, pad, ph, W, { levels: [0, maxV/2, maxV], min: 0, max: maxV, f: fmtV });
+    subGrid(y0, pad, ph, W, { levels: [0, maxV/2, maxV], min: 0, max: maxV, f: v => Fmt.compact(v) });
     // Volume bars
     const barW = Math.max(1, gap * 0.7);
     for (let i = vs; i < ve; i++) {
@@ -6853,7 +7022,8 @@ function resolveSub(candles, y0, subH, W, key) {
     const absMax = absMaxFenetre([macd.macdLine, macd.signal, macd.histogram], vs, ve) || 1;
     const scale = (ph / 2) / absMax;
     const midY = y0 + pad.top + ph / 2;
-    subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: v => v.toFixed(2) });
+    const dc = decimalesCote();
+    subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: v => Fmt.nombre(v, dc) });
     // Histogram
     const barW = Math.max(1, gap * 0.6);
     for (let i = vs; i < ve; i++) {
@@ -6878,7 +7048,8 @@ function resolveSub(candles, y0, subH, W, key) {
     // Échelle sur TOUT l'historique (comme avant) : calculée une fois par état des données.
     const maxA = memoized('sub_atr_max', a => { let m = -Infinity; for (const v of a) if (v !== null && v > m) m = v; return m; }, atr) || 1;
     const scale = ph / maxA;
-    subGrid(y0, pad, ph, W, { levels: [0, maxA/2, maxA], min: 0, max: maxA, f: v => '$' + v.toFixed(1) });
+    const dc = decimalesCote(), unite = guideUnite();
+    subGrid(y0, pad, ph, W, { levels: [0, maxA/2, maxA], min: 0, max: maxA, f: v => Fmt.prix(v, unite, dc) });
     drawLineAt(atr, y0 + pad.top + ph, scale, pad, gap, COLORS.atr, [], 1.5, vs);
   } else if (key === 'obv') {
     const closes = cols().close, volumes = cols().vol;
@@ -6886,8 +7057,9 @@ function resolveSub(candles, y0, subH, W, key) {
     const absMax = absMaxFenetre([obv], vs, ve) || 1;
     const scale = (ph / 2) / absMax;
     const midY = y0 + pad.top + ph / 2;
-    const fmtOBV = v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : v.toFixed(0);
-    subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: fmtOBV });
+    // L'axe et le badge du réticule au même format (« 54,8 k », « −2,3 M ») : avant, l'axe en K ou M
+    // selon la taille, le badge toujours en millions (« 0.05M » à côté de « 50.0K »).
+    subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: v => Fmt.compact(v) });
     drawLineAt(obv, midY, scale, pad, gap, COLORS.obv, [], 1.5, vs);
   } else if (key === 'mfi') {
     const closes = cols().close, highs = cols().high, lows = cols().low, vols = cols().vol;
@@ -6900,8 +7072,13 @@ function resolveSub(candles, y0, subH, W, key) {
   } else if (key === 'cci') {
     const closes = cols().close, highs = cols().high, lows = cols().low;
     const cci = memoized('sub_cci', calcCCI, highs, lows, closes, PARAM.cci.periode);
-    subGrid(y0, pad, ph, W, { levels: [100, 0, -100], span: 200 });
+    // Échelle ±200 sur la hauteur du panneau (ph/400 par unité) : les lignes ±100 sont donc au quart
+    // de la hauteur, là où la courbe vaut ±100 (avant : posées aux bords avec un span de 200, elles
+    // marquaient en fait ±200). Au-delà de ±200, la courbe est coupée au bord du panneau.
+    subGrid(y0, pad, ph, W, { levels: [100, 0, -100], span: 400 });
+    ctx.save(); ctx.beginPath(); ctx.rect(pad.left, y0 + pad.top, pw, ph); ctx.clip();
     drawLineAt(cci, y0 + pad.top + ph/2, ph/400, pad, gap, COLORS.cci, [], 1.5, vs);
+    ctx.restore();
   } else if (key === 'adx') {
     const closes = cols().close, highs = cols().high, lows = cols().low;
     const adxData = memoized('sub_adx', calcADX, highs, lows, closes, PARAM.adx.periode);
@@ -6915,8 +7092,8 @@ function resolveSub(candles, y0, subH, W, key) {
     // Échelle sur TOUT l'historique (comme avant) : calculée une fois par état des données.
     const absMax = memoized('sub_ao_max', a => absMaxFenetre([a], 0, a.length), ao) || 1;
     const scale = (ph / 2) / absMax;
-    const midY = y0 + pad.top + ph / 2;
-    subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: v => v.toFixed(2) });
+    const midY = y0 + pad.top + ph / 2, dc = decimalesCote();
+    subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: v => Fmt.nombre(v, dc) });
     const barW = Math.max(1, gap * 0.6);
     for (let i = vs; i < ve; i++) {
       if (ao[i] === null) continue;
@@ -6925,68 +7102,6 @@ function resolveSub(candles, y0, subH, W, key) {
       ctx.fillStyle = avecAlpha(ao[i] >= 0 ? COLORS.candleUp : COLORS.candleDown, 0.55);
       ctx.fillRect(x + gap*0.2, Math.min(midY, midY - h), barW, Math.abs(h));
     }
-  } else if (key === 'equity') {
-    // Equity curve sub-chart — shows total equity (gold) + realized PnL (green)
-    if (!btResult || !btResult.equityCurve || btResult.equityCurve.length < 2) {
-      ctx.fillStyle = COLORS.text; ctx.font = chartFont(10);
-      ctx.fillText('Pas de backtest — lancez un backtest', pad.left + 10, y0 + pad.top + ph/2);
-      return;
-    }
-    const eq = btResult.equityCurve;
-    const startCap = btResult.capital;
-    const allTotals = eq.map(e => e.total);
-    const minEq = Math.min(...allTotals);
-    const maxEq = Math.max(...allTotals);
-    const rangeEq = maxEq - minEq || 1;
-
-    // Grid + échelle $
-    const eqFmt = v => '$' + v.toLocaleString('en-US', {maximumFractionDigits: 0});
-    subGrid(y0, pad, ph, W, { levels: [minEq, minEq + rangeEq / 2, maxEq], min: minEq, max: maxEq, f: eqFmt });
-    // Capital baseline
-    const capY = y0 + pad.top + ph * (1 - (startCap - minEq) / rangeEq);
-    ctx.strokeStyle = avecAlpha(COLORS.ink3, 0.5); ctx.lineWidth = 0.5;
-    ctx.setLineDash([3, 6]);
-    ctx.beginPath(); ctx.moveTo(pad.left, capY); ctx.lineTo(W - pad.right, capY); ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Draw equity curve — total (gold)
-    ctx.strokeStyle = COLORS.equity_total; ctx.lineWidth = 1.8;
-    ctx.beginPath(); let started = false;
-    let firstEqIdx = eq[0].idx, lastEqIdx = eq[eq.length - 1].idx;
-    for (let j = 0; j < eq.length; j++) {
-      const e = eq[j];
-      if (e.idx < vs || e.idx > ve) continue;
-      const x = pad.left + gap * (e.idx - vs) + gap/2;
-      const y = y0 + pad.top + ph * (1 - (e.total - minEq) / rangeEq);
-      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-
-    // Draw realized PnL (green)
-    ctx.strokeStyle = COLORS.equity_realized; ctx.lineWidth = 1.2;
-    ctx.beginPath(); started = false;
-    for (let j = 0; j < eq.length; j++) {
-      const e = eq[j];
-      if (e.idx < vs || e.idx > ve) continue;
-      const x = pad.left + gap * (e.idx - vs) + gap/2;
-      const realizedTotal = startCap + e.realized;
-      const y = y0 + pad.top + ph * (1 - (realizedTotal - minEq) / rangeEq);
-      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-
-    // Labels
-    const retPct = ((allTotals[allTotals.length-1] - startCap) / startCap * 100);
-    const retStr = (retPct >= 0 ? '+' : '') + retPct.toFixed(2) + '%';
-    ctx.fillStyle = retPct >= 0 ? COLORS.upInk : COLORS.downInk;
-    ctx.font = chartFont(10, 650);
-    ctx.fillText(retStr, pad.left + 4, y0 + pad.top + 12);
-
-    // Legend
-    ctx.fillStyle = COLORS.equity_total; ctx.font = chartFont(9);
-    ctx.fillText('─ Equity', pad.left + 65, y0 + pad.top + 12);
-    ctx.fillStyle = COLORS.equity_realized;
-    ctx.fillText('─ Realized', pad.left + 125, y0 + pad.top + 12);
   }
 }
 
@@ -7032,11 +7147,11 @@ function drawBandSub(y0, pad, ph, W, gap, data, color, vs, ve, levels, dataMin, 
 
 // Helpers pour le crosshair des sous-graphes
 function subLabel(key) {
-  const map = { vol:'Vol', rsi:'RSI', macd:'MACD', stoch:'%K', atr:'ATR', obv:'OBV', mfi:'MFI', williamsR:'%R', cci:'CCI', adx:'ADX', ao:'AO', equity:'Equity' };
+  const map = { vol:'Vol', rsi:'RSI', macd:'MACD', stoch:'%K', atr:'ATR', obv:'OBV', mfi:'MFI', williamsR:'%R', cci:'CCI', adx:'ADX', ao:'AO' };
   return map[key] || key;
 }
 function subColor(key) {
-  const map = { vol:COLORS.ink3, rsi:COLORS.rsi, macd:COLORS.macd, stoch:COLORS.stoch_k, atr:COLORS.atr, obv:COLORS.obv, mfi:COLORS.mfi, williamsR:COLORS.williamsR, cci:COLORS.cci, adx:COLORS.adx, ao:COLORS.candleUp, equity:COLORS.equity_total };
+  const map = { vol:COLORS.ink3, rsi:COLORS.rsi, macd:COLORS.macd, stoch:COLORS.stoch_k, atr:COLORS.atr, obv:COLORS.obv, mfi:COLORS.mfi, williamsR:COLORS.williamsR, cci:COLORS.cci, adx:COLORS.adx, ao:COLORS.candleUp };
   return map[key] || COLORS.ink3;
 }
 function getSubIndicatorValue(key, idx) {
@@ -7045,23 +7160,24 @@ function getSubIndicatorValue(key, idx) {
   const { close: closes, high: highs, low: lows, vol: vols } = cols();
   try {
     switch(key) {
-      case 'vol': return c[idx].volume >= 1000 ? (c[idx].volume/1000).toFixed(1)+'K' : c[idx].volume.toFixed(0);
-      case 'rsi': { const v = memoized('gsi_rsi', calcRSI, closes, PARAM.rsi.periode); return v[idx] !== null ? v[idx].toFixed(1) : null; }
-      case 'macd': { const v = memoized('gsi_macd', calcMACD, closes, PARAM.macd.rapide, PARAM.macd.lente, PARAM.macd.signal); return v.macdLine[idx] !== null ? v.macdLine[idx].toFixed(2) : null; }
-      case 'stoch': { const v = memoized('gsi_stoch', calcStoch, highs, lows, closes, PARAM.stoch.k, PARAM.stoch.d); return v.k[idx] !== null ? v.k[idx].toFixed(1) : null; }
-      case 'atr': { const v = memoized('gsi_atr', calcATR, highs, lows, closes, PARAM.atr.periode); return v[idx] !== null ? v[idx].toFixed(1) : null; }
-      case 'obv': { const v = memoized('gsi_obv', calcOBV, closes, vols); return v[idx] !== null ? (v[idx]/1e6).toFixed(2)+'M' : null; }
-      case 'mfi': { const v = memoized('gsi_mfi', calcMFI, highs, lows, closes, vols, PARAM.mfi.periode); return v[idx] !== null ? v[idx].toFixed(1) : null; }
-      case 'williamsR': { const v = memoized('gsi_wr', calcWilliamsR, highs, lows, closes, PARAM.williamsR.periode); return v[idx] !== null ? v[idx].toFixed(1) : null; }
-      case 'cci': { const v = memoized('gsi_cci', calcCCI, highs, lows, closes, PARAM.cci.periode); return v[idx] !== null ? v[idx].toFixed(1) : null; }
-      case 'adx': { const v = memoized('gsi_adx', calcADX, highs, lows, closes, PARAM.adx.periode); return v.adx[idx] !== null ? v.adx[idx].toFixed(1) : null; }
-      case 'ao': { const v = memoized('gsi_ao', calcAO, highs, lows, PARAM.ao.rapide, PARAM.ao.lente); return v[idx] !== null ? v[idx].toFixed(2) : null; }
+      // Les formats de l'axe de chaque sous-graphe (js/format.js) : « 54,8 k », « 45,3 », « −0,0012 ».
+      case 'vol': return Fmt.compact(c[idx].volume);
+      case 'rsi': { const v = memoized('gsi_rsi', calcRSI, closes, PARAM.rsi.periode); return v[idx] !== null ? Fmt.nombre(v[idx], 1) : null; }
+      case 'macd': { const v = memoized('gsi_macd', calcMACD, closes, PARAM.macd.rapide, PARAM.macd.lente, PARAM.macd.signal); return v.macdLine[idx] !== null ? Fmt.nombre(v.macdLine[idx], decimalesCote()) : null; }
+      case 'stoch': { const v = memoized('gsi_stoch', calcStoch, highs, lows, closes, PARAM.stoch.k, PARAM.stoch.d); return v.k[idx] !== null ? Fmt.nombre(v.k[idx], 1) : null; }
+      case 'atr': { const v = memoized('gsi_atr', calcATR, highs, lows, closes, PARAM.atr.periode); return v[idx] !== null ? Fmt.prix(v[idx], guideUnite(), decimalesCote()) : null; }
+      case 'obv': { const v = memoized('gsi_obv', calcOBV, closes, vols); return v[idx] !== null ? Fmt.compact(v[idx]) : null; }
+      case 'mfi': { const v = memoized('gsi_mfi', calcMFI, highs, lows, closes, vols, PARAM.mfi.periode); return v[idx] !== null ? Fmt.nombre(v[idx], 1) : null; }
+      case 'williamsR': { const v = memoized('gsi_wr', calcWilliamsR, highs, lows, closes, PARAM.williamsR.periode); return v[idx] !== null ? Fmt.nombre(v[idx], 1) : null; }
+      case 'cci': { const v = memoized('gsi_cci', calcCCI, highs, lows, closes, PARAM.cci.periode); return v[idx] !== null ? Fmt.nombre(v[idx], 1) : null; }
+      case 'adx': { const v = memoized('gsi_adx', calcADX, highs, lows, closes, PARAM.adx.periode); return v.adx[idx] !== null ? Fmt.nombre(v.adx[idx], 1) : null; }
+      case 'ao': { const v = memoized('gsi_ao', calcAO, highs, lows, PARAM.ao.rapide, PARAM.ao.lente); return v[idx] !== null ? Fmt.nombre(v[idx], decimalesCote()) : null; }
       default: return null;
     }
   } catch(e) { return null; }
 }
 
-// ═══════════════ MARCHÉ LIVE (market-data.json) ═══════════════
+// ═══════════════ INFOS DU MARCHÉ (market-data.json, publié toutes les 15 min) ═══════════════
 // Un tour par CADENCES.publication_lue : le fichier n'est relu que s'il est dû (lectureDue), en
 // revalidation (`no-cache` : 304 tant qu'il n'a pas changé). Le `?t=` d'avant n'apportait rien
 // — le CDN ignore la requête (même copie, même âge, vérifié) — et forçait 8,6 Ko par minute.
@@ -7087,53 +7203,70 @@ async function fetchMarket(force) {
   } catch(e) {
     marcheLu = 0; marcheEnErreur = true;            // à retenter au prochain tour
     Horloges.noter('marche', e);
-    document.getElementById('dot').style.background = 'var(--down)';
-    const td = document.getElementById('taskbarDot');
-    if (td) td.style.background = 'var(--down)';
-    const feed = document.getElementById('feed');
     const c = Horloges.classer({ erreur: e });
-    feed.innerHTML = '<div class="error">⚠️ market-data.json : ' + escHtml(c.libelle || e.message) + '</div>';
+    // Le voyant passe au rouge ET dit pourquoi (son infobulle disait encore l'âge d'avant).
+    const pourquoi = 'Infos du marché : lecture impossible (' + (c.libelle || e.message) + '), nouvel essai dans ' + Math.round(CADENCES.publication_lue / 1000) + ' s';
+    const dot = document.getElementById('dot');
+    if (dot) { dot.style.background = 'var(--down)'; dot.title = pourquoi; }
+    const td = document.getElementById('taskbarDot');
+    if (td) { td.style.background = 'var(--down)'; td.title = pourquoi; }
+    const feed = document.getElementById('feed');
+    // (Le fichier lu est market-data.json : son nom n'est pas affiché, ce n'est pas un mot du lecteur.)
+    feed.innerHTML = '<div class="error">⚠️ Infos du marché illisibles : ' + escHtml(c.libelle || e.message) + '</div>';
   }
 }
 // ─── ÂGE DE LA DONNÉE ────────────────────────────────────────────────
 // Un HTTP 200 ne prouve RIEN sur la fraîcheur : une source morte reste servie indéfiniment et
 // le point restait vert. C'est la panne du 16/08 — un consommateur a lu 13 cycles de données
 // gelées sans qu'aucun voyant ne bronche. Seuils de js/cadences.js : au-delà de vieux_min, une
-// publication manquée ; de fige_min, deux.
+// publication manquée ; de fige_min, deux. UN seul seuil pour tout ce qui le dit (voyant, barre
+// des tâches, bandeau d'âge, pastille « en retard », teinte des chiffres clés) : l'âge ARRONDI à
+// la minute, celui qui s'affiche — entre 20,0 et 20,5 min, le voyant passait à l'orange et le
+// bandeau disait « il y a 20 min » pendant que la pastille disait encore « Infos du marché ▸ ».
 function etatPublication(updated) {
   const ageMin = updated ? (Date.now() - Date.parse(updated)) / 60000 : null;
-  const etat = ageMin === null || !isFinite(ageMin) ? 'inconnu'
-             : ageMin > CADENCES.fige_min ? 'fige'
-             : ageMin > CADENCES.vieux_min ? 'retard' : 'ok';
-  return { ageMin: etat === 'inconnu' ? null : ageMin, etat };
+  const min = ageMin === null || !isFinite(ageMin) ? null : Math.max(0, Math.round(ageMin));
+  const etat = min === null ? 'inconnu'
+             : min > CADENCES.fige_min ? 'fige'
+             : min > CADENCES.vieux_min ? 'retard' : 'ok';
+  return { ageMin: etat === 'inconnu' ? null : ageMin, min, etat };
 }
 let etatAffiche = null;
+/** Le titre du voyant et de la barre des tâches : ce qu'il mesure (l'âge des infos du marché,
+ *  publiées toutes les N min — pas le prix, lu à la seconde) et son état. */
+function titreVoyant(min, etat) {
+  if (min === null) return 'Infos du marché : heure de publication inconnue';
+  return 'Infos du marché publiées il y a ' + min + ' min (attendues toutes les ' + CADENCES.attendue_min + ' min)'
+    + (etat === 'fige' ? ' : la publication s’est arrêtée' : etat === 'retard' ? ' : en retard' : '') + '. Le prix du haut est lu à la seconde.';
+}
 /** Âge de la publication affichée, à chaque tour : voyant (teinte, titre), barre des tâches,
- *  âges écrits dans la page ([data-age-de], posés par renderFeedTo), teinte « vieux » des
- *  chiffres clés. Un seuil franchi change le bandeau d'âge des cartes : elles sont refaites.
- *  `nouvelle` : une publication vient d'arriver — une onde du voyant, une seule. */
+ *  âges écrits dans la page ([data-age-de], posés par renderFeedTo), teinte « vieux » et
+ *  pastille « en retard » de l'en-tête. Un seuil franchi change le bandeau d'âge des cartes :
+ *  elles sont refaites. `nouvelle` : une publication vient d'arriver — une onde du voyant, une seule. */
 function majAges(nouvelle) {
   if (!marketData) return;
-  const { ageMin, etat } = etatPublication(marketData.updated);
+  const { min, etat } = etatPublication(marketData.updated);
   if (!nouvelle && etatAffiche !== null && etat !== etatAffiche) renderFeed();
   etatAffiche = etat;
   const teinte = { ok: 'var(--up)', retard: 'var(--warn)', fige: 'var(--down)', inconnu: 'var(--ink-3)' }[etat];
+  const titre = titreVoyant(min, etat);
   const dot = document.getElementById('dot');
   if (dot) {
     dot.style.background = teinte;
     dot.classList.toggle('calme', etat !== 'ok');        // ne pas onduler sur du figé
     if (nouvelle && etat === 'ok') onde(dot);
-    dot.title = ageMin === null
-      ? 'Âge de la donnée inconnu (champ updated absent)'
-      : `Dernière publication il y a ${Math.round(ageMin)} min`;
+    dot.title = titre;
   }
   const td = document.getElementById('taskbarDot');
-  if (td) td.style.background = teinte;
-  if (ageMin !== null && document.querySelectorAll) {
-    const n = String(Math.max(0, Math.round(ageMin)));
+  if (td) { td.style.background = teinte; td.title = titre; }
+  if (min !== null && document.querySelectorAll) {
+    const n = String(min);
     for (const el of document.querySelectorAll('[data-age-de]')) if (el.textContent !== n) el.textContent = n;
     const cy = document.getElementById('cycle');
-    if (cy) cy.classList.toggle('vieux', Math.round(ageMin) > CADENCES.vieux_min);
+    if (cy && cy.classList.contains('vieux') !== (etat === 'retard' || etat === 'fige')) {
+      cy.classList.toggle('vieux', etat === 'retard' || etat === 'fige');
+      ajusterKpis();       // la pastille d'âge s'allonge (« en retard · ») : la bande se remesure
+    }
     const kd = cy && cy.querySelector ? cy.querySelector('.kpi-deb') : null;
     if (kd && kd.title !== titreKpiDeb(n)) { kd.title = titreKpiDeb(n); kd.setAttribute('aria-label', ariaKpiDeb(n)); }
   }
@@ -7160,24 +7293,33 @@ function onde(dot) {
 
 function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 const isNum = v => (v !== null && v !== undefined && !isNaN(v));
-const fmtNum = (v,d=2) => isNum(v) ? Number(v).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}) : '—';
-const fmtUsd = v => isNum(v) ? '$' + Math.round(v).toLocaleString('en-US') : '—';
-const fmtBig = v => { if(!isNum(v)) return '—'; const a=Math.abs(v);
-  if(a>=1e9) return '$'+(v/1e9).toFixed(2)+'B'; if(a>=1e6) return '$'+(v/1e6).toFixed(2)+'M';
-  if(a>=1e3) return '$'+(v/1e3).toFixed(1)+'K'; return '$'+v.toFixed(2); };
-const pctSpan = v => { if(!isNum(v)) return '—'; const c = v>0?'stat-pos':(v<0?'stat-neg':''); return '<span class="'+c+'">'+(v>0?'+':'')+fmtNum(v)+'%</span>'; };
+// Les formats des cartes, de la bande des chiffres clés, du panneau ⚡ et du Grid Bot : ceux de
+// js/format.js (Fmt), à la française dans les deux modes — « 86 013 $ », « −1,6 % », « 96,94 M $ »,
+// le moins typographique, l'unité après le nombre. Ces alias ne font que déléguer.
+const fmtNum = (v, d = 2) => (isNum(v) ? Fmt.nombre(Number(v), d) : '—');
+/** Un prix arrondi pour la lecture (« 86 013 $ ») : les prix du fichier publié. */
+const fmtUsd = v => (isNum(v) ? Fmt.prix(Number(v)) : '—');
+/** Un montant en dollars abrégé : « 1,68 Md $ », « 96,94 M $ », « 54,8 k $ ». */
+const fmtBig = v => (isNum(v) ? Fmt.compact(Number(v), Math.abs(v) >= 1e6 ? 2 : 1) + ' $' : '—');
+/** Une bande autour du prix, avec ses décimales à elle : « ±0,1 % », « ±0,25 % », « ±1 % » —
+ *  comme dans les Réglages (le titre disait « ±0.1 % » à côté de « ±0,1 % »). */
+const bandeTxt = b => '±' + Fmt.nombre(+b, (String(b).split('.')[1] || '').length) + ' %';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// LECTURE LIVE — bouton ⚡ (ajouté le 02/10/2026)
+// EN DIRECT (À LA SECONDE) — bouton ⚡ (ajouté le 02/10/2026)
 // ─────────────────────────────────────────────────────────────────────────────
 // POURQUOI CETTE VUE EXISTE. Le dashboard a DEUX cadences, et ça a été pris pour une panne :
 //   · le badge de prix en haut -> api.binance.com ticker/price, rafraîchi à la SECONDE ;
-//   · les cartes « Marché live » -> market-data.json, fichier réécrit toutes les 15 MINUTES.
+//   · les cartes « Infos du marché » -> market-data.json, fichier réécrit toutes les 15 MINUTES.
+// D'où les noms : « en direct » est réservé à ce qui est relu à la seconde (ce panneau, le prix
+// du haut) ; le fichier publié s'appelle « Infos du marché » (il s'appelait « Marché live »).
 // L'utilisateur a signalé deux fois un « écart entre le prix réel OKX et ce qu'affiche le dashboard ».
 // Mesuré le 02/10 à 11:07 UTC : badge 86 422,0 contre OKX spot 86 423,0 — soit 1,0 pt, pas
 // d'écart. Mais la CARTE affichait 86 330,1 (publiée 4,7 min plus tôt) — soit −92,9 pts. Écart
 // réel, dû au seul retard de publication. Sur un cycle complet il atteint 300 à 400 pts.
-// Ici, tout ce qui PEUT être live l'est vraiment, et le reste s'affiche avec son âge.
+// Ici, tout ce qui PEUT être en direct l'est vraiment, et le reste s'affiche avec son âge.
+// Ce panneau lit toujours BTCUSDT (comme le fichier publié, qui ne parle que du bitcoin) : sur
+// une autre paire, une note le dit en tête du panneau.
 //
 // ⚠️ NE JAMAIS appeler ici une source autre que Binance. Les autres (OKX, Deribit, Yahoo) sont
 // agrégées côté serveur dans market-data.json ; appelées depuis la page, elles échoueraient en
@@ -7205,15 +7347,23 @@ function closeLiveModal() {
 function liveRank(p, lo, hi) {
   return hi > lo ? Math.max(0, Math.min(100, (p - lo) / (hi - lo) * 100)) : 0;
 }
-// Même composant que les cartes « Marché live » : rail, remplissage, point.
+// Même composant que les cartes « Infos du marché » : rail, remplissage, point.
 function liveBar(pct) {
   return '<div class="track"><div class="track-rail"><span class="track-fill" style="width:' + pct.toFixed(1)
     + '%"></span><span class="track-dot" style="left:' + pct.toFixed(1) + '%"></span></div></div>';
 }
-const fmtPx = v => isNum(v) ? Number(v).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—';
+const fmtPx = v => isNum(v) ? Fmt.nombre(Number(v), 1) : '—';
 // 2 décimales : un spread Binance BTCUSDT vaut souvent 0,01 $ — arrondi à 1 décimale il
-// s'affiche « 0.0 pts », c'est-à-dire « pas de spread », ce qui est faux.
-const fmtPx2 = v => isNum(v) ? Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+// s'affiche « 0,0 pts », c'est-à-dire « pas de spread », ce qui est faux.
+const fmtPx2 = v => isNum(v) ? Fmt.nombre(Number(v), 2) : '—';
+// La classe d'un rapport autour de son milieu (1 pour un ratio, 0,5 pour une part), jugée sur la
+// valeur AFFICHÉE (dec décimales) : au milieu, aucune couleur — un ratio de 1,00 s'affichait en
+// rouge, comme un penchant vendeur.
+function clsCote(v, milieu, dec) {
+  if (!isFinite(v)) return '';
+  const r = dec === undefined ? v : Number(Number(v).toFixed(dec));
+  return r > milieu ? 'stat-pos' : r < milieu ? 'stat-neg' : '';
+}
 
 async function renderLive() {
   const box = document.getElementById('liveModalBody');
@@ -7240,7 +7390,9 @@ async function renderLive() {
   const bid = parseFloat(t24.bidPrice), ask = parseFloat(t24.askPrice);
   const sprd = ask - bid;
   const hi = parseFloat(t24.highPrice), lo = parseFloat(t24.lowPrice);
-  const chg = parseFloat(t24.priceChangePercent);
+  // La variation 24 h calculée comme dans l'en-tête ((dernier − ouverture) / ouverture) : le
+  // priceChangePercent arrondi de Binance donnait « +0,37 % » ici pour « +0,36 % » en haut.
+  const chg = var24De(t24);
   const rank = liveRank(px, lo, hi);
   // ── carnet : profondeur réellement posée autour du prix ──
   // 500 niveaux Binance ne couvrent que ≈ ±0,13 % du prix (mesuré le 04/10/2026). La carte
@@ -7266,79 +7418,87 @@ async function renderLive() {
   // ── tout le reste : lu dans le fichier de 15 min, avec son âge affiché ──
   const md = marketData || {}, mi = md.micro || {}, bf = md.btc || {};
   const ageMin = md.updated ? Math.round((Date.now() - Date.parse(md.updated)) / 60000) : null;
-  if (clk) clk.textContent = '· ' + new Date().toISOString().slice(11, 19) + ' UTC · aller-retour ' + lat + ' ms';
+  // L'heure de l'appareil, comme toutes les heures de la page (le fuseau est dit une fois, dans
+  // l'infobulle de l'horloge de la barre du bas).
+  if (clk) clk.textContent = '· ' + Fmt.heureSec(Date.now()) + ' · aller-retour ' + lat + ' ms';
 
   const pos = 'stat-pos', neg = 'stat-neg';
   let html = '';
   carteEntree = !(box.dataset && box.dataset.vu);
+  // Sur une autre paire, ce panneau parle toujours du bitcoin : il le dit, dans les deux modes.
+  if (activeSymbol !== 'BTCUSDT') {
+    html += '<div class="deb-btc">Ces lectures parlent du bitcoin (BTC/USDT), pas de '
+      + escHtml(NOMS_PAIRES[activeSymbol] || activeSymbol) + '.</div>';
+  }
 
-  // 1 — PRIX LIVE
-  html += mCard('⚡', 'Prix live', 'Binance spot · à la seconde · aller-retour ' + lat + ' ms', '',
-    '<div style="font-size:22px;font-weight:800;letter-spacing:-0.5px">' + fmtUsd(px)
-    + ' <span style="font-size:14px" class="' + (chg > 0 ? pos : neg) + '">' + (chg > 0 ? '+' : '') + fmtNum(chg) + '% 24h</span></div>'
+  // 1 — PRIX EN DIRECT
+  html += mCard('⚡', 'Prix en direct', 'Binance spot · à la seconde · aller-retour ' + lat + ' ms', '',
+    '<div style="font-size:22px;font-weight:800;letter-spacing:-0.5px">' + Fmt.prix(px, '$', 'fin')
+    + ' <span style="font-size:14px" class="' + signCls(chg) + '">' + Fmt.pct(chg, 2) + ' en 24 h</span></div>'
     + '<div style="margin-top:6px;font-size:12px;font-variant-numeric:tabular-nums">Bid <b>' + fmtPx2(bid) + '</b> · Ask <b>' + fmtPx2(ask)
-    + '</b> · spread <b>' + sprd.toFixed(2) + ' pts</b> (' + (sprd / px * 10000).toFixed(2) + ' bp)</div>');
+    + '</b> · spread <b>' + fmtPx2(sprd) + ' pts</b> (' + fmtNum(sprd / px * 10000, 2) + ' bp)</div>');
 
-  // 2 — RANGE 24 H
-  html += mCard('📊', 'Range 24 h', 'haut / bas des 24 h · position du spot', '',
+  // 2 — FOURCHETTE DES 24 H
+  html += mCard('📊', 'Fourchette des 24 h', 'haut / bas des 24 h · position du spot', '',
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">Haut <b>' + fmtPx(hi) + '</b> · Bas <b>' + fmtPx(lo)
     + '</b></div>' + liveBar(rank)
-    + '<div style="margin-top:5px;font-size:12px">Position dans le range : <b>' + rank.toFixed(1) + ' %</b>'
+    + '<div style="margin-top:5px;font-size:12px">Position dans la fourchette : <b>' + fmtNum(rank, 1) + ' %</b>'
     + ' · amplitude <b>' + fmtNum((hi / lo - 1) * 100) + ' %</b></div>'
     + '<div style="margin-top:5px;font-size:11px;color:var(--ink-2)">Volume 24 h <b>' + fmtBig(parseFloat(t24.quoteVolume))
-    + '</b> · ' + parseInt(t24.count, 10).toLocaleString('fr-FR') + ' trades</div>');
+    + '</b> · ' + Fmt.nombre(parseInt(t24.count, 10)) + ' trades</div>');
 
-  // 3 — CARNET LIVE ±1 %
+  // 3 — CARNET EN DIRECT ±x %
   // Seuils de LECTURE (réglables) : ils choisissent la phrase, jamais le ratio affiché.
   const carnetTxt = !isFinite(ratio) ? (m0.couverte === false ? 'bande non couverte par le carnet reçu' : '—')
-    : ratio >= RL.ratioMarque ? 'déséquilibre ACHETEUR marqué' : ratio >= RL.ratioLeger ? 'léger penchant acheteur'
-    : ratio <= 1 / RL.ratioMarque ? 'déséquilibre VENDEUR marqué' : ratio <= 1 / RL.ratioLeger ? 'léger penchant vendeur' : 'équilibré';
-  const autresBandes = mesures.slice(1).map(([b, m]) => '±' + b + ' % : ' + (!m ? '—' : m.couverte ? '<b>' + m.ratio.toFixed(2) + '</b>' : 'non couverte')).join(' · ');
-  html += mCard('💧', 'Carnet live ±' + BANDE + ' %', 'Binance spot · ' + RL.niveaux.toLocaleString('fr-FR') + ' niveaux, vus jusqu\'à ±'
-    + (isFinite(couv) ? couv.toFixed(2) : '—') + ' % · instantané', '',
+    : ratio >= RL.ratioMarque ? 'déséquilibre acheteur marqué' : ratio >= RL.ratioLeger ? 'léger penchant acheteur'
+    : ratio <= 1 / RL.ratioMarque ? 'déséquilibre vendeur marqué' : ratio <= 1 / RL.ratioLeger ? 'léger penchant vendeur' : 'équilibré';
+  const autresBandes = mesures.slice(1).map(([b, m]) => bandeTxt(b) + ' : ' + (!m ? '—' : m.couverte ? '<b>' + fmtNum(m.ratio, 2) + '</b>' : 'non couverte')).join(' · ');
+  html += mCard('💧', 'Carnet en direct ' + bandeTxt(BANDE), 'Binance spot · ' + Fmt.nombre(RL.niveaux) + ' niveaux, vus jusqu\'à ±'
+    + (isFinite(couv) ? fmtNum(couv, 2) : '—') + ' % · instantané', '',
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">Bids <b>' + fmtNum(bv, 1) + ' BTC</b> · Asks <b>' + fmtNum(av, 1) + ' BTC</b></div>'
-    + '<div style="margin-top:6px;font-size:15px;font-weight:800" class="' + (ratio >= 1 ? pos : neg) + '">Ratio bid/ask '
-    + (isFinite(ratio) ? ratio.toFixed(2) : '—') + '</div>'
+    + '<div style="margin-top:6px;font-size:15px;font-weight:800" class="' + clsCote(ratio, 1, 2) + '">Ratio bid/ask '
+    + (isFinite(ratio) ? fmtNum(ratio, 2) : '—') + '</div>'
     + (autresBandes ? '<div style="margin-top:4px;font-size:11.5px;font-variant-numeric:tabular-nums">' + autresBandes + '</div>' : '')
     + '<div style="margin-top:4px;font-size:11px;color:var(--ink-2)">' + carnetTxt
-    + ' — un carnet est PÉRISSABLE : valable quelques minutes, et un mur peut être retiré</div>');
+    + ' — un carnet ne vaut que quelques minutes, et un mur peut être retiré</div>');
 
-  // 4 — TAPE LIVE
+  // 4 — TAPE EN DIRECT
   const tD = RL.takerDominant / 100, tL = RL.takerLeger / 100;
   const tapeTxt = !isFinite(taker) ? '—'
     : taker >= tD ? 'acheteurs agressifs dominants' : taker >= tL ? 'léger penchant acheteur'
     : taker <= 1 - tD ? 'vendeurs agressifs dominants' : taker <= 1 - tL ? 'léger penchant vendeur' : 'partagé';
-  html += mCard('🌊', 'Tape live', RL.trades + ' derniers trades · fenêtre ' + (spanS === null ? '—' : spanS + ' s') + ' · agression, pas intention', '',
+  html += mCard('🌊', 'Tape en direct', RL.trades + ' derniers trades · fenêtre ' + (spanS === null ? '—' : spanS + ' s') + ' · agression, pas intention', '',
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">Achats au taker <b>' + fmtNum(buy, 1) + ' BTC</b> · Ventes <b>' + fmtNum(sell, 1) + ' BTC</b></div>'
-    + '<div style="margin-top:6px;font-size:15px;font-weight:800" class="' + (taker >= 0.5 ? pos : neg) + '">Taker buy '
-    + (isFinite(taker) ? (taker * 100).toFixed(1) + ' %' : '—') + '</div>'
-    + '<div style="margin-top:4px;font-size:12px">Delta net <b class="' + (delta >= 0 ? pos : neg) + '">'
-    + (delta >= 0 ? '+' : '') + fmtNum(delta, 1) + ' BTC</b> — ' + tapeTxt + '</div>');
+    + '<div style="margin-top:6px;font-size:15px;font-weight:800" class="' + clsCote(taker, 0.5, 3) + '">Taker buy '
+    + (isFinite(taker) ? fmtNum(taker * 100, 1) + ' %' : '—') + '</div>'
+    + '<div style="margin-top:4px;font-size:12px">Delta net <b class="' + signCls(delta) + '">'
+    + Fmt.signe(delta, x => Fmt.nombre(x, 1)) + ' BTC</b> — ' + tapeTxt + '</div>');
 
-  // 5 — CE QUI N'EST PAS LIVE ICI, ET POURQUOI
+  // 5 — CE QUI N'EST PAS EN DIRECT ICI, ET POURQUOI
+  // Mêmes précisions que les chiffres clés et les cartes : funding 4 décimales sur 8 h, 1 une
+  // fois annualisé, L/S 2, variation 24 h 2.
   const ageTxt = ageMin === null ? 'inconnu' : ageMin + ' min';
-  html += mCard('🕐', "ce qui n'est PAS live ici", 'lu dans le fichier publié — âge ' + ageTxt, '',
+  html += mCard('🕐', 'Ce qui n’est pas en direct ici', 'lu dans les infos du marché publiées — âge ' + ageTxt, '',
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">'
     + 'Perp (mark) <b>' + (isNum(mi.mark_price) ? fmtPx(mi.mark_price) : '—') + '</b>'
     // ⚠️ Le basis se calcule entre le perp ET le spot DU MÊME INSTANT du fichier. Soustraire
-    // ce perp (daté) au spot LIVE fabriquait un basis de −207 pts au lieu de −45. C'est
-    // exactement le péché que ce panneau est censé rendre impossible.
-    + ' · basis <b>' + (isNum(mi.mark_price) && isNum(bf.price) ? (mi.mark_price - bf.price).toFixed(1) + ' pts' : '—') + '</b>'
-    + ' <span style="color:var(--ink-2)">(perp et spot du même instant du fichier)</span><br>'
-    + 'Dérive du spot depuis la publication <b>' + (isNum(bf.price) ? (px - bf.price).toFixed(1) + ' pts' : '—') + '</b>'
-    + ' · funding <b>' + (isNum(mi.funding_rate_pct) ? fmtNum(mi.funding_rate_pct, 5) + ' %/8h' : '—') + '</b>'
-    + ' · annualisé <b>' + (isNum(mi.funding_annual_pct) ? fmtNum(mi.funding_annual_pct, 1) + ' %' : '—') + '</b><br>'
+    // ce perp (daté) au spot LIVE fabriquait un basis de −207 pts au lieu de −45 (mesuré le
+    // 02/10). C'est exactement le péché que ce panneau est censé rendre impossible.
+    + ' · basis <b>' + (isNum(mi.mark_price) && isNum(bf.price) ? Fmt.signe(mi.mark_price - bf.price, x => Fmt.nombre(x, 1)) + ' pts' : '—') + '</b>'
+    + ' <span style="color:var(--ink-2)">(perp et spot du même instant de la publication)</span><br>'
+    + 'Dérive du spot depuis la publication <b>' + (isNum(bf.price) ? Fmt.signe(px - bf.price, x => Fmt.nombre(x, 1)) + ' pts' : '—') + '</b>'
+    + ' · funding <b>' + (isNum(mi.funding_rate_pct) ? Fmt.pct(mi.funding_rate_pct, 4) + ' / 8 h' : '—') + '</b>'
+    + ' · annualisé <b>' + (isNum(mi.funding_annual_pct) ? Fmt.pct(mi.funding_annual_pct, 1) : '—') + '</b><br>'
     + 'OI <b>' + (isNum(mi.oi_btc) ? fmtNum(mi.oi_btc, 0) + ' BTC' : '—') + '</b>'
-    + ' · L/S retail <b>' + (isNum(mi.ls_ratio) ? fmtNum(mi.ls_ratio, 3) : '—') + '</b>'
-    + ' · variation 24 h (fichier) <b>' + (isNum(bf.change_24h_pct) ? fmtNum(bf.change_24h_pct) + ' %' : '—') + '</b></div>'
+    + ' · L/S retail <b>' + (isNum(mi.ls_ratio) ? fmtNum(mi.ls_ratio, 2) : '—') + '</b>'
+    + ' · variation 24 h (publiée) <b>' + (isNum(bf.change_24h_pct) ? Fmt.pct(bf.change_24h_pct, 2) : '—') + '</b></div>'
     + '<div style="margin-top:8px;font-size:11px;color:var(--ink-2);line-height:1.45">'
-    + '<b>Piège mesuré le 02/10 :</b> soustraire le perp du fichier au spot live affichait un basis de '
-    + '<b>−207 pts</b> quand le vrai basis valait <b>−45 pts</b>. Deux cadences différentes ne se soustraient '
-    + 'jamais — c&#39;est l&#39;erreur exacte que ce panneau existe pour éviter.<br><br>'
-    + 'Ces blocs viennent de market-data.json (cron, ' + CADENCES.attendue_min + ' min) : cette page n\'interroge que Binance '
-    + 'en direct, les autres sources (OKX, Deribit, Yahoo) sont agrégées côté serveur et arrivent avec '
-    + 'leurs ' + CADENCES.attendue_min + ' minutes. Pour comparer honnêtement, ce prix-ci est du <b>spot Binance</b> : compare-le '
-    + 'à ton <b>spot</b> OKX, jamais à un swap — le basis perp/spot fait 20 à 50 pts et ce n&#39;est pas '
+    + 'Le basis se lit entre le perp et le spot publiés au même instant. Deux cadences différentes ne se soustraient '
+    + 'jamais : le perp publié retranché du spot en direct donnerait un écart faux de plusieurs centaines de points.<br><br>'
+    + 'Ces blocs viennent des infos du marché, publiées toutes les ' + CADENCES.attendue_min + ' min : cette page n\'interroge que Binance '
+    + 'en direct, les autres sources (OKX, Deribit, Yahoo) sont rassemblées avant la publication et arrivent avec '
+    + 'leurs ' + CADENCES.attendue_min + ' minutes. Pour comparer honnêtement, ce prix-ci est du <b>spot Binance</b> : comparez-le '
+    + 'à votre <b>spot</b> OKX, jamais à un swap — le basis perp/spot fait 20 à 50 pts et ce n&#39;est pas '
     + 'une panne.</div>');
 
   carteEntree = false;
@@ -7380,15 +7540,16 @@ function mCard(icon, title, sub, right, body) {
 // Et le badge dit ce que le champ EST : l'état EMA20 < EMA50 sur le TF de la ligne. Il
 // affichait « DEATH CROSS », nom d'un CROISEMENT de SMA50 / SMA200 en daily — un autre objet.
 function crossTag(sous) {
-  if (sous === true)  return '<span class="badge badge-baissier" title="État sur ce TF, pas un croisement daté">EMA20 &lt; EMA50</span>';
-  if (sous === false) return '<span class="badge badge-hausser" title="État sur ce TF, pas un croisement daté">EMA20 &gt; EMA50</span>';
+  if (sous === true)  return '<span class="badge badge-baissier" title="État sur ce TF, pas un croisement daté">EMA 20 &lt; EMA 50</span>';
+  if (sous === false) return '<span class="badge badge-hausser" title="État sur ce TF, pas un croisement daté">EMA 20 &gt; EMA 50</span>';
   return '<span class="badge" style="background:var(--rail);color:var(--ink-3)">n/d</span>';
 }
-// Montant signé lisible : « −$6.83M » plutôt que « $-6.83M ».
-const fmtSigned = v => !isNum(v) ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + fmtBig(Math.abs(v));
+// Montant signé lisible : « −6,83 M $ » (moins typographique, unité après le nombre).
+const fmtSigned = v => !isNum(v) ? '—' : Fmt.signe(Number(v), fmtBig);
 const signCls = v => v > 0 ? 'stat-pos' : (v < 0 ? 'stat-neg' : '');
 const chipCls = v => 'chip' + (v > 0 ? ' pos' : v < 0 ? ' neg' : '');
-const pctSigne = (v, d) => !isNum(v) ? '—' : (v > 0 ? '+' : '') + fmtNum(v, d === undefined ? 2 : d) + '%';
+// « +0,30 % », « −1,6 % » : signe, virgule, espace avant « % » (Fmt.pct), 2 décimales par défaut.
+const pctSigne = (v, d) => !isNum(v) ? '—' : Fmt.pct(Number(v), d === undefined ? 2 : d);
 const pct1 = v => isNum(v) ? Math.max(0, Math.min(100, v)).toFixed(1) : null;
 
 // ═══ Composants visuels des cartes ═══
@@ -7428,7 +7589,7 @@ function axePrix(points) {
   if (ps.length < 2) return '';
   const lo = ps[0].p, hi = ps[ps.length - 1].p, marge = (hi - lo) * 0.14 || 1;
   const pos = v => ((v - lo + marge) / (hi - lo + 2 * marge) * 100).toFixed(1);
-  const k = v => '$' + (v / 1000).toFixed(1) + 'k';
+  const k = v => Fmt.compact(v, 1) + ' $';          // « 86,0 k $ »
   return '<div class="axe"><div class="axe-rail"></div>' + ps.map((x, i) =>
     '<span class="axe-pt ' + x.cls + (i % 2 ? ' bas' : ' haut') + '" style="left:' + pos(x.p) + '%"><i></i><b><em>' + x.lbl + '</em>' + k(x.p) + '</b></span>'
   ).join('') + '</div>';
@@ -7466,20 +7627,33 @@ function renderCycle(d) {
   const t4 = tf['4h'] || {};
   const oiK = isNum(x.oi_change_24h_pct) ? x.oi_change_24h_pct : x.oi_change_1d_pct;
   const ageK = upd ? Math.max(0, Math.round((Date.now() - upd.getTime()) / 60000)) : null;
-  cy.innerHTML = kpi('RSI 4h', fmtNum(t4.rsi_14, 1), '', 'tf.4h.rsi_14')
+  // Mêmes précisions que les cartes et le panneau ⚡ (funding annualisé 1 décimale, OI 1, L/S 2).
+  // Le GEX n'a pas de couleur : il ne dit ni la direction ni le moment (fiche « gex »).
+  // Sur une autre paire, la bande dit qu'elle parle du bitcoin (Expert ; hors des .kpi, elle ne
+  // cède jamais sa place à ajusterKpis).
+  cy.innerHTML = (activeSymbol !== 'BTCUSDT' ? '<span class="kpi-btc expert-seul" title="Ces chiffres clés sont ceux du bitcoin, pas de '
+      + escHtml(NOMS_PAIRES[activeSymbol] || activeSymbol) + '">Bitcoin</span>' : '')
+    + kpi('RSI 4h', fmtNum(t4.rsi_14, 1), '', 'tf.4h.rsi_14')
     + kpi('Funding an.', pctSigne(x.funding_annual_pct, 1), signCls(x.funding_annual_pct), 'micro.funding_annual_pct')
     + kpi('OI 24h', pctSigne(oiK, 1), signCls(oiK), 'micro.oi_change_24h_pct')
     + kpi('CVD 24h', fmtSigned(x.cvd_24h_usd), signCls(x.cvd_24h_usd), 'micro.cvd_24h_usd')
-    + kpi('GEX', isNum(x.gex_usd_1pct) ? (x.gex_usd_1pct > 0 ? 'long γ' : 'short γ') : '—', signCls(x.gex_usd_1pct), 'micro.gex_usd_1pct')
+    + kpi('GEX', isNum(x.gex_usd_1pct) ? (x.gex_usd_1pct > 0 ? 'long γ' : 'short γ') : '—', '', 'micro.gex_usd_1pct')
     + kpi('L/S', fmtNum(x.ls_ratio, 2), '', 'micro.ls_ratio')
     + kpi('DXY', fmtNum(m.dxy_spot, 2), '', 'macro.dxy_spot')
     + kpi('VIX', fmtNum(m.vix, 1), '', 'macro.vix')
     // L'âge avance chaque minute sans refaire la bande : majAges() réécrit les [data-age-de].
-    + '<span class="kpi-age" title="Âge de la publication">' + (ageK === null ? '—' : ageDe(d.updated, ageK) + ' min') + '</span>'
+    // Au-delà du seuil, la pastille dit « en retard » (CSS .kpis.vieux, mot écrit par le CSS dans
+    // .age-retard : le texte de la pastille reste « 25 min », que Gare et la Planche habillent à
+    // leur façon) ; elle reste visible au téléphone, seule de la bande.
+    + '<span class="kpi-age" title="Âge des infos du marché (publiées toutes les ' + CADENCES.attendue_min + ' min)">'
+    + (ageK === null ? '—' : '<span class="age-retard"></span>' + ageDe(d.updated, ageK) + ' min') + '</span>'
     // Débutant : une seule pastille, qui ouvre les cartes ; son âge dans l'infobulle (collé au prix
-    // en direct, « il y a 18 min » se lisait comme l'âge du prix). « en retard » au-delà du seuil.
+    // en direct, « il y a 18 min » se lisait comme l'âge du prix). « en retard » au-delà du seuil,
+    // avec l'âge qui avance : c'est alors l'âge d'une publication manquée, il se lit.
     + '<span class="kpi-deb debutant-seul" role="button" tabindex="0" title="' + titreKpiDeb(ageK) + '" aria-label="' + ariaKpiDeb(ageK) + '">'
-    + '<span class="deb-frais">Infos du marché ▸</span><span class="deb-retard">Infos<span class="deb-mot"> du marché</span> · en retard ▸</span></span>';
+    // (Au téléphone, « Infos · » cède : « en retard · 25 min ▸ » tient à côté des boutons.)
+    + '<span class="deb-frais">Infos du marché ▸</span><span class="deb-retard"><span class="deb-quoi">Infos<span class="deb-mot"> du marché</span> · </span>en retard'
+    + (ageK === null ? '' : ' · ' + ageDe(d.updated, ageK) + ' min') + '<span class="deb-fleche"> ▸</span></span></span>';
   cy.classList.toggle('vieux', ageK !== null && ageK > CADENCES.vieux_min);
   const cad = chronique.cadence();
   cy.title = 'Dernière publication (cadence ' + (cad ? 'mesurée ' + Math.round(cad / 60000) : 'attendue ' + CADENCES.attendue_min) + ' min) — cliquer pour le détail';
@@ -7488,14 +7662,21 @@ function renderCycle(d) {
 // Le nom accessible commence par le texte visible (« Infos du marché »), l'âge ensuite.
 const ariaKpiDeb = min => 'Infos du marché — ' + titreKpiDeb(min);
 // Au clavier : Entrée ou Espace sur la pastille ouvre les cartes (comme le clic sur #cycle).
+// La bande se remesure quand SA largeur change : le prix et la variation 24 h s'écrivent après
+// elle (publication arrivée avant le prix : à 1440 px, L/S et DXY restaient rognés et l'âge
+// invisible jusqu'à un appel manuel à ajusterKpis), une police arrive, la fenêtre change. Rien
+// au repos : l'observateur ne rappelle que sur un changement de taille (sa largeur ne dépend
+// pas de ce qu'ajusterKpis masque : pas de boucle).
 (function () {
   const cy = typeof document !== 'undefined' && document.getElementById ? document.getElementById('cycle') : null;
   if (cy && cy.addEventListener) cy.addEventListener('keydown', e => {
     if (!(e.target && e.target.classList && e.target.classList.contains('kpi-deb'))) return;
     if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); e.stopPropagation(); toggleFeed(); }
   });
+  if (cy && typeof ResizeObserver !== 'undefined') new ResizeObserver(() => ajusterKpis()).observe(cy);
 })();
-const titreKpiDeb = min => (min === null ? 'Infos publiées : âge inconnu' : 'Infos publiées il y a ' + min + ' min') + ' (toutes les ' + CADENCES.attendue_min + ' min). Le prix du haut est en direct.';
+const titreKpiDeb = min => (min === null ? 'Infos publiées : âge inconnu' : 'Infos publiées il y a ' + min + ' min') + ' (toutes les ' + CADENCES.attendue_min + ' min'
+  + (min !== null && min > CADENCES.vieux_min ? ' : en retard' : '') + '). Le prix du haut est en direct.';
 function renderFeed() { renderFeedTo(document.getElementById('feed')); }
 // Un âge en minutes, réécrit sur place à chaque tour par majAges().
 const ageDe = (updated, min) => '<span data-age-de="' + escHtml(updated) + '">' + min + '</span>';
@@ -7510,7 +7691,9 @@ function ajusterKpis() {
   const items = Array.from(cy.querySelectorAll('.kpi'));
   items.forEach(k => { k.hidden = false; k.classList.add('sans-trace'); });
   const deborde = () => cy.scrollWidth > cy.clientWidth + 1;
-  for (let i = items.length - 1; i > 0 && deborde(); i--) items[i].hidden = true;
+  // Jusqu'au premier compris : la pastille d'âge (« en retard · 25 min ») passe avant tout
+  // chiffre — à 1024 px, elle était rognée derrière le RSI, jamais masqué.
+  for (let i = items.length - 1; i >= 0 && deborde(); i--) items[i].hidden = true;
   for (const k of items) {
     if (k.hidden || !k.querySelector('.chron-spark')) continue;
     k.classList.remove('sans-trace');
@@ -7545,17 +7728,21 @@ const positionDans = (v, lo, hi) => (isNum(v) && isNum(lo) && isNum(hi) && hi > 
 function ageBannerHtml(d) {
   const upd = d && d.updated ? Date.parse(d.updated) : NaN;
   if (isNaN(upd)) {
-    return '<div class="age-banner" style="display:block">' + modes('Âge de la donnée inconnu — champ <b>updated</b> absent', 'Âge des infos du marché inconnu.') + '</div>';
+    // (Le champ `updated` de market-data.json est absent : son nom n'est pas un mot du lecteur.)
+    return '<div class="age-banner" style="display:block">' + modes('Heure de publication inconnue : l’âge des infos du marché ne peut pas être dit', 'Âge des infos du marché inconnu.') + '</div>';
   }
-  const age = (Date.now() - upd) / 60000;
-  if (age <= CADENCES.vieux_min) return '';
-  const fige = age > CADENCES.fige_min;
+  // L'âge ARRONDI, comme le voyant et la pastille (etatPublication) : un seul seuil partout. Les
+  // minutes sont réécrites sur place chaque minute (ageDe, majAges) : le bandeau ne se fige plus
+  // à l'âge de son dernier rendu.
+  const min = Math.max(0, Math.round((Date.now() - upd) / 60000));
+  if (min <= CADENCES.vieux_min) return '';
+  const fige = min > CADENCES.fige_min, n = ageDe(d.updated, min);
   return '<div class="age-banner' + (fige ? '' : ' retard') + '" style="display:block">'
     + (fige
-        ? modes('Données figées depuis ' + Math.round(age) + ' min — le cron de publication ne tourne plus',
-          'Données figées depuis ' + Math.round(age) + ' min : la publication s’est arrêtée.')
-        : modes('Dernière publication il y a ' + Math.round(age) + ' min (cadence attendue : ' + CADENCES.attendue_min + ' min)',
-          'Dernière publication il y a ' + Math.round(age) + ' min (attendue toutes les ' + CADENCES.attendue_min + ' min).'))
+        ? modes('Données figées depuis ' + n + ' min — la publication s’est arrêtée',
+          'Données figées depuis ' + n + ' min : la publication s’est arrêtée.')
+        : modes('Dernière publication il y a ' + n + ' min (cadence attendue : ' + CADENCES.attendue_min + ' min)',
+          'Dernière publication il y a ' + n + ' min (attendue toutes les ' + CADENCES.attendue_min + ' min).'))
     + '</div>';
 }
 
@@ -7564,14 +7751,15 @@ function renderFeedTo(container) {
   const d = marketData, b = d.btc||{}, m = d.macro||{}, tf = d.tf||{},
         x = d.micro||{}, lq = d.liquidity||{}, st = d.status||{};
   const upd = d.updated ? new Date(d.updated) : null;
-  // Le libellé annonce « UTC » : il faut donc formater EN UTC. Sans `timeZone`,
-  // c'était l'heure locale du poste (Paris, +2 h en été) affichée sous l'étiquette UTC.
-  const hhmm = upd ? upd.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'UTC'}) : '—';
+  // L'heure de publication à l'heure de l'APPAREIL, comme l'horloge de la barre du bas (qui dit le
+  // fuseau dans son infobulle) : en haut une heure UTC sans étiquette, en bas l'heure locale — à
+  // Paris en été, « 20:48 » et « 22:52 » pour le même instant. Le jour s'ajoute s'il a changé.
+  const hhmm = upd ? Fmt.jourHeure(upd.getTime()) : '—';
 
   // L'heure d'abord : elle élargit la droite de l'en-tête, et la bande se mesure ensuite —
   // dans l'autre ordre, des chiffres clés restaient « affichés » mais coupés (mesuré à 1440 px).
   const up = document.getElementById('updated');
-  if (up) up.textContent = hhmm;
+  if (up) { up.textContent = hhmm; up.title = 'Heure de la dernière publication des infos du marché'; }
   renderCycle(d);
 
   let html = '';
@@ -7590,19 +7778,24 @@ function renderFeedTo(container) {
   // Débutant, sur une autre paire que BTCUSDT : ces cartes parlent du BITCOIN (le fichier publié ne
   // suit que lui). Elles le disent dans leurs titres et leurs phrases (« le bitcoin », pas « le
   // prix ») — sinon on lisait « le prix est dans le haut de sa fourchette » à côté de SOL à −4 %.
-  const autrePaire = activeSymbol !== 'BTCUSDT', sujet = autrePaire ? 'le bitcoin' : 'le prix';
+  // Les phrases de fourchette sont calculées sur le prix PUBLIÉ (jusqu'à 15 min d'âge), pas sur
+  // celui du haut : elles le nomment (« le prix publié »), sinon un prix du haut au-dessus du
+  // « Haut publié » côtoyait « le prix est au milieu de sa fourchette ».
+  const autrePaire = activeSymbol !== 'BTCUSDT', sujet = autrePaire ? 'le prix publié du bitcoin' : 'le prix publié';
+  // Expert aussi : sur une autre paire, chaque titre de carte qui parle du bitcoin le dit.
   const btcTitre = t => (autrePaire ? 'Bitcoin : ' + t.charAt(0).toLowerCase() + t.slice(1) : t);
-  // Débutant : « Fourchette des 24 h » — un seul prix en grand à l'écran (celui du haut, en
-  // direct) ; le prix publié, en petit, avec son âge.
-  html += mCard('📊', modes('Marché live', btcTitre('Fourchette des 24 h')), modes('Binance spot · maj ' + hhmm + ' UTC'
-      + (ageMin !== null ? ' (+' + ageDe(d.updated, ageMin) + ' min — le badge du haut est live)' : ''), 'Binance · le prix du haut est en direct'), '',
-    envExpert('<div class="hero"><span class="hero-val">' + fmtUsd(b.price) + '</span>'
-    + '<span class="' + chipCls(b.change_24h_pct) + '">' + pctSigne(b.change_24h_pct) + ' 24h</span></div>')
+  // « Fourchette des 24 h » dans les deux modes (l'Expert disait « Marché live » : ce n'est pas
+  // du direct). Un seul prix en grand à l'écran, celui du haut, en direct ; le prix publié, plus
+  // petit (Expert) ou en ligne (Débutant), avec son âge.
+  html += mCard('📊', btcTitre('Fourchette des 24 h'), modes('Binance spot · publié à ' + hhmm
+      + (ageMin !== null ? ' (il y a ' + ageDe(d.updated, ageMin) + ' min — le prix du haut est en direct)' : ''), 'Binance · le prix du haut est en direct'), '',
+    envExpert('<div class="hero hero-publie"><span class="hero-lbl">Prix publié</span><span class="hero-val">' + fmtUsd(b.price) + '</span>'
+    + '<span class="' + chipCls(b.change_24h_pct) + '">' + pctSigne(b.change_24h_pct) + ' en 24 h</span></div>')
     + envDebutant('<div class="fine">' + (autrePaire ? 'Prix du bitcoin publié ' : 'Prix publié ') + ilYaDeb(d.updated, ageMin) + ' : <b style="color:var(--ink-1)">' + prixDeb(b.price) + '</b></div>')
     + trackHtml(b.price, b.low_24h, b.high_24h, modes('Bas&nbsp;<b>' + fmtUsd(b.low_24h) + '</b>', 'Bas publié&nbsp;<b>' + prixDeb(b.low_24h) + '</b>'),
       modes('Haut&nbsp;<b>' + fmtUsd(b.high_24h) + '</b>', 'Haut publié&nbsp;<b>' + prixDeb(b.high_24h) + '</b>'))
     + phraseCarte('fourchette', positionDans(b.price, b.low_24h, b.high_24h), '24 h', sujet)
-    + envExpert('<div class="fine" style="margin-top:8px">Volume 24h&nbsp;<b style="color:var(--ink-1)">' + fmtBig(b.quote_volume_24h_usd) + '</b></div>'));
+    + envExpert('<div class="fine" style="margin-top:8px">Volume 24 h&nbsp;<b style="color:var(--ink-1)">' + fmtBig(b.quote_volume_24h_usd) + '</b></div>'));
 
   // ── 2. MACRO ──
   // Week-end : DXY et VIX sont TOUS DEUX des dernières clôtures (marchés fermés), pas des
@@ -7611,7 +7804,7 @@ function renderFeedTo(container) {
   // Débutant : « Bourses américaines », la seule tuile du VIX (le dollar est en Expert).
   html += mCard('🌍', modes('Macro', 'Bourses américaines'), modes('Dollar et volatilité · Yahoo', 'Yahoo · ' + ilYaDeb(d.updated, ageMin)), '',
     '<div class="tuiles deb-une">'
-    + envExpert(tuile('DXY', fmtNum(m.dxy_spot,2), ferme ? 'clôture' + (m.dxy_date ? ' du ' + escHtml(m.dxy_date) : '') : 'indice dollar', 'dxy'))
+    + envExpert(tuile('DXY', fmtNum(m.dxy_spot,2), ferme ? 'clôture' + (m.dxy_date ? ' du ' + escHtml(dateSeule(m.dxy_date)) : '') : 'indice dollar', 'dxy'))
     + tuile(modes('VIX', 'Nervosité des bourses'), modes(fmtNum(m.vix,1), isNum(m.vix) ? escHtml(Guide.nombre(m.vix, 1)) : '—'),
       modes(ferme ? 'clôture' : 'volatilité implicite S&amp;P', ferme ? 'dernière séance' : ''), 'vix', phraseCarte('vix', m.vix))
     + '</div>');
@@ -7632,15 +7825,15 @@ function renderFeedTo(container) {
     // n'existe pas dans l'ancien format : on y affiche alors l'écart ABSOLU, et on le dit.
     const e20 = isNum(t.ema20) ? t.ema20 : t.ema20_4h, e50 = isNum(t.ema50) ? t.ema50 : t.ema50_4h;
     const sous = typeof t.ema20_sous_ema50 === 'boolean' ? t.ema20_sous_ema50 : t.death_cross_4h;
-    const ecart = isNum(t.ema_ecart_pct) ? 'écart ' + pctSigne(t.ema_ecart_pct) : 'écart absolu ' + fmtNum(t.ema_gap_pct,2) + '%';
+    const ecart = isNum(t.ema_ecart_pct) ? 'écart ' + pctSigne(t.ema_ecart_pct) : 'écart absolu ' + fmtNum(t.ema_gap_pct,2) + ' %';
     const ampl = isNum(t.amplitude_30_pct) ? t.amplitude_30_pct : t.range_24h_pct;
     indBody += '<div class="tf-row"><div class="tf-tete"><span class="tf-nom">' + (tfLabel[k]||k) + '</span>'
       + '<span class="tf-rsi">RSI&nbsp;<b>' + fmtNum(t.rsi_14,1) + '</b></span>' + rsiMeter(t.rsi_14) + crossTag(sous) + '</div>'
       // Canal S/R : où le dernier cours se situe entre le support et la résistance de la fenêtre.
       + trackHtml(t.last_close, t.support_30, t.resistance_30, 'S&nbsp;<b>' + fmtUsd(t.support_30) + '</b>', 'R&nbsp;<b>' + fmtUsd(t.resistance_30) + '</b>')
-      + '<div class="tf-pied">EMA20 ' + fmtUsd(e20) + ' · EMA50 ' + fmtUsd(e50)
-      + ' (' + ecart + ') · amplitude ' + fmtNum(ampl,2) + '% (min/max ' + fen + ')'
-      + (isNum(t.atr_14) ? '<span class="expert-seul"> · ATR ' + fmtUsd(t.atr_14) + ' (' + fmtNum(t.atr_14_pct,2) + '%)</span>' : '') + '</div>'
+      + '<div class="tf-pied">EMA 20 ' + fmtUsd(e20) + ' · EMA 50 ' + fmtUsd(e50)
+      + ' (' + ecart + ') · amplitude ' + fmtNum(ampl,2) + ' % (min/max ' + fen + ')'
+      + (isNum(t.atr_14) ? '<span class="expert-seul"> · ATR ' + fmtUsd(t.atr_14) + ' (' + fmtNum(t.atr_14_pct,2) + ' %)</span>' : '') + '</div>'
       + (k === '4h' ? lectureCourte('rsi_tf', t.rsi_14) : '') + '</div>';
   }
   indBody += '<div class="fiches-ligne">' + ['rsi_tf', 'croisement', 'ema_tf', 'sr_tf', 'amplitude', 'atr_tf'].map(f =>
@@ -7653,7 +7846,7 @@ function renderFeedTo(container) {
   const fenCourt = h => (h % 24 === 0 ? (h / 24) + ' j' : h + ' h');
   const indDeb = t4 ? trackHtml(t4.last_close, t4.support_30, t4.resistance_30, 'Bas ' + fenCourt(fen4) + '&nbsp;<b>' + prixDeb(t4.support_30) + '</b>', 'Haut ' + fenCourt(fen4) + '&nbsp;<b>' + prixDeb(t4.resistance_30) + '</b>')
     + phraseCarte('fourchette', positionDans(t4.last_close, t4.support_30, t4.resistance_30), fenMots(fen4), sujet) : '<div class="fine">En attente de la prochaine publication.</div>';
-  html += mCard('📈', modes('Indicateurs', btcTitre('Fourchette des ' + (fen4 ? fenMots(fen4) : '5 jours'))), modes('Binance 4h/1h/1d · RSI Wilder · bougie en cours incluse', 'Publié ' + ilYaDeb(d.updated, ageMin)), '',
+  html += mCard('📈', modes(btcTitre('Indicateurs'), btcTitre('Fourchette des ' + (fen4 ? fenMots(fen4) : '5 jours'))), modes('Binance 4 h / 1 h / 1 j · RSI Wilder · bougie en cours incluse', 'Publié ' + ilYaDeb(d.updated, ageMin)), '',
     envExpert(indBody) + envDebutant(indDeb));
 
   // ── 4. MICROSTRUCTURE ──
@@ -7664,7 +7857,7 @@ function renderFeedTo(container) {
   // daemon depuis son premier démarrage (des mois de flux) : il n'a pas de sens ici, on ne
   // l'affiche pas comme une lecture du moment.
   const cvdTxt = (v, tb) => '<span class="' + signCls(v) + '">' + fmtSigned(v) + '</span>'
-    + (isNum(tb) ? ' <span class="mute">' + fmtNum(tb,1) + '% achat</span>' : '');
+    + (isNum(tb) ? ' <span class="mute">' + fmtNum(tb,1) + ' % achat</span>' : '');
   const cvdHtml = isNum(x.cvd_1h_usd)
     ? divergeRows([{ lbl: '1h', v: x.cvd_1h_usd, txt: cvdTxt(x.cvd_1h_usd, x.taker_buy_1h_pct) },
                    { lbl: '4h', v: x.cvd_4h_usd, txt: cvdTxt(x.cvd_4h_usd, x.taker_buy_4h_pct) },
@@ -7676,11 +7869,14 @@ function renderFeedTo(container) {
   if (isNum(x.gex_usd_1pct)) {
     const zg = isNum(x.zero_gamma)
       ? 'zéro γ <b style="color:var(--ink-1)">' + fmtUsd(x.zero_gamma) + '</b> (spot '
-        + (x.spot_vs_zero_gamma_pct > 0 ? '+' : '') + fmtNum(x.spot_vs_zero_gamma_pct,1) + '%)'
+        + pctSigne(x.spot_vs_zero_gamma_pct, 1) + ')'
       : 'zéro γ hors ±15 %';
-    gexHtml = '<div class="bloc"><div class="bloc-titre"><span class="ligne"><b>GEX</b>' + infoBtn('gex') + ' <span class="badge '
-      + (x.gex_usd_1pct > 0 ? 'badge-hausser' : 'badge-baissier') + '">' + escHtml(x.gex_state||'—') + '</span></span>'
-      + '<span><b class="' + signCls(x.gex_usd_1pct) + '">' + fmtSigned(x.gex_usd_1pct) + '</b> / 1 %</span></div>'
+    // Le badge dit l'état avec le mot des chiffres clés (« long γ » / « short γ », pas le code
+    // LONG_GAMMA du fichier), sans couleur hausse / baisse : le GEX ne dit ni la direction ni le
+    // moment (fiche « gex »). Le montant signé, de même, sans couleur.
+    gexHtml = '<div class="bloc"><div class="bloc-titre"><span class="ligne"><b>GEX</b>' + infoBtn('gex') + ' <span class="badge" style="background:var(--rail);color:var(--ink-2)" title="'
+      + (x.gex_usd_1pct > 0 ? 'régime long gamma (convention)">long γ' : 'régime short gamma (convention)">short γ') + '</span></span>'
+      + '<span><b>' + fmtSigned(x.gex_usd_1pct) + '</b> / 1 %</span></div>'
       + axePrix([{ p: x.put_wall, cls: 'put', lbl: 'put' }, { p: x.zero_gamma, cls: 'zg', lbl: '0γ' },
                  { p: x.spot_deribit, cls: 'spot', lbl: 'spot' }, { p: x.call_wall, cls: 'call', lbl: 'call' }])
       + '<div class="fine">' + zg + ' · call wall ' + fmtUsd(x.call_wall) + ' · put wall ' + fmtUsd(x.put_wall)
@@ -7692,23 +7888,26 @@ function renderFeedTo(container) {
   }
   const premCls = /NEGATIVE/.test(x.premium_state || '') ? 'badge badge-baissier'
                 : /POSITIVE/.test(x.premium_state || '') ? 'badge badge-hausser' : 'badge';
-  const oiTxt = isNum(x.oi_btc) ? x.oi_btc.toLocaleString('en-US',{maximumFractionDigits:0}) : '—';
+  // L'état de la prime en mots (le fichier publie un code : NEGATIVE, EXTREME_POSITIVE…).
+  const MOTS_PRIME = { POSITIVE: 'positive', NEGATIVE: 'négative', EXTREME_POSITIVE: 'très positive', EXTREME_NEGATIVE: 'très négative', NEUTRAL: 'neutre' };
+  const premMot = x.premium_state ? (MOTS_PRIME[x.premium_state] || String(x.premium_state).toLowerCase().replace(/_/g, ' ')) : '—';
+  const oiTxt = isNum(x.oi_btc) ? Fmt.nombre(Number(x.oi_btc), 0) : '—';
   let microBody = '<div class="tuiles">'
-    + tuile('Funding / 8 h', fmtNum(x.funding_rate_pct,4) + '%', fmtNum(x.funding_annual_pct,2) + '% annualisé', 'funding', lectureCourte('funding', x.funding_rate_pct))
+    + tuile('Funding / 8 h', pctSigne(x.funding_rate_pct, 4), pctSigne(x.funding_annual_pct, 1) + ' annualisé', 'funding', lectureCourte('funding', x.funding_rate_pct))
     + tuile('Open interest', oiTxt + ' <span style="font-size:11px;font-weight:600;color:var(--ink-3)">BTC</span>',
-            fmtBig(x.oi_usd) + '<div class="ligne" style="margin-top:4px"><span class="' + chipCls(oi24) + '">Δ24h ' + pctSigne(oi24) + '</span>'
-            + '<span class="' + chipCls(x.oi_change_5d_pct) + '">Δ5j ' + pctSigne(x.oi_change_5d_pct) + '</span></div>', 'oi', lectureCourte('oi', oi24))
+            fmtBig(x.oi_usd) + '<div class="ligne" style="margin-top:4px"><span class="' + chipCls(oi24) + '">Δ24h ' + pctSigne(oi24, 1) + '</span>'
+            + '<span class="' + chipCls(x.oi_change_5d_pct) + '">Δ5j ' + pctSigne(x.oi_change_5d_pct, 1) + '</span></div>', 'oi', lectureCourte('oi', oi24))
     + '</div>'
     + '<div class="bloc"><div class="bloc-titre"><span class="lbl">Comptes long / short' + infoBtn('ls') + '</span>'
-    + '<span class="fine">L/S&nbsp;<b style="color:var(--ink-1)">' + fmtNum(x.ls_ratio,4) + '</b></span></div>'
-    + splitHtml(x.long_pct, x.short_pct, 'Long&nbsp;<b>' + fmtNum(x.long_pct,1) + '%</b>', 'Short&nbsp;<b>' + fmtNum(x.short_pct,1) + '%</b>')
-    + '<div class="ligne" style="margin-top:7px"><span class="chip">Top traders ' + fmtNum(x.top_ls_ratio,4) + infoBtn('top_ls') + '</span>'
-    + '<span class="chip">Taker B/S ' + fmtNum(x.taker_ratio,4) + infoBtn('taker') + '</span></div>' + lectureCourte('ls', x.ls_ratio) + '</div>'
+    + '<span class="fine">L/S&nbsp;<b style="color:var(--ink-1)">' + fmtNum(x.ls_ratio,2) + '</b></span></div>'
+    + splitHtml(x.long_pct, x.short_pct, 'Long&nbsp;<b>' + fmtNum(x.long_pct,1) + ' %</b>', 'Short&nbsp;<b>' + fmtNum(x.short_pct,1) + ' %</b>')
+    + '<div class="ligne" style="margin-top:7px"><span class="chip">Top traders ' + fmtNum(x.top_ls_ratio,2) + infoBtn('top_ls') + '</span>'
+    + '<span class="chip">Taker B/S ' + fmtNum(x.taker_ratio,2) + infoBtn('taker') + '</span></div>' + lectureCourte('ls', x.ls_ratio) + '</div>'
     + '<div class="bloc"><div class="bloc-titre"><span class="lbl">CVD spot' + infoBtn('cvd') + '</span><span class="fine">achats − ventes au taker</span></div>'
     + cvdHtml + lectureCourte('cvd', x.cvd_24h_usd) + '</div>'
     + gexHtml
-    + '<div class="bloc"><div class="ligne"><span class="lbl">Prime Coinbase' + infoBtn('prime') + '</span><b>' + fmtNum(x.premium_pct,4) + '%</b>'
-    + '<span class="' + premCls + '"' + (premCls === 'badge' ? ' style="background:var(--rail);color:var(--ink-2)"' : '') + '>' + escHtml(x.premium_state||'—') + '</span>'
+    + '<div class="bloc"><div class="ligne"><span class="lbl">Prime Coinbase' + infoBtn('prime') + '</span><b>' + pctSigne(x.premium_pct, 4) + '</b>'
+    + '<span class="' + premCls + '"' + (premCls === 'badge' ? ' style="background:var(--rail);color:var(--ink-2)"' : '') + '>' + escHtml(premMot) + '</span>'
     + '<span class="fine">' + (x.us_demand ? 'au-dessus du seuil « demande US » (0,03 %, USDT inclus)' : 'sous le seuil « demande US » (0,03 %, USDT inclus)') + '</span></div>'
     // Hors USDT (publish.py ≥ 4.0) : des dollars contre des dollars. La prime usuelle contient
     // l'écart USDT/USD — mesuré le 06/10/2026, il en expliquait la totalité.
@@ -7717,7 +7916,7 @@ function renderFeedTo(container) {
     + lectureCourte('prime', x.premium_pct, x.premium_hors_usdt_pct) + '</div>';
   // Débutant : « Achats et ventes » — une phrase qui porte la valeur (l'écart des achats et des
   // ventes immédiats sur 24 h) ; le reste est en Expert.
-  html += mCard('📡', modes('Microstructure', btcTitre('Achats et ventes')), modes('Binance Futures · Deribit · Coinbase', 'Binance, 24 h · ' + ilYaDeb(d.updated, ageMin)), '',
+  html += mCard('📡', modes(btcTitre('Microstructure'), btcTitre('Achats et ventes')), modes('Binance Futures · Deribit · Coinbase', 'Binance, 24 h · ' + ilYaDeb(d.updated, ageMin)), '',
     envExpert(microBody) + (isNum(x.cvd_24h_usd) ? phraseCarte('cvd', x.cvd_24h_usd) : envDebutant('<div class="fine">En attente de la prochaine publication.</div>')));
 
   // ── 5. LIQUIDITÉ ──
@@ -7732,11 +7931,12 @@ function renderFeedTo(container) {
     const cle = (RC.bande !== null && bandes[String(RC.bande)]) ? String(RC.bande) : String(lq.bande_ref_pct);
     const bt = bandes[cle] || { ratio: lq.ratio_bid_ask, bid_btc: lq.total_bid, ask_btc: lq.total_ask };
     const autres = Object.keys(bandes).sort((a, b) => a - b)
-      .map(k => '±' + k + ' % : ' + fmtNum(bandes[k].ratio,2)).join(' · ');
+      .map(k => bandeTxt(k) + ' : ' + fmtNum(bandes[k].ratio,2)).join(' · ');
     const perso = RC.bandesPerso.map(b => [b, bandeProfil(lq, b)]).filter(([, r]) => r)
-      .map(([b, r]) => '±' + b + ' % ≈ ' + fmtNum(r.ratio,2)).join(' · ');
-    liqBody = '<div class="bloc-titre"><span class="lbl">Carnet ±' + cle + ' %' + infoBtn('carnet') + '</span>'
-      + '<span class="fine">Ratio <b>bid/ask</b> ±' + cle + ' % : <b class="' + (bt.ratio>1?'stat-pos':'stat-neg') + '">'
+      .map(([b, r]) => bandeTxt(b) + ' ≈ ' + fmtNum(r.ratio,2)).join(' · ');
+    // Le ratio au milieu (1,00 affiché) n'a pas de couleur : il était rouge, comme un penchant vendeur.
+    liqBody = '<div class="bloc-titre"><span class="lbl">Carnet ' + bandeTxt(cle) + infoBtn('carnet') + '</span>'
+      + '<span class="fine">Ratio <b>bid/ask</b> ' + bandeTxt(cle) + ' : <b class="' + clsCote(bt.ratio, 1, 2) + '">'
       + fmtNum(bt.ratio,2) + '</b></span></div>'
       + splitHtml(bt.bid_btc, bt.ask_btc, 'Bids&nbsp;<b>' + fmtNum(bt.bid_btc,1) + ' BTC</b>', 'Asks&nbsp;<b>' + fmtNum(bt.ask_btc,1) + ' BTC</b>')
       + '<div class="fine" style="margin-top:4px">' + autres + ' · carnet vu jusqu\'à ±' + fmtNum(lq.couverture_pct,2) + ' %</div>'
@@ -7753,16 +7953,19 @@ function renderFeedTo(container) {
   }
   // Débutant : « Ordres en attente » — la barre achat / vente près du prix, une phrase, et ce que
   // vaut une photo du carnet.
-  let liqDeb = '<div class="fine">En attente de la prochaine publication.</div>';
+  let liqDeb = '<div class="fine">En attente de la prochaine publication.</div>', liqSousDeb = 'Binance, près du prix';
   if (lq.unit === 'BTC') {
     const bandes = lq.bandes || {}, RC = REGLAGES.carnet;
     const cle = (RC.bande !== null && bandes[String(RC.bande)]) ? String(RC.bande) : String(lq.bande_ref_pct);
+    // La bande vient d'un RÉGLAGE (masqué en Débutant) : le sous-titre la dit, et dit qu'elle a
+    // été choisie en mode Expert — sinon un réglage changeait ces BTC sans que rien ne le dise.
+    liqSousDeb = 'Binance, à ' + bandeTxt(cle) + ' du prix' + (RC.bande !== null && cle === String(RC.bande) ? ' (bande choisie en mode Expert)' : '');
     const bt = bandes[cle] || { ratio: lq.ratio_bid_ask, bid_btc: lq.total_bid, ask_btc: lq.total_ask };
     liqDeb = splitHtml(bt.bid_btc, bt.ask_btc, 'À l’achat&nbsp;<b>' + btcDeb(bt.bid_btc) + '</b>', 'À la vente&nbsp;<b>' + btcDeb(bt.ask_btc) + '</b>')
       + lectureCourte('carnet', bt.ratio)
       + '<div class="fine" style="margin-top:6px">Une photo : ces ordres peuvent être retirés à tout moment.</div>';
   }
-  html += mCard('💧', modes('Liquidité', btcTitre('Ordres en attente')), modes('Carnet Binance spot · BTC posés', 'Binance, près du prix · relevés ' + ilYaDeb(d.updated, ageMin)), '',
+  html += mCard('💧', modes(btcTitre('Liquidité'), btcTitre('Ordres en attente')), modes('Carnet Binance spot · BTC posés', liqSousDeb + ' · relevés ' + ilYaDeb(d.updated, ageMin)), '',
     envExpert(liqBody) + envDebutant(liqDeb));
 
   // ── 6. ÉTAT DU FLUX ──
@@ -7770,28 +7973,42 @@ function renderFeedTo(container) {
   const errs = d.errors || [];
   const NOMS_BLOCS = { btc_spot: 'Spot', indicators: 'Indicateurs', macro: 'Macro', micro_futures: 'Futures',
                        cvd: 'CVD', gex: 'GEX', premium: 'Prime', liquidity: 'Carnet' };
+  // Cette carte compte les BLOCS de la dernière publication (`status` du fichier) : ni des sources,
+  // ni du direct (« 8/8 blocs live », « 8/8 sources à jour »). Elle ne juge pas l'âge — le bandeau
+  // et le voyant le font —, mais le dit : sous-titre « il y a N min », et « en retard » au-delà
+  // du seuil (même seuil arrondi qu'eux, etatPublication).
+  const vieille = ['retard', 'fige'].includes(etatPublication(d.updated).etat);
+  // L'état de chaque bloc en mots (le fichier écrit « ok », « vide », « incomplet:… », « error: … »).
+  const motEtat = v => v === 'ok' ? 'publié' : v === 'vide' ? 'aucun résultat'
+    : /^incomplet:/.test(v) ? 'incomplet (absents : ' + v.slice(10).split(',').join(', ') + ')'
+    : /^error:/.test(v) ? 'en erreur (' + v.slice(6).trim() + ')' : String(v);
   let stBody = '<div class="hero"><span class="hero-val ' + (errs.length ? 'stat-neg' : '') + '" style="font-size:19px">'
-    + nOk + '/' + nTot + ' blocs live</span></div>'
+    + nOk + '/' + nTot + ' blocs publiés</span></div>'
     + '<div class="etats">' + Object.entries(st).map(([k, v]) => '<span class="etat' + (v === 'ok' ? '' : ' ko') + '" title="'
-      + escHtml(k + ' : ' + v) + '">' + (v === 'ok' ? '✓ ' : '✗ ') + escHtml(NOMS_BLOCS[k] || k) + '</span>').join('') + '</div>'
+      + escHtml((NOMS_BLOCS[k] || k) + ' : ' + motEtat(v)).replace(/"/g, '&quot;') + '">' + (v === 'ok' ? '✓ ' : '✗ ') + escHtml(NOMS_BLOCS[k] || k) + '</span>').join('') + '</div>'
     + (errs.length ? '<div class="stat-neg" style="margin-top:8px;font-size:11px">' + errs.map(escHtml).join('<br>') + '</div>' : '')
-    + '<div class="fine" style="margin-top:8px">' + escHtml(d.generator||'') + '<br>Sources : ' + escHtml(d.source||'—') + '</div>';
-  html += mCard('🔌', modes('Flux', 'Sources'), modes('Pas d\'erreur silencieuse', 'État de la publication'), '',
-    envExpert(stBody) + envDebutant('<div class="hero"><span class="hero-val' + (nOk < nTot ? ' stat-neg' : '') + '" style="font-size:19px">' + nOk + '/' + nTot + ' sources à jour</span></div>')
+    // (Le nom et la version du programme de publication — `generator` — ne sont plus affichés :
+    // une note de développeur, pas une information du lecteur.)
+    + '<div class="fine" style="margin-top:8px">Sources : ' + escHtml(nomsSources(d.source)) + '</div>';
+  const ageFlux = 'il y a ' + (ageMin === null ? '—' : ageDe(d.updated, ageMin)) + ' min' + (vieille ? ' · en retard' : '');
+  html += mCard('🔌', modes('Flux', 'Publication'), modes('Blocs de la dernière publication · ' + ageFlux, 'Dernière publication · ' + ageFlux), '',
+    envExpert(stBody) + envDebutant('<div class="hero"><span class="hero-val' + (nOk < nTot ? ' stat-neg' : '') + '" style="font-size:19px">' + nOk + '/' + nTot + ' infos publiées</span></div>')
     + phraseCarte('sources', nOk, nTot));
 
   // ── 7. HORLOGES ── chaque instant que la page affiche, son âge (js/horloges.js)
-  html += mCard('⏱', modes('Horloges', 'Heures des données'), modes('Chaque instant affiché, son âge · UTC', 'Publication ' + ilYaDeb(d.updated, ageMin) + ' · prix en direct.'), '',
+  html += mCard('⏱', modes('Horloges', 'Heures des données'), modes('Chaque instant affiché, son âge', 'Publication ' + ilYaDeb(d.updated, ageMin) + ' · prix en direct.'), '',
     envExpert(horlogesHtml(d)) + envDebutant('<div class="fine">Les infos du marché sont publiées toutes les ' + CADENCES.attendue_min + ' min ; le prix en haut de l’écran est relu chaque seconde.</div>'));
   // ── 8. CONTRE-EXPERTISE ── la publication recalculée ici (js/contre-expertise.js)
-  html += mCard('🔎', modes('Contre-expertise', 'Vérification'), modes('Vérifié par ton navigateur · Binance spot', 'Recalculé par le navigateur'), contreDroite(d), contreCorps(d));
+  html += mCard('🔎', modes('Contre-expertise', 'Vérification'), modes('Vérifié par votre navigateur · Binance spot', 'Recalculé par le navigateur'), contreDroite(d), contreCorps(d));
   carteEntree = false;
   if (container.dataset) container.dataset.vu = '1';
 
   // Le bandeau d'âge voyage AVEC les cartes : il apparaît donc dans le conteneur
   // réellement affiché, quel qu'il soit.
+  // Sur une autre paire, la note « bitcoin » s'affiche dans les DEUX modes (elle n'existait qu'en
+  // Débutant : l'Expert sur SOL lisait les chiffres du bitcoin sans que rien ne le dise).
   container.innerHTML = ageBannerHtml(d)
-    + (autrePaire ? envDebutant('<div class="deb-btc">Ces infos parlent du bitcoin (en dollars), pas de ' + escHtml(NOMS_PAIRES[activeSymbol] || activeSymbol) + '.</div>') : '') + html;
+    + (autrePaire ? '<div class="deb-btc">Ces infos parlent du bitcoin (en dollars), pas de ' + escHtml(NOMS_PAIRES[activeSymbol] || activeSymbol) + '.</div>' : '') + html;
   brancherContre(container);
 }
 
@@ -7844,13 +8061,21 @@ function lancerChronique() {
 // avancent sans refaire la carte : majHorloges() réécrit les [data-horloge-t] / [data-horloge-src]
 // au rythme du prix (même image que l'horloge de la barre), et ne refait le bloc « page » que
 // si l'état d'une source change (panne, retour, écart d'horloge).
-const FMT_UTC = t => new Date(t).toISOString().slice(11, 19);
+// Les instants à l'heure de l'APPAREIL (ils étaient en UTC, sous un sous-titre « · UTC »), à la
+// seconde ; le jour devant quand ce n'est pas aujourd'hui.
+const FMT_INSTANT = t => (Fmt.memeJour(t, Date.now()) ? '' : Fmt.jour(t) + ' ') + Fmt.heureSec(t);
+// Une date SEULE (« 2026-10-09 », clôture du DXY) : réécrite « 09/10 » comme les autres jours de
+// la page, sans passer par une heure (minuit UTC deviendrait la veille à l'ouest de Greenwich).
+const dateSeule = s => { const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(s || ''); return m ? m[3] + '/' + m[2] : s; };
+// Les sources de la publication (« binance · deribit ») sous leur nom (« Binance · Deribit »).
+const NOMS_SOURCES = { binance: 'Binance', deribit: 'Deribit', coinbase: 'Coinbase', yahoo: 'Yahoo' };
+const nomsSources = s => (s ? String(s).replace(/[a-z]+/g, w => NOMS_SOURCES[w] || w) : '—');
 function horlogesPageHtml() {
   const lignes = Horloges.dePage({ marche: marketData, chaleur: histHeatmap, cadenceMesureeMs: chronique.cadence() }), t = Horloges.maintenant();
   const ecart = Horloges.texteEcart();
   return (ecart ? '<div class="horloge-ecart">' + escHtml(ecart) + '</div>' : '')
     + lignes.map(l => '<div class="horloge-ligne' + (l.classe ? ' ko' : '') + '"><span class="h-nom">' + escHtml(l.libelle) + '</span>'
-      + '<span class="h-quand">' + (l.t ? FMT_UTC(l.t) : '—') + '</span>'
+      + '<span class="h-quand">' + (l.t ? FMT_INSTANT(l.t) : '—') + '</span>'
       + '<span class="h-age" data-horloge-t="' + (l.t || '') + '">' + Horloges.texteAge(l.t ? t - l.t : null) + '</span>'
       + (l.classe ? '<span class="h-panne">' + escHtml(l.panne) + '</span>' : '')
       + (l.seuil ? '<span class="h-seuil">' + escHtml(l.seuil) + '</span>' : '') + '</div>').join('');
@@ -7859,13 +8084,14 @@ function horlogesHtml(d) {
   const t = Horloges.maintenant();
   const fichier = Horloges.duFichier(d).map(l => '<div class="horloge-ligne"><span class="h-nom">' + escHtml(l.libelle)
     // Une date seule (dxy_date) se montre telle quelle : « 00:00:00 » inventerait une heure.
-    + '</span><span class="h-quand">' + (l.t && !/^\d{4}-\d\d-\d\d$/.test(l.valeur) ? FMT_UTC(l.t) : escHtml(String(l.valeur))) + '</span>'
+    + '</span><span class="h-quand">' + (l.t && !/^\d{4}-\d\d-\d\d$/.test(l.valeur) ? FMT_INSTANT(l.t) : escHtml(dateSeule(String(l.valeur)))) + '</span>'
     + '<span class="h-age" data-horloge-t="' + (l.t || '') + '">' + Horloges.texteAge(l.t ? t - l.t : null) + '</span>'
     + '<span class="h-src">' + escHtml(l.source || '') + '</span></div>').join('');
   return '<div class="bloc-titre"><span class="lbl">Cette page</span><span class="fine">dernier succès · panne nommée</span></div>'
     + '<div class="horloges-page">' + horlogesPageHtml() + '</div>'
-    + '<div class="bloc-titre" style="margin-top:10px"><span class="lbl">Le fichier publié</span><span class="fine">champs « horodatage » de meta.champs</span></div>'
-    + (fichier || '<div class="fine">format antérieur : aucun horodatage décrit</div>');
+    // (La liste vient des champs de type « horodatage » décrits dans meta.champs.)
+    + '<div class="bloc-titre" style="margin-top:10px"><span class="lbl">Les infos publiées</span><span class="fine">heures écrites dans la publication</span></div>'
+    + (fichier || '<div class="fine">publication d’un format antérieur : aucune heure décrite</div>');
 }
 let sigHorloges = '';
 function majHorloges() {
@@ -7906,14 +8132,14 @@ function contreCorps(d) {
   return envDebutant('<div class="fine">Le navigateur recalcule les chiffres publiés : détail en mode Expert.</div>') + envExpert(contreCorpsExpert(d));
 }
 function contreCorpsExpert(d) {
-  const pub = Date.parse(d.updated), hm = isFinite(pub) ? new Date(pub).toISOString().slice(11, 16) + ' UTC' : '—';
+  const pub = Date.parse(d.updated), hm = isFinite(pub) ? Fmt.jourHeure(pub) : '—';
   if (contre.pour !== d.updated || !contre.res) {
     return '<div class="age-banner verif" style="display:block">publication ' + hm + ' · ' + (contre.enCours === d.updated ? 'vérification en cours…' : 'pas encore vérifiée') + '</div>'
       + '<div class="fine">Recalculée ici depuis Binance quand cette carte est à l’écran, une fois par publication.</div>';
   }
   const r = contre.res;
-  let html = '<div class="age-banner verif" style="display:block">publication ' + hm + ' · vérifiée à ' + FMT_UTC(contre.a)
-    + ' UTC (<span data-horloge-t="' + contre.a + '">' + Horloges.texteAge(Horloges.maintenant() - contre.a) + '</span>)</div>';
+  let html = '<div class="age-banner verif" style="display:block">publication ' + hm + ' · vérifiée à ' + FMT_INSTANT(contre.a)
+    + ' (<span data-horloge-t="' + contre.a + '">' + Horloges.texteAge(Horloges.maintenant() - contre.a) + '</span>)</div>';
   if (r.note) html += '<div class="fine">' + escHtml(r.note) + '</div>';
   const groupes = new Map();
   for (const l of r.lignes) { if (!groupes.has(l.groupe)) groupes.set(l.groupe, []); groupes.get(l.groupe).push(l); }
@@ -8053,15 +8279,19 @@ function renderStratHelp() {
   if (!p) {
     html += '<div class="strat-auto">Aperçu de la grille : en attente des bougies…</div>';
   } else {
-    const f = v => '$' + v.toLocaleString('fr-FR', { maximumFractionDigits: 2 });
-    const sig = p.signal === 'enter' ? '<span class="stat-pos">signal armé</span>'
-      : p.signal === 'exit' ? '<span class="stat-neg">signal de sortie</span>'
+    // Le prix au format commun, unité APRÈS le nombre (« 83 512,50 $ », « 1,2345 SOL ») — il
+    // s'écrivait « $83 512,5 ». Le signal sans couleur : « armé » dit seulement que la condition
+    // d'entrée de la grille est remplie (pour la grille RSI, un RSI sous le seuil) — ni une bonne
+    // nouvelle, ni l'annonce d'un rebond.
+    const f = v => Fmt.prix(v, guideUnite(), 'fin');
+    const sig = p.signal === 'enter' ? 'signal armé'
+      : p.signal === 'exit' ? 'signal de sortie'
       : p.signal === 'idle' ? 'signal pas encore armé' : 'pas de signal sur cette bougie';
     const tp = (btUserParams.tpPct !== undefined) ? btUserParams.tpPct : strat.params.tpPct.value;
     const sl = (btUserParams.slPct !== undefined) ? btUserParams.slPct : strat.params.slPct.value;
     html += '<div class="strat-auto">' + (p.manual ? 'Bornes saisies à la main' : 'Auto') + ' : '
       + f(p.lo) + ' → ' + f(p.hi) + ' · ' + p.n + ' niveaux · pas de ' + f(p.step)
-      + ' · TP +' + tp + ' % / SL −' + sl + ' % · ' + sig + '</div>';
+      + ' · prise de gain +' + Fmt.nombre(+tp, decimalesDe(tp)) + ' % / stop de perte −' + Fmt.nombre(+sl, decimalesDe(sl)) + ' % · ' + sig + '</div>';
   }
   el.innerHTML = html;
 }
@@ -8150,7 +8380,7 @@ function startForward() {
   }
   forwardRunning = true;
   const btn = document.getElementById('stratFwdBtn');
-  btn.textContent = '🟢 Forward (arrêter)';
+  btn.textContent = '🟢 En direct (arrêter)';
   btn.classList.add('forward');
 
   // Track the last candle index processed
@@ -8190,7 +8420,7 @@ function stopForward() {
   forwardRunning = false;
   if (forwardInterval) { clearInterval(forwardInterval); forwardInterval = null; }
   const btn = document.getElementById('stratFwdBtn');
-  btn.textContent = '🔴 Forward Test';
+  btn.textContent = '🔴 Suivre en direct';
   btn.classList.remove('forward');
 }
 
@@ -8198,43 +8428,50 @@ function updateForwardStats() {
   if (!btResult) return;
   const div = document.getElementById('stratStats');
   div.style.display = 'block';
-  const pnlStr = btResult.totalPnl >= 0 ? '+' + btResult.totalPnl.toFixed(2) : btResult.totalPnl.toFixed(2);
+  const pnlStr = Fmt.signe(btResult.totalPnl, x => Fmt.nombre(x, 2));
   div.innerHTML =
-    '<div>🔄 <b>Forward</b> | Trades: <span class="stat-val">' + btResult.tradeCount + '</span></div>' +
-    '<div>P&L live: <span class="' + (btResult.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' USDT</span></div>' +
-    '<div>Return: <span class="' + (btResult.totalReturn >= 0 ? 'stat-pos' : 'stat-neg') + '">' + btResult.totalReturn.toFixed(2) + '%</span></div>';
+    '<div>🔄 <b>Suivi en direct</b> | Opérations closes : <span class="stat-val">' + btResult.tradeCount + '</span></div>' +
+    '<div>Résultat en direct : <span class="' + (btResult.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' ' + guideUnite() + '</span></div>' +
+    '<div>Rendement : <span class="' + (btResult.totalReturn >= 0 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.pct(btResult.totalReturn, 2) + '</span></div>';
 }
 
+// Un nombre du Grid Bot publié en texte par runBacktest (« 1.234 », « ∞ ») : au format commun.
+function nombreBot(t, dec) { return isFinite(parseFloat(t)) ? Fmt.nombre(parseFloat(t), dec) : String(t); }
+// Les décimales d'un réglage tel qu'il a été saisi (« 0.5 » → 1) : « prise de gain +0,5 % ».
+function decimalesDe(v) { return (String(v).split('.')[1] || '').length; }
 // Durée d'une bougie en minutes : traduit la fenêtre testée en « 8 h » / « 3,2 j ».
 const INTERVAL_MIN = { '1m': 1, '5m': 5, '15m': 15, '1h': 60, '4h': 240, '1d': 1440 };
 
 function showStratStats(result) {
   const div = document.getElementById('stratStats');
   div.style.display = 'block';
-  const pnlStr = (result.totalPnl >= 0 ? '+' : '') + result.totalPnl.toFixed(2);
-  // Verdict : le seul juge qui compte est « garder le BTC » sur la MÊME période. Une grille qui
-  // gagne 0,40 % quand le BTC fait 3 % a perdu du terrain, malgré un P&L positif.
+  // Montants dans la devise de cotation de la paire, comme les prix de la page (« $ », « SOL »).
+  const unite = guideUnite(), pnlStr = Fmt.signe(result.totalPnl, x => Fmt.nombre(x, 2));
+  // Verdict : le seul juge qui compte est « garder l'actif » (le BTC sur BTC/USDT, le SOL sur
+  // SOL/USDT) sur la MÊME période. Une grille qui gagne 0,40 % quand l'actif fait 3 % a perdu du
+  // terrain, malgré un P&L positif.
+  const actif = (NOMS_PAIRES[activeSymbol] || 'BTC/USDT').split('/')[0];
   const c0 = candles[result.startIdx], c1 = candles[result.endIdx];
   const hold = (c0 && c1 && c0.close) ? (c1.close - c0.close) / c0.close * 100 : null;
   const ret = result.totalReturn;
   const mins = (result.endIdx - result.startIdx + 1) * (INTERVAL_MIN[chartInterval] || 15);
-  const durStr = mins >= 1440 ? (mins / 1440).toFixed(1) + ' j' : mins >= 60 ? (mins / 60).toFixed(1) + ' h' : mins + ' min';
+  const durStr = mins >= 1440 ? Fmt.nombre(mins / 1440, 1) + ' j' : mins >= 60 ? Fmt.nombre(mins / 60, 1) + ' h' : mins + ' min';
   let html = '';
   if (hold !== null) {
     const v = (ret > 0 && ret > hold) ? ['stat-pos', '✅ gagne et bat le marché']
-      : (ret > 0) ? ['stat-val', '⚠️ gagne, mais garder le BTC rapportait plus']
+      : (ret > 0) ? ['stat-val', '⚠️ gagne, mais garder le ' + actif + ' rapportait plus']
       : (ret > hold) ? ['stat-val', '⚠️ perd, mais moins que le marché']
-      : ['stat-neg', '❌ perd alors que garder le BTC montait'];
+      : ['stat-neg', hold > 0 ? '❌ perd alors que garder le ' + actif + ' montait' : '❌ perd plus que le marché'];
     html += '<div class="verdict"><span class="' + v[0] + '">' + v[1] + '</span> — '
-      + (ret >= 0 ? '+' : '') + ret.toFixed(2) + ' % en ' + durStr + ', BTC '
-      + (hold >= 0 ? '+' : '') + hold.toFixed(2) + ' % sur la même période</div>';
+      + Fmt.pct(ret, 2) + ' en ' + durStr + ', ' + actif + ' '
+      + Fmt.pct(hold, 2) + ' sur la même période</div>';
   }
   html +=
-    '<div>Trades: <span class="stat-val">' + result.tradeCount + '</span> | Win: <span title="Part des trades clôturés en profit" class="' + (result.winRate >= 50 ? 'stat-pos' : 'stat-neg') + '">' + result.winRate.toFixed(1) + '%</span></div>' +
-    '<div>P&L: <span title="Profit ou perte en USDT, frais 0,1 % déjà déduits" class="' + (result.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' USDT</span> (' + (ret >= 0 ? '+' : '') + ret.toFixed(2) + ' %)</div>' +
-    '<div>Perte max: <span title="Plus forte baisse depuis un sommet du capital (drawdown)" class="stat-neg">' + result.maxDrawdownPct.toFixed(1) + '%</span> | Sharpe: <span title="Rendement par unité de risque, annualisé. Au-delà de 1 c\'est bon ; sur une fenêtre courte il ne veut rien dire." class="stat-val">' + result.sharpe + '</span></div>' +
-    '<div>Gains/pertes: <span title="Total des gains divisé par le total des pertes. Au-dessus de 1, la grille gagne." class="stat-val">' + result.profitFactor + '</span> | Gain moyen: <span title="Gain moyen par trade gagnant" class="stat-pos">' + result.avgWin.toFixed(2) + '</span> | Perte moyenne: <span title="Perte moyenne par trade perdant" class="stat-neg">' + result.avgLoss.toFixed(2) + '</span></div>';
-  if (result.tradeCount < 10) html += '<div class="strat-note">' + result.tradeCount + ' trade(s) : trop peu pour conclure — visez 30, ou élargissez la période avec les champs « Du » / « Au ».</div>';
+    '<div>Opérations closes : <span class="stat-val">' + result.tradeCount + '</span> | Gagnantes : <span title="Part des opérations closes en profit" class="' + (result.winRate >= 50 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.nombre(result.winRate, 1) + ' %</span></div>' +
+    '<div>Résultat : <span title="Profit ou perte, frais de 0,1 % déjà déduits" class="' + (result.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' ' + unite + '</span> (' + Fmt.pct(ret, 2) + ')</div>' +
+    '<div>Perte max : <span title="Plus forte baisse depuis un sommet du capital (drawdown)" class="stat-neg">' + Fmt.nombre(result.maxDrawdownPct, 1) + ' %</span> | Ratio de Sharpe : <span title="Rendement par unité de risque, annualisé. Au-delà de 1 c\'est bon ; sur une fenêtre courte il ne veut rien dire." class="stat-val">' + nombreBot(result.sharpe, 3) + '</span></div>' +
+    '<div>Gains / pertes : <span title="Total des gains divisé par le total des pertes. Au-dessus de 1, la grille gagne." class="stat-val">' + nombreBot(result.profitFactor, 2) + '</span> | Gain moyen : <span title="Gain moyen par opération gagnante" class="stat-pos">' + Fmt.nombre(result.avgWin, 2) + ' ' + unite + '</span> | Perte moyenne : <span title="Perte moyenne par opération perdante" class="stat-neg">' + Fmt.nombre(result.avgLoss, 2) + ' ' + unite + '</span></div>';
+  if (result.tradeCount < 10) html += '<div class="strat-note">' + result.tradeCount + ' opération(s) close(s) : trop peu pour conclure — visez 30, ou élargissez la période avec les champs « Du » / « Au ».</div>';
   div.innerHTML = html;
 }
 
@@ -8248,11 +8485,15 @@ function onCompareDumbGrid() {
 
   const div = document.getElementById('stratStats');
   div.style.display = 'block';
+  // Au format de la page (js/format.js), dans la devise de cotation de la paire.
+  const unite = guideUnite(), montant = v => Fmt.signe(v, x => Fmt.nombre(x, 2)) + ' ' + unite;
+  const ligne = (nom, r) => '<div><b>' + nom + '</b> : <span class="' + (r.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + montant(r.totalPnl) + '</span> ('
+    + r.tradeCount + ' opération(s) close(s), ratio de Sharpe ' + nombreBot(r.sharpe, 3) + ')</div>';
+  const ecart = taResult.totalPnl - dumbResult.totalPnl;
   div.innerHTML =
-    '<div style="margin-bottom:6px;color:var(--accent);font-weight:700">📊 Comparaison TA vs Grille Fixe</div>' +
-    '<div><b>' + STRATEGIES[btActiveStrategy].label + '</b>: <span class="' + (taResult.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + (taResult.totalPnl >= 0 ? '+' : '') + taResult.totalPnl.toFixed(2) + ' USDT</span> (' + taResult.tradeCount + ' trades, Sharpe ' + taResult.sharpe + ')</div>' +
-    '<div><b>Grille Fixe</b>: <span class="' + (dumbResult.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + (dumbResult.totalPnl >= 0 ? '+' : '') + dumbResult.totalPnl.toFixed(2) + ' USDT</span> (' + dumbResult.tradeCount + ' trades, Sharpe ' + dumbResult.sharpe + ')</div>' +
-    '<div>Delta: <span class="' + ((taResult.totalPnl - dumbResult.totalPnl) >= 0 ? 'stat-pos' : 'stat-neg') + '">' + ((taResult.totalPnl - dumbResult.totalPnl) >= 0 ? '+' : '') + (taResult.totalPnl - dumbResult.totalPnl).toFixed(2) + ' USDT</span></div>';
+    '<div style="margin-bottom:6px;color:var(--accent);font-weight:700">📊 Comparaison avec la grille fixe (témoin)</div>' +
+    ligne(STRATEGIES[btActiveStrategy].label, taResult) + ligne('Grille fixe', dumbResult) +
+    '<div>Écart : <span class="' + (ecart >= 0 ? 'stat-pos' : 'stat-neg') + '">' + montant(ecart) + '</span></div>';
   btResult = taResult;
   btBot = taResult.bot;
   drawChart();
@@ -8331,7 +8572,7 @@ function runWalkForward(strategyKey, candles, userParams, capital, segments) {
     segments: results,
     degradationRatio: degradationRatio,
     sensitivity: sensResults,
-    interpretation: degradationRatio < 0.5 ? '⚠️ Overfit probable (ratio < 0.5)' :
+    interpretation: degradationRatio < 0.5 ? '⚠️ Surajustement probable (rapport < 0,5)' :
                     degradationRatio < 0.7 ? '⚠️ Faible robustesse' :
                     degradationRatio < 0.9 ? '✅ Correct' : '✅ Robuste'
   };
@@ -8343,23 +8584,23 @@ function showWalkForward() {
 
   const div = document.getElementById('stratStats');
   div.style.display = 'block';
-  let html = '<div style="color:var(--accent);font-weight:700;margin-bottom:6px">🔬 Walk-Forward (' + wf.segments.length + ' segments)</div>';
+  let html = '<div style="color:var(--accent);font-weight:700;margin-bottom:6px">🔬 Test de robustesse (walk-forward, ' + wf.segments.length + ' segments)</div>';
 
   for (const seg of wf.segments) {
     html += '<div style="margin-bottom:4px;font-size:10px">';
-    html += '<b>S' + seg.segment + '</b> In: <span class="stat-val">' + seg.inSample.return.toFixed(2) + '%</span> (Sharpe ' + seg.inSample.sharpe.toFixed(2) + ') ';
-    html += '→ Out: <span class="' + (seg.outSample.return >= 0 ? 'stat-pos' : 'stat-neg') + '">' + seg.outSample.return.toFixed(2) + '%</span> (Sharpe ' + seg.outSample.sharpe.toFixed(2) + ')';
+    html += '<b>S' + seg.segment + '</b> Entraînement : <span class="stat-val">' + Fmt.pct(seg.inSample.return, 2) + '</span> (Sharpe ' + Fmt.nombre(seg.inSample.sharpe, 2) + ') ';
+    html += '→ Suite : <span class="' + (seg.outSample.return >= 0 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.pct(seg.outSample.return, 2) + '</span> (Sharpe ' + Fmt.nombre(seg.outSample.sharpe, 2) + ')';
     html += '</div>';
   }
 
-  html += '<div style="margin-top:6px"><b>Degradation Ratio:</b> <span class="' + (wf.degradationRatio >= 0.7 ? 'stat-pos' : 'stat-neg') + '">' + wf.degradationRatio.toFixed(3) + '</span></div>';
+  html += '<div style="margin-top:6px"><b title="Ratio de Sharpe moyen sur la suite divisé par celui de l’entraînement">Rapport suite / entraînement :</b> <span class="' + (wf.degradationRatio >= 0.7 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.nombre(wf.degradationRatio, 3) + '</span></div>';
   html += '<div style="font-size:10px;color:var(--ink-2)">' + wf.interpretation + '</div>';
 
   // Sensitivity
   if (wf.sensitivity && wf.sensitivity.length > 0) {
-    html += '<div style="margin-top:6px;font-size:10px"><b>Sensibilité gridLevels ±20%:</b></div>';
+    html += '<div style="margin-top:6px;font-size:10px"><b>Sensibilité au nombre de niveaux ±20 % :</b></div>';
     for (const s of wf.sensitivity) {
-      html += '<span style="margin-right:8px">' + s.value + ': <span class="' + (s.return >= 0 ? 'stat-pos' : 'stat-neg') + '">' + s.return.toFixed(2) + '%</span></span>';
+      html += '<span style="margin-right:8px">' + s.value + ' : <span class="' + (s.return >= 0 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.pct(s.return, 2) + '</span></span>';
     }
   }
 

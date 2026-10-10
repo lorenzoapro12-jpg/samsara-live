@@ -12,12 +12,15 @@
 //      bougie) : la ligne dit les deux ; plus « frais » après fonduMinutes ;
 //   4. contact en mèche : toute bulle Débutant qui dit la réalisation dit « zone » et « passage
 //      bref » ; jamais « vers 84 500 $ — réalisé ✓ » ; la raison courte d'une invalidation ;
-//   5. après minuit (heure de Paris) : « hier » devant les créneaux de la veille ;
+//   5. après minuit (heure de l'appareil) : « hier » devant les créneaux de la veille ;
 //   6. mots : « Trop tôt pour dire quel scénario suit le mieux le prix » ; Expert : pas de redite de
 //      la touche d'un chemin réalisé ; « sorti par le haut » comme état ; « ◂ » expliqué.
+// Les heures dites sont celles de l'appareil (Fmt.heure, Fmt.jour), sans « UTC » ni « heure de
+// Paris » : les attendus sont calculés avec Fmt, pour tenir dans n'importe quel fuseau.
 // USAGE   node tests/test_scenarios_jour_stable.js
 const S = require('../js/scenarios.js');
 const Guide = require('../js/guide.js');
+const Fm = require('../js/format.js');
 const { reel, synth } = require('./scenarios-jour-0910');
 let ko = 0;
 const check = (nom, ok, det) => { if (!ok) ko++; console.log(`  ${ok ? '✓' : '✗'} ${nom}${!ok && det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 700) : ''}`); };
@@ -112,7 +115,9 @@ titre('3. Fait frais : la ligne le dit, et le garde une heure (suite synthétiqu
   const items = z.items.map(i => (i.sc.rang === '3' ? { sc: i.sc, sv: Object.assign({}, i.sv, { cle: 'rien', k: 0, t: null }) } : i));
   const Jz = S.classerJour(items, z.J.prix, z.F, z.now, { grille: true, sortiTot: true, prec: z.F.scenarios[0].id, cas: 'meneur', ordre: [] }, PJ);
   const Lz = S.ligneJourDebutant(z.F, Jz, items, z.now, 48, {});
-  check(`le 2 seul fermé depuis peu : « ${Lz} »`, /^Scén\. 2 invalidé ✗ (vers 21h00 )?\(en direct\) ▸$/.test(Lz), Lz);
+  // L'heure de la fermeture : le début de la bougie du contact (19:00 UTC), à l'heure de l'appareil.
+  const t2 = Date.parse('2026-10-09T19:00Z'), h2 = (Fm.memeJour(t2, z.now) ? 'vers ' : 'hier ') + Fm.heure(t2);
+  check(`le 2 seul fermé depuis peu : « ${Lz} » (« ${h2} » ou sans heure)`, Lz === 'Scén. 2 invalidé ✗ ' + h2 + ' (en direct) ▸' || Lz === 'Scén. 2 invalidé ✗ (en direct) ▸', Lz);
   const tous = [L48, L40, Lz];
   check('lignes : sans mot banni, sans %, sans conseil', tous.every(t => !Guide.motsBannis(t).length && !/%/.test(t) && !CONSEIL.test(t)), tous);
 }
@@ -130,13 +135,21 @@ titre('4. Contact en mèche : les bulles Débutant disent « zone » et « passa
   }
 }
 
-titre('5. Après minuit (heure de Paris) : « hier » devant les créneaux de la veille');
+titre('5. Après minuit (heure de l’appareil) : « hier » devant les créneaux de la veille');
 {
   const x = journee(synth, new Map())(Date.parse('2026-10-10T03:35Z')), J = x.J;
   const c = J.items.map(i => S.ligneDebutantJour(i, J, true)), l = J.items.map(i => S.ligneDebutantJour(i, J));
-  check(`03:35 UTC le 10/10 : « ${c[0]} »`, c.concat(l).every(t => !/entre \d\dh\d\d/.test(t) || /hier entre \d\dh\d\d et \d\dh\d\d/.test(t)) && c.some(t => /hier entre/.test(t)), c);
-  const lib = J.items.filter(i => i.ferme && i.ferme.type !== 'realise').map(i => S.libellesJourDebutant(i, 32, null, x.now)[0]);
-  check(`libellés : « ${lib.join(' » « ')} »`, lib.length && lib.every(t => /hier \d\dh\d\d/.test(t) && t.length <= 32), lib);
+  // Les fermetures (19:00–20:15 UTC le 09/10) sont de la veille de 03:35 UTC le 10/10 en UTC comme à
+  // Paris ; dans un fuseau où elles tombent le même jour de l'appareil, aucun « hier ».
+  const fermes = J.items.filter(i => i.ferme && Number.isFinite(i.ferme.t));
+  const veille = t => Fm.jour(t) === Fm.jour(x.now - 86400000), toutesVeille = fermes.length > 0 && fermes.every(i => veille(i.ferme.t));
+  const aucuneVeille = fermes.every(i => !veille(i.ferme.t));
+  check(`03:35 UTC le 10/10 : « ${c[0]} »`, toutesVeille ? c.concat(l).every(t => !/entre \d\d:\d\d/.test(t) || /hier entre \d\d:\d\d et \d\d:\d\d/.test(t)) && c.some(t => /hier entre/.test(t))
+    : aucuneVeille ? c.concat(l).every(t => !/hier/.test(t)) : true, c);
+  check('heures de l’appareil : ni « UTC » ni « heure de Paris »', c.concat(l).every(t => !/UTC|Paris|\d\dh\d\d/.test(t)), c.concat(l));
+  const fermesNR = J.items.filter(i => i.ferme && i.ferme.type !== 'realise');
+  const lib = fermesNR.map(i => S.libellesJourDebutant(i, 32, null, x.now)[0]);
+  check(`libellés : « ${lib.join(' » « ')} »`, lib.length && lib.every((t, k) => (veille(fermesNR[k].ferme.t) ? t.includes(' hier ' + Fm.heure(fermesNR[k].ferme.t) + ' ') : !/hier/.test(t)) && t.length <= 32), lib);
   const y = journee(synth, new Map())(Date.parse('2026-10-09T21:30Z'));
   check('le même jour : pas de « hier »', y.J.items.every(i => !/hier/.test(S.ligneDebutantJour(i, y.J, true))));
 }
@@ -150,7 +163,9 @@ titre('6. Mots');
   const b3 = S.ligneJourExpert(trois, y.J, { itv: '15 min', maintenant: y.now });
   check(`Expert, le 3 réalisé : la touche dite une fois (« ${b3} »)`, /cible touchée en mèche/.test(b3) && !/zone 84 500 touchée/.test(b3), b3);
   const et = S.texteEtat(un.sc, un.sv, null, 'expert', { itv: '15 min', maintenant: y.now });
-  check(`Expert, état court du 1 sorti : « ${et.court} »`, /^sorti par le haut \d\d:\d\d–\d\d:\d\d UTC$/.test(et.court), et.court);
+  // La sortie : la bougie de 20:00–20:15 UTC, à l'heure de l'appareil (le jour devant si ce n'est pas celui de maintenant).
+  const ts = Date.parse('2026-10-09T20:00Z'), etAtt = 'sorti par le haut ' + (Fm.memeJour(ts, y.now) ? '' : Fm.jour(ts) + ' ') + Fm.heure(ts) + '–' + Fm.heure(ts + Q);
+  check(`Expert, état court du 1 sorti : « ${et.court} » (attendu « ${etAtt} »)`, et.court === etAtt, et.court);
   const regle = S.regleJourExpert(PJ).join(' ');
   check('règle Expert : « ◂ » expliqué (plus petit écart à la dernière clôture)', /« ◂ » : le plus petit écart à la dernière clôture/.test(regle), regle.slice(0, 300));
 }

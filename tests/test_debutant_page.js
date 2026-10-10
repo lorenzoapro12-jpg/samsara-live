@@ -205,7 +205,8 @@ async function controlerEcran(o, nom, opts = {}) {
   check(`${nom} : chaque texte du registre est celui dessiné`, e.items.every(i => e.trace.includes(i.texte)), { items: e.items.map(i => i.texte), trace: e.trace });
   // 2. Limites, en caractères et dans le tracé.
   const trop = e.items.filter(i => i.texte.length > LIMITES[i.role][etroit ? 1 : 0]);
-  check(`${nom} : limites de caractères (phrase ${etroit ? 48 : 90}, repère ${etroit ? 18 : 26}, scénario 32, forme 24, ligne ${etroit ? 40 : 48})`, !trop.length, trop);
+  const lim = k => LIMITES[k][etroit ? 1 : 0];
+  check(`${nom} : limites de caractères (phrase ${lim('phrase')}, repère ${lim('niveau')}, scénario ${lim('scenario')}, forme ${lim('forme')}, ligne ${lim('boite')})`, !trop.length, trop);
   const dehors = e.items.filter(i => !i.rect || i.rect.x < 16 - 0.5 || i.rect.x + i.rect.w > e.xAxe + 0.5 || i.rect.y < 0 || i.rect.y + i.rect.h > e.mainH - 20 + 0.5);
   check(`${nom} : chaque texte tient dans le tracé, en pixels`, !dehors.length, dehors);
   // 3. Mots (et aucun pourcentage sur le tracé : choix 1B, rien qui se lise comme une probabilité).
@@ -252,7 +253,7 @@ async function controlerEcran(o, nom, opts = {}) {
   check(`${nom} : le prix de l'en-tête au format français (« ${dom.prix} »)`, /^\d{1,3}(?:[\s ]\d{3})*(?:,\d+)?[\s ]\$$/.test(dom.prix), dom.prix);
   check(`${nom} : la variation 24 h visible, sa durée dite (« ${dom.var24} »)`, dom.var24 && / en 24 h$/.test(dom.var24), dom.var24);
   // 6. Absents en Débutant.
-  const exp = e.trace.filter(t => /^\d+\/\d+ · /.test(t) || /^[+-]\d+\.\d+%$/.test(t) || /^fichier .* UTC/.test(t) || /^\d$/.test(t) || /^(Point|fin|Écrit à)/.test(t) || /EMA|RSI|Bollinger/.test(t));
+  const exp = e.trace.filter(t => /^\d[\d ]*\/\d[\d ]* · /.test(t) || /^[+−]?\d+,\d+ %$/.test(t) || /^fichier .* · prix publié /.test(t) || /^\d$/.test(t) || /^(Point|fin|Écrit à)/.test(t) || /EMA|RSI|Bollinger/.test(t));
   check(`${nom} : ni compteur, ni pastille de la vue, ni repère de publication, ni repères ①②, ni traits du point et de la fin`, !exp.length, exp);
   check(`${nom} : ni badge du régime, ni « Et ensuite ? » (guideEtat.chemins vide)`, !e.cibles.some(c => /^Tendance/.test(c.titre || '')) && !e.chemins, { chemins: e.chemins, cibles: e.cibles.map(c => c.titre) });
   // Le scénario MONTRÉ (rang 1 tant qu'il est ouvert ou réalisé ; sinon le suivant encore ouvert —
@@ -505,8 +506,8 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       await o.ctx.close();
     }
 
-    // ── 4 h, une forme confirmée : elle entre, la ligne des scénarios cède (budget) ──
-    titre('4 h · double sommet confirmé (forme forcée)');
+    // ── 4 h, une forme validée : elle entre, la ligne des scénarios cède (budget) ──
+    titre('4 h · double sommet validé (forme forcée)');
     {
       const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
       await o.page.click('#int_4h'); await o.page.waitForTimeout(1500);
@@ -532,8 +533,8 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       });
       const roles = r.items.map(i => i.role);
       // (Amendement C1 : le libellé de la figure est posé sur le calque et dit l'état vivant au prix
-      // live ; « Double sommet confirmé » est le libellé de la clôture, le texte posé l'un des possibles.)
-      check('4 h : « Double sommet confirmé » posé, au plus 5 textes', roles.includes('forme') && r.items.length <= 5 && r.base === 'Double sommet confirmé'
+      // live ; « Double sommet validé » est le libellé de la clôture, le texte posé l'un des possibles.)
+      check('4 h : « Double sommet validé » posé, au plus 5 textes', roles.includes('forme') && r.items.length <= 5 && r.base === 'Double sommet validé'
         && r.items.some(i => i.role === 'forme' && r.possibles.includes(i.texte)), { base: r.base, items: r.items });
       if (roles.includes('scenario')) check('4 h : forme + scénario 1 posés → la ligne des scénarios cède ; sa bulle passe dans celle du libellé « Scénario 1 »', r.cede && !roles.includes('boite') && /La ligne des scénarios/.test(r.un), r);
       // (Amendement E4 : la cible s'écrit « cible théorique selon l'usage des analystes : X, non garantie ».)
@@ -547,7 +548,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
     }
 
     // ── Une figure qui se dessine encore : nommée « possible », en tirets, sa bulle dit ce qui la validerait ──
-    titre('15 min · double creux possible (forme forcée, pas encore confirmée)');
+    titre('15 min · double creux possible (forme forcée, pas encore validée)');
     {
       const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
       const r = await o.page.evaluate(() => {
@@ -567,7 +568,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         Guide.formesAffichees = f0; Guide.formesDebutant = fd0; if (GUIDE_FORMES.val) GUIDE_FORMES.val.bilan = b0; drawChart();
         return { base, possibles, items, forme: forme ? { titre: forme.titre, texte: forme.texte.join(' ') } : null };
       });
-      // (Amendement C1 : au prix live, le libellé peut dire « Ligne passée, à confirmer »…)
+      // (Amendement C1 : au prix live, le libellé peut dire « … à valider »…)
       check('« Double creux possible » posé, au plus 5 textes', r.base === 'Double creux possible' && r.items.some(i => i.role === 'forme' && r.possibles.includes(i.texte)) && r.items.length <= 5, { base: r.base, items: r.items });
       check('sa bulle : ce qu’on voit, ce qui la validerait (« serait validée si le prix finit 2 quarts d’heure de suite au-dessus de »), le bilan mesuré, aucun prix visé, aucun mot banni',
         r.forme && /^Double creux possible : le prix a rebondi deux fois vers /.test(r.forme.texte) && /serait validée si le prix finit 2 quarts d’heure de suite au-dessus de /.test(r.forme.texte)
@@ -634,11 +635,11 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
           kpisDom: document.querySelectorAll('#cycle .kpi').length, aria: c.getAttribute('aria-label') };
       });
       check('M → data-mode="expert"', exp.mode === 'expert' && x.mode === 'expert', exp);
-      check('Expert : le badge du régime, « Et ensuite ? » (2 boîtes ou une commune), le compteur', x.cibles.some(c => /^Tendance|^Sans tendance|^Régime/.test(c.titre || '')) && x.chemins && x.chemins.boites.length >= 1 && x.trace.some(t => /^\d+\/\d+ · /.test(t)), { cibles: x.cibles.map(c => c.titre), chemins: x.chemins, trace: x.trace.slice(0, 8) });
+      check('Expert : le badge du régime, « Et ensuite ? » (2 boîtes ou une commune), le compteur', x.cibles.some(c => /^Tendance|^Sans tendance|^Régime/.test(c.titre || '')) && x.chemins && x.chemins.boites.length >= 1 && x.trace.some(t => /^\d[\d ]*\/\d[\d ]* · /.test(t)), { cibles: x.cibles.map(c => c.titre), chemins: x.chemins, trace: x.trace.slice(0, 8) });
       check('Expert : au moins 3 bandes nommées, l\'encadré des scénarios de plusieurs lignes (« Scénarios du matin · »), les libellés des rangs 2 et 3 ou leurs lignes',
         x.cibles.filter(c => c.prio === 1).length >= 2 && x.scen && x.scen.boite && !x.scen.boite.deb && x.scen.boite.lignes.length > 1 && /^Scénarios du matin · /.test(x.scen.boite.lignes[0])
         && (x.scen.libelles.some(l => l.rang === '2') || x.scen.boite.lignes.some(l => /^2\b|2\./.test(l)) || x.scen.boite.lignes.some(l => /\| 2/.test(l)) || x.scen.boite.lignes.length >= 3), x.scen);
-      check('Expert : le repère de publication est dessiné', x.tous.some(t => /fichier .*UTC/.test(t)), x.tous.filter(t => /UTC/.test(t)));
+      check('Expert : le repère de publication est dessiné', x.tous.some(t => /^fichier .* · prix publié /.test(t)), x.tous.filter(t => /fichier/.test(t)));
       check('Expert : les 8 chiffres clés dans la bande (au moins 3 de largeur > 0 à cette taille), le Grid Bot, les puces d\'indicateurs, le bouton ⚡', exp.kpisDom === 8 && exp.kpis >= 3 && exp.strat && exp.puces === 12 && exp.liveBtn, exp);
       check('Expert : le graphique n\'a plus pour nom la phrase du Débutant (aria-label retiré)', exp.aria === null, exp.aria);
       check('Expert : le graphique remis en page (taille du canvas = son conteneur × devicePixelRatio)', exp.taille[0] === exp.attendu[0] && exp.taille[1] === exp.attendu[1], exp);
@@ -761,8 +762,10 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         return { texte: p.innerText, ouvert: !p.hidden, replie: !!d && !d.open, h4: [...p.querySelectorAll('h4')].filter(vis).map(h => h.innerText.trim()).filter(Boolean),
           boutons: [...p.querySelectorAll('.glossaire-item')].filter(vis).map(b => b.innerText) };
       });
+      // Les noms des fiches du Guide sont ceux du menu « + Affichage » (« Repères et phrase de
+      // lecture ») ; la fiche des niveaux, « Les repères de prix » (elle ne parle que des repères).
       check('Légendes, Débutant : « Ce que montre l’écran » d’abord (phrase et repères, scénarios du matin, les cartes) ; les fiches de l’Expert repliées',
-        g.ouvert && g.replie && /^Ce que montre l’écran$/i.test(g.h4[0]) && g.h4.length === 1 && g.boutons.includes('Scénarios du matin') && g.boutons.includes('La phrase et les deux repères') && g.boutons.includes('Ordres en attente'), g);
+        g.ouvert && g.replie && /^Ce que montre l’écran$/i.test(g.h4[0]) && g.h4.length === 1 && g.boutons.includes('Scénarios du matin') && g.boutons.includes('Repères et phrase de lecture') && g.boutons.includes('Les repères de prix') && g.boutons.includes('Ordres en attente'), g);
       check('Légendes, Débutant : aucun mot banni dans ce qui est affiché', !bannis(g.texte).length && !CONSEIL.test(g.texte), bannis(g.texte));
       // Les fiches du Guide ouvertes en Débutant : leur explication est celle de l'écran Débutant.
       const fiches = [];
@@ -793,8 +796,8 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       await o.page.evaluate(() => { const k = document.querySelector('#cycle .kpi-deb'); if (k) k.click(); });
       await o.page.waitForTimeout(500);
       const t = await o.page.evaluate(() => { const box = document.getElementById(innerWidth <= 768 ? 'marketModalBody' : 'feed'); return box ? box.innerText : ''; });
-      check(`SOL · ${vue.width} : « Ces infos parlent du bitcoin (en dollars), pas de SOL/USDT. », titres « Bitcoin : … », « le bitcoin est … de sa fourchette »`,
-        /Ces infos parlent du bitcoin \(en dollars\), pas de SOL\/USDT\./.test(t) && /Bitcoin : fourchette des 24 h/i.test(t) && /le bitcoin est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(t) && !/le prix est (dans le haut|dans le bas|au milieu)/.test(t), t.slice(0, 500));
+      check(`SOL · ${vue.width} : « Ces infos parlent du bitcoin (en dollars), pas de SOL/USDT. », titres « Bitcoin : … », « le prix publié du bitcoin est … de sa fourchette »`,
+        /Ces infos parlent du bitcoin \(en dollars\), pas de SOL\/USDT\./.test(t) && /Bitcoin : fourchette des 24 h/i.test(t) && /le prix publié du bitcoin est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(t) && !/le prix (publié )?est (dans le haut|dans le bas|au milieu)/.test(t), t.slice(0, 500));
       scanTexte(`SOL · ${vue.width}, cartes ouvertes`, await texteVisible(o.page));
       check(`SOL · ${vue.width} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
@@ -928,9 +931,12 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
           const vis = el => el.getClientRects().length > 0 || getComputedStyle(el).display !== 'none';
           const m = [...document.querySelectorAll('#marketModal .modal-titre')].find(el => getComputedStyle(el).display !== 'none');
           const l = document.querySelector('#liveModal .modal-titre'), c = el => { const cs = getComputedStyle(el); return [cs.fontSize, cs.fontWeight]; };
-          return { texte: m && m.textContent, m: m && c(m), l: l && c(l) };
+          return { texte: m && m.textContent, m: m && c(m), l: l && c(l), live: l && l.firstChild && l.firstChild.textContent.trim() };
         });
-        check(`${nom} : titre des cartes « ${t.texte} », même taille et graisse que le titre du panneau live (${t.l})`, t.m && t.l && t.m[0] === t.l[0] && t.m[1] === t.l[1] && (mode === 'expert' ? t.texte === 'Marché live' : t.texte === 'Infos du marché'), t);
+        // Un seul nom dans les deux modes : « Infos du marché » (publiées toutes les 15 min) ;
+        // l'Expert disait « Marché live » pour des infos qui ne sont pas en direct. Le panneau ⚡,
+        // lui, est « En direct (à la seconde) ».
+        check(`${nom} : titre des cartes « ${t.texte} » (le même dans les deux modes), même taille et graisse que le titre du panneau ⚡ « ${t.live} » (${t.l})`, t.m && t.l && t.m[0] === t.l[0] && t.m[1] === t.l[1] && t.texte === 'Infos du marché' && t.live === 'En direct (à la seconde)', t);
         await o.ctx.close();
       }
     }

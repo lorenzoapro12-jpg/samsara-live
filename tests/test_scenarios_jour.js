@@ -13,10 +13,13 @@
 //   6. textes Expert : « Plus petit écart : N (clôture de 15 min …) », « nom gardé » quand l'hystérésis garde un autre nom à la clôture, jamais « écart 0,xx » ni « en tête » (A2) ;
 //   7. raison() (chemin, range, ambigu, mèche) ; pas() avec la clôture (contact en mèche) ;
 //   8. coût : rejeu de 3000 bougies 1 min, classement + bougie en cours.
+// Les heures affichées sont celles de l'appareil (Fmt.heure, Fmt.jour), sans « UTC » écrit : les
+// attendus sont calculés avec Fmt, pour tenir dans n'importe quel fuseau.
 // USAGE   node tests/test_scenarios_jour.js
 const fs = require('fs'), path = require('path');
 const S = require('../js/scenarios.js');
 const Guide = require('../js/guide.js');
+const Fm = require('../js/format.js');
 const FX = path.join(__dirname, 'fixtures');
 let ko = 0;
 const check = (nom, ok, det) => { if (!ok) ko++; console.log(`  ${ok ? '✓' : '✗'} ${nom}${!ok && det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 600) : ''}`); };
@@ -122,10 +125,15 @@ titre('2. decider / classerJour : les règles de la journée');
   check('le scénario de la semaine n’entre jamais dans le classement', J.items.length === 3 && J.ouverts.every(i => i.sc.rang !== 'S') && (!J.meneur || J.meneur.sc.rang !== 'S'), J.ouverts.map(i => i.sc.rang));
   // fini
   J = S.classerJour(items(), 100000, F, T0 + 86400e3, rjOk, PJ);
-  check('après la fin → « fini » ; Expert « Terminé à 04:20 UTC · note du journal à venir » (M12)', J.cas === 'fini' && S.phraseJourExpert(J)[0] === 'Terminé à 04:20 UTC · note du journal à venir', [J.cas, S.phraseJourExpert(J)]);
+  const hTermine = Fm.heure(T0 + 86400e3 - 600e3);
+  check(`après la fin → « fini » ; Expert « Terminé à ${hTermine} · note du journal à venir » (M12), heure de l’appareil sans « UTC »`, J.cas === 'fini' && S.phraseJourExpert(J)[0] === 'Terminé à ' + hTermine + ' · note du journal à venir', [J.cas, S.phraseJourExpert(J)]);
   // grille
   J = S.classerJour(items(), 100800, F, T0 + 5 * 3600e3, { grille: false }, PJ);
   check('bougies d’une heure (pas de grille de 15 min) : aucun nom ; Expert « à voir en 15 min » (M6)', J.cas === 'grille' && !J.meneur && /à voir en 15 min/.test(S.phraseJourExpert(J)[0]), J.cas);
+  // Débutant, même cas : aucun mot banni (la phrase disait « bougies », incohérence 90) ; la durée
+  // du quart vient de P.quartMs, pas d'un « 15 » écrit dans le code.
+  const dg = S.phraseMeneurDebutant(J), dg30 = S.phraseMeneurDebutant(S.classerJour(items(), 100800, F, T0 + 5 * 3600e3, { grille: false }, Object.assign({}, PJ, { quartMs: 1800000 })));
+  check(`Débutant, cas « grille » : « ${dg} » — aucun mot banni, « à voir en 15 min » ; avec un quart de 30 min, « à voir en 30 min »`, !bannis(dg).length && !/bougie/i.test(dg) && /à voir en 15 min\.$/.test(dg) && /à voir en 30 min\.$/.test(dg30), [dg, bannis(dg), dg30]);
   // la bougie en cours ferme le nommé : le suivant tout de suite
   J = S.classerJour([it(a, Object.assign(sv('sortie'), { t: T0 + 5 * 3600e3, sortie: { haut: true } })), it(b, sv('rien')), it(c, sv('rien'))], 102100, F, T0 + 5 * 3600e3 + 60e3, rjOk, PJ);
   check('A1 : la bougie en cours ferme le scénario nommé → le suivant est nommé tout de suite (sans hystérésis)', J.remplace && J.meneur && J.meneur.sc === b || J.cas === 'aucunNeColle', [J.cas, J.meneur && J.meneur.sc.rang]);
@@ -212,6 +220,8 @@ check('17:30 : le 1 sorti (bougie 17:15–17:30) → plus aucun ouvert', a1730 &
   const l48 = S.ligneJourDebutant(F06, J, items, now, 48, {}), l40 = S.ligneJourDebutant(F06, J, items, now, 40, {});
   check(`06/10, 02:20 UTC le 07/10 : « aucun » ; ligne G « ${l48} » / « ${l40} »`, J.cas === 'aucun' && l48 === 'Aucun scénario ne tient plus (en direct) ▸' && l40 === 'Scénarios : aucun ne tient (en direct) ▸', [J.cas, l48, l40]);
   check('06/10 : Expert « Aucun scénario du matin ne décrit ce mouvement »', /^Aucun scénario du matin ne décrit ce mouvement/.test(S.phraseJourExpert(J)[0]), S.phraseJourExpert(J));
+  const da = S.phraseMeneurDebutant(J);
+  check(`06/10, Débutant : « ${da} » — aucun mot banni, « prochain point du matin » sans heure écrite en dur`, /^Aucun scénario du matin ne décrit ce mouvement/.test(da) && !bannis(da).length && /prochain point du matin\.$/.test(da) && !/07h00|UTC|Paris/.test(da), [da, bannis(da)]);
 }
 
 // ── 4. Fondu, reste ──
@@ -292,7 +302,8 @@ titre('6. Textes Expert : une mesure, jamais un indice en liste ni « en tête �
   const sufG = J.items.map(i => S.suffixeExpert(i, Jg));
   check(`suffixes en dollars, ◂ sur le plus petit écart de la clôture : « ${suf.join(' » « ')} » ; nom gardé : « ${sufG.join(' » « ')} »`, /^ · bord toléré à [\d ]+ \$$/.test(suf[0]) && /^ · zone à [\d ]+ \$ · inv\. à [\d ]+ \$ ◂$/.test(suf[1])
     && /^ · bord toléré à [\d ]+ \$ ◂$/.test(sufG[0]) && !/◂/.test(sufG[1]), [suf, sufG]);
-  check(`temps restant : « ${re[0]} »`, /^Reste 14 h 15 \(fin 09\/10 04:20 UTC\) · aucune nouvelle prévision avant le prochain point$/.test(re[0]), re);
+  const finJ = Date.parse('2026-10-09T04:20Z'), finTxt = Fm.jour(finJ) + ' ' + Fm.heure(finJ);
+  check(`temps restant : « ${re[0]} » (fin à l’heure de l’appareil : ${finTxt})`, re[0] === 'Reste 14 h 15 (fin ' + finTxt + ') · aucune nouvelle prévision avant le prochain point' && re[1] === 'Reste 14 h 15 (fin ' + finTxt + ')' && re[2] === 'Reste 14 h 15', re);
   const bulle = S.ligneJourExpert(J.items[1], J, { itv: '15 min', maintenant: now });
   check('bulle Expert : l’indice SEULEMENT avec sa formule et son nom complet', /écart relatif 0,\d\d = [\d ]+ \/ \([\d ]+ \+ [\d ]+\) \(0 = sur la zone, 1 = sur l’invalidation\)/.test(bulle) && /une mesure, pas une probabilité/.test(bulle), bulle);
   const regle = S.regleJourExpert(PJ).join(' ');

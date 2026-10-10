@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Saṃsāra — Marché live</title>
+<title>Saṃsāra — Terminal BTC</title>
 <script src="js/binance-repli.js"></script>
 <script>
 /* Les lectures du premier écran partent ICI, avant les feuilles et les scripts : lancées par
@@ -66,6 +66,7 @@
   catch (e) { document.documentElement.setAttribute('data-mode', 'debutant'); }
 })();
 </script>
+<script defer src="js/format.js"></script>
 <script defer src="js/cadences.js"></script>
 <script defer src="js/structures.js"></script>
 <script defer src="js/fiches.js"></script>
@@ -102,34 +103,36 @@
   <!-- Chiffres clés de la dernière PUBLICATION (market-data.json, 15 min) — avec leur âge. -->
   <div class="kpis" id="cycle" onclick="toggleFeed()" title="Dernière publication — cliquer pour le détail"></div>
   <div class="header-right">
-    <span id="updated"></span>
-    <button class="theme-btn ico-btn expert-seul" onclick="toggleFeed()" id="feedBtn" title="Marché live (F)" aria-label="Marché live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
-    <button class="theme-btn ico-btn expert-seul" onclick="openLiveModal()" id="liveBtn" title="Lecture LIVE — Binance, à la seconde" aria-label="Lecture live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></button>
+    <span id="updated" title="Heure de la dernière publication des infos du marché"></span>
+    <button class="theme-btn ico-btn expert-seul" onclick="toggleFeed()" id="feedBtn" title="Infos du marché (F)" aria-label="Infos du marché"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
+    <button class="theme-btn ico-btn expert-seul" onclick="openLiveModal()" id="liveBtn" title="En direct (à la seconde) — Binance" aria-label="En direct (à la seconde)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></button>
     <button class="theme-btn ico-btn" onclick="resetView()" id="resetBtn" title="Réinitialiser le zoom (R)" aria-label="Réinitialiser le zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg></button>
     <a class="theme-btn ico-btn" href="bookmap.html" id="carteBtn" title="Carte du carnet (bookmap) — page à côté" aria-label="Carte du carnet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M8 4v16M14 4v16"/></svg></a>
     <button class="theme-btn mode-btn" onclick="basculerMode()" id="modeBtn" title="Niveau de détail : débutant ou expert (M) — les valeurs ne changent pas" aria-pressed="false">Débutant</button>
     <button class="theme-btn ico-btn expert-seul" onclick="ouvrirReglages(this)" id="reglagesBtn" title="Réglages d'affichage : bandes, tranches, profondeur, seuils" aria-label="Réglages d'affichage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
     <button class="theme-btn ico-btn" onclick="ouvrirGlossaire(this)" id="legendesBtn" title="Légendes : comment lire chaque indicateur (?)" aria-label="Légendes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></button>
-    <span class="refresh-dot" id="dot" title="Flux temps réel actif"></span>
+    <!-- Le voyant mesure l'âge des infos du marché (pas le prix, lu à la seconde) : gris et calme
+         tant qu'aucune publication n'a été lue (il était vert, « Flux temps réel actif »). -->
+    <span class="refresh-dot calme" id="dot" style="background:var(--ink-3)" title="Infos du marché : en attente de la première lecture"></span>
     <button class="theme-btn ico-btn" onclick="ouvrirThemes(event)" id="themeBtn" title="Thème (T : suivant · D : clair / sombre)" aria-label="Choisir le thème" aria-haspopup="menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.7-.8 1.7-1.7 0-.9-.7-1.3-.7-2.2 0-.9.8-1.6 1.7-1.6H17a4 4 0 0 0 4-4C21 6.8 17 3 12 3z"/><circle cx="7.5" cy="11.5" r="1.1"/><circle cx="10" cy="7.3" r="1.1"/><circle cx="14.6" cy="7.3" r="1.1"/></svg></button>
   </div>
 </div>
 
 <div class="indicator-bar" id="indicatorBar">
-  <span class="section-title expert-seul">Overlays</span>
-  <label id="lbl_ema20" class="expert-seul" onclick="toggleInd('ema20',this)"><span class="ind-label ov">EMA20</span></label>
-  <label id="lbl_ema50" class="expert-seul" onclick="toggleInd('ema50',this)"><span class="ind-label ov">EMA50</span></label>
-  <label id="lbl_ema100" class="expert-seul" onclick="toggleInd('ema100',this)"><span class="ind-label ov">EMA100</span></label>
-  <label id="lbl_ema200" class="expert-seul" onclick="toggleInd('ema200',this)"><span class="ind-label ov">EMA200</span></label>
-  <label id="lbl_sma20" class="expert-seul" onclick="toggleInd('sma20',this)"><span class="ind-label ov">SMA20</span></label>
-  <label id="lbl_sma50" class="expert-seul" onclick="toggleInd('sma50',this)"><span class="ind-label ov">SMA50</span></label>
+  <span class="section-title expert-seul">Sur les bougies</span>
+  <label id="lbl_ema20" class="expert-seul" onclick="toggleInd('ema20',this)"><span class="ind-label ov">EMA 20</span></label>
+  <label id="lbl_ema50" class="expert-seul" onclick="toggleInd('ema50',this)"><span class="ind-label ov">EMA 50</span></label>
+  <label id="lbl_ema100" class="expert-seul" onclick="toggleInd('ema100',this)"><span class="ind-label ov">EMA 100</span></label>
+  <label id="lbl_ema200" class="expert-seul" onclick="toggleInd('ema200',this)"><span class="ind-label ov">EMA 200</span></label>
+  <label id="lbl_sma20" class="expert-seul" onclick="toggleInd('sma20',this)"><span class="ind-label ov">SMA 20</span></label>
+  <label id="lbl_sma50" class="expert-seul" onclick="toggleInd('sma50',this)"><span class="ind-label ov">SMA 50</span></label>
   <label id="lbl_bb" class="expert-seul" onclick="toggleInd('bb',this)"><span class="ind-label ov">Bollinger</span></label>
   <span class="sep expert-seul"></span>
-  <span class="section-title expert-seul">Sous-graphes</span>
+  <span class="section-title expert-seul">Sous le graphique</span>
   <label id="lbl_vol" class="active expert-seul" onclick="toggleSub('vol',this)"><span class="ind-label sg">Volume</span></label>
   <label id="lbl_rsi" class="expert-seul" onclick="toggleSub('rsi',this)"><span class="ind-label sg">RSI</span></label>
   <label id="lbl_macd" class="expert-seul" onclick="toggleSub('macd',this)"><span class="ind-label sg">MACD</span></label>
-  <label id="lbl_stoch" class="expert-seul" onclick="toggleSub('stoch',this)"><span class="ind-label sg">Stoch</span></label>
+  <label id="lbl_stoch" class="expert-seul" onclick="toggleSub('stoch',this)"><span class="ind-label sg">Stochastique</span></label>
   <label id="lbl_atr" class="expert-seul" onclick="toggleSub('atr',this)"><span class="ind-label sg">ATR</span></label>
   <span class="sep expert-seul"></span>
   <span class="section-title">Intervalle</span>
@@ -138,7 +141,7 @@
   <label id="int_15m" class="active" onclick="changeInterval('15m',this)"><span class="ind-label"><span class="expert-seul">15m</span><span class="debutant-seul">15 min</span></span></label>
   <label id="int_1h" onclick="changeInterval('1h',this)"><span class="ind-label"><span class="expert-seul">1h</span><span class="debutant-seul">1 h</span></span></label>
   <label id="int_4h" onclick="changeInterval('4h',this)"><span class="ind-label"><span class="expert-seul">4h</span><span class="debutant-seul">4 h</span></span></label>
-  <label id="int_1d" onclick="changeInterval('1d',this)"><span class="ind-label"><span class="expert-seul">1D</span><span class="debutant-seul">1 j</span></span></label>
+  <label id="int_1d" onclick="changeInterval('1d',this)"><span class="ind-label">1 j</span></label>
   <span class="sep"></span>
   <div class="ind-dropdown">
     <button class="ind-dropdown-btn" id="indDropdownBtn" onclick="toggleDropdown(event)" title="Choisir ce qui s’affiche ; chaque ligne explique ce que c’est et comment s’en servir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="expert-seul">Indicateurs</span><span class="debutant-seul">Affichage</span><span class="ind-compte expert-seul" id="indCompte" title="Indicateurs affichés" hidden></span></button>
@@ -161,7 +164,7 @@
 <div class="chart-container"><div class="gloss-bubble"></div><div class="lg-ring"></div><div class="lg-ring-cotes"></div><canvas id="chart"></canvas><canvas id="chartCalque" class="calque" aria-hidden="true"></canvas><div id="astuceTap" class="astuce-tap debutant-seul" role="status" hidden></div></div>
 
 <div class="feed-panel collapsed" id="feedPanel">
-  <div class="feed-panel-handle" onclick="toggleFeed()" id="feedHandle"><span class="expert-seul">Marché live</span><span class="debutant-seul">Infos du marché</span></div>
+  <div class="feed-panel-handle" onclick="toggleFeed()" id="feedHandle">Infos du marché</div>
   <div class="feed-panel-body">
     <div class="feed" id="feed">
       <div class="loading">📊 En attente des données…</div>
@@ -204,10 +207,10 @@
       <div class="strat-col-actions">
         <button class="strat-btn" onclick="onBacktestClick()">▶ Backtest</button>
         <button class="strat-btn secondary" onclick="onFullBacktestClick()">▶ Complet</button>
-        <button class="strat-btn forward" id="stratFwdBtn" onclick="onForwardClick()">🔴 Forward</button>
-        <button class="strat-btn secondary" id="stratDumbCmp" onclick="onCompareDumbGrid()">📊 vs Grille Fixe</button>
-        <button class="strat-btn secondary" onclick="showWalkForward()">🔬 Walk-Forward</button>
-        <div class="strat-toggle" onclick="toggleAdvanced()" id="advToggle">⚙ Avancé ▸</div>
+        <button class="strat-btn forward" id="stratFwdBtn" onclick="onForwardClick()" title="Joue la grille sur chaque nouvelle bougie close (forward test)">🔴 Suivre en direct</button>
+        <button class="strat-btn secondary" id="stratDumbCmp" onclick="onCompareDumbGrid()">📊 Comparer au témoin</button>
+        <button class="strat-btn secondary" onclick="showWalkForward()" title="Walk-forward : la même grille sur des tranches successives de l'historique">🔬 Robustesse</button>
+        <div class="strat-toggle" onclick="toggleAdvanced()" id="advToggle">⚙ Mode avancé ▸</div>
       </div>
       <!-- Colonne droite : stats -->
       <div class="strat-col-stats">
@@ -217,10 +220,10 @@
   </div>
 </div>
 
-<!-- Mobile : modal Marché live -->
+<!-- Mobile : modal « Infos du marché » (publiées toutes les 15 min) -->
 <div id="marketModal" class="modal" style="display:none;z-index:1000">
   <div class="modal-tete">
-    <span class="modal-titre expert-seul">Marché live</span><span class="modal-titre debutant-seul">Infos du marché</span>
+    <span class="modal-titre">Infos du marché</span>
     <button onclick="closeMarketModal()" class="modal-fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
   <div id="marketModalBody" class="modal-corps">
@@ -228,11 +231,11 @@
   </div>
 </div>
 
-<!-- Mobile : modal LECTURE LIVE (bouton ⚡) — n'affiche que ce qui peut être interrogé en direct
+<!-- Mobile : modal EN DIRECT (À LA SECONDE) (bouton ⚡) — n'affiche que ce qui peut être interrogé en direct
      par cette page (Binance). Les autres sources sont agrégées côté serveur, avec leur retard. -->
 <div id="liveModal" class="modal" style="display:none;z-index:1001">
   <div class="modal-tete">
-    <span class="modal-titre">Lecture live <span id="liveClock"></span></span>
+    <span class="modal-titre">En direct (à la seconde) <span id="liveClock"></span></span>
     <button onclick="closeLiveModal()" class="modal-fermer" aria-label="Fermer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
   <div id="liveModalBody" class="modal-corps">
@@ -252,7 +255,7 @@
     <span id="taskbarPair">BTC/USDT</span>
   </div>
   <div class="taskbar-right">
-    <span class="taskbar-dot" id="taskbarDot" style="background:var(--up)"></span>
+    <span class="taskbar-dot" id="taskbarDot" style="background:var(--ink-3)" title="Infos du marché : en attente de la première lecture"></span>
     <span id="taskbarClock">--:--:--</span>
   </div>
 </div>

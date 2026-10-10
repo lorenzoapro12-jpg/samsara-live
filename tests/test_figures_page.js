@@ -2,21 +2,21 @@
 // la fixture 15 min tronquées à un instant, la dernière étant la bougie EN COURS (plan figures §9.2).
 //
 // Les instants sont trouvés par le rejeu pur (js/guide.js), pas écrits en dur : la 1re figure de la
-// fixture montrée en Débutant comme ébauche, puis formée, puis « à confirmer », puis confirmée ; la
+// fixture montrée en Débutant comme ébauche, puis formée, puis « à valider », puis validée ; la
 // 1re figure montrée puis invalidée.
 //   1. ÉBAUCHE : Débutant « … possible » (registre debItem 'forme'), au plus 5 textes, tirets fins et
 //      point creux ; Expert : le libellé dit « ébauche » et les comptes mesurés.
 //   2. BOUGIE EN COURS : le prix live passe la ligne qui valide, puis revient en ne laissant qu'une
-//      mèche : le calque dit « <Nom> à confirmer » et le GARDE quand le prix revient (le libellé lit
+//      mèche : le calque dit « <Nom> à valider » et le GARDE quand le prix revient (le libellé lit
 //      le plus haut / le plus bas de la bougie : il ne clignote pas, il garde le nom de la figure) ;
 //      la bulle dit « Cela ne compte pas » / « percé en mèche » ; le graphique n'est pas redessiné ;
 //      le libellé de la clôture ne change pas.
-//   3. CLÔTURES SUCCESSIVES : « … à confirmer » (1/2), puis « … confirmé » (2/2) ; Expert : l'objectif
+//   3. CLÔTURES SUCCESSIVES : « … à valider » (1/2), puis « … validé » (2/2) ; Expert : l'objectif
 //      théorique est dessiné, ou une flèche au bord s'il est hors de l'échelle.
 //   4. INVALIDATION, clôture après clôture DANS UNE MÊME PAGE (le Débutant ne barre que la figure
 //      qu'il a dessinée : une page ouverte après coup ne la barre pas) : « ✗ … invalidé » pendant
-//      garderInvalide bougies, de plus en plus pâle, puis plus rien ; bulle Expert « invalidé à
-//      HH:MM UTC » et journal ; bulle Débutant « (heure de Paris) » ; une page ouverte APRÈS
+//      garderInvalide bougies, de plus en plus pâle, puis plus rien ; bulles Expert et Débutant
+//      « invalidé à HH:MM » à l'heure de l'appareil (Fmt.heure), sans fuseau écrit, et journal ; une page ouverte APRÈS
 //      l'invalidation ne montre pas de ✗ pour une figure qu'elle n'a jamais dessinée.
 //   5. BULLES (survol à 1440, toucher à 390) : validation, invalidation, cible et « Mesuré sur »
 //      ensemble ; aucun mot banni ; bulle entière dans le tracé ; la ligne qui valide n'est couverte
@@ -31,6 +31,7 @@
 const fs = require('fs'), path = require('path'), http = require('http'), vm = require('vm');
 const REPO = path.resolve(__dirname, '..');
 const G = require(path.join(REPO, 'js/guide.js'));
+const Fm = require(path.join(REPO, 'js/format.js'));
 const { chargerPage } = require('./bac');
 
 let playwright = null;
@@ -65,7 +66,7 @@ const VUE = 50;
 // La figure que le Débutant montre quand la bougie en cours est iC (closes 0..iC−1), vue des 50 dernières.
 const premiere = iC => G.formesAffichees(Object.assign({}, R, { n: iC }), P, iC + 1 - VUE, iC + 1, 'debutant')[0] || null;
 const etatA = (f, j) => (f.ebauche ? 'ebauche' : f.fin && f.jFin <= j ? f.fin : G.phaseA(f, j));
-// Séquence 1 : une ébauche montrée, devenue une figure montrée, « à confirmer », puis confirmée.
+// Séquence 1 : une ébauche montrée, devenue une figure montrée, « à valider », puis validée.
 let seq = null;
 for (const e of R.ebauches.liste.filter(x => x.fin === 'devenue' && x.devenue && x.devenue.jConf !== null && G.famille(x) === 'extremes')) {
   const f = e.devenue, jD = (f.journal.find(x => x.quoi === 'demi') || {}).j;
@@ -173,7 +174,7 @@ async function bulle(o, tactile) {
   const nav = await playwright.chromium.launch();
   try {
     titre('Instants trouvés par le rejeu pur');
-    check('séquence 1 trouvée : ébauche → figure → à confirmer → confirmée, montrée chaque fois en Débutant', !!seq, null);
+    check('séquence 1 trouvée : ébauche → figure → à valider → validée, montrée chaque fois en Débutant', !!seq, null);
     check(`Expert : une ébauche montrée trouvée${ebX ? ' (' + ebX.e.type + ', bougie ' + (ebX.iC - 1) + ')' : ''}`, !!ebX, null);
     check(`séquence 2 trouvée : figure montrée puis invalidée${inv ? ' (' + inv.f.type + ', bougie ' + inv.f.jFin + ')' : ''}`, !!inv, null);
     if (!seq || !inv) throw new Error('instants introuvables');
@@ -193,7 +194,7 @@ async function bulle(o, tactile) {
       const x = await ouvrir(nav, { iC: ebX ? ebX.iC : seq.iE, mode: 'expert', w: 1440, h: 900 });
       const ex = await lireEtat(x.page);
       const fe = ex.figures.find(f => f.ebauche);
-      check('Expert : le libellé dit « ébauche » et les comptes mesurés (« mesuré … conf. », ou « mesuré … rep. » pour une figure à deux droites), ≤ 80 caractères', fe && fe.lignes && /ébauche/.test(fe.lignes.join(' ')) && /mesuré \d+(\/\d+ conf\.| rep\.)/.test(fe.lignes.join(' ')) && fe.lignes.join(' ').length <= 80, ex.figures);
+      check('Expert : le libellé dit « ébauche » et les comptes mesurés (« mesuré … valid. », ou « mesuré … rep. » pour une figure à deux droites), ≤ 80 caractères', fe && fe.lignes && /ébauche/.test(fe.lignes.join(' ')) && /mesuré \d+(\/\d+ valid\.| rep\.)/.test(fe.lignes.join(' ')) && fe.lignes.join(' ').length <= 80, ex.figures);
       await x.ctx.close();
     }
 
@@ -222,10 +223,12 @@ async function bulle(o, tactile) {
       // « Passé et revenu, à suivre » perdait le nom de la figure et clignotait quand le prix
       // oscillait autour de la ligne ; le libellé garde désormais le nom et ne revient pas en arrière
       // avant la clôture.
-      check(`le prix live au-delà de la ligne qui valide : le calque dit « ${nom} à confirmer » ; la bulle « Si … finit … (à HHhMM) »`, r && r.a.t === nom + ' à confirmer' && r.a.item === r.a.t && /^En ce moment le prix est .* finit .*\(à \d\dh\d\d\)/.test(r.a.vivant), r);
+      // L'heure dite : la fin de la bougie en cours, à l'heure de l'appareil (Fmt.heure ; Node et Chromium lisent le même fuseau).
+      const hFinF = Fm.heure((K[seq.iF][0] + 900) * 1000);
+      check(`le prix live au-delà de la ligne qui valide : le calque dit « ${nom} à valider » ; la bulle « Si … finit … (à ${hFinF}) »`, r && r.a.t === nom + ' à valider' && r.a.item === r.a.t && r.a.vivant.indexOf('En ce moment le prix est ') === 0 && / finit /.test(r.a.vivant) && r.a.vivant.includes('(à ' + hFinF + ')') && !/UTC|Paris/.test(r.a.vivant), r);
       // (Changé exprès, revue des figures 2 : « … à confirmer » restait affiché alors que le prix était
       // revenu dedans — une mèche seule ne valide rien ; le libellé garde le nom et dit « revenu ».)
-      check('il revient, une mèche reste : le libellé garde le nom et dit « revenu » (plus « à confirmer ») ; « Cela ne compte pas » (Débutant), « percé en mèche » (Expert)', r && (r.b.t === nom + ' : revenu dedans' || r.b.t === nom + ' : revenu') && r.b.t !== r.a.t && /Cela ne compte pas/.test(r.b.vivant) && /percé en mèche/.test(r.b.expert), r && r.b);
+      check('il revient, une mèche reste : le libellé garde le nom et dit « revenu » (plus « à valider ») ; « Cela ne compte pas » (Débutant), « percé en mèche » (Expert)', r && (r.b.t === nom + ' : revenu dedans' || r.b.t === nom + ' : revenu') && r.b.t !== r.a.t && /Cela ne compte pas/.test(r.b.vivant) && /percé en mèche/.test(r.b.expert), r && r.b);
       check('… sans redessiner le graphique (calque seul), et le libellé de la clôture ne change pas', r && r.dc === 0 && r.base === r.apres, r && { dc: r.dc, base: r.base, apres: r.apres });
       check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();
@@ -236,11 +239,11 @@ async function bulle(o, tactile) {
     {
       const o = await ouvrir(nav, { iC: seq.iD, mode: 'debutant', w: 1440, h: 900 });
       const e = await lireEtat(o.page);
-      check(`1 clôture au-delà : « ${G.libelleFormeDebutant(Object.assign({}, seq.f, { phase: 'formation', fin: null, demi: true }))} »`, e.debForme && e.debForme.cle === 'demi' && /à confirmer$/.test(e.debForme.t), e.debForme);
+      check(`1 clôture au-delà : « ${G.libelleFormeDebutant(Object.assign({}, seq.f, { phase: 'formation', fin: null, demi: true }))} »`, e.debForme && e.debForme.cle === 'demi' && /à valider$/.test(e.debForme.t), e.debForme);
       await o.ctx.close();
       const o2 = await ouvrir(nav, { iC: seq.iC, mode: 'debutant', w: 1440, h: 900 });
       const e2 = await lireEtat(o2.page);
-      check(`2 clôtures au-delà : « ${nom} confirmé » (traits pleins)`, e2.debForme && e2.debForme.cle === 'confirme' && e2.debForme.t === nom + ' confirmé' && !e2.debForme.dash.length, e2.debForme);
+      check(`2 clôtures au-delà : « ${nom} validé » (traits pleins)`, e2.debForme && e2.debForme.cle === 'confirme' && e2.debForme.t === nom + ' validé' && !e2.debForme.dash.length, e2.debForme);
       await o2.ctx.close();
       const x = await ouvrir(nav, { iC: seq.iC, mode: 'expert', w: 1440, h: 900 });
       const ex = await lireEtat(x.page);
@@ -276,7 +279,8 @@ async function bulle(o, tactile) {
         } else vuApres = e.debForme;
         if (k === 0) {
           const b = await bulle(o, false);
-          check('bulle Débutant : « Invalidé à HHhMM (heure de Paris) », jamais « UTC »', b && /Invalidé à \d\dh\d\d \(heure de Paris\)/.test(b.texte) && !/UTC/.test(b.texte), b && b.texte.slice(0, 300));
+          const hInv = Fm.heure(K[inv.iI][0] * 1000);
+          check(`bulle Débutant : « Invalidé à ${hInv} » (heure de l’appareil), jamais « UTC » ni « heure de Paris »`, b && b.texte.includes('Invalidé à ' + hInv + ' :') && !/UTC|Paris/.test(b.texte), b && b.texte.slice(0, 300));
           await o.page.mouse.move(2, 2);
         }
       }
@@ -292,7 +296,8 @@ async function bulle(o, tactile) {
       await neuve.ctx.close();
       const x = await ouvrir(nav, { iC: inv.iI, mode: 'expert', w: 1440, h: 900 });
       const b = await bulle(x, false);
-      check('bulle Expert : « invalidé à HH:MM UTC (HHhMM Paris) » et le journal (« Observé »)', b && /invalidé à \d\d:\d\d UTC \(\d\dh\d\d Paris\)/.test(b.texte) && /Observé/.test(b.texte), b && b.texte.slice(0, 400));
+      const hInvX = Fm.heure(K[inv.iI][0] * 1000);
+      check(`bulle Expert : « invalidé à ${hInvX} » (heure de l’appareil, sans « UTC » ni « Paris ») et le journal (« Observé »)`, b && b.texte.includes('invalidé à ' + hInvX + ' :') && !/UTC|Paris/.test(b.texte) && /Observé/.test(b.texte), b && b.texte.slice(0, 400));
       check('aucune erreur JavaScript', !x.erreurs.length, x.erreurs);
       await x.ctx.close();
     }

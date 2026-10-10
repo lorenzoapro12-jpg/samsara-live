@@ -126,9 +126,9 @@ function reglagesHtml() {
   const enc = typeof histHeatmap !== 'undefined' && histHeatmap && histHeatmap.encodage;
   const btcDe = v => enc ? ' (≈ ' + nf(enc.ref_btc * Math.pow(v / enc.plafond, 2), 3) + ' BTC)' : '';
   return '<div class="fiche-tete"><h3 class="fiche-titre">Réglages d’affichage</h3><button type="button" class="fiche-fermer" onclick="fermerReglages()" aria-label="Fermer">×</button></div>'
-    + '<p class="fiche-simple">Un réglage change le niveau de DÉTAIL, jamais une valeur : un chiffre affiché garde sa valeur, il porte sa bande ou sa tranche.</p>'
+    + '<p class="fiche-simple">Un réglage change le niveau de détail, jamais une valeur : un chiffre affiché garde sa valeur, il porte sa bande ou sa tranche.</p>'
     // ⚡
-    + '<h4>Panneau ⚡ — lu par la page sur Binance</h4>'
+    + '<h4>Panneau ⚡ « En direct (à la seconde) » — lu par la page sur Binance</h4>'
     + '<label class="reglage">Profondeur du carnet ' + choix('r_live_niveaux', LIVE_NIVEAUX, R.live.niveaux, v => nf(v, 0) + ' niveaux') + '</label>'
     + '<div class="reglage">Bandes affichées <div class="puces">' + LIVE_BANDES.map(b => '<label class="puce-case"><input type="checkbox" data-bande-live="' + b + '"'
       + (R.live.bandes.includes(b) ? ' checked' : '') + ' onchange="changerReglage(this)">±' + nf(b) + ' %</label>').join('') + '</div>'
@@ -141,9 +141,12 @@ function reglagesHtml() {
     + '<div class="ligne-reglage">dominant ≥ <input type="number" id="r_live_takerDominant" min="51" max="95" step="1" value="' + R.live.takerDominant + '" onchange="changerReglage(this)">'
     + ' léger ≥ <input type="number" id="r_live_takerLeger" min="50.5" max="95" step="0.5" value="' + R.live.takerLeger + '" onchange="changerReglage(this)"></div></div>'
     // Carnet du fichier
-    + '<h4>Carte « Liquidité » — fichier de ' + CADENCES.attendue_min + ' min</h4>'
+    // La bande choisie change aussi la carte « Ordres en attente » du Débutant (où ces réglages
+    // sont masqués) : on le dit ici, et le sous-titre de cette carte le dit là-bas.
+    + '<h4>Carte « Liquidité » — infos du marché, publiées toutes les ' + CADENCES.attendue_min + ' min</h4>'
     + (pub.length ? '<label class="reglage">Bande du ratio ' + choix('r_carnet_bande', ['auto'].concat(pub), R.carnet.bande === null ? 'auto' : R.carnet.bande,
-        v => v === 'auto' ? 'référence publiée (±' + lq.bande_ref_pct + ' %)' : '±' + nf(v) + ' % (publiée)') + '</label>'
+        v => v === 'auto' ? 'référence publiée (±' + nf(lq.bande_ref_pct) + ' %)' : '±' + nf(v) + ' % (publiée)')
+        + ' <span class="fine">(aussi celle de la carte « Ordres en attente » du mode Débutant)</span></label>'
       : '<p class="fine">Aucune bande publiée par ce fichier.</p>')
     + (prof
       ? '<div class="reglage">Bandes calculées sur le profil publié <span class="fine">(à la tranche de ' + tr + ' $ près, jusqu’à ±' + nf(lq.couverture_pct) + ' %)</span><div class="puces">'
@@ -155,12 +158,12 @@ function reglagesHtml() {
       : '<p class="fine">Tranche des murs non publiée par ce fichier.</p>')
     + '<label class="reglage">Murs affichés par côté ' + choix('r_carnet_murs', [3, 5, 8, 12], R.carnet.murs) + '</label>'
     + '<label class="reglage">Masquer les murs sous ' + choix('r_carnet_murMin', [0, 5, 10, 25, 50, 100], R.carnet.murMin, v => v ? v + ' BTC' : 'aucun seuil') + '</label>'
-    // Heatmap
-    + '<h4>Heatmap du graphique — fusionner, jamais affiner</h4>'
+    // Heatmap (la couche du graphique : un seul nom partout au terminal, « Ordres en attente (carte) »)
+    + '<h4>Ordres en attente (carte) — fusionner, jamais affiner</h4>'
     + '<label class="reglage">Tranches de prix ' + choix('r_heat_fusionP', [1, 2, 5, 10], R.heat.fusionP, k => histHeatmapDp(k)) + '</label>'
     + '<label class="reglage">Colonnes ' + choix('r_heat_fusionT', [1, 5, 15, 60], R.heat.fusionT, k => k === 1 ? '1 min (publiée)' : k + ' min') + '</label>'
     + '<label class="reglage">Masquer sous l’intensité ' + choix('r_heat_seuil', [1, 16, 32, 64, 128], R.heat.seuil, v => v + btcDe(v)) + '</label>'
-    + '<p class="fine">Fusion par MAXIMUM : une case fusionnée montre la plus forte case de son bloc. En dézoom, le graphique fusionne de lui-même au pixel (par MAX) : un mur ne disparaît plus entre deux pixels.</p>'
+    + '<p class="fine">Fusion par le maximum : une case fusionnée montre la plus forte case de son bloc. En dézoom, le graphique fusionne de lui-même au pixel (par le maximum) : un mur ne disparaît plus entre deux pixels.</p>'
     + '<button type="button" class="glossaire-item" onclick="reinitReglages()">Réglages par défaut</button>';
 }
 function histHeatmapDp(k) {

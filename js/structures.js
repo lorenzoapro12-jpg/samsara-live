@@ -155,11 +155,12 @@ STRUCTURES.codex = {
 // ─── FENÊTRES (thèmes Bureau 95 et Bureau 95 contraste) : un bureau d'ordinateur personnel ───
 // La page a déjà une barre des tâches et son horloge : la structure en révèle les fenêtres. Le
 // graphique devient une fenêtre — barre de titre, barre d'outils (le ruban), zone client, barre
-// d'état (les chiffres clés de la publication et leur âge) — et le marché live une seconde ; la
-// barre des tâches reçoit « Démarrer » (le menu des thèmes), un lancement rapide (les boutons
+// d'état (les chiffres clés de la publication et leur âge) — et les infos du marché une seconde ;
+// la barre des tâches reçoit « Démarrer » (le menu des thèmes), un lancement rapide (les boutons
 // d'accès de l'en-tête, qui libèrent la place du prix au téléphone), la tâche active et une zone
-// de notification où l'heure de publication (UTC) côtoie l'horloge du poste : deux heures, deux
-// cadences, chacune nommée.
+// de notification où l'heure de publication côtoie l'horloge du poste : deux heures, deux
+// cadences, chacune nommée. Les deux sont à l'heure de l'APPAREIL (js/format.js) : le fuseau
+// écrit après l'heure de publication est celui de l'appareil (Fmt.fuseau), jamais « UTC » en dur.
 STRUCTURES.fenetres = {
   nom: 'Fenêtres',
   construire() {
@@ -172,8 +173,8 @@ STRUCTURES.fenetres = {
     c.deplacer($('indicatorBar'), cc, $('chart'));
     const etat = c.conteneur('div', 'f95-etat', cc, null, "Barre d'état : dernière publication");
     c.deplacer($('cycle'), etat);
-    // 2. Fenêtre « Marché live »
-    c.decor('div', 'f95-titre', fp, fp.firstChild, 'Marché live');
+    // 2. Fenêtre « Infos du marché » (le nom du bouton qui l'ouvre, dans les deux modes)
+    c.decor('div', 'f95-titre', fp, fp.firstChild, 'Infos du marché');
     // 3. Barre des tâches. La tâche active regroupe les deux étiquettes de la base (nom, paire).
     const etiquettes = [...tl.children];
     c.deplacer($('themeBtn'), tl, tl.firstChild);
@@ -186,10 +187,10 @@ STRUCTURES.fenetres = {
     c.deplacer($('dot'), zone);
     c.decor('span', 'f95-pub', zone, null, 'Pub.');
     c.deplacer($('updated'), zone);
-    c.decor('span', 'f95-pub', zone, null, 'UTC');
+    c.decor('span', 'f95-pub', zone, null, Fmt.fuseau());   // l'heure de #updated est celle de l'appareil
     c.deplacer($('taskbarClock'), zone);
-    // La barre d'état suit la LARGEUR de la fenêtre, qui change quand le marché live s'ouvre ou se
-    // replie : les chiffres clés y sont réajustés (masqués en entier depuis la fin, ajusterKpis),
+    // La barre d'état suit la LARGEUR de la fenêtre, qui change quand les infos du marché s'ouvrent ou se
+    // replient : les chiffres clés y sont réajustés (masqués en entier depuis la fin, ajusterKpis),
     // et le canvas redimensionné sans attendre. Dans l'en-tête de la base, la bande ne dépendait
     // pas du panneau. Une image d'animation au plus par changement ; rien au repos ni pendant un
     // geste (la taille ne change pas).
@@ -230,7 +231,7 @@ STRUCTURES.tableau = {
     const h = c.conteneur('div', 'gare-heure', tab, null, 'Heure de publication');
     c.decor('span', 'gare-titre', h, null, 'Publié à');
     c.deplacer($('updated'), h);
-    c.decor('span', 'gare-utc', h, null, 'UTC');
+    c.decor('span', 'gare-utc', h, null, Fmt.fuseau());     // l'heure de #updated est celle de l'appareil
     const hp = document.querySelector('.hero-prix');
     c.decor('span', 'gare-provenance', hp, hp.firstChild, 'Binance · ' + CADENCES.prix / 1000 + ' s');
     const tl = document.querySelector('.taskbar-left');
@@ -306,7 +307,7 @@ STRUCTURES.tableau = {
 //
 // LA MANCHETTE NE CALCULE RIEN. Elle RECOPIE le texte affiché des chiffres clés de la cote (les
 // <b> de #cycle, repérés par le libellé de leur <i>) : même signe, même format, même instant que
-// la cote — « +0.2% », jamais « +0,2 % ». Elle ne titre que sur des champs SANS équivalent live
+// la cote — la chaîne affichée, jamais reformatée. Elle ne titre que sur des champs SANS équivalent live
 // (financement, intérêt ouvert, CVD, GEX) : la variation 24 h publiée, titrée à côté de l'oreille
 // qui bat à la seconde, la contredisait (constaté sur le prototype). Son seul mot choisi est le
 // verbe d'une VARIATION, tiré du premier caractère du texte affiché : « + » progresse, « − »
@@ -325,7 +326,9 @@ function manchetteGazette(lire, heure) {
   if (oi) titre.push([(titre.length ? '\u00a0; l’' : 'L’') + 'intérêt ouvert ' + verbeGazette(oi) + '\u00a0: ', 0], [oi, 1], [' en\u00a024\u00a0h', 0]);
   const chapeau = [];
   for (const [cle, v] of [['cvd', cvd], ['gex', gex]]) if (v) chapeau.push([(chapeau.length ? ' · ' : '') + GAZETTE_CLES[cle] + '\u00a0', 0], [v, 1]);
-  if (heure && /\d/.test(heure)) chapeau.push([(chapeau.length ? ' · ' : '') + 'édition de ', 0], [heure, 1], ['\u00a0UTC', 0]);
+  // L'heure de l'édition, recopiée de #updated (heure de l'appareil) ; son fuseau est écrit une
+  // fois, dans l'oreille droite (« Édition de 15:03 UTC+2 »).
+  if (heure && /\d/.test(heure)) chapeau.push([(chapeau.length ? ' · ' : '') + 'édition de ', 0], [heure, 1]);
   if (!titre.length) titre.push([lire(GAZETTE_CLES.interet) === null && lire(GAZETTE_CLES.financement) === null ? 'Édition en attente' : 'La cote de l’édition', 0]);
   return { titre, chapeau };
 }
@@ -345,7 +348,7 @@ STRUCTURES.une = {
     const ed = c.conteneur('div', 'gazette-edition', od);
     c.decor('span', 'gazette-tag', ed, null, 'Édition de');
     c.deplacer($('updated'), ed);                  // AVANT de déplacer .header-right, qui le contient
-    c.decor('span', 'gazette-tag', ed, null, 'UTC');
+    c.decor('span', 'gazette-tag', ed, null, Fmt.fuseau());   // l'heure de #updated est celle de l'appareil
     // Seconde ligne, de hauteur fixe (rien ne bouge quand elle change) : la cadence attendue, ou
     // « Édition périmée » (en plus de l'âge, quand la cote est vieille : #cycle.vieux, CSS :has),
     // ou le tampon « Dernière heure » (une édition NOUVELLE).
@@ -460,12 +463,22 @@ STRUCTURES.planche = {
     c.deplacer($('indicatorBar'), pied);
     const cart = c.conteneur('div', 'plan-cartouche', pied, null, 'Cartouche : dernière publication');
     c.decor('span', 'plan-titre plan-nom', cart, null, 'Saṃsāra · planche 1/1');
-    c.decor('span', 'plan-titre plan-unite', cart, null, 'Unité : USD');
+    // L'unité des prix : la devise de cotation de la paire affichée (« USDT », « SOL » sur
+    // BTC/SOL), relue dans #paireNom à chaque changement de paire. Elle était écrite « USD » en dur.
+    const pn = $('paireNom');
+    const unite = c.decor('span', 'plan-titre plan-unite', cart, null, 'Unité : USDT');
+    const lireUnite = () => { const q = pn ? pn.textContent.split('/')[1] : ''; unite.textContent = 'Unité : ' + ((q || '').trim() || 'USDT'); };
+    lireUnite();
+    const obsUnite = pn && typeof MutationObserver !== 'undefined' ? new MutationObserver(lireUnite) : null;
+    if (obsUnite) obsUnite.observe(pn, { childList: true, characterData: true, subtree: true });
     // Provenance : les sources que la publication déclare (market-data.json, champ `source`).
     const src = c.decor('span', 'plan-titre plan-sources', cart, null, 'Sources : —');
     c.deplacer($('cycle'), cart);
     c.decor('span', 'plan-titre plan-date', cart, null, 'Date de rév.');
     c.deplacer($('updated'), cart);
+    // L'heure de #updated est celle de l'APPAREIL (js/format.js) : le fuseau écrit après elle est
+    // le sien (css/app.css le lit dans data-fuseau, à la place du « UTC » des feuilles de thème).
+    c.attribut($('updated'), 'data-fuseau', Fmt.fuseau());
     // 3. La vue du graphique, lettrée dans la marge basse de son cadre (jamais sur le canvas).
     c.decor('span', 'plan-vue', document.querySelector('.chart-container'), null, 'Vue A · cours');
     // 4. Marge : le format de la planche, dans la barre des tâches.
@@ -507,7 +520,7 @@ STRUCTURES.planche = {
       });
     }) : null;
     if (ro) ro.observe(cc);
-    return () => { if (obs) obs.disconnect(); if (ro) ro.disconnect(); cancelAnimationFrame(image); clearTimeout(minuterie); c.defaire(); };
+    return () => { if (obs) obs.disconnect(); if (obsUnite) obsUnite.disconnect(); if (ro) ro.disconnect(); cancelAnimationFrame(image); clearTimeout(minuterie); c.defaire(); };
   },
 };
 

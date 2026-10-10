@@ -163,14 +163,16 @@ const Horloges = (function () {
     };
     src('prix', 'Prix (ticker)', 'Binance spot');
     src('bougies', 'Bougies du graphique', 'Binance spot');
-    src('live', 'Lecture ⚡', 'Binance spot');
+    src('live', 'Panneau ⚡ (en direct)', 'Binance spot');
     // La cadence mesurée (js/chronique.js) est celle de market-data.json : la carte de chaleur,
     // publiée par un autre script à un autre rythme, garde la convention.
-    for (const [cle, libelle, f, cad] of [['marche', 'market-data.json (updated)', ctx && ctx.marche, ctx && ctx.cadenceMesureeMs],
-      ['chaleur', 'heatmap.json (updated)', ctx && ctx.chaleur, null]]) {
+    // Les libellés disent la chose (le champ `updated` de market-data.json / heatmap.json, lus
+    // sur raw.githubusercontent.com), pas le nom du fichier : ce sont les mots de la page.
+    for (const [cle, libelle, f, cad] of [['marche', 'Infos du marché (publication)', ctx && ctx.marche, ctx && ctx.cadenceMesureeMs],
+      ['chaleur', 'Ordres en attente (carte) : publication', ctx && ctx.chaleur, null]]) {
       const s = sources[cle] || {}, tu = f ? instant(f.updated) : null, seuil = seuilFige(cad);
       let c = s.classe ? { classe: s.classe, libelle: s.libelle } : classer({ ageMs: tu === null ? null : t - tu, seuilFigeMs: seuil.ms });
-      out.push({ cle, libelle, source: 'raw.githubusercontent.com', t: tu, classe: c.classe, panne: c.libelle, seuil: seuil.texte, lu: s.ok || null });
+      out.push({ cle, libelle, source: 'publié sur GitHub', t: tu, classe: c.classe, panne: c.libelle, seuil: seuil.texte, lu: s.ok || null });
     }
     return out;
   }

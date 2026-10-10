@@ -436,8 +436,13 @@ titre('5c. Ligne de prix : VWAP exact à la seconde au zoom, clôtures ailleurs,
 
 // ── 6. Bougies 1 min : volume et CVD ─────────────────────────────────────────
 titre('6. Bougies 1 min : delta exact, CVD cumulé');
-const k = (t, q, tb) => [t, '1', '2', '0.5', '1.5', '10', t + 59999, String(q), 5, '5', String(tb), '0'];
+// Volumes en BTC : k[5] (volume) et k[9] (part achetée au taker) ; k[7] / k[10] (en USDT) ne sont pas lus.
+const k = (t, q, tb) => [t, '1', '2', '0.5', '1.5', String(q), t + 59999, '10', 5, String(tb), '5', '0'];
 const ms = BM.minutes([k(0, 1000, 700), k(60000, 1000, 200), k(120000, 500, 250)]);
+{
+  const m = BM.minutes([[0, '1', '2', '0.5', '1.5', '3', 59999, '300000', 5, '1', '100000', '0']])[0];
+  check('volume et CVD en BTC (l\'actif échangé, comme les ronds) : k[5] et k[9], jamais les USDT de k[7] / k[10]', m.vol === 3 && m.achat === 1 && m.vente === 2 && m.delta === -1, m);
+}
 check('delta = 2 × achats taker − volume', ms[0].delta === 400 && ms[1].delta === -600 && ms[2].delta === 0);
 const cvd = BM.cvdDepuis(ms, 1);
 check('CVD remis à zéro au bord gauche (indice 1) : −600, −600', isNaN(cvd[0]) && cvd[1] === -600 && cvd[2] === -600);
@@ -486,6 +491,10 @@ check('contraste appliqué : saturation ≤ seuil → seuil + 1 (c\'est cette va
   check(`bulles : surface ∝ volume de ${BM.btc(b.min)} à ${BM.btc(b.max)} BTC (normale), bornes tirées du rayon`,
     Math.abs(BM.rayonBulle(b.min, 1) - BM.BULLES.rMin) < 1e-9 && Math.abs(BM.rayonBulle(b.max, 1) - BM.BULLES.rMax) < 1e-9
     && BM.rayonBulle(b.min / 2, 1) === BM.BULLES.rMin && BM.rayonBulle(b.max * 3, 1) === BM.BULLES.rMax && b6.min > b.min);
+  check(`ronds : volume écrit (avec « BTC ») à partir de ${BM.btc(b.texte)} BTC — tiré de BM.BULLES.rTexte, bien sous le plafond (${BM.btc(b.max)} BTC)`,
+    Math.abs(BM.rayonBulle(b.texte, 1) - BM.BULLES.rTexte) < 1e-9 && b.texte > b.min && b.texte < b.max / 2, b);
+  const src = fs.readFileSync(path.join(REPO, 'js/bookmap.js'), 'utf8'), fb = (src.match(/function bulles\(\) \{[\s\S]*?\n  \}\n/) || [''])[0];
+  check('ronds : le nombre écrit est suivi de son unité (« BTC »), au seuil BM.BULLES.rTexte', /r >= BM\.BULLES\.rTexte/.test(fb) && /texte\('BTC'/.test(fb) && !/r >= 12\)/.test(fb), fb.slice(-400));
 }
 {
   const D = { calques: { a: true, b: false }, palette: 'classique', fusionT: 1, seuilBas: 2, bulleMin: 0.1 };
@@ -542,6 +551,27 @@ check('Retry-After : secondes ou date HTTP ; absent → null', BM.lireRetryAfter
   check('recul plafonné à 30 min', d === 30 * 60e3);
 }
 check('une lecture vaut jusqu\'à la suivante, au plus 3 cadences + 1 s', BM.validiteLecture(2000) === 7000);
+
+// ── 7b. Formats communs (js/format.js) ──────────────────────────────────────
+titre('7b. Formats : ceux de Fmt (français, moins « − », heure de l\'appareil), fuseau écrit une fois');
+{
+  const Fmt = require('../js/format.js');
+  const ecarts = [];
+  for (const v of [0, 7, 14.25, 1234.5, -1234.5, 86012.5, 86012.495, -0.001, -0.004, 1e9, 0.0005, -42])
+    for (const d of [0, 1, 2, 3]) if (BM.nombre(v, d, d) !== Fmt.nombre(v, d)) ecarts.push([v, d, BM.nombre(v, d, d), Fmt.nombre(v, d)]);
+  check('BM.nombre(v, d, d) = Fmt.nombre(v, d) : espaces simples, « − », jamais « −0 »', !ecarts.length, ecarts.slice(0, 4));
+  check('BTC et prix : espaces simples et moins typographique (« 1 235 », « −2,00 », « 86 012,50 »)', BM.btc(1234.5) === '1 235' && BM.btc(-2) === '−2,00' && BM.prix(86012.5, 2) === '86 012,50' && !/[\u00a0\u202f-]/.test(BM.btc(-1234.5) + BM.prix(-86012.5, 2)), [BM.btc(1234.5), BM.btc(-2), BM.prix(86012.5, 2)]);
+  check('valeur absente : « — », jamais « NaN » ni 0', BM.nombre(NaN, 0, 0) === '—' && BM.prix(null) === '—' && BM.age(NaN) === '—');
+  check('âges et horloge : virgule décimale (« 5,3 s »)', BM.age(5300) === '5,3 s' && /^horloge locale en retard de 2,5 s ± /.test(Object.assign(new BM.Horloge(), { ecart: 2500, u: 120 }).texte()), Object.assign(new BM.Horloge(), { ecart: 2500, u: 120 }).texte());
+  const t = Date.UTC(2026, 9, 8, 14, 5, 7), d = new Date(t), p = n => String(n).padStart(2, '0');
+  check('heures : celles de l\'APPAREIL (Fmt.heure / heureSec), pas UTC', BM.heure(t) === Fmt.heure(t) && BM.heure(t, true) === Fmt.heureSec(t) && BM.heure(t, true) === p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()), [BM.heure(t, true)]);
+  check('« depuis » d\'un autre jour : avec son jour (« 07/10 14:05 »), le même jour : l\'heure seule', BM.jourHeure(t - 86400e3, t) === Fmt.jour(t - 86400e3) + ' ' + Fmt.heure(t - 86400e3) && BM.jourHeure(t, t) === Fmt.heure(t) && BM.jourHeure(t - 86400e3, t, true) === Fmt.jour(t - 86400e3) + ' ' + Fmt.heureSec(t - 86400e3), [BM.jourHeure(t - 86400e3, t), BM.jourHeure(t - 86400e3, t, true)]);
+  check('plus d\'heure UTC ni de fuseau maison dans les calculs de la carte (BM.heureUtc, BM.fuseau retirés)', BM.heureUtc === undefined && BM.fuseau === undefined);
+  const src = fs.readFileSync(path.join(REPO, 'js/bookmap.js'), 'utf8');
+  check('fuseau écrit UNE fois, par Fmt.fuseau, dans l\'angle de l\'axe du temps (plus de « UTC+0 » maison)',
+    (src.match(/Fmt\.fuseau\(/g) || []).length === 1 && /TEXTES\.fuseau = .*Fmt\.fuseau\(/.test(src) && !/function fuseau\(/.test(src) && !/BM\.fuseau|heureUtc/.test(src));
+  check('plus de formateur local d\'affichage (toFixed, en-US) dans les calculs de la carte', !/toFixed\(\d\)\.replace|en-US/.test(fs.readFileSync(path.join(REPO, 'js/bookmap-calc.js'), 'utf8')));
+}
 
 // ── 7d. Mémoire du carnet : seuil exact, comptes, sommes préfixes ─────────────
 titre('7d. Mémoire du carnet : seuil EXACT en BTC, comptes par rangée, fenêtres');
@@ -686,11 +716,26 @@ titre('7e. Rafales : même ms, même côté, identifiants consécutifs ; borne b
   const Rp = new BM.Rafales(0); for (const t of fx) Rp.ajouter(t);
   Rp.purger(fx[150].T);
   check('purge : plus rien avant la limite', Rp.liste.every(r => r.T >= fx[150].T));
+  // Début des rafales : la plus ancienne exécution REÇUE (direct ou remplissage arrière), relevé par la purge.
+  const Rd = new BM.Rafales(0);
+  const debut0 = Rd.debut;
+  for (const t of fx.slice(100)) Rd.ajouter(t);
+  const d1 = Rd.debut;
+  Rd.ajouterAncien(fx.slice(40, 100));
+  const d2 = Rd.debut;
+  Rd.purger(fx[120].T);
+  check('début des rafales = la plus ancienne exécution reçue (null avant), recule avec le remplissage arrière, avance avec la purge',
+    debut0 === null && d1 === fx[100].T && d2 === fx[40].T && Rd.debut === fx[120].T, [debut0, d1, d2, Rd.debut]);
+  const srcB = fs.readFileSync(path.join(REPO, 'js/bookmap.js'), 'utf8');
+  check('garde des rafales : 24 h (BM.RAFALES.gardeMs), la constante que la purge et la légende lisent',
+    BM.RAFALES.gardeMs === 24 * 3600e3 && /E\.raf\.purger\(maintenant\(\) - BM\.RAFALES\.gardeMs\)/.test(srcB) && /RF\.gardeMs/.test(srcB) && !/pendant 24 h/.test(srcB));
+  check('pastille, panneau et dessin des rafales : depuis E.raf.debut, jamais E.exec.premier (qui compte les 24 h publiées)',
+    /Rafales ≥ .+depuis ' \+ BM\.jourHeure\(E\.raf\.debut/.test(srcB) && /const debut = E\.raf\.debut;/.test(srcB) && !/Aucune rafale[^\n]*E\.exec\.premier/.test(srcB));
   check('libellé de la borne : jamais « un ordre de »', !/un ordre de/i.test(BM.TEXTE_RAFALES) && /≥ k est prouvé/.test(BM.TEXTE_RAFALES));
 }
 
-// ── 7f. Destin des murs ──────────────────────────────────────────────────────
-titre('7f. Destin des murs : bornes mesurées entre deux lectures, attente des exécutions complètes');
+// ── 7f. Destin des gros ordres ──────────────────────────────────────────────────────
+titre('7f. Destin des gros ordres : bornes mesurées entre deux lectures, attente des exécutions complètes');
 {
   const M = BM.MURS, F = BM.FINS_MURS;
   const dep = (bids, asks, id) => ({ lastUpdateId: id, bids: bids.map(([p, q]) => [p.toFixed(2), String(q)]), asks: asks.map(([p, q]) => [p.toFixed(2), String(q)]) });
@@ -888,8 +933,9 @@ titre('7g. Mode débutant : la convention du « sens du prix » vient des consta
 titre('8. Isolement : une page à côté, qui ne partage aucun code avec le terminal');
 const html = fs.readFileSync(path.join(REPO, 'bookmap.html'), 'utf8');
 const charges = [...html.matchAll(/\b(?:src|href)="([^"#]+)"/g)].map(m => m[1]).filter(u => !/^https?:/.test(u));
-check('bookmap.html ne charge que ses fichiers (+ le repli Binance commun et le lien retour vers le terminal)',
-  charges.every(u => ['css/bookmap.css', 'js/binance-repli.js', 'js/bookmap-calc.js', 'js/bookmap.js', 'index.html'].includes(u)), charges);
+check('bookmap.html ne charge que ses fichiers (+ le repli Binance commun, les formats communs et le lien retour vers le terminal)',
+  charges.every(u => ['css/bookmap.css', 'js/binance-repli.js', 'js/format.js', 'js/bookmap-calc.js', 'js/bookmap.js', 'index.html'].includes(u)), charges);
+check('les formats communs (js/format.js) sont chargés AVANT les calculs de la carte', charges.indexOf('js/format.js') >= 0 && charges.indexOf('js/format.js') < charges.indexOf('js/bookmap-calc.js'), charges);
 check('aucun script du terminal chargé', !/js\/app\.js/.test(html) && !/themes\//.test(html));
 const index = fs.readFileSync(path.join(REPO, 'index.html'), 'utf8');
 check('le terminal ne charge aucun fichier de la carte', !/bookmap/.test(index.replace(/<a [^>]*href="bookmap\.html"[^>]*>/g, '')));

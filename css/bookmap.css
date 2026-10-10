@@ -66,9 +66,11 @@ body {
 .barre-droite { display: flex; gap: 6px; flex: 0 0 auto; margin-left: auto; }
 @media (max-width: 1599px) { .barre .sous { display: none; } }
 @media (max-width: 1279px) { .calques { order: 3; flex: 1 1 100%; } }
+/* Marge intérieure de 8 px (comme sous 640 px) : les noms justes (« Gros paquets », « ≡ Rafales ») sont
+   plus longs que les anciens, et la rangée garde autant de puces entièrement visibles. */
 .puce, .bouton {
   font: inherit; font-size: 12px; color: var(--ink-2); background: transparent;
-  border: 1px solid var(--bord); border-radius: 999px; padding: 4px 10px; cursor: pointer;
+  border: 1px solid var(--bord); border-radius: 999px; padding: 4px 8px; cursor: pointer;
 }
 .puce, .bouton { white-space: nowrap; }
 .bouton { border-radius: 8px; }

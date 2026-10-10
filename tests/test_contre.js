@@ -63,7 +63,13 @@ const ligne = (r, cle) => r.lignes.find(l => l.cle === cle);
   check(`indicateurs des ${tfs.length} TF du fichier recalculés et ✓ (RSI, EMA, ATR, S/R, écarts)`,
     tfs.every(tf => ['rsi_14', 'ema20', 'ema50', 'atr_14', 'support_30', 'resistance_30', 'ema_ecart_pct', 'atr_14_pct', 'amplitude_30_pct', 'ema20_sous_ema50'].every(n => (ligne(r0, `tf.${tf}.${n}`) || {}).etat === 'ok')));
   const cvd = ligne(r0, 'micro.cvd_24h_usd');
-  check(`CVD ≈ à la seconde (« ${cvd && cvd.borne} »)`, cvd && cvd.etat === 'approx' && /cohérent à la seconde \(écart \d+ USDT, lecture estimée \d\d:\d\d:\d\d UTC\)/.test(cvd.borne));
+  check(`CVD ≈ à la seconde (« ${cvd && cvd.borne} »)`, cvd && cvd.etat === 'approx' && /cohérent à la seconde \(écart \d{1,3}(?:[ \u202f\u00a0]\d{3})* USDT, lecture estimée \d\d:\d\d:\d\d\)/.test(cvd.borne));
+  // L'heure lue est celle de l'appareil (comme toute la page) : « UTC » n'y est plus écrit.
+  {
+    const srcCE = fs.readFileSync(path.join(REPO, 'js/contre-expertise.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    const utc = srcCE.match(/(['"`])[^'"`\n]*UTC[^'"`\n]*\1/g) || [];
+    check('heures de la contre-expertise : celles de l’appareil (Fmt.heureSec / Fmt.jourHeure), aucun « UTC » écrit', !utc.length && /F\.heureSec\(/.test(srcCE) && /F\.jourHeure\(/.test(srcCE) && !/getUTC|toISOString\(\)\.slice/.test(srcCE), utc);
+  }
   const px = ligne(r0, 'btc.price');
   check(`prix ≈ dans la fourchette de ses secondes, fenêtre dite (« ${px && px.borne} »)`, px && px.etat === 'approx' && /convention/.test(px.borne));
   check('chaque ligne porte la nature de son champ (meta.champs)', r0.lignes.every(l => l.nature === ((MD.meta.champs[l.cle.replace(/^tf\.[^.]+\./, 'tf.*.')] || {}).nature)));

@@ -95,7 +95,7 @@ async function ouvrir(nav, h, opts = {}) {
     }
     return r.abort();
   });
-  await page.addInitScript(([m, th, sg]) => { try { localStorage.clear(); localStorage.setItem('samsara-theme', th); localStorage.setItem('samsara-mode', m); localStorage.setItem('samsara-astuce-v1', '1'); if (sg) localStorage.setItem('samsara-guide-v1', '0'); } catch (e) { /* */ } }, [opts.mode || 'debutant', opts.theme || 'aero', !!opts.sansGuide]);
+  await page.addInitScript(([m, th, sg]) => { try { localStorage.clear(); localStorage.setItem('samsara-theme', th); localStorage.setItem('samsara-mode', m); localStorage.setItem('samsara-astuce-tap-v1', '1'); if (sg) localStorage.setItem('samsara-guide-v1', '0'); } catch (e) { /* */ } }, [opts.mode || 'debutant', opts.theme || 'aero', !!opts.sansGuide]);
   await page.goto(`http://127.0.0.1:${(await demarrer()).address().port}/index.html`);
   await page.waitForFunction(() => typeof scenEtat !== 'undefined' && scenEtat && scenEtat.jour && candles.length > 500, null, { timeout: 20000 }).catch(() => {});
   await page.waitForTimeout(500);

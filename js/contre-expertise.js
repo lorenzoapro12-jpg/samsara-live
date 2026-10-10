@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// CONTRE-EXPERTISE — « Vérifié par ton navigateur »
+// CONTRE-EXPERTISE — « Vérifié par votre navigateur »
 // ─────────────────────────────────────────────────────────────────────────────
 // Ce que le serveur a publié, recalculé ICI depuis Binance : les indicateurs de chaque TF, le
 // CVD à la seconde près, le prix dans la fourchette de ses secondes. Le lecteur n'a pas à
@@ -24,9 +24,13 @@
 // de js/app.js) : la page vérifie avec SES propres implémentations, pas une copie.
 // ═══════════════════════════════════════════════════════════════════════════════
 const ContreExpertise = (function () {
+  // Les formats communs (js/format.js) : les heures affichées sont celles de l'APPAREIL, comme
+  // partout (elles étaient en UTC). Dans la page, Fmt est global ; en Node (tests), on le charge.
+  const F = typeof Fmt !== 'undefined' ? Fmt : require('./format.js');
   // Les seules phrases écrites à la main : pourquoi un champ ne PEUT pas être recalculé ici.
+  // (Futures : l'API fapi de Binance est hors du contrat réseau de la page — dit en mots.)
   const RAISONS = {
-    futures: 'API futures (fapi) : hors du contrat réseau de la page',
+    futures: 'Binance Futures : la page ne l’interroge pas',
     deribit: 'Deribit : la page ne l’interroge pas',
     coinbase: 'Coinbase : la page ne l’interroge pas',
     yahoo: 'Yahoo : la page ne l’interroge pas',
@@ -129,14 +133,14 @@ const ContreExpertise = (function () {
     const t = md.tf[tf], nature = n => (champ(md, 'tf.*.' + n) || {}).nature || '';
     const base = { groupe: 'Indicateurs ' + tf, tf };
     if (!t || !(t.bougies_lues > 0) || !t.derniere_cloture_a || !Array.isArray(t.last_5_candles)) {
-      return [ligne(Object.assign({}, base, { cle: 'tf.' + tf, libelle: 'bloc ' + tf, etat: 'ancien', note: 'format antérieur : bougies_lues ou derniere_cloture_a absent' }))];
+      return [ligne(Object.assign({}, base, { cle: 'tf.' + tf, libelle: 'bloc ' + tf, etat: 'ancien', note: 'format antérieur : nombre de bougies lues ou heure de la dernière clôture non publiés' }))];
     }
     if (k && k.erreur) return [ligne(Object.assign({}, base, { cle: 'tf.' + tf, libelle: 'bloc ' + tf, etat: 'injoignable', note: k.erreur }))];
     if (!Array.isArray(k)) return [];
     const finPub = Date.parse(t.derniere_cloture_a);
     if (k.length !== t.bougies_lues || +k[k.length - 1][6] !== finPub) {
-      return [ligne(Object.assign({}, base, { cle: 'tf.' + tf, libelle: 'bougies ' + tf, etat: 'source', publie: t.bougies_lues + ' bougies, clôture ' + t.derniere_cloture_a,
-        recalcule: k.length + ' bougies, clôture ' + (k.length ? new Date(+k[k.length - 1][6]).toISOString() : '—'),
+      return [ligne(Object.assign({}, base, { cle: 'tf.' + tf, libelle: 'bougies ' + tf, etat: 'source', publie: t.bougies_lues + ' bougies, clôture ' + F.jourHeure(Date.parse(t.derniere_cloture_a)),
+        recalcule: k.length + ' bougies, clôture ' + (k.length ? F.jourHeure(+k[k.length - 1][6]) : '—'),
         note: 'source différente : Binance ne rend pas les bougies que le serveur a lues' }))];
     }
     const H = k.map(x => +x[2]), L = k.map(x => +x[3]), Cl = k.map(x => +x[4]), V = k.map(x => +x[5]);
@@ -151,7 +155,7 @@ const ContreExpertise = (function () {
       if (!(nom in t)) return;
       const p = params(md, 'tf.*.' + nom);
       const l = ligne(Object.assign({}, base, { cle: 'tf.' + tf + '.' + nom, libelle: ((champ(md, 'tf.*.' + nom) || {}).libelle || nom) + ' ' + tf, nature: nature(nom), publie: t[nom] }));
-      if (!p) { l.etat = 'ancien'; l.note = 'format antérieur : paramètres absents de meta.champs'; lignes.push(l); return; }
+      if (!p) { l.etat = 'ancien'; l.note = 'format antérieur : paramètres de calcul non publiés'; lignes.push(l); return; }
       const v = f(p);
       if (v === undefined) return;
       l.recalcule = v;
@@ -234,7 +238,7 @@ const ContreExpertise = (function () {
     }
     if (dans) {
       return pour('approx', { ecartUsd: Math.round(dans.e), lecture: dans.t,
-        borne: 'cohérent à la seconde (écart ' + Math.round(dans.e) + ' USDT, lecture estimée ' + new Date(dans.t).toISOString().slice(11, 19) + ' UTC)' });
+        borne: 'cohérent à la seconde (écart ' + F.nombre(Math.round(dans.e)) + ' USDT, lecture estimée ' + F.heureSec(dans.t) + ')' });
     }
     const meilleur = proche;
     const det = meilleur ? 'résidu ' + Math.round(meilleur.res) + ' USDT, au plus près ' + Math.round(meilleur.cum) + ' USDT'
@@ -251,7 +255,7 @@ const ContreExpertise = (function () {
     if (!Array.isArray(k1)) return [];
     if (!k1.length) return [Object.assign(l, { etat: 'diff', note: 'aucune seconde échangée dans la fenêtre' })];
     const lo = Math.min(...k1.map(x => +x[3])), hi = Math.max(...k1.map(x => +x[2]));
-    const fen = 'secondes de ' + new Date(+k1[0][0]).toISOString().slice(11, 19) + ' à ' + new Date(+k1[k1.length - 1][0] + 999).toISOString().slice(11, 19) + ' UTC (fenêtre −' + PRIX_AVANT_S + ' s / +' + PRIX_APRES_S + ' s : convention)';
+    const fen = 'secondes de ' + F.heureSec(+k1[0][0]) + ' à ' + F.heureSec(+k1[k1.length - 1][0] + 999) + ' (fenêtre −' + PRIX_AVANT_S + ' s / +' + PRIX_APRES_S + ' s : convention)';
     const dans = md.btc.price >= lo && md.btc.price <= hi;
     return [Object.assign(l, { etat: dans ? 'approx' : 'diff', recalcule: lo, recalculeHaut: hi, borne: fen, note: dans ? '' : 'source modifiée ou calcul différent' })];
   }
@@ -274,7 +278,7 @@ const ContreExpertise = (function () {
   /** Le verdict complet. reponses = { 'tf:4h': klines|{erreur}, cvd5, cvd1s, prix1s }.
    *  calc = { calcRSI, calcEMA, calcATR }. PUR. */
   function verifier(md, reponses, calc) {
-    if (!md || !md.meta || !md.meta.champs) return { etat: 'ancien', lignes: [], non: [], note: 'format antérieur : meta.champs absent' };
+    if (!md || !md.meta || !md.meta.champs) return { etat: 'ancien', lignes: [], non: [], note: 'format antérieur : champs non décrits dans la publication' };
     let lignes = [];
     for (const tf of Object.keys(md.tf || {})) lignes = lignes.concat(verifierTf(md, tf, reponses['tf:' + tf], calc));
     lignes = lignes.concat(verifierCvd(md, reponses.cvd5, reponses.cvd1s), verifierPrix(md, reponses.prix1s));
