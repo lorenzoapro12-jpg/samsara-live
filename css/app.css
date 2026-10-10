@@ -1386,14 +1386,32 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
 }
 .onglet-sous::before { content: ''; flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--dot); }
 .onglet-sous:hover, .onglet-sous:focus-visible { border-color: var(--accent); outline: none; }
-/* L'astuce, une seule fois : en bas du tracé, au-dessus du graphique (pas un texte du canvas). */
+/* La clé « ? » du Lisible, toujours là, dans un coin du tracé (js : astucePlacer) — un bouton, pas
+   un texte du canvas ; la première fois, l'astuce à côté d'elle. Seule la clé prend le pointeur :
+   un toucher sur l'astuce va au graphique (il la cache). */
 .astuce-tap {
-  position: absolute; z-index: 3; left: 20px; bottom: 60px; padding: 5px 11px; border-radius: 999px;
-  font-size: 11.5px; font-weight: 600; color: var(--ink-1); background: var(--card-solid, var(--rail));
-  border: 1px solid var(--hairline); box-shadow: var(--capsule-ombre); pointer-events: none;
-  transition: opacity .3s ease;
+  position: absolute; z-index: 3; left: 20px; bottom: 60px;
+  display: flex; align-items: center; gap: 6px; pointer-events: none;
 }
-.astuce-tap[hidden] { display: none; }
+.astuce-tap[hidden], .astuce-phrase[hidden] { display: none; }
+.cle-aide {
+  flex-shrink: 0; width: 28px; height: 28px; padding: 0; border-radius: 50%; pointer-events: auto; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  font: inherit; font-size: 14px; font-weight: 750; line-height: 1; color: var(--accent-2);
+  background: var(--card-solid, var(--rail)); background-clip: padding-box; border: 0 solid transparent;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.cle-aide:hover, .cle-aide:focus-visible { color: var(--ink-1); box-shadow: inset 0 0 0 1px var(--accent); outline: none; }
+/* Au doigt : une cible de 40 px, le rond dessiné garde ses 28 px (le bord transparent la porte). */
+@media (pointer: coarse) { .cle-aide { width: 40px; height: 40px; border-width: 6px; } }
+.astuce-phrase {
+  padding: 5px 11px; border-radius: 999px; white-space: nowrap;
+  font-size: 11.5px; font-weight: 600; color: var(--ink-1); background: var(--card-solid, var(--rail));
+  border: 1px solid var(--hairline); box-shadow: var(--capsule-ombre);
+}
+/* Téléphone : la clé et l'astuce tiennent dans le tracé (à 360 px, 233 px entre la marge et la
+   colonne des prix) — l'astuce passe sur deux lignes. */
+@media (max-width: 480px) { .astuce-phrase { white-space: normal; max-width: 170px; border-radius: 12px; line-height: 1.3; } }
 /* Le prix, sa variation et la pastille d'abord (la pastille ne rétrécit pas : elle n'a qu'un
    mot) ; les boutons à droite, et à la ligne quand ils ne tiennent plus. La barre d'outils
    passe aussi à la ligne plutôt que de défiler. */
@@ -1479,4 +1497,74 @@ html:not([data-mode="expert"]):not([data-structure="fenetres"]) .header-right { 
 @media (max-width: 400px) {
   :where(html):not([data-mode="expert"]) .indicator-bar label { padding: 6px 5px; }
   :where(html):not([data-mode="expert"]) .ind-dropdown-btn { padding: 6px 7px; }
+}
+
+/* ─── Au doigt (pointer: coarse) : des cibles d'au moins 40 × 40 px ──────────────────────────────
+   Le dessin ne change presque pas : un ::before transparent, centré, porte la zone de toucher à 40 px
+   de côté au moins (inset négatif quand le bouton est plus petit, nul quand il est plus grand), et les
+   marges écartent les voisins pour qu'aucune zone n'empiète sur une autre ni sur un bouton voisin
+   (le bouton de mode, « + Indicateurs / Affichage » et Réglages relèvent d'autres chantiers : leurs
+   voisins s'en écartent, eux ne changent pas). Entre deux boutons ronds, 42 px de centre à centre : le
+   rendu au sous-pixel décale la zone de toucher de près d'un pixel. Les rangées s'écartent de 14 px
+   (6 + 6 pour les zones des deux rangées, et 2 entre elles). Thèmes sans structure (aero,
+   kala) : les structures rangent ces boutons ailleurs, à leur façon. */
+@media (pointer: coarse) {
+  html:not([data-structure]) .header .ico-btn:not(#reglagesBtn), html:not([data-structure]) .header .paire-btn,
+  html:not([data-structure]) .indicator-bar label[id^="int_"] { position: relative; }
+  html:not([data-structure]) .header .ico-btn:not(#reglagesBtn)::before, html:not([data-structure]) .header .paire-btn::before,
+  html:not([data-structure]) .indicator-bar label[id^="int_"]::before,
+  html[data-mode="debutant"]:not([data-structure]) .kpis::before {
+    content: ''; position: absolute; inset: min(0px, calc(50% - 20px));
+  }
+  /* La pastille « Infos du marché » : sa zone est celle de la bande qui la porte (même action : un
+     clic sur la bande ouvre les cartes) ; en Lisible, la bande ne montre qu'elle, rien n'en déborde.
+     Vide (au chargement : largeur nulle, au bout de la rangée), elle n'a pas de zone : celle-ci
+     déborderait à droite de l'en-tête. */
+  html[data-mode="debutant"]:not([data-structure]) .kpis { position: relative; overflow: visible; min-height: 28px; }
+  html[data-mode="debutant"]:not([data-structure]) .kpis:empty::before { display: none; }
+  /* La paire : 28 px de haut (sa zone, 6 px au-dessus et au-dessous, tient dans la marge de l'en-tête). */
+  html:not([data-structure]) .paire-btn { min-height: 28px; }
+  html[data-mode]:not([data-structure]) .header { row-gap: 14px; }
+  /* Les boutons ronds : 34 px, l'écart de la rangée (6 ou 10) et 1 px de marge de chaque côté. */
+  html[data-mode]:not([data-structure]) .header-right > .ico-btn:not(#reglagesBtn) { margin: 0 1px; }
+  /* Le voyant (un rond de 10 px, sans action au doigt) laisse le toucher à la zone voisine. */
+  html:not([data-structure]) #dot { pointer-events: none; }
+  /* Intervalles : 40 px de large et 32 de haut au moins (la zone déborde de 4 px dans la marge du
+     ruban, qui la rognerait au-delà). */
+  html:not([data-structure]) .indicator-bar label[id^="int_"] { min-width: 40px; min-height: 32px; justify-content: center; }
+}
+/* Le nom d'un bouton-icône, dit à l'appui du doigt (js/app.js) : une bulle inerte, 1,2 s. */
+.nom-appui {
+  position: fixed; z-index: 3000; pointer-events: none;
+  padding: 4px 10px; border-radius: 8px; white-space: nowrap;
+  font-size: 12px; font-weight: 650; color: var(--ink-1); background: var(--card-solid, var(--rail));
+  border: 1px solid var(--hairline); box-shadow: var(--capsule-ombre);
+}
+.nom-appui[hidden] { display: none; }
+@media (pointer: coarse) and (max-width: 768px) {
+  /* 30 px, l'écart de 6 et 3 de marge. Le voyant, entre Légendes et Thème, ne prend pas de place. */
+  html[data-mode]:not([data-structure]) .header-right > .ico-btn:not(#reglagesBtn) { margin: 0 3px; }
+  html[data-mode]:not([data-structure]) .header-right > #dot { margin: 0 -5px; }
+}
+/* Téléphone, Complet : neuf boutons sur la 2e rangée — sans écart fixe, 5 px de marge de chaque côté
+   des boutons ronds, et la place qui reste se partage entre eux (à 360 px, 16 px : 2 de plus entre
+   deux voisins). */
+@media (pointer: coarse) and (max-width: 480px) {
+  html[data-mode]:not([data-structure]) .header-right { gap: 0; }
+  html[data-mode]:not([data-structure]) .header-right > .ico-btn:not(#reglagesBtn) { margin: 0 5px; }
+}
+/* Téléphone, Lisible : la pastille, Réinitialiser, Carte, le bouton de mode, Légendes et le voyant
+   tiennent sur la 2e rangée avec leurs zones (à 360 px, 332 px sur 334 : la pastille et le premier
+   bouton sans écart, sa marge suffit) ; le Thème passe au bout de la 1re rangée, à droite du prix, qui
+   lui laisse sa place (44 px). Boutons ronds de 28 px et 7 de marge. Les six intervalles et le menu :
+   sans écart fixe, la place qui reste se partage entre eux (à 360 px, 7 px). */
+@media (pointer: coarse) and (max-width: 480px) {
+  html[data-mode="debutant"]:not([data-structure]) .header { column-gap: 0; }
+  html[data-mode="debutant"]:not([data-structure]) .header-right > .ico-btn:not(#reglagesBtn) { width: 28px; height: 28px; margin: 0 7px; }
+  /* Le voyant, désormais au bout de la rangée : 4 px à sa droite, pour que son onde (×3, js : ping)
+     reste dans l'en-tête au lieu de le faire déborder. */
+  html[data-mode="debutant"]:not([data-structure]) .header-right > #dot { margin: 0 4px 0 0; }
+  html[data-mode="debutant"]:not([data-structure]) .header-left { padding-right: 44px; }
+  html[data-mode="debutant"]:not([data-structure]) .header-right > #themeBtn { position: absolute; top: 6px; right: 6px; }
+  html[data-mode="debutant"]:not([data-structure]) .indicator-bar { gap: 0; }
 }

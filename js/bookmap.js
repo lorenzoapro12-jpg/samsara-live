@@ -930,7 +930,7 @@
     if (estVu('bidask')) bidAsk();
     // Débutant : la ligne de prix passe AU-DESSUS des ronds (elle ne se perd pas dessous).
     if (estVu('prix') && !deb) lignePrix();
-    if (estVu('executions')) bulles();
+    if (estVu('executions')) bulles(); else FORMES_SENS = { achat: 0, vente: 0 };
     // Débutant : les cadres des repères (une zone « allumée » est remplie) passent SOUS la ligne de prix.
     if (deb) { ETIQ_DIFF = []; if (R.calques.guide) guideFond(); else { GU.cadres = []; GU.marques = []; GU.etiquettes = []; } }
     if (estVu('prix') && deb) lignePrix();
@@ -956,6 +956,7 @@
     majPanneauRafales();
     majPanneauJournal();
     majResume();
+    placerMiniCle();
     MESURE.rendu = performance.now() - debutRendu;
   }
 
@@ -1310,8 +1311,11 @@
     return { pasT: BM.pasTemps((E.vue.t2 - E.vue.t1) / Z.chaleur.w * 9), pasP: BM.pasMultiple((E.vue.p2 - E.vue.p1) / Z.chaleur.h * 9, E.exec.dp) };
   }
   let BULLES = [], TRI = { cle: null, g: [] };
+  const RAYON_SENS = 5;          // px : en Lisible, à partir de ce rayon, un rond porte ▲ (achats) ou ▼ (ventes)
+  let FORMES_SENS = { achat: 0, vente: 0 };   // triangles tracés au dernier rendu (contrôle)
+  let TRIANGLES = [];                         // leurs places (x, y, demi-taille a, sens s), pour le contrôle
   function bulles() {
-    BULLES = [];
+    BULLES = []; FORMES_SENS = { achat: 0, vente: 0 }; TRIANGLES = [];
     if (!E.exec.seaux.size) return;
     const { pasT, pasP } = pasBulles();
     // Les seaux viennent des plis gardés (BM.SeauxExecutions) ; le tri par volume est gardé tant que
@@ -1321,9 +1325,12 @@
       TRI = { cle, g: E.exec.regrouper(E.vue.t1, E.vue.t2, pasT, pasP).filter(b => b.achat + b.vente >= R.bulleMin).sort((a, b) => (a.achat + a.vente) - (b.achat + b.vente)) };
     }
     const g = TRI.g;
-    // Débutant : couleur et taille seules (ni arc, ni nombre), plus pâles, et plus petites sur un
-    // écran étroit. Le rayon dessiné est gardé : la lecture au pointeur vise la bulle vue.
+    // Débutant : couleur et taille (ni arc, ni nombre), plus pâles, et plus petites sur un écran
+    // étroit ; le sens a aussi sa FORME, pas la couleur seule : ▲ dans un rond où les achats dominent,
+    // ▼ où ce sont les ventes (dès RAYON_SENS px : plus petit, il ne se lirait pas — la lecture au
+    // doigt le dit en mots). Le rayon dessiné est gardé : la lecture au pointeur vise la bulle vue.
     const deb = debutant(), echelle = deb && (Z.etroit || Z.chaleur.h < 400) ? Math.min(R.bulleEchelle, 0.6) : R.bulleEchelle;
+    const sens = [];
     for (const b of g) {
       const q = b.achat + b.vente, r = BM.rayonBulle(q, echelle);
       const x = X(b.t), y = Y(b.p);
@@ -1332,7 +1339,10 @@
       ctx.globalAlpha = deb ? 0.4 : 0.55; ctx.fillStyle = coul;
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 0.95; ctx.strokeStyle = coul; ctx.lineWidth = 1; ctx.stroke();
-      if (deb) continue;
+      if (deb) {
+        if (r >= RAYON_SENS) sens.push({ x, y, r, a: Math.min(r * 0.55, 9), s: b.achat >= b.vente ? -1 : 1 });
+        continue;
+      }
       // Part achetée : un arc intérieur, quand la bulle est assez grande pour le montrer.
       if (r >= 8) {
         ctx.globalAlpha = 0.9; ctx.strokeStyle = C.prix; ctx.lineWidth = 1.5;
@@ -1340,6 +1350,22 @@
       }
       // Le volume ET son unité, sur deux lignes, dès que le rond est assez grand pour les contenir.
       if (r >= BM.BULLES.rTexte) { texte(BM.btc(q), x, y - 5, C.ink1, 10, 'center', true); texte('BTC', x, y + 6, C.ink1, 8.5, 'center', true); }
+    }
+    // Lisible : les triangles du sens, APRÈS tous les ronds (un rond posé ensuite les couvrirait), dans
+    // la couleur du fond de la carte (un creux net dans le rond vert ou rouge, quelle que soit la
+    // palette) ; pointe en haut pour les achats, en bas pour les ventes. Des plus gros ronds aux plus
+    // petits, et pas deux triangles collés : là où les ronds s'empilent, un sur quelques-uns suffit.
+    // Des tracés, pas des textes : le budget des mots de la carte n'en compte pas.
+    if (sens.length) {
+      sens.sort((u, v) => v.r - u.r);
+      ctx.globalAlpha = 0.9; ctx.fillStyle = C.fond;
+      for (const t of sens) {
+        if (TRIANGLES.some(o => Math.hypot(o.x - t.x, o.y - t.y) < o.a + t.a + 6)) continue;
+        TRIANGLES.push(t);
+        FORMES_SENS[t.s < 0 ? 'achat' : 'vente']++;
+        const { x, y, a, s } = t;
+        ctx.beginPath(); ctx.moveTo(x, y + s * a); ctx.lineTo(x - a * 0.95, y - s * a * 0.6); ctx.lineTo(x + a * 0.95, y - s * a * 0.6); ctx.closePath(); ctx.fill();
+      }
     }
     ctx.globalAlpha = 1;
   }
@@ -1597,8 +1623,10 @@
     if (!m) { try { localStorage.setItem(MODE_CLE, MODE); } catch (e) { /* navigation privée : le mode vaut pour cette page */ } }
     document.documentElement.setAttribute('data-mode', MODE);
     majBoutonMode();
-    // Débutant : les panneaux experts ouverts se ferment (leurs boutons sont cachés).
-    if (debutant()) for (const id of ['reglages', 'rafalesPanneau']) { const el = document.getElementById(id); if (el && !el.hidden) fermerPanneaux(); }
+    // Lisible : le panneau des rafales ouvert se ferme (son bouton est caché). « Choisir l'affichage »
+    // reste ouvert : il propose ce que le nouveau mode montre (les réglages fins, en Complet seul).
+    if (debutant()) { const el = document.getElementById('rafalesPanneau'); if (el && !el.hidden) fermerPanneaux(); }
+    construireAffichage();
     GU.cleJournal = null; GU.slots.clear(); RESUME_FORME.cle = null; RECT = null; INTRO_RECT = null; LISTE_RAF = null;
     majBoutonSuivre(); majHauteurBarre(); majLegende(); remplirIntro(); majIndice(); majPanneauJournal();
     // Débutant : la chaleur live est toujours lue (FORCE_DEBUTANT) — relue tout de suite.
@@ -1636,6 +1664,75 @@
     if (!indiceEl || indiceEl.hidden) return;
     indiceEl.hidden = true; clearTimeout(indiceMinuteur);
     try { localStorage.setItem(INDICE_CLE, 'vu'); } catch (e) { /* navigation privée : il reviendra */ }
+  }
+  /** Lisible : la mini-clé des couleurs, toujours là — « peu → beaucoup d'ordres », le dégradé même
+   *  de la carte (sa table de couleurs), en mots pour les achats et les ventes : une rampe par côté
+   *  avec la palette « teintés », sinon une seule et « ventes au-dessus du prix, achats au-dessous ».
+   *  Un élément de la page, pas un texte de la carte (le budget de ses deux mots n'en compte pas),
+   *  posé dans un coin libre : ni sur la ligne du prix, ni sur la rangée du prix, ni sur une
+   *  étiquette ou un cadre des repères. Cachée sous l'explication (qui dit les couleurs). */
+  const miniEl = document.getElementById('miniCle');
+  const MINI = { cle: null, w: 0, h: 0, pos: null };
+  function rampeUrl(table) {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 1;
+    const x = c.getContext('2d'), im = x.createImageData(256, 1);
+    new Uint32Array(im.data.buffer).set(table); x.putImageData(im, 0, 0);
+    return c.toDataURL();
+  }
+  function remplirMiniCle() {
+    if (MINI.cle === LUTV) return;
+    MINI.cle = LUTV; MINI.w = 0;
+    const rampe = (table, nom) => '<span class="mc-ligne">' + (nom ? '<b>' + nom + '</b>' : '') + '<span class="mc-mot">peu</span><span class="mc-rampe" style="background-image:url(' + rampeUrl(table) + ')"></span><span class="mc-mot">beaucoup' + (nom ? '' : ' d’ordres') + '</span></span>';
+    miniEl.innerHTML = LUT ? rampe(LUT, null) + '<span class="mc-sens">ventes au-dessus du prix, achats dessous</span>' : rampe(LUTA, 'Ventes') + rampe(LUTB, 'Achats');
+    miniEl.title = 'Ordres en attente : peu → beaucoup (la Légende dit tout)';
+  }
+  /** La ligne du prix passe-t-elle dans [xa, xb] × [ya, yb] ? Ses minutes (clôture, plus haut, plus
+   *  bas, reliées à la précédente), et le dernier prix au-delà de la dernière minute close. */
+  function prixDans(xa, xb, ya, yb) {
+    const ta = T(xa), tb = T(xb);
+    let prec = null;
+    for (const m of E.minutes) {
+      if (m.t > tb) break;
+      if (m.fin >= ta) {
+        const c0 = prec ? prec.c : m.c, hi = Y(Math.max(c0, m.c, m.h)), lo = Y(Math.min(c0, m.c, m.l));
+        if (hi <= yb && lo >= ya) return true;
+      }
+      prec = m;
+    }
+    const der = E.minutes.length ? E.minutes[E.minutes.length - 1].fin : -Infinity, p = dernierPrix();
+    if (p && tb > der && Math.min(tb, maintenant()) >= ta) { const y = Y(p); if (y >= ya && y <= yb) return true; }
+    return false;
+  }
+  function placerMiniCle() {
+    if (!miniEl) return;
+    const montrer = debutant() && !!Z && !!E.vue && !!(LUT || LUTA) && !(introEl && !introEl.hidden);
+    if (miniEl.hidden === montrer) miniEl.hidden = !montrer;
+    if (!montrer) { MINI.pos = null; return; }
+    remplirMiniCle();
+    if (!MINI.w) { MINI.w = miniEl.offsetWidth; MINI.h = miniEl.offsetHeight; }
+    const w = MINI.w, h = MINI.h, W = Z.chaleur.w, H = Z.chaleur.h, m = 8;
+    // Les repères (étiquettes et cadres), la rangée du prix, et ce que la page pose déjà sur la carte.
+    const obst = GU.etiquettes.map(e => ({ x: e.x - 4, y: e.y - 4, w: e.w + 8, h: e.h + 8 }))
+      .concat(GU.cadres.map(f => ({ x: f.x0 - 4, y: f.ya - 4, w: f.x1 - f.x0 + 8, h: f.yb - f.ya + 8 })));
+    const p = dernierPrix();
+    if (p) obst.push({ x: 0, y: Y(p) - 12, w: W, h: 24 });
+    for (const el of [$('statut'), indiceEl]) if (el && !el.hidden) { const r = el.getBoundingClientRect(), c = rect(); obst.push({ x: r.left - c.left - Z.chaleur.x - 4, y: r.top - c.top - Z.chaleur.y - 4, w: r.width + 8, h: r.height + 8 }); }
+    const libre = q => q.x >= 0 && q.y >= 0 && q.x + w <= W && q.y + h <= H && !obst.some(o => q.x < o.x + o.w && q.x + w > o.x && q.y < o.y + o.h && q.y + h > o.y)
+      && !prixDans(q.x - 3, q.x + w + 3, q.y - 3, q.y + h + 3);
+    // Elle ne saute pas : sa place reste tant qu'elle est libre. Sinon, le coin bas puis haut à gauche,
+    // en remontant (descendant) d'un cran ; puis de même juste avant « maintenant ».
+    let pos = MINI.pos && libre(MINI.pos) ? MINI.pos : null;
+    if (!pos) {
+      const pas = h + 6, n = Math.max(1, Math.floor((H - 2 * m - h) / pas) + 1);
+      for (const x of [m, Math.max(m, Math.min(W, X(maintenant())) - w - m)]) {
+        for (let k = 0; k < n && !pos; k++) for (const y of [H - m - h - k * pas, m + k * pas]) if (!pos && libre({ x, y })) pos = { x, y };
+        if (pos) break;
+      }
+    }
+    MINI.pos = pos;
+    miniEl.style.visibility = pos ? '' : 'hidden';
+    // Coordonnées de la chaleur → celles de la scène (le canevas la couvre, la chaleur y est décalée de Z.chaleur).
+    if (pos) { const l = (Z.chaleur.x + pos.x) + 'px', t = (Z.chaleur.y + pos.y) + 'px'; if (miniEl.style.left !== l) miniEl.style.left = l; if (miniEl.style.top !== t) miniEl.style.top = t; }
   }
   // Le mode changé dans le terminal (autre onglet) : suivi ici.
   window.addEventListener('storage', e => { if (e.key === MODE_CLE || e.key === null) changerMode(lireMode()); });
@@ -2373,7 +2470,7 @@
     // Débutant : 3 points, ce qu'il voit — couleurs, ligne du prix (à fil noir) et ronds, les deux repères.
     if (debutant()) return [
       ['Couleurs = ordres d\'achat ou de vente en attente.', couleursDebutant() + ' Un ordre peut être retiré à tout moment. Hachures : ce qui n\'a pas été lu là (les ordres en attente, ou les échanges), et l\'avenir, à droite de «\u00a0maintenant\u00a0».'],
-      ['Ligne à fil noir = le prix, jusqu\'au trait jaune «\u00a0maintenant\u00a0». Ronds = échanges réels.', couleurMot('Vert', '--up') + ' : surtout des acheteurs qui ont pris des ventes en attente. ' + couleurMot('Rouge', '--down') + ' : surtout des vendeurs qui ont pris des achats en attente. Plus gros = plus de BTC.'],
+      ['Ligne à fil noir = le prix, jusqu\'au trait jaune «\u00a0maintenant\u00a0». Ronds = échanges réels.', couleurMot('Vert', '--up') + ' ▲ : surtout des acheteurs qui ont pris des ventes en attente. ' + couleurMot('Rouge', '--down') + ' ▼ : surtout des vendeurs qui ont pris des achats en attente. Plus gros = plus de BTC.'],
       ['«\u00a0Mur d’achat\u00a0» sous le prix, «\u00a0Mur de vente\u00a0» au-dessus : le prix le plus proche où nettement plus d\'ordres attendent qu\'ailleurs.', 'La phrase du haut décrit l\'instant : ce n\'est pas une prévision.'],
     ];
     const n = E.niv, tr = (n && n.tranche) || BM.GUIDE.trancheUsd;
@@ -3108,6 +3205,7 @@
     fermerPanneaux();
     p.hidden = !ouvert;
     if (ouvert && id === 'legende') majLegende();      // couverture, âges : ceux de l'instant où on l'ouvre
+    if (ouvert && id === 'affichage') majCalques();
     const b = document.querySelector('[aria-controls="' + id + '"]');
     if (b) b.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
   }
@@ -3132,6 +3230,91 @@
     ['destin', 'Destin des gros ordres', 'Ce que devient chaque gros niveau de prix du carnet live (un ou plusieurs ordres, à un seul prix) quand il disparaît : retiré, échangé, en partie… Sert à voir si les gros ordres tiennent quand le prix arrive.'],
     ['loin', 'Profondeur Coinbase', 'Le carnet complet de Coinbase sur ±10 % (5 min × 100 $). Sert à voir les gros ordres loin du prix, hors de la bande lue chez Binance.'],
   ];
+  /** Allume ou éteint un calque — la puce, le panneau « Choisir l'affichage » et la touche G passent
+   *  tous par ici. Vrai s'il a changé. (Puis apresCalques : le choix gardé, les deux accès d'accord.) */
+  function poserCalque(k, v) {
+    if (!!R.calques[k] === !!v) return false;
+    R.calques[k] = !!v;
+    // Le carnet n'est lu que pour ses calques : rallumé, il repart tout de suite.
+    if (boucleCarnet && ['live', 'dom', 'bidask', 'destin', 'guide'].includes(k) && R.calques[k]) boucleCarnet.reveiller();
+    // Le guide rallumé repart d'une lecture fraîche (ses murs, son journal reprennent).
+    if (k === 'guide') { GU.cleJournal = null; oublierGuide(); remplirIntro(); }
+    return true;
+  }
+  function apresCalques() { sauver(); majCalques(); dessiner(); }
+  /** Les puces et les cases du panneau disent l'état gardé (R.calques). */
+  function majCalques() {
+    for (const b of document.querySelectorAll('#calques .puce')) b.setAttribute('aria-pressed', R.calques[b.dataset.calque] ? 'true' : 'false');
+    for (const c of document.querySelectorAll('#affGroupes input[data-calque]')) c.checked = !!R.calques[c.dataset.calque];
+  }
+
+  // ─── Le panneau « Choisir l'affichage » ─────────────────────────────────────
+  // Un seul panneau pour choisir ce que montre la carte : en tête « Tout afficher » et « Revenir au
+  // départ » ; puis les calques rangés par QUESTION (ce qu'on cherche à voir, pas l'endroit où c'est
+  // dessiné), chacun avec sa phrase « C'est quoi ? » en mots simples ; tout en bas, replié, les
+  // réglages fins (Complet). Les puces du haut restent : la légende des calques et l'accès rapide.
+  const QUESTIONS = [
+    ['Que dit la carte, en mots ?', ['guide']],
+    ['Où attendent les ordres ?', ['publiee', 'live', 'dom', 'murs', 'memoire', 'loin']],
+    ['Qu’est-ce qui s’échange ?', ['executions', 'volume', 'cvd', 'profil', 'rafales']],
+    ['D’où vient le prix ?', ['prix', 'bidask']],
+    ['Les gros ordres tiennent-ils ?', ['destin']],
+    ['Que disent les options ?', ['gamma']],
+  ];
+  // « C'est quoi ? » : une phrase par calque, sans formule (la Légende garde le détail).
+  const C_EST_QUOI = {
+    guide: 'Les prix proches où nettement plus d’ordres attendent qu’ailleurs, nommés sur la carte, avec la phrase du haut et le journal de ce qui vient de se passer.',
+    publiee: 'Les ordres posés des dernières 24 h, une colonne par minute : on voit où de gros ordres sont restés longtemps.',
+    live: 'Les ordres posés en ce moment, relus par la page toutes les quelques secondes depuis son ouverture.',
+    dom: 'À droite, combien d’ordres attendent à chaque prix, à la dernière lecture.',
+    murs: 'Les prix où le plus d’ordres attendaient à la dernière publication (toutes les 15 min). Ils peuvent être retirés.',
+    memoire: 'Au bord droit, à chaque prix, la part du temps où beaucoup d’ordres y attendaient : une présence passée, pas une promesse.',
+    loin: 'Les ordres d’une autre plateforme (Coinbase), jusqu’à 10 % du prix, avec leur propre échelle de couleurs.',
+    executions: 'Les échanges réels, en ronds : vert quand les achats dominent, rouge quand ce sont les ventes ; plus gros, plus échangé.',
+    volume: 'En bas, combien s’est échangé à chaque période : les achats au-dessus, les ventes au-dessous.',
+    cvd: 'Les achats moins les ventes, additionnés depuis le bord gauche : la courbe monte quand les acheteurs pressés dominent.',
+    profil: 'À gauche, combien s’est échangé à chaque prix de la vue.',
+    rafales: 'Un trait quand beaucoup s’échange d’un coup, d’un même côté, dans la même milliseconde.',
+    prix: 'La ligne du prix : le dernier prix de chaque minute, puis de chaque seconde. Le repère de tout le reste.',
+    bidask: 'Le meilleur prix offert par les acheteurs et par les vendeurs, à chaque lecture : le prix se fait entre les deux.',
+    destin: 'Ce que devient chaque gros ordre quand il disparaît : retiré, échangé, ou en partie.',
+    gamma: 'Des prix tirés des contrats d’options (Deribit) où le prix pourrait réagir : une estimation, pas une mesure.',
+  };
+  // Lisible : seulement ce que l'écran montre, en mots du Lisible. Le Guide se choisit ; les couleurs,
+  // les ronds et la ligne du prix sont toujours là (FORCE_DEBUTANT) : leur case le dit, sans bouger.
+  // [clé (null : toujours là), nom, « C'est quoi ? » (null : les couleurs de la palette choisie), « toujours … »]
+  const QUESTIONS_LISIBLE = [
+    ['Que dit la carte, en mots ?', [['guide', 'Repères en mots (Guide)', 'Les prix proches où nettement plus d’ordres attendent qu’ailleurs : « Mur d’achat » sous le prix, « Mur de vente » au-dessus, et la phrase du haut. Un ordre peut être retiré à tout moment.']]],
+    ['Où attendent les ordres ?', [[null, 'Les couleurs', null, 'toujours affichées']]],
+    ['Qu’est-ce qui s’échange ?', [[null, 'Les ronds', 'Les échanges réels : vert ▲, surtout des achats ; rouge ▼, surtout des ventes. Plus gros, plus échangé.', 'toujours affichés']]],
+    ['D’où vient le prix ?', [[null, 'La ligne à fil noir', 'Le prix, minute après minute, jusqu’au trait jaune « maintenant ».', 'toujours affichée']]],
+  ];
+  const NOM_CALQUE = Object.fromEntries(NOMS_CALQUES.map(([k, nom]) => [k, nom]));
+  function construireAffichage() {
+    const z = $('affGroupes');
+    if (!z) return;
+    let n = 0;
+    const ligne = (k, nom, quoi, toujours) => {
+      const id = 'affQuoi' + (n++);
+      return '<div class="aff-calque"><label><input type="checkbox"' + (k ? ' data-calque="' + k + '"' + (R.calques[k] ? ' checked' : '') : ' checked disabled')
+        + ' aria-describedby="' + id + '"> <span class="aff-nom">' + echap(nom) + '</span>' + (toujours ? ' <span class="aff-toujours">' + toujours + '</span>' : '') + '</label>'
+        + '<p class="aff-quoi" id="' + id + '"><span class="aff-qq">C’est quoi ?</span> ' + echap(quoi) + '</p></div>';
+    };
+    const groupes = debutant() ? QUESTIONS_LISIBLE.map(([q, l]) => [q, l.map(([k, nom, quoi, toujours]) => ligne(k, nom, quoi || couleursDebutant(), toujours))])
+      : QUESTIONS.map(([q, ks]) => [q, ks.map(k => ligne(k, NOM_CALQUE[k], C_EST_QUOI[k]))]);
+    z.innerHTML = groupes.map(([q, l]) => '<fieldset class="aff-groupe"><legend>' + echap(q) + '</legend>' + l.join('') + '</fieldset>').join('');
+    for (const c of z.querySelectorAll('input[data-calque]')) c.addEventListener('change', () => { poserCalque(c.dataset.calque, c.checked); apresCalques(); });
+    $('affNote').textContent = debutant()
+      ? 'En Lisible, la carte montre l’essentiel : les couleurs, les ronds et la ligne du prix restent affichés. Le mode Complet propose tous les calques et les réglages fins.'
+      : 'Chaque case allume ou éteint un calque, comme les puces du haut. Le choix est gardé dans ce navigateur.';
+  }
+  /** Les calques que ce panneau propose dans ce mode (Lisible : ceux qu'il montre et qui se choisissent). */
+  const calquesProposes = () => (debutant() ? [].concat(...QUESTIONS_LISIBLE.map(([, l]) => l.map(x => x[0]).filter(Boolean))) : NOMS_CALQUES.map(([k]) => k));
+  /** « Tout afficher » : chaque calque proposé allumé. « Revenir au départ » : ceux du départ
+   *  (DEFAUTS) ; les réglages fins gardent leurs valeurs (leur bouton « Réglages par défaut »). */
+  function toutAfficher() { for (const k of calquesProposes()) poserCalque(k, true); apresCalques(); }
+  function revenirAuDepart() { for (const k of calquesProposes()) poserCalque(k, DEFAUTS.calques[k]); apresCalques(); }
+
   function construireBarre() {
     const z = $('calques');
     // Une ligne de puces qui défile : la molette verticale la fait défiler (sans Maj).
@@ -3142,15 +3325,7 @@
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'puce'; b.textContent = nom; b.dataset.calque = k; b.title = nom + ' : ' + aide;
       b.setAttribute('aria-pressed', R.calques[k] ? 'true' : 'false');
-      b.addEventListener('click', () => {
-        R.calques[k] = !R.calques[k]; b.setAttribute('aria-pressed', R.calques[k] ? 'true' : 'false');
-        sauver();
-        // Le carnet n'est lu que pour ses calques : rallumé, il repart tout de suite.
-        if (boucleCarnet && ['live', 'dom', 'bidask', 'destin', 'guide'].includes(k) && R.calques[k]) boucleCarnet.reveiller();
-        // Le guide rallumé repart d'une lecture fraîche (ses murs, son journal reprennent).
-        if (k === 'guide') { GU.cleJournal = null; oublierGuide(); remplirIntro(); }
-        dessiner();
-      });
+      b.addEventListener('click', () => { poserCalque(k, !R.calques[k]); apresCalques(); });
       z.appendChild(b);
     }
     // La même aide dans la Légende : au doigt, une puce n'a pas de survol.
@@ -3162,7 +3337,10 @@
     if (window.ResizeObserver) new ResizeObserver(debord).observe(z);
     debord();
     $('btnSuivre').addEventListener('click', basculerSuivre);
-    $('btnReglages').addEventListener('click', () => basculerPanneau('reglages'));
+    construireAffichage();
+    $('btnAffichage').addEventListener('click', () => basculerPanneau('affichage'));
+    $('affTout').addEventListener('click', toutAfficher);
+    $('affDepart').addEventListener('click', revenirAuDepart);
     $('btnLegende').addEventListener('click', () => basculerPanneau('legende'));
     $('btnRafales').addEventListener('click', () => { LISTE_RAF = null; basculerPanneau('rafalesPanneau'); majPanneauRafales(); });
     $('btnJournal').addEventListener('click', () => { GU.cleJournal = null; basculerPanneau('journalPanneau'); majPanneauJournal(); });
@@ -3292,7 +3470,7 @@
     const nivMax = Math.max(...Object.keys(CADENCE_CARNET).map(Number));
     const pub = E.pub ? 'dernière colonne il y a ' + BM.age(maintenant() - BM.instantDerniereColonne(E.pub)) : 'pas encore lue';
     tx('legGuideLimites', 'Un mur peut être retiré à tout moment, avant d\'être touché : «' + NB + 'beaucoup d\'ordres en attente' + NB + '» n\'est pas une promesse. La chaleur, les murs et les gros paquets montrent des INTENTIONS (ordres posés) ; seuls les ronds et les rafales sont des échanges. '
-      + 'Couverture : le carnet Binance lu ici couvre en ce moment ' + cv + (R.niveauxLive < nivMax ? ' ; davantage à ' + BM.nombre(nivMax, 0, 0) + ' niveaux (Réglages)' : '') + ' ; la profondeur Coinbase va à ±' + LOIN_BANDE_PCT + ' %, à sa propre échelle. '
+      + 'Couverture : le carnet Binance lu ici couvre en ce moment ' + cv + (R.niveauxLive < nivMax ? ' ; davantage à ' + BM.nombre(nivMax, 0, 0) + ' niveaux (Choisir l’affichage › Réglages fins)' : '') + ' ; la profondeur Coinbase va à ±' + LOIN_BANDE_PCT + ' %, à sa propre échelle. '
       + 'Délais : carte publiée — ' + pub + ' ; gros paquets et gamma du fichier de 15 min (heure de lecture écrite) ; carnet live toutes les ' + BM.nombre(CADENCE_CARNET[R.niveauxLive] / 1000, 0, 1) + ' s. Les niveaux d\'options reposent sur une hypothèse (modèle).');
     const e = $('encodageEtat'), encL = E.loin && E.loin.encodage;
     // La profondeur Coinbase : même palette, AUTRE échelle — les graduations de la barre ne s'y appliquent pas.
@@ -3395,7 +3573,10 @@
         yPrix: Z && E.vue && dernierPrix() ? Y(dernierPrix()) : null,
         cadres: GU.cadres.map(f => ({ cote: f.z.cote, x0: f.x0, x1: f.x1, ya: f.ya, yb: f.yb, dedans: f.dedans })),
         niveaux: Z ? (n => ({ bid: n.bid && { P: n.bid.P, source: n.bid.source, dedans: !!n.bid.dedans, pBas: n.bid.pBas, pHaut: n.bid.pHaut }, ask: n.ask && { P: n.ask.P, source: n.ask.source, dedans: !!n.ask.dedans, pBas: n.ask.pBas, pHaut: n.ask.pHaut } }))(niveauxDebutant()) : null,
-        indice: !!(indiceEl && !indiceEl.hidden), dernierPrix: dernierPrix(), croix: CROIX_VUE, maintenant: TEXTES.maintenant || '', sensPrix: SENS_PRIX && Object.assign({}, SENS_PRIX) },
+        indice: !!(indiceEl && !indiceEl.hidden), dernierPrix: dernierPrix(),
+        // La mini-clé des couleurs : sa boîte posée (coordonnées de la chaleur) et son texte ; null si cachée.
+        formesSens: Object.assign({}, FORMES_SENS), triangles: TRIANGLES.slice(0, 12).map(t => ({ x: t.x, y: t.y, r: t.r, a: t.a, s: t.s })),
+        miniCle: miniEl && !miniEl.hidden && MINI.pos ? { x: MINI.pos.x, y: MINI.pos.y, w: MINI.w, h: MINI.h, texte: miniEl.innerText, rampes: miniEl.querySelectorAll('.mc-rampe').length } : null, croix: CROIX_VUE, maintenant: TEXTES.maintenant || '', sensPrix: SENS_PRIX && Object.assign({}, SENS_PRIX) },
       posees: posees.map(p => ({ x: p.x, y: p.y, w: p.w, h: p.h, texte: p.texte, pastille: !!p.pastille })),
       memoire: { barres: MEM.barres.map(r => ({ y0: r.y0, y1: r.y1, pb: r.b.pb, part: r.b.part, obs: r.b.obs, pres: r.b.pres, peu: r.b.peu, cote: r.cote })), largeur: Z ? largeurMemoire() : 0, seuil: seuilMemoire(), fenetre: E.vue && fenetreMemoire() },
       destin: { niveaux: E.murs.niveaux.length, actifs: E.murs.actifs.size, attente: E.murs.attente.length, total: Object.assign({}, E.murs.totaux[E.murs.indice(R.mursSeuil)]), totaux: E.murs.totaux.map(x => Object.assign({}, x)), seuil: E.murs.seuils[E.murs.indice(R.mursSeuil)], dessines: DM.items.length, traits: DM.traits, marques: DM.marques.map(m => m.t), items: DM.items.slice(-200).map(it => ({ x0: it.x0, x1: it.x1, y: it.y, fin: it.n.fin })) },

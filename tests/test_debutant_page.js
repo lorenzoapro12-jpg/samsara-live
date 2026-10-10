@@ -635,32 +635,101 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       await o.ctx.close();
     }
 
-    // ── L'astuce : une fois ──
-    titre('Astuce : une fois, jamais sur un texte');
+    // ── La clé « ? » et l'astuce : la clé toujours là en Lisible, l'astuce une fois ──
+    // La clé est un bouton (hors du budget des 5 textes) posé dans un coin du tracé, jamais sur un
+    // texte, ni sur la ligne qui valide une figure, ni sur la ligne du prix ; elle ouvre la fiche du
+    // Guide. L'astuce (« Touchez / Survolez une étiquette pour le détail ») l'accompagne la toute
+    // première fois, puis s'efface ; la clé reste.
+    titre('Clé « ? » et astuce : la clé toujours là en Lisible, l’astuce une fois, jamais sur un texte');
+    /** La clé et l'astuce telles qu'elles se voient (coordonnées du canvas). */
+    const lireCle = page => page.evaluate(() => {
+      const a = document.getElementById('astuceTap'), k = document.getElementById('cleAide'), ph = document.getElementById('astucePhrase');
+      const c = canvas.getBoundingClientRect(), ra = a.getBoundingClientRect(), rk = k.getBoundingClientRect();
+      const vis = el => !!el && !el.hidden && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden' && el.getBoundingClientRect().width > 0;
+      const R = r => ({ x: r.left - c.left, y: r.top - c.top, w: r.width, h: r.height });
+      const boite = R(ra), cle = R(rk), P = geoPrix;
+      const coupe = (r, i) => r.x < i.x + i.w && r.x + r.w > i.x && r.y < i.y + i.h && r.y + r.h > i.y;
+      const segs = (debEtat && debEtat.eviteSegs) || [];
+      const surSeg = segs.some(s => { for (let t = 0; t <= 1; t += 0.02) { const x = s[0] + (s[2] - s[0]) * t, y = s[1] + (s[3] - s[1]) * t; if (x >= boite.x && x <= boite.x + boite.w && y >= boite.y && y <= boite.y + boite.h) return true; } return false; });
+      const yL = yPrixLive(), h = elementFromPointCle();
+      function elementFromPointCle() { const x = document.elementFromPoint(rk.left + rk.width / 2, rk.top + rk.height / 2); return x && (x === k || k.contains(x)); }
+      return {
+        cle: vis(k) && vis(a), bouton: k.tagName === 'BUTTON', nom: k.getAttribute('aria-label') || '', dessous: h, phrase: vis(ph) ? ph.textContent : null,
+        boite, r: cle, dansTrace: !!P && boite.x >= 0 && boite.x + boite.w <= P.W - P.right + 0.5 && boite.y >= P.top - 0.5 && boite.y + boite.h <= P.top + P.ph + 0.5,
+        surTexte: debEtat ? debEtat.items.filter(i => i.rect && coupe(boite, i.rect)).map(i => i.texte) : ['(pas de Lisible)'],
+        surSeg, yPrix: yL, surPrix: yL !== null && yL >= boite.y - 4 && yL <= boite.y + boite.h + 4,
+        stockee: (() => { try { return localStorage.getItem('samsara-astuce-tap-v1'); } catch (e) { return 'bloqué'; } })(),
+      };
+    });
+    const cleBienPosee = c => c.cle && c.bouton && c.dessous && c.dansTrace && !c.surTexte.length && !c.surSeg && !c.surPrix;
     {
+      // Tactile (390 px), 1re visite : l'astuce « Touchez… », sur aucun texte ; cachée au toucher ; la clé reste.
       const ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
       await ctx.clock.install({ time: maintenant() });
       const o = await ouvrir(nav, { ctx, tactile: true });
-      const a = await o.page.evaluate(() => {
-        const el = document.getElementById('astuceTap'), b = el.getBoundingClientRect(), c = canvas.getBoundingClientRect();
-        const r = { x: b.left - c.left, y: b.top - c.top, w: b.width, h: b.height };
-        return { vis: !el.hidden && b.width > 0, texte: el.textContent, chevauche: debEtat.items.filter(i => i.rect && r.x < i.rect.x + i.rect.w && r.x + r.w > i.rect.x && r.y < i.rect.y + i.rect.h && r.y + r.h > i.rect.y).map(i => i.texte) };
-      });
-      check('tactile, 1re visite : « Touchez une étiquette pour le détail », sur aucun texte', a.vis && a.texte === 'Touchez une étiquette pour le détail' && !a.chevauche.length, a);
+      const a = await lireCle(o.page);
+      check('tactile, 1re visite : « Touchez une étiquette pour le détail » à côté de la clé « ? », sur aucun texte ni aucune ligne', a.phrase === 'Touchez une étiquette pour le détail' && cleBienPosee(a), a);
       const b = await o.page.evaluate(() => canvas.getBoundingClientRect());
-      await o.page.touchscreen.tap(b.left + 30, b.top + b.height - 60); await o.page.waitForTimeout(200);
-      const apres = await o.page.evaluate(() => ({ cache: document.getElementById('astuceTap').hidden, cle: localStorage.getItem('samsara-astuce-tap-v1') }));
-      check('… cachée au premier toucher ; la clé samsara-astuce-tap-v1 vaut « 1 »', apres.cache && apres.cle === '1', apres);
+      await o.page.touchscreen.tap(b.left + b.width / 2, b.top + b.height - 60); await o.page.waitForTimeout(200);
+      const apres = await lireCle(o.page);
+      check('… l’astuce cachée au premier toucher du graphique ; la clé samsara-astuce-tap-v1 vaut « 1 » ; la clé « ? » reste, sur aucun texte', apres.phrase === null && apres.stockee === '1' && cleBienPosee(apres), apres);
       await o.page.close();
       const o2 = await ouvrir(nav, { ctx, tactile: true, garder: true });
-      check('… au rechargement, elle ne revient pas', await o2.page.evaluate(() => document.getElementById('astuceTap').hidden), null);
+      const a2 = await lireCle(o2.page);
+      check('… au rechargement, l’astuce ne revient pas ; la clé, si', a2.phrase === null && cleBienPosee(a2), a2);
       await ctx.close();
+      // Souris (1440 px) : « Survolez… », une fois, cachée au bout de 8 s ; la clé reste.
       const o3 = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
-      const a3 = await o3.page.evaluate(() => ({ vis: !document.getElementById('astuceTap').hidden, texte: document.getElementById('astuceTap').textContent }));
-      check('souris : « Survolez une étiquette pour le détail », une fois', a3.vis && a3.texte === 'Survolez une étiquette pour le détail', a3);
+      const a3 = await lireCle(o3.page);
+      check('souris : « Survolez une étiquette pour le détail », une fois, à côté de la clé', a3.phrase === 'Survolez une étiquette pour le détail' && cleBienPosee(a3), a3);
       await o3.page.clock.runFor(9000); await o3.page.waitForTimeout(100);
-      check('… cachée au bout de 8 s', await o3.page.evaluate(() => document.getElementById('astuceTap').hidden), null);
+      const a4 = await lireCle(o3.page);
+      check('… l’astuce cachée au bout de 8 s ; la clé reste, sur aucun texte', a4.phrase === null && a4.stockee === '1' && cleBienPosee(a4), a4);
       await o3.ctx.close();
+    }
+    {
+      // La clé, à 360, 390 (au doigt) et 1440 px : un bouton nommé en mots, sous le doigt, dans le tracé,
+      // sur aucun texte ni aucune ligne ; la ligne du prix amenée dessus la fait changer de place ; elle
+      // ouvre la fiche du Guide (clic, toucher, Entrée), Échap la ferme et rend la main à la clé.
+      for (const [vue, tactile] of [[{ width: 360, height: 740 }, true], [{ width: 390, height: 844 }, true], [{ width: 1440, height: 900 }, false]]) {
+        const o = await ouvrir(nav, { vue, tactile });
+        const nom = vue.width + ' px' + (tactile ? ' (doigt)' : '');
+        const c = await lireCle(o.page);
+        check(`${nom} : la clé « ? » est là — un bouton nommé « ${c.nom} », sous le doigt, dans le tracé, sur aucun texte (${c.surTexte.length}), ni la ligne d’une figure, ni la ligne du prix`,
+          cleBienPosee(c) && /^[A-ZÀ-Ÿ][a-zà-ÿ ’']{8,}$/.test(c.nom), c);
+        if (tactile) check(`${nom} : au doigt, sa cible fait au moins 40 × 40 px (${Math.round(c.r.w)} × ${Math.round(c.r.h)})`, c.r.w >= 40 && c.r.h >= 40, c.r);
+        // Le prix live amené au milieu de la clé : elle change de place, toujours hors des textes.
+        const p = await o.page.evaluate(() => { const P = geoPrix, k = document.getElementById('cleAide').getBoundingClientRect(), cv = canvas.getBoundingClientRect();
+          const y = k.top - cv.top + k.height / 2; return P.minP + P.range * (1 - (y - P.top) / P.ph); });
+        await o.page.evaluate(v => { livePrice = v; dessinerCalque(); }, p);
+        await o.page.waitForTimeout(100);
+        const c2 = await lireCle(o.page);
+        check(`${nom} : la ligne du prix amenée sur la clé (y ${Math.round(c.r.y + c.r.h / 2)}) : la clé change de place (y ${Math.round(c2.r.y)}), hors de la ligne et des textes`,
+          Math.abs(c2.yPrix - (c.r.y + c.r.h / 2)) < 2 && c2.r.y !== c.r.y && cleBienPosee(c2), { avant: c.r, apres: c2 });
+        // Elle ouvre la fiche du Guide.
+        if (tactile) await o.page.tap('#cleAide'); else await o.page.click('#cleAide');
+        await o.page.waitForTimeout(250);
+        const f1 = await o.page.evaluate(() => ({ fiche: ficheOuverte, vue: !document.getElementById('fichePop').hidden, titre: (document.querySelector('#fichePop .fiche-titre') || {}).textContent }));
+        await o.page.keyboard.press('Escape'); await o.page.waitForTimeout(150);
+        const f2 = await o.page.evaluate(() => ({ fiche: ficheOuverte, focus: document.activeElement && document.activeElement.id }));
+        check(`${nom} : ${tactile ? 'un toucher' : 'un clic'} sur la clé ouvre la fiche du Guide (« ${f1.titre} ») ; Échap la ferme et rend la main à la clé`,
+          f1.fiche === 'guide' && f1.vue && f2.fiche === null && f2.focus === 'cleAide', { f1, f2 });
+        if (!tactile) {
+          await o.page.focus('#cleAide'); await o.page.keyboard.press('Enter'); await o.page.waitForTimeout(250);
+          const f3 = await o.page.evaluate(() => ficheOuverte);
+          await o.page.keyboard.press('Escape');
+          check(`${nom} : au clavier, Entrée sur la clé ouvre la même fiche`, f3 === 'guide', f3);
+        }
+        check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+        await o.ctx.close();
+      }
+      // Complet : ni clé ni astuce.
+      for (const [vue, tactile] of [[{ width: 390, height: 844 }, true], [{ width: 1440, height: 900 }, false]]) {
+        const o = await ouvrir(nav, { vue, tactile, mode: 'expert' });
+        const c = await o.page.evaluate(() => { const a = document.getElementById('astuceTap'), k = document.getElementById('cleAide'); return { conteneur: !a.hidden && a.getClientRects().length > 0, cle: k.getClientRects().length > 0 }; });
+        check(`Complet, ${vue.width} px : ni clé « ? » ni astuce`, !c.conteneur && !c.cle, c);
+        await o.ctx.close();
+      }
     }
 
     // ── ↺ : revenir au présent ──
@@ -1143,7 +1212,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         for (const k of ['getItem', 'setItem', 'removeItem', 'clear']) Storage.prototype[k] = bloque;
       });
       const o = await ouvrir(nav, { ctx });
-      const etat = () => o.page.evaluate(() => ({ html: document.documentElement.getAttribute('data-mode'), deb: debutant(), items: debEtat ? debEtat.items.length : null, astuce: !document.getElementById('astuceTap').hidden }));
+      const etat = () => o.page.evaluate(() => ({ html: document.documentElement.getAttribute('data-mode'), deb: debutant(), items: debEtat ? debEtat.items.length : null, astuce: !document.getElementById('astucePhrase').hidden, cle: !document.getElementById('astuceTap').hidden }));
       const e0 = await etat();
       await o.page.keyboard.press('m'); await o.page.waitForTimeout(400);
       const e1 = await etat();
@@ -1151,8 +1220,10 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       const e2 = await etat();
       check('stockage bloqué : Débutant au départ ; M → Expert partout (page ET graphique) ; 2e M → Débutant', e0.html === 'debutant' && e0.deb && e1.html === 'expert' && !e1.deb && e1.items === null && e2.html === 'debutant' && e2.deb && e2.items > 0, { e0, e1, e2 });
       await o.page.clock.runFor(9000); await o.page.waitForTimeout(100);
-      const a1 = await o.page.evaluate(() => { drawChart(); astuceMontrer(); return !document.getElementById('astuceTap').hidden; });
-      check('stockage bloqué : l’astuce, cachée au bout de 8 s, ne revient pas au dessin suivant', !a1, a1);
+      const a1 = await o.page.evaluate(() => { drawChart(); astuceMontrer(); const a = document.getElementById('astuceTap'), ph = document.getElementById('astucePhrase');
+        return { phrase: !ph.hidden && ph.getClientRects().length > 0, cle: !a.hidden && document.getElementById('cleAide').getClientRects().length > 0 }; });
+      check('stockage bloqué : l’astuce, cachée au bout de 8 s, ne revient pas au dessin suivant ; la clé « ? » reste', !a1.phrase && a1.cle, a1);
+      check('stockage bloqué : la clé « ? » est là en Débutant, partie en Expert, revenue au retour', e0.cle && !e1.cle && e2.cle, { e0, e1, e2 });
       check('stockage bloqué : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await ctx.close();
     }

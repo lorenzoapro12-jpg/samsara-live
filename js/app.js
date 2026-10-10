@@ -961,57 +961,114 @@ function apresChangementMode(m) {
     if (typeof ajusterRuban === 'function') ajusterRuban();
   });
 }
-// L'astuce du Débutant, une seule fois (clé samsara-astuce-tap-v1) : « Touchez une étiquette pour le
-// détail » (écran tactile) ou « Survolez… » (souris). Cachée au premier toucher du graphique ou au
-// bout de 8 s. Un élément HTML, pas un texte du graphique ; posée là où elle ne couvre aucune
-// étiquette.
+// La clé « ? » du Lisible, toujours là : un bouton (pas un texte du graphique : hors du budget des
+// 5 textes) qui ouvre l'explication de l'écran (la fiche du Guide). La toute première fois (clé
+// samsara-astuce-tap-v1), l'astuce l'accompagne : « Touchez une étiquette pour le détail » (écran
+// tactile) ou « Survolez… » (souris), cachée au premier toucher du graphique ou au bout de 8 s ;
+// seule la clé reste. Posée dans un coin du tracé, là où elle ne couvre ni une étiquette, ni la
+// ligne qui valide une figure, ni la ligne du prix.
 const ASTUCE_CLE = 'samsara-astuce-tap-v1';
 let astuceFin = null, astuceVueIci = false;   // vue dans cette page (le stockage peut être bloqué)
+let astucePos = null;                          // { y, h } de la clé posée, en coordonnées du tracé
 function astuceVue() { if (astuceVueIci) return true; try { return localStorage.getItem(ASTUCE_CLE) === '1'; } catch (e) { return false; } }
 function astuceMontrer() {
-  const a = document.getElementById('astuceTap');
+  const a = document.getElementById('astuceTap'), ph = document.getElementById('astucePhrase');
   if (!a) return;
-  if (!debutant() || astuceVue()) { a.hidden = true; return; }
-  if (!a.hidden) return;
-  const tactile = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-  a.textContent = (tactile ? 'Touchez' : 'Survolez') + ' une étiquette pour le détail';
+  if (!debutant()) {
+    // Complet : ni clé ni astuce ; une astuce pas encore lue reviendra en Lisible.
+    a.hidden = true; astucePos = null;
+    if (ph && !ph.hidden) { ph.hidden = true; clearTimeout(astuceFin); astuceFin = null; }
+    return;
+  }
   a.hidden = false;
+  if (ph && ph.hidden && !astuceVue()) {
+    const tactile = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    ph.textContent = (tactile ? 'Touchez' : 'Survolez') + ' une étiquette pour le détail';
+    ph.hidden = false;
+    clearTimeout(astuceFin);
+    astuceFin = setTimeout(astuceCacher, 8000);
+  }
   astucePlacer();
-  clearTimeout(astuceFin);
-  astuceFin = setTimeout(astuceCacher, 8000);
 }
-/** En bas du tracé, à gauche ; plus haut si une étiquette du Débutant y est déjà, ou la ligne qui
- *  valide la figure (testée segment par segment, pas par son rectangle englobant). Sans place libre,
- *  l'invite reste cachée pour cette image (elle ne couvre jamais un libellé ni la ligne). */
+/** Le prix live, en y du tracé (null hors de la vue). */
+function yPrixLive() {
+  const P = geoPrix;
+  return P && isNum(livePrice) && livePrice >= P.minP && livePrice <= P.maxP ? P.top + P.ph * (1 - (livePrice - P.minP) / P.range) : null;
+}
+/** En bas du tracé, à gauche ; plus haut si une étiquette du Débutant y est déjà, la ligne qui
+ *  valide la figure (testée segment par segment, pas par son rectangle englobant) ou la ligne du
+ *  prix live ; puis à droite, avant la colonne des prix. Sans place libre, la clé reste cachée
+ *  pour cette image (elle ne couvre jamais un libellé ni une ligne). */
 function astucePlacer() {
   const a = document.getElementById('astuceTap');
   if (!a || a.hidden || !geoPrix) return;
-  const h = a.offsetHeight || 24, w = a.offsetWidth || 240;
+  const h = a.offsetHeight || 28, w = a.offsetWidth || 28;
   const items = debEtat ? debEtat.items.filter(i => i.rect) : [], segs = (debEtat && debEtat.eviteSegs) || [];
   const surSeg = (x, y) => segs.some(s => {
     const n = Math.max(2, Math.ceil(Math.hypot(s[2] - s[0], s[3] - s[1]) / 4));
     for (let k = 0; k <= n; k++) { const px = s[0] + (s[2] - s[0]) * k / n, py = s[1] + (s[3] - s[1]) * k / n; if (px >= x - 3 && px <= x + w + 3 && py >= y - 3 && py <= y + h + 3) return true; }
     return false;
   });
-  const libre = (x, y) => y >= geoPrix.top && !items.some(i => x < i.rect.x + i.rect.w && x + w > i.rect.x && y < i.rect.y + i.rect.h && y + h > i.rect.y) && !surSeg(x, y);
+  const yL = yPrixLive();
+  const libre = (x, y) => y >= geoPrix.top && !items.some(i => x < i.rect.x + i.rect.w && x + w > i.rect.x && y < i.rect.y + i.rect.h && y + h > i.rect.y) && !surSeg(x, y)
+    && (yL === null || y > yL + 4 || y + h < yL - 4);
   let pos = null;
   for (const x of [20, Math.max(20, geoPrix.W - geoPrix.right - w - 8)]) {
     for (let k = 0, y = geoPrix.top + geoPrix.ph - h - 8; k < 12 && !pos; k++, y -= h + 6) if (libre(x, y)) pos = { x, y };
     if (pos) break;
   }
   a.style.visibility = pos ? '' : 'hidden';
+  astucePos = pos && { y: pos.y, h };
   if (!pos) return;
   // Coordonnées du tracé → celles du conteneur (le canvas est dans sa marge).
   a.style.left = (canvas.offsetLeft + pos.x) + 'px'; a.style.top = (canvas.offsetTop + pos.y) + 'px'; a.style.bottom = 'auto';
 }
+/** Le calque, à chaque prix live : la clé est reposée seulement si la ligne du prix la traverse. */
+function astuceEviterPrix() {
+  const y = yPrixLive();
+  if (astucePos && y !== null && y >= astucePos.y - 4 && y <= astucePos.y + astucePos.h + 4) astucePlacer();
+}
+/** L'astuce (la phrase) s'efface ; la clé reste, reposée à sa taille seule. */
 function astuceCacher() {
-  const a = document.getElementById('astuceTap');
+  const ph = document.getElementById('astucePhrase');
   clearTimeout(astuceFin); astuceFin = null;
-  if (!a || a.hidden) return;
-  a.hidden = true;
+  if (!ph || ph.hidden) return;
+  ph.hidden = true;
   astuceVueIci = true;
   try { localStorage.setItem(ASTUCE_CLE, '1'); } catch (e) { /* navigation privée */ }
+  astucePlacer();
 }
+
+// Au doigt, pas de survol : le titre d'un bouton fait d'une icône seule (Réinitialiser, Carte,
+// Légendes, Thème, la clé « ? »…) ne se lirait jamais. À l'appui du doigt, son nom (aria-label,
+// celui que lit un lecteur d'écran) s'affiche juste dessous, le temps de l'appui et 1,2 s après ;
+// l'action part au relâcher, comme avant. Une bulle muette (aria-hidden : le nom est déjà dit),
+// inerte au pointeur.
+(function () {
+  if (typeof document === 'undefined' || !document.addEventListener) return;
+  let bulle = null, fin = 0;
+  document.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'touch' || !e.target || !e.target.closest) return;
+    const b = e.target.closest('.ico-btn[aria-label], #cleAide');
+    const nom = b && b.getAttribute('aria-label');
+    if (!nom) return;
+    if (!bulle) {
+      bulle = document.createElement('div');
+      bulle.className = 'nom-appui'; bulle.id = 'nomAppui'; bulle.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(bulle);
+    }
+    clearTimeout(fin);
+    bulle.textContent = nom; bulle.hidden = false;
+    // Sous le bouton, centrée, dans l'écran ; au-dessus quand la place manque en bas.
+    const r = b.getBoundingClientRect(), w = bulle.offsetWidth, h = bulle.offsetHeight;
+    const y = r.bottom + 8 + h <= innerHeight - 4 ? r.bottom + 8 : r.top - h - 8;
+    bulle.style.left = Math.round(Math.max(6, Math.min(innerWidth - w - 6, r.left + r.width / 2 - w / 2))) + 'px';
+    bulle.style.top = Math.round(Math.max(4, y)) + 'px';
+  }, { passive: true });
+  const relacher = () => { if (bulle && !bulle.hidden) { clearTimeout(fin); fin = setTimeout(() => { bulle.hidden = true; }, 1200); } };
+  document.addEventListener('pointerup', relacher, { passive: true });
+  document.addEventListener('pointercancel', relacher, { passive: true });
+})();
 
 function toggleDropdown(e) {
   e.stopPropagation();
@@ -3351,8 +3408,8 @@ function drawChart() {
   resolveChart(candles, 16, 75, mainH, W);
   ctx.save(); etiquettesAFaire.forEach(f => f()); ctx.restore();
   etiquettesAFaire = [];
-  // Débutant : l'astuce (une seule fois), posée hors des étiquettes.
-  if (deb) { astuceMontrer(); astucePlacer(); }
+  // Lisible : la clé « ? » (et l'astuce, une seule fois), posée hors des étiquettes.
+  if (deb) astuceMontrer();
 
   // Compteur bougies visibles + plage dates + % variation (Expert : en Débutant, la variation de
   // la vue contredirait celle de l'en-tête, et le régime est le verbe de la phrase).
@@ -3456,6 +3513,8 @@ function dessinerCalque() {
       cx.beginPath(); cx.moveTo(triX, y - 4); cx.lineTo(triX + 8, y); cx.lineTo(triX, y + 4); cx.closePath(); cx.fill();
       cx.fillStyle = baisse ? COLORS.surDown : COLORS.surUp;   // --up-sur / --down-sur
       cx.fillText(lpStr, bx + 6, y + 4);
+      // Lisible : la ligne a bougé sous la clé « ? » → la clé change de place (jamais sur la ligne).
+      if (deb) astuceEviterPrix();
     }
   }
   // Âge de la couche « Ordres en attente (carte) » (heatmap.json, publiée au quart d'heure) : aucun calque n'est
@@ -5659,7 +5718,7 @@ function guideFormeDebutant(E, f, t, garder) {
   const b = R.bilan[f.type], ctxF = E.ctxF;
   const entree = { f, tr, pose, w, h: H, t, v: null, st: st0, segsV };
   E.figures.push(entree);
-  // L'invite « Touchez une étiquette… » évite la ligne qui valide, segment par segment (astucePlacer).
+  // La clé « ? » (et l'astuce « Touchez une étiquette… ») évite la ligne qui valide, segment par segment (astucePlacer).
   if (debEtat) debEtat.eviteSegs = segsV;
   E.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs: tr.segs, prio: 2, figure: entree, titre: Guide.titreForme(f, 'debutant', ctxF), texte: Guide.texteFormeDebutant(f, b, ctxF, G, unite) });
   if (pose) entree.item = debItem('forme', t, { x: pose.x, y: pose.y, w: Math.min(w, ctx.measureText(t).width + 14), h: H });

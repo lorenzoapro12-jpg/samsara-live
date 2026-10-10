@@ -307,3 +307,70 @@ html:not([data-mode="expert"]) .statut { bottom: 26px; white-space: nowrap; over
 .geste-doigt { display: none; }
 @media (pointer: coarse) { .geste-souris { display: none; } .geste-doigt { display: inline; } }
 @media (max-width: 479px) { #gradBarre span.mi { display: none; } }
+
+/* ─── « Choisir l'affichage » ───
+   Un seul panneau : « Tout afficher » et « Revenir au départ » en tête, puis les calques rangés par
+   question, chacun avec sa phrase « C'est quoi ? » (petite, grise : du détail), et tout en bas, replié,
+   les réglages fins (Complet). Le bouton dit son nom entier, « Affichage » quand la place manque :
+   jamais coupé. */
+.bouton-affichage .aff-court { display: none; }
+/* Où le nom entier ne tient pas (mesuré : 121 px contre 73) — Complet : sous 800 px (à 650, la barre
+   passait sur trois rangées) et dès 1280 px, où les puces des calques partagent la rangée (une puce de
+   moins à 1280, 1366 et 1680 px) ; Lisible : sous 360 px. */
+@media (max-width: 799px), (min-width: 1280px) {
+  [data-mode="expert"] .bouton-affichage .aff-long { display: none; }
+  [data-mode="expert"] .bouton-affichage .aff-court { display: inline; }
+}
+@media (max-width: 359px) {
+  .bouton-affichage .aff-long { display: none; }
+  .bouton-affichage .aff-court { display: inline; }
+}
+.affichage .aff-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
+.affichage .aff-actions .bouton { flex: 1 1 auto; padding: 7px 10px; color: var(--ink-1); }
+.panneau-flottant .aff-note { margin: 6px 0 2px; }
+.aff-groupe { padding: 2px 10px 8px; }
+.aff-groupe legend { color: var(--ink-1); font-weight: 600; font-size: 12.5px; }
+.aff-calque { margin-top: 4px; }
+.aff-calque label { flex-direction: row; align-items: center; gap: 8px; margin: 0; min-height: 28px; color: var(--ink-1); font-size: 12.5px; cursor: pointer; }
+.aff-calque input { flex-shrink: 0; width: 16px; height: 16px; margin: 0; accent-color: var(--carte-live); cursor: pointer; }
+.aff-calque input:disabled { cursor: default; }
+.aff-toujours { margin-left: auto; font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.panneau-flottant .aff-quoi { margin: 0 0 2px 24px; font-size: 11.5px; line-height: 1.4; color: var(--ink-3); }
+.aff-qq { color: var(--ink-2); font-weight: 600; }
+.reglages-fins { margin-top: 12px; border-top: 1px solid var(--bord); padding-top: 4px; }
+.reglages-fins > summary { cursor: pointer; padding: 6px 0; font-size: 13px; font-weight: 600; color: var(--ink-1); }
+.reglages-fins > summary:focus-visible { outline: 2px solid var(--carte-live); outline-offset: 1px; }
+
+/* ─── Lisible : la mini-clé des couleurs (js : placerMiniCle) ───
+   Petite, permanente, dans un coin libre de la carte ; inerte au pointeur (les gestes vont à la carte).
+   Fond plein, comme la bulle du Lisible : une rangée jaune de la chaleur ne transparaît pas sous ses mots. */
+.mini-cle {
+  position: absolute; z-index: 3; left: 8px; top: 8px; pointer-events: none;
+  display: flex; flex-direction: column; gap: 3px; padding: 4px 8px 5px;
+  background: var(--surface); border: 1px solid var(--bord); border-radius: 8px;
+  font-size: 11px; line-height: 1.25; color: var(--ink-2); white-space: nowrap;
+}
+.mini-cle[hidden] { display: none; }
+.mc-ligne { display: flex; align-items: center; gap: 5px; }
+.mc-ligne b { min-width: 3.3em; color: var(--ink-1); font-weight: 600; }
+.mc-rampe { flex-shrink: 0; width: 56px; height: 8px; border-radius: 2px; background-size: 100% 100%; image-rendering: pixelated; outline: 1px solid var(--bord); }
+.mc-sens { font-size: 10.5px; color: var(--ink-3); }
+
+/* ─── Au doigt (pointer: coarse) : des cibles d'au moins 40 × 40 px dans la barre ───
+   « ← Terminal », chaque bouton et chaque puce : 32 px de haut et 40 de large au moins, et un ::before
+   transparent, centré, qui porte la zone de toucher à 40 px de côté (4 px au-dessus et au-dessous, dans
+   la marge de la barre et dans l'écart de 9 px entre ses rangées : 1 px entre les zones, qui ne se
+   couvrent pas). Les puces de Complet sont dans une rangée qui défile, qui les rognerait : elle a 4 px de
+   marge haute et basse. Le bouton de mode (un autre chantier) ne change pas. Lisible à 390 px : la barre
+   fait 82 px (deux rangées, ≤ 82). */
+@media (pointer: coarse) {
+  .barre { padding-top: 4px; padding-bottom: 4px; row-gap: 9px; }
+  .barre .retour, .barre .puce, .barre .bouton:not(.bouton-mode) {
+    position: relative; flex-shrink: 0; min-width: 40px; min-height: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .barre .retour::before, .barre .puce::before, .barre .bouton:not(.bouton-mode)::before {
+    content: ''; position: absolute; inset: min(0px, calc(50% - 20px));
+  }
+  [data-mode="expert"] .calques { padding-top: 4px; padding-bottom: 4px; }
+}

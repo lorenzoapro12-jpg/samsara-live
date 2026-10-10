@@ -24,6 +24,9 @@
 //  10. TÉLÉPHONE : la barre du bas ne cache pas la dernière ligne des modales.
 //  11. BOUTONS DE L'EN-TÊTE, de 360 à 1440 px, dans neuf thèmes et les deux modes : ni sur le
 //      prix, ni hors de l'écran, ni cachés ; « Choisir l'affichage » à l'écran (Planche comprise).
+//  12. AU DOIGT (écran tactile, 360 et 390 px, aero et kala, deux modes) : chaque bouton de
+//      l'en-tête et chaque intervalle du ruban couvre un carré de 40 × 40 px ; aucune zone sur
+//      l'interrupteur de mode ni « Choisir l'affichage » ; le nom d'un bouton-icône dit à l'appui.
 //
 // Binance simulé (prix 86 012,50, ouverture 85 700 : +0,36 % ; Binance arrondit à +0,365), le
 // fichier publié du dépôt avec l'heure de publication réglée par contrôle ; horloge fixée au
@@ -395,6 +398,92 @@ const lireEntete = page => page.evaluate(() => {
         check(`${theme.padEnd(9)} · ${mode.padEnd(8)} : de 360 à 1440 px, aucun bouton sur le prix ni hors de l’écran ; l’interrupteur « Lisible | Complet » entier, le bon segment enfoncé, sous aucun bouton`, !fautes.length, fautes.slice(0, 6));
         await o.ctx.close();
       }
+    }
+
+    // ── 8. Au doigt : des cibles d'au moins 40 × 40 px ──────────────────────────
+    // Écran tactile (pointer: coarse), 360 et 390 px, deux modes, aero et kala, publication en retard
+    // (la pastille la plus longue). Chaque bouton de l'en-tête et chaque intervalle du ruban : tout
+    // le carré de 40 × 40 px centré sur lui (17 × 17 points jusqu'à ±19,5 px : le point du bord est au
+    // milieu du dernier pixel) le touche, lui (la pastille
+    // « Infos du marché » : elle ou la bande qui la porte, même action). Les deux segments de
+    // l'interrupteur de mode et « Choisir l'affichage » ont leur propre mesure : pas de taille exigée ici,
+    // mais aucune zone voisine ne les couvre (chaque point de leur cadre les touche, eux ou leur groupe). Puis le nom d'un bouton-icône,
+    // dit à l'appui du doigt : chaque bouton sans mot visible a un nom en mots (aria-label), qui
+    // s'affiche sous lui à l'appui, entier dans l'écran, et s'efface après le relâcher.
+    titre('8. Au doigt (360 et 390 px, écran tactile) : chaque bouton de l’en-tête et du ruban, une cible de 40 × 40 px au moins ; le nom d’un bouton-icône dit à l’appui');
+    for (const theme of ['aero', 'kala']) for (const mode of ['debutant', 'expert']) for (const w of [360, 390]) {
+      const o = await ouvrir(nav, { vue: { width: w, height: 800 }, mode, theme, ageS: 25 * 60 });
+      const nom = `${theme} · ${mode} · ${w}`;
+      const m = await o.page.evaluate(() => {
+        const vis = e => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
+        const AUTRES = ['modeBtn', 'indDropdownBtn'], autre = b => AUTRES.includes(b.id) || !!b.closest('#modeBtn');
+        const tous = [...document.querySelectorAll('.header button, .header a, .header [role="button"], .indicator-bar label[id^="int_"], #indDropdownBtn')].filter(vis);
+        const cycle = document.getElementById('cycle');
+        const nomDe = b => b.id || b.className.split(' ')[0];
+        const cibles = tous.filter(b => !autre(b)).map(b => {
+          // Un intervalle hors de la partie visible du ruban (Complet : il défile) : amené à l'écran d'abord.
+          if (b.closest('.indicator-bar')) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          const a = h => !!h && (b.contains(h) || (b.classList.contains('kpi-deb') && h === cycle));
+          const rates = [];
+          for (let i = -8; i <= 8; i++) for (let j = -8; j <= 8; j++) { const h = document.elementFromPoint(cx + i * 19.5 / 8, cy + j * 19.5 / 8); if (!a(h)) rates.push([Math.round(i * 19.5 / 8), Math.round(j * 19.5 / 8), h ? nomDe(h) : 'rien']); }
+          // L'étendue de la zone sur les deux axes (au demi-pixel), pour le rapport.
+          const ext = (dx, dy) => { let d = 0; while (d < 60 && a(document.elementFromPoint(cx + dx * (d + 0.5), cy + dy * (d + 0.5)))) d += 0.5; return d; };
+          return { id: nomDe(b), dessin: [Math.round(r.width), Math.round(r.height)], zone: [ext(-1, 0) + ext(1, 0), ext(0, -1) + ext(0, 1)], rates: rates.length, ex: rates.slice(0, 3) };
+        });
+        // L'interrupteur et « Choisir l'affichage » : aucun point de leur cadre (grille de 2 px) ne touche un
+        // autre élément qu'eux — ou que leur conteneur, dans les coins arrondis.
+        const autres = tous.filter(autre).map(b => {
+          if (b.closest('.indicator-bar')) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          const r = b.getBoundingClientRect(), pris = new Set();
+          for (let x = r.left + 1; x < r.right - 0.5; x += 2) for (let y = r.top + 1; y < r.bottom - 0.5; y += 2) { const h = document.elementFromPoint(x, y); if (!h || !(b.contains(h) || h.contains(b))) pris.add(h ? nomDe(h) : 'rien'); }
+          return { id: b.id || b.dataset.modeChoix || nomDe(b), rates: pris.size, par: [...pris] };
+        });
+        const hd = document.querySelector('.header');
+        return { cibles, autres, page: document.documentElement.scrollWidth - innerWidth, tete: [hd.scrollWidth, hd.clientWidth], hTete: Math.round(hd.getBoundingClientRect().height),
+          geo: ['.header-left', '#cycle', '.header-right'].map(s => { const q = document.querySelector(s).getBoundingClientRect(); return s + ' ' + [q.left, q.top, q.right, q.bottom].map(Math.round).join(','); }) };
+      });
+      const petits = m.cibles.filter(c => c.rates);
+      check(`${nom} : ${m.cibles.length} cibles (${m.cibles.map(c => c.id + ' ' + c.zone.join('×')).join(', ')}) — chacune couvre un carré de 40 × 40 px`,
+        m.cibles.length >= (mode === 'debutant' ? 12 : 13) && !petits.length, { petits, geo: m.geo });
+      check(`${nom} : les deux segments de l’interrupteur et « Choisir l’affichage » restent entiers sous le doigt (aucune zone voisine sur eux)`,
+        m.autres.length >= 3 && m.autres.every(x => !x.rates), m.autres);
+      check(`${nom} : ni la page ni l’en-tête ne débordent (en-tête ${m.hTete} px)`, m.page <= 0 && m.tete[0] <= m.tete[1] + 1, m);
+      // Le nom à l'appui : chaque bouton sans mot visible, un nom en mots ; à l'appui, il s'affiche.
+      const icones = await o.page.evaluate(() => [...document.querySelectorAll('.header button, .header a')].filter(b => b.getClientRects().length && getComputedStyle(b).visibility !== 'hidden' && !b.innerText.trim())
+        .map(b => ({ id: b.id, nom: b.getAttribute('aria-label') || '' })));
+      check(`${nom} : ${icones.length} boutons-icônes, chacun un nom en mots (${icones.map(i => '« ' + i.nom + ' »').join(', ')})`,
+        icones.length >= 4 && icones.every(i => /^[A-ZÀ-Ÿ][a-zà-ÿ’' ()]+[a-zà-ÿ)]$/.test(i.nom) && i.nom.length >= 6), icones);
+      const dits = [];
+      for (const i of icones) {
+        // L'appui seul (pointerdown tactile, sans relâcher : la carte du carnet ne s'ouvre pas).
+        const r = await o.page.evaluate(id => {
+          const b = document.getElementById(id), q = b.getBoundingClientRect();
+          b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', isPrimary: true, clientX: q.left + q.width / 2, clientY: q.top + q.height / 2 }));
+          const n = document.getElementById('nomAppui'), rn = n && n.getBoundingClientRect();
+          const res = n && { texte: n.textContent, vu: !n.hidden && rn.width > 0, dans: rn.left >= 0 && rn.right <= innerWidth && rn.top >= 0 && rn.bottom <= innerHeight, pres: Math.abs(rn.left + rn.width / 2 - (q.left + q.width / 2)) < rn.width / 2 + q.width / 2 + 1 && (rn.top >= q.bottom || rn.bottom <= q.top), muet: n.getAttribute('aria-hidden') === 'true' };
+          b.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch', isPrimary: true }));
+          return res;
+        }, i.id);
+        dits.push({ id: i.id, r });
+        if (!r || r.texte !== i.nom || !r.vu || !r.dans || !r.pres || !r.muet) break;
+      }
+      check(`${nom} : à l’appui, chaque bouton-icône dit son nom sous lui, entier dans l’écran (bulle muette pour un lecteur d’écran)`,
+        dits.length === icones.length && dits.every((d, k) => d.r && d.r.texte === icones[k].nom && d.r.vu && d.r.dans && d.r.pres && d.r.muet), dits.slice(-2));
+      await o.page.waitForTimeout(1400);
+      const parti = await o.page.evaluate(() => { const n = document.getElementById('nomAppui'); return !n || n.hidden; });
+      check(`${nom} : 1,2 s après le relâcher, le nom s’efface`, parti, parti);
+      if (w === 390 && mode === 'debutant') {
+        // Un vrai toucher : le nom s'affiche ET l'action a lieu (Légendes s'ouvre).
+        const b = await o.page.evaluate(() => { const q = document.getElementById('legendesBtn').getBoundingClientRect(); return { x: q.left + q.width / 2, y: q.top + q.height / 2 }; });
+        await o.page.touchscreen.tap(b.x, b.y);
+        await o.page.waitForTimeout(300);
+        const t = await o.page.evaluate(() => { const n = document.getElementById('nomAppui'), g = document.getElementById('fichePop'), ti = g && g.querySelector('.fiche-titre');
+          return { nom: n && !n.hidden ? n.textContent : null, ouvert: !!g && g.getClientRects().length > 0 && getComputedStyle(g).visibility !== 'hidden' && !!ti && ti.textContent === 'Légendes' }; });
+        check(`${nom} : un vrai toucher sur Légendes : « ${t.nom} » s’affiche et les légendes s’ouvrent`, t.nom === 'Légendes' && t.ouvert, t);
+      }
+      check(`${nom} : aucune erreur de script`, !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
     }
   } finally {
     await nav.close();
