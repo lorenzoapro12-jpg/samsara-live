@@ -7537,10 +7537,11 @@ function renderCycle(d) {
     + kpi('DXY', fmtNum(m.dxy_spot, 2), '', 'macro.dxy_spot')
     + kpi('VIX', fmtNum(m.vix, 1), '', 'macro.vix')
     // L'âge avance chaque minute sans refaire la bande : majAges() réécrit les [data-age-de].
-    // Au-delà du seuil, la pastille dit « en retard » (CSS .kpis.vieux) : elle reste visible au
-    // téléphone, seule de la bande (les chiffres clés y sont masqués).
+    // Au-delà du seuil, la pastille dit « en retard » (CSS .kpis.vieux, mot écrit par le CSS dans
+    // .age-retard : le texte de la pastille reste « 25 min », que Gare et la Planche habillent à
+    // leur façon) ; elle reste visible au téléphone, seule de la bande.
     + '<span class="kpi-age" title="Âge des infos du marché (publiées toutes les ' + CADENCES.attendue_min + ' min)">'
-    + (ageK === null ? '—' : '<span class="age-retard">en retard · </span>' + ageDe(d.updated, ageK) + ' min') + '</span>'
+    + (ageK === null ? '—' : '<span class="age-retard"></span>' + ageDe(d.updated, ageK) + ' min') + '</span>'
     // Débutant : une seule pastille, qui ouvre les cartes ; son âge dans l'infobulle (collé au prix
     // en direct, « il y a 18 min » se lisait comme l'âge du prix). « en retard » au-delà du seuil,
     // avec l'âge qui avance : c'est alors l'âge d'une publication manquée, il se lit.

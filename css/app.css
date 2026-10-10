@@ -278,10 +278,14 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 }
 .kpis.vieux .kpi-age { color: var(--warn-ink); background: var(--warn-soft); }
 /* Au-delà du seuil, la pastille d'âge dit le mot : « en retard · 25 min » (la teinte seule ne se
-   lisait pas). Gare l'écrit déjà elle-même (« Retard · », themes/gare.css) : pas deux fois. */
+   lisait pas). Le mot est écrit ici (contenu généré) : le texte de la pastille reste l'âge seul,
+   que les structures habillent. Gare l'écrit déjà elle-même (« Retard · », themes/gare.css) et la
+   Planche le marque de son △ (indice de révision) : pas deux fois, ni la case élargie. */
 .kpi-age .age-retard { display: none; }
 .kpis.vieux .kpi-age .age-retard { display: inline; }
-[data-structure="tableau"] .kpis.vieux .kpi-age .age-retard { display: none; }
+.kpis.vieux .kpi-age .age-retard::before { content: 'en retard · '; }
+[data-structure="tableau"] .kpis.vieux .kpi-age .age-retard,
+[data-structure="planche"] .kpis.vieux .kpi-age .age-retard { display: none; }
 /* Sur une autre paire que BTC/USDT, la bande dit qu'elle parle du bitcoin (js/app.js). */
 .kpi-btc {
   flex-shrink: 0; margin-right: 4px; padding: 2px 8px; border-radius: 999px;
@@ -389,19 +393,19 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
    téléphone, à trois écrans à droite. Au bureau, il est épinglé au bord droit du ruban (sticky),
    sur un fond plein qui recouvre en fondu ce qui défile dessous — le fondu du ruban est alors
    inutile ; au téléphone, il passe en tête, avant les intervalles. Bureau 95 l'épinglait déjà
-   (ses règles) ; la Planche le range sur la 1re rangée de sa nomenclature (les siennes l'emportent). */
+   et la Planche le range sur la 1re rangée de sa nomenclature : leurs règles, pas celles-ci. */
 @media (min-width: 769px) {
-  :root:not([data-mode="debutant"]):not([data-structure="fenetres"]) .indicator-bar > .ind-dropdown {
+  :root:not([data-mode="debutant"]):not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar > .ind-dropdown {
     position: sticky; right: 0; z-index: 1; margin-left: auto;
   }
-  :root:not([data-mode="debutant"]):not([data-structure="fenetres"]) .indicator-bar.deborde > .ind-dropdown {
+  :root:not([data-mode="debutant"]):not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar.deborde > .ind-dropdown {
     padding-left: 22px; background: linear-gradient(90deg, transparent, var(--card-solid) 18px);
     box-shadow: 12px 0 0 var(--card-solid);
   }
-  :root:not([data-mode="debutant"]):not([data-structure="fenetres"]) .indicator-bar.deborde { -webkit-mask-image: none; mask-image: none; }
+  :root:not([data-mode="debutant"]):not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar.deborde { -webkit-mask-image: none; mask-image: none; }
 }
 @media (max-width: 768px) {
-  :root:not([data-mode="debutant"]):not([data-structure="fenetres"]) .indicator-bar > .ind-dropdown { order: -2; }
+  :root:not([data-mode="debutant"]):not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar > .ind-dropdown { order: -2; }
 }
 .indicator-bar .section-title {
   flex-shrink: 0;

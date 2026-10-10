@@ -120,12 +120,16 @@ const lireEntete = page => page.evaluate(() => {
   const dotEtat = dotFond === teinte('var(--up)') ? 'ok' : dotFond === teinte('var(--warn)') ? 'retard' : dotFond === teinte('var(--down)') ? 'fige' : dotFond;
   sonde.remove();
   const rp = vis(pastille) ? R(pastille) : null, rprix = R(prix), rc = R(cy);
+  // Le texte LU de la pastille : le mot « en retard · » est écrit par le CSS (contenu généré de
+  // .age-retard, le texte de la pastille restant l'âge seul) ; innerText ne le voit pas.
+  const genere = el => { if (!vis(el)) return ''; const c = getComputedStyle(el, '::before').content; return c && c !== 'none' && c !== 'normal' ? c.replace(/^"|"$/g, '') : ''; };
+  const lu = el => (el === age ? genere(age.querySelector('.age-retard')) : '') + el.innerText.replace(/\s+/g, ' ').trim();
   // Rangées de l'en-tête : les sommets distincts (à 12 px près) des éléments visibles.
   const tops = [...document.querySelectorAll('.header-left > *, .header-right > *, #cycle > .kpi-age, #cycle > .kpi-deb')].filter(vis).map(e => e.getBoundingClientRect().top).sort((a, b) => a - b);
   const rangees = tops.reduce((n, t, i) => n + (i === 0 || t - tops[i - 1] > 12 ? 1 : 0), 0);
   return {
     mode: document.documentElement.dataset.mode, vieux: cy.classList.contains('vieux'),
-    pastille: rp && { texte: pastille.innerText.replace(/\s+/g, ' ').trim(), r: rp, fond: getComputedStyle(pastille).backgroundColor, dedans: rp.l >= Math.min(rc.l, 0) && rp.r <= innerWidth && pastille.scrollWidth <= pastille.clientWidth + 1
+    pastille: rp && { texte: lu(pastille), r: rp, fond: getComputedStyle(pastille).backgroundColor, dedans: rp.l >= Math.min(rc.l, 0) && rp.r <= innerWidth && pastille.scrollWidth <= pastille.clientWidth + 1
       && (getComputedStyle(cy).overflow === 'visible' || (rp.l >= rc.l - 1 && rp.r <= rc.r + 1)) },
     ambre, retardVu: !!retard && vis(retard), fraisVu: !!frais && vis(frais), fraisTexte: frais ? frais.innerText.trim() : null,
     ageRetardVu: !!age && vis(age.querySelector('.age-retard')),
