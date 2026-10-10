@@ -492,8 +492,15 @@ const PARAM = {
                 marge: 0.07,            // échelle : 7 % de l'amplitude au-dessus et au-dessous (place des libellés)
                 // Bulle résumée (le détail au 2e toucher) : 4 lignes au plus, titre et ligne
                 // d'accès au détail compris, et 3 nombres au plus (demande du 10/10/2026).
-                bulleLignes: 4, bulleNombres: 3 },
+                bulleLignes: 4, bulleNombres: 3,
+                // La ligne « ce qui vient de se passer » (plan §10 bis) : une ligne, comme la phrase.
+                evenement: 90, evenementEtroit: 48 },
   },
+  // Apprendre en se servant du site (plan §10 bis, js/apprendre.js) : la ligne de ce qui vient de se
+  // passer reste `dureeLisible` (`dureeComplet`) ms, plus longtemps tant que sa bulle est ouverte ;
+  // un même repère franchi n'est redit qu'après `passageMs` ; la marque « nouveau » est un point de
+  // rayon `marque` (`marqueComplet`, plus discret, en Complet).
+  apprendre: { dureeLisible: 8000, dureeComplet: 6000, passageMs: 15 * 60000, marque: 3, marqueComplet: 2.2 },
   // Scénarios du matin (js/scenarios.js) : les nombres de leur dessin et de leurs mots.
   scenarios: {
     point: '07h00',               // l'heure du point du matin dans la routine (à Paris) ; affichée à l'heure de l'appareil (heurePointMatin)
@@ -769,6 +776,8 @@ function filtrerMenu(t) {
   const menu = document.getElementById('indMenu');
   for (const l of menu.querySelectorAll('label[data-ind]')) l.hidden = !!q && !sansAccents(l.dataset.cherche).includes(q);
   for (const c of menu.querySelectorAll('.cat-title[data-cat]')) c.hidden = !menu.querySelector('label[data-cat="' + c.dataset.cat + '"]:not([hidden])');
+  // L'aide à la lecture n'est pas un indicateur : masquée pendant une recherche.
+  for (const el of menu.querySelectorAll('.aff-aide, .aff-aide-titre')) el.hidden = !!q;
   const vide = menu.querySelector('.ind-aucun');
   if (vide) vide.hidden = !!menu.querySelector('label[data-ind]:not([hidden])');
 }
@@ -832,6 +841,8 @@ function buildDropdown() {
       if (cat.cat === 'reaction') html += ligneFiguresPassees();
     }
     html += '<p class="ind-aucun" hidden>Aucun indicateur ne correspond.</p>';
+    // L'aide à la lecture (apprendre), avant les réglages fins : couper la ligne, couper les marques.
+    html += apprPanneau();
     html += '<details class="aff-fins" id="affFins"' + (finsOuverts ? ' open' : '') + ' ontoggle="finsOuverts = this.open"><summary>Réglages fins</summary>'
       + '<div class="aff-fins-corps">' + (typeof reglagesHtml === 'function' ? reglagesHtml() : '') + '</div></details>';
   }
@@ -1418,7 +1429,7 @@ canvas.addEventListener('dblclick', () => {
 // au même endroit la ferme.
 let bulleVue = null, bulleDetail = null;   // la clé de la bulle dessinée en résumé ; celle dont le détail est ouvert
 /** La clé d'une bulle : sa cible, d'une image à l'autre (les cibles sont refaites à chaque dessin). */
-const cleBulle = c => (c.scenario ? 's:' + c.scenario + ':' : '') + (c.figure ? 'f:' + c.figure.f.type + ':' + (c.figure.f.t0 != null ? c.figure.f.t0 : c.figure.f.t) + ':' : '')
+const cleBulle = c => (c.evenement ? 'e:' + c.evenement + ':' : '') + (c.scenario ? 's:' + c.scenario + ':' : '') + (c.figure ? 'f:' + c.figure.f.type + ':' + (c.figure.f.t0 != null ? c.figure.f.t0 : c.figure.f.t) + ':' : '')
   + (c.passee ? 'p:' + c.passee.id + ':' : '') + c.titre;
 function tapGraphique(clientX, clientY) {
   astuceCacher();
@@ -3552,6 +3563,8 @@ function dessinerCalque() {
   if (guideEtat) guideCalque();
   // Scénarios du matin : l'encadré (relu, pas recalculé).
   if (scenEtat) scenCalque();
+  // Apprendre : ce qui vient de se passer (comparé à l'image d'avant), puis la marque « nouveau ».
+  apprCalque();
   if (crossX === null || crossY === null) return;
   // x → indice : le pas des bougies (pasBougie), et la bougie dont le CRÉNEAU contient le
   // curseur [x, x + pas[ — l'arrondi d'avant désignait la voisine sur la moitié droite du créneau.
@@ -4276,6 +4289,8 @@ function resolveChart(candles, padL, padR, chartH, W) {
     if (guide) guidePassees(guide);
     if (guide) guideFormesDebutant(guide);
     debArbitrer();
+    // Ce qui vient de se passer (apprendre) : sa ligne prend une place du budget, le temps du message.
+    apprCeder(guide, scen);
     if (guide) guidePasseeLibelle(guide);
   } else {
     if (scen) scenAvantGuide(scen);
@@ -5772,7 +5787,7 @@ function guidePasseesCompte(E) {
   });
   E.cibles.push({ rects: [guideZone(r)], prio: 4, titre: 'Figures passées', texte: [V[1] || V[0],
     'Chaque figure passée garde la marque de son issue : ✓ cible atteinte, ✗ invalidée ou annulée, – délai écoulé après la validation, ○ sans suite. Survolez ou touchez sa marque : ce qui s’est passé ensuite.',
-    'Des exemples du passé, réussis ou non : pas une prévision ni une recommandation.'] });
+    Guide.RISQUE + ' Des exemples du passé, réussis ou non : pas une prévision ni une recommandation.'] });
 }
 /** Lisible : le libellé de la figure passée (« ✓ Double creux : cible »), près de sa marque, s'il
  *  reste une place dans le budget des textes (PARAM.guide.debutant.items) une fois tout le reste
@@ -5875,7 +5890,7 @@ function guideCalqueFigures(E) {
  *  en arrière avant la clôture (figureVivante(…).etiq lit le plus haut et le plus bas de la bougie). */
 function guideCalqueFormeDebutant(E) {
   const x = E.debForme;
-  if (!x || !x.pose) return;
+  if (!x || !x.pose || x.cede) return;   // cédé le temps d'un message (apprCeder) : son tracé reste
   const P = PARAM.guide.debutant, f = x.f, v = x.v;
   let t = Guide.libelleVivantDebutant(f, v, P.forme, x.t);
   if (!t || t.length > P.forme) t = x.t;
@@ -6035,7 +6050,7 @@ const nombresDe = t => {
 };
 /** Un avertissement de fin de bulle (« Une description, pas une recommandation. ») : en résumé, la
  *  ligne d'accès au détail le redit (« pas une prévision »). */
-const estAvertissement = t => t.length < 90 && /recommandation|conseil/.test(t);
+const estAvertissement = t => { const s = t.replace(Guide.RISQUE + ' ', ''); return s.length < 90 && /recommandation|conseil/.test(s); };
 /** Le résumé d'une bulle du Débutant (niveau 2) : ses phrases, dans l'ordre, tant que la bulle
  *  garde 4 lignes (titre compris ; la ligne qui mène au détail en plus) et 3 nombres au plus.
  *  Jamais une phrase coupée : celle qui ne tient pas arrête le résumé. Un résumé écrit pour la
@@ -6058,15 +6073,21 @@ function resumeBulle(texte, largeur, lignesLibres, nombresLibres) {
  *  bulle) ; la phrase, les scénarios et leur ligne ont le leur (c.resume) ; sinon, le texte. */
 function sourceResume(c, vivant, texte) {
   if (c.niveau && c.niveau.niv) return [[Guide.quoiDebutant(Guide.raisonPrincipale(c.niveau.niv))], [Guide.ouEstPrixDebutant(c.niveau.live, c.niveau.niv, livePrice)]];
+  // Une figure, une figure passée, un scénario (son libellé, sa ligne) : la ligne du risque en
+  // dernier, si elle tient (sinon elle est au détail, au 2e toucher).
+  const risque = [[Guide.RISQUE]];
   if (c.figure) {
     const vu = (String(texte[vivant ? 1 : 0] || '').match(/^.*?\.(?=\s|$)/) || [''])[0].replace(/^[^:]{2,40} : /, ''), maj = t => t.charAt(0).toUpperCase() + t.slice(1);
-    return [[vivant], [vu ? maj(vu) : '']];
+    return [[vivant], [vu ? maj(vu) : '']].concat(risque);
   }
-  return c.resume ? c.resume.map(p => (Array.isArray(p) ? p : [p])) : null;
+  if (!c.resume) return null;
+  const R = c.resume.map(p => (Array.isArray(p) ? p : [p]));
+  return c.passee || (scenEtat && scenEtat.cibles.includes(c)) ? R.concat(risque) : R;
 }
 /** La bulle d'une cible, près du curseur, toujours dans le tracé. */
 function guideBulle(c, W, mainH, evite) {
   const E = guideEtat, Sc = scenEtat;
+  apprLu(c);   // la marque « nouveau » de sa nature s'efface ; la bulle d'un message le fait durer
   if (Sc && Sc.cibles.includes(c)) Sc.survol = c; else E.survol = c;   // ce que la bulle explique (relu par les tests)
   // Débutant : le résumé (niveau 2) ; le détail au 2e toucher ou clic (tapGraphique). Expert : tout.
   const cle = cleBulle(c), detail = !debutant() || bulleDetail === cle;
@@ -6589,6 +6610,8 @@ function scenCible(S, it, rects, segs, zones, prio) {
   // La journée : distances, écart relatif (avec sa formule), contacts, temps restant — après le suivi.
   const lj = it.j ? Scenarios.ligneJourExpert(it.j, S.jour, ctxE) : null;
   if (lj) { const k = texte.findIndex(l => /^Suivi en direct/.test(l)); texte.splice(k < 0 ? texte.length : k + 1, 0, lj); }
+  // La ligne du risque, la même partout (Guide.RISQUE), en tête du dernier paragraphe.
+  texte.push(Guide.RISQUE + ' Une hypothèse de Claude (une IA), pas une recommandation.');
   S.cibles.push({ rects, segs, zones, prio, coul: it.coul, scenario: it.sc.id, titre: scenTitre(it.sc, S.mode), texte });
 }
 /** Flèche et repères numérotés d'un chemin ENCORE OUVERT, dans la marge de futur : de la dernière
@@ -7100,7 +7123,7 @@ function scenTexteBoite(S, sansBilan, court) {
       .concat(large ? [Scenarios.noteLarge(S.itv, 'debutant')] : [])
       .concat(b ? [b + '.'] : [])
       .concat(exp ? [] : ['Classé par Claude (une IA), du plus au moins probable, sans pourcentage.'])
-      .concat(['Plus : fiche « Scénarios du matin » dans les Légendes (bouton ?).', exp ? 'Description, pas une recommandation.' : 'Une description, pas une recommandation : rien ici ne dit quoi faire.']);
+      .concat(['Plus : fiche « Scénarios du matin » dans les Légendes (bouton ?).', Guide.RISQUE + (exp ? ' Description, pas une recommandation.' : ' Une description, pas une recommandation : rien ici ne dit quoi faire.')]);
   }
   const attente = !F && previsions && previsions.etat === 'attente';
   if (attente && previsions.note) out.push(previsions.note);
@@ -7129,7 +7152,7 @@ function scenTexteBoite(S, sansBilan, court) {
   if (src) out.push((isNum(src.updated) ? 'Fichier publié le ' + jourH(src.updated) + ', relu' : 'Fichier relu') + ' à ' + Fmt.jourHeure(src.luA)
     + (previsionsEchec ? ' ; dernière relecture impossible (' + scenRaison(previsionsEchec.raison) + ', ' + Fmt.jourHeure(previsionsEchec.a) + ')' : '') + '.');
   else if (previsionsEchec) out.push('Dernière lecture : ' + scenRaison(previsionsEchec.raison) + ' à ' + Fmt.jourHeure(previsionsEchec.a) + '. Rien n’est dessiné tant qu’aucun fichier lisible n’est arrivé.');
-  out.push(exp ? 'Description, pas une recommandation.' : 'Une description, pas une recommandation : rien ici ne dit quoi faire.');
+  out.push(Guide.RISQUE + (exp ? ' Description, pas une recommandation.' : ' Une description, pas une recommandation : rien ici ne dit quoi faire.'));
   return out;
 }
 /** Calque : l'encadré (déjà mis en page). Ne recalcule rien. */
@@ -7228,7 +7251,7 @@ function scenTexteDebutant(S, it, court) {
   if (autres.length) out.push('Les autres scénarios de Claude : ' + autres.map(i => (court ? Scenarios.ligneCourteDebutant(i.sc, i.sv, S.maintenant, true)
     : i.j && S.jour && !i.j.ouvert ? Scenarios.ligneDebutantJour(i.j, S.jour).replace(/\.$/, '') : Scenarios.ligneDebutant(i.sc, i.sv, S.maintenant))).join(' · '));
   // Le classement « sans pourcentage » est dit une fois (le sens du rang, dans l'explication).
-  out.push('Une hypothèse de Claude (une IA), pas une promesse ni un conseil.');
+  out.push(Guide.RISQUE + ' Une hypothèse de Claude (une IA), pas une promesse ni un conseil.');
   return out;
 }
 /** Le libellé du scénario 1, près du trait de son premier niveau (le haut d'un range), à gauche
@@ -7309,7 +7332,7 @@ function scenLibelleDebutant(S, it, top, bas) {
  *  l'ordre, ce que veut dire « (en direct) ». */
 function scenTexteLigneDebutant(S) {
   const F = S.F, P = PARAM.scenarios, out = [];
-  const fin = 'Une hypothèse de Claude (une IA), pas une promesse ni un conseil.';
+  const fin = Guide.RISQUE + ' Une hypothèse de Claude (une IA), pas une promesse ni un conseil.';
   const hP = heurePointMatin();
   const chaque = 'Chaque matin' + (hP ? ' vers ' + hP : '') + ', Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ et les classe du plus au moins probable, sans pourcentage.';
   if (!F) {
@@ -7692,6 +7715,308 @@ function drawBandSub(y0, pad, ph, W, gap, data, color, vs, ve, levels, dataMin, 
     if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
   }
   ctx.stroke();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// APPRENDRE EN SE SERVANT DU SITE (plan §10 bis) — le cœur pur est js/apprendre.js
+// ─────────────────────────────────────────────────────────────────────────────
+// Sur le CALQUE, à chaque image (le prix live) : les repères, les figures et les scénarios déjà
+// préparés par le dernier dessin sont relus (rien n'est recalculé) et comparés à l'image d'avant
+// (Apprendre.comparer). Un changement vu EN DIRECT (la vue suit la dernière bougie) fait UNE ligne :
+// ce qui vient de se passer, et ce que veut dire son mot ; elle s'efface seule après quelques
+// secondes (plus tard si sa bulle est ouverte). Deux changements ensemble : le plus important seul
+// (Apprendre.ORDRE). Lisible : elle prend une des PARAM.guide.debutant.items places du tracé, jamais
+// au-delà — budget plein, la ligne des scénarios, puis le libellé de la forme, puis celui du
+// scénario cèdent le temps du message (un redessin du graphique à l'arrivée, un au départ) ;
+// Complet : la même ligne, plus discrète, sans jamais redessiner le graphique, et une case pour la
+// couper (« Choisir l'affichage », samsara-apprendre-v1). Elle ne couvre ni la ligne du prix ni une
+// étiquette. Les marques « nouveau » : un petit point (pas un texte) sur la première étiquette dont
+// la bulle n'a jamais été ouverte, une à la fois ; lue, elle s'efface (samsara-nouveau-v1).
+const apprSuivi = Apprendre.suivi();
+const apprVus = Apprendre.lireVus();
+let apprChoix = Apprendre.lireChoix();
+let apprMsg = null;          // le message en cours (apprAnnoncer)
+let apprMinuterie = null;
+const apprEtat = { ligne: null, marque: null, bulle: 0 };   // relu par les tests : la ligne et la marque posées
+/** Le calque : observer, poser la ligne du message, puis la marque « nouveau ». */
+function apprCalque() {
+  apprObserver();
+  apprDessiner();
+  apprMarques();
+}
+/** Compare ce que montre le dernier dessin à l'image d'avant ; annonce le plus important des
+ *  changements. Le contexte (paire, intervalle, mode, début de l'historique) est remis à zéro dès que
+ *  la vue ne suit plus la dernière bougie, que l'onglet est caché, ou que le Complet a coupé l'aide :
+ *  rien n'est dit au chargement, ni en parcourant le passé, ni en y revenant. */
+function apprObserver(enDessin) {
+  const deb = debutant(), E = guideEtat, S = scenEtat, n = candles.length;
+  // La vue suit la dernière bougie (la même règle que la phrase : sinon « Maintenant, … »).
+  const vivant = (deb || apprChoix.evenements) && n > 1 && Math.min(n, viewEnd) === n && !(typeof document !== 'undefined' && document.hidden);
+  if (Apprendre.contexte(apprSuivi, vivant ? [activeSymbol, chartInterval, deb ? 'L' : 'C', candles[0].time].join('|') : null) && apprMsg) apprFermer(true);
+  if (!vivant) return;
+  const o = { live: livePrice, maintenant: Date.now(), tClos: candles[n - 2].time, passageMs: PARAM.apprendre.passageMs };
+  const evts = [];
+  if (E && overlays.guide && E.D) {
+    if (isNum(livePrice)) evts.push(...Apprendre.comparer(apprSuivi, 'repere', apprReperes(E), o));
+    else Apprendre.oublier(apprSuivi, 'repere');
+    evts.push(...Apprendre.comparer(apprSuivi, 'figure', apprFigures(E), o));
+  } else { Apprendre.oublier(apprSuivi, 'repere'); Apprendre.oublier(apprSuivi, 'figure'); }
+  if (S && S.items && S.items.length) evts.push(...Apprendre.comparer(apprSuivi, 'scenario', apprScenarios(S), o));
+  else Apprendre.oublier(apprSuivi, 'scenario');
+  // « Prix au-dessus de X » n'est plus vrai (le prix est repassé) : la ligne s'en va.
+  if (apprMsg && Apprendre.perime(apprSuivi, apprMsg.e)) { const c = apprMsg.cede; apprFermer(true); if (c && !enDessin) scheduleDraw(); }
+  const e = Apprendre.choisir(evts);
+  if (e && Apprendre.remplace(apprMsg && apprMsg.e, e)) apprAnnoncer(e);
+}
+/** Les repères observés : Lisible, tous ceux du Guide (les deux de l'écran « affichés ») ; Complet,
+ *  ses bandes. Un passage se lit d'un bord à l'autre de la petite bande (± demi) : un prix qui
+ *  oscille sur le trait ne passe rien. */
+function apprReperes(E) {
+  const F = x => (x && x.ferme) || {};
+  if (E.deb) {
+    const sel = E.debSel || {}, montres = [sel.dessus, sel.dessous].filter(Boolean).map(x => x.p);
+    return (E.D.reperes || []).map(x => ({ id: 'L' + x.p + '|' + (x.principale ? x.principale.cle : ''), bas: x.lo, haut: x.hi, cassure: F(x).cassure, sens: F(x).sens, retest: !!F(x).retest,
+      affiche: montres.includes(x.p), niv: x }));
+  }
+  return E.niveaux.map(L => ({ id: 'C' + L.niv.pMin + '-' + L.niv.pMax, bas: L.niv.lo, haut: L.niv.hi, cassure: F(L.niv).cassure, sens: F(L.niv).sens, retest: !!F(L.niv).retest,
+    affiche: !!L.visible, niv: L.niv }));
+}
+/** Les figures observées (celles de la vue) ; « affichées » : celles dessinées (Lisible : une). Les
+ *  figures passées ne sont jamais observées : un exemple du passé ne fait pas d'événement. */
+function apprFigures(E) {
+  const t = cols().time, dessinees = new Set((E.deb ? [E.debForme] : E.figures || []).filter(Boolean).map(x => Guide.idFigure(x.f, t)));
+  return (E.formes || []).map(f => { const id = Guide.idFigure(f, t); return { id, cle: Guide.etatForme(f).cle, f, affiche: dessinees.has(id) }; });
+}
+/** Les scénarios suivis en direct (un état sur ces bougies, pas encore notés au journal) ; Lisible :
+ *  « affiché » = le scénario montré. */
+function apprScenarios(S) {
+  const montre = S.montre ? S.montre.sc : null;
+  return S.items.filter(it => it.sc.statut === '⏳' && it.sv && it.sv.cle && it.sv.cle !== 'large' && it.sv.cle !== 'incomplet')
+    .map(it => ({ id: it.sc.id || it.sc.rang, cle: it.sv.cle, k: it.sv.k || 0, haut: !!(it.sv.sortie && it.sv.sortie.haut), sc: it.sc, affiche: S.deb ? it.sc === montre : true }));
+}
+/** Un nouveau message (il remplace le précédent) : ses mots, sa durée, sa bulle. */
+function apprAnnoncer(e) {
+  const deb = debutant(), P = PARAM.apprendre;
+  const T = Apprendre.textes(e, deb ? 'debutant' : 'expert', { unite: guideUnite(), itv: chartInterval });
+  if (!T || !T.variantes.length) return;
+  const avant = apprMsg;
+  if (avant) apprRetirer(avant);
+  const maintenant = Date.now();
+  apprMsg = { e, T, deb, fin: maintenant + (deb ? P.dureeLisible : P.dureeComplet), cede: !!(avant && avant.cede), item: null, place: null, attente: false,
+    cible: { rects: [], prio: 0, evenement: e.type, coul: COLORS.accent2, titre: T.titre, texte: T.texte, resume: T.resume } };
+  clearTimeout(apprMinuterie);
+  apprMinuterie = setTimeout(apprVerifierFin, apprMsg.fin - maintenant);
+}
+/** Le message n'est plus à l'écran : sa place du budget et sa cible sont rendues. */
+function apprRetirer(m) {
+  if (debEtat) debEtat.items = debEtat.items.filter(i => i !== m.item);
+  for (const L of [guideEtat && guideEtat.cibles, scenEtat && scenEtat.cibles]) if (L && L.includes(m.cible)) L.splice(L.indexOf(m.cible), 1);
+  m.item = null;
+}
+/** La fin du message : à son heure, ou plus tard si sa bulle est ouverte (lue il y a moins de 1,5 s). */
+function apprVerifierFin() {
+  apprMinuterie = null;
+  const m = apprMsg;
+  if (!m) return;
+  const reste = Math.max(m.fin, apprEtat.bulle + 1500) - Date.now();
+  if (reste > 0) { apprMinuterie = setTimeout(apprVerifierFin, reste); return; }
+  apprFermer();
+}
+/** Ferme le message. Une place cédée revient par un redessin ; sinon le calque seul est refait.
+ *  sansDessin : un dessin est déjà en cours (contexte changé, mode changé, case décochée). */
+function apprFermer(sansDessin) {
+  const m = apprMsg;
+  if (!m) return;
+  apprMsg = null; apprEtat.ligne = null;
+  clearTimeout(apprMinuterie); apprMinuterie = null;
+  apprRetirer(m);
+  if (!sansDessin) { if (m.cede) scheduleDraw(); else scheduleCalque(); }
+}
+/** Lisible, au dessin du graphique (après l'arbitrage du budget) : ce qui a changé à la fermeture
+ *  d'une bougie est observé ICI, avant que les étiquettes soient peintes (un seul dessin) ; un
+ *  message en cours prend une place — budget plein, la ligne des scénarios cède, puis le libellé de
+ *  la forme, puis celui du scénario (son tracé et sa zone restent, survolables). Sans place
+ *  possible, rien n'est posé. */
+function apprCeder(E, S) {
+  if (!debEtat || !debutant()) return;
+  apprObserver(true);
+  const m = apprMsg;
+  if (!m || !m.deb) return;
+  const P = PARAM.guide.debutant;
+  m.item = null; m.place = null;
+  for (const role of ['boite', 'forme', 'scenario']) {
+    if (debEtat.items.length < P.items) break;
+    if (apprCederRole(role, E, S)) m.cede = true;
+  }
+  m.attente = debEtat.items.length >= P.items;   // aucune place : il n'en redemande pas
+  if (!m.attente) m.item = debItem('evenement', '', null);
+}
+function apprCederRole(role, E, S) {
+  const avant = debEtat.items.length;
+  if (role === 'boite') {
+    const B = S && S.boite;
+    if (!(B && B.deb && !B.cede)) return false;
+    B.cede = true;
+    debEtat.items = debEtat.items.filter(i => i.role !== 'boite');
+    if (B.cible) S.cibles = S.cibles.filter(c => c !== B.cible);
+  } else if (role === 'forme') {
+    const x = E && E.debForme;
+    if (!(x && x.item && !x.cede)) return false;
+    x.cede = true;
+    debEtat.items = debEtat.items.filter(i => i !== x.item);
+    for (const c of E.cibles) if (c.figure === x) c.rects = [];
+  } else if (role === 'scenario') {
+    if (!(S && S.libelleDeb)) return false;
+    const k = etiquettesAFaire.indexOf(S.libelleDeb.dessin);
+    if (k >= 0) etiquettesAFaire.splice(k, 1);
+    debEtat.items = debEtat.items.filter(i => i.role !== 'scenario');
+    if (S.cibleUn) S.cibleUn.rects = [];
+    S.libelles = S.libelles.filter(l => l.t !== S.libelleDeb.t);
+    S.libelleDeb = null; S.libelleCede = true;
+  }
+  return debEtat.items.length < avant;
+}
+/** La place de la ligne : la plus riche de ses variantes qui tient (Lisible : PARAM.guide.debutant
+ *  .evenement caractères, 48 au téléphone), à gauche du tracé — Lisible en haut (sous la phrase,
+ *  là où on lit), Complet en bas (discrète) —, puis de l'autre bord ; jamais sur une étiquette ni
+ *  sur la ligne du prix, sur les bougies seulement faute de mieux. → { seq, x, y, w, h, t } (t null :
+ *  aucune place). */
+function apprPlacer(E, m, h, surPrix) {
+  const g = E.g, deb = m.deb, P = PARAM.guide.debutant, top = g.pad.top, bas = top + g.ph, x0 = g.pad.left + (deb ? 6 : 4);
+  const xMax = (E.marge ? E.xFin : E.xMax) - 4, max = deb ? (g.pw < P.etroit ? P.evenementEtroit : P.evenement) : Infinity;
+  const rects = E.rects.slice(), surB = guideSurBougies(E);
+  const bords = deb ? [[top + 2, 1], [bas - h - 2, -1]] : [[bas - h - 4, -1], [top + 2, 1]];
+  // Lisible : la ligne des scénarios a cédé et avait sa rangée à elle (au-dessus du tracé) : la
+  // ligne du message s'y pose, hors des bougies et des étiquettes.
+  const B = deb && scenEtat && scenEtat.boite, memo = debHautMemo;
+  const rang = B && B.deb && B.cede && memo && !(memo.partage && memo.phrase) ? { x: g.pad.left + 2, y: B.y + 1, max: E.xMax - g.pad.left - 4 } : null;
+  for (const t of m.T.variantes) {
+    const w = Math.ceil(cx.measureText(t).width) + (deb ? 16 : 12);
+    if (rang && t.length <= max && w <= rang.max) return { seq: scaleSeq, x: rang.x, y: rang.y, w, h, t };
+    if (t.length > max || w > xMax - x0) continue;
+    for (const ev of [r => surPrix(r) || surB(r), surPrix]) for (const [y, vers] of bords) {
+      const r = guidePlacer(rects, x0, w, h, [y], top, bas, vers, 0, 14, ev);
+      if (r) return { seq: scaleSeq, x: r.x, y: r.y, w, h, t };
+    }
+  }
+  return { seq: scaleSeq, x: 0, y: 0, w: 0, h: 0, t: null };
+}
+/** Calque : la ligne du message en cours (sa place gardée tant que le graphique n'est pas redessiné
+ *  et que la ligne du prix ne la traverse pas), sa cible (sa bulle explique), son entrée au registre. */
+function apprDessiner() {
+  const m = apprMsg, E = guideEtat || scenEtat;
+  apprEtat.ligne = null;
+  if (!m) return;
+  if (!E || !geoPrix || m.deb !== debutant()) { apprFermer(true); return; }
+  const deb = m.deb, P = PARAM.guide.debutant, g = E.g;
+  if (deb) {
+    if (!debEtat) return;
+    if (!m.item || !debEtat.items.includes(m.item)) {
+      // Né au calque : une place libre du budget ; sinon un redessin, une seule fois (une place cède).
+      if (debEtat.items.length >= P.items) { if (!m.attente) { m.attente = true; scheduleDraw(); } return; }
+      m.item = debItem('evenement', '', null);
+    }
+  }
+  const h = deb ? 18 : 14, yL = isNum(livePrice) ? g.pad.top + g.ph * (1 - (livePrice - g.minP) / g.range) : null;
+  const surPrix = r => yL !== null && r.y < yL + 5 && r.y + r.h > yL - 5;
+  cx.save();
+  cx.font = deb ? chartFont(DEB_POLICE_LIGNE, 650) : chartFont(9, 600);
+  let pl = m.place;
+  if (!pl || pl.seq !== scaleSeq || (pl.y >= g.pad.top && surPrix(pl))) pl = m.place = apprPlacer(E, m, h, surPrix);
+  if (!pl.t) {
+    // Aucune place sans couvrir une étiquette ou le prix : rien n'est posé (la place est rendue).
+    cx.restore();
+    if (m.item && debEtat) { debEtat.items = debEtat.items.filter(i => i !== m.item); m.item = null; m.attente = true; }
+    m.cible.rects = [];
+    return;
+  }
+  if (deb) {
+    cx.globalAlpha = 0.95; cx.fillStyle = COLORS.bulle;
+    cx.beginPath(); cx.roundRect(pl.x, pl.y, pl.w, pl.h, 5); cx.fill(); cx.globalAlpha = 1;
+    // Le trait de la couleur des marques « nouveau » (celui de la phrase est accent-2) : ce qui vient
+    // d'arriver ne se confond pas avec la lecture du moment.
+    cx.fillStyle = COLORS.accent; cx.fillRect(pl.x + 2, pl.y + 3, 2.5, pl.h - 6);
+    cx.fillStyle = COLORS.ink1; cx.fillText(pl.t, pl.x + 9, pl.y + 13);
+  } else {
+    // Complet : discrète — l'encre pâle, sur un fond à peine posé, comme la ligne du compte des figures passées.
+    cx.globalAlpha = 0.85; cx.fillStyle = COLORS.bulle;
+    cx.beginPath(); cx.roundRect(pl.x, pl.y, pl.w, pl.h, 4); cx.fill(); cx.globalAlpha = 1;
+    cx.fillStyle = COLORS.ink3; cx.fillText(pl.t, pl.x + 6, pl.y + pl.h - 4);
+  }
+  cx.restore();
+  m.cible.rects = [{ x0: pl.x, y0: pl.y, x1: pl.x + pl.w, y1: pl.y + pl.h }];
+  if (!E.cibles.includes(m.cible)) E.cibles.push(m.cible);
+  if (m.item) { m.item.texte = pl.t; m.item.rect = { x: pl.x, y: pl.y, w: pl.w, h: pl.h }; }
+  apprEtat.ligne = { type: m.e.type, texte: pl.t, rect: { x: pl.x, y: pl.y, w: pl.w, h: pl.h }, mode: deb ? 'debutant' : 'expert', fin: m.fin };
+  // La clé « ? » du Lisible ne reste pas sous la ligne.
+  if (deb && astucePos && pl.y < astucePos.y + astucePos.h && pl.y + pl.h > astucePos.y) astucePlacer();
+}
+/** La nature d'une cible pour les marques « nouveau » (Apprendre.NATURES), ou null (pas marquée). */
+function apprNature(c) {
+  if (!c) return null;
+  if (c.evenement) return 'evenement:' + c.evenement;
+  if (guideEtat && c === guideEtat.ciblePhrase) return 'phrase';
+  if (c.niveau && c.niveau.niv) {
+    const n = c.niveau.niv, r = Guide.raisonPrincipale(n);
+    return Guide.optionsSeules(n) ? 'repere:options' : r ? 'repere:' + r.cle : null;
+  }
+  if (c.figure && c.figure.f) return 'figure:' + c.figure.f.type;
+  if (c.passee) return 'passee';
+  if (c.scenario || (scenEtat && scenEtat.cibles.includes(c))) return 'scenario';
+  return null;
+}
+/** Le rectangle PEINT de l'étiquette d'une cible (sa zone de survol peut être plus large : la place
+ *  réservée à l'état d'un niveau du Complet, au plus long libellé possible d'une figure). */
+function apprCoin(c) {
+  const r = c.rects && c.rects[0];
+  if (!r) return null;
+  const et = c.niveau && c.niveau.etiq, it = c.figure && c.figure.item && c.figure.item.rect;
+  const q = et ? { x: et.x, y: et.y, w: et.w, h: (et.lignes ? et.lignes.length : 1) * et.h } : it;
+  return q ? { x0: q.x, y0: q.y, x1: q.x + q.w, y1: q.y + q.h } : r;
+}
+/** La marque « nouveau » : un point, en haut à droite de la première étiquette jamais lue (une
+ *  seule à la fois) ; plus petit et plus pâle en Complet, où une case la coupe. */
+function apprMarques() {
+  apprEtat.marque = null;
+  const deb = debutant();
+  if (!geoPrix || (!deb && !apprChoix.marques)) return;
+  const cands = [];
+  for (const c of [].concat(guideEtat && overlays.guide ? guideEtat.cibles : [], scenEtat ? scenEtat.cibles : [])) {
+    const r = apprCoin(c);
+    if (!r || r.x1 - r.x0 < 24 || r.y1 - r.y0 < 10) continue;
+    const cle = apprNature(c);
+    if (cle) cands.push({ cle, r });
+  }
+  const k = Apprendre.choisirMarque(cands, apprVus);
+  if (!k) return;
+  const R = deb ? PARAM.apprendre.marque : PARAM.apprendre.marqueComplet, x = k.r.x1 - R + 0.5, y = k.r.y0 + R - 0.5;
+  cx.save();
+  cx.globalAlpha = deb ? 1 : 0.7;
+  cx.fillStyle = COLORS.bulle; cx.beginPath(); cx.arc(x, y, R + 1.2, 0, Math.PI * 2); cx.fill();
+  cx.fillStyle = COLORS.accent; cx.beginPath(); cx.arc(x, y, R, 0, Math.PI * 2); cx.fill();
+  cx.restore();
+  apprEtat.marque = { cle: k.cle, x, y, r: R };
+}
+/** Une bulle s'ouvre (guideBulle) : sa nature est lue (sa marque s'efface) ; celle du message en
+ *  cours le fait durer tant qu'elle reste ouverte. */
+function apprLu(c) {
+  if (apprMsg && c === apprMsg.cible) apprEtat.bulle = Date.now();
+  if (Apprendre.noterVu(apprVus, apprNature(c))) scheduleCalque();
+}
+/** Complet : « Aide à la lecture » dans « Choisir l'affichage », deux cases gardées sous
+ *  samsara-apprendre-v1 (le Lisible n'a pas de choix : les deux y sont toujours). */
+const AIDES_LECTURE = [['evenements', 'Dire ce qui vient de se passer', 'Une ligne discrète, quelques secondes, quand le prix casse un niveau, qu’une figure est validée ou tombe, qu’un scénario touche sa cible ou tombe.'],
+  ['marques', 'Marquer ce qui est nouveau', 'Un petit point sur une étiquette jamais ouverte ; il s’efface quand sa bulle a été lue.']];
+function apprPanneau() {
+  return '<div class="cat-title aff-aide-titre">Aide à la lecture</div>' + AIDES_LECTURE.map(([k, nom, quoi]) =>
+    `<label class="aff-ligne aff-aide" data-aide="${k}"><input type="checkbox"${apprChoix[k] ? ' checked' : ''} onchange="choisirApprendre('${k}', this.checked)">`
+    + `<span class="aff-texte"><span class="aff-nom">${nom}</span><span class="aff-quoi">${echapF(quoi)}</span></span></label>`).join('');
+}
+function choisirApprendre(k, on) {
+  apprChoix[k] = !!on;
+  Apprendre.noterChoix(apprChoix);
+  if (k === 'evenements' && !on) apprFermer(true);
+  scheduleCalque();
 }
 
 // ============ SAMSARA ============

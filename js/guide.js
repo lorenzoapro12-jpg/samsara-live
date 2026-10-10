@@ -2364,6 +2364,11 @@ const Guide = (function () {
         : fam === 'lignes' ? ' ; aucune n’est encore allée au bout.' : ' ; aucun n’est encore allé au bout.');
     return t + ' ' + texteEcart(b);
   }
+  /** La ligne du risque (plan §10 bis), la MÊME partout : en tête du dernier paragraphe des bulles
+   *  de figure (en cours ou passée, les deux modes), de scénario et de « ce qui vient de se passer »
+   *  (js/apprendre.js) — ce paragraphe-là reste quand une bulle manque de place. Au résumé du
+   *  Lisible, elle vient en dernier, si elle tient (sinon au détail, au 2e toucher). */
+  const RISQUE = 'Personne ne sait prédire le prix : rien n’est promis.';
   /** La bulle d'une figure en Débutant : ce qu'on voit et ce qui manque, les niveaux du moment
    *  (validation, annulation, cible), le bilan mesuré, l'avertissement. ctx : voir plus haut. */
   function texteFormeDebutant(f, b, ctx, P, unite) {
@@ -2400,7 +2405,7 @@ const Guide = (function () {
       if (e.cle === 'atteint' && fini(f.objectif)) out.push('Cible théorique selon l’usage des analystes : ' + prix(f.objectif, unite) + ', non garantie ; elle a été atteinte.');
     }
     if (b) out.push(bilanDebutant(f, b, c, P));
-    out.push('Une lecture débattue, pas une prévision ni un conseil.');
+    out.push(RISQUE + ' Une lecture débattue, pas une prévision ni un conseil.');
     return out.filter(Boolean);
   }
   /** L'état vivant en mots, en tête de bulle (calque) : seule la fin de la bougie compte. Le prix
@@ -2523,7 +2528,7 @@ const Guide = (function () {
     if (tbS.length) out.push('Sans suite récemment (ce graphique, sorties jamais validées) : ' + tbS.map(g => NOMS_FORMES[g.type][0] + ' ' + marqueFin(g, ctx, 'expert', unite).replace(/^○ sans suite /, '')).join(' ; ') + '.');
     if (tbE.length) out.push('Ébauches annulées récemment (jamais devenues des figures) : ' + tbE.map(g => NOMS_FORMES[g.type][0] + ' ' + marqueFin(g, ctx, 'expert', unite).replace(/^✗ ébauche annulée /, '')).join(' ; ') + '.');
     if (x.concurrentes && x.concurrentes.length) out.push('Raisonnement : lecture concurrente sur le même ' + (f.s > 0 || f.sens < 0 ? 'sommet' : 'point') + ' : ' + x.concurrentes.map(g => NOMS_FORMES[g.type][0].toLowerCase() + ' (' + etatForme(g).court + ')').join(', ') + ' ; une seule est montrée.');
-    out.push('Lecture des formes : débattue ; une description, pas une recommandation.');
+    out.push(RISQUE + ' Lecture des formes : débattue ; une description, pas une recommandation.');
     return out;
   }
   /** Le titre de la bulle d'une figure. */
@@ -2657,7 +2662,7 @@ const Guide = (function () {
       }
       const J = texteJournal(f, ctx, unite);
       if (J) texte.push(J);
-      texte.push('Une figure passée dit ce qui s’est passé ensuite : pas une prévision ni une recommandation.');
+      texte.push(RISQUE + ' Une figure passée dit ce qui s’est passé ensuite : pas une prévision ni une recommandation.');
       return { titre, texte, resume: null };
     }
     const nomL = NOM_LONG_DEBUTANT[f.type], dm = dureeMots(d), apres = dm ? ' ' + dm + ' plus tard' : '';
@@ -2674,7 +2679,7 @@ const Guide = (function () {
     const conf = valide ? finMs(ctx, f.jConf) : NaN, qc = fini(conf) && heureVueSi(conf) ? ' ' + quandDeb(conf, ctx) : '';
     const texte = [def, valide ? 'Figure validée' + qc + '. Cible théorique selon l’usage des analystes : ' + prix(f.objectif, unite) + ', non garantie.' : '',
       (valide ? ensuite[0] + ' ' : '') + marqueFin(f, ctx, 'debutant', unite)]
-      .concat(C.length ? [C[0]] : [], b ? [bilanDebutant(f, b, ctx, P)] : [], ['Un exemple du passé, pas une prévision ni un conseil.']);
+      .concat(C.length ? [C[0]] : [], b ? [bilanDebutant(f, b, ctx, P)] : [], [RISQUE + ' Un exemple du passé, pas une prévision ni un conseil.']);
     return { titre, texte: texte.filter(Boolean), resume: [ensuite, C] };
   }
   /** Les mots qui n'ont pas leur place sur l'écran Débutant (noms d'indicateurs, jargon, heures UTC,
@@ -2707,6 +2712,6 @@ const Guide = (function () {
     texteSuiteDebutant, prixRond, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
     MARQUES_FIN, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant,
-    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee };
+    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;

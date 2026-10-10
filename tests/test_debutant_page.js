@@ -221,8 +221,10 @@ const interrupteurJuste = (x, m) => !!x && x.visible && x.role === 'group' && x.
 const nombres = t => (t.match(/\d{1,3}(?:[\s  ]\d{3})+|\d+/g) || []).map(x => x.replace(/[\s  ]/g, ''));
 const VERBES = /\b(touche|est passé|monte|baisse|hésite|s’agite|est entre|est sous|est au-dessus|est sans repère|indisponible)\b/;
 // forme : PARAM.guide.debutant.forme (26) — plan figures §5.3 et amendement C1 (« Cible touchée, à confirmer », 26).
-const LIMITES = { phrase: [90, 48], niveau: [26, 18], scenario: [32, 32], forme: [26, 26], boite: [48, 40] };
-const ROLES_MAX = { phrase: 1, niveau: 2, scenario: 1, forme: 1, boite: 1 };
+// « evenement » : la ligne « ce qui vient de se passer » (PR 5), une seule, aux limites de la phrase ;
+// elle prend une des 5 places (le registre et le journal la comptent comme les autres).
+const LIMITES = { phrase: [90, 48], niveau: [26, 18], scenario: [32, 32], forme: [26, 26], boite: [48, 40], evenement: [90, 48] };
+const ROLES_MAX = { phrase: 1, niveau: 2, scenario: 1, forme: 1, boite: 1, evenement: 1 };
 
 /** Les contrôles d'un écran Débutant (budget, limites, mots, chevauchements, 5 secondes, absents). */
 async function controlerEcran(o, nom, opts = {}) {
@@ -239,7 +241,7 @@ async function controlerEcran(o, nom, opts = {}) {
   // 2. Limites, en caractères et dans le tracé.
   const trop = e.items.filter(i => i.texte.length > LIMITES[i.role][etroit ? 1 : 0]);
   const lim = k => LIMITES[k][etroit ? 1 : 0];
-  check(`${nom} : limites de caractères (phrase ${lim('phrase')}, repère ${lim('niveau')}, scénario ${lim('scenario')}, forme ${lim('forme')}, ligne ${lim('boite')})`, !trop.length, trop);
+  check(`${nom} : limites de caractères (phrase ${lim('phrase')}, repère ${lim('niveau')}, scénario ${lim('scenario')}, forme ${lim('forme')}, ligne ${lim('boite')}, événement ${lim('evenement')})`, !trop.length, trop);
   const dehors = e.items.filter(i => !i.rect || i.rect.x < 16 - 0.5 || i.rect.x + i.rect.w > e.xAxe + 0.5 || i.rect.y < 0 || i.rect.y + i.rect.h > e.mainH - 20 + 0.5);
   check(`${nom} : chaque texte tient dans le tracé, en pixels`, !dehors.length, dehors);
   // 3. Mots (et aucun pourcentage sur le tracé : choix 1B, rien qui se lise comme une probabilité).

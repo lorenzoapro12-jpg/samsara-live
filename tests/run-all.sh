@@ -76,6 +76,9 @@ node test_figures.js || ko=1
 etape "2j''. Figures passées : Lisible une seule (validée, entière dans la vue, la plus récente, rien au présent), Complet non / validées / toutes (≤ 6), compte des réussites et des échecs en mots, identité par les dates — hors ligne"
 node test_figures_passees.js || ko=1
 
+etape "2j'''. Apprendre en se servant du site : ce qui vient de se passer (repère passé ou cassé, figure validée ou tombée, scénario qui touche ou tombe), rien au chargement ni dans le passé, une fois, le plus important d'abord, mots exacts sans conseil, ligne du risque, marques « nouveau » — hors ligne"
+node test_apprendre.js || ko=1
+
 etape "2k. Scénarios du matin : lecture du fichier, suivi des zones dans l'ordre, range, note du journal d'abord, aucun pourcentage en débutant, mots sans conseil — hors ligne"
 node test_scenarios.js || ko=1
 
@@ -171,6 +174,9 @@ node test_figures_revue2.js || ko=1
 
 etape "9b⁗'''. Figures passées dans Chromium : Lisible rien au présent, une seule dans le passé avec sa marque (budget de 5 textes, résumé puis détail, sans mot banni), effacée au retour ; Complet non / validées / toutes, ≤ 6, ligne du compte, choix gardé au rechargement ; 1440 et 390 (non exécuté sans Playwright)"
 node test_figures_passees_page.js || ko=1
+
+etape "9b⁗''''. Apprendre dans Chromium : le prix franchit un repère → une ligne dans le budget de 5 textes (ni sur le prix ni sur une étiquette), effacée seule ; deux changements → un message ; marque « nouveau » lue puis gardée ; Complet discret, cases « Aide à la lecture » gardées ; 1440 et 390 (non exécuté sans Playwright)"
+node test_apprendre_page.js || ko=1
 
 etape "9c. Sobriété dans Chromium : éclair, horloge, onde, calque, verre, chargement, chaleur (non exécuté sans Playwright)"
 node test_sobriete.js || ko=1
