@@ -2048,9 +2048,9 @@
         if (m.source !== 'live' || (!connu && !deb)) continue;
         if (connu && deb && xn - Math.max(0, X(m.depuis)) < 12) connu = false;
         const y = Math.round(Y(m.p + m.pas / 2)) + 0.5;
-        // Non daté, il dépasse à gauche de son étiquette quand elle est posée dessus (un téléphone : sa
-        // largeur de cadre est sous l'étiquette) — le prix exact du mur se voit à côté d'elle.
-        const eq = !connu && deb && GU.etiquettes.find(e => e.cote === m.cote && e.source === 'mur' && e.y <= y && e.y + e.h >= y && e.x < xn && e.x + e.w > x0);
+        // Non daté, il dépasse à gauche de son étiquette quand elle est posée dessus ou le borde (un
+        // téléphone : sa largeur de cadre est sous l'étiquette) — le prix exact du mur se voit à côté d'elle.
+        const eq = !connu && deb && GU.etiquettes.find(e => e.cote === m.cote && e.source === 'mur' && e.y - 4 <= y && e.y + e.h + 4 >= y && e.x < xn && e.x + e.w > x0);
         const xa = Math.min(xn, connu ? Math.max(0, X(m.depuis)) : eq ? Math.max(0, Math.min(x0, eq.x - 24)) : x0);
         if (y < 0 || y > H) continue;
         const point = xn - xa < 2;
