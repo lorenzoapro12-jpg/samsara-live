@@ -3737,9 +3737,10 @@ function reperePublication(P) {
   if (x < P.left || x > P.W - P.right) return null;
   const px = d.btc.price, y = px >= P.minP && px <= P.maxP ? P.top + P.ph * (1 - (px - P.minP) / P.range) : null;
   // L'heure de l'appareil (le jour s'il n'est pas aujourd'hui) et le prix au format de l'Expert.
-  // Téléphone en Complet : l'heure et l'âge du fichier ; son prix est le point sur le trait (et
-  // dans les Infos du marché).
-  if (etiqCourtes(P.W - P.left - P.right)) return { x, y, texte: 'fichier ' + Fmt.jourHeure(tu) + ' (' + Horloges.texteAge(Horloges.maintenant() - tu) + ')' };
+  // Téléphone (tracé de moins de 520 px) avec « Le détail » : l'heure et l'âge du fichier ; son
+  // prix est le point sur le trait (et dans les Infos du marché). Ce repère n'a pas de bulle : plus
+  // large, il garde son prix en entier.
+  if (etiqCourtes(P.W - P.left - P.right) && P.W - P.left - P.right < 520) return { x, y, texte: 'fichier ' + Fmt.jourHeure(tu) + ' (' + Horloges.texteAge(Horloges.maintenant() - tu) + ')' };
   return { x, y, texte: 'fichier ' + Fmt.jourHeure(tu) + ' · prix publié ' + Fmt.prix(px, '$', 'fin') + ' (' + Horloges.texteAge(Horloges.maintenant() - tu) + ')' };
 }
 // Le calque, à la prochaine image (une seule par image, quel que soit le nombre d'événements).

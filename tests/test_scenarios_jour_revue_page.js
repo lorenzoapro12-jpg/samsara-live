@@ -114,7 +114,10 @@ const textes = page => page.evaluate(() => {
       const h = H.harnais(X, '2026-10-08T18:40:00Z');
       const o = await H.ouvrir(nav, h, { vue: { width: 1440, height: 900 }, mode: 'expert' });
       const e = await H.lire(o.page), l1 = e.libelles.find(l => l.rang === '1');
-      check(`18:40 : fondu du 1 fini, son libellé garde ses niveaux (« ${l1 && l1.t} »)`, e.jour.fondu[0] === 0 && l1 && /81 436/.test(l1.t), [e.jour.fondu, e.libelles]);
+      // Avec « Le détail » (option A du 11/10/2026), le libellé est un repère court ; ses niveaux
+      // sont dans sa bulle (« S1 (rang 1) range 81 436 – … »).
+      const b1 = e.cibles.find(c => /^S1\s\(rang\s1\)/.test(c.titre || ''));
+      check(`18:40 : fondu du 1 fini, son libellé reste (« ${l1 && l1.t} ») et sa bulle garde ses niveaux (« ${b1 && b1.titre} »)`, e.jour.fondu[0] === 0 && l1 && b1 && /81\s436/.test(b1.titre), [e.jour.fondu, e.libelles, b1 && b1.titre]);
       check('18:40 : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
