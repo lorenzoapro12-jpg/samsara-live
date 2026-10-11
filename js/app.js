@@ -1450,7 +1450,14 @@ function tapGraphique(clientX, clientY) {
   if (tx > rect.width - 55) return;
   // Le lien « Voir sur la carte ▸ » de la bulle ouverte : il navigue (rien d'autre ne le fait).
   const L = lienBulle && lienBulle.rect;
-  if (L && tx >= L.x && tx <= L.x + L.w && ty >= L.y && ty <= L.y + L.h) { location.href = lienBulle.url; return; }
+  if (L && tx >= L.x && tx <= L.x + L.w && ty >= L.y && ty <= L.y + L.h) {
+    if (lienBulle.action) { lienBulle.action(); return true; }
+    location.href = lienBulle.url; return true;
+  }
+  // Une figure dont la bulle est déjà ouverte en entier (Complet : au survol ou au 1er toucher ;
+  // Lisible : son détail) : un clic de plus sur elle ouvre ses statistiques détaillées.
+  const cF = geo && lienBulle && lienBulle.action && crossX !== null ? guideCibleSous(tx, ty, geo.mainH, debutant()) : null;
+  if (cF && cleBulle(cF) === lienBulle.cle && (!debutant() || bulleDetail === lienBulle.cle)) { lienBulle.action(); return true; }
   const c = debutant() && geo ? guideCibleSous(tx, ty, geo.mainH) : null, k = c ? cleBulle(c) : null;
   if (k && crossX !== null && bulleVue === k && bulleDetail !== k) {
     // 2e toucher sur la bulle montrée : son détail.
@@ -1464,7 +1471,8 @@ function tapGraphique(clientX, clientY) {
   }
   dessinerCalque();
 }
-canvas.addEventListener('click', (e) => tapGraphique(e.clientX, e.clientY));
+// (Un lien suivi s'arrête ici : le clic n'atteint pas le document, qui fermerait le détail ouvert.)
+canvas.addEventListener('click', (e) => { if (tapGraphique(e.clientX, e.clientY)) e.stopPropagation(); });
 
 // ============ TOUCH (Mobile) ============
 let touchMode = null; // 'pan', 'price', 'pinch'
@@ -6248,7 +6256,12 @@ function guideBulle(c, W, mainH, evite) {
   let sep = hC;
   // « Voir sur la carte ▸ » (liaison avec la carte) : une ligne réservée au bas de la bulle, hors du
   // résumé compté ; plus haute au doigt (une cible de 32 px).
-  const adresse = adresseCarte(c), hLien = adresse ? (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 32 : hC + 9) : 0;
+  // La bulle d'une figure (en cours ou passée) : sa cible et le taux mesuré de son type, en une
+  // ligne de la couleur des liens, au même endroit ; elle ouvre les statistiques détaillées.
+  const adresse = adresseCarte(c), stats = adresse ? null : statsBulle(c), doigt = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  let lStats = null;
+  if (stats) { cx.font = chartFont(fC, 650); lStats = guideLignes(cx, stats.texte, bw - 28); cx.font = chartFont(fC, 500); }
+  const hLien = adresse ? (doigt ? 32 : hC + 9) : lStats ? Math.max(doigt ? 32 : 0, lStats.length * hC + 9) : 0;
   const hMax = mainH - 8 - hLien, hL = l => (l === '' ? sep : hC);
   const hDe = ls => tl.length * hT + ls.reduce((a, l) => a + hL(l), 0) + 16;
   const decouper = ts => { const out = []; for (const t of ts) out.push(guideLignes(cx, t, bw - 20)); return out; };
@@ -6277,6 +6290,16 @@ function guideBulle(c, W, mainH, evite) {
   if (bx + bw > W - 75) bx = Math.max(16, crossX - bw - 16);
   if (by + bh > mainH - 4) by = Math.max(4, Math.min(crossY, evite ? evite.y : crossY) - bh - 8);
   by = Math.max(4, Math.min(by, mainH - 4 - bh));
+  // La touche « ? » (HTML, par-dessus le tracé) ne couvre pas la bulle : sa dernière ligne est un
+  // lien. Sinon la bulle remonte au-dessus d'elle, ou passe à sa droite.
+  const aide = document.getElementById('astuceTap');
+  if (aide && !aide.hidden && aide.offsetParent) {
+    const ra = aide.getBoundingClientRect(), rc = canvas.getBoundingClientRect(), a = { x: ra.left - rc.left, y: ra.top - rc.top, w: ra.width, h: ra.height };
+    if (a.w > 0 && bx < a.x + a.w && bx + bw > a.x && by < a.y + a.h && by + bh > a.y) {
+      if (a.y - bh - 6 >= 4) by = a.y - bh - 6;
+      else if (a.x + a.w + 6 + bw <= W - 75) bx = a.x + a.w + 6;
+    }
+  }
   // Relue par les tests : la place, le corps, et pour le résumé du Débutant ses lignes (titre
   // compris) et ses nombres.
   const nAcces = acces ? paras[paras.length - 1].length : 0, contenu = corps.slice(0, corps.length - nAcces);
@@ -6301,6 +6324,7 @@ function guideBulle(c, W, mainH, evite) {
     yl += hL(l);
   });
   if (adresse) poserLienCarte(adresse, cle, bx, by, bw, bh, hLien, fC);
+  else if (lStats) poserLienStats(stats, lStats, cle, bx, by, bw, bh, hLien, fC, hC);
   cx.restore();
 }
 
@@ -6354,6 +6378,20 @@ function poserLienCarte(adresse, cle, bx, by, bw, bh, hLien, fC) {
   cx.font = chartFont(fC, 650); cx.fillStyle = COLORS.accent2;
   cx.fillText('Voir sur la carte ▸', bx + 14, y0 + hLien / 2 + fC * 0.36);
   lienBulle = { rect: { x: bx, y: y0 - 2, w: bw, h: hLien + 8 }, url: adresse, cle, bulle: { x: bx, y: by, w: bw, h: bh }, ancre: { x: crossX, y: crossY } };
+}
+/** La figure d'une cible (en cours ou passée) et sa ligne de statistiques ; sinon null. */
+function statsBulle(c) {
+  const f = c.figure ? c.figure.f : c.passee ? c.passee.f : null, R = GUIDE_FORMES.val, E = guideEtat;
+  if (!f || !R || !R.bilan || !E || !E.ctxF) return null;
+  return { f, texte: Guide.resumeStatsFigure(f, R.bilan[f.type], E.ctxF, PARAM.guide, guideUnite()) };
+}
+/** La ligne des statistiques, au bas de la bulle, sous un filet ; sa zone de clic gardée. */
+function poserLienStats(stats, lignes, cle, bx, by, bw, bh, hLien, fC, hC) {
+  const y0 = by + bh - hLien, y1 = y0 + (hLien - lignes.length * hC) / 2 + hC / 2 + fC * 0.36;
+  cx.fillStyle = COLORS.hairline; cx.fillRect(bx + 14, y0, bw - 28, 1);
+  cx.font = chartFont(fC, 650); cx.fillStyle = COLORS.accent2;
+  lignes.forEach((l, k) => cx.fillText(l, bx + 14, y1 + k * hC));
+  lienBulle = { rect: { x: bx, y: y0 - 2, w: bw, h: hLien + 8 }, action: () => ouvrirStatsFigure(stats.f), texte: stats.texte, cle, bulle: { x: bx, y: by, w: bw, h: bh }, ancre: { x: crossX, y: crossY } };
 }
 /** La souris va-t-elle vers le lien de la bulle ? Sur le lien, ou sortie de son repère dans la
  *  direction de la bulle (la demi-droite de l'ancre à travers le pointeur touche la bulle) : la
