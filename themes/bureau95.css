@@ -155,8 +155,6 @@
 [data-theme="bureau95"] .theme-btn:active { transform: none; box-shadow: var(--appuye); }
 [data-theme="bureau95"] .theme-btn:active > svg { transform: translate(1px, 1px); }
 [data-theme="bureau95"] .theme-btn.ico-btn.on { color: var(--pill-actif-ink); background: var(--pill-actif); box-shadow: var(--appuye); }
-[data-theme="bureau95"] .mode-btn { height: 24px; }
-[data-theme="bureau95"] .mode-btn[aria-pressed="true"] { color: var(--pill-actif-ink); background: var(--pill-actif); box-shadow: var(--appuye); }
 [data-theme="bureau95"] .info-btn { border: 0; border-radius: 0; background: var(--surface); color: var(--ink-1); box-shadow: var(--releve-mince); }
 [data-theme="bureau95"] .info-btn:hover { color: var(--ink-1); }
 [data-theme="bureau95"] .info-btn:active { box-shadow: var(--enfonce-mince); }

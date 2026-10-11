@@ -27,6 +27,9 @@
 //  12. AU DOIGT (écran tactile, 360 et 390 px, aero et kala, deux modes) : chaque bouton de
 //      l'en-tête et chaque intervalle du ruban couvre un carré de 40 × 40 px ; aucune zone sur
 //      « Choisir l'affichage » ; le nom d'un bouton-icône dit à l'appui.
+//  13. ÉPINGLER (1440, 1024 et 390 px) : depuis « Infos du marché » (avec les chiffres du marché),
+//      un chiffre choisi reste dans l'en-tête ensuite sans eux (en tête de la bande avec), gardé
+//      sur l'appareil.
 //
 // Binance simulé (prix 86 012,50, ouverture 85 700 : +0,36 % ; Binance arrondit à +0,365), le
 // fichier publié du dépôt avec l'heure de publication réglée par contrôle ; horloge fixée au
@@ -474,6 +477,58 @@ const lireEntete = page => page.evaluate(() => {
           return { nom: n && !n.hidden ? n.textContent : null, ouvert: !!g && g.getClientRects().length > 0 && getComputedStyle(g).visibility !== 'hidden' && !!ti && ti.textContent === 'Légendes' }; });
         check(`${nom} : un vrai toucher sur Légendes : « ${t.nom} » s’affiche et les légendes s’ouvrent`, t.nom === 'Légendes' && t.ouvert, t);
       }
+      check(`${nom} : aucune erreur de script`, !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
+    titre('9. Épingler des chiffres du marché dans l’en-tête depuis « Infos du marché » (option A)');
+    for (const [w, h, mode] of [[1440, 900, 'debutant'], [1024, 768, 'debutant'], [390, 844, 'debutant'], [1440, 900, 'expert']]) {
+      const nom = `${mode} ${w}`;
+      const o = await ouvrir(nav, { vue: { width: w, height: h }, mode });
+      const ouvrirPanneau = () => o.page.evaluate(() => (innerWidth > 768 ? toggleFeed() : openMarketModal()));
+      const fermerPanneau = () => o.page.evaluate(() => (innerWidth > 768 ? toggleFeed() : closeMarketModal()));
+      const corps = w > 768 ? '#feed' : '#marketModalBody';
+      // Le choix se fait avec « Les chiffres du marché » (sans eux, le panneau parle en mots) ; en
+      // Débutant, on les allume le temps de choisir, puis on les éteint.
+      const chiffres = on => o.page.evaluate(v => appliquerChiffres(v, true), on);
+      await ouvrirPanneau(); await o.page.waitForTimeout(450);
+      const cache = await o.page.evaluate(c => [...document.querySelectorAll(c + ' .epingles')].every(e => !e.getClientRects().length), corps);
+      check(`${nom} : sans les chiffres du marché, le choix n’est pas montré (le panneau parle en mots)`, mode === 'expert' || cache, cache);
+      if (mode !== 'expert') { await chiffres(true); await o.page.waitForTimeout(300); }
+      const choix = await o.page.evaluate(c => [...document.querySelectorAll(c + ' .epingle-btn')].map(b => b.textContent), corps);
+      check(`${nom} : le panneau propose les huit chiffres de l’en-tête, sous leurs noms de l’en-tête`,
+        choix.join('|') === 'RSI 4h|Funding an.|OI 24h|CVD 24h|GEX|L/S|DXY|VIX', choix);
+      for (const c of ['macro.vix', 'micro.funding_annual_pct']) await o.page.click(`${corps} .epingle-btn[data-chemin="${c}"]`);
+      await fermerPanneau(); await o.page.waitForTimeout(450);
+      if (mode !== 'expert') { await chiffres(false); await o.page.waitForTimeout(450); }
+      const lire = () => o.page.evaluate(() => {
+        const vis = el => el.getClientRects().length > 0 && el.getBoundingClientRect().width > 0;
+        const R = el => el.getBoundingClientRect(), prix = R(document.getElementById('price'));
+        const kp = [...document.querySelectorAll('#cycle .kpi')].filter(vis);
+        const boutons = [...document.querySelectorAll('.header-right button')].filter(vis).map(R);
+        const sur = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+        return { vus: kp.map(k => k.querySelector('i').textContent),
+          entiers: kp.every(k => { const r = R(k); return r.left >= 0 && r.right <= innerWidth + 0.5; }),
+          surPrix: kp.some(k => sur(R(k), prix)) || boutons.some(b => sur(b, prix)),
+          surBouton: kp.some(k => boutons.some(b => sur(R(k), b))),
+          stocke: localStorage.getItem('samsara-epingles-v1') };
+      });
+      const a = await lire();
+      const attendus = mode === 'expert' ? a.vus.slice(0, 2) : a.vus;
+      check(`${nom} : panneau fermé, les deux épinglés (Funding an., VIX) sont dans l’en-tête${mode === 'expert' ? ', en tête de la bande' : ', seuls'}, entiers, ni sur le prix ni sur un bouton`,
+        attendus.slice().sort().join('|') === 'Funding an.|VIX' && a.entiers && !a.surPrix && !a.surBouton
+        && (mode === 'expert' ? a.vus.length > 2 : a.vus.length === 2), a);
+      // (Pas de rechargement ici : le script d'ouverture vide le stockage à chaque chargement.)
+      check(`${nom} : gardés sur l’appareil`, JSON.parse(a.stocke || '[]').sort().join('|') === 'macro.vix|micro.funding_annual_pct', a.stocke);
+      if (mode !== 'expert') await chiffres(true);
+      await ouvrirPanneau(); await o.page.waitForTimeout(450);
+      const presses = await o.page.evaluate(c => [...document.querySelectorAll(c + ' .epingle-btn[aria-pressed="true"]')].map(b => b.dataset.chemin).sort(), corps);
+      check(`${nom} : le panneau les montre cochés`, presses.join('|') === 'macro.vix|micro.funding_annual_pct', presses);
+      for (const c of ['macro.vix', 'micro.funding_annual_pct']) await o.page.click(`${corps} .epingle-btn[data-chemin="${c}"]`);
+      await fermerPanneau(); await o.page.waitForTimeout(450);
+      if (mode !== 'expert') { await chiffres(false); await o.page.waitForTimeout(450); }
+      const c = await lire();
+      check(`${nom} : décochés, l’en-tête revient comme avant`, mode === 'expert' ? c.vus[0] === 'RSI 4h' : c.vus.length === 0, c);
       check(`${nom} : aucune erreur de script`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }

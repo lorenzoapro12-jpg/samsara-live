@@ -113,7 +113,6 @@
 [data-theme="gare"] .feed-panel-handle,
 [data-theme="gare"] .strat-handle { font-family: var(--font); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 [data-theme="gare"] .paire-btn { font-size: 14px; font-weight: 600; letter-spacing: 0.06em; border-radius: 2px; }
-[data-theme="gare"] .mode-btn { font-size: 13px; letter-spacing: 0.04em; }
 [data-theme="gare"] .hero-val,
 [data-theme="gare"] .tuile .val { font-family: var(--font-palette); font-weight: 500; letter-spacing: 0; }
 

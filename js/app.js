@@ -8791,6 +8791,49 @@ function ladderHtml(asks, bids, mid) {
 const tuile = (lbl, val, sub, fiche, lecture) => '<div class="tuile"><div class="lbl">' + lbl + (fiche ? infoBtn(fiche) : '') + '</div><div class="val">' + val + '</div>'
   + (sub ? '<div class="sub">' + sub + '</div>' : '') + (lecture || '') + '</div>';
 
+// Les chiffres clés de l'en-tête, dans leur ordre d'utilité : [libellé, chemin dans market-data].
+const KPIS_ENTETE = [['RSI 4h', 'tf.4h.rsi_14'], ['Funding an.', 'micro.funding_annual_pct'], ['OI 24h', 'micro.oi_change_24h_pct'],
+  ['CVD 24h', 'micro.cvd_24h_usd'], ['GEX', 'micro.gex_usd_1pct'], ['L/S', 'micro.ls_ratio'], ['DXY', 'macro.dxy_spot'], ['VIX', 'macro.vix']];
+// Mêmes précisions que les cartes et le panneau ⚡ (funding annualisé 1 décimale, OI 1, L/S 2).
+function valeurKpi(chemin, d) {
+  const x = d.micro || {}, m = d.macro || {}, t4 = (d.tf || {})['4h'] || {};
+  switch (chemin) {
+    case 'tf.4h.rsi_14': return fmtNum(t4.rsi_14, 1);
+    case 'micro.funding_annual_pct': return pctSigne(x.funding_annual_pct, 1);
+    case 'micro.oi_change_24h_pct': return pctSigne(isNum(x.oi_change_24h_pct) ? x.oi_change_24h_pct : x.oi_change_1d_pct, 1);
+    case 'micro.cvd_24h_usd': return fmtSigned(x.cvd_24h_usd);
+    case 'micro.gex_usd_1pct': return isNum(x.gex_usd_1pct) ? (x.gex_usd_1pct > 0 ? 'long γ' : 'short γ') : '—';
+    case 'micro.ls_ratio': return fmtNum(x.ls_ratio, 2);
+    case 'macro.dxy_spot': return fmtNum(m.dxy_spot, 2);
+    case 'macro.vix': return fmtNum(m.vix, 1);
+  }
+  return '—';
+}
+// Les chiffres épinglés dans l'en-tête (option A : on choisit ce qui reste en haut). Gardés sur
+// l'appareil ; un chemin inconnu (ancienne version) est ignoré.
+const EPINGLES_CLE = 'samsara-epingles-v1';
+function epingles() {
+  try {
+    const v = JSON.parse(localStorage.getItem(EPINGLES_CLE) || '[]');
+    return Array.isArray(v) ? v.filter(c => KPIS_ENTETE.some(k => k[1] === c)) : [];
+  } catch (e) { return []; }
+}
+function basculerEpingle(chemin) {
+  const ep = epingles(), i = ep.indexOf(chemin);
+  if (i >= 0) ep.splice(i, 1); else ep.push(chemin);
+  try { localStorage.setItem(EPINGLES_CLE, JSON.stringify(ep)); } catch (e) { /* stockage refusé : rien n'est gardé */ }
+  if (marketData) renderCycle(marketData);
+  for (const b of document.querySelectorAll('.epingle-btn[data-chemin="' + chemin + '"]')) b.setAttribute('aria-pressed', String(i < 0));
+}
+// Le choix, en tête du panneau « Infos du marché » : les mêmes noms que dans l'en-tête. Il se fait
+// avec « Les chiffres du marché » (sans eux, le panneau parle en mots) ; les épinglés restent ensuite.
+function epinglesHtml() {
+  const ep = epingles();
+  return '<div class="epingles chiffres-seul"><div class="epingles-t">Garder en haut de l’écran</div><div class="epingles-btns">'
+    + KPIS_ENTETE.map(([lbl, chemin]) => '<button type="button" class="epingle-btn" data-chemin="' + chemin + '" aria-pressed="' + ep.includes(chemin) + '">' + lbl + '</button>').join('')
+    + '</div><div class="epingles-quoi">Un chiffre choisi reste dans l’en-tête, même sans « Les chiffres du marché ».</div></div>';
+}
+
 // Bande de chiffres clés de l'en-tête : la publication en un coup d'œil, par ordre d'utilité
 // (ce qui ne tient pas en largeur est coupé à droite). TOUTES ces valeurs viennent du même
 // fichier, au même instant ; son âge ferme la bande. Rien n'y est mêlé au prix live.
@@ -8798,32 +8841,25 @@ const tuile = (lbl, val, sub, fiche, lecture) => '<div class="tuile"><div class=
 function renderCycle(d) {
   const cy = document.getElementById('cycle');
   if (!cy) return;
-  const x = d.micro || {}, m = d.macro || {}, tf = d.tf || {};
   const upd = d.updated ? new Date(d.updated) : null;
   // Signe moins typographique partout (« −2.0% » comme « −$76M »), pas un tiret.
   // Chaque chiffre porte sa trace des dernières heures (js/chronique.js), sur la ligne de son
   // libellé : la hauteur de la bande ne change pas. Elle cède la place avant toute valeur
   // (ajusterKpis). Sans historique, pas de trace (rien d'inventé).
-  const kpi = (lbl, val, cls, chemin) => '<span class="kpi"' + titreKpi(chemin) + '><span class="kpi-t"><i>' + lbl + '</i>' + traceKpi(chemin) + '</span><b' + (cls ? ' class="' + cls + '"' : '') + '>'
+  // Un chiffre épinglé (panneau « Infos du marché ») passe en tête et reste dans l'en-tête même
+  // sans « Les chiffres du marché » (CSS .kpi.epingle).
+  const ep = epingles();
+  const kpi = (lbl, val, cls, chemin) => '<span class="kpi' + (ep.includes(chemin) ? ' epingle' : '') + '" data-chemin="' + chemin + '"' + titreKpi(chemin) + '><span class="kpi-t"><i>' + lbl + '</i>' + traceKpi(chemin) + '</span><b' + (cls ? ' class="' + cls + '"' : '') + '>'
     + String(val).replace(/^-/, '−') + '</b></span>';
-  const t4 = tf['4h'] || {};
-  const oiK = isNum(x.oi_change_24h_pct) ? x.oi_change_24h_pct : x.oi_change_1d_pct;
   const ageK = upd ? Math.max(0, Math.round((Date.now() - upd.getTime()) / 60000)) : null;
-  // Mêmes précisions que les cartes et le panneau ⚡ (funding annualisé 1 décimale, OI 1, L/S 2).
   // Le vert et le rouge disent seulement « le prix monte / descend » (plan, § 2) : le funding, l'OI,
   // le CVD et le GEX n'ont pas de couleur — un signe n'est ni « bien » ni « mal ».
   // Sur une autre paire, la bande dit qu'elle parle du bitcoin (Expert ; hors des .kpi, elle ne
   // cède jamais sa place à ajusterKpis).
   cy.innerHTML = (activeSymbol !== 'BTCUSDT' ? '<span class="kpi-btc chiffres-seul" title="Ces chiffres clés sont ceux du bitcoin, pas de '
       + escHtml(NOMS_PAIRES[activeSymbol] || activeSymbol) + '">Bitcoin</span>' : '')
-    + kpi('RSI 4h', fmtNum(t4.rsi_14, 1), '', 'tf.4h.rsi_14')
-    + kpi('Funding an.', pctSigne(x.funding_annual_pct, 1), '', 'micro.funding_annual_pct')
-    + kpi('OI 24h', pctSigne(oiK, 1), '', 'micro.oi_change_24h_pct')
-    + kpi('CVD 24h', fmtSigned(x.cvd_24h_usd), '', 'micro.cvd_24h_usd')
-    + kpi('GEX', isNum(x.gex_usd_1pct) ? (x.gex_usd_1pct > 0 ? 'long γ' : 'short γ') : '—', '', 'micro.gex_usd_1pct')
-    + kpi('L/S', fmtNum(x.ls_ratio, 2), '', 'micro.ls_ratio')
-    + kpi('DXY', fmtNum(m.dxy_spot, 2), '', 'macro.dxy_spot')
-    + kpi('VIX', fmtNum(m.vix, 1), '', 'macro.vix')
+    + KPIS_ENTETE.map(([lbl, chemin], i) => [i, lbl, chemin]).sort((a, b) => ep.includes(b[2]) - ep.includes(a[2]) || a[0] - b[0])
+      .map(([, lbl, chemin]) => kpi(lbl, valeurKpi(chemin, d), '', chemin)).join('')
     // L'âge avance chaque minute sans refaire la bande : majAges() réécrit les [data-age-de].
     // Au-delà du seuil, la pastille dit « en retard » (CSS .kpis.vieux, mot écrit par le CSS dans
     // .age-retard : le texte de la pastille reste « 25 min », que Gare et la Planche habillent à
@@ -8838,6 +8874,7 @@ function renderCycle(d) {
     + '<span class="deb-frais">Infos du marché ▸</span><span class="deb-retard"><span class="deb-quoi">Infos<span class="deb-mot"> du marché</span> · </span>en retard'
     + (ageK === null ? '' : ' · ' + ageDe(d.updated, ageK) + ' min') + '<span class="deb-fleche"> ▸</span></span></span>';
   cy.classList.toggle('vieux', ageK !== null && ageK > CADENCES.vieux_min);
+  cy.classList.toggle('a-epingles', ep.length > 0);
   const cad = chronique.cadence();
   cy.title = 'Dernière publication (cadence ' + (cad ? 'mesurée ' + Math.round(cad / 60000) : 'attendue ' + CADENCES.attendue_min) + ' min) — cliquer pour le détail';
   ajusterKpis();
@@ -9188,8 +9225,9 @@ function renderFeedTo(container) {
   // réellement affiché, quel qu'il soit.
   // Sur une autre paire, la note « bitcoin » s'affiche dans les DEUX modes (elle n'existait qu'en
   // Débutant : l'Expert sur SOL lisait les chiffres du bitcoin sans que rien ne le dise).
-  container.innerHTML = ageBannerHtml(d)
+  container.innerHTML = ageBannerHtml(d) + epinglesHtml()
     + (autrePaire ? '<div class="deb-btc">Ces infos parlent du bitcoin (en dollars), pas de ' + escHtml(NOMS_PAIRES[activeSymbol] || activeSymbol) + '.</div>' : '') + html;
+  for (const b of container.querySelectorAll ? container.querySelectorAll('.epingle-btn') : []) b.addEventListener('click', () => basculerEpingle(b.dataset.chemin));
   brancherContre(container);
 }
 

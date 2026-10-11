@@ -1928,7 +1928,7 @@
     if (dit(a.autre)) ag.push('autre plateforme ' + BM.age(a.autre));
     const l4 = 'Âges : ' + (ag.length ? ag.join(' · ') : 'rien de lu encore') + '.';
     return [l1, l2, l3, l4, 'Le scénario du matin de Claude est sur le Terminal (bouton «' + NB + '←' + NB + 'Terminal' + NB + '»).',
-      'Une photo de l\'instant, pas une prévision. Tout le détail technique : mode Complet.'].map(BM.typo);
+      'Une photo de l\'instant, pas une prévision. Tout le détail technique : « Le détail », dans « Choisir l’affichage ».'].map(BM.typo);
   };
 
   /** L'histoire d'une tranche (k, de `pas` $, côté 'b' ou 'a') dans le carnet live gardé

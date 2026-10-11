@@ -1,5 +1,5 @@
 {
- "mesure_le": "2026-10-07T17:46Z",
+ "mesure_le": "2026-10-11T17:19Z",
  "machine": "linux x64, Chromium headless (rendu logiciel)",
  "protocole": {
   "essais": 5,
@@ -17,26 +17,26 @@
   "aero": {
    "feuille": "themes/aero.css",
    "empreinte": "0083053e85f4947e",
-   "repos_ms_par_s": 90,
-   "geste_ms_par_image": 23.44,
-   "rapport_repos": 2.045,
-   "rapport_geste": 1.074,
+   "repos_ms_par_s": 110,
+   "geste_ms_par_image": 33.44,
+   "rapport_repos": 1.664,
+   "rapport_geste": 0.982,
    "essais_rapport_repos": [
-    2.068,
-    1.934,
-    2.067,
-    2.045,
-    2.022
+    1.811,
+    1.664,
+    1.54,
+    1.594,
+    1.82
    ],
    "essais_rapport_geste": [
-    1.108,
-    1.008,
-    1.077,
-    1.051,
-    1.074
+    1.049,
+    1.126,
+    0.982,
+    0.981,
+    0.906
    ],
-   "principal_repos_ms_par_s": 9.4,
-   "principal_geste_ms_par_image": 8.96,
+   "principal_repos_ms_par_s": 16.3,
+   "principal_geste_ms_par_image": 17.04,
    "verre": "refraction",
    "juge": false,
    "dans_le_budget": false
@@ -44,26 +44,26 @@
   "aero-nuit": {
    "feuille": "themes/aero-nuit.css",
    "empreinte": "051786497802f721",
-   "repos_ms_par_s": 92,
-   "geste_ms_par_image": 22.78,
-   "rapport_repos": 2,
-   "rapport_geste": 1.068,
+   "repos_ms_par_s": 115,
+   "geste_ms_par_image": 32.44,
+   "rapport_repos": 1.708,
+   "rapport_geste": 1.002,
    "essais_rapport_repos": [
-    2,
-    1.956,
-    2.044,
-    1.957,
-    2.044
+    1.645,
+    1.489,
+    1.966,
+    1.708,
+    1.891
    ],
    "essais_rapport_geste": [
-    1.07,
-    1.068,
-    1.098,
-    1.012,
-    0.971
+    1.114,
+    1.154,
+    0.899,
+    1.002,
+    0.939
    ],
-   "principal_repos_ms_par_s": 9.3,
-   "principal_geste_ms_par_image": 8.74,
+   "principal_repos_ms_par_s": 17.4,
+   "principal_geste_ms_par_image": 16.59,
    "verre": "refraction",
    "juge": false,
    "dans_le_budget": false
@@ -71,14 +71,14 @@
   "kala": {
    "feuille": "themes/kala.css",
    "empreinte": "96fed342f0401bbe",
-   "repos_ms_par_s": 45,
-   "geste_ms_par_image": 22.33,
+   "repos_ms_par_s": 63,
+   "geste_ms_par_image": 31,
    "rapport_repos": 1,
    "rapport_geste": 1,
    "essais_rapport_repos": [],
    "essais_rapport_geste": [],
-   "principal_repos_ms_par_s": 9.2,
-   "principal_geste_ms_par_image": 8.88,
+   "principal_repos_ms_par_s": 17,
+   "principal_geste_ms_par_image": 17.27,
    "verre": "aucun",
    "juge": true,
    "dans_le_budget": true
@@ -86,26 +86,26 @@
   "neon": {
    "feuille": "themes/neon.css",
    "empreinte": "2b7eb62af3515e4d",
-   "repos_ms_par_s": 49,
-   "geste_ms_par_image": 23.33,
-   "rapport_repos": 1.054,
-   "rapport_geste": 1.04,
+   "repos_ms_par_s": 65,
+   "geste_ms_par_image": 31.44,
+   "rapport_repos": 1.135,
+   "rapport_geste": 1.045,
    "essais_rapport_repos": [
-    1.054,
-    1.022,
-    1.065,
-    1.077,
-    1.022
+    1.13,
+    1.421,
+    1.135,
+    1.214,
+    1.094
    ],
    "essais_rapport_geste": [
-    1.04,
-    1.07,
-    0.985,
-    1.028,
-    1.102
+    0.998,
+    1.215,
+    1.105,
+    0.993,
+    1.045
    ],
-   "principal_repos_ms_par_s": 9.4,
-   "principal_geste_ms_par_image": 8.74,
+   "principal_repos_ms_par_s": 16.1,
+   "principal_geste_ms_par_image": 15.71,
    "verre": "aucun",
    "juge": true,
    "dans_le_budget": true
@@ -113,134 +113,134 @@
   "codex": {
    "feuille": "themes/codex.css",
    "empreinte": "be856909d4647f7b",
-   "repos_ms_par_s": 40,
-   "geste_ms_par_image": 19.33,
-   "rapport_repos": 0.903,
-   "rapport_geste": 0.907,
+   "repos_ms_par_s": 62,
+   "geste_ms_par_image": 31.78,
+   "rapport_repos": 1.016,
+   "rapport_geste": 0.981,
    "essais_rapport_repos": [
-    0.903,
-    0.886,
-    0.909,
-    0.92,
-    0.894
+    0.873,
+    0.959,
+    1.077,
+    1.016,
+    1.07
    ],
    "essais_rapport_geste": [
-    0.933,
-    0.885,
-    0.894,
-    0.926,
-    0.907
+    0.865,
+    0.974,
+    1.002,
+    0.981,
+    1.035
    ],
-   "principal_repos_ms_par_s": 9.1,
-   "principal_geste_ms_par_image": 6.79,
+   "principal_repos_ms_par_s": 17.6,
+   "principal_geste_ms_par_image": 16.74,
    "verre": "aucun",
    "juge": true,
    "dans_le_budget": true
   },
   "bureau95": {
    "feuille": "themes/bureau95.css",
-   "empreinte": "0ec1d772d9dc3441",
-   "repos_ms_par_s": 33,
-   "geste_ms_par_image": 15.22,
-   "rapport_repos": 0.767,
-   "rapport_geste": 0.723,
+   "empreinte": "60e4053b19bb8a5e",
+   "repos_ms_par_s": 62,
+   "geste_ms_par_image": 27.56,
+   "rapport_repos": 0.947,
+   "rapport_geste": 0.869,
    "essais_rapport_repos": [
-    0.767,
-    0.721,
-    0.809,
-    0.733,
-    0.787
+    0.844,
+    0.756,
+    1.025,
+    1.16,
+    0.947
    ],
    "essais_rapport_geste": [
-    0.724,
-    0.723,
-    0.731,
-    0.678,
-    0.623
+    0.81,
+    0.917,
+    0.869,
+    0.952,
+    0.739
    ],
-   "principal_repos_ms_par_s": 10.4,
-   "principal_geste_ms_par_image": 7.66,
+   "principal_repos_ms_par_s": 18,
+   "principal_geste_ms_par_image": 18.2,
    "verre": "aucun",
    "juge": true,
    "dans_le_budget": true
   },
   "bureau95-contraste": {
    "feuille": "themes/bureau95-contraste.css",
-   "empreinte": "23ebfed0c6c29c65",
-   "repos_ms_par_s": 35,
-   "geste_ms_par_image": 15.33,
-   "rapport_repos": 0.791,
-   "rapport_geste": 0.692,
+   "empreinte": "70665f0e6cf9cee4",
+   "repos_ms_par_s": 62,
+   "geste_ms_par_image": 24.33,
+   "rapport_repos": 0.925,
+   "rapport_geste": 0.819,
    "essais_rapport_repos": [
-    0.8,
-    0.769,
-    0.787,
-    0.791,
-    0.805
+    0.697,
+    0.925,
+    0.973,
+    0.972,
+    0.635
    ],
    "essais_rapport_geste": [
-    0.667,
-    0.719,
-    0.69,
-    0.698,
-    0.692
+    0.836,
+    0.787,
+    0.819,
+    0.832,
+    0.668
    ],
-   "principal_repos_ms_par_s": 10.9,
-   "principal_geste_ms_par_image": 7.64,
+   "principal_repos_ms_par_s": 20.3,
+   "principal_geste_ms_par_image": 15.46,
    "verre": "aucun",
    "juge": true,
    "dans_le_budget": true
   },
   "gare": {
    "feuille": "themes/gare.css",
-   "empreinte": "3478932048e45ccc",
-   "repos_ms_par_s": 43,
-   "geste_ms_par_image": 19.22,
-   "rapport_repos": 0.945,
-   "rapport_geste": 0.83,
+   "empreinte": "a31ad3d78b2f88a3",
+   "repos_ms_par_s": 65,
+   "geste_ms_par_image": 28,
+   "rapport_repos": 0.959,
+   "rapport_geste": 0.942,
    "essais_rapport_repos": [
-    1.023,
-    1.011,
-    0.945,
     0.935,
-    0.913
+    0.959,
+    1.288,
+    1.008,
+    0.855
    ],
    "essais_rapport_geste": [
-    0.83,
-    0.816,
-    0.826,
-    0.839,
-    0.904
+    0.867,
+    1.058,
+    1.004,
+    0.942,
+    0.906
    ],
-   "principal_repos_ms_par_s": 9.7,
-   "principal_geste_ms_par_image": 7.19,
+   "principal_repos_ms_par_s": 17.5,
+   "principal_geste_ms_par_image": 15.48,
    "verre": "aucun",
    "juge": true,
    "dans_le_budget": true
   },
   "gazette": {
    "feuille": "themes/gazette.css",
-   "empreinte": "a8cfee48c8b7cd00",
-   "repos_ms_par_s": 34,
-   "geste_ms_par_image": 16,
-   "rapport_repos": 0.733,
-   "rapport_geste": 0.69,
+   "empreinte": "6ac14a09f12e9731",
+   "repos_ms_par_s": 65,
+   "geste_ms_par_image": 24.22,
+   "rapport_repos": 0.859,
+   "rapport_geste": 0.823,
    "essais_rapport_repos": [
-    0.711,
-    0.764,
-    0.766,
-    0.731,
-    0.733
+    0.812,
+    0.73,
+    1.007,
+    0.859,
+    1.043
    ],
    "essais_rapport_geste": [
-    0.654,
-    0.62,
-    0.691,
-    0.69,
-    0.692
+    0.838,
+    0.772,
+    0.9,
+    0.823,
+    0.705
    ],
-   "principal_repos_ms_par_s": 9.7,
-   "principal_geste_ms_par_image": 7.43,
+   "principal_repos_ms_par_s": 19,
+   "principal_geste_ms_par_image": 15.66,
    "verre": "aucun",
    "juge": true,
    "dans_le_budget": true
@@ -248,26 +248,26 @@
   "cyanotype": {
    "feuille": "themes/cyanotype.css",
    "empreinte": "3e57d66cad95c1eb",
-   "repos_ms_par_s": 35,
-   "geste_ms_par_image": 16.56,
-   "rapport_repos": 0.778,
-   "rapport_geste": 0.727,
+   "repos_ms_par_s": 78,
+   "geste_ms_par_image": 26.33,
+   "rapport_repos": 1.092,
+   "rapport_geste": 0.862,
    "essais_rapport_repos": [
-    0.83,
-    0.769,
-    0.864,
-    0.778,
-    0.747
+    0.971,
+    1.289,
+    1.092,
+    1.252,
+    1
    ],
    "essais_rapport_geste": [
-    0.727,
-    0.667,
-    0.738,
-    0.758,
-    0.711
+    0.728,
+    0.861,
+    0.887,
+    0.862,
+    0.912
    ],
-   "principal_repos_ms_par_s": 9.8,
-   "principal_geste_ms_par_image": 7.4,
+   "principal_repos_ms_par_s": 17.8,
+   "principal_geste_ms_par_image": 16.43,
    "verre": "aucun",
    "juge": true,
    "dans_le_budget": true
@@ -275,26 +275,26 @@
   "diazo": {
    "feuille": "themes/diazo.css",
    "empreinte": "941eee8efe9fc521",
-   "repos_ms_par_s": 37,
-   "geste_ms_par_image": 17.22,
-   "rapport_repos": 0.8,
-   "rapport_geste": 0.747,
+   "repos_ms_par_s": 64,
+   "geste_ms_par_image": 27.33,
+   "rapport_repos": 0.95,
+   "rapport_geste": 0.849,
    "essais_rapport_repos": [
-    0.787,
-    0.826,
-    0.8,
-    0.778,
-    0.857
+    0.863,
+    1.168,
+    0.95,
+    0.851,
+    1.016
    ],
    "essais_rapport_geste": [
-    0.747,
-    0.759,
-    0.748,
-    0.741,
-    0.717
+    0.874,
+    0.77,
+    0.786,
+    0.923,
+    0.849
    ],
-   "principal_repos_ms_par_s": 9.3,
-   "principal_geste_ms_par_image": 7.62,
+   "principal_repos_ms_par_s": 18.9,
+   "principal_geste_ms_par_image": 16.58,
    "verre": "aucun",
    "juge": true,
    "dans_le_budget": true
@@ -302,36 +302,36 @@
  },
  "contre_epreuves": {
   "animation infinie qui repeint (fond)": {
-   "repos_ms_par_s": 2525,
-   "geste_ms_par_image": 97,
-   "rapport_repos": 57.75,
-   "rapport_geste": 4.644,
+   "repos_ms_par_s": 2591,
+   "geste_ms_par_image": 143.33,
+   "rapport_repos": 40.088,
+   "rapport_geste": 4.442,
    "refusee": true
   },
   "flou posé sur le graphique": {
-   "repos_ms_par_s": 80,
-   "geste_ms_par_image": 49.33,
-   "rapport_repos": 1.702,
-   "rapport_geste": 2.17,
+   "repos_ms_par_s": 107,
+   "geste_ms_par_image": 57.56,
+   "rapport_repos": 1.63,
+   "rapport_geste": 2.007,
    "refusee": true
   }
  },
  "temoin": {
-  "rapport_repos": 1.011,
-  "rapport_geste": 0.995,
+  "rapport_repos": 1,
+  "rapport_geste": 0.977,
   "essais_rapport_repos": [
-   1.044,
-   0.978,
-   0.917,
-   1.011,
-   1.034
+   1,
+   0.87,
+   0.814,
+   1.099,
+   1.108
   ],
   "essais_rapport_geste": [
-   0.995,
-   0.995,
-   0.99,
-   1.038,
-   1.073
+   0.977,
+   0.937,
+   0.932,
+   1.003,
+   1.03
   ],
   "dans_le_budget": true
  }

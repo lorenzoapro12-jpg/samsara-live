@@ -917,7 +917,7 @@ titre('7g. Mode débutant : la convention du « sens du prix » vient des consta
   const GD = BM.GUIDE, src = fs.readFileSync(path.join(REPO, 'js/bookmap.js'), 'utf8');
   check(`fenêtre de tendance (${GD.tendanceMs / 60e3} min) et seuil « stable » (${GD.tendancePct} %) positifs`, GD.tendanceMs > 0 && GD.tendancePct > 0 && GD.tendanceMs % 60e3 === 0, [GD.tendanceMs, GD.tendancePct]);
   // La légende (Expert) qui dit la convention la tire des constantes : jamais un « 15 min » ou un « 0,1 % » écrit en dur.
-  const l = src.split('\n').filter(x => /Mode Lisible : une ligne, d\\'abord le sens du prix/.test(x));
+  const l = src.split('\n').filter(x => /Sans «' \+ NB \+ 'Le détail' \+ NB \+ '» : une ligne, d\\'abord le sens du prix/.test(x));
   check('légende : la convention de tendance est tirée de BM.GUIDE (tendanceMs, tendancePct), rien en dur',
     l.length === 1 && /BM\.age\(GD\.tendanceMs\)/.test(l[0]) && /GD\.tendancePct/.test(l[0]) && !/15 min|0,1 %/.test(l[0]), l);
   // Le nombre de repères débutants : la constante que la légende écrit (« deux repères au plus ») est
