@@ -41,7 +41,7 @@ const CIBLES = [
   ['cartes du marché', '#feed .demon-card', 'tous'], ['bandeau d’âge du marché', '#feed .age-banner', 'tous'],
   // (Les réglages d'affichage n'ont plus de bouton dans l'en-tête : ce sont les « Réglages fins »
   // du panneau « Choisir l'affichage », dont le bouton doit rester visible.)
-  ['bouton thème', '#themeBtn'], ['bouton ⚡', '#liveBtn'], ['bouton mode', '#modeBtn'], ['bouton « Choisir l’affichage »', '#indDropdownBtn'],
+  ['bouton thème', '#themeBtn'], ['bouton ⚡', '#liveBtn'], ['bouton « Choisir l’affichage »', '#indDropdownBtn'],
   ['bouton légendes', '#legendesBtn'], ['lien carte', '#carteBtn'], ['horloge', '#taskbarClock'],
   // Horloges (js/horloges.js) et Contre-expertise (js/contre-expertise.js) : leurs âges aussi.
   ['carte Horloges', '#feed .carte-horloges'], ['âges des horloges', '#feed .carte-horloges .h-age', 'tous'],

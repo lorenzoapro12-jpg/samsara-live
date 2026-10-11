@@ -396,28 +396,28 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
    et la Planche le range sur la 1re rangée de sa nomenclature à partir de 1280 px : leurs
    règles, pas celles-ci (la Planche a les siennes plus bas, en dessous de 1280 px). */
 @media (min-width: 769px) {
-  :root[data-mode="expert"]:not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar > .ind-dropdown {
+  :root[data-calques="1"]:not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar > .ind-dropdown {
     position: sticky; right: 0; z-index: 1; margin-left: auto;
   }
-  :root[data-mode="expert"]:not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar.deborde > .ind-dropdown {
+  :root[data-calques="1"]:not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar.deborde > .ind-dropdown {
     padding-left: 22px; background: linear-gradient(90deg, transparent, var(--card-solid) 18px);
     box-shadow: 12px 0 0 var(--card-solid);
   }
-  :root[data-mode="expert"]:not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar.deborde { -webkit-mask-image: none; mask-image: none; }
+  :root[data-calques="1"]:not([data-structure="fenetres"]):not([data-structure="planche"]) .indicator-bar.deborde { -webkit-mask-image: none; mask-image: none; }
 }
 /* La Planche ne le range sur la 1re rangée de sa nomenclature qu'à partir de 1280 px : en dessous,
    sa nomenclature est une rangée qui défile, et le bouton était au bout, hors de l'écran. */
 @media (min-width: 769px) and (max-width: 1279px) {
-  :root[data-structure="planche"][data-mode="expert"] .indicator-bar > .ind-dropdown {
+  :root[data-structure="planche"][data-calques="1"] .indicator-bar > .ind-dropdown {
     position: sticky; right: 0; z-index: 1; margin-left: auto;
   }
-  :root[data-structure="planche"][data-mode="expert"] .indicator-bar.deborde > .ind-dropdown {
+  :root[data-structure="planche"][data-calques="1"] .indicator-bar.deborde > .ind-dropdown {
     padding-left: 22px; background: linear-gradient(90deg, transparent, var(--card-solid) 18px);
     box-shadow: 12px 0 0 var(--card-solid);
   }
 }
 @media (max-width: 768px) {
-  :root[data-mode="expert"]:not([data-structure="fenetres"]) .indicator-bar > .ind-dropdown { order: -2; }
+  :root[data-calques="1"]:not([data-structure="fenetres"]) .indicator-bar > .ind-dropdown { order: -2; }
 }
 /* L'intervalle en tête du ruban, à toutes les largeurs : la légende des calques allumés (Complet)
    change de longueur, les intervalles gardent leur place ; la légende est suivie du bouton. Titres
@@ -590,8 +590,6 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 @media (min-width: 769px) {
   .ind-dropdown-menu.open { display: grid; grid-template-columns: minmax(0, 1fr) 290px; align-items: start; }
   .ind-dropdown-menu { width: min(780px, calc(100vw - 16px)); max-width: min(780px, calc(100vw - 16px)); }
-  .ind-dropdown-menu.aff-lisible { width: min(640px, calc(100vw - 16px)); }
-  .ind-dropdown-menu.aff-lisible.open { grid-template-columns: minmax(0, 1fr) 260px; }
   .ind-apercu { position: sticky; top: 0; bottom: auto; margin: -8px 0 -8px; min-height: 100%; max-height: none; box-sizing: border-box;
     padding: 14px 16px; border-top: 0; border-left: 1px solid var(--hairline); }
 }
@@ -1114,9 +1112,9 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
      place va au prix. Sauf l'alerte : publication en retard, la pastille d'âge (« en retard ·
      25 min ») reste, seule de la bande, à côté du prix — panneau fermé, elle se voit. */
   .kpis { display: none; }
-  :root[data-mode="expert"] .header > .kpis.vieux { display: flex; flex: 0 0 auto; height: auto; }
-  :root[data-mode="expert"] .header > .kpis.vieux > :not(.kpi-age) { display: none; }
-  :root[data-mode="expert"] .header > .kpis.vieux > .kpi-age { margin-left: 0; }
+  :root[data-chiffres="1"] .header > .kpis.vieux { display: flex; flex: 0 0 auto; height: auto; }
+  :root[data-chiffres="1"] .header > .kpis.vieux > :not(.kpi-age) { display: none; }
+  :root[data-chiffres="1"] .header > .kpis.vieux > .kpi-age { margin-left: 0; }
   .hero-prix { gap: 7px; }
   .price-badge { font-size: 17px; gap: 6px; }
   .var24 { font-size: 10.5px; padding: 2px 7px; }
@@ -1128,36 +1126,35 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
    jusqu'à 800 px, après les boutons au-delà s'ils y sont passés (sous 481 px, elle est à côté
    du prix ; au-delà de 1100 px, dans la bande). */
 @media (min-width: 481px) and (max-width: 1100px) {
-  html[data-mode="expert"]:not([data-structure]) .header:has(> .kpis.vieux) { flex-wrap: wrap; row-gap: 4px; }
-  html[data-mode="expert"]:not([data-structure]) .header > .kpis.vieux { order: 3; flex: 0 0 auto; height: auto; }
-  html[data-mode="expert"]:not([data-structure]) .header > .kpis.vieux > :not(.kpi-age) { display: none; }
-  html[data-mode="expert"]:not([data-structure]) .header > .kpis.vieux > .kpi-age { margin-left: 0; }
+  html[data-chiffres="1"]:not([data-structure]) .header:has(> .kpis.vieux) { flex-wrap: wrap; row-gap: 4px; }
+  html[data-chiffres="1"]:not([data-structure]) .header > .kpis.vieux { order: 3; flex: 0 0 auto; height: auto; }
+  html[data-chiffres="1"]:not([data-structure]) .header > .kpis.vieux > :not(.kpi-age) { display: none; }
+  html[data-chiffres="1"]:not([data-structure]) .header > .kpis.vieux > .kpi-age { margin-left: 0; }
 }
 @media (min-width: 481px) and (max-width: 800px) {
-  html[data-mode="expert"]:not([data-structure]) .header:has(> .kpis.vieux) > .header-left { flex-basis: 0; }
-  html[data-mode="expert"]:not([data-structure]) .header > .kpis.vieux { flex-basis: 100%; }
+  html[data-chiffres="1"]:not([data-structure]) .header:has(> .kpis.vieux) > .header-left { flex-basis: 0; }
+  html[data-chiffres="1"]:not([data-structure]) .header > .kpis.vieux { flex-basis: 100%; }
 }
 /* Expert : la paire, le prix et neuf boutons ne tiennent pas toujours sur une rangée. Entre 481
    et 660 px, les boutons se posaient sur le prix ; dans les thèmes à structure, entre 801 et
    1000 px, les derniers sortaient de l'écran (Réglages, Légendes, Thème). Le bloc du prix garde
    sa largeur, et les boutons passent sur une 2e rangée, à droite, quand ils n'ont plus la place. */
 @media (min-width: 481px) and (max-width: 800px) {
-  html[data-mode="expert"]:not([data-structure="fenetres"]) .header { flex-wrap: wrap; row-gap: 6px; }
-  html[data-mode="expert"]:not([data-structure="fenetres"]) .header > .header-left,
-  html[data-mode="expert"]:not([data-structure]) .header:has(> .kpis.vieux) > .header-left { flex: 1 0 auto; }
-  html[data-mode="expert"]:not([data-structure="fenetres"]) .header > .header-right { margin-left: auto; }
+  html[data-chiffres="1"]:not([data-structure="fenetres"]) .header { flex-wrap: wrap; row-gap: 6px; }
+  html[data-chiffres="1"]:not([data-structure="fenetres"]) .header > .header-left,
+  html[data-chiffres="1"]:not([data-structure]) .header:has(> .kpis.vieux) > .header-left { flex: 1 0 auto; }
+  html[data-chiffres="1"]:not([data-structure="fenetres"]) .header > .header-right { margin-left: auto; }
 }
 /* Fenêtres (Bureau 95) : l'en-tête garde UNE rangée (ses boutons sont dans la barre des tâches),
-   mais l'interrupteur « Lisible | Complet » est plus large que l'ancien bouton de mode : entre 481
-   et 640 px, le prix du mode Complet passait dessous. Le titre s'efface, comme sous 481 px (le
+   mais entre 481 et 640 px, avec les chiffres du marché, le prix passait dessous. Le titre s'efface, comme sous 481 px (le
    nom reste dans la barre des tâches) : le prix et la variation 24 h gardent leur place. */
 @media (min-width: 481px) and (max-width: 640px) {
   html[data-structure="fenetres"] .header-left h1 { display: none; }
 }
 @media (min-width: 801px) and (max-width: 1100px) {
-  html[data-mode="expert"][data-structure]:not([data-structure="fenetres"]) .header { flex-wrap: wrap; row-gap: 6px; }
-  html[data-mode="expert"][data-structure]:not([data-structure="fenetres"]) .header > .header-left { flex: 1 0 auto; }
-  html[data-mode="expert"][data-structure]:not([data-structure="fenetres"]) .header > .header-right { margin-left: auto; }
+  html[data-chiffres="1"][data-structure]:not([data-structure="fenetres"]) .header { flex-wrap: wrap; row-gap: 6px; }
+  html[data-chiffres="1"][data-structure]:not([data-structure="fenetres"]) .header > .header-left { flex: 1 0 auto; }
+  html[data-chiffres="1"][data-structure]:not([data-structure="fenetres"]) .header > .header-right { margin-left: auto; }
 }
 @media (max-width: 768px) {
   body { font-size: 12px; -webkit-tap-highlight-color: transparent; }
@@ -1216,7 +1213,7 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
   html:not([data-structure="fenetres"]) .header-right { flex: 1 1 100%; justify-content: space-between; }
   /* Expert : la pastille « en retard » se range à côté du prix, sur la 1re rangée (les boutons,
      à 100 %, restent sur la 2e) ; sans elle, le prix occupe la rangée comme avant. */
-  html[data-mode="expert"]:not([data-structure]) .header-left { flex: 1 1 auto; }
+  html[data-chiffres="1"]:not([data-structure]) .header-left { flex: 1 1 auto; }
 }
 @media (max-width: 400px) {
   .price-badge { font-size: 15px; }
@@ -1240,34 +1237,20 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
    (tests/test_structures.js l'exige de tout [data-decor]). */
 [data-decor] { pointer-events: none; }
 
-/* ─── Légendes (js/fiches.js) ───────────────────────────────────────────────────
-   Le MODE de lecture n'est qu'une classe sur <html> : le HTML est le même dans les deux
-   modes, seul ce qui s'affiche change. Une valeur ne peut donc pas en dépendre.
-   Lisible (data-mode="debutant") est le DÉFAUT de la feuille, comme sur la carte : sans attribut, ou
-   avec une valeur inconnue, la page montre la version Lisible — jamais les deux variantes (« 15m15 min »).
-   Toutes les règles du mode suivent ce principe : :not([data-mode="expert"]) pour Lisible (sous
-   :where(html) quand le sélecteur était nu : même spécificité), [data-mode="expert"] pour Complet. */
+/* ─── Un seul écran : trois attributs sur <html> (index.html, js/fiches.js, js/app.js) ───────────
+   Le HTML est le même quels que soient les calques choisis : seul ce qui s'affiche change, jamais une
+   valeur.
+   - data-mode : le calque « Le détail » ('expert' allumé). .expert-seul / .debutant-seul le suivent
+     (fiches, graphique). Éteint est le DÉFAUT de la feuille : sans attribut, ou avec une valeur
+     inconnue, la page montre la version courte — jamais les deux variantes.
+   - data-chiffres : le calque « Les chiffres du marché » ('1' allumé) : les chiffres de l'en-tête,
+     l'En direct, le Grid Bot et les infos du marché chiffrées. .chiffres-seul / .sans-chiffres.
+   - data-calques : '1' quand un calque de marché est allumé : le ruban montre sa légende. */
 :where(html):not([data-mode="expert"]) .expert-seul,
 [data-mode="expert"] .debutant-seul { display: none !important; }
-/* L'interrupteur de mode « Lisible | Complet », le même sur la carte (css/bookmap.css) : deux
-   segments sur un rail, l'actif surligné. Le surlignage suit data-mode (posé avant le premier
-   rendu) ; aria-pressed, posé par js/fiches.js, dit l'état aux lecteurs d'écran et aux thèmes qui
-   habillent .mode-btn (Bureau 95 l'enfonce). */
-.mode-bascule {
-  display: inline-flex; align-items: center; flex-shrink: 0; gap: 1px; padding: 2px;
-  border-radius: var(--r-bar); background: var(--rail); box-shadow: inset 0 0 0 1px var(--hairline);
-}
-/* Padding mesuré : l'interrupteur ne prend pas plus que l'ancien bouton de mode et le bouton des
-   réglages réunis (à 1440 px en Complet, la bande des chiffres clés garde ses chiffres et sa trace). */
-.mode-bascule .mode-btn {
-  font: inherit; font-size: 11px; font-weight: 700; height: 30px; padding: 0 7px; white-space: nowrap;
-  border-radius: var(--r-bar); background: transparent; box-shadow: none; color: var(--ink-3);
-}
-.mode-bascule .mode-btn[aria-pressed="false"]:hover { color: var(--ink-1); background: var(--capsule-hover); }
-:where(html:not([data-mode="expert"])) .mode-btn[data-mode-choix="debutant"],
-:where(html[data-mode="expert"]) .mode-btn[data-mode-choix="expert"] {
-  color: var(--accent); background: var(--capsule); box-shadow: var(--capsule-ombre); cursor: default;
-}
+:where(html):not([data-chiffres="1"]) .chiffres-seul,
+[data-chiffres="1"] .sans-chiffres { display: none !important; }
+:where(html):not([data-calques="1"]) .legende-seule { display: none !important; }
 .info-btn {
   display: inline-flex; align-items: center; justify-content: center; vertical-align: 1px;
   width: 15px; height: 15px; margin-left: 5px; padding: 0; border-radius: 50%;
@@ -1282,7 +1265,7 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
 }
 /* Complet : la phrase en mots se lit à côté des chiffres, un cran plus discrète qu'eux (niveau
    « utile » : plus petite, sans fond) ; les chiffres restent ce qui se voit d'abord. */
-html[data-mode="expert"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7px; font-size: 10.5px; background: transparent; }
+html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7px; font-size: 10.5px; background: transparent; }
 /* Débutant, autre paire que BTCUSDT : les infos du marché parlent du bitcoin (js/app.js). */
 .deb-btc {
   margin: 0 0 8px; padding: 6px 9px; border-radius: 8px; font-size: 11.5px; line-height: 1.4;
@@ -1380,7 +1363,6 @@ html[data-mode="expert"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7
 @media (max-width: 768px) {
   /* Au-dessus de la barre des tâches (fixe, au-dessus de tout) : elle cachait le bas de la fiche. */
   .fiche-pop { left: 8px !important; right: 8px; top: auto !important; bottom: calc(30px + 2 * var(--gutter) + 4px); width: auto; max-height: 70vh; }
-  .mode-bascule .mode-btn { height: 26px; padding: 0 7px; font-size: 10px; }
 }
 
 /* ─── Réglages d'affichage (js/reglages.js), dans les « Réglages fins » du panneau ─── */
@@ -1413,28 +1395,21 @@ html[data-mode="expert"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7
 .kpis.vieux .kpi-deb { color: var(--warn-ink); background: var(--warn-soft); }
 .kpis.vieux .kpi-deb .deb-frais { display: none; }
 .kpis.vieux .kpi-deb .deb-retard { display: inline; }
-:where(html):not([data-mode="expert"]) #cycle .kpi, :where(html):not([data-mode="expert"]) #cycle .kpi-age { display: none; }
-:where(html):not([data-mode="expert"]) .header-right > #updated { display: none; }
+:where(html):not([data-chiffres="1"]) #cycle .kpi, :where(html):not([data-chiffres="1"]) #cycle .kpi-age { display: none; }
+:where(html):not([data-chiffres="1"]) .header-right > #updated { display: none; }
 /* Les structures déplacent l'heure de publication hors de l'en-tête : en Débutant, son âge est
    dit par la pastille « Infos du marché » (infobulle) ; l'heure et ses étiquettes restent en
    Expert. La légende de la Gazette nomme les « bougies » : Expert aussi. */
-:where(html):not([data-mode="expert"]) #updated, :where(html):not([data-mode="expert"]) .f95-pub, :where(html):not([data-mode="expert"]) .gare-heure,
-:where(html):not([data-mode="expert"]) .gazette-edition, :where(html):not([data-mode="expert"]) .gazette-legende { display: none !important; }
+:where(html):not([data-chiffres="1"]) #updated, :where(html):not([data-chiffres="1"]) .f95-pub, :where(html):not([data-chiffres="1"]) .gare-heure,
+:where(html):not([data-chiffres="1"]) .gazette-edition, :where(html):not([data-chiffres="1"]) .gazette-legende { display: none !important; }
 /* Planche (cyanotype, diazo) : les chiffres clés masqués, la case du cartouche garde son fond de
    case (sinon le trait clair de la grille paraît) et s'étend sous « date de rév. » (heure UTC masquée). */
-:root:not([data-mode="expert"]) .plan-cartouche > .kpis { grid-column: 1 / -1; display: flex; align-items: center; padding: 4px 9px; background: var(--plan-case); }
+:root:not([data-chiffres="1"]) .plan-cartouche > .kpis { grid-column: 1 / -1; display: flex; align-items: center; padding: 4px 9px; background: var(--plan-case); }
 /* Sans les neuf cases, rien ne donne sa largeur au cartouche : les sources la donnent (sur une
    ligne), et la nomenclature, courte, part de la gauche. */
-:root:not([data-mode="expert"]) .plan-cartouche > .plan-sources { contain: none; white-space: nowrap; }
-:root:not([data-mode="expert"]) .plan-pied .indicator-bar > .ind-dropdown { margin-left: 0; }
-:where(html):not([data-mode="expert"]) .gazette-manchette { display: none; }
-/* Le panneau du Lisible : ses cases (couches du site, trois calques simples), puis le lien vers le Complet. */
-.ind-dropdown-menu .menu-expert {
-  display: block; width: calc(100% - 12px); margin: 6px; padding: 6px 10px; text-align: left;
-  font: inherit; font-size: 11.5px; font-weight: 600; color: var(--accent-2);
-  background: var(--rail); border: 1px solid var(--hairline); border-radius: 8px; cursor: pointer;
-}
-.ind-dropdown-menu .menu-expert:hover { border-color: var(--accent); }
+:root:not([data-chiffres="1"]) .plan-cartouche > .plan-sources { contain: none; white-space: nowrap; }
+:root:not([data-calques="1"]) .plan-pied .indicator-bar > .ind-dropdown { margin-left: 0; }
+:where(html):not([data-chiffres="1"]) .gazette-manchette { display: none; }
 /* Les onglets des sous-graphiques sans place (dispositionGraphique, js/app.js) : posés sur le
    canvas, au-dessus du sélecteur de plage ; un clic en montre un à la place d'un autre. Ils
    défilent s'ils ne tiennent pas. Un élément HTML, pas un texte du graphique. */
@@ -1481,56 +1456,52 @@ html[data-mode="expert"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7
 /* Le prix, sa variation et la pastille d'abord (la pastille ne rétrécit pas : elle n'a qu'un
    mot) ; les boutons à droite, et à la ligne quand ils ne tiennent plus. La barre d'outils
    passe aussi à la ligne plutôt que de défiler. */
-:where(html):not([data-mode="expert"]) .kpis { flex: 0 0 auto; order: 2; }
-html:not([data-mode="expert"]):not([data-structure="fenetres"]) .header { flex-wrap: wrap; row-gap: 6px; }
-html:not([data-mode="expert"]):not([data-structure="fenetres"]) .header-right { order: 3; margin-left: auto; }
+:where(html):not([data-chiffres="1"]) .kpis { flex: 0 0 auto; order: 2; }
+html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header { flex-wrap: wrap; row-gap: 6px; }
+html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header-right { order: 3; margin-left: auto; }
 @media (max-width: 1100px) {
-  html:not([data-mode="expert"]):not([data-structure="fenetres"]) .header { column-gap: 8px; }
-  html:not([data-mode="expert"]):not([data-structure="fenetres"]) .header-right { gap: 6px; }
+  html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header { column-gap: 8px; }
+  html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header-right { gap: 6px; }
 }
-:where(html):not([data-mode="expert"]) .indicator-bar { flex-wrap: wrap; overflow-x: visible; row-gap: 4px; }
+:where(html):not([data-calques="1"]) .indicator-bar { flex-wrap: wrap; overflow-x: visible; row-gap: 4px; }
 @media (max-width: 800px) {
   /* La pastille reste : c'est l'accès aux cartes du Débutant. */
-  :where(html):not([data-mode="expert"]) .kpis { display: flex; }
+  :where(html):not([data-chiffres="1"]) .kpis { display: flex; }
 }
 @media (max-width: 480px) {
   /* La variation 24 h répond à « ça monte ou ça baisse ? » : visible aussi sur téléphone. */
-  :where(html):not([data-mode="expert"]) .var24 { display: inline-flex; }
+  :where(html):not([data-chiffres="1"]) .var24 { display: inline-flex; }
   /* Structure « fenêtres » (bureau95) : l'en-tête ne passe pas à la ligne (le bouton de mode y
      recouvrait la variation). Le bloc du prix passe, lui, sur deux rangées : la paire et le prix,
      puis la variation 24 h en entier ; le bouton de mode reste à droite. */
-  html:not([data-mode="expert"])[data-structure="fenetres"] .header-left { min-width: 0; }
+  html:not([data-chiffres="1"])[data-structure="fenetres"] .header-left { min-width: 0; }
   /* Tous thèmes : quand la variation ne tient plus à droite du prix (Gazette à 360 px), elle passe
      sous lui, entière — jamais coupée au bord de l'écran. */
-  html:not([data-mode="expert"]) .hero-prix { flex-wrap: wrap; row-gap: 4px; }
-  html:not([data-mode="expert"])[data-structure="fenetres"] .header-right { flex-shrink: 0; }
-  :where(html):not([data-mode="expert"]) .kpi-deb { padding: 4px 9px; font-size: 10.5px; }
-  html:not([data-mode="expert"]):not([data-structure="fenetres"]) .kpis { order: 2; flex: 0 1 auto; }
-  html:not([data-mode="expert"]):not([data-structure="fenetres"]) .header-right { order: 3; flex: 1 1 auto; justify-content: flex-end; gap: 4px; }
+  html:not([data-chiffres="1"]) .hero-prix { flex-wrap: wrap; row-gap: 4px; }
+  html:not([data-chiffres="1"])[data-structure="fenetres"] .header-right { flex-shrink: 0; }
+  :where(html):not([data-chiffres="1"]) .kpi-deb { padding: 4px 9px; font-size: 10.5px; }
+  html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .kpis { order: 2; flex: 0 1 auto; }
+  html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header-right { order: 3; flex: 1 1 auto; justify-content: flex-end; gap: 4px; }
   /* La pastille et les boutons sur la 2e rangée : des boutons un peu plus petits (28 px). */
-  :where(html):not([data-mode="expert"]) .header-right .theme-btn.ico-btn { width: 28px; height: 28px; }
+  :where(html):not([data-chiffres="1"]) .header-right .theme-btn.ico-btn { width: 28px; height: 28px; }
   /* La barre d'outils sur deux rangées au plus : sans son titre ni ses séparateurs. */
-  :where(html):not([data-mode="expert"]) .indicator-bar .section-title { display: none; }
-  :where(html):not([data-mode="expert"]) .indicator-bar .sep { display: none; }
+  :where(html):not([data-calques="1"]) .indicator-bar .section-title { display: none; }
+  :where(html):not([data-calques="1"]) .indicator-bar .sep { display: none; }
 }
 @media (max-width: 400px) {
-  :where(html):not([data-mode="expert"]) .kpi-deb { padding: 3px 7px; font-size: 10px; }
+  :where(html):not([data-chiffres="1"]) .kpi-deb { padding: 3px 7px; font-size: 10px; }
   /* À 360 px, la flèche de la pastille « en retard · 25 min » cède aussi (2 px de trop). */
-  :where(html):not([data-mode="expert"]) .kpi-deb .deb-fleche { display: none; }
-  html:not([data-mode="expert"]):not([data-structure="fenetres"]) .header-right { gap: 3px; }
-  :where(html):not([data-mode="expert"]) .header-right .theme-btn.ico-btn { width: 26px; height: 26px; }
-  /* L'interrupteur tient dans la place de l'ancien bouton (« Passer en Expert », 92 px) : la
-     pastille et les boutons restent sur la 2e rangée. */
-  .mode-bascule { padding: 1px; gap: 0; }
-  .mode-bascule .mode-btn { padding: 0 4px; font-size: 9.5px; }
-  /* Complet : sept boutons, le voyant et l'interrupteur sur la 2e rangée (« Expert » faisait 48 px). */
-  html[data-mode="expert"]:not([data-structure="fenetres"]) .header-right { gap: 4px; }
-  :where(html)[data-mode="expert"] .header-right .theme-btn.ico-btn { width: 28px; height: 28px; }
+  :where(html):not([data-chiffres="1"]) .kpi-deb .deb-fleche { display: none; }
+  html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header-right { gap: 3px; }
+  :where(html):not([data-chiffres="1"]) .header-right .theme-btn.ico-btn { width: 26px; height: 26px; }
+  /* Avec les chiffres du marché : sept boutons et le voyant sur la 2e rangée. */
+  html[data-chiffres="1"]:not([data-structure="fenetres"]) .header-right { gap: 4px; }
+  :where(html)[data-chiffres="1"] .header-right .theme-btn.ico-btn { width: 28px; height: 28px; }
 }
 /* Cartes : un bloc réservé à l'Expert est enveloppé sans boîte (même mise en page qu'avant) ;
    en Débutant, une carte d'une seule tuile la montre en entier. */
 .env-exp { display: contents; }
-:where(html):not([data-mode="expert"]) .tuiles.deb-une { grid-template-columns: minmax(0, 1fr); }
+:where(html):not([data-chiffres="1"]) .tuiles.deb-une { grid-template-columns: minmax(0, 1fr); }
 
 /* ─── Téléphone : l'en-tête et la barre tiennent en deux rangées, sans débord ──────────────
    Un rayon de pilule (999 px) sur un bloc de deux rangées rognait la paire au bord gauche et
@@ -1538,31 +1509,31 @@ html:not([data-mode="expert"]):not([data-structure="fenetres"]) .header-right { 
 @media (max-width: 1100px) {
   .header, .indicator-bar { border-radius: min(var(--r-bar), 22px); }
   /* Débutant : « Infos · en retard ▸ » (le mot « du marché » cède) ; l'en-tête tient sur une rangée. */
-  :where(html):not([data-mode="expert"]) .kpi-deb .deb-mot { display: none; }
+  :where(html):not([data-chiffres="1"]) .kpi-deb .deb-mot { display: none; }
 }
 /* Tablette : le nom (redit dans la barre du bas) cède avant que l'en-tête passe à la ligne —
    dès 1100 px quand la pastille s'allonge (« Infos · en retard · 25 min ▸ »). */
-@media (max-width: 900px) { html:not([data-mode="expert"]):not([data-structure]) .header-left h1 { display: none; } }
-@media (max-width: 1100px) { html:not([data-mode="expert"]):not([data-structure]) .header:has(> .kpis.vieux) .header-left h1 { display: none; } }
+@media (max-width: 900px) { html:not([data-chiffres="1"]):not([data-structure]) .header-left h1 { display: none; } }
+@media (max-width: 1100px) { html:not([data-chiffres="1"]):not([data-structure]) .header:has(> .kpis.vieux) .header-left h1 { display: none; } }
 @media (max-width: 480px) {
   /* Débutant : 1re rangée, la paire, le prix et la variation ; 2e rangée, la pastille « Infos »
      (qui cède, en entier puis en points de suspension) et les boutons (qui ne passent jamais à
      une 3e rangée). */
-  html:not([data-mode="expert"]):not([data-structure="fenetres"]) .header-left { order: 1; }
-  html:not([data-mode="expert"]):not([data-structure="fenetres"]) .kpis { flex: 0 1 auto; min-width: 0; height: auto; }
-  html:not([data-mode="expert"]):not([data-structure="fenetres"]) .header-right { flex: 0 0 auto; flex-wrap: nowrap; margin-left: auto; }
-  :where(html):not([data-mode="expert"]) .kpi-deb { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header-left { order: 1; }
+  html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .kpis { flex: 0 1 auto; min-width: 0; height: auto; }
+  html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header-right { flex: 0 0 auto; flex-wrap: nowrap; margin-left: auto; }
+  :where(html):not([data-chiffres="1"]) .kpi-deb { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   /* En retard, la pastille porte l'âge (« en retard · 25 min ») : « Infos · » cède, pour que
      les boutons restent sur la 2e rangée (le titre et le nom accessible disent « Infos du marché »). */
-  :where(html):not([data-mode="expert"]) .kpi-deb .deb-quoi { display: none; }
+  :where(html):not([data-chiffres="1"]) .kpi-deb .deb-quoi { display: none; }
   /* La barre : les six intervalles et « Affichage » sur une seule rangée. */
-  :where(html):not([data-mode="expert"]) .indicator-bar { flex-wrap: nowrap; justify-content: space-between; gap: 2px; padding: 4px 6px; }
-  :where(html):not([data-mode="expert"]) .indicator-bar label { padding: 7px 7px; }
-  :where(html):not([data-mode="expert"]) .ind-dropdown-btn { padding: 7px 9px; gap: 3px; }
+  :where(html):not([data-calques="1"]) .indicator-bar { flex-wrap: nowrap; justify-content: space-between; gap: 2px; padding: 4px 6px; }
+  :where(html):not([data-calques="1"]) .indicator-bar label { padding: 7px 7px; }
+  :where(html):not([data-calques="1"]) .ind-dropdown-btn { padding: 7px 9px; gap: 3px; }
 }
 @media (max-width: 400px) {
-  :where(html):not([data-mode="expert"]) .indicator-bar label { padding: 6px 5px; }
-  :where(html):not([data-mode="expert"]) .ind-dropdown-btn { padding: 6px 7px; }
+  :where(html):not([data-calques="1"]) .indicator-bar label { padding: 6px 5px; }
+  :where(html):not([data-calques="1"]) .ind-dropdown-btn { padding: 6px 7px; }
 }
 
 /* ─── Au doigt (pointer: coarse) : des cibles d'au moins 40 × 40 px ──────────────────────────────
@@ -1579,15 +1550,15 @@ html:not([data-mode="expert"]):not([data-structure="fenetres"]) .header-right { 
   html:not([data-structure]) .indicator-bar label[id^="int_"] { position: relative; }
   html:not([data-structure]) .header .ico-btn:not(#reglagesBtn)::before, html:not([data-structure]) .header .paire-btn::before,
   html:not([data-structure]) .indicator-bar label[id^="int_"]::before,
-  html[data-mode="debutant"]:not([data-structure]) .kpis::before {
+  html:not([data-chiffres="1"]):not([data-structure]) .kpis::before {
     content: ''; position: absolute; inset: min(0px, calc(50% - 20px));
   }
   /* La pastille « Infos du marché » : sa zone est celle de la bande qui la porte (même action : un
      clic sur la bande ouvre les cartes) ; en Lisible, la bande ne montre qu'elle, rien n'en déborde.
      Vide (au chargement : largeur nulle, au bout de la rangée), elle n'a pas de zone : celle-ci
      déborderait à droite de l'en-tête. */
-  html[data-mode="debutant"]:not([data-structure]) .kpis { position: relative; overflow: visible; min-height: 28px; }
-  html[data-mode="debutant"]:not([data-structure]) .kpis:empty::before { display: none; }
+  html:not([data-chiffres="1"]):not([data-structure]) .kpis { position: relative; overflow: visible; min-height: 28px; }
+  html:not([data-chiffres="1"]):not([data-structure]) .kpis:empty::before { display: none; }
   /* La paire : 28 px de haut (sa zone, 6 px au-dessus et au-dessous, tient dans la marge de l'en-tête). */
   html:not([data-structure]) .paire-btn { min-height: 28px; }
   html[data-mode]:not([data-structure]) .header { row-gap: 14px; }
@@ -1625,21 +1596,18 @@ html:not([data-mode="expert"]):not([data-structure="fenetres"]) .header-right { 
    lui laisse sa place (44 px). Boutons ronds de 28 px et 7 de marge. Les six intervalles et le menu :
    sans écart fixe, la place qui reste se partage entre eux (à 360 px, 7 px). */
 @media (pointer: coarse) and (max-width: 480px) {
-  html[data-mode="debutant"]:not([data-structure]) .header { column-gap: 0; }
-  html[data-mode="debutant"]:not([data-structure]) .header-right > .ico-btn:not(#reglagesBtn) { width: 28px; height: 28px; margin: 0 7px; }
+  html:not([data-chiffres="1"]):not([data-structure]) .header { column-gap: 0; }
+  html:not([data-chiffres="1"]):not([data-structure]) .header-right > .ico-btn:not(#reglagesBtn) { width: 28px; height: 28px; margin: 0 7px; }
   /* Le voyant, désormais au bout de la rangée : 4 px à sa droite, pour que son onde (×3, js : ping)
      reste dans l'en-tête au lieu de le faire déborder. */
-  html[data-mode="debutant"]:not([data-structure]) .header-right > #dot { margin: 0 4px 0 0; }
-  html[data-mode="debutant"]:not([data-structure]) .header-left { padding-right: 44px; }
-  html[data-mode="debutant"]:not([data-structure]) .header-right > #themeBtn { position: absolute; top: 6px; right: 6px; }
-  html[data-mode="debutant"]:not([data-structure]) .indicator-bar { gap: 0; }
+  html:not([data-chiffres="1"]):not([data-structure]) .header-right > #dot { margin: 0 4px 0 0; }
+  html:not([data-chiffres="1"]):not([data-structure]) .header-left { padding-right: 44px; }
+  html:not([data-chiffres="1"]):not([data-structure]) .header-right > #themeBtn { position: absolute; top: 6px; right: 6px; }
+  html:not([data-calques="1"]):not([data-structure]) .indicator-bar { gap: 0; }
 }
-/* Téléphone de 400 px et moins, Complet : l'interrupteur « Lisible | Complet » est plus large que
-   l'ancien bouton « Expert ». Il se resserre, et les boutons des deux bouts rejoignent le bord de la
-   rangée : les boutons ronds gardent plus de 41 px de centre à centre (à 360 px, 40 sans cela). */
+/* Téléphone de 400 px et moins, avec les chiffres du marché : les boutons des deux bouts rejoignent
+   le bord de la rangée : les boutons ronds gardent plus de 41 px de centre à centre (à 360 px, 40 sans cela). */
 @media (pointer: coarse) and (max-width: 400px) {
-  html[data-mode="expert"]:not([data-structure]) .mode-bascule { padding: 0; }
-  html[data-mode="expert"]:not([data-structure]) .mode-bascule .mode-btn { padding: 0 3px; }
-  html[data-mode="expert"]:not([data-structure]) .header-right > #feedBtn.ico-btn { margin-left: 2px; }
-  html[data-mode="expert"]:not([data-structure]) .header-right > #themeBtn.ico-btn { margin-right: 2px; }
+  html[data-chiffres="1"]:not([data-structure]) .header-right > #feedBtn.ico-btn { margin-left: 2px; }
+  html[data-chiffres="1"]:not([data-structure]) .header-right > #themeBtn.ico-btn { margin-right: 2px; }
 }

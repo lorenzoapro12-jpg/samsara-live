@@ -329,7 +329,7 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
           puces: [...document.querySelectorAll('#indicatorBar label[data-calque]')].map(l => ({ cle: l.dataset.calque, t: txt(l.querySelector('.ind-label')) })),
           sous: SUB_ORDRE.map(k => ({ cle: k, titre: subTitle(k), menu: menu[k] })), jour: txt(document.getElementById('int_1d')),
           equity: 'equity' in activeSubs || SUB_ORDRE.includes('equity') || INDICATORS.some(c => c.items.some(i => i.key === 'equity')) };
-        revenirAuDepart();
+        revenirAuDepart(); appliquerMode('expert');   // « Revenir au départ » éteint aussi « Le détail » : rallumé, c'est le tracé du détail qu'on lit ici
         return r;
       });
       check('panneau : les calques rangés par question, plus par endroit ; ruban : « À l’écran » (la légende) et « Intervalle », plus « Overlays » ni « Sous-graphes »',
@@ -355,8 +355,9 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       const t1 = await releve();
       const anglais = t1.filter(x => /\$\s?\d|\d,\d{3}\.\d|\d{4,}\.\d/.test(x.t)).map(x => x.t);
       check('aucun prix au format anglais ni « $ » devant le nombre, sur le graphique et son calque', !anglais.length, [...new Set(anglais)].slice(0, 12));
-      const axe = t1.filter(x => x.c === 'chartCalque' && /^\d[\d ]*,\d\d \$$/.test(x.t));
-      check(`axe et étiquette du prix au format de l'Expert (« 86 012,50 $ ») : ${new Set(axe.map(x => x.t)).size} libellés`, new Set(axe.map(x => x.t)).size >= 6, t1.filter(x => x.c === 'chartCalque').map(x => x.t).slice(0, 12));
+      // L'axe et l'étiquette du prix : un seul format, arrondi, avec ou sans « Le détail ».
+      const axe = t1.filter(x => x.c === 'chartCalque' && /^\d[\d  ]* \$$/.test(x.t));
+      check(`axe et étiquette du prix au format de la page (« 86 013 $ ») : ${new Set(axe.map(x => x.t)).size} libellés`, new Set(axe.map(x => x.t)).size >= 6, t1.filter(x => x.c === 'chartCalque').map(x => x.t).slice(0, 12));
       const motif = (nom, re) => check(`${nom} au format de la page`, t1.some(x => re.test(x.t)), t1.map(x => x.t).filter(t => /\$|%/.test(t)).slice(0, 20));
       motif('badge S/R « 86 154,92 $ · 4h »', /^\d[\d ]*,\d\d \$ · (15m|1h|4h)$/);
       motif('Fibonacci « 23,6 % · 85 855,11 $ »', /^\d+,\d % · \d[\d ]*,\d\d \$$/);
@@ -557,12 +558,14 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
         const vis = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
         const H = canvas.height / devicePixelRatio, d = dispositionGraphique(H), dispo = H - 4 - RS_HEIGHT, og = document.getElementById('ongletsSous');
         let garde = null; try { garde = JSON.parse(localStorage.getItem('samsara-affichage-v1')); } catch (e) { garde = 'illisible'; }
-        // La légende attendue : chaque calque allumé qui dessine sur la paire (posés sur les bougies,
-        // puis sous-graphiques, dans l'ordre du panneau) ; au-delà de 7, 6 puces et « + N autres ».
+        // La légende attendue : chaque calque DE MARCHÉ allumé qui dessine sur la paire (posés sur les
+        // bougies, puis sous-graphiques, dans l'ordre du panneau ; le Guide et les scénarios sont
+        // l'écran lui-même) ; au-delà de 7, 6 puces et « + N autres » ; aucun : aucune puce.
         const items = INDICATORS.flatMap(c => c.items), dessine = i => !i.paires || i.paires.includes(activeSymbol);
-        const on = items.filter(i => i.key in overlays && overlays[i.key] && dessine(i)).concat(items.filter(i => !(i.key in overlays) && activeSubs[i.key])).map(i => i.key);
-        const attendue = !on.length ? ['lbl__vide'] : on.length > 7 ? on.slice(0, 6).concat('lbl__plus') : on;
+        const on = items.filter(i => i.key in overlays && !SITE.includes(i.key) && overlays[i.key] && dessine(i)).concat(items.filter(i => !(i.key in overlays) && activeSubs[i.key])).map(i => i.key);
+        const attendue = on.length > 7 ? on.slice(0, 6).concat('lbl__plus') : on;
         return {
+          calques: document.documentElement.getAttribute('data-calques'),
           ov: Object.keys(overlays).filter(k => !SITE.includes(k) && overlays[k]).sort(), sg: Object.keys(activeSubs).filter(k => activeSubs[k]).sort(),
           site: SITE.map(k => overlays[k]), on: on.length,
           dessines: geo ? geo.sous.map(s => s.cle) : [], disposition: d.sous.map(s => s.cle), onglets: d.onglets, part: d.mainH / dispo,
@@ -578,11 +581,18 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       const meme = (a, b) => JSON.stringify(a) === JSON.stringify(b);
       const legendeOk = e => meme(e.puces, e.attendue) && e.noms.every(n => n.t === n.court && n.x);
 
-      // A. Sans clé : les réglages d'origine, et le panneau.
+      // A. Sans clé (et sans l'ancien Complet : la page est ouverte avec « Le détail » choisi mais la
+      // migration ne donne le Volume qu'à qui n'avait rien d'autre — ici, la clé est vidée d'abord) :
+      // les réglages d'origine, et le panneau.
+      await p7.evaluate(() => { appliquerSelection([], [], true); localStorage.removeItem('samsara-affichage-v1'); });
       let e = await etat();
-      check('sans clé gardée : les réglages d’origine (le Volume seul ; Guide et scénarios affichés), rien de gardé',
-        meme(e.ov, []) && meme(e.sg, ['vol']) && meme(e.site, [true, true]) && e.garde === null && meme(e.dessines, ['vol']), e);
-      check(`légende du ruban : les seuls calques allumés, nom court et croix (${e.puces.join(', ')})`, legendeOk(e) && meme(e.puces, ['guide', 'scenarios', 'vol']), e);
+      check('sans clé gardée : les réglages d’origine (aucun calque de marché ; Guide et scénarios affichés), rien de gardé',
+        meme(e.ov, []) && meme(e.sg, []) && meme(e.site, [true, true]) && e.garde === null && meme(e.dessines, []), e);
+      check('légende du ruban : aucune puce sans calque de marché (data-calques="0")', legendeOk(e) && meme(e.puces, []) && e.calques === '0', e);
+      await p7.evaluate(() => { toggleAny('vol'); });
+      e = await etat();
+      check(`légende du ruban : les seuls calques de marché allumés, nom court et croix (${e.puces.join(', ')}) ; ni Guide ni scénarios (l'écran lui-même)`, legendeOk(e) && meme(e.puces, ['vol']) && e.calques === '1', e);
+      await p7.evaluate(() => { toggleAny('vol'); localStorage.removeItem('samsara-affichage-v1'); });
       await p7.click('#indDropdownBtn'); await pause(200);
       e = await etat();
       check('le bouton ouvre le panneau (aria-expanded="true") ; l’origine est « L’essentiel »', e.ouvert && e.aria === 'true' && meme(e.presse, ['essentiel']), e);
@@ -602,14 +612,18 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       });
       check('tête du panneau : « Tout afficher », « Revenir au départ », puis les six préréglages en mots',
         meme(pan.boutons, ['Tout afficher', 'Revenir au départ']) && meme(pan.presets, ['L’essentiel', 'La tendance', 'L’élan', 'Le volume', 'Le carnet', 'Tout']), pan);
-      const QUESTIONS = [['Dans quel sens ?', ['ema20', 'ema50', 'ema100', 'ema200', 'sma20', 'sma50', 'ichimoku', 'sar', 'vwap']],
+      const QUESTIONS = [['Ce que dit le graphique', ['guide', 'scenarios', 'detail', 'chiffres']], ['Dans quel sens ?', ['ema20', 'ema50', 'ema100', 'ema200', 'sma20', 'sma50', 'ichimoku', 'sar', 'vwap']],
         ['Ça s’essouffle ?', ['rsi', 'macd', 'stoch', 'williamsR', 'cci', 'mfi', 'ao']], ['Qui échange ?', ['vol', 'obv', 'vp']],
-        ['Où le prix peut réagir ?', ['guide', 'scenarios', 'sr', 'fib', 'liq', 'figuresPassees']], ['Ça bouge beaucoup ?', ['atr', 'bb', 'adx']]];
-      check('les calques rangés par question, dans l’ordre (« Dans quel sens ? », « Ça s’essouffle ? », « Qui échange ? », « Où le prix peut réagir ? », « Ça bouge beaucoup ? »)',
-        meme(pan.cats.map(c => [c.titre, c.cles.slice().sort()]), QUESTIONS.map(([t, k]) => [t, k.slice().sort()])) && pan.cats.find(c => c.cat === 'reaction').cles[0] === 'guide', pan.cats);
+        ['Où le prix peut réagir ?', ['sr', 'fib', 'liq', 'figuresPassees']], ['Ça bouge beaucoup ?', ['atr', 'bb', 'adx']]];
+      check('« Ce que dit le graphique » d’abord (Guide, scénarios, Le détail, Les chiffres du marché), puis les calques rangés par question, dans l’ordre (« Dans quel sens ? », « Ça s’essouffle ? », « Qui échange ? », « Où le prix peut réagir ? », « Ça bouge beaucoup ? »)',
+        meme(pan.cats.map(c => [c.titre, c.cles.slice().sort()]), QUESTIONS.map(([t, k]) => [t, k.slice().sort()])) && meme(pan.cats.find(c => c.cat === 'ecran').cles, ['guide', 'scenarios', 'detail', 'chiffres']), pan.cats);
       const MOTS = { 'imp-courant': 'courant', 'imp-utile': 'utile', 'imp-special': 'spécialisé' };
-      const mal = pan.lignes.filter(l => !l.coche || !l.nom || !/^[A-ZÀ-Ý].{8,}[.!?]$/.test(l.quoi) || !l.fiche || MOTS[l.classe] !== l.imp);
-      check(`chaque ligne (${pan.lignes.length}) : case, nom, phrase « C’est quoi ? », importance en MOT (courant, utile, spécialisé) et bouton de fiche`, pan.lignes.length === 28 && !mal.length, mal);
+      // « Le détail » et « Les chiffres du marché » ne sont pas des calques : case, nom et phrase, sans
+      // importance (ni fiche pour les chiffres, qui ont chacun la leur sur sa carte).
+      const ecran = pan.lignes.filter(l => l.cle === 'detail' || l.cle === 'chiffres'), calques = pan.lignes.filter(l => !ecran.includes(l));
+      const mal = calques.filter(l => !l.coche || !l.nom || !/^[A-ZÀ-Ý].{8,}[.!?]$/.test(l.quoi) || !l.fiche || MOTS[l.classe] !== l.imp)
+        .concat(ecran.filter(l => !l.coche || !l.nom || !/^[A-ZÀ-Ý].{8,}[.!?]$/.test(l.quoi) || l.imp));
+      check(`chaque ligne (${calques.length} calques, puis « Le détail » et « Les chiffres du marché ») : case, nom, phrase « C’est quoi ? », importance en MOT (courant, utile, spécialisé) et bouton de fiche pour les calques`, calques.length === 28 && ecran.length === 2 && !mal.length, mal);
       const formes = Object.keys(MOTS).map(c => (pan.lignes.find(l => l.classe === c) || {}).forme);
       const plein = f => f && !/rgba\(0, 0, 0, 0\)|transparent/.test(f.couleur), dessin = f => f && /gradient/.test(f.image);
       check('l’importance a aussi une FORME, jamais la couleur seule : disque plein (courant), demi-disque (utile), anneau (spécialisé)',
@@ -624,7 +638,7 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       const MARCHE = await p7.evaluate(SITE => Object.keys(overlays).filter(k => !SITE.includes(k)).sort(), SITE);
       const TOUS_SG = await p7.evaluate(() => Object.keys(activeSubs).sort());
       const PRESETS = [['tendance', ['ema20', 'ema200', 'ema50', 'ichimoku'], [], [false, true]], ['elan', [], ['macd', 'rsi', 'stoch'], [false, true]],
-        ['volume', ['vp', 'vwap'], ['obv', 'vol'], [false, true]], ['carnet', ['liq', 'sr'], [], [false, true]], ['essentiel', [], ['vol'], [true, true]], ['tout', MARCHE, TOUS_SG, [true, true]]];
+        ['volume', ['vp', 'vwap'], ['obv', 'vol'], [false, true]], ['carnet', ['liq', 'sr'], [], [false, true]], ['essentiel', [], [], [true, true]], ['tout', MARCHE, TOUS_SG, [true, true]]];
       for (const [id, ov, sg, site] of PRESETS) {
         await p7.click(`#indMenu .aff-preset[data-preset="${id}"]`); await pause(250);
         e = await etat();
@@ -664,14 +678,15 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       // E. « Revenir au départ » : les réglages d'origine, la clé effacée ; rouvert, toujours eux.
       await p7.click('#indMenu .aff-boutons .aff-btn:not(.aff-tout)'); await pause(250);
       e = await etat();
-      check('« Revenir au départ » : le Volume seul, Guide et scénarios affichés, clé effacée', meme(e.ov, []) && meme(e.sg, ['vol']) && meme(e.site, [true, true]) && e.garde === null && meme(e.presse, ['essentiel']) && legendeOk(e), e);
+      check('« Revenir au départ » : aucun calque de marché, Guide et scénarios affichés, clé effacée', meme(e.ov, []) && meme(e.sg, []) && meme(e.site, [true, true]) && e.garde === null && meme(e.presse, ['essentiel']) && legendeOk(e), e);
       await p7.reload(); await pause(1800);
       e = await etat();
-      check('« Revenir au départ », rouvert : toujours les réglages d’origine', meme(e.ov, []) && meme(e.sg, ['vol']) && e.garde === null, e);
+      check('« Revenir au départ », rouvert : toujours les réglages d’origine', meme(e.ov, []) && meme(e.sg, []) && e.garde === null, e);
 
       // F. Plus de sous-graphiques cochés qu'il n'en tient : la même règle (le dernier coché se montre).
       await p7.click('#indDropdownBtn'); await pause(200);
-      for (const k of ['rsi', 'macd', 'stoch']) {
+      for (const k of ['vol', 'rsi', 'macd', 'stoch']) {
+        await p7.evaluate(k => document.querySelector(`#indMenu label[data-ind="${k}"]`).scrollIntoView({ block: 'center' }), k);
         await p7.click(`#indMenu label[data-ind="${k}"] input`); await pause(200);
         e = await etat();
         check(`« ${k} » coché : dessiné tout de suite (${e.dessines.join(', ')}), au plus 3, le prix garde ${Math.round(e.part * 100)} %`, e.dessines.includes(k) && e.dessines.length <= 3 && e.part >= 0.6 - 1e-9, e);
@@ -688,18 +703,18 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       check('au clavier : Entrée sur une puce masque son calque (RSI)', !e.sg.includes('rsi') && !e.puces.includes('rsi') && legendeOk(e), e);
       await p7.evaluate(() => { for (const k of ['guide', 'scenarios', 'macd', 'stoch', 'vol']) if (isActive(k)) toggleAny(k); });
       e = await etat();
-      const vide = await p7.evaluate(() => (document.getElementById('lbl__vide') || {}).textContent || '');
-      check(`rien d’allumé : une phrase invite à choisir (« ${vide} »)`, meme(e.puces, ['lbl__vide']) && /^Rien d’allumé : choisissez ce qui s’affiche/.test(vide) && e.compte === 0, { e, vide });
-      await p7.click('#lbl__vide'); await pause(200);
-      check('… et l’ouvre : le panneau', (await etat()).ouvert);
-      // H. Le ruban du Lisible ne change pas : les intervalles et le bouton, aucune puce.
-      await p7.evaluate(() => { document.getElementById('indMenu').classList.remove('open'); revenirAuDepart(); basculerMode(); });
+      check('rien d’allumé : aucune puce (data-calques="0"), le compte à zéro ; « Choisir l’affichage » reste le chemin', meme(e.puces, []) && e.calques === '0' && e.compte === 0, e);
+      await p7.click('#indDropdownBtn'); await pause(200);
+      check('… qui ouvre le panneau', (await etat()).ouvert);
+      // H. « Revenir au départ » : l'écran calme (sans « Le détail »), le ruban de la 1re visite — les
+      // intervalles et le bouton, aucune puce.
+      await p7.evaluate(() => { document.getElementById('indMenu').classList.remove('open'); revenirAuDepart(); });
       await pause(400);
       const lis = await p7.evaluate(() => {
         const vis = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
         return { labels: [...document.querySelectorAll('#indicatorBar label')].filter(vis).map(l => l.id), bouton: vis(document.getElementById('indDropdownBtn')), mode: modeCourant() };
       });
-      check('Lisible : le ruban garde ses six intervalles et le bouton, sans légende', lis.mode === 'debutant' && meme(lis.labels, ['int_1m', 'int_5m', 'int_15m', 'int_1h', 'int_4h', 'int_1d']) && lis.bouton, lis);
+      check('Revenir au départ : l’écran calme, le ruban garde ses six intervalles et le bouton, sans légende', lis.mode === 'debutant' && meme(lis.labels, ['int_1m', 'int_5m', 'int_15m', 'int_1h', 'int_4h', 'int_1d']) && lis.bouton, lis);
       check('aucune erreur JavaScript', !o7.erreurs.length, o7.erreurs);
       await o7.ctx.close();
     }
@@ -710,7 +725,7 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       const o8 = await ouvrir(nav, th, { width: 1440, height: 900 });
       const fautes = [];
       for (const mode of ['expert', 'debutant']) {
-        if (mode === 'debutant') await o8.page.evaluate(() => basculerMode());
+        if (mode === 'debutant') await o8.page.evaluate(() => appliquerMode('debutant'));
         for (const [w, h] of [[360, 740], [390, 844], [1440, 900]]) {
           await o8.page.setViewportSize({ width: w, height: h }); await o8.page.waitForTimeout(150);
           const m = await menu(o8.page, '#indDropdownBtn', 'indMenu');

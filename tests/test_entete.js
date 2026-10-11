@@ -26,7 +26,7 @@
 //      prix, ni hors de l'écran, ni cachés ; « Choisir l'affichage » à l'écran (Planche comprise).
 //  12. AU DOIGT (écran tactile, 360 et 390 px, aero et kala, deux modes) : chaque bouton de
 //      l'en-tête et chaque intervalle du ruban couvre un carré de 40 × 40 px ; aucune zone sur
-//      l'interrupteur de mode ni « Choisir l'affichage » ; le nom d'un bouton-icône dit à l'appui.
+//      « Choisir l'affichage » ; le nom d'un bouton-icône dit à l'appui.
 //
 // Binance simulé (prix 86 012,50, ouverture 85 700 : +0,36 % ; Binance arrondit à +0,365), le
 // fichier publié du dépôt avec l'heure de publication réglée par contrôle ; horloge fixée au
@@ -246,7 +246,7 @@ const lireEntete = page => page.evaluate(() => {
       await p.evaluate(() => document.getElementById('liveBtn').click());
       await p.waitForFunction(() => /en 24 h/.test((document.getElementById('liveModalBody') || {}).textContent || ''), null, { timeout: 10000 }).catch(() => {});
       const v = await p.evaluate(() => ({ tete: document.getElementById('var24').textContent, live: (document.getElementById('liveModalBody').textContent.match(/[+−]?\d+,\d\d % en 24 h/) || [])[0] }));
-      check(`variation 24 h : en-tête « ${v.tete} », panneau ⚡ « ${v.live} » — la même (ouverture → dernier prix)`, v.tete === '+0,36 %' && v.live === v.tete + ' en 24 h', v);
+      check(`variation 24 h : en-tête « ${v.tete} », panneau ⚡ « ${v.live} » — la même (ouverture → dernier prix)`, v.tete === '+0,36 % en 24 h' && v.live === v.tete, v);   // un seul format : la durée toujours dite
       await p.evaluate(() => { const m = document.getElementById('liveModal'); if (typeof closeLiveModal === 'function') closeLiveModal(); else m.style.display = 'none'; });
 
       // Raccourcis : rien depuis un champ ni un texte éditable, rien avec Ctrl ; la touche seule, oui.
@@ -370,8 +370,7 @@ const lireEntete = page => page.evaluate(() => {
             const vis = e => { const s = getComputedStyle(e); return s.display !== 'none' && s.visibility !== 'hidden' && r(e).width > 0 && r(e).height > 0; };
             const prix = document.getElementById('price'), rp = r(prix), out = [];
             const coupe = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
-            // L'interrupteur de mode compté où qu'il soit (la Gazette le pose dans le folio, sous l'en-tête).
-            const boutons = [...new Set(document.querySelectorAll('.header button, .header .ico-btn, #dot, .header .kpi-deb, .header .kpi-age, #indDropdownBtn, #modeBtn button'))].filter(b => vis(b) && !b.contains(prix) && !prix.contains(b));
+            const boutons = [...new Set(document.querySelectorAll('.header button, .header .ico-btn, #dot, .header .kpi-deb, .header .kpi-age, #indDropdownBtn'))].filter(b => vis(b) && !b.contains(prix) && !prix.contains(b));
             for (const b of boutons) {
               const rb = r(b), nom = b.id || b.className.split(' ')[0];
               if (vis(prix) && coupe(rp, rb)) out.push(nom + ' sur le prix');
@@ -381,21 +380,14 @@ const lireEntete = page => page.evaluate(() => {
               else if (!x || !(b.contains(x) || x.contains(b))) out.push(nom + ' caché');
             }
             if (document.documentElement.scrollWidth > innerWidth) out.push('défilement horizontal');
-            // L'interrupteur « Lisible | Complet » : ses deux segments visibles, leur texte entier, celui
-            // du mode enfoncé, et aucun autre bouton de l'en-tête dessus.
-            const segs = [...document.querySelectorAll('#modeBtn [data-mode-choix]')];
-            if (segs.map(x => x.textContent.trim()).join('|') !== 'Lisible|Complet' || !segs.every(vis)) out.push('interrupteur incomplet');
-            else {
-              for (const x of segs) if (x.scrollWidth > x.clientWidth + 1) out.push('« ' + x.textContent.trim() + ' » rogné');
-              if (segs.map(x => x.getAttribute('aria-pressed')).join() !== (mode === 'expert' ? 'false,true' : 'true,false')) out.push('interrupteur : mauvais segment enfoncé');
-              const ri = r(document.getElementById('modeBtn'));
-              for (const b of boutons) if (!document.getElementById('modeBtn').contains(b) && coupe(ri, r(b))) out.push((b.id || b.className.split(' ')[0]) + ' sur l’interrupteur');
-            }
+            // Plus d'interrupteur « Lisible | Complet » : « Le détail » et « Les chiffres du marché » sont
+            // dans « Choisir l'affichage » (compté plus haut avec les autres boutons).
+            if (document.getElementById('modeBtn')) out.push('interrupteur de mode encore là');
             return out;
           }, mode);
           for (const x of f) fautes.push(w + ' px : ' + x);
         }
-        check(`${theme.padEnd(9)} · ${mode.padEnd(8)} : de 360 à 1440 px, aucun bouton sur le prix ni hors de l’écran ; l’interrupteur « Lisible | Complet » entier, le bon segment enfoncé, sous aucun bouton`, !fautes.length, fautes.slice(0, 6));
+        check(`${theme.padEnd(9)} · ${mode.padEnd(8)} : de 360 à 1440 px, aucun bouton sur le prix ni hors de l’écran ni caché ; plus d’interrupteur de mode`, !fautes.length, fautes.slice(0, 6));
         await o.ctx.close();
       }
     }
@@ -405,9 +397,9 @@ const lireEntete = page => page.evaluate(() => {
     // (la pastille la plus longue). Chaque bouton de l'en-tête et chaque intervalle du ruban : tout
     // le carré de 40 × 40 px centré sur lui (17 × 17 points jusqu'à ±19,5 px : le point du bord est au
     // milieu du dernier pixel) le touche, lui (la pastille
-    // « Infos du marché » : elle ou la bande qui la porte, même action). Les deux segments de
-    // l'interrupteur de mode et « Choisir l'affichage » ont leur propre mesure : pas de taille exigée ici,
-    // mais aucune zone voisine ne les couvre (chaque point de leur cadre les touche, eux ou leur groupe). Puis le nom d'un bouton-icône,
+    // « Infos du marché » : elle ou la bande qui la porte, même action). « Choisir
+    // l'affichage » a sa propre mesure : pas de taille exigée ici, mais aucune zone voisine ne le
+    // couvre (chaque point de son cadre le touche, lui ou son conteneur). Puis le nom d'un bouton-icône,
     // dit à l'appui du doigt : chaque bouton sans mot visible a un nom en mots (aria-label), qui
     // s'affiche sous lui à l'appui, entier dans l'écran, et s'efface après le relâcher.
     titre('8. Au doigt (360 et 390 px, écran tactile) : chaque bouton de l’en-tête et du ruban, une cible de 40 × 40 px au moins ; le nom d’un bouton-icône dit à l’appui');
@@ -416,7 +408,7 @@ const lireEntete = page => page.evaluate(() => {
       const nom = `${theme} · ${mode} · ${w}`;
       const m = await o.page.evaluate(() => {
         const vis = e => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
-        const AUTRES = ['modeBtn', 'indDropdownBtn'], autre = b => AUTRES.includes(b.id) || !!b.closest('#modeBtn');
+        const AUTRES = ['indDropdownBtn'], autre = b => AUTRES.includes(b.id);
         const tous = [...document.querySelectorAll('.header button, .header a, .header [role="button"], .indicator-bar label[id^="int_"], #indDropdownBtn')].filter(vis);
         const cycle = document.getElementById('cycle');
         const nomDe = b => b.id || b.className.split(' ')[0];
@@ -431,8 +423,8 @@ const lireEntete = page => page.evaluate(() => {
           const ext = (dx, dy) => { let d = 0; while (d < 60 && a(document.elementFromPoint(cx + dx * (d + 0.5), cy + dy * (d + 0.5)))) d += 0.5; return d; };
           return { id: nomDe(b), dessin: [Math.round(r.width), Math.round(r.height)], zone: [ext(-1, 0) + ext(1, 0), ext(0, -1) + ext(0, 1)], rates: rates.length, ex: rates.slice(0, 3) };
         });
-        // L'interrupteur et « Choisir l'affichage » : aucun point de leur cadre (grille de 2 px) ne touche un
-        // autre élément qu'eux — ou que leur conteneur, dans les coins arrondis.
+        // « Choisir l'affichage » : aucun point de son cadre (grille de 2 px) ne touche un autre élément
+        // que lui — ou que son conteneur, dans les coins arrondis.
         const autres = tous.filter(autre).map(b => {
           if (b.closest('.indicator-bar')) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
           const r = b.getBoundingClientRect(), pris = new Set();
@@ -446,8 +438,8 @@ const lireEntete = page => page.evaluate(() => {
       const petits = m.cibles.filter(c => c.rates);
       check(`${nom} : ${m.cibles.length} cibles (${m.cibles.map(c => c.id + ' ' + c.zone.join('×')).join(', ')}) — chacune couvre un carré de 40 × 40 px`,
         m.cibles.length >= (mode === 'debutant' ? 12 : 13) && !petits.length, { petits, geo: m.geo });
-      check(`${nom} : les deux segments de l’interrupteur et « Choisir l’affichage » restent entiers sous le doigt (aucune zone voisine sur eux)`,
-        m.autres.length >= 3 && m.autres.every(x => !x.rates), m.autres);
+      check(`${nom} : « Choisir l’affichage » reste entier sous le doigt (aucune zone voisine sur lui)`,
+        m.autres.length === 1 && m.autres.every(x => !x.rates), m.autres);
       check(`${nom} : ni la page ni l’en-tête ne débordent (en-tête ${m.hTete} px)`, m.page <= 0 && m.tete[0] <= m.tete[1] + 1, m);
       // Le nom à l'appui : chaque bouton sans mot visible, un nom en mots ; à l'appui, il s'affiche.
       const icones = await o.page.evaluate(() => [...document.querySelectorAll('.header button, .header a')].filter(b => b.getClientRects().length && getComputedStyle(b).visibility !== 'hidden' && !b.innerText.trim())

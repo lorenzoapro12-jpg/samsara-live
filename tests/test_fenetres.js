@@ -102,7 +102,7 @@ const boites = page => page.evaluate(() => {
     client: { g: rc.left + cc.clientLeft + parseFloat(cs.paddingLeft), d: rc.left + cc.clientLeft + cc.clientWidth - parseFloat(cs.paddingRight),
               h: rc.top + cc.clientTop + parseFloat(cs.paddingTop), b: rc.top + cc.clientTop + cc.clientHeight - parseFloat(cs.paddingBottom) },
     cycle: R(cy), deborde: cy.scrollWidth - cy.clientWidth, kpis: kpis.map(R), nKpis: kpis.length, age: R($('#cycle .kpi-age')),
-    prix: R($('#price')), mode: R($('#modeBtn')), entete: R($('.header')),
+    prix: R($('#price')), droite: R($('.header-right')), entete: R($('.header')),
     boutons: [...document.querySelectorAll('.f95-lancement > *')].map(R),
   };
 });
@@ -197,7 +197,7 @@ const dedans = (a, b, m = 0.5) => a && b && a.g >= b.g - m && a.d <= b.d + m && 
           Math.abs(t.barre.t - 40) < 0.5 && t.demarrer.l >= 32 && t.demarrer.t >= 34 && t.boutons.length === 5 && t.boutons.every(x => x.l >= 32 && x.t >= 34), { barre: t.barre, demarrer: t.demarrer, boutons: t.boutons });
         check('rien ne déborde ni ne se chevauche : Démarrer | lancement rapide | zone de notification',
           t.demarrer.d <= t.lancement.g + 0.5 && t.lancement.d <= t.zone.g + 0.5 && t.zone.d <= t.L + 0.5 && t.demarrer.g >= -0.5, { demarrer: t.demarrer, lancement: t.lancement, zone: t.zone, L: t.L });
-        check('le prix entier dans l\'en-tête, sans chevaucher le bouton de mode', dedans(t.prix, t.entete) && t.prix.d <= t.mode.g + 0.5, { prix: t.prix, mode: t.mode, entete: t.entete });
+        check('le prix entier dans l\'en-tête, sans chevaucher les boutons de droite', dedans(t.prix, t.entete) && t.prix.d <= t.droite.g + 0.5, { prix: t.prix, droite: t.droite, entete: t.entete });
         check(`la barre d'état garde ${t.nKpis} chiffre(s) clé(s) entier(s) et l'âge`, t.nKpis >= 1 && t.deborde <= 1 && t.kpis.every(k => dedans(k, t.cycle)) && dedans(t.age, t.etat), { n: t.nKpis, deborde: t.deborde });
         check('aucune erreur JavaScript', !o3.erreurs.length, o3.erreurs);
         await o3.ctx.close();

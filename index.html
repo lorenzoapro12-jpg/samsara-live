@@ -60,10 +60,16 @@
       setTimeout(function () { document.documentElement.setAttribute('data-structure-posee', ''); }, 2500);
     }
   } catch (e) {}
-  /* Mode de lecture (Lisible / Complet ; gardé 'debutant' / 'expert') : une classe, posée avant le
-     premier rendu. Il change le niveau de DÉTAIL affiché, jamais une valeur (js/fiches.js). */
-  try { document.documentElement.setAttribute('data-mode', localStorage.getItem('samsara-mode') === 'expert' ? 'expert' : 'debutant'); }
-  catch (e) { document.documentElement.setAttribute('data-mode', 'debutant'); }
+  /* Un seul écran. Deux calques du panneau sont posés avant le premier rendu (js/fiches.js) :
+     « Le détail » (data-mode : 'expert' allumé, 'debutant' éteint ; clé samsara-mode, celle de
+     l'ancien mode Complet : qui y était garde tout son détail) et « Les chiffres du marché »
+     (data-chiffres : l'en-tête chiffré ; clé samsara-chiffres-v1, allumé par défaut pour qui était
+     en Complet). Ils changent ce qui est MONTRÉ, jamais une valeur. */
+  try {
+    var detail = localStorage.getItem('samsara-mode') === 'expert', ch = localStorage.getItem('samsara-chiffres-v1');
+    document.documentElement.setAttribute('data-mode', detail ? 'expert' : 'debutant');
+    document.documentElement.setAttribute('data-chiffres', (ch === null ? detail : ch === '1') ? '1' : '0');
+  } catch (e) { document.documentElement.setAttribute('data-mode', 'debutant'); document.documentElement.setAttribute('data-chiffres', '0'); }
 })();
 </script>
 <script defer src="js/format.js"></script>
@@ -110,13 +116,10 @@
   <div class="kpis" id="cycle" onclick="toggleFeed()" title="Dernière publication — cliquer pour le détail"></div>
   <div class="header-right">
     <span id="updated" title="Heure de la dernière publication des infos du marché"></span>
-    <button class="theme-btn ico-btn expert-seul" onclick="toggleFeed()" id="feedBtn" title="Infos du marché (I)" aria-label="Infos du marché"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
-    <button class="theme-btn ico-btn expert-seul" onclick="openLiveModal()" id="liveBtn" title="En direct (à la seconde) — Binance" aria-label="En direct (à la seconde)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></button>
+    <button class="theme-btn ico-btn chiffres-seul" onclick="toggleFeed()" id="feedBtn" title="Infos du marché (I)" aria-label="Infos du marché"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
+    <button class="theme-btn ico-btn chiffres-seul" onclick="openLiveModal()" id="liveBtn" title="En direct (à la seconde) — Binance" aria-label="En direct (à la seconde)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></button>
     <button class="theme-btn ico-btn" onclick="resetView()" id="resetBtn" title="Revenir au présent (R ou F)" aria-label="Réinitialiser le zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg></button>
     <a class="theme-btn ico-btn" href="bookmap.html" id="carteBtn" title="Carte du carnet (bookmap) — page à côté" aria-label="Carte du carnet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M8 4v16M14 4v16"/></svg></a>
-    <!-- L'interrupteur de mode, le même sur la carte et au même endroit : le segment actif est enfoncé
-         (aria-pressed, posé par js/fiches.js ; surligné d'emblée par la feuille, qui lit data-mode). -->
-    <div class="mode-bascule" id="modeBtn" role="group" aria-label="Mode d'affichage" title="Mode d'affichage (touche M) : Lisible, l'essentiel ; Complet, tout le détail. Les valeurs ne changent pas."><button type="button" class="theme-btn mode-btn" data-mode-choix="debutant" onclick="choisirMode('debutant')">Lisible</button><button type="button" class="theme-btn mode-btn" data-mode-choix="expert" onclick="choisirMode('expert')">Complet</button></div>
     <button class="theme-btn ico-btn" onclick="ouvrirGlossaire(this)" id="legendesBtn" title="Légendes : comment lire chaque indicateur (?)" aria-label="Légendes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></button>
     <!-- Le voyant mesure l'âge des infos du marché (pas le prix, lu à la seconde) : gris et calme
          tant qu'aucune publication n'a été lue (il était vert, « Flux temps réel actif »). -->
@@ -129,14 +132,14 @@
   <!-- Complet : la légende des calques allumés — une puce par calque (sa couleur, son nom court ;
        un clic la masque), posées par js/app.js (majLegende) juste après ce titre. Lisible : le
        ruban garde les intervalles et le bouton. L'ordre des <span> compte (css/app.css). -->
-  <span class="section-title expert-seul" id="legendeTitre">À l’écran</span>
-  <span class="sep expert-seul"></span>
+  <span class="section-title legende-seule" id="legendeTitre">À l’écran</span>
+  <span class="sep legende-seule"></span>
   <span class="section-title">Intervalle</span>
-  <label id="int_1m" onclick="changeInterval('1m',this)"><span class="ind-label"><span class="expert-seul">1m</span><span class="debutant-seul">1 min</span></span></label>
-  <label id="int_5m" onclick="changeInterval('5m',this)"><span class="ind-label"><span class="expert-seul">5m</span><span class="debutant-seul">5 min</span></span></label>
-  <label id="int_15m" class="active" onclick="changeInterval('15m',this)"><span class="ind-label"><span class="expert-seul">15m</span><span class="debutant-seul">15 min</span></span></label>
-  <label id="int_1h" onclick="changeInterval('1h',this)"><span class="ind-label"><span class="expert-seul">1h</span><span class="debutant-seul">1 h</span></span></label>
-  <label id="int_4h" onclick="changeInterval('4h',this)"><span class="ind-label"><span class="expert-seul">4h</span><span class="debutant-seul">4 h</span></span></label>
+  <label id="int_1m" onclick="changeInterval('1m',this)"><span class="ind-label">1 min</span></label>
+  <label id="int_5m" onclick="changeInterval('5m',this)"><span class="ind-label">5 min</span></label>
+  <label id="int_15m" class="active" onclick="changeInterval('15m',this)"><span class="ind-label">15 min</span></label>
+  <label id="int_1h" onclick="changeInterval('1h',this)"><span class="ind-label">1 h</span></label>
+  <label id="int_4h" onclick="changeInterval('4h',this)"><span class="ind-label">4 h</span></label>
   <label id="int_1d" onclick="changeInterval('1d',this)"><span class="ind-label">1 j</span></label>
   <span class="sep"></span>
   <!-- « Choisir l'affichage » : un seul panneau, dans les deux modes (calques, préréglages, réglages
@@ -179,7 +182,7 @@
 </div>
 
 <!-- ═══ GRID BOT SECTION — bottom panel under chart ═══ -->
-<div class="strat-section collapsed expert-seul" id="stratSection">
+<div class="strat-section collapsed chiffres-seul" id="stratSection">
   <div class="strat-handle" onclick="toggleStratPanel()">
     <span>🤖 Grid Bot</span>
     <span class="strat-handle-arrow">▸</span>

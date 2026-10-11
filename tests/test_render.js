@@ -24,7 +24,7 @@ globalThis.__TEST__ = {
                                updated: document.getElementById('updated').textContent }; }
 };`;
 
-/** Le HTML sans ses sous-arbres « expert-seul » (masqués en Débutant par display:none). */
+/** Le HTML sans ses sous-arbres « expert-seul » et « chiffres-seul » (masqués sur l’écran calme, sans « Le détail » ni « Les chiffres du marché »). */
 function sansExpert(html) {
   const VIDES = /^(br|hr|img|input|meta|link|wbr|source)$/i;
   let out = '', i = 0;
@@ -33,7 +33,7 @@ function sansExpert(html) {
     if (lt < 0) { out += html.slice(i); break; }
     out += html.slice(i, lt);
     const gt = html.indexOf('>', lt), tag = html.slice(lt, gt + 1), m = tag.match(/^<([a-z0-9]+)/i);
-    if (m && /class="[^"]*\bexpert-seul\b/.test(tag) && !VIDES.test(m[1]) && !/\/>$/.test(tag)) {
+    if (m && /class="[^"]*\b(expert|chiffres)-seul\b/.test(tag) && !VIDES.test(m[1]) && !/\/>$/.test(tag)) {
       // Saute jusqu'à la fermeture assortie (même nom de balise, imbrications comptées).
       const nom = m[1].toLowerCase(), re = new RegExp('<(/?)' + nom + '\\b[^>]*>', 'gi');
       re.lastIndex = gt + 1;

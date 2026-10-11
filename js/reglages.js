@@ -133,7 +133,7 @@ function reglagesHtml() {
     + '<h4>Carte « Liquidité » — infos du marché, publiées toutes les ' + CADENCES.attendue_min + ' min</h4>'
     + (pub.length ? '<label class="reglage">Bande du ratio ' + choix('r_carnet_bande', ['auto'].concat(pub), R.carnet.bande === null ? 'auto' : R.carnet.bande,
         v => v === 'auto' ? 'référence publiée (±' + nf(lq.bande_ref_pct) + ' %)' : '±' + nf(v) + ' % (publiée)')
-        + ' <span class="fine">(aussi celle de la carte « Ordres en attente » du mode Lisible)</span></label>'
+        + ' <span class="fine">(aussi celle de la carte « Ordres en attente » sans les chiffres du marché)</span></label>'
       : '<p class="fine">Aucune bande publiée par ce fichier.</p>')
     + (prof
       ? '<div class="reglage">Bandes calculées sur le profil publié <span class="fine">(à la tranche de ' + tr + ' $ près, jusqu’à ±' + nf(lq.couverture_pct) + ' %)</span><div class="puces">'
