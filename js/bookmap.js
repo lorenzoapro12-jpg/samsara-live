@@ -1308,6 +1308,23 @@
     ctx.restore();
   }
   let LIGNE = { cle: null, chemin: null };
+  /** Le tracé de la ligne du prix (Path2D). Les points viennent de BM.lignePrix : clôtures 1 min, puis
+   *  VWAP à la seconde — partout où les exécutions sont lues dès qu'une minute fait au moins 6 px —,
+   *  coupée sur ce qui n'est pas lu. Il est gardé tant que ni les données ni la vue ne changent (le
+   *  survol ne le refait pas). */
+  function cheminPrix() {
+    const ms = E.minutes, ppm = Z.chaleur.w / ((E.vue.t2 - E.vue.t1) / 60e3);
+    const nonLues = execNonLues(), parSeconde = ppm >= SECONDE_DES_PPM, der = ms.length ? ms[ms.length - 1] : null;
+    const cle = [E.exec.version, ms.length, der ? der.t + ':' + der.c : '', E.minutesA, E.horloge.ecart, E.vue.t1, E.vue.t2, E.vue.p1, E.vue.p2,
+      Z.chaleur.w, Z.chaleur.h, parSeconde, nonLues.map(x => x.join(':')).join(',')].join('|');
+    if (LIGNE.cle !== cle) {
+      const segs = BM.lignePrix(ms, E.exec, { t1: E.vue.t1, t2: E.vue.t2, parSeconde, minutesA: E.minutesA ? axe(E.minutesA) : null, nonLues, maintenant: maintenant() });
+      const ch = new Path2D();
+      for (const seg of segs) tracerM4(ch, seg);
+      LIGNE = { cle, chemin: ch };
+    }
+    return LIGNE.chemin;
+  }
   function lignePrix() {
     const ms = E.minutes;
     ctx.save();
@@ -1323,18 +1340,7 @@
       }
       ctx.stroke(); ctx.globalAlpha = 1;
     }
-    // Les points viennent de BM.lignePrix : clôtures 1 min, puis VWAP à la seconde — partout où les
-    // exécutions sont lues dès qu'une minute fait au moins 6 px —, coupée sur ce qui n'est pas lu. Le
-    // tracé est gardé tant que ni les données ni la vue ne changent (le survol ne le refait pas).
-    const nonLues = execNonLues(), parSeconde = ppm >= SECONDE_DES_PPM, der = ms.length ? ms[ms.length - 1] : null;
-    const cle = [E.exec.version, ms.length, der ? der.t + ':' + der.c : '', E.minutesA, E.horloge.ecart, E.vue.t1, E.vue.t2, E.vue.p1, E.vue.p2,
-      Z.chaleur.w, Z.chaleur.h, parSeconde, nonLues.map(x => x.join(':')).join(',')].join('|');
-    if (LIGNE.cle !== cle) {
-      const segs = BM.lignePrix(ms, E.exec, { t1: E.vue.t1, t2: E.vue.t2, parSeconde, minutesA: E.minutesA ? axe(E.minutesA) : null, nonLues, maintenant: maintenant() });
-      const ch = new Path2D();
-      for (const seg of segs) tracerM4(ch, seg);
-      LIGNE = { cle, chemin: ch };
-    }
+    cheminPrix();
     // Un trait sombre plus large SOUS la ligne la détache de la chaleur (une ombre floue coûtait
     // ≈ 1,5 ms par image au navigateur).
     // Débutant : un trait qu'aucune couleur de la chaleur ne prend — blanc, plus épais, avec un fil
@@ -1400,11 +1406,27 @@
     // palette) ; pointe en haut pour les achats, en bas pour les ventes. Des plus gros ronds aux plus
     // petits, et pas deux triangles collés : là où les ronds s'empilent, un sur quelques-uns suffit.
     // Des tracés, pas des textes : le budget des mots de la carte n'en compte pas.
+    // Jamais sous la ligne du prix, dessinée par-dessus : elle passe au milieu des ronds (là où se fait
+    // l'échange) et cachait la plupart des triangles. Un triangle couvert glisse dans son rond, vers sa
+    // pointe ou de côté, là où la ligne ne passe pas ; un rond trop petit pour cela n'en porte pas.
     if (sens.length) {
       sens.sort((u, v) => v.r - u.r);
+      const chemin = estVu('prix') ? cheminPrix() : null;
+      if (chemin) {
+        ctx.save(); ctx.lineWidth = 9;
+        // Le triangle (milieu, pointe, coins de la base) et le rond juste sous sa base, hors du trait.
+        const libre = (x, y, a, s) => ![[0, -s * a * 0.2], [0, s * a], [-0.95 * a, -s * a * 0.6], [0.95 * a, -s * a * 0.6], [0, -s * (a * 0.6 + 3)]]
+          .some(([u, v]) => ctx.isPointInStroke(chemin, (x + u) * Z.sx, (y + v) * Z.sy));
+        for (const t of sens) {
+          if (libre(t.x, t.y, t.a, t.s)) continue;
+          const d = t.r - t.a - 1.5, ok = d >= t.a * 0.8 && [[0, t.s * d], [-d, 0], [d, 0]].find(([u, v]) => libre(t.x + u, t.y + v, t.a, t.s));
+          if (ok) { t.x += ok[0]; t.y += ok[1]; } else t.cache = true;
+        }
+        ctx.restore();
+      }
       ctx.globalAlpha = 0.9; ctx.fillStyle = C.fond;
       for (const t of sens) {
-        if (TRIANGLES.some(o => Math.hypot(o.x - t.x, o.y - t.y) < o.a + t.a + 6)) continue;
+        if (t.cache || TRIANGLES.some(o => Math.hypot(o.x - t.x, o.y - t.y) < o.a + t.a + 6)) continue;
         TRIANGLES.push(t);
         FORMES_SENS[t.s < 0 ? 'achat' : 'vente']++;
         const { x, y, a, s } = t;
@@ -2003,26 +2025,49 @@
       const { x0, ya, yb, coul, allume } = f;
       ctx.save();
       ctx.globalAlpha = allume ? 0.26 : 0.16; ctx.fillStyle = coul; ctx.fillRect(x0, ya, W - x0, yb - ya);
-      ctx.globalAlpha = 0.6; ctx.strokeStyle = '#000'; ctx.lineWidth = allume ? 5 : 4; ctx.strokeRect(x0 + 0.5, ya + 0.5, xn - x0 - 1, yb - ya - 1);
+      // Le halo déborde d'1,5 px de chaque côté du trait : une rangée de pixels entière, sombre, le borde
+      // à toute densité (avec 1 px, l'anticrénelage le diluait : turquoise sur des ronds verts, peu net).
+      ctx.globalAlpha = 0.6; ctx.strokeStyle = '#000'; ctx.lineWidth = allume ? 6 : 5; ctx.strokeRect(x0 + 0.5, ya + 0.5, xn - x0 - 1, yb - ya - 1);
       ctx.globalAlpha = allume ? 1 : 0.95; ctx.strokeStyle = coul; ctx.lineWidth = allume ? 3 : 2; ctx.strokeRect(x0 + 0.5, ya + 0.5, xn - x0 - 1, yb - ya - 1);
       ctx.fillRect(W - 5, ya, 5, yb - ya);
       ctx.restore();
     }
+    GU.traits = [];
     if (GU.present && carnetFrais() && GU.C) {
       const x0 = Math.max(0, xn - Math.min(170, Math.max(110, W * 0.16)));
       // Vie des murs nommés : un trait à leur prix, depuis quand ils portent au moins le seuil « mur ».
       // Débutant : seulement le mur de repli (le côté sans zone), celui que son repère nomme.
       for (const m of deb ? mursRepli() : mursAffiches()) {
         // Débutant : un mur de repli dont la série n'est pas connue est marqué sur la largeur des cadres
-        // (sans point de départ : rien n'est daté).
-        const connu = m.depuis !== null && m.depuis !== undefined;
+        // (sans point de départ : rien n'est daté) ; de même un mur vu depuis trop peu de temps pour un
+        // trait lisible (moins de 12 px) : son trait de 0 ou 1 px ne se voyait pas, et son étiquette ne
+        // désignait rien. Expert : un mur vu à l'instant (moins de 2 px de vie) garde son seul point de
+        // départ, à « maintenant ». Le trait et le point ont le halo sombre des cadres : ils restent nets
+        // sur les ronds de leur couleur et sur la chaleur claire.
+        let connu = m.depuis !== null && m.depuis !== undefined;
         if (m.source !== 'live' || (!connu && !deb)) continue;
-        const y = Math.round(Y(m.p + m.pas / 2)) + 0.5, xa = connu ? Math.max(0, X(m.depuis)) : x0;
-        if (y < 0 || y > H || xn - xa < 2) continue;
-        ctx.save(); ctx.strokeStyle = m.cote === 'bid' ? C.murBid : C.murAsk; ctx.globalAlpha = 0.9; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(xa, y); ctx.lineTo(xn, y); ctx.stroke();
-        if (connu && xa > 0) { ctx.fillStyle = ctx.strokeStyle; ctx.beginPath(); ctx.arc(xa, y, 3, 0, Math.PI * 2); ctx.fill(); }
+        if (connu && deb && xn - Math.max(0, X(m.depuis)) < 12) connu = false;
+        const y = Math.round(Y(m.p + m.pas / 2)) + 0.5;
+        // Non daté, il dépasse à gauche de son étiquette quand elle est posée dessus (un téléphone : sa
+        // largeur de cadre est sous l'étiquette) — le prix exact du mur se voit à côté d'elle.
+        const eq = !connu && deb && GU.etiquettes.find(e => e.cote === m.cote && e.source === 'mur' && e.y <= y && e.y + e.h >= y && e.x < xn && e.x + e.w > x0);
+        const xa = Math.min(xn, connu ? Math.max(0, X(m.depuis)) : eq ? Math.max(0, Math.min(x0, eq.x - 24)) : x0);
+        if (y < 0 || y > H) continue;
+        const point = xn - xa < 2;
+        if (point && !connu) continue;
+        const coul = m.cote === 'bid' ? C.murBid : C.murAsk, xp = point ? xn : xa;
+        ctx.save();
+        if (!point) {
+          ctx.beginPath(); ctx.moveTo(xa, y); ctx.lineTo(xn, y);
+          ctx.globalAlpha = 0.6; ctx.strokeStyle = '#000'; ctx.lineWidth = 5; ctx.stroke();
+          ctx.globalAlpha = 0.9; ctx.strokeStyle = coul; ctx.lineWidth = 2; ctx.stroke();
+        }
+        if (connu && xp > 0) {
+          ctx.globalAlpha = 0.6; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(xp, y, 4.5, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = 0.9; ctx.fillStyle = coul; ctx.beginPath(); ctx.arc(xp, y, 3, 0, Math.PI * 2); ctx.fill();
+        }
         ctx.restore();
+        GU.traits.push({ cote: m.cote, xa: point ? xn : xa, xb: xn, y, point, depart: connu && xp > 0 });
       }
     }
     // Marques du journal : un symbole à l'instant et au prix de chaque évènement, une seule par case
@@ -2089,14 +2134,19 @@
     posees.push({ x: x0, y: y0, w, h, texte: ls[0], lignes: ls, etiquette: true });
     const dessin = () => dessinerBoite(ls, x0, y0, w, h, x, y, align, coul, opt);
     if (DIFFERE) DIFFERE.push(dessin); else dessin();
-    return { x: x0, y: y0, w, h };
+    return { x: x0, y: y0, w, h, trait: traitBoite(x0, y0, w, h, x, y, align, opt) };
+  }
+  /** Le trait qui relie une boîte à ce qu'elle décrit ([bx, by, x, y]), ou null quand elle y touche. */
+  function traitBoite(x0, y0, w, h, x, y, align, opt) {
+    const bx = align === 'right' ? x0 + w : x0, by = Math.max(y0 + 3, Math.min(y0 + h - 3, y));
+    return !(opt && opt.discret) && (Math.abs(by - y) > 3 || Math.abs(bx - x) > 12) ? [bx, by, x, y] : null;
   }
   function dessinerBoite(ls, x0, y0, w, h, x, y, align, coul, opt) {
-    const bx = align === 'right' ? x0 + w : x0, by = Math.max(y0 + 3, Math.min(y0 + h - 3, y));
-    if (!(opt && opt.discret) && (Math.abs(by - y) > 3 || Math.abs(bx - x) > 12)) {
+    const t = traitBoite(x0, y0, w, h, x, y, align, opt);
+    if (t) {
       ctx.save(); ctx.lineCap = 'round';
-      ctx.strokeStyle = '#000'; ctx.globalAlpha = 0.6; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(x, y); ctx.stroke();
-      ctx.strokeStyle = coul; ctx.globalAlpha = 1; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(x, y); ctx.stroke();
+      ctx.strokeStyle = '#000'; ctx.globalAlpha = 0.6; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(t[0], t[1]); ctx.lineTo(x, y); ctx.stroke();
+      ctx.strokeStyle = coul; ctx.globalAlpha = 1; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(t[0], t[1]); ctx.lineTo(x, y); ctx.stroke();
       ctx.restore();
     }
     ctx.fillStyle = C.pastille; arrondi(x0, y0, w, h, 6); ctx.fill();
@@ -3658,6 +3708,8 @@
     },
     couleurIntensite: (v, cote) => (LUT ? LUT[v] : (cote === 'ask' ? LUTA[v] : LUTB[v])),
     cadrer: (t1, t2, p1, p2) => { E.vue = { t1, t2, p1, p2 }; E.suivre = false; majBoutonSuivre(); dessiner(); },
+    /** (x, y) de la chaleur est-il sur la ligne du prix du dernier rendu, à `marge` px près ? */
+    surLignePrix: (x, y, marge) => { if (!LIGNE.chemin) return false; ctx.save(); ctx.setTransform(Z.sx, 0, 0, Z.sy, 0, 0); ctx.lineWidth = 7 + 2 * (marge || 0); const r = ctx.isPointInStroke(LIGNE.chemin, x * Z.sx, y * Z.sy); ctx.restore(); return r; },
     bulles: () => BULLES.map(z => ({ x: z.x, y: z.y, r: z.r, achat: z.b.achat, vente: z.b.vente, ta: z.b.ta, tb: z.b.tb, pa: z.b.pa, pb: z.b.pb })),
     lectures: () => (E.live ? { n: E.live.n, deb: Array.from(E.live.deb.subarray(0, E.live.n)), fin: Array.from(E.live.fin.subarray(0, E.live.n)),
       envoi: Array.from(E.live.envoi.subarray(0, E.live.n)), recu: Array.from(E.live.recu.subarray(0, E.live.n)), validite: E.live.validite } : null),
@@ -3693,9 +3745,11 @@
       textesCarte: TEXTES_CARTE.map(t => Object.assign({}, t)),
       ages: AGES.map(a => a.lignes.join(' | ')),
       debutant: { resume: Object.assign({}, RESUME_DEB, { tendance: undefined }), tendance: RESUME_DEB.tendance && Object.assign({}, RESUME_DEB.tendance),
-        etiquettes: GU.etiquettes.map(x => ({ texte: x.texte, cote: x.cote || null, prix: x.prix === undefined ? null : x.prix, source: x.source || null, dedans: !!x.dedans, x: x.x, y: x.y, w: x.w, h: x.h, long: x.long, lien: x.lien === undefined ? null : x.lien })),
+        etiquettes: GU.etiquettes.map(x => ({ texte: x.texte, cote: x.cote || null, prix: x.prix === undefined ? null : x.prix, source: x.source || null, dedans: !!x.dedans, x: x.x, y: x.y, w: x.w, h: x.h, trait: x.trait || null, long: x.long, lien: x.lien === undefined ? null : x.lien })),
         yPrix: Z && E.vue && dernierPrix() ? Y(dernierPrix()) : null,
         cadres: GU.cadres.map(f => ({ cote: f.z.cote, x0: f.x0, x1: f.x1, ya: f.ya, yb: f.yb, dedans: f.dedans })),
+        // Les traits de vie des murs dessinés au dernier rendu (un point seul : mur vu à l'instant).
+        traits: (GU.traits || []).map(t => Object.assign({}, t)),
         niveaux: Z ? (n => ({ bid: n.bid && { P: n.bid.P, source: n.bid.source, dedans: !!n.bid.dedans, pBas: n.bid.pBas, pHaut: n.bid.pHaut }, ask: n.ask && { P: n.ask.P, source: n.ask.source, dedans: !!n.ask.dedans, pBas: n.ask.pBas, pHaut: n.ask.pHaut } }))(niveauxDebutant()) : null,
         indice: !!(indiceEl && !indiceEl.hidden), dernierPrix: dernierPrix(),
         // La mini-clé des couleurs : sa boîte posée (coordonnées de la chaleur) et son texte ; null si cachée.

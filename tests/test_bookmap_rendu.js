@@ -2214,7 +2214,17 @@ async function filNoir(page, x, y) {
       const rc = await pg.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(); return { x: r.left, y: r.top }; });
       const viserTP = async (tt, p) => { const v = e.vue, Zc = e.mise.chaleur, x = Zc.x + (tt - v.t1) / (v.t2 - v.t1) * Zc.w, y = Zc.y + (v.p2 - p) / (v.p2 - v.p1) * Zc.h;
         await pg.mouse.move(rc.x + x + 1, rc.y + y); await pg.mouse.move(rc.x + x, rc.y + y); await pg.waitForTimeout(300); return pg.evaluate(() => document.getElementById('lecture').innerText); };
-      const loinLu = await viserTP((t - 10.5) * 300e3, pMid * 0.92), presLu = await viserTP((t - 10.5) * 300e3, pMid * 0.9995);
+      // L'instant visé : une colonne de 5 min de la vue où la carte publiée du dépôt est OBSERVÉE (elle a
+      // des trous : une publication manquée y laisse « non observé », et Coinbase s'y voit), au prix visé.
+      const jP = Math.floor(pMid * 0.9995 / G.dp), plage = [0, 0];
+      const kVise = [10.5, 9.5, 11.5, 8.5, 12.5, 7.5, 13.5, 6.5, 14.5, 5.5, 15.5, 4.5, 16.5, 3.5, 17.5].find(k => {
+        if (!BM.plageColonnes(G, (t - k) * 300e3 - 30e3, (t - k) * 300e3 + 30e3, plage)) return false;
+        for (let c = plage[0]; c <= plage[1]; c++) if (!(G.bas[c] >= 0 && G.bas[c] <= jP && G.haut[c] >= jP)) return false;
+        return true;
+      });
+      if (kVise === undefined) check('46q. une colonne observée de la carte publiée, au prix visé, dans la vue', false, { t, jP });
+      const tVise = (t - (kVise === undefined ? 10.5 : kVise)) * 300e3;
+      const loinLu = await viserTP(tVise, pMid * 0.92), presLu = await viserTP(tVise, pMid * 0.9995);
       check('46p. loin du prix (hors de la bande Binance) : la ligne Coinbase, sa colonne de 5 min dite telle (« colonne HH:MM–HH:MM (5 min) »)', /Coinbase \(USD\) [\d ]+–[\d ]+ \$ \(bid\)/.test(loinLu) && /colonne \d\d:\d\d–\d\d:\d\d \(5 min\)/.test(loinLu) && !/minute \d\d:\d\d/.test(loinLu.split('Coinbase')[1] || ''), loinLu.slice(0, 300));
       check('46q. dans la bande Binance : la carte de Binance, pas la ligne Coinbase cachée dessous', /^Carte /m.test(presLu) && !/Coinbase/.test(presLu), presLu.slice(0, 300));
       await pg.click('#btnLegende'); await pg.waitForTimeout(300);
@@ -2552,18 +2562,43 @@ async function filNoir(page, x, y) {
           fils.push({ m, fil: await filNoir(pg, x, y), x: Math.round(x), y: Math.round(y) });
         }
         check(`${nom} : la ligne du prix se voit — son fil noir aux clôtures d'il y a 3, 5 et 7 min (${fils.filter(r => r.fil).length} sur 3)`, fils.filter(r => r.fil).length >= 2, fils);
-        // f. Les repères : le bord de chaque cadre et le trait de chaque mur tranchent sur la chaleur juste au-dessus.
+        // f. Les repères : le bord de chaque cadre, et le trait de chaque mur nommé (son seul point de départ
+        // pour un mur vu à l’instant), tranchent sur la chaleur juste à côté. Mesurés en plusieurs points,
+        // là où rien ne les couvre (une étiquette, la ligne du prix, dessinées par-dessus) : chaque point
+        // mesuré compte (tous les 3 px le long d'un trait), et chaque repère en a au moins un. Un mur nommé a
+        // toujours sa marque, à son prix.
         const reperes = await pg.evaluate(() => {
           const e = window.__carte.etat(), m = e.mise, v = e.vue, ch = m.chaleur, cx = document.getElementById('carte').getContext('2d');
           const px = (X, Y) => Array.from(cx.getImageData(Math.round((ch.x + X) * m.sx), Math.round((ch.y + Y) * m.sy), 1, 1).data.slice(0, 3));
           const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-          const Yp = p => (v.p2 - p) / (v.p2 - v.p1) * ch.h, xn = Math.min(ch.w, (e.maintenant - v.t1) / (v.t2 - v.t1) * ch.w);
-          const ecart = (x, y) => { const o = px(x, y - 7); let best = 0; for (let k = -2; k <= 2; k++) best = Math.max(best, d(px(x, y + k), o)); return Math.round(best); };
-          const out = e.debutant.cadres.map(f => ({ quoi: 'cadre ' + f.cote, d: ecart((f.x0 + f.x1) / 2, f.ya) }));
-          for (const k of ['bid', 'ask']) { const n = e.debutant.niveaux && e.debutant.niveaux[k]; if (n && n.source === 'mur') out.push({ quoi: 'trait du mur ' + k, d: ecart(xn - 12, Math.round(Yp((n.pBas + n.pHaut) / 2))) }); }
-          return out;
-        });
-        check(`${nom} : les repères se voient — ${reperes.map(r => r.quoi + ' ' + r.d).join(', ')} (écart ≥ 60 avec la chaleur juste au-dessus)`, reperes.length >= 1 && reperes.every(r => r.d >= 60), reperes);
+          const Yp = p => (v.p2 - p) / (v.p2 - v.p1) * ch.h;
+          // L'écart entre le bord (x, y) et la chaleur à 7 px de là, du côté (u, w) : dessus (0, −1), dessous
+          // (0, 1) ou à gauche (−1, 0) ; le meilleur des 5 px qui traversent le bord (un trait lissé).
+          const ecart = (x, y, u = 0, w = -1) => { const o = px(x + 7 * u, y + 7 * w); let best = 0; for (let k = -2; k <= 2; k++) best = Math.max(best, d(px(x - k * u, y - k * w), o)); return Math.round(best); };
+          // Près d'une étiquette, ou du trait qui la relie à ce qu'elle nomme (4 px de large) — sauf le trait
+          // d'une étiquette posé le long du trait même de son mur (même couleur, même halo : c'est lui).
+          const surSeg = ([ax, ay, bx, by], x, y) => { const L = (bx - ax) ** 2 + (by - ay) ** 2, t = L ? Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / L)) : 0; return Math.hypot(x - ax - t * (bx - ax), y - ay - t * (by - ay)) <= 4.5; };
+          const pres = (q, x, y, yMur) => (x >= q.x - 1 && x <= q.x + q.w + 1 && y >= q.y - 1 && y <= q.y + q.h + 1)
+            || (!!q.trait && !(yMur !== undefined && Math.abs(q.trait[1] - yMur) <= 1.5 && Math.abs(q.trait[3] - yMur) <= 1.5) && surSeg(q.trait, x, y));
+          const couvert = (x, y, u, w, yMur) => [0, 2, 7].some(k => e.debutant.etiquettes.some(q => pres(q, x + k * u, y + k * w, yMur)) || window.__carte.surLignePrix(x + k * u, y + k * w, 3))
+            || e.debutant.etiquettes.some(q => pres(q, x - 2 * u, y - 2 * w, yMur));
+          const faibles = [];
+          const mesurer = (pts, yMur) => pts.filter(([x, y, u, w]) => !couvert(x, y, u, w, yMur)).map(([x, y, u, w]) => { const v = ecart(x, y, u, w); if (v < 60) faibles.push([x, y, u, w, v].map(Math.round)); return v; });
+          const fr = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => i / 10);
+          // Un cadre : son bord du haut (contre la chaleur au-dessus), du bas (au-dessous) et de gauche.
+          const out = e.debutant.cadres.map(f => ({ quoi: 'cadre ' + f.cote, ds: mesurer(fr.map(i => [f.x0 + (f.x1 - f.x0) * i, f.ya, 0, -1])
+            .concat(fr.map(i => [f.x0 + (f.x1 - f.x0) * i, f.yb, 0, 1]), f.yb - f.ya >= 10 ? [0.25, 0.5, 0.75].map(i => [f.x0, f.ya + (f.yb - f.ya) * i, -1, 0]) : [])) }));
+          for (const k of ['bid', 'ask']) {
+            const n = e.debutant.niveaux && e.debutant.niveaux[k];
+            if (!n || n.source !== 'mur') continue;
+            const t = e.debutant.traits.find(q => q.cote === k), y = Yp((n.pBas + n.pHaut) / 2);
+            if (!t || Math.abs(t.y - y) > 1.5) { out.push({ quoi: 'trait du mur ' + k + ' (absent ou hors de son prix)', ds: [], t, y }); continue; }
+            out.push({ quoi: (t.point ? 'point du mur ' : 'trait du mur ') + k, t: [t.xa, t.xb, t.y].map(Math.round), ds: mesurer((t.point ? [t.xb - 2] : Array.from({ length: Math.floor((t.xb - t.xa - 6) / 3) }, (_, i) => t.xa + 4 + 3 * i)).flatMap(x => [[x, t.y, 0, -1], [x, t.y, 0, 1]]), t.y) });
+          }
+          return { out, faibles };
+        }).then(r => (r.out.faibles = r.faibles, r.out));
+        check(`${nom} : les repères se voient — ${reperes.map(r => r.quoi + ' ' + r.ds.join('/')).join(', ')} (écart ≥ 60 avec la chaleur juste à côté, en chaque point non couvert)`,
+          reperes.length >= 1 && reperes.every(r => r.ds.length >= 1 && r.ds.every(x => x >= 60)), { faibles: reperes.faibles, reperes: reperes.map(r => ({ quoi: r.quoi, t: r.t, n: r.ds.length })) });
         if (!doigt) {
           // g. La légende et l'explication : les mots de la palette AFFICHÉE (la claire), jamais ceux de la sombre.
           await pg.click('#btnLegende'); await pg.waitForTimeout(300);
