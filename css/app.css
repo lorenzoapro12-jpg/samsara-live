@@ -1347,6 +1347,27 @@ html[data-mode="expert"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7
 .fiche-technique dt { color: var(--ink-3); }
 .fiche-technique dd { margin: 0; color: var(--ink-2); word-break: break-word; }
 .fiche-pied { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--hairline); font-size: 10.5px; color: var(--ink-3); }
+/* Statistiques détaillées d'une figure (js/stats-figures.js) : la cible en gros, puis les comptes. */
+.stats-cible { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 8px 0 2px; }
+.stats-etiquette { font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--ink-3); width: 100%; }
+.stats-prix { font-size: 19px; font-weight: 800; color: var(--ink-1); font-variant-numeric: tabular-nums; }
+.stats-ou { font-size: 11.5px; color: var(--ink-3); }
+.stats-note { width: 100%; margin: 0; font-size: 11.5px; color: var(--ink-2); }
+.stats-comment { margin: 6px 0; font-size: 11.5px; color: var(--ink-2); }
+.stats-phrase { margin: 6px 0 4px; color: var(--ink-1); }
+.stats-barre { display: flex; gap: 2px; height: 10px; margin: 4px 0; border-radius: 5px; overflow: hidden; background: var(--rail); }
+.stats-barre i { display: block; min-width: 3px; }
+.stats-barre .ok { background: var(--up); } .stats-barre .ko { background: var(--down); } .stats-barre .neutre { background: var(--ink-3); }
+.stats-barre .pale { opacity: 0.45; }
+.stats-legende { margin: 2px 0 6px; font-size: 11px; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 2px 10px; font-variant-numeric: tabular-nums; }
+.stats-legende .ok, .stats-marque.ok { color: var(--up-ink); } .stats-legende .ko, .stats-marque.ko { color: var(--down-ink); } .stats-legende .neutre, .stats-marque.neutre { color: var(--ink-3); }
+.stats-table { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; margin: 4px 0; font-size: 12px; }
+.stats-table dt { color: var(--ink-2); }
+.stats-table dd { margin: 0; color: var(--ink-1); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.stats-dernieres { list-style: none; margin: 4px 0; padding: 0; font-size: 12px; color: var(--ink-2); }
+.stats-dernieres li { margin: 3px 0; }
+.stats-marque { display: inline-block; width: 1.1em; font-weight: 800; text-align: center; }
+.stats-quand { color: var(--ink-1); font-variant-numeric: tabular-nums; }
 .glossaire { display: flex; flex-wrap: wrap; gap: 5px; }
 /* Les touches du terminal, en une ligne sous le mode : un rappel, petit et gris. */
 .fiche-touches { margin: 2px 0 8px; font-size: 11px; color: var(--ink-3); }
@@ -1357,7 +1378,8 @@ html[data-mode="expert"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7
 .fiche-pop .lien { padding: 1px 8px; }
 .glossaire-item:hover, .fiche-pop .lien:hover { border-color: var(--accent); }
 @media (max-width: 768px) {
-  .fiche-pop { left: 8px !important; right: 8px; top: auto !important; bottom: 8px; width: auto; max-height: 70vh; }
+  /* Au-dessus de la barre des tâches (fixe, au-dessus de tout) : elle cachait le bas de la fiche. */
+  .fiche-pop { left: 8px !important; right: 8px; top: auto !important; bottom: calc(30px + 2 * var(--gutter) + 4px); width: auto; max-height: 70vh; }
   .mode-bascule .mode-btn { height: 26px; padding: 0 7px; font-size: 10px; }
 }
 

@@ -21,6 +21,9 @@
 //   5. BULLES (survol à 1440, toucher à 390) : validation, invalidation, cible et « Mesuré sur »
 //      ensemble ; aucun mot banni ; bulle entière dans le tracé ; la ligne qui valide n'est couverte
 //      par aucun texte sur plus de 30 % de sa longueur visible (amendement C5).
+//   5 bis. CIBLE ET STATISTIQUES (11/10/2026) : la bulle (résumé du Lisible compris) finit par « Cible … ·
+//      atteinte X fois sur Y ▸ » ; la toucher ouvre le détail (#fichePop) : cible en gros, réussite
+//      mesurée, barre, détail, sans mot banni ; Échap le ferme ; en Complet, un clic sur le libellé aussi.
 //   6. Aucune erreur JavaScript ; pas de défilement horizontal à 390 px.
 //   7. TEMPS (amendement E2) : le rejeu dans Chromium, processeur ralenti 4 fois, en 1 min (où il
 //      revient chaque minute) et en 15 min : ≤ 100 ms à chaque clôture. Le rejeu complet dépassant
@@ -338,6 +341,44 @@ async function bulle(o, tactile) {
         b && { bannis, b: b.b, mainH: b.mainH, texte: b.texte.slice(0, 300) });
       if (tactile) check(`${w} px : pas de défilement horizontal`, c5 && c5.scroll <= 0, c5);
       check(`${w} px · ${theme} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
+    // ── 5 bis. Cible et statistiques (demande du 11/10/2026) ──
+    titre('5 bis. La ligne « Cible … · atteinte X fois sur Y ▸ » au bas de la bulle, et le détail qu’elle ouvre');
+    for (const [mode, w, h] of [['debutant', 1440, 900], ['debutant', 390, 844], ['expert', 1440, 900]]) {
+      const tactile = w < 500;
+      const o = await ouvrir(nav, { iC: seq.iC + 2, mode, w, h });
+      // Le résumé du Lisible (1er toucher) porte déjà la ligne ; bulle() ouvre ensuite le détail.
+      const pt = await o.page.evaluate(() => { const b = canvas.getBoundingClientRect(), c = guideEtat.cibles.find(x => x.figure && x.rects && x.rects.length); return c ? { x: b.left + (c.rects[0].x0 + c.rects[0].x1) / 2, y: b.top + (c.rects[0].y0 + c.rects[0].y1) / 2 } : null; });
+      if (pt && tactile) await o.page.touchscreen.tap(pt.x, pt.y); else if (pt) { await o.page.mouse.move(pt.x - 8, pt.y - 3); await o.page.mouse.move(pt.x, pt.y, { steps: 3 }); }
+      await o.page.waitForTimeout(350);
+      const r1 = await o.page.evaluate(() => ({ resume: !!(guideEtat.bulle && guideEtat.bulle.resume), lien: lienBulle && lienBulle.action ? { texte: lienBulle.texte, rect: lienBulle.rect, bulle: lienBulle.bulle } : null,
+        attendu: (() => { const c = guideEtat.survol; return c && c.figure ? Guide.resumeStatsFigure(c.figure.f, GUIDE_FORMES.val.bilan[c.figure.f.type], guideEtat.ctxF, PARAM.guide, guideUnite()) : null; })(),
+        aide: (() => { const a = document.getElementById('astuceTap'); if (!a || a.hidden || !a.offsetParent) return null; const r = a.getBoundingClientRect(), cb = canvas.getBoundingClientRect(); return { x: r.left - cb.left, y: r.top - cb.top, w: r.width, h: r.height }; })() }));
+      const L1 = r1.lien;
+      check(`${mode} ${w} px · ${mode === 'debutant' ? 'résumé (1er ' + (tactile ? 'toucher' : 'survol') + ')' : 'survol'} : la bulle finit par « ${L1 && L1.texte} » (la cible et le taux mesuré), dans la bulle`,
+        L1 && L1.texte === r1.attendu && /^Cible .+ \$ · atteinte \d+ fois sur \d+ ▸$/.test(L1.texte) && L1.rect.y + L1.rect.h <= L1.bulle.y + L1.bulle.h + 8 && (mode === 'expert' || r1.resume), r1);
+      if (r1.aide && L1) check(`${mode} ${w} px : la touche « ? » ne couvre pas la bulle`, !(L1.bulle.x < r1.aide.x + r1.aide.w && L1.bulle.x + L1.bulle.w > r1.aide.x && L1.bulle.y < r1.aide.y + r1.aide.h && L1.bulle.y + L1.bulle.h > r1.aide.y), r1);
+      // Toucher (cliquer) la ligne : le détail s'ouvre, la page ne change pas.
+      const cible = await o.page.evaluate(() => { const b = canvas.getBoundingClientRect(), R = lienBulle.rect; return { x: b.left + R.x + R.w / 2, y: b.top + R.y + R.h / 2 }; });
+      if (tactile) await o.page.touchscreen.tap(cible.x, cible.y); else { await o.page.mouse.move(cible.x, cible.y, { steps: 6 }); await o.page.waitForTimeout(120); await o.page.mouse.click(cible.x, cible.y); }
+      await o.page.waitForTimeout(300);
+      const d = await o.page.evaluate(() => { const p = document.getElementById('fichePop'), r = p.getBoundingClientRect(); return { ouvert: !p.hidden, texte: p.innerText, prix: [...p.querySelectorAll('.stats-prix')].map(x => x.textContent), barres: p.querySelectorAll('.stats-barre').length, S: window.__statsFigure,
+        dedans: r.left >= 0 && r.right <= innerWidth + 0.5 && r.top >= 0 && r.bottom <= innerHeight + 0.5, chemin: location.pathname.replace(/^.*\//, ''), scroll: document.documentElement.scrollWidth - innerWidth }; });
+      check(`${mode} ${w} px : la ligne ouvre « ${d.S && d.S.titre} » : la cible en gros (${d.prix.join(' / ')}), la réussite mesurée et sa barre, le détail, sans mot banni, dans l’écran, sans changer de page`,
+        d.ouvert && d.S && d.prix.length >= 1 && d.prix.length === d.S.cibles.length && d.barres >= 1 && /Sur ce graphique/i.test(d.texte) && /Le détail/i.test(d.texte)
+        && /usage des analystes/.test(d.texte) && !G.motsBannis(d.texte).length && d.dedans && d.chemin === 'index.html' && (!tactile || d.scroll <= 0), { d: Object.assign({}, d, { texte: d.texte.slice(0, 400) }), bannis: G.motsBannis(d.texte) });
+      // Échap le referme.
+      await o.page.keyboard.press('Escape'); await o.page.waitForTimeout(100);
+      check(`${mode} ${w} px : Échap referme le détail`, await o.page.evaluate(() => document.getElementById('fichePop').hidden), null);
+      // Complet (souris) : un clic sur la figure dont la bulle est ouverte ouvre aussi le détail.
+      if (mode === 'expert' && pt) {
+        await o.page.mouse.move(pt.x - 8, pt.y - 3); await o.page.mouse.move(pt.x, pt.y, { steps: 3 }); await o.page.waitForTimeout(250);
+        await o.page.mouse.click(pt.x, pt.y); await o.page.waitForTimeout(300);
+        check('Complet : cliquer sur le libellé de la figure (ses statistiques courtes) ouvre le détail', await o.page.evaluate(() => !document.getElementById('fichePop').hidden && !!window.__statsFigure), null);
+      }
+      check(`${mode} ${w} px : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
 
