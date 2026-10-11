@@ -65,7 +65,9 @@ async function agesDuCalque(page) {
     // Au téléphone, l'âge de la couche prend sa forme courte pour laisser le compteur entier
     // (test_interface, partie 5) : l'âge de la publication y reste toujours.
     const plein = /^Ordres en attente \(carte\) · dernière colonne .+ · publiée .+/, court = /^(Ordres en attente \(carte\) · publiée|Carte publiée) (il y a .+|< 5 s)$/;
-    return { couche: vus.some(t => plein.test(t) || (innerWidth < PARAM.guide.debutant.etroit && court.test(t))), repere: vus.some(t => /^fichier (\d\d\/\d\d )?\d\d:\d\d · prix publié \d[\d ]*,\d\d \$ \((il y a .+|< 5 s)\)$/.test(t)), vus };
+    return { couche: vus.some(t => plein.test(t) || (innerWidth < PARAM.guide.debutant.etroit && court.test(t))), repere: vus.some(t => /^fichier (\d\d\/\d\d )?\d\d:\d\d · prix publié \d[\d ]*,\d\d \$ \((il y a .+|< 5 s)\)$/.test(t)
+      // Téléphone en Complet (repères courts, PARAM.guide.courtes) : l'heure et l'âge ; le prix est le point du trait.
+      || (etiqCourtes(canvas.width / devicePixelRatio - 16 - 75) && /^fichier (\d\d\/\d\d )?\d\d:\d\d \((il y a .+|< 5 s)\)$/.test(t))), vus };
   });
 }
 
