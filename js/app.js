@@ -483,6 +483,10 @@ const PARAM = {
     // scénario du matin (voir margeFutur) ; elle se referme d'un pas de bougie par bougie
     // quittée à droite (un glissement ne fait pas sauter la largeur des bougies).
     futur: 0.18, futurMinPx: 56, futurMaxPx: 250, futurMaxFraction: 0.4,
+    // Mode Complet sur un tracé de moins de `courtes` px (téléphone) : sur le graphique, des repères
+    // courts (un prix, un nom) ; le texte entier de chaque étiquette est dans sa bulle (au toucher)
+    // et dans la liste « Sur le graphique » sous le tracé (demande du 11/10/2026).
+    courtes: 520,
     // Mode Débutant : au plus `items` textes sur le tracé (phrase, repère du haut, repère du bas,
     // scénario 1, forme, ligne des scénarios), chacun sur une ligne d'au plus N caractères ;
     // « étroit » : un tracé de moins de `etroit` px (téléphone).
@@ -3574,6 +3578,8 @@ function dessinerCalque() {
   if (scenEtat) scenCalque();
   // Apprendre : ce qui vient de se passer (comparé à l'image d'avant), puis la marque « nouveau ».
   apprCalque();
+  // La liste « Sur le graphique » (téléphone, Complet) : après le calque, qui ajoute ses cibles (régime).
+  majReperes(W);
   if (crossX === null || crossY === null) return;
   // x → indice : le pas des bougies (pasBougie), et la bougie dont le CRÉNEAU contient le
   // curseur [x, x + pas[ — l'arrondi d'avant désignait la voisine sur la moitié droite du créneau.
@@ -3716,6 +3722,9 @@ function reperePublication(P) {
   if (x < P.left || x > P.W - P.right) return null;
   const px = d.btc.price, y = px >= P.minP && px <= P.maxP ? P.top + P.ph * (1 - (px - P.minP) / P.range) : null;
   // L'heure de l'appareil (le jour s'il n'est pas aujourd'hui) et le prix au format de l'Expert.
+  // Téléphone en Complet : l'heure et l'âge du fichier ; son prix est le point sur le trait (et
+  // dans les Infos du marché).
+  if (etiqCourtes(P.W - P.left - P.right)) return { x, y, texte: 'fichier ' + Fmt.jourHeure(tu) + ' (' + Horloges.texteAge(Horloges.maintenant() - tu) + ')' };
   return { x, y, texte: 'fichier ' + Fmt.jourHeure(tu) + ' · prix publié ' + Fmt.prix(px, '$', 'fin') + ' (' + Horloges.texteAge(Horloges.maintenant() - tu) + ')' };
 }
 // Le calque, à la prochaine image (une seule par image, quel que soit le nombre d'événements).
@@ -4484,6 +4493,8 @@ let srBadges = [];                                // badges S/R posés dans la f
 const guideUnite = () => (activeSymbol === 'BTCSOL' ? 'SOL' : '$');
 const frN = v => v.toLocaleString('fr-FR');                     // 0.5 → « 0,5 »
 const guideMode = () => (typeof modeCourant === 'function' ? modeCourant() : 'debutant');
+/** Complet sur un tracé étroit (téléphone) : des repères courts sur le graphique (PARAM.guide.courtes). */
+const etiqCourtes = pw => !debutant() && pw < PARAM.guide.courtes;
 
 /** Les données du Guide pour l'état courant des bougies. Indicateurs, niveaux et régime sont
  *  mémorisés avec les autres (memoized : vidé quand les bougies changent) ; les formes, rejouées
@@ -4710,6 +4721,7 @@ function guidePreparer(g) {
   // Le haut du tracé (compteur, régime, lecture du moment) est hors de pad.top (guideHaut) :
   // aucune étiquette n'y monte. La lecture se pose sur le calque, à la rangée prévue.
   E.lectureY = overlays.sr ? 46 : 38;
+  E.courtes = etiqCourtes(g.pw);
   // Les badges S/R (s'ils sont affichés) et le texte du repère de publication : leur place est gardée.
   for (const r of srBadges) E.rects.push(r);
   const rep = geoPrix && !debutant() && reperePublication(geoPrix);
@@ -4724,7 +4736,7 @@ function guidePreparer(g) {
     const yH = yDe(niv.pMax) - E.demiPx, yB = yDe(niv.pMin) + E.demiPx;
     const visible = niv.pMax >= g.minP && niv.pMin <= g.maxP;
     E.niveaux.push({ niv, y: (yH + yB) / 2, yH, yB, visible, libelle: Guide.libelleNiveau(niv, mode, unite), court: Guide.libelleNiveau(niv, mode, unite, true),
-      mini: Guide.libelleNiveau(niv, mode, unite, 'mini'), micro: Guide.libelleNiveau(niv, mode, unite, 'micro') });
+      mini: Guide.libelleNiveau(niv, mode, unite, 'mini'), micro: Guide.libelleNiveau(niv, mode, unite, 'micro'), repere: Guide.libelleNiveau(niv, mode, unite, 'repere') });
   }
   E.formes = exp ? Guide.formesAffichees(GUIDE_FORMES.val, G, g.vs, g.ve, 'expert') : debFormesListe(g.vs, g.ve);
   // Les figures passées de la vue (plan §8), relues dans le rejeu : jamais une figure en cours.
@@ -4854,12 +4866,15 @@ function guideLibellesNiveaux(E, top, bas, surBougies) {
   for (const L of vis) {
     const publie = L.niv.raisons.some(r => isNum(r.lu));
     let lignes = null;
-    for (const [t, lim] of [[L.libelle, Math.min(largMax, dispo)], [L.court, dispo], [L.mini, dispo], [L.micro, dispo]]) if (larg(t) <= lim) { lignes = [t]; break; }
+    // Téléphone en Complet : le repère court (sa plage) ; le libellé entier est dans la bulle.
+    const formes = E.courtes ? [[L.repere, dispo]] : [[L.libelle, Math.min(largMax, dispo)], [L.court, dispo], [L.mini, dispo], [L.micro, dispo]];
+    for (const [t, lim] of formes) if (larg(t) <= lim) { lignes = [t]; break; }
+    if (!lignes && E.courtes) lignes = [guideCouper(ctx, L.repere, dispo - 14)];
     if (!lignes) lignes = publie ? guideLignes(ctx, L.micro, dispo - 14) : [guideCouper(ctx, L.micro, dispo - 14)];
     const wL = Math.min(dispo, Math.max(...lignes.map(larg)));
     const etatPlein = ctx.measureText(Guide.texteEtatMax(E.mode, 'plein', L.niv.ferme)).width + 16;
     const etatMini = ctx.measureText(Guide.texteEtatMax(E.mode, 'mini', L.niv.ferme)).width + 16;
-    const enLigne = lignes.length === 1 && wL + 3 + etatMini <= dispo;
+    const enLigne = !E.courtes && lignes.length === 1 && wL + 3 + etatMini <= dispo;
     // Écran étroit (téléphone) : l'état ne prend pas une ligne à lui sous le libellé — il est dans
     // la bulle (« Maintenant : … », au toucher). Une ligne de moins par bande.
     const sansEtat = etroit && !enLigne;
@@ -4907,7 +4922,15 @@ function guideBords(E, top, bas) {
       return morceaux.join(' | ');
     };
     let lignes = null;
-    for (const v of [true, 'mini', 'micro']) { const t = texte(v); if (ctx.measureText(t).width + 14 <= place) { lignes = [t]; break; } }
+    // Téléphone en Complet : la flèche et les repères courts (« ↑ 83 510 Mur ask »), sinon le plus
+    // proche et le nombre des autres (« ↓ 82 714 S/R +2 ») ; tout le reste est dans la bulle.
+    if (E.courtes) {
+      const Ls = hors.concat(sans), fl = hors.length ? (sens > 0 ? '↑ ' : '↓ ') : '', proche = sens > 0 ? Ls : Ls.slice().reverse();
+      for (const t of [fl + proche.map(L => L.repere).join(' · '), fl + proche[0].repere + (Ls.length > 1 ? ' +' + (Ls.length - 1) : '')])
+        if (ctx.measureText(t).width + 14 <= place) { lignes = [t]; break; }
+      if (!lignes) lignes = [guideCouper(ctx, fl + proche[0].repere, place - 14)];
+    }
+    if (!lignes) for (const v of [true, 'mini', 'micro']) { const t = texte(v); if (ctx.measureText(t).width + 14 <= place) { lignes = [t]; break; } }
     // Trois lignes au plus, sauf si l'étiquette nomme un chiffre publié : son heure n'est jamais
     // coupée (« … ») — elle prend les lignes qu'il lui faut.
     const publie = hors.concat(sans).some(L => L.niv.raisons.some(r => isNum(r.lu)));
@@ -4954,12 +4977,12 @@ function guideChemins(E, top, bas, surBougies) {
   };
   // 1. Deux boîtes, même variante : dans la marge, ou débordant à gauche sans couvrir de bougie.
   let boites = null, variante = null, taille = 9;
-  for (const v of Guide.VARIANTES_SUITE[mode]) {
-    const tp = v === 'mini' ? 8.5 : 9;
+  for (const v of E.courtes ? ['repere'] : Guide.VARIANTES_SUITE[mode]) {
+    const tp = v === 'mini' || v === 'repere' ? 8.5 : 9;
     ctx.font = chartFont(tp, 600);
     const bs = cotes.map(c => {
       let l = Guide.texteSuite(c.ch, mode, unite, chartInterval, G, v, c.sens);
-      if (c.ch && v !== 'mini' && (c.horsS || c.horsC)) l = l.concat([exp ? '(hors vue)' : '(niveau hors de la vue)']);
+      if (c.ch && v !== 'mini' && v !== 'repere' && (c.horsS || c.horsC)) l = l.concat([exp ? '(hors vue)' : '(niveau hors de la vue)']);
       return { c, l, bw: Math.max(...l.map(t => ctx.measureText(t).width)) + 12, bh: l.length * 12 + 5 };
     });
     // La boîte du chemin vers le haut reste AU-DESSUS de celle du chemin vers le bas (un ordre
@@ -4983,7 +5006,7 @@ function guideChemins(E, top, bas, surBougies) {
   let commune = null;
   if (!boites) {
     ctx.font = chartFont(8.5, 600);
-    const l = cotes.map(c => Guide.texteSuite(c.ch, mode, unite, chartInterval, G, 'mini', c.sens).join(' '));
+    const l = cotes.map(c => Guide.texteSuite(c.ch, mode, unite, chartInterval, G, E.courtes ? 'repere' : 'mini', c.sens).join(' '));
     const bw = Math.max(...l.map(t => ctx.measureText(t).width)) + 12, bh = l.length * 12 + 5, bx = Math.max(g.pad.left + 2, Math.min(xFin + 2, xMax - bw - 2));
     const r = guidePlacer(E.rects, bx, bw, bh, [y0 - bh - 8, y0 + 8, top + 4, bas - bh - 4], top, bas, 1, 0, 12, surBougies)
       || guidePlacer(E.rects, bx, bw, bh, [top + 4], top, bas, 1, 0, 30);
@@ -5238,7 +5261,8 @@ function guideFigureObjectif(E, f, tr) {
   const xa = X(iObj), xb = f.fin ? Math.max(xa + 12, X(f.jFin)) : Math.max(xa + 30, Math.min(xMax, xFin + (xMax - xFin) * 0.5));
   const xDroite = E.marge ? xFin - 2 : xMax - 2, yObj = yDe(obj);
   // Préfixé du nom de sa figure : deux objectifs à l'écran se distinguent.
-  const t = Guide.NOMS_FORMES[f.type][0] + ' · ' + (f.fin === 'atteint' ? 'obj. théorique atteint · ' : 'obj. théorique (convention, non garanti) · ') + Guide.prix(obj, unite);
+  const t = E.courtes ? (f.fin === 'atteint' ? 'obj. atteint · ' : 'obj. ') + Guide.prix(obj, unite)
+    : Guide.NOMS_FORMES[f.type][0] + ' · ' + (f.fin === 'atteint' ? 'obj. théorique atteint · ' : 'obj. théorique (convention, non garanti) · ') + Guide.prix(obj, unite);
   ctx.font = chartFont(8.5, 600);
   const w = ctx.measureText(t).width + 10;
   if (yObj > top && yObj < bas) {
@@ -5270,7 +5294,7 @@ function guideFigureInval(E, f, tr) {
   if (!E.exp || f.fin || !tr.geo.inval) return null;
   const y = yDe(f.invalidation);
   if (!(y > top && y < bas)) return null;
-  const s = -f.sens, t = 'invalidation · clôture ' + (s > 0 ? '> ' : '< ') + Guide.prix(f.invalidation, unite);
+  const s = -f.sens, t = (E.courtes ? 'inval. ' : 'invalidation · clôture ') + (s > 0 ? '> ' : '< ') + Guide.prix(f.invalidation, unite);
   ctx.font = chartFont(8.5, 600);
   const w = ctx.measureText(t).width + 10, xDroite = E.marge ? E.xFin - 2 : E.xMax - 2;
   const rx = Math.max(g.pad.left + 2, Math.min(X(tr.geo.inval[1][0]), xDroite) - w);
@@ -5297,7 +5321,7 @@ function guideForme(E, f, surBougies) {
   const wP = f.fin ? 0 : Math.max(...Object.values(PASTILLES_FIGURE).map(t => ctx.measureText(t).width)) + 14 + 3;
   ctx.font = chartFont(9, 650);
   let pose = null, lignes = null;
-  for (const texte of Guide.libellesFormeExpert(f, b, ctxF, G)) {
+  for (const texte of E.courtes ? [Guide.libelleFormeCourt(f)] : Guide.libellesFormeExpert(f, b, ctxF, G)) {
     const wT = ctx.measureText(texte).width + 14, place = xDroite - g.pad.left - 4;
     const w = Math.min(wT, place);
     lignes = w < wT ? guideLignes(ctx, texte, w - 12, 2) : [texte];
@@ -5317,7 +5341,7 @@ function guideForme(E, f, surBougies) {
   // Une forme dessinée garde son nom : en dernier recours, le nom court en haut (ou en bas) du
   // tracé, au-dessus de son dernier point, sans la règle des 120 px.
   if (!pose) {
-    const V = Guide.libellesFormeExpert(f, b, ctxF, G), texte = V[V.length - 1];
+    const V = E.courtes ? [Guide.libelleFormeCourt(f)] : Guide.libellesFormeExpert(f, b, ctxF, G), texte = V[V.length - 1];
     const w = Math.min(ctx.measureText(texte).width + 14, xDroite - g.pad.left - 4);
     lignes = [guideCouper(ctx, texte, w - 12)];
     const x0 = Math.max(g.pad.left + 2, Math.min(tr.xd - w / 2, xDroite - w));
@@ -6047,6 +6071,77 @@ function guideCibleSous(x, y, mainH, etiquettesSeules) {
   }
   return c;
 }
+/** « Sur le graphique » (Complet, téléphone : etiqCourtes) : sous le tracé, le texte entier de
+ *  chaque repère court posé dessus (le titre de sa bulle), du haut vers le bas ; toucher une ligne
+ *  ouvre la bulle de ce repère sur le graphique. Rien n'est retiré : le graphique garde des
+ *  repères courts, la liste et la bulle gardent tout. La section ne dépend que de la largeur et du
+ *  mode (pas du contenu de la vue) : le tracé ne change pas de hauteur en glissant. */
+let reperesCibles = [], reperesCle = '', reperesActif = null;
+function reperesPoint(c) {
+  const r = (c.rects || [])[0] || (c.zones || [])[0];
+  if (r) return [(r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2];
+  const sg = (c.segs || [])[0];
+  return sg ? [(sg[0] + sg[2]) / 2, (sg[1] + sg[3]) / 2] : null;
+}
+function majReperes(W) {
+  const sec = document.getElementById('reperesSection');
+  if (!sec) return;
+  const voir = etiqCourtes(W - 16 - 75);
+  if (sec.hidden === voir) {
+    sec.hidden = !voir;
+    // La hauteur du tracé change : redimensionné à l'image suivante (jamais pendant ce dessin).
+    requestAnimationFrame(() => { resizeCanvas(); drawChart(); });
+  }
+  if (!voir) { reperesCibles = []; reperesCle = ''; if (!document.getElementById('reperesListe').hidden) ouvrirReperes(false); return; }
+  const E = guideEtat && overlays.guide ? guideEtat : null, Sc = scenEtat;
+  const coul = c => c.coul || (c.niveau || c.niveaux ? COLORS.accent2 : c.figure ? c.figure.tr.encre : COLORS.ink3);
+  const L = (E ? E.cibles : []).concat(Sc ? Sc.cibles : []).filter(c => c.titre && !c.evenement)
+    .map(c => ({ c, p: reperesPoint(c) })).filter(x => x.p).sort((a, b) => a.p[1] - b.p[1])
+    // Un repère à deux cibles (le libellé d'un scénario et sa zone) : une seule ligne, la plus haute.
+    .filter((x, k, a) => a.findIndex(y => y.c.titre === x.c.titre) === k);
+  reperesCibles = L.map(x => x.c);
+  const cle = L.map(x => x.c.titre + '|' + coul(x.c)).join('\n');
+  if (cle === reperesCle) return;
+  reperesCle = cle;
+  const n = L.length;
+  document.getElementById('reperesTitre').textContent = n ? (n > 1 ? 'Lire les ' + n + ' repères en entier' : 'Lire le repère en entier') : 'Aucun repère dans la vue';
+  const ul = document.getElementById('reperesListe');
+  ul.textContent = '';
+  L.forEach((x, k) => {
+    const li = document.createElement('li'), b = document.createElement('button'), t = document.createElement('span'), m = document.createElement('span');
+    b.type = 'button'; b.dataset.k = k;
+    if (reperesActif === x.c.titre) b.setAttribute('aria-current', 'true');
+    t.className = 'reperes-trait'; t.style.setProperty('--trait', coul(x.c));
+    m.textContent = x.c.titre;
+    b.append(t, m); li.append(b); ul.append(li);
+  });
+}
+function ouvrirReperes(ouvert) {
+  const sec = document.getElementById('reperesSection'), ul = document.getElementById('reperesListe'), h = document.getElementById('reperesHandle');
+  sec.classList.toggle('collapsed', !ouvert);
+  h.setAttribute('aria-expanded', String(ouvert));
+  ul.hidden = !ouvert;
+  if (ouvert) { ul.style.width = h.getBoundingClientRect().width + 'px'; placerMenu(ul, h, true); }
+}
+function toggleReperes() { ouvrirReperes(document.getElementById('reperesListe').hidden); }
+document.addEventListener('click', e => {
+  const ul = document.getElementById('reperesListe');
+  if (ul && !ul.hidden && !e.target.closest('#reperesListe, #reperesHandle')) ouvrirReperes(false);
+});
+/** Une ligne de la liste touchée : la bulle de son repère, comme un toucher sur le graphique. */
+function voirRepere(k) {
+  const c = reperesCibles[k], p = c && reperesPoint(c);
+  if (!p) return;
+  reperesActif = c.titre;
+  for (const b of document.querySelectorAll('#reperesListe button')) { if (b.dataset.k === String(k)) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current'); }
+  ouvrirReperes(false);
+  crossX = p[0]; crossY = p[1]; bulleDetail = null;
+  dessinerCalque();
+}
+if (document.getElementById('reperesListe')) document.getElementById('reperesListe').addEventListener('click', e => {
+  const b = e.target.closest('button[data-k]');
+  if (b) voirRepere(+b.dataset.k);
+});
 /** Survol : la cible sous le curseur (guideCibleSous), expliquée dans sa bulle (guideBulle). */
 function guideSurvol(W, mainH, evite) {
   if (guideEtat) guideEtat.survol = null;
@@ -6880,7 +6975,9 @@ function scenLibelle(S, it, top, bas, surBougies) {
   const rai = exp && !it.ouvert && sc.statut === '⏳' ? Scenarios.raison(sc, it.sv, 'expert') : null, efface = it.fondu === 0;
   // Après le fondu, l'Expert garde ses niveaux et sa raison (le détail reste) ; seul le Débutant
   // n'a plus que l'état court.
-  const variantes = it.ouvert ? base.concat(exp ? (it.meneur ? [exper] : []) : [exper])
+  // Téléphone en Complet : le nom court du rang (« S1 »), et son état court s'il est fermé.
+  const variantes = etiqCourtes(g.pw) ? (it.ouvert ? [nom] : [nom + ' · ' + et.microD])
+    : it.ouvert ? base.concat(exp ? (it.meneur ? [exper] : []) : [exper])
     : efface && !exp ? [nom + ' · ' + et.miniD, nom + ' · ' + et.microD]
     : [...new Set((rai ? [exper + ' · ' + et.court + ' : ' + rai + ' · direct'] : []).concat(base.map(v => v + ' · ' + et.courtD), [nom + ' · ' + et.courtD, nom + ' · ' + et.miniD, nom + ' · ' + et.microD]))];
   const large = Math.min(place, g.pw * (g.pw < PARAM.scenarios.etroit ? 0.9 : 0.62));
@@ -6931,7 +7028,7 @@ function scenReperes(S, top, bas) {
   // Le temps restant, relu à chaque dessin (aucune minuterie : sans nouvelle donnée, il avance au dessin suivant).
   const resteF = Scenarios.reste(F.fin - S.maintenant);
   const sem = isNum(F.finSemaine) && F.finSemaine !== F.fin && S.items.some(i => i.sc.rang === 'S') ? ' Le scénario de la semaine court jusqu’au ' + jour(F.finSemaine) + ' à ' + hU(F.finSemaine) + '.' : '';
-  for (const [t, noms, expl] of [
+  for (const [t, nomsTous, expl] of [
     // L'heure du point (celle du titre de l'encadré) n'est pas celle de l'écriture : le trait est
     // posé à l'écriture, son nom le dit (« Point · 07:59 » contredisait « Scénarios du matin · 07:00 »).
     [F.emis, exp ? ['Point' + dePoint + ' · écrit ' + hU(F.emis), 'Écrit · ' + hU(F.emis), hU(F.emis)] : ['Point' + dePoint + ' · écrit à ' + hU(F.emis), 'Écrit à ' + hU(F.emis), hU(F.emis)],
@@ -6940,6 +7037,8 @@ function scenReperes(S, top, bas) {
       'Fin de la fenêtre des scénarios 1 à 3 : ' + jour(F.fin) + ' à ' + hU(F.fin) + '. Le journal les note ensuite, le matin même.' + sem]]) {
     const x = xDeT(t);
     if (!(x >= g.pad.left && x <= xMax)) continue;
+    // Téléphone en Complet : les deux formes les plus courtes (« Écrit · 07:32 », « 07:32 »).
+    const noms = etiqCourtes(g.pw) ? nomsTous.slice(-2) : nomsTous;
     ctx.font = chartFont(8.5, 650);
     const rangs = [0, 1, 2, 3, 4].map(k => top + 2 + k * (H + 2)).concat([bas - H - 26, bas - H - 42]);
     let pose = null, nom = null, xl = 0, w = 0;
@@ -6951,7 +7050,7 @@ function scenReperes(S, top, bas) {
       }
       if (pose) break;
     }
-    S.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs: [[x, top, x, bas]], prio: 3, coul: COLORS.ink3, titre: noms[0], texte: [expl, 'Une description, pas une recommandation.'] });
+    S.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs: [[x, top, x, bas]], prio: 3, coul: COLORS.ink3, titre: nomsTous[0], texte: [expl, 'Une description, pas une recommandation.'] });
     if (!pose) continue;
     etiquettesAFaire.push(() => {
       ctx.font = chartFont(8.5, 650);

@@ -120,14 +120,14 @@ const etat = page => page.evaluate(() => {
   const E = guideEtat, b = canvas.getBoundingClientRect();
   const hh = ms => Fmt.heure(ms);   // l'heure affichée par la page : celle de l'appareil (js/format.js)
   return {
-    bx: b.left, by: b.top, exp: E.exp,
-    niveaux: E.niveaux.map(L => ({ visible: L.visible, prix: L.niv.raisons.map(r => r.p), heures: L.niv.raisons.filter(r => isFinite(r.lu)).map(r => hh(r.lu)),
+    bx: b.left, by: b.top, exp: E.exp, courtes: !!E.courtes,
+    niveaux: E.niveaux.map(L => ({ visible: L.visible, titre: (E.cibles.find(c => c.niveau === L) || {}).titre || null, prix: L.niv.raisons.map(r => r.p), heures: L.niv.raisons.filter(r => isFinite(r.lu)).map(r => hh(r.lu)),
       lignes: L.etiq ? L.etiq.lignes : null, etiq: L.etiq ? { enLigne: L.etiq.enLigne, sansEtat: !!L.etiq.sansEtat } : null, sansPlace: (E.sansPlace || []).includes(L),
       auBord: E.cibles.some(c => c.niveaux && c.niveaux.includes(L) && c.rects.length) })),
     chemins: E.chemins || null, suite: { haut: !!E.D.suite.haut, bas: !!E.D.suite.bas },
     cibles: E.cibles.map(c => ({ prio: c.prio, titre: c.titre, rects: c.rects || [] })),
     // Les étiquettes du bord posées : leurs lignes, et l'heure de CHAQUE chiffre publié qu'elles nomment.
-    bords: E.cibles.filter(c => c.niveaux && c.rects.length).map(c => ({ lignes: c.lignes,
+    bords: E.cibles.filter(c => c.niveaux && c.rects.length).map(c => ({ lignes: c.lignes, titre: c.titre,
       heures: [].concat(...c.niveaux.map(L => L.niv.raisons.filter(r => isFinite(r.lu)).map(r => hh(r.lu)))) })),
   };
 });
@@ -149,17 +149,32 @@ const etat = page => page.evaluate(() => {
       // 1. Chaque bande nommée ; chaque libellé publié garde son heure, en entier.
       check(`${nom} : chaque bande visible est nommée — son libellé près d'elle, ou dans l'étiquette du bord`, vis.every(L => L.lignes || (L.sansPlace && L.auBord)), vis);
       const pub = vis.filter(L => L.lignes && L.heures.length);
+      // Téléphone en Complet (PARAM.guide.courtes, demande du 11/10/2026) : sur le tracé, un repère
+      // court d'une ligne (la plage) ; le libellé entier, heures comprises, est le titre de sa bulle
+      // (et une ligne de la liste « Sur le graphique », vérifiée plus bas).
+      if (e.courtes) {
+        check(`${nom} : repères courts — chaque libellé de bande tient sur une ligne de 24 caractères au plus, sans « … »`, vis.filter(L => L.lignes).length > 0 && vis.filter(L => L.lignes).every(L => L.lignes.length === 1 && L.lignes[0].length <= 24 && !/…/.test(L.lignes[0])), vis.map(L => L.lignes));
+        check(`${nom} : la bulle de chaque bande posée qui porte un chiffre publié garde son heure (« ${HM} »)`, pub.length > 0 && pub.every(L => L.titre && L.heures.every(h => L.titre.includes(h))), pub.map(L => [L.titre, L.heures]));
+      } else
       check(`${nom} : chaque libellé posé qui porte un chiffre publié garde son heure (« ${HM} »), sans « … »`, pub.length > 0 && pub.every(L => L.heures.every(h => L.lignes.join(' ').includes(h)) && !/…/.test(L.lignes.join(' '))), pub);
       // … et l'étiquette du bord aussi : une heure par chiffre publié nommé, rien de coupé.
       const nFois = (t, h) => t.split(h).length - 1;
       const bordsPub = e.bords.filter(b => b.heures.length);
-      check(`${nom} : chaque étiquette du bord qui nomme un chiffre publié garde chaque heure, sans « … » (${bordsPub.length})`,
+      if (e.courtes) check(`${nom} : repères courts — chaque étiquette du bord tient sur une ligne ; sa bulle garde chaque heure publiée (${bordsPub.length})`,
+        e.bords.every(b => Array.isArray(b.lignes) && b.lignes.length === 1) && bordsPub.every(b => b.heures.every(h => nFois(b.titre, h) >= b.heures.filter(x => x === h).length)), e.bords);
+      else check(`${nom} : chaque étiquette du bord qui nomme un chiffre publié garde chaque heure, sans « … » (${bordsPub.length})`,
         bordsPub.every(b => Array.isArray(b.lignes) && b.heures.every(h => nFois(b.lignes.join(' '), h) >= b.heures.filter(x => x === h).length) && !/…/.test(b.lignes.join(' '))), bordsPub);
       // 2. Les deux chemins, ensemble, dans la même variante, chacun avec sa condition.
       const ch = e.chemins;
       const boites = ch ? ch.boites : [];
       check(`${nom} : « Et ensuite ? » rendu pour les DEUX côtés (deux boîtes, ou une commune) — jamais un seul`, ch && ch.variante && (ch.variante === 'commune' ? boites.length === 1 && boites[0].lignes.length === 2 : boites.length === 2 && boites.some(b => b.sens > 0) && boites.some(b => b.sens < 0)), ch);
       const conditionnel = l => /^(Si clôt|si [<>]|[↑↓] aucun|Si clôture)/.test(l);
+      // Repères courts : la cible au bout de la flèche (« ↑ 86 330 ») ; la condition est dans la bulle.
+      if (e.courtes) {
+        const tc = e.cibles.filter(c => c.prio === 3 && /^Et ensuite \?/.test(c.titre)).map(c => c.titre);
+        check(`${nom} : repères courts — chaque chemin dit sa cible en une ligne (« ↑ … », « ↓ … ») ; sa bulle garde la condition (« Si clôture … »)`,
+          boites.length && boites.every(b => b.lignes.every(l => /^[↑↓] /.test(l))) && tc.length && tc.every(t => /Si clôture/.test(t)), { lignes: boites.map(b => b.lignes), tc });
+      } else
       check(`${nom} : chaque chemin garde sa condition (« Si clôture … », « si > … », « si < … »)`, boites.length && boites.every(b => (ch.variante === 'commune' ? b.lignes : [b.lignes[0]]).every(conditionnel)), boites.map(b => b.lignes));
       if (ch && ch.variante !== 'commune' && boites.length === 2) {
         const h = boites.find(b => b.sens > 0), b = boites.find(x => x.sens < 0);
@@ -194,6 +209,25 @@ const etat = page => page.evaluate(() => {
       // il est dans la bulle (« Maintenant : … »).
       if (vue.width < 700) check(`${nom} : l'état de chaque bande est à côté de son libellé ou dans la bulle, jamais sur une ligne de plus`,
         e.niveaux.filter(L => L.etiq).every(L => L.etiq.enLigne || L.etiq.sansEtat), e.niveaux.map(L => L.etiq));
+      // La liste « Sur le graphique » : au téléphone en Complet seulement ; une ligne par repère (le
+      // titre entier de sa bulle) ; toucher une ligne ouvre la bulle de ce repère sur le graphique.
+      const li = await o.page.evaluate(() => {
+        const sec = document.getElementById('reperesSection'), lignes = [...document.querySelectorAll('#reperesListe button')].map(b => b.textContent);
+        const titres = [...new Set(guideEtat.cibles.concat(scenEtat ? scenEtat.cibles : []).filter(c => c.titre && !c.evenement && [c.rects, c.zones, c.segs].some(x => x && x.length)).map(c => c.titre))];
+        return { visible: !sec.hidden && sec.getBoundingClientRect().height > 30, lignes, titres, barre: document.getElementById('reperesTitre').textContent };
+      });
+      if (!e.courtes) check(`${nom} : pas de liste « Sur le graphique » (les étiquettes sont entières sur le tracé)`, !li.visible, li.barre);
+      else {
+        check(`${nom} : la liste « Sur le graphique » est là, avec une ligne par repère du tracé (${li.lignes.length}) et le libellé entier de chaque bande`,
+          li.visible && li.lignes.length > 3 && li.titres.every(t => li.lignes.includes(t)) && pub.every(L => li.lignes.includes(L.titre)) && /^Lire les \d+ repères en entier$/.test(li.barre),
+          { barre: li.barre, manquants: li.titres.filter(t => !li.lignes.includes(t)).concat(pub.map(L => L.titre).filter(t => !li.lignes.includes(t))) });
+        await o.page.click('#reperesHandle'); await o.page.waitForTimeout(200);
+        const ouverte = await o.page.evaluate(() => { const r = document.getElementById('reperesListe').getBoundingClientRect(); return r.height > 40 && r.top >= 0 && r.bottom <= innerHeight; });
+        const k = li.lignes.indexOf(pub[0] && pub[0].titre);
+        await o.page.click(`#reperesListe li:nth-child(${k + 1}) button`); await o.page.waitForTimeout(200);
+        const vu = await o.page.evaluate(() => ({ survol: guideEtat.survol ? guideEtat.survol.titre : null, fermee: document.getElementById('reperesListe').hidden }));
+        check(`${nom} : la liste s'ouvre dans l'écran ; toucher une ligne la ferme et ouvre la bulle de ce repère`, ouverte && k >= 0 && vu.fermee && vu.survol === li.lignes[k], { ouverte, k, vu });
+      }
       check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
@@ -236,8 +270,10 @@ const etat = page => page.evaluate(() => {
     const es = await etat(s.page);
     const pubS = es.niveaux.filter(L => L.visible && L.lignes && L.heures.length);
     const nFoisS = (t, h) => t.split(h).length - 1;
-    check(`sans scénarios : chaque libellé posé qui porte un chiffre publié garde chaque heure, sans « … » (${pubS.length})`,
-      pubS.length > 0 && pubS.every(L => L.heures.every(h => nFoisS(L.lignes.join(' '), h) >= L.heures.filter(x => x === h).length) && !/…/.test(L.lignes.join(' '))), pubS);
+    // Repères courts (Complet au téléphone) : la bulle du libellé posé garde ses deux heures.
+    const texteS = L => (es.courtes ? L.titre || '' : L.lignes.join(' '));
+    check(`sans scénarios : chaque libellé posé qui porte un chiffre publié garde chaque heure${es.courtes ? ' dans sa bulle' : ''}, sans « … » (${pubS.length})`,
+      pubS.length > 0 && pubS.every(L => L.heures.every(h => nFoisS(texteS(L), h) >= L.heures.filter(x => x === h).length) && !/…/.test(texteS(L))), pubS);
     check('sans scénarios : aucune erreur JavaScript', !s.erreurs.length, s.erreurs);
     await s.ctx.close();
   } finally { await nav.close(); serveur.close(); }

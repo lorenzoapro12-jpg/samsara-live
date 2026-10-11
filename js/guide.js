@@ -259,6 +259,9 @@ const Guide = (function () {
    *  chaque raison garde son origine (un mot au moins) : une coupure n'a plus rien à ôter. */
   function libelleNiveau(niv, mode, unite, court) {
     const R = niv.raisons, exp = mode === 'expert';
+    // 'repere' : le repère court d'un téléphone en Complet (la plage, ou le prix et son mot) ; le
+    // libellé entier, heures comprises, est dans la bulle et dans la liste sous le graphique.
+    if (court === 'repere') return R.length === 1 ? (exp ? chiffresR(R[0]) : prixR(R[0], unite)) + ' ' + motR(R[0], exp) : plage(niv, unite, exp);
     if (court === 'micro') {
       // Chaque prix suivi de son heure (s'il est publié) et de son mot : « 82 130 $ 20:33 mur de vente ».
       return R.map(r => (exp ? chiffresR(r) : prixR(r, unite)) + tagMicro(r) + ' ' + motR(r, exp)).join(' + ');
@@ -1582,12 +1585,15 @@ const Guide = (function () {
     const pc = P ? pctParam(P.distanceMax) + ' %' : '';
     const up = ch ? ch.sens > 0 : sens > 0;
     if (!ch) {
+      if (v === 'repere') return [(up ? '↑ ' : '↓ ') + 'aucun'];
       if (v === 'mini') return [(up ? '↑ ' : '↓ ') + 'aucun niveau', pc ? '(< ' + pc + ')' : ''].filter(Boolean);
       if (exp) return [(up ? 'Au-dessus' : 'Au-dessous') + ' : aucun niveau', pc ? '(< ' + pc + ')' : ''].filter(Boolean);
       return ['Si clôture ' + (v === 'plein' ? it : '') + (up ? 'au-dessus' : 'au-dessous') + ' :', 'aucun niveau nommé' + (pc ? ' à moins de ' + pc : '')];
     }
     const rx = ch.rx || bord(ch.seuil, up), ry = ch.ry || (ch.cible ? bord(ch.cible, !up) : null);
     const loin = pc ? ' à moins de ' + pc : '';
+    // 'repere' (téléphone, Complet) : la cible seule, au bout de la flèche ; la condition est dans la bulle.
+    if (v === 'repere') return [(up ? '↑ ' : '↓ ') + (ry ? chiffresR(ry) : 'aucun')];
     if (v === 'mini') return [(up ? 'si > ' : 'si < ') + chiffresR(rx) + (fini(rx.lu) ? ' (' + tagMicro(rx).slice(1) + ')' : ''),
       '→ ' + (ry ? chiffresR(ry) + (fini(ry.lu) ? ' (' + tagMicro(ry).slice(1) + ')' : '') : 'aucun niveau')];
     if (exp) return ['Si clôt. ' + it + (up ? '> ' : '< ') + chiffresR(rx) + tagLu(rx, 'expert'), '→ ' + (ry ? chiffresR(ry) + tagLu(ry, 'expert') : 'aucun niveau nommé' + loin)];
@@ -2200,6 +2206,9 @@ const Guide = (function () {
     const rec = !f.fin && fini(f.tMaj) && ctx && fini(ctx.n) && ctx.n - 1 - f.tMaj <= 1 ? ' · recalé ' + heureCourte(finMs(ctx, f.tMaj), ctx) : '';
     return e.court + rec;
   }
+  /** Le repère court d'une figure (téléphone, Complet) : son nom, sans la parenthèse, et la marque
+   *  de son issue si elle est finie (« Rectangle ✗ ») ; l'état et le bilan sont dans la bulle. */
+  const libelleFormeCourt = f => NOMS_FORMES[f.type][0].replace(/\s*\([^)]*\)$/, '') + (marqueIssue(f) ? ' ' + marqueIssue(f) : '');
   /** Les libellés Expert, du plus riche au plus court (≤ 80 caractères) :
    *  « {Nom} · {état} · mesuré {validées}/{repérées hors devenues triples} valid., obj. {a}/{finies} · éch. faible ». */
   function libellesFormeExpert(f, b, ctx, P) {
@@ -2711,7 +2720,7 @@ const Guide = (function () {
     FAMILLES, famille, groupeVue, enAttente, candidats, avancer, niveauxFigure, figureVivante, cleFigure, niveauAbandon, wilson, ecartTemoin, dernierPoint, rangFigure, concurrentes, tombees, phaseA, classer, deuxDroites, ete, drapeau, tripleExtreme, doubleExtreme, range, ligne,
     NOMS_DEBUTANT, raisonPrincipale, choixDebutant, reperesDe, choisirReperes, VERBE_DEBUTANT, optionsSeules, libelleDebutant, libellesDebutant, formatDebutant, AVEC_POINT, titreDebutant, nomDebutant, nomPhrase, HORIZON_DEBUTANT, HORIZON_COURT, PERIODE_DEBUTANT, phrasesDebutant, phraseDebutant,
     texteSuiteDebutant, prixRond, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
-    MARQUES_FIN, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
+    MARQUES_FIN, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, libelleFormeCourt, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant,
     MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE };
 })();
