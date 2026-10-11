@@ -1413,6 +1413,31 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .kpis.vieux .kpi-deb .deb-frais { display: none; }
 .kpis.vieux .kpi-deb .deb-retard { display: inline; }
 :where(html):not([data-chiffres="1"]) #cycle .kpi, :where(html):not([data-chiffres="1"]) #cycle .kpi-age { display: none; }
+/* Épinglés (panneau « Infos du marché », js/app.js epingles) : ils restent dans l'en-tête sans
+   « Les chiffres du marché », devant la pastille. Au téléphone, la bande ne garde qu'eux, sur sa
+   propre ligne sous le prix (ce qui ne tient pas cède à droite, ajusterKpis). */
+:where(html):not([data-chiffres="1"]) #cycle .kpi.epingle:not([hidden]) { display: flex; }
+:where(html):not([data-chiffres="1"]) #cycle .kpi.epingle ~ .kpi-deb { margin-left: 10px; }
+@media (max-width: 768px) {
+  .header:has(> #cycle.a-epingles) { flex-wrap: wrap; row-gap: 6px; }
+  .header > #cycle.a-epingles { display: flex; order: 9; flex: 1 0 100%; height: auto; min-width: 0; overflow: hidden; }
+  #cycle.a-epingles > .kpi:not(.epingle), #cycle.a-epingles > .kpi-deb, #cycle.a-epingles > .kpi-btc,
+  #cycle.a-epingles:not(.vieux) > .kpi-age { display: none; }
+  #cycle.a-epingles > .kpi.epingle:not([hidden]) { display: flex; padding: 0 10px; }
+  #cycle.a-epingles > .kpi.epingle:first-of-type { padding-left: 0; border-left: 0; }
+}
+/* Le choix des épinglés, en tête du panneau : les noms de l'en-tête, en pastilles à cocher. */
+.epingles { margin: 0 0 10px; padding: 8px 10px; border-radius: 10px; background: var(--rail); }
+.epingles-t { font-size: 11px; font-weight: 700; color: var(--ink-2); margin-bottom: 6px; }
+.epingles-btns { display: flex; flex-wrap: wrap; gap: 5px; }
+.epingle-btn {
+  padding: 3px 9px; border-radius: 999px; border: 1px solid var(--hairline); background: transparent;
+  font: inherit; font-size: 11px; font-weight: 650; color: var(--ink-2); cursor: pointer;
+}
+.epingle-btn[aria-pressed="true"] { color: var(--ink-1); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.epingle-btn[aria-pressed="true"]::before { content: '✓ '; }
+.epingle-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.epingles-quoi { margin-top: 6px; font-size: 10.5px; line-height: 1.35; color: var(--ink-3); }
 :where(html):not([data-chiffres="1"]) .header-right > #updated { display: none; }
 /* Les structures déplacent l'heure de publication hors de l'en-tête : en Débutant, son âge est
    dit par la pastille « Infos du marché » (infobulle) ; l'heure et ses étiquettes restent en

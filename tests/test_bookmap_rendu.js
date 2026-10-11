@@ -197,6 +197,10 @@ async function ouvrir(nav, opts) {
   return { page, erreurs, hotes, S, comptes, urls };
 }
 const etat = page => page.evaluate(() => window.__carte.etat());
+/** « Le détail » : la case du panneau « Choisir l'affichage » (plus d'interrupteur ni de touche M
+ *  depuis le 11/10/2026). basculerDetail la change ; poserDetail la met à on (sans rien si elle y est). */
+const basculerDetail = page => page.evaluate(() => document.getElementById('affDetail').click());
+const poserDetail = (page, on) => page.evaluate(v => { const c = document.getElementById('affDetail'); if (c.checked !== v) c.click(); }, on);
 // Onglet caché / visible, simulé (document.hidden piloté par le harnais).
 const ONGLET = () => {
   window.__cache = false;
@@ -867,33 +871,11 @@ async function filNoir(page, x, y) {
     }
 
     // ════ Mise en page : en-tête, canevas, densité, pastilles ═══════════════════
-    /** L'interrupteur de mode « Lisible | Complet » tel qu'il se voit : ses segments (texte, aria-pressed,
-     *  fond, entiers, réellement sous le pointeur), sa boîte, et les boutons de la barre qu'il chevauche. */
-    const interrupteur = pg => pg.evaluate(() => {
-      const b = document.getElementById('btnModeBarre'), r = b.getBoundingClientRect();
-      const sous = e => { const q = e.getBoundingClientRect(), x = document.elementFromPoint(Math.min(innerWidth - 1, q.left + q.width / 2), Math.min(innerHeight - 1, q.top + q.height / 2)); return !!x && (x === e || e.contains(x)); };
-      const segs = [...b.querySelectorAll('button')].map(s => ({ texte: s.textContent.trim(), mode: s.getAttribute('data-mode-choix'), presse: s.getAttribute('aria-pressed'), fond: getComputedStyle(s).backgroundColor,
-        entier: s.scrollWidth <= s.clientWidth + 1, dessus: sous(s) }));
-      const coupe = (a, c) => a.left < c.right - 0.5 && c.left < a.right - 0.5 && a.top < c.bottom - 0.5 && c.top < a.bottom - 0.5;
-      // Une puce des calques se mesure dans la rangée qui défile (#calques) : la part qui en sort est
-      // coupée, invisible, et ne compte pas.
-      const vu = e => { const q = e.getBoundingClientRect(), c = e.closest('#calques'); if (!c) return q; const k = c.getBoundingClientRect();
-        return { left: Math.max(q.left, k.left), right: Math.min(q.right, k.right), top: Math.max(q.top, k.top), bottom: Math.min(q.bottom, k.bottom) }; };
-      const autres = [...document.querySelectorAll('.barre a, .barre button')].filter(e => !b.contains(e) && e.offsetParent !== null && coupe(r, vu(e))).map(e => e.id || e.className);
-      const bloc = s => { const q = document.querySelector(s).getBoundingClientRect(); return { g: q.left, d: q.right, h: q.top, b: q.bottom }; };
-      return { role: b.getAttribute('role'), nom: b.getAttribute('aria-label'), segs, visible: b.offsetParent !== null && r.width > 0, g: r.left, d: r.right, h: r.top, b: r.bottom, vw: innerWidth, autres,
-        gauche: bloc('.barre-gauche'), droite: bloc('.barre-droite') };
-    });
-    /** Sa place, la même que sur le terminal (le groupe de droite de l'en-tête) : juste devant les boutons
-     *  de la page (Suivre, Journal, Légende… : 16 px au plus, sur leur rangée), à droite du titre ; ou,
-     *  quand la rangée est pleine, au bout droit de la sienne (24 px du bord au plus). Dans l'écran. */
-    const memeRangee = (a, c) => a.h < c.b - 0.5 && c.h < a.b - 0.5;
-    const interrupteurPlace = x => x.d <= x.vw + 0.5 && (!memeRangee(x, x.gauche) || x.g >= x.gauche.d - 0.5)
-      && ((memeRangee(x, x.droite) && x.d <= x.droite.g + 0.5 && x.droite.g - x.d <= 16) || x.d >= x.vw - 24);
-    /** Les deux segments « Lisible » puis « Complet », entiers et cliquables, celui du mode m seul enfoncé (et surligné). */
-    const interrupteurJuste = (x, m) => x.role === 'group' && x.nom === 'Mode d\'affichage' && x.segs.map(s => s.texte + ':' + s.mode).join('|') === 'Lisible:debutant|Complet:expert'
-      && x.segs.every(s => s.presse === String(s.mode === m) && s.entier && s.dessus) && x.segs.filter(s => !/rgba\(0, 0, 0, 0\)|transparent/.test(s.fond)).map(s => s.mode).join() === m;
-
+    /** Plus d'interrupteur de mode dans l'en-tête (11/10/2026) : « Le détail » est la case du panneau
+     *  « Choisir l'affichage », cochée selon le mode. */
+    const sansInterrupteur = pg => pg.evaluate(() => ({ bascule: !!document.getElementById('btnModeBarre') || !!document.querySelector('.barre .mode-btn'),
+      detail: document.getElementById('affDetail') ? document.getElementById('affDetail').checked : null, mode: document.documentElement.dataset.mode }));
+    const caseJuste = (x, m) => !x.bascule && x.detail === (m === 'expert') && x.mode === m;
     titre('28. En-tête : jamais plus de deux lignes ; canevas à sa taille réelle (jamais étiré)');
     // 667 × 375 (téléphone couché) et 650 : juste au-dessus de 640 px, là où la rangée du titre passe à la ligne.
     for (const mode of ['expert', 'debutant']) for (const [w, h, dpr] of [[800, 900, 1], [1024, 768, 1], [1280, 800, 1], [1366, 768, 1], [1440, 860, 1], [1680, 1000, 1], [740, 360, 2], [667, 375, 2], [650, 800, 1], [568, 320, 2]]) {
@@ -906,29 +888,22 @@ async function filNoir(page, x, y) {
       const etire = Math.abs(d.bw / d.cw - d.bh / d.ch) > 0.02;
       check(`${mode === 'expert' ? 'Expert' : 'Débutant'}, ${w} × ${h} (densité ${dpr}) : en-tête ${Math.round(d.barre)} px, canevas ${d.cw} × ${d.ch} CSS → ${d.bw} × ${d.bh}, ${etire ? 'ÉTIRÉ' : 'non étiré'}`,
         d.barre <= 82 && !etire && d.defil <= 0 && d.ch >= Math.min(400, h - 120), d);
-      // L'interrupteur, à toutes ces tailles : entier, cliquable, dans l'écran, dans le groupe de DROITE de
-      // l'en-tête (comme sur le terminal) : juste devant Suivre…, ou au bout droit de sa rangée ; sur
-      // aucun autre bouton de la barre.
-      const it = await interrupteur(pg);
-      check(`${mode === 'expert' ? 'Complet' : 'Lisible'}, ${w} px : interrupteur « Lisible | Complet » (${mode === 'expert' ? 'Complet' : 'Lisible'} enfoncé) entier, cliquable, à droite (x ${Math.round(it.g)}–${Math.round(it.d)} : devant les boutons de la page, x ${Math.round(it.droite.g)}, ou au bord droit), sur aucun bouton`,
-        interrupteurJuste(it, mode) && it.visible && interrupteurPlace(it) && !it.autres.length, it);
+      // Plus d'interrupteur dans l'en-tête : « Le détail » est la case du panneau, cochée selon le mode.
+      const it = await sansInterrupteur(pg);
+      check(`${mode === 'expert' ? 'Le détail' : 'Sans le détail'}, ${w} px : aucun interrupteur dans l'en-tête ; la case « Le détail » du panneau ${mode === 'expert' ? 'cochée' : 'décochée'}`, caseJuste(it, mode), it);
       if (mode === 'expert' && w >= 1280) {
-        // L'interrupteur ne pousse pas les puces des calques hors de la bande : autant de puces entièrement
-        // visibles qu'avant le mode Lisible (mesuré sur c532402 : 10 à 1280 px, 11 à 1366, 12 à 1440 et à
-        // 1680). Il est posé au bout de la bande du résumé, au bord droit, qui lui garde sa place ; les
-        // panneaux s'ouvrent sous lui.
+        // Autant de puces entièrement visibles qu'avant le mode Lisible (mesuré sur c532402 : 10 à 1280 px,
+        // 11 à 1366, 12 à 1440 et à 1680) ; les panneaux s'ouvrent sous la barre.
         const n = await pg.evaluate(() => { const c = document.getElementById('calques'), r = c.getBoundingClientRect(); return [...c.querySelectorAll('.puce')].filter(p => { const b = p.getBoundingClientRect(); return b.left >= r.left - 0.5 && b.right <= r.right + 0.5; }).length; });
         const min = { 1280: 10, 1366: 11, 1440: 12, 1680: 12 }[w];
-        const bm = await pg.evaluate(() => { const b = document.getElementById('btnModeBarre'), r = b.getBoundingClientRect(), z = document.getElementById('resumeCarte'), q = z.getBoundingClientRect();
-          return { haut: r.top, bas: r.bottom, zt: q.top, zb: q.bottom, droite: q.right - r.left, pad: parseFloat(getComputedStyle(z).paddingRight),
-            panneaux: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--haut-barre')) }; });
-        check(`Complet, ${w} px : ${n} puces de calques entièrement visibles (= ${min}, comme avant), l'interrupteur cliquable au bout de la bande du résumé, la bande lui garde sa place, les panneaux s'ouvrent dessous`,
-          n >= min && interrupteurJuste(it, 'expert') && bm.haut >= bm.zt - 0.5 && bm.bas <= bm.zb + 0.5 && bm.pad >= bm.droite && bm.panneaux >= bm.bas - 0.5, { n, bm });
+        const bm = await pg.evaluate(() => ({ bas: document.querySelector('.barre').getBoundingClientRect().bottom,
+          panneaux: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--haut-barre')) }));
+        check(`Le détail, ${w} px : ${n} puces de calques entièrement visibles (≥ ${min}, comme avant), les panneaux s'ouvrent sous la barre`,
+          n >= min && bm.panneaux >= bm.bas - 0.5, { n, bm });
       }
       await pg.close();
     }
-    // Au téléphone (360 et 390 px), dans les deux modes : l'interrupteur en haut à droite, entier, sur
-    // aucun bouton ; rien ne sort de l'écran.
+    // Au téléphone (360 et 390 px), avec et sans le détail : aucun interrupteur ; rien ne sort de l'écran.
     for (const mode of ['expert', 'debutant']) for (const w of [360, 390]) {
       const ctx = await nav.newContext({ viewport: { width: w, height: 800 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
       await ctx.addInitScript(m => { try { localStorage.setItem('samsara-mode', m); } catch (e) { /* */ } }, mode);
@@ -936,10 +911,10 @@ async function filNoir(page, x, y) {
       await pg.route('**/*', r => (new URL(r.request().url()).host.startsWith('127.0.0.1') ? r.continue() : r.abort()));
       await pg.goto(`http://127.0.0.1:${serveur.address().port}/bookmap.html`);
       await pg.waitForTimeout(1200);
-      const it = await interrupteur(pg), d = await pg.evaluate(() => ({ defil: document.documentElement.scrollWidth - innerWidth,
+      const it = await sansInterrupteur(pg), d = await pg.evaluate(() => ({ defil: document.documentElement.scrollWidth - innerWidth,
         hors: [...document.querySelectorAll('.barre a, .barre button')].filter(e => e.offsetParent !== null && !e.closest('#calques')).filter(e => { const q = e.getBoundingClientRect(); return q.left < -0.5 || q.right > innerWidth + 0.5; }).map(e => e.id || e.className) }));
-      check(`${mode === 'expert' ? 'Complet' : 'Lisible'}, ${w} px (téléphone) : interrupteur entier et cliquable, à droite de la 1re rangée (x ${Math.round(it.g)}–${Math.round(it.d)}, y ${Math.round(it.h)}), sur aucun bouton ; aucun bouton hors de l'écran, aucun défilement`,
-        interrupteurJuste(it, mode) && it.d <= it.vw + 0.5 && it.g >= it.vw / 2 && it.h < 20 && !it.autres.length && d.defil <= 0 && !d.hors.length, { it, d });
+      check(`${mode === 'expert' ? 'Le détail' : 'Sans le détail'}, ${w} px (téléphone) : aucun interrupteur, la case du panneau ${mode === 'expert' ? 'cochée' : 'décochée'} ; aucun bouton hors de l'écran, aucun défilement`,
+        caseJuste(it, mode) && d.defil <= 0 && !d.hors.length, { it, d });
       await ctx.close();
     }
 
@@ -1420,9 +1395,9 @@ async function filNoir(page, x, y) {
         /\d\d:\d\d:\d\d Près du prix du moment.: \d+ gros ordres? d'achat (posés?|disparus?)/.test(lj) && !/UTC/.test(lj) && !/un seul prix/.test(lj), lj.slice(0, 200));
       await p44.keyboard.press('Escape');
       // b et c portent sur les puces des calques (cachées en Débutant) : la page passe en Expert par
-      // la touche M (ce qui contrôle aussi la bascule), puis revient en Débutant.
-      await p44.keyboard.press('m'); await p44.waitForTimeout(400);
-      check('touche M : la page passe en Expert', (await etat(p44)).mode === 'expert');
+      // la case « Le détail » (ce qui contrôle aussi la bascule), puis revient en Débutant.
+      await basculerDetail(p44); await p44.waitForTimeout(400);
+      check('case « Le détail » cochée : la page passe en Expert', (await etat(p44)).mode === 'expert');
       // Expert : chaque évènement, à l'heure de l'appareil (comme l'axe de la carte), avec sa phrase entière.
       await p44.click('#btnJournal'); await p44.waitForTimeout(300);
       const ljx = await p44.evaluate(() => ({ liste: document.getElementById('listeJournal').innerText, note: document.getElementById('journalNote').innerText }));
@@ -1445,8 +1420,8 @@ async function filNoir(page, x, y) {
       await p44.waitForTimeout(1300);
       const g44 = (await etat(p44)).guide;
       check('vue passée : aucune étiquette de mur ni de zone (elles décrivent le présent)', g44.present === false && !g44.etiquettes.some(t => /^(Mur|À surveiller|Ordres|Le prix est|Zone|Bid|Ask)/.test(t)), g44);
-      await p44.keyboard.press('m'); await p44.waitForTimeout(400);
-      check('touche M encore : retour en Débutant', (await etat(p44)).mode === 'debutant');
+      await basculerDetail(p44); await p44.waitForTimeout(400);
+      check('case « Le détail » décochée : retour en Débutant', (await etat(p44)).mode === 'debutant');
       // d. Explication : ouverte à la première visite ; « J'ai compris » la referme et s'en souvient.
       check('« Comment lire cette carte » : ouverte à la première visite', e0.guide.intro === true);
       await p44.click('#guideIntroOk'); await p44.waitForTimeout(300);
@@ -1583,14 +1558,11 @@ async function filNoir(page, x, y) {
       const dm = await p45.evaluate(() => document.documentElement.dataset.mode);
       check('45a. data-mode = debutant (aucun mode stocké : défaut de la page)', dm === 'debutant' && e.mode === 'debutant', dm);
       const vis = await visibles(p45);
-      check(`en-tête : exactement ← Terminal, les deux segments du mode, Guide, Suivre, Choisir l’affichage, Journal, Légende (+ le titre) — ${vis.join(', ')}`,
-        vis.length === 8 && ['retour', 'btnSuivre', 'btnAffichage', 'btnJournal', 'btnLegende'].every(k => vis.some(v => v.includes(k))) && vis.filter(v => v === 'mode-btn').length === 2 && vis.some(v => /puce/.test(v)), vis);
+      check(`en-tête : exactement ← Terminal, Guide, Suivre, Choisir l’affichage, Journal, Légende (+ le titre), sans interrupteur de mode — ${vis.join(', ')}`,
+        vis.length === 6 && ['retour', 'btnSuivre', 'btnAffichage', 'btnJournal', 'btnLegende'].every(k => vis.some(v => v.includes(k))) && !vis.some(v => v === 'mode-btn') && vis.some(v => /puce/.test(v)), vis);
       const barre = await p45.evaluate(() => ({ h: document.querySelector('.barre').getBoundingClientRect().height, defil: document.documentElement.scrollWidth - innerWidth, titre: document.querySelector('.barre h1').innerText }));
-      const it45 = await interrupteur(p45);
-      check(`en-tête sur une rangée (${Math.round(barre.h)} px ≤ 46), aucun défilement, interrupteur « Lisible | Complet »`, barre.h <= 46 && barre.defil <= 0 && it45.segs.map(s => s.texte).join('|') === 'Lisible|Complet', { barre, it45 });
-      // Incohérence 101 : l'interrupteur dit l'ÉTAT, comme celui du terminal — le segment actif enfoncé
-      // (aria-pressed="true") et surligné, l'autre non (aria-pressed="false", fond transparent).
-      check('interrupteur : Lisible enfoncé et surligné (aria-pressed), Complet non (fond transparent) ; dans un groupe nommé « Mode d\'affichage »', interrupteurJuste(it45, 'debutant'), it45);
+      const it45 = await sansInterrupteur(p45);
+      check(`en-tête sur une rangée (${Math.round(barre.h)} px ≤ 46), aucun défilement, aucun interrupteur (« Le détail » décochée dans le panneau)`, barre.h <= 46 && barre.defil <= 0 && caseJuste(it45, 'debutant'), { barre, it45 });
       check('panneaux du côté et du bas à 0 (carnet latéral, volume, CVD) : la chaleur prend la place', e.mise.dom.w === 0 && e.mise.vol.h === 0 && e.mise.cvd.h === 0 && e.mise.chaleur.w === e.mise.w - 66 && e.mise.chaleur.h === e.mise.h - 20, e.mise);
       controlerEtiquettes(e, '1440 × 900');
       check('les deux côtés ont leur repère (données préparées)', ['bid', 'ask'].every(c => e.debutant.etiquettes.some(x => x.cote === c && x.prix !== null)), e.debutant.etiquettes);
@@ -1749,7 +1721,7 @@ async function filNoir(page, x, y) {
         const ysMurs = ['bid', 'ask'].map(k => eD0.debutant.niveaux[k]).filter(n => n && n.source === 'mur').map(n => Yd((n.pBas + n.pHaut) / 2));
         const libre = z => !eD0.debutant.etiquettes.some(q => z.x >= q.x - 6 && z.x <= q.x + q.w + 6 && z.y >= q.y - 6 && z.y <= q.y + q.h + 6)
           && !eD0.debutant.cadres.some(f => z.x >= f.x0 - 4 && z.x <= f.x1 + 4 && z.y >= f.ya - 6 && z.y <= f.yb + 6) && ysMurs.every(y => Math.abs(z.y - y) > 8);
-        await p45.keyboard.press('m'); await p45.waitForTimeout(600);
+        await basculerDetail(p45); await p45.waitForTimeout(600);
         await p45.evaluate(([a, b, c2, d]) => window.__carte.cadrer(a, b, c2, d), [tc - 60e3, tc + 60e3, pc - 100, pc + 100]);
         await p45.waitForTimeout(500);
         const luE = await viser(p45), mE = luE.match(/mesuré : ([\d,]+) BTC/);
@@ -1764,7 +1736,7 @@ async function filNoir(page, x, y) {
           const zE = bE.find(z => cle(z) === cle(commun)), rE = await canvasRect(p45);
           await p45.mouse.move(rE.x + zE.x + 1, rE.y + zE.y); await p45.mouse.move(rE.x + zE.x, rE.y + zE.y); await p45.waitForTimeout(300);
           const lE = await lecture(p45), xE = lE.match(/: ([\d,]+) BTC achetés \/ ([\d,]+) vendus au marché/);
-          await p45.keyboard.press('m'); await p45.waitForTimeout(600);
+          await basculerDetail(p45); await p45.waitForTimeout(600);
           await p45.evaluate(([a, b, c2, d]) => window.__carte.cadrer(a, b, c2, d), [tc - 60e3, tc + 60e3, pb - 100, pb + 100]);
           await p45.waitForTimeout(500);
           const zD = (await p45.evaluate(() => window.__carte.bulles())).find(z => cle(z) === cle(commun)), rD = await canvasRect(p45);
@@ -1772,7 +1744,7 @@ async function filNoir(page, x, y) {
           const lD = await lecture(p45), xD = lD.match(/Échangé ici : ([\d,]+) BTC acheté, ([\d,]+) BTC vendu/);
           check(`même bulle d'échanges : ${xD && xD[1]} / ${xD && xD[2]} BTC (Débutant) = ${xE && xE[1]} / ${xE && xE[2]} BTC (Expert)`, xD && xE && xD[1] === xE[1] && xD[2] === xE[2], [lD, lE]);
         }
-        if (e.mode !== (await etat(p45)).mode) { await p45.keyboard.press('m'); await p45.waitForTimeout(400); }
+        if (e.mode !== (await etat(p45)).mode) { await basculerDetail(p45); await p45.waitForTimeout(400); }
         await p45.keyboard.press('f'); await p45.waitForTimeout(800);
       }
       // Résumé ouvert : 5 lignes en clair ; refermé, la bande revient à sa hauteur.
@@ -1780,9 +1752,9 @@ async function filNoir(page, x, y) {
         const h0 = (await bande(p45)).h, cv0 = await p45.evaluate(() => document.getElementById('carte').getBoundingClientRect().toJSON());
         await p45.click('#resumeCarte'); await p45.waitForTimeout(400);
         const o = await bande(p45), lignes = o.texte.replace(/[\u202f\u00a0]/g, ' ').split('\n');
-        check('résumé ouvert : la ligne + 6 lignes (variation chiffrée, ordres lus, deux côtés, 3 âges, le scénario au Terminal, « pas une prévision » et « mode Complet »)',
+        check('résumé ouvert : la ligne + 6 lignes (variation chiffrée, ordres lus, deux côtés, 3 âges, le scénario au Terminal, « pas une prévision » et « Le détail »)',
           lignes.length === 7 && /^Prix : de .+ \$ à .+ \$ en 15 min \([+−]\d/.test(lignes[1]) && /^Ordres en attente lus il y a /.test(lignes[2]) && /^Au-dessus : .+ Au-dessous : /.test(lignes[3])
-            && /^Âges : couleurs récentes .+, plus anciennes .+ · ronds .+ · ligne du prix /.test(lignes[4]) && /^Le scénario du matin de Claude est sur le Terminal/.test(lignes[5]) && /pas une prévision.+mode Complet/.test(lignes[6]) && o.h > h0, { lignes, h0, h: o.h });
+            && /^Âges : couleurs récentes .+, plus anciennes .+ · ronds .+ · ligne du prix /.test(lignes[4]) && /^Le scénario du matin de Claude est sur le Terminal/.test(lignes[5]) && /pas une prévision.+Le détail/.test(lignes[6]) && o.h > h0, { lignes, h0, h: o.h });
         const cv1 = await p45.evaluate(() => document.getElementById('carte').getBoundingClientRect().toJSON());
         check(`résumé ouvert PAR-DESSUS la carte : la carte ne bouge pas (${Math.round(cv0.top)}/${Math.round(cv0.height)} → ${Math.round(cv1.top)}/${Math.round(cv1.height)} px)`, cv0.top === cv1.top && cv0.height === cv1.height, { cv0, cv1 });
         const mal = interdits(o.texte);
@@ -1793,16 +1765,16 @@ async function filNoir(page, x, y) {
       e = await etat(p45);
       check(`budget de rendu : chaleur ${e.mesure.chaleur.toFixed(1)} ms < 50, calques ${e.mesure.rendu.toFixed(1)} ms < 30`, e.mesure.chaleur < 50 && e.mesure.rendu < 30, e.mesure);
 
-      // ── 45b. Bascule (touche M, bouton, autre onglet) ─────────────────────
+      // ── 45b. Bascule (case « Le détail » du panneau, autre onglet) ─────────
       {
         const c0 = await p45.evaluate(() => document.getElementById('carte').clientHeight);
-        await p45.keyboard.press('m'); await p45.waitForTimeout(1500);
+        await basculerDetail(p45); await p45.waitForTimeout(1500);
         const x = await p45.evaluate(() => ({ mode: document.documentElement.dataset.mode, cle: localStorage.getItem('samsara-mode'),
           affichage: document.getElementById('btnAffichage').offsetParent !== null, rafales: document.getElementById('btnRafales').offsetParent !== null,
           puces: [...document.querySelectorAll('.calques .puce')].filter(p => p.offsetParent !== null).length, ch: document.getElementById('carte').clientHeight }));
-        const eX = await etat(p45), itX = await interrupteur(p45);
-        check('45b. touche M : Complet (data-mode, samsara-mode = expert), « Complet » enfoncé dans l\'interrupteur, « Choisir l’affichage », Rafales et toutes les puces visibles',
-          x.mode === 'expert' && x.cle === 'expert' && interrupteurJuste(itX, 'expert') && x.affichage && x.rafales && x.puces === 16, { x, itX });
+        const eX = await etat(p45), itX = await sansInterrupteur(p45);
+        check('45b. case « Le détail » cochée : data-mode et samsara-mode = expert, la case cochée, « Choisir l’affichage », Rafales et toutes les puces visibles',
+          x.mode === 'expert' && x.cle === 'expert' && caseJuste(itX, 'expert') && x.affichage && x.rafales && x.puces === 16, { x, itX });
         // Les cinq pastilles de la section 2 : murs et gamma viennent du fichier de 15 min, relu en Expert.
         const motifs = [/^Carte publiée · /, /^Carnet live · /, /^Exécutions · /, /^Gros paquets · lus il y a /, /^Gamma \(Deribit\) · /];
         await p45.waitForFunction(ms => { const p = window.__carte.etat().pastilles; return ms.every(m => p.some(t => new RegExp(m).test(t))); }, motifs.map(m => m.source), { timeout: 15000 }).catch(() => {});
@@ -1810,20 +1782,19 @@ async function filNoir(page, x, y) {
         check('Expert : les 5 pastilles d\'âge de la section 2 sont là, panneaux du côté et du bas rouverts', motifs.every(m => eX5.pastilles.some(t => m.test(t))) && eX.mise.dom.w > 0 && eX.mise.vol.h > 0 && eX.mise.cvd.h > 0, { p: eX5.pastilles, dom: eX.mise.dom, vol: eX.mise.vol });
         check('45h. pas de régression Expert : « Σ … BTC » posés, axe gradué, volume et CVD écrits', eX.posees.some(p => /Σ/.test(p.texte)) && (eX.textes.axePrix || []).length > 3 && !!eX.textes.volume && !!eX.textes.cvd, { posees: eX.posees.map(p => p.texte).slice(0, 12), v: eX.textes.volume, c: eX.textes.cvd });
         check(`la hauteur du canevas suit la bande (${c0} → ${x.ch} px)`, Math.abs(x.ch - c0) < 40, [c0, x.ch]);
-        // « Choisir l'affichage » ouvert (réglages fins dépliés), puis l'interrupteur : le segment actif
-        // (« Complet ») ne change rien ; l'autre (« Lisible ») change de mode et le panneau suit le mode — en
-        // Lisible, ses seules lignes (le Guide, et ce qui reste toujours affiché), sans réglages fins ni mot technique.
+        // « Choisir l'affichage » ouvert (réglages fins dépliés), puis la case « Le détail » décochée : le
+        // panneau reste ouvert et suit — sans le détail, ses seules lignes (le Guide, et ce qui reste
+        // toujours affiché), sans réglages fins ni mot technique.
         await p45.click('#btnAffichage'); await p45.waitForTimeout(200);
         await p45.keyboard.press('Escape'); await p45.click('#btnAffichage'); await p45.waitForTimeout(200);
         const casesX = await p45.evaluate(() => { document.getElementById('reglagesFins').open = true; return document.querySelectorAll('#affGroupes input[data-calque]').length; });
-        await p45.click('#btnModeBarre [data-mode-choix="expert"]'); await p45.waitForTimeout(400);
-        const rien = await p45.evaluate(() => ({ mode: document.documentElement.dataset.mode, cle: localStorage.getItem('samsara-mode'), ouvert: !document.getElementById('affichage').hidden }));
-        check('interrupteur : un clic sur le segment actif (« Complet ») ne change rien (« Choisir l’affichage » reste ouvert)', rien.mode === 'expert' && rien.cle === 'expert' && rien.ouvert, rien);
-        await p45.click('#btnModeBarre [data-mode-choix="debutant"]'); await p45.waitForTimeout(1500);
-        const eD = await etat(p45), itD = await interrupteur(p45), rg = await p45.evaluate(() => { const p = document.getElementById('affichage');
+        const rien = await p45.evaluate(() => ({ visible: document.getElementById('affDetail').offsetParent !== null, coche: document.getElementById('affDetail').checked }));
+        check('« Choisir l’affichage » ouvert : la case « Le détail » y est, visible et cochée', rien.visible && rien.coche, rien);
+        await p45.click('#affDetail'); await p45.waitForTimeout(1500);
+        const eD = await etat(p45), itD = await sansInterrupteur(p45), rg = await p45.evaluate(() => { const p = document.getElementById('affichage');
           return { ouvert: !p.hidden, fins: document.getElementById('reglagesFins').offsetParent !== null, cases: [...p.querySelectorAll('#affGroupes input')].map(c => (c.dataset.calque || '') + (c.disabled ? '(toujours)' : '')).join(','), texte: p.innerText }; });
-        check('interrupteur (« Lisible ») : retour en Lisible, « Lisible » enfoncé, budget de 45a tenu ; « Choisir l’affichage » suit le mode (16 cases → le Guide et 3 lignes « toujours », réglages fins cachés, aucun mot technique)',
-          eD.mode === 'debutant' && interrupteurJuste(itD, 'debutant') && eD.textesCarte.filter(t => !t.repere).length <= 2 && !eD.posees.some(p => p.pastille) && casesX === 16 && rg.ouvert && rg.cases === 'guide,(toujours),(toujours),(toujours)' && !rg.fins && !interdits(rg.texte).length,
+        check('case « Le détail » décochée : retour à l’écran calme, budget de 45a tenu ; « Choisir l’affichage » reste ouvert et suit (16 cases → le Guide et 3 lignes « toujours », réglages fins cachés, aucun mot technique)',
+          eD.mode === 'debutant' && caseJuste(itD, 'debutant') && eD.textesCarte.filter(t => !t.repere).length <= 2 && !eD.posees.some(p => p.pastille) && casesX === 16 && rg.ouvert && rg.cases === 'guide,(toujours),(toujours),(toujours)' && !rg.fins && !interdits(rg.texte).length,
           { mode: eD.mode, tc: eD.textesCarte, itD, casesX, rg: Object.assign({}, rg, { mal: interdits(rg.texte) }) });
         await p45.keyboard.press('Escape');
         await p45.evaluate(() => { localStorage.setItem('samsara-mode', 'expert'); window.dispatchEvent(new StorageEvent('storage', { key: 'samsara-mode', newValue: 'expert' })); });
@@ -1910,12 +1881,12 @@ async function filNoir(page, x, y) {
         let pg;
         ({ page: pg, erreurs } = await ouvrir(nav, { encodage: true, mode: 'debutant', vue: { width: 1024, height: 768 }, stockage: VU, intercept: deuxCotes }));
         await pg.waitForFunction(() => window.__carte.etat().debutant.etiquettes.length >= 1 && window.__carte.etat().debutant.tendance, null, { timeout: 15000 }).catch(() => {});
-        const g = await etat(pg), b = await bande(pg), h = await pg.evaluate(() => ({ h: document.querySelector('.barre').getBoundingClientRect().height })), it = await interrupteur(pg);
-        check(`45c. 1024 × 768 : en-tête sur une rangée (${Math.round(h.h)} px), interrupteur « Lisible | Complet » (Lisible enfoncé), résumé sur une ligne (${b.texte.length} ≤ 100)`, h.h <= 46 && interrupteurJuste(it, 'debutant') && it.visible && !it.autres.length && b.sw <= b.cw + 1 && b.h <= 26.5 && b.texte.length <= 100 && motifAge.test(b.texte) && motifTete.test(b.texte), { h, it, b });
+        const g = await etat(pg), b = await bande(pg), h = await pg.evaluate(() => ({ h: document.querySelector('.barre').getBoundingClientRect().height })), it = await sansInterrupteur(pg);
+        check(`45c. 1024 × 768 : en-tête sur une rangée (${Math.round(h.h)} px), sans interrupteur, résumé sur une ligne (${b.texte.length} ≤ 100)`, h.h <= 46 && caseJuste(it, 'debutant') && b.sw <= b.cw + 1 && b.h <= 26.5 && b.texte.length <= 100 && motifAge.test(b.texte) && motifTete.test(b.texte), { h, it, b });
         controlerEtiquettes(g, '1024 × 768');
         await pg.setViewportSize({ width: 1023, height: 768 }); await pg.waitForTimeout(400);
-        const it2 = await interrupteur(pg);
-        check('1023 px : interrupteur « Lisible | Complet » entier, cliquable, dans l\'écran (Lisible enfoncé)', interrupteurJuste(it2, 'debutant') && it2.visible && it2.d <= it2.vw + 0.5 && !it2.autres.length, it2);
+        const it2 = await pg.evaluate(() => ({ h: document.querySelector('.barre').getBoundingClientRect().height, defil: document.documentElement.scrollWidth - innerWidth }));
+        check('1023 px : l\'en-tête tient, sans défilement', it2.defil <= 0 && it2.h <= 82, it2);
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
         await pg.close();
       }
@@ -2024,7 +1995,7 @@ async function filNoir(page, x, y) {
         }
         const blancs = res.filter(px => px.every(c => c > 225)).length, nb = (await pg.evaluate(() => window.__carte.bulles())).length;
         check(`45i. prix, échanges, carnet éteints en Expert : en Débutant la ligne de prix (${blancs}/3 pixels blancs) et les ronds (${nb}) sont là, le carnet est lu`, blancs >= 2 && nb > 0 && g.live && g.live.n >= 1, { res, nb, live: g.live });
-        await pg.keyboard.press('m'); await pg.waitForTimeout(800);
+        await basculerDetail(pg); await pg.waitForTimeout(800);
         const g2 = await etat(pg), ap = await pg.evaluate(() => ['prix', 'executions', 'live'].map(k => document.querySelector(`button[data-calque="${k}"]`).getAttribute('aria-pressed')));
         check('… et en Expert ils restent éteints (puces non pressées, réglage intact)', ap.every(a => a === 'false') && !g2.reglages.calques.prix && !g2.reglages.calques.executions && !g2.reglages.calques.live, { ap, c: g2.reglages.calques });
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
@@ -2104,7 +2075,7 @@ async function filNoir(page, x, y) {
         check(`45n. palette « cote » en Débutant : rampes « ${lg.rampes.join(' », « ')} », légende sans mot technique`, lg.rampes.join('|') === 'Achats en attente|Ventes en attente' && !mal.length, { mal, rampes: lg.rampes });
         check('45n. la légende dit les couleurs de cette palette (turquoise / rouge)', /Achats en turquoise, ventes en rouge/.test(lg.texte), lg.texte.slice(0, 300));
         await pg.keyboard.press('Escape');
-        await pg.keyboard.press('m'); await pg.waitForTimeout(500);
+        await basculerDetail(pg); await pg.waitForTimeout(500);
         await pg.click('#btnLegende'); await pg.waitForTimeout(300);
         const rx = await pg.evaluate(() => [...document.querySelectorAll('#barreCouleurs .rampe-nom')].map(e => e.textContent));
         check('… et en Expert, les noms Bid / Ask restent', rx.join('|') === 'Bid (achats posés)|Ask (ventes posées)', rx);
@@ -2142,7 +2113,7 @@ async function filNoir(page, x, y) {
       const jn = await pg.evaluate(() => ({ note: document.getElementById('journalNote').innerText, liste: document.getElementById('listeJournal').innerText }));
       await pg.keyboard.press('Escape');
       await pg.click('#btnLegende'); await pg.waitForTimeout(300);
-      const lg = await pg.evaluate(() => ({ texte: document.getElementById('legende').innerText, mode: document.getElementById('btnMode').textContent, zones: document.getElementById('legGuideZones').textContent,
+      const lg = await pg.evaluate(() => ({ texte: document.getElementById('legende').innerText, mode: document.getElementById('legGuideMode').textContent, zones: document.getElementById('legGuideZones').textContent,
         resume: document.getElementById('legGuideResume').textContent, rafales: document.getElementById('legRafales').textContent, bulles: document.getElementById('legBulles').textContent }));
       // La légende refermée : ouverte, elle couvre la droite de la carte, et un pointeur posé
       // dessous ne lit plus rien (la lecture restait celle d'avant — faux vert ou faux rouge).
@@ -2151,13 +2122,14 @@ async function filNoir(page, x, y) {
       const ailleurs = e.pastillesCompletes.concat(e.textesCarte.map(t => t.texte), [jn.note, jn.liste, lg.texte, e.statut]).filter(t => /\bUTC\b/.test(t));
       check('46f. aucune autre heure UTC : pastilles, carte, journal, légende à l\'heure de l\'appareil', !ailleurs.length && /^Heure de l'appareil, comme l'axe de la carte/.test(jn.note), { ailleurs: ailleurs.slice(0, 3), note: jn.note.slice(0, 80) });
       check('46g. légende : bouton de mode qui dit l\'action, « 15 dernières minutes », le résumé réellement affiché, garde des rafales tirée du code',
-        lg.mode === 'Passer en Lisible' && /des 15 dernières minutes/.test(lg.zones) && /FINIT par «.pas une prévision.»/.test(lg.resume) && !/dès le début/.test(lg.resume)
+         /^Avec « Le détail » : les chiffres seuls\. C'est la même case que sur le terminal/.test(lg.mode.replace(/\u00a0/g, ' ')) && /des 15 dernières minutes/.test(lg.zones) && /FINIT par «.pas une prévision.»/.test(lg.resume) && !/dès le début/.test(lg.resume)
         && lg.rafales.includes('pendant ' + BM.nombre(BM.RAFALES.gardeMs / 3600e3, 0, 1) + ' h') && /bouton «.≡ Rafales.» \(en haut à droite\) en liste les 20 plus récentes/.test(lg.rafales) && /écrit dans le rond, avec «.BTC.», à partir de [\d,]+ BTC/.test(lg.bulles), lg);
       check('46h. légende : « Plusieurs horloges », gestes complets (L, + / −, Ctrl + molette), ronds (pas « bulles ») pour les échanges, plus de note périmée « avant le 08/10 »',
         /Plusieurs horloges sur une même surface/.test(lg.texte) && !/Trois horloges/.test(lg.texte) && /L : la légende/.test(lg.texte) && /\+ \/ − : zoom/.test(lg.texte) && /Ctrl \+ molette/.test(lg.texte) && !/\bbulles?\b/i.test(lg.texte) && !/avant le 08\/10/.test(lg.texte), lg.texte.slice(0, 200));
-      // Les touches communes au terminal et à la carte (M, ?, R, F), dites dans la légende avec le même sens.
-      check('46h. légende : les touches communes au terminal, M (mode Lisible / Complet), ? (aide), R (vue de départ), F (suivre le présent)',
-        /M : changer de mode, Lisible \/ Complet/.test(lg.texte) && /\? : comment lire cette carte/.test(lg.texte) && /R ou double-clic : revenir à la vue de départ/.test(lg.texte) && /F : suivre le présent/.test(lg.texte), lg.texte.slice(0, 200));
+      // Les touches communes au terminal et à la carte (?, R, F), dites dans la légende avec le même sens ;
+      // plus de touche M (« Le détail » est une case du panneau, 11/10/2026).
+      check('46h. légende : les touches communes au terminal, ? (aide), R (vue de départ), F (suivre le présent), sans M',
+        !/\bM : /.test(lg.texte) && !/Lisible \/ Complet/.test(lg.texte) && /\? : comment lire cette carte/.test(lg.texte) && /R ou double-clic : revenir à la vue de départ/.test(lg.texte) && /F : suivre le présent/.test(lg.texte), lg.texte.slice(0, 200));
       check('46i. volume et CVD en BTC (la quantité échangée, comme les ronds)', /^Volume \(BTC\) par /.test(e.textes.volume || '') && /^CVD spot \(BTC\) cumulé depuis .+ · [+−]?[\d ]+(,\d+)? BTC$/.test(e.textes.cvd || ''), [e.textes.volume, e.textes.cvd]);
       check('46j. puces et pastilles : « Gros paquets » (fichier de 15 min) et « Destin des gros ordres », plus de calque « Murs »',
         await pg.evaluate(() => { const t = [...document.querySelectorAll('#calques button')].map(b => b.textContent); return t.includes('Gros paquets') && t.includes('Destin des gros ordres') && !t.includes('Murs') && !t.includes('Destin des murs'); })
@@ -2444,11 +2416,11 @@ async function filNoir(page, x, y) {
           const intro = await pg.evaluate(() => document.getElementById('guideIntro').innerText);
           check('48f. explication ouverte : la mini-clé se retire (l’explication dit les couleurs, avec ▲ et ▼)', sousIntro === null && /▲/.test(intro) && /▼/.test(intro), { sousIntro, intro: intro.slice(0, 300) });
           await pg.click('#guideIntroOk'); await pg.waitForTimeout(300);
-          await pg.click('#btnModeBarre [data-mode-choix="expert"]'); await pg.waitForTimeout(800);
+          await poserDetail(pg, true); await pg.waitForTimeout(800);
           const ex = await etat(pg);
           const cache = await pg.evaluate(() => { const m = document.getElementById('miniCle'); return m.hidden || getComputedStyle(m).display === 'none'; });
           check(`48g. Complet : ni mini-clé, ni triangle dans les ronds (${ex.debutant.formesSens.achat + ex.debutant.formesSens.vente})`, ex.mode === 'expert' && ex.debutant.miniCle === null && cache && ex.debutant.formesSens.achat + ex.debutant.formesSens.vente === 0, { mode: ex.mode, mc: ex.debutant.miniCle, fs: ex.debutant.formesSens });
-          await pg.click('#btnModeBarre [data-mode-choix="debutant"]'); await pg.waitForTimeout(800);
+          await poserDetail(pg, false); await pg.waitForTimeout(800);
           check('48h. de retour en Lisible : la mini-clé revient', !!(await etat(pg)).debutant.miniCle);
         }
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
@@ -2457,35 +2429,28 @@ async function filNoir(page, x, y) {
 
       titre('49. Au doigt (360 et 390 px) : chaque bouton et chaque puce de la barre de la carte, une cible de 40 × 40 px au moins');
       // Tout le carré de 40 × 40 px centré sur le bouton (17 × 17 points jusqu'à ±19,5 px) le touche, lui ;
-      // une puce de Complet d'abord amenée à l'écran dans sa rangée qui défile. Les deux segments de
-      // l'interrupteur de mode ont leur propre mesure : pas de taille exigée, mais aucune zone voisine sur eux.
+      // une puce de Complet d'abord amenée à l'écran dans sa rangée qui défile.
       for (const mode of ['debutant', 'expert']) for (const w of [360, 390]) {
         let pg;
         ({ page: pg, erreurs } = await ouvrir(nav, { encodage: true, mode, vue: { width: w, height: 800 }, stockage: VU, contexte: { deviceScaleFactor: 2, hasTouch: true, isMobile: true } }));
         const m = await pg.evaluate(() => {
           const vis = e => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
           const nomDe = b => b.id || (b.dataset.calque ? 'puce ' + b.dataset.calque : b.className.split(' ')[0]);
-          const cibles = [...document.querySelectorAll('.barre a, .barre button')].filter(b => vis(b) && !b.closest('#btnModeBarre')).map(b => {
+          const cibles = [...document.querySelectorAll('.barre a, .barre button')].filter(b => vis(b)).map(b => {
             if (b.closest('#calques')) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
             const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, rates = [];
             for (let i = -8; i <= 8; i++) for (let j = -8; j <= 8; j++) { const h = document.elementFromPoint(cx + i * 19.5 / 8, cy + j * 19.5 / 8); if (!h || !b.contains(h)) rates.push([Math.round(i * 19.5 / 8), Math.round(j * 19.5 / 8), h ? nomDe(h) : 'rien']); }
             return { id: nomDe(b), dessin: [Math.round(r.width), Math.round(r.height)], rates: rates.length, ex: rates.slice(0, 3) };
           });
           document.getElementById('calques').scrollLeft = 0;
-          const segs = [...document.querySelectorAll('#btnModeBarre [data-mode-choix]')].filter(vis), pris = new Set();
-          for (const bm of segs) {
-            const q = bm.getBoundingClientRect();
-            for (let x = q.left + 1; x < q.right - 0.5; x += 2) for (let y = q.top + 1; y < q.bottom - 0.5; y += 2) { const h = document.elementFromPoint(x, y); if (!h || !(bm.contains(h) || h.contains(bm))) pris.add(bm.dataset.modeChoix + ' : ' + (h ? nomDe(h) : 'rien')); }
-          }
           const ba = document.getElementById('btnAffichage'), ra = ba.getBoundingClientRect();
-          return { cibles, segs: segs.length, mode: [...pris], barre: Math.round(document.querySelector('.barre').getBoundingClientRect().height), page: document.documentElement.scrollWidth - innerWidth,
+          return { cibles, barre: Math.round(document.querySelector('.barre').getBoundingClientRect().height), page: document.documentElement.scrollWidth - innerWidth,
             aff: { texte: ba.innerText.trim(), coupe: ba.scrollWidth > ba.clientWidth + 1, dans: ra.left >= 0 && ra.right <= innerWidth } };
         });
         const nom = `${mode === 'expert' ? 'Complet' : 'Lisible'} · ${w}`;
         const petits = m.cibles.filter(c => c.rates);
         check(`49a. ${nom} : ${m.cibles.length} cibles (« ← Terminal », ${m.cibles.filter(c => /^puce/.test(c.id)).length} puces, les boutons) — chacune couvre un carré de 40 × 40 px`,
           m.cibles.length >= (mode === 'expert' ? 22 : 6) && !petits.length, petits.slice(0, 4));
-        check(`49b. ${nom} : aucune zone voisine sur les deux segments de l’interrupteur de mode`, m.segs === 2 && !m.mode.length, { segs: m.segs, pris: m.mode });
         check(`49c. ${nom} : barre de ${m.barre} px${mode === 'debutant' ? ' (≤ 82)' : ''}, rien ne déborde ; « ${m.aff.texte} » entier, dans l’écran`,
           (mode === 'expert' || m.barre <= 82) && m.page <= 0 && !m.aff.coupe && m.aff.dans, m);
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
@@ -2613,7 +2578,7 @@ async function filNoir(page, x, y) {
             /Bleu très pâle : peu d'ordres/.test(intro) && /bleu nuit : le plus d'ordres/.test(intro) && /orange/.test(intro) && /▲/.test(intro) && /▼/.test(intro) && !/Bleu foncé : peu|blanc : le plus|trait jaune/.test(intro) && !interdits(intro).length, intro.slice(0, 600));
           await pg.click('#guideIntroOk'); await pg.waitForTimeout(300);
           // Le Complet clair : la légende dit aussi la ligne et l'arc de sa couleur (noire, noir).
-          await pg.click('#btnModeBarre [data-mode-choix="expert"]'); await pg.waitForTimeout(800);
+          await poserDetail(pg, true); await pg.waitForTimeout(800);
           await pg.click('#btnLegende'); await pg.waitForTimeout(300);
           const lgC = await pg.evaluate(() => document.getElementById('legende').innerText);
           await pg.keyboard.press('Escape');

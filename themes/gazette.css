@@ -222,7 +222,6 @@
 [data-theme="gazette"] .header-right { gap: 6px; }
 [data-theme="gazette"] .theme-btn.ico-btn { width: 28px; height: 28px; }
 [data-theme="gazette"] .theme-btn.ico-btn svg { width: 15px; height: 15px; }
-[data-theme="gazette"] .mode-btn { height: 28px; font: 400 14px/1 var(--police-rubrique); letter-spacing: 0.08em; text-transform: uppercase; }
 [data-theme="gazette"] .theme-btn.ico-btn.on { box-shadow: none; }
 [data-theme="gazette"] .refresh-dot { box-shadow: none; }
 
@@ -399,9 +398,7 @@
   [data-theme="gazette"] .gazette-oreille-d #updated { font-size: 19px; }
   [data-theme="gazette"] .gazette-alertes { height: 13px; font-size: 11px; }
   [data-theme="gazette"] .gazette-folio { padding-bottom: 2px; }
-  [data-theme="gazette"] .theme-btn.ico-btn,
-  [data-theme="gazette"] .mode-btn { width: 26px; height: 26px; }
-  [data-theme="gazette"] .mode-btn { width: auto; }
+  [data-theme="gazette"] .theme-btn.ico-btn { width: 26px; height: 26px; }
   [data-theme="gazette"] .gazette-manchette { margin-top: calc(-1 * var(--gap) + 3px); padding-bottom: 3px; }
   [data-theme="gazette"] .gazette-titre { font-size: 25px; }
   [data-theme="gazette"] .gazette-chapeau { display: none; }

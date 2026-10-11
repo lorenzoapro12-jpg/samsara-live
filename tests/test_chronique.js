@@ -206,9 +206,11 @@ const CH = ['micro.cvd_24h_usd', 'micro.oi_change_24h_pct', 'tf.4h.rsi_14'];
     const liste = (app.match(/const CHRONIQUE_KPIS = \[([\s\S]*?)\]/) || [])[1] || '';
     const suivis = [...liste.matchAll(/'([^']+)'/g)].map(m => m[1]);
     const bande = (app.match(/function renderCycle[\s\S]*?\n}\n/) || [''])[0];
-    const kpis = [...bande.matchAll(/\+?\s*kpi\('([^']+)',[\s\S]*?'([a-z0-9_.]+)'\)\n/g)].map(m => [m[1], m[2]]);
+    // La bande est faite de KPIS_ENTETE (la liste que le panneau propose aussi d'épingler).
+    const entete = (app.match(/const KPIS_ENTETE = \[([\s\S]*?)\];/) || [])[1] || '';
+    const kpis = [...entete.matchAll(/\['([^']+)', '([a-z0-9_.]+)'\]/g)].map(m => [m[1], m[2]]);
     check(`chaque chiffre clé de #cycle a sa trace (${kpis.length} : ${kpis.map(k => k[0]).join(', ')})`,
-      kpis.length === 8 && kpis.every(([, c]) => suivis.includes(c)), { kpis, suivis });
+      kpis.length === 8 && kpis.every(([, c]) => suivis.includes(c)) && /KPIS_ENTETE\.map/.test(bande), { kpis, suivis });
     check('la trace est rendue dans le chiffre clé (traceKpi)', /traceKpi\(chemin\)/.test(bande));
     const src = x => html.indexOf('<script defer src="js/' + x + '"');
     check('chronique.js chargé avant app.js', src('chronique.js') > 0 && src('chronique.js') < src('app.js'));

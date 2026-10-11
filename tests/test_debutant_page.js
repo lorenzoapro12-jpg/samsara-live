@@ -960,27 +960,27 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       await pc.route('**/*', r => (new URL(r.request().url()).host.startsWith('127.0.0.1') ? r.continue() : r.abort()));
       await pc.goto(`http://127.0.0.1:${serveur.address().port}/bookmap.html`);
       await pc.waitForTimeout(800);
-      const carte = () => pc.evaluate(() => ({ mode: document.documentElement.getAttribute('data-mode'), presse: [...document.querySelectorAll('#btnModeBarre [data-mode-choix]')].map(s => s.getAttribute('data-mode-choix') + ':' + s.getAttribute('aria-pressed')).join('|') }));
+      const carte = () => pc.evaluate(() => ({ mode: document.documentElement.getAttribute('data-mode'), detail: document.getElementById('affDetail').checked, bascule: !!document.getElementById('btnModeBarre') }));
       const terminal = () => o.page.evaluate(() => ({ mode: document.documentElement.getAttribute('data-mode'), deb: debutant(), items: debEtat ? debEtat.items.length : null,
         detail: (() => { buildDropdown(); return document.querySelector('#indMenu label[data-ind="detail"] input').checked; })(), ecrits: window.__ecrits.filter(e => /^samsara-mode=/.test(e)) }));
       const c0 = await carte();
-      check('la carte, ouverte à côté, est en Lisible comme le terminal (même réglage)', c0.mode === 'debutant' && c0.presse === 'debutant:true|expert:false', c0);
-      await pc.click('#btnModeBarre [data-mode-choix="expert"]');
+      check('la carte, ouverte à côté, est sans le détail comme le terminal (même réglage) ; plus d\'interrupteur, sa case « Le détail » décochée', c0.mode === 'debutant' && c0.detail === false && !c0.bascule, c0);
+      await pc.evaluate(() => document.getElementById('affDetail').click());
       await o.page.waitForFunction(() => document.documentElement.getAttribute('data-mode') === 'expert', null, { timeout: 5000 }).catch(() => {});
       await o.page.waitForTimeout(300);
       const t1 = await terminal();
-      check('« Complet » cliqué sur la carte : le terminal passe au détail (data-mode, debutant(), graphique redessiné, « Le détail » coché) sans réécrire le stockage',
+      check('« Le détail » coché sur la carte : le terminal passe au détail (data-mode, debutant(), graphique redessiné, « Le détail » coché) sans réécrire le stockage',
         t1.mode === 'expert' && !t1.deb && t1.items === null && t1.detail === true && !t1.ecrits.length, t1);
-      await pc.keyboard.press('m');
+      await pc.evaluate(() => document.getElementById('affDetail').click());
       await o.page.waitForFunction(() => document.documentElement.getAttribute('data-mode') === 'debutant', null, { timeout: 5000 }).catch(() => {});
       await o.page.waitForTimeout(300);
       const t2 = await terminal();
-      check('M sur la carte : le terminal revient à l\'écran calme (data-mode, debutant(), l\'écran calme redessiné, « Le détail » décoché), sans écrire', t2.mode === 'debutant' && t2.deb && t2.items > 0 && t2.detail === false && !t2.ecrits.length, t2);
+      check('« Le détail » décoché sur la carte : le terminal revient à l\'écran calme (data-mode, debutant(), l\'écran calme redessiné, « Le détail » décoché), sans écrire', t2.mode === 'debutant' && t2.deb && t2.items > 0 && t2.detail === false && !t2.ecrits.length, t2);
       // Dans l'autre sens : le terminal change, la carte suit.
       await cocher(o.page, 'detail');
       await pc.waitForFunction(() => document.documentElement.getAttribute('data-mode') === 'expert', null, { timeout: 5000 }).catch(() => {});
       const c1 = await carte();
-      check('« Le détail » coché sur le terminal : la carte suit (Complet enfoncé)', c1.mode === 'expert' && c1.presse === 'debutant:false|expert:true', c1);
+      check('« Le détail » coché sur le terminal : la carte suit (sa case cochée)', c1.mode === 'expert' && c1.detail === true, c1);
       check('aucune erreur JavaScript (terminal et carte)', !o.erreurs.length && !errCarte.length, { t: o.erreurs, c: errCarte });
       await o.ctx.close();
     }

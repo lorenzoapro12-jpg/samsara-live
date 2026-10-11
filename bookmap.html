@@ -13,9 +13,9 @@
      avec les formats et le repli Binance. Chargée ici, AVANT le premier rendu : le thème est posé. -->
 <script src="js/liaison.js"></script>
 <script>
-  /* Le mode (Lisible / Complet ; gardé 'debutant' / 'expert', le même que le terminal), posé AVANT le
-     premier rendu, comme dans index.html : un visiteur en Complet ne voit pas un instant l'écran
-     Lisible. Lisible par défaut, et quand le stockage est bloqué. */
+  /* « Le détail » (gardé 'expert' sous samsara-mode, le même que le terminal), posé AVANT le premier
+     rendu, comme dans index.html : qui l'a coché ne voit pas un instant l'écran calme. Éteint par
+     défaut, et quand le stockage est bloqué. */
   try { document.documentElement.setAttribute('data-mode', localStorage.getItem('samsara-mode') === 'expert' ? 'expert' : 'debutant'); }
   catch (e) { document.documentElement.setAttribute('data-mode', 'debutant'); }
   /* Le thème du terminal (clair / sombre, couleur d'accent), décrit par lui (js/liaison.js), posé lui
@@ -31,9 +31,6 @@
     <h1>Carte <span class="sous expert-seul">BTC/USDT · carnet, exécutions, murs, gamma</span><span class="sous debutant-seul">BTC/USDT · ordres en attente et échanges</span></h1>
   </div>
   <nav class="calques" id="calques" aria-label="Calques affichés"></nav>
-  <!-- L'interrupteur de mode, le même que celui du terminal (index.html) et au même endroit : à droite de
-       l'en-tête, devant les boutons de la page. Le segment actif est enfoncé (aria-pressed). -->
-  <div class="mode-bascule" id="btnModeBarre" role="group" aria-label="Mode d'affichage" title="Mode d'affichage (touche M) : Lisible, l'essentiel ; Complet, tout le détail. Le même réglage que le terminal : le changer ici le change aussi là-bas."><button type="button" class="mode-btn" data-mode-choix="debutant">Lisible</button><button type="button" class="mode-btn" data-mode-choix="expert">Complet</button></div>
   <div class="barre-droite">
     <button type="button" class="bouton" id="btnSuivre" aria-pressed="true" title="Suivre le présent (F) — R ou double-clic sur la carte : la vue de départ">Suivre</button>
     <!-- Un seul panneau pour choisir ce que montre la carte (les deux modes) : « Affichage » quand la place manque. -->
@@ -73,11 +70,17 @@
     <button type="button" class="bouton" id="affTout">Tout afficher</button>
     <button type="button" class="bouton" id="affDepart">Revenir au départ</button>
   </div>
+  <!-- « Le détail » : la même case que dans le panneau du terminal (samsara-mode) ; la cocher ici la
+       coche aussi là-bas. Plus d'interrupteur Lisible / Complet (un seul écran, 11/10/2026). -->
+  <fieldset class="aff-groupe aff-detail"><legend>Ce que dit la carte</legend>
+    <div class="aff-calque"><label><input type="checkbox" id="affDetail" aria-describedby="affDetailQuoi"> <span class="aff-nom">Le détail</span></label>
+    <p class="aff-quoi" id="affDetailQuoi"><span class="aff-qq">C’est quoi ?</span> Tous les calques, les chiffres et les réglages fins. Sans lui, la carte montre l’essentiel en phrases. Le même choix que sur le terminal.</p></div>
+  </fieldset>
   <p class="note aff-note" id="affNote"></p>
   <!-- Les calques rangés par question, chacun avec sa phrase « C'est quoi ? » : remplis par js/bookmap.js
-       (construireAffichage). En Lisible, seulement ce que le Lisible montre. -->
+       (construireAffichage). Sans « Le détail », seulement ce que l'écran calme montre. -->
   <div class="aff-groupes" id="affGroupes"></div>
-  <!-- Les réglages fins (Complet) : les mêmes champs qu'avant, la même clé de stockage (samsara-carte-v1). -->
+  <!-- Les réglages fins (avec « Le détail ») : les mêmes champs qu'avant, la même clé de stockage (samsara-carte-v1). -->
   <details class="reglages-fins expert-seul" id="reglagesFins">
     <summary>Réglages fins</summary>
     <p class="note">Un réglage change le NIVEAU DE DÉTAIL ou la couleur, jamais une valeur : la lecture au pointeur donne toujours le chiffre mesuré.</p>
@@ -193,7 +196,7 @@
     <h3>Gestes</h3>
     <p>Glisser : déplacer la carte. <span class="geste-souris">Molette ou deux doigts : zoomer ; double-clic : revenir à la vue par défaut.</span><span class="geste-doigt">Deux doigts : zoomer ; double appui : revenir à la vue par défaut.</span></p>
     <p>Toucher ou survoler un élément : son détail. Au doigt, un appui bref le montre et le même appui l'enlève ; un appui long le fait suivre le doigt.</p>
-    <p><button type="button" class="bouton" id="btnIntroDebutant">Comment lire cette carte</button> <button type="button" class="bouton bouton-mode" id="btnModeDebutant">Passer en Complet</button></p>
+    <p><button type="button" class="bouton" id="btnIntroDebutant">Comment lire cette carte</button></p>
     <p class="note">La carte décrit des ordres en attente et des échanges passés, pas une recommandation : un ordre peut être retiré avant d'être touché, et un rond ne dit pas qui a acheté.</p>
   </div>
   <div class="expert-seul">
@@ -228,7 +231,7 @@
     <dd>À droite, la <b>somme</b> des ordres du dernier carnet live par tranche. À gauche, le profil des exécutions visibles. En bas, le volume (achats au-dessus, ventes au-dessous), regroupé par <span id="legVolume">1, 2, 3, 5, 10…</span> min selon le zoom — le titre du panneau dit la durée — et le CVD : achats au marché moins ventes au marché, cumulés depuis le bord gauche de la vue ; après des bougies non lues (hachurées), il repart de 0 et le dit.</dd>
   </dl>
   <h3>Guide : la carte en mots</h3>
-  <p><button type="button" class="bouton" id="btnIntro">Comment lire cette carte (?)</button> <button type="button" class="bouton" id="btnMode">Passer en Lisible</button></p>
+  <p><button type="button" class="bouton" id="btnIntro">Comment lire cette carte (?)</button></p>
   <p class="note" id="legGuideMode"></p>
   <dl class="leg-guide">
     <dt>Le guide</dt><dd id="legGuide"></dd>
@@ -241,7 +244,7 @@
   </dl>
   <h3>Gestes</h3>
   <p>Glisser : déplacer. Molette : zoom dans le temps (sur l'axe des prix, ou avec Maj : zoom des prix). Pincer à deux doigts. Glisser sur un axe : l'étirer. Ctrl + molette : zoom du temps et des prix ensemble. + / − : zoom dans le temps. Flèches : se déplacer. Échap : fermer un panneau.</p>
-  <p>Touches, les mêmes que sur le terminal : M : changer de mode, Lisible / Complet (le même réglage que le terminal : le changer ici le change aussi là-bas). ? : comment lire cette carte. R ou double-clic : revenir à la vue de départ. F : suivre le présent. Et sur la carte : G : le guide. J : le journal. L : la légende.</p>
+  <p>Touches, les mêmes que sur le terminal : ? : comment lire cette carte. R ou double-clic : revenir à la vue de départ. F : suivre le présent. Et sur la carte : G : le guide. J : le journal. L : la légende.</p>
   <p>Au doigt : un appui bref épingle la lecture là où il tombe (le même appui l'enlève) ; un appui long l'affiche et la fait suivre le doigt sans déplacer la carte.</p>
   <p class="note">Toutes les heures de la carte (axe, pastilles, journal, marques) sont celles de l'appareil ; le fuseau est écrit une fois, dans l'angle sous l'axe des prix. « Maintenant » est l'heure de Binance, recalée.</p>
   <p class="note">Ce que la carte montre est une lecture du carnet, pas une recommandation : un mur peut être retiré avant d'être touché, et un rond ne dit pas qui a acheté.</p>
