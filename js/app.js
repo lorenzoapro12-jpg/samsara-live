@@ -7173,16 +7173,21 @@ function scenBoite(S, top, bas) {
     if (!pose && F && g.pw < 520) {
       // Écran étroit : plutôt qu'épinglée par-dessus une étiquette, la forme la plus courte d'abord,
       // plus bas dans le tracé, sans couvrir d'étiquette (ni, si possible, les bougies récentes).
+      // Les mots entiers (« Scénarios · toucher ▸ ») passent avant l'abréviation : plus bas, puis
+      // par-dessus un tracé (chemin, figure) plutôt que sur une étiquette ; « Scén. » seulement si
+      // aucune forme entière ne trouve de place.
       const micro = [{ t: 'Scén.' + (tactile ? ' · toucher ▸' : ' ▸'), f: 'titre', h: hL('titre') }];
-      for (const ls of essaisL.slice().reverse().concat([micro])) {
-        const f = mesurer(ls);
-        if ((pose = chercher(f.w, f.h, bas, gene[1], false) || chercher(f.w, f.h, bas, null, false))) { forme = f; break; }
-      }
-      // Toujours rien : par-dessus un tracé (chemin, figure) plutôt que sur une étiquette.
-      for (const ls of pose ? [] : essaisL.slice().reverse().concat([micro])) {
-        const f = mesurer(ls);
-        for (let x = S.xMax - f.w - 4; !pose && x >= g.pad.left + 2; x -= 16) for (let y = Math.max(top + 4, 38); !pose && y + f.h <= bas; y += 4) if (guideLibre(S.rects, { x, y, w: f.w, h: f.h })) pose = { x, y, w: f.w, h: f.h };
-        if (pose) { forme = f; break; }
+      for (const formes of [essaisL.slice().reverse(), [micro]]) {
+        for (const ls of formes) {
+          const f = mesurer(ls);
+          if ((pose = chercher(f.w, f.h, bas, gene[1], false) || chercher(f.w, f.h, bas, null, false))) { forme = f; break; }
+        }
+        for (const ls of pose ? [] : formes) {
+          const f = mesurer(ls);
+          for (let x = S.xMax - f.w - 4; !pose && x >= g.pad.left + 2; x -= 16) for (let y = Math.max(top + 4, 38); !pose && y + f.h <= bas; y += 4) if (guideLibre(S.rects, { x, y, w: f.w, h: f.h })) pose = { x, y, w: f.w, h: f.h };
+          if (pose) { forme = f; break; }
+        }
+        if (pose) break;
       }
     }
     if (!pose) {
