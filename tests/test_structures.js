@@ -209,7 +209,8 @@ async function squelette(page) {
         // Une trace rendue dans la base peut manquer dans un thème dont la bande des chiffres clés
         // est plus serrée : ajusterKpis ne masque jamais une valeur pour une trace. Ce n'est une
         // perte que si la trace suivante tenait (prouvé ici : on la rend et la bande déborde-t-elle ?).
-        // Sans ce contrôle, le test dépendait des valeurs du jour (market-data.json du dépôt).
+        // Sans ce contrôle, le test dépendait des valeurs du jour (market-data.json du dépôt, réécrit
+        // toutes les 15 min) : à quelques pixels près, une trace tenait ou non selon le commit.
         const traceTient = await o.page.evaluate(() => {
           const cy = document.getElementById('cycle'), k = [...cy.querySelectorAll('.kpi:not([hidden]).sans-trace')].find(x => x.querySelector('.chron-spark'));
           if (!k) return null;
@@ -230,7 +231,7 @@ async function squelette(page) {
             const n = document.querySelectorAll('#cycle .kpi:not([hidden])').length; s.remove(); ajusterKpis(); return n; });
           const tr = v['traces des chiffres clés'].visibles, kp = v['chiffres clés'].visibles;
           check(`${t.id.padEnd(9)} : ${tr} trace(s) sur ${kp} chiffres clés, aucun masqué pour elles (${sans} sans traces)`
-            + (t.structure ? ', la bande de la structure les montre' : ''), kp === sans && (!t.structure || tr > 0), { tr, kp, sans });
+            + (t.structure ? ', la bande de la structure les montre (ou la suivante ne tient pas)' : ''), kp === sans && (!t.structure || tr > 0 || traceTient === false), { tr, kp, sans, traceTient });
         }
         // La courbe des dernières heures dans une fiche (trous hachurés) : visible, dans l'écran.
         const fc = await o.page.evaluate(() => { ouvrirFiche('cvd'); const g = document.querySelector('#fichePop .chron-fiche');
