@@ -1070,13 +1070,13 @@ function ficheHtml(id) {
   if (f.usage && usageCourt) entiers.push('<h4>Comment s’en servir, en détail</h4><p class="fiche-usage">' + (typeof f.usage === 'string' ? echapF(f.usage) : echapF(f.usage.exp || f.usage.deb)) + '</p>');
   if (calcul && calculCourt && calculCourt !== calcul) entiers.push('<h4>Le calcul en détail</h4><p class="fiche-calcul">' + echapF(calcul) + '</p>');
   if (valeur) entiers.push('<p class="fiche-valeur">' + valeur + '</p>');
-  if (entiers.length) h += '<div class="fiche-entiers">' + entiers.join('') + '</div>';
   if (f.champ) {
     if (m && m.nom_trompeur) h += '<p class="fiche-alerte">Nom trompeur : ' + echapF(m.nom_trompeur) + '</p>';
-    // Les dernières heures de ce champ, publication par publication (js/chronique.js) : même
-    // HTML dans les deux modes ; absent tant qu'aucun historique n'est lu.
+    // Les dernières heures de ce champ, publication par publication (js/chronique.js), en tête du
+    // détail : la courbe se lit avant les textes entiers ; absente tant qu'aucun historique n'est lu.
     if (typeof chroniqueFiche === 'function') h += chroniqueFiche(f.champ, id);
   }
+  if (entiers.length) h += '<div class="fiche-entiers">' + entiers.join('') + '</div>';
   h += '<h4>À savoir</h4><ul class="fiche-lectures">' + f.lectures.map(l =>
     // Une lecture propre à un mode (mode : 'debutant' | 'expert') : même HTML, seule sa classe change.
     '<li' + (l.mode === 'debutant' || l.mode === 'expert' ? ' class="' + l.mode + '-seul"' : '') + '><span class="statut statut-' + echapF(l.s) + '">' + echapF(STATUTS_DEB[l.s] || STATUTS[l.s] || l.s) + '</span> ' + echapF(l.t) + '</li>').join('') + '</ul>';
@@ -1106,7 +1106,9 @@ function ouvrirFiche(id, ancre) {
   const p = document.getElementById('fichePop');
   if (!p || !FICHES[id]) return;
   p.innerHTML = ficheHtml(id);
-  // « En savoir plus » : replié (le détail, sur demande).
+  // « En savoir plus » : replié sur l'écran calme, ouvert avec « Le détail » (qui veut tout voir).
+  const plus = p.querySelector('.fiche-plus');
+  if (plus) plus.open = detailAllume();
   p.hidden = false;
   ficheOuverte = id; ficheRetour = ancre || null;
   // Bureau : près du bouton ; téléphone : en bas de l'écran (CSS).

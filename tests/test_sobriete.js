@@ -187,7 +187,8 @@ async function ouvrir(nav, theme, o = {}) {
       livePrice = P.maxP - P.range / GRILLE_N * 2;              // pile sur le 3e libellé
       prixSurGraphique();
       CanvasRenderingContext2D.prototype.fillText = f;
-      const attendu = Fmt.prix(P.maxP - P.range / GRILLE_N * 2, '$', 'fin'), libelles = vus.filter(v => /^\d[\d ]*,\d\d \$$/.test(v.t));
+      // L'axe et l'étiquette : un seul format, arrondi (« 86 013 $ »), avec ou sans « Le détail ».
+      const attendu = Fmt.prix(P.maxP - P.range / GRILLE_N * 2, '$'), libelles = vus.filter(v => /^\d[\d  ]* \$$/.test(v.t));
       livePrice = avant; prixSurGraphique();
       return { omis: !libelles.some(v => v.t === attendu && Math.abs(v.y - (P.top + P.ph / GRILLE_N * 2 + 3)) < 0.5), etiquette: libelles.some(v => v.t === attendu), n: libelles.length, dessins: window.__t.dessins - d0 };
     });

@@ -216,7 +216,7 @@ const dessinT = page => page.evaluate(() => {
   const W = canvas.width / devicePixelRatio, mainH = geo.mainH, xAxe = W - 75;
   const fil = (NOMS_PAIRES[activeSymbol] || activeSymbol) + '  ·  ' + Guide.nomIntervalle(chartInterval);
   const trace = window.__ft.filter(e => (e.c === 'chart' || e.c === 'chartCalque') && e.t !== fil && e.x >= 14 && e.x < xAxe && e.y >= 0 && e.y <= mainH - 20).map(e => e.t);
-  const pm = prixMarqueCarte(), etiq = pm === null ? null : Fmt.prix(pm, guideUnite(), debutant() ? undefined : 'fin');
+  const pm = prixMarqueCarte(), etiq = pm === null ? null : Fmt.prix(pm, guideUnite())   // l'axe : un seul format, arrondi, avec ou sans « Le détail »;
   return { sym: activeSymbol, tf: chartInterval, pm, minP: geoPrix.minP, maxP: geoPrix.maxP, trace, items: debEtat ? debEtat.items.length : null,
     etiquette: etiq, axe: etiq !== null && window.__ft.some(e => e.c === 'chartCalque' && e.t === etiq && e.x >= xAxe - 4),
     cible: cibleMarque && { prix: cibleMarque.prix, titre: cibleMarque.titre }, live: livePrice,

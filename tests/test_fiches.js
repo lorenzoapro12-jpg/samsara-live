@@ -346,7 +346,7 @@ titre('11. Les fiches disent ce que la page calcule, avec les mots de l’écran
     && lq.limites.includes('toutes les ' + T.CADENCES.attendue_min + ' min') && !/quart d’heure|vingtaine/.test(lq.limites));
   check('guide et scénarios : masquables dans « Choisir l’affichage », dans les deux modes (plus de « + Indicateurs » ni de « + Affichage »)', ['guide', 'scenarios'].every(k => /Masquable dans « Choisir l’affichage », dans les deux modes/.test(T.FICHES[k].limites)
     && !/« \+ (Affichage|Indicateurs) »/.test(T.FICHES[k].limites)));
-  check('la couche Guide en Débutant : un seul nom, du menu (LIBELLES_DEBUTANT) à la fiche et au glossaire', vm.runInContext('LIBELLES_DEBUTANT.guide', page.sandbox) === T.FICHES.guide.titreDeb);
+  check('la couche Guide : un seul nom, du menu (LIBELLES_ECRAN) à la fiche et au glossaire', vm.runInContext('LIBELLES_ECRAN.guide', page.sandbox) === T.FICHES.guide.titreDeb);
   check('« Et ensuite ? » : la marge de futur reçoit aussi les flèches des scénarios (elle ne disparaît pas avec le seul Guide)', /flèches des scénarios/.test(T.FICHES.guide_suite.limites) && !/ne sert qu’à dessiner ces chemins/.test(T.FICHES.guide_suite.limites));
   const fg = T.FICHES.guide_formes, txtF = [fg.simple, fg.simpleDeb, ...fg.lectures.map(l => l.t), T.FICHES.guide.usage.exp, T.FICHES.guide.usage.deb].join(' ');
   check('figures : « validée » (plus « confirmée »), en tirets tant qu’elles se forment, une marque par issue (✗, –, ○)', !/« confirmé »|à confirmer|confirmée|confirmations/.test(txtF) && /en tirets/.test(fg.simpleDeb) && /en tirets/.test(T.FICHES.guide.usage.exp) && /en tirets/.test(T.FICHES.guide.usage.deb)
@@ -381,9 +381,12 @@ titre('12. Chaque fiche en trois lignes d’ado : ce que c’est, comment les tr
   const vues = DEB.map(k => [k, Gd.motsBannis(visibleDeb(T.ficheHtml(k)).replace(/^\s*(Mesuré|Estimation|Règle d’usage|Horodatage|Seuil de ce code)\s*/, ''))]).filter(([, b]) => b.length);
   check('à l’ouverture en Débutant, ces fiches se lisent sans mot de la liste du Guide (le détail est replié)', !vues.length, vues);
   const rsi = T.ficheHtml('rsi');
-  check('fiche RSI : la phrase en gras, l’usage et le calcul courts pour le Débutant, les textes entiers pour l’Expert, puis « En savoir plus » qui garde tout (lectures, limites, formule)',
-    rsi.includes('<b>' + esc(ct(C.rsi.quoi)) + '</b>') && rsi.includes('<span class="debutant-seul">' + esc(ct(C.rsi.traders)) + '</span>') && rsi.includes('<span class="expert-seul">' + esc(T.FICHES.rsi.traders) + '</span>')
-    && /<details class="fiche-plus"><summary>En savoir plus<\/summary>[\s\S]*Le calcul en détail[\s\S]*À savoir[\s\S]*fiche-limites[\s\S]*fiche-technique[\s\S]*<\/details><p class="fiche-pied">/.test(rsi));
+  // Une seule fiche pour tous : les lignes courtes d'abord, les textes entiers sous « En savoir plus ».
+  const avantPlus = rsi.split('<details class="fiche-plus">')[0], plus = rsi.slice(avantPlus.length);
+  check('fiche RSI : la phrase en gras, l’usage et le calcul courts d’abord (une seule version), puis « En savoir plus » qui garde tout (textes entiers, lectures, limites, formule)',
+    avantPlus.includes('<b>' + esc(ct(C.rsi.quoi)) + '</b>') && avantPlus.includes(esc(ct(C.rsi.traders))) && !avantPlus.includes(esc(T.FICHES.rsi.traders)) && !/expert-seul|debutant-seul/.test(rsi)
+    && plus.includes(esc(T.FICHES.rsi.traders))
+    && /<details class="fiche-plus"><summary>En savoir plus<\/summary>[\s\S]*Le calcul en détail[\s\S]*À savoir[\s\S]*fiche-limites[\s\S]*fiche-technique[\s\S]*<\/details><p class="fiche-pied">/.test(rsi), { avantPlus: avantPlus.slice(0, 400) });
   const sauveP2 = JSON.stringify(T.PARAM);
   T.PARAM.rsi.periode = 21; T.PARAM.bb.periode = 30;
   check('les trois lignes suivent PARAM (RSI 21, Bollinger 30)', ct(C.rsi.calcul).includes('les 21 dernières périodes') && ct(C.bb.calcul).includes('des 30 derniers prix'));

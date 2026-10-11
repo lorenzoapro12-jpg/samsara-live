@@ -668,7 +668,7 @@ function masquerCalque(key) { if (isActive(key)) toggleAny(key); }
 // (plan, section 5.1). « Revenir au départ » : l'écran de la première visite (le Guide et les
 // scénarios, sans calque de marché, sans « Le détail » ni « Les chiffres du marché »).
 const PRESELECTIONS = [
-  { id: 'essentiel', nom: 'L’essentiel', ov: [], sg: ['vol'], site: true, dit: 'Guide, scénarios, Volume' },
+  { id: 'essentiel', nom: 'L’essentiel', ov: [], sg: [], site: true, dit: 'Le Guide et les scénarios, rien d’autre (comme « Revenir au départ »)' },
   { id: 'tendance', nom: 'La tendance', ov: ['ema20', 'ema50', 'ema200', 'ichimoku'], sg: [], dit: 'EMA 20, EMA 50, EMA 200, Ichimoku' },
   { id: 'elan', nom: 'L’élan', ov: [], sg: ['rsi', 'macd', 'stoch'], dit: 'RSI, MACD, Stochastique' },
   { id: 'volume', nom: 'Le volume', ov: ['vp', 'vwap'], sg: ['vol', 'obv'], dit: 'Volume, OBV, profil de volume, VWAP' },

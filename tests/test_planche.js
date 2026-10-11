@@ -222,7 +222,7 @@ const MESURES = () => {
     const tag = await o.page.evaluate(() => {
       const cs = getComputedStyle(document.documentElement), norm = c => { const x = document.createElement('canvas').getContext('2d'); x.fillStyle = c; return x.fillStyle; };
       window.__textes.length = 0; drawChart(); dessinerCalque();   // l'étiquette du prix vit sur le calque (chartCalque)
-      const t = window.__textes.filter(e => /^86 012,50 \$$/.test(e.t));
+      const t = window.__textes.filter(e => /^86 013 \$$/.test(e.t));   // un seul format, arrondi
       return { styles: [...new Set(t.map(e => e.s))], surUp: norm(cs.getPropertyValue('--up-sur').trim()), surDown: norm(cs.getPropertyValue('--down-sur').trim()), up: norm(cs.getPropertyValue('--up').trim()) };
     });
     check('étiquette du dernier prix écrite en --up-sur / --down-sur, jamais à la couleur de la barre',
@@ -291,7 +291,7 @@ const MESURES = () => {
         m.kpis === 8 && m.kpisMasques === 0 && m.debord <= 0 && m.canvasDansCadre && Math.abs(m.ecartCanvas) <= 1, m);
       if (w >= 1280) {
         check(`${nom} · nomenclature en 2 rangées (la légende et « Choisir l’affichage » sur la première), pied ≤ 95 px, cartouche en 5 colonnes`,
-          m.lignes === 2 && m.menuEnPremiereLigne && m.pied <= 95 && m.colonnes === 5 && m.legende.join() === 'guide,scenarios,vol', m);
+          m.lignes === 2 && m.menuEnPremiereLigne && m.pied <= 95 && m.colonnes === 5 && m.legende.join() === 'vol', m);   // les calques de marché seuls (le Guide et les scénarios sont l'écran)
         check(`${nom} · « Vue A » dans la marge basse, sous le tracé`, m.vueSousLeTrace === true, m);
         // « Tout afficher » : la légende garde la 1re rangée avec le bouton — autant de puces que la
         // place en laisse, les autres comptées dans « + N autres » ; toujours 2 rangées, pied ≤ 95 px.
@@ -301,7 +301,7 @@ const MESURES = () => {
           if (vue) { await o.page.setViewportSize(vue); await o.page.waitForTimeout(500); }
           const mt = await o.page.evaluate(MESURES);
           const lg = await o.page.evaluate(() => {
-            const on = CALQUES.filter(i => isOverlay(i.key) ? overlays[i.key] && disponible(i) : activeSubs[i.key]).length;
+            const on = CALQUES.filter(i => isOverlay(i.key) ? !COUCHES_SITE.includes(i.key) && overlays[i.key] && disponible(i) : activeSubs[i.key]).length;
             const plus = document.getElementById('lbl__plus');
             return { on, puces: document.querySelectorAll('#indicatorBar label[data-calque]').length, plus: plus ? plus.textContent : null };
           });

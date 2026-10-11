@@ -246,7 +246,7 @@ const lireEntete = page => page.evaluate(() => {
       await p.evaluate(() => document.getElementById('liveBtn').click());
       await p.waitForFunction(() => /en 24 h/.test((document.getElementById('liveModalBody') || {}).textContent || ''), null, { timeout: 10000 }).catch(() => {});
       const v = await p.evaluate(() => ({ tete: document.getElementById('var24').textContent, live: (document.getElementById('liveModalBody').textContent.match(/[+−]?\d+,\d\d % en 24 h/) || [])[0] }));
-      check(`variation 24 h : en-tête « ${v.tete} », panneau ⚡ « ${v.live} » — la même (ouverture → dernier prix)`, v.tete === '+0,36 %' && v.live === v.tete + ' en 24 h', v);
+      check(`variation 24 h : en-tête « ${v.tete} », panneau ⚡ « ${v.live} » — la même (ouverture → dernier prix)`, v.tete === '+0,36 % en 24 h' && v.live === v.tete, v);   // un seul format : la durée toujours dite
       await p.evaluate(() => { const m = document.getElementById('liveModal'); if (typeof closeLiveModal === 'function') closeLiveModal(); else m.style.display = 'none'; });
 
       // Raccourcis : rien depuis un champ ni un texte éditable, rien avec Ctrl ; la touche seule, oui.
