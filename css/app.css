@@ -1004,6 +1004,23 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 }
 .reperes-liste button[aria-current="true"] { background: var(--pill); border-radius: min(var(--r-tile), 8px); }
 .reperes-trait { flex: 0 0 3px; align-self: stretch; border-radius: 2px; background: var(--trait, var(--ink-3)); }
+/* Grand écran, avec « Le détail » : la liste en colonne à droite du graphique, toujours ouverte
+   (majReperes y range la liste ; PARAM.guide.colonne et colonneL). */
+.reperes-section.colonne { width: var(--colonne-l, 300px); display: flex; flex-direction: column; min-height: 0; }
+.reperes-section.colonne .reperes-handle { flex-shrink: 0; }
+.reperes-section.colonne .reperes-fleche { display: none; }
+.reperes-section.colonne .reperes-liste {
+  position: static; z-index: auto; flex: 1; min-height: 0; max-height: none; padding: 0 10px 8px;
+  background: none; border: 0; border-radius: 0; box-shadow: none;
+}
+.reperes-section.colonne .reperes-liste button { font-size: 12px; min-height: 34px; padding: 6px 4px; }
+/* Fenêtre moyenne : la colonne repliée en onglet vertical, comme « Infos du marché ». */
+.reperes-section.colonne.collapsed { width: 34px; }
+.reperes-section.colonne.collapsed .reperes-handle {
+  flex: 1; justify-content: center; padding: 12px 0; writing-mode: vertical-rl; text-transform: uppercase;
+  font-size: 9.5px; letter-spacing: 3px; color: var(--ink-2); cursor: pointer;
+}
+.reperes-section.colonne:not(.collapsed) .reperes-handle { cursor: pointer; }
 .strat-section {
   flex-shrink: 0; height: 28px;
   border-radius: var(--r-panel);

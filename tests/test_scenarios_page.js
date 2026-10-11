@@ -135,10 +135,11 @@ const etat = page => page.evaluate(() => {
       const tp = Sc.pointMs(e.groupe, e.point), B = e.boite, titreB = 'Scénarios du matin · ' + Fm.jour(tp) + ' ' + Fm.heure(tp);
       // L'encadré ne couvre jamais les bougies récentes, ni des bougies au milieu du tracé : sous
       // 1400 px (bougies simulées sur toute la hauteur), il tient ou il est replié en une ligne qui
-      // nomme le rang 1 si la ligne le permet, et dont l'explication dit tout ; jamais replié sur
-      // un grand écran (1440 px).
-      const repliable = vue.width < 1400;
-      check(`${nom} : encadré ${repliable ? 'complet, serré ou replié en une ligne' : 'complet ou serré (non replié)'}`, B && (repliable || !B.replie), B);
+      // nomme le rang 1 si la ligne le permet, et dont l'explication dit tout.
+      // Avec « Le détail » (option A du 11/10/2026), l'encadré est replié en une ligne à toutes les
+      // largeurs : le tableau entier est dans son explication et dans la liste « Sur le graphique ».
+      const repliable = true;
+      check(`${nom} : encadré replié en une ligne (le tableau entier dans son explication)`, B && B.replie, B);
       if (B && B.serre) {
         check(`${nom} : encadré serré : les états de tous les rangs sur une ligne (« ${mode === 'expert' ? 'En direct' : 'Suivi en direct'} : 1 · … | Sem. · … »)`,
           B.lignes.some(l => /^(Suivi en direct|En direct|Note du journal|Journal) : 1 · /.test(l)) && /Sem\. · /.test(B.lignes.join(' ')), B.lignes);

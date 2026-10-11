@@ -487,10 +487,12 @@ const PARAM = {
     // scénario du matin (voir margeFutur) ; elle se referme d'un pas de bougie par bougie
     // quittée à droite (un glissement ne fait pas sauter la largeur des bougies).
     futur: 0.18, futurMinPx: 56, futurMaxPx: 250, futurMaxFraction: 0.4,
-    // Mode Complet sur un tracé de moins de `courtes` px (téléphone) : sur le graphique, des repères
-    // courts (un prix, un nom) ; le texte entier de chaque étiquette est dans sa bulle (au toucher)
-    // et dans la liste « Sur le graphique » sous le tracé (demande du 11/10/2026).
-    courtes: 520,
+    // Avec « Le détail », à toutes les largeurs (écran unique, choix A du 11/10/2026) : sur le
+    // graphique, des repères courts (un prix, un nom) ; le texte entier de chaque étiquette est dans
+    // sa bulle (au toucher ou au survol) et dans la liste « Sur le graphique » : sous le tracé au
+    // téléphone ; ailleurs, en colonne à droite du graphique (`colonneL` px), ouverte d'elle-même
+    // quand la fenêtre a au moins `colonne` px, sinon repliée en onglet comme « Infos du marché ».
+    colonne: 1280, colonneL: 300,
     // Mode Débutant : au plus `items` textes sur le tracé (phrase, repère du haut, repère du bas,
     // scénario 1, forme, ligne des scénarios), chacun sur une ligne d'au plus N caractères ;
     // « étroit » : un tracé de moins de `etroit` px (téléphone).
@@ -4501,8 +4503,9 @@ let srBadges = [];                                // badges S/R posés dans la f
 const guideUnite = () => (activeSymbol === 'BTCSOL' ? 'SOL' : '$');
 const frN = v => v.toLocaleString('fr-FR');                     // 0.5 → « 0,5 »
 const guideMode = () => (typeof modeCourant === 'function' ? modeCourant() : 'debutant');
-/** Complet sur un tracé étroit (téléphone) : des repères courts sur le graphique (PARAM.guide.courtes). */
-const etiqCourtes = pw => !debutant() && pw < PARAM.guide.courtes;
+/** Avec « Le détail », des repères courts sur le graphique, à toutes les largeurs : le texte entier
+ *  est dans la bulle et dans la liste « Sur le graphique » (pw : gardé pour les appelants). */
+const etiqCourtes = pw => !debutant();
 
 /** Les données du Guide pour l'état courant des bougies. Indicateurs, niveaux et régime sont
  *  mémorisés avec les autres (memoized : vidé quand les bougies changent) ; les formes, rejouées
@@ -6079,11 +6082,15 @@ function guideCibleSous(x, y, mainH, etiquettesSeules) {
   }
   return c;
 }
-/** « Sur le graphique » (Complet, téléphone : etiqCourtes) : sous le tracé, le texte entier de
- *  chaque repère court posé dessus (le titre de sa bulle), du haut vers le bas ; toucher une ligne
- *  ouvre la bulle de ce repère sur le graphique. Rien n'est retiré : le graphique garde des
- *  repères courts, la liste et la bulle gardent tout. La section ne dépend que de la largeur et du
- *  mode (pas du contenu de la vue) : le tracé ne change pas de hauteur en glissant. */
+/** « Sur le graphique » (avec « Le détail » : etiqCourtes) : le texte entier de chaque repère
+ *  court posé sur le tracé (le titre de sa bulle), du haut vers le bas ; toucher une ligne ouvre la
+ *  bulle de ce repère sur le graphique. Rien n'est retiré : le graphique garde des repères courts,
+ *  la liste et la bulle gardent tout. Sous le tracé, une barre qui ouvre la liste ; sur grand écran
+ *  (PARAM.guide.colonne), une colonne à droite du graphique, toujours ouverte. La section ne dépend
+ *  que de la largeur et du détail (pas du contenu de la vue) : le tracé ne change pas de taille en
+ *  glissant. */
+const reperesEnColonne = () => document.getElementById('reperesSection').classList.contains('colonne');
+let reperesOuvertCol = null;   // la colonne ouverte ou repliée à la main (null : selon la largeur)
 let reperesCibles = [], reperesCle = '', reperesActif = null;
 function reperesPoint(c) {
   const r = (c.rects || [])[0] || (c.zones || [])[0];
@@ -6100,7 +6107,22 @@ function majReperes(W) {
     // La hauteur du tracé change : redimensionné à l'image suivante (jamais pendant ce dessin).
     requestAnimationFrame(() => { resizeCanvas(); drawChart(); });
   }
-  if (!voir) { reperesCibles = []; reperesCle = ''; if (!document.getElementById('reperesListe').hidden) ouvrirReperes(false); return; }
+  // Hors téléphone (.main-area en rangée) : une colonne à droite du graphique ; ouverte d'elle-même
+  // sur grand écran, sinon un onglet replié qui l'ouvre.
+  const ul0 = document.getElementById('reperesListe'), colonne = voir && innerWidth > 768;
+  const ouverte = colonne && (reperesOuvertCol !== null ? reperesOuvertCol : innerWidth >= PARAM.guide.colonne);
+  if (sec.classList.contains('colonne') !== colonne || (colonne && sec.classList.contains('collapsed') === ouverte)) {
+    // La liste entre dans la colonne, ou revient hors de tout verre (fermée, sous sa barre).
+    sec.classList.toggle('colonne', colonne);
+    if (colonne) { if (ul0.parentNode !== sec) sec.append(ul0); sec.style.setProperty('--colonne-l', PARAM.guide.colonneL + 'px'); }
+    else if (ul0.parentNode === sec) document.querySelector('.main-area').before(ul0);
+    ul0.hidden = !ouverte; ul0.style.width = '';
+    sec.classList.toggle('collapsed', !ouverte);
+    document.getElementById('reperesHandle').setAttribute('aria-expanded', String(ouverte));
+    reperesCle = '';   // le titre change avec la forme de la section
+    requestAnimationFrame(() => { resizeCanvas(); drawChart(); });
+  }
+  if (!voir) { reperesCibles = []; reperesCle = ''; if (!ul0.hidden) ouvrirReperes(false); return; }
   const E = guideEtat && overlays.guide ? guideEtat : null, Sc = scenEtat;
   const coul = c => c.coul || (c.niveau || c.niveaux ? COLORS.accent2 : c.figure ? c.figure.tr.encre : COLORS.ink3);
   const L = (E ? E.cibles : []).concat(Sc ? Sc.cibles : []).filter(c => c.titre && !c.evenement)
@@ -6112,7 +6134,8 @@ function majReperes(W) {
   if (cle === reperesCle) return;
   reperesCle = cle;
   const n = L.length;
-  document.getElementById('reperesTitre').textContent = n ? (n > 1 ? 'Lire les ' + n + ' repères en entier' : 'Lire le repère en entier') : 'Aucun repère dans la vue';
+  document.getElementById('reperesTitre').textContent = colonne && !ouverte ? 'Sur le graphique' : colonne ? 'Sur le graphique' + (n ? ' · ' + n + ' repère' + (n > 1 ? 's' : '') + ' en entier' : ' : aucun repère dans la vue')
+    : n ? (n > 1 ? 'Lire les ' + n + ' repères en entier' : 'Lire le repère en entier') : 'Aucun repère dans la vue';
   const ul = document.getElementById('reperesListe');
   ul.textContent = '';
   L.forEach((x, k) => {
@@ -6125,13 +6148,21 @@ function majReperes(W) {
   });
 }
 function ouvrirReperes(ouvert) {
+  if (reperesEnColonne()) return;   // la colonne : ouverte ou repliée par son onglet (toggleReperes)
   const sec = document.getElementById('reperesSection'), ul = document.getElementById('reperesListe'), h = document.getElementById('reperesHandle');
   sec.classList.toggle('collapsed', !ouvert);
   h.setAttribute('aria-expanded', String(ouvert));
   ul.hidden = !ouvert;
   if (ouvert) { ul.style.width = h.getBoundingClientRect().width + 'px'; placerMenu(ul, h, true); }
 }
-function toggleReperes() { ouvrirReperes(document.getElementById('reperesListe').hidden); }
+function toggleReperes() {
+  if (reperesEnColonne()) {
+    reperesOuvertCol = document.getElementById('reperesSection').classList.contains('collapsed');
+    majReperes(canvas.width / devicePixelRatio);
+    return;
+  }
+  ouvrirReperes(document.getElementById('reperesListe').hidden);
+}
 document.addEventListener('click', e => {
   const ul = document.getElementById('reperesListe');
   if (ul && !ul.hidden && !e.target.closest('#reperesListe, #reperesHandle')) ouvrirReperes(false);
@@ -7261,7 +7292,9 @@ function scenBoite(S, top, bas) {
   // tiers haut seulement (jamais au milieu du tracé).
   const yMoitie = top + Math.max(0, (bas - top) / 2), yTiers = top + (bas - top) / 3;
   let pose = null, forme = null;
-  for (const aDroite of [true, false]) {
+  // Avec « Le détail » (repères courts) : l'encadré se replie toujours en une ligne ; son contenu
+  // entier est dans sa bulle et dans la liste « Sur le graphique ».
+  if (!etiqCourtes(g.pw)) for (const aDroite of [true, false]) {
     for (const ev of gene) {
       for (const f of formes) if ((pose = chercher(f.w, f.h, ev === gene[0] ? yMoitie : yTiers + 8, ev, aDroite))) { forme = f; break; }
       if (pose) break;

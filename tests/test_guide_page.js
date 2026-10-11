@@ -149,7 +149,8 @@ const etat = page => page.evaluate(() => {
       // 1. Chaque bande nommée ; chaque libellé publié garde son heure, en entier.
       check(`${nom} : chaque bande visible est nommée — son libellé près d'elle, ou dans l'étiquette du bord`, vis.every(L => L.lignes || (L.sansPlace && L.auBord)), vis);
       const pub = vis.filter(L => L.lignes && L.heures.length);
-      // Téléphone en Complet (PARAM.guide.courtes, demande du 11/10/2026) : sur le tracé, un repère
+      check(`${nom} : avec « Le détail », les repères sont courts sur le tracé à cette largeur aussi`, e.courtes === true, e.courtes);
+      // Avec « Le détail », à toutes les largeurs (option A du 11/10/2026) : sur le tracé, un repère
       // court d'une ligne (la plage) ; le libellé entier, heures comprises, est le titre de sa bulle
       // (et une ligne de la liste « Sur le graphique », vérifiée plus bas).
       if (e.courtes) {
@@ -209,7 +210,7 @@ const etat = page => page.evaluate(() => {
       // il est dans la bulle (« Maintenant : … »).
       if (vue.width < 700) check(`${nom} : l'état de chaque bande est à côté de son libellé ou dans la bulle, jamais sur une ligne de plus`,
         e.niveaux.filter(L => L.etiq).every(L => L.etiq.enLigne || L.etiq.sansEtat), e.niveaux.map(L => L.etiq));
-      // La liste « Sur le graphique » : au téléphone en Complet seulement ; une ligne par repère (le
+      // La liste « Sur le graphique » : avec « Le détail », à toutes les largeurs ; une ligne par repère (le
       // titre entier de sa bulle) ; toucher une ligne ouvre la bulle de ce repère sur le graphique.
       const li = await o.page.evaluate(() => {
         const sec = document.getElementById('reperesSection'), lignes = [...document.querySelectorAll('#reperesListe button')].map(b => b.textContent);
@@ -219,14 +220,27 @@ const etat = page => page.evaluate(() => {
       if (!e.courtes) check(`${nom} : pas de liste « Sur le graphique » (les étiquettes sont entières sur le tracé)`, !li.visible, li.barre);
       else {
         check(`${nom} : la liste « Sur le graphique » est là, avec une ligne par repère du tracé (${li.lignes.length}) et le libellé entier de chaque bande`,
-          li.visible && li.lignes.length > 3 && li.titres.every(t => li.lignes.includes(t)) && pub.every(L => li.lignes.includes(L.titre)) && /^Lire les \d+ repères en entier$/.test(li.barre),
+          li.visible && li.lignes.length > 3 && li.titres.every(t => li.lignes.includes(t)) && pub.every(L => li.lignes.includes(L.titre)),
           { barre: li.barre, manquants: li.titres.filter(t => !li.lignes.includes(t)).concat(pub.map(L => L.titre).filter(t => !li.lignes.includes(t))) });
-        await o.page.click('#reperesHandle'); await o.page.waitForTimeout(200);
-        const ouverte = await o.page.evaluate(() => { const r = document.getElementById('reperesListe').getBoundingClientRect(); return r.height > 40 && r.top >= 0 && r.bottom <= innerHeight; });
-        const k = li.lignes.indexOf(pub[0] && pub[0].titre);
+        // Grand écran (> 768 px) : la liste est une colonne à droite du graphique, ouverte d'office
+        // dès PARAM.guide.colonne (1280 px), repliée en onglet en dessous ; toucher une ligne ouvre
+        // la bulle et la colonne reste ouverte. Téléphone : une barre sous le graphique, que toucher
+        // une ligne referme.
+        const enColonne = vue.width > 768;
+        if (enColonne) {
+          const col0 = await o.page.evaluate(() => ({ colonne: document.getElementById('reperesSection').classList.contains('colonne'), repliee: document.getElementById('reperesSection').classList.contains('collapsed') }));
+          check(`${nom} : la liste est une colonne à droite, ${vue.width >= 1280 ? 'ouverte d\'office' : 'repliée en onglet'}`, col0.colonne && col0.repliee === (vue.width < 1280), col0);
+          if (col0.repliee) { await o.page.click('#reperesHandle'); await o.page.waitForTimeout(300); }
+        } else { await o.page.click('#reperesHandle'); await o.page.waitForTimeout(200); }
+        const ouverte = await o.page.evaluate(() => { const r = document.getElementById('reperesListe').getBoundingClientRect(); return r.height > 40 && r.top >= 0 && r.bottom <= innerHeight + 1; });
+        const barre = await o.page.evaluate(() => document.getElementById('reperesTitre').textContent);
+        check(`${nom} : le titre de la liste ouverte compte les repères (« ${barre} »)`, enColonne ? /^Sur le graphique · \d+ repères en entier$/.test(barre) : /^Lire les \d+ repères en entier$/.test(barre), barre);
+        // La colonne ouverte rétrécit le graphique : la liste est relue (les repères de la vue).
+        const lignes2 = await o.page.evaluate(() => [...document.querySelectorAll('#reperesListe button')].map(b => b.textContent));
+        const k = lignes2.indexOf((pub.find(L => lignes2.includes(L.titre)) || {}).titre);
         await o.page.click(`#reperesListe li:nth-child(${k + 1}) button`); await o.page.waitForTimeout(200);
         const vu = await o.page.evaluate(() => ({ survol: guideEtat.survol ? guideEtat.survol.titre : null, fermee: document.getElementById('reperesListe').hidden }));
-        check(`${nom} : la liste s'ouvre dans l'écran ; toucher une ligne la ferme et ouvre la bulle de ce repère`, ouverte && k >= 0 && vu.fermee && vu.survol === li.lignes[k], { ouverte, k, vu });
+        check(`${nom} : la liste s'ouvre dans l'écran ; toucher une ligne ouvre la bulle de ce repère ${enColonne ? '(la colonne reste ouverte)' : 'et ferme la liste'}`, ouverte && k >= 0 && vu.fermee === !enColonne && vu.survol === lignes2[k], { ouverte, k, vu, ligne: lignes2[k] });
       }
       check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
