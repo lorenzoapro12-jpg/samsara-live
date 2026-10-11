@@ -995,7 +995,7 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
   position: fixed; z-index: 999; box-sizing: border-box; list-style: none; margin: 0; padding: 4px 8px;
   max-height: 60vh; overflow-y: auto;
   background: var(--card-solid); color: var(--ink-1);
-  border: 1px solid var(--hairline); border-radius: 18px; box-shadow: var(--card-shadow);
+  border: 1px solid var(--hairline); border-radius: min(var(--r-card), 18px); box-shadow: var(--card-shadow);
 }
 .reperes-liste[hidden] { display: none; }
 .reperes-liste li:first-child button { border-top: 0; }
@@ -1004,7 +1004,7 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
   font: 500 13px/1.35 var(--font); color: var(--ink-1); background: none; border: 0;
   border-top: 1px solid var(--hairline); cursor: pointer;
 }
-.reperes-liste button[aria-current="true"] { background: var(--pill); border-radius: 8px; }
+.reperes-liste button[aria-current="true"] { background: var(--pill); border-radius: min(var(--r-tile), 8px); }
 .reperes-trait { flex: 0 0 3px; align-self: stretch; border-radius: 2px; background: var(--trait, var(--ink-3)); }
 .strat-section {
   flex-shrink: 0; height: 28px;
@@ -1100,7 +1100,9 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
    placé avant elles, il était neutralisé par la cascade. */
 @media (max-width: 800px) {
   :root { --gutter: 7px; --gap: 6px; }
-  .chart-container { --graphe-marge: 11px; border-radius: 20px; }
+  /* Coins plafonnés à 20 px, jamais plus ronds que le thème : Bureau 95, Cyanotype, Diazo, Gazette
+     (--r-panel: 0) gardent leurs fenêtres carrées au téléphone (demande du 11/10/2026). */
+  .chart-container { --graphe-marge: 11px; border-radius: min(var(--r-panel), 20px); }
   .header { padding: 6px 9px; gap: 6px; }
   /* L'orbe est DÉCORATIF, le badge porte de la donnée : c'est l'orbe qui cède. */
   .header-orb { display: none; }

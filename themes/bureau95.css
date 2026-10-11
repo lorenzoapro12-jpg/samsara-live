@@ -369,6 +369,13 @@
 
 /* ── Grid Bot : une fenêtre dont la barre de titre est la poignée (marine, ouverte) ── */
 [data-theme="bureau95"] .strat-section { transition: none; }
+/* La barre « Lire les N repères en entier » et sa liste (Complet, téléphone) : un bouton en relief
+   et un menu carré, comme le Grid Bot et le menu Affichage. */
+[data-theme="bureau95"] .reperes-handle { font-weight: 700; }
+[data-theme="bureau95"] .reperes-liste { padding: 3px; border: 0; border-radius: 0; background: var(--surface); box-shadow: var(--releve); }
+[data-theme="bureau95"] .reperes-liste button { border-top-color: var(--relief-3, var(--hairline)); }
+[data-theme="bureau95"] .reperes-liste button[aria-current="true"] { border-radius: 0; background: var(--champ); }
+[data-theme="bureau95"] .reperes-trait { border-radius: 0; }
 [data-theme="bureau95"] .strat-handle {
   height: 28px; padding: 0 3px 0 6px; border: 3px solid transparent; letter-spacing: 0;
   color: var(--titre-ink); background: var(--titre-inactif) padding-box;
