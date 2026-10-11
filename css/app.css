@@ -609,6 +609,12 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
    feuilles Cyanotype et Diazo écrivent « UTC » en dur après elle : le fuseau de l'appareil, posé
    par js/structures.js dans data-fuseau, le remplace (sélecteur plus précis que celui du thème). */
 html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { content: attr(data-fuseau); }
+/* Planche : la case « Ind. de révision » tient dans sa colonne, même quand la date de révision
+   s'allonge (publication d'un autre jour : « 10/10 23:18 » au lieu de « 23:18 ») et resserre les
+   colonnes. Son titre débordait de 7 px à 1024 px : le cartouche débordait, et ajusterKpis
+   masquait le VIX pour lui faire place. Titre resserré, et rien ne déborde de la case. */
+:root[data-structure="planche"] .plan-cartouche .kpi-age { padding-left: 5px; padding-right: 5px; min-width: 0; overflow: hidden; }
+:root[data-structure="planche"] .plan-cartouche .kpi-age::before { letter-spacing: 0.06em; }
 @media (min-width: 1280px) {
   :root[data-structure="planche"] .plan-pied .indicator-bar label { padding-left: 3px; padding-right: 3px; }
   :root[data-structure="planche"] .plan-pied .indicator-bar label[style*="--dot"] .ind-label::before { margin-right: 4px; }

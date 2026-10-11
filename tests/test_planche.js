@@ -91,7 +91,7 @@ const serveur = http.createServer((req, res) => {
   fs.createReadStream(f).pipe(res);
 });
 
-async function ouvrir(nav, theme, vue, retardPublication) {
+async function ouvrir(nav, theme, vue, retardPublication, ageMin) {
   const ctx = await nav.newContext({ viewport: vue, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
   const erreurs = [];
@@ -103,7 +103,12 @@ async function ouvrir(nav, theme, vue, retardPublication) {
     if (estPrevisions(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: previsionsFixture() });
     if (h === 'raw.githubusercontent.com') {
       if (retardPublication && !u.includes('heatmap')) await new Promise(ok => setTimeout(ok, retardPublication));
-      return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, u.includes('heatmap') ? 'heatmap.json' : 'market-data.json')) });
+      // ageMin : la publication servie a cet âge (son heure « updated » réécrite), pour ne pas dépendre
+      // de l'âge du fichier du dépôt.
+      const corps = fs.readFileSync(path.join(REPO, u.includes('heatmap') ? 'heatmap.json' : 'market-data.json'));
+      if (ageMin === undefined || u.includes('heatmap')) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: corps });
+      const d = JSON.parse(corps); d.updated = new Date(Date.now() - ageMin * 60000).toISOString().replace(/\.\d+Z$/, '+00:00');
+      return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(d) });
     }
     return r.abort();
   });
@@ -310,6 +315,26 @@ const MESURES = () => {
         check(`${nom} · ni cadre ni repères ; cartouche et heure visibles ; intervalle en tête du ruban`, m.cadre === 'none' && m.cartoucheVisible && m.majVisible && m.intervalleEnTete, m);
         check(`${nom} · aucun bouton de l'en-tête ne recouvre le prix`, !m.prixRecouvert.length, m.prixRecouvert);
       }
+      check(`${nom} · aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
+    // ─── 3 bis. Publication d'un autre jour ───
+    // La date de révision s'allonge (« 10/10 23:18 » au lieu de « 23:18 ») et resserre les colonnes du
+    // cartouche : à 1024 px, le titre « Ind. de révision » débordait alors de sa case, et le VIX était
+    // masqué pour lui faire place. Publication servie à 26 h (toujours un autre jour) et à 5 min.
+    titre('3 bis. Publication d’un autre jour : la date s’allonge, aucun chiffre clé masqué');
+    for (const [th, w, h, age] of [['cyanotype', 1024, 768, 26 * 60], ['diazo', 1024, 768, 26 * 60], ['cyanotype', 1280, 720, 26 * 60], ['cyanotype', 800, 900, 26 * 60], ['cyanotype', 1024, 768, 5]]) {
+      o = await ouvrir(nav, th, { width: w, height: h }, 0, age);
+      const m = await o.page.evaluate(MESURES);
+      const c = await o.page.evaluate(() => {
+        const a = document.querySelector('#cycle .kpi-age'), u = document.getElementById('updated');
+        return { maj: u.textContent.trim(), ageDeborde: a ? a.scrollWidth - a.clientWidth : null, titre: a ? getComputedStyle(a, '::before').content : null };
+      });
+      const nom = `${th.padEnd(9)} ${w} × ${h}, publication ${age >= 60 ? 'd’un autre jour' : 'de 5 min'}`;
+      check(`${nom} · ${age >= 60 ? 'la date de révision porte le jour' : 'la date de révision est l’heure seule'} (« ${c.maj} »)`, age >= 60 ? /\d\d\/\d\d/.test(c.maj) : !/\//.test(c.maj) && /\d\d:\d\d/.test(c.maj), c);
+      check(`${nom} · 8 chiffres clés, aucun masqué ; « Ind. de révision » entier dans sa case ; pas de défilement horizontal`,
+        m.kpis === 8 && m.kpisMasques === 0 && c.ageDeborde !== null && c.ageDeborde <= 0 && /révision/.test(c.titre) && m.debord <= 0, { m, c });
       check(`${nom} · aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
