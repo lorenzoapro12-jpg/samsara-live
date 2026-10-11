@@ -2692,6 +2692,83 @@ const Guide = (function () {
       .concat(C.length ? [C[0]] : [], b ? [bilanDebutant(f, b, ctx, P)] : [], [RISQUE + ' Un exemple du passé, pas une prévision ni un conseil.']);
     return { titre, texte: texte.filter(Boolean), resume: [ensuite, C] };
   }
+  // ── Les statistiques d'une figure (demande du 11/10/2026) : la cible et le taux de réussite
+  // ensemble, en une ligne au bas de la bulle (resumeStatsFigure, qui ouvre le détail), puis le
+  // détail mesuré (statsFigure) : tout est relu dans le rejeu déjà fait (res.formes, bilan), rien
+  // n'est recalculé ni inventé. La cible est la règle des analystes (une convention) ; la mesure,
+  // c'est combien de fois elle a été atteinte sur ce graphique.
+  /** Comment la cible se calcule, en mots, par famille (générique). */
+  function commentCible(f) {
+    const fam = famille(f), bas = f.sens < 0;
+    if (fam === 'extremes') return 'la hauteur de la figure (des ' + (bas ? 'sommets au creux' : 'creux au sommet') + ' qui les sépare) est reportée à partir de ' + (bas ? 'ce creux, vers le bas.' : 'ce sommet, vers le haut.');
+    if (fam === 'ete') return 'la hauteur de la tête jusqu’à la ligne qui joint les deux ' + (bas ? 'creux' : 'sommets') + ' est reportée à partir de cette ligne, ' + (bas ? 'vers le bas.' : 'vers le haut.');
+    if (fam === 'drapeau') return 'la longueur du mât (le mouvement rapide d’avant la pause) est reportée à partir du point où le prix sort de la pause.';
+    return 'la largeur de la figure à son début est reportée à partir du point où le prix en sort, du côté de la sortie.';
+  }
+  /** Le taux de réussite d'un type, en mots : « atteinte 3 fois sur 8 » (validées et terminées). */
+  const tauxCible = b => { const n = b ? b.atteints + b.invalides + b.expires : 0; return !b ? '' : n ? 'atteinte ' + b.atteints + ' fois sur ' + n : 'aucun cas terminé'; };
+  /** Les cibles d'une figure en prix arrondis : [{ s, p }] (en cours : celles du moment ; finie et
+   *  validée : la sienne ; tombée avant sa validation ou annulée : aucune). */
+  function ciblesFigure(f, ctx, P) {
+    if (f.fin) return fini(f.objectif) && fini(f.jConf) ? [{ s: f.sens, p: f.objectif }] : [];
+    const j = ctx && fini(ctx.j) ? ctx.j : (ctx && ctx.n) || 0;
+    return niveauxFigure(f, j, P).objectifs.filter(o => fini(o.p));
+  }
+  /** La ligne courte au bas de la bulle d'une figure (les deux modes) : sa cible et le taux mesuré
+   *  de son type, ensemble ; elle ouvre le détail (statsFigure). */
+  function resumeStatsFigure(f, b, ctx, P, unite) {
+    const O = ciblesFigure(f, ctx, P), t = tauxCible(b), pr = o => prixRond(o.p, unite);
+    if (!O.length) return 'Statistiques' + (t ? ' : cible ' + t : '') + ' ▸';
+    const ici = t ? ' · sur ce graphique : ' + t.replace(/^atteinte /, '') : '';
+    if (f.fin === 'atteint') return 'Cible ' + pr(O[0]) + ' atteinte' + ici + ' ▸';
+    if (f.fin) return 'Cible ' + pr(O[0]) + ' pas atteinte' + ici + ' ▸';
+    const c = O.length > 1 ? 'Cible ' + O.map(o => pr(o) + ' ' + enHautBas(o.s)).join(' ou ') : 'Cible ' + pr(O[0]);
+    return c + (t ? ' · ' + t : '') + ' ▸';
+  }
+  /** Le détail des statistiques d'une figure : sa cible et comment elle se calcule, puis ce qui a été
+   *  mesuré sur l'historique chargé pour son type. res : le rejeu (detecter, avec bilan) ; ctx : voir
+   *  plus haut. → { titre, cibles: [{ s, p, texte }], cibleEtat, comment, taux: { atteints, invalides,
+   *  expires, finis, ouverts }, phrase, temoin: { atteints, departs, phrase } | null, delai, lignes,
+   *  dernieres: [{ quand, marque, issue }], source, faible, risque }. */
+  function statsFigure(f, res, ctx, P, unite) {
+    const b = res && res.bilan ? res.bilan[f.type] : null, fam = famille(f), per = periode(ctx && ctx.intervalle), O = ciblesFigure(f, ctx, P);
+    const nomL = NOM_LONG_DEBUTANT[f.type] || NOMS_FORMES[f.type][0], noms = NOMS_FORMES[f.type];
+    const S = { titre: nomL + ' : statistiques', type: f.type, cibles: O.map(o => ({ s: o.s, p: o.p, texte: prix(o.p, unite) + (O.length > 1 ? ' si le prix sort ' + (o.s > 0 ? 'par le haut' : 'par le bas') : '') })),
+      cibleEtat: f.fin === 'atteint' ? 'Atteinte.' : f.fin && O.length ? 'Pas atteinte : la figure est finie.' : !O.length ? 'Pas de cible : la figure est tombée avant d’être validée.' : f.phase === 'confirme' ? 'La figure est validée : la cible compte à partir de maintenant.' : 'Elle ne compte que si la figure est validée.',
+      comment: 'Comment elle se calcule : ' + commentCible(f) + ' C’est l’usage des analystes, pas une mesure du site, et rien ne la garantit.',
+      taux: null, phrase: '', temoin: null, delai: null, lignes: [], dernieres: [], faible: false,
+      source: 'Mesuré par le site sur ' + (dernieres(ctx && ctx.duree) ? 'les ' + dernieres(ctx.duree) : 'l’historique') + ' de ce graphique (' + nomIntervalle(ctx && ctx.intervalle) + '), sans regarder l’avenir : à chaque instant, seul le passé est connu.',
+      risque: RISQUE + ' Des comptes du passé, pas une prévision ni un conseil.' };
+    if (!b) return S;
+    const finis = b.atteints + b.invalides + b.expires, T = b.temoin || { departs: 0, atteints: 0 }, E = b.ebauches || { n: 0, devenues: 0, confirmees: 0 };
+    S.taux = { atteints: b.atteints, invalides: b.invalides, expires: b.expires, finis, ouverts: b.ouverts };
+    const valides = fam === 'lignes' || fam === 'drapeau' ? 'sorties validées' : 'figures validées';
+    S.phrase = finis ? 'Après leur validation, la cible a été atteinte ' + b.atteints + ' fois sur ' + finis + '.' : 'Aucune figure de ce type n’est encore allée au bout sur ce graphique.';
+    S.faible = b.confirmes < P.echantillonFaible;
+    if (T.departs > 0) S.temoin = { atteints: T.atteints, departs: T.departs, phrase: 'Pour comparer, un trajet de même taille pris à n’importe quel moment : ' + nombre(T.atteints, 0) + ' fois sur ' + nombre(T.departs, 0) + '.' + (b.ecart && b.ecart !== 'peu' ? ' ' + texteEcart(b) : '') };
+    // Le temps habituel jusqu'à la cible : celui du milieu des cas atteints (la moitié plus vite).
+    const atteintes = (res.formes || []).filter(g => g.type === f.type && !g.doublon && g.fin === 'atteint' && fini(g.jConf));
+    const D = atteintes.map(g => delaiIssue(g, ctx)).filter(fini).sort((x, y) => x - y);
+    const dm = D.length ? dureeMots(D[Math.floor((D.length - 1) / 2)]) : null;
+    if (dm) S.delai = 'Quand elle a été atteinte, c’était ' + (D.length > 1 ? 'en général ' : '') + dm + ' après la validation' + (D.length > 1 ? ' (la moitié des fois plus vite)' : '') + '.';
+    const L = S.lignes, ex = x => x > 1 ? 's' : '';
+    L.push([fam === 'lignes' ? 'Figures repérées' : 'Repérées', b.formes + (b.devenusTriples ? ' (dont ' + b.devenusTriples + ' devenu' + ex(b.devenusTriples) + ' triple' + ex(b.devenusTriples) + ')' : '')]);
+    L.push([majuscule(valides), String(b.confirmes)]);
+    const avant = b.invalidesAvant + b.expiresAvant;
+    if (avant) L.push(['Tombées avant leur validation', String(avant)]);
+    L.push(['Cible atteinte', String(b.atteints)], ['Annulées avant la cible', String(b.invalides)], ['Ni l’une ni l’autre à temps (' + P.horizon + ' ' + per[3] + ')', String(b.expires)]);
+    if (b.ouverts) L.push(['Encore en cours', String(b.ouverts)]);
+    if (fam === 'lignes' && b.haut + b.bas) L.push(['Sorties par le haut / par le bas', b.haut + ' / ' + b.bas]);
+    if (E.n) L.push(['Débuts repérés → devenus ' + minuscule(noms[1]), E.n + ' → ' + E.devenues + (fam === 'lignes' ? '' : ' (validés : ' + E.confirmees + ')')]);
+    // Les dernières figures de ce type validées et terminées, chacune avec son issue (les échecs aussi).
+    const vues = (res.formes || []).filter(g => g.type === f.type && !g.doublon && passeeValidee(g)).sort((x, y) => y.jFin - x.jFin).slice(0, 6);
+    S.dernieres = vues.map(g => {
+      const ms = finMs(ctx, g.jConf), d = dureeMots(delaiIssue(g, ctx));
+      return { quand: fini(ms) ? (ctx && ctx.pas >= 86400 ? dateVue(ms) : dateVue(ms) + ' ' + heureVue(ms)) : '—', marque: marqueIssue(g),
+        issue: ({ atteint: 'cible atteinte', invalide: 'annulée avant la cible', expire: 'délai écoulé' })[g.fin] + (d ? ', ' + d + ' après' : '') };
+    });
+    return S;
+  }
   /** Les mots qui n'ont pas leur place sur l'écran Débutant (noms d'indicateurs, jargon, heures UTC,
    *  intervalles abrégés). UNE liste pour tout le site : le terminal, js/scenarios.js et la carte
    *  (tests/mots_debutant.js la relit). Bornes : `\b` ne voit pas de frontière après une lettre
@@ -2722,6 +2799,6 @@ const Guide = (function () {
     texteSuiteDebutant, prixRond, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
     MARQUES_FIN, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, libelleFormeCourt, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant,
-    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE };
+    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, resumeStatsFigure, statsFigure, ciblesFigure };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;

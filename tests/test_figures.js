@@ -437,6 +437,43 @@ titre('4 ter. Rejeu repris (une bougie de plus) = rejeu complet ; repli si l’h
   check(`reprise la plus lente sur 600 clôtures : ${max.toFixed(1)} ms (≤ 60 ms)`, max <= 60, max);
 }
 
+// ── 8 bis. Cible et statistiques d'une figure (demande du 11/10/2026) ──
+titre('8 bis. Cible et statistiques : la ligne courte de la bulle et le détail');
+{
+  const ctx = ctxDe(NN), b = R.bilan;
+  const finis = x => x.atteints + x.invalides + x.expires;
+  const enCours = R.formes.filter(f => !f.doublon && !f.fin && f.phase === 'confirme');
+  const deux = R.formes.filter(f => !f.doublon && !f.fin && f.phase !== 'confirme' && fam(f) === 'lignes');
+  const atteinte = R.formes.find(f => !f.doublon && f.fin === 'atteint'), tombee = R.formes.find(f => !f.doublon && f.fin === 'invalide_avant');
+  const ex = [].concat(enCours.slice(0, 3), deux.slice(0, 2), atteinte ? [atteinte] : [], tombee ? [tombee] : []);
+  check(`des figures de chaque sorte trouvées (${ex.length})`, atteinte && tombee && ex.length >= 3, ex.length);
+  for (const f of ex) {
+    const l = G.resumeStatsFigure(f, b[f.type], ctx, P, '$'), O = G.ciblesFigure(f, ctx, P), x = b[f.type];
+    // La cible dite est celle de la machine (niveauxFigure, ou l'objectif de la figure finie), arrondie au dollar.
+    const prixOk = O.every(o => l.includes(G.prixRond(o.p, '$')));
+    const tauxOk = finis(x) ? l.includes(x.atteints + ' fois sur ' + finis(x)) : /aucun cas terminé/.test(l);
+    check(`${f.type} (${f.fin || f.phase}) : « ${l} » — cible${O.length > 1 ? 's' : ''} de la machine et taux mesuré, ▸ au bout, sans « % » ni mot banni`,
+      prixOk && tauxOk && / ▸$/.test(l) && (O.length ? /^Cible /.test(l) : /^Statistiques/.test(l)) && !/%/.test(l) && !G.motsBannis(l).length, { l, O });
+    const St = G.statsFigure(f, R, ctx, P, '$'), txt = JSON.stringify(St);
+    const dern = R.formes.filter(g => g.type === f.type && !g.doublon && g.fin && ['atteint', 'invalide', 'expire'].includes(g.fin) && g.jConf !== null);
+    check(`… détail : mêmes cibles, comptes du bilan (${St.taux && St.taux.atteints}/${St.taux && St.taux.finis}), ${St.dernieres.length} dernières (≤ 6, des plus récentes), sans mot banni ni conseil`,
+      St.cibles.length === O.length && St.cibles.every((c, k) => c.p === O[k].p) && St.taux.atteints === x.atteints && St.taux.finis === finis(x) && St.taux.invalides === x.invalides
+      && St.dernieres.length === Math.min(6, dern.length) && St.faible === (x.confirmes < P.echantillonFaible)
+      && /usage des analystes/.test(St.comment) && /rien ne la garantit/.test(St.comment) && St.risque.startsWith(G.RISQUE)
+      && !G.motsBannis(txt).length && !CONSEIL.test(txt) && !/%/.test(txt), { St, bannis: G.motsBannis(txt) });
+    const lig = Object.fromEntries(St.lignes);
+    check(`… le détail reprend le bilan : repérées, validées, tombées avant, atteintes, annulées, délai écoulé`,
+      +String(lig['Repérées'] || lig['Figures repérées']).split(' ')[0] === x.formes && +(lig['Figures validées'] || lig['Sorties validées']) === x.confirmes
+      && +(lig['Tombées avant leur validation'] || 0) === x.invalidesAvant + x.expiresAvant && +lig['Cible atteinte'] === x.atteints && +lig['Annulées avant la cible'] === x.invalides
+      && +Object.entries(lig).find(([k]) => /^Ni l’une ni l’autre/.test(k))[1] === x.expires, { lig, x });
+  }
+  // Une figure tombée avant sa validation n'a plus de cible : la ligne ne promet pas de prix.
+  if (tombee) check('une figure tombée avant sa validation : « Statistiques : … », aucun prix', /^Statistiques/.test(G.resumeStatsFigure(tombee, b[tombee.type], ctx, P, '$')) && !G.statsFigure(tombee, R, ctx, P, '$').cibles.length, null);
+  // Le témoin, quand il existe, est celui du bilan.
+  const avecT = ex.find(f => b[f.type].temoin && b[f.type].temoin.departs > 0);
+  if (avecT) { const St = G.statsFigure(avecT, R, ctx, P, '$'); check('le repère « trajet de même taille » est celui du bilan', St.temoin && St.temoin.departs === b[avecT.type].temoin.departs && St.temoin.atteints === b[avecT.type].temoin.atteints, St.temoin); }
+}
+
 // ── 9. Temps ──
 titre('9. Temps');
 {
