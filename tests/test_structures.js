@@ -65,8 +65,11 @@ async function agesDuCalque(page) {
     // Au téléphone, l'âge de la couche prend sa forme courte pour laisser le compteur entier
     // (test_interface, partie 5) : l'âge de la publication y reste toujours.
     const plein = /^Ordres en attente \(carte\) · dernière colonne .+ · publiée .+/, court = /^(Ordres en attente \(carte\) · publiée|Carte publiée) (il y a .+|< 5 s)$/;
-    return { couche: vus.some(t => plein.test(t) || (innerWidth < PARAM.guide.debutant.etroit && court.test(t))), repere: vus.some(t => /^fichier (\d\d\/\d\d )?\d\d:\d\d · prix publié \d[\d ]*,\d\d \$ \((il y a .+|< 5 s)\)$/.test(t)
-      // Téléphone en Complet (repères courts, PARAM.guide.courtes) : l'heure et l'âge ; le prix est le point du trait.
+    // La colonne « Sur le graphique » ouverte (grand écran, avec « Le détail ») prend 300 px au tracé :
+    // la forme courte, qui garde l'âge de la publication, y est la forme qui tient.
+    const sec = document.getElementById('reperesSection'), colonne = sec.classList.contains('colonne') && !sec.classList.contains('collapsed');
+    return { couche: vus.some(t => plein.test(t) || ((innerWidth < PARAM.guide.debutant.etroit || colonne) && court.test(t))), repere: vus.some(t => /^fichier (\d\d\/\d\d )?\d\d:\d\d · prix publié \d[\d ]*,\d\d \$ \((il y a .+|< 5 s)\)$/.test(t)
+      // Tracé de moins de 520 px avec « Le détail » : l'heure et l'âge ; le prix est le point du trait.
       || (etiqCourtes(canvas.width / devicePixelRatio - 16 - 75) && /^fichier (\d\d\/\d\d )?\d\d:\d\d \((il y a .+|< 5 s)\)$/.test(t))), vus };
   });
 }
@@ -176,10 +179,12 @@ async function visibles(page) {
   }, CIBLES);
 }
 
+// Les contenus vivants (fil, liste « Sur le graphique », modales…) ne sont pas du squelette : leur
+// nombre de lignes suit les données et la vue.
 async function squelette(page) {
   return page.evaluate(() => {
     const sig = el => el.tagName + (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).filter(c => !/^(on|open|active|collapsed|entree|deborde|ping|calme|vieux|price-up|price-down|pos|neg)$/.test(c)).sort().join('.') : '');
-    const parcours = (el, d) => d > 4 ? [] : [sig(el)].concat(...[...el.children].filter(c => !['SCRIPT', 'svg'].includes(c.tagName) && !c.closest('#feed,#marketModalBody,#liveModalBody,#indMenu,#themeMenu,#stratStats,#stratParams,#stratHelp,#cycle,#fichePop'))
+    const parcours = (el, d) => d > 4 ? [] : [sig(el)].concat(...[...el.children].filter(c => !['SCRIPT', 'svg'].includes(c.tagName) && !c.closest('#feed,#reperesListe,#marketModalBody,#liveModalBody,#indMenu,#themeMenu,#stratStats,#stratParams,#stratHelp,#cycle,#fichePop'))
       .map(c => parcours(c, d + 1).map(s => '  '.repeat(d + 1) + s)));
     return parcours(document.body, 0).join('\n');
   });

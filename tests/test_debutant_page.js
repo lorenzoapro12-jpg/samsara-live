@@ -184,8 +184,8 @@ const dessin = page => page.evaluate(() => {
     gd: guideEtat && guideEtat.debutant ? guideEtat.debutant.items.length : null,
     chemins: guideEtat ? guideEtat.chemins || null : 'sans guide',
     cibles: (guideEtat ? guideEtat.cibles : []).map(c => ({ prio: c.prio, titre: c.titre })),
-    scen: scenEtat ? { libelles: scenEtat.libelles, cibles: scenEtat.cibles.map(c => ({ prio: c.prio, titre: c.titre, scenario: c.scenario || null })),
-      boite: scenEtat.boite ? { deb: !!scenEtat.boite.deb, cede: !!scenEtat.boite.cede, texte: scenEtat.boite.texte || null, lignes: scenEtat.boite.lignes.map(l => l.t) } : null,
+    scen: scenEtat ? { libelles: scenEtat.libelles, cibles: scenEtat.cibles.map(c => ({ prio: c.prio, titre: c.titre, scenario: c.scenario || null, texte: [].concat(c.texte || []) })),
+      boite: scenEtat.boite ? { deb: !!scenEtat.boite.deb, cede: !!scenEtat.boite.cede, replie: !!scenEtat.boite.replie, texte: scenEtat.boite.texte || null, lignes: scenEtat.boite.lignes.map(l => l.t) } : null,
       items: scenEtat.items.map(i => ({ rang: i.sc.rang, cle: i.et.cle })), montre: scenEtat.montre ? scenEtat.montre.sc.rang : null } : null,
     sous: geo.sous.map(s => s.cle),
     valeurs: D ? { choix: { dessus: D.choix.dessus.map(n => n.p), dessous: D.choix.dessous.map(n => n.p) }, regime: D.regime ? D.regime.cle : null } : null,
@@ -799,9 +799,12 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       check('« Le détail » coché : data-mode="expert", gardé (« expert »), la case reste cochée ; « Les chiffres du marché » ni cochés ni écrits',
         x.mode === 'expert' && r1.mode === 'expert' && r1.detail === true && r1.chiffres === false && r1.attrChiffres === '0' && r1.stocke === 'expert' && r1.stockeCh === null, r1);
       check('Le détail : le badge du régime, « Et ensuite ? » (2 boîtes ou une commune), le compteur', x.cibles.some(c => /^Tendance|^Sans tendance|^Régime/.test(c.titre || '')) && x.chemins && x.chemins.boites.length >= 1 && x.trace.some(t => /^\d[\d ]*\/\d[\d ]* · /.test(t)), { cibles: x.cibles.map(c => c.titre), chemins: x.chemins, trace: x.trace.slice(0, 8) });
-      check('Le détail : au moins 3 bandes nommées, l\'encadré des scénarios de plusieurs lignes (« Scénarios du matin · »), les libellés des rangs 2 et 3 ou leurs lignes',
-        x.cibles.filter(c => c.prio === 1).length >= 2 && x.scen && x.scen.boite && !x.scen.boite.deb && x.scen.boite.lignes.length > 1 && /^Scénarios du matin · /.test(x.scen.boite.lignes[0])
-        && (x.scen.libelles.some(l => l.rang === '2') || x.scen.boite.lignes.some(l => /^2\b|2\./.test(l)) || x.scen.boite.lignes.some(l => /\| 2/.test(l)) || x.scen.boite.lignes.length >= 3), x.scen);
+      // Option A (11/10/2026) : avec « Le détail », l'encadré des scénarios est replié en une ligne ;
+      // son explication (« Scénarios du matin · … ») porte une ligne par rang.
+      const explB = x.scen && (x.scen.cibles.find(c => /^Scénarios du matin · /.test(c.titre || '') && c.texte.length) || {}).texte || [];
+      check('Le détail : au moins 3 bandes nommées, l\'encadré des scénarios replié en une ligne, son explication « Scénarios du matin · » avec les rangs 1, 2 et 3',
+        x.cibles.filter(c => c.prio === 1).length >= 2 && x.scen && x.scen.boite && !x.scen.boite.deb && x.scen.boite.replie && x.scen.boite.lignes.length === 1
+        && ['1. ', '2. ', '3. '].every(m => explB.some(l => l.startsWith(m))), { scen: x.scen && x.scen.boite, explB });
       check('Le détail : le repère de publication est dessiné', x.tous.some(t => /^fichier .* · prix publié /.test(t)), x.tous.filter(t => /fichier/.test(t)));
       check('Le détail seul : ni chiffres clés, ni Grid Bot, ni bouton ⚡ (ils suivent « Les chiffres du marché ») ; aucun calque de marché ajouté (ni puce, ni sous-graphe)',
         exp.kpisDom === 8 && exp.kpis === 0 && !exp.strat && !exp.liveBtn && !exp.puces.length && !x.sous.length, { exp, sous: x.sous });

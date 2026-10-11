@@ -202,7 +202,11 @@ async function bulle(o, tactile) {
       const x = await ouvrir(nav, { iC: ebX ? ebX.iC : seq.iE, mode: 'expert', w: 1440, h: 900 });
       const ex = await lireEtat(x.page);
       const fe = ex.figures.find(f => f.ebauche);
-      check('Expert : le libellé dit « ébauche » et les comptes mesurés (« mesuré … valid. », ou « mesuré … rep. » pour une figure à deux droites), ≤ 80 caractères', fe && fe.lignes && /ébauche/.test(fe.lignes.join(' ')) && /mesuré \d+(\/\d+ valid\.| rep\.)/.test(fe.lignes.join(' ')) && fe.lignes.join(' ').length <= 80, ex.figures);
+      // Avec « Le détail » (option A du 11/10/2026) : sur le tracé, le repère court d'une ligne ; le
+      // libellé entier (« ébauche », comptes mesurés) est dans la bulle de la figure et dans la liste.
+      const bulleE = await x.page.evaluate(() => { const c = guideEtat.cibles.find(q => q.figure && q.figure.f.ebauche); return c ? [c.titre].concat(c.texte || []).join(' ') : null; });
+      check('Expert : repère court d\'une ligne sur le tracé (le nom de la figure, ≤ 24 caractères)', fe && fe.lignes && fe.lignes.length === 1 && fe.lignes[0].length <= 24, ex.figures);
+      check('Expert : la bulle dit « ébauche » et les comptes mesurés (« Mesuré · hist. … : N repérés · M valid. », ou « N repérées » pour une figure à deux droites)', bulleE && /ébauche/.test(bulleE) && /Mesuré · hist\. [^:]*: \d+ repéré(e)?s.*( · \d+ valid\.| · sorties)/.test(bulleE), bulleE);
       await x.ctx.close();
     }
 

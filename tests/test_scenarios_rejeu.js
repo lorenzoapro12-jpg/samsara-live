@@ -97,7 +97,10 @@ const ligne = page => page.evaluate(() => {
         const lib = suite.filter(s => !(s.libelles.length === 1 && s.libelles[0].rang === '1'));
         check(`${mode} ${vue.width} : un seul libellé, celui du montré (le 1), qui ne change pas avec le nom`, !lib.length, lib.map(s => [hm(s.t), s.libelles]));
       } else {
-        const ph = await o.page.evaluate(() => scenEtat.boite && scenEtat.boite.lignes.map(l => l.t));
+        // Avec « Le détail » (option A du 11/10/2026), l'encadré est replié en une ligne : ses lignes
+        // entières sont dans son explication (la bulle « Scénarios du matin · … »).
+        const ph = await o.page.evaluate(() => scenEtat.boite && scenEtat.boite.lignes.map(l => l.t)
+          .concat(...scenEtat.cibles.filter(c => c.prio === 0 && /^Scénarios du matin · /.test(c.titre || '')).map(c => [].concat(c.texte || []))));
         // Changé délibérément (figures en direct) : les libellés des figures prennent de la place en
         // Expert ; l'encadré peut passer à sa forme serrée, qui nomme aussi (« … · écart min. : 1 »).
         check(`${mode} ${vue.width} : l'encadré nomme le ${noms[noms.length - 1]} (« Plus petit écart pour l’instant : ${noms[noms.length - 1]} … », « … nom gardé : ${noms[noms.length - 1]} » quand un autre est un peu plus près, ou en forme serrée « … · écart min. : ${noms[noms.length - 1]} »)`, ph && ph.some(l => new RegExp('^(Plus petit écart pour l’instant : |Plus petit écart : |Écart min\\. : )' + noms[noms.length - 1] + '\\b|(nom gardé|nom repris| · écart min\\.) : ' + noms[noms.length - 1] + '\\b').test(l)), ph);
@@ -114,7 +117,10 @@ const ligne = page => page.evaluate(() => {
       const e = await H.lire(o.page), ref = H.reference(S, h), L = await ligne(o.page);
       check(`${mode} ${vue.width} : cas « aucun », = calcul pur`, e.jour && e.jour.cas === 'aucun' && ref.cas === 'aucun', [e.jour, ref]);
       if (mode === 'debutant') check(`${mode} ${vue.width} : ligne G « ${L && L.texte} »`, L && (vue.width < 500 ? /^(Aucun scénario ne tient plus|Scénarios : aucun ne tient) \(en direct\) ▸$/ : /^Aucun scénario ne tient plus \(en direct\) ▸$/).test(L.texte), L);
-      else check(`${mode} ${vue.width} : encadré « Aucun scénario du matin ne décrit ce mouvement »`, e.boite && e.boite.lignes.some(l => /^Aucun scénario (du matin )?ne décrit ce mouvement/.test(l)), e.boite);
+      else {
+        const lb = e.boite ? e.boite.lignes.concat(...e.cibles.filter(c => c.prio === 0 && /^Scénarios du matin · /.test(c.titre || '')).map(c => [].concat(c.texte || []))) : [];
+        check(`${mode} ${vue.width} : encadré « Aucun scénario du matin ne décrit ce mouvement » (sur sa ligne ou dans son explication)`, lb.some(l => /^Aucun scénario (du matin )?ne décrit ce mouvement/.test(l)), lb);
+      }
       check(`${mode} ${vue.width} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
