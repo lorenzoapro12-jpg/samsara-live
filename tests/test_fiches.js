@@ -87,7 +87,7 @@ check('S/R de la page : profondeur, tolérances et fusion lues dans PARAM', !/co
   && /PARAM\.sr\.tolMin/.test(sansCommentaires) && /PARAM\.sr\.fusionTf/.test(sansCommentaires));
 
 // ── 4. Le mode change le détail, jamais une valeur ───────────────────────────
-titre('4. Mode débutant / expert : même HTML, seule une classe change');
+titre('4. « Le détail » et « Les chiffres du marché » : même HTML, seule une classe change');
 T.setData(Object.assign({}, DATA, { meta: { version: 1, champs: META } }));
 const rendre = mode => { MODE.v = mode; const c = el(); T.renderFeedTo(c); return c.innerHTML; };
 const deb = rendre(null), exp = rendre('expert');
@@ -95,19 +95,19 @@ check('le mode est bien lu différemment', (MODE.v = null, T.modeCourant()) === 
 check('cartes du marché : HTML identique en débutant et en expert', deb === exp && deb.length > 1000, { deb: deb.length, exp: exp.length });
 const fichesIdentiques = Object.keys(T.FICHES).every(k => { MODE.v = null; const a = T.ficheHtml(k); MODE.v = 'expert'; return a === T.ficheHtml(k); });
 check('chaque fiche : HTML identique dans les deux modes', fichesIdentiques);
-// Plan, mode Complet : les phrases de lecture en mots reviennent à côté des chiffres. Chaque bloc de
-// chiffres du Complet (funding, OI, L/S, CVD, GEX, prime, RSI 4 h, carnet ; VIX dans sa tuile commune)
-// porte sa phrase, sans classe de mode ; les phrases propres aux cartes du Lisible (phraseCarte)
-// restent réservées au Lisible. Aucune autre forme.
+// Les phrases de lecture en mots, à côté des chiffres. Chaque bloc chiffré (« Les chiffres du
+// marché » : funding, OI, L/S, CVD, GEX, prime, RSI 4 h, carnet ; VIX dans sa tuile commune) porte
+// sa phrase, sans classe ; les phrases propres aux cartes sans les chiffres (phraseCarte) restent
+// dans leur classe (.sans-chiffres). Aucune autre forme.
 {
-  const exp = (deb.match(/<div class="env-exp expert-seul">[\s\S]*?(?=<div class="env-deb debutant-seul">|<\/section>|$)/g) || []).join('');
-  const libres = deb.match(/class="lecture-courte"/g) || [], lisible = deb.match(/class="lecture-courte debutant-seul"/g) || [];
+  const exp = (deb.match(/<div class="env-exp chiffres-seul">[\s\S]*?(?=<div class="env-deb sans-chiffres">|<\/section>|$)/g) || []).join('');
+  const libres = deb.match(/class="lecture-courte"/g) || [], lisible = deb.match(/class="lecture-courte sans-chiffres"/g) || [];
   const dansExp = exp.match(/class="lecture-courte"/g) || [];
-  check(`lectures courtes : ${libres.length} phrases à côté des chiffres, visibles dans les deux modes (${dansExp.length} dans les blocs du Complet), ${lisible.length} propres au Lisible ; aucune autre forme`,
+  check(`lectures courtes : ${libres.length} phrases à côté des chiffres, visibles avec ou sans les chiffres (${dansExp.length} dans les blocs chiffrés), ${lisible.length} propres à l’écran sans les chiffres ; aucune autre forme`,
     libres.length >= 9 && dansExp.length >= 8 && lisible.length >= 1 && libres.length + lisible.length === (deb.match(/lecture-courte/g) || []).length,
     { libres: libres.length, dansExp: dansExp.length, lisible: lisible.length });
 }
-check('la formule est réservée au mode expert (dans chaque fiche)', Object.keys(T.FICHES).every(k => /class="expert-seul fiche-technique"/.test(T.ficheHtml(k))));
+check('la formule est dans chaque fiche, sous « En savoir plus » (pour tout le monde, repliée)', Object.keys(T.FICHES).every(k => { const h = T.ficheHtml(k), i = h.indexOf('<details class="fiche-plus">'); return i > 0 && h.indexOf('<div class="fiche-technique">') > i && !/expert-seul fiche-technique|fiche-indice/.test(h); }));
 
 // ── 5. Une lecture n'est pas un conseil ──────────────────────────────────────
 titre('5. « Voici comment ça se lit » n’est pas « voici quoi faire »');
@@ -131,7 +131,7 @@ check('ratio affiché « 1,00 » (L/S, carnet) : « Autant de… », jamais « P
 {
   const Gd = require(path.join(REPO, 'js/guide.js'));
   const ph = [['fourchette', 0, '24 h'], ['fourchette', 0.5, '5 jours'], ['fourchette', 0.9], ['vix', 12], ['vix', 20], ['vix', 30], ['cvd', 1.2e8], ['cvd', -3.4e7], ['sources', 9, 9], ['sources', 7, 9], ['sources', 8, 9]].map(a => T.phraseCarte(...a));
-  check(`${ph.length} phrases des cartes : chacune « lecture-courte debutant-seul », sans conseil ni mot technique`, ph.every(h => /^<div class="lecture-courte debutant-seul">[^<]+<\/div>$/.test(h) && !CONSEIL.test(h) && !Gd.motsBannis(h).length), ph);
+  check(`${ph.length} phrases des cartes : chacune « lecture-courte sans-chiffres », sans conseil ni mot technique`, ph.every(h => /^<div class="lecture-courte sans-chiffres">[^<]+<\/div>$/.test(h) && !CONSEIL.test(h) && !Gd.motsBannis(h).length), ph);
   check('fourchette : « Sur 24 h, le prix est dans le bas de sa fourchette. » ; écart achats/ventes arrondi en millions (« 120 millions $ », « 34 millions $ », jamais un nombre à 7 chiffres)', /^<div[^>]*>Sur 24 h, le prix est dans le bas de sa fourchette\.<\/div>$/.test(ph[0]) && /de 120 millions \$\./.test(ph[6]) && /de 34 millions \$\./.test(ph[7])
     && /de 3,4 millions \$\./.test(T.phraseCarte('cvd', 3356931)) && /de 1,2 million \$\./.test(T.phraseCarte('cvd', -1.2e6)) && /de 845 000 \$\./.test(T.phraseCarte('cvd', 845000)) && !/\d{1,3}(?: \d{3}){2}/.test(ph[6] + ph[7] + T.phraseCarte('cvd', 3356931)) && /2 infos manquent dans la dernière publication/.test(ph[9]) && /1 info manque dans la dernière publication/.test(ph[10])
     && /La dernière publication est complète\./.test(ph[8]) && !/sont arrivées|sources? manque/.test(ph.join(' ')), [ph[0], ph[6], ph[8], ph[9]]);
@@ -149,8 +149,9 @@ check('ratio affiché « 1,00 » (L/S, carnet) : « Autant de… », jamais « P
   check('guide, guide_regime, guide_suite : une explication du Débutant qui décrit l’écran Débutant (ni badge, ni chemins dessinés, « Choisir l’affichage »)', ['guide', 'guide_regime', 'guide_suite'].every(k => T.FICHES[k].simpleDeb)
     && /« Choisir l’affichage »/.test(T.FICHES.guide.simpleDeb) && !/« \+ (Affichage|Indicateurs) »/.test(T.FICHES.guide.simpleDeb) && /pas de badge/.test(T.FICHES.guide_regime.simpleDeb) && /rien n’est dessiné/.test(T.FICHES.guide_suite.simpleDeb));
   const fg = T.ficheHtml('guide_regime');
-  check('fiche avec texte du Débutant : les deux explications, chacune dans sa classe (celle du Débutant en gras, son texte entier sous « En savoir plus ») ; les deux titres de même', /<p class="fiche-simple expert-seul">/.test(fg) && /<p class="fiche-simple fiche-quoi debutant-seul"><b>/.test(fg)
-    && fg.slice(fg.indexOf('<details class="fiche-plus">')).includes(esc(T.FICHES.guide_regime.simpleDeb)) && /<span class="debutant-seul">Le mouvement du prix<\/span>/.test(fg));
+  const plusG = fg.slice(fg.indexOf('<details class="fiche-plus">'));
+  check('fiche avec texte simple : la phrase courte en gras en tête, sans classe ; le titre simple ; sous « En savoir plus », le texte entier simple, l’explication technique et le titre technique', /<p class="fiche-simple fiche-quoi"><b>/.test(fg) && !/fiche-simple expert-seul|debutant-seul/.test(fg.slice(0, fg.indexOf('<details class="fiche-plus">')))
+    && plusG.includes(esc(T.FICHES.guide_regime.simpleDeb)) && plusG.includes(esc(T.FICHES.guide_regime.simple)) && plusG.includes(esc(T.FICHES.guide_regime.titre)) && /<h3 class="fiche-titre">Le mouvement du prix<\/h3>/.test(fg), fg.slice(0, 400));
   // Autre paire : les cartes du Débutant nomment le bitcoin (le fichier ne suit que lui).
   const sym = T.activeSymbol;
   T.activeSymbol = 'SOLUSDT';

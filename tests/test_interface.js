@@ -692,14 +692,15 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       check(`rien d’allumé : une phrase invite à choisir (« ${vide} »)`, meme(e.puces, ['lbl__vide']) && /^Rien d’allumé : choisissez ce qui s’affiche/.test(vide) && e.compte === 0, { e, vide });
       await p7.click('#lbl__vide'); await pause(200);
       check('… et l’ouvre : le panneau', (await etat()).ouvert);
-      // H. Le ruban du Lisible ne change pas : les intervalles et le bouton, aucune puce.
-      await p7.evaluate(() => { document.getElementById('indMenu').classList.remove('open'); revenirAuDepart(); basculerMode(); });
+      // H. « Revenir au départ » : l'écran calme (sans « Le détail »), le ruban de la 1re visite — les
+      // intervalles et le bouton, aucune puce.
+      await p7.evaluate(() => { document.getElementById('indMenu').classList.remove('open'); revenirAuDepart(); });
       await pause(400);
       const lis = await p7.evaluate(() => {
         const vis = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
         return { labels: [...document.querySelectorAll('#indicatorBar label')].filter(vis).map(l => l.id), bouton: vis(document.getElementById('indDropdownBtn')), mode: modeCourant() };
       });
-      check('Lisible : le ruban garde ses six intervalles et le bouton, sans légende', lis.mode === 'debutant' && meme(lis.labels, ['int_1m', 'int_5m', 'int_15m', 'int_1h', 'int_4h', 'int_1d']) && lis.bouton, lis);
+      check('Revenir au départ : l’écran calme, le ruban garde ses six intervalles et le bouton, sans légende', lis.mode === 'debutant' && meme(lis.labels, ['int_1m', 'int_5m', 'int_15m', 'int_1h', 'int_4h', 'int_1d']) && lis.bouton, lis);
       check('aucune erreur JavaScript', !o7.erreurs.length, o7.erreurs);
       await o7.ctx.close();
     }
@@ -710,7 +711,7 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       const o8 = await ouvrir(nav, th, { width: 1440, height: 900 });
       const fautes = [];
       for (const mode of ['expert', 'debutant']) {
-        if (mode === 'debutant') await o8.page.evaluate(() => basculerMode());
+        if (mode === 'debutant') await o8.page.evaluate(() => appliquerMode('debutant'));
         for (const [w, h] of [[360, 740], [390, 844], [1440, 900]]) {
           await o8.page.setViewportSize({ width: w, height: h }); await o8.page.waitForTimeout(150);
           const m = await menu(o8.page, '#indDropdownBtn', 'indMenu');

@@ -198,7 +198,7 @@ function sonderRefraction() {
 // Une touche seule : Ctrl / Cmd / Alt + touche reste au navigateur (Ctrl+R recharge, Ctrl+F
 // cherche), et une saisie (champ, liste déroulante, texte éditable) garde ses touches — les
 // flèches d'une liste du Grid Bot changeaient la vue du graphique. Même règle que la carte.
-// Une même touche veut dire la même chose sur les deux pages : M le mode, ? l'aide de la page,
+// Une même touche veut dire la même chose sur les deux pages : ? l'aide de la page,
 // R la vue de départ, F suivre le présent — ici, la même vue que R (la dernière bougie à droite) ;
 // les infos du marché passent sur I (F les ouvrait). La liste, dite à l'écran : RACCOURCIS_TERMINAL
 // (js/fiches.js, les Légendes).
@@ -210,7 +210,6 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'd' || e.key === 'D') { themeJumeau(); e.preventDefault(); }
   if (e.key === 't' || e.key === 'T') { themeSuivant(); e.preventDefault(); }
   if (e.key === 'r' || e.key === 'R' || e.key === 'f' || e.key === 'F') { resetView(); e.preventDefault(); }
-  if (e.key === 'm' || e.key === 'M') { basculerMode(); e.preventDefault(); }
   if (e.key === '?') { ouvrirGlossaire(); e.preventDefault(); }
   if (e.key === 'Escape') { document.getElementById('indMenu').classList.remove('open'); document.getElementById('themeMenu').classList.remove('open'); document.getElementById('paireMenu').classList.remove('open'); }
   // Flèches : scroller horizontalement
@@ -375,7 +374,7 @@ function scenariosNoter(on) { try { localStorage.setItem('samsara-scenarios-v1',
 const FIG_PASSEES_CLE = 'samsara-figures-passees-v1';
 function figuresPasseesMemorise() { try { const v = localStorage.getItem(FIG_PASSEES_CLE); return Guide.CHOIX_PASSEES.includes(v) ? v : 'non'; } catch (e) { return 'non'; } }
 let figuresPasseesChoix = figuresPasseesMemorise();
-const activeSubs = { vol: true, rsi: false, macd: false, stoch: false, atr: false, obv: false, mfi: false, williamsR: false, cci: false, adx: false, ao: false };
+const activeSubs = { vol: false, rsi: false, macd: false, stoch: false, atr: false, obv: false, mfi: false, williamsR: false, cci: false, adx: false, ao: false };
 const subHeights = { vol: 110, rsi: 120, macd: 120, stoch: 120, atr: 110, obv: 110, mfi: 120, williamsR: 120, cci: 120, adx: 120, ao: 110 };
 // Les couches du site (Guide, scénarios) gardent leurs propres clés ; les choix du panneau
 // « Choisir l'affichage » en Complet (calques posés sur les bougies et sous-graphiques allumés) sont
@@ -390,23 +389,28 @@ function affichageNoter() {
   const ov = Object.keys(overlays).filter(k => !COUCHES_SITE.includes(k) && overlays[k]), sg = Object.keys(activeSubs).filter(k => activeSubs[k]);
   try { localStorage.setItem(AFFICHAGE_CLE, JSON.stringify({ ov, sg })); } catch (e) { /* navigation privée */ }
 }
+// Un seul écran (11/10/2026) : sans choix gardé, aucun calque de marché, sauf pour qui était en
+// Complet (« Le détail » allumé) : il garde le Volume, comme avant. Les trois calques simples de
+// l'ancien Lisible (samsara-lisible-v1 : Volume, Moyennes, Ordres en attente) sont versés une fois
+// dans les choix du panneau : Volume, EMA 20 et EMA 50, la carte des ordres.
+const LISIBLE_CLE = 'samsara-lisible-v1';
 (function () {
   const m = affichageRelu();
-  if (!m) return;
-  for (const k of Object.keys(overlays)) if (!COUCHES_SITE.includes(k)) overlays[k] = m.ov.includes(k);
-  for (const k of Object.keys(activeSubs)) activeSubs[k] = m.sg.includes(k);
+  if (m) {
+    for (const k of Object.keys(overlays)) if (!COUCHES_SITE.includes(k)) overlays[k] = m.ov.includes(k);
+    for (const k of Object.keys(activeSubs)) activeSubs[k] = m.sg.includes(k);
+    return;
+  }
+  let l = null;
+  try { l = JSON.parse(localStorage.getItem(LISIBLE_CLE) || 'null'); } catch (e) { /* illisible : éteints */ }
+  if (l && typeof l === 'object' && typeof modeCourant === 'function' && modeCourant() !== 'expert') {
+    activeSubs.vol = l.vol === true; overlays.ema20 = overlays.ema50 = l.moyennes === true; overlays.liq = l.liq === true;
+    affichageNoter();
+    try { localStorage.removeItem(LISIBLE_CLE); } catch (e) { /* navigation privée */ }
+  } else activeSubs.vol = typeof modeCourant === 'function' && modeCourant() === 'expert';
 })();
-// Lisible : trois calques simples, éteints par défaut, choisis À PART (les choix du Complet ne
-// s'y dessinent jamais) et gardés sous samsara-lisible-v1. Ils n'ajoutent aucun texte au tracé.
-const LISIBLE_CLE = 'samsara-lisible-v1';
-const lisible = (() => {
-  const o = { vol: false, moyennes: false, liq: false };
-  try { const m = JSON.parse(localStorage.getItem(LISIBLE_CLE) || 'null'); if (m && typeof m === 'object') for (const k of Object.keys(o)) o[k] = m[k] === true; } catch (e) { /* illisible : éteints */ }
-  return o;
-})();
-function lisibleNoter() { try { localStorage.setItem(LISIBLE_CLE, JSON.stringify(lisible)); } catch (e) { /* navigation privée */ } }
-/** La couche « Ordres en attente (carte) » est-elle demandée dans le mode affiché ? */
-const coucheLiq = () => debutant() ? lisible.liq : overlays.liq;
+/** La couche « Ordres en attente (carte) » est-elle demandée ? */
+const coucheLiq = () => overlays.liq;
 
 // ============ PARAMÈTRES DES INDICATEURS : une seule source ============
 // Le calcul, le libellé (menu, titre de sous-graphe) et la légende (js/fiches.js) lisent CES
@@ -594,7 +598,7 @@ const INDICATORS = [
     { key: 'ao', label: ETIQ.ao(), court: 'Awesome Oscillator', imp: 'special' },
   ]},
   { cat: 'echange', titre: 'Qui échange ?', items: [
-    { key: 'vol', label: 'Volume', court: 'Volume', imp: 'courant' },
+    { key: 'vol', label: 'Volume', court: 'Volume', imp: 'courant', get quoi() { return 'Combien de ' + quantiteMots() + ' ont été échangés à chaque période.'; } },
     { key: 'obv', label: 'OBV — On-Balance Volume', court: 'OBV', imp: 'utile' },
     { key: 'vp', label: 'Profil de volume', court: 'Profil de volume', imp: 'utile' },
   ]},
@@ -619,8 +623,16 @@ const calqueDe = key => CALQUES.find(i => i.key === key) || null;
 const disponible = item => !item.paires || item.paires.includes(activeSymbol);
 
 function isOverlay(key) { return key in overlays; }
-function isActive(key) { return key === 'figuresPassees' ? figuresPasseesChoix !== 'non' : (overlays[key] || activeSubs[key]) || false; }
+function isActive(key) {
+  if (key === 'detail') return !debutant();
+  if (key === 'chiffres') return typeof chiffresAllumes === 'function' && chiffresAllumes();
+  return key === 'figuresPassees' ? figuresPasseesChoix !== 'non' : (overlays[key] || activeSubs[key]) || false;
+}
 function toggleAny(key) {
+  // « Le détail » et « Les chiffres du marché » (js/fiches.js) : la page suit (apresChangementMode,
+  // apresChangementChiffres), le panneau est refait par elles.
+  if (key === 'detail') { basculerMode(); return; }
+  if (key === 'chiffres') { appliquerChiffres(!chiffresAllumes()); return; }
   if (isOverlay(key)) {
     overlays[key] = !overlays[key];
     if (key === 'liq') toggleDepth(coucheLiq());
@@ -651,9 +663,10 @@ function masquerCalque(key) { if (isActive(key)) toggleAny(key); }
 // ─── Préréglages (Complet) ───
 // Un préréglage REMPLACE la sélection des calques de marché ; le Guide et les scénarios restent
 // comme ils sont, sauf dans « L'essentiel » (allumés). « Tout » est « Tout afficher » : tout ce qui
-// se dessine sur le graphique (Guide et scénarios compris) et tous les sous-graphiques — dont au
-// plus SOUS_MAX sont dessinés à la fois, les autres rangés en onglets (plan, section 5.1).
-// « Revenir au départ » : les réglages d'origine (le Volume seul, le Guide et les scénarios).
+// se dessine sur le graphique (Guide, scénarios et « Le détail » compris) et tous les
+// sous-graphiques — dont au plus SOUS_MAX sont dessinés à la fois, les autres rangés en onglets
+// (plan, section 5.1). « Revenir au départ » : l'écran de la première visite (le Guide et les
+// scénarios, sans calque de marché, sans « Le détail » ni « Les chiffres du marché »).
 const PRESELECTIONS = [
   { id: 'essentiel', nom: 'L’essentiel', ov: [], sg: ['vol'], site: true, dit: 'Guide, scénarios, Volume' },
   { id: 'tendance', nom: 'La tendance', ov: ['ema20', 'ema50', 'ema200', 'ichimoku'], sg: [], dit: 'EMA 20, EMA 50, EMA 200, Ichimoku' },
@@ -684,10 +697,16 @@ function choisirPreselection(id) {
 }
 // « Tout afficher » montre aussi les figures passées validées (« toutes » reste un choix à part) ;
 // « Revenir au départ » les retire.
-function toutAfficher() { figuresPasseesPoser('validees'); appliquerSelection(Object.keys(overlays), Object.keys(activeSubs), true); }
+function toutAfficher() {
+  figuresPasseesPoser('validees');
+  if (debutant()) appliquerMode('expert');
+  appliquerSelection(Object.keys(overlays), Object.keys(activeSubs), true);
+}
 function revenirAuDepart() {
   figuresPasseesPoser('non');
-  appliquerSelection([], ['vol'], true);
+  if (!debutant()) appliquerMode('debutant');
+  if (typeof chiffresAllumes === 'function' && chiffresAllumes()) appliquerChiffres(false);
+  appliquerSelection([], [], true);
   try { localStorage.removeItem(AFFICHAGE_CLE); } catch (e) { /* navigation privée */ }
 }
 /** Le préréglage que la sélection affichée reproduit exactement (null : une sélection à soi). */
@@ -703,9 +722,19 @@ function preselectionActive() {
 const FICHE_IND = { ema20: 'ema', ema50: 'ema', ema100: 'ema', ema200: 'ema', sma20: 'ema', sma50: 'ema', bb: 'bb', vwap: 'vwap',
   ichimoku: 'ichimoku', sar: 'sar', vol: 'volume', rsi: 'rsi', macd: 'macd', stoch: 'stoch', atr: 'atr', obv: 'obv', mfi: 'mfi',
   williamsR: 'williamsR', cci: 'cci', adx: 'adx', ao: 'ao', sr: 'sr', fib: 'fib', vp: 'vp', liq: 'liq', guide: 'guide', scenarios: 'scenarios' };
-// Lisible : le panneau garde les deux couches du site, en mots simples (et trois calques simples,
-// plus bas) ; tout le reste est dans le Complet (une ligne y mène).
-const LIBELLES_DEBUTANT = { guide: 'Repères et phrase de lecture', get scenarios() { return libelleScenarios(); } };
+// « Ce que dit le graphique », en tête du panneau : les deux couches du site, en mots simples, puis
+// « Le détail » et « Les chiffres du marché » (js/fiches.js) — ces deux-là ne sont pas des calques
+// de marché : ni puce dans le ruban, ni compte sur le bouton.
+const LIBELLES_ECRAN = { guide: 'Repères et phrase de lecture', get scenarios() { return libelleScenarios(); } };
+const QUOI_ECRAN = { guide: 'Une phrase et deux repères de prix qui décrivent ce que fait le graphique.',
+  scenarios: 'Chaque matin, Claude (une IA) écrit trois scénarios pour la journée, classés du plus au moins probable.' };
+const LIGNES_ECRAN = [
+  { key: 'detail', label: 'Le détail : tous les repères, figures et scénarios', fiche: 'guide',
+    quoi: 'Tous les niveaux du Guide, les chemins si le prix franchit un repère, les figures en cours et passées, les trois scénarios, avec leurs chiffres.' },
+  { key: 'chiffres', label: 'Les chiffres du marché',
+    quoi: 'Les chiffres clés du marché dans l’en-tête, les infos du marché avec leurs chiffres, les échanges en direct et le Grid Bot.' },
+];
+const estLigneEcran = key => key === 'detail' || key === 'chiffres';
 // Les questions en mots, par clé de catégorie (le filtre cherche aussi dedans).
 const TITRES_CAT = Object.fromEntries(INDICATORS.map(c => [c.cat, c.titre]));
 // L'aperçu du menu : l'indicateur survolé, touché ou au clavier, et le filtre de l'Expert. Gardés
@@ -715,10 +744,9 @@ const sansAccents = t => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLo
 /** Le contenu de l'aperçu : ce que c'est, comment s'en servir, la fiche complète. */
 function apercuHtml(key) {
   const id = key && FICHE_IND[key], f = id && typeof FICHES !== 'undefined' ? FICHES[id] : null;
-  if (!f) return '<p class="ind-apercu-vide">' + (debutant() ? 'Survolez ou touchez une ligne : ce qu’elle montre et comment s’en servir.'
-    : 'Survolez ou touchez un indicateur : ce que c’est, comment les traders l’utilisent et comment il est calculé. Le « i » ouvre sa fiche complète.') + '</p>';
-  const deb = debutant();
-  // Débutant : les trois lignes courtes de la fiche (COURT, js/fiches.js) ; Expert : les textes entiers.
+  if (!f) return '<p class="ind-apercu-vide">Survolez ou touchez une ligne : ce qu’elle montre et comment s’en servir. Le « i » ouvre sa fiche complète.</p>';
+  const deb = true;
+  // Les trois lignes courtes de la fiche (COURT, js/fiches.js) ; les textes entiers sont dans la fiche.
   const c = deb && typeof COURT !== 'undefined' ? COURT[id] || {} : {}, court = t => (typeof courtTexte === 'function' ? courtTexte(t) : '');
   const titre = deb && f.titreDeb ? f.titreDeb : f.titre;
   const quoi = (deb && court(c.quoi)) || (deb && f.simpleDeb ? f.simpleDeb : f.simple);
@@ -732,26 +760,8 @@ function apercuHtml(key) {
     + (calcul ? '<p><b>Comment c’est calculé :</b> ' + echapF(calcul) + '</p>' : '')
     + '<button type="button" class="lien" onclick="event.stopPropagation();ouvrirFiche(\'' + id + '\',this)">Fiche complète ▸</button>';
 }
-// Lisible : trois calques simples, chacun avec sa phrase « C'est quoi ? » et sa ligne « Comment s'en
-// servir ? » à lui, en mots simples (aucun mot de Guide.MOTS_BANNIS_DEBUTANT : « période » pour une
-// bougie) — pas les textes du Complet. Leurs choix : `lisible` (samsara-lisible-v1).
 /** « bitcoins » sur BTC/USDT et BTC/SOL, sinon l'actif de base de la paire (« SOL »). */
 const quantiteMots = () => uniteVolume() === 'BTC' ? 'bitcoins' : uniteVolume();
-const CALQUES_SIMPLES = [
-  { key: 'vol', nom: 'Volume', fiche: 'volume',
-    get quoi() { return 'Combien de ' + quantiteMots() + ' ont été échangés à chaque période.'; },
-    usage: 'Une barre haute : beaucoup d’échanges pendant cette période. Un mouvement du prix avec beaucoup d’échanges est souvent jugé plus solide.' },
-  { key: 'moyennes', nom: 'Moyennes', fiche: 'ema',
-    quoi: 'Deux lignes qui lissent le prix : une courte, qui le suit de près, et une longue, plus lente.',
-    usage: 'Le prix au-dessus des deux lignes : il a surtout monté ces derniers temps ; au-dessous, il a surtout baissé. Elles disent le passé récent, pas la suite.' },
-  { key: 'liq', nom: 'Ordres en attente', fiche: 'liq', paires: ['BTCUSDT'],
-    quoi: 'Les prix où beaucoup d’ordres d’achat ou de vente attendaient, minute après minute : plus la couleur est vive, plus il y en avait.',
-    get usage() { return 'Un ordre peut être retiré à tout moment : la carte dit où ils étaient, pas ce que fera le prix. Elle est mise à jour toutes les ' + CADENCES.attendue_min + ' min.'; } },
-];
-// Les deux couches du site en Lisible : leur phrase « C'est quoi ? ».
-const QUOI_LISIBLE = { guide: 'Une phrase et deux repères de prix qui décrivent ce que fait le graphique.',
-  scenarios: 'Chaque matin, Claude (une IA) écrit trois scénarios pour la journée, classés du plus au moins probable.' };
-const calqueSimple = key => CALQUES_SIMPLES.find(c => 'l_' + c.key === key) || null;
 /** « C'est quoi ? » en une phrase : la 1re des trois lignes courtes de la fiche (COURT, js/fiches.js)
  *  quand elle existe ; à défaut, la 1re phrase de son explication. */
 function quoiCourt(id) {
@@ -760,10 +770,12 @@ function quoiCourt(id) {
   const f = typeof FICHES !== 'undefined' ? FICHES[id] : null, t = f ? String(f.simple || '') : '';
   return (t.match(/^.+?[.!?](?=\s|$)/) || [t])[0];
 }
-/** L'aperçu d'une ligne : celui de la fiche ; pour un calque simple du Lisible, ses mots à lui. */
+/** L'aperçu d'une ligne : celui de la fiche ; pour « Le détail » et « Les chiffres du marché »,
+ *  leurs mots à eux. */
 function apercuPanneau(key) {
-  const c = calqueSimple(key);
-  return c ? '<p class="ind-apercu-titre">' + echapF(c.nom) + '</p><p><b>C’est quoi ?</b> ' + echapF(c.quoi) + '</p><p><b>Comment s’en servir ?</b> ' + echapF(c.usage) + '</p>'
+  const c = LIGNES_ECRAN.find(l => l.key === key);
+  return c ? '<p class="ind-apercu-titre">' + echapF(c.label) + '</p><p><b>C’est quoi ?</b> ' + echapF(c.quoi) + '</p>'
+    + '<p><b>Comment s’en servir ?</b> Cochez-le quand vous voulez tout voir ; décochez-le pour revenir à l’essentiel. Rien n’est calculé autrement.</p>'
     : apercuHtml(key);
 }
 function montrerApercu(key) {
@@ -772,7 +784,7 @@ function montrerApercu(key) {
   const a = document.getElementById('indApercu');
   if (a) a.innerHTML = apercuPanneau(key);
 }
-/** Le filtre du Complet : sur le libellé, le nom court, le titre de la fiche, la question et
+/** Le filtre du panneau : sur le libellé, le nom court, le titre de la fiche, la question et
  *  l'importance, sans accents. */
 function filtrerMenu(t) {
   menuFiltre = t;
@@ -785,14 +797,14 @@ function filtrerMenu(t) {
   const vide = menu.querySelector('.ind-aucun');
   if (vide) vide.hidden = !!menu.querySelector('label[data-ind]:not([hidden])');
 }
-/** Une ligne du panneau : la case, le nom, sa phrase « C'est quoi ? », (Complet) la pastille
- *  d'importance — une forme ET un mot, jamais la couleur seule —, et le « i » de sa fiche. Sur une
- *  autre paire, une couche qui n'y dessinerait rien : case grisée (le choix est gardé), et dit. */
-function ligneMenu(item, libelle, cat, complet) {
+/** Une ligne du panneau : la case, le nom, sa phrase « C'est quoi ? », la pastille d'importance —
+ *  une forme ET un mot, jamais la couleur seule —, et le « i » de sa fiche. Sur une autre paire,
+ *  une couche qui n'y dessinerait rien : case grisée (le choix est gardé), et dit. */
+function ligneMenu(item, libelle, cat) {
   const checked = isActive(item.key) ? ' checked' : '';
-  const fiche = FICHE_IND[item.key], f = fiche && typeof FICHES !== 'undefined' ? FICHES[fiche] : null;
-  const quoi = complet ? item.quoi || quoiCourt(fiche) : QUOI_LISIBLE[item.key] || '';
-  const imp = complet && item.imp ? IMPORTANCES[item.imp] : '';
+  const fiche = item.fiche || FICHE_IND[item.key], f = fiche && typeof FICHES !== 'undefined' ? FICHES[fiche] : null;
+  const quoi = item.quoi || QUOI_ECRAN[item.key] || quoiCourt(fiche);
+  const imp = item.imp ? IMPORTANCES[item.imp] : '';
   const cherche = libelle + ' ' + (item.court || '') + ' ' + (f ? f.titre : '') + ' ' + (TITRES_CAT[cat] || cat) + ' ' + imp;
   const dispo = disponible(item), seul = dispo ? '' : ' disabled';
   const note = dispo ? '' : ' <span class="ind-seul">' + item.paires.map(p => NOMS_PAIRES[p] || p).join(', ') + ' seulement</span>';
@@ -800,56 +812,39 @@ function ligneMenu(item, libelle, cat, complet) {
     + `<span class="aff-texte"><span class="aff-nom">${echapF(libelle)}${note}</span><span class="aff-quoi">${echapF(quoi)}</span></span>`
     + (imp ? `<span class="aff-imp imp-${item.imp}" title="Importance : ${imp}">${imp}</span>` : '') + (fiche ? infoBtn(fiche) : '') + '</label>';
 }
-/** Une ligne d'un calque simple du Lisible (BTC/USDT seulement pour les ordres en attente). */
-function ligneSimple(c) {
-  const dispo = !c.paires || c.paires.includes(activeSymbol);
-  const note = dispo ? '' : ' <span class="ind-seul">' + c.paires.map(p => NOMS_PAIRES[p] || p).join(', ') + ' seulement</span>';
-  return `<label data-ind="l_${c.key}" data-cat="simples" data-cherche="${echapF(c.nom)}" class="aff-ligne${dispo ? '' : ' indispo'}"><input type="checkbox"${lisible[c.key] ? ' checked' : ''}${dispo ? '' : ' disabled'} onchange="toggleLisible('${c.key}')">`
-    + `<span class="aff-texte"><span class="aff-nom">${echapF(c.nom)}${note}</span><span class="aff-quoi">${echapF(c.quoi)}</span></span></label>`;
-}
-function toggleLisible(key) {
-  lisible[key] = !lisible[key];
-  lisibleNoter();
-  if (key === 'liq') toggleDepth(coucheLiq());
-  resizeCanvas(); drawChart();
-  buildDropdown();
-}
-// « Réglages fins » (Complet) : replié par défaut, gardé ouvert d'une reconstruction à l'autre.
+// « Réglages fins » : replié par défaut, gardé ouvert d'une reconstruction à l'autre.
 let finsOuverts = false;
-/** Le panneau « Choisir l'affichage ». Lisible : les deux couches du site, trois calques simples et
- *  le passage au Complet. Complet : « Tout afficher », « Revenir au départ » et les préréglages en
- *  mots ; puis chaque calque, rangé par question ; tout en bas, repliés, les réglages fins. */
+/** Le panneau « Choisir l'affichage », le même pour tout le monde : « Tout afficher », « Revenir au
+ *  départ » et les préréglages en mots ; « Ce que dit le graphique » (Guide, scénarios, Le détail,
+ *  Les chiffres du marché) ; puis chaque calque de marché, rangé par question ; tout en bas, repliés,
+ *  les réglages fins. Les figures passées et l'aide à la lecture se règlent avec « Le détail ». */
 function buildDropdown() {
   const menu = document.getElementById('indMenu');
-  const defile = menu.scrollTop, deb = debutant();
-  if (menu.classList) menu.classList.toggle('aff-lisible', deb);
+  const defile = menu.scrollTop, detail = !debutant();
   let html = '<div class="ind-liste">';
-  if (deb) {
-    html += '<div class="cat-title">Ce que dit le graphique</div>';
-    for (const k of COUCHES_SITE) html += ligneMenu(calqueDe(k), LIBELLES_DEBUTANT[k], 'reaction', false);
-    html += '<div class="cat-title">Ajouter au graphique</div>';
-    for (const c of CALQUES_SIMPLES) html += ligneSimple(c);
-    html += '<button type="button" class="lien menu-expert" onclick="event.stopPropagation();basculerMode()">Tout voir : passer en Complet ▸</button>';
-  } else {
-    const actif = preselectionActive();
-    html += '<div class="aff-tete"><div class="aff-boutons">'
-      + '<button type="button" class="aff-btn aff-tout" onclick="toutAfficher()" title="Tout ce qui se dessine sur le graphique ; au plus ' + SOUS_MAX + ' sous-graphiques à la fois, les autres en onglets">Tout afficher</button>'
-      + '<button type="button" class="aff-btn" onclick="revenirAuDepart()" title="Les réglages d’origine : le Volume, le Guide et les scénarios">Revenir au départ</button></div>'
-      + '<div class="aff-presets" role="group" aria-label="Préréglages"><span class="aff-presets-titre">Préréglages</span>'
-      + PRESELECTIONS.map(p => `<button type="button" class="aff-preset" data-preset="${p.id}" aria-pressed="${p.id === actif}" title="${echapF(p.dit)}" onclick="choisirPreselection('${p.id}')">${p.nom}</button>`).join('')
-      + '</div></div>';
-    html += '<div class="ind-filtre"><input type="search" id="indFiltre" placeholder="Chercher un indicateur…" aria-label="Chercher un indicateur" autocomplete="off" oninput="filtrerMenu(this.value)"></div>';
-    for (const cat of INDICATORS) {
-      html += `<div class="cat-title" data-cat="${cat.cat}">${cat.titre}</div>`;
-      for (const item of cat.items) html += ligneMenu(item, item.label, cat.cat, true);
-      if (cat.cat === 'reaction') html += ligneFiguresPassees();
-    }
-    html += '<p class="ind-aucun" hidden>Aucun indicateur ne correspond.</p>';
-    // L'aide à la lecture (apprendre), avant les réglages fins : couper la ligne, couper les marques.
-    html += apprPanneau();
-    html += '<details class="aff-fins" id="affFins"' + (finsOuverts ? ' open' : '') + ' ontoggle="finsOuverts = this.open"><summary>Réglages fins</summary>'
-      + '<div class="aff-fins-corps">' + (typeof reglagesHtml === 'function' ? reglagesHtml() : '') + '</div></details>';
+  const actif = preselectionActive();
+  html += '<div class="aff-tete"><div class="aff-boutons">'
+    + '<button type="button" class="aff-btn aff-tout" onclick="toutAfficher()" title="Tout ce qui se dessine sur le graphique ; au plus ' + SOUS_MAX + ' sous-graphiques à la fois, les autres en onglets">Tout afficher</button>'
+    + '<button type="button" class="aff-btn" onclick="revenirAuDepart()" title="Les réglages d’origine : le Guide et les scénarios, rien d’autre">Revenir au départ</button></div>'
+    + '<div class="aff-presets" role="group" aria-label="Préréglages"><span class="aff-presets-titre">Préréglages</span>'
+    + PRESELECTIONS.map(p => `<button type="button" class="aff-preset" data-preset="${p.id}" aria-pressed="${p.id === actif}" title="${echapF(p.dit)}" onclick="choisirPreselection('${p.id}')">${p.nom}</button>`).join('')
+    + '</div></div>';
+  html += '<div class="ind-filtre"><input type="search" id="indFiltre" placeholder="Chercher un indicateur…" aria-label="Chercher un indicateur" autocomplete="off" oninput="filtrerMenu(this.value)"></div>';
+  html += '<div class="cat-title" data-cat="ecran">Ce que dit le graphique</div>';
+  for (const k of COUCHES_SITE) html += ligneMenu(calqueDe(k), LIBELLES_ECRAN[k], 'ecran');
+  for (const l of LIGNES_ECRAN) html += ligneMenu(l, l.label, 'ecran');
+  if (detail) html += ligneFiguresPassees();
+  for (const cat of INDICATORS) {
+    const items = cat.items.filter(i => !COUCHES_SITE.includes(i.key));
+    if (!items.length) continue;
+    html += `<div class="cat-title" data-cat="${cat.cat}">${cat.titre}</div>`;
+    for (const item of items) html += ligneMenu(item, item.label, cat.cat);
   }
+  html += '<p class="ind-aucun" hidden>Aucun indicateur ne correspond.</p>';
+  // L'aide à la lecture (apprendre), avec « Le détail » : couper la ligne, couper les marques.
+  if (detail) html += apprPanneau();
+  html += '<details class="aff-fins" id="affFins"' + (finsOuverts ? ' open' : '') + ' ontoggle="finsOuverts = this.open"><summary>Réglages fins</summary>'
+    + '<div class="aff-fins-corps">' + (typeof reglagesHtml === 'function' ? reglagesHtml() : '') + '</div></details>';
   html += '</div><div class="ind-apercu" id="indApercu" aria-live="polite">' + apercuPanneau(menuApercu) + '</div>';
   menu.innerHTML = html;
   // Survol, toucher et clavier montrent l'explication dans l'aperçu (sans rien cocher de plus).
@@ -884,13 +879,13 @@ function figuresPasseesPoser(v) {
 }
 function choisirFiguresPassees(v) { figuresPasseesPoser(v); drawChart(); buildDropdown(); }
 
-// ─── La légende des calques allumés (Complet) ───
+// ─── La légende des calques de marché allumés ───
 // Dans le ruban, juste après « À l'écran » : une puce par calque allumé qui dessine sur la paire
 // affichée — pastille de sa couleur, nom court ; un clic (ou Entrée, Espace) le masque. Au plus
 // LEGENDE_MAX puces (moins si la rangée passerait à la ligne) : au-delà, la dernière dit « + N
-// autres » et ouvre le panneau. Rien d'allumé : une phrase invite à choisir. Les puces gardent l'id
+// autres » et ouvre le panneau. Les puces gardent l'id
 // lbl_<calque> des pastilles d'avant (la Planche range les sept premières sur sa 1re rangée), et
-// sont reposées quand la fenêtre change de taille. Lisible : aucune (.expert-seul).
+// sont reposées quand la fenêtre change de taille. Aucun calque de marché : ni titre ni puce.
 const LEGENDE_MAX = 7;
 /** La couleur de la pastille : celle du tracé du calque (lue dans les jetons du thème). */
 function couleurCalque(key) {
@@ -906,18 +901,20 @@ function majLegende() {
   const titre = document.getElementById('legendeTitre');
   if (!titre || !titre.parentNode || !titre.insertAdjacentHTML) return;
   // Les calques posés sur les bougies d'abord, puis les sous-graphiques, chacun dans l'ordre du panneau.
-  const on = CALQUES.filter(i => isOverlay(i.key) && overlays[i.key] && disponible(i)).concat(CALQUES.filter(i => !isOverlay(i.key) && activeSubs[i.key]));
+  // Les calques de MARCHÉ seulement : le Guide et les scénarios sont l'écran lui-même. Sans calque
+  // de marché, ni titre ni puce (data-calques : le ruban garde la mise en page de la 1re visite).
+  const on = CALQUES.filter(i => !COUCHES_SITE.includes(i.key) && isOverlay(i.key) && overlays[i.key] && disponible(i)).concat(CALQUES.filter(i => !isOverlay(i.key) && activeSubs[i.key]));
+  document.documentElement.setAttribute('data-calques', on.length ? '1' : '0');
   const touche = k => ` role="button" tabindex="0" onkeydown="toucheLegende(event${k ? ', \'' + k + '\'' : ''})"`;
   const poser = n => {
     for (const el of [...titre.parentNode.querySelectorAll('.puce-calque')]) el.remove();
     let html = on.slice(0, n).map(i => {
       const q = i.quoi || quoiCourt(FICHE_IND[i.key]);
-      return `<label id="lbl_${i.key}" class="puce-calque expert-seul" data-calque="${i.key}" style="--dot:${couleurCalque(i.key)}"${touche(i.key)} onclick="masquerCalque('${i.key}')"`
+      return `<label id="lbl_${i.key}" class="puce-calque" data-calque="${i.key}" style="--dot:${couleurCalque(i.key)}"${touche(i.key)} onclick="masquerCalque('${i.key}')"`
         + ` aria-label="Masquer : ${echapF(i.court)}" title="${echapF(i.label + (q ? ' : ' + q : '') + '\nUn clic le masque ; « Choisir l’affichage » en a la fiche complète.')}">`
         + `<span class="ind-label">${echapF(i.court)}</span><span class="puce-x" aria-hidden="true">×</span></label>`;
     }).join('');
-    if (on.length > n) html += `<label id="lbl__plus" class="puce-calque puce-plus expert-seul"${touche()} onclick="toggleDropdown(event)" title="Voir et choisir tous les calques allumés">+ ${on.length - n} autre${on.length - n > 1 ? 's' : ''} ▸</label>`;
-    if (!on.length) html = `<label id="lbl__vide" class="puce-calque legende-vide expert-seul"${touche()} onclick="toggleDropdown(event)">Rien d’allumé : choisissez ce qui s’affiche ▸</label>`;
+    if (on.length > n) html += `<label id="lbl__plus" class="puce-calque puce-plus"${touche()} onclick="toggleDropdown(event)" title="Voir et choisir tous les calques allumés">+ ${on.length - n} autre${on.length - n > 1 ? 's' : ''} ▸</label>`;
     titre.insertAdjacentHTML('afterend', html);
   };
   let n = on.length > LEGENDE_MAX ? LEGENDE_MAX - 1 : on.length;
@@ -951,23 +948,17 @@ function compterIndicateurs() {
   c.hidden = !n;
 }
 
-/** Après un changement de mode (appliquerMode, js/fiches.js) : ce qui ne vaut plus est fermé, la
- *  page est remise en page (l'en-tête, la barre d'outils et le Grid Bot changent de hauteur) et
- *  redessinée. Mêmes valeurs : aucun calcul n'est refait, seuls les mots et ce qui est montré
- *  changent. */
+/** Après « Le détail » allumé ou éteint (appliquerMode, js/fiches.js) : ce qui ne vaut plus est
+ *  fermé, la page est remise en page et redessinée. Mêmes valeurs : aucun calcul n'est refait,
+ *  seuls les mots et ce qui est montré changent. */
 function apresChangementMode(m) {
   crossX = crossY = null;
   const menu = document.getElementById('indMenu');
   if (menu && menu.classList.contains('open')) buildDropdown();
-  if (m !== 'expert' && typeof closeLiveModal === 'function') closeLiveModal();
   guideHautMemo = null; scenFlechesMemo = null; debHautMemo = null;
-  // Chaque mode a ses calques (lisible / overlays) : les ordres en attente sont relus ou laissés, la
-  // légende du ruban, les onglets des sous-graphiques et le compteur du bouton suivent.
-  if (!!coucheLiq() !== !!depthTimer) toggleDepth(coucheLiq());
   ongletsMemo = ''; majLegende(); compterIndicateurs();
-  // Le nom accessible du graphique est la phrase du Débutant : l'Expert ne l'a pas.
+  // Le nom accessible du graphique est la phrase de l'écran sans le détail : le détail ne l'a pas.
   if (m === 'expert') { try { canvas.removeAttribute('aria-label'); } catch (e) { /* hors navigateur */ } }
-  if (isNum(livePrice)) ecrirePrixEntete(livePrice, isNum(var24Courant) ? var24Courant : NaN);
   astuceMontrer();
   requestAnimationFrame(() => {
     resizeCanvas();
@@ -976,7 +967,20 @@ function apresChangementMode(m) {
     if (typeof ajusterRuban === 'function') ajusterRuban();
   });
 }
-// La clé « ? » du Lisible, toujours là : un bouton (pas un texte du graphique : hors du budget des
+/** Après « Les chiffres du marché » allumés ou éteints (appliquerChiffres, js/fiches.js) : l'en-tête,
+ *  les infos du marché et le Grid Bot changent de hauteur ; l'En direct se ferme avec eux. */
+function apresChangementChiffres() {
+  const menu = document.getElementById('indMenu');
+  if (menu && menu.classList.contains('open')) buildDropdown();
+  if (!chiffresAllumes() && typeof closeLiveModal === 'function') closeLiveModal();
+  requestAnimationFrame(() => {
+    resizeCanvas();
+    if (candles.length) drawChart();
+    if (typeof ajusterKpis === 'function') ajusterKpis();
+    if (typeof ajusterRuban === 'function') ajusterRuban();
+  });
+}
+// La clé « ? » de l'écran sans le détail, toujours là : un bouton (pas un texte du graphique : hors du budget des
 // 5 textes) qui ouvre l'explication de l'écran (la fiche du Guide). La toute première fois (clé
 // samsara-astuce-tap-v1), l'astuce l'accompagne : « Touchez une étiquette pour le détail » (écran
 // tactile) ou « Survolez… » (souris), cachée au premier toucher du graphique ou au bout de 8 s ;
@@ -2046,12 +2050,13 @@ function texteVar24(v, avecDuree) {
 function ecrirePrixEntete(price, var24) {
   const el = document.getElementById('price');
   if (el && isNum(price)) {
-    const t = debutant() ? Guide.prix(price, guideUnite()) : Fmt.prix(price, guideUnite(), 'fin');
+    // L'arrondi de lecture (« 81 185 $ ») pour tout le monde ; les centimes sont dans les bulles.
+    const t = Guide.prix(price, guideUnite());
     el.textContent = t;   // écrit à chaque lecture, comme avant : l'horloge part dans la même tâche
   }
   const v = document.getElementById('var24');
   if (v) {
-    v.textContent = !isFinite(var24) ? '' : texteVar24(var24, debutant());
+    v.textContent = !isFinite(var24) ? '' : texteVar24(var24, true);
     v.className = 'var24' + (var24 > 0 ? ' pos' : var24 < 0 ? ' neg' : '');
   }
 }
@@ -3316,7 +3321,7 @@ function montrerSous(key) {
 }
 function dispositionGraphique(H) {
   // Lisible : le Volume seul, si son calque simple est allumé (les choix du Complet sont gardés à part).
-  const actifs = debutant() ? (lisible.vol ? ['vol'] : []) : SUB_ORDRE.filter(k => activeSubs[k]);
+  const actifs = SUB_ORDRE.filter(k => activeSubs[k]);
   const dispo = H - 4 - RS_HEIGHT;
   const mainMin = Math.max(Math.min(MAIN_H_MIN, dispo), Math.ceil(dispo * MAIN_PART_MIN));
   const haut = cle => subHeights[cle] || 80;
@@ -3393,7 +3398,7 @@ function drawChart() {
   ctx.clearRect(0, 0, W, H);
   if (candles.length < 2) {
     ctx.save(); ctx.fillStyle = COLORS.ink3 || '#5f6e8c'; ctx.font = chartFont(12, 600); ctx.textAlign = 'center';
-    ctx.fillText('Chargement ' + (NOMS_PAIRES[activeSymbol] || activeSymbol) + ' · ' + (debutant() ? Guide.nomIntervalle(chartInterval) : nomTf(chartInterval)) + '…', (W - 50) / 2, H / 2); ctx.restore();
+    ctx.fillText('Chargement ' + (NOMS_PAIRES[activeSymbol] || activeSymbol) + ' · ' + Guide.nomIntervalle(chartInterval) + '…', (W - 50) / 2, H / 2); ctx.restore();
     dessinerCalque();
     return;
   }
@@ -3412,10 +3417,10 @@ function drawChart() {
   ctx.fillStyle = COLORS.ink1;
   // Taille bridée au tracé disponible : à 64 px fixes le filigrane débordait du graphe
   // sur téléphone et se faisait rogner par le bord gauche.
-  // La paire sous son nom (« BTC/USDT », comme l'en-tête) ; l'intervalle en mots en Débutant
-  // (« 15 min »), comme le ruban en Expert (« 15m », « 1 j »).
+  // La paire sous son nom (« BTC/USDT », comme l'en-tête) ; l'intervalle en mots (« 15 min »),
+  // comme le ruban.
   const deb = debutant();
-  const filigrane = (NOMS_PAIRES[activeSymbol] || activeSymbol) + '  ·  ' + (deb ? Guide.nomIntervalle(chartInterval) : nomTf(chartInterval));
+  const filigrane = (NOMS_PAIRES[activeSymbol] || activeSymbol) + '  ·  ' + Guide.nomIntervalle(chartInterval);
   ctx.font = chartFont(Math.min(40, Math.round((W - 16 - 75) / (filigrane.length * 0.9))), 300);
   if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -3494,8 +3499,8 @@ function dessinerCalque() {
   const { W, H, mainH } = geo;
   const P = geoPrix, deb = debutant();
   // Un seul format de prix (js/format.js), l'unité de la paire après le nombre (« $ », « SOL » sur
-  // BTC/SOL) : Débutant, l'arrondi de lecture (« 82 442 $ ») ; Expert, la cotation (« 82 442,00 $ »).
-  const prixAxe = v => Fmt.prix(v, guideUnite(), deb ? undefined : 'fin');
+  // BTC/SOL) : l'arrondi de lecture (« 82 442 $ »), pour tout le monde.
+  const prixAxe = v => Fmt.prix(v, guideUnite());
   if (P) {
     const { top, ph, left, right, minP, maxP, range } = P;
     // Libellés de l'axe des prix ; celui que l'étiquette du dernier prix recouvrirait est omis (et
@@ -3869,7 +3874,7 @@ function priceWindow(vs, ve) {
   // du haut tienne AU-DESSUS du prix (et celui du bas au-dessous) même quand le prix est au bord.
   if (deb) { maxP += naturalRange * PARAM.guide.debutant.marge; minP -= naturalRange * PARAM.guide.debutant.marge; }
   // Étendre si Bollinger actif, mais cap à ±15% du range naturel
-  if (overlays.bb && !debutant() && candles.length >= 20) {
+  if (overlays.bb && candles.length >= 20) {
     const bb = memoized('bb', calcBollinger, cols().close, PARAM.bb.periode, PARAM.bb.ecarts);
     for (let i = vs; i < ve; i++) {
       if (bb.upper[i] === null) continue;
@@ -3904,8 +3909,8 @@ function resolveChart(candles, padL, padR, chartH, W) {
   const deb = debutant();
   // Débutant : les rangées de la phrase et de la ligne des scénarios (debHaut).
   const pad = { left: padL, right: padR, top: 10 + (deb ? debHaut(W, padL, padR) : overlays.guide ? guideHaut(W, padL, padR) : 0), bottom: 20 };
-  // Les couches d'analyse : Expert seulement (le choix reste gardé pour lui).
-  const ov = k => overlays[k] && !deb;
+  // Les calques de marché : ceux du panneau, avec ou sans « Le détail ».
+  const ov = k => overlays[k];
   const pw = W - pad.left - pad.right;
   const ph = chartH - pad.top - pad.bottom;
   if (ph < 30) return;
@@ -4027,11 +4032,6 @@ function resolveChart(candles, padL, padR, chartH, W) {
   const TRAITS_OV = { ema20: [[], 1.5], ema50: [[], 1.5], ema100: [[4, 4], 1], ema200: [[2, 6], 1], sma20: [[6, 3], 1], sma50: [[8, 4], 1] };
   for (const [k, [tir, ep]] of Object.entries(TRAITS_OV)) {
     if (ov(k)) drawLine(memoized(k, k.startsWith('ema') ? calcEMA : calcSMA, closes, periodeDe(k)), minP, range, pad, gap, ph, COLORS[k], tir, ep, vs, ETIQ_OVERLAYS[k]);
-  }
-  // Lisible, calque « Moyennes » : les mêmes EMA 20 et 50, en couleurs adoucies, SANS étiquette ni
-  // nom technique sur le graphique (le budget de cinq textes tient ; le panneau dit ce que c'est).
-  if (deb && lisible.moyennes) {
-    for (const k of ['ema20', 'ema50']) drawLine(memoized(k, calcEMA, closes, periodeDe(k)), minP, range, pad, gap, ph, avecAlpha(COLORS[k], 0.55), [], 1.5, vs, null);
   }
 
   // VWAP
@@ -7701,7 +7701,9 @@ function drawLine(data, minP, range, pad, gap, ph, color, dash, width, dataOffse
   ctx.stroke();
   ctx.setLineDash([]);
   // Étiquette en bout de tracé : l'identité de la ligne ne repose jamais sur la couleur seule.
-  if (etiquette && lastX !== null && lastY > pad.top + 8 && lastY < pad.top + ph - 8) {
+  // Sans « Le détail », aucune : le tracé garde ses cinq textes, le calque est nommé par sa puce
+  // dans le ruban.
+  if (etiquette && !debutant() && lastX !== null && lastY > pad.top + 8 && lastY < pad.top + ph - 8) {
     ctx.font = chartFont(9, 650);
     const w = ctx.measureText(etiquette).width + 16;
     const ex = Math.min(lastX - w - 6, xMax - w - 4), ey = lastY - 8;
@@ -8721,7 +8723,7 @@ function renderCycle(d) {
   // le CVD et le GEX n'ont pas de couleur — un signe n'est ni « bien » ni « mal ».
   // Sur une autre paire, la bande dit qu'elle parle du bitcoin (Expert ; hors des .kpi, elle ne
   // cède jamais sa place à ajusterKpis).
-  cy.innerHTML = (activeSymbol !== 'BTCUSDT' ? '<span class="kpi-btc expert-seul" title="Ces chiffres clés sont ceux du bitcoin, pas de '
+  cy.innerHTML = (activeSymbol !== 'BTCUSDT' ? '<span class="kpi-btc chiffres-seul" title="Ces chiffres clés sont ceux du bitcoin, pas de '
       + escHtml(NOMS_PAIRES[activeSymbol] || activeSymbol) + '">Bitcoin</span>' : '')
     + kpi('RSI 4h', fmtNum(t4.rsi_14, 1), '', 'tf.4h.rsi_14')
     + kpi('Funding an.', pctSigne(x.funding_annual_pct, 1), '', 'micro.funding_annual_pct')
@@ -8740,7 +8742,7 @@ function renderCycle(d) {
     // Débutant : une seule pastille, qui ouvre les cartes ; son âge dans l'infobulle (collé au prix
     // en direct, « il y a 18 min » se lisait comme l'âge du prix). « en retard » au-delà du seuil,
     // avec l'âge qui avance : c'est alors l'âge d'une publication manquée, il se lit.
-    + '<span class="kpi-deb debutant-seul" role="button" tabindex="0" title="' + titreKpiDeb(ageK) + '" aria-label="' + ariaKpiDeb(ageK) + '">'
+    + '<span class="kpi-deb sans-chiffres" role="button" tabindex="0" title="' + titreKpiDeb(ageK) + '" aria-label="' + ariaKpiDeb(ageK) + '">'
     // (Au téléphone, « Infos · » cède : « en retard · 25 min ▸ » tient à côté des boutons.)
     + '<span class="deb-frais">Infos du marché ▸</span><span class="deb-retard"><span class="deb-quoi">Infos<span class="deb-mot"> du marché</span> · </span>en retard'
     + (ageK === null ? '' : ' · ' + ageDe(d.updated, ageK) + ' min') + '<span class="deb-fleche"> ▸</span></span></span>';
@@ -8801,13 +8803,13 @@ function ajusterRuban() {
 // s'affiche dans le conteneur réellement visible (#marketModalBody) — un bandeau
 // inséré avant #feed partait dans le panneau latéral replié et restait invisible
 // (constaté au rendu : présent dans le DOM, absent de l'écran).
-// Les cartes ont le MÊME HTML dans les deux modes : un texte qui diffère est écrit deux fois,
-// chacun dans son span (modes) ; un bloc réservé à l'Expert est enveloppé (envExpert : sans
-// boîte en Expert, display: contents — la mise en page Expert ne change pas) ; un bloc du
-// Débutant seul, dans un div .debutant-seul (envDebutant).
-const modes = (exp, deb) => '<span class="expert-seul">' + exp + '</span><span class="debutant-seul">' + deb + '</span>';
-const envExpert = h => '<div class="env-exp expert-seul">' + h + '</div>';
-const envDebutant = h => '<div class="env-deb debutant-seul">' + h + '</div>';
+// Les cartes ont le MÊME HTML avec ou sans les chiffres du marché : un texte qui diffère est écrit
+// deux fois, chacun dans son span (modes) ; un bloc chiffré est enveloppé (envExpert : sans boîte,
+// display: contents — sa mise en page ne change pas) ; un bloc sans les chiffres, dans un div
+// .sans-chiffres (envDebutant).
+const modes = (exp, deb) => '<span class="chiffres-seul">' + exp + '</span><span class="sans-chiffres">' + deb + '</span>';
+const envExpert = h => '<div class="env-exp chiffres-seul">' + h + '</div>';
+const envDebutant = h => '<div class="env-deb sans-chiffres">' + h + '</div>';
 // Débutant : un prix au format français (« 80 394 $ »), un nombre de BTC à l'unité.
 const prixDeb = v => (isNum(v) ? escHtml(Guide.prix(v, '$')) : '—');
 const btcDeb = v => (isNum(v) ? escHtml(Guide.nombre(v, v >= 10 ? 0 : 1)) + ' BTC' : '—');
@@ -8923,7 +8925,7 @@ function renderFeedTo(container) {
       + trackHtml(t.last_close, t.support_30, t.resistance_30, 'S&nbsp;<b>' + fmtUsd(t.support_30) + '</b>', 'R&nbsp;<b>' + fmtUsd(t.resistance_30) + '</b>')
       + '<div class="tf-pied">EMA 20 ' + fmtUsd(e20) + ' · EMA 50 ' + fmtUsd(e50)
       + ' (' + ecart + ') · amplitude ' + fmtNum(ampl,2) + ' % (min/max ' + fen + ')'
-      + (isNum(t.atr_14) ? '<span class="expert-seul"> · ATR ' + fmtUsd(t.atr_14) + ' (' + fmtNum(t.atr_14_pct,2) + ' %)</span>' : '') + '</div>'
+      + (isNum(t.atr_14) ? '<span class="chiffres-seul"> · ATR ' + fmtUsd(t.atr_14) + ' (' + fmtNum(t.atr_14_pct,2) + ' %)</span>' : '') + '</div>'
       + (k === '4h' ? lectureCourte('rsi_tf', t.rsi_14) : '') + '</div>';
   }
   indBody += '<div class="fiches-ligne">' + ['rsi_tf', 'croisement', 'ema_tf', 'sr_tf', 'amplitude', 'atr_tf'].map(f =>
@@ -9047,7 +9049,7 @@ function renderFeedTo(container) {
     const cle = (RC.bande !== null && bandes[String(RC.bande)]) ? String(RC.bande) : String(lq.bande_ref_pct);
     // La bande vient d'un RÉGLAGE (masqué en Débutant) : le sous-titre la dit, et dit qu'elle a
     // été choisie en mode Expert — sinon un réglage changeait ces BTC sans que rien ne le dise.
-    liqSousDeb = 'Binance, à ' + bandeTxt(cle) + ' du prix' + (RC.bande !== null && cle === String(RC.bande) ? ' (bande choisie en mode Complet)' : '');
+    liqSousDeb = 'Binance, à ' + bandeTxt(cle) + ' du prix' + (RC.bande !== null && cle === String(RC.bande) ? ' (bande choisie dans les réglages fins)' : '');
     const bt = bandes[cle] || { ratio: lq.ratio_bid_ask, bid_btc: lq.total_bid, ask_btc: lq.total_ask };
     liqDeb = splitHtml(bt.bid_btc, bt.ask_btc, 'À l’achat&nbsp;<b>' + btcDeb(bt.bid_btc) + '</b>', 'À la vente&nbsp;<b>' + btcDeb(bt.ask_btc) + '</b>')
       + lectureCourte('carnet', bt.ratio)
@@ -9217,7 +9219,7 @@ function valeurContre(v) {
 }
 function contreCorps(d) {
   if (!d) return '';
-  return envDebutant('<div class="fine">Le navigateur recalcule les chiffres publiés : détail en mode Complet.</div>') + envExpert(contreCorpsExpert(d));
+  return envDebutant('<div class="fine">Le navigateur recalcule les chiffres publiés : détail avec « Les chiffres du marché ».</div>') + envExpert(contreCorpsExpert(d));
 }
 function contreCorpsExpert(d) {
   const pub = Date.parse(d.updated), hm = isFinite(pub) ? Fmt.jourHeure(pub) : '—';
@@ -9696,7 +9698,7 @@ function showWalkForward() {
 }
 async function init() {
   liaisonCarte();                 // le prix venu de la carte (#prix=…), le thème décrit pour elle
-  appliquerMode(modeCourant());   // libellé du bouton ; la classe est déjà posée par index.html
+  appliquerMode(modeCourant(), false);   // la page suit ce qui est gardé (index.html a posé la classe), sans rien écrire
   lireJetons(); jetonsLus = true;
   redessinerApresPolices();
   // La légende du ruban (calques allumés, gardés sous samsara-affichage-v1) et le compteur du bouton.

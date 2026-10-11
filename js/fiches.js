@@ -17,26 +17,45 @@
 // tests/test_fiches.js fait tenir ces règles (champ publié, paramètres réels, aucun conseil,
 // aucun nombre avec unité écrit en dur dans TRADERS, CALCUL et USAGES).
 //
-// MODE LISIBLE / COMPLET : une CLASSE sur <html>, rien d'autre. Le HTML produit est le même
-// dans les deux modes ; seul l'affichage de `.debutant-seul` / `.expert-seul` change. Une
-// valeur ne peut donc pas différer d'un mode à l'autre — le harnais le vérifie. Les noms MONTRÉS
-// sont « Lisible » (l'essentiel) et « Complet » (tout) ; la valeur gardée (samsara-mode) et les
-// identifiants restent 'debutant' et 'expert' : qui était en Expert arrive en Complet, même écran.
+// UN SEUL ÉCRAN (choix de Lorenzo, 11/10/2026) : plus d'interrupteur Lisible / Complet. Deux calques
+// du panneau « Choisir l'affichage » décident de ce qui est MONTRÉ, jamais d'une valeur :
+//   - « Le détail » (tous les repères, figures et scénarios) : data-mode="expert" sur <html> quand il
+//     est allumé, 'debutant' sinon ; gardé sous samsara-mode, la clé de l'ancien mode Complet — qui
+//     y était garde donc tout son détail. Les classes .expert-seul / .debutant-seul le suivent.
+//   - « Les chiffres du marché » (chiffres de l'en-tête, En direct, Grid Bot, infos chiffrées) :
+//     data-chiffres="1" ; gardé sous samsara-chiffres-v1 ; sans clé, l'état du détail au chargement.
+// Le HTML produit est le même dans tous les cas : seul l'affichage des classes change (le harnais le
+// vérifie). Les identifiants internes restent 'debutant' (détail éteint) et 'expert' (allumé).
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const MODE_CLE = 'samsara-mode';
-// Le mode quand le stockage ne le garde pas (navigation privée, stockage bloqué) : la page entière
-// — classes, bouton ET graphique — lit alors ce mode-ci, jamais un stockage muet ou figé.
-let MODE_MEMOIRE = null;
+const MODE_CLE = 'samsara-mode', CHIFFRES_CLE = 'samsara-chiffres-v1';
+// Le choix quand le stockage ne le garde pas (navigation privée, stockage bloqué) : la page entière
+// — classes, panneau ET graphique — lit alors ce choix-ci, jamais un stockage muet ou figé.
+let MODE_MEMOIRE = null, CHIFFRES_MEMOIRE = null;
 function modeHtml() {
   try { return document.documentElement.getAttribute('data-mode') === 'expert' ? 'expert' : 'debutant'; } catch (e) { return 'debutant'; }
 }
+/** 'expert' quand « Le détail » est allumé, 'debutant' sinon. */
 function modeCourant() {
   if (MODE_MEMOIRE) return MODE_MEMOIRE;
   try { return localStorage.getItem(MODE_CLE) === 'expert' ? 'expert' : 'debutant'; } catch (e) { return modeHtml(); }
 }
-/** Pose le mode m sur toute la page. `ecrire` (par défaut) le garde aussi dans le stockage ; false :
- *  il y est déjà (changé dans un autre onglet : la carte, ou un autre terminal). */
+/** « Le détail » est-il allumé ? */
+const detailAllume = () => modeCourant() === 'expert';
+// Sans choix gardé, « Les chiffres du marché » prennent, une fois pour toutes, l'état du détail au
+// chargement (qui était en Complet les garde) ; ensuite les deux cases sont indépendantes.
+const CHIFFRES_DEPART = (() => {
+  try { const v = localStorage.getItem(CHIFFRES_CLE); return v === null ? localStorage.getItem(MODE_CLE) === 'expert' : v === '1'; }
+  catch (e) { try { return document.documentElement.getAttribute('data-chiffres') === '1'; } catch (e2) { return false; } }
+})();
+/** « Les chiffres du marché » sont-ils allumés ? */
+function chiffresAllumes() {
+  if (CHIFFRES_MEMOIRE !== null) return CHIFFRES_MEMOIRE;
+  try { const v = localStorage.getItem(CHIFFRES_CLE); return v === null ? CHIFFRES_DEPART : v === '1'; }
+  catch (e) { return CHIFFRES_DEPART; }
+}
+/** Pose « Le détail » (m : 'expert' allumé, 'debutant' éteint) sur toute la page. `ecrire` (par
+ *  défaut) le garde aussi dans le stockage ; false : il y est déjà (changé dans un autre onglet). */
 function appliquerMode(m, ecrire) {
   document.documentElement.setAttribute('data-mode', m);
   if (ecrire === false) MODE_MEMOIRE = null;   // le stockage dit vrai : l'autre onglet vient de l'écrire
@@ -45,35 +64,32 @@ function appliquerMode(m, ecrire) {
     try { localStorage.setItem(MODE_CLE, m); garde = localStorage.getItem(MODE_CLE) === m; } catch (e) { /* navigation privée */ }
     MODE_MEMOIRE = garde ? null : m;
   }
-  const b = document.getElementById('modeBtn');
-  if (b) {
-    // L'interrupteur « Lisible | Complet » dit l'ÉTAT, comme celui de la carte : le segment du mode
-    // actif est enfoncé (aria-pressed), l'autre y mène ; la touche M passe de l'un à l'autre.
-    for (const s of b.querySelectorAll('[data-mode-choix]')) s.setAttribute('aria-pressed', s.getAttribute('data-mode-choix') === m ? 'true' : 'false');
-  }
-  const c = document.getElementById('carteBtn');
-  if (c) {
-    c.title = m === 'expert' ? 'Carte du carnet (bookmap) — page à côté' : 'Carte des ordres en attente (page à côté)';
-    c.setAttribute('aria-label', m === 'expert' ? 'Carte du carnet' : 'Carte des ordres en attente');
-  }
-  // R et F font ici la même chose : la vue de départ, au présent (sur la carte, R : la vue par
-  // défaut ; F : suivre le présent).
-  const r = document.getElementById('resetBtn');
-  if (r) r.title = m === 'expert' ? 'Réinitialiser le zoom, revenir au présent (R ou F)' : 'Revenir au présent (R ou F)';
-  // Le graphique écrit ses mots selon le mode (le canvas n'a pas de classes) : remise en page et
+  document.documentElement.setAttribute('data-chiffres', chiffresAllumes() ? '1' : '0');
+  // Le graphique écrit ses mots selon le détail (le canvas n'a pas de classes) : remise en page et
   // dessin à la prochaine image — mêmes valeurs, autres mots.
   try {
     if (typeof apresChangementMode === 'function') apresChangementMode(m);
     else if (typeof scheduleDraw === 'function' && candles.length) scheduleDraw();
   } catch (e) { /* page pas encore chargée */ }
 }
+/** Pose « Les chiffres du marché » (on : booléen) et le garde. */
+function appliquerChiffres(on, ecrire) {
+  if (ecrire !== false) {
+    let garde = false;
+    try { localStorage.setItem(CHIFFRES_CLE, on ? '1' : '0'); garde = localStorage.getItem(CHIFFRES_CLE) === (on ? '1' : '0'); } catch (e) { /* navigation privée */ }
+    CHIFFRES_MEMOIRE = garde ? null : !!on;
+  } else CHIFFRES_MEMOIRE = null;
+  document.documentElement.setAttribute('data-chiffres', chiffresAllumes() ? '1' : '0');
+  try { if (typeof apresChangementChiffres === 'function') apresChangementChiffres(); } catch (e) { /* page pas encore chargée */ }
+}
 function basculerMode() { appliquerMode(modeCourant() === 'expert' ? 'debutant' : 'expert'); }
-/** Un segment de l'interrupteur : celui du mode actif ne fait rien, l'autre change de mode. */
+/** « Le détail » allumé ('expert') ou éteint ('debutant') ; rien si c'est déjà le cas. */
 function choisirMode(m) { if (m !== modeCourant()) appliquerMode(m); }
-// Le mode changé dans un autre onglet (la carte, ou un autre terminal) : suivi ici sans réécrire le
+// Le choix changé dans un autre onglet (la carte, ou un autre terminal) : suivi ici sans réécrire le
 // stockage, comme la carte (js/bookmap.js). Sans cela, le graphique (qui relit le stockage à chaque
-// dessin) passait dans l'autre mode, la page (classes, interrupteur) restait dans le premier.
+// dessin) suivait l'autre onglet, la page (classes) restait sur le premier choix.
 function modeChangeAilleurs(e) {
+  if (e && e.key === CHIFFRES_CLE) { appliquerChiffres(null, false); return; }
   if (e && e.key !== MODE_CLE && e.key !== null) return;
   const m = modeCourant();
   if (document.documentElement.getAttribute('data-mode') !== m) appliquerMode(m, false);
@@ -225,7 +241,7 @@ const FICHES = {
       { s: 'usuel', t: 'Prix au-dessus de la moyenne : tendance haussière sur cet horizon ; en dessous : baissière.' },
       { s: 'usuel', t: 'EMA courte au-dessus de la longue : tendance haussière de plus court terme. Un croisement arrive toujours APRÈS le mouvement (retard par construction).' },
     ],
-    limites: 'Dépend de la profondeur chargée : voir le poids résiduel de l’amorce en mode Complet.',
+    limites: 'Dépend de la profondeur chargée : voir le poids résiduel de l’amorce sous « En savoir plus ».',
   },
   croisement: {
     titre: 'EMA 20 sous EMA 50 (ex-« death cross »)', champ: 'tf.*.ema20_sous_ema50',
@@ -357,7 +373,7 @@ const FICHES = {
   guide: {
     titre: 'Guide du graphique', page: 'guide', nature: 'convention',
     titreDeb: 'Repères et phrase de lecture',
-    simpleDeb: 'En haut du graphique, une phrase dit si le prix monte, baisse ou hésite, et depuis quand. Deux repères de prix l’encadrent : le plus proche au-dessus, le plus proche en dessous. Puis le scénario n° 1 de Claude et, s’il y en a une, une figure du graphique. Touchez (ou survolez) un texte pour le détail. Une description, jamais un conseil ; le reste est en mode Complet, et tout se masque dans « Choisir l’affichage ».',
+    simpleDeb: 'En haut du graphique, une phrase dit si le prix monte, baisse ou hésite, et depuis quand. Deux repères de prix l’encadrent : le plus proche au-dessus, le plus proche en dessous. Puis le scénario n° 1 de Claude et, s’il y en a une, une figure du graphique. Touchez (ou survolez) un texte pour le détail. Une description, jamais un conseil ; tout le reste s’ajoute ou se masque dans « Choisir l’affichage » (« Le détail » pour tous les repères).',
     simple: 'Une couche qui DÉCRIT ce que montre le graphique : les niveaux de prix proches et d’où ils viennent, le régime du marché, les formes chartistes en cours avec leur bilan mesuré, deux chemins conditionnels et une phrase de résumé. Elle ne dit jamais quoi faire.',
     formule: P => 'Niveaux : au plus ' + P.guide.niveauxParCote + ' au-dessus et ' + P.guide.niveauxParCote + ' au-dessous du prix, à moins de ' + pcF(P.guide.distanceMax) + ' %. Régime : ADX ' + P.adx.periode
       + ', EMA ' + P.guide.emaCourte + '/' + P.guide.emaLongue + ', Bollinger ' + P.bb.periode + '. Formes : au plus ' + P.guide.formesMax + ' à la fois. Choix gardé dans ce navigateur.',
@@ -388,7 +404,7 @@ const FICHES = {
   guide_regime: {
     titre: 'Guide — régime du marché', page: 'guide', nature: 'convention',
     titreDeb: 'Le mouvement du prix',
-    simpleDeb: 'En mode Lisible, le mouvement n’a pas de badge : il donne le verbe de la phrase en haut du graphique. « Monte » ou « baisse » : le prix a pris une direction nette ; « hésite » : pas de direction nette ; « s’agite » : il bouge fort, sans sens clair. Le badge et ses mesures sont en mode Complet.',
+    simpleDeb: 'Sans « Le détail », le mouvement n’a pas de badge : il donne le verbe de la phrase en haut du graphique. « Monte » ou « baisse » : le prix a pris une direction nette ; « hésite » : pas de direction nette ; « s’agite » : il bouge fort, sans sens clair. Le badge et ses mesures s’affichent avec « Le détail » (dans « Choisir l’affichage »).',
     simple: 'Un badge en haut du graphique : marché en tendance (et dans quel sens), en tendance faible ou sans tendance nette ; il ajoute « compression » quand les bandes de Bollinger sont parmi les plus étroites des dernières bougies.',
     formule: P => 'ADX ' + P.adx.periode + ' ≥ ' + P.guide.adxTendance + ' : tendance (haussière si +DI > −DI et EMA ' + P.guide.emaCourte + ' > EMA ' + P.guide.emaLongue + ', baissière si les deux disent l’inverse, sinon sens incertain) ; ADX ≤ '
       + P.guide.adxSans + ' : sans tendance nette ; entre les deux : tendance faible. Compression : largeur de Bollinger (' + P.bb.periode + ', ' + P.bb.ecarts + ' σ) au plus à son ' + P.guide.bbPercentile + 'e centile des ' + P.guide.bbFenetre + ' dernières bougies ; « au plus bas depuis N bougies » n’est dit qu’à partir de N = ' + P.guide.compressionDepuisMin + '.',
@@ -429,7 +445,7 @@ const FICHES = {
   guide_suite: {
     titre: 'Guide — et ensuite ?', page: 'guide', nature: 'convention',
     titreDeb: 'Et après un repère ?',
-    simpleDeb: 'En mode Lisible, rien n’est dessiné pour la suite : touchez un repère (ou la phrase) pour lire « si le prix finit au-delà de ce repère, le repère suivant est … ». Une condition, pas une prévision. Les chemins dessinés sont en mode Complet.',
+    simpleDeb: 'Sans « Le détail », rien n’est dessiné pour la suite : touchez un repère (ou la phrase) pour lire « si le prix finit au-delà de ce repère, le repère suivant est … ». Une condition, pas une prévision. Les chemins dessinés s’affichent avec « Le détail » (dans « Choisir l’affichage »).',
     simple: 'Deux chemins conditionnels à droite de la dernière bougie : « si clôture au-dessus de X, prochain niveau Y » et « si clôture sous Z, prochain niveau W ».',
     formule: P => 'X et Z : le premier niveau nommé au-dessus et au-dessous du prix ; Y et W : le suivant de chaque côté. Prix DANS une bande : X et Z sont ses deux bords. Marge de dessin : ' + pcF(P.guide.futur) + ' % de la largeur du tracé, entre ' + P.guide.futurMinPx + ' et ' + P.guide.futurMaxPx + ' pixels, au plus ' + pcF(P.guide.futurMaxFraction) + ' % du tracé.',
     lectures: [
@@ -441,7 +457,7 @@ const FICHES = {
   // ── Les scénarios du matin (js/scenarios.js) : fichier previsions.json, branche « previsions » ──
   scenarios: {
     titreDeb: 'Scénarios du matin',
-    simpleDeb: 'Chaque matin, Claude (une IA) écrit trois scénarios pour les 24 h qui suivent et les classe du plus au moins probable, sans pourcentage. L’écran Lisible montre le n° 1 (son libellé près de sa zone ; s’il ne tient plus, le suivant encore en cours) et une ligne qui dit où il en est ; touchez-les pour les trois. Une hypothèse, jamais un conseil.',
+    simpleDeb: 'Chaque matin, Claude (une IA) écrit trois scénarios pour les 24 h qui suivent et les classe du plus au moins probable, sans pourcentage. L’écran montre le n° 1 (son libellé près de sa zone ; s’il ne tient plus, le suivant encore en cours) et une ligne qui dit où il en est ; touchez-les pour les trois. Une hypothèse, jamais un conseil.',
     titre: 'Scénarios du matin', page: 'scenarios', nature: 'convention',
     simple: 'Chaque matin, Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ, à partir de son analyse du marché, et les classe du plus au moins probable, SANS pourcentage. Chaque niveau a une origine nommée (plus haut d’hier, mur d’options…) et se lit comme une zone : le niveau plus ou moins une marge. Le graphique les dessine et suit en direct ce que les bougies en font. Une description, jamais un conseil.',
     formule: P => 'Point du matin : ' + pointMots(P) + ', BTCUSDT seulement. Zone : niveau × (1 ± marge du fichier). Une bougie touche une zone si son plus bas est sous le haut de la zone et son plus haut au-dessus du bas. Chemin : chaque cible dans une bougie plus tardive que la précédente ; invalidation touchée d’abord = invalidé. Range : sorti si une bougie dépasse une borne de plus de la marge. Suivi en direct : seules les bougies ENTIÈRES dans la fenêtre comptent, sur des bougies de ' + Math.round(P.scenarios.suiviPasMax / 60) + ' min au plus. « Échantillon faible » sous '
@@ -1002,11 +1018,10 @@ function fmtValF(v) {
   return String(v);
 }
 
-/** La fiche, en HTML. IDENTIQUE dans les deux modes : seules les classes `.debutant-seul` /
- *  `.expert-seul` décident de ce qui s'affiche. Trois niveaux : ce que c'est (en gras), comment
- *  les traders s'en servent et comment c'est calculé — en trois lignes courtes pour le Débutant
- *  (COURT), en entier pour l'Expert —, puis « En savoir plus » (lectures, limites, formule ; pour
- *  le Débutant, aussi les textes entiers), replié en Débutant et ouvert en Expert (ouvrirFiche). */
+/** La fiche, en HTML, la même pour tout le monde (un seul écran). Trois niveaux : ce que c'est (en
+ *  gras), comment les traders s'en servent et comment c'est calculé, en lignes courtes (COURT) ;
+ *  puis « En savoir plus », replié : les textes entiers, la valeur publiée, les lectures, les
+ *  limites et la formule. */
 function ficheHtml(id) {
   const f = FICHES[id];
   if (!f) return '';
@@ -1016,27 +1031,26 @@ function ficheHtml(id) {
   // Nature : celle que publie le producteur (champ du fichier), sinon celle que la fiche déclare
   // (la forme des bougies est une convention), sinon « mesuré » pour un calcul de la page.
   const nature = m ? m.nature : (f.nature || (f.page ? 'mesure' : null));
-  const titre = f.titreDeb ? '<span class="expert-seul">' + echapF(f.titre) + '</span><span class="debutant-seul">' + echapF(f.titreDeb) + '</span>' : echapF(f.titre);
-  // Un texte pour chaque mode, chacun dans sa classe ; le même s'ils sont égaux.
-  const deux = (exp, deb) => (deb && deb !== exp ? '<span class="expert-seul">' + echapF(exp) + '</span><span class="debutant-seul">' + echapF(deb) + '</span>' : echapF(exp));
+  const titre = echapF(f.titreDeb || f.titre);
+  // La forme courte quand elle existe (le texte entier est sous « En savoir plus »).
+  const deux = (exp, deb) => echapF(deb || exp);
   const quoiDeb = courtTexte(c.quoi) || f.simpleDeb || f.simple;
   let h = '<div class="fiche-tete"><h3 class="fiche-titre">' + titre + '</h3>'
-    + (nature ? '<span class="fiche-nature nature-' + echapF(nature) + '">' + motModes(NATURES[nature] || nature, NATURES_DEB[nature]) + '</span>' : '')
+    + (nature ? '<span class="fiche-nature nature-' + echapF(nature) + '">' + echapF(NATURES_DEB[nature] || NATURES[nature] || nature) + '</span>' : '')
     + '<button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>'
-    + '<p class="fiche-simple expert-seul">' + echapF(f.simple) + '</p><p class="fiche-simple fiche-quoi debutant-seul"><b>' + echapF(quoiDeb) + '</b></p>';
+    + '<p class="fiche-simple fiche-quoi"><b>' + echapF(quoiDeb) + '</b></p>';
   // État du moment dérivé du code (ex. la forme de bougie du thème courant) : même HTML dans les deux modes.
   const etat = f.etat ? f.etat() : null;
   if (etat) h += '<p class="fiche-valeur">' + echapF(etat) + '</p>';
-  // Niveau 2 : l'usage et le calcul. Le Débutant lit les deux phrases de COURT, l'Expert le texte entier.
+  // Niveau 2 : l'usage et le calcul, en deux phrases (COURT) quand elles existent.
   const tradersCourt = courtTexte(c.traders), usageCourt = courtTexte(c.usage), calculCourt = courtTexte(c.calcul), calcul = calculTexte(f);
   if (f.traders) h += '<h4>Comment les traders l’utilisent</h4><p class="fiche-usage">' + deux(f.traders, tradersCourt) + '</p>';
-  else if (f.usage) h += '<h4>Comment s’en servir</h4><p class="fiche-usage">' + (usageCourt ? '<span class="expert-seul">' + (typeof f.usage === 'string' ? echapF(f.usage) : echapF(f.usage.exp)) + '</span><span class="debutant-seul">' + echapF(usageCourt) + '</span>' : usageHtml(id)) + '</p>';
-  else if (usageCourt) h += '<h4 class="debutant-seul">Comment s’en servir</h4><p class="fiche-usage debutant-seul">' + echapF(usageCourt) + '</p>';
+  else if (f.usage) h += '<h4>Comment s’en servir</h4><p class="fiche-usage">' + (usageCourt ? echapF(usageCourt) : usageHtml(id)) + '</p>';
+  else if (usageCourt) h += '<h4>Comment s’en servir</h4><p class="fiche-usage">' + echapF(usageCourt) + '</p>';
   if (calcul) h += '<h4>Comment c’est calculé</h4><p class="fiche-calcul">' + deux(calcul, calculCourt) + '</p>';
-  else if (calculCourt) h += '<h4 class="debutant-seul">Comment c’est calculé</h4><p class="fiche-calcul debutant-seul">' + echapF(calculCourt) + '</p>';
-  // La valeur publiée, avec son unité et son échelle de temps telles que le fichier les nomme : à
-  // ce niveau pour l'Expert ; pour le Débutant, sous « En savoir plus » (sa carte dit déjà la
-  // valeur en mots).
+  else if (calculCourt) h += '<h4>Comment c’est calculé</h4><p class="fiche-calcul">' + echapF(calculCourt) + '</p>';
+  // La valeur publiée, avec son unité et son échelle de temps telles que le fichier les nomme : sous
+  // « En savoir plus » (la carte des infos du marché dit déjà la valeur en mots).
   let valeur = '';
   if (f.champ) {
     const vals = valeursDe(f.champ);
@@ -1046,17 +1060,17 @@ function ficheHtml(id) {
       + (m && m.unite ? ' <span class="fiche-unite">' + echapF(m.unite) + '</span>' : '')
       + (age !== null ? ' <span class="fiche-age">· publié il y a ' + age + ' min</span>' : '');
   }
-  if (valeur) h += '<p class="fiche-valeur expert-seul">' + valeur + '</p>';
-  // Niveau 3 : « En savoir plus ». Le Débutant y retrouve d'abord les textes entiers (ceux que
-  // l'Expert lit plus haut), puis tout ce qui suit est commun aux deux modes.
+  // Niveau 3 : « En savoir plus » : d'abord les textes entiers, puis le reste.
   h += '<details class="fiche-plus"><summary>En savoir plus</summary>';
   const entiers = [];
+  if (f.titreDeb && f.titreDeb !== f.titre) entiers.push('<p class="fiche-simple"><b>' + echapF(f.titre) + '</b></p>');
+  if (f.simple && f.simple !== quoiDeb && f.simple !== f.simpleDeb) entiers.push('<p class="fiche-simple">' + echapF(f.simple) + '</p>');
   if (f.simpleDeb && f.simpleDeb !== quoiDeb) entiers.push('<p class="fiche-simple">' + echapF(f.simpleDeb) + '</p>');
   if (f.traders && tradersCourt && tradersCourt !== f.traders) entiers.push('<h4>Comment les traders l’utilisent, en détail</h4><p class="fiche-usage">' + echapF(f.traders) + '</p>');
-  if (f.usage && usageCourt) entiers.push('<h4>Comment s’en servir, en détail</h4><p class="fiche-usage">' + (typeof f.usage === 'string' ? echapF(f.usage) : echapF(f.usage.deb || f.usage.exp)) + '</p>');
+  if (f.usage && usageCourt) entiers.push('<h4>Comment s’en servir, en détail</h4><p class="fiche-usage">' + (typeof f.usage === 'string' ? echapF(f.usage) : echapF(f.usage.exp || f.usage.deb)) + '</p>');
   if (calcul && calculCourt && calculCourt !== calcul) entiers.push('<h4>Le calcul en détail</h4><p class="fiche-calcul">' + echapF(calcul) + '</p>');
   if (valeur) entiers.push('<p class="fiche-valeur">' + valeur + '</p>');
-  if (entiers.length) h += '<div class="debutant-seul">' + entiers.join('') + '</div>';
+  if (entiers.length) h += '<div class="fiche-entiers">' + entiers.join('') + '</div>';
   if (f.champ) {
     if (m && m.nom_trompeur) h += '<p class="fiche-alerte">Nom trompeur : ' + echapF(m.nom_trompeur) + '</p>';
     // Les dernières heures de ce champ, publication par publication (js/chronique.js) : même
@@ -1065,10 +1079,10 @@ function ficheHtml(id) {
   }
   h += '<h4>À savoir</h4><ul class="fiche-lectures">' + f.lectures.map(l =>
     // Une lecture propre à un mode (mode : 'debutant' | 'expert') : même HTML, seule sa classe change.
-    '<li' + (l.mode === 'debutant' || l.mode === 'expert' ? ' class="' + l.mode + '-seul"' : '') + '><span class="statut statut-' + echapF(l.s) + '">' + motModes(STATUTS[l.s] || l.s, STATUTS_DEB[l.s]) + '</span> ' + echapF(l.t) + '</li>').join('') + '</ul>';
+    '<li' + (l.mode === 'debutant' || l.mode === 'expert' ? ' class="' + l.mode + '-seul"' : '') + '><span class="statut statut-' + echapF(l.s) + '">' + echapF(STATUTS_DEB[l.s] || STATUTS[l.s] || l.s) + '</span> ' + echapF(l.t) + '</li>').join('') + '</ul>';
   if (f.debat) h += '<div class="fiche-debat"><b>La littérature se contredit.</b> ' + echapF(f.debat) + '</div>';
   if (f.limites) h += '<p class="fiche-limites"><b>Ce que ça ne dit pas :</b> ' + echapF(f.limites) + '</p>';
-  // Détail technique : expert. La formule n'est JAMAIS écrite ici à la main.
+  // Détail technique. La formule n'est JAMAIS écrite ici à la main.
   let formule, details = [];
   if (f.champ) {
     if (m) {
@@ -1078,10 +1092,9 @@ function ficheHtml(id) {
       if (m.params && m.params.poids_amorce_pct !== undefined) details.push(['Poids résiduel de l’amorce', m.params.poids_amorce_pct + ' %']);
     } else formule = 'Description non publiée par ce fichier (producteur antérieur au 06/10/2026).';
   } else if (f.formule) formule = P ? f.formule(P) : '—';
-  h += '<div class="expert-seul fiche-technique"><h4>Formule</h4><p>' + echapF(formule)
+  h += '<div class="fiche-technique"><h4>Formule</h4><p>' + echapF(formule)
     + '</p>' + (details.length ? '<dl>' + details.filter(d => d[1] !== undefined && d[1] !== null).map(([k, v]) => '<dt>' + echapF(k) + '</dt><dd>' + echapF(v) + '</dd>').join('') + '</dl>' : '')
     + '</div>'
-    + '<p class="debutant-seul fiche-indice">La formule exacte, la fenêtre et la source sont en mode Complet.</p>'
     + '</details>'
     + '<p class="fiche-pied">Ceci décrit comment l’indicateur se lit. Ce n’est pas une recommandation d’achat ou de vente.</p>';
   return h;
@@ -1093,9 +1106,7 @@ function ouvrirFiche(id, ancre) {
   const p = document.getElementById('fichePop');
   if (!p || !FICHES[id]) return;
   p.innerHTML = ficheHtml(id);
-  // « En savoir plus » : ouvert en Expert, replié en Débutant (le détail, sur demande).
-  const plus = p.querySelector('.fiche-plus');
-  if (plus) plus.open = modeCourant() === 'expert';
+  // « En savoir plus » : replié (le détail, sur demande).
   p.hidden = false;
   ficheOuverte = id; ficheRetour = ancre || null;
   // Bureau : près du bouton ; téléphone : en bas de l'écran (CSS).
@@ -1131,7 +1142,7 @@ const GLOSSAIRE_DEBUTANT = ['guide', 'guide_niveaux', 'scenarios', 'bougies', 's
 /** Les touches du terminal (js/app.js), dans l'ordre de la légende de la carte : une même touche
  *  veut dire la même chose sur les deux pages (M le mode, ? l'aide de la page, R la vue de départ,
  *  F le présent) ; I ouvre les infos du marché (le terminal seul). */
-const RACCOURCIS_TERMINAL = 'Touches : M change de mode (Lisible / Complet) · ? cette aide · R revient à la vue de départ · F suit le présent (ici, comme R) · I les infos du marché · T / D le thème.';
+const RACCOURCIS_TERMINAL = 'Touches : ? cette aide · R revient à la vue de départ · F suit le présent (ici, comme R) · I les infos du marché · T / D le thème.';
 function ouvrirGlossaire(ancre) {
   const p = document.getElementById('fichePop');
   if (!p) return;
@@ -1144,13 +1155,11 @@ function ouvrirGlossaire(ancre) {
   const bouton = (i, t) => '<button type="button" class="glossaire-item" onclick="ouvrirFiche(\'' + i + '\')">' + echapF(t) + '</button>';
   const tous = groupes.map(([g, ids]) => '<h4>' + g + '</h4><div class="glossaire">' + ids.map(i => bouton(i, FICHES[i].titre)).join('') + '</div>').join('');
   p.innerHTML = '<div class="fiche-tete"><h3 class="fiche-titre">Légendes</h3><button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>'
-    + '<p class="fiche-simple">Comment chaque chiffre se lit — et ce qu’il ne dit pas. Mode <b><span class="expert-seul">Complet</span><span class="debutant-seul">Lisible</span></b> : '
-    + '<button type="button" class="lien" onclick="basculerMode();ouvrirGlossaire()">changer</button>.</p>'
-    // Les touches : les mêmes que sur la carte (M, ?, R, F), en une ligne.
+    + '<p class="fiche-simple">Comment chaque chiffre se lit, et ce qu’il ne dit pas. « Choisir l’affichage » ajoute ou retire ce que montre le graphique.</p>'
+    // Les touches : les mêmes que sur la carte (?, R, F), en une ligne.
     + '<p class="fiche-touches">' + RACCOURCIS_TERMINAL + '</p>'
-    + '<div class="debutant-seul"><h4>Ce que montre l’écran</h4><div class="glossaire">' + GLOSSAIRE_DEBUTANT.map(i => bouton(i, FICHES[i].titreDeb || FICHES[i].titre)).join('') + '</div>'
-    + '<details class="glossaire-plus"><summary>Fiches du mode Complet ▸</summary>' + tous + '</details></div>'
-    + '<div class="expert-seul">' + tous + '</div>';
+    + '<h4>Ce que montre l’écran</h4><div class="glossaire">' + GLOSSAIRE_DEBUTANT.map(i => bouton(i, FICHES[i].titreDeb || FICHES[i].titre)).join('') + '</div>'
+    + '<details class="glossaire-plus"><summary>Toutes les fiches ▸</summary>' + tous + '</details>';
   p.hidden = false;
   p.style.left = ''; p.style.top = '';
   ficheOuverte = 'glossaire'; ficheRetour = ancre || null;
@@ -1163,9 +1172,9 @@ document.addEventListener('click', e => {
 
 // ─── Lecture courte : ce que dit la valeur DU MOMENT, en mots, sans conseil ────────────────
 // Les seuils utilisés ici sont des CONVENTIONS ; la phrase le dit quand c'en est une.
-// lectureCourte : la phrase d'un bloc de chiffres, dans les deux modes (en Complet, à côté des
-// chiffres, plus discrète) ; le bloc qui la porte (envExpert / envDebutant) dit où elle se voit.
-// phraseCarte : les phrases propres aux cartes du Lisible.
+// lectureCourte : la phrase d'un bloc de chiffres, toujours (avec les chiffres du marché, à côté
+// des chiffres, plus discrète) ; le bloc qui la porte (envExpert / envDebutant) dit où elle se voit.
+// phraseCarte : les phrases propres aux cartes sans les chiffres du marché.
 /** Les phrases des cartes en mode Débutant (sans jargon, sans seuil inventé) : le même bloc que
  *  lectureCourte, pour des cartes qui n'ont pas de fiche. cle : 'fourchette' (v : position dans
  *  la fourchette, de 0 au plus bas à 1 au plus haut ; v2 : « 24 h » ou « 5 jours » ; sujet : « le
@@ -1192,7 +1201,7 @@ function phraseCarte(cle, v, v2, sujet) {
     case 'sources': if (n(v) && n(v2)) t = v >= v2 ? 'La dernière publication est complète.' : (v2 - v) + (v2 - v > 1 ? ' infos manquent' : ' info manque') + ' dans la dernière publication (détail en mode Complet).'; break;
     default: t = null;
   }
-  return t ? '<div class="lecture-courte debutant-seul">' + echapF(t) + '</div>' : '';
+  return t ? '<div class="lecture-courte sans-chiffres">' + echapF(t) + '</div>' : '';
 }
 
 /** Le VIX en mots du Débutant : UNE phrase pour les mêmes repères (sous 15, au-dessus de 25), dans

@@ -54,11 +54,11 @@ check('tranche des murs affichée = tranche publiée', h0.includes('par tranche 
 // La bande vient d'un RÉGLAGE de l'Expert, masqué en Débutant : la carte « Ordres en attente »
 // du Débutant la dit, et dit quand elle a été choisie en mode Expert.
 check('Débutant, « Ordres en attente » : « à ±' + frB(LQ.bande_ref_pct) + ' % du prix », sans « bande choisie » quand rien n’est réglé',
-  h0.includes('Binance, à ±' + frB(LQ.bande_ref_pct) + ' % du prix') && !h0.includes('bande choisie en mode Complet'));
+  h0.includes('Binance, à ±' + frB(LQ.bande_ref_pct) + ' % du prix') && !h0.includes('bande choisie dans les réglages fins'));
 {
   const rg = page.sandbox.reglagesHtml();
   check('Réglages : « référence publiée (±' + frB(LQ.bande_ref_pct) + ' %) » à la française, comme les autres bandes ; la carte du Débutant nommée',
-    rg.includes('référence publiée (±' + frB(LQ.bande_ref_pct) + ' %)') && rg.includes('du mode Lisible') && !rg.includes('Débutant') && !/±\d+\.\d/.test(rg), (rg.match(/±[\d.,]+ %[^<]{0,20}/g) || []).slice(0, 6));
+    rg.includes('référence publiée (±' + frB(LQ.bande_ref_pct) + ' %)') && rg.includes('sans les chiffres du marché') && !rg.includes('Débutant') && !/±\d+\.\d/.test(rg), (rg.match(/±[\d.,]+ %[^<]{0,20}/g) || []).slice(0, 6));
 }
 {
   // Plus de bouton « Réglages » dans l'en-tête : ce sont les « Réglages fins », repliés en bas du
@@ -73,7 +73,7 @@ check('Débutant, « Ordres en attente » : « à ±' + frB(LQ.bande_ref_pct) + 
     && panneau.includes(rg) && rg.includes('r_live_niveaux') && rg.includes('r_heat_seuil') && panneau.indexOf('aff-fins') > panneau.lastIndexOf('data-ind='), panneau.slice(-300));
   const deb = chargerPage();
   vm.runInContext('buildDropdown()', deb.sandbox);
-  check('Lisible : pas de réglages fins dans le panneau', !deb.T.el('indMenu').innerHTML.includes('Réglages fins') && !deb.T.el('indMenu').innerHTML.includes('r_live_niveaux'));
+  check('un seul panneau : sans « Le détail » aussi, les « Réglages fins » repliés en bas, le même contenu', deb.T.el('indMenu').innerHTML.includes('Réglages fins') && deb.T.el('indMenu').innerHTML.includes('r_live_niveaux'));
   const html = fs.readFileSync(path.join(REPO, 'index.html'), 'utf8');
   check('plus de bouton ni de bulle « Réglages » dans l’en-tête (#reglagesBtn, #reglagesPop)', !/id="reglages(Btn|Pop)"/.test(html));
   // (Le bac n'a pas de canvas : le dessin du graphique, que appliquerReglages demande, est neutralisé.)
@@ -107,7 +107,7 @@ regler(r => { r.carnet.bande = +autre; });
 const h2 = rendre();
 check(`bande choisie (±${autre} %) parmi les PUBLIÉES : son ratio publié tel quel`, h2.includes('Carnet ±' + frB(autre) + ' %')
   && h2.includes('>' + fr2(LQ.bandes[autre].ratio) + '</b>'));
-check(`… et la carte du Débutant le dit : « à ±${frB(autre)} % du prix (bande choisie en mode Complet) »`, h2.includes('Binance, à ±' + frB(autre) + ' % du prix (bande choisie en mode Complet)'));
+check(`… et la carte du Débutant le dit : « à ±${frB(autre)} % du prix (bande choisie dans les réglages fins) »`, h2.includes('Binance, à ±' + frB(autre) + ' % du prix (bande choisie dans les réglages fins)'));
 regler(r => { r.carnet.bande = 0.37; });
 check('bande demandée mais NON publiée : retour à la référence publiée (rien d’inventé)', rendre().includes('Carnet ±' + frB(LQ.bande_ref_pct) + ' %'));
 
