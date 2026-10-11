@@ -215,9 +215,14 @@ const etat = page => page.evaluate(() => {
         await t.page.touchscreen.tap(x, y); await t.page.waitForTimeout(200);
         const apres = await t.page.evaluate(() => (scenEtat.survol ? scenEtat.survol.titre : null));
         check('tap → son explication (bulle partagée avec le Guide) : « ' + c.titre + ' »', apres === c.titre, { apres, attendu: c.titre });
+        // Une bulle en trois niveaux, avec ou sans « Le détail » (option A, 11/10/2026) : le 2e tap
+        // ouvre son détail, le 3e la retire.
+        await t.page.touchscreen.tap(x, y); await t.page.waitForTimeout(200);
+        const detail = await t.page.evaluate(() => ({ survol: scenEtat.survol ? scenEtat.survol.titre : null, bulleDetail }));
+        check('… un 2e tap ouvre son détail (même bulle)', detail.survol === c.titre && detail.bulleDetail !== null, detail);
         await t.page.touchscreen.tap(x, y); await t.page.waitForTimeout(200);
         const retire = await t.page.evaluate(() => ({ survol: scenEtat.survol, crossX }));
-        check('… un 2e tap au même endroit la retire', retire.survol === null && retire.crossX === null, retire);
+        check('… un 3e tap au même endroit la retire', retire.survol === null && retire.crossX === null, retire);
       }
       check('écran tactile : aucune erreur JavaScript', !t.erreurs.length, t.erreurs);
       await t.ctx.close();
@@ -247,6 +252,11 @@ const etat = page => page.evaluate(() => {
       else {
         const r = c.rects[0], x = e.bx + (r.x0 + r.x1) / 2, y = e.by + (r.y0 + r.y1) / 2;
         if (tactile) await o.page.touchscreen.tap(x, y); else { await o.page.mouse.move(x - 8, y - 2); await o.page.mouse.move(x, y, { steps: 3 }); }
+        await o.page.waitForTimeout(250);
+        // D'abord le résumé, qui mène au détail ; un 2e toucher (ou un clic) ouvre le détail.
+        const b0 = await o.page.evaluate(() => (scenEtat && scenEtat.bulle ? scenEtat.bulle : null));
+        check(`${nom} : la bulle de l’encadré s’ouvre sur son résumé, qui mène au détail (« ${tactile ? 'Touchez encore' : 'Cliquez'} : le détail »)`, b0 && /(Touchez encore|Cliquez) : le détail/.test(b0.corps.join(' ')), b0 && b0.corps);
+        if (tactile) await o.page.touchscreen.tap(x, y); else await o.page.mouse.click(x, y);
         await o.page.waitForTimeout(250);
         const b = await o.page.evaluate(() => (scenEtat && scenEtat.bulle ? scenEtat.bulle : null));
         const vu = b ? b.corps.join(' ') : '';

@@ -376,11 +376,14 @@ async function bulle(o, tactile) {
       // Échap le referme.
       await o.page.keyboard.press('Escape'); await o.page.waitForTimeout(100);
       check(`${mode} ${w} px : Échap referme le détail`, await o.page.evaluate(() => document.getElementById('fichePop').hidden), null);
-      // Complet (souris) : un clic sur la figure dont la bulle est ouverte ouvre aussi le détail.
+      // Le détail (souris) : la bulle s'ouvre sur son résumé (option A, 11/10/2026) ; un clic sur la
+      // figure ouvre la bulle entière, un 2e clic ses statistiques détaillées.
       if (mode === 'expert' && pt) {
         await o.page.mouse.move(pt.x - 8, pt.y - 3); await o.page.mouse.move(pt.x, pt.y, { steps: 3 }); await o.page.waitForTimeout(250);
         await o.page.mouse.click(pt.x, pt.y); await o.page.waitForTimeout(300);
-        check('Complet : cliquer sur le libellé de la figure (ses statistiques courtes) ouvre le détail', await o.page.evaluate(() => !document.getElementById('fichePop').hidden && !!window.__statsFigure), null);
+        const entiere = await o.page.evaluate(() => ({ fiche: !document.getElementById('fichePop').hidden, detail: bulleDetail !== null }));
+        await o.page.mouse.click(pt.x, pt.y); await o.page.waitForTimeout(300);
+        check('Le détail : un clic sur le libellé de la figure ouvre sa bulle entière, un 2e clic ses statistiques détaillées', !entiere.fiche && entiere.detail && await o.page.evaluate(() => !document.getElementById('fichePop').hidden && !!window.__statsFigure), entiere);
       }
       check(`${mode} ${w} px : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();

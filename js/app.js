@@ -1436,7 +1436,7 @@ canvas.addEventListener('dblclick', () => {
 });
 
 // Tap = réticule, infobulle OHLCV et explication du Guide ; un 2e tap au même endroit les retire.
-// Débutant, une bulle en trois niveaux (demande du 10/10/2026) : son titre en gras, quelques mots
+// Une bulle en trois niveaux (demande du 10/10/2026, avec ou sans « Le détail » depuis le 11/10) : son titre en gras, quelques mots
 // (guideBulle) ; toucher (ou cliquer) la même bulle une 2e fois ouvre tout le détail ; une 3e fois
 // au même endroit la ferme.
 let bulleVue = null, bulleDetail = null;   // la clé de la bulle dessinée en résumé ; celle dont le détail est ouvert
@@ -1456,11 +1456,11 @@ function tapGraphique(clientX, clientY) {
     if (lienBulle.action) { lienBulle.action(); return true; }
     location.href = lienBulle.url; return true;
   }
-  // Une figure dont la bulle est déjà ouverte en entier (Complet : au survol ou au 1er toucher ;
-  // Lisible : son détail) : un clic de plus sur elle ouvre ses statistiques détaillées.
+  // Une figure dont la bulle est déjà ouverte en entier (son détail) : un clic de plus sur elle
+  // ouvre ses statistiques détaillées.
   const cF = geo && lienBulle && lienBulle.action && crossX !== null ? guideCibleSous(tx, ty, geo.mainH, debutant()) : null;
-  if (cF && cleBulle(cF) === lienBulle.cle && (!debutant() || bulleDetail === lienBulle.cle)) { lienBulle.action(); return true; }
-  const c = debutant() && geo ? guideCibleSous(tx, ty, geo.mainH) : null, k = c ? cleBulle(c) : null;
+  if (cF && cleBulle(cF) === lienBulle.cle && bulleDetail === lienBulle.cle) { lienBulle.action(); return true; }
+  const c = geo ? guideCibleSous(tx, ty, geo.mainH) : null, k = c ? cleBulle(c) : null;
   if (k && crossX !== null && bulleVue === k && bulleDetail !== k) {
     // 2e toucher sur la bulle montrée : son détail.
     bulleDetail = k; crossX = tx; crossY = ty;
@@ -4878,20 +4878,31 @@ function guideLibellesNiveaux(E, top, bas, surBougies) {
   const larg = t => ctx.measureText(t).width + 14;
   for (const L of E.niveaux) if (!L.visible) E.hors.push(L);
   const vis = E.niveaux.filter(L => L.visible).sort((a, b) => a.y - b.y);
+  // L'essentiel (option A, 11/10/2026) : avec « Le détail », la bande la plus proche du prix
+  // au-dessus et au-dessous garde son libellé entier, en gras ; les autres sont des repères courts.
+  if (E.courtes) {
+    const px = isNum(livePrice) ? livePrice : E.D.ref;
+    const dessus = vis.filter(L => L.niv.pMin > px).sort((a, b) => a.niv.pMin - b.niv.pMin)[0];
+    const dessous = vis.filter(L => L.niv.pMax < px).sort((a, b) => b.niv.pMax - a.niv.pMax)[0];
+    for (const L of vis) L.essentiel = L === dessus || L === dessous;
+  }
   E.sansPlace = [];
   let yPrec = -Infinity;
   for (const L of vis) {
     const publie = L.niv.raisons.some(r => isNum(r.lu));
     let lignes = null;
-    // Téléphone en Complet : le repère court (sa plage) ; le libellé entier est dans la bulle.
-    const formes = E.courtes ? [[L.repere, dispo]] : [[L.libelle, Math.min(largMax, dispo)], [L.court, dispo], [L.mini, dispo], [L.micro, dispo]];
+    // Avec « Le détail » : le repère court (sa plage), le libellé entier dans la bulle ; l'essentiel
+    // garde le sien, en gras.
+    const court = E.courtes && !L.essentiel, poids = L.essentiel ? 800 : 600;
+    ctx.font = chartFont(9, poids);
+    const formes = court ? [[L.repere, dispo]] : [[L.libelle, Math.min(largMax, dispo)], [L.court, dispo], [L.mini, dispo], [L.micro, dispo]];
     for (const [t, lim] of formes) if (larg(t) <= lim) { lignes = [t]; break; }
-    if (!lignes && E.courtes) lignes = [guideCouper(ctx, L.repere, dispo - 14)];
+    if (!lignes && court) lignes = [guideCouper(ctx, L.repere, dispo - 14)];
     if (!lignes) lignes = publie ? guideLignes(ctx, L.micro, dispo - 14) : [guideCouper(ctx, L.micro, dispo - 14)];
     const wL = Math.min(dispo, Math.max(...lignes.map(larg)));
     const etatPlein = ctx.measureText(Guide.texteEtatMax(E.mode, 'plein', L.niv.ferme)).width + 16;
     const etatMini = ctx.measureText(Guide.texteEtatMax(E.mode, 'mini', L.niv.ferme)).width + 16;
-    const enLigne = !E.courtes && lignes.length === 1 && wL + 3 + etatMini <= dispo;
+    const enLigne = !court && lignes.length === 1 && wL + 3 + etatMini <= dispo;
     // Écran étroit (téléphone) : l'état ne prend pas une ligne à lui sous le libellé — il est dans
     // la bulle (« Maintenant : … », au toucher). Une ligne de moins par bande.
     const sansEtat = etroit && !enLigne;
@@ -4915,8 +4926,8 @@ function guideLibellesNiveaux(E, top, bas, surBougies) {
     const titreN = Guide.libelleNiveau(L.niv, E.exp ? 'expert' : 'debutant', E.unite);
     if (!pose) { E.sansPlace.push(L); E.cibles.push({ rects: [], zones, prio: 1, niveau: L, titre: titreN, texte: guideTexteNiveau(L, E.exp) }); continue; }
     yPrec = pose.y;
-    L.etiq = { x, y: pose.y, w: wL, h: H, wR, lignes, enLigne, sansEtat };
-    etiquettesAFaire.push(() => { ctx.font = chartFont(9, 600); guidePastilleL(ctx, x, pose.y, wL, lignes, COLORS.accent2, H); });
+    L.etiq = { x, y: pose.y, w: wL, h: H, wR, lignes, enLigne, sansEtat, essentiel: !!L.essentiel };
+    etiquettesAFaire.push(() => { ctx.font = chartFont(9, poids); guidePastilleL(ctx, x, pose.y, wL, lignes, COLORS.accent2, H); });
     E.cibles.push({ rects: [{ x0: x, y0: pose.y, x1: x + wR, y1: pose.y + h }], zones, prio: 1, niveau: L, titre: titreN, texte: guideTexteNiveau(L, E.exp) });
   }
 }
@@ -6246,8 +6257,9 @@ function guideBulle(c, W, mainH, evite) {
   const E = guideEtat, Sc = scenEtat;
   apprLu(c);   // la marque « nouveau » de sa nature s'efface ; la bulle d'un message le fait durer
   if (Sc && Sc.cibles.includes(c)) Sc.survol = c; else if (E && E.cibles.includes(c)) E.survol = c;   // ce que la bulle explique (relu par les tests)
-  // Débutant : le résumé (niveau 2) ; le détail au 2e toucher ou clic (tapGraphique). Expert : tout.
-  const cle = cleBulle(c), detail = !debutant() || bulleDetail === cle;
+  // Le résumé (niveau 2) d'abord, avec ou sans « Le détail » (option A, 11/10/2026) ; le détail
+  // au 2e toucher ou au clic (tapGraphique).
+  const cle = cleBulle(c), detail = bulleDetail === cle;
   let texte = c.texte.slice(), vivant = '';
   // Une figure : son état vivant en tête, en mots du mode (« En ce moment le prix est sous … ») ;
   // en Débutant, le reste de la bulle est refait au prix live (une condition déjà franchie par la
@@ -6282,7 +6294,9 @@ function guideBulle(c, W, mainH, evite) {
   if (!detail) {
     const tactile = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
     const a = (tactile ? 'Touchez encore' : 'Cliquez') + ' : le détail · pas une prévision', src = sourceResume(c, vivant, texte);
-    const R = resumeBulle(src || texte, bw - 20, PARAM.guide.debutant.bulleLignes - tl.length, PARAM.guide.debutant.bulleNombres - nombresDe(c.titre));
+    // Avec « Le détail », le titre porte les prix (« 83 048 – 83 210 · S/R ×6 … ») : le résumé
+    // compte ses nombres à part, pour dire quand même, en mots, ce qu'est le repère.
+    const R = resumeBulle(src || texte, bw - 20, PARAM.guide.debutant.bulleLignes - tl.length, PARAM.guide.debutant.bulleNombres - (debutant() ? nombresDe(c.titre) : 0));
     if (src || !R.complet) { texte = R.texte; acces = a; }
   }
   bulleVue = acces ? cle : null;   // tapGraphique : un 2e toucher sur ce résumé ouvre le détail

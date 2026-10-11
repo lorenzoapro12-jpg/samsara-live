@@ -206,7 +206,19 @@ async function squelette(page) {
       for (const t of THEMES) {
         const o = await ouvrir(nav, t.id, vue);
         const v = await visibles(o.page);
-        const pertes = Object.entries(ref).filter(([nom, r]) => r.visibles > 0 && (v[nom].visibles === 0 || (r.tous && v[nom].visibles < Math.min(r.visibles, v[nom].trouves))))
+        // Une trace rendue dans la base peut manquer dans un thème dont la bande des chiffres clés
+        // est plus serrée : ajusterKpis ne masque jamais une valeur pour une trace. Ce n'est une
+        // perte que si la trace suivante tenait (prouvé ici : on la rend et la bande déborde-t-elle ?).
+        // Sans ce contrôle, le test dépendait des valeurs du jour (market-data.json du dépôt, réécrit
+        // toutes les 15 min) : à quelques pixels près, une trace tenait ou non selon le commit.
+        const traceTient = await o.page.evaluate(() => {
+          const cy = document.getElementById('cycle'), k = [...cy.querySelectorAll('.kpi:not([hidden]).sans-trace')].find(x => x.querySelector('.chron-spark'));
+          if (!k) return null;
+          k.classList.remove('sans-trace'); const tient = cy.scrollWidth <= cy.clientWidth + 1; k.classList.add('sans-trace');
+          return tient;
+        });
+        const pertes = Object.entries(ref).filter(([nom, r]) => r.visibles > 0 && !(nom === 'traces des chiffres clés' && traceTient === false)
+          && (v[nom].visibles === 0 || (r.tous && v[nom].visibles < Math.min(r.visibles, v[nom].trouves))))
           .map(([nom, r]) => `${nom} : ${v[nom].visibles}/${v[nom].trouves} visibles (base : ${r.visibles})`);
         const st = await o.page.evaluate(() => document.documentElement.getAttribute('data-structure'));
         check(`${t.id.padEnd(9)} ${t.structure ? '(structure « ' + t.structure + ' ») ' : ''}: rien de ce que la base montre ne disparaît`
@@ -219,7 +231,7 @@ async function squelette(page) {
             const n = document.querySelectorAll('#cycle .kpi:not([hidden])').length; s.remove(); ajusterKpis(); return n; });
           const tr = v['traces des chiffres clés'].visibles, kp = v['chiffres clés'].visibles;
           check(`${t.id.padEnd(9)} : ${tr} trace(s) sur ${kp} chiffres clés, aucun masqué pour elles (${sans} sans traces)`
-            + (t.structure ? ', la bande de la structure les montre' : ''), kp === sans && (!t.structure || tr > 0), { tr, kp, sans });
+            + (t.structure ? ', la bande de la structure les montre (ou la suivante ne tient pas)' : ''), kp === sans && (!t.structure || tr > 0 || traceTient === false), { tr, kp, sans, traceTient });
         }
         // La courbe des dernières heures dans une fiche (trous hachurés) : visible, dans l'écran.
         const fc = await o.page.evaluate(() => { ouvrirFiche('cvd'); const g = document.querySelector('#fichePop .chron-fiche');

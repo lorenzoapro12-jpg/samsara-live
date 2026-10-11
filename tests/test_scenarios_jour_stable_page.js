@@ -31,7 +31,8 @@ async function survoler(o, rect, doigt) {
   const x = cv.x + rect.x + Math.min(rect.w / 2, 40), y = cv.y + rect.y + rect.h / 2;
   if (doigt) await o.page.touchscreen.tap(x, y); else { await o.page.mouse.move(x - 10, y); await o.page.mouse.move(x, y, { steps: 3 }); }
   await o.page.waitForTimeout(300);
-  if (cv.deb && await o.page.evaluate(() => !!(scenEtat && scenEtat.bulle && scenEtat.bulle.resume))) {
+  // La bulle s'ouvre sur son résumé, avec ou sans « Le détail » (option A, 11/10/2026) : son détail au 2e toucher.
+  if (await o.page.evaluate(() => !!(scenEtat && scenEtat.bulle && scenEtat.bulle.resume))) {
     if (doigt) await o.page.touchscreen.tap(x, y); else await o.page.mouse.click(x, y);
     await o.page.waitForTimeout(300);
   }

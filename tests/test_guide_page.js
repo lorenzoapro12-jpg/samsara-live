@@ -122,7 +122,7 @@ const etat = page => page.evaluate(() => {
   return {
     bx: b.left, by: b.top, exp: E.exp, courtes: !!E.courtes,
     niveaux: E.niveaux.map(L => ({ visible: L.visible, titre: (E.cibles.find(c => c.niveau === L) || {}).titre || null, prix: L.niv.raisons.map(r => r.p), heures: L.niv.raisons.filter(r => isFinite(r.lu)).map(r => hh(r.lu)),
-      lignes: L.etiq ? L.etiq.lignes : null, etiq: L.etiq ? { enLigne: L.etiq.enLigne, sansEtat: !!L.etiq.sansEtat } : null, sansPlace: (E.sansPlace || []).includes(L),
+      lignes: L.etiq ? L.etiq.lignes : null, essentiel: !!L.essentiel, libelle: L.libelle, etiq: L.etiq ? { enLigne: L.etiq.enLigne, sansEtat: !!L.etiq.sansEtat } : null, sansPlace: (E.sansPlace || []).includes(L),
       auBord: E.cibles.some(c => c.niveaux && c.niveaux.includes(L) && c.rects.length) })),
     chemins: E.chemins || null, suite: { haut: !!E.D.suite.haut, bas: !!E.D.suite.bas },
     cibles: E.cibles.map(c => ({ prio: c.prio, titre: c.titre, rects: c.rects || [] })),
@@ -154,7 +154,11 @@ const etat = page => page.evaluate(() => {
       // court d'une ligne (la plage) ; le libellé entier, heures comprises, est le titre de sa bulle
       // (et une ligne de la liste « Sur le graphique », vérifiée plus bas).
       if (e.courtes) {
-        check(`${nom} : repères courts — chaque libellé de bande tient sur une ligne de 24 caractères au plus, sans « … »`, vis.filter(L => L.lignes).length > 0 && vis.filter(L => L.lignes).every(L => L.lignes.length === 1 && L.lignes[0].length <= 24 && !/…/.test(L.lignes[0])), vis.map(L => L.lignes));
+        // L'essentiel (option A) : la bande la plus proche du prix de chaque côté garde son libellé
+        // entier (ou sa forme la plus longue qui tient), en gras ; les autres sont des repères courts.
+        const ess = vis.filter(L => L.essentiel), aut = vis.filter(L => !L.essentiel && L.lignes);
+        check(`${nom} : l'essentiel — une ou deux bandes (la plus proche de chaque côté du prix), libellé de plus de 24 caractères ou entier`, ess.length >= 1 && ess.length <= 2 && ess.every(L => !L.lignes || L.lignes.join(' ').length > 24 || L.lignes.join(' ') === L.libelle), ess.map(L => [L.lignes, L.libelle]));
+        check(`${nom} : repères courts — chaque autre libellé de bande tient sur une ligne de 24 caractères au plus, sans « … »`, aut.every(L => L.lignes.length === 1 && L.lignes[0].length <= 24 && !/…/.test(L.lignes[0])), aut.map(L => L.lignes));
         check(`${nom} : la bulle de chaque bande posée qui porte un chiffre publié garde son heure (« ${HM} »)`, pub.length > 0 && pub.every(L => L.titre && L.heures.every(h => L.titre.includes(h))), pub.map(L => [L.titre, L.heures]));
       } else
       check(`${nom} : chaque libellé posé qui porte un chiffre publié garde son heure (« ${HM} »), sans « … »`, pub.length > 0 && pub.every(L => L.heures.every(h => L.lignes.join(' ').includes(h)) && !/…/.test(L.lignes.join(' '))), pub);
