@@ -3297,6 +3297,9 @@ function lireJetons() {
   const forme = v('--bougie-forme', 'pleine');
   COLORS.bougieForme = Object.prototype.hasOwnProperty.call(FORMES_BOUGIE, forme) ? forme : 'pleine';
   COLORS.bougieRayon = Math.max(0, num('--bougie-rayon', 2));
+  // --etiquette-rayon : facteur des coins des pastilles, bulles et encadrés dessinés sur le graphique
+  // (1 par défaut, 0 = angles vifs : Bureau 95, demande du 11/10/2026).
+  COLORS.etiqRayon = Math.max(0, num('--etiquette-rayon', 1));
   const tirets = v('--grille-tirets', 'none');
   COLORS.grilleTirets = tirets === 'none' ? [] : tirets.split(/[\s,]+/).map(Number).filter(x => isFinite(x) && x >= 0);
   const encre = (nom, r) => { const c = rvb(v(nom, '')); return c ? rampeU32(c.concat(CHALEUR_ALPHA.base), [0, 0, 0, CHALEUR_ALPHA.pente]) : rampeU32(r.base, r.pente); };
@@ -3476,7 +3479,7 @@ function drawChart() {
   ctx.font = chartFont(10, 650);
   const pw0 = ctx.measureText(pctStr).width + 12;
   ctx.save(); ctx.globalAlpha = 0.14; ctx.fillStyle = pctChange >= 0 ? COLORS.candleUp : COLORS.candleDown;
-  ctx.beginPath(); ctx.roundRect(16, 19, pw0, 15, 7.5); ctx.fill(); ctx.restore();
+  ctx.beginPath(); ctx.roundRect(16, 19, pw0, 15, rE(7.5)); ctx.fill(); ctx.restore();
   ctx.fillStyle = pctColor;
   ctx.fillText(pctStr, 22, 30);
   // Guide : le régime du marché, à droite de la pastille (rangée du haut).
@@ -3547,7 +3550,7 @@ function dessinerCalque() {
       cx.font = chartFont(11, 700);
       const lw = cx.measureText(lpStr).width + 12, bx = Math.min(triX + 10, W - 3 - lw);
       cx.fillStyle = tagC;
-      cx.beginPath(); cx.roundRect(bx, y - 11, lw, 22, 11); cx.fill();
+      cx.beginPath(); cx.roundRect(bx, y - 11, lw, 22, rE(11)); cx.fill();
       // Pointe vers le tracé : elle reste visible si le badge a reculé
       cx.beginPath(); cx.moveTo(triX, y - 4); cx.lineTo(triX + 8, y); cx.lineTo(triX, y + 4); cx.closePath(); cx.fill();
       cx.fillStyle = baisse ? COLORS.surDown : COLORS.surUp;   // --up-sur / --down-sur
@@ -3627,7 +3630,7 @@ function dessinerCalque() {
     const bX = Math.min(W - 2 - bw, W - 75 + (75 - bw) / 2);   // plus large que la colonne : recalé, jamais hors du canvas
     const bY = Math.max(2, Math.min(mainH - 20, crossY - 9));
     cx.fillStyle = COLORS.ink1;
-    cx.beginPath(); cx.roundRect(bX, bY, bw, 18, 9); cx.fill();
+    cx.beginPath(); cx.roundRect(bX, bY, bw, 18, rE(9)); cx.fill();
     cx.fillStyle = COLORS.surface;
     cx.fillText(priceStr, bX + 7, bY + 13);
     // Débutant : quatre lignes en mots (« Début 82 430 $ », « Haut », « Bas », « Fin »).
@@ -3639,9 +3642,9 @@ function dessinerCalque() {
       cx.save();
       cx.fillStyle = COLORS.bulle;
       cx.shadowColor = 'rgba(16,35,61,0.18)'; cx.shadowBlur = 14; cx.shadowOffsetY = 4;
-      cx.beginPath(); cx.roundRect(tX, tY, 135, 90, 10); cx.fill();
+      cx.beginPath(); cx.roundRect(tX, tY, 135, 90, rE(10)); cx.fill();
       cx.shadowColor = 'transparent'; cx.shadowBlur = 0; cx.shadowOffsetY = 0;
-      cx.fillStyle = candle.close >= candle.open ? COLORS.candleUp : COLORS.candleDown; cx.beginPath(); cx.roundRect(tX + 6, tY + 10, 3, 70, 1.5); cx.fill();
+      cx.fillStyle = candle.close >= candle.open ? COLORS.candleUp : COLORS.candleDown; cx.beginPath(); cx.roundRect(tX + 6, tY + 10, 3, 70, rE(1.5)); cx.fill();
       cx.font = chartFont(10, 600);
       [['Début', candle.open], ['Haut', candle.high], ['Bas', candle.low], ['Fin', candle.close]].forEach(([m, v], k) => {
         cx.fillStyle = COLORS.ink3; cx.fillText(m, tX + 16, tY + 22 + k * 18);
@@ -3665,10 +3668,10 @@ function dessinerCalque() {
       const tY = Math.max(30, Math.min(mainH - 85, crossY - 65));
       cx.fillStyle = COLORS.bulle;
       cx.shadowColor = 'rgba(16,35,61,0.18)'; cx.shadowBlur = 14; cx.shadowOffsetY = 4;
-      cx.beginPath(); cx.roundRect(tX, tY, tw, 72, 10); cx.fill();
+      cx.beginPath(); cx.roundRect(tX, tY, tw, 72, rE(10)); cx.fill();
       cx.shadowColor = 'transparent'; cx.shadowBlur = 0; cx.shadowOffsetY = 0;
       // Filet de la couleur de la bougie à gauche : la direction se lit sans encadrer la donnée.
-      cx.fillStyle = cColor; cx.beginPath(); cx.roundRect(tX + 6, tY + 10, 3, 52, 1.5); cx.fill();
+      cx.fillStyle = cColor; cx.beginPath(); cx.roundRect(tX + 6, tY + 10, 3, 52, rE(1.5)); cx.fill();
       cx.fillStyle = COLORS.ink1;
       cx.fillText(cel[0], tX + 16, tY + 20);
       cx.fillText(cel[1], tX + 16 + col, tY + 20);
@@ -3701,7 +3704,7 @@ function dessinerCalque() {
         const ty = sY + 4;
         cx.fillStyle = COLORS.bulle;
         cx.strokeStyle = subColor(key); cx.lineWidth = 0.8;
-        cx.beginPath(); cx.roundRect(tx, ty, tw, 15, 3); cx.fill(); cx.stroke();
+        cx.beginPath(); cx.roundRect(tx, ty, tw, 15, rE(3)); cx.fill(); cx.stroke();
         cx.fillStyle = COLORS.text;
         cx.fillText(txt, tx + 6, ty + 11);
       }
@@ -3765,7 +3768,7 @@ function drawRangeSelector(candles, W, H) {
   ctx.fillStyle = avecAlpha(COLORS.surface, 0.7);
   ctx.strokeStyle = COLORS.hairline;
   ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.roundRect(padL, rsY + 2, rsw, RS_HEIGHT - 6, 5); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.roundRect(padL, rsY + 2, rsw, RS_HEIGHT - 6, rE(5)); ctx.fill(); ctx.stroke();
   
   // Mini courbe des 3000 clôtures : tracée UNE fois par état des données et par taille
   // (Path2D mémorisé), puis rejouée — elle était recalculée point par point à chaque image.
@@ -3832,7 +3835,7 @@ function drawRangeSelector(candles, W, H) {
   ctx.fillStyle = COLORS.bulle;
   ctx.strokeStyle = COLORS.hairline;
   ctx.lineWidth = 0.5;
-  ctx.beginPath(); ctx.roundRect(legX, legY, legW, legH, 3); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.roundRect(legX, legY, legW, legH, rE(3)); ctx.fill(); ctx.stroke();
   ctx.font = chartFont(7, 650);
   sesColors.forEach((s, i) => {
     const sx = legX + 4 + i * 42;
@@ -4148,11 +4151,11 @@ function resolveChart(candles, padL, padR, chartH, W) {
       // Fond badge
       // Fond opaque (la bulle du thème) puis la teinte du niveau : lisible sur les bougies.
       ctx.fillStyle = COLORS.bulle;
-      ctx.beginPath(); ctx.roundRect(bx, by, tw, 20, 5); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(bx, by, tw, 20, rE(5)); ctx.fill();
       ctx.fillStyle = avecAlpha(s.color, lvl.tier >= 2 ? 0.24 : 0.18);
       ctx.strokeStyle = s.color;
       ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.roundRect(bx, by, tw, 20, 5); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.roundRect(bx, by, tw, 20, rE(5)); ctx.fill(); ctx.stroke();
       
       // Texte badge
       ctx.fillStyle = COLORS.ink1;
@@ -4501,6 +4504,8 @@ const GUIDE_FORMES = { cle: null, val: null, base: null, tF: null };   // formes
 // le refaire sur tout l'historique. Au plus 6 séries (les plus récemment vues).
 const GUIDE_SERIES = new Map();
 let srBadges = [];                                // badges S/R posés dans la frame : le Guide les évite
+/** Le rayon d'une pastille, d'une bulle ou d'un encadré dessiné : r, multiplié par --etiquette-rayon. */
+const rE = r => r * (COLORS.etiqRayon === undefined ? 1 : COLORS.etiqRayon);
 const guideUnite = () => (activeSymbol === 'BTCSOL' ? 'SOL' : '$');
 const frN = v => v.toLocaleString('fr-FR');                     // 0.5 → « 0,5 »
 const guideMode = () => (typeof modeCourant === 'function' ? modeCourant() : 'debutant');
@@ -4612,7 +4617,7 @@ function guideFroidPas(J) {
 /** Une étiquette du Guide : pastille à la bulle du thème, encre 1, un trait de couleur à gauche. */
 function guidePastille(g, x, y, w, h, texte, coul) {
   g.fillStyle = COLORS.bulle;
-  g.beginPath(); g.roundRect(x, y, w, h, 4); g.fill();
+  g.beginPath(); g.roundRect(x, y, w, h, rE(4)); g.fill();
   if (coul) { g.fillStyle = coul; g.fillRect(x + 2, y + 3, 2.5, h - 6); }
   g.fillStyle = COLORS.ink1;
   g.fillText(texte, x + (coul ? 8 : 5), y + h - 4.5);
@@ -4813,7 +4818,7 @@ function guideTexteNiveau(L, exp) {
 function guidePastilleL(g, x, y, w, lignes, coul, hL) {
   const h = lignes.length * hL;
   g.fillStyle = COLORS.bulle;
-  g.beginPath(); g.roundRect(x, y, w, h, 4); g.fill();
+  g.beginPath(); g.roundRect(x, y, w, h, rE(4)); g.fill();
   if (coul) { g.fillStyle = coul; g.fillRect(x + 2, y + 3, 2.5, h - 6); }
   g.fillStyle = COLORS.ink1;
   lignes.forEach((t, k) => g.fillText(t, x + (coul ? 8 : 5), y + (k + 1) * hL - 4.5));
@@ -5075,7 +5080,7 @@ function guideChemins(E, top, bas, surBougies) {
       etiquettesAFaire.push(() => {
         ctx.font = chartFont(taille, 600);
         ctx.globalAlpha = c.ch ? 1 : 0.9;
-        ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(r.x, r.y, bw, bh, 4); ctx.fill(); ctx.globalAlpha = 1;
+        ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(r.x, r.y, bw, bh, rE(4)); ctx.fill(); ctx.globalAlpha = 1;
         ctx.fillStyle = c.ch ? coul : COLORS.ink3; ctx.fillRect(r.x + 2, r.y + 3, 2.5, bh - 6);
         ctx.fillStyle = c.ch ? COLORS.ink1 : COLORS.text;
         l.forEach((t, k) => ctx.fillText(t, r.x + 7, r.y + 12 + k * 12));
@@ -5086,7 +5091,7 @@ function guideChemins(E, top, bas, surBougies) {
     const { r, l, bw, bh } = commune;
     etiquettesAFaire.push(() => {
       ctx.font = chartFont(8.5, 600);
-      ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(r.x, r.y, bw, bh, 4); ctx.fill();
+      ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(r.x, r.y, bw, bh, rE(4)); ctx.fill();
       ctx.fillStyle = COLORS.ink3; ctx.fillRect(r.x + 2, r.y + 3, 2.5, bh - 6);
       ctx.fillStyle = COLORS.ink1; l.forEach((t, k) => ctx.fillText(t, r.x + 7, r.y + 12 + k * 12));
     });
@@ -5457,7 +5462,7 @@ function guideCalque() {
     const lignes = E.lectureCache.l, h = lignes.length * 14 + 4;
     const w = Math.max(...lignes.map(l => cx.measureText(l).width)) + 14;
     cx.globalAlpha = 0.94; cx.fillStyle = COLORS.bulle;
-    cx.beginPath(); cx.roundRect(g.pad.left + 2, E.lectureY, w, h, 5); cx.fill(); cx.globalAlpha = 1;
+    cx.beginPath(); cx.roundRect(g.pad.left + 2, E.lectureY, w, h, rE(5)); cx.fill(); cx.globalAlpha = 1;
     cx.fillStyle = COLORS.accent2; cx.fillRect(g.pad.left + 4, E.lectureY + 3, 2.5, h - 6);
     cx.fillStyle = COLORS.ink1;
     lignes.forEach((l, k) => cx.fillText(l, g.pad.left + 11, E.lectureY + 13 + k * 14));
@@ -5845,7 +5850,7 @@ function guidePasseesCompte(E) {
   Pz.ligne = { texte: t, rect: { x: r.x, y: r.y, w: r.w, h: r.h } };
   etiquettesAFaire.push(() => {
     ctx.font = chartFont(9, 600);
-    ctx.globalAlpha = 0.85; ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 4); ctx.fill(); ctx.globalAlpha = 1;
+    ctx.globalAlpha = 0.85; ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, rE(4)); ctx.fill(); ctx.globalAlpha = 1;
     ctx.fillStyle = COLORS.ink3; ctx.fillText(t, r.x + 6, r.y + r.h - 4);
   });
   E.cibles.push({ rects: [guideZone(r)], prio: 4, titre: 'Figures passées', texte: [V[1] || V[0],
@@ -5978,7 +5983,7 @@ function debSurBandes(E) {
 /** Une pastille d'une ligne du Débutant : fond de bulle, trait de couleur à gauche, texte. */
 function guidePastilleDebutant(g, x, y, w, h, texte, coul, encre) {
   g.fillStyle = COLORS.bulle;
-  g.beginPath(); g.roundRect(x, y, w, h, 4); g.fill();
+  g.beginPath(); g.roundRect(x, y, w, h, rE(4)); g.fill();
   g.fillStyle = coul; g.fillRect(x + 2, y + 3, 2.5, h - 6);
   g.fillStyle = encre || COLORS.ink1;
   g.fillText(texte, x + 8, y + h - 5);
@@ -6050,7 +6055,7 @@ function guideCalqueDebutant(E) {
   cx.font = chartFont(ph.taille, 650);
   const w = Math.min(maxPx, cx.measureText(ph.t).width + 16), x = g.pad.left + 2, y = 8, h = 20;
   cx.globalAlpha = 0.94; cx.fillStyle = COLORS.bulle;
-  cx.beginPath(); cx.roundRect(x, y, w, h, 5); cx.fill(); cx.globalAlpha = 1;
+  cx.beginPath(); cx.roundRect(x, y, w, h, rE(5)); cx.fill(); cx.globalAlpha = 1;
   cx.fillStyle = COLORS.accent2; cx.fillRect(x + 2, y + 3, 2.5, h - 6);
   cx.fillStyle = COLORS.ink1;
   cx.fillText(ph.t, x + 9, y + 14);
@@ -6355,7 +6360,7 @@ function guideBulle(c, W, mainH, evite) {
   // Fond du tracé d'abord : une bulle translucide laisserait lire la lecture et les étiquettes à travers.
   cx.fillStyle = COLORS.surface;
   cx.shadowColor = 'rgba(16,35,61,0.18)'; cx.shadowBlur = 14; cx.shadowOffsetY = 4;
-  cx.beginPath(); cx.roundRect(bx, by, bw, bh, 8); cx.fill();
+  cx.beginPath(); cx.roundRect(bx, by, bw, bh, rE(8)); cx.fill();
   cx.shadowColor = 'transparent'; cx.shadowBlur = 0; cx.shadowOffsetY = 0;
   cx.fillStyle = COLORS.bulle; cx.fill();
   cx.fillStyle = c.coul || COLORS.accent2; cx.fillRect(bx + 5, by + 8, 3, bh - 16);
@@ -6474,7 +6479,7 @@ function dessinerMarqueCarte(P, pm, W, prixAxe) {
   const t = prixAxe(pm);
   cx.font = chartFont(10, 700);
   const lw = cx.measureText(t).width + 10, bx = Math.min(x1 + 2, W - 3 - lw);
-  cx.fillStyle = COLORS.accent2; cx.beginPath(); cx.roundRect(bx, y - 9, lw, 18, 4); cx.fill();
+  cx.fillStyle = COLORS.accent2; cx.beginPath(); cx.roundRect(bx, y - 9, lw, 18, rE(4)); cx.fill();
   cx.fillStyle = COLORS.surface; cx.fillText(t, bx + 5, y + 4);
   cx.restore();
   // Le trait lui-même est sa cible (une bande de 10 px) : le Lisible n'ouvre une bulle que sur une
@@ -6875,7 +6880,7 @@ function scenMarques(S, it, top, bas) {
       ctx.strokeStyle = m.ok ? c : avecAlpha(c, 0.95); ctx.lineWidth = 2; trait();
       if (pose) {
         ctx.font = chartFont(8.5, 650);
-        ctx.globalAlpha = 0.92; ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(pose.x, pose.y, w, 13, 3); ctx.fill(); ctx.globalAlpha = 1;
+        ctx.globalAlpha = 0.92; ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(pose.x, pose.y, w, 13, rE(3)); ctx.fill(); ctx.globalAlpha = 1;
         ctx.fillStyle = c; ctx.fillRect(pose.x + 1.5, pose.y + 2.5, 2, 8);
         ctx.fillStyle = COLORS.ink1; ctx.fillText(m.texte, pose.x + 6, pose.y + 10);
       }
@@ -7138,7 +7143,7 @@ function scenReperes(S, top, bas) {
     if (!pose) continue;
     etiquettesAFaire.push(() => {
       ctx.font = chartFont(8.5, 650);
-      ctx.globalAlpha = 0.92; ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(xl, pose.y, w, H, 3); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.globalAlpha = 0.92; ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(xl, pose.y, w, H, rE(3)); ctx.fill(); ctx.globalAlpha = 1;
       ctx.fillStyle = COLORS.text; ctx.fillText(nom, xl + 5, pose.y + H - 4);
     });
   }
@@ -7469,7 +7474,7 @@ function scenCalque() {
   if (B.deb) { if (!B.cede) scenLigneDessiner(B); return; }
   cx.save();
   cx.globalAlpha = B.seule ? 0.85 : 0.95; cx.fillStyle = COLORS.bulle;
-  cx.beginPath(); cx.roundRect(B.x, B.y, B.w, B.h, 5); cx.fill(); cx.globalAlpha = 1;
+  cx.beginPath(); cx.roundRect(B.x, B.y, B.w, B.h, rE(5)); cx.fill(); cx.globalAlpha = 1;
   if (!B.seule) { cx.strokeStyle = avecAlpha(COLORS.accent, 0.5); cx.lineWidth = 1; cx.stroke(); }
   let y = B.y + 4, prec = null;
   for (const l of B.lignes) {
@@ -7738,7 +7743,7 @@ function scenLigneDessiner(B) {
   cx.save();
   cx.font = chartFont(DEB_POLICE_LIGNE, 650);
   cx.globalAlpha = 0.94; cx.fillStyle = COLORS.bulle;
-  cx.beginPath(); cx.roundRect(B.x, B.y, B.w, B.h, 5); cx.fill(); cx.globalAlpha = 1;
+  cx.beginPath(); cx.roundRect(B.x, B.y, B.w, B.h, rE(5)); cx.fill(); cx.globalAlpha = 1;
   cx.fillStyle = B.seule ? COLORS.ink3 : B.coulMontre || scenCouleur('1'); cx.fillRect(B.x + 2, B.y + 3, 2.5, B.h - 6);
   cx.fillStyle = B.seule ? COLORS.text : COLORS.ink1;
   cx.fillText(B.texte, B.x + 9, B.y + 14);
@@ -7800,7 +7805,7 @@ function drawLine(data, minP, range, pad, gap, ph, color, dash, width, dataOffse
       etiquettesAFaire.push(() => {
         ctx.font = chartFont(9, 650);
         ctx.fillStyle = COLORS.bulle;
-        ctx.beginPath(); ctx.roundRect(ex, ey, w, 16, 8); ctx.fill();
+        ctx.beginPath(); ctx.roundRect(ex, ey, w, 16, rE(8)); ctx.fill();
         ctx.fillStyle = color; ctx.beginPath(); ctx.arc(ex + 7, ey + 8, 3, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = COLORS.ink1; ctx.fillText(etiquette, ex + 12, ey + 11.5);
       });
@@ -8240,7 +8245,7 @@ function apprDessiner() {
   }
   if (deb) {
     cx.globalAlpha = 0.95; cx.fillStyle = COLORS.bulle;
-    cx.beginPath(); cx.roundRect(pl.x, pl.y, pl.w, pl.h, 5); cx.fill(); cx.globalAlpha = 1;
+    cx.beginPath(); cx.roundRect(pl.x, pl.y, pl.w, pl.h, rE(5)); cx.fill(); cx.globalAlpha = 1;
     // Le trait de la couleur des marques « nouveau » (celui de la phrase est accent-2) : ce qui vient
     // d'arriver ne se confond pas avec la lecture du moment.
     cx.fillStyle = COLORS.accent; cx.fillRect(pl.x + 2, pl.y + 3, 2.5, pl.h - 6);
@@ -8248,7 +8253,7 @@ function apprDessiner() {
   } else {
     // Complet : discrète — l'encre pâle, sur un fond à peine posé, comme la ligne du compte des figures passées.
     cx.globalAlpha = 0.85; cx.fillStyle = COLORS.bulle;
-    cx.beginPath(); cx.roundRect(pl.x, pl.y, pl.w, pl.h, 4); cx.fill(); cx.globalAlpha = 1;
+    cx.beginPath(); cx.roundRect(pl.x, pl.y, pl.w, pl.h, rE(4)); cx.fill(); cx.globalAlpha = 1;
     cx.fillStyle = COLORS.ink3; cx.fillText(pl.t, pl.x + 6, pl.y + pl.h - 4);
   }
   cx.restore();

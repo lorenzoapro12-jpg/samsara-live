@@ -88,7 +88,7 @@
   --chart-1: #ffffff; --chart-2: #ffffff; --chart-3: #f4f4f4; --chart-surface: #ffffff;
   --chart-lueur: none; --chart-creux: var(--enfonce);
   --grille: rgba(0,0,0,0.12); --grille-tirets: 1 1; --reticule: rgba(0,0,0,0.6); --bulle: #ffffe1;
-  --filigrane: 0.05; --vol-alpha: 0.5; --bande-alpha: 0.08; --aura: 0; --bougie-rayon: 0;
+  --filigrane: 0.05; --vol-alpha: 0.5; --bande-alpha: 0.08; --aura: 0; --bougie-rayon: 0; --etiquette-rayon: 0;
   /* Chaleur : encre fixe, seule l'opacité croît — 1,25 → 13,4 et 1,20 → 4,74:1, monotones. */
   --chaleur-bid: #000080; --chaleur-ask: #e00000;
   /* Overlays VGA : ΔE min 19,2 ; EMA100 #ff00ff à 2,85:1, rattrapé par son étiquette (ETIQ_OVERLAYS). */

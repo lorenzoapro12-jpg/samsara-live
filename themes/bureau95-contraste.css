@@ -60,7 +60,7 @@
   --chart-1: #000000; --chart-2: #000000; --chart-3: #000000; --chart-surface: #000000;
   --chart-lueur: none; --chart-creux: var(--enfonce);
   --grille: rgba(255,255,255,0.2); --grille-tirets: 1 1; --reticule: rgba(255,255,255,0.7); --bulle: #000080;
-  --filigrane: 0.07; --vol-alpha: 0.55; --bande-alpha: 0.12; --aura: 0; --bougie-rayon: 0;
+  --filigrane: 0.07; --vol-alpha: 0.55; --bande-alpha: 0.12; --aura: 0; --bougie-rayon: 0; --etiquette-rayon: 0;
   /* Chaleur : 1,15 → 12,3 et 1,06 → 5,5:1, monotones. */
   --chaleur-bid: #00ff00; --chaleur-ask: #ff00ff;
   /* Overlays : ΔE min 24,7, tous au-dessus de 3:1 sur le noir. */
