@@ -518,6 +518,10 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     && G.raisonPrincipale(N(Rd('call_wall', 87000, { strike: 87000 }))).cle === 'call_wall' && G.raisonPrincipale(null) === null, [G.raisonPrincipale(nOpt).cle, G.raisonPrincipale(nDeux).cle]);
   check('choixDebutant : une bande faite seulement d’options passe après une mesure du même côté', G.choixDebutant({ dessus: [N(Rd('call_wall', 86500, { strike: 86500 })), N(Rd('hier_haut', 86700))], dessous: [] }).dessus.raisons[0].cle === 'hier_haut'
     && G.choixDebutant({ dessus: [N(Rd('call_wall', 86500, { strike: 86500 }))], dessous: [] }).dessus.raisons[0].cle === 'call_wall' && G.choixDebutant(null).dessus === null);
+  // La bulle d'un repère dit l'écart en dollars, sans « % » (le Lisible n'en montre aucun).
+  const nE = { p: 85640, demi: 40, dessus: true, pMin: 85600, pMax: 85680, raisons: [Rd('hier_haut', 85640)] }, PL = dansPage('PARAM.guide');
+  const etats = [85300, 85500, 85660, 86000, 88000].map(live => G.texteEtatDebutant(G.etatLive(nE, live, null, PL), nE, live, '$', '1h'));
+  check('bulle d’un repère, « Maintenant : … » : l’écart en dollars, aucun « % »', etats.every(x => /^Maintenant : /.test(x) && !/%/.test(x)) && etats.some(x => /\$ (au-dessus|en dessous)\.$/.test(x)), etats);
   // 2 bis. Les repères du Débutant, choisis au prix LIVE (constat de revue : une bande fusionnée qui
   // enjambait le prix nommait « au-dessus » un prix situé en dessous).
   {

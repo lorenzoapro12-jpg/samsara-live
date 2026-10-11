@@ -103,6 +103,9 @@ node test_guide_carte.js || ko=1
 etape "5c. Carte (bookmap) rendue dans Chromium — Binance simulé (non exécuté sans Playwright)"
 node test_bookmap_rendu.js || ko=1
 
+etape "5d. Liaison graphique ↔ carte dans Chromium : « Voir sur la carte ▸ » et « Voir sur le graphique ▸ » (souris et doigt, Lisible et Complet), prix marqué et budgets tenus, BTC/USDT seul, adresses piégées ignorées, thème suivi d'un onglet à l'autre (non exécuté sans Playwright)"
+node test_lien_carte_page.js || ko=1
+
 etape "6. Scan de TOUS les fichiers publiés"
 python3 scan-public.py || ko=1
 

@@ -1709,8 +1709,13 @@ async function filNoir(page, x, y) {
         const lu = await lecture(p45), ls = lu.split('\n'), sp2 = t => t.replace(/[\u202f\u00a0]/g, ' ');
         check('survol d\'une étiquette : sa phrase entière (« … d\'ordres … en attente … », « à tout moment ») et la ligne des âges',
           /(Beaucoup d'ordres|Mur d’achat|Mur de vente|ordres d'achat|ordres de vente)/.test(lu) && /à tout moment/.test(lu) && /^Âges : couleurs récentes .+ · ronds .+ · ligne du prix /m.test(lu), lu);
-        check('… le nom de l\'étiquette en titre, sa phrase juste après, ni prix ni case sous le pointeur (« Ici (… ) ») : 3 lignes',
-          ls.length === 3 && sp2(ls[0]) === sp2(x.texte) && /^([\d,]+ BTC d'ordres (d'achat|de vente) en attente |Le prix est dans cette zone)/.test(sp2(ls[1])) && !/^Ici \(/m.test(lu) && /^Âges : /.test(ls[2]), { ls, t: x.texte });
+        // (Plus, depuis la liaison avec le terminal, une 4e ligne : le lien « Voir sur le graphique ▸ » —
+        // contrôlé ici à part, avec son adresse : le prix du repère.)
+        check('… le nom de l\'étiquette en titre, sa phrase juste après, ni prix ni case sous le pointeur (« Ici (… ) ») : 3 lignes, puis le seul lien « Voir sur le graphique ▸ »',
+          ls.length === 4 && sp2(ls[0]) === sp2(x.texte) && /^([\d,]+ BTC d'ordres (d'achat|de vente) en attente |Le prix est dans cette zone)/.test(sp2(ls[1])) && !/^Ici \(/m.test(lu) && /^Âges : /.test(ls[2]) && ls[3] === 'Voir sur le graphique ▸', { ls, t: x.texte });
+        const ln = await p45.evaluate(() => { const a = document.querySelector('#lecture a'); return a && { href: a.getAttribute('href'), n: document.querySelectorAll('#lecture a').length, vu: !a.hidden && a.getClientRects().length > 0 }; });
+        check(`… ce lien mène au graphique du terminal, au prix du repère (« ${ln && ln.href} » ; repère ${x.lien})`,
+          !!ln && ln.n === 1 && ln.vu && typeof x.lien === 'number' && ln.href === 'index.html#prix=' + String(Math.round(x.lien * 100) / 100), { ln, lien: x.lien });
         check('… la phrase ne répète pas le nom du titre (« Mur d’achat : … »)', !/^(Mur d’achat|Mur de vente|Dans un mur)/.test(ls[1] || ''), ls);
         const cx = (await etat(p45)).debutant.croix;
         check('… et pas de croix sur le repère survolé (elle barrerait son nom)', cx === false, cx);
@@ -2474,6 +2479,114 @@ async function filNoir(page, x, y) {
         check(`49c. ${nom} : barre de ${m.barre} px${mode === 'debutant' ? ' (≤ 82)' : ''}, rien ne déborde ; « ${m.aff.texte} » entier, dans l’écran`,
           (mode === 'expert' || m.barre <= 82) && m.page <= 0 && !m.aff.coupe && m.aff.dans, m);
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
+        await pg.close();
+      }
+
+      titre('50. Carte claire (le terminal en Aero) : fond clair ; mini-clé, légende et explication aux mots de la palette affichée ; ronds, triangles, ligne du prix, cadres et traits des repères visibles');
+      // Le thème que décrit le terminal (js/liaison.js, clé « samsara-theme-carte ») : la carte ne lit
+      // rien d'autre du terminal. tests/test_lien_carte_page.js le fait décrire par un vrai terminal,
+      // et le change dans un autre onglet.
+      const AERO = Object.assign({}, VU, { 'samsara-theme-carte': JSON.stringify({ id: 'aero', mode: 'clair', accent: '#0b84b0' }) });
+      const lum = c => BM.luminance(c), hexRgb = s => [1, 3, 5].map(i => parseInt(s.slice(i, i + 2), 16));
+      for (const [w, h, doigt] of [[1440, 860, false], [390, 844, true]]) {
+        let pg, S50;
+        const nom = `50. ${w} px, Aero`;
+        ({ page: pg, erreurs, S: S50 } = await ouvrir(nav, { encodage: true, mode: 'debutant', vue: { width: w, height: h }, stockage: AERO, intercept: deuxCotes,
+          contexte: doigt ? { deviceScaleFactor: 2, hasTouch: true, isMobile: true } : {} }));
+        await pg.waitForFunction(() => window.__carte.etat().debutant.etiquettes.length >= 1 && window.__carte.etat().debutant.miniCle, null, { timeout: 15000 }).catch(() => {});
+        await pg.waitForTimeout(600);
+        const e = await etat(pg), ch = e.mise.chaleur, v = e.vue;
+        // a. Le fond : la page, le fond de la carte, et la chaleur elle-même (peu d'ordres ≈ le fond).
+        const fond = await pg.evaluate(() => {
+          const e = window.__carte.etat(), m = e.mise, x = document.getElementById('carte').getContext('2d'), L = [];
+          for (let i = 0; i < 24; i++) for (let j = 0; j < 16; j++) L.push(Array.from(x.getImageData(Math.round((m.chaleur.x + m.chaleur.w * (i + 0.5) / 24) * m.sx), Math.round((m.chaleur.y + m.chaleur.h * (j + 0.5) / 16) * m.sy), 1, 1).data.slice(0, 3)));
+          return { body: getComputedStyle(document.body).backgroundColor.match(/\d+/g).slice(0, 3).map(Number), px: L };
+        });
+        const lums = fond.px.map(lum).sort((a, b) => a - b), med = lums[lums.length >> 1];
+        check(`${nom} : ton clair (${e.theme.ton}), page claire (${fond.body}), fond de carte clair (${e.theme.fond}), cadre à l'accent d'Aero (${e.theme.accentCadre}) ; la chaleur surtout claire (luminance médiane ${med.toFixed(2)} ≥ 0,5)`,
+          e.theme.ton === 'clair' && lum(fond.body) > 0.7 && lum(hexRgb(e.theme.fond)) > 0.7 && e.theme.accentCadre === '#0b84b0' && med >= 0.5, { theme: e.theme, med });
+        // b. La mini-clé : la rampe même de la carte, pâle (peu) → foncée (beaucoup), et ses mots.
+        const mc = e.debutant.miniCle;
+        const bouts = await pg.evaluate(() => [1, 255].map(v => { const c = window.__carte.couleurIntensite(v, 'bid'); return [c & 255, (c >>> 8) & 255, (c >>> 16) & 255]; }));
+        check(`${nom} : mini-clé « peu → beaucoup d’ordres » sur la rampe claire (peu ${bouts[0]} : pâle ; beaucoup ${bouts[1]} : foncé)`,
+          !!mc && mc.rampes === 1 && /\bpeu\b/.test(mc.texte) && /beaucoup d’ordres/.test(mc.texte) && !interdits(mc.texte).length && lum(bouts[0]) > 0.6 && lum(bouts[1]) < 0.05, { mc, bouts });
+        // c. Les triangles du sens (48d), au même seuil, sur les ronds de la carte claire.
+        const fs = e.debutant.formesSens;
+        const vus = await pg.evaluate(() => {
+          const e = window.__carte.etat(), m = e.mise, x = document.getElementById('carte').getContext('2d');
+          const px = (X, Y) => Array.from(x.getImageData(Math.round((m.chaleur.x + X) * m.sx), Math.round((m.chaleur.y + Y) * m.sy), 1, 1).data.slice(0, 3));
+          return e.debutant.triangles.map(t => {
+            const c = px(t.x, t.y - t.s * t.a * 0.07), base = t.y - t.s * t.a * 0.6, o = px(t.x, base - t.s * (t.r - t.a * 0.6) / 2);
+            return { s: t.s, c, o, d: Math.round(Math.hypot(c[0] - o[0], c[1] - o[1], c[2] - o[2])) };
+          });
+        });
+        const nets = vus.filter(q => q.d >= 60).length;
+        check(`${nom} : ${fs.achat} ▲ et ${fs.vente} ▼ — ${nets} sur ${vus.length} tranchent sur leur rond (écart de couleur ≥ 60)`, fs.achat + fs.vente > 0 && vus.length > 0 && nets >= Math.ceil(vus.length * 2 / 3), vus.slice(0, 6));
+        // d. Les ronds : leur bord tranche sur la chaleur claire juste à côté.
+        const ronds = await pg.evaluate(() => {
+          const e = window.__carte.etat(), m = e.mise, x = document.getElementById('carte').getContext('2d');
+          const px = (X, Y) => Array.from(x.getImageData(Math.round((m.chaleur.x + X) * m.sx), Math.round((m.chaleur.y + Y) * m.sy), 1, 1).data.slice(0, 3));
+          const d = (a, b) => Math.round(Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]));
+          // Le bord de chaque rond, dans une direction (gauche, droite, haut, bas) où ni ce bord ni le point de
+          // comparaison, 5 px plus loin, ne sont dans un autre rond (là où ils s'empilent, le voisin serait
+          // comparé à lui-même) ; les 12 plus gros de ceux qui en ont une.
+          const tous = window.__carte.bulles(), dans = (X, Y, z) => tous.some(q => q !== z && Math.hypot(q.x - X, q.y - Y) <= q.r + 1.5);
+          const libre = (X, Y) => X > 2 && Y > 2 && X < m.chaleur.w - 2 && Y < m.chaleur.h - 2;
+          const out = [];
+          for (const b of tous.filter(q => q.r >= 4)) {
+            const dir = [[-1, 0], [1, 0], [0, -1], [0, 1]].find(([u, w]) => libre(b.x + u * (b.r + 5), b.y + w * (b.r + 5)) && !dans(b.x + u * (b.r + 5), b.y + w * (b.r + 5), b) && !dans(b.x + u * b.r, b.y + w * b.r, b));
+            if (!dir) continue;
+            const [u, w] = dir, o = px(b.x + u * (b.r + 5), b.y + w * (b.r + 5));
+            let best = 0;
+            for (let k = -1; k <= 1; k += 0.5) best = Math.max(best, d(px(b.x + u * (b.r + k), b.y + w * (b.r + k)), o));
+            out.push(best);
+          }
+          return out.slice(-12);
+        });
+        check(`${nom} : les ronds se voient — ${ronds.filter(q => q >= 40).length} sur ${ronds.length} ont un bord net sur la chaleur claire (écart ≥ 40)`, ronds.length >= 4 && ronds.filter(q => q >= 40).length >= Math.ceil(ronds.length * 2 / 3), ronds);
+        // e. La ligne du prix : son fil noir (45, « 5 s ») aux clôtures d'il y a 3, 5 et 7 min.
+        const fils = [];
+        for (const m of [3, 5, 7]) {
+          const t = Math.floor(e.maintenant / 60e3) * 60e3 - m * 60e3, k = S50.kline(t, e.maintenant);
+          const x = ch.x + (t + 60e3 - v.t1) / (v.t2 - v.t1) * ch.w - 1, y = ch.y + (v.p2 - +k[4]) / (v.p2 - v.p1) * ch.h;
+          fils.push({ m, fil: await filNoir(pg, x, y), x: Math.round(x), y: Math.round(y) });
+        }
+        check(`${nom} : la ligne du prix se voit — son fil noir aux clôtures d'il y a 3, 5 et 7 min (${fils.filter(r => r.fil).length} sur 3)`, fils.filter(r => r.fil).length >= 2, fils);
+        // f. Les repères : le bord de chaque cadre et le trait de chaque mur tranchent sur la chaleur juste au-dessus.
+        const reperes = await pg.evaluate(() => {
+          const e = window.__carte.etat(), m = e.mise, v = e.vue, ch = m.chaleur, cx = document.getElementById('carte').getContext('2d');
+          const px = (X, Y) => Array.from(cx.getImageData(Math.round((ch.x + X) * m.sx), Math.round((ch.y + Y) * m.sy), 1, 1).data.slice(0, 3));
+          const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+          const Yp = p => (v.p2 - p) / (v.p2 - v.p1) * ch.h, xn = Math.min(ch.w, (e.maintenant - v.t1) / (v.t2 - v.t1) * ch.w);
+          const ecart = (x, y) => { const o = px(x, y - 7); let best = 0; for (let k = -2; k <= 2; k++) best = Math.max(best, d(px(x, y + k), o)); return Math.round(best); };
+          const out = e.debutant.cadres.map(f => ({ quoi: 'cadre ' + f.cote, d: ecart((f.x0 + f.x1) / 2, f.ya) }));
+          for (const k of ['bid', 'ask']) { const n = e.debutant.niveaux && e.debutant.niveaux[k]; if (n && n.source === 'mur') out.push({ quoi: 'trait du mur ' + k, d: ecart(xn - 12, Math.round(Yp((n.pBas + n.pHaut) / 2))) }); }
+          return out;
+        });
+        check(`${nom} : les repères se voient — ${reperes.map(r => r.quoi + ' ' + r.d).join(', ')} (écart ≥ 60 avec la chaleur juste au-dessus)`, reperes.length >= 1 && reperes.every(r => r.d >= 60), reperes);
+        if (!doigt) {
+          // g. La légende et l'explication : les mots de la palette AFFICHÉE (la claire), jamais ceux de la sombre.
+          await pg.click('#btnLegende'); await pg.waitForTimeout(300);
+          const lg = await pg.evaluate(() => document.getElementById('legende').innerText);
+          await pg.keyboard.press('Escape');
+          check('50g. légende claire : « Bleu très pâle : peu d’ordres … bleu nuit : le plus d’ordres », « trait orange » ; jamais « Bleu foncé : peu », « blanc : le plus », « trait jaune » ; les ronds en mots et en forme',
+            /Bleu très pâle : peu d'ordres à ce prix ; puis bleu, de plus en plus foncé ; bleu nuit : le plus d'ordres\./.test(lg) && /trait orange/.test(lg) && !/Bleu foncé : peu|blanc : le plus|trait jaune/.test(lg)
+            && /Ligne à fil noir = le prix/.test(lg) && /Vert, avec ▲[^\n]*acheteurs/.test(lg) && /Rouge, avec ▼[^\n]*vendeurs/.test(lg) && !interdits(lg).length, lg.slice(0, 600));
+          await pg.keyboard.press('?'); await pg.waitForTimeout(500);
+          const intro = await pg.evaluate(() => document.getElementById('guideIntro').innerText);
+          check('50h. explication claire : les mêmes mots (« Bleu très pâle … bleu nuit », « orange »), ▲ et ▼ ; jamais ceux de la carte sombre',
+            /Bleu très pâle : peu d'ordres/.test(intro) && /bleu nuit : le plus d'ordres/.test(intro) && /orange/.test(intro) && /▲/.test(intro) && /▼/.test(intro) && !/Bleu foncé : peu|blanc : le plus|trait jaune/.test(intro) && !interdits(intro).length, intro.slice(0, 600));
+          await pg.click('#guideIntroOk'); await pg.waitForTimeout(300);
+          // Le Complet clair : la légende dit aussi la ligne et l'arc de sa couleur (noire, noir).
+          await pg.click('#btnModeBarre [data-mode-choix="expert"]'); await pg.waitForTimeout(800);
+          await pg.click('#btnLegende'); await pg.waitForTimeout(300);
+          const lgC = await pg.evaluate(() => document.getElementById('legende').innerText);
+          await pg.keyboard.press('Escape');
+          // (Le Complet dit la palette par sa barre de couleurs graduée, pas par une phrase.)
+          check('50i. légende du Complet clair : « La ligne noire », « l’arc noir » — jamais « blanche », « blanc », ni une phrase de la palette sombre',
+            /ligne noire/i.test(lgC) && /arc noir/.test(lgC) && !/ligne blanche|arc blanc|Bleu foncé : peu|blanc : le plus/i.test(lgC), lgC.slice(0, 1500));
+        }
+        check(`${nom} : aucune erreur JavaScript`, !erreurs.length, erreurs);
         await pg.close();
       }
     }
