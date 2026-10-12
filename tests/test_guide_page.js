@@ -270,7 +270,7 @@ const etat = page => page.evaluate(() => {
           return { titre: c && c.titre, r: !!r, voile, liste: crossListe, ligne: ligne && ligne.textContent };
         });
         check(`${nom} : le repère touché est mis en avant sur le graphique, le reste voilé, sa ligne marquée`, sb.titre === lignes2[k] && sb.r && sb.voile > 60 && sb.liste && sb.ligne === lignes2[k], sb);
-        const fin = await o.page.evaluate(() => new Promise(ok => setTimeout(() => ok(reperesVu), PARAM.guide.surbrillanceMs + 200)));
+        const fin = await o.page.evaluate(() => new Promise(ok => setTimeout(() => { dessinerCalque(); ok(reperesVu); }, PARAM.guide.surbrillanceMs + 200)));
         check(`${nom} : la mise en avant s'arrête d'elle-même après quelques secondes`, fin === null, fin);
       }
       check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);

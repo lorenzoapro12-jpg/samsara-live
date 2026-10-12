@@ -6147,7 +6147,7 @@ const icoCible = c => c.ico || (c.niveau || c.niveaux ? 'niveau' : c.figure || c
 const reperesEnColonne = () => document.getElementById('reperesSection').classList.contains('colonne');
 let reperesOuvertCol = null;   // la colonne ouverte ou repliée à la main (null : selon la largeur)
 let reperesCibles = [], reperesCle = '', reperesActif = null;
-let reperesVu = null, reperesVuMinuteur = 0;   // { titre, fin } : le repère mis en avant (fin 0 : tant que la souris est sur sa ligne)
+let reperesVu = null;   // { titre, fin } : le repère mis en avant (fin 0 : tant que la souris est sur sa ligne)
 function reperesPoint(c) {
   const r = (c.rects || [])[0] || (c.zones || [])[0];
   if (r) return [(r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2];
@@ -6285,9 +6285,9 @@ function voirRepere(k) {
   for (const b of document.querySelectorAll('#reperesListe button')) { if (b.dataset.k === String(k)) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current'); }
   ouvrirReperes(false);
   crossX = p[0]; crossY = p[1]; bulleDetail = null; crossListe = true;
+  // Sans minuterie (rien ne tourne au repos) : l'image suivante après l'échéance la retire (le prix
+  // en direct redessine le calque à chaque cours reçu).
   reperesVu = { titre: c.titre, fin: Date.now() + PARAM.guide.surbrillanceMs };
-  clearTimeout(reperesVuMinuteur);
-  reperesVuMinuteur = setTimeout(() => { if (reperesVu && reperesVu.fin) { reperesVu = null; dessinerCalque(); } }, PARAM.guide.surbrillanceMs);
   dessinerCalque();
 }
 if (document.getElementById('reperesListe')) {
@@ -6320,6 +6320,7 @@ function cibleVue() {
  *  troué sur un calque à part (destination-out), puis posé : rien du repère n'est recouvert. */
 let surbrillanceToile = null;
 function surbrillanceCalque(W, mainH) {
+  if (reperesVu && reperesVu.fin && Date.now() > reperesVu.fin) reperesVu = null;
   const c = cibleVue(), P = geoPrix;
   if (!c || !P) return;
   // Le curseur montre un autre repère sur le tracé : c'est lui qu'on lit, la mise en avant s'arrête.
