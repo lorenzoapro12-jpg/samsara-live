@@ -1011,7 +1011,13 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
   font: 500 13px/1.35 var(--font); color: var(--ink-1); background: none; border: 0;
   border-top: 1px solid var(--hairline); cursor: pointer;
 }
-.reperes-liste button[aria-current="true"] { background: var(--pill); border-radius: min(var(--r-tile), 8px); }
+/* Le repère choisi (aria-current) et celui que la bulle du graphique explique (.survole) : la ligne
+   ressort, un filet d'accent à gauche, comme le repère ressort sur le tracé (surbrillanceCalque). */
+.reperes-liste button[aria-current="true"], .reperes-liste button.survole {
+  background: color-mix(in srgb, var(--accent-2) 12%, var(--card-solid)); border-radius: min(var(--r-tile), 8px);
+  box-shadow: inset 3px 0 0 var(--accent-2);
+}
+.reperes-liste button:hover { background: color-mix(in srgb, var(--accent-2) 7%, transparent); border-radius: min(var(--r-tile), 8px); }
 .reperes-trait { flex: 0 0 3px; align-self: stretch; border-radius: 2px; background: var(--trait, var(--ink-3)); }
 /* L'icône de la famille d'une info (js/icones.js), la même que sur le graphique, dans sa couleur. */
 .reperes-ico { flex: 0 0 13px; width: 13px; height: 13px; margin-top: 2px; }
