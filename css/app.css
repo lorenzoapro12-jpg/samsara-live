@@ -987,7 +987,7 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 }
 .reperes-textes { display: flex; flex-direction: column; gap: 1px; padding: 5px 0; min-width: 0; }
 .reperes-resume { font-weight: 800; font-size: 13.5px; color: var(--ink-1); }
-.reperes-resume + #reperesTitre { font-weight: 500; font-size: 11.5px; color: var(--ink-2); }
+.reperes-resume:not([hidden]) + #reperesTitre { font-weight: 500; font-size: 11.5px; color: var(--ink-2); }
 .reperes-resume[hidden] { display: none; }
 .reperes-fleche { font-size: 14px; transition: transform .3s; }
 .reperes-section:not(.collapsed) .reperes-fleche { transform: rotate(-90deg); }
