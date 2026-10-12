@@ -712,6 +712,12 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
   check('chaque phrase : 15 mots au plus (charte)', !longues.length, longues);
   check('aucun pourcentage, aucun mot technique (liste du Débutant), aucun conseil', !phrases.some(x => /%/.test(x) || G.motsBannis(x).length || CONSEIL.test(x)), phrases.filter(x => /%/.test(x) || G.motsBannis(x).length || CONSEIL.test(x)));
   check('l’avertissement unique de la page', tous.every(r => r.avertissement === G.AVERTISSEMENT));
+  // Chaque signal porte sa famille (son icône, js/icones.js) ; « À surveiller » a la sienne, ligne pour ligne.
+  const I = require(path.join(REPO, 'js/icones.js'));
+  check('chaque signal du pourquoi a une famille connue (icône), la ligne de chaque repère à surveiller aussi',
+    tous.every(r => r.pourquoi.every(p => I.connue(p.fam === 'tendance' ? I.tendance(p.sens) : p.fam)) && r.surveillerFam.length === r.surveiller.length
+      && r.surveiller.every((t, k) => (r.surveillerFam[k] === 'niveau') === /^(Au-dessus|En dessous|Le prix est)/.test(t))), tous.map(r => [r.pourquoi, r.surveillerFam]));
+  check('les icônes : une par famille de la légende, un nom chacune', I.LEGENDE.every(f => I.connue(f) && I.NOMS[f]) && /<svg[^>]*viewBox="0 0 10 10"/.test(I.svg('figure')) && I.svg('inconnue') === '');
   const sans = G.synthese(Object.assign({}, base, { prix: NaN }));
   check('prix absent : dit, rien d’inventé', /indisponible/.test(sans.titre) && !sans.pourquoi.length && !sans.surveiller.length, sans);
 }
