@@ -353,6 +353,9 @@ let rsDragStartEnd = 0;
 // ============ CROSSHAIR ============
 let crossX = null, crossY = null;  // coordonnées canvas du curseur
 let crossListe = false;   // crossX / crossY posés par la liste « Sur le graphique » (voirRepere), pas par le curseur
+let bulleOuverte = null;   // la bulle dessinée : { cle, x, y, w, h, ancre, resume }
+let bulleTenue = null;     // la clé de la bulle où va la souris (versBulle) : redessinée telle quelle
+let ancreBulle = null;     // { cle, x, y } : où la bulle montrée s'est ouverte (guideBulle)
 // Mode Débutant : le registre des textes posés sur le tracé ({ items: [{ role, texte, rect }] },
 // relu par les tests), refait à chaque dessin ; null en Expert.
 let debEtat = null;
@@ -782,6 +785,7 @@ function apercuPanneau(key) {
     + '<p><b>Comment s’en servir ?</b> Cochée : tout voir. Décochée : l’essentiel. Les calculs restent les mêmes.</p>'
     : apercuHtml(key);
 }
+let apercuMinuteur = 0;   // l'aperçu du menu suit la ligne où la souris se pose
 function montrerApercu(key) {
   if (key === menuApercu) return;
   menuApercu = key;
@@ -856,8 +860,11 @@ function buildDropdown() {
   // Survol, toucher et clavier montrent l'explication dans l'aperçu (sans rien cocher de plus).
   for (const l of menu.querySelectorAll('label[data-ind]')) {
     const k = l.dataset.ind;
-    l.addEventListener('mouseenter', () => montrerApercu(k));
-    l.addEventListener('pointerdown', () => montrerApercu(k));
+    // La souris qui ne fait que passer (en route vers l'aperçu et son lien « En savoir plus ») ne
+    // change pas l'aperçu : il suit la ligne où elle se pose.
+    l.addEventListener('mouseenter', () => { clearTimeout(apercuMinuteur); apercuMinuteur = setTimeout(() => montrerApercu(k), 160); });
+    l.addEventListener('mouseleave', () => clearTimeout(apercuMinuteur));
+    l.addEventListener('pointerdown', () => { clearTimeout(apercuMinuteur); montrerApercu(k); });
     l.addEventListener('focusin', () => montrerApercu(k));
   }
   const filtre = document.getElementById('indFiltre');
@@ -1257,12 +1264,40 @@ function scheduleDraw() {
   rafPending = true;
   requestAnimationFrame(() => { rafPending = false; drawChart(); });
 }
+const GRACE_BULLE_MS = 300, GRACE_BULLE_MAX = 1200;   // une bulle quittée suit le curseur quand il se pose (ms)
+let graceBulle = null, graceMinuteur = 0;   // { x, y, debut } : la dernière position du curseur pendant la grâce
 canvas.addEventListener('mousemove', (e) => {
   const rect = canvas.getBoundingClientRect();
-  // Vers le lien « Voir sur la carte ▸ » de la bulle : elle reste où elle est (liaison avec la carte).
-  if (versLienBulle(e.clientX - rect.left, e.clientY - rect.top)) return;
-  crossX = e.clientX - rect.left;
-  crossY = e.clientY - rect.top;
+  // Vers la bulle ou dessus : elle reste où elle est (on peut cliquer son détail ou son lien).
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  if (versBulle(mx, my)) { graceBulle = null; clearTimeout(graceMinuteur); return; }
+  // Sortie de la bulle ou de son repère hors du couloir : un court délai de grâce avant qu'elle
+  // suive le curseur (un geste un peu de travers ne la perd pas).
+  // Sur l'étiquette même de la bulle ouverte : la bulle ne bouge pas (elle fuyait le curseur qui
+  // allait vers elle) ; sur sa bande ou son tracé, elle suit le curseur, comme le réticule.
+  const etiq = bulleOuverte && geo ? guideCibleSous(mx, my, geo.mainH, true) : null;
+  if (etiq && cleBulle(etiq) === bulleOuverte.cle) { graceBulle = null; clearTimeout(graceMinuteur); bulleTenue = bulleOuverte.cle; canvas.style.cursor = 'pointer'; return; }
+  // Sur l'étiquette d'un autre repère (hors du couloir) : sa bulle tout de suite, c'est un choix.
+  // Ailleurs (le fond, une bande, un tracé) : la grâce.
+  const sous = bulleOuverte && geo ? guideCibleSous(mx, my, geo.mainH, debutant()) : null;
+  if (bulleOuverte && !etiq && !isPanning && !isPriceDrag && !rsDragging && !(sous && cleBulle(sous) === bulleOuverte.cle)) {
+    // La bulle suit quand le curseur se pose (GRACE_BULLE_MS sans bouger), ou au plus tard après
+    // GRACE_BULLE_MAX : tant qu'on est en route vers elle, même de travers, elle ne bouge pas.
+    const t = Date.now(), debut = graceBulle ? graceBulle.debut : t;
+    clearTimeout(graceMinuteur);
+    graceBulle = { x: mx, y: my, debut };
+    const appliquer = () => {
+      const g = graceBulle;
+      graceBulle = null;
+      if (g && crossX !== null) { crossX = g.x; crossY = g.y; crossListe = false; bulleTenue = null; scheduleCalque(); }
+    };
+    if (t - debut >= GRACE_BULLE_MAX) appliquer();
+    else graceMinuteur = setTimeout(appliquer, GRACE_BULLE_MS);
+    return;
+  }
+  graceBulle = null; clearTimeout(graceMinuteur); bulleTenue = null;
+  crossX = mx;
+  crossY = my;
   crossListe = false;
   
   // Curseur Range Selector
@@ -1292,7 +1327,7 @@ canvas.addEventListener('mousemove', (e) => {
   survol();
   scheduleCalque();
 });
-canvas.addEventListener('mouseleave', () => { if (crossListe) return; crossX = null; crossY = null; bulleDetail = null; dessinerCalque(); });
+canvas.addEventListener('mouseleave', () => { graceBulle = null; clearTimeout(graceMinuteur); bulleTenue = null; if (crossListe) return; crossX = null; crossY = null; bulleDetail = null; dessinerCalque(); });
 
 // --- Zoom molette ---
 canvas.addEventListener('wheel', (e) => {
@@ -1461,12 +1496,20 @@ function tapGraphique(clientX, clientY) {
     if (lienBulle.action) { lienBulle.action(); return true; }
     location.href = lienBulle.url; return true;
   }
+  // Un clic (ou un toucher) dans la bulle : son détail, la bulle reste en place ; déjà en détail,
+  // rien ne bouge (on lit).
+  const B = bulleOuverte;
+  if (B && crossX !== null && tx >= B.x && tx <= B.x + B.w && ty >= B.y && ty <= B.y + B.h) {
+    bulleTenue = B.cle;
+    if (B.resume) { bulleDetail = B.cle; dessinerCalque(); }
+    return true;
+  }
   // Une figure dont la bulle est déjà ouverte en entier (son détail) : un clic de plus sur elle
   // ouvre ses statistiques détaillées.
   const cF = geo && lienBulle && lienBulle.action && crossX !== null ? guideCibleSous(tx, ty, geo.mainH, debutant()) : null;
   if (cF && cleBulle(cF) === lienBulle.cle && bulleDetail === lienBulle.cle) { lienBulle.action(); return true; }
   const c = geo ? guideCibleSous(tx, ty, geo.mainH) : null, k = c ? cleBulle(c) : null;
-  crossListe = false; reperesVu = null;
+  crossListe = false; reperesVu = null; bulleTenue = null;
   if (k && crossX !== null && bulleVue === k && bulleDetail !== k) {
     // 2e toucher sur la bulle montrée : son détail.
     bulleDetail = k; crossX = tx; crossY = ty;
@@ -3510,6 +3553,7 @@ function drawChart() {
 function dessinerCalque() {
   reperesBulleTitre = null;
   calqueDessin();
+  if (!bulleOuverte) ancreBulle = null;   // plus de bulle : la prochaine s'ouvre où est le curseur
   for (const b of document.querySelectorAll('#reperesListe button[data-k]')) {
     const c = reperesCibles[+b.dataset.k];
     b.classList.toggle('survole', !!c && c.titre === reperesBulleTitre);
@@ -3519,7 +3563,7 @@ let reperesBulleTitre = null;   // posé par guideBulle : le titre du repère ex
 function calqueDessin() {
   calqueDemande = false;
   bulleVue = null;   // la bulle de cette image la reposera (guideBulle)
-  lienBulle = null; cibleMarque = null;   // liaison avec la carte : reposés par cette image
+  lienBulle = null; cibleMarque = null; bulleOuverte = null;   // liaison avec la carte, bulle : reposés par cette image
   if (crossX === null) bulleDetail = null;   // plus de bulle : la prochaine recommence par son résumé
   if (!cx) return;
   const dpr = window.devicePixelRatio;
@@ -3631,7 +3675,7 @@ function calqueDessin() {
   // (la bulle prend leur place). Sur une bande, une zone ou un tracé, le réticule et les quatre
   // valeurs de la bougie restent (les bougies récentes sont souvent dans une bande) ; la bulle se
   // pose à côté, comme en Expert.
-  const cibleDeb = deb && crossY < mainH && P && (guideEtat || scenEtat) ? guideCibleSous(crossX, crossY, mainH, true) : null;
+  const cibleDeb = deb && crossY < mainH && P && (guideEtat || scenEtat) ? (cibleTenue(true) || guideCibleSous(crossX, crossY, mainH, true)) : null;
   if (cibleDeb) {
     if (guideEtat) guideEtat.survol = null;
     if (scenEtat) { scenEtat.survol = null; scenEtat.bulle = null; }
@@ -3678,7 +3722,7 @@ function calqueDessin() {
       });
       cx.restore();
       bulleOHLCV = { x: tX, y: tY, w: 135, h: 90 };
-    } else if (idx >= 0 && idx < n && !((guideEtat || scenEtat) && guideCibleSous(crossX, crossY, mainH, true))) {
+    } else if (idx >= 0 && idx < n && !bulleTenue && !((guideEtat || scenEtat) && guideCibleSous(crossX, crossY, mainH, true))) {
     // Infobulle OHLCV — 2 colonnes. Pas sur une étiquette : sa bulle seule (les deux se
     // recouvraient et cachaient les bougies) ; sur une bande ou un tracé, les deux restent. Les prix à la précision de cotation, au format de la page
     // (« O 86 012,50 », l'unité est sur l'axe juste à droite) ; le volume dans l'actif de base.
@@ -6366,7 +6410,7 @@ function surbrillanceCalque(W, mainH) {
 function guideSurvol(W, mainH, evite) {
   if (guideEtat) guideEtat.survol = null;
   if (scenEtat) { scenEtat.survol = null; scenEtat.bulle = null; }
-  const c = guideCibleSous(crossX, crossY, mainH);
+  const c = cibleTenue() || guideCibleSous(crossX, crossY, mainH);
   if (c && debutant()) scenSurvolDebutant(c);   // la zone d'invalidation du scénario 1, sous la bulle
   if (c) guideBulle(c, W, mainH, evite);
 }
@@ -6501,9 +6545,16 @@ function guideBulle(c, W, mainH, evite) {
   const corps = aplatir(paras);
   const bh = Math.min(hDe(corps), Math.max(hMax, 40)) + hLien;
   // Sous le curseur, et sous l'infobulle OHLCV si elle est là ; au-dessus quand la place manque.
-  let bx = crossX + 16, by = Math.max(crossY + 18, evite ? evite.y + evite.h + 6 : 0);
-  if (bx + bw > W - 75) bx = Math.max(16, crossX - bw - 16);
-  if (by + bh > mainH - 4) by = Math.max(4, Math.min(crossY, evite ? evite.y : crossY) - bh - 8);
+  // L'ancre : le point où la bulle s'est ouverte, gardé tant qu'elle montre le même repère — elle
+  // ne fuit plus devant la souris qui glisse sur la bande ou le tracé vers elle.
+  // Ancrée, la bulle garde la place prise à son ouverture (à l'écart de l'infobulle des bougies
+  // d'alors) : l'infobulle suit le curseur, la bulle ne saute plus avec elle.
+  if (ancreBulle && ancreBulle.cle === cle) evite = ancreBulle.evite;
+  else ancreBulle = { cle, x: crossX, y: crossY, evite };
+  const ax = ancreBulle.x, ay = ancreBulle.y;
+  let bx = ax + 16, by = Math.max(ay + 18, evite ? evite.y + evite.h + 6 : 0);
+  if (bx + bw > W - 75) bx = Math.max(16, ax - bw - 16);
+  if (by + bh > mainH - 4) by = Math.max(4, Math.min(ay, evite ? evite.y : ay) - bh - 8);
   by = Math.max(4, Math.min(by, mainH - 4 - bh));
   // La touche « ? » (HTML, par-dessus le tracé) ne couvre pas la bulle : sa dernière ligne est un
   // lien. Sinon la bulle remonte au-dessus d'elle, ou passe à sa droite.
@@ -6541,6 +6592,8 @@ function guideBulle(c, W, mainH, evite) {
   if (adresse) poserLienCarte(adresse, cle, bx, by, bw, bh, hLien, fC);
   else if (lStats) poserLienStats(stats, lStats, cle, bx, by, bw, bh, hLien, fC, hC);
   cx.restore();
+  // La bulle de cette image : la souris peut aller sur elle (versBulle), un clic dedans ouvre son détail.
+  bulleOuverte = { cle, x: bx, y: by, w: bw, h: bh, ancre: { x: ax, y: ay }, resume: !!acces };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -6550,7 +6603,7 @@ function guideBulle(c, W, mainH, evite) {
 //   résistances du Complet, le prix venu de la carte) porte ce lien en dernière ligne, hors de son
 //   résumé compté. Toucher le repère ouvre sa bulle, comme avant ; seul le lien navigue
 //   (bookmap.html#prix=…). La carte ne montre que BTC/USDT : sur une autre paire, pas de lien.
-//   À la souris, la bulle reste en place pendant qu'on va vers elle (versLienBulle).
+//   À la souris, la bulle reste en place pendant qu’on va vers elle (versBulle), toute bulle.
 // • « Voir sur le graphique ▸ » (la carte) ouvre index.html#prix=… : ce prix, validé (Liaison),
 //   est marqué d'un trait en tirets et de son étiquette sur l'axe des prix, et gardé dans l'échelle
 //   (priceWindow) — sur BTC/USDT seulement. Le terminal s'ouvre toujours sur BTC/USDT, à son
@@ -6592,7 +6645,7 @@ function poserLienCarte(adresse, cle, bx, by, bw, bh, hLien, fC) {
   cx.fillStyle = COLORS.hairline; cx.fillRect(bx + 14, y0, bw - 28, 1);
   cx.font = chartFont(fC, 650); cx.fillStyle = COLORS.accent2;
   cx.fillText('Voir sur la carte ▸', bx + 14, y0 + hLien / 2 + fC * 0.36);
-  lienBulle = { rect: { x: bx, y: y0 - 2, w: bw, h: hLien + 8 }, url: adresse, cle, bulle: { x: bx, y: by, w: bw, h: bh }, ancre: { x: crossX, y: crossY } };
+  lienBulle = { rect: { x: bx, y: y0 - 2, w: bw, h: hLien + 8 }, url: adresse, cle, bulle: { x: bx, y: by, w: bw, h: bh }, ancre: ancreBulle ? { x: ancreBulle.x, y: ancreBulle.y } : { x: crossX, y: crossY } };
 }
 /** La figure d'une cible (en cours ou passée) et sa ligne de statistiques ; sinon null. */
 function statsBulle(c) {
@@ -6606,29 +6659,38 @@ function poserLienStats(stats, lignes, cle, bx, by, bw, bh, hLien, fC, hC) {
   cx.fillStyle = COLORS.hairline; cx.fillRect(bx + 14, y0, bw - 28, 1);
   cx.font = chartFont(fC, 650); cx.fillStyle = COLORS.accent2;
   lignes.forEach((l, k) => cx.fillText(l, bx + 14, y1 + k * hC));
-  lienBulle = { rect: { x: bx, y: y0 - 2, w: bw, h: hLien + 8 }, action: () => ouvrirStatsFigure(stats.f), texte: stats.texte, cle, bulle: { x: bx, y: by, w: bw, h: bh }, ancre: { x: crossX, y: crossY } };
+  lienBulle = { rect: { x: bx, y: y0 - 2, w: bw, h: hLien + 8 }, action: () => ouvrirStatsFigure(stats.f), texte: stats.texte, cle, bulle: { x: bx, y: by, w: bw, h: bh }, ancre: ancreBulle ? { x: ancreBulle.x, y: ancreBulle.y } : { x: crossX, y: crossY } };
 }
-/** La souris va-t-elle vers le lien de la bulle ? Sur le lien, ou sortie de son repère dans la
- *  direction de la bulle (la demi-droite de l'ancre à travers le pointeur touche la bulle) : la
- *  bulle reste alors où elle est — collée au pointeur, elle fuirait devant lui. */
-function versLienBulle(x, y) {
-  const L = lienBulle;
-  if (!L || crossX === null || !geo) return false;
-  const r = L.rect;
-  if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) { canvas.style.cursor = 'pointer'; return true; }
+/** La souris va-t-elle vers la bulle ouverte, ou est-elle dessus ? Sur la bulle (son lien compris),
+ *  ou sortie de son repère vers elle (dans le couloir qui va de l'ancre à la bulle) : la bulle reste
+ *  où elle est. Toute bulle, avec ou sans lien : on doit pouvoir aller cliquer « le détail » ou
+ *  « Voir sur la carte ▸ » (demande du 12/10/2026). Encore sur son repère : faux, la bulle le suit. */
+function versBulle(x, y) {
+  const r = versBulle0(x, y);
+  bulleTenue = r ? bulleOuverte.cle : null;
+  return r;
+}
+/** La cible de la bulle tenue (la souris est sur elle ou en route) : retrouvée par sa clé, même si
+ *  un nouveau dessin a déplacé son étiquette sous l'ancre ; null sinon. etiq : une cible à étiquette. */
+function cibleTenue(etiq) {
+  if (!bulleTenue) return null;
+  const E = guideEtat && overlays.guide ? guideEtat : null, Sc = scenEtat, Pc = cibleMarque ? ciblesPrix.concat([cibleMarque]) : ciblesPrix;
+  const c = (E ? E.cibles : []).concat(Sc ? Sc.cibles : [], Pc).find(q => cleBulle(q) === bulleTenue) || null;
+  return c && (!etiq || (c.rects || []).length) ? c : null;
+}
+function versBulle0(x, y) {
+  const B = bulleOuverte, L = lienBulle;
+  if (!B || crossX === null || !geo) return false;
+  if (L && L.cle === B.cle && x >= L.rect.x && x <= L.rect.x + L.rect.w && y >= L.rect.y && y <= L.rect.y + L.rect.h) { canvas.style.cursor = 'pointer'; return true; }
+  if (x >= B.x - 6 && x <= B.x + B.w + 6 && y >= B.y - 6 && y <= B.y + B.h + 6) { canvas.style.cursor = B.resume ? 'pointer' : 'default'; return true; }
   const c = guideCibleSous(x, y, geo.mainH, debutant());
-  if (c && cleBulle(c) === L.cle) return false;     // encore sur le repère : la bulle le suit, comme avant
-  const b = L.bulle, lo = [b.x - 6, b.y - 6], hi = [b.x + b.w + 6, b.y + b.h + 6], o = [L.ancre.x, L.ancre.y], d = [x - o[0], y - o[1]];
-  let s0 = 1, s1 = Infinity;
-  for (let k = 0; k < 2; k++) {
-    if (Math.abs(d[k]) < 1e-9) { if (o[k] < lo[k] || o[k] > hi[k]) return false; continue; }
-    let u = (lo[k] - o[k]) / d[k], v = (hi[k] - o[k]) / d[k];
-    if (u > v) [u, v] = [v, u];
-    s0 = Math.max(s0, u); s1 = Math.min(s1, v);
-  }
-  if (s0 > s1) return false;
-  canvas.style.cursor = 'default';
-  return true;
+  if (c && cleBulle(c) === B.cle) return false;
+  // Le couloir : l'enveloppe de l'ancre et des coins de la bulle (élargie), en triangles.
+  const m = 14, P = [[B.x - m, B.y - m], [B.x + B.w + m, B.y - m], [B.x + B.w + m, B.y + B.h + m], [B.x - m, B.y + B.h + m]], o = [B.ancre.x, B.ancre.y];
+  const cote = (a, b, q) => (b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0]);
+  const dansT = (a, b, d, q) => { const s1 = cote(a, b, q), s2 = cote(b, d, q), s3 = cote(d, a, q); return (s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0); };
+  for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) if (dansT(o, P[i], P[j], [x, y])) { canvas.style.cursor = 'default'; return true; }
+  return false;
 }
 /** Le prix venu de la carte, sur le calque : un trait en tirets de la couleur des liens, son
  *  étiquette sur l'axe des prix (hors du tracé : aucun texte de plus sur le graphique), et sa
