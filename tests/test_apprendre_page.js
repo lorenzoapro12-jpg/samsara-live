@@ -384,15 +384,15 @@ function controlerLisible(e, nom) {
       const o = await ouvrir(nav, { mode: 'debutant', w, h, scen: true });
       const s0 = await o.page.evaluate(() => ({ montre: scenEtat && scenEtat.montre ? scenEtat.montre.sc.rang : null, cle: scenEtat && scenEtat.montre ? scenEtat.montre.sv.cle : null, msg: !!apprMsg }));
       check(`le scénario 1 est montré, suivi en direct (« ${s0.cle} ») ; aucun message au chargement`, s0.montre === '1' && ['rien', 'avant'].includes(s0.cle) && !s0.msg, s0);
-      // La bulle du scénario : la ligne du risque, au résumé et au détail.
+      // La bulle du scénario : l’avertissement une fois, au détail ; le résumé dit « pas une prévision ».
       const ps = await pointCible(o.page, 'scenario');
       if (ps) {
         await montrer(o, ps);
         const b = await lireBulle(o.page);
         await detail(o, ps);
         const d = await lireBulle(o.page);
-        check(`bulle du scénario (« ${b && b.titre} ») : la ligne du risque au résumé (${b && b.lignes} lignes, ${b && b.nombres} nombres) et au détail, une fois, court : « Une hypothèse de Claude (une IA), pas un conseil » (charte du 12/10/2026)`,
-          !!b && !!d && b.corps.includes(G.RISQUE) && b.lignes <= b.P.bulleLignes && b.nombres <= b.P.bulleNombres && /Une hypothèse de Claude \(une IA\), pas un conseil\./.test(d.corps), { b, d });
+        check(`bulle du scénario (« ${b && b.titre} ») : au résumé, la ligne d’accès dit « pas une prévision » sans la ligne du risque (${b && b.lignes} lignes, ${b && b.nombres} nombres) et au détail, une fois, court : « Une hypothèse de Claude (une IA), pas un conseil » (charte du 12/10/2026)`,
+          !!b && !!d && !b.corps.includes(G.RISQUE) && /pas une prévision/.test(b.corps) && b.lignes <= b.P.bulleLignes && b.nombres <= b.P.bulleNombres && /Une hypothèse de Claude \(une IA\), pas un conseil\./.test(d.corps), { b, d });
         await ailleurs(o);
       } else check('le libellé du scénario 1 mène à sa bulle', false, null);
       const rd = await repereDessus(o.page);

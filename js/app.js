@@ -6236,17 +6236,15 @@ function resumeBulle(texte, largeur, lignesLibres, nombresLibres) {
  *  bulle) ; la phrase, les scénarios et leur ligne ont le leur (c.resume) ; sinon, le texte. */
 function sourceResume(c, vivant, texte) {
   if (c.niveau && c.niveau.niv) return [[Guide.quoiDebutant(Guide.raisonPrincipale(c.niveau.niv))], [Guide.ouEstPrixDebutant(c.niveau.live, c.niveau.niv, livePrice)]];
-  // Un scénario (son libellé, sa ligne) : la ligne du risque en dernier, si elle tient (sinon elle
-  // est au détail, au 2e toucher). Une figure, une figure passée : la ligne d'accès au détail dit
-  // déjà « pas une prévision » (charte du 12/10/2026 : l'avertissement une fois).
-  const risque = [[Guide.RISQUE]];
+  // Un scénario, une figure, une figure passée : la ligne d'accès au détail dit déjà « pas une
+  // prévision », et le détail finit par l'avertissement (charte du 12/10/2026 : une fois).
   if (c.figure) {
     const vu = (String(texte[vivant ? 1 : 0] || '').match(/^.*?\.(?=\s|$)/) || [''])[0].replace(/^[^:]{2,40} : /, ''), maj = t => t.charAt(0).toUpperCase() + t.slice(1);
     return [[vivant], [vu ? maj(vu) : '']];
   }
   if (!c.resume) return null;
   const R = c.resume.map(p => (Array.isArray(p) ? p : [p]));
-  return scenEtat && scenEtat.cibles.includes(c) ? R.concat(risque) : R;
+  return R;
 }
 /** La bulle d'une cible, près du curseur, toujours dans le tracé. */
 function guideBulle(c, W, mainH, evite) {
