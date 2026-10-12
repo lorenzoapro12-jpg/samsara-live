@@ -425,8 +425,8 @@ titre('7. Dans la page : paramètres, menu, fiche, choix gardé, lecture du fich
   check(`panneau : « Scénarios du matin … (${hMenu}) » juste après le Guide, dans la question « Où le prix peut réagir ? » (heure de l’appareil), avec sa fiche`, item && /^Scénarios du matin/.test(item.label) && item.label.endsWith('(' + hMenu + ')') && !/Paris|\dh\d/.test(item.label) && T.FICHE_IND.scenarios === 'scenarios'
     && cat.cat === 'reaction' && cat.items[1] === item, item);
   const f = T.ficheHtml('scenarios');
-  check('fiche « scenarios » : Claude (une IA), sans pourcentage, ordre du premier mouvement, suivi en direct / journal, pas une recommandation',
-    /Claude \(une IA\)/.test(f) && /SANS pourcentage/.test(f) && /Ordre du premier mouvement/.test(f) && /SUIVI EN DIRECT/.test(f) && /note officielle est celle du journal/.test(f) && /pas une recommandation/.test(f));
+  check('fiche « scenarios » : Claude (une IA), sans pourcentage, ordre du premier mouvement, suivi en direct / journal, pas un conseil',
+    /Claude \(une IA\)/.test(f) && /SANS pourcentage/.test(f) && /Ordre du premier mouvement/.test(f) && /SUIVI EN DIRECT/.test(f) && /note officielle est celle du journal/.test(f) && /pas un conseil/.test(f));
   const SRC_FICHES = fs.readFileSync(path.join(REPO, 'js/fiches.js'), 'utf8');
   check('la fiche est dans le glossaire, groupe « Guide et scénarios du matin »', /\['Guide et scénarios du matin', \[[^\]]*'scenarios'/.test(SRC_FICHES));
   check('fiche : la cadence de relecture et le seuil d’échantillon lus dans CADENCES / PARAM', f.includes('toutes les ' + Math.round(T.CADENCES.previsions_lue / 60000) + ' minutes') && f.includes('sous ' + P.echantillonFaible + ' matins'));

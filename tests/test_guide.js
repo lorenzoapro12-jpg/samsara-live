@@ -448,7 +448,7 @@ titre('7. Dans la page : paramètres, menu, fiche, choix gardé, marge de futur'
     cat && cat.cat === 'reaction' && cat.titre === 'Où le prix peut réagir ?' && cat.items[0].key === 'guide' && T.FICHE_IND.guide === 'guide'
     && vm.runInContext('COUCHES_SITE[0]', page.sandbox) === 'guide', cat && cat.items.map(i => i.key));
   const fiches = ['guide', 'guide_niveaux', 'guide_regime', 'guide_formes', 'guide_suite'];
-  check('fiches du Guide définies, chacune « pas une recommandation »', fiches.every(k => T.FICHES[k] && /pas une recommandation/.test(T.ficheHtml(k))));
+  check('fiches du Guide définies, chacune « pas un conseil »', fiches.every(k => T.FICHES[k] && /pas un conseil/.test(T.ficheHtml(k))));
   check('la fiche des formes dit « débattu » et « mesuré » (sa lecture est discutée, son bilan compté)', T.FICHES.guide_formes.lectures.some(l => l.s === 'débattu') && T.FICHES.guide_formes.lectures.some(l => l.s === 'mesuré'));
   const sauve = JSON.stringify(P); P.niveauxParCote = 3; P.fusion = 0.0042;
   check('PARAM.guide change → la fiche suit (3 niveaux, 0,42 %)', /au plus 3 de chaque côté/.test(T.ficheHtml('guide_niveaux')) && /0,42 %/.test(T.ficheHtml('guide_niveaux')));
