@@ -238,7 +238,7 @@ const etat = page => page.evaluate(() => {
         } else { await o.page.click('#reperesHandle'); await o.page.waitForTimeout(200); }
         const ouverte = await o.page.evaluate(() => { const r = document.getElementById('reperesListe').getBoundingClientRect(); return r.height > 40 && r.top >= 0 && r.bottom <= innerHeight + 1; });
         const barre = await o.page.evaluate(() => document.getElementById('reperesTitre').textContent);
-        check(`${nom} : le titre de la liste ouverte compte les repères (« ${barre} »)`, enColonne ? /^Sur le graphique · \d+ repères en entier$/.test(barre) : /^Lire les \d+ repères en entier$/.test(barre), barre);
+        check(`${nom} : le titre de la liste ouverte compte les repères (« ${barre} »)`, enColonne ? /^Sur le graphique · \d+ repères$/.test(barre) : /^Lire les \d+ repères en entier$/.test(barre), barre);
         // « En résumé » : en tête de la liste, la phrase en gras, le pourquoi, les repères à surveiller,
         // l'avertissement unique ; au téléphone, la phrase est aussi sur la barre (lisible sans toucher).
         const sy = await o.page.evaluate(() => {
@@ -256,6 +256,22 @@ const etat = page => page.evaluate(() => {
         await o.page.click(`#reperesListe button[data-k="${k}"]`); await o.page.waitForTimeout(200);
         const vu = await o.page.evaluate(() => ({ survol: guideEtat.survol ? guideEtat.survol.titre : null, fermee: document.getElementById('reperesListe').hidden }));
         check(`${nom} : la liste s'ouvre dans l'écran ; toucher une ligne ouvre la bulle de ce repère ${enColonne ? '(la colonne reste ouverte)' : 'et ferme la liste'}`, ouverte && k >= 0 && vu.fermee === !enColonne && vu.survol === lignes2[k], { ouverte, k, vu, ligne: lignes2[k] });
+        // Surbrillance : le repère touché est mis en avant sur le tracé (le reste voilé), sans réticule
+        // ni valeurs de bougie ; sa ligne de la liste est marquée.
+        const sb = await o.page.evaluate(() => {
+          const c = cibleVue(), d = devicePixelRatio, g = calque.getContext('2d');
+          const r = c && (c.rects[0] || c.zones[0]);
+          // Un point du tracé loin du repère (hors de ses rectangles, zones et tracés) : voilé (opaque sur le calque).
+          const dedans = (x, y) => c.rects.concat(c.zones).some(q => x >= q.x0 - 8 && x <= q.x1 + 8 && y >= q.y0 - 8 && y <= q.y1 + 8) || c.segs.some(sg => guideDistSeg(x, y, sg) < 14);
+          let voile = -1;
+          for (let y = geoPrix.top + 10; y < geoPrix.top + geoPrix.ph && voile < 0; y += 23) for (let x = geoPrix.left + 10; x < geoPrix.W - geoPrix.right - 10; x += 37)
+            if (!dedans(x, y)) { voile = g.getImageData(Math.round(x * d), Math.round(y * d), 1, 1).data[3]; break; }
+          const ligne = document.querySelector('#reperesListe button[aria-current="true"]');
+          return { titre: c && c.titre, r: !!r, voile, liste: crossListe, ligne: ligne && ligne.textContent };
+        });
+        check(`${nom} : le repère touché est mis en avant sur le graphique, le reste voilé, sa ligne marquée`, sb.titre === lignes2[k] && sb.r && sb.voile > 60 && sb.liste && sb.ligne === lignes2[k], sb);
+        const fin = await o.page.evaluate(() => new Promise(ok => setTimeout(() => { dessinerCalque(); ok(reperesVu); }, PARAM.guide.surbrillanceMs + 200)));
+        check(`${nom} : la mise en avant s'arrête d'elle-même après quelques secondes`, fin === null, fin);
       }
       check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();

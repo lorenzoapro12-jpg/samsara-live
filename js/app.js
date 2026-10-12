@@ -352,6 +352,7 @@ let rsDragStartEnd = 0;
 
 // ============ CROSSHAIR ============
 let crossX = null, crossY = null;  // coordonnées canvas du curseur
+let crossListe = false;   // crossX / crossY posés par la liste « Sur le graphique » (voirRepere), pas par le curseur
 // Mode Débutant : le registre des textes posés sur le tracé ({ items: [{ role, texte, rect }] },
 // relu par les tests), refait à chaque dessin ; null en Expert.
 let debEtat = null;
@@ -493,6 +494,7 @@ const PARAM = {
     // téléphone ; ailleurs, en colonne à droite du graphique (`colonneL` px), ouverte d'elle-même
     // quand la fenêtre a au moins `colonne` px, sinon repliée en onglet comme « Infos du marché ».
     colonne: 1280, colonneL: 300,
+    surbrillanceMs: 8000,   // un repère choisi dans la liste reste en avant sur le tracé (ms)
     // Mode Débutant : au plus `items` textes sur le tracé (phrase, repère du haut, repère du bas,
     // scénario 1, forme, ligne des scénarios), chacun sur une ligne d'au plus N caractères ;
     // « étroit » : un tracé de moins de `etroit` px (téléphone).
@@ -1261,6 +1263,7 @@ canvas.addEventListener('mousemove', (e) => {
   if (versLienBulle(e.clientX - rect.left, e.clientY - rect.top)) return;
   crossX = e.clientX - rect.left;
   crossY = e.clientY - rect.top;
+  crossListe = false;
   
   // Curseur Range Selector
   if (crossY > rect.height - RS_HEIGHT && !isPanning && !isPriceDrag && !rsDragging) {
@@ -1289,7 +1292,7 @@ canvas.addEventListener('mousemove', (e) => {
   survol();
   scheduleCalque();
 });
-canvas.addEventListener('mouseleave', () => { crossX = null; crossY = null; bulleDetail = null; dessinerCalque(); });
+canvas.addEventListener('mouseleave', () => { if (crossListe) return; crossX = null; crossY = null; bulleDetail = null; dessinerCalque(); });
 
 // --- Zoom molette ---
 canvas.addEventListener('wheel', (e) => {
@@ -1463,6 +1466,7 @@ function tapGraphique(clientX, clientY) {
   const cF = geo && lienBulle && lienBulle.action && crossX !== null ? guideCibleSous(tx, ty, geo.mainH, debutant()) : null;
   if (cF && cleBulle(cF) === lienBulle.cle && bulleDetail === lienBulle.cle) { lienBulle.action(); return true; }
   const c = geo ? guideCibleSous(tx, ty, geo.mainH) : null, k = c ? cleBulle(c) : null;
+  crossListe = false; reperesVu = null;
   if (k && crossX !== null && bulleVue === k && bulleDetail !== k) {
     // 2e toucher sur la bulle montrée : son détail.
     bulleDetail = k; crossX = tx; crossY = ty;
@@ -3502,7 +3506,17 @@ function drawChart() {
 
 /** Le calque : étiquette et ligne du dernier prix, réticule et infobulles. Relit la géométrie
  *  du dernier dessin du graphique (geo, geoPrix) : il ne recalcule ni échelle ni indicateur. */
+/** Le calque, puis, dans la liste « Sur le graphique », la ligne du repère que la bulle explique. */
 function dessinerCalque() {
+  reperesBulleTitre = null;
+  calqueDessin();
+  for (const b of document.querySelectorAll('#reperesListe button[data-k]')) {
+    const c = reperesCibles[+b.dataset.k];
+    b.classList.toggle('survole', !!c && c.titre === reperesBulleTitre);
+  }
+}
+let reperesBulleTitre = null;   // posé par guideBulle : le titre du repère expliqué sur cette image
+function calqueDessin() {
   calqueDemande = false;
   bulleVue = null;   // la bulle de cette image la reposera (guideBulle)
   lienBulle = null; cibleMarque = null;   // liaison avec la carte : reposés par cette image
@@ -3587,9 +3601,13 @@ function dessinerCalque() {
       cx.fillStyle = COLORS.ink1; cx.strokeStyle = COLORS.surface; cx.lineWidth = 1.5;
       cx.beginPath(); cx.arc(rep.x, rep.y, 3.5, 0, Math.PI * 2); cx.fill(); cx.stroke();
     }
-    cx.font = chartFont(9, 650); cx.fillStyle = COLORS.ink3;
-    const lw = cx.measureText(rep.texte).width;
-    cx.fillText(rep.texte, texteRepere(rep, P, lw), P.top + P.ph - 12);
+    cx.font = chartFont(9, 650);
+    const lw = cx.measureText(rep.texte).width, xt = texteRepere(rep, P, lw), yt = P.top + P.ph - 12;
+    // Sur un fond pâle, comme les autres étiquettes : le texte se lit par-dessus une bande ou un trait.
+    cx.globalAlpha = 0.85; cx.fillStyle = COLORS.bulle;
+    cx.beginPath(); cx.roundRect(xt - 4, yt - 10, lw + 8, 14, rE(4)); cx.fill();
+    cx.globalAlpha = 1; cx.fillStyle = COLORS.ink3;
+    cx.fillText(rep.texte, xt, yt);
     cx.restore();
   }
   // Guide : état de chaque niveau au prix LIVE, lecture du moment (relus, pas recalculés).
@@ -3598,6 +3616,8 @@ function dessinerCalque() {
   if (scenEtat) scenCalque();
   // Apprendre : ce qui vient de se passer (comparé à l'image d'avant), puis la marque « nouveau ».
   apprCalque();
+  // Le repère choisi dans la liste « Sur le graphique » : en avant, le reste estompé un moment.
+  surbrillanceCalque(W, mainH);
   // La liste « Sur le graphique » (téléphone, Complet) : après le calque, qui ajoute ses cibles (régime).
   majReperes(W);
   if (crossX === null || crossY === null) return;
@@ -3617,6 +3637,10 @@ function dessinerCalque() {
     if (scenEtat) { scenEtat.survol = null; scenEtat.bulle = null; }
     scenSurvolDebutant(cibleDeb);
     guideBulle(cibleDeb, W, mainH, null);
+  } else if (crossListe && crossY < mainH && P) {
+    // Bulle ouverte depuis la liste : la bulle seule, sans réticule ni valeurs de bougie (le
+    // repère est mis en avant, rien ne le recouvre).
+    if (guideEtat || scenEtat) guideSurvol(W, mainH, null);
   } else if (crossY < mainH && P) {
     cx.strokeStyle = COLORS.reticule;
     cx.lineWidth = 1; cx.setLineDash([3, 3]);
@@ -3654,8 +3678,9 @@ function dessinerCalque() {
       });
       cx.restore();
       bulleOHLCV = { x: tX, y: tY, w: 135, h: 90 };
-    } else if (idx >= 0 && idx < n) {
-    // Infobulle OHLCV — 2 colonnes. Les prix à la précision de cotation, au format de la page
+    } else if (idx >= 0 && idx < n && !((guideEtat || scenEtat) && guideCibleSous(crossX, crossY, mainH, true))) {
+    // Infobulle OHLCV — 2 colonnes. Pas sur une étiquette : sa bulle seule (les deux se
+    // recouvraient et cachaient les bougies) ; sur une bande ou un tracé, les deux restent. Les prix à la précision de cotation, au format de la page
     // (« O 86 012,50 », l'unité est sur l'axe juste à droite) ; le volume dans l'actif de base.
       const candle = candles[geo.vs + idx];
       const cColor = candle.close >= candle.open ? COLORS.candleUp : COLORS.candleDown;
@@ -6108,6 +6133,8 @@ function guideCibleSous(x, y, mainH, etiquettesSeules) {
   }
   return c;
 }
+/** La couleur d'une cible : la sienne, sinon celle de sa famille (niveau, figure). */
+const couleurCible = c => c.coul || (c.niveau || c.niveaux ? COLORS.accent2 : c.figure ? c.figure.tr.encre : COLORS.ink3);
 /** La famille d'une cible (l'icône de js/icones.js) : posée par sa cible, sinon tirée de ce qu'elle porte. */
 const icoCible = c => c.ico || (c.niveau || c.niveaux ? 'niveau' : c.figure || c.passee ? 'figure' : c.scenario ? 'scenario' : null);
 /** « Sur le graphique » (avec « Le détail » : etiqCourtes) : le texte entier de chaque repère
@@ -6120,6 +6147,7 @@ const icoCible = c => c.ico || (c.niveau || c.niveaux ? 'niveau' : c.figure || c
 const reperesEnColonne = () => document.getElementById('reperesSection').classList.contains('colonne');
 let reperesOuvertCol = null;   // la colonne ouverte ou repliée à la main (null : selon la largeur)
 let reperesCibles = [], reperesCle = '', reperesActif = null;
+let reperesVu = null;   // { titre, fin } : le repère mis en avant (fin 0 : tant que la souris est sur sa ligne)
 function reperesPoint(c) {
   const r = (c.rects || [])[0] || (c.zones || [])[0];
   if (r) return [(r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2];
@@ -6152,8 +6180,7 @@ function majReperes(W) {
   }
   if (!voir) { reperesCibles = []; reperesCle = ''; if (!ul0.hidden) ouvrirReperes(false); return; }
   const E = guideEtat && overlays.guide ? guideEtat : null, Sc = scenEtat;
-  const coul = c => c.coul || (c.niveau || c.niveaux ? COLORS.accent2 : c.figure ? c.figure.tr.encre : COLORS.ink3);
-  const ico = c => icoCible(c);
+  const coul = couleurCible, ico = c => icoCible(c);
   const L = (E ? E.cibles : []).concat(Sc ? Sc.cibles : []).filter(c => c.titre && !c.evenement)
     .map(c => ({ c, p: reperesPoint(c) })).filter(x => x.p).sort((a, b) => a.p[1] - b.p[1])
     // Un repère à deux cibles (le libellé d'un scénario et sa zone) : une seule ligne, la plus haute.
@@ -6164,7 +6191,7 @@ function majReperes(W) {
   if (cle === reperesCle) return;
   reperesCle = cle;
   const n = L.length;
-  document.getElementById('reperesTitre').textContent = colonne && !ouverte ? 'Sur le graphique' : colonne ? 'Sur le graphique' + (n ? ' · ' + n + ' repère' + (n > 1 ? 's' : '') + ' en entier' : ' : aucun repère dans la vue')
+  document.getElementById('reperesTitre').textContent = colonne && !ouverte ? 'Sur le graphique' : colonne ? 'Sur le graphique' + (n ? ' · ' + n + ' repère' + (n > 1 ? 's' : '') : ' : aucun repère dans la vue')
     : n ? (n > 1 ? 'Lire les ' + n + ' repères en entier' : 'Lire le repère en entier') : 'Aucun repère dans la vue';
   // Téléphone (liste fermée sous sa barre) : la phrase du résumé en tête de la barre, lisible sans toucher.
   const res = document.getElementById('reperesResume');
@@ -6249,20 +6276,92 @@ document.addEventListener('click', e => {
   const ul = document.getElementById('reperesListe');
   if (ul && !ul.hidden && !e.target.closest('#reperesListe, #reperesHandle')) ouvrirReperes(false);
 });
-/** Une ligne de la liste touchée : la bulle de son repère, comme un toucher sur le graphique. */
+/** Une ligne de la liste touchée : la bulle de son repère, comme un toucher sur le graphique, et
+ *  le repère mis en avant sur le tracé (surbrillanceCalque) le temps de le trouver. */
 function voirRepere(k) {
   const c = reperesCibles[k], p = c && reperesPoint(c);
   if (!p) return;
   reperesActif = c.titre;
   for (const b of document.querySelectorAll('#reperesListe button')) { if (b.dataset.k === String(k)) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current'); }
   ouvrirReperes(false);
-  crossX = p[0]; crossY = p[1]; bulleDetail = null;
+  crossX = p[0]; crossY = p[1]; bulleDetail = null; crossListe = true;
+  // Sans minuterie (rien ne tourne au repos) : l'image suivante après l'échéance la retire (le prix
+  // en direct redessine le calque à chaque cours reçu).
+  reperesVu = { titre: c.titre, fin: Date.now() + PARAM.guide.surbrillanceMs };
   dessinerCalque();
 }
-if (document.getElementById('reperesListe')) document.getElementById('reperesListe').addEventListener('click', e => {
-  const b = e.target.closest('button[data-k]');
-  if (b) voirRepere(+b.dataset.k);
-});
+if (document.getElementById('reperesListe')) {
+  const ul = document.getElementById('reperesListe');
+  ul.addEventListener('click', e => {
+    const b = e.target.closest('button[data-k]');
+    if (b) voirRepere(+b.dataset.k);
+  });
+  // Souris sur une ligne : son repère en avant sur le tracé, sans bulle (un clic l'ouvre). Un repère
+  // déjà choisi par un clic garde la main tant qu'il dure.
+  ul.addEventListener('mouseover', e => {
+    const b = e.target.closest('button[data-k]'), c = b && reperesCibles[+b.dataset.k];
+    if (!c || (reperesVu && reperesVu.fin) || (reperesVu && reperesVu.titre === c.titre)) return;
+    reperesVu = { titre: c.titre, fin: 0 }; dessinerCalque();
+  });
+  ul.addEventListener('mouseleave', () => { if (reperesVu && !reperesVu.fin) { reperesVu = null; dessinerCalque(); } });
+}
+/** Le repère choisi dans la liste (reperesVu), retrouvé par son titre parmi les cibles de l'image :
+ *  toutes celles qui le portent (le libellé d'un scénario et sa zone), réunies. */
+function cibleVue() {
+  if (!reperesVu) return null;
+  const E = guideEtat && overlays.guide ? guideEtat : null, Sc = scenEtat;
+  const L = (E ? E.cibles : []).concat(Sc ? Sc.cibles : []).filter(c => c.titre === reperesVu.titre);
+  if (!L.length) return null;
+  const tous = k => [].concat(...L.map(c => c[k] || []));
+  return Object.assign({}, L[0], { rects: tous('rects'), zones: tous('zones'), segs: tous('segs') });
+}
+/** Surbrillance : le tracé est voilé (la couleur du fond, à moitié) sauf le repère choisi — son
+ *  étiquette, sa bande ou sa zone, son tracé — qui est souligné dans sa couleur. Le voile est
+ *  troué sur un calque à part (destination-out), puis posé : rien du repère n'est recouvert. */
+let surbrillanceToile = null;
+function surbrillanceCalque(W, mainH) {
+  if (reperesVu && reperesVu.fin && Date.now() > reperesVu.fin) reperesVu = null;
+  const c = cibleVue(), P = geoPrix;
+  if (!c || !P) return;
+  // Le curseur montre un autre repère sur le tracé : c'est lui qu'on lit, la mise en avant s'arrête.
+  const sous = !crossListe && crossX !== null && crossY !== null ? guideCibleSous(crossX, crossY, mainH) : null;
+  if (sous && sous.titre !== c.titre) { reperesVu = null; return; }
+  const dpr = window.devicePixelRatio, xD = W - P.right;
+  const t = surbrillanceToile || (surbrillanceToile = document.createElement('canvas'));
+  if (t.width !== calque.width || t.height !== calque.height) { t.width = calque.width; t.height = calque.height; }
+  const g = t.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, mainH);
+  g.globalCompositeOperation = 'source-over';
+  g.globalAlpha = 0.55; g.fillStyle = COLORS.surface;
+  g.fillRect(0, 0, xD, mainH);
+  g.globalAlpha = 1; g.globalCompositeOperation = 'destination-out';
+  const R = (c.rects || []).map(r => ({ x0: r.x0 - 3, y0: r.y0 - 3, x1: r.x1 + 3, y1: r.y1 + 3 })), Z = c.zones || [], S = c.segs || [];
+  for (const r of R.concat(Z)) g.fillRect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
+  g.lineWidth = 16; g.lineCap = 'round';
+  for (const sg of S) { g.beginPath(); g.moveTo(sg[0], sg[1]); g.lineTo(sg[2], sg[3]); g.stroke(); }
+  g.globalCompositeOperation = 'source-over';
+  cx.save();
+  cx.setTransform(1, 0, 0, 1, 0, 0);
+  cx.drawImage(t, 0, 0);
+  cx.restore();
+  // Le repère, dans sa couleur : la zone teintée et bordée, le tracé doublé, l'étiquette encadrée.
+  const coul = couleurCible(c);
+  cx.save();
+  cx.strokeStyle = coul; cx.fillStyle = coul;
+  for (const z of Z) {
+    cx.globalAlpha = 0.1; cx.fillRect(z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0);
+    cx.globalAlpha = 0.9; cx.lineWidth = 2; cx.strokeRect(z.x0 + 1, z.y0 + 1, z.x1 - z.x0 - 2, z.y1 - z.y0 - 2);
+  }
+  cx.globalAlpha = 0.9; cx.lineCap = 'round';
+  for (const sg of S) {
+    cx.lineWidth = 6; cx.strokeStyle = COLORS.bulle; cx.beginPath(); cx.moveTo(sg[0], sg[1]); cx.lineTo(sg[2], sg[3]); cx.stroke();
+    cx.lineWidth = 2.5; cx.strokeStyle = coul; cx.beginPath(); cx.moveTo(sg[0], sg[1]); cx.lineTo(sg[2], sg[3]); cx.stroke();
+  }
+  cx.globalAlpha = 1; cx.lineWidth = 2; cx.strokeStyle = coul;
+  for (const r of R) { cx.beginPath(); cx.roundRect(r.x0 + 1, r.y0 + 1, r.x1 - r.x0 - 2, r.y1 - r.y0 - 2, rE(6)); cx.stroke(); }
+  cx.restore();
+}
 /** Survol : la cible sous le curseur (guideCibleSous), expliquée dans sa bulle (guideBulle). */
 function guideSurvol(W, mainH, evite) {
   if (guideEtat) guideEtat.survol = null;
@@ -6320,7 +6419,8 @@ function sourceResume(c, vivant, texte) {
 function guideBulle(c, W, mainH, evite) {
   const E = guideEtat, Sc = scenEtat;
   apprLu(c);   // la marque « nouveau » de sa nature s'efface ; la bulle d'un message le fait durer
-  if (Sc && Sc.cibles.includes(c)) Sc.survol = c; else if (E && E.cibles.includes(c)) E.survol = c;   // ce que la bulle explique (relu par les tests)
+  if (Sc && Sc.cibles.includes(c)) Sc.survol = c; else if (E && E.cibles.includes(c)) E.survol = c;
+  reperesBulleTitre = c.titre;   // ce que la bulle explique (relu par les tests)
   // Le résumé (niveau 2) d'abord, avec ou sans « Le détail » (option A, 11/10/2026) ; le détail
   // au 2e toucher ou au clic (tapGraphique).
   const cle = cleBulle(c), detail = bulleDetail === cle;
