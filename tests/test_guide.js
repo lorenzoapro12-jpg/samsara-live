@@ -672,6 +672,50 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
   check('prixRond : « 84 $ » (pas « 83,57 $ »), « 24 $ », « 3,50 $ » sous 10 $', G.prixRond(83.57) === '84 $' && G.prixRond(-24) === '24 $' && G.prixRond(3.5) === '3,50 $', [G.prixRond(83.57), G.prixRond(-24), G.prixRond(3.5)]);
 }
 
+// ── 7 bis. En résumé ──
+titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre de trop');
+{
+  const Rd = (cle, p, extra) => Object.assign({ cle, p, nom: cle, court: cle, art: 'le ' + cle, origine: '', nature: 'mesuré', detail: '', detailCourt: '' }, extra || {});
+  const N = (...rs) => ({ p: rs[0].p, pMin: Math.min(...rs.map(r => r.p)), pMax: Math.max(...rs.map(r => r.p)), raisons: rs, demi: 40 });
+  const haut = N(Rd('sr', 86398.2), Rd('hier_haut', 86398)), loin = N(Rd('mur_vente', 86700)), bas = N(Rd('sr', 85600)), bas2 = N(Rd('h24_bas', 85300));
+  const choix = { dessus: [haut, loin], dessous: [bas, bas2] }, suite = G.suite(choix, 86000);
+  const base = { prix: 86000, unite: '$', itv: '1h', choix, suite, figures: [], scenario: null };
+  const syn = x => { const r = G.synthese(Object.assign({}, base, x)); [r.titre, r.regle].concat(r.pourquoi.map(p => p.texte), r.surveiller).forEach(t); return r; };
+  const figure = (sens, extra) => Object.assign({ type: 'double_creux', famille: 'extremes', sens, phase: 'confirme', fin: null }, extra || {});
+  // 1. Le sens n'est dit qu'avec au moins deux signaux d'accord et aucun en face.
+  const h = syn({ regime: { cle: 'hausse' }, figures: [figure(1)] });
+  check('deux signaux vers le haut, aucun en face : « penchent plutôt vers la hausse »', h.ton === 'hausse' && /penchent plutôt vers la hausse/.test(h.titre) && h.pourquoi.filter(p => p.sens > 0).length === 2, h);
+  check('la lecture dit ce qui la ferait tomber (le repère du bas)', h.surveiller.some(x => /tombe si le prix finit une heure sous/.test(x)), h.surveiller);
+  const b = syn({ regime: { cle: 'baisse' }, scenario: { rang: '1', forme: 'chemin', ouvert: true, sens: -1 } });
+  check('tendance et scénario vers le bas : baisse ; le scénario est dit « de Claude »', b.ton === 'baisse' && b.pourquoi.some(p => /de Claude/.test(p.texte) && p.sens < 0), b);
+  const c = syn({ regime: { cle: 'hausse' }, scenario: { rang: '1', forme: 'chemin', ouvert: true, sens: -1 } });
+  check('signaux opposés : « se contredisent : pas de sens net »', c.ton === 'partage' && /pas de sens net/.test(c.titre), c);
+  const u = syn({ regime: { cle: 'hausse' } });
+  check('un seul signal : pas de sens net, et la règle le dit (« trop peu »)', u.ton === 'calme' && /Pas de sens net/.test(u.titre) && /trop peu/.test(u.regle), u);
+  const z = syn({ regime: { cle: 'faible' }, scenario: { rang: '1', forme: 'range', ouvert: true, sens: 0 } });
+  check('tendance faible, scénario en fourchette : le prix hésite, aucun signal ne penche', z.ton === 'calme' && /hésite/.test(z.titre) && z.pourquoi.every(p => p.sens === 0) && /Aucun signal/.test(z.regle), z);
+  check('à surveiller : un repère de chaque côté, le plus parlant à prix égal (« le plus haut d’hier »)', /^Au-dessus : 86 398 \$, le plus haut d’hier\.$/.test(z.surveiller[0]) && /^En dessous : 85 600 \$, une zone de retour\.$/.test(z.surveiller[1]), z.surveiller);
+  // 2. Le prix dans une bande : elle est dite, puis le repère suivant de chaque côté.
+  const d = G.synthese(Object.assign({}, base, { prix: 86398, suite: G.suite(choix, 86398), regime: { cle: 'faible' } }));
+  check('prix sur un repère : « Le prix est sur … », puis les repères suivants', /^Le prix est sur 86 398 \$, le plus haut d’hier\.$/.test(d.surveiller[0]) && /prochain repère : 86 700 \$/.test(d.surveiller[1]) && /prochain repère : 85 600 \$/.test(d.surveiller[2]), d.surveiller);
+  // 3. Figures : une sortie à valider ne compte pas ; une figure finie est dite sans effet.
+  const dm = syn({ regime: { cle: 'hausse' }, figures: [figure(1, { phase: null, demi: true })] });
+  check('figure sortie mais pas validée : dite, sans compter', dm.ton === 'calme' && dm.pourquoi.some(p => /pas encore validé/.test(p.texte) && p.sens === 0), dm);
+  const fa = syn({ regime: { cle: 'faible' }, figures: [figure(1, { fin: 'atteint', jFin: 10 })] });
+  check('figure finie (objectif atteint) : « plus de signal »', fa.pourquoi.some(p => /objectif déjà atteint, plus de signal/.test(p.texte) && p.sens === 0), fa.pourquoi);
+  const st = syn({ regime: { cle: 'faible', compression: true }, scenario: { rang: '1', forme: 'chemin', ouvert: false, tombe: true, sens: 0 } });
+  check('scénario tombé et calme du prix : dits, sans sens', st.pourquoi.some(p => /ne tient plus/.test(p.texte)) && st.pourquoi.some(p => /bouge peu/.test(p.texte)) && st.ton === 'calme', st.pourquoi);
+  // 4. Charte : une idée par phrase, 15 mots au plus ; aucun %, aucun mot technique ; l'avertissement une fois.
+  const tous = [h, b, c, u, z, d, dm, fa, st];
+  const phrases = [].concat(...tous.map(r => [r.titre, r.regle].concat(r.pourquoi.map(p => p.texte), r.surveiller)));
+  const longues = phrases.filter(x => x.split(/\s+/).filter(w => /[\p{L}\d]/u.test(w)).length > 15);
+  check('chaque phrase : 15 mots au plus (charte)', !longues.length, longues);
+  check('aucun pourcentage, aucun mot technique (liste du Débutant), aucun conseil', !phrases.some(x => /%/.test(x) || G.motsBannis(x).length || CONSEIL.test(x)), phrases.filter(x => /%/.test(x) || G.motsBannis(x).length || CONSEIL.test(x)));
+  check('l’avertissement unique de la page', tous.every(r => r.avertissement === G.AVERTISSEMENT));
+  const sans = G.synthese(Object.assign({}, base, { prix: NaN }));
+  check('prix absent : dit, rien d’inventé', /indisponible/.test(sans.titre) && !sans.pourquoi.length && !sans.surveiller.length, sans);
+}
+
 // ── 8. Mots ──
 titre('8. Ce que le Guide écrit : il décrit, ne conseille pas, n’attribue aucune intention');
 {

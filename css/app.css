@@ -985,6 +985,10 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
   padding: 0 14px; font: 700 13px/1.2 var(--font); color: var(--ink-1); text-align: left;
   background: none; border: 0; border-radius: inherit; cursor: pointer;
 }
+.reperes-textes { display: flex; flex-direction: column; gap: 1px; padding: 5px 0; min-width: 0; }
+.reperes-resume { font-weight: 800; font-size: 13.5px; color: var(--ink-1); }
+.reperes-resume + #reperesTitre { font-weight: 500; font-size: 11.5px; color: var(--ink-2); }
+.reperes-resume[hidden] { display: none; }
 .reperes-fleche { font-size: 14px; transition: transform .3s; }
 .reperes-section:not(.collapsed) .reperes-fleche { transform: rotate(-90deg); }
 /* La liste s'ouvre AU-DESSUS de sa barre, par-dessus le bas du graphique (placerMenu) : le tracé
@@ -1004,6 +1008,26 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 }
 .reperes-liste button[aria-current="true"] { background: var(--pill); border-radius: min(var(--r-tile), 8px); }
 .reperes-trait { flex: 0 0 3px; align-self: stretch; border-radius: 2px; background: var(--trait, var(--ink-3)); }
+/* « En résumé » (js/app.js, syntheseElement) : en tête de la liste, mis en valeur. La phrase en
+   gras ; un trait de couleur par signal (hausse, baisse, neutre) que les mots disent aussi. */
+.reperes-liste li.synthese {
+  margin: 6px 0 8px; padding: 10px 12px 9px; border-radius: min(var(--r-tile), 10px);
+  background: color-mix(in srgb, var(--accent) 9%, var(--card-solid)); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-left: 4px solid var(--accent); color: var(--ink-1); font: 500 12.5px/1.4 var(--font);
+}
+.reperes-liste li.synthese.ton-hausse { border-left-color: var(--up-ink); }
+.reperes-liste li.synthese.ton-baisse { border-left-color: var(--down-ink); }
+.synthese p { margin: 0; }
+.synthese-tete { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.synthese-titre { margin-top: 3px !important; font-size: 14.5px; font-weight: 800; line-height: 1.3; }
+.synthese-regle { margin-top: 2px !important; color: var(--ink-2); }
+.synthese-sous { margin-top: 8px !important; font-size: 10.5px; font-weight: 700; color: var(--ink-2); }
+.synthese-liste { list-style: none; margin: 3px 0 0; padding: 0; }
+.synthese-liste li { position: relative; padding: 2px 0 2px 11px; }
+.synthese-liste li::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--ink-3); }
+.synthese-liste li.sens-haut::before { background: var(--up-ink); }
+.synthese-liste li.sens-bas::before { background: var(--down-ink); }
+.synthese-avert { margin-top: 7px !important; font-size: 10.5px; color: var(--ink-3); }
 /* Grand écran, avec « Le détail » : la liste en colonne à droite du graphique, toujours ouverte
    (majReperes y range la liste ; PARAM.guide.colonne et colonneL). */
 .reperes-section.colonne { width: var(--colonne-l, 300px); display: flex; flex-direction: column; min-height: 0; }
