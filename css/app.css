@@ -1035,6 +1035,9 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 .reperes-section.colonne .reperes-fleche { display: none; }
 .reperes-section.colonne .reperes-liste {
   position: static; z-index: auto; flex: 1; min-height: 0; max-height: none; padding: 0 10px 8px;
+  /* Sa hauteur vient de la colonne, jamais de son contenu : le résumé et les repères défilent
+     au lieu d'allonger la colonne (une mise en page en colonne, Gare ou Planche, la grandirait). */
+  contain: size;
   background: none; border: 0; border-radius: 0; box-shadow: none;
 }
 .reperes-section.colonne .reperes-liste button { font-size: 12px; min-height: 34px; padding: 6px 4px; }
