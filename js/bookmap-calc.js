@@ -1911,12 +1911,14 @@
    *  « : » (BM.typo) : un deux-points ne commence jamais une ligne. */
   BM.detailCarteDebutant = function (d) {
     const o = Object.assign({}, BM.GUIDE, d.o), t = d.tendance, r = d.r, n = d.niveaux || {}, a = d.ages || {};
-    const l1 = t ? 'Prix : de ' + BM.prix(t.de) + DOL + ' à ' + BM.prix(t.a) + DOL + ' en ' + BM.age(o.tendanceMs) + ' (' + BM.pourcent(t.pct, 2) + '). «' + NB + 'En hausse' + NB + '» ou «' + NB + 'en baisse' + NB + '» au-delà de ' + BM.nombre(o.tendancePct, 0, 2) + ' %, «' + NB + 'stable' + NB + '» de retour sous ' + BM.nombre(o.tendanceRetourPct, 0, 2) + ' % ; un mot reste au moins ' + BM.age(o.tendanceGardeMs) + '.'
+    // Charte des explications courtes (12/10/2026) : les seuils du mot « en hausse » sont dans la
+    // légende (« La phrase du haut ») ; ici, la variation seule.
+    const l1 = t ? 'Prix : de ' + BM.prix(t.de) + DOL + ' à ' + BM.prix(t.a) + DOL + ' en ' + BM.age(o.tendanceMs) + ' (' + BM.pourcent(t.pct, 2) + ').'
       : 'Prix sur ' + BM.age(o.tendanceMs) + ' : des minutes manquent, pas de sens écrit.';
-    const l2 = r ? 'Ordres en attente lus il y a ' + BM.age(d.luMs) + ', jusqu\'à ' + BM.prix(r.usd) + DOL + ' de chaque côté du prix : ' + BM.btc(r.qB) + ' BTC à l\'achat, ' + BM.btc(r.qA) + ' BTC à la vente.'
+    const l2 = r ? 'Ordres en attente lus il y a ' + BM.age(d.luMs) + ', à ' + BM.prix(r.usd) + DOL + ' du prix au plus : ' + BM.btc(r.qB) + ' BTC à l\'achat, ' + BM.btc(r.qA) + ' BTC à la vente.'
       : 'Ordres en attente : lecture en cours.';
     const entre = x => BM.btc(x.q) + ' BTC entre ' + BM.prix(x.pBas) + ' et ' + BM.prix(x.pHaut) + DOL;
-    const cote = (mot, x) => mot + ' : ' + (!x ? 'rien de nettement plus chargé dans ce qui est lu.'
+    const cote = (mot, x) => mot + ' : ' + (!x ? 'rien de marquant.'
       : x.dedans ? 'le prix est dans un mur ' + (mot === 'Au-dessus' ? 'de vente' : 'd\'achat') + ' (' + entre(x) + ').'
         : x.etiquette + ' (' + entre(x) + ').');
     const l3 = cote('Au-dessus', n.ask) + ' ' + cote('Au-dessous', n.bid);
@@ -1927,8 +1929,8 @@
     if (dit(a.ligne)) ag.push('ligne du prix ' + BM.age(a.ligne));
     if (dit(a.autre)) ag.push('autre plateforme ' + BM.age(a.autre));
     const l4 = 'Âges : ' + (ag.length ? ag.join(' · ') : 'rien de lu encore') + '.';
-    return [l1, l2, l3, l4, 'Le scénario du matin de Claude est sur le Terminal (bouton «' + NB + '←' + NB + 'Terminal' + NB + '»).',
-      'Une photo de l\'instant, pas une prévision. Tout le détail technique : « Le détail », dans « Choisir l’affichage ».'].map(BM.typo);
+    return [l1, l2, l3, l4, 'Le scénario du matin de Claude est sur le Terminal («' + NB + '←' + NB + 'Terminal' + NB + '»).',
+      'Une photo de l\'instant, pas une prévision. Tout voir : « Le détail ».'].map(BM.typo);
   };
 
   /** L'histoire d'une tranche (k, de `pas` $, côté 'b' ou 'a') dans le carnet live gardé

@@ -390,8 +390,8 @@ function controlerLisible(e, nom) {
         const b = await lireBulle(o.page);
         await detail(o, ps);
         const d = await lireBulle(o.page);
-        check(`bulle du scénario (« ${b && b.titre} ») : la ligne du risque au résumé (${b && b.lignes} lignes, ${b && b.nombres} nombres) et au détail, « pas une promesse ni un conseil »`,
-          !!b && !!d && b.corps.includes(G.RISQUE) && b.lignes <= b.P.bulleLignes && b.nombres <= b.P.bulleNombres && d.corps.includes(G.RISQUE) && /pas une promesse ni un conseil/.test(d.corps), { b, d });
+        check(`bulle du scénario (« ${b && b.titre} ») : la ligne du risque au résumé (${b && b.lignes} lignes, ${b && b.nombres} nombres) et au détail, une fois, court : « Une hypothèse de Claude (une IA), pas un conseil » (charte du 12/10/2026)`,
+          !!b && !!d && b.corps.includes(G.RISQUE) && b.lignes <= b.P.bulleLignes && b.nombres <= b.P.bulleNombres && /Une hypothèse de Claude \(une IA\), pas un conseil\./.test(d.corps), { b, d });
         await ailleurs(o);
       } else check('le libellé du scénario 1 mène à sa bulle', false, null);
       const rd = await repereDessus(o.page);

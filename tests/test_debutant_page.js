@@ -447,9 +447,9 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
             && nombres(r.vise).filter(x => x.length >= 4).every(x => nombres(r.titre).includes(x)) && / · \d/.test(r.titre);
           if (role === 'phrase') detail = (r.corps.match(/Si le prix finit|Aucun repère proche/g) || []).length >= 2;
           // Le libellé est celui du scénario MONTRÉ (le 1, ou le suivant encore ouvert s'il est tombé) :
-          // sa bulle nomme les deux autres.
+          // sa bulle ne redit pas les autres (charte du 12/10/2026 : la bulle de la ligne les liste).
           const mo = (e.scen && e.scen.montre) || '1', autres = ['1', '2', '3'].filter(x => x !== mo);
-          if (role === 'scenario') detail = new RegExp('^Scénario ' + mo + ' de Claude$').test(r.titre) && autres.every(x => new RegExp('\\b' + x + '\\. ').test(r.corps)) && /sans pourcentage/.test(r.corps) && /pas une promesse ni un conseil/.test(r.corps);
+          if (role === 'scenario') detail = new RegExp('^Scénario ' + mo + ' de Claude$').test(r.titre) && !autres.some(x => new RegExp('(^|\\s)' + x + '\\. ').test(r.corps)) && /sans pourcentage/.test(r.corps) && /Une hypothèse de Claude \(une IA\), pas un conseil/.test(r.corps);
           if (role === 'boite') detail = /\b1\. /.test(r.corps) && /\b2\. /.test(r.corps) && /\b3\. /.test(r.corps) && /journal/.test(r.corps);
           // Choix 1B : le classement est celui de Claude (une IA), sans pourcentage ; le seul « % »
           // admis est la marge d'une zone (« ± 0,3 % »), qui n'est pas une probabilité.
@@ -545,8 +545,8 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       // Sa bulle (toucher ou survol) tient dans le tracé et dit le suivi en direct, le journal, l'avertissement.
       const r = await viser(o, 'boite', tactile);
       const b = await o.page.evaluate(() => (scenEtat && scenEtat.bulle ? { y: scenEtat.bulle.y, h: scenEtat.bulle.h, mainH: geo.mainH } : null));
-      check(`fermé · ${vue.width}×${vue.height} : la bulle de la ligne tient dans le tracé et dit le suivi en direct, le journal et « pas une promesse ni un conseil »`,
-        r && b && b.y >= 0 && b.y + b.h <= b.mainH && /en direct/.test(r.corps) && /journal/.test(r.corps) && /pas une promesse ni un conseil/.test(r.corps), { b, corps: r && r.corps });
+      check(`fermé · ${vue.width}×${vue.height} : la bulle de la ligne tient dans le tracé et dit le suivi en direct, le journal et « pas un conseil »`,
+        r && b && b.y >= 0 && b.y + b.h <= b.mainH && /en direct/.test(r.corps) && /journal/.test(r.corps) && /Une hypothèse de Claude \(une IA\), pas un conseil/.test(r.corps), { b, corps: r && r.corps });
       check(`fermé · ${vue.width} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }

@@ -732,7 +732,7 @@ const QUOI_ECRAN = { guide: 'Une phrase et deux repères de prix qui décrivent 
   scenarios: 'Chaque matin, Claude (une IA) écrit trois scénarios pour la journée, classés du plus au moins probable.' };
 const LIGNES_ECRAN = [
   { key: 'detail', label: 'Le détail : tous les repères, figures et scénarios', fiche: 'guide',
-    quoi: 'Tous les niveaux du Guide, les chemins si le prix franchit un repère, les figures en cours et passées, les trois scénarios, avec leurs chiffres.' },
+    quoi: 'Tous les niveaux, les chemins après un repère, les figures et les trois scénarios, avec leurs chiffres.' },
   { key: 'chiffres', label: 'Les chiffres du marché',
     quoi: 'Les chiffres clés du marché dans l’en-tête, les infos du marché avec leurs chiffres, les échanges en direct et le Grid Bot.' },
 ];
@@ -777,7 +777,7 @@ function quoiCourt(id) {
 function apercuPanneau(key) {
   const c = LIGNES_ECRAN.find(l => l.key === key);
   return c ? '<p class="ind-apercu-titre">' + echapF(c.label) + '</p><p><b>C’est quoi ?</b> ' + echapF(c.quoi) + '</p>'
-    + '<p><b>Comment s’en servir ?</b> Cochez-le quand vous voulez tout voir ; décochez-le pour revenir à l’essentiel. Rien n’est calculé autrement.</p>'
+    + '<p><b>Comment s’en servir ?</b> Cochée : tout voir. Décochée : l’essentiel. Les calculs restent les mêmes.</p>'
     : apercuHtml(key);
 }
 function montrerApercu(key) {
@@ -6908,10 +6908,11 @@ function scenCible(S, it, rects, segs, zones, prio) {
   const ctxE = { itv: S.itv, statuts: S.F.statuts, maintenant: S.maintenant, PJ: PARAM.scenarios.jour };
   const texte = Scenarios.explication(it.sc, it.sv, S.mode, PARAM.scenarios, ctxE);
   // La journée : distances, écart relatif (avec sa formule), contacts, temps restant — après le suivi.
+  // Sur la ligne du suivi en direct, à sa suite (une ligne de moins, charte du 12/10/2026).
   const lj = it.j ? Scenarios.ligneJourExpert(it.j, S.jour, ctxE) : null;
-  if (lj) { const k = texte.findIndex(l => /^Suivi en direct/.test(l)); texte.splice(k < 0 ? texte.length : k + 1, 0, lj); }
-  // La ligne du risque, la même partout (Guide.RISQUE), en tête du dernier paragraphe.
-  texte.push(Guide.RISQUE + ' Une hypothèse de Claude (une IA), pas une recommandation.');
+  if (lj) { const k = texte.findIndex(l => /^Suivi en direct/.test(l)); if (k < 0) texte.push(lj + '.'); else texte[k] = texte[k].replace(/\.$/, '') + ' · ' + lj + '.'; }
+  // L'avertissement, une fois, court.
+  texte.push('Une hypothèse de Claude (une IA), pas une recommandation.');
   S.cibles.push({ rects, segs, zones, prio, coul: it.coul, scenario: it.sc.id, titre: scenTitre(it.sc, S.mode), texte });
 }
 /** Flèche et repères numérotés d'un chemin ENCORE OUVERT, dans la marge de futur : de la dernière
@@ -7116,14 +7117,14 @@ function scenReperes(S, top, bas) {
   const tP = Scenarios.instantPoint(F, P), dePoint = isNum(tP) ? ' de ' + hU(tP) : '';
   // Le temps restant, relu à chaque dessin (aucune minuterie : sans nouvelle donnée, il avance au dessin suivant).
   const resteF = Scenarios.reste(F.fin - S.maintenant);
-  const sem = isNum(F.finSemaine) && F.finSemaine !== F.fin && S.items.some(i => i.sc.rang === 'S') ? ' Le scénario de la semaine court jusqu’au ' + jour(F.finSemaine) + ' à ' + hU(F.finSemaine) + '.' : '';
+  const sem = isNum(F.finSemaine) && F.finSemaine !== F.fin && S.items.some(i => i.sc.rang === 'S') ? ' Semaine : jusqu’au ' + jour(F.finSemaine) + ' à ' + hU(F.finSemaine) + '.' : '';
   for (const [t, nomsTous, expl] of [
     // L'heure du point (celle du titre de l'encadré) n'est pas celle de l'écriture : le trait est
     // posé à l'écriture, son nom le dit (« Point · 07:59 » contredisait « Scénarios du matin · 07:00 »).
     [F.emis, exp ? ['Point' + dePoint + ' · écrit ' + hU(F.emis), 'Écrit · ' + hU(F.emis), hU(F.emis)] : ['Point' + dePoint + ' · écrit à ' + hU(F.emis), 'Écrit à ' + hU(F.emis), hU(F.emis)],
-      'Le moment où les scénarios du point' + dePoint + ' ont été écrits : le ' + jour(F.emis) + ' à ' + hU(F.emis) + (isNum(F.prixEmission) ? ', prix ' + Scenarios.prix(F.prixEmission) : '') + '. Les zones partent de là.'],
+      'Scénarios écrits le ' + jour(F.emis) + ' à ' + hU(F.emis) + (isNum(F.prixEmission) ? ', prix ' + Scenarios.prix(F.prixEmission) : '') + ' : les zones partent de là.'],
     [F.fin, (resteF ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin) + ' · reste ' + resteF, 'fin · ' + hU(F.fin) + ' · reste ' + resteF] : []).concat(exp ? ['fin · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)] : ['fin des scénarios du jour · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin du jour · ' + jour(F.fin) + ' ' + hU(F.fin), 'fin · ' + hU(F.fin)]),
-      'Fin de la fenêtre des scénarios 1 à 3 : ' + jour(F.fin) + ' à ' + hU(F.fin) + '. Le journal les note ensuite, le matin même.' + sem]]) {
+      'Fin des scénarios 1 à 3 : ' + jour(F.fin) + ' à ' + hU(F.fin) + ' ; le journal les note ensuite.' + sem]]) {
     const x = xDeT(t);
     if (!(x >= g.pad.left && x <= xMax)) continue;
     // Téléphone en Complet : les deux formes les plus courtes (« Écrit · 07:32 », « 07:32 »).
@@ -7139,7 +7140,7 @@ function scenReperes(S, top, bas) {
       }
       if (pose) break;
     }
-    S.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs: [[x, top, x, bas]], prio: 3, coul: COLORS.ink3, titre: nomsTous[0], texte: [expl, 'Une description, pas une recommandation.'] });
+    S.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs: [[x, top, x, bas]], prio: 3, coul: COLORS.ink3, titre: nomsTous[0], texte: [expl, exp ? 'Une description, pas une recommandation.' : 'Une description, pas un conseil.'] });
     if (!pose) continue;
     etiquettesAFaire.push(() => {
       ctx.font = chartFont(8.5, 650);
@@ -7409,7 +7410,17 @@ function scenBoite(S, top, bas) {
   const resteRect = { x0: x, y0: y, x1: x + w, y1: y + h };
   // Replié : l'explication commence par ce que l'encadré aurait montré (le bilan y est déjà dit,
   // suivi de ce qu'il compte).
-  const plein = L.filter(l => l.f === 'ligne' || l.f === 'jour' || l.toujours || (!l.compact && l.garde >= 1)).map(l => l.t);
+  // Charte du 12/10/2026 : une ligne par scénario et trois autres au plus (la journée et le temps
+  // restant ; le bilan et ce qui est officiel ; le matin précédent), puis l'avertissement.
+  let plein = [];
+  if (replie || serre) {
+    if (F) {
+      const jr = [PJx.length ? PJx[0] : null, RE.length ? RE[Math.min(1, RE.length - 1)] : null].filter(Boolean).join('. ');
+      const bl = Scenarios.texteBilan(F.bilan, P, S.mode);
+      plein = (jr ? [jr] : []).concat(L.filter(l => l.f === 'ligne' || l.toujours).map(l => l.t),
+        [(bl ? bl + ' · ' : '') + (exp ? 'Claude (IA), sans pourcentage · suivi en direct ; officiel : le journal' : 'Classé par Claude (une IA), sans pourcentage · suivi en direct ; la note officielle est celle du journal')]);
+    } else plein = L.filter(l => l.f === 'seule').map(l => l.t);
+  }
   const texte = replie || serre ? plein.concat(scenTexteBoite(S, true)) : scenTexteBoite(S);
   // Écran court (téléphone) : la bulle garde les lignes, le bilan et ce qui est en direct ou
   // officiel, et renvoie à la fiche pour le reste (guideSurvol la prend si l'autre ne tient pas).
@@ -7421,49 +7432,44 @@ function scenBoite(S, top, bas) {
  *  est en direct ou officiel, un renvoi à la fiche, et « pas une recommandation ». */
 function scenTexteBoite(S, sansBilan, court) {
   const F = S.F, P = PARAM.scenarios, exp = S.exp, out = [];
+  const fin = exp ? 'Une hypothèse de Claude (une IA), pas une recommandation.' : 'Une hypothèse de Claude (une IA), pas un conseil.';
+  const officiel = exp ? 'États : suivi en direct (bougies ' + S.itv + ') ; officiel : le journal, le lendemain (bougies 1 min).' : '« (en direct) » : suivi par le site ; la note officielle (journal) vient le lendemain.';
   if (court && F) {
     // Les lignes courtes des scénarios (niveaux, invalidation, état), le bilan, ce qui est en direct.
     const large = S.items.some(i => i.et.cle === 'large');
     const b = Scenarios.texteBilan(F.bilan, P, S.mode);
     // Expert : la journée aussi (plus petit écart, « seul », « hors », distances, temps restant).
     const J = exp ? S.jour : null, PJ = J ? Scenarios.phraseJourExpert(J, PARAM.scenarios.jour) : [], RE = J ? Scenarios.ligneResteExpert(J) : [];
-    return [exp ? 'États : suivi en direct sur les bougies ' + S.itv + ' (un affichage) ; note officielle : le journal, le lendemain.' : 'Les états sont un suivi EN DIRECT sur les bougies ' + S.itv + ' (un affichage) ; la note officielle est celle du journal, le lendemain.']
-      .concat(PJ.length ? [PJ[Math.min(1, PJ.length - 1)] + '.'] : [])
+    return [officiel]
+      .concat([[PJ.length ? PJ[Math.min(1, PJ.length - 1)] : null, RE.length ? RE[Math.min(1, RE.length - 1)] : null].filter(Boolean).join(' · ')].filter(Boolean).map(t => t + '.'))
       .concat(S.items.map(it => Scenarios.ligne(it.sc, large && it.et.cle === 'large' ? null : it.et, S.mode, true) + (J && it.j ? Scenarios.suffixeExpert(it.j, J) : '')))
-      .concat(RE.length ? [RE[Math.min(1, RE.length - 1)] + '.'] : [])
       .concat(large ? [Scenarios.noteLarge(S.itv, 'debutant')] : [])
-      .concat(b ? [b + '.'] : [])
-      .concat(exp ? [] : ['Classé par Claude (une IA), du plus au moins probable, sans pourcentage.'])
-      .concat(['Plus : fiche « Scénarios du matin » dans les Légendes (bouton ?).', Guide.RISQUE + (exp ? ' Description, pas une recommandation.' : ' Une description, pas une recommandation : rien ici ne dit quoi faire.')]);
+      .concat([(b ? b + ' · ' : '') + (exp ? 'Claude (IA), sans pourcentage.' : 'Classé par Claude (une IA), sans pourcentage.')])
+      .concat([fin]);
   }
   const attente = !F && previsions && previsions.etat === 'attente';
   if (attente && previsions.note) out.push(previsions.note);
   const hP = heurePointMatin();
-  out.push('Chaque matin' + (hP ? ' vers ' + hP : '') + ', Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ, à partir de son analyse du marché, et les classe du plus au moins probable selon son jugement, sans pourcentage. Chaque niveau a une origine nommée et se lit comme une zone : le niveau plus ou moins la marge.');
-  if (F) out.push('Les états de cet encadré sont un suivi EN DIRECT sur les bougies ' + S.itv + ' du graphique (un affichage). La note officielle est celle du journal, faite mécaniquement le lendemain sur des bougies d’une minute.');
-  // Pendant la journée : aucune nouvelle prévision ; la règle de l'écart, en entier (Expert).
-  if (F && exp && S.jour) out.push(...Scenarios.regleJourExpert(PARAM.scenarios.jour));
-  if (F && F.bilan && F.bilan.matins > 0) {
-    // La règle du fichier, si elle est écrite, nomme déjà le chemin compté : la suite seule, sans redite.
-    if (!sansBilan) out.push(Scenarios.texteBilan(F.bilan, P, 'debutant') + (F.bilan.regle ? ' (règle du journal : ' + F.bilan.regle + ').' : '.'));
-    out.push(F.bilan.regle && !sansBilan ? Scenarios.REGLE_BILAN_SUITE : Scenarios.REGLE_BILAN);
-  } else if (F && F.bilan) out.push('Pas encore de matin compté dans la mesure de l’ordre du premier mouvement.');
-  else if (F) out.push('Ce fichier ne donne pas la mesure de l’ordre du premier mouvement : aucun chiffre de réussite n’est montré.');
-  if (F && F.precedents.length) {
-    const st = F.statuts || Scenarios.STATUTS;
-    const p = F.precedents.slice(0, 3).map(m => Scenarios.jourGroupe(m.groupe) + ' — ' + m.scenarios.slice(0, 3).map(x => {
-      const mo = Scenarios.motsStatut(x.statut, x.premier_ok, null, st, exp);
-      return (x.rang === 'S' ? 'sem.' : x.rang + '.') + ' ' + (x.enonce || '') + ' : ' + (x.premier_ok === 'bas' || x.premier_ok === 'haut' ? mo.long : mo.court);
-    }).join(' ; '));
-    out.push('Matins précédents (note du journal) : ' + p.join(' | ') + '.');
+  // Encadré replié : ses lignes sont déjà dites (scenBoite) ; seul le matin précédent s'ajoute.
+  if (!sansBilan || !F) {
+    out.push('Chaque matin' + (hP ? ' vers ' + hP : '') + ', Claude (une IA) écrit trois scénarios pour environ 24 h, classés du plus au moins probable, sans pourcentage. Chaque niveau se lit comme une zone.');
+    if (F) out.push(officiel);
+    if (F && F.bilan && F.bilan.matins > 0) out.push(Scenarios.texteBilan(F.bilan, P, S.mode) + '.');
+    else if (F && F.bilan) out.push('Pas encore de matin compté dans la mesure de l’ordre.');
+    else if (F) out.push('Ce fichier ne donne aucun chiffre de réussite.');
   }
+  if (F && F.precedents.length) {
+    const st = F.statuts || Scenarios.STATUTS, m = F.precedents[0];
+    out.push('Matin du ' + Scenarios.jourGroupe(m.groupe) + ' (journal) : ' + m.scenarios.slice(0, 3).map(x => {
+      const mo = Scenarios.motsStatut(x.statut, x.premier_ok, null, st, exp);
+      return (x.rang === 'S' ? 'sem.' : x.rang + '.') + ' ' + (x.premier_ok === 'bas' || x.premier_ok === 'haut' ? mo.long : mo.court);
+    }).join(' ; ') + '.');
+  }
+  // L'heure du fichier : seulement quand elle change la lecture (relecture ratée, fichier d'attente).
   const src = F || (attente ? previsions : null);
-  // Jours et heures de l'appareil (js/format.js).
-  const jourH = t => Fmt.jour(t) + ' à ' + Fmt.heure(t);
-  if (src) out.push((isNum(src.updated) ? 'Fichier publié le ' + jourH(src.updated) + ', relu' : 'Fichier relu') + ' à ' + Fmt.jourHeure(src.luA)
-    + (previsionsEchec ? ' ; dernière relecture impossible (' + scenRaison(previsionsEchec.raison) + ', ' + Fmt.jourHeure(previsionsEchec.a) + ')' : '') + '.');
-  else if (previsionsEchec) out.push('Dernière lecture : ' + scenRaison(previsionsEchec.raison) + ' à ' + Fmt.jourHeure(previsionsEchec.a) + '. Rien n’est dessiné tant qu’aucun fichier lisible n’est arrivé.');
-  out.push(Guide.RISQUE + (exp ? ' Description, pas une recommandation.' : ' Une description, pas une recommandation : rien ici ne dit quoi faire.'));
+  if (src && (previsionsEchec || attente)) out.push('Fichier relu à ' + Fmt.jourHeure(src.luA) + (previsionsEchec ? ' ; dernière relecture impossible (' + scenRaison(previsionsEchec.raison) + ', ' + Fmt.jourHeure(previsionsEchec.a) + ')' : '') + '.');
+  else if (!src && previsionsEchec) out.push('Dernière lecture : ' + scenRaison(previsionsEchec.raison) + ' à ' + Fmt.jourHeure(previsionsEchec.a) + '. Rien n’est dessiné sans fichier lisible.');
+  out.push(fin);
   return out;
 }
 /** Calque : l'encadré (déjà mis en page). Ne recalcule rien. */
@@ -7536,33 +7542,26 @@ function scenResumeLigneDebutant(S) {
   // Tous dans le même état : dit une fois (« En direct : les 3 en cours. »).
   const etats = E.length > 1 && une && new Set(E.map(e => e.etat)).size === 1 ? tete + (E.length === 2 ? 'les deux ' : 'les ' + E.length + ' ') + E[0].etat
     : tete + E.map(e => e.r + ' ' + e.etat + (!une && e.marque ? ' ' + e.marque : '')).join(' · ');
-  return ['Des hypothèses écrites par Claude, une IA, au point du matin.', etats + '.'];
+  return ['Hypothèses de Claude (une IA), écrites au point du matin.', etats + '.'];
 }
 function scenTexteDebutant(S, it, court) {
   const P = PARAM.scenarios, F = S.F;
+  // Charte des explications courtes (12/10/2026) : qui et quand, ce qu'il dit, où il en est, son
+  // rang, puis l'avertissement — les autres scénarios sont dans la bulle de la ligne.
   const ex = Scenarios.explicationDebutant(it.sc, it.sv, P, { itv: S.itv, statuts: F.statuts, maintenant: S.maintenant });
-  // La journée : après « Suivi en direct sur ce graphique : … », où en est le prix (distances) et,
-  // s'il a le plus petit écart, une règle de calcul (jamais une prévision).
+  const k = ex.iEtat;
+  // La journée : sur la ligne de l'état, où en est le prix (distances) ; puis, s'il a le plus
+  // petit écart, une phrase courte (une règle de calcul, jamais une prévision).
   if (it.j && S.jour) {
-    const d = Scenarios.distancesDebutant(it.j), k = ex.findIndex(t => /^Suivi en direct/.test(t)), add = d ? ['Maintenant : ' + d + '.'] : [];
-    // Le nom (la ligne qui le dit peut avoir cédé sa place à une figure du Guide) : « il suit le
-    // mieux le prix », « le prix est le plus près du scénario N », ou le nom gardé dit tel quel.
-    // Écran court : la phrase courte du nom (elle reste : la ligne qui le dit peut avoir cédé sa
-    // place à une figure du Guide).
-    const nomP = Scenarios.phraseNomDebutant(S.jour, it.j, !!court);
-    if (nomP) add.push(nomP);
-    ex.splice(k < 0 ? ex.length : k + 1, 0, ...add);
+    const d = it.j.ouvert ? Scenarios.distancesDebutant(it.j) : null;
+    if (d) ex[k] += ' : ' + d;
+    const nomP = Scenarios.phraseNomDebutant(S.jour, it.j, true);
+    if (nomP) ex.splice(k + 1, 0, nomP);
   }
-  const out = [Scenarios.enteteDebutant(F, P, S.maintenant)].concat(court ? ex.slice(0, 1).concat(ex.filter(t => /^Suivi en direct|^Maintenant :|^Pour l’instant|^Nommé |^Rang /.test(t))) : ex);
-  const autres = S.items.filter(i => i !== it);
-  // Écran court : les autres en peu de mots (« 2. vers 80 806 $ — en cours (en direct) »).
-  // Un scénario fermé (ou réalisé) ici dit sa raison (la zone touchée, « par un passage bref du
-  // prix » pour un contact en mèche) : jamais « réalisé ✓ » seul.
-  // Écran court : sans la raison (la place manque), mais « par un passage bref du prix » reste.
-  if (autres.length) out.push('Les autres scénarios de Claude : ' + autres.map(i => (court ? Scenarios.ligneCourteDebutant(i.sc, i.sv, S.maintenant, true)
-    : i.j && S.jour && !i.j.ouvert ? Scenarios.ligneDebutantJour(i.j, S.jour).replace(/\.$/, '') : Scenarios.ligneDebutant(i.sc, i.sv, S.maintenant))).join(' · '));
-  // Le classement « sans pourcentage » est dit une fois (le sens du rang, dans l'explication).
-  out.push(Guide.RISQUE + ' Une hypothèse de Claude (une IA), pas une promesse ni un conseil.');
+  const out = ex.map((t, i) => (i === k ? t + '.' : t));
+  // Écran court : sans le rang (le classement est dit dans la bulle de la ligne).
+  if (court) out.splice(out.length - 1, 1);
+  out.push('Une hypothèse de Claude (une IA), pas un conseil.');
   return out;
 }
 /** Le libellé du scénario 1, près du trait de son premier niveau (le haut d'un range), à gauche
@@ -7643,37 +7642,37 @@ function scenLibelleDebutant(S, it, top, bas) {
  *  l'ordre, ce que veut dire « (en direct) ». */
 function scenTexteLigneDebutant(S) {
   const F = S.F, P = PARAM.scenarios, out = [];
-  const fin = Guide.RISQUE + ' Une hypothèse de Claude (une IA), pas une promesse ni un conseil.';
+  // Charte du 12/10/2026 : une ligne courte par scénario, trois autres au plus, l'avertissement.
+  // « (en direct) » et le journal vont avec l'avertissement : une bulle coupée les garde.
+  const fin = '« (en direct) » : suivi par le site ; la note officielle (journal) vient le lendemain. Une hypothèse de Claude (une IA), pas un conseil.';
   const hP = heurePointMatin();
-  const chaque = 'Chaque matin' + (hP ? ' vers ' + hP : '') + ', Claude (une IA) écrit trois scénarios pour les prochaines 24 h environ et les classe du plus au moins probable, sans pourcentage.';
+  const chaque = 'Chaque matin' + (hP ? ' vers ' + hP : '') + ', Claude (une IA) écrit trois scénarios pour environ 24 h, classés du plus au moins probable, sans pourcentage.';
   if (!F) {
     const attente = previsions && previsions.etat === 'attente';
     if (attente) out.push(previsions.note || 'En attente du prochain point.');
     else {
       const e = previsionsEchec, h = e ? Fmt.jourHeure(e.a) : null;
-      out.push('Le fichier des scénarios n’a pas pu être lu' + (e ? ' (' + scenRaison(e.raison) + (h ? ', ' + h : '') + ')' : '') + '. Rien n’est dessiné tant qu’aucun fichier lisible n’est arrivé.');
+      out.push('Fichier des scénarios illisible' + (e ? ' (' + scenRaison(e.raison) + (h ? ', ' + h : '') + ')' : '') + ' : rien n’est dessiné.');
     }
-    out.push(chaque, fin);
+    out.push(chaque, 'Une hypothèse de Claude (une IA), pas un conseil.');
     return out;
   }
-  out.push(Scenarios.enteteDebutant(F, P, S.maintenant));
-  // Pendant la journée (aucune nouvelle prévision) : chaque scénario avec son état et ses distances ;
-  // le classement du matin, qui ne change pas ; le temps restant ; puis seulement le scénario au plus
-  // petit écart, une règle de calcul.
   const J = S.jour;
-  for (const it of S.items) out.push(it.j && J ? Scenarios.ligneDebutantJour(it.j, J) : Scenarios.ligneDebutant(it.sc, it.sv, S.maintenant));
-  if (J && J.hors) out.push('Le prix est allé au-delà de tous les niveaux du matin.');
-  out.push('Classé par Claude (une IA), du plus au moins probable, sans pourcentage.' + (J ? ' Ce classement ne change pas pendant la journée.' : ''));
-  if (J) {
-    const r = Scenarios.texteResteDebutant(J, S.maintenant), m = Scenarios.phraseMeneurDebutant(J);
-    if (r) out.push(r);
-    if (m) out.push(m);
-    if (J.cas === 'meneur' || J.cas === 'aucunNeColle') out.push(Scenarios.COMMENT_DEBUTANT);
+  out.push(Scenarios.enteteDebutant(F, P, S.maintenant).replace(/\.$/, '') + ' ; classés du plus au moins probable, sans pourcentage.' + (J ? ' Ce classement ne change pas pendant la journée.' : ''));
+  // Chaque scénario : ce qu'il dit en peu de mots, son état (marqué), et où en est le prix.
+  for (const it of S.items) {
+    const j = it.j, d = j && J && j.ouvert ? Scenarios.distancesDebutant(j, 'mini') : null;
+    const nom = j && J && J.meneur === j ? ', suit le mieux le prix' : '';
+    out.push(Scenarios.ligneCourteDebutant(it.sc, it.sv, S.maintenant, true).replace(/^(\d\. )(vers|entre) /, (x, a, b) => a + b.charAt(0).toUpperCase() + b.slice(1) + ' ') + (d ? ' : ' + d : '') + nom + '.');
   }
+  // Le temps restant (aucune nouvelle prévision), ce qui est au-delà de tous les niveaux, le scénario
+  // qui suit le mieux le prix : une ligne.
+  // « Un seul scénario est encore en cours » : les lignes le disent déjà ; seule la suite reste.
+  const r = J ? Scenarios.texteResteDebutant(J, S.maintenant) : null, m = J ? (Scenarios.phraseMeneurDebutant(J) || '').replace(/^Un seul scénario est encore en cours : le \S+\.$/, '') || null : null;
+  const jour = [r, J && J.hors ? 'Le prix est allé au-delà de tous les niveaux du matin.' : null, m].filter(Boolean).join(' ');
+  if (jour) out.push(jour);
   const b = F.bilan;
-  if (b && b.matins > 0) out.push((b.matins > 1 ? 'Sur les ' + b.matins + ' derniers matins comptés' : 'Sur le dernier matin compté') + ', le premier mouvement annoncé par Claude est arrivé en premier ' + b.reussis + ' fois.' + (b.matins < P.echantillonFaible ? ' Trop peu de matins pour en tirer une règle.' : ''));
-  out.push('« (en direct) » : l’état est suivi par cette page sur le graphique affiché, un simple affichage. La note officielle est celle du journal, faite le lendemain ; elle est marquée « (journal) ».');
-  out.push('Plus : fiche « Scénarios du matin » dans les Légendes (bouton ?).');
+  if (b && b.matins > 0) out.push('Le 1er mouvement annoncé par Claude est venu en premier ' + b.reussis + ' fois sur ' + b.matins + (b.matins > 1 ? ' matins' : ' matin') + (b.matins < P.echantillonFaible ? ' : trop peu pour juger.' : '.'));
   out.push(fin);
   return out;
 }
@@ -7703,20 +7702,9 @@ function scenBoiteDebutant(S) {
 /** La bulle courte (écran court) de la ligne : le bilan et le renvoi partent, « (en direct) » et le
  *  journal restent en une phrase ; la règle du « suit le mieux » part (la phrase qui le nomme reste). */
 function scenTexteCourtLigne(S, texte) {
-  const J = S.jour, F = S.F;
-  if (!J || !F) return texte.filter(l => !/^Plus :|^Sur (?:les \d+ derniers|le dernier) matin/.test(l))
-    .map(l => (/^« \(en direct\) »/.test(l) ? '« (en direct) » : suivi par cette page ; la note officielle est celle du journal, le lendemain.' : l));
-  // Pendant la journée, l'écran court : les lignes courtes (état, distances), le classement, ce qui
-  // est en direct ou officiel, le scénario au plus petit écart, le temps restant, l'avertissement.
-  const m = Scenarios.phraseNomDebutant(J, null);
-  const r = Scenarios.reste(J.reste);
-  return [Scenarios.enteteDebutant(F, PARAM.scenarios, S.maintenant)]
-    .concat(S.items.map(it => (it.j ? Scenarios.ligneDebutantJour(it.j, J, true) : Scenarios.ligneDebutant(it.sc, it.sv, S.maintenant))))
-    .concat(['Classé par Claude (une IA), du plus au moins probable, sans pourcentage ; ce classement ne change pas.'])
-    .concat(m ? [m, 'Pour un chemin, plus le prix est près de sa zone et loin de ce qui l’invaliderait, mieux il suit ; pour « reste entre », plus il est loin des limites.'] : []).concat(r ? ['Encore ' + r + ', sans nouvelle prévision.'] : [])
-    // Le suivi « (en direct) » et le journal vont avec l'avertissement, dans le dernier paragraphe :
-    // une bulle coupée faute de place (375×667, des fermetures avec leur raison) les garde toujours.
-    .concat(['« (en direct) » : suivi par cette page ; la note officielle est celle du journal, le lendemain. ' + texte[texte.length - 1]]);
+  // Le texte est déjà court : seul le bilan part ; le dernier paragraphe garde « (en direct) », le
+  // journal et l'avertissement.
+  return texte.filter(l => !/^Le 1er mouvement annoncé/.test(l));
 }
 /** M8 (arbitrage du budget Débutant) : quand la ligne porte l'indication d'une fermeture, c'est le
  *  libellé du scénario qui cède (sa zone reste dessinée, sans texte) ; la bulle de la ligne reprend
