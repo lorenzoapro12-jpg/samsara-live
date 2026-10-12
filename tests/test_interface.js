@@ -371,6 +371,15 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       });
       check(`OBV : le badge (« ${obv.badge} ») au format abrégé de l'axe, sans « M » sous le million`,
         obv.s && /^−?\d+(,\d)?( k| M| Md)?$/.test(obv.badge || '') && (Math.abs(obv.v) >= 1e6 || !/M/.test(obv.badge)), obv);
+      // OBV : l'échelle suit le bas et le haut de la VUE (12/10 : centrée sur 0, un cumul de +11 k
+      // qui bougeait de ±1 k tenait en une ligne plate). La courbe remplit la hauteur du panneau.
+      const obvEch = await p4.evaluate(() => {
+        const v = calcOBV(cols().close, cols().vol), vs = Math.max(0, viewStart), ve = Math.min(candles.length, viewEnd);
+        let mn = Infinity, mx = -Infinity; for (let i = vs; i < ve; i++) { mn = Math.min(mn, v[i]); mx = Math.max(mx, v[i]); }
+        return { mn, mx, ...basHautFenetre(v, vs, ve) };
+      });
+      check('OBV : échelle sur le bas et le haut de la vue (la courbe en occupe plus de 80 %), pas symétrique autour de 0',
+        obvEch.bas < obvEch.mn && obvEch.haut > obvEch.mx && (obvEch.mx - obvEch.mn) / (obvEch.haut - obvEch.bas) > 0.8, obvEch);
 
       // Les heures (en-tête de cette partie) : celles de l'appareil, ici Auckland.
       const heures = await p4.evaluate(() => {

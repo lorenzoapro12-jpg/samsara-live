@@ -934,7 +934,7 @@ titre('8. Isolement : une page à côté, qui ne partage aucun code avec le term
 const html = fs.readFileSync(path.join(REPO, 'bookmap.html'), 'utf8');
 const charges = [...html.matchAll(/\b(?:src|href)="([^"#]+)"/g)].map(m => m[1]).filter(u => !/^https?:/.test(u));
 check('bookmap.html ne charge que ses fichiers (+ les cœurs communs : repli Binance, formats, liaison ; et le lien retour vers le terminal)',
-  charges.every(u => ['css/bookmap.css', 'js/binance-repli.js', 'js/format.js', 'js/liaison.js', 'js/bookmap-calc.js', 'js/bookmap.js', 'index.html'].includes(u)), charges);
+  charges.every(u => ['css/bookmap.css', 'js/binance-repli.js', 'js/repli-raw.js', 'js/format.js', 'js/liaison.js', 'js/bookmap-calc.js', 'js/bookmap.js', 'index.html'].includes(u)), charges);
 check('les formats communs (js/format.js) sont chargés AVANT les calculs de la carte', charges.indexOf('js/format.js') >= 0 && charges.indexOf('js/format.js') < charges.indexOf('js/bookmap-calc.js'), charges);
 check('la liaison (js/liaison.js) est chargée AVANT le script de tête qui pose le thème, et avant js/bookmap.js',
   html.indexOf('src="js/liaison.js"') > 0 && html.indexOf('src="js/liaison.js"') < html.indexOf('Liaison.poserTheme') && html.indexOf('src="js/liaison.js"') < html.indexOf('src="js/bookmap.js"'));

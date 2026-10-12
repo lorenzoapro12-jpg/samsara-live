@@ -7923,13 +7923,15 @@ function resolveSub(candles, y0, subH, W, key) {
   } else if (key === 'obv') {
     const closes = cols().close, volumes = cols().vol;
     const obv = memoized('sub_obv', calcOBV, closes, volumes);
-    const absMax = absMaxFenetre([obv], vs, ve) || 1;
-    const scale = (ph / 2) / absMax;
-    const midY = y0 + pad.top + ph / 2;
+    // Échelle sur le BAS et le HAUT de la fenêtre visible, pas symétrique autour de 0 : le niveau
+    // de l'OBV ne veut rien dire (il part de 0 à la première bougie chargée), seule sa pente se lit.
+    // Centré sur 0, un cumul de +11 k qui bouge de ±1 k dans la vue tenait en une ligne plate (12/10).
+    const { bas, haut } = basHautFenetre(obv, vs, ve);
+    const scale = ph / (haut - bas);
     // L'axe et le badge du réticule au même format (« 54,8 k », « −2,3 M ») : avant, l'axe en K ou M
     // selon la taille, le badge toujours en millions (« 0.05M » à côté de « 50.0K »).
-    subGrid(y0, pad, ph, W, { levels: [-absMax, 0, absMax], min: -absMax, max: absMax, f: v => Fmt.compact(v) });
-    drawLineAt(obv, midY, scale, pad, gap, COLORS.obv, [], 1.5, vs);
+    subGrid(y0, pad, ph, W, { levels: [bas, (bas + haut) / 2, haut], min: bas, max: haut, f: v => Fmt.compact(v) });
+    drawLineAt(obv.slice(0, ve), y0 + pad.top + ph + bas * scale, scale, pad, gap, COLORS.obv, [], 1.5, vs);
   } else if (key === 'mfi') {
     const closes = cols().close, highs = cols().high, lows = cols().low, vols = cols().vol;
     const mfi = memoized('sub_mfi', calcMFI, highs, lows, closes, vols, PARAM.mfi.periode);
@@ -7980,6 +7982,15 @@ function absMaxFenetre(series, vs, ve) {
   let m = 0;
   for (const a of series) for (let i = vs; i < ve && i < a.length; i++) { const v = a[i]; if (v !== null && Math.abs(v) > m) m = Math.abs(v); }
   return m;
+}
+/** Bas et haut d'une série sur la fenêtre [vs, ve), avec 8 % de marge de chaque côté ;
+ *  une série plate garde une hauteur (sinon division par zéro). */
+function basHautFenetre(a, vs, ve) {
+  let bas = Infinity, haut = -Infinity;
+  for (let i = Math.max(0, vs); i < ve && i < a.length; i++) { const v = a[i]; if (v !== null && isFinite(v)) { if (v < bas) bas = v; if (v > haut) haut = v; } }
+  if (!isFinite(bas)) return { bas: -1, haut: 1 };
+  const marge = (haut - bas) * 0.08 || Math.max(Math.abs(haut) * 0.01, 1);
+  return { bas: bas - marge, haut: haut + marge };
 }
 function drawLineAt(data, baseY, scale, pad, gap, color, dash, width, dataOffset) {
   ctx.strokeStyle = color; ctx.lineWidth = width;
