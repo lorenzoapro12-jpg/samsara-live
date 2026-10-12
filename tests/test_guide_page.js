@@ -239,10 +239,21 @@ const etat = page => page.evaluate(() => {
         const ouverte = await o.page.evaluate(() => { const r = document.getElementById('reperesListe').getBoundingClientRect(); return r.height > 40 && r.top >= 0 && r.bottom <= innerHeight + 1; });
         const barre = await o.page.evaluate(() => document.getElementById('reperesTitre').textContent);
         check(`${nom} : le titre de la liste ouverte compte les repères (« ${barre} »)`, enColonne ? /^Sur le graphique · \d+ repères en entier$/.test(barre) : /^Lire les \d+ repères en entier$/.test(barre), barre);
+        // « En résumé » : en tête de la liste, la phrase en gras, le pourquoi, les repères à surveiller,
+        // l'avertissement unique ; au téléphone, la phrase est aussi sur la barre (lisible sans toucher).
+        const sy = await o.page.evaluate(() => {
+          const el = document.getElementById('synthese'), premier = document.querySelector('#reperesListe > li'), r = el && el.getBoundingClientRect();
+          const res = document.getElementById('reperesResume');
+          return el && { premier: premier === el, titre: el.querySelector('.synthese-titre').textContent, gras: +getComputedStyle(el.querySelector('.synthese-titre')).fontWeight,
+            pourquoi: el.querySelectorAll('.synthese-liste')[0] ? el.querySelectorAll('.synthese-liste')[0].children.length : 0, texte: el.innerText,
+            dansEcran: r.height > 60 && r.top >= 0 && r.bottom <= innerHeight + 1, barre: res && !res.hidden ? res.textContent : null };
+        });
+        check(`${nom} : « En résumé » en tête de la liste, visible, la phrase en gras, le pourquoi et l'avertissement`, sy && sy.premier && sy.dansEcran && sy.gras >= 700 && sy.pourquoi >= 1
+          && /Une description, pas un conseil\./.test(sy.texte) && !/%/.test(sy.texte) && (enColonne ? sy.barre === null : sy.barre === sy.titre), sy);
         // La colonne ouverte rétrécit le graphique : la liste est relue (les repères de la vue).
         const lignes2 = await o.page.evaluate(() => [...document.querySelectorAll('#reperesListe button')].map(b => b.textContent));
         const k = lignes2.indexOf((pub.find(L => lignes2.includes(L.titre)) || {}).titre);
-        await o.page.click(`#reperesListe li:nth-child(${k + 1}) button`); await o.page.waitForTimeout(200);
+        await o.page.click(`#reperesListe button[data-k="${k}"]`); await o.page.waitForTimeout(200);
         const vu = await o.page.evaluate(() => ({ survol: guideEtat.survol ? guideEtat.survol.titre : null, fermee: document.getElementById('reperesListe').hidden }));
         check(`${nom} : la liste s'ouvre dans l'écran ; toucher une ligne ouvre la bulle de ce repère ${enColonne ? '(la colonne reste ouverte)' : 'et ferme la liste'}`, ouverte && k >= 0 && vu.fermee === !enColonne && vu.survol === lignes2[k], { ouverte, k, vu, ligne: lignes2[k] });
       }

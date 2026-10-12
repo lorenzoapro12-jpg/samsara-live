@@ -2813,6 +2813,82 @@ const Guide = (function () {
   /** Un terme permis dans une bulle Débutant seulement avec son explication, dans la même bulle. */
   const EXPLIQUES_DEBUTANT = { 'repère d’options': 'une estimation, tirée des contrats d’options de la plateforme Deribit' };
 
+  // ─── 9. En résumé : tout ce que la page montre, recoupé en une lecture ──────
+  /** L'encadré « En résumé » (en tête de la liste « Sur le graphique ») : UNE phrase qui dit où
+   *  penchent les signaux déjà affichés, le pourquoi en lignes courtes (un signal par ligne, son
+   *  sens : +1, −1 ou 0), puis les deux repères qui changeraient la lecture. Rien de nouveau n'est
+   *  calculé : la tendance (régime du Guide), un repère franchi et validé, la figure en cours, le
+   *  scénario du matin montré. Aucun pourcentage, aucun conseil, aucune flèche seule. Honnête : un
+   *  sens n'est dit que si au moins deux signaux vont dans ce sens et aucun en face ; sinon « pas
+   *  de sens net », et pourquoi.
+   *  o = { prix, unite, itv, regime, choix, suite, figures: [f], scenario: { rang, forme, sens,
+   *        ouvert, tombe } | null } → { titre, ton ('hausse' | 'baisse' | 'partage' | 'calme'),
+   *  pourquoi: [{ texte, sens }], surveiller: [texte], avertissement }. */
+  function synthese(o) {
+    const u = o.unite, per = periode(o.itv)[0], pourquoi = [];
+    if (!fini(o.prix)) return { titre: 'Prix en direct indisponible pour l’instant.', ton: 'calme', regle: '', pourquoi: [], surveiller: [], avertissement: AVERTISSEMENT };
+    const r = o.regime;
+    if (r && r.cle === 'hausse') pourquoi.push({ texte: 'Tendance : le prix monte depuis un moment.', sens: 1 });
+    else if (r && r.cle === 'baisse') pourquoi.push({ texte: 'Tendance : le prix baisse depuis un moment.', sens: -1 });
+    else if (r && r.cle === 'incertaine') pourquoi.push({ texte: 'Tendance : le prix bouge fort, sans sens clair.', sens: 0 });
+    else if (r && (r.cle === 'faible' || r.cle === 'sans')) pourquoi.push({ texte: 'Tendance : pas de direction claire.', sens: 0 });
+    // Un repère franchi et validé (deux fins de période au-delà) : le prix a changé de côté.
+    const ch = choixDebutant(o.choix), rA = ch.dessus && raisonPrincipale(ch.dessus), rB = ch.dessous && raisonPrincipale(ch.dessous);
+    if (ch.dessus && ch.dessus.ferme && ch.dessus.ferme.cassure === 'valide' && ch.dessus.ferme.sens < 0)
+      pourquoi.push({ texte: 'Le prix est repassé sous ' + prixR(rA, u) + ' et y reste.', sens: -1 });
+    else if (ch.dessous && ch.dessous.ferme && ch.dessous.ferme.cassure === 'valide' && ch.dessous.ferme.sens > 0)
+      pourquoi.push({ texte: 'Le prix est passé au-dessus de ' + prixR(rB, u) + ' et y reste.', sens: 1 });
+    // La figure en cours qui a un sens : validée d'abord, puis sortie à valider.
+    const F = (o.figures || []).filter(f => !f.fin && !f.ebauche).map(f => ({ f, e: etatForme(f) }));
+    const fv = F.find(x => x.e.cle === 'confirme' && (x.f.sens === 1 || x.f.sens === -1));
+    const fd = !fv && F.find(x => x.e.cle === 'demi');
+    if (fv) pourquoi.push({ texte: NOM_LONG_DEBUTANT[fv.f.type] + ' validé : il pointe vers ' + (fv.f.sens > 0 ? 'le haut.' : 'le bas.'), sens: fv.f.sens });
+    else if (fd) {
+      const s = deuxCotes(fd.f) || famille(fd.f) === 'drapeau' ? fd.f.demiSens : fd.f.sens;
+      if (s === 1 || s === -1) pourquoi.push({ texte: NOM_LONG_DEBUTANT[fd.f.type] + ' : sorti par ' + (s > 0 ? 'le haut' : 'le bas') + ', pas encore validé.', sens: 0 });
+    } else {
+      // Aucune figure en cours n'a de sens : la dernière finie de la vue est dite, sans effet.
+      const ff = (o.figures || []).filter(f => f.fin === 'atteint' || f.fin === 'invalide' || f.fin === 'invalide_avant').sort((a, b) => (b.jFin || 0) - (a.jFin || 0))[0];
+      if (ff) pourquoi.push({ texte: NOM_LONG_DEBUTANT[ff.type] + (ff.fin === 'atteint' ? ' : objectif déjà atteint, plus de signal.' : ' : invalidé, plus de signal.'), sens: 0 });
+    }
+    // Le scénario du matin montré (une hypothèse de Claude, dite comme telle).
+    const sc = o.scenario;
+    if (sc && sc.tombe) pourquoi.push({ texte: 'Le scénario n° ' + sc.rang + ' de Claude, ce matin, ne tient plus.', sens: 0 });
+    else if (sc && sc.ouvert && sc.forme === 'range') pourquoi.push({ texte: 'Scénario n° ' + sc.rang + ' de Claude, ce matin : le prix reste dans une fourchette.', sens: 0 });
+    else if (sc && sc.ouvert && (sc.sens === 1 || sc.sens === -1)) pourquoi.push({ texte: 'Scénario n° ' + sc.rang + ' de Claude, ce matin : ' + (sc.sens > 0 ? 'vers le haut.' : 'vers le bas.'), sens: sc.sens });
+    if (r && r.compression) pourquoi.push({ texte: 'Le prix bouge peu : ce calme ne dit pas le sens du prochain mouvement.', sens: 0 });
+    const haut = pourquoi.filter(x => x.sens > 0).length, bas = pourquoi.filter(x => x.sens < 0).length;
+    // regle : comment la phrase est tirée des signaux, en mots (le « comment » du pourquoi).
+    let ton, titre, regle;
+    if (haut >= 2 && !bas) { ton = 'hausse'; titre = 'Les signaux penchent plutôt vers la hausse.'; regle = 'Plusieurs signaux vont vers le haut, aucun vers le bas.'; }
+    else if (bas >= 2 && !haut) { ton = 'baisse'; titre = 'Les signaux penchent plutôt vers la baisse.'; regle = 'Plusieurs signaux vont vers le bas, aucun vers le haut.'; }
+    else if (haut && bas) { ton = 'partage'; titre = 'Les signaux se contredisent : pas de sens net.'; regle = 'Certains signaux vont vers le haut, d’autres vers le bas.'; }
+    else if (haut || bas) { ton = 'calme'; titre = 'Pas de sens net pour l’instant.'; regle = 'Un seul signal va vers ' + (haut ? 'le haut' : 'le bas') + ' : c’est trop peu.'; }
+    else { ton = 'calme'; titre = 'Pas de sens net : le prix hésite.'; regle = 'Aucun signal ne penche d’un côté.'; }
+    // Les repères qui changeraient la lecture : ceux de « Et ensuite ? » (o.suite). Le prix est
+    // dans une bande : elle est dite, puis le repère suivant de chaque côté.
+    const S = o.suite || {}, nom = x => nomsDebutant(x)[2], surveiller = [];
+    // À prix égal, la raison la plus parlante (hier, semaine, 24 h, mur, zone de retour).
+    const parlante = (r, niv) => (r && niv ? niv.raisons.filter(x => chiffresR(x) === chiffresR(r)).sort((a, b) => rangRaison(a) - rangRaison(b))[0] || r : r);
+    const cote = (c, haut) => (!c ? null : S.dans ? (c.cible ? parlante(c.ry || bord(c.cible, !haut), c.cible) : null) : parlante(c.rx || bord(c.seuil, haut), c.seuil));
+    const xH = cote(S.haut, true), xB = cote(S.bas, false);
+    if (S.dans) {
+      const [a, b] = bornesNiv(S.dans), rd = parlante(raisonPrincipale(S.dans), S.dans);
+      surveiller.push(chiffres(a) === chiffres(b) ? 'Le prix est sur ' + prixR(rd, u) + ', ' + nom(rd) + '.' : 'Le prix est dans une zone de repères, de ' + chiffres(a) + ' à ' + prix(b, u) + '.');
+    }
+    const suivant = S.dans ? ', prochain repère : ' : ' : ';
+    surveiller.push(xH ? 'Au-dessus' + suivant + prixR(xH, u) + ', ' + nom(xH) + '.' : 'Aucun repère proche au-dessus.',
+      xB ? 'En dessous' + suivant + prixR(xB, u) + ', ' + nom(xB) + '.' : 'Aucun repère proche en dessous.');
+    if (S.dans) {
+      if (ton === 'hausse') surveiller.push('Cette lecture tombe si le prix finit ' + per + ' sous cette zone.');
+      else if (ton === 'baisse') surveiller.push('Cette lecture tombe si le prix finit ' + per + ' au-dessus de cette zone.');
+      else surveiller.push('Un sens apparaîtrait si le prix finit ' + per + ' hors de cette zone.');
+    } else if (ton === 'hausse' && xB) surveiller.push('Cette lecture tombe si le prix finit ' + per + ' sous le repère du bas.');
+    else if (ton === 'baisse' && xH) surveiller.push('Cette lecture tombe si le prix finit ' + per + ' au-dessus du repère du haut.');
+    else if (xH || xB) surveiller.push('Un sens apparaîtrait si le prix finit ' + per + ' au-delà ' + (xH && xB ? 'de l’un d’eux.' : 'de ce repère.'));
+    return { titre, ton, regle, pourquoi, surveiller, avertissement: AVERTISSEMENT };
+  }
+
   return { pctParam, nombre, prix, chiffres, pct, nomIntervalle, duree, heureVue, heureUTC: HEURE_UTC_EXPORT, niveauxDuJour, niveauxSR, niveauxPublies, choisirNiveaux, libelleNiveau,
     prixR, tagLu, artLu, quoi, bord, etatFerme, etatLive, texteEtatLive, texteEtatMax, MOTS, centile, regime, texteRegime, pivots, regression, regressionParallele,
     detecter, bilan, formesAffichees, formesDebutant, idFigure, etatForme, NOMS_FORMES, texteBilan, suite, texteSuite, VARIANTES_SUITE, tagMicro, deArt, decrire, decrireCompact, lecture, VARIANTES_LECTURE, phraseForme, TYPES, bornes,
@@ -2821,6 +2897,6 @@ const Guide = (function () {
     texteSuiteDebutant, prixRond, ageLu, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
     MARQUES_FIN, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, libelleFormeCourt, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant,
-    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_FORME, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, ciblesFigure };
+    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_FORME, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, ciblesFigure, synthese };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;

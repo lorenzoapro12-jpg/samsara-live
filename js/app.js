@@ -6142,14 +6142,19 @@ function majReperes(W) {
     // Un repère à deux cibles (le libellé d'un scénario et sa zone) : une seule ligne, la plus haute.
     .filter((x, k, a) => a.findIndex(y => y.c.titre === x.c.titre) === k);
   reperesCibles = L.map(x => x.c);
-  const cle = L.map(x => x.c.titre + '|' + coul(x.c)).join('\n');
+  const R = syntheseLecture();
+  const cle = L.map(x => x.c.titre + '|' + coul(x.c)).join('\n') + '\n' + JSON.stringify(R);
   if (cle === reperesCle) return;
   reperesCle = cle;
   const n = L.length;
   document.getElementById('reperesTitre').textContent = colonne && !ouverte ? 'Sur le graphique' : colonne ? 'Sur le graphique' + (n ? ' · ' + n + ' repère' + (n > 1 ? 's' : '') + ' en entier' : ' : aucun repère dans la vue')
     : n ? (n > 1 ? 'Lire les ' + n + ' repères en entier' : 'Lire le repère en entier') : 'Aucun repère dans la vue';
+  // Téléphone (liste fermée sous sa barre) : la phrase du résumé en tête de la barre, lisible sans toucher.
+  const res = document.getElementById('reperesResume');
+  if (res) { res.textContent = R && !colonne ? R.titre : ''; res.hidden = !R || colonne; }
   const ul = document.getElementById('reperesListe');
   ul.textContent = '';
+  if (R) ul.append(syntheseElement(R));
   L.forEach((x, k) => {
     const li = document.createElement('li'), b = document.createElement('button'), t = document.createElement('span'), m = document.createElement('span');
     b.type = 'button'; b.dataset.k = k;
@@ -6158,6 +6163,43 @@ function majReperes(W) {
     m.textContent = x.c.titre;
     b.append(t, m); li.append(b); ul.append(li);
   });
+}
+/** « En résumé » (Guide.synthese) : tout ce que la page montre déjà (tendance, repère franchi,
+ *  figure en cours, scénario du matin), recoupé en une phrase, au présent (la dernière bougie,
+ *  pas la vue) ; null sans données. Rien n'est recalculé : guideDonnees, les figures du rejeu
+ *  et la journée des scénarios (scenJour) sont ceux du graphique. */
+function syntheseLecture() {
+  const D = guideDonnees();
+  if (!D) return null;
+  const n = candles.length, large = Math.max(1, Math.min(n, viewEnd) - Math.max(0, viewStart));
+  const figures = GUIDE_FORMES.val ? Guide.formesAffichees(GUIDE_FORMES.val, PARAM.guide, Math.max(0, n - large), n, 'expert') : [];
+  let scenario = null;
+  const J = typeof scenJour === 'function' ? scenJour() : null, m = J && J.montre;
+  if (m) {
+    const fe = m.ferme, tombe = !m.ouvert && !!fe && ['invalide', 'sortie'].includes(fe.type);
+    scenario = { rang: m.sc.rang, forme: m.sc.forme, ouvert: !!m.ouvert, tombe, sens: m.pos && m.pos.forme === 'chemin' ? m.pos.sens : 0 };
+  }
+  return Guide.synthese({ prix: isNum(livePrice) ? livePrice : D.ref, unite: guideUnite(), itv: chartInterval, regime: D.regime, choix: D.choix, suite: D.suite, figures, scenario });
+}
+/** L'encadré « En résumé », en tête de la liste « Sur le graphique » : la phrase en gras, le
+ *  pourquoi (un trait de couleur par signal : hausse, baisse ou neutre, et les mots qui le disent),
+ *  les repères à surveiller, l'avertissement. */
+function syntheseElement(R) {
+  const li = document.createElement('li'), el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt) e.textContent = txt; return e; };
+  li.className = 'synthese ton-' + R.ton; li.id = 'synthese';
+  li.append(el('p', 'synthese-tete', 'En résumé'), el('p', 'synthese-titre', R.titre));
+  if (R.regle) li.append(el('p', 'synthese-regle', R.regle));
+  const liste = (titre, L) => {
+    if (!L.length) return;
+    li.append(el('p', 'synthese-sous', titre));
+    const ul = el('ul', 'synthese-liste');
+    for (const x of L) { const e = el('li', typeof x === 'string' ? '' : 'sens-' + (x.sens > 0 ? 'haut' : x.sens < 0 ? 'bas' : 'neutre'), typeof x === 'string' ? x : x.texte); ul.append(e); }
+    li.append(ul);
+  };
+  liste('Pourquoi', R.pourquoi);
+  liste('À surveiller', R.surveiller);
+  li.append(el('p', 'synthese-avert', R.avertissement));
+  return li;
 }
 function ouvrirReperes(ouvert) {
   if (reperesEnColonne()) return;   // la colonne : ouverte ou repliée par son onglet (toggleReperes)
