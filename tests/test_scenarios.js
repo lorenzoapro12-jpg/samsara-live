@@ -405,7 +405,7 @@ titre('6 bis. Débutant : une ligne d’état marquée, un libellé court, une b
   check('ligne de bulle : « 1. Le prix va vers 86 500 $ puis 87 200 $, sans toucher 85 500 $ avant — en cours (en direct) »', S.ligneDebutant(un, { cle: 'avant' }) === '1. Le prix va vers 86 500 $ puis 87 200 $, sans toucher 85 500 $ avant — en cours (en direct)', S.ligneDebutant(un, { cle: 'avant' }));
   check('origine sans jargon : « plus haut du 08/10 (83 521), EMA 20 1d » → « plus haut du 08/10, 83 521 » ; « mur de calls (modèle) » → rien', S.origineDebutant('plus haut du 08/10 (83 521), EMA 20 1d') === 'plus haut du 08/10, 83 521' && S.origineDebutant('mur de calls (modèle)') === null, [S.origineDebutant('plus haut du 08/10 (83 521), EMA 20 1d'), S.origineDebutant('mur de calls (modèle)')]);
   const hPoint = Fm.heure(S.pointMs(F.groupe, P.point));
-  check('en-tête : « Écrits par Claude, une IA, ce matin, publiés au point de ' + hPoint + '. » (heure de l’appareil, sans « heure de Paris »)', S.enteteDebutant(F, P, H3) === 'Écrits par Claude, une IA, ce matin, publiés au point de ' + hPoint + '.', S.enteteDebutant(F, P, H3));
+  check('en-tête : « Écrits par Claude (une IA) ce matin, au point de ' + hPoint + '. » (heure de l’appareil, sans « heure de Paris »)', S.enteteDebutant(F, P, H3) === 'Écrits par Claude (une IA) ce matin, au point de ' + hPoint + '.', S.enteteDebutant(F, P, H3));
   const exR = S.explicationDebutant(F.scenarios[2], null, P, {}).join(' ');
   check('range, bulle : ses bornes élargies en dollars (« sans sortir de 85 343 – 86 659 $ »), aucun « ± N % »', /sans sortir de \d{1,3}(?: \d{3})* – \d{1,3}(?: \d{3})* \$/.test(exR) && !/%/.test(exR), exR);
 }

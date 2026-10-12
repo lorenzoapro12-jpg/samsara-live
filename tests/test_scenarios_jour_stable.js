@@ -97,7 +97,7 @@ titre('2. Nom gardé à la clôture de 16:00 (09/10 réel, 16:05)');
   check('bulle Expert du 3 : « nom gardé (avance pas assez nette …) ; plus petit écart à cette clôture : 1 »', /nom gardé \(avance pas assez nette à la dernière clôture de 15 min\) ; plus petit écart à cette clôture : 1/.test(b3), b3);
   check('bulle Expert du 1 : « plus petit écart à la dernière clôture de 15 min ; le nom reste au 3 »', /plus petit écart à la dernière clôture de 15 min ; le nom reste au 3/.test(b1), b1);
   const d = S.phraseMeneurDebutant(J), dc = S.phraseNomDebutant(J, null, true);
-  check(`bulle Débutant : « ${d.slice(0, 150)}… »`, /^Le nom reste au scénario 3 : au dernier quart d’heure décidé, le prix était un peu plus près de ce que décrit le scénario 1/.test(d) && !/depuis/.test(d), d);
+  check(`bulle Débutant : « ${d.slice(0, 150)}… »`, /^Le nom reste au scénario 3 : le 1 est un peu plus près, pas assez nettement/.test(d) && !/depuis/.test(d), d);
   check(`bulle courte : « ${dc} »`, /le 1 était un peu plus près/.test(dc), dc);
 }
 

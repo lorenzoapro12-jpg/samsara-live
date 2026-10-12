@@ -2211,23 +2211,23 @@
   function texteNiveauDebutant(n, now) {
     const achat = n.cote === 'bid', mot = achat ? 'd\'achat' : 'de vente', NB = '\u00a0';
     const ou = 'entre ' + BM.prix(n.pBas) + ' et ' + BM.prix(n.pHaut) + NB + '$', lus = 'lus il y a ' + BM.ageEntier(Date.now() - GU.lu);
-    const suite = 'Si le prix ' + (achat ? 'descend' : 'monte') + ' jusque-là, on verra si ces ordres sont échangés ou retirés : ils peuvent l\'être à tout moment. '
-      + 'Ce repère vient des ordres que cette page lit en direct sur Binance ; celui du Terminal vient d\'une photo prise toutes les 15 min : ils peuvent différer.';
+    // Charte des explications courtes (12/10/2026) : ce que c'est, où, ce qui peut changer, la source.
+    const suite = 'Ils peuvent être échangés ou retirés à tout moment. Lus en direct sur Binance ; le repère du Terminal (photo de 15 min) peut différer.';
     if (n.source === 'zone') {
-      if (n.dedans) return 'Le prix est dans cette zone (' + BM.btc(n.q) + ' BTC d\'ordres ' + mot + ' en attente ' + ou + ', ' + lus + ') : on voit maintenant si ses ordres sont échangés ou retirés. Ils peuvent l\'être à tout moment. Ce repère vient des ordres lus en direct sur Binance.';
+      if (n.dedans) return 'Le prix est dans cette zone : ' + BM.btc(n.q) + ' BTC d\'ordres ' + mot + ' en attente ' + ou + ', ' + lus + '. Ils peuvent être échangés ou retirés à tout moment. Lus en direct sur Binance.';
       const w = GU.murs.filter(m => m.cote === n.cote && m.p >= n.pBas - 1e-6 && m.p + m.pas <= n.pHaut + 1e-6).sort((a, b) => b.q - a.q)[0];
       const dont = w ? ', dont ' + BM.btc(w.q) + ' BTC entre ' + BM.prix(w.p) + ' et ' + BM.prix(w.p + w.pas) + NB + '$' + depuisMots(w, now) : '';
       return BM.btc(n.q) + ' BTC d\'ordres ' + mot + ' en attente ' + ou + ', ' + lus + dont + '. ' + suite;
     }
     const ecart = GU.C ? (achat ? GU.C.mid - n.pHaut : n.pBas - GU.C.mid) : null;
     return BM.btc(n.q) + ' BTC d\'ordres ' + mot + ' en attente ' + ou + depuisMots(n.h, now) + ', ' + lus + '.'
-      + (ecart !== null ? ' À ' + BM.prix(Math.max(0, ecart)) + NB + '$ ' + (achat ? 'sous le' : 'au-dessus du') + ' prix (' + BM.nombre(Math.abs(n.m.ecartPct || 0), 2, 2) + ' %).' : '') + ' ' + suite;
+      + (ecart !== null ? ' À ' + BM.prix(Math.max(0, ecart)) + NB + '$ ' + (achat ? 'sous le' : 'au-dessus du') + ' prix.' : '') + ' ' + suite;
   }
   /** Le détail d'un côté sans repère, au toucher. */
   function texteVideDebutant(cote) {
     const achat = cote === 'bid', r = GU.resume, lus = GU.lu !== null ? ' (ordres lus il y a ' + BM.ageEntier(Date.now() - GU.lu) + ')' : '';
-    return (achat ? 'Au-dessous' : 'Au-dessus') + ' du prix, aucun prix n\'a nettement plus d\'ordres ' + (achat ? 'd\'achat' : 'de vente') + ' en attente que les autres'
-      + (r && r.usd ? ', jusqu\'à ' + BM.prix(r.usd) + '\u00a0$ du prix' : '') + lus + '. Un mur peut apparaître à tout moment : la carte le montrera.';
+    return (achat ? 'Au-dessous' : 'Au-dessus') + ' du prix, aucun prix n\'a nettement plus d\'ordres ' + (achat ? 'd\'achat' : 'de vente') + ' que les autres'
+      + (r && r.usd ? ', jusqu\'à ' + BM.prix(r.usd) + '\u00a0$' : '') + lus + '. Un mur peut apparaître à tout moment.';
   }
   /** Obstacles DURS des repères débutants : la ligne de prix des tendanceMs dernières minutes et la
    *  rangée du prix actuel — un repère ne cache jamais le prix récent. */
@@ -2579,8 +2579,8 @@
   function itemsIntro() {
     // Débutant : 3 points, ce qu'il voit — couleurs, ligne du prix (à fil noir) et ronds, les deux repères.
     if (debutant()) return [
-      ['Couleurs = ordres d\'achat ou de vente en attente.', couleursDebutant() + ' Un ordre peut être retiré à tout moment. Hachures : ce qui n\'a pas été lu là (les ordres en attente, ou les échanges), et l\'avenir, à droite de «\u00a0maintenant\u00a0».'],
-      ['Ligne à fil noir = le prix, jusqu\'au trait ' + motsCouleurs().maintenant + ' «\u00a0maintenant\u00a0». Ronds = échanges réels.', couleurMot('Vert', '--up') + ' ▲ : surtout des acheteurs qui ont pris des ventes en attente. ' + couleurMot('Rouge', '--down') + ' ▼ : surtout des vendeurs qui ont pris des achats en attente. Plus gros = plus de BTC.'],
+      ['Couleurs = ordres d\'achat ou de vente en attente.', couleursDebutant() + ' Un ordre peut être retiré à tout moment. Hachures : rien de lu là, ou l\'avenir (à droite de «\u00a0maintenant\u00a0»).'],
+      ['Ligne à fil noir = le prix, jusqu\'au trait ' + motsCouleurs().maintenant + ' «\u00a0maintenant\u00a0». Ronds = échanges réels.', couleurMot('Vert', '--up') + ' ▲ : surtout des acheteurs qui ont pris des ventes en attente ; ' + couleurMot('rouge', '--down') + ' ▼ : l\'inverse. Plus gros = plus de BTC.'],
       ['«\u00a0Mur d’achat\u00a0» sous le prix, «\u00a0Mur de vente\u00a0» au-dessus : le prix le plus proche où nettement plus d\'ordres attendent qu\'ailleurs.', 'La phrase du haut décrit l\'instant : ce n\'est pas une prévision.'],
     ];
     const n = E.niv, tr = (n && n.tranche) || BM.GUIDE.trancheUsd;
@@ -2603,7 +2603,7 @@
       // (Débutant : seulement « pas d'exemple » — l'explication se pose loin du prix et des repères.)
       + (ouvert && R.calques.guide && !vus.has(i + 1) && !(deb && (GU.caches.has(i + 1) || GU.sansPlace.has(i + 1))) ? ' <i>' + (GU.caches.has(i + 1) ? '(caché sous ce cadre)' : GU.sansPlace.has(i + 1) ? '(visible, mais sans place libre pour son numéro)' : '(pas d\'exemple dans cette vue)') + '</i>' : '') + '</span></li>').join('');
     if (deb) {
-      document.getElementById('guideIntroNote').textContent = (survol ? 'Touchez ou survolez' : 'Touchez') + ' un repère pour le détail. Tout voir : la case «\u00a0Le détail\u00a0» du panneau «\u00a0Choisir l\'affichage\u00a0».';
+      document.getElementById('guideIntroNote').textContent = (survol ? 'Touchez ou survolez' : 'Touchez') + ' un repère pour le détail. Tout voir : «\u00a0Le détail\u00a0», dans «\u00a0Choisir l\'affichage\u00a0».';
       return;
     }
     document.getElementById('guideIntroNote').textContent = (R.calques.guide ? 'Les numéros montrent un exemple réel de chacun. Vert ou turquoise : côté achat ; rouge ou rose : côté vente. Rond : échangé ; rectangle : en attente.' : 'Calque Guide éteint : pas de numéros sur la carte.')
@@ -3466,7 +3466,7 @@
     z.innerHTML = groupes.map(([q, l]) => '<fieldset class="aff-groupe"><legend>' + echap(q) + '</legend>' + l.join('') + '</fieldset>').join('');
     for (const c of z.querySelectorAll('input[data-calque]')) c.addEventListener('change', () => { poserCalque(c.dataset.calque, c.checked); apresCalques(); });
     $('affNote').textContent = debutant()
-      ? 'Sans « Le détail », la carte montre l’essentiel : les couleurs, les ronds et la ligne du prix restent affichés. « Le détail » propose tous les calques et les réglages fins.'
+      ? 'Les couleurs, les ronds et la ligne du prix restent toujours affichés.'
       : 'Chaque case allume ou éteint un calque, comme les puces du haut. Le choix est gardé dans ce navigateur.';
   }
   /** Les calques que ce panneau propose dans ce mode (Lisible : ceux qu'il montre et qui se choisissent). */
@@ -3605,7 +3605,7 @@
     const GD = BM.GUIDE, n2 = v => BM.nombre(v, 0, 2), pc = v => Math.round(v * 100) + ' %', NB = ' ', SG = BM.SYMBOLES_GUIDE;
     tx('legGuideMode', (MODE === 'expert' ? 'Avec «\u00a0Le détail\u00a0» : les chiffres seuls' : 'Sans «\u00a0Le détail\u00a0» : des phrases') + '. C\'est la même case que sur le terminal (panneau «\u00a0Choisir l\'affichage\u00a0») : la cocher ici la coche aussi là-bas.');
     tx('legPaletteDeb', couleursDebutant());
-    tx('legSensDeb', '«' + NB + 'En hausse' + NB + '» ou «' + NB + 'en baisse' + NB + '» : le prix a bougé de plus de ' + n2(GD.tendancePct) + ' % depuis ' + BM.age(GD.tendanceMs) + ' ; «' + NB + 'stable' + NB + '» revient sous ' + n2(GD.tendanceRetourPct) + ' %, et le mot change au plus une fois par ' + (GD.tendanceGardeMs === 60e3 ? 'minute' : BM.age(GD.tendanceGardeMs)) + '.');
+    tx('legSensDeb', '«' + NB + 'En hausse' + NB + '» : plus de ' + n2(GD.tendancePct) + ' % en ' + BM.age(GD.tendanceMs) + ' ; «' + NB + 'stable' + NB + '» sous ' + n2(GD.tendanceRetourPct) + ' %. Le mot change au plus une fois par ' + (GD.tendanceGardeMs === 60e3 ? 'minute' : BM.age(GD.tendanceGardeMs)) + '.');
     tx('legGuide', 'Il relit ce que la carte montre et l\'écrit en mots ; il ne mesure rien de neuf, et ne dit ni pourquoi ni ce qui va suivre. Mesuré : lu dans les données ; convention : un seuil choisi par ce code ; modèle : les niveaux d\'options. '
       + 'Heures du guide : celles de l\'appareil, comme l\'axe du temps (le fuseau est écrit dans son angle). Le guide ne décrit le présent qu\'avec un carnet live de moins de ' + BM.VALIDITE.cadences + ' cadences ; sur une vue passée, il ne dessine que les marques du journal.');
     tx('legGuideMurs', 'Les ' + GD.parCote + ' tranches de ' + GD.trancheUsd + NB + '$ les plus chargées de chaque côté du prix, dans le dernier carnet live (mesuré), à ±' + n2(GD.procheMaxPct) + ' % au plus et dans la bande lue. '

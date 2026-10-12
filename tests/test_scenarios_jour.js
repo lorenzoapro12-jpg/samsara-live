@@ -312,7 +312,7 @@ titre('6. Textes Expert : une mesure, jamais un indice en liste ni « en tête �
   const deb = [S.phraseMeneurDebutant(J), S.COMMENT_DEBUTANT, S.texteResteDebutant(J, now)].concat(J.items.map(i => S.ligneDebutantJour(i, J)), J.items.map(i => S.ligneDebutantJour(i, J, true)));
   check('bulles Débutant de la journée : aucun mot banni, aucun %, aucun conseil, jamais « probable »', deb.every(t => t && !bannis(t).length && !/%/.test(t) && !CONSEIL.test(t) && !/probable/.test(t)), deb.filter(t => !t || bannis(t).length || /%|probable/.test(t) || CONSEIL.test(t)));
   check('Débutant : « une règle de calcul, pas une prévision ni une chance de réussite » ; « décidé tous les quarts d’heure »', /pas une prévision ni une chance de réussite/.test(deb[0]) && /tous les quarts d’heure/.test(deb[0]) && /tous les quarts d’heure/.test(deb[1]), deb.slice(0, 2));
-  check('Débutant (A3) : « du début de sa zone (… $, autour de … $) », jamais « de sa zone (84 500 $) »', /jusqu’au début de sa zone \([\d ]+ \$, autour de [\d ]+ \$\)/.test(S.ligneDebutantJour(J.items[1], J)), S.ligneDebutantJour(J.items[1], J));
+  check('Débutant (A3) : « du début de sa zone (autour de … $) », jamais « de sa zone (84 500 $) »', /jusqu’au début de sa zone \(autour de [\d ]+ \$\)/.test(S.ligneDebutantJour(J.items[1], J)), S.ligneDebutantJour(J.items[1], J));
 }
 
 // ── 7. raison(), pas() avec la clôture ──
@@ -330,17 +330,17 @@ titre('7. raison() et contacts en mèche');
   const rx = S.raison(b, svI, 'expert'), rd = S.raison(b, svI, 'debutant');
   check(`chemin, Expert : « ${rx} »`, /^zone 97 000 touchée avant 103 000 \(en mèche : contact, règle du journal\)$/.test(rx), rx);
   // Changé délibérément (revue) : un contact seulement en mèche est qualifié aussi pour une invalidation et une sortie.
-  check(`chemin, Débutant : « ${rd} »`, /^le prix a touché la zone de 97 000 \$ \(à partir de 97 970 \$\) avant de toucher la zone de 103 000 \$, par un passage bref du prix : le journal compte ce passage/.test(rd), rd);
+  check(`chemin, Débutant : « ${rd} »`, /^zone de 97 000 \$ touchée avant celle de 103 000 \$, par un passage bref du prix \(le journal le compte\)$/.test(rd), rd);
   const er = S.suiviVide(Q); S.pas(a, er, 0, T0, 102100, 100000, 101000);
   const svR = S.etat(a, er, T0 + Q);
   const rrx = S.raison(a, svR, 'expert'), rrd = S.raison(a, svR, 'debutant');
-  check(`range : « ${rrx} » / « ${rrd} »`, /^borne haute 102 010 dépassée \(en mèche/.test(rrx) && /^le prix est passé au-dessus de 102 010 \$ \(101 000 \$ plus la marge\), par un passage bref du prix/.test(rrd), [rrx, rrd]);
+  check(`range : « ${rrx} » / « ${rrd} »`, /^borne haute 102 010 dépassée \(en mèche/.test(rrx) && /^passé au-dessus de 102 010 \$ \(101 000 \$ plus la marge\), par un passage bref du prix/.test(rrd), [rrx, rrd]);
   const ea = S.suiviVide(Q); S.pas(b, ea, 0, T0, 103500, 96500, 100000);
   const svA = S.etat(b, ea, T0 + Q), rax = S.raison(b, svA, 'expert'), rad = S.raison(b, svA, 'debutant');
-  check(`ambigu : « ${rax} » / « ${rad} »`, svA.cle === 'ambigu' && /ordre inconnu/.test(rax) && /^non tranché : .* le même quart d’heure, et l’ordre est inconnu ; le journal tranchera avec les minutes$/.test(rad), [svA.cle, rax, rad]);
+  check(`ambigu : « ${rax} » / « ${rad} »`, svA.cle === 'ambigu' && /ordre inconnu/.test(rax) && /^non tranché : .* le même quart d’heure ; le journal tranchera$/.test(rad), [svA.cle, rax, rad]);
   const ec = S.suiviVide(Q); S.pas(b, ec, 0, T0, 103000, 100000, 101000);
   const svC = S.etat(b, ec, T0 + Q), rcd = S.raison(b, svC, 'debutant');
-  check(`réalisé en passage bref, Débutant : « ${rcd} »`, svC.cle === 'realise' && svC.meche[0] === true && /passage bref du prix : le journal compte ce passage, alors que pour les figures, la page attend que le prix s’y maintienne/.test(rcd), [svC.meche, rcd]);
+  check(`réalisé en passage bref, Débutant : « ${rcd} »`, svC.cle === 'realise' && svC.meche[0] === true && /^zone de 103 000 \$ touchée .*passage bref du prix \(le journal le compte\)$/.test(rcd), [svC.meche, rcd]);
   const tousD = [rd, rrd, rad, rcd];
   check('Débutant : ni « mèche », ni « bougie », ni « UTC », ni « range », ni « clôture »', tousD.every(t => !/mèche|bougie|UTC|range|clôtur/i.test(t) && !bannis(t).length), tousD);
 }
