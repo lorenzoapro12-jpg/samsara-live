@@ -272,6 +272,30 @@ const etat = page => page.evaluate(() => {
         check(`${nom} : le repère touché est mis en avant sur le graphique, le reste voilé, sa ligne marquée`, sb.titre === lignes2[k] && sb.r && sb.voile > 60 && sb.liste && sb.ligne === lignes2[k], sb);
         const fin = await o.page.evaluate(() => new Promise(ok => setTimeout(() => { dessinerCalque(); ok(reperesVu); }, PARAM.guide.surbrillanceMs + 200)));
         check(`${nom} : la mise en avant s'arrête d'elle-même après quelques secondes`, fin === null, fin);
+        // Une bulle ouverte au survol reste quand la souris va vers elle (même de travers, même en
+        // passant sur un autre repère), et un clic dedans ouvre son détail (demande du 12/10/2026).
+        if (enColonne) {
+          const b0 = await o.page.evaluate(() => { const r = canvas.getBoundingClientRect(); return { x: r.left, y: r.top }; });
+          const cs = await o.page.evaluate(() => guideEtat.cibles.filter(c => c.rects && c.rects[0] && c.niveau).map(c => [(c.rects[0].x0 + c.rects[0].x1) / 2, (c.rects[0].y0 + c.rects[0].y1) / 2]));
+          const suivi = [];
+          for (const pt of cs) {
+            await o.page.mouse.move(b0.x + 3, b0.y + 3); await o.page.waitForTimeout(450);
+            await o.page.mouse.move(b0.x + pt[0], b0.y + pt[1]); await o.page.waitForTimeout(80);
+            const B = await o.page.evaluate(() => bulleOuverte && Object.assign({}, bulleOuverte));
+            if (!B) { suivi.push({ pt, bulle: false }); continue; }
+            const but = [B.x + B.w / 2, B.y + B.h - 6];
+            for (let k = 1; k <= 12; k++) {
+              const f = k / 12;
+              await o.page.mouse.move(b0.x + pt[0] + (but[0] - pt[0]) * f + Math.sin(f * Math.PI) * 30, b0.y + pt[1] + (but[1] - pt[1]) * f); await o.page.waitForTimeout(30);
+            }
+            await o.page.waitForTimeout(450);
+            const tenue = await o.page.evaluate(cle => !!bulleOuverte && bulleOuverte.cle === cle, B.cle);
+            let detail = !B.resume;
+            if (tenue && B.resume) { await o.page.mouse.click(b0.x + B.x + 30, b0.y + B.y + 20); await o.page.waitForTimeout(120); detail = await o.page.evaluate(cle => bulleDetail === cle && !!bulleOuverte && bulleOuverte.cle === cle, B.cle); }
+            suivi.push({ cle: B.cle.slice(0, 30), tenue, detail });
+          }
+          check(`${nom} : chaque bulle de repère reste ouverte quand la souris va vers elle, un clic dedans ouvre son détail (${suivi.length})`, suivi.length > 1 && suivi.every(x => x.tenue && x.detail), suivi.filter(x => !(x.tenue && x.detail)));
+        }
       }
       check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
