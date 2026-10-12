@@ -303,8 +303,8 @@ function controlerLisible(e, nom) {
           !!b1 && b1.estMessage && b1.resume && b1.lignes <= b1.P.bulleLignes && b1.nombres <= b1.P.bulleNombres && !/%/.test(b1.corps) && !G.motsBannis(b1.titre + ' ' + b1.corps).length, b1);
         await detail(o, pl);
         const b2 = await lireBulle(o.page);
-        check(`${o.tactile ? '2e toucher' : 'clic'} : le DÉTAIL dit le mot (« cassé » = 2 fins au-delà) et la ligne du risque, sans conseil`,
-          !!b2 && !b2.resume && b2.corps.includes(G.RISQUE) && /2 quarts d’heure/.test(b2.corps) && !CONSEIL.test(b2.corps) && !/%/.test(b2.corps), b2);
+        check(`${o.tactile ? '2e toucher' : 'clic'} : le DÉTAIL dit le mot (« cassé » = 2 fins au-delà) et l’avertissement (« pas une prévision ni un conseil », une fois), sans conseil`,
+          !!b2 && !b2.resume && /pas une prévision ni un conseil/.test(b2.corps) && !b2.corps.includes(G.RISQUE) && /2 quarts d’heure/.test(b2.corps) && !CONSEIL.test(b2.corps) && !/%/.test(b2.corps), b2);
         const lu = await o.page.evaluate(() => apprVus.has('evenement:repere_passe'));
         check('la bulle du message lue : sa nature notée (plus de marque pour elle)', lu, null);
         await ailleurs(o);
@@ -359,10 +359,11 @@ function controlerLisible(e, nom) {
         const b = await lireBulle(o.page);
         await detail(o, pt);
         const d = await lireBulle(o.page);
-        // Le résumé du Lisible garde ses limites (4 lignes, 3 nombres) : la ligne du risque y est quand
-        // elle tient, sinon au détail (2e toucher, clic) — toujours au détail.
-        check(`bulle d’une ${q === 'passee' ? 'figure passée' : 'figure en cours'} (« ${b && b.titre} ») : résumé dans ses limites (${b && b.lignes} lignes, ${b && b.nombres} nombres), la ligne du risque ${b && b.corps.includes(G.RISQUE) ? 'au résumé et' : '(résumé plein)'} au détail`,
-          !!b && !!d && b.resume && (b.corps.includes(G.RISQUE) || b.lignes >= b.P.bulleLignes) && b.lignes <= b.P.bulleLignes && b.nombres <= b.P.bulleNombres && !d.resume && d.corps.includes(G.RISQUE), { b, d });
+        // Le résumé du Lisible garde ses limites (4 lignes, 3 nombres).
+        // Charte du 12/10/2026 : l'avertissement une fois — au résumé, la ligne d'accès (« pas une
+        // prévision ») ; au détail, la dernière ligne (« pas une prévision ni un conseil »).
+        check(`bulle d’une ${q === 'passee' ? 'figure passée' : 'figure en cours'} (« ${b && b.titre} ») : résumé dans ses limites (${b && b.lignes} lignes, ${b && b.nombres} nombres), « pas une prévision » au résumé, l’avertissement au détail`,
+          !!b && !!d && b.resume && /pas une prévision/.test(b.corps) && b.lignes <= b.P.bulleLignes && b.nombres <= b.P.bulleNombres && !d.resume && /pas une prévision ni une? (?:conseil|recommandation)/.test(d.corps), { b, d });
         await ailleurs(o);
       }
       const r8 = await o.page.evaluate(() => { drawChart(); dessinerCalque(); return { msg: !!apprMsg, ligne: !!apprEtat.ligne }; });

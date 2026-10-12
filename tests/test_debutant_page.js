@@ -472,7 +472,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
               if (tactile) await o.page.evaluate(() => { crossX = crossY = null; dessinerCalque(); });
               const k2 = (await o.page.evaluate(() => debEtat.items.filter(i => i.role === 'niveau').map(i => i.texte))).findIndex(t => pub.includes(t));
               const r2 = await viser(o, 'niveau', tactile, k2);
-              check(`${nom} : la bulle d'un repère publié dit son âge (« relevé il y a … »)`, r2 && /relevée? il y a \d+ min/.test(r2.corps), r2);
+              check(`${nom} : la bulle d'un repère publié dit son âge ou son heure (« relevé il y a … » ; « relevé à hh:mm » sous une minute)`, r2 && /relevée? (il y a \d+ min|à \d\d:\d\d)/.test(r2.corps), r2);
               if (tactile) await quitter(o, tactile, r2 ? 0 : 0, 0);
             }
           }
