@@ -500,6 +500,11 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 .aff-texte { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
 .aff-nom { font-weight: 600; }
 .aff-quoi { font-size: 11px; line-height: 1.35; font-weight: 400; color: var(--ink-2); }
+/* La légende des icônes (js/icones.js), sous « Ce que dit le graphique ». */
+.aff-legende { display: flex; flex-wrap: wrap; gap: 3px 12px; margin: 2px 8px 6px; font-size: 11px; line-height: 1.35; color: var(--ink-2); }
+.aff-legende[hidden] { display: none; }
+.aff-leg { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.aff-leg .ico { width: 11px; height: 11px; flex: none; color: var(--ink-1); }
 .ind-dropdown-menu label.aff-ligne:hover .aff-quoi { color: inherit; }
 .ind-dropdown-menu label.aff-ligne .info-btn { flex-shrink: 0; margin-top: 1px; }
 /* L'importance : une FORME et un MOT, jamais la couleur seule — disque plein « courant »,
@@ -1008,6 +1013,8 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 }
 .reperes-liste button[aria-current="true"] { background: var(--pill); border-radius: min(var(--r-tile), 8px); }
 .reperes-trait { flex: 0 0 3px; align-self: stretch; border-radius: 2px; background: var(--trait, var(--ink-3)); }
+/* L'icône de la famille d'une info (js/icones.js), la même que sur le graphique, dans sa couleur. */
+.reperes-ico { flex: 0 0 13px; width: 13px; height: 13px; margin-top: 2px; }
 /* « En résumé » (js/app.js, syntheseElement) : en tête de la liste, mis en valeur. La phrase en
    gras ; un trait de couleur par signal (hausse, baisse, neutre) que les mots disent aussi. */
 .reperes-liste li.synthese {
@@ -1027,6 +1034,12 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 .synthese-liste li::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--ink-3); }
 .synthese-liste li.sens-haut::before { background: var(--up-ink); }
 .synthese-liste li.sens-bas::before { background: var(--down-ink); }
+.synthese-liste li.avec-ico { padding-left: 17px; }
+.synthese-liste li.avec-ico::before { display: none; }
+.synthese-liste li .ico { position: absolute; left: 0; top: 5px; width: 11px; height: 11px; color: var(--accent-2); }
+.synthese-liste li.sens-neutre .ico { color: var(--ink-3); }
+.synthese-liste li.sens-haut .ico { color: var(--up-ink); }
+.synthese-liste li.sens-bas .ico { color: var(--down-ink); }
 .synthese-avert { margin-top: 7px !important; font-size: 10.5px; color: var(--ink-3); }
 /* Grand écran, avec « Le détail » : la liste en colonne à droite du graphique, toujours ouverte
    (majReperes y range la liste ; PARAM.guide.colonne et colonneL). */

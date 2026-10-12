@@ -2823,40 +2823,41 @@ const Guide = (function () {
    *  de sens net », et pourquoi.
    *  o = { prix, unite, itv, regime, choix, suite, figures: [f], scenario: { rang, forme, sens,
    *        ouvert, tombe } | null } → { titre, ton ('hausse' | 'baisse' | 'partage' | 'calme'),
-   *  pourquoi: [{ texte, sens }], surveiller: [texte], avertissement }. */
+   *  pourquoi: [{ texte, sens, fam }], surveiller: [texte], surveillerFam: [famille | null], avertissement }.
+   *  fam : la famille de l'info (son icône, js/icones.js) : 'tendance', 'niveau', 'figure' ou 'scenario'. */
   function synthese(o) {
     const u = o.unite, per = periode(o.itv)[0], pourquoi = [];
     if (!fini(o.prix)) return { titre: 'Prix en direct indisponible pour l’instant.', ton: 'calme', regle: '', pourquoi: [], surveiller: [], avertissement: AVERTISSEMENT };
     const r = o.regime;
-    if (r && r.cle === 'hausse') pourquoi.push({ texte: 'Tendance : le prix monte depuis un moment.', sens: 1 });
-    else if (r && r.cle === 'baisse') pourquoi.push({ texte: 'Tendance : le prix baisse depuis un moment.', sens: -1 });
-    else if (r && r.cle === 'incertaine') pourquoi.push({ texte: 'Tendance : le prix bouge fort, sans sens clair.', sens: 0 });
-    else if (r && (r.cle === 'faible' || r.cle === 'sans')) pourquoi.push({ texte: 'Tendance : pas de direction claire.', sens: 0 });
+    if (r && r.cle === 'hausse') pourquoi.push({ texte: 'Tendance : le prix monte depuis un moment.', sens: 1, fam: 'tendance' });
+    else if (r && r.cle === 'baisse') pourquoi.push({ texte: 'Tendance : le prix baisse depuis un moment.', sens: -1, fam: 'tendance' });
+    else if (r && r.cle === 'incertaine') pourquoi.push({ texte: 'Tendance : le prix bouge fort, sans sens clair.', sens: 0, fam: 'tendance' });
+    else if (r && (r.cle === 'faible' || r.cle === 'sans')) pourquoi.push({ texte: 'Tendance : pas de direction claire.', sens: 0, fam: 'tendance' });
     // Un repère franchi et validé (deux fins de période au-delà) : le prix a changé de côté.
     const ch = choixDebutant(o.choix), rA = ch.dessus && raisonPrincipale(ch.dessus), rB = ch.dessous && raisonPrincipale(ch.dessous);
     if (ch.dessus && ch.dessus.ferme && ch.dessus.ferme.cassure === 'valide' && ch.dessus.ferme.sens < 0)
-      pourquoi.push({ texte: 'Le prix est repassé sous ' + prixR(rA, u) + ' et y reste.', sens: -1 });
+      pourquoi.push({ texte: 'Le prix est repassé sous ' + prixR(rA, u) + ' et y reste.', sens: -1, fam: 'niveau' });
     else if (ch.dessous && ch.dessous.ferme && ch.dessous.ferme.cassure === 'valide' && ch.dessous.ferme.sens > 0)
-      pourquoi.push({ texte: 'Le prix est passé au-dessus de ' + prixR(rB, u) + ' et y reste.', sens: 1 });
+      pourquoi.push({ texte: 'Le prix est passé au-dessus de ' + prixR(rB, u) + ' et y reste.', sens: 1, fam: 'niveau' });
     // La figure en cours qui a un sens : validée d'abord, puis sortie à valider.
     const F = (o.figures || []).filter(f => !f.fin && !f.ebauche).map(f => ({ f, e: etatForme(f) }));
     const fv = F.find(x => x.e.cle === 'confirme' && (x.f.sens === 1 || x.f.sens === -1));
     const fd = !fv && F.find(x => x.e.cle === 'demi');
-    if (fv) pourquoi.push({ texte: NOM_LONG_DEBUTANT[fv.f.type] + ' validé : il pointe vers ' + (fv.f.sens > 0 ? 'le haut.' : 'le bas.'), sens: fv.f.sens });
+    if (fv) pourquoi.push({ texte: NOM_LONG_DEBUTANT[fv.f.type] + ' validé : il pointe vers ' + (fv.f.sens > 0 ? 'le haut.' : 'le bas.'), sens: fv.f.sens, fam: 'figure' });
     else if (fd) {
       const s = deuxCotes(fd.f) || famille(fd.f) === 'drapeau' ? fd.f.demiSens : fd.f.sens;
-      if (s === 1 || s === -1) pourquoi.push({ texte: NOM_LONG_DEBUTANT[fd.f.type] + ' : sorti par ' + (s > 0 ? 'le haut' : 'le bas') + ', pas encore validé.', sens: 0 });
+      if (s === 1 || s === -1) pourquoi.push({ texte: NOM_LONG_DEBUTANT[fd.f.type] + ' : sorti par ' + (s > 0 ? 'le haut' : 'le bas') + ', pas encore validé.', sens: 0, fam: 'figure' });
     } else {
       // Aucune figure en cours n'a de sens : la dernière finie de la vue est dite, sans effet.
       const ff = (o.figures || []).filter(f => f.fin === 'atteint' || f.fin === 'invalide' || f.fin === 'invalide_avant').sort((a, b) => (b.jFin || 0) - (a.jFin || 0))[0];
-      if (ff) pourquoi.push({ texte: NOM_LONG_DEBUTANT[ff.type] + (ff.fin === 'atteint' ? ' : objectif déjà atteint, plus de signal.' : ' : invalidé, plus de signal.'), sens: 0 });
+      if (ff) pourquoi.push({ texte: NOM_LONG_DEBUTANT[ff.type] + (ff.fin === 'atteint' ? ' : objectif déjà atteint, plus de signal.' : ' : invalidé, plus de signal.'), sens: 0, fam: 'figure' });
     }
     // Le scénario du matin montré (une hypothèse de Claude, dite comme telle).
     const sc = o.scenario;
-    if (sc && sc.tombe) pourquoi.push({ texte: 'Le scénario n° ' + sc.rang + ' de Claude, ce matin, ne tient plus.', sens: 0 });
-    else if (sc && sc.ouvert && sc.forme === 'range') pourquoi.push({ texte: 'Scénario n° ' + sc.rang + ' de Claude, ce matin : le prix reste dans une fourchette.', sens: 0 });
-    else if (sc && sc.ouvert && (sc.sens === 1 || sc.sens === -1)) pourquoi.push({ texte: 'Scénario n° ' + sc.rang + ' de Claude, ce matin : ' + (sc.sens > 0 ? 'vers le haut.' : 'vers le bas.'), sens: sc.sens });
-    if (r && r.compression) pourquoi.push({ texte: 'Le prix bouge peu : ce calme ne dit pas le sens du prochain mouvement.', sens: 0 });
+    if (sc && sc.tombe) pourquoi.push({ texte: 'Le scénario n° ' + sc.rang + ' de Claude, ce matin, ne tient plus.', sens: 0, fam: 'scenario' });
+    else if (sc && sc.ouvert && sc.forme === 'range') pourquoi.push({ texte: 'Scénario n° ' + sc.rang + ' de Claude, ce matin : le prix reste dans une fourchette.', sens: 0, fam: 'scenario' });
+    else if (sc && sc.ouvert && (sc.sens === 1 || sc.sens === -1)) pourquoi.push({ texte: 'Scénario n° ' + sc.rang + ' de Claude, ce matin : ' + (sc.sens > 0 ? 'vers le haut.' : 'vers le bas.'), sens: sc.sens, fam: 'scenario' });
+    if (r && r.compression) pourquoi.push({ texte: 'Le prix bouge peu : ce calme ne dit pas le sens du prochain mouvement.', sens: 0, fam: 'tendance' });
     const haut = pourquoi.filter(x => x.sens > 0).length, bas = pourquoi.filter(x => x.sens < 0).length;
     // regle : comment la phrase est tirée des signaux, en mots (le « comment » du pourquoi).
     let ton, titre, regle;
@@ -2886,7 +2887,9 @@ const Guide = (function () {
     } else if (ton === 'hausse' && xB) surveiller.push('Cette lecture tombe si le prix finit ' + per + ' sous le repère du bas.');
     else if (ton === 'baisse' && xH) surveiller.push('Cette lecture tombe si le prix finit ' + per + ' au-dessus du repère du haut.');
     else if (xH || xB) surveiller.push('Un sens apparaîtrait si le prix finit ' + per + ' au-delà ' + (xH && xB ? 'de l’un d’eux.' : 'de ce repère.'));
-    return { titre, ton, regle, pourquoi, surveiller, avertissement: AVERTISSEMENT };
+    // La famille de chaque ligne (son icône) : un repère de prix nommé ; la règle qui changerait la lecture n'en a pas.
+    const surveillerFam = surveiller.map(t => (/^(Au-dessus|En dessous|Le prix est)/.test(t) ? 'niveau' : null));
+    return { titre, ton, regle, pourquoi, surveiller, surveillerFam, avertissement: AVERTISSEMENT };
   }
 
   return { pctParam, nombre, prix, chiffres, pct, nomIntervalle, duree, heureVue, heureUTC: HEURE_UTC_EXPORT, niveauxDuJour, niveauxSR, niveauxPublies, choisirNiveaux, libelleNiveau,

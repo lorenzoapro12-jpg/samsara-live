@@ -795,7 +795,7 @@ function filtrerMenu(t) {
   for (const l of menu.querySelectorAll('label[data-ind]')) l.hidden = !!q && !sansAccents(l.dataset.cherche).includes(q);
   for (const c of menu.querySelectorAll('.cat-title[data-cat]')) c.hidden = !menu.querySelector('label[data-cat="' + c.dataset.cat + '"]:not([hidden])');
   // L'aide à la lecture n'est pas un indicateur : masquée pendant une recherche.
-  for (const el of menu.querySelectorAll('.aff-aide, .aff-aide-titre')) el.hidden = !!q;
+  for (const el of menu.querySelectorAll('.aff-aide, .aff-aide-titre, .aff-legende')) el.hidden = !!q;
   const vide = menu.querySelector('.ind-aucun');
   if (vide) vide.hidden = !!menu.querySelector('label[data-ind]:not([hidden])');
 }
@@ -833,6 +833,8 @@ function buildDropdown() {
     + '</div></div>';
   html += '<div class="ind-filtre"><input type="search" id="indFiltre" placeholder="Chercher un indicateur…" aria-label="Chercher un indicateur" autocomplete="off" oninput="filtrerMenu(this.value)"></div>';
   html += '<div class="cat-title" data-cat="ecran">Ce que dit le graphique</div>';
+  // La légende des icônes : chaque famille d'info a la sienne, sur le graphique comme dans les listes.
+  html += '<p class="aff-legende" aria-label="Les icônes du graphique">' + Icones.LEGENDE.map(f => '<span class="aff-leg">' + Icones.svg(f) + echapF(Icones.NOMS[f]) + '</span>').join('') + '</p>';
   for (const k of COUCHES_SITE) html += ligneMenu(calqueDe(k), LIBELLES_ECRAN[k], 'ecran');
   for (const l of LIGNES_ECRAN) html += ligneMenu(l, l.label, 'ecran');
   if (detail) html += ligneFiguresPassees();
@@ -4615,12 +4617,23 @@ function guideFroidPas(J) {
 }
 
 /** Une étiquette du Guide : pastille à la bulle du thème, encre 1, un trait de couleur à gauche. */
-function guidePastille(g, x, y, w, h, texte, coul) {
+/** Le début d'une étiquette : l'icône de sa famille (js/icones.js), dans la couleur de son état,
+ *  centrée sur sa 1re ligne (hL), sinon le trait de couleur. → la place prise en plus du trait
+ *  (Icones.PLUS, ou 0) : le texte se décale d'autant, et la largeur de l'étiquette la compte
+ *  (ICO, à ajouter partout où une étiquette à icône se mesure). */
+const ICO = Icones.PLUS;
+function etiqDebut(g, x, y, h, coul, ico, hL) {
+  const l = hL || h, s = l >= 17 ? 9 : 8;
+  if (ico && Icones.dessiner(g, ico, x + 2.5, y + (l - s) / 2, s, coul)) return ICO;
+  g.fillStyle = coul; g.fillRect(x + 2, y + 3, 2.5, h - 6);
+  return 0;
+}
+function guidePastille(g, x, y, w, h, texte, coul, ico) {
   g.fillStyle = COLORS.bulle;
   g.beginPath(); g.roundRect(x, y, w, h, rE(4)); g.fill();
-  if (coul) { g.fillStyle = coul; g.fillRect(x + 2, y + 3, 2.5, h - 6); }
+  const d = coul ? etiqDebut(g, x, y, h, coul, ico) : 0;
   g.fillStyle = COLORS.ink1;
-  g.fillText(texte, x + (coul ? 8 : 5), y + h - 4.5);
+  g.fillText(texte, x + (coul ? 8 : 5) + d, y + h - 4.5);
 }
 /** Coupe `texte` pour tenir dans `w` px (police déjà posée sur g) : « … » en fin. */
 function guideCouper(g, texte, w) {
@@ -4713,7 +4726,7 @@ function guideHaut(W, padL, padR) {
   const cle = textes.map(x => x.join('|')).join('||') + '|' + W + '|' + lectureY;
   if (!guideHautMemo || guideHautMemo.cle !== cle) {
     ctx.font = chartFont(10, 600);
-    const larg = W - padL - padR - 16 - 14, n = t => guideLignes(ctx, t + ' 00', larg).length;
+    const larg = W - padL - padR - 16 - 14 - ICO, n = t => guideLignes(ctx, t + ' 00', larg).length;
     let variante = Guide.VARIANTES_LECTURE.length - 1, lignes = maxL;
     for (let k = 0; k < textes.length; k++) {
       const l = Math.max(...textes[k].map(n));
@@ -4815,13 +4828,13 @@ function guideTexteNiveau(L, exp) {
 }
 
 /** Une étiquette de plusieurs lignes : pastille à la bulle du thème, encre 1, trait de couleur. */
-function guidePastilleL(g, x, y, w, lignes, coul, hL) {
+function guidePastilleL(g, x, y, w, lignes, coul, hL, ico) {
   const h = lignes.length * hL;
   g.fillStyle = COLORS.bulle;
   g.beginPath(); g.roundRect(x, y, w, h, rE(4)); g.fill();
-  if (coul) { g.fillStyle = coul; g.fillRect(x + 2, y + 3, 2.5, h - 6); }
+  const d = coul ? etiqDebut(g, x, y, h, coul, ico, hL) : 0;
   g.fillStyle = COLORS.ink1;
-  lignes.forEach((t, k) => g.fillText(t, x + (coul ? 8 : 5), y + (k + 1) * hL - 4.5));
+  lignes.forEach((t, k) => g.fillText(t, x + (coul ? 8 : 5) + d, y + (k + 1) * hL - 4.5));
 }
 /** Un rectangle de survol {x0, y0, x1, y1} depuis une place {x, y, w, h} (wR : largeur gardée). */
 const guideZone = r => ({ x0: r.x, y0: r.y, x1: r.x + (r.wR || r.w), y1: r.y + r.h });
@@ -4875,7 +4888,7 @@ function guideLibellesNiveaux(E, top, bas, surBougies) {
   const largMax = Math.max(120, (etroit ? 1 : 0.55) * (xMax - g.pad.left) - 12);
   // Le libellé et son état restent à gauche de la marge de futur (les chemins y sont).
   const x = g.pad.left + 6, dispo = (E.marge ? xFin : xMax) - x - 2;
-  const larg = t => ctx.measureText(t).width + 14;
+  const larg = t => ctx.measureText(t).width + 14 + ICO;
   for (const L of E.niveaux) if (!L.visible) E.hors.push(L);
   const vis = E.niveaux.filter(L => L.visible).sort((a, b) => a.y - b.y);
   // L'essentiel (option A, 11/10/2026) : avec « Le détail », la bande la plus proche du prix
@@ -4897,8 +4910,8 @@ function guideLibellesNiveaux(E, top, bas, surBougies) {
     ctx.font = chartFont(9, poids);
     const formes = court ? [[L.repere, dispo]] : [[L.libelle, Math.min(largMax, dispo)], [L.court, dispo], [L.mini, dispo], [L.micro, dispo]];
     for (const [t, lim] of formes) if (larg(t) <= lim) { lignes = [t]; break; }
-    if (!lignes && court) lignes = [guideCouper(ctx, L.repere, dispo - 14)];
-    if (!lignes) lignes = publie ? guideLignes(ctx, L.micro, dispo - 14) : [guideCouper(ctx, L.micro, dispo - 14)];
+    if (!lignes && court) lignes = [guideCouper(ctx, L.repere, dispo - 14 - ICO)];
+    if (!lignes) lignes = publie ? guideLignes(ctx, L.micro, dispo - 14 - ICO) : [guideCouper(ctx, L.micro, dispo - 14 - ICO)];
     const wL = Math.min(dispo, Math.max(...lignes.map(larg)));
     const etatPlein = ctx.measureText(Guide.texteEtatMax(E.mode, 'plein', L.niv.ferme)).width + 16;
     const etatMini = ctx.measureText(Guide.texteEtatMax(E.mode, 'mini', L.niv.ferme)).width + 16;
@@ -4927,7 +4940,7 @@ function guideLibellesNiveaux(E, top, bas, surBougies) {
     if (!pose) { E.sansPlace.push(L); E.cibles.push({ rects: [], zones, prio: 1, niveau: L, titre: titreN, texte: guideTexteNiveau(L, E.exp) }); continue; }
     yPrec = pose.y;
     L.etiq = { x, y: pose.y, w: wL, h: H, wR, lignes, enLigne, sansEtat, essentiel: !!L.essentiel };
-    etiquettesAFaire.push(() => { ctx.font = chartFont(9, poids); guidePastilleL(ctx, x, pose.y, wL, lignes, COLORS.accent2, H); });
+    etiquettesAFaire.push(() => { ctx.font = chartFont(9, poids); guidePastilleL(ctx, x, pose.y, wL, lignes, COLORS.accent2, H, 'niveau'); });
     E.cibles.push({ rects: [{ x0: x, y0: pose.y, x1: x + wR, y1: pose.y + h }], zones, prio: 1, niveau: L, titre: titreN, texte: guideTexteNiveau(L, E.exp) });
   }
 }
@@ -4955,21 +4968,21 @@ function guideBords(E, top, bas) {
     if (E.courtes) {
       const Ls = hors.concat(sans), fl = hors.length ? (sens > 0 ? '↑ ' : '↓ ') : '', proche = sens > 0 ? Ls : Ls.slice().reverse();
       for (const t of [fl + proche.map(L => L.repere).join(' · '), fl + proche[0].repere + (Ls.length > 1 ? ' +' + (Ls.length - 1) : '')])
-        if (ctx.measureText(t).width + 14 <= place) { lignes = [t]; break; }
-      if (!lignes) lignes = [guideCouper(ctx, fl + proche[0].repere, place - 14)];
+        if (ctx.measureText(t).width + 14 + ICO <= place) { lignes = [t]; break; }
+      if (!lignes) lignes = [guideCouper(ctx, fl + proche[0].repere, place - 14 - ICO)];
     }
-    if (!lignes) for (const v of [true, 'mini', 'micro']) { const t = texte(v); if (ctx.measureText(t).width + 14 <= place) { lignes = [t]; break; } }
+    if (!lignes) for (const v of [true, 'mini', 'micro']) { const t = texte(v); if (ctx.measureText(t).width + 14 + ICO <= place) { lignes = [t]; break; } }
     // Trois lignes au plus, sauf si l'étiquette nomme un chiffre publié : son heure n'est jamais
     // coupée (« … ») — elle prend les lignes qu'il lui faut.
     const publie = hors.concat(sans).some(L => L.niv.raisons.some(r => isNum(r.lu)));
-    if (!lignes) lignes = guideLignes(ctx, texte('micro'), place - 14, publie ? 0 : 3);
-    const w = Math.min(place, Math.max(...lignes.map(t => ctx.measureText(t).width)) + 14), h = lignes.length * H;
+    if (!lignes) lignes = guideLignes(ctx, texte('micro'), place - 14 - ICO, publie ? 0 : 3);
+    const w = Math.min(place, Math.max(...lignes.map(t => ctx.measureText(t).width)) + 14 + ICO), h = lignes.length * H;
     // Au bord de son côté, sinon au bord opposé (la flèche et les prix disent le côté) ; jamais
     // glissée au milieu des bandes, où elle se lirait comme le nom d'une voisine.
     const pose = guidePlacer(E.rects, x, w, h, [sens > 0 ? top + 2 : bas - h - 2], top, bas, sens > 0 ? 1 : -1, 0, 4)
       || guidePlacer(E.rects, x, w, h, [sens > 0 ? bas - h - 2 : top + 2], top, bas, sens > 0 ? -1 : 1, 0, 4);
     if (!pose) continue;
-    etiquettesAFaire.push(() => { ctx.font = chartFont(9, 600); guidePastilleL(ctx, x, pose.y, w, lignes, COLORS.accent2, H); });
+    etiquettesAFaire.push(() => { ctx.font = chartFont(9, 600); guidePastilleL(ctx, x, pose.y, w, lignes, COLORS.accent2, H, 'niveau'); });
     const Ls = hors.concat(sans);
     E.cibles.push({ rects: [guideZone(pose)], prio: 1, niveaux: Ls, lignes,
       titre: (hors.length ? (sens > 0 ? 'Au-dessus' : 'Au-dessous') + ' de la vue' : 'Bandes du graphique') + ' : ' + Ls.map(L => Guide.libelleNiveau(L.niv, exp ? 'expert' : 'debutant', unite, true)).join(' | '),
@@ -5011,7 +5024,7 @@ function guideChemins(E, top, bas, surBougies) {
     const bs = cotes.map(c => {
       let l = Guide.texteSuite(c.ch, mode, unite, chartInterval, G, v, c.sens);
       if (c.ch && v !== 'mini' && v !== 'repere' && (c.horsS || c.horsC)) l = l.concat([exp ? '(hors vue)' : '(niveau hors de la vue)']);
-      return { c, l, bw: Math.max(...l.map(t => ctx.measureText(t).width)) + 12, bh: l.length * 12 + 5 };
+      return { c, l, bw: Math.max(...l.map(t => ctx.measureText(t).width)) + 12 + ICO, bh: l.length * 12 + 5 };
     });
     // La boîte du chemin vers le haut reste AU-DESSUS de celle du chemin vers le bas (un ordre
     // inversé se lirait à l'envers) : l'une est posée, l'autre doit être de son côté ; puis
@@ -5035,7 +5048,7 @@ function guideChemins(E, top, bas, surBougies) {
   if (!boites) {
     ctx.font = chartFont(8.5, 600);
     const l = cotes.map(c => Guide.texteSuite(c.ch, mode, unite, chartInterval, G, E.courtes ? 'repere' : 'mini', c.sens).join(' '));
-    const bw = Math.max(...l.map(t => ctx.measureText(t).width)) + 12, bh = l.length * 12 + 5, bx = Math.max(g.pad.left + 2, Math.min(xFin + 2, xMax - bw - 2));
+    const bw = Math.max(...l.map(t => ctx.measureText(t).width)) + 12 + ICO, bh = l.length * 12 + 5, bx = Math.max(g.pad.left + 2, Math.min(xFin + 2, xMax - bw - 2));
     const r = guidePlacer(E.rects, bx, bw, bh, [y0 - bh - 8, y0 + 8, top + 4, bas - bh - 4], top, bas, 1, 0, 12, surBougies)
       || guidePlacer(E.rects, bx, bw, bh, [top + 4], top, bas, 1, 0, 30);
     if (!r) { E.chemins = { variante: null, boites: [] }; return; }    // 3. Ni l'un ni l'autre.
@@ -5081,21 +5094,21 @@ function guideChemins(E, top, bas, surBougies) {
         ctx.font = chartFont(taille, 600);
         ctx.globalAlpha = c.ch ? 1 : 0.9;
         ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(r.x, r.y, bw, bh, rE(4)); ctx.fill(); ctx.globalAlpha = 1;
-        ctx.fillStyle = c.ch ? coul : COLORS.ink3; ctx.fillRect(r.x + 2, r.y + 3, 2.5, bh - 6);
+        const d = etiqDebut(ctx, r.x, r.y + 2, bh - 4, c.ch ? coul : COLORS.ink3, 'suite', 13);
         ctx.fillStyle = c.ch ? COLORS.ink1 : COLORS.text;
-        l.forEach((t, k) => ctx.fillText(t, r.x + 7, r.y + 12 + k * 12));
+        l.forEach((t, k) => ctx.fillText(t, r.x + 7 + d, r.y + 12 + k * 12));
       });
-      E.cibles.push({ rects: [guideZone(r)], segs: segsDe(c), prio: 3, titre: titreDe(c), texte: [explication(c), commun] });
+      E.cibles.push({ rects: [guideZone(r)], segs: segsDe(c), prio: 3, ico: 'suite', titre: titreDe(c), texte: [explication(c), commun] });
     }
   } else {
     const { r, l, bw, bh } = commune;
     etiquettesAFaire.push(() => {
       ctx.font = chartFont(8.5, 600);
       ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(r.x, r.y, bw, bh, rE(4)); ctx.fill();
-      ctx.fillStyle = COLORS.ink3; ctx.fillRect(r.x + 2, r.y + 3, 2.5, bh - 6);
-      ctx.fillStyle = COLORS.ink1; l.forEach((t, k) => ctx.fillText(t, r.x + 7, r.y + 12 + k * 12));
+      const d = etiqDebut(ctx, r.x, r.y + 2, bh - 4, COLORS.ink3, 'suite', 13);
+      ctx.fillStyle = COLORS.ink1; l.forEach((t, k) => ctx.fillText(t, r.x + 7 + d, r.y + 12 + k * 12));
     });
-    E.cibles.push({ rects: [guideZone(r)], segs: [].concat(...cotes.map(segsDe)), prio: 3, titre: 'Et ensuite ? ' + cotes.map(c => Guide.texteSuite(c.ch, 'debutant', unite, chartInterval, G, 'court', c.sens).join(' ')).join(' ; '),
+    E.cibles.push({ rects: [guideZone(r)], segs: [].concat(...cotes.map(segsDe)), prio: 3, ico: 'suite', titre: 'Et ensuite ? ' + cotes.map(c => Guide.texteSuite(c.ch, 'debutant', unite, chartInterval, G, 'court', c.sens).join(' ')).join(' ; '),
       texte: cotes.map(explication).concat([commun]) });
   }
 }
@@ -5350,9 +5363,9 @@ function guideForme(E, f, surBougies) {
   ctx.font = chartFont(9, 650);
   let pose = null, lignes = null;
   for (const texte of E.courtes ? [Guide.libelleFormeCourt(f)] : Guide.libellesFormeExpert(f, b, ctxF, G)) {
-    const wT = ctx.measureText(texte).width + 14, place = xDroite - g.pad.left - 4;
+    const wT = ctx.measureText(texte).width + 14 + ICO, place = xDroite - g.pad.left - 4;
     const w = Math.min(wT, place);
-    lignes = w < wT ? guideLignes(ctx, texte, w - 12, 2) : [texte];
+    lignes = w < wT ? guideLignes(ctx, texte, w - 12 - ICO, 2) : [texte];
     // Écran étroit : le nom de la figure sur une ligne (le détail est dans la bulle).
     if (lignes.length > (g.pw < 520 ? 1 : 2)) continue;
     const h = lignes.length * hL;
@@ -5370,13 +5383,13 @@ function guideForme(E, f, surBougies) {
   // tracé, au-dessus de son dernier point, sans la règle des 120 px.
   if (!pose) {
     const V = E.courtes ? [Guide.libelleFormeCourt(f)] : Guide.libellesFormeExpert(f, b, ctxF, G), texte = V[V.length - 1];
-    const w = Math.min(ctx.measureText(texte).width + 14, xDroite - g.pad.left - 4);
-    lignes = [guideCouper(ctx, texte, w - 12)];
+    const w = Math.min(ctx.measureText(texte).width + 14 + ICO, xDroite - g.pad.left - 4);
+    lignes = [guideCouper(ctx, texte, w - 12 - ICO)];
     const x0 = Math.max(g.pad.left + 2, Math.min(tr.xd - w / 2, xDroite - w));
     for (const x of [x0, g.pad.left + 2, xDroite - w]) if ((pose = guidePlacer(E.rects, x, w, hL, [top + 2, bas - hL - 2], top, bas, 1, 0, 12))) break;
   }
   const entree = { f, tr, pose, lignes: pose ? lignes : null, v: null };
-  if (pose) etiquettesAFaire.push(() => { ctx.font = chartFont(9, 650); guidePastilleL(ctx, pose.x, pose.y, pose.w, lignes, tr.encre, hL); });
+  if (pose) etiquettesAFaire.push(() => { ctx.font = chartFont(9, 650); guidePastilleL(ctx, pose.x, pose.y, pose.w, lignes, tr.encre, hL, 'figure'); });
   E.figures.push(entree);
   E.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs: tr.segs, prio: 2, figure: entree, titre: Guide.titreForme(f, 'expert', ctxF),
     texte: Guide.texteFormeExpert(f, b, ctxF, G, unite, { concurrentes: Guide.concurrentes(R, f, G), tombees: Guide.tombees(R, 3, G.horizon) }) });
@@ -5401,15 +5414,16 @@ function guideRegimeBadge(E, x, W) {
   if (max < 40) return;
   // La forme pleine si elle tient, sinon la courte (régime, ADX, compression), coupée en dernier recours.
   let t = Guide.texteRegime(E.D.regime, E.mode, PARAM.guide);
-  if (ctx.measureText(t).width + 14 > max) t = Guide.texteRegime(E.D.regime, E.mode, PARAM.guide, true);
-  const tt = guideCouper(ctx, t, max - 14), w = Math.min(max, ctx.measureText(tt).width + 14);
+  if (ctx.measureText(t).width + 14 + ICO > max) t = Guide.texteRegime(E.D.regime, E.mode, PARAM.guide, true);
+  const tt = guideCouper(ctx, t, max - 14 - ICO), w = Math.min(max, ctx.measureText(tt).width + 14 + ICO);
   const r = E.D.regime, coul = r.cle === 'hausse' ? COLORS.candleUp : r.cle === 'baisse' ? COLORS.candleDown : COLORS.ink3;
-  guidePastille(ctx, x, 19, w, 15, tt, coul);
+  const ico = Icones.tendance(r.cle === 'hausse' ? 1 : r.cle === 'baisse' ? -1 : 0);
+  guidePastille(ctx, x, 19, w, 15, tt, coul, ico);
   const G = PARAM.guide, itv = Guide.nomIntervalle(chartInterval);
   const valeurs = r.cle === 'inconnu' ? 'Pas assez de bougies pour l’ADX.' : 'ADX ' + Math.round(r.adx) + ', +DI ' + Math.round(r.pdi) + ', −DI ' + Math.round(r.mdi)
     + (r.emaHaut === null ? '' : ', EMA ' + G.emaCourte + (r.emaHaut ? ' au-dessus de' : ' sous') + ' l’EMA ' + G.emaLongue) + ' (dernière bougie ' + itv + ' close).';
   // La règle en une ligne compacte (le détail et ses raisons : la fiche du régime).
-  E.cibles.push({ rects: [{ x0: x, y0: 17, x1: x + w, y1: 36 }], prio: 0, titre: Guide.texteRegime(r, 'debutant', G),
+  E.cibles.push({ rects: [{ x0: x, y0: 17, x1: x + w, y1: 36 }], prio: 0, ico, titre: Guide.texteRegime(r, 'debutant', G),
     texte: (E.exp ? [] : ['L’ADX mesure la force d’un mouvement, pas son sens. +DI et −DI disent quel côté domine.'])
       .concat([valeurs,
         'Règle : ADX ≥ ' + G.adxTendance + ' tendance, ≤ ' + G.adxSans + ' sans tendance, entre les deux faible. Sens : +DI/−DI et EMA ' + G.emaCourte + '/' + G.emaLongue + ' ; s’ils divergent, « sens incertain ».',
@@ -5435,7 +5449,7 @@ function guideCalque() {
     if (!L.etiq) continue;
     const et = L.etiq, hLib = et.lignes.length * et.h;
     // La ligne du prix live passe sur le libellé : il est reposé au-dessus d'elle.
-    if (yLive !== null && yLive > et.y - 3 && yLive < et.y + hLib + 3) guidePastilleL(cx, et.x, et.y, et.w, et.lignes, COLORS.accent2, et.h);
+    if (yLive !== null && yLive > et.y - 3 && yLive < et.y + hLib + 3) guidePastilleL(cx, et.x, et.y, et.w, et.lignes, COLORS.accent2, et.h, 'niveau');
     if (et.sansEtat) continue;   // écran étroit : l'état est dans la bulle
     // L'état : à droite du libellé, ou sur la ligne du dessous ; au téléphone, dans la bulle seulement.
     const x = et.enLigne ? et.x + et.w + 3 : et.x, yE = et.enLigne ? et.y : et.y + hLib, place = et.enLigne ? et.x + et.wR - x : et.wR;
@@ -5459,15 +5473,15 @@ function guideCalque() {
     const txt = Guide.lecture(Object.assign({ prix: isNum(livePrice) ? livePrice : null, unite: E.unite, choix: E.D.choix, enTest, regime: E.D.regime, forme,
       formeQuand: E.formeQuand, maintenant: !E.finVue }, V));
     cx.font = chartFont(10, 600);
-    const wMax = E.xMax - g.pad.left - 16 - 14;
+    const wMax = E.xMax - g.pad.left - 16 - 14 - ICO;
     if (!E.lectureCache || E.lectureCache.t !== txt) E.lectureCache = { t: txt, l: guideLignes(cx, txt, wMax, E.lectureLignes) };
     const lignes = E.lectureCache.l, h = lignes.length * 14 + 4;
-    const w = Math.max(...lignes.map(l => cx.measureText(l).width)) + 14;
+    const w = Math.max(...lignes.map(l => cx.measureText(l).width)) + 14 + ICO;
     cx.globalAlpha = 0.94; cx.fillStyle = COLORS.bulle;
     cx.beginPath(); cx.roundRect(g.pad.left + 2, E.lectureY, w, h, rE(5)); cx.fill(); cx.globalAlpha = 1;
-    cx.fillStyle = COLORS.accent2; cx.fillRect(g.pad.left + 4, E.lectureY + 3, 2.5, h - 6);
+    const d = etiqDebut(cx, g.pad.left + 2, E.lectureY, h, COLORS.accent2, 'lecture', 19);
     cx.fillStyle = COLORS.ink1;
-    lignes.forEach((l, k) => cx.fillText(l, g.pad.left + 11, E.lectureY + 13 + k * 14));
+    lignes.forEach((l, k) => cx.fillText(l, g.pad.left + 11 + d, E.lectureY + 13 + k * 14));
   }
   cx.restore();
 }
@@ -5514,10 +5528,10 @@ function debHaut(W, padL, padR) {
     let rangs = D ? 1 : 0, partage = false, wLigne = 0;
     if (ligne) {
       ctx.font = chartFont(DEB_POLICE_LIGNE, 650);
-      wLigne = ctx.measureText(ligne).width + 16;
+      wLigne = ctx.measureText(ligne).width + 16 + ICO;
       if (D) {
         const max = etroit ? P.phraseEtroit : P.phrase;
-        const mesure = taille => { ctx.font = chartFont(taille, 650); return t => ctx.measureText(t).width + 16; };
+        const mesure = taille => { ctx.font = chartFont(taille, 650); return t => ctx.measureText(t).width + 16 + ICO; };
         const rang = (V, px, m) => { const k = V.findIndex(t => t.length <= max && m(t) <= px); return k < 0 ? V.length : k; };
         // Partager la rangée seulement si la phrase y tient ENTIÈRE, à 11,5 px (la variante que
         // debPhraseChoisir prendrait sur toute la largeur, à 11,5 ou 10,5 px, sans coupure).
@@ -5629,12 +5643,12 @@ function guideDebutant(E) {
   // les libellés posés avant elle (scénario 1) l'évitent.
   const f0 = E.formes[0];
   E.debSegsPrevus = f0 ? guideSegsValide(E, { geo: guideFigureGeo(f0, f0.fin ? f0.jFin : candles.length - 1, null) }) : null;
-  E.ciblePhrase = { rects: [], prio: 0, titre: '', texte: [] };
+  E.ciblePhrase = { rects: [], prio: 0, ico: 'lecture', titre: '', texte: [] };
   E.cibles.push(E.ciblePhrase);
   E.itemPhrase = debItem('phrase', '', null);
   const etroit = g.pw < P.etroit, max = etroit ? P.niveauEtroit : P.niveau, surBougies = guideSurBougies(E);
   ctx.font = chartFont(10, 600);
-  const m = t => ctx.measureText(t).width + 14;
+  const m = t => ctx.measureText(t).width + 14 + ICO;
   const x0 = g.pad.left + 6, droite = (E.marge ? xFin : xMax) - 2;
   const yLive = isNum(livePrice) ? yDe(livePrice) : null;
   // Le style commun : chaque libellé prend le premier format qui tient ; si l'un perd le « · »,
@@ -5769,7 +5783,7 @@ function guideFormeDebutant(E, f, t, garder) {
   // clôture : une figure dont le nom ne trouve pas de place n'est pas dessinée (sauf `garder`).
   const possibles = Guide.libellesPossiblesDebutant(f, P.forme).concat([t]).filter(x => x.length <= P.forme);
   ctx.font = chartFont(10, 600);
-  const w = Math.max(...possibles.map(x => ctx.measureText(x).width)) + 14;
+  const w = Math.max(...possibles.map(x => ctx.measureText(x).width)) + 14 + ICO;
   // Géométrie sans dessin : un tracé « à blanc » pour connaître sa ligne et sa croix.
   const st0 = guideStyleFigure(f, R.n - 1, 'debutant');
   const geo = guideFigureGeo(f, f.fin ? f.jFin : candles.length - 1, null);
@@ -5799,7 +5813,7 @@ function guideFormeDebutant(E, f, t, garder) {
   // La clé « ? » (et l'astuce « Touchez une étiquette… ») évite la ligne qui valide, segment par segment (astucePlacer).
   if (debEtat) debEtat.eviteSegs = segsV;
   E.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs: tr.segs, prio: 2, figure: entree, titre: Guide.titreForme(f, 'debutant', ctxF), texte: Guide.texteFormeDebutant(f, b, ctxF, G, unite) });
-  if (pose) entree.item = debItem('forme', t, { x: pose.x, y: pose.y, w: Math.min(w, ctx.measureText(t).width + 14), h: H });
+  if (pose) entree.item = debItem('forme', t, { x: pose.x, y: pose.y, w: Math.min(w, ctx.measureText(t).width + 14 + ICO), h: H });
   // Sans place pour son nom : il passe dans la bulle de la phrase (une chute ne passe jamais inaperçue).
   else E.debNote = t + (f.fin ? ' — ' + Guide.marqueFin(f, ctxF, 'debutant', unite) : ' (touchez ou survolez le tracé pour le détail).');
   E.debForme = entree;
@@ -5848,7 +5862,7 @@ function guidePasseesCompte(E) {
     ctx.globalAlpha = 0.85; ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, rE(4)); ctx.fill(); ctx.globalAlpha = 1;
     ctx.fillStyle = COLORS.ink3; ctx.fillText(t, r.x + 6, r.y + r.h - 4);
   });
-  E.cibles.push({ rects: [guideZone(r)], prio: 4, titre: 'Figures passées', texte: [V[1] || V[0],
+  E.cibles.push({ rects: [guideZone(r)], prio: 4, ico: 'figure', titre: 'Figures passées', texte: [V[1] || V[0],
     'Marques : ✓ cible atteinte, ✗ invalidée ou annulée, – délai écoulé après la validation, ○ sans suite. Survolez une marque : la suite.',
     'Des exemples du passé, réussis ou non : pas un conseil.'] });
 }
@@ -5862,7 +5876,7 @@ function guidePasseeLibelle(E) {
   if (!t) return;
   const { g } = E, top = g.pad.top, bas = top + g.ph, H = 17;
   ctx.font = chartFont(10, 600);
-  const w = ctx.measureText(t).width + 14;
+  const w = ctx.measureText(t).width + 14 + ICO;
   const m = x.tr.marque, places = debPlacesFigure(E, x.f, x.tr.geo, w, H, m ? { x: m.x, y: m.y } : null);
   const surBougies = guideSurBougies(E), bandes = debSurBandes(E), surSegs = guideSurSegs(x.tr.segs);
   let pose = null;
@@ -5875,7 +5889,7 @@ function guidePasseeLibelle(E) {
   x.item = debItem('passee', t, { x: pose.x, y: pose.y, w, h: H });
   // Une pastille de figure passée : le trait de gauche et le texte en encre 2 (jamais la couleur
   // d'avertissement d'une figure en cours).
-  etiquettesAFaire.push(() => { ctx.font = chartFont(10, 600); guidePastilleDebutant(ctx, pose.x, pose.y, w, H, t, COLORS.ink3, COLORS.text); });
+  etiquettesAFaire.push(() => { ctx.font = chartFont(10, 600); guidePastilleDebutant(ctx, pose.x, pose.y, w, H, t, COLORS.ink3, COLORS.text, 'figure'); });
 }
 /** Le prix de la marque de fin d'une figure (Guide.marqueIssue : MARQUES_FIN, et ✓), ou null — jamais
  *  le prix de clôture, qui n'est pas un niveau de la figure : sans niveau, pas de marque sur le tracé.
@@ -5959,12 +5973,12 @@ function guideCalqueFormeDebutant(E) {
   if (!t || t.length > P.forme) t = x.t;
   cx.save();
   cx.font = chartFont(10, 600);
-  const w = Math.min(x.w, cx.measureText(t).width + 14);
+  const w = Math.min(x.w, cx.measureText(t).width + 14 + ICO);
   const vif = v && v.etiq;
   const coul = vif ? COLORS.warn : x.tr.encre;
   // Une figure tombée : son libellé pâlit avec son tracé (jamais sous 0,45 : il reste lisible).
   if (f.fin && isNum(x.st.k)) cx.globalAlpha = Math.max(0.45, Math.min(1, x.st.k));
-  guidePastilleDebutant(cx, x.pose.x, x.pose.y, w, x.h, t, coul, COLORS.ink1);
+  guidePastilleDebutant(cx, x.pose.x, x.pose.y, w, x.h, t, coul, COLORS.ink1, 'figure');
   cx.restore();
   if (x.item) { x.item.texte = t; x.item.rect = { x: x.pose.x, y: x.pose.y, w, h: x.h }; }
   x.texteVivant = t;
@@ -5976,12 +5990,12 @@ function debSurBandes(E) {
   return r => Z.some(([a, b]) => r.y < b && r.y + r.h > a);
 }
 /** Une pastille d'une ligne du Débutant : fond de bulle, trait de couleur à gauche, texte. */
-function guidePastilleDebutant(g, x, y, w, h, texte, coul, encre) {
+function guidePastilleDebutant(g, x, y, w, h, texte, coul, encre, ico) {
   g.fillStyle = COLORS.bulle;
   g.beginPath(); g.roundRect(x, y, w, h, rE(4)); g.fill();
-  g.fillStyle = coul; g.fillRect(x + 2, y + 3, 2.5, h - 6);
+  const d = etiqDebut(g, x, y, h, coul, ico);
   g.fillStyle = encre || COLORS.ink1;
-  g.fillText(texte, x + 8, y + h - 5);
+  g.fillText(texte, x + 8 + d, y + h - 5);
 }
 /** La phrase à poser : la plus riche qui tient (caractères et pixels) à 11,5 px, puis à 10,5 px ;
  *  la forme compacte en dernier recours. → { t, taille } */
@@ -5992,15 +6006,15 @@ function debPhraseChoisir(g, o, maxPx, etroit) {
   // prix monte et touche 86 133 $. » en 10,5 px plutôt que de perdre « touche » (ou la durée).
   for (const t of pleines) {
     if (t.length > max) continue;
-    for (const taille of [DEB_POLICE_PHRASE, 10.5]) { g.font = chartFont(taille, 650); if (g.measureText(t).width + 16 <= maxPx) return { t, taille }; }
+    for (const taille of [DEB_POLICE_PHRASE, 10.5]) { g.font = chartFont(taille, 650); if (g.measureText(t).width + 16 + ICO <= maxPx) return { t, taille }; }
   }
-  for (const taille of [DEB_POLICE_PHRASE, 10.5]) { g.font = chartFont(taille, 650); if (g.measureText(compacte).width + 16 <= maxPx) return { t: compacte, taille }; }
+  for (const taille of [DEB_POLICE_PHRASE, 10.5]) { g.font = chartFont(taille, 650); if (g.measureText(compacte).width + 16 + ICO <= maxPx) return { t: compacte, taille }; }
   // Une police large sur un écran étroit : le verbe seul (« Le prix monte. », « Le prix s’agite. »),
   // entier, plutôt qu'une phrase coupée au milieu d'un prix ; les repères ont leurs libellés.
   const verbe = compacte.replace(/(?:\.|\s*:)\s.*$/, '.');
-  for (const taille of [DEB_POLICE_PHRASE, 10.5]) { g.font = chartFont(taille, 650); if (verbe !== compacte && g.measureText(verbe).width + 16 <= maxPx) return { t: verbe, taille }; }
+  for (const taille of [DEB_POLICE_PHRASE, 10.5]) { g.font = chartFont(taille, 650); if (verbe !== compacte && g.measureText(verbe).width + 16 + ICO <= maxPx) return { t: verbe, taille }; }
   g.font = chartFont(10.5, 650);
-  return { t: guideCouper(g, compacte, maxPx - 16), taille: 10.5 };
+  return { t: guideCouper(g, compacte, maxPx - 16 - ICO), taille: 10.5 };
 }
 /** Calque, Débutant : l'état de chaque bande au prix live (couleur du trait, lueur de la bande
  *  quand le prix est dedans), les deux libellés, la phrase. Ne recalcule rien d'autre. */
@@ -6032,7 +6046,7 @@ function guideCalqueDebutant(E) {
     if (!L.etiq) continue;
     const mot = L.live.mot || '', r = Guide.raisonPrincipale(L.niv), vieux = vieuxPub && r && isNum(r.lu);
     const coul = vieux ? COLORS.ink3 : /^(demi|valide)/.test(mot) ? COLORS.ink1 : ['test', 'proche', 'meche', 'mecheCours', 'franchi'].includes(mot) ? COLORS.warn : COLORS.ink3;
-    guidePastilleDebutant(cx, L.etiq.x, L.etiq.y, L.etiq.w, L.etiq.h, L.etiq.t, coul, vieux ? COLORS.ink3 : COLORS.ink1);
+    guidePastilleDebutant(cx, L.etiq.x, L.etiq.y, L.etiq.w, L.etiq.h, L.etiq.t, coul, vieux ? COLORS.ink3 : COLORS.ink1, 'niveau');
   }
   // La phrase : une ligne, en haut à gauche du tracé ; la ligne des scénarios à sa droite si elles
   // partagent la rangée.
@@ -6048,12 +6062,12 @@ function guideCalqueDebutant(E) {
   }
   const { ph } = E.phraseCache;
   cx.font = chartFont(ph.taille, 650);
-  const w = Math.min(maxPx, cx.measureText(ph.t).width + 16), x = g.pad.left + 2, y = 8, h = 20;
+  const w = Math.min(maxPx, cx.measureText(ph.t).width + 16 + ICO), x = g.pad.left + 2, y = 8, h = 20;
   cx.globalAlpha = 0.94; cx.fillStyle = COLORS.bulle;
   cx.beginPath(); cx.roundRect(x, y, w, h, rE(5)); cx.fill(); cx.globalAlpha = 1;
-  cx.fillStyle = COLORS.accent2; cx.fillRect(x + 2, y + 3, 2.5, h - 6);
+  const d = etiqDebut(cx, x, y, h, COLORS.accent2, 'lecture');
   cx.fillStyle = COLORS.ink1;
-  cx.fillText(ph.t, x + 9, y + 14);
+  cx.fillText(ph.t, x + 9 + d, y + 14);
   cx.restore();
   if (E.ciblePhrase) { E.ciblePhrase.rects = [{ x0: x, y0: y, x1: x + w, y1: y + h }]; E.ciblePhrase.titre = ph.t; E.ciblePhrase.texte = E.phraseCache.texte.concat(E.debNote ? [E.debNote] : []); E.ciblePhrase.resume = E.phraseCache.resume; }
   if (E.itemPhrase) { E.itemPhrase.texte = ph.t; E.itemPhrase.rect = { x, y, w, h }; }
@@ -6094,6 +6108,8 @@ function guideCibleSous(x, y, mainH, etiquettesSeules) {
   }
   return c;
 }
+/** La famille d'une cible (l'icône de js/icones.js) : posée par sa cible, sinon tirée de ce qu'elle porte. */
+const icoCible = c => c.ico || (c.niveau || c.niveaux ? 'niveau' : c.figure || c.passee ? 'figure' : c.scenario ? 'scenario' : null);
 /** « Sur le graphique » (avec « Le détail » : etiqCourtes) : le texte entier de chaque repère
  *  court posé sur le tracé (le titre de sa bulle), du haut vers le bas ; toucher une ligne ouvre la
  *  bulle de ce repère sur le graphique. Rien n'est retiré : le graphique garde des repères courts,
@@ -6137,13 +6153,14 @@ function majReperes(W) {
   if (!voir) { reperesCibles = []; reperesCle = ''; if (!ul0.hidden) ouvrirReperes(false); return; }
   const E = guideEtat && overlays.guide ? guideEtat : null, Sc = scenEtat;
   const coul = c => c.coul || (c.niveau || c.niveaux ? COLORS.accent2 : c.figure ? c.figure.tr.encre : COLORS.ink3);
+  const ico = c => icoCible(c);
   const L = (E ? E.cibles : []).concat(Sc ? Sc.cibles : []).filter(c => c.titre && !c.evenement)
     .map(c => ({ c, p: reperesPoint(c) })).filter(x => x.p).sort((a, b) => a.p[1] - b.p[1])
     // Un repère à deux cibles (le libellé d'un scénario et sa zone) : une seule ligne, la plus haute.
     .filter((x, k, a) => a.findIndex(y => y.c.titre === x.c.titre) === k);
   reperesCibles = L.map(x => x.c);
   const R = syntheseLecture();
-  const cle = L.map(x => x.c.titre + '|' + coul(x.c)).join('\n') + '\n' + JSON.stringify(R);
+  const cle = L.map(x => x.c.titre + '|' + coul(x.c) + '|' + ico(x.c)).join('\n') + '\n' + JSON.stringify(R);
   if (cle === reperesCle) return;
   reperesCle = cle;
   const n = L.length;
@@ -6159,9 +6176,12 @@ function majReperes(W) {
     const li = document.createElement('li'), b = document.createElement('button'), t = document.createElement('span'), m = document.createElement('span');
     b.type = 'button'; b.dataset.k = k;
     if (reperesActif === x.c.titre) b.setAttribute('aria-current', 'true');
-    t.className = 'reperes-trait'; t.style.setProperty('--trait', coul(x.c));
+    // L'icône de sa famille (la même que sur le graphique), sinon le trait ; dans la couleur du repère.
+    const i = Icones.element(ico(x.c), 'reperes-ico');
+    if (i) { i.style.color = coul(x.c); b.title = Icones.NOMS[Icones.famille(ico(x.c))]; }
+    else { t.className = 'reperes-trait'; t.style.setProperty('--trait', coul(x.c)); }
     m.textContent = x.c.titre;
-    b.append(t, m); li.append(b); ul.append(li);
+    b.append(i || t, m); li.append(b); ul.append(li);
   });
 }
 /** « En résumé » (Guide.synthese) : tout ce que la page montre déjà (tendance, repère franchi,
@@ -6189,15 +6209,23 @@ function syntheseElement(R) {
   li.className = 'synthese ton-' + R.ton; li.id = 'synthese';
   li.append(el('p', 'synthese-tete', 'En résumé'), el('p', 'synthese-titre', R.titre));
   if (R.regle) li.append(el('p', 'synthese-regle', R.regle));
-  const liste = (titre, L) => {
+  // Chaque ligne : l'icône de la famille de son signal (tendance, repère, figure, scénario), dans
+  // la couleur de son sens ; sans famille, le trait de couleur.
+  const liste = (titre, L, fams) => {
     if (!L.length) return;
     li.append(el('p', 'synthese-sous', titre));
     const ul = el('ul', 'synthese-liste');
-    for (const x of L) { const e = el('li', typeof x === 'string' ? '' : 'sens-' + (x.sens > 0 ? 'haut' : x.sens < 0 ? 'bas' : 'neutre'), typeof x === 'string' ? x : x.texte); ul.append(e); }
+    L.forEach((x, k) => {
+      const fam = typeof x === 'string' ? fams && fams[k] : x.fam;
+      const e = el('li', typeof x === 'string' ? '' : 'sens-' + (x.sens > 0 ? 'haut' : x.sens < 0 ? 'bas' : 'neutre'), typeof x === 'string' ? x : x.texte);
+      const i = fam && Icones.element(fam === 'tendance' ? Icones.tendance(x.sens) : fam);
+      if (i) { e.classList.add('avec-ico'); e.prepend(i); e.title = Icones.NOMS[fam]; }
+      ul.append(e);
+    });
     li.append(ul);
   };
   liste('Pourquoi', R.pourquoi);
-  liste('À surveiller', R.surveiller);
+  liste('À surveiller', R.surveiller, R.surveillerFam);
   li.append(el('p', 'synthese-avert', R.avertissement));
   return li;
 }
@@ -6898,7 +6926,7 @@ function scenMarques(S, it, top, bas) {
     let pose = null, w = 0;
     if (!S.deb) {
       ctx.font = chartFont(8.5, 650);
-      w = ctx.measureText(m.texte).width + 10;
+      w = ctx.measureText(m.texte).width + 10 + ICO;
       const xs = [x + 7, x - 7 - w].filter(xx => xx >= g.pad.left + 2 && xx + w <= xMax - 2);
       for (const xx of xs) if ((pose = guidePlacer(S.rects, xx, w, 13, [y - 6.5, y - 20, y + 7], top, bas, 1, 0, 0))) { pose.x = xx; break; }
     }
@@ -6917,8 +6945,9 @@ function scenMarques(S, it, top, bas) {
       if (pose) {
         ctx.font = chartFont(8.5, 650);
         ctx.globalAlpha = 0.92; ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(pose.x, pose.y, w, 13, rE(3)); ctx.fill(); ctx.globalAlpha = 1;
-        ctx.fillStyle = c; ctx.fillRect(pose.x + 1.5, pose.y + 2.5, 2, 8);
-        ctx.fillStyle = COLORS.ink1; ctx.fillText(m.texte, pose.x + 6, pose.y + 10);
+        const ico = Icones.dessiner(ctx, 'scenario', pose.x + 2, pose.y + 2.5, 8, c);
+        if (!ico) { ctx.fillStyle = c; ctx.fillRect(pose.x + 1.5, pose.y + 2.5, 2, 8); }
+        ctx.fillStyle = COLORS.ink1; ctx.fillText(m.texte, pose.x + 6 + (ico ? ICO : 0), pose.y + 10);
       }
       ctx.restore();
     });
@@ -7108,15 +7137,15 @@ function scenLibelle(S, it, top, bas, surBougies) {
     : [...new Set((rai ? [exper + ' · ' + et.court + ' : ' + rai + ' · direct'] : []).concat(base.map(v => v + ' · ' + et.courtD), [nom + ' · ' + et.courtD, nom + ' · ' + et.miniD, nom + ' · ' + et.microD]))];
   const large = Math.min(place, g.pw * (g.pw < PARAM.scenarios.etroit ? 0.9 : 0.62));
   const texte = fleche => {
-    for (const v of variantes) if (ctx.measureText(fleche + v).width + 14 <= large) return fleche + v;
-    if (!it.ouvert) { const v = fleche + variantes[variantes.length - 1]; return ctx.measureText(v).width + 14 <= place ? v : null; }
-    return guideCouper(ctx, fleche + variantes[variantes.length - 1], place - 14);
+    for (const v of variantes) if (ctx.measureText(fleche + v).width + 14 + ICO <= large) return fleche + v;
+    if (!it.ouvert) { const v = fleche + variantes[variantes.length - 1]; return ctx.measureText(v).width + 14 + ICO <= place ? v : null; }
+    return guideCouper(ctx, fleche + variantes[variantes.length - 1], place - 14 - ICO);
   };
   // Collé à droite (avant la marge de futur), sinon à gauche de l'encadré, sinon au milieu du
   // tracé : toujours sur le trait de SON niveau ; sans les bougies d'abord, puis par-dessus.
   const B = S.boite;
   const poser = (t, essais, vers, evs) => {
-    const w = ctx.measureText(t).width + 14, xs = [droite - w];
+    const w = ctx.measureText(t).width + 14 + ICO, xs = [droite - w];
     if (B && B.x - 4 - w >= g.pad.left + 2) xs.push(B.x - 4 - w);
     xs.push(Math.max(g.pad.left + 2, (g.pad.left + droite) / 2 - w / 2));
     for (const ev of evs || [surBougies, null]) for (const x of xs) {
@@ -7136,7 +7165,7 @@ function scenLibelle(S, it, top, bas, surBougies) {
   if (!r && B && (hors < 0 ? B.y <= top + 40 : !hors && y >= B.y - H && y <= B.y + B.h + H) && (t = texte('↑ '))) r = poser(t, [B.y + B.h + 2], 1, [surBougies, scenRecentes(S)]);
   if (!r) return false;
   const c = it.coul;
-  etiquettesAFaire.push(() => { ctx.font = chartFont(9, 600); guidePastille(ctx, r.x, r.pose.y, r.w, H, r.t, c); });
+  etiquettesAFaire.push(() => { ctx.font = chartFont(9, 600); guidePastille(ctx, r.x, r.pose.y, r.w, H, r.t, c, 'scenario'); });
   S.propres.push({ x: r.x, y: r.pose.y, w: r.w, h: H });
   S.libelles.push({ rang: sc.rang, t: r.t });
   scenCible(S, it, [guideZone(r.pose)], [], [], 1);
@@ -7169,19 +7198,20 @@ function scenReperes(S, top, bas) {
     const rangs = [0, 1, 2, 3, 4].map(k => top + 2 + k * (H + 2)).concat([bas - H - 26, bas - H - 42]);
     let pose = null, nom = null, xl = 0, w = 0;
     for (const n of noms) {
-      w = ctx.measureText(n).width + 10;
+      w = ctx.measureText(n).width + 12 + ICO;
       for (const xc of [x + 3, x - 3 - w]) {
         if (xc < g.pad.left || xc + w > xMax) continue;
         if ((pose = guidePlacer(S.rects, xc, w, H, rangs, top, bas, 1, 0, 0))) { xl = xc; nom = n; break; }
       }
       if (pose) break;
     }
-    S.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs: [[x, top, x, bas]], prio: 3, coul: COLORS.ink3, titre: nomsTous[0], texte: [expl, exp ? 'Une description, pas une recommandation.' : 'Une description, pas un conseil.'] });
+    S.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs: [[x, top, x, bas]], prio: 3, coul: COLORS.ink3, ico: 'moment', titre: nomsTous[0], texte: [expl, exp ? 'Une description, pas une recommandation.' : 'Une description, pas un conseil.'] });
     if (!pose) continue;
     etiquettesAFaire.push(() => {
       ctx.font = chartFont(8.5, 650);
       ctx.globalAlpha = 0.92; ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(xl, pose.y, w, H, rE(3)); ctx.fill(); ctx.globalAlpha = 1;
-      ctx.fillStyle = COLORS.text; ctx.fillText(nom, xl + 5, pose.y + H - 4);
+      const ico = Icones.dessiner(ctx, 'moment', xl + 2.5, pose.y + 3, 8, COLORS.text);
+      ctx.fillStyle = COLORS.text; ctx.fillText(nom, xl + 5 + (ico ? ICO + 2 : 0), pose.y + H - 4);
     });
   }
 }
@@ -7260,14 +7290,14 @@ function scenBoite(S, top, bas) {
       if (l.f === 'note' && !l.toujours && (compact ? !(l.compact === compact || l.compact === 'bilan') : l.compact || l.garde < gardeMin)) continue;
       ctx.font = police(l.f);
       if (compact && l.compact === compact && RE.length) {
-        const ls = guideLignes(ctx, l.t + ' · ' + RE[RE.length - 1], wMax - 16, compact);
+        const ls = guideLignes(ctx, l.t + ' · ' + RE[RE.length - 1], wMax - 18, compact);
         if (!/…$/.test(ls[ls.length - 1])) { out.push(...ls.map(t => ({ t, f: l.f, h: hL(l.f) }))); continue; }
       }
-      if (court && l.tcs) { const v = l.tcs.find(x => ctx.measureText(x).width <= wMax - 16); if (v) { out.push({ t: v, f: l.f, it: l.it, h: hL(l.f) }); continue; } }
+      if (court && l.tcs) { const v = l.tcs.find(x => ctx.measureText(x).width <= wMax - 18); if (v) { out.push({ t: v, f: l.f, it: l.it, h: hL(l.f) }); continue; } }
       // La ligne de la journée et celle du temps restant : sur UNE ligne, la plus riche qui tient.
-      if (l.variantes) { const v = l.variantes.find(x => ctx.measureText(x).width <= wMax - 16) || l.variantes[l.variantes.length - 1]; out.push({ t: guideCouper(ctx, v, wMax - 16) || v, f: l.f, h: hL(l.f) }); continue; }
+      if (l.variantes) { const v = l.variantes.find(x => ctx.measureText(x).width <= wMax - 18) || l.variantes[l.variantes.length - 1]; out.push({ t: guideCouper(ctx, v, wMax - 18) || v, f: l.f, h: hL(l.f) }); continue; }
       const nMax = l.f === 'ligne' ? maxL : l.compact ? 1 : 2;
-      const ls = guideLignes(ctx, court && l.tc ? l.tc : l.t, wMax - 16, nMax);
+      const ls = guideLignes(ctx, court && l.tc ? l.tc : l.t, wMax - 18, nMax);
       for (const t of ls) out.push({ t, f: l.f, it: l.it, h: hL(l.f) });
     }
     return out;
@@ -7275,7 +7305,7 @@ function scenBoite(S, top, bas) {
   const mesurer = lignes => {
     let w = 0;
     for (const l of lignes) { ctx.font = police(l.f); w = Math.max(w, ctx.measureText(l.t).width); }
-    return { lignes, w: Math.min(wMax, Math.ceil(w) + (F ? 18 : 12)), h: lignes.reduce((a, l) => a + l.h, 0) + 8 };
+    return { lignes, w: Math.min(wMax, Math.ceil(w) + 18), h: lignes.reduce((a, l) => a + l.h, 0) + 8 };
   };
   // La forme SERRÉE (écrans de portable) : le titre, les états de tous les rangs sur une ligne
   // (« Suivi en direct : 1 · invalidé | 2 · rien de touché | … », deux lignes au plus), puis
@@ -7284,11 +7314,11 @@ function scenBoite(S, top, bas) {
   // (débutant : « classés sans pourcentage » au bout du titre) ; niveau −1 : le titre seul.
   const serrer = niveau => {
     const out = [];
-    const pousser = (t, f, max) => { ctx.font = police(f); for (const x of guideLignes(ctx, t, wMax - 16, max)) out.push({ t: x, f, h: hL(f) }); };
+    const pousser = (t, f, max) => { ctx.font = police(f); for (const x of guideLignes(ctx, t, wMax - 18, max)) out.push({ t: x, f, h: hL(f) }); };
     // Niveau 0, débutant : le classement sans pourcentage tient dans le titre (sur une ligne), s'il y tient.
     ctx.font = police('titre');
     const tSans = titreBoite + ' · classés sans pourcentage';
-    pousser(niveau === 0 && !exp && ctx.measureText(tSans).width <= wMax - 16 ? tSans : titreBoite, 'titre', 2);
+    pousser(niveau === 0 && !exp && ctx.measureText(tSans).width <= wMax - 18 ? tSans : titreBoite, 'titre', 2);
     const etats = Scenarios.ligneEtats(S.items, S.mode, large);
     const J = S.jour, nomJ = exp && J && J.cas === 'meneur' ? (Scenarios.nomNet(J) ? ' · écart min. : ' : J.remplace ? ' · nom repris : ' : ' · nom gardé : ') + J.meneur.sc.rang : exp && J && J.cas === 'tot' ? ' · trop tôt pour départager' : '';
     if (etats) pousser(etats + nomJ, 'etats', 2);
@@ -7461,7 +7491,7 @@ function scenBoite(S, top, bas) {
   // Écran court (téléphone) : la bulle garde les lignes, le bilan et ce qui est en direct ou
   // officiel, et renvoie à la fiche pour le reste (guideSurvol la prend si l'autre ne tient pas).
   const texteCourt = F ? scenTexteBoite(S, true, true) : null;
-  S.cibles.push({ rects: [resteRect], prio: replie || serre ? 0 : 1, coul: COLORS.accent, titre: titreBoite, texte, texteCourt });
+  S.cibles.push({ rects: [resteRect], prio: replie || serre ? 0 : 1, coul: COLORS.accent, ico: 'scenario', titre: titreBoite, texte, texteCourt });
 }
 /** L'explication de l'encadré (survol du titre ou des notes). sansBilan : la ligne du bilan est
  *  déjà dite (encadré replié) ; seule sa règle suit. court : la version des écrans courts — ce qui
@@ -7519,12 +7549,14 @@ function scenCalque() {
   cx.beginPath(); cx.roundRect(B.x, B.y, B.w, B.h, rE(5)); cx.fill(); cx.globalAlpha = 1;
   if (!B.seule) { cx.strokeStyle = avecAlpha(COLORS.accent, 0.5); cx.lineWidth = 1; cx.stroke(); }
   let y = B.y + 4, prec = null;
-  for (const l of B.lignes) {
+  for (const [k, l] of B.lignes.entries()) {
     cx.font = B.police(l.f);
+    // La 1re ligne (le titre) porte l'icône des scénarios de Claude ; chaque scénario, le trait de sa couleur.
+    if (!k && !l.it) Icones.dessiner(cx, 'scenario', B.x + 2.5, y + (l.h - 8) / 2 - 0.5, 8, B.seule ? COLORS.ink3 : COLORS.accent);
     if (l.it && l.it !== prec) { cx.fillStyle = l.it.coul; cx.fillRect(B.x + 5, y + 2.5, 3, l.h - 4); }
     if (l.it) prec = l.it;
     cx.fillStyle = l.f === 'note' || l.f === 'seule' ? COLORS.text : COLORS.ink1;
-    cx.fillText(l.t, B.x + (B.seule || B.replie ? 6 : 12), y + l.h - 3.5);
+    cx.fillText(l.t, B.x + 12, y + l.h - 3.5);
     y += l.h;
   }
   cx.restore();
@@ -7544,13 +7576,13 @@ function scenLigneDebutant(pw) {
   const J = L ? scenJour() : null;
   const items = J ? J.tous : L ? L.map(sc => ({ sc, sv: scenSuivi(sc) })) : [];
   ctx.font = chartFont(DEB_POLICE_LIGNE, 650);
-  const mesure = t => ctx.measureText(t).width + 16, maxPx = pw - 8;
+  const mesure = t => ctx.measureText(t).width + 16 + ICO, maxPx = pw - 8;
   // Pendant la journée : la ligne suit ce que la page recalcule (un fait d'abord, puis le scénario
   // au plus petit écart) ; les autres cas restent ceux de ligneBoiteDebutant.
   let t = Scenarios.ligneJourDebutant(F, J, items, now, max, PARAM.scenarios, mesure, maxPx);
   // Une note d'attente trop longue : coupée (caractères, puis pixels), jamais sur deux lignes.
   if (t.length > max) t = t.slice(0, max - 1).trimEnd() + '…';
-  if (mesure(t) > maxPx) t = guideCouper(ctx, t, maxPx - 16);
+  if (mesure(t) > maxPx) t = guideCouper(ctx, t, maxPx - 16 - ICO);
   return t;
 }
 /** Le titre de la bulle d'un scénario : « Scénario 1 de Claude ». */
@@ -7606,7 +7638,7 @@ function scenLibelleDebutant(S, it, top, bas) {
   const { g, yDe, xFin, xMax } = S, sc = it.sc, H = 17, P = PARAM.guide.debutant;
   if (S.xDeT(sc.fin) < g.pad.left) return false;
   ctx.font = chartFont(10, 600);
-  const m = t => ctx.measureText(t).width + 14;
+  const m = t => ctx.measureText(t).width + 14 + ICO;
   // Un range se nomme dans sa boîte (son bord haut, ou le haut du tracé si ce bord est au-dessus
   // de la vue) ; une flèche seulement quand la boîte entière est hors de la vue.
   const range = sc.forme === 'range';
@@ -7664,7 +7696,7 @@ function scenLibelleDebutant(S, it, top, bas) {
   }
   if (!pose) return false;
   const c = it.coul;
-  const dessin = () => { ctx.font = chartFont(10, 600); guidePastilleDebutant(ctx, xp, pose.y, w, H, t, c); };
+  const dessin = () => { ctx.font = chartFont(10, 600); guidePastilleDebutant(ctx, xp, pose.y, w, H, t, c, null, 'scenario'); };
   etiquettesAFaire.push(dessin);
   S.propres.push({ x: xp, y: pose.y, w, h: H });
   S.libelles.push({ rang: sc.rang, t });
@@ -7721,7 +7753,7 @@ function scenBoiteDebutant(S) {
   const x = Math.max(g.pad.left + 2, S.xMax - w - 2), y = memo.partage || !memo.phrase ? 8 : 30;
   const texte = scenTexteLigneDebutant(S);
   const titre = S.F ? Scenarios.titre(S.F, PARAM.scenarios, S.maintenant) : 'Scénarios du matin';
-  const cible = { rects: [{ x0: x, y0: y, x1: x + w, y1: y + h }], prio: 0, coul: COLORS.accent, titre, texte,
+  const cible = { rects: [{ x0: x, y0: y, x1: x + w, y1: y + h }], prio: 0, coul: COLORS.accent, ico: 'scenario', titre, texte,
     // Écran court : le bilan et le renvoi partent ; « (en direct) » et le journal restent, en une phrase.
     texteCourt: scenTexteCourtLigne(S, texte, true), resume: scenResumeLigneDebutant(S) };
   S.cibles.push(cible);
@@ -7768,9 +7800,9 @@ function scenLigneDessiner(B) {
   cx.font = chartFont(DEB_POLICE_LIGNE, 650);
   cx.globalAlpha = 0.94; cx.fillStyle = COLORS.bulle;
   cx.beginPath(); cx.roundRect(B.x, B.y, B.w, B.h, rE(5)); cx.fill(); cx.globalAlpha = 1;
-  cx.fillStyle = B.seule ? COLORS.ink3 : B.coulMontre || scenCouleur('1'); cx.fillRect(B.x + 2, B.y + 3, 2.5, B.h - 6);
+  const d = etiqDebut(cx, B.x, B.y, B.h, B.seule ? COLORS.ink3 : B.coulMontre || scenCouleur('1'), 'scenario');
   cx.fillStyle = B.seule ? COLORS.text : COLORS.ink1;
-  cx.fillText(B.texte, B.x + 9, B.y + 14);
+  cx.fillText(B.texte, B.x + 9 + d, B.y + 14);
   cx.restore();
 }
 /** Survol ou toucher du scénario 1 (Débutant) : sa zone d'invalidation, hachurée sur le calque —
