@@ -459,7 +459,7 @@ titre('8 bis. Cible et statistiques : la ligne courte de la bulle et le détail'
     check(`… détail : mêmes cibles, comptes du bilan (${St.taux && St.taux.atteints}/${St.taux && St.taux.finis}), ${St.dernieres.length} dernières (≤ 6, des plus récentes), sans mot banni ni conseil`,
       St.cibles.length === O.length && St.cibles.every((c, k) => c.p === O[k].p) && St.taux.atteints === x.atteints && St.taux.finis === finis(x) && St.taux.invalides === x.invalides
       && St.dernieres.length === Math.min(6, dern.length) && St.faible === (x.confirmes < P.echantillonFaible)
-      && /usage des analystes/.test(St.comment) && /rien ne la garantit/.test(St.comment) && St.risque.startsWith(G.RISQUE)
+      && /usage des analystes/.test(St.comment) && /rien ne la garantit/.test(St.comment) && /pas une prévision ni un conseil/.test(St.risque) && St.risque.length < 90
       && !G.motsBannis(txt).length && !CONSEIL.test(txt) && !/%/.test(txt), { St, bannis: G.motsBannis(txt) });
     const lig = Object.fromEntries(St.lignes);
     check(`… le détail reprend le bilan : repérées, validées, tombées avant, atteintes, annulées, délai écoulé`,

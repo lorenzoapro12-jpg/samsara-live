@@ -4807,9 +4807,9 @@ function guideTexteNiveau(L, exp) {
     return t;
   };
   return R.map(une).concat([
-    exp ? 'Bande ± ' + frN(G.bandeAtr) + ' × ATR ' + G.atrPeriode + ' (± ' + Guide.prix(L.niv.demi, unite) + ') autour de ses prix. Cassure : 2 clôtures ' + itv + ' hors bande, ou 1 + retour réussi.'
-      : 'La bande fait ± ' + Guide.prix(L.niv.demi, unite) + ' autour de ' + (R.length > 1 ? 'ses prix' : 'ce prix') + ' : ' + frN(G.bandeAtr) + ' fois l’ATR ' + G.atrPeriode + ', l’amplitude moyenne d’une bougie sur les ' + G.atrPeriode + ' dernières.',
-    exp ? '' : 'État lu sur les bougies ' + itv + ' closes (règle de travail) : « cassé » demande 2 clôtures successives hors de la bande, ou 1 clôture puis un retour réussi sur la bande ; une mèche seule = « percé en mèche ».'
+    exp ? 'Bande ± ' + Guide.prixRond(L.niv.demi, unite) + ' (' + frN(G.bandeAtr) + ' × ATR ' + G.atrPeriode + '). Cassure : 2 clôtures ' + itv + ' hors bande, ou 1 + retour réussi.'
+      : 'Bande de ± ' + Guide.prixRond(L.niv.demi, unite) + ' (' + frN(G.bandeAtr) + ' fois l’ATR ' + G.atrPeriode + ', l’écart moyen d’une bougie).',
+    exp ? '' : '« Cassé » : 2 clôtures ' + itv + ' de suite hors de la bande, ou 1 puis un retour réussi ; une mèche seule ne compte pas.'
       + (L.niv.raisons.some(r => r.lu) ? ' Pour un chiffre publié, seules les clôtures après sa lecture comptent.' : ''),
   ].filter(Boolean));
 }
@@ -5062,16 +5062,16 @@ function guideChemins(E, top, bas, surBougies) {
   // Les textes du survol.
   const pc = Guide.pctParam(G.distanceMax);
   const noms = (niv, rr) => rr.nom + ' ' + Guide.prixR(rr, unite) + Guide.tagLu(rr) + (niv.raisons.length > 1 ? ' — dans une bande de ' + niv.raisons.length + ' raisons' : '');
-  const dans = D.suite.dans ? ' Le prix est dans cette bande : les deux chemins partent de ses deux bords.' : '';
+  const dans = D.suite.dans ? ' Le prix est dans cette bande : les chemins partent de ses deux bords.' : '';
   const explication = c => {
     const ch = c.ch, sens = c.sens;
-    if (!ch) return 'Aucun niveau nommé (plus haut / plus bas d’hier ou des 24 h, zone de demi-tours, mur, option) à moins de ' + pc + ' % du prix ' + (sens > 0 ? 'au-dessus' : 'au-dessous') + ' : pas de chemin à dessiner de ce côté.';
+    if (!ch) return 'Aucun niveau nommé à moins de ' + pc + ' % ' + (sens > 0 ? 'au-dessus' : 'au-dessous') + ' : pas de chemin de ce côté.';
     if (exp) return 'Si clôture ' + itv + (sens > 0 ? ' > ' : ' < ') + 'seuil : ' + noms(ch.seuil, ch.rx) + '. ' + (ch.cible ? 'Niveau suivant : ' + noms(ch.cible, ch.ry) + '.' : 'Aucun autre niveau nommé à moins de ' + pc + ' %.');
-    return 'Si une bougie ' + itv + ' clôture ' + (sens > 0 ? 'au-dessus de ' : 'sous ') + Guide.prixR(ch.rx, unite) + ' (' + noms(ch.seuil, ch.rx) + '), '
-      + (ch.cible ? 'le niveau nommé suivant est ' + Guide.prixR(ch.ry, unite) + ' (' + noms(ch.cible, ch.ry) + ').' : 'aucun autre niveau nommé n’est proche.')
-      + (c.horsS || c.horsC ? ' Une partie de ce chemin sort de la vue : le prix du niveau est dans le texte.' : '');
+    return 'Si une bougie ' + itv + ' clôture ' + (sens > 0 ? 'au-dessus de ' : 'sous ') + Guide.prixR(ch.rx, unite) + ' (' + noms(ch.seuil, ch.rx) + ') : '
+      + (ch.cible ? 'niveau suivant ' + Guide.prixR(ch.ry, unite) + ' (' + noms(ch.cible, ch.ry) + ').' : 'aucun autre niveau proche.')
+      + (c.horsS || c.horsC ? ' Le chemin sort en partie de la vue.' : '');
   };
-  const commun = (exp ? 'Conditionnel, pas une prévision ; aucune probabilité calculée.' : 'Deux chemins CONDITIONNELS, pas une prévision : montrés ensemble, avec le même poids ; aucun n’est privilégié, aucune probabilité n’est calculée.') + dans;
+  const commun = (exp ? 'Conditionnel, pas une prévision ; aucune probabilité calculée.' : 'Deux chemins conditionnels, de même poids : pas une prévision, aucune probabilité.') + dans;
   const segsDe = c => { const s = []; if (c.pts) for (let k = 1; k < c.pts.length; k++) s.push([c.pts[k - 1][0], c.pts[k - 1][1], c.pts[k][0], c.pts[k][1]]); return s; };
   const titreDe = c => 'Et ensuite ? ' + Guide.texteSuite(c.ch, 'debutant', unite, chartInterval, G, 'plein', c.sens).join(' ');
   if (boites) {
@@ -5406,13 +5406,15 @@ function guideRegimeBadge(E, x, W) {
   const r = E.D.regime, coul = r.cle === 'hausse' ? COLORS.candleUp : r.cle === 'baisse' ? COLORS.candleDown : COLORS.ink3;
   guidePastille(ctx, x, 19, w, 15, tt, coul);
   const G = PARAM.guide, itv = Guide.nomIntervalle(chartInterval);
-  const valeurs = r.cle === 'inconnu' ? 'Pas assez de bougies pour l’ADX.' : 'Valeurs sur la dernière bougie ' + itv + ' close : ADX ' + Math.round(r.adx) + ', +DI ' + Math.round(r.pdi) + ', −DI ' + Math.round(r.mdi)
-    + (r.emaHaut === null ? '.' : ', EMA ' + G.emaCourte + (r.emaHaut ? ' au-dessus de' : ' sous') + ' l’EMA ' + G.emaLongue + '.');
+  const valeurs = r.cle === 'inconnu' ? 'Pas assez de bougies pour l’ADX.' : 'ADX ' + Math.round(r.adx) + ', +DI ' + Math.round(r.pdi) + ', −DI ' + Math.round(r.mdi)
+    + (r.emaHaut === null ? '' : ', EMA ' + G.emaCourte + (r.emaHaut ? ' au-dessus de' : ' sous') + ' l’EMA ' + G.emaLongue) + ' (dernière bougie ' + itv + ' close).';
+  // La règle en une ligne compacte (le détail et ses raisons : la fiche du régime).
   E.cibles.push({ rects: [{ x0: x, y0: 17, x1: x + w, y1: 36 }], prio: 0, titre: Guide.texteRegime(r, 'debutant', G),
-    texte: (E.exp ? [] : ['L’ADX mesure la FORCE d’un mouvement, pas son sens : au-dessus de ' + G.adxTendance + ' le prix avance nettement dans une direction, sous ' + G.adxSans + ' il hésite. +DI et −DI disent quel côté domine ; l’EMA ' + G.emaCourte + ' et l’EMA ' + G.emaLongue + ' sont les moyennes du prix sur ' + G.emaCourte + ' et ' + G.emaLongue + ' bougies.'])
+    texte: (E.exp ? [] : ['L’ADX mesure la force d’un mouvement, pas son sens. +DI et −DI disent quel côté domine.'])
       .concat([valeurs,
-        'Règle (convention) : ADX ≥ ' + G.adxTendance + ' = tendance, dont le sens se lit sur +DI/−DI et l’EMA ' + G.emaCourte + '/' + G.emaLongue + ' (s’ils divergent : « sens incertain ») ; ADX ≤ ' + G.adxSans + ' = sans tendance nette ; entre les deux = tendance faible.',
-        'Compression : bandes de Bollinger parmi les ' + G.bbPercentile + ' % les plus étroites des ' + G.bbFenetre + ' dernières bougies' + (E.exp ? '' : ' (les bandes s’écartent quand le prix bouge beaucoup, se resserrent quand il bouge peu)') + '. Un régime décrit le passé récent, il ne prédit pas la suite.']) });
+        'Règle : ADX ≥ ' + G.adxTendance + ' tendance, ≤ ' + G.adxSans + ' sans tendance, entre les deux faible. Sens : +DI/−DI et EMA ' + G.emaCourte + '/' + G.emaLongue + ' ; s’ils divergent, « sens incertain ».',
+        'Compression : bandes de Bollinger parmi les ' + G.bbPercentile + ' % les plus étroites des ' + G.bbFenetre + ' dernières bougies.',
+        'Décrit le passé récent, pas la suite.']) });
 }
 
 /** Calque : état de chaque niveau au prix LIVE, lecture du moment. Ne recalcule rien. */
@@ -5545,24 +5547,26 @@ function guidePresDebutant(L, E) {
  *  autres prix de sa bande Expert), son chemin (de CE repère au suivant), sa bande. */
 function guideTexteNiveauDebutant(L, E) {
   const out = [], R = L.niv.raisons, now = Horloges.maintenant(), pas = geoPrix && geoPrix.pas > 0 ? geoPrix.pas : 900;
-  if (Guide.optionsSeules(L.niv)) {
+  // Une seule raison : son nom et son prix sont dans le titre, la bulle ne les redit pas.
+  const seule = R.length === 1;
+  if (Guide.optionsSeules(L.niv) && !seule) {
     const lu = Math.max(...R.map(r => (isNum(r.lu) ? r.lu : -Infinity)));
-    out.push('Une estimation, tirée des contrats d’options de la plateforme Deribit' + (isFinite(lu) ? ', relevée ' + Guide.ageDebutant(lu, now) : '') + '.');
+    out.push('Une estimation, tirée des contrats d’options de la plateforme Deribit' + (isFinite(lu) ? ', relevée ' + Guide.ageLu(lu, now) : '') + '.');
   }
-  for (const r of R) out.push(Guide.origineDebutant(r, E.unite, now, pas));
+  for (const r of R) out.push(Guide.origineDebutant(r, E.unite, now, pas, seule));
   // Le « Haut des 24 h » du graphique (bougies, en direct) et celui de la carte des infos du marché
   // (publié, 24 h glissantes de Binance) peuvent différer : la bulle dit pourquoi.
   if (activeSymbol === 'BTCUSDT' && R.some(r => /^h24_/.test(r.cle)))
-    out.push('La carte « Fourchette des 24 h » des infos du marché peut dire un autre chiffre : elle est publiée à heure fixe, et ses 24 h ne commencent pas à la même minute que celles de ce graphique.');
+    out.push('La carte « Fourchette des 24 h » peut dire un autre chiffre : ses 24 h ne commencent pas à la même minute.');
   // « Tout près » : les autres prix de sa bande Expert À CÔTÉ de ce repère seulement — à moins
   // d'une demi-bande (au moins 0,25 × ATR), du même côté du prix, jamais l'autre repère de l'écran
   // ni le repère suivant (une bande fusionnée de 200 $ qui enjambe le prix appelait « tout près »
-  // le repère de l'autre côté).
-  const pres = guidePresDebutant(L, E);
-  if (pres.length) out.push('Tout près : ' + pres.map(r => Guide.nomPhrase(r) + ' (' + Guide.prixR(r, E.unite) + ')').join(', ') + '.');
-  out.push(Guide.texteSuiteDebutant(debChemin(L.niv, L.suivant, L.niv.dessus ? 1 : -1), E.unite, chartInterval, L.niv.dessus ? 1 : -1, now));
-  out.push('La bande couvre ' + Guide.prixRond(L.niv.demi, E.unite) + ' de part et d’autre de ce prix : le prix réagit rarement au dollar près.');
-  out.push('Une description, pas une recommandation.');
+  // le repère de l'autre côté). Un prix égal à celui du repère n'est pas redit.
+  const pres = guidePresDebutant(L, E), rP = Guide.raisonPrincipale(L.niv), memePrix = r => !!rP && Guide.prixR(r, E.unite) === Guide.prixR(rP, E.unite);
+  if (pres.length) out.push('Tout près : ' + pres.map(r => Guide.nomPhrase(r) + (memePrix(r) ? '' : ' (' + Guide.prixR(r, E.unite) + ')')).join(', ') + '.');
+  out.push(Guide.texteSuiteDebutant(debChemin(L.niv, L.suivant, L.niv.dessus ? 1 : -1), E.unite, chartInterval, L.niv.dessus ? 1 : -1, now, true));
+  out.push('Bande de ± ' + Guide.prixRond(L.niv.demi, E.unite) + ' : le prix réagit rarement au dollar près.');
+  out.push(Guide.AVERTISSEMENT);
   return out;
 }
 /** Le résumé de la bulle de la phrase (1er toucher) : le sens des mots employés, sans chiffre. */
@@ -5583,35 +5587,26 @@ function guideTextePhraseDebutant(E, phrase) {
   const D = E.D, r = D.regime || { cle: 'inconnu' }, G = PARAM.guide, itv = chartInterval, now = Horloges.maintenant();
   const per = Guide.PERIODE_DEBUTANT[itv] || ['une période', '2 périodes', 'cette période', 'périodes'];
   const pas = geoPrix && geoPrix.pas > 0 ? geoPrix.pas : 900, n = PARAM.adx.periode;
-  // La fenêtre de l'ADX (lissé deux fois : les bougies plus anciennes comptent un peu aussi).
-  const sur = 'surtout sur les ' + n + (/^une /.test(per[0]) ? ' dernières ' : ' derniers ') + per[3] + (Guide.environ(n * pas) ? ' (' + Guide.environ(n * pas) + ')' : '');
+  // La fenêtre de l'ADX (lissé deux fois : les bougies plus anciennes comptent un peu aussi), en durée.
+  const env = Guide.environ(n * pas), sur = env ? 'sur ' + env + ', ' : '';
   // « Monte » et « Baisse » demandent aussi la moyenne courte du bon côté de la longue (Guide.regime).
-  const long = ', et la tendance plus longue va dans le même sens';
+  const long = ', comme la tendance plus longue';
   const out = [];
   if (/touche/.test(phrase)) out.push('« Touche » : le prix est en ce moment dans la bande de ce repère.');
-  if (/est passé/.test(phrase)) out.push('« Est passé » : ' + per[1] + ' de suite ont fini au-delà de ce repère (la règle de la page pour dire « franchi »).');
+  if (/est passé/.test(phrase)) out.push('« Est passé » : ' + per[1] + ' de suite ont fini au-delà de ce repère.');
   // Le sens du verbe, seulement s'il est dans la phrase affichée (sinon : ce que dit le mouvement).
   const verbe = Guide.VERBE_DEBUTANT[r.cle], dit = verbe && new RegExp('\\b' + verbe + '\\b').test(phrase);
-  out.push((dit ? {
-    hausse: '« Monte » : ' + sur + ', le prix a pris une direction nette vers le haut' + long + '.',
-    baisse: '« Baisse » : ' + sur + ', le prix a pris une direction nette vers le bas' + long + '.',
-    faible: '« Hésite » : ' + sur + ', le mouvement n’a pas de direction nette.',
-    sans: '« Hésite » : ' + sur + ', le mouvement n’a pas de direction nette.',
-    incertaine: '« S’agite » : ' + sur + ', le prix bouge nettement, mais sans sens clair.',
-  } : {
-    hausse: 'Le mouvement : ' + sur + ', le prix a pris une direction nette vers le haut' + long + '.',
-    baisse: 'Le mouvement : ' + sur + ', le prix a pris une direction nette vers le bas' + long + '.',
-    faible: 'Le mouvement : ' + sur + ', le prix n’a pas de direction nette.',
-    sans: 'Le mouvement : ' + sur + ', le prix n’a pas de direction nette.',
-    incertaine: 'Le mouvement : ' + sur + ', le prix bouge nettement, mais sans sens clair.',
-  })[r.cle] || 'Pas encore assez d’historique sur ce graphique pour dire si le prix monte ou baisse.');
+  const tete = dit ? '« ' + verbe.charAt(0).toUpperCase() + verbe.slice(1) + ' » : ' : 'Le mouvement : ';
+  const sens = { hausse: 'le prix va nettement vers le haut' + long, baisse: 'le prix va nettement vers le bas' + long,
+    faible: 'le prix n’a pas de direction nette', sans: 'le prix n’a pas de direction nette', incertaine: 'le prix bouge nettement, sans sens clair' }[r.cle];
+  out.push(sens ? tete + sur + sens + '.' : 'Pas encore assez d’historique pour dire si le prix monte ou baisse.');
   if (isNum(var24Courant) && ((r.cle === 'hausse' && var24Courant < 0) || (r.cle === 'baisse' && var24Courant > 0)))
-    out.push('La variation en haut de l’écran (' + texteVar24(var24Courant, true) + ') porte sur 24 h : sur une durée plus courte, le prix peut aller dans l’autre sens.');
-  if (r.compression) out.push('Le prix bouge peu en ce moment, moins que d’habitude sur les ' + Guide.dernieres(G.bbFenetre * pas) + '.');
+    out.push('La variation en haut (' + texteVar24(var24Courant, true) + ') porte sur 24 h : sur moins long, le sens peut changer.');
+  if (r.compression) out.push('Le prix bouge moins que d’habitude ces ' + Guide.dernieres(G.bbFenetre * pas) + '.');
   // Les deux chemins partent des deux repères de l'écran (aucun autre seuil).
   const S = E.debSel || {};
   out.push(Guide.texteSuiteDebutant(debChemin(S.dessus, S.suivantHaut, 1), E.unite, itv, 1, now), Guide.texteSuiteDebutant(debChemin(S.dessous, S.suivantBas, -1), E.unite, itv, -1, now));
-  out.push('Une description, pas une recommandation.');
+  out.push(Guide.AVERTISSEMENT);
   return out;
 }
 /** Les bougies visibles, gêne « douce » des étiquettes du Guide (essayées d'abord sans les couvrir). */
@@ -5854,8 +5849,8 @@ function guidePasseesCompte(E) {
     ctx.fillStyle = COLORS.ink3; ctx.fillText(t, r.x + 6, r.y + r.h - 4);
   });
   E.cibles.push({ rects: [guideZone(r)], prio: 4, titre: 'Figures passées', texte: [V[1] || V[0],
-    'Chaque figure passée garde la marque de son issue : ✓ cible atteinte, ✗ invalidée ou annulée, – délai écoulé après la validation, ○ sans suite. Survolez ou touchez sa marque : ce qui s’est passé ensuite.',
-    Guide.RISQUE + ' Des exemples du passé, réussis ou non : pas une prévision ni une recommandation.'] });
+    'Marques : ✓ cible atteinte, ✗ invalidée ou annulée, – délai écoulé après la validation, ○ sans suite. Survolez une marque : la suite.',
+    'Des exemples du passé, réussis ou non : pas un conseil.'] });
 }
 /** Lisible : le libellé de la figure passée (« ✓ Double creux : cible »), près de sa marque, s'il
  *  reste une place dans le budget des textes (PARAM.guide.debutant.items) une fois tout le reste
@@ -6241,16 +6236,17 @@ function resumeBulle(texte, largeur, lignesLibres, nombresLibres) {
  *  bulle) ; la phrase, les scénarios et leur ligne ont le leur (c.resume) ; sinon, le texte. */
 function sourceResume(c, vivant, texte) {
   if (c.niveau && c.niveau.niv) return [[Guide.quoiDebutant(Guide.raisonPrincipale(c.niveau.niv))], [Guide.ouEstPrixDebutant(c.niveau.live, c.niveau.niv, livePrice)]];
-  // Une figure, une figure passée, un scénario (son libellé, sa ligne) : la ligne du risque en
-  // dernier, si elle tient (sinon elle est au détail, au 2e toucher).
+  // Un scénario (son libellé, sa ligne) : la ligne du risque en dernier, si elle tient (sinon elle
+  // est au détail, au 2e toucher). Une figure, une figure passée : la ligne d'accès au détail dit
+  // déjà « pas une prévision » (charte du 12/10/2026 : l'avertissement une fois).
   const risque = [[Guide.RISQUE]];
   if (c.figure) {
     const vu = (String(texte[vivant ? 1 : 0] || '').match(/^.*?\.(?=\s|$)/) || [''])[0].replace(/^[^:]{2,40} : /, ''), maj = t => t.charAt(0).toUpperCase() + t.slice(1);
-    return [[vivant], [vu ? maj(vu) : '']].concat(risque);
+    return [[vivant], [vu ? maj(vu) : '']];
   }
   if (!c.resume) return null;
   const R = c.resume.map(p => (Array.isArray(p) ? p : [p]));
-  return c.passee || (scenEtat && scenEtat.cibles.includes(c)) ? R.concat(risque) : R;
+  return scenEtat && scenEtat.cibles.includes(c) ? R.concat(risque) : R;
 }
 /** La bulle d'une cible, près du curseur, toujours dans le tracé. */
 function guideBulle(c, W, mainH, evite) {
@@ -6323,7 +6319,7 @@ function guideBulle(c, W, mainH, evite) {
   if (hDe(aplatir(paras)) > hMax) sep = 5;
   if (hDe(aplatir(paras)) > hMax && c.texteCourt) { paras = decouper(c.texteCourt); sep = hC; if (hDe(aplatir(paras)) > hMax) sep = 5; }
   if (hDe(aplatir(paras)) > hMax) {
-    const dernier = (debutant() ? /recommandation|conseil/ : /recommandation/).test(paras[paras.length - 1].join(' ')) ? paras[paras.length - 1] : null;
+    const dernier = /recommandation|conseil/.test(paras[paras.length - 1].join(' ')) ? paras[paras.length - 1] : null;
     const suite = guideLignes(cx, '… (suite : fiche dans les Légendes, bouton ?)', bw - 20);
     const garde = [];
     for (const p of dernier ? paras.slice(0, -1) : paras) {

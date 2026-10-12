@@ -645,8 +645,8 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     const tr = { type: 'triangle_symetrique', hautL: { a: 84000, b: -10 }, basL: { a: 82000, b: 10 }, hauteur: 1900, apex: 100, demi: true, demiSens: -1, jDemi: 40, debut: 5 };
     const b = { type: 'double_sommet', formes: 6, confirmes: 3, atteints: 1, invalides: 1, expires: 0, haut: 1, bas: 2, ebauches: { n: 0, devenues: 0, confirmees: 0 }, temoin: { departs: 300, atteints: 90 } };
     const ec = [[ds, '15m'], [dc, '1h'], [rg, '15m'], [tr, '4h']].map(([f, itv]) => t(G.texteFormeDebutant(f, b, { duree: 5 * 86400, itv, j: 41 }, P, '$').join(' ')));
-    check('en train de se dessiner : « Double sommet possible : le prix a buté deux fois entre 86 350 et 86 400 $. La figure serait validée si le prix finit 2 quarts d’heure de suite sous 85 700 $ (le creux entre les sommets). »',
-      /^Double sommet possible : le prix a buté deux fois entre 86 350 et 86 400 \$\. La figure serait validée si le prix finit 2 quarts d’heure de suite sous 85 700 \$ \(le creux entre les sommets\)\./.test(ec[0]), ec[0]);
+    check('en train de se dessiner : « Double sommet possible : le prix a buté deux fois entre 86 350 et 86 400 $. La figure serait validée si le prix finit 2 quarts d’heure de suite sous 85 700 $ (le creux entre les sommets) ; un court retour entre les deux compte aussi. »',
+      /^Double sommet possible : le prix a buté deux fois entre 86 350 et 86 400 \$\. La figure serait validée si le prix finit 2 quarts d’heure de suite sous 85 700 \$ \(le creux entre les sommets\) ; un court retour entre les deux compte aussi\./.test(ec[0]), ec[0]);
     check('… à valider : « s’il finit encore une heure au-dessus, la figure sera validée » ; rectangle : « entre 82 900 et 83 500 $ » ; sortie : « s’il revient franchement dedans, la sortie ne compte pas »',
       /^Double creux à valider : .*s’il finit encore une heure au-dessus, la figure sera validée\./.test(ec[1]) && /Prix dans un rectangle : il fait des allers-retours entre 82 900 et 83 500 \$/.test(ec[2])
       && /^Triangle qui se resserre : .*Le prix vient de sortir par le bas \(.*s’il revient franchement dedans, la sortie ne compte pas\./.test(ec[3]), ec);
@@ -657,10 +657,16 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
   // 5. La suite, en une phrase : « Si le prix finit un quart d'heure au-dessus de … ».
   const s2 = G.suite({ dessus: [N(Rd('hier_haut', 86398)), N(Rd('mur_vente', 86700, { lu: Date.parse('2026-10-08T22:51:00Z') }))], dessous: [bas] }, 86012.5);
   const sh = t(G.texteSuiteDebutant(s2.haut, '$', '15m', 1, Date.parse('2026-10-08T22:52:00Z'))), sb = t(G.texteSuiteDebutant(s2.bas, '$', '4h', -1)), sv = t(G.texteSuiteDebutant(null, '$', '15m', 1));
-  check('suite : « Si le prix finit un quart d’heure au-dessus de 86 398 $ (plus haut d’hier), le repère suivant est 86 700 $ (mur de vente, relevé il y a 1 min). »',
-    sh === 'Si le prix finit un quart d’heure au-dessus de 86 398 $ (plus haut d’hier), le repère suivant est 86 700 $ (mur de vente, relevé il y a 1 min).', sh);
-  check('suite : la durée suit l’intervalle (« une tranche de 4 h ») ; sans repère suivant, dit ; côté vide, dit', /^Si le prix finit une tranche de 4 h sous 85 900 \$ \(mur d’achat\), aucun autre repère n’est proche de ce côté\.$/.test(sb)
-    && sv === 'Aucun repère proche au-dessus : pas de suite à décrire de ce côté.', [sb, sv]);
+  check('suite : « Si le prix finit un quart d’heure au-dessus de 86 398 $ (plus haut d’hier) : prochain repère 86 700 $ (mur de vente, relevé il y a 1 min). »',
+    sh === 'Si le prix finit un quart d’heure au-dessus de 86 398 $ (plus haut d’hier) : prochain repère 86 700 $ (mur de vente, relevé il y a 1 min).', sh);
+  // Un chiffre publié il y a moins d'une minute : pas de « relevé il y a 0 min » (rien de plus à dire).
+  const s0 = t(G.texteSuiteDebutant(s2.haut, '$', '15m', 1, Date.parse('2026-10-08T22:51:30Z')));
+  check('suite : un chiffre publié il y a moins d’une minute ne dit pas « il y a 0 min »', s0 === 'Si le prix finit un quart d’heure au-dessus de 86 398 $ (plus haut d’hier) : prochain repère 86 700 $ (mur de vente).', s0);
+  // Dans la bulle du repère lui-même (seuilDit) : son nom et son prix sont dans le titre, pas redits.
+  const sd = t(G.texteSuiteDebutant(s2.haut, '$', '15m', 1, Date.parse('2026-10-08T22:52:00Z'), true));
+  check('suite, bulle du repère : la condition sans redire le repère du titre', sd === 'Si le prix finit un quart d’heure au-dessus : prochain repère 86 700 $ (mur de vente, relevé il y a 1 min).', sd);
+  check('suite : la durée suit l’intervalle (« une tranche de 4 h ») ; sans repère suivant, dit ; côté vide, dit', /^Si le prix finit une tranche de 4 h sous 85 900 \$ \(mur d’achat\) : aucun autre repère proche\.$/.test(sb)
+    && sv === 'Aucun repère proche au-dessus.', [sb, sv]);
   check('suite et forme : aucun mot banni, aucun conseil', ![sh, sb, sv].concat(fo.map(f => f[1] || '')).some(x => G.motsBannis(x).length || CONSEIL.test(x)));
   // 6. Les écarts en dollars : à l'unité près dès 10 $.
   check('prixRond : « 84 $ » (pas « 83,57 $ »), « 24 $ », « 3,50 $ » sous 10 $', G.prixRond(83.57) === '84 $' && G.prixRond(-24) === '24 $' && G.prixRond(3.5) === '3,50 $', [G.prixRond(83.57), G.prixRond(-24), G.prixRond(3.5)]);
