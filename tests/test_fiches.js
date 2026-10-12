@@ -150,8 +150,10 @@ check('ratio affiché « 1,00 » (L/S, carnet) : « Autant de… », jamais « P
     && /« Choisir l’affichage »/.test(T.FICHES.guide.simpleDeb) && !/« \+ (Affichage|Indicateurs) »/.test(T.FICHES.guide.simpleDeb) && /pas de badge/.test(T.FICHES.guide_regime.simpleDeb) && /rien n’est dessiné/.test(T.FICHES.guide_suite.simpleDeb));
   const fg = T.ficheHtml('guide_regime');
   const plusG = fg.slice(fg.indexOf('<details class="fiche-plus">'));
-  check('fiche avec texte simple : la phrase courte en gras en tête, sans classe ; le titre simple ; sous « En savoir plus », le texte entier simple, l’explication technique et le titre technique', /<p class="fiche-simple fiche-quoi"><b>/.test(fg) && !/fiche-simple expert-seul|debutant-seul/.test(fg.slice(0, fg.indexOf('<details class="fiche-plus">')))
-    && plusG.includes(esc(T.FICHES.guide_regime.simpleDeb)) && plusG.includes(esc(T.FICHES.guide_regime.simple)) && plusG.includes(esc(T.FICHES.guide_regime.titre)) && /<h3 class="fiche-titre">Le mouvement du prix<\/h3>/.test(fg), fg.slice(0, 400));
+  // Charte du 12/10/2026 : « En savoir plus » n'ajoute que du neuf — ce que montre l'écran calme
+  // (simpleDeb du Guide) et le titre technique ; la définition `simple`, redite de la ligne courte, n'y est plus.
+  check('fiche avec texte simple : la phrase courte en gras en tête, sans classe ; le titre simple ; sous « En savoir plus », ce que montre l’écran calme et le titre technique, sans redire la définition', /<p class="fiche-simple fiche-quoi"><b>/.test(fg) && !/fiche-simple expert-seul|debutant-seul/.test(fg.slice(0, fg.indexOf('<details class="fiche-plus">')))
+    && plusG.includes(esc(T.FICHES.guide_regime.simpleDeb)) && !plusG.includes(esc(T.FICHES.guide_regime.simple)) && plusG.includes(esc(T.FICHES.guide_regime.titre)) && /<h3 class="fiche-titre">Le mouvement du prix<\/h3>/.test(fg), fg.slice(0, 400));
   // Autre paire : les cartes du Débutant nomment le bitcoin (le fichier ne suit que lui).
   const sym = T.activeSymbol;
   T.activeSymbol = 'SOLUSDT';
@@ -164,7 +166,7 @@ check('ratio affiché « 1,00 » (L/S, carnet) : « Autant de… », jamais « P
   const dB = rendre(null);
   check('BTC/USDT : « le prix publié », pas de mention « Ces infos parlent du bitcoin » ; haut et bas publiés dits « publié »', !/Ces infos parlent du bitcoin/.test(dB) && /le prix publié est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(dB) && !/bitcoin est (dans le haut|dans le bas|au milieu)/.test(dB) && /Haut publié/.test(dB) && /Bas publié/.test(dB));
 }
-check('chaque fiche se termine par « ce n’est pas une recommandation »', Object.keys(T.FICHES).every(k => /pas une recommandation/.test(T.ficheHtml(k))));
+check('chaque fiche se termine par « Une description, pas un conseil. » (une ligne, une fois)', Object.keys(T.FICHES).every(k => /<p class="fiche-pied">Une description, pas un conseil\.<\/p>$/.test(T.ficheHtml(k)) && (T.ficheHtml(k).match(/pas un conseil/g) || []).length === 1));
 
 // ── 6. Chaque bouton « i » ouvre une fiche qui existe ────────────────────────
 titre('6. Les boutons de la page pointent vers des fiches existantes');
@@ -275,8 +277,10 @@ titre('10. Les nombres des textes sont LUS (PARAM, meta.champs, CADENCES, carte 
   const table = nom => { const i = src.indexOf('const ' + nom + ' = {'); if (i < 0) return null; let k = src.indexOf('{', i), n = 0; const d = k;
     do { n += { '{': 1, '}': -1 }[src[k]] || 0; k++; } while (n && k < src.length); return src.slice(d, k); };
   const UNITE = /\d+(?:[,.]\d+)?\s*(?:%|\$|h\b|min\b|minutes?\b|s\b|secondes?\b|bougies?\b|jours?\b|heures?\b|semaines?\b|mois\b|BTC\b|ATR\b)/;
-  const enDur = ['TRADERS', 'CALCUL', 'USAGES', 'COURT'].flatMap(nom => { const b = table(nom); return b === null ? [nom + ' introuvable'] : (b.match(/'(?:[^'\\\n]|\\.)*'/g) || []).filter(t => UNITE.test(t)).map(t => nom + ' : ' + t); });
-  check('TRADERS, CALCUL, USAGES, COURT : aucun nombre avec unité écrit en dur', !enDur.length, enDur);
+  // TRADERS a rejoint COURT le 12/10/2026 (une seule version de l'usage des traders).
+  check('l’usage des traders n’a qu’une version : celle des lignes courtes (COURT)', src.indexOf('const TRADERS = {') < 0 && Object.keys(T.COURT).filter(k => T.COURT[k].traders).every(k => T.FICHES[k].traders === T.courtTexte(T.COURT[k].traders)));
+  const enDur = ['CALCUL', 'USAGES', 'COURT'].flatMap(nom => { const b = table(nom); return b === null ? [nom + ' introuvable'] : (b.match(/'(?:[^'\\\n]|\\.)*'/g) || []).filter(t => UNITE.test(t)).map(t => nom + ' : ' + t); });
+  check('CALCUL, USAGES, COURT : aucun nombre avec unité écrit en dur', !enDur.length, enDur);
   check('les dents du contrôle : « 20 $ », « 8 h », « 14 bougies », « ±0,5 % », « 5 min » y tombent', ["'tranche de 20 $'", "'toutes les 8 h'", "'Wilder, 14 bougies'", "'à ±0,5 % du milieu'", "'bougie de 5 min'"].every(t => UNITE.test(t)));
   check('js/fiches.js : ni « 07h00 » ni seuil de prime 0.03 écrits dans le code', !/07h00|\b0\.03\b/.test(src));
   // Dynamique : chaque source change, le texte suit.
@@ -313,8 +317,9 @@ titre('10. Les nombres des textes sont LUS (PARAM, meta.champs, CADENCES, carte 
   vm.runInContext('histHeatmap = { dt: 60, dp: 20 }', page.sandbox);
   const l1 = [T.FICHES.liq.formule(T.PARAM), calc('liq')];
   vm.runInContext('histHeatmap = null', page.sandbox);
-  check('la grille de la carte (heatmap.json : dt, dp) est lue dans le fichier : « une colonne toutes les 2 min, … par 50 $ » ; « par minute, … par 20 $ »',
-    l2[0].includes('une colonne toutes les 2 min, une tranche de prix par 50 $') && /^Toutes les 2 min, .* de 50 \$/.test(l2[1]) && l1[0].includes('une colonne par minute, une tranche de prix par 20 $') && /^Chaque minute, .* de 20 \$/.test(l1[1]), { l1, l2 });
+  // La formule de la carte EST son calcul en détail (une seule version, 12/10/2026).
+  check('la grille de la carte (heatmap.json : dt, dp) est lue dans le fichier : « Toutes les 2 min, … de 50 $ » ; « Chaque minute, … de 20 $ »',
+    l2.every(t => /^Toutes les 2 min, .* de 50 \$/.test(t)) && l1.every(t => /^Chaque minute, .* de 20 \$/.test(t)), { l1, l2 });
   // Le point du matin : une heure de la routine (Paris), dite à l'heure de l'appareil.
   const jourIso = new Date().toISOString().slice(0, 10), pt = T.PARAM.scenarios.point;
   const fs1 = T.FICHES.scenarios.formule(T.PARAM);
@@ -383,15 +388,29 @@ titre('12. Chaque fiche en trois lignes d’ado : ce que c’est, comment les tr
   const rsi = T.ficheHtml('rsi');
   // Une seule fiche pour tous : les lignes courtes d'abord, les textes entiers sous « En savoir plus ».
   const avantPlus = rsi.split('<details class="fiche-plus">')[0], plus = rsi.slice(avantPlus.length);
-  check('fiche RSI : la phrase en gras, l’usage et le calcul courts d’abord (une seule version), puis « En savoir plus » qui garde tout (textes entiers, lectures, limites, formule)',
-    avantPlus.includes('<b>' + esc(ct(C.rsi.quoi)) + '</b>') && avantPlus.includes(esc(ct(C.rsi.traders))) && !avantPlus.includes(esc(T.FICHES.rsi.traders)) && !/expert-seul|debutant-seul/.test(rsi)
-    && plus.includes(esc(T.FICHES.rsi.traders))
-    && /<details class="fiche-plus"><summary>En savoir plus<\/summary>[\s\S]*Le calcul en détail[\s\S]*À savoir[\s\S]*fiche-limites[\s\S]*fiche-technique[\s\S]*<\/details><p class="fiche-pied">/.test(rsi), { avantPlus: avantPlus.slice(0, 400) });
+  check('fiche RSI : la phrase en gras, l’usage et le calcul courts d’abord (une seule version), puis « En savoir plus » qui n’ajoute que du neuf (lectures, limites, calcul en détail)',
+    avantPlus.includes('<b>' + esc(ct(C.rsi.quoi)) + '</b>') && avantPlus.includes(esc(ct(C.rsi.traders))) && avantPlus.includes(esc(ct(C.rsi.calcul))) && !/expert-seul|debutant-seul/.test(rsi)
+    && /<details class="fiche-plus"><summary>En savoir plus<\/summary>[\s\S]*À savoir[\s\S]*fiche-limites[\s\S]*fiche-technique"><h4>Le calcul en détail<\/h4>[\s\S]*<\/details><p class="fiche-pied">/.test(rsi), { avantPlus: avantPlus.slice(0, 400) });
+  // Pas de redite (charte du 12/10/2026) : rien sous « En savoir plus » ne répète une ligne courte
+  // ni la définition `simple`.
+  const redites = ids.flatMap(k => { const h = T.ficheHtml(k), pl = h.slice(h.indexOf('<details class="fiche-plus">'));
+    return ['quoi', 'traders', 'usage', 'calcul'].filter(c => C[k][c] && pl.includes(esc(ct(C[k][c])))).map(c => k + '.' + c).concat(T.FICHES[k].simple && pl.includes(esc(T.FICHES[k].simple)) ? [k + '.simple'] : []); });
+  check('« En savoir plus » ne redit ni les lignes courtes ni la définition', !redites.length, redites);
   const sauveP2 = JSON.stringify(T.PARAM);
   T.PARAM.rsi.periode = 21; T.PARAM.bb.periode = 30;
   check('les trois lignes suivent PARAM (RSI 21, Bollinger 30)', ct(C.rsi.calcul).includes('les 21 dernières périodes') && ct(C.bb.calcul).includes('des 30 derniers prix'));
   Object.assign(T.PARAM, JSON.parse(sauveP2));
-  check('RSI en trois lignes : la zone basse n’annonce rien (règle du propriétaire)', /pas des annonces/.test(ct(C.rsi.traders)) && !/rebond|remont|retour/.test(ct(C.rsi.traders) + ct(C.rsi_tf.traders) + ct(C.stoch.traders) + ct(C.mfi.traders)));
+  check('RSI en trois lignes : la zone basse n’annonce rien (règle du propriétaire)', /peut pourtant continuer longtemps/.test(ct(C.rsi.traders)) && !/rebond|remont|retour/.test(ct(C.rsi.traders) + ct(C.rsi_tf.traders) + ct(C.stoch.traders) + ct(C.mfi.traders)));
+  // Les budgets de la charte des explications courtes (12/10/2026) : un mot = un groupe qui porte
+  // une lettre ou un chiffre. Ce que c'est : 15 ; usage et calcul : 25 ; une lecture : 20 ; le
+  // débat : 35 ; les limites : 20. La lecture Expert de la journée des scénarios (ses règles, lues
+  // dans PARAM) et les formules n'ont pas de budget.
+  const nMots = t => String(t).split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
+  const hors = ids.flatMap(k => { const f = T.FICHES[k], c = C[k] || {};
+    return [['quoi', ct(c.quoi), 15], ['traders', ct(c.traders), 25], ['usage', ct(c.usage), 25], ['calcul', ct(c.calcul), 25], ['debat', f.debat, 35], ['limites', f.limites, 20]]
+      .concat(f.lectures.filter(l => l.mode !== 'expert').map((l, i) => ['lecture ' + i, l.t, 20]))
+      .filter(([, t, n]) => t && nMots(t) > n).map(([c, t, n]) => k + '.' + c + ' ' + nMots(t) + '/' + n); });
+  check('budgets de la charte : ce que c’est ≤ 15 mots, usage et calcul ≤ 25, lecture ≤ 20, débat ≤ 35, limites ≤ 20', !hors.length, hors);
 }
 
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }

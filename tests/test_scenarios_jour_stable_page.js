@@ -114,7 +114,7 @@ async function survoler(o, rect, doigt) {
       const o = await H.ouvrir(nav, h, { vue: { width: 390, height: 844 }, mode: 'expert', tactile: true });
       const B = await o.page.evaluate(() => { const B = scenEtat.boite; return B ? { x: B.x, y: B.y, w: B.w, h: Math.min(B.h, 14), replie: B.replie || B.serre } : null; });
       const b = B ? await survoler(o, B, true) : '';
-      check(`bulle de l’encadré : « Seul en cours : 1 … », distances, « Reste … »`, /Seul en cours : 1/.test(b) && /bord toléré à [\d ]+ \$/.test(b) && /Reste \d+ h \d\d/.test(b), b.slice(0, 900));
+      check(`bulle de l’encadré : « Seul en cours : 1 … », distances, « Reste … »`, /Seul (encore )?en cours : 1/.test(b) && /bord toléré à [\d ]+ \$/.test(b) && /Reste \d+ h \d\d/.test(b), b.slice(0, 900));
       check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }

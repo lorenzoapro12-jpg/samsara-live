@@ -16,11 +16,11 @@
 //   3. LES MOTS, pour chaque type, chaque sens, chaque intervalle, chaque type de figure de la
 //      fixture : Lisible — sans mot banni, sans conseil, sans prévision (ni « rebond »), sans « % »,
 //      une variante de 48 caractères au plus (téléphone) et chacune de 90 au plus, résumé de 3
-//      nombres au plus ; Complet — sans conseil ; les deux : la ligne du risque (Guide.RISQUE) en
-//      tête du dernier paragraphe ; et EXACTS : « cassé » = « 2 quarts d'heure ont fini au-delà »,
+//      nombres au plus ; Complet — sans conseil ; les deux : un avertissement d'une ligne courte en
+//      dernier paragraphe (charte du 12/10/2026, sans la ligne du risque devant) ; et EXACTS : « cassé » = « 2 quarts d'heure ont fini au-delà »,
 //      « validé » = 2 fins au-delà de la ligne, « invalidé » = une fin au-delà du niveau qui annule ;
-//   4. LA LIGNE DU RISQUE dans les bulles de figure (en cours et passées, les deux modes), pour
-//      chaque figure de la fixture ;
+//   4. L'AVERTISSEMENT d'une ligne dans les bulles de figure (en cours et passées, les deux modes),
+//      pour chaque figure de la fixture ;
 //   5. « NOUVEAU » : clé versionnée, lue et écrite sous try/catch (stockage absent, qui lève,
 //      illisible), une marque à la fois dans l'ordre des natures ; les choix du Complet gardés ;
 //   6. les paramètres de la page (PARAM.apprendre, la limite de la ligne = celle de la phrase).
@@ -35,6 +35,9 @@ let ko = 0;
 const check = (nom, ok, det) => { if (!ok) ko++; console.log(`  ${ok ? '✓' : '✗'} ${nom}${!ok && det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 700) : ''}`); };
 const titre = t => console.log(`\n── ${t} ──`);
 const CONSEIL = /\b(achetez|vendez|achète[rz]?\b|vends\b|il faut (?:acheter|vendre)|entrez|sortez|prenez position|signal d['’]achat|signal de vente|recommand(?:e|ons))/i;
+// L'avertissement de fin de bulle (charte des explications courtes, 12/10/2026) : UNE ligne courte,
+// qui dit « pas un conseil » / « pas une recommandation », sans la ligne du risque devant.
+const AVERT = t => typeof t === 'string' && t.length < 90 && /pas une recommandation|ni une recommandation|ni un conseil|pas un conseil/.test(t) && !t.includes('Personne ne sait');
 const PREVISION = /\b(va (?:monter|baisser|remonter|rebondir|chuter)|rebond\w*|c['’]est le moment|bientôt|devrait|prochaine? hausse|prochaine? baisse)\b/i;
 const page = chargerPage();
 const PAGE = page.sandbox;
@@ -229,7 +232,7 @@ for (const e of evts) for (const itv of ITV) {
   if (D.variantes.some(v => v.length > P.guide.debutant.evenement)) longs.push({ type: e.type, itv, v: D.variantes.filter(v => v.length > 90) });
   if (!D.variantes.some(v => v.length <= P.guide.debutant.evenementEtroit)) courts.push({ type: e.type, itv, v: D.variantes });
   for (const ph of D.resume || []) for (const v of ph) if (nombresDe(D.titre) + nombresDe(v) > P.guide.debutant.bulleNombres) nb.push({ type: e.type, v });
-  if (!D.texte[D.texte.length - 1].startsWith(G.RISQUE) || !X.texte[X.texte.length - 1].startsWith(G.RISQUE) || !/pas une recommandation|ni un conseil/.test(X.texte[X.texte.length - 1] + D.texte[D.texte.length - 1])) risque.push(e.type);
+  if (!AVERT(D.texte[D.texte.length - 1]) || !AVERT(X.texte[X.texte.length - 1])) risque.push(e.type);
   // Exactitude des mots (la règle du code, dite dans la ligne).
   const v0 = D.variantes[0], cote = e.sens > 0 ? 'au-dessus' : 'en dessous';
   const ok = {
@@ -251,7 +254,7 @@ check('Complet : aucun conseil, aucune prévision', !malX.length, malX.slice(0, 
 check(`Lisible : chaque variante de la ligne en ${P.guide.debutant.evenement} caractères au plus (la phrase)`, !longs.length, longs.slice(0, 3));
 check(`Lisible : toujours une variante de ${P.guide.debutant.evenementEtroit} caractères au plus (téléphone)`, !courts.length, courts.slice(0, 3));
 check(`Lisible : chaque phrase du résumé, titre compris, ${P.guide.debutant.bulleNombres} nombres au plus`, !nb.length, nb.slice(0, 3));
-check('les deux modes : le dernier paragraphe commence par la ligne du risque, puis « pas une recommandation » ou « ni un conseil »', !risque.length, [...new Set(risque)]);
+check('les deux modes : le dernier paragraphe est l’avertissement, une ligne courte (« pas une recommandation », « ni un conseil »), sans seconde phrase de risque', !risque.length, [...new Set(risque)]);
 check('les mots sont EXACTS (la règle du code dite dans la ligne : « cassé » = 2 fins au-delà, « validé », « invalidé », « touchée »…) pour chaque intervalle', !exact.length, exact.slice(0, 3));
 {
   const D = A.textes({ type: 'repere_casse', source: 'repere', sens: 1, niv: evts[0].niv }, 'debutant', { unite: '$', itv: '15m' });
@@ -272,14 +275,14 @@ titre('4. La ligne du risque : la même, dans chaque bulle de figure (en cours, 
     const b = R.bilan[f.type];
     const T1 = G.texteFormeDebutant(f, b, ctx, P.guide, '$'), T2 = G.texteFormeExpert(f, b, ctx, P.guide, '$', {});
     const dern = t => t[t.length - 1];
-    if (!dern(T1).startsWith(G.RISQUE) || !dern(T2).startsWith(G.RISQUE)) mal.push(f.type + ' en cours');
+    if (!AVERT(dern(T1)) || !AVERT(dern(T2))) mal.push(f.type + ' en cours');
     if (f.fin && !f.ebauche) {
       const p1 = G.texteFigurePassee(f, b, ctx, P.guide, '$', 'debutant', []), p2 = G.texteFigurePassee(f, b, ctx, P.guide, '$', 'expert', []);
-      if (!dern(p1.texte).startsWith(G.RISQUE) || !dern(p2.texte).startsWith(G.RISQUE)) mal.push(f.type + ' passée');
+      if (!AVERT(dern(p1.texte)) || !AVERT(dern(p2.texte))) mal.push(f.type + ' passée');
     }
     n++;
   }
-  check(`${n} figures de la fixture : le dernier paragraphe de chaque bulle (en cours et passée, Lisible et Complet) commence par la ligne du risque`, n > 50 && !mal.length, mal.slice(0, 5));
+  check(`${n} figures de la fixture : le dernier paragraphe de chaque bulle (en cours et passée, Lisible et Complet) est l’avertissement, une ligne courte`, n > 50 && !mal.length, mal.slice(0, 5));
   // Le résumé du Lisible : elle ne compte pas comme un avertissement à ôter, ni comme des nombres.
   const estAv = vm.runInContext('estAvertissement', PAGE);
   check('la ligne du risque devant l’avertissement : le paragraphe reste un avertissement (le résumé l’ôte comme avant), sans nombre', estAv(G.RISQUE + ' Une lecture débattue, pas une prévision ni un conseil.') && nombresDe(G.RISQUE) === 0, null);

@@ -74,7 +74,7 @@
        coche aussi là-bas. Plus d'interrupteur Lisible / Complet (un seul écran, 11/10/2026). -->
   <fieldset class="aff-groupe aff-detail"><legend>Ce que dit la carte</legend>
     <div class="aff-calque"><label><input type="checkbox" id="affDetail" aria-describedby="affDetailQuoi"> <span class="aff-nom">Le détail</span></label>
-    <p class="aff-quoi" id="affDetailQuoi"><span class="aff-qq">C’est quoi ?</span> Tous les calques, les chiffres et les réglages fins. Sans lui, la carte montre l’essentiel en phrases. Le même choix que sur le terminal.</p></div>
+    <p class="aff-quoi" id="affDetailQuoi"><span class="aff-qq">C’est quoi ?</span> Tous les calques, les chiffres et les réglages fins. Sans lui : l’essentiel, en phrases. Le même choix que sur le terminal.</p></div>
   </fieldset>
   <p class="note aff-note" id="affNote"></p>
   <!-- Les calques rangés par question, chacun avec sa phrase « C'est quoi ? » : remplis par js/bookmap.js
@@ -183,21 +183,21 @@
     <h3>L'essentiel</h3>
     <dl>
       <dt>Couleurs = ordres d'achat ou de vente en attente</dt>
-      <dd><span id="legPaletteDeb">Bleu foncé : peu d'ordres à ce prix ; puis bleu clair, vert, jaune, orange ; blanc : le plus d'ordres.</span> Un ordre peut être retiré à tout moment. Hachures : ce qui n'a pas été lu là (les ordres en attente, ou les échanges), et l'avenir, à droite de «&nbsp;maintenant&nbsp;».</dd>
+      <dd><span id="legPaletteDeb">Bleu foncé : peu d'ordres à ce prix ; puis bleu clair, vert, jaune, orange ; blanc : le plus d'ordres.</span> Un ordre peut être retiré à tout moment. Hachures : rien de lu là, ou l'avenir (à droite de «&nbsp;maintenant&nbsp;»).</dd>
       <dt>Ligne à fil noir = le prix</dt>
-      <dd>Une ligne blanche avec un fil noir au milieu, qui zigzague jusqu'au trait <span data-mot="maintenant">jaune</span> « maintenant » (nommé sous l'axe du temps). Les bandes <span data-mot="bandes">claires</span> et droites sont des ordres en attente, pas le prix.</dd>
+      <dd>Elle zigzague jusqu'au trait <span data-mot="maintenant">jaune</span> « maintenant ». Les bandes <span data-mot="bandes">claires</span> et droites sont des ordres en attente, pas le prix.</dd>
       <dt>Ronds = échanges réels</dt>
       <dd>Vert, avec ▲ dans les plus gros : surtout des acheteurs qui ont pris des ventes en attente. Rouge, avec ▼ : surtout des vendeurs qui ont pris des achats en attente. Plus gros = plus de BTC.</dd>
       <dt>« Mur d’achat » sous le prix, « Mur de vente » au-dessus</dt>
-      <dd>Le prix le plus proche où nettement plus d'ordres attendent qu'ailleurs, en ce moment. Ils peuvent être retirés avant que le prix y arrive. «&nbsp;Dans un mur…&nbsp;» : le prix y est entré (son cadre s'allume). «&nbsp;Pas de mur au-dessus&nbsp;» (ou au-dessous) : rien de nettement plus chargé de ce côté.</dd>
+      <dd>Le prix le plus proche où nettement plus d'ordres attendent qu'ailleurs. Ils peuvent être retirés avant que le prix y arrive. «&nbsp;Dans un mur…&nbsp;» : le prix y est entré. «&nbsp;Pas de mur&nbsp;» : rien de marquant de ce côté.</dd>
       <dt>La phrase du haut</dt>
       <dd>Une photo de l'instant, pas une prévision : plus d'ordres d'un côté ne dit pas où ira le prix. <span id="legSensDeb"></span></dd>
     </dl>
     <h3>Gestes</h3>
     <p>Glisser : déplacer la carte. <span class="geste-souris">Molette ou deux doigts : zoomer ; double-clic : revenir à la vue par défaut.</span><span class="geste-doigt">Deux doigts : zoomer ; double appui : revenir à la vue par défaut.</span></p>
-    <p>Toucher ou survoler un élément : son détail. Au doigt, un appui bref le montre et le même appui l'enlève ; un appui long le fait suivre le doigt.</p>
+    <p>Toucher ou survoler un élément : son détail. Au doigt : un appui bref le montre ou l'enlève ; un appui long suit le doigt.</p>
     <p><button type="button" class="bouton" id="btnIntroDebutant">Comment lire cette carte</button></p>
-    <p class="note">La carte décrit des ordres en attente et des échanges passés, pas une recommandation : un ordre peut être retiré avant d'être touché, et un rond ne dit pas qui a acheté.</p>
+    <p class="note">La carte décrit, elle ne conseille pas : un ordre peut être retiré avant d'être touché, et un rond ne dit pas qui a acheté.</p>
   </div>
   <div class="expert-seul">
   <p class="note" id="encodageEtat"></p>

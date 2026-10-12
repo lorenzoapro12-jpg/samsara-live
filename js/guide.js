@@ -1535,6 +1535,12 @@ const Guide = (function () {
       // Un double devenu triple ne peut plus être validé : il ne compte pas au dénominateur.
       return (lignesF ? 'mesuré ' + b.formes + ' rep.' + obj : 'mesuré ' + b.confirmes + '/' + (b.formes - (b.devenusTriples || 0)) + ' valid.' + obj) + (faible ? ' · éch. faible' : '');
     }
+    if (mode === 'expertCompact') {
+      // La bulle (charte du 12/10/2026) : les comptes qui servent à lire ; tout le détail (ébauches,
+      // repère sans forme, invalidées, sans issue) est dans les statistiques de la figure (▸).
+      const obj = finis ? ' · obj. ' + b.atteints + '/' + finis : '';
+      return 'Mesuré · hist. ' + d + ' : ' + (lignesF ? b.formes + ' repérées · sorties ↑ ' + b.haut + ' / ↓ ' + b.bas : b.formes + ' repérés · ' + b.confirmes + ' valid.') + obj + (faible ? ' · éch. faible' : '');
+    }
     if (mode === 'expert') {
       const eb = E.n ? ' · ébauches ' + E.n + ' → figures ' + E.devenues + (lignesF ? '' : ' → valid. ' + E.confirmees) + (E.n < P.echantillonFaible ? ' (éch. faible)' : '') : '';
       const ecart = { peu: '', pareil: ' (pareil au repère, Wilson 95 %)', plus: ' (plus souvent que le repère, Wilson 95 %)', moins: ' (moins souvent que le repère, Wilson 95 %)' }[b.ecart || 'peu'];
@@ -1869,6 +1875,12 @@ const Guide = (function () {
     if (age === null) return hp ? 'à ' + hp : '';
     return 'il y a ' + age + (hp && !sansHeure ? ' (' + hp + ')' : '');
   }
+  /** L'âge d'un chiffre publié pour une bulle : « à 07:33 » s'il a moins d'une minute (« il y a
+   *  0 min » ne dit rien de plus), sinon « il y a 4 min (07:33) ». */
+  function ageLu(lu, maintenant) {
+    if (!fini(lu)) return '';
+    return fini(maintenant) && maintenant - lu < 60000 && heureVueSi(lu) ? 'à ' + heureVueSi(lu) : ageDebutant(lu, maintenant);
+  }
   // Un écart en dollars se lit à l'unité près (« 84 $ », pas « 83,57 $ ») dès 10 $.
   const prixRond = (v, unite) => (Math.abs(v) >= ((unite || '$') === '$' ? 10 : 100) ? nombre(Math.round(Math.abs(v)), 0) + ' ' + (unite || '$') : prix(Math.abs(v), unite));
   /** La phrase de lecture, ses variantes de la plus riche à la plus courte (la dernière est la
@@ -1953,13 +1965,15 @@ const Guide = (function () {
   /** Un chemin « Et ensuite ? » en une phrase : « Si le prix finit un quart d'heure au-dessus de
    *  82 827 $ (zone de retour), le repère suivant est 83 105 $ (haut d'hier). » Un chiffre
    *  publié dit son âge. ch null : le côté sans repère proche, dit. */
-  function texteSuiteDebutant(ch, unite, itv, sens, maintenant) {
+  function texteSuiteDebutant(ch, unite, itv, sens, maintenant, seuilDit) {
     const up = ch ? ch.sens > 0 : sens > 0, per = periode(itv);
-    if (!ch) return 'Aucun repère proche ' + (up ? 'au-dessus' : 'en dessous') + ' : pas de suite à décrire de ce côté.';
+    if (!ch) return 'Aucun repère proche ' + (up ? 'au-dessus' : 'en dessous') + '.';
     const rx = ch.rx || bord(ch.seuil, up), ry = ch.ry || (ch.cible ? bord(ch.cible, !up) : null);
-    const de = r => ' (' + nomPhrase(r) + (fini(r.lu) ? ', relevé ' + ageDebutant(r.lu, maintenant, true) : '') + ')';
-    return 'Si le prix finit ' + per[0] + (up ? ' au-dessus de ' : ' sous ') + prixR(rx, unite) + de(rx) + ', '
-      + (ry ? 'le repère suivant est ' + prixR(ry, unite) + de(ry) + '.' : 'aucun autre repère n’est proche de ce côté.');
+    // L'âge d'un chiffre publié, seulement s'il a au moins une minute (« relevé il y a 0 min » ne dit rien).
+    const de = r => ' (' + nomPhrase(r) + (fini(r.lu) && !(fini(maintenant) && maintenant - r.lu < 60000) ? ', relevé ' + ageDebutant(r.lu, maintenant, true) : '') + ')';
+    // seuilDit : la bulle de ce repère (son nom et son prix sont dans le titre).
+    return 'Si le prix finit ' + per[0] + (seuilDit ? (up ? ' au-dessus' : ' en dessous') : (up ? ' au-dessus de ' : ' sous ') + prixR(rx, unite) + de(rx)) + ' : '
+      + (ry ? 'prochain repère ' + prixR(ry, unite) + de(ry) + '.' : 'aucun autre repère proche.');
   }
   /** L'état d'un repère au prix live, en mots (bulle). */
   const ETATS_DEBUTANT = {
@@ -2017,24 +2031,25 @@ const Guide = (function () {
   }
   /** L'origine d'une raison en mots simples, pour la bulle d'un repère. pasS : la durée d'une
    *  bougie (s), pour dire la fenêtre des zones de rebonds en jours ou en heures. */
-  function origineDebutant(r, unite, maintenant, pasS) {
-    const n = nomsDebutant(r)[0] + ' (' + prixR(r, unite) + ') : ';
-    const age = fini(r.lu) ? ', relevée ' + ageDebutant(r.lu, maintenant) : '';
-    if (estOption(r)) return n + 'une estimation, tirée des contrats d’options de la plateforme Deribit (des contrats sur le prix futur du BTC)' + age + '. Pas une mesure : un calcul sur ces contrats.';
+  function origineDebutant(r, unite, maintenant, pasS, sansNom) {
+    // sansNom : le nom et le prix sont déjà dans le titre de la bulle (une seule raison) : pas redits.
+    const n = sansNom ? '' : nomsDebutant(r)[0] + ' (' + prixR(r, unite) + ') : ';
+    const age = fini(r.lu) ? ', relevée ' + ageLu(r.lu, maintenant) : '';
+    const fin = t => (sansNom ? majuscule(t) : n + t);
+    if (estOption(r)) return fin('une estimation, tirée des contrats d’options de la plateforme Deribit (des contrats sur le prix futur du BTC)' + age + '. Un calcul, pas une mesure.');
     switch (r.cle) {
-      case 'hier_haut': return n + 'le prix le plus haut atteint hier, sur ce graphique.';
-      case 'hier_bas': return n + 'le prix le plus bas atteint hier, sur ce graphique.';
-      case 'sem_haut': return n + 'le prix le plus haut de la semaine dernière.';
-      case 'sem_bas': return n + 'le prix le plus bas de la semaine dernière.';
-      case 'h24_haut': return n + 'le prix le plus haut des dernières 24 heures, sur ce graphique.';
-      case 'h24_bas': return n + 'le prix le plus bas des dernières 24 heures, sur ce graphique.';
-      case 'sr': { const d = fini(r.bougies) && fini(pasS) ? dernieres(r.bougies * pasS) : null; return n + (r.touches || '') + ' fois, le prix a fait demi-tour autour de ce prix' + (d ? ' sur les ' + d + ' de ce graphique' : '') + '.'; }
+      case 'hier_haut': return fin('le prix le plus haut atteint hier.');
+      case 'hier_bas': return fin('le prix le plus bas atteint hier.');
+      case 'sem_haut': return fin('le prix le plus haut de la semaine dernière.');
+      case 'sem_bas': return fin('le prix le plus bas de la semaine dernière.');
+      case 'h24_haut': return fin('le prix le plus haut des dernières 24 heures.');
+      case 'h24_bas': return fin('le prix le plus bas des dernières 24 heures.');
+      case 'sr': { const d = fini(r.bougies) && fini(pasS) ? dernieres(r.bougies * pasS) : null; return fin((r.touches || '') + ' fois, le prix a fait demi-tour ici' + (d ? ' ces ' + d : '') + '.'); }
       case 'mur_achat': case 'mur_vente': {
         const q = fini(r.btc) ? ' (' + nombre(r.btc, r.btc >= 10 ? 0 : 1) + ' BTC)' : '';
-        return n + (fini(r.bin) && r.bin > 0 ? 'la tranche de ' + nombre(r.bin, 0) + ' $' : 'le prix') + ' où le plus de BTC attendaient ' + (r.cle === 'mur_achat' ? 'à l’achat' : 'à la vente') + q
-          + ' parmi les ordres en attente de Binance' + age + '. Ces ordres peuvent avoir bougé depuis.';
+        return fin('le plus d’ordres ' + (r.cle === 'mur_achat' ? 'd’achat' : 'de vente') + ' en attente chez Binance' + q + (fini(r.lu) ? ', relevé ' + ageLu(r.lu, maintenant) : '') + ' : ils ont pu bouger.');
       }
-      default: return n + minuscule(r.nom) + '.';
+      default: return fin(minuscule(r.nom) + '.');
     }
   }
   // ─── Figures, en mots : libellés (Débutant ≤ 26 caractères, Expert ≤ 80) et bulles ───
@@ -2229,7 +2244,6 @@ const Guide = (function () {
   /** Ce que la figure montre, et ce qui lui manque encore (1re phrase de la bulle Débutant). */
   function vuDebutant(f, ctx, unite) {
     const fam = famille(f), per = periode(ctx && ctx.intervalle), now = ctx && ctx.maintenant;
-    const q = i => quandVu(debutMs(ctx, i), now);
     // « d’ici 14:00 », « d’ici demain 02:00 » ; le point en attente au prix de la bougie en cours
     // quand elle va plus loin que lui (v.cle 'suit') ; rien à promettre quand l'ébauche se défait.
     const dici = ms => { const t = quandDeb(ms, ctx); return t ? ' d’ici ' + t.replace(/^à /, '').replace(/ à /, ' ') : ''; };
@@ -2238,9 +2252,8 @@ const Guide = (function () {
     if (fam === 'extremes') {
       const pts = estTriple(f) ? [f.a, f.b, f.c] : [f.a, f.b], haut = f.sens < 0;
       const ps = pts.map(x => x.p), lo = Math.min(...ps), hi = Math.max(...ps);
-      const dates = pts.map(x => q(x.i)).filter(Boolean);
       const vu = 'Le prix a ' + (haut ? 'buté ' : 'rebondi ') + (pts.length === 3 ? 'trois' : 'deux') + ' fois ' + (hi - lo >= 1 ? 'entre ' + chiffres(lo) + ' et ' + prix(hi, unite) : 'vers ' + prix(hi, unite))
-        + (dates.length ? ' (' + dates.join(', ') + ')' : '') + '.';
+        + '.';   // les dates des points : sur le tracé (charte du 12/10/2026 : peu de chiffres)
       if (f.ebauche && !defait) {
         const k = pts.length === 3 ? '3e' : '2e', fin = finMs(ctx, f.pend.conf), d = dici(fin);
         return vu + ' Le ' + k + (haut ? ' sommet' : ' creux') + pourLInstant + ' sera acquis si le prix ' + (haut ? 'ne va pas plus haut' : 'ne va pas plus bas') + (d || ' encore ' + (f.pend.reste > 1 ? f.pend.reste + ' ' + per[3] : per[0])) + '.';
@@ -2249,7 +2262,7 @@ const Guide = (function () {
     }
     if (fam === 'ete') {
       const haut = f.sens < 0;
-      const vu = 'Trois ' + (haut ? 'sommets' : 'creux') + ', celui du milieu ' + (haut ? 'plus haut' : 'plus bas') + ' (la tête, ' + prix(f.T.p, unite) + ' ' + q(f.T.i) + '), les deux autres à peu près au même niveau (les épaules).';
+      const vu = 'Trois ' + (haut ? 'sommets' : 'creux') + ', celui du milieu ' + (haut ? 'plus haut' : 'plus bas') + ' (la tête, ' + prix(f.T.p, unite) + '), les deux autres à peu près au même niveau (les épaules).';
       if (f.ebauche && !defait) { const fin = finMs(ctx, f.pend.conf); return vu + ' La 2e épaule' + pourLInstant + ' sera acquise si le prix ' + (haut ? 'ne va pas plus haut' : 'ne va pas plus bas') + dici(fin) + '.'; }
       return vu;
     }
@@ -2286,19 +2299,19 @@ const Guide = (function () {
     }
     if (fam === 'extremes' || fam === 'ete' || fam === 'drapeau') {
       const x = N.sorties[0], o = N.objectifs[0], s = x.s;
-      const quoi = fam === 'extremes' ? (f.sens < 0 ? 'le creux entre les sommets' : 'le sommet entre les creux') : fam === 'ete' ? 'la ligne qui joint les deux ' + (f.sens < 0 ? 'creux' : 'sommets') : 'le ' + (s > 0 ? 'haut' : 'bas') + ' de la pause';
-      const marge = Math.abs(x.seuil - x.ligne) >= 0.5 ? ' (' + quoi + ', ' + prix(x.ligne, unite) + enCeMoment + ', avec une petite marge)' : ' (' + quoi + enCeMoment + ')';
+      const quoi = fam === 'extremes' ? (f.sens < 0 ? 'le creux entre les sommets' : 'le sommet entre les creux') : fam === 'ete' ? 'la ligne des deux ' + (f.sens < 0 ? 'creux' : 'sommets') : 'le ' + (s > 0 ? 'haut' : 'bas') + ' de la pause';
+      const marge = Math.abs(x.seuil - x.ligne) >= 0.5 ? ' (' + quoi + enCeMoment + ', avec une marge)' : ' (' + quoi + enCeMoment + ')';
       const dejaFini = seuilDemi !== null && pente && Math.abs(seuilDemi - x.seuil) >= 0.5
-        ? 'Il a fini ' + per[0] + ' ' + sousSur(s) + prix(seuilDemi, unite) + ' (' + quoi + ', avec une petite marge, à ce moment-là) ; s’il finit encore ' + per[0] + ' ' + sousSur(s) + prix(x.seuil, unite) + ' (son niveau en ce moment)'
+        ? 'Il a fini ' + per[0] + ' ' + sousSur(s) + prix(seuilDemi, unite) + ' (' + quoi + ' à ce moment-là) ; s’il finit encore ' + per[0] + ' ' + sousSur(s) + prix(x.seuil, unite) + ' (son niveau en ce moment)'
         : 'Il a fini ' + per[0] + ' ' + sousSur(s) + prix(x.seuil, unite) + marge + ' ; s’il finit encore ' + per[0] + ' ' + dessous(s);
-      let t = (f.demi ? dejaFini + ', la figure sera validée. S’il revient tout près de la ligne puis ressort, cela compte aussi ; s’il revient franchement dedans, la sortie ne compte pas.'
-        : 'La figure serait validée si le prix finit ' + per[1] + ' de suite ' + sousSur(s) + prix(x.seuil, unite) + marge + '. ' + majuscule(per[0]) + ' ' + dessous(s) + ', puis un court retour vers ce prix et ' + nouvellePer(per) + ' ' + dessous(s) + ', compte aussi.');
+      let t = (f.demi ? dejaFini + ', la figure sera validée. S’il revient franchement dedans, la sortie ne compte pas.'
+        : 'La figure serait validée si le prix finit ' + per[1] + ' de suite ' + sousSur(s) + prix(x.seuil, unite) + marge + ' ; un court retour entre les deux compte aussi.');
       // Une ébauche : UN niveau d'annulation, celui que la machine applique (le plus haut ou le plus
       // bas des bougies, pas leur fin) ; l'extrême et la tête sont l'affaire de ce niveau.
-      if (f.ebauche && fini(f.abandonP)) t += ' Annulée si le prix ' + (f.s > 0 ? 'monte au-dessus de ' : 'descend sous ') + prix(f.abandonP, unite) + ', même un instant' + (fam === 'ete' ? ' (plus loin que la tête).' : ' (les ' + (f.s > 0 ? 'sommets' : 'creux') + ' ne seraient plus au même niveau).');
+      if (f.ebauche && fini(f.abandonP)) t += ' Annulée si le prix ' + (f.s > 0 ? 'monte au-dessus de ' : 'descend sous ') + prix(f.abandonP, unite) + ', même un instant.';
       for (const iv of N.invals) {
         if (f.ebauche && (iv.raison === 'extreme' || iv.raison === 'tete')) continue;
-        if (iv.raison === 'recul') t += ' Annulée si le prix finit ' + per[0] + ' ' + sousSur(iv.s) + prix(iv.p, unite) + ' (' + (s > 0 ? 'recul' : 'remontée') + ' de plus de ' + partMots(P.drapeau.retrait) + ' du mât).';
+        if (iv.raison === 'recul') t += ' Annulée si le prix finit ' + per[0] + ' ' + sousSur(iv.s) + prix(iv.p, unite) + ' (' + (s > 0 ? 'recul' : 'remontée') + ' trop forte).';
         else if (iv.raison === 'sortie_contraire') t += ' Annulée aussi si le prix finit ' + per[1] + ' de suite ' + sousSur(iv.s) + prix(iv.p, unite) + '.';
         else t += ' Annulée si le prix finit ' + per[0] + ' ' + sousSur(iv.s) + prix(iv.p, unite) + (iv.raison === 'tete' ? ' (la tête)' : '') + '.';
       }
@@ -2313,14 +2326,14 @@ const Guide = (function () {
       const x = x1, s = x.s;
       const s0 = seuilDemi !== null ? seuilDemi : x.seuil, bouge = pente && Math.abs(s0 - x.seuil) >= 0.5;
       t = 'Le prix vient de sortir ' + (s > 0 ? 'par le haut' : 'par le bas') + ' (il a fini ' + per[0] + ' ' + sousSur(s) + prix(s0, unite) + (bouge ? ', le niveau de la ligne à ce moment-là' : '') + '). S’il finit encore ' + per[0] + ' dehors'
-        + (bouge ? ' (' + sousSur(s) + prix(x.seuil, unite) + ' en ce moment)' : '') + ', la sortie sera validée. S’il revient tout près de la ligne puis ressort, cela compte aussi ; s’il revient franchement dedans, la sortie ne compte pas.';
+        + (bouge ? ' (' + sousSur(s) + prix(x.seuil, unite) + ' en ce moment)' : '') + ', la sortie sera validée ; s’il revient franchement dedans, la sortie ne compte pas.';
       t += ' Si elle est validée, ' + cible(prix((s > 0 ? oH : oB).p, unite)) + '.';
     } else {
-      t = 'Une sortie compte quand le prix finit ' + per[1] + ' de suite au-dessus de ' + prix(hautB.seuil, unite) + ' ou sous ' + prix(basB.seuil, unite) + enCeMoment + (pente ? ' (ces droites bougent un peu à chaque ' + per[0].replace(/^une? /, '') + ')' : '')
-        + ', ou une fois dehors, puis encore une fois dehors après un court retour. Si elle est validée, ' + cible(prix(oH.p, unite) + ' par le haut, ' + prix(oB.p, unite) + ' par le bas', true) + '.';
-      if (fini(N.pointe)) { const ms = finMs(ctx, Math.floor(N.pointe)); t += ' Sans sortie avant la pointe' + (fini(ms) && heureVueSi(ms) ? ' (vers ' + quandVu(ms, ctx && ctx.maintenant) + ')' : '') + ', elle s’arrête sans suite.'; }
+      t = 'Une sortie compte quand le prix finit ' + per[1] + ' de suite au-dessus de ' + prix(hautB.seuil, unite) + ' ou sous ' + prix(basB.seuil, unite) + enCeMoment
+        + ' ; un court retour entre les deux compte aussi. Si elle est validée, ' + cible(prix(oH.p, unite) + ' par le haut, ' + prix(oB.p, unite) + ' par le bas', true) + '.';
+      if (fini(N.pointe)) { const ms = finMs(ctx, Math.floor(N.pointe)); t += ' Sans sortie avant la pointe' + (fini(ms) && heureVueSi(ms) ? ' (vers ' + quandVu(ms, ctx && ctx.maintenant) + ')' : '') + ' : sans suite.'; }
     }
-    if (f.ebauche) t += ' Elle est annulée si le prochain ' + (f.s > 0 ? 'sommet' : 'creux') + ' s’écarte de sa droite.';
+    if (f.ebauche) t += ' Annulée si le prochain ' + (f.s > 0 ? 'sommet' : 'creux') + ' s’écarte de sa droite.';
     return t;
   }
   /** La définition d'une figure (bulle Débutant d'une figure validée ou tombée) : ce qu'on voit,
@@ -2347,10 +2360,10 @@ const Guide = (function () {
   function texteEcart(b) {
     const finis = b.atteints + b.invalides + b.expires;
     switch (b.ecart) {
-      case 'pareil': return 'Sur ce graphique, cette cible n’a pas été atteinte plus souvent qu’un trajet de même taille pris à n’importe quel moment (mesuré, ' + finis + ' cas).';
-      case 'plus': return 'Sur ce graphique, cette cible a été atteinte plus souvent qu’un trajet de même taille pris à n’importe quel moment (mesuré, ' + finis + ' cas).';
-      case 'moins': return 'Sur ce graphique, cette cible a été atteinte moins souvent qu’un trajet de même taille pris à n’importe quel moment (mesuré, ' + finis + ' cas).';
-      default: return 'Trop peu de cas pour comparer à un trajet quelconque.';
+      case 'pareil': return 'Cible pas plus souvent atteinte qu’un trajet de même taille pris au hasard (' + finis + ' cas).';
+      case 'plus': return 'Cible plus souvent atteinte qu’un trajet de même taille pris au hasard (' + finis + ' cas).';
+      case 'moins': return 'Cible moins souvent atteinte qu’un trajet de même taille pris au hasard (' + finis + ' cas).';
+      default: return 'Trop peu de cas pour comparer au hasard.';
     }
   }
   /** Le bilan mesuré en mots du Débutant : au plus DEUX comptes. Une ébauche : combien de débuts
@@ -2359,26 +2372,34 @@ const Guide = (function () {
    *  figures à deux droites (il se lirait comme une probabilité de sens). */
   function bilanDebutant(f, b, ctx, P) {
     if (!b) return '';
-    const d = dernieres(ctx && ctx.duree), sur = 'Mesuré sur les ' + (d || 'données') + ' de ce graphique : ', noms = NOMS_FORMES[f.type], fam = famille(f);
+    const d = dernieres(ctx && ctx.duree), sur = 'Mesuré sur les ' + (d || 'données') + ' : ', noms = NOMS_FORMES[f.type], fam = famille(f);
     const nomP = NOM_FORME_DEBUTANT[f.type] === 'Tête-épaules' ? 'tête-épaules' : minuscule(noms[1]).replace(/ (ascendants|descendants|symétriques|montants|descendants|inversés)$/, '');
     if (f.ebauche) {
       const E = b.ebauches || { n: 0, devenues: 0 };
-      return sur + E.n + (E.n > 1 ? ' débuts comme celui-ci, ' : ' début comme celui-ci, ') + E.devenues + (E.devenues > 1 ? ' sont devenus ' : ' est devenu ') + noms[2] + '.'
-        + (E.n < P.echantillonFaible ? ' Trop peu de cas pour en tirer une règle.' : '');
+      return sur + 'sur ' + E.n + (E.n > 1 ? ' débuts comme celui-ci, ' : ' début comme celui-ci, ') + (E.devenues ? E.devenues + (E.devenues > 1 ? ' sont devenus' : ' est devenu') : 'aucun n’est devenu') + ' la figure.'
+        + (E.n < P.echantillonFaible ? ' Trop peu de cas.' : '');
     }
     const finis = b.atteints + b.invalides + b.expires;
     const nomL = fam === 'lignes' || fam === 'drapeau' ? NOM_LONG_DEBUTANT[f.type].toLowerCase() : nomP;
+    // Le taux de la cible n'est pas redit : la ligne des statistiques, au bas de la bulle, le donne.
     let t = sur + b.formes + ' ' + (fam === 'lignes' ? (b.formes > 1 ? 'figures « ' + nomL + ' »' : 'figure « ' + nomL + ' »') : (b.formes > 1 ? (fam === 'drapeau' ? minuscule(noms[1]) : nomL) + ' repérés' : minuscule(noms[0]) + ' repéré'))
-      + (finis ? (fam === 'lignes' || fam === 'drapeau' ? ' ; après leur sortie, cible atteinte ' : ' ; une fois validés, cible atteinte ') + b.atteints + ' fois sur ' + finis + '.'
+      + (finis ? '.'
         // L'accord suit le nom dit juste avant : « figures » (deux droites) au féminin, les autres au masculin.
         : fam === 'lignes' ? ' ; aucune n’est encore allée au bout.' : ' ; aucun n’est encore allé au bout.');
-    return t + ' ' + texteEcart(b);
+    // La comparaison au hasard, seulement quand elle dit quelque chose (assez de cas).
+    return t + (b.ecart && b.ecart !== 'peu' ? ' ' + texteEcart(b) : '');
   }
   /** La ligne du risque (plan §10 bis), la MÊME partout : en tête du dernier paragraphe des bulles
    *  de figure (en cours ou passée, les deux modes), de scénario et de « ce qui vient de se passer »
    *  (js/apprendre.js) — ce paragraphe-là reste quand une bulle manque de place. Au résumé du
    *  Lisible, elle vient en dernier, si elle tient (sinon au détail, au 2e toucher). */
   const RISQUE = 'Personne ne sait prédire le prix : rien n’est promis.';
+  /** L'avertissement de fin de bulle, UNE ligne courte (charte des explications courtes, 12/10/2026) :
+   *  il remplace, dans les bulles du graphique, la ligne du risque suivie d'un second avertissement
+   *  (deux phrases pour une seule idée). RISQUE reste exporté pour les textes qui le citent encore. */
+  const AVERTISSEMENT = 'Une description, pas un conseil.';
+  const AVERTISSEMENT_FORME = 'Une lecture débattue, pas une prévision ni un conseil.';
+  const AVERTISSEMENT_CLAUDE = 'Une hypothèse de Claude (une IA), pas un conseil.';
   /** La bulle d'une figure en Débutant : ce qu'on voit et ce qui manque, les niveaux du moment
    *  (validation, annulation, cible), le bilan mesuré, l'avertissement. ctx : voir plus haut. */
   function texteFormeDebutant(f, b, ctx, P, unite) {
@@ -2415,7 +2436,7 @@ const Guide = (function () {
       if (e.cle === 'atteint' && fini(f.objectif)) out.push('Cible théorique selon l’usage des analystes : ' + prix(f.objectif, unite) + ', non garantie ; elle a été atteinte.');
     }
     if (b) out.push(bilanDebutant(f, b, c, P));
-    out.push(RISQUE + ' Une lecture débattue, pas une prévision ni un conseil.');
+    out.push(AVERTISSEMENT_FORME);
     return out.filter(Boolean);
   }
   /** L'état vivant en mots, en tête de bulle (calque) : seule la fin de la bougie compte. Le prix
@@ -2481,12 +2502,12 @@ const Guide = (function () {
     const j = ctx && fini(ctx.j) ? ctx.j : (ctx && ctx.n) || 0, N = niveauxFigure(f, j, P), itv = nomIntervalle(ctx && ctx.intervalle), b = bandeSortie(f);
     const obj = o => prix(o.p, unite);
     if (N.confirme) return 'Maintenant : invalidation = clôture ' + itv + (N.invals[0].s > 0 ? ' > ' : ' < ') + prix(N.invals[0].p, unite) + ' · objectif théorique (convention, non garanti) : ' + obj(N.objectifs[0]) + ' · horizon ' + P.horizon + ' bougies.';
-    const sorties = N.sorties.map(x => '2 clôtures ' + itv + (x.s > 0 ? ' > ' : ' < ') + prix(x.seuil, unite) + (b ? ' (ligne ' + prix(x.ligne, unite) + ' ' + (x.s > 0 ? '+' : '−') + ' bande ' + prixRond(b, unite) + ')' : '')).join(' ou ');
+    const sorties = N.sorties.map(x => '2 clôtures ' + itv + (x.s > 0 ? ' > ' : ' < ') + prix(x.seuil, unite) + (b ? ' (ligne + ' + prixRond(b, unite) + ')' : '')).join(' ou ');
     const invals = N.invals.filter(iv => !(f.ebauche && (iv.raison === 'extreme' || iv.raison === 'tete'))).map(iv => (iv.clotures === 2 ? '2 clôtures' : 'clôture') + (iv.s > 0 ? ' > ' : ' < ') + prix(iv.p, unite) + ' (' + { extreme: 'extrême', tete: 'tête', recul: 'recul > ' + nombre(P.drapeau.retrait * 100, 0) + ' % du mât', sortie_contraire: 'sortie contraire' }[iv.raison] + ')');
-    const ab = f.ebauche && fini(f.abandonP) ? ' · abandon de l’ébauche = ' + (f.s > 0 ? 'plus haut > ' : 'plus bas < ') + prix(f.abandonP, unite) + (famille(f) === 'ete' ? ' (la tête)' : ' (autres ' + (f.s > 0 ? 'sommets' : 'creux') + ' ' + (f.s > 0 ? '+' : '−') + ' tol. ' + prixRond(f.tol, unite) + ', figée)') + ', jugé sur l’extrême de la bougie, pas la clôture' : '';
+    const ab = f.ebauche && fini(f.abandonP) ? ' · abandon = ' + (f.s > 0 ? 'plus haut > ' : 'plus bas < ') + prix(f.abandonP, unite) + ' (extrême de bougie)' : '';
     const objs = N.objectifs.map(o => (N.objectifs.length > 1 ? (o.s > 0 ? '↑ ' : '↓ ') : '') + obj(o)).join(' / ');
-    const base = famille(f) === 'drapeau' ? 'mât reporté' : famille(f) === 'lignes' ? 'largeur ' + prix(f.hauteur, unite) + ' reportée' : 'hauteur ' + prix(f.hauteur, unite) + ' reportée';
-    return 'Maintenant : validation = ' + sorties + ' (ou 1 clôture + retour réussi, ≤ ' + P.retourMax + ')' + (invals.length ? ' · invalidation = ' + invals.join(' ou ') : '') + ab
+    const base = famille(f) === 'drapeau' ? 'mât reporté' : famille(f) === 'lignes' ? 'largeur ' + prixRond(f.hauteur, unite) + ' reportée' : 'hauteur ' + prixRond(f.hauteur, unite) + ' reportée';
+    return 'Maintenant : validation = ' + sorties + ' (ou 1 + retour)' + (invals.length ? ' · invalidation = ' + invals.join(' ou ') : '') + ab
       + (fini(N.pointe) ? ' · pointe à ' + heureCourte(finMs(ctx, Math.floor(N.pointe)), ctx) + ' (sans sortie : sans suite)' : '') + ' · objectif théorique (convention, non garanti) : ' + objs + ' (' + base + ').';
   }
   const QUOI_JOURNAL = { repere: 'repéré', ebauche: 'ébauche', suivi: 'point en attente déplacé', recalage: 'recalé', demi: 'sortie 1/2', retour: 'retour', sortie_annulee: 'sortie non validée',
@@ -2497,7 +2518,8 @@ const Guide = (function () {
     if (!J.length) return '';
     // L'heure (de l'appareil) seule le même jour ; la date (jj/mm) à chaque changement de jour, ou
     // partout sur des bougies de 4 h et plus (un jour : la date seule).
-    const J8 = J.slice(-8), plusieurs = new Set(J8.map(x => fini(finMs(ctx, x.j)) ? dateVue(finMs(ctx, x.j)) : '')).size > 1;
+    // Compact (charte du 12/10/2026) : les 5 derniers faits, sans les bornes ni les clôtures.
+    const J8 = J.slice(-5), plusieurs = new Set(J8.map(x => fini(finMs(ctx, x.j)) ? dateVue(finMs(ctx, x.j)) : '')).size > 1;
     let jourPrec = null;
     const quand = ms => {
       if (!fini(ms)) return '—';
@@ -2507,10 +2529,8 @@ const Guide = (function () {
       return (montre ? d + ' ' : '') + heureVue(ms);
     };
     const parts = J8.map(x => quand(finMs(ctx, x.j)) + ' ' + QUOI_JOURNAL[x.quoi]
-      + (x.quoi === 'repere' && x.triple ? ' (3e ' + (/creux/.test(f.type) ? 'creux' : 'sommet') + ' : le double devient un triple)' : '')
-      + (x.quoi === 'recalage' && x.apres ? ' (bornes ' + chiffres(x.avant[0]) + ' / ' + chiffres(x.avant[1]) + ' → ' + chiffres(x.apres[0]) + ' / ' + chiffres(x.apres[1]) + ')' : '')
-      + ((x.quoi === 'demi' || x.quoi === 'confirme' || x.quoi === 'invalide' || x.quoi === 'invalide_avant' || x.quoi === 'atteint') && fini(x.c) ? ' (clôture ' + prix(x.c, unite) + ')' : ''));
-    return 'Observé (fin de bougie) : ' + (J.length > 8 ? '… · ' : '') + parts.join(' · ') + '.';
+      + (x.quoi === 'repere' && x.triple ? ' (3e ' + (/creux/.test(f.type) ? 'creux' : 'sommet') + ', devenu triple)' : ''));
+    return 'Observé (fin de bougie) : ' + (J.length > 5 ? '… · ' : '') + parts.join(' · ') + '.';
   }
   /** La lecture classique (débattue) d'un type, à côté du partage mesuré des sorties (Expert). */
   const CLASSIQUE = { biseau_montant: 'sortie par le bas', biseau_descendant: 'sortie par le haut', drapeau: 'sortie dans le sens du mât', fanion: 'sortie dans le sens du mât',
@@ -2518,27 +2538,28 @@ const Guide = (function () {
   /** La bulle Expert d'une figure : règle, niveaux du moment, bilan, journal, invalidées récemment,
    *  lectures concurrentes, avertissement. extra = { concurrentes: [figures], tombees: [figures] }. */
   function texteFormeExpert(f, b, ctx, P, unite, extra) {
-    const x = extra || {}, out = [], itv = nomIntervalle(ctx && ctx.intervalle);
-    out.push('Règle (seuils de convention) : ' + regleExpert(f, P, unite) + ' Détection mécanique sur les bougies ' + itv + ' closes (pivots : ' + P.pivot + ' bougies de chaque côté).'
-      + (f.ebauche ? ' Ébauche : le dernier ' + (f.s > 0 ? 'sommet' : 'creux') + ' (' + prix(f.pend.p, unite) + ') est en attente, il manque ' + f.pend.reste + ' bougie' + (f.pend.reste > 1 ? 's' : '') + ' ' + itv + ' pour le confirmer.' : ''));
+    // Compact (charte du 12/10/2026) : la règle de détection et ses seuils sont dans la fiche des
+    // figures ; la bulle garde le moment (niveaux, ébauche), le bilan court, le journal, le reste en noms.
+    const x = extra || {}, out = [], nomC = g => NOMS_FORMES[g.type][0].replace(/ \(.*\)$/, '');
+    // Une ébauche : le titre dit déjà « ébauche » et les bougies qui manquent ; le prix du point en attente ici.
+    if (f.ebauche && !f.fin) out.push('Point en attente : ' + prix(f.pend.p, unite) + '.');
     if (!f.fin) out.push(niveauxExpert(f, ctx, P, unite));
     else out.push(marqueFin(f, ctx, 'expert', unite).replace(/^./, c => c.toUpperCase()) + '.' + (fini(f.objectif) && f.fin !== 'abandon' ? (f.fin === 'atteint' ? ' Objectif théorique (convention, non garanti) : ' : ' Objectif (caduc) : ') + prix(f.objectif, unite) + '.' : ''));
     if (b) {
-      let t = texteBilan(b, ctx, P, 'expert');
-      if (CLASSIQUE[f.type]) t += ' · lecture classique (débattue) : ' + CLASSIQUE[f.type] + ' ; ici, mesuré : ↑ ' + b.haut + ' / ↓ ' + b.bas + ' sur ' + (b.haut + b.bas);
+      let t = texteBilan(b, ctx, P, 'expertCompact');
+      if (CLASSIQUE[f.type]) t += ' · lecture classique (débattue) : ' + CLASSIQUE[f.type] + (FAMILLES[f.type] === 'lignes' ? '' : ' ; mesuré ↑ ' + b.haut + ' / ↓ ' + b.bas);
       out.push(t + '.');
     }
     const J = texteJournal(f, ctx, unite);
     if (J) out.push(J);
     const tb = (x.tombees || []).filter(g => g !== f);
-    // Les figures invalidées, les figures sans suite (ni validées ni invalidées), puis les ébauches
-    // annulées (jamais devenues des figures) : chacune sous son titre.
+    // Les figures tombées récemment : leurs noms seuls, en une ligne (leur détail : leur propre bulle).
+    const nomsDe = L => [...new Set(L.map(nomC))].map((n, k) => (k ? n.toLowerCase() : n)).join(', ');
     const tbF = tb.filter(g => !g.ebauche && g.fin !== 'expire_avant'), tbS = tb.filter(g => !g.ebauche && g.fin === 'expire_avant'), tbE = tb.filter(g => g.ebauche);
-    if (tbF.length) out.push('Invalidées récemment (ce graphique) : ' + tbF.map(g => NOMS_FORMES[g.type][0] + ' ' + marqueFin(g, ctx, 'expert', unite).replace(/^✗ /, '')).join(' ; ') + '.');
-    if (tbS.length) out.push('Sans suite récemment (ce graphique, sorties jamais validées) : ' + tbS.map(g => NOMS_FORMES[g.type][0] + ' ' + marqueFin(g, ctx, 'expert', unite).replace(/^○ sans suite /, '')).join(' ; ') + '.');
-    if (tbE.length) out.push('Ébauches annulées récemment (jamais devenues des figures) : ' + tbE.map(g => NOMS_FORMES[g.type][0] + ' ' + marqueFin(g, ctx, 'expert', unite).replace(/^✗ ébauche annulée /, '')).join(' ; ') + '.');
-    if (x.concurrentes && x.concurrentes.length) out.push('Raisonnement : lecture concurrente sur le même ' + (f.s > 0 || f.sens < 0 ? 'sommet' : 'point') + ' : ' + x.concurrentes.map(g => NOMS_FORMES[g.type][0].toLowerCase() + ' (' + etatForme(g).court + ')').join(', ') + ' ; une seule est montrée.');
-    out.push(RISQUE + ' Lecture des formes : débattue ; une description, pas une recommandation.');
+    const recents = [tbF.length ? 'Invalidées récemment : ' + nomsDe(tbF) : '', tbS.length ? 'Sans suite récemment : ' + nomsDe(tbS) : '', tbE.length ? 'Ébauches annulées récemment : ' + nomsDe(tbE) : ''].filter(Boolean);
+    if (recents.length) out.push(recents.join(' · ') + '.');
+    if (x.concurrentes && x.concurrentes.length) out.push('Lecture concurrente : ' + x.concurrentes.map(g => nomC(g).toLowerCase() + ' (' + etatForme(g).court + ')').join(', ') + ' ; une seule est montrée.');
+    out.push(AVERTISSEMENT_FORME);
     return out;
   }
   /** Le titre de la bulle d'une figure. */
@@ -2663,16 +2684,16 @@ const Guide = (function () {
       const texte = ['Exemple passé : ' + (valide ? 'validé ' + quandExpert(finMs(ctx, f.jConf), ctx) + ' ; ensuite, ' : 'jamais validé ; ') + marqueFin(f, ctx, 'expert', unite)
         + (valide && n > 0 ? ' — ' + n + ' bougie' + (n > 1 ? 's' : '') + (fini(d) ? ' (' + duree(d) + ')' : '') + ' après la validation' : '') + '.'];
       if (C.length) texte.push(C[0]);
-      texte.push('Règle (seuils de convention) : ' + regleExpert(f, P, unite));
+      // La règle de détection : dans la fiche des figures (charte du 12/10/2026).
       if (valide && fini(f.objectif)) texte.push('Objectif théorique (convention, non garanti) : ' + prix(f.objectif, unite) + (f.fin === 'atteint' ? ', atteint.' : ', pas atteint.'));
       if (b) {
-        let t = texteBilan(b, ctx, P, 'expert');
-        if (CLASSIQUE[f.type]) t += ' · lecture classique (débattue) : ' + CLASSIQUE[f.type] + ' ; ici, mesuré : ↑ ' + b.haut + ' / ↓ ' + b.bas + ' sur ' + (b.haut + b.bas);
+        let t = texteBilan(b, ctx, P, 'expertCompact');
+        if (CLASSIQUE[f.type]) t += ' · lecture classique (débattue) : ' + CLASSIQUE[f.type] + (FAMILLES[f.type] === 'lignes' ? '' : ' ; mesuré ↑ ' + b.haut + ' / ↓ ' + b.bas);
         texte.push(t + '.');
       }
       const J = texteJournal(f, ctx, unite);
       if (J) texte.push(J);
-      texte.push(RISQUE + ' Une figure passée dit ce qui s’est passé ensuite : pas une prévision ni une recommandation.');
+      texte.push('Un exemple passé : pas une prévision ni une recommandation.');
       return { titre, texte, resume: null };
     }
     const nomL = NOM_LONG_DEBUTANT[f.type], dm = dureeMots(d), apres = dm ? ' ' + dm + ' plus tard' : '';
@@ -2687,9 +2708,10 @@ const Guide = (function () {
     let def = DEFINITION_FORME[f.type] || '';
     if (famille(f) === 'lignes' && fini(f.sens)) def = def.replace(/en est sorti\./, 'en est sorti ' + (f.sens > 0 ? 'par le haut' : 'par le bas') + '.');
     const conf = valide ? finMs(ctx, f.jConf) : NaN, qc = fini(conf) && heureVueSi(conf) ? ' ' + quandDeb(conf, ctx) : '';
-    const texte = [def, valide ? 'Figure validée' + qc + '. Cible théorique selon l’usage des analystes : ' + prix(f.objectif, unite) + ', non garantie.' : '',
-      (valide ? ensuite[0] + ' ' : '') + marqueFin(f, ctx, 'debutant', unite)]
-      .concat(C.length ? [C[0]] : [], b ? [bilanDebutant(f, b, ctx, P)] : [], [RISQUE + ' Un exemple du passé, pas une prévision ni un conseil.']);
+    const texte = [def, valide ? 'Figure validée' + qc + ' ; cible théorique selon l’usage des analystes : ' + prix(f.objectif, unite) + ', non garantie.' : '',
+      // Ce qui s'est passé ensuite : la marque de fin (quand, pourquoi) et le délai, sans redire le résumé.
+      valide && dm && marqueFin(f, ctx, 'debutant', unite) ? marqueFin(f, ctx, 'debutant', unite).replace(/\.$/, '') + ' (' + dm + ' après la validation).' : marqueFin(f, ctx, 'debutant', unite) || (valide ? ensuite[0] : '')]
+      .concat(C.length ? [C[0]] : [], b ? [bilanDebutant(f, b, ctx, P)] : [], ['Un exemple du passé, pas une prévision ni un conseil.']);
     return { titre, texte: texte.filter(Boolean), resume: [ensuite, C] };
   }
   // ── Les statistiques d'une figure (demande du 11/10/2026) : la cible et le taux de réussite
@@ -2738,7 +2760,7 @@ const Guide = (function () {
       comment: 'Comment elle se calcule : ' + commentCible(f) + ' C’est l’usage des analystes, pas une mesure du site, et rien ne la garantit.',
       taux: null, phrase: '', temoin: null, delai: null, lignes: [], dernieres: [], faible: false,
       source: 'Mesuré par le site sur ' + (dernieres(ctx && ctx.duree) ? 'les ' + dernieres(ctx.duree) : 'l’historique') + ' de ce graphique (' + nomIntervalle(ctx && ctx.intervalle) + '), sans regarder l’avenir : à chaque instant, seul le passé est connu.',
-      risque: RISQUE + ' Des comptes du passé, pas une prévision ni un conseil.' };
+      risque: 'Des comptes du passé, pas une prévision ni un conseil.' };
     if (!b) return S;
     const finis = b.atteints + b.invalides + b.expires, T = b.temoin || { departs: 0, atteints: 0 }, E = b.ebauches || { n: 0, devenues: 0, confirmees: 0 };
     S.taux = { atteints: b.atteints, invalides: b.invalides, expires: b.expires, finis, ouverts: b.ouverts };
@@ -2796,9 +2818,9 @@ const Guide = (function () {
     detecter, bilan, formesAffichees, formesDebutant, idFigure, etatForme, NOMS_FORMES, texteBilan, suite, texteSuite, VARIANTES_SUITE, tagMicro, deArt, decrire, decrireCompact, lecture, VARIANTES_LECTURE, phraseForme, TYPES, bornes,
     FAMILLES, famille, groupeVue, enAttente, candidats, avancer, niveauxFigure, figureVivante, cleFigure, niveauAbandon, wilson, ecartTemoin, dernierPoint, rangFigure, concurrentes, tombees, phaseA, classer, deuxDroites, ete, drapeau, tripleExtreme, doubleExtreme, range, ligne,
     NOMS_DEBUTANT, raisonPrincipale, choixDebutant, reperesDe, choisirReperes, VERBE_DEBUTANT, optionsSeules, libelleDebutant, libellesDebutant, formatDebutant, AVEC_POINT, titreDebutant, nomDebutant, nomPhrase, HORIZON_DEBUTANT, HORIZON_COURT, PERIODE_DEBUTANT, phrasesDebutant, phraseDebutant,
-    texteSuiteDebutant, prixRond, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
+    texteSuiteDebutant, prixRond, ageLu, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
     MARQUES_FIN, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, libelleFormeCourt, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant,
-    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, resumeStatsFigure, statsFigure, ciblesFigure };
+    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_FORME, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, ciblesFigure };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;

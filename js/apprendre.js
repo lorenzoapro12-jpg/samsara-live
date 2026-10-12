@@ -142,15 +142,17 @@ const Apprendre = (function () {
   const nomScenario = sc => (sc && sc.rang === 'S' ? 'Scénario de la semaine' : 'Scénario ' + (sc ? sc.rang : ''));
   const ordinal = k => (k === 1 ? '1re' : k + 'e');
   const majuscule = t => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
-  const FIN_DEBUTANT = ' Une description, pas une prévision ni un conseil.';
-  const FIN_EXPERT = ' Une description, pas une recommandation.';
+  // L'avertissement : UNE ligne courte en fin de bulle (charte du 12/10/2026), sans la ligne du
+  // risque devant (deux phrases pour une seule idée).
+  const FIN_DEBUTANT = 'Une description, pas une prévision ni un conseil.';
+  const FIN_EXPERT = 'Une description, pas une recommandation.';
   /** Le repère en mots : son prix (celui de son libellé) et son nom (« le plus haut d'hier »). */
   function repereMots(niv, unite) {
     const r = niv ? Gd.raisonPrincipale(niv) : null;
     return { X: r ? Gd.prixR(r, unite) : niv ? Gd.prix(niv.p, unite) : '', N: r ? Gd.nomPhrase(r) : '' };
   }
   /** Les textes d'un événement : { variantes (ligne, de la plus riche à la plus courte), titre,
-   *  texte (paragraphes de la bulle, le dernier commence par Guide.RISQUE), resume (Lisible :
+   *  texte (paragraphes de la bulle, le dernier est l'avertissement, une ligne courte), resume (Lisible :
    *  les phrases du 1er toucher, en variantes) }. mode 'debutant' | 'expert' ; o = { unite, itv }. */
   function textes(e, mode, o) {
     if (!e) return null;
@@ -160,7 +162,7 @@ const Apprendre = (function () {
     return T;
   }
   function lisible(e, o) {
-    const P = periode(o.itv), R = Gd.RISQUE;
+    const P = periode(o.itv);
     if (e.source === 'repere') {
       const { X, N } = repereMots(e.niv, o.unite), haut = e.sens > 0, de = N ? ' (' + N + ')' : '';
       const au = haut ? 'au-dessus de ' + X : 'sous ' + X, cote = haut ? 'au-dessus' : 'en dessous';
@@ -168,94 +170,94 @@ const Apprendre = (function () {
         const V = ['Prix ' + au + ' : cassé seulement si ' + P[1] + ' finissent ' + cote + '.', 'Prix ' + au + ' : pas encore cassé.', majuscule(au) + ', pas encore cassé.'];
         return { variantes: V, titre: 'Le prix passe un repère',
           texte: ['Le prix vient de passer ' + au + de + '.',
-            'Un repère est « cassé » quand le prix passe de l’autre côté et y reste : ' + P[1] + ' finis ' + cote + '. Avant, le prix peut revenir : ce passage seul ne valide rien.',
-            R + FIN_DEBUTANT],
-          resume: [['Le prix vient de passer ' + au + de + '.', 'Le prix vient de passer ' + au + '.'], ['« Cassé » : ' + P[1] + ' finis ' + cote + ' ; avant, le prix peut revenir.'], [R]] };
+            '« Cassé » seulement si ' + P[1] + ' finissent ' + cote + '. Avant, le prix peut revenir.',
+            FIN_DEBUTANT],
+          resume: [['Le prix vient de passer ' + au + de + '.', 'Le prix vient de passer ' + au + '.'], ['« Cassé » : ' + P[1] + ' finis ' + cote + ' ; avant, le prix peut revenir.']] };
       }
       const V = ['Le prix a cassé ' + X + ' : ' + P[1] + ' ont fini ' + cote + ', c’est validé.', 'Le prix a cassé ' + X + ' : ' + P[1] + ' ont fini ' + cote + '.',
         'Repère ' + X + ' cassé ' + (haut ? 'vers le haut' : 'vers le bas') + '.'];
       return { variantes: V, titre: 'Repère cassé',
         texte: ['Le prix a cassé ' + X + de + ' : il est passé ' + cote + ' et ' + P[1] + ' ont fini de ce côté' + (e.retest ? ', avec un retour sur le repère entre les deux' : '') + '.',
-          'C’est ce que le site appelle « cassé » : passer de l’autre côté et y rester. Le prix peut encore revenir le toucher, ou repasser de l’autre côté.',
-          R + FIN_DEBUTANT],
+          '« Cassé » : passé de l’autre côté, et resté. Le prix peut encore revenir.',
+          FIN_DEBUTANT],
         resume: [['Le prix est passé ' + cote + ' de ' + X + de + ' et ' + P[1] + ' ont fini de ce côté.', 'Le prix est passé ' + cote + ' de ' + X + ' et ' + P[1] + ' ont fini de ce côté.'],
-          ['C’est « cassé » : passé de l’autre côté, et resté.'], [R]] };
+          ['C’est « cassé » : passé de l’autre côté, et resté.']] };
     }
     if (e.source === 'figure') {
       const f = e.f, nom = (Gd.NOM_FORME_DEBUTANT && Gd.NOM_FORME_DEBUTANT[f.type]) || 'Figure', fam = Gd.famille(f), sortie = fam === 'lignes' || fam === 'drapeau';
-      const FIN = R + ' Une lecture débattue, pas une prévision ni un conseil.';
+      const FIN = Gd.AVERTISSEMENT_FORME;
       if (e.type === 'figure_validee') {
         const s = f.sens > 0, tete = sortie ? nom + ' : sortie ' + (s ? 'en haut' : 'en bas') + ' validée' : nom + ' validé';
         const ou = sortie ? (s ? 'au-dessus' : 'en dessous') : (s ? 'au-dessus de sa ligne' : 'sous sa ligne');
         return { variantes: [tete + ' : ' + P[1] + ' ont fini ' + ou + '.', tete + '.'], titre: tete,
           texte: [tete + ' : ' + P[1] + ' ont fini ' + ou + '.',
-            'Une figure est « validée » quand le prix sort de sa ligne et y reste : ' + P[1] + ' finis au-delà. Elle a alors une cible théorique, non garantie, et un niveau qui l’annule.', FIN],
-          resume: [['Le prix est sorti ' + (s ? 'par le haut' : 'par le bas') + ' et ' + P[1] + ' ont fini ' + ou + '.'], ['C’est « validé » : sorti, et resté.'], [R]] };
+            '« Validée » : sortie de sa ligne, et restée. Elle a une cible théorique, non garantie, et un niveau qui l’annule.', FIN],
+          resume: [['Le prix est sorti ' + (s ? 'par le haut' : 'par le bas') + ' et ' + P[1] + ' ont fini ' + ou + '.'], ['C’est « validé » : sorti, et resté.']] };
       }
       if (e.type === 'figure_tombee') {
         if (e.cleEtat === 'abandon') {
           const tete = nom + ' possible annulé';
           return { variantes: [tete + ' : la figure ne s’est pas formée.', '✗ ' + tete + '.'], titre: tete,
-            texte: [tete + ' : la figure ne s’est pas formée.', 'Une figure « possible » attend encore son dernier point : celle-ci ne s’est pas formée, elle ne compte plus.', FIN],
-            resume: [['La figure possible ne s’est pas formée.'], ['Elle ne compte plus.'], [R]] };
+            texte: [tete + ' : la figure ne s’est pas formée.', 'Il lui manquait son dernier point : elle ne compte plus.', FIN],
+            resume: [['La figure possible ne s’est pas formée.'], ['Elle ne compte plus.']] };
         }
         const tete = nom + ' invalidé';
         return { variantes: [tete + ' : le prix a fini au-delà du niveau qui l’annule.', '✗ ' + tete + '.'], titre: tete,
           texte: [tete + ' : le prix a fini ' + P[0] + ' au-delà du niveau qui l’annule.',
-            'Une figure « tombe » quand le prix finit au-delà du niveau qui l’annule : sa lecture ne tient plus. Aucune figure ne réussit à coup sûr.', FIN],
-          resume: [['Le prix a fini au-delà du niveau qui annule la figure.'], ['Elle est « tombée » : sa lecture ne tient plus.'], [R]] };
+            'Sa lecture ne tient plus. Aucune figure ne réussit à coup sûr.', FIN],
+          resume: [['Le prix a fini au-delà du niveau qui annule la figure.'], ['Elle est « tombée » : sa lecture ne tient plus.']] };
       }
       if (e.type === 'figure_atteinte') {
         const tete = nom + ' : cible atteinte';
         return { variantes: [tete + ', ' + P[0] + ' a fini à la cible ou au-delà.', tete + '.'], titre: tete,
           texte: [tete + ' : ' + P[0] + ' a fini à la cible théorique ou au-delà.',
-            'La cible théorique est un usage des analystes, non garanti : l’atteindre ne dit rien de la suite.', FIN],
-          resume: [[majuscule(P[0]) + ' a fini à la cible théorique ou au-delà.'], ['L’atteindre ne dit rien de la suite.'], [R]] };
+            'Cette cible est un usage des analystes, non garanti : l’atteindre ne dit rien de la suite.', FIN],
+          resume: [[majuscule(P[0]) + ' a fini à la cible théorique ou au-delà.'], ['L’atteindre ne dit rien de la suite.']] };
       }
       if (e.type === 'figure_finie') {
         const sansSuite = e.cleEtat === 'sans_suite', tete = sansSuite ? nom + ' sans suite' : nom + ' : délai écoulé';
         const quoi = sansSuite ? (f.raison === 'pointe' ? 'le prix est resté dedans jusqu’à la pointe.' : 'le prix n’en est pas sorti à temps.') : 'ni la cible ni l’invalidation n’ont été atteintes.';
         return { variantes: [tete + (sansSuite ? ' : ' : ', ') + quoi, tete + '.'], titre: tete,
-          texte: [tete + (sansSuite ? ' : ' : ', ') + quoi, 'Une figure peut finir sans issue : elle ne compte plus, ni comme réussite ni comme échec.', FIN],
-          resume: [[majuscule(quoi)], ['Elle ne compte plus.'], [R]] };
+          texte: [tete + (sansSuite ? ' : ' : ', ') + quoi, 'Elle ne compte plus, ni comme réussite ni comme échec.', FIN],
+          resume: [[majuscule(quoi)], ['Elle ne compte plus.']] };
       }
       return null;
     }
     if (e.source === 'scenario') {
-      const sc = e.sc || {}, nomS = nomScenario(sc), n = (sc.cibles || []).length, FIN = R + ' Une hypothèse de Claude (une IA), pas une promesse ni un conseil.';
-      const qui = 'Les scénarios sont des hypothèses écrites le matin par Claude, une IA ; le site les suit en direct sur ce graphique. La note officielle est celle du journal, le lendemain.';
+      const sc = e.sc || {}, nomS = nomScenario(sc), n = (sc.cibles || []).length, FIN = 'Une hypothèse de Claude (une IA), pas une promesse ni un conseil.';
+      const qui = 'Écrit le matin par Claude, une IA ; suivi en direct ici. La note officielle : le journal, le lendemain.';
       let tete, quoi, mot;
-      if (e.type === 'scenario_cible') { tete = nomS + ' : ' + ordinal(e.k) + ' cible touchée'; quoi = 'le prix a atteint sa zone.'; mot = 'Une cible est « touchée » quand le prix entre dans sa zone, même un instant.'; }
-      else if (e.type === 'scenario_realise') { tete = nomS + ' réalisé'; quoi = 'le prix a touché ' + (n > 1 ? 'ses ' + n + ' cibles dans l’ordre' : 'sa cible') + (sc.invalidation !== null && sc.invalidation !== undefined ? ', avant l’invalidation.' : '.'); mot = 'Un scénario « réalisé » est allé au bout de ce qu’il disait : cela ne dit rien de la suite.'; }
-      else if (e.type === 'scenario_tombe' && e.cleEtat === 'sortie') { tete = nomS + ' sorti'; quoi = 'le prix a quitté ses bornes par le ' + (e.haut ? 'haut' : 'bas') + '.'; mot = 'Ce scénario disait que le prix resterait entre deux bornes : il ne tient plus.'; }
-      else if (e.type === 'scenario_tombe') { tete = nomS + ' invalidé'; quoi = 'le prix a touché son invalidation avant ' + (n > 1 ? 'la dernière cible.' : 'la cible.'); mot = 'L’invalidation est le niveau qui fait tomber le scénario s’il est touché avant la dernière cible : il ne tient plus.'; }
-      else if (e.type === 'scenario_indecis') { tete = nomS + ' indécis'; quoi = 'deux de ses niveaux touchés en même temps, ordre inconnu.'; mot = 'Quand deux niveaux sont touchés dans le même créneau, l’ordre n’est pas connu : le journal tranchera, le lendemain.'; }
+      if (e.type === 'scenario_cible') { tete = nomS + ' : ' + ordinal(e.k) + ' cible touchée'; quoi = 'le prix a atteint sa zone.'; mot = '« Touchée » : le prix est entré dans sa zone, même un instant.'; }
+      else if (e.type === 'scenario_realise') { tete = nomS + ' réalisé'; quoi = 'le prix a touché ' + (n > 1 ? 'ses ' + n + ' cibles dans l’ordre' : 'sa cible') + (sc.invalidation !== null && sc.invalidation !== undefined ? ', avant l’invalidation.' : '.'); mot = 'Allé au bout de ce qu’il disait : cela ne dit rien de la suite.'; }
+      else if (e.type === 'scenario_tombe' && e.cleEtat === 'sortie') { tete = nomS + ' sorti'; quoi = 'le prix a quitté ses bornes par le ' + (e.haut ? 'haut' : 'bas') + '.'; mot = 'Il disait que le prix resterait entre deux bornes : il ne tient plus.'; }
+      else if (e.type === 'scenario_tombe') { tete = nomS + ' invalidé'; quoi = 'le prix a touché son invalidation avant ' + (n > 1 ? 'la dernière cible.' : 'la cible.'); mot = 'Le scénario ne tient plus.'; }
+      else if (e.type === 'scenario_indecis') { tete = nomS + ' indécis'; quoi = 'deux de ses niveaux touchés en même temps, ordre inconnu.'; mot = 'Le journal tranchera, le lendemain.'; }
       else return null;
       // « Scénario 1 : 1re cible touchée, le prix… » : pas deux deux-points dans la même phrase.
       const sep = e.type === 'scenario_cible' ? ', ' : ' : ';
       return { variantes: [tete + sep + quoi, tete + '.'], titre: nomS + ' de Claude',
-        texte: [tete + sep + quoi, mot, qui, FIN], resume: [[majuscule(quoi)], [mot], [R]] };
+        texte: [tete + sep + quoi, mot, qui, FIN], resume: [[majuscule(quoi)], [mot]] };
     }
     return null;
   }
   function expert(e, o) {
-    const R = Gd.RISQUE, titre = 'Ce qui vient de se passer';
+    const titre = 'Ce qui vient de se passer';
     if (e.source === 'repere') {
       // La bande par ses prix (« 84 145 – 84 321 $ ») : ses raisons sont dans son libellé, à l'écran.
       const n = e.niv || {}, X = fini(n.pMin) && fini(n.pMax) && n.pMax > n.pMin ? Gd.chiffres(n.pMin) + ' – ' + Gd.prix(n.pMax, o.unite) : Gd.prix(n.p, o.unite), fl = e.sens > 0 ? '↑' : '↓';
-      const regle = 'Règle de travail du Guide : la cassure part de la dernière traversée de la bande ; elle est validée par la clôture suivante au-delà (2 clôtures), ou par une clôture au-delà après un retour sur la bande. Une mèche au-delà ne casse rien.';
+      const regle = 'Cassure : 2 clôtures au-delà de la bande, ou 1 après un retour sur elle ; une mèche ne casse rien.';
       if (e.type === 'repere_passe') {
         const V = ['Niveau ' + X + ' franchi ' + fl + ' · bougie pas encore close : la cassure se juge en clôture', 'Niveau ' + X + ' franchi ' + fl + ' · non clos', X + ' franchi ' + fl];
-        return { variantes: V, titre, texte: ['Le prix live est passé ' + (e.sens > 0 ? 'au-dessus' : 'en dessous') + ' de la bande ' + X + ' : au-delà, bougie pas encore close.', regle, R + FIN_EXPERT], resume: null };
+        return { variantes: V, titre, texte: ['Le prix live est passé ' + (e.sens > 0 ? 'au-dessus' : 'en dessous') + ' de la bande ' + X + ' : au-delà, bougie pas encore close.', regle, FIN_EXPERT], resume: null };
       }
       const etat = 'cassé ' + (e.sens > 0 ? 'vers le haut' : 'vers le bas') + ' (' + (e.retest ? 'validé par un retour réussi' : '2/2 clôtures, validé') + ')';
       return { variantes: ['Niveau ' + X + ' : ' + etat, 'Niveau ' + X + ' cassé ' + fl + (e.retest ? ' · retour réussi' : ' 2/2'), X + ' cassé ' + fl],
-        titre, texte: ['Niveau ' + X + ' : ' + etat + '.', regle, R + FIN_EXPERT], resume: null };
+        titre, texte: ['Niveau ' + X + ' : ' + etat + '.', regle, FIN_EXPERT], resume: null };
     }
     if (e.source === 'figure') {
       const f = e.f, nom = (Gd.NOMS_FORMES[f.type] || ['Figure'])[0], et = Gd.etatForme(f);
-      const regle = 'Machine d’état des figures : validation par 2 clôtures au-delà de la ligne (ou 1 puis un retour) ; invalidation par une clôture au-delà de l’invalidation ; objectif théorique jugé en clôture.';
-      return { variantes: [nom + ' : ' + et.texte, nom + ' : ' + et.court], titre, texte: [nom + ' : ' + et.texte + '.', regle, R + FIN_EXPERT], resume: null };
+      const regle = 'Validation : 2 clôtures au-delà de la ligne (ou 1 + retour) ; invalidation : 1 clôture au-delà ; objectif jugé en clôture.';
+      return { variantes: [nom + ' : ' + et.texte, nom + ' : ' + et.court], titre, texte: [nom + ' : ' + et.texte + '.', regle, 'Une lecture débattue, pas une recommandation.'], resume: null };
     }
     if (e.source === 'scenario') {
       const sc = e.sc || {}, nomS = nomScenario(sc);
@@ -263,7 +265,7 @@ const Apprendre = (function () {
         scenario_tombe: e.cleEtat === 'sortie' ? 'sorti par le ' + (e.haut ? 'haut' : 'bas') : 'invalidé (invalidation touchée avant la dernière cible)' }[e.type];
       if (!etat) return null;
       return { variantes: [nomS + ' : ' + etat + ' · suivi en direct', nomS + ' : ' + etat], titre,
-        texte: [nomS + ' : ' + etat + ' (suivi en direct sur les bougies de ce graphique, un affichage).', 'Une bougie dont le plus haut et le plus bas recoupent une zone la touche ; la note officielle est celle du journal, le lendemain.', R + ' Une hypothèse de Claude (une IA), pas une recommandation.'], resume: null };
+        texte: [nomS + ' : ' + etat + ' (suivi en direct).', 'Touchée : une bougie recoupe la zone. Note officielle : le journal, le lendemain.', 'Une hypothèse de Claude (une IA), pas une recommandation.'], resume: null };
     }
     return null;
   }

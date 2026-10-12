@@ -90,8 +90,8 @@ const ligne = page => page.evaluate(() => {
           if (s.page.meneur === '2' && s.page.montre === '1' && s.page.net) { if (!(etroit ? /^En direct : le 2 \(80 806 \$\) suit mieux( le prix)? ▸$|^Scénario( du matin)? : en cours \(en direct\) ▸$/ : /^En direct : le 2 \(80 806 \$\) suit mieux le prix ▸$/).test(t)) faux.push([hm(s.t), 'cas C attendu', t]); }
           else if (s.page.meneur === '1' || s.page.cas === 'tot' || (s.page.meneur && !s.page.net)) { if (!/^Scénario( du matin)? : en cours \(en direct\) ▸$/.test(t)) faux.push([hm(s.t), 'cas A attendu', t]); }
           if (L.texte.length > (etroit ? 40 : 48)) faux.push([hm(s.t), 'trop longue', t]);
-          // Le nom dit aussi dans la bulle du libellé (la ligne peut céder sa place à une figure).
-          if (s.page.meneur && s.page.meneur !== s.page.montre && !new RegExp('^(Pour l’instant, le prix est le plus près de ce que décrit le scénario|Le scénario) ' + s.page.meneur + ' ', 'm').test(L.un)) faux.push([hm(s.t), 'bulle du libellé sans le nom', L.un.slice(0, 300)]);
+          // Le nom dit aussi dans la bulle du libellé (la ligne peut céder sa place à une figure) ; phrase courte depuis la charte du 12/10/2026.
+          if (s.page.meneur && s.page.meneur !== s.page.montre && !new RegExp('^(Pour l’instant, le prix est le plus près de ce que décrit le scénario|Pour l’instant, le scénario|Le scénario) ' + s.page.meneur + ' ', 'm').test(L.un)) faux.push([hm(s.t), 'bulle du libellé sans le nom', L.un.slice(0, 300)]);
         }
         check(`${mode} ${vue.width} : la ligne suit le nom (cas C quand le 2 est nommé, cas A quand c'est le 1), « (en direct) » partout, le nom aussi dans la bulle du libellé : ${[...new Set(suite.map(s => s.L && s.L.texte))].join(' / ')}`, !faux.length, faux);
         const lib = suite.filter(s => !(s.libelles.length === 1 && s.libelles[0].rang === '1'));
