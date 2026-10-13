@@ -1545,7 +1545,7 @@ const Guide = (function () {
       const eb = E.n ? ' · ébauches ' + E.n + ' → figures ' + E.devenues + (lignesF ? '' : ' → valid. ' + E.confirmees) + (E.n < P.echantillonFaible ? ' (éch. faible)' : '') : '';
       const ecart = { peu: '', pareil: ' (pareil au repère, Wilson 95 %)', plus: ' (plus souvent que le repère, Wilson 95 %)', moins: ' (moins souvent que le repère, Wilson 95 %)' }[b.ecart || 'peu'];
       if (lignesF) {
-        return 'Mesuré · hist. ' + nb + ' × ' + itv + ' (' + d + ') : ' + b.formes + ' repérées · sorties ↑ ' + b.haut + ' / ↓ ' + b.bas + ' · après sortie : cible ' + b.atteints + ' / invalidée ' + b.invalides + ' / sans issue ' + b.expires + ' / ouv. ' + b.ouverts
+        return 'Mesuré · hist. ' + nb + ' × ' + itv + ' (' + d + ') : ' + b.formes + ' repérées · sorties ↑ ' + b.haut + ' / ↓ ' + b.bas + ' · après sortie : objectif ' + b.atteints + ' / invalidée ' + b.invalides + ' / sans issue ' + b.expires + ' / ouv. ' + b.ouverts
           + (T.departs ? ' · sans forme : obj. ' + nombre(T.atteints, 0) + '/' + nombre(T.departs, 0) + ecart : '') + eb + (faible ? ' · échantillon faible' : '');
       }
       return 'Mesuré · hist. ' + nb + ' × ' + itv + ' (' + d + ') : ' + b.formes + ' repérés' + (b.devenusTriples ? ' (dont ' + b.devenusTriples + (b.devenusTriples > 1 ? ' devenus triples)' : ' devenu triple)') : '') + ' · ' + b.confirmes + ' valid. · obj. ' + b.atteints + ' · inval. ' + b.invalides
@@ -2084,7 +2084,7 @@ const Guide = (function () {
       case 'invalide': return '✗ ' + nom + ' invalidé';
       case 'abandon': return '✗ ' + nom + ' annulé';
       case 'sans_suite': return MARQUES_FIN.expire_avant + ' ' + nom + ' sans suite';
-      case 'atteint': return tenir([nom + ' : cible atteinte', nom + ' : cible ✓']);
+      case 'atteint': return tenir([nom + ' : objectif atteint', nom + ' : objectif ✓']);
       case 'oublie': return tenir([MARQUES_FIN.expire + ' ' + nom + ' : délai écoulé', MARQUES_FIN.expire + ' ' + nom + ' : expiré']);
       default: return null;
     }
@@ -2105,13 +2105,13 @@ const Guide = (function () {
       case 'sortie': return cote ? [nom + ' : sort ' + enHautBas(famille(f) === 'drapeau' ? f.sens : s) + ' ?'] : [nom + ' à valider'];
       case 'meche': return [nom + ' : revenu dedans', nom + ' : revenu'];
       case 'menace': return [nom + ' : menacé'];
-      case 'cible': return [nom + ' : à la cible'];
+      case 'cible': return [nom + ' : à l’objectif', nom + ' : objectif'];
       case 'remise': return [nom + ' : se défait'];
       default: return [];
     }
   }
   /** Des exemples de libellés vivants (un par état), pour les tests de mots. */
-  const LIBELLES_VIVANTS = { sortie: 'Rectangle : sort en haut ?', meche: 'Drapeau : revenu dedans', menace: 'Double sommet : menacé', cible: 'Tête-épaules : à la cible', remise: 'Double sommet : se défait' };
+  const LIBELLES_VIVANTS = { sortie: 'Rectangle : sort en haut ?', meche: 'Drapeau : revenu dedans', menace: 'Double sommet : menacé', cible: 'Rectangle : à l’objectif', remise: 'Double sommet : se défait' };
   /** base : le libellé posé à la clôture (par défaut celui de l'état). */
   function libelleVivantDebutant(f, v, max, base) {
     const V = v && v.etiq ? libellesVivantsDebutant(f, v.etiq, v.etiqS != null ? v.etiqS : v.s).filter(t => t.length <= (max || 26)) : [];
@@ -2194,9 +2194,9 @@ const Guide = (function () {
       return 'Annulé ' + h + ' : ' + (f.raison === 'depasse' ? 'le prix est ' + (f.s > 0 ? 'monté au-dessus de ' : 'descendu sous ') + prix(f.abandonP, unite) + (ete ? ', plus loin que la tête.' : ' ; les ' + pts + ' ne sont plus au même niveau.')
         : f.raison === 'regle' ? 'le dernier ' + pt + ' est acquis, mais la figure ne remplit plus ses conditions.' : 'avec ce nouveau ' + pt + ', la figure ne tient plus.');
     }
-    if (f.fin === 'atteint') return exp ? 'objectif théorique atteint ' + h + ' (clôture ' + prix(ev.c, unite) + ')' : 'Cible théorique atteinte ' + h + ' (' + prix(f.objectif, unite) + ').';
+    if (f.fin === 'atteint') return exp ? 'objectif théorique atteint ' + h + ' (clôture ' + prix(ev.c, unite) + ')' : 'Objectif théorique atteint ' + h + ' (' + prix(f.objectif, unite) + ').';
     if (f.fin === 'expire_avant') return exp ? MARQUES_FIN.expire_avant + ' sans suite ' + h + ' : ' + (f.raison === 'pointe' ? 'pointe atteinte sans sortie' : 'délai écoulé') : 'Sans suite ' + h + ' : ' + (f.raison === 'pointe' ? 'le prix est resté dedans jusqu’à la pointe.' : 'le prix n’en est pas sorti à temps.');
-    if (f.fin === 'expire') return exp ? MARQUES_FIN.expire + ' délai de ' + (ctx && ctx.horizon || '') + ' bougies écoulé ' + h + ' sans objectif ni invalidation' : 'Délai écoulé ' + h + ' : ni la cible ni l’invalidation n’ont été atteintes.';
+    if (f.fin === 'expire') return exp ? MARQUES_FIN.expire + ' délai de ' + (ctx && ctx.horizon || '') + ' bougies écoulé ' + h + ' sans objectif ni invalidation' : 'Délai écoulé ' + h + ' : ni l’objectif ni l’invalidation n’ont été atteints.';
     if (f.fin !== 'invalide' && f.fin !== 'invalide_avant') return '';
     const raisons = {
       extreme: [s < 0 ? 'clôture au-dessus des sommets' : 'clôture sous les creux', 'le prix a fini ' + per[0] + (s < 0 ? ' au-dessus des sommets' : ' sous les creux')],
@@ -2285,7 +2285,7 @@ const Guide = (function () {
    *  théorique — toujours ensemble. */
   function niveauxDebutant(f, ctx, P, unite) {
     const N = niveauxFigure(f, ctx && fini(ctx.j) ? ctx.j : (ctx && ctx.n) || 0, P), per = periode(ctx && ctx.intervalle), fam = famille(f), out = [];
-    const cible = (o, plur) => 'cible' + (plur ? 's' : '') + ' théorique' + (plur ? 's' : '') + ' selon l’usage des analystes : ' + o + ', non garantie' + (plur ? 's' : '');
+    const cible = (o, plur) => 'objectif' + (plur ? 's' : '') + ' théorique' + (plur ? 's' : '') + ' selon l’usage des analystes : ' + o + ', non garanti' + (plur ? 's' : '');
     const pente = fam === 'lignes' && f.type !== 'range' || fam === 'drapeau' || (fam === 'ete' && f.couL && Math.abs(f.couL.b) > 0);
     const enCeMoment = pente ? ' en ce moment' : '';
     // La 1re clôture dehors s'est jugée contre le seuil de SA bougie (journal) ; une droite en pente
@@ -2294,7 +2294,7 @@ const Guide = (function () {
     if (N.confirme) {
       const o = N.objectifs[0], iv = N.invals[0];
       out.push('Figure validée ' + (fini(f.jConf) && heureVueSi(finMs(ctx, f.jConf)) ? quandDeb(finMs(ctx, f.jConf), ctx) : '') + (f.retest ? ', après un court retour vers la ligne' : '') + '. Si le prix finit ' + per[0] + ' ' + sousSur(iv.s) + prix(iv.p, unite)
-        + ', la figure ne tient plus. ' + cible(prix(o.p, unite)).replace(/^c/, 'C') + '.');
+        + ', la figure ne tient plus. ' + cible(prix(o.p, unite)).replace(/^o/, 'O') + '.');
       return out.join(' ');
     }
     if (fam === 'extremes' || fam === 'ete' || fam === 'drapeau') {
@@ -2360,9 +2360,9 @@ const Guide = (function () {
   function texteEcart(b) {
     const finis = b.atteints + b.invalides + b.expires;
     switch (b.ecart) {
-      case 'pareil': return 'Cible pas plus souvent atteinte qu’un trajet de même taille pris au hasard (' + finis + ' cas).';
-      case 'plus': return 'Cible plus souvent atteinte qu’un trajet de même taille pris au hasard (' + finis + ' cas).';
-      case 'moins': return 'Cible moins souvent atteinte qu’un trajet de même taille pris au hasard (' + finis + ' cas).';
+      case 'pareil': return 'Objectif pas plus souvent atteint qu’un trajet de même taille pris au hasard (' + finis + ' cas).';
+      case 'plus': return 'Objectif plus souvent atteint qu’un trajet de même taille pris au hasard (' + finis + ' cas).';
+      case 'moins': return 'Objectif moins souvent atteint qu’un trajet de même taille pris au hasard (' + finis + ' cas).';
       default: return 'Trop peu de cas pour comparer au hasard.';
     }
   }
@@ -2433,7 +2433,7 @@ const Guide = (function () {
         out.push(niveauxDebutant(f, c, P, unite));
       } else out.push(def.replace(/\.$/, '') + '.', marqueFin(f, c, 'debutant', unite));
       // La cible : dite seulement quand elle a été atteinte (une figure tombée n'en a plus).
-      if (e.cle === 'atteint' && fini(f.objectif)) out.push('Cible théorique selon l’usage des analystes : ' + prix(f.objectif, unite) + ', non garantie ; elle a été atteinte.');
+      if (e.cle === 'atteint' && fini(f.objectif)) out.push('Objectif théorique selon l’usage des analystes : ' + prix(f.objectif, unite) + ', non garanti ; il a été atteint.');
     }
     if (b) out.push(bilanDebutant(f, b, c, P));
     out.push(AVERTISSEMENT_FORME);
@@ -2469,7 +2469,7 @@ const Guide = (function () {
       case 'menace': return 'En ce moment le prix est ' + sousSur(v.s) + P0 + ', le niveau qui annule la figure. ' + (deux
         ? 'Il faut ' + per[1] + ' de suite ' + dessous(v.s) + ' : si ' + per[2] + ' finit ' + dessous(v.s) + fn + ', ce sera la ' + (n1 === 1 ? '1re' : n1 + 'e') + '.'
         : 'Cela ne compte que si ' + per[2] + ' finit ' + dessous(v.s) + fn + '.');
-      case 'cible': return 'Le prix touche en ce moment la cible théorique (' + P0 + '). Cela compte seulement si ' + per[2] + ' finit au-delà' + fn + '.';
+      case 'cible': return 'Le prix touche en ce moment l’objectif théorique (' + P0 + '). Cela compte seulement si ' + per[2] + ' finit au-delà' + fn + '.';
       case 'remise': {
         const live = ctx && fini(ctx.live) ? ctx.live : null, haut = v.s > 0;
         return 'Le plus ' + (haut ? 'haut' : 'bas') + ' de ' + per[2] + ' (' + prix(v.ext, unite) + ') est passé ' + (haut ? 'au-dessus de ' : 'sous ') + P0 + ' : '
@@ -2567,7 +2567,7 @@ const Guide = (function () {
     if (mode === 'expert') return NOMS_FORMES[f.type][0] + ' — ' + (f.ebauche && !f.fin ? 'ébauche (dernier ' + (f.s > 0 ? 'sommet' : 'creux') + ' en attente : ' + f.pend.reste + ' bougie' + (f.pend.reste > 1 ? 's' : '') + ' ' + nomIntervalle(ctx && ctx.intervalle) + ')' : etatForme(f).texte);
     const e = etatForme(f), nom = NOM_LONG_DEBUTANT[f.type];
     return ({ ebauche: nom + ' possible', formation: nom + ' possible', dedans: nom, demi: nom + ' : sortie à valider', confirme: ['lignes', 'drapeau'].includes(famille(f)) ? nom + ' : sortie validée' : nom + ' validé', invalide: '✗ ' + nom + ' invalidé',
-      abandon: '✗ ' + nom + ' annulé', sans_suite: MARQUES_FIN.expire_avant + ' ' + nom + ' sans suite', atteint: nom + ' : cible théorique atteinte', oublie: MARQUES_FIN.expire + ' ' + nom + ' : délai écoulé' })[e.cle] || nom;
+      abandon: '✗ ' + nom + ' annulé', sans_suite: MARQUES_FIN.expire_avant + ' ' + nom + ' sans suite', atteint: nom + ' : objectif théorique atteint', oublie: MARQUES_FIN.expire + ' ' + nom + ' : délai écoulé' })[e.cle] || nom;
   }
 
   // ── Les figures passées (plan §8 et §5.2) : des EXEMPLES, à leur place, chacun avec son issue ──
@@ -2650,8 +2650,8 @@ const Guide = (function () {
    *  → les variantes, de la plus complète à la plus courte. */
   function texteComptePassees(c, mode, choix, montrees) {
     const n = c.validees, k = c.atteintes;
-    const cible = n === 1 ? (k ? 'elle a atteint sa cible' : 'elle n’a pas atteint sa cible')
-      : k === 0 ? 'aucune n’a atteint sa cible' : k === n ? (n === 2 ? 'les deux ont' : 'toutes ont') + ' atteint leur cible' : k + (k > 1 ? ' ont atteint leur cible' : ' a atteint sa cible');
+    const cible = n === 1 ? (k ? 'elle a atteint son objectif' : 'elle n’a pas atteint son objectif')
+      : k === 0 ? 'aucune n’a atteint son objectif' : k === n ? (n === 2 ? 'les deux ont' : 'toutes ont') + ' atteint leur objectif' : k + (k > 1 ? ' ont atteint leur objectif' : ' a atteint son objectif');
     if (mode === 'debutant') {
       if (n <= 1) return ['C’est la seule figure validée de cette vue.'];
       return ['Dans cette vue : ' + n + ' figures validées, ' + cible + '.', 'Vue : ' + n + ' figures validées, ' + cible + '.'];
@@ -2660,7 +2660,7 @@ const Guide = (function () {
     const base = n ? n + (n > 1 ? ' figures validées, ' : ' figure validée, ') + cible : 'aucune figure validée terminée';
     const tomb = !toutes ? '' : t ? ' ; ' + t + (t > 1 ? ' tombées avant leur validation' : ' tombée avant sa validation') : ' ; aucune tombée avant sa validation';
     const trace = fini(montrees) && montrees < tot ? ' (les ' + montrees + ' plus récentes sont tracées)' : '';
-    const court = n + ' validée' + (n > 1 ? 's' : '') + ' · ' + k + ' cible' + (k > 1 ? 's' : '') + ' atteinte' + (k > 1 ? 's' : '') + (toutes ? ' · ' + t + ' tombée' + (t > 1 ? 's' : '') + ' avant' : '');
+    const court = n + ' validée' + (n > 1 ? 's' : '') + ' · ' + k + ' objectif' + (k > 1 ? 's' : '') + ' atteint' + (k > 1 ? 's' : '') + (toutes ? ' · ' + t + ' tombée' + (t > 1 ? 's' : '') + ' avant' : '');
     return ['Figures passées · dans cette vue : ' + base + tomb + trace + '.', 'Dans cette vue : ' + base + tomb + '.', 'Vue : ' + court];
   }
   /** Le libellé d'une figure passée sur le tracé (Lisible, ≤ max caractères) : la marque de son
@@ -2668,7 +2668,7 @@ const Guide = (function () {
   function libellePassee(f, max) {
     const nom = NOM_FORME_DEBUTANT[f.type], m = marqueIssue(f);
     if (!nom || !m) return null;
-    const mots = { atteint: [' : cible atteinte', ' : cible'], invalide: [' invalidé'], invalide_avant: [' invalidé'], expire: [' : délai écoulé', ' : expiré'], expire_avant: [' sans suite'], abandon: [' annulé'] }[f.fin] || [];
+    const mots = { atteint: [' : objectif atteint', ' : objectif'], invalide: [' invalidé'], invalide_avant: [' invalidé'], expire: [' : délai écoulé', ' : expiré'], expire_avant: [' sans suite'], abandon: [' annulé'] }[f.fin] || [];
     return tenir(mots.map(x => m + ' ' + nom + x).concat([m + ' ' + nom]), max);
   }
   /** Les mots d'une figure passée : { titre, texte (la bulle entière), resume } — ce qu'elle était,
@@ -2697,18 +2697,18 @@ const Guide = (function () {
       return { titre, texte, resume: null };
     }
     const nomL = NOM_LONG_DEBUTANT[f.type], dm = dureeMots(d), apres = dm ? ' ' + dm + ' plus tard' : '';
-    const issue = { atteint: 'cible atteinte', invalide: 'invalidé avant sa cible', expire: 'délai écoulé' }[f.fin] || etatForme(f).texte;
+    const issue = { atteint: 'objectif atteint', invalide: 'invalidé avant son objectif', expire: 'délai écoulé' }[f.fin] || etatForme(f).texte;
     const titre = (m ? m + ' ' : '') + 'Exemple passé : ' + minuscule(nomL) + ', ' + issue;
     // Ce qui s'est passé après la validation, de la plus complète à la plus courte (un nombre au plus).
     const ensuite = {
-      atteint: ['Après sa validation, le prix a atteint la cible' + apres + '.', 'Après sa validation, le prix a atteint la cible.'],
-      invalide: ['Après sa validation, le prix est reparti dans l’autre sens : la figure est tombée' + apres + ', sans atteindre sa cible.', 'Après sa validation, la figure est tombée sans atteindre sa cible.'],
-      expire: ['Après sa validation, le prix n’a atteint ni la cible ni le niveau qui annulait la figure : délai écoulé' + apres + '.', 'Après sa validation, ni la cible ni le niveau qui annulait la figure n’ont été atteints à temps.'],
+      atteint: ['Après sa validation, le prix a atteint l’objectif' + apres + '.', 'Après sa validation, le prix a atteint l’objectif.'],
+      invalide: ['Après sa validation, le prix est reparti dans l’autre sens : la figure est tombée' + apres + ', sans atteindre son objectif.', 'Après sa validation, la figure est tombée sans atteindre son objectif.'],
+      expire: ['Après sa validation, le prix n’a atteint ni l’objectif ni le niveau qui annulait la figure : délai écoulé' + apres + '.', 'Après sa validation, ni l’objectif ni le niveau qui annulait la figure n’ont été atteints à temps.'],
     }[f.fin] || [marqueFin(f, ctx, 'debutant', unite)];
     let def = DEFINITION_FORME[f.type] || '';
     if (famille(f) === 'lignes' && fini(f.sens)) def = def.replace(/en est sorti\./, 'en est sorti ' + (f.sens > 0 ? 'par le haut' : 'par le bas') + '.');
     const conf = valide ? finMs(ctx, f.jConf) : NaN, qc = fini(conf) && heureVueSi(conf) ? ' ' + quandDeb(conf, ctx) : '';
-    const texte = [def, valide ? 'Figure validée' + qc + ' ; cible théorique selon l’usage des analystes : ' + prix(f.objectif, unite) + ', non garantie.' : '',
+    const texte = [def, valide ? 'Figure validée' + qc + ' ; objectif théorique selon l’usage des analystes : ' + prix(f.objectif, unite) + ', non garanti.' : '',
       // Ce qui s'est passé ensuite : la marque de fin (quand, pourquoi) et le délai, sans redire le résumé.
       valide && dm && marqueFin(f, ctx, 'debutant', unite) ? marqueFin(f, ctx, 'debutant', unite).replace(/\.$/, '') + ' (' + dm + ' après la validation).' : marqueFin(f, ctx, 'debutant', unite) || (valide ? ensuite[0] : '')]
       .concat(C.length ? [C[0]] : [], b ? [bilanDebutant(f, b, ctx, P)] : [], ['Un exemple du passé, pas une prévision ni un conseil.']);
@@ -2727,8 +2727,88 @@ const Guide = (function () {
     if (fam === 'drapeau') return 'la longueur du mât (le mouvement rapide d’avant la pause) est reportée à partir du point où le prix sort de la pause.';
     return 'la largeur de la figure à son début est reportée à partir du point où le prix en sort, du côté de la sortie.';
   }
-  /** Le taux de réussite d'un type, en mots : « atteinte 3 fois sur 8 » (validées et terminées). */
-  const tauxCible = b => { const n = b ? b.atteints + b.invalides + b.expires : 0; return !b ? '' : n ? 'atteinte ' + b.atteints + ' fois sur ' + n : 'aucun cas terminé'; };
+  /** Le taux de réussite d'un type, en mots : « atteint 3 fois sur 8 » (validées et terminées). */
+  const tauxCible = b => { const n = b ? b.atteints + b.invalides + b.expires : 0; return !b ? '' : n ? 'atteint ' + b.atteints + ' fois sur ' + n : 'aucun cas terminé'; };
+  /** Le verdict du témoin de ce graphique (ecartTemoin), en mots ; rien sous le seuil de cas. */
+  const VERDICT_ECART = { pareil: 'comme au hasard', plus: 'plus souvent qu’au hasard', moins: 'moins souvent qu’au hasard' };
+  // ─── Ce que ces figures ont fait sur des années (plan du site du 13/10/2026, idée 3) ───
+  // Mesuré hors du site le 13/10/2026 avec CE détecteur (detecter), sur BTCUSDT Binance : 15 min
+  // depuis 2023, 1 h et 4 h depuis 2019 (/mnt/project-files/marche/figures-comportement/
+  // resultats.json, champs fav1 et obj). Par type : [cas, sens prévu ‰, au hasard ‰, verdict,
+  // cas à objectif devant le prix, objectif atteint ‰, au hasard ‰, verdict]. « Sens prévu » : le
+  // prix part d'abord d'un ATR dans le sens de la figure (en clôture), avant un ATR dans l'autre
+  // sens. « Au hasard » : un trajet de même taille parti n'importe quand. Verdict : « pareil », ou
+  // un écart tenu dans les trois contrôles de la mesure (|z| ≥ 1,96 : « plus? » / « moins? » ;
+  // ≥ 3 : « PLUS » / « MOINS ») ; « peu » : trop peu de cas. Seulement pour cette paire et ces
+  // unités : ailleurs, le compte de l'historique chargé (bilan) reste la seule mesure.
+  const MESURES_FIGURES = { symbole: 'BTCUSDT', le: '13/10/2026', depuis: { '15m': 2023, '1h': 2019, '4h': 2019 }, u: {
+      '15m': { double_creux: [785, 466, 506, 'pareil', 728, 540, 566, 'pareil'],
+        double_sommet: [720, 457, 489, 'pareil', 669, 546, 551, 'pareil'],
+        range: [601, 463, 497, 'pareil', 580, 414, 408, 'pareil'],
+        drapeau: [426, 446, 490, 'pareil', 424, 149, 157, 'pareil'],
+        triple_sommet: [264, 413, 488, 'moins?', 239, 519, 540, 'pareil'],
+        triple_creux: [230, 422, 503, 'moins?', 207, 522, 548, 'pareil'],
+        biseau_montant: [167, 521, 482, 'pareil', 165, 303, 327, 'pareil'],
+        canal_montant: [147, 503, 493, 'pareil', 141, 475, 455, 'pareil'],
+        biseau_descendant: [130, 423, 497, 'pareil', 129, 302, 323, 'pareil'],
+        canal_descendant: [125, 568, 506, 'pareil', 121, 579, 490, 'pareil'],
+        ete_inverse: [114, 544, 503, 'pareil', 108, 417, 387, 'pareil'],
+        ete: [110, 455, 489, 'pareil', 109, 303, 368, 'pareil'],
+        triangle_symetrique: [88, 432, 475, 'pareil', 88, 239, 231, 'pareil'],
+        triangle_ascendant: [85, 400, 496, 'pareil', 83, 313, 301, 'pareil'],
+        triangle_descendant: [71, 507, 502, 'pareil', 68, 353, 322, 'pareil'],
+        fanion: [23, 565, 484, 'pareil', 23, 174, 126, 'pareil'] },
+      '1h': { double_creux: [441, 456, 519, 'moins?', 396, 510, 561, 'pareil'],
+        double_sommet: [399, 501, 476, 'pareil', 358, 511, 549, 'pareil'],
+        range: [322, 472, 496, 'pareil', 309, 385, 420, 'pareil'],
+        drapeau: [288, 486, 487, 'pareil', 287, 132, 168, 'pareil'],
+        triple_sommet: [152, 546, 473, 'pareil', 140, 550, 526, 'pareil'],
+        triple_creux: [137, 474, 519, 'pareil', 128, 539, 533, 'pareil'],
+        biseau_montant: [90, 511, 480, 'pareil', 83, 361, 351, 'pareil'],
+        ete: [73, 507, 483, 'pareil', 68, 412, 426, 'pareil'],
+        ete_inverse: [68, 382, 510, 'moins?', 67, 343, 366, 'pareil'],
+        canal_montant: [66, 500, 490, 'pareil', 65, 508, 459, 'pareil'],
+        biseau_descendant: [60, 517, 504, 'pareil', 57, 404, 365, 'pareil'],
+        canal_descendant: [57, 404, 514, 'pareil', 55, 400, 492, 'pareil'],
+        triangle_ascendant: [46, 478, 470, 'pareil', 46, 326, 329, 'pareil'],
+        triangle_symetrique: [46, 457, 463, 'pareil', 46, 283, 230, 'pareil'],
+        triangle_descendant: [43, 558, 492, 'pareil', 43, 488, 385, 'pareil'],
+        fanion: [12, null, null, 'peu', 12, null, null, 'peu'] },
+      '4h': { double_creux: [127, 559, 520, 'pareil', 118, 568, 599, 'pareil'],
+        double_sommet: [97, 526, 479, 'pareil', 84, 595, 540, 'pareil'],
+        range: [75, 667, 502, 'plus?', 75, 480, 395, 'pareil'],
+        drapeau: [70, 543, 497, 'pareil', 70, 257, 203, 'pareil'],
+        canal_descendant: [27, 556, 512, 'pareil', 25, 560, 543, 'pareil'],
+        triple_sommet: [26, 385, 483, 'pareil', 26, 577, 517, 'pareil'],
+        biseau_montant: [25, 640, 487, 'pareil', 24, 458, 407, 'pareil'],
+        triple_creux: [23, 522, 520, 'pareil', 22, 455, 550, 'pareil'],
+        ete_inverse: [21, 667, 526, 'pareil', 21, 429, 429, 'pareil'],
+        canal_montant: [20, 400, 500, 'peu', 17, null, null, 'peu'],
+        triangle_ascendant: [11, null, null, 'peu', 11, null, null, 'peu'],
+        ete: [11, null, null, 'peu', 11, null, null, 'peu'],
+        biseau_descendant: [9, null, null, 'peu', 9, null, null, 'peu'],
+        triangle_descendant: [7, null, null, 'peu', 6, null, null, 'peu'],
+        triangle_symetrique: [5, null, null, 'peu', 5, null, null, 'peu'],
+        fanion: [1, null, null, 'peu', 1, null, null, 'peu'] } } };
+  /** La mesure sur des années d'un type pour ce graphique (ctx : { symbole, intervalle }) ; null
+   *  pour une autre paire ou une autre unité de temps. */
+  function mesureFigure(type, ctx) {
+    const U = ctx && ctx.symbole === MESURES_FIGURES.symbole ? MESURES_FIGURES.u[ctx.intervalle] : null, m = U && U[type];
+    return m ? { n: m[0], sens: { p: m[1], q: m[2], v: m[3] }, nObj: m[4], obj: { p: m[5], q: m[6], v: m[7] }, depuis: MESURES_FIGURES.depuis[ctx.intervalle], le: MESURES_FIGURES.le } : null;
+  }
+  const surDix = pm => Math.round(pm / 100);
+  const mesurable = M => !!M && M.sens.v !== 'peu' && M.obj.v !== 'peu' && M.sens.p !== null && M.obj.p !== null;
+  /** La ligne honnête : « sens prévu 5 sur 10, objectif atteint 5 sur 10, comme au hasard ». Un
+   *  écart au hasard dit le chiffre du hasard à côté ; null si trop peu de cas. */
+  function ligneHasard(M) {
+    if (!mesurable(M)) return null;
+    const deux = M.sens.v === 'pareil' && M.obj.v === 'pareil';
+    const x = (m, nom, dernier) => nom + ' ' + surDix(m.p) + ' sur 10' + (m.v !== 'pareil' ? ' (au hasard ' + surDix(m.q) + ')' : !deux || dernier ? ', comme au hasard' : '');
+    return x(M.sens, 'sens prévu', false) + ', ' + x(M.obj, 'objectif atteint', true);
+  }
+  /** Un verdict de la mesure sur des années, en mots (le panneau). */
+  const VERDICT_ANNEES = { pareil: 'comme au hasard', 'plus?': 'un peu plus souvent qu’au hasard, sans que ce soit net', 'moins?': 'un peu moins souvent qu’au hasard, sans que ce soit net',
+    PLUS: 'plus souvent qu’au hasard', MOINS: 'moins souvent qu’au hasard' };
   /** Les cibles d'une figure en prix arrondis : [{ s, p }] (en cours : celles du moment ; finie et
    *  validée : la sienne ; tombée avant sa validation ou annulée : aucune). */
   function ciblesFigure(f, ctx, P) {
@@ -2736,49 +2816,62 @@ const Guide = (function () {
     const j = ctx && fini(ctx.j) ? ctx.j : (ctx && ctx.n) || 0;
     return niveauxFigure(f, j, P).objectifs.filter(o => fini(o.p));
   }
-  /** La ligne courte au bas de la bulle d'une figure (les deux modes) : sa cible et le taux mesuré
-   *  de son type, ensemble ; elle ouvre le détail (statsFigure). */
+  /** La ligne courte au bas de la bulle d'une figure (les deux modes) : son objectif, puis ce que
+   *  ces figures ont fait, face au hasard ; elle ouvre le détail (statsFigure). Sur des années quand
+   *  la mesure existe (mesureFigure) ; sinon le compte de ce graphique, avec le verdict du témoin. */
   function resumeStatsFigure(f, b, ctx, P, unite) {
-    const O = ciblesFigure(f, ctx, P), t = tauxCible(b), pr = o => prixRond(o.p, unite);
-    if (!O.length) return 'Statistiques' + (t ? ' : cible ' + t : '') + ' ▸';
-    const ici = t ? ' · sur ce graphique : ' + t.replace(/^atteinte /, '') : '';
-    if (f.fin === 'atteint') return 'Cible ' + pr(O[0]) + ' atteinte' + ici + ' ▸';
-    if (f.fin) return 'Cible ' + pr(O[0]) + ' pas atteinte' + ici + ' ▸';
-    const c = O.length > 1 ? 'Cible ' + O.map(o => pr(o) + ' ' + enHautBas(o.s)).join(' ou ') : 'Cible ' + pr(O[0]);
-    return c + (t ? ' · ' + t : '') + ' ▸';
+    const O = ciblesFigure(f, ctx, P), pr = o => prixRond(o.p, unite), h = ligneHasard(mesureFigure(f.type, ctx)), t = tauxCible(b);
+    const taux = h ? 'ces figures : ' + h : t ? 'sur ce graphique : ' + t + (b.ecart && VERDICT_ECART[b.ecart] && t !== 'aucun cas terminé' ? ', ' + VERDICT_ECART[b.ecart] : '') : '';
+    if (!O.length) return (taux ? majuscule(taux) : 'Statistiques') + ' ▸';
+    const o = O.length > 1 ? 'Objectif ' + O.map(o => pr(o) + ' ' + enHautBas(o.s)).join(' ou ')
+      : 'Objectif ' + pr(O[0]) + (f.fin === 'atteint' ? ' atteint' : f.fin ? ' pas atteint' : '');
+    return o + (taux ? ' · ' + taux : '') + ' ▸';
   }
-  /** Le détail des statistiques d'une figure : sa cible et comment elle se calcule, puis ce qui a été
-   *  mesuré sur l'historique chargé pour son type. res : le rejeu (detecter, avec bilan) ; ctx : voir
-   *  plus haut. → { titre, cibles: [{ s, p, texte }], cibleEtat, comment, taux: { atteints, invalides,
-   *  expires, finis, ouverts }, phrase, temoin: { atteints, departs, phrase } | null, delai, lignes,
-   *  dernieres: [{ quand, marque, issue }], source, faible, risque }. */
+  /** Le détail des statistiques d'une figure : son objectif et comment il se calcule, ce que ces
+   *  figures ont fait sur des années (si mesuré), puis ce qui a été mesuré sur l'historique chargé
+   *  pour son type. res : le rejeu (detecter, avec bilan) ; ctx : voir plus haut. → { titre, cibles:
+   *  [{ s, p, texte }], cibleEtat, comment, annees: { phrase, verdict, source } | null, taux: {
+   *  atteints, invalides, expires, finis, ouverts }, phrase, temoin: { atteints, departs, phrase } |
+   *  null, delai, lignes, dernieres: [{ quand, marque, issue }], source, faible, risque }. */
+  /** Ce que ces figures ont fait sur des années, pour le panneau ; null hors de la mesure. */
+  function annees(f, ctx) {
+    const M = mesureFigure(f.type, ctx);
+    if (!M) return null;
+    const source = 'Mesuré sur le bitcoin (Binance) en ' + nomIntervalle(ctx.intervalle) + ', de ' + M.depuis + ' au ' + M.le + ', avec les règles de ce site.';
+    if (!mesurable(M)) return { phrase: 'Trop peu de cas passés (' + M.n + ') pour juger.', verdict: '', source };
+    const sur = m => surDix(m.p) + ' fois sur 10 (au hasard : ' + surDix(m.q) + ')';
+    return { phrase: 'Les ' + nombre(M.n, 0) + ' cas passés de cette figure : partis d’abord dans le sens prévu ' + sur(M.sens) + ', objectif atteint ' + sur(M.obj) + '.',
+      verdict: M.sens.v === 'pareil' && M.obj.v === 'pareil' ? 'Comme un trajet de même taille pris au hasard.'
+        : 'Le sens : ' + VERDICT_ANNEES[M.sens.v] + '. L’objectif : ' + VERDICT_ANNEES[M.obj.v] + '.',
+      source };
+  }
   function statsFigure(f, res, ctx, P, unite) {
     const b = res && res.bilan ? res.bilan[f.type] : null, fam = famille(f), per = periode(ctx && ctx.intervalle), O = ciblesFigure(f, ctx, P);
     const nomL = NOM_LONG_DEBUTANT[f.type] || NOMS_FORMES[f.type][0], noms = NOMS_FORMES[f.type];
     const S = { titre: nomL + ' : statistiques', type: f.type, cibles: O.map(o => ({ s: o.s, p: o.p, texte: prix(o.p, unite) + (O.length > 1 ? ' si le prix sort ' + (o.s > 0 ? 'par le haut' : 'par le bas') : '') })),
-      cibleEtat: f.fin === 'atteint' ? 'Atteinte.' : f.fin && O.length ? 'Pas atteinte : la figure est finie.' : !O.length ? 'Pas de cible : la figure est tombée avant d’être validée.' : f.phase === 'confirme' ? 'La figure est validée : la cible compte à partir de maintenant.' : 'Elle ne compte que si la figure est validée.',
-      comment: 'Comment elle se calcule : ' + commentCible(f) + ' C’est l’usage des analystes, pas une mesure du site, et rien ne la garantit.',
-      taux: null, phrase: '', temoin: null, delai: null, lignes: [], dernieres: [], faible: false,
+      cibleEtat: f.fin === 'atteint' ? 'Atteint.' : f.fin && O.length ? 'Pas atteint : la figure est finie.' : !O.length ? 'Pas d’objectif : la figure est tombée avant d’être validée.' : f.phase === 'confirme' ? 'La figure est validée : l’objectif compte à partir de maintenant.' : 'Il ne compte que si la figure est validée.',
+      comment: 'Comment il se calcule : ' + commentCible(f) + ' C’est l’usage des analystes, pas une mesure du site, et rien ne le garantit.',
+      annees: annees(f, ctx), taux: null, phrase: '', temoin: null, delai: null, lignes: [], dernieres: [], faible: false,
       source: 'Mesuré par le site sur ' + (dernieres(ctx && ctx.duree) ? 'les ' + dernieres(ctx.duree) : 'l’historique') + ' de ce graphique (' + nomIntervalle(ctx && ctx.intervalle) + '), sans regarder l’avenir : à chaque instant, seul le passé est connu.',
       risque: 'Des comptes du passé, pas une prévision ni un conseil.' };
     if (!b) return S;
     const finis = b.atteints + b.invalides + b.expires, T = b.temoin || { departs: 0, atteints: 0 }, E = b.ebauches || { n: 0, devenues: 0, confirmees: 0 };
     S.taux = { atteints: b.atteints, invalides: b.invalides, expires: b.expires, finis, ouverts: b.ouverts };
     const valides = fam === 'lignes' || fam === 'drapeau' ? 'sorties validées' : 'figures validées';
-    S.phrase = finis ? 'Après leur validation, la cible a été atteinte ' + b.atteints + ' fois sur ' + finis + '.' : 'Aucune figure de ce type n’est encore allée au bout sur ce graphique.';
+    S.phrase = finis ? 'Après leur validation, l’objectif a été atteint ' + b.atteints + ' fois sur ' + finis + '.' : 'Aucune figure de ce type n’est encore allée au bout sur ce graphique.';
     S.faible = b.confirmes < P.echantillonFaible;
     if (T.departs > 0) S.temoin = { atteints: T.atteints, departs: T.departs, phrase: 'Pour comparer, un trajet de même taille pris à n’importe quel moment : ' + nombre(T.atteints, 0) + ' fois sur ' + nombre(T.departs, 0) + '.' + (b.ecart && b.ecart !== 'peu' ? ' ' + texteEcart(b) : '') };
-    // Le temps habituel jusqu'à la cible : celui du milieu des cas atteints (la moitié plus vite).
+    // Le temps habituel jusqu'à l'objectif : celui du milieu des cas atteints (la moitié plus vite).
     const atteintes = (res.formes || []).filter(g => g.type === f.type && !g.doublon && g.fin === 'atteint' && fini(g.jConf));
     const D = atteintes.map(g => delaiIssue(g, ctx)).filter(fini).sort((x, y) => x - y);
     const dm = D.length ? dureeMots(D[Math.floor((D.length - 1) / 2)]) : null;
-    if (dm) S.delai = 'Quand elle a été atteinte, c’était ' + (D.length > 1 ? 'en général ' : '') + dm + ' après la validation' + (D.length > 1 ? ' (la moitié des fois plus vite)' : '') + '.';
+    if (dm) S.delai = 'Quand il a été atteint, c’était ' + (D.length > 1 ? 'en général ' : '') + dm + ' après la validation' + (D.length > 1 ? ' (la moitié des fois plus vite)' : '') + '.';
     const L = S.lignes, ex = x => x > 1 ? 's' : '';
     L.push([fam === 'lignes' ? 'Figures repérées' : 'Repérées', b.formes + (b.devenusTriples ? ' (dont ' + b.devenusTriples + ' devenu' + ex(b.devenusTriples) + ' triple' + ex(b.devenusTriples) + ')' : '')]);
     L.push([majuscule(valides), String(b.confirmes)]);
     const avant = b.invalidesAvant + b.expiresAvant;
     if (avant) L.push(['Tombées avant leur validation', String(avant)]);
-    L.push(['Cible atteinte', String(b.atteints)], ['Annulées avant la cible', String(b.invalides)], ['Ni l’une ni l’autre à temps (' + P.horizon + ' ' + per[3] + ')', String(b.expires)]);
+    L.push(['Objectif atteint', String(b.atteints)], ['Annulées avant l’objectif', String(b.invalides)], ['Ni l’une ni l’autre à temps (' + P.horizon + ' ' + per[3] + ')', String(b.expires)]);
     if (b.ouverts) L.push(['Encore en cours', String(b.ouverts)]);
     if (fam === 'lignes' && b.haut + b.bas) L.push(['Sorties par le haut / par le bas', b.haut + ' / ' + b.bas]);
     if (E.n) L.push(['Débuts repérés → devenus ' + minuscule(noms[1]), E.n + ' → ' + E.devenues + (fam === 'lignes' ? '' : ' (validés : ' + E.confirmees + ')')]);
@@ -2787,7 +2880,7 @@ const Guide = (function () {
     S.dernieres = vues.map(g => {
       const ms = finMs(ctx, g.jConf), d = dureeMots(delaiIssue(g, ctx));
       return { quand: fini(ms) ? (ctx && ctx.pas >= 86400 ? dateVue(ms) : dateVue(ms) + ' ' + heureVue(ms)) : '—', marque: marqueIssue(g),
-        issue: ({ atteint: 'cible atteinte', invalide: 'annulée avant la cible', expire: 'délai écoulé' })[g.fin] + (d ? ', ' + d + ' après' : '') };
+        issue: ({ atteint: 'objectif atteint', invalide: 'annulée avant l’objectif', expire: 'délai écoulé' })[g.fin] + (d ? ', ' + d + ' après' : '') };
     });
     return S;
   }
@@ -2900,6 +2993,6 @@ const Guide = (function () {
     texteSuiteDebutant, prixRond, ageLu, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
     MARQUES_FIN, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, libelleFormeCourt, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant,
-    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_FORME, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, ciblesFigure, synthese };
+    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_FORME, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, synthese };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;

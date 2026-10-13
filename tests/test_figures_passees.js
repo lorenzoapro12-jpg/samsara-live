@@ -136,10 +136,10 @@ titre('3. Complet : non / validées seulement / toutes, au plus 6, les plus réc
 titre('4. Le compte en mots : les réussites et les échecs');
 {
   const c = (validees, atteintes, tombees) => ({ validees, atteintes, invalidees: validees - atteintes, expirees: 0, tombees: tombees || 0 });
-  check('« Dans cette vue : 5 figures validées, 2 ont atteint leur cible. » (Lisible et Complet)', G.texteComptePassees(c(5, 2), 'debutant')[0] === 'Dans cette vue : 5 figures validées, 2 ont atteint leur cible.'
-    && G.texteComptePassees(c(5, 2), 'expert', 'validees', 5)[1] === 'Dans cette vue : 5 figures validées, 2 ont atteint leur cible.', [G.texteComptePassees(c(5, 2), 'debutant'), G.texteComptePassees(c(5, 2), 'expert', 'validees', 5)]);
-  check('les échecs sont dits : « aucune n’a atteint sa cible », « 1 a atteint sa cible », « elle n’a pas atteint sa cible »', /aucune n’a atteint sa cible/.test(G.texteComptePassees(c(3, 0), 'debutant')[0])
-    && /, 1 a atteint sa cible\.$/.test(G.texteComptePassees(c(4, 1), 'debutant')[0]) && /elle n’a pas atteint sa cible/.test(G.texteComptePassees(c(1, 0), 'expert', 'validees', 1)[0]), null);
+  check('« Dans cette vue : 5 figures validées, 2 ont atteint leur objectif. » (Lisible et Complet)', G.texteComptePassees(c(5, 2), 'debutant')[0] === 'Dans cette vue : 5 figures validées, 2 ont atteint leur objectif.'
+    && G.texteComptePassees(c(5, 2), 'expert', 'validees', 5)[1] === 'Dans cette vue : 5 figures validées, 2 ont atteint leur objectif.', [G.texteComptePassees(c(5, 2), 'debutant'), G.texteComptePassees(c(5, 2), 'expert', 'validees', 5)]);
+  check('les échecs sont dits : « aucune n’a atteint son objectif », « 1 a atteint son objectif », « elle n’a pas atteint son objectif »', /aucune n’a atteint son objectif/.test(G.texteComptePassees(c(3, 0), 'debutant')[0])
+    && /, 1 a atteint son objectif\.$/.test(G.texteComptePassees(c(4, 1), 'debutant')[0]) && /elle n’a pas atteint son objectif/.test(G.texteComptePassees(c(1, 0), 'expert', 'validees', 1)[0]), null);
   check('Complet « toutes » : les tombées avant validation sont comptées ; « (les 6 plus récentes sont tracées) » quand la vue en a plus', /; 7 tombées avant leur validation \(les 6 plus récentes sont tracées\)\.$/.test(G.texteComptePassees(c(5, 2, 7), 'expert', 'toutes', 6)[0])
     && !/tracées/.test(G.texteComptePassees(c(5, 2), 'expert', 'validees', 5)[0]), G.texteComptePassees(c(5, 2, 7), 'expert', 'toutes', 6));
   // Sur la fixture : les nombres dits sont ceux du compte, dans chaque vue.
@@ -169,16 +169,16 @@ titre('5. Les mots : libellé, titre, résumé, détail (Lisible) ; bulle (Compl
     if (x.titre.indexOf(marques[f.fin] + ' Exemple passé : ') !== 0 || nombres(x.titre) || G.motsBannis(x.titre).length) malT.push(x.titre);
     // Le résumé : chaque variante sans « % » ni mot banni ; la plus riche de « ensuite » ≤ 1 nombre, le compte ≤ 2.
     const [ensuite, cpt] = x.resume, tous = ensuite.concat(cpt);
-    const dit = f.fin === 'atteint' ? ensuite.every(t => /a atteint la cible/.test(t)) : ensuite.every(t => /sans atteindre sa cible|ni la cible/.test(t));
+    const dit = f.fin === 'atteint' ? ensuite.every(t => /a atteint l’objectif/.test(t)) : ensuite.every(t => /sans atteindre son objectif|ni l’objectif/.test(t));
     if (!dit || !/^Après sa validation/.test(ensuite[0]) || ensuite.some(t => nombres(t) > 1) || cpt.some(t => nombres(t) > 2) || tous.some(t => /%/.test(t) || G.motsBannis(t).length || CONSEIL.test(t))) malR.push({ f: f.type + ':' + f.fin, ensuite, cpt });
     const D = x.texte.join(' ');
     if (/%/.test(D) || G.motsBannis(D).length || CONSEIL.test(D) || !D.includes(compte[0]) || !/pas une prévision ni un conseil/.test(x.texte[x.texte.length - 1]) || !/Figure validée/.test(D) || !/Mesuré sur/.test(D)) malD.push({ f: f.type, bannis: G.motsBannis(D), D: D.slice(0, 200) });
     const e = G.texteFigurePassee(f, R.bilan[f.type], ctx, P, '$', 'expert', G.texteComptePassees(r.compte, 'expert', 'validees', 1));
     if (e.titre.indexOf(marques[f.fin] + ' Passée · ') !== 0 || !/^Exemple passé : validé /.test(e.texte[0]) || !/après la validation/.test(e.texte[0]) || CONSEIL.test(e.texte.join(' ')) || !/pas une prévision ni une recommandation/.test(e.texte[e.texte.length - 1])) malX.push({ t: e.titre, x: e.texte[0] });
   }
-  check(`libellé (${VAL.length} figures validées) : ≤ ${P.debutant.forme} caractères, la marque de son issue d’abord (✓ cible atteinte, ✗ invalidée, – délai écoulé), sans mot banni ni « % »`, !malL.length && ['atteint', 'invalide', 'expire'].every(k => vus.has(k)), malL.slice(0, 4));
+  check(`libellé (${VAL.length} figures validées) : ≤ ${P.debutant.forme} caractères, la marque de son issue d’abord (✓ objectif atteint, ✗ invalidée, – délai écoulé), sans mot banni ni « % »`, !malL.length && ['atteint', 'invalide', 'expire'].every(k => vus.has(k)), malL.slice(0, 4));
   check('titre : « ✓ Exemple passé : … », sans nombre ni mot banni', !malT.length, malT.slice(0, 3));
-  check('résumé : ce qui s’est passé ENSUITE (cible atteinte, ou pas), un nombre au plus, puis le compte (deux au plus) — trois au plus en tout, sans « % », mot banni ni conseil', !malR.length, malR.slice(0, 2));
+  check('résumé : ce qui s’est passé ENSUITE (objectif atteint, ou pas), un nombre au plus, puis le compte (deux au plus) — trois au plus en tout, sans « % », mot banni ni conseil', !malR.length, malR.slice(0, 2));
   check('détail : définition, validation, issue, le compte de la vue, le bilan mesuré, « pas une prévision ni un conseil » ; sans « % », mot banni ni conseil', !malD.length, malD.slice(0, 2));
   check('Complet : « ✓ Passée · … », « Exemple passé : validé … après la validation », « pas une prévision ni une recommandation », sans conseil', !malX.length, malX.slice(0, 2));
   // Toutes les issues, tombées comprises (Complet « toutes ») : une marque par issue.

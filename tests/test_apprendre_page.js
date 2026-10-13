@@ -352,7 +352,10 @@ function controlerLisible(e, nom) {
       check('la vue dans le passé : le prix live franchit des repères, aucun message', !r7.msg && !r7.ligne, r7);
       // Les bulles des figures passées (dans cette vue) et de la figure en cours : la ligne du risque.
       for (const q of ['passee', 'figure']) {
-        if (q === 'figure') { await o.page.evaluate(n => { viewStart = n - 200; viewEnd = n; drawChart(); }, n); }
+        // La vue revient au présent SANS réticule : celui que le toucher de la figure passée a laissé
+        // peut tomber, la vue déplacée, sur la figure en cours (constaté à 390 px le 13/10/2026) ; sa
+        // bulle serait alors déjà montrée, et ce toucher-ci, un 2e toucher, ouvrirait le détail.
+        if (q === 'figure') { await o.page.evaluate(n => { viewStart = n - 200; viewEnd = n; crossX = null; crossY = null; bulleDetail = null; drawChart(); }, n); }
         const pt = await pointCible(o.page, q);
         if (!pt) { console.log(`  − pas de ${q === 'passee' ? 'figure passée' : 'figure en cours'} dans cette vue (rien à ouvrir)`); continue; }
         await montrer(o, pt);

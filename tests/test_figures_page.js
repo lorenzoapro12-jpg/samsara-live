@@ -341,7 +341,7 @@ async function bulle(o, tactile) {
       const b = await bulle(o, tactile);
       const bannis = b ? G.motsBannis(b.corps) : null;
       check(`${w} px · ${theme} : ${tactile ? 'toucher' : 'survol'} du libellé → bulle avec validation, invalidation, cible et « Mesuré sur », sans mot banni, entière dans le tracé`,
-        b && /validée/.test(b.texte) && /Annulée si|ne tient plus/.test(b.texte) && /cible théorique/i.test(b.texte) && /Mesuré sur/.test(b.texte) && !bannis.length && b.b && b.b.y >= 0 && b.b.y + b.b.h <= b.mainH,
+        b && /validée/.test(b.texte) && /Annulée si|ne tient plus/.test(b.texte) && /objectif théorique/i.test(b.texte) && !/cible/i.test(b.texte) && /Mesuré sur/.test(b.texte) && !bannis.length && b.b && b.b.y >= 0 && b.b.y + b.b.h <= b.mainH,
         b && { bannis, b: b.b, mainH: b.mainH, texte: b.texte.slice(0, 300) });
       if (tactile) check(`${w} px : pas de défilement horizontal`, c5 && c5.scroll <= 0, c5);
       check(`${w} px · ${theme} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
@@ -362,7 +362,7 @@ async function bulle(o, tactile) {
         aide: (() => { const a = document.getElementById('astuceTap'); if (!a || a.hidden || !a.offsetParent) return null; const r = a.getBoundingClientRect(), cb = canvas.getBoundingClientRect(); return { x: r.left - cb.left, y: r.top - cb.top, w: r.width, h: r.height }; })() }));
       const L1 = r1.lien;
       check(`${mode} ${w} px · ${mode === 'debutant' ? 'résumé (1er ' + (tactile ? 'toucher' : 'survol') + ')' : 'survol'} : la bulle finit par « ${L1 && L1.texte} » (la cible et le taux mesuré), dans la bulle`,
-        L1 && L1.texte === r1.attendu && /^Cible .+ \$ · atteinte \d+ fois sur \d+ ▸$/.test(L1.texte) && L1.rect.y + L1.rect.h <= L1.bulle.y + L1.bulle.h + 8 && (mode === 'expert' || r1.resume), r1);
+        L1 && L1.texte === r1.attendu && /^Objectif .+ \$.* · (ces figures : sens prévu \d+ sur 10|sur ce graphique : atteint \d+ fois sur \d+).* ▸$/.test(L1.texte) && L1.rect.y + L1.rect.h <= L1.bulle.y + L1.bulle.h + 8 && (mode === 'expert' || r1.resume), r1);
       if (r1.aide && L1) check(`${mode} ${w} px : la touche « ? » ne couvre pas la bulle`, !(L1.bulle.x < r1.aide.x + r1.aide.w && L1.bulle.x + L1.bulle.w > r1.aide.x && L1.bulle.y < r1.aide.y + r1.aide.h && L1.bulle.y + L1.bulle.h > r1.aide.y), r1);
       // Toucher (cliquer) la ligne : le détail s'ouvre, la page ne change pas.
       const cible = await o.page.evaluate(() => { const b = canvas.getBoundingClientRect(), R = lienBulle.rect; return { x: b.left + R.x + R.w / 2, y: b.top + R.y + R.h / 2 }; });
@@ -370,8 +370,8 @@ async function bulle(o, tactile) {
       await o.page.waitForTimeout(300);
       const d = await o.page.evaluate(() => { const p = document.getElementById('fichePop'), r = p.getBoundingClientRect(); return { ouvert: !p.hidden, texte: p.innerText, prix: [...p.querySelectorAll('.stats-prix')].map(x => x.textContent), barres: p.querySelectorAll('.stats-barre').length, S: window.__statsFigure,
         dedans: r.left >= 0 && r.right <= innerWidth + 0.5 && r.top >= 0 && r.bottom <= innerHeight + 0.5, chemin: location.pathname.replace(/^.*\//, ''), scroll: document.documentElement.scrollWidth - innerWidth }; });
-      check(`${mode} ${w} px : la ligne ouvre « ${d.S && d.S.titre} » : la cible en gros (${d.prix.join(' / ')}), la réussite mesurée et sa barre, le détail, sans mot banni, dans l’écran, sans changer de page`,
-        d.ouvert && d.S && d.prix.length >= 1 && d.prix.length === d.S.cibles.length && d.barres >= 1 && /Sur ce graphique/i.test(d.texte) && /Le détail/i.test(d.texte)
+      check(`${mode} ${w} px : la ligne ouvre « ${d.S && d.S.titre} » : l’objectif de la figure en gros (${d.prix.join(' / ')}), sur des années si mesuré, la réussite mesurée et sa barre, le détail, sans mot banni, dans l’écran, sans changer de page`,
+        d.ouvert && d.S && d.prix.length >= 1 && d.prix.length === d.S.cibles.length && d.barres >= 1 && /Sur ce graphique/i.test(d.texte) && /Objectif de la figure/i.test(d.texte) && (!d.S.annees || /Sur des années/i.test(d.texte)) && !/cible/i.test(d.texte) && /Le détail/i.test(d.texte)
         && /usage des analystes/.test(d.texte) && !G.motsBannis(d.texte).length && d.dedans && d.chemin === 'index.html' && (!tactile || d.scroll <= 0), { d: Object.assign({}, d, { texte: d.texte.slice(0, 400) }), bannis: G.motsBannis(d.texte) });
       // Échap le referme.
       await o.page.keyboard.press('Escape'); await o.page.waitForTimeout(100);

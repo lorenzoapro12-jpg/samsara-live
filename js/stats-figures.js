@@ -1,12 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Les statistiques détaillées d'une figure chartiste (demande du 11/10/2026)
 // ─────────────────────────────────────────────────────────────────────────────
-// La bulle d'une figure se termine par une ligne courte : sa cible et le taux mesuré de son type
-// (« Cible 84 116 $ · atteinte 3 fois sur 8 ▸ », Guide.resumeStatsFigure). La toucher (ou cliquer
-// sur la figure dont la bulle est déjà ouverte en entier) ouvre ce détail, dans la bulle des
-// légendes (#fichePop, js/fiches.js) : la cible et comment elle se calcule, puis ce qui a été
-// mesuré sur l'historique chargé (Guide.statsFigure). Les mots sont ceux de tout le monde ; les
-// barres disent les proportions sans pourcentage.
+// La bulle d'une figure se termine par une ligne courte : son objectif et ce que ces figures ont
+// fait face au hasard (« Objectif 84 116 $ · ces figures : sens prévu 5 sur 10, objectif atteint 5
+// sur 10, comme au hasard ▸ », Guide.resumeStatsFigure). La toucher (ou cliquer sur la figure dont
+// la bulle est déjà ouverte en entier) ouvre ce détail, dans la bulle des légendes (#fichePop,
+// js/fiches.js) : l'objectif de la figure et comment il se calcule, ce que ces figures ont fait sur
+// des années, puis ce qui a été mesuré sur l'historique chargé (Guide.statsFigure). Les mots sont
+// ceux de tout le monde ; les barres disent les proportions sans pourcentage.
 /** Une barre de proportions : [[nombre, classe, titre]…], la largeur de chaque part ∝ son nombre. */
 function barreStats(parts) {
   const tot = parts.reduce((a, p) => a + p[0], 0);
@@ -18,18 +19,20 @@ function barreStats(parts) {
 function statsFigureHtml(S) {
   const nb = x => (typeof Fmt !== 'undefined' && Fmt.nombre ? Fmt.nombre(x, 0) : String(x));
   let h = '<div class="fiche-tete"><h3 class="fiche-titre">' + echapF(S.titre) + '</h3><button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>';
-  // 1. La cible : le prix d'abord, en gros ; son état ; comment elle se calcule.
-  h += '<div class="stats-cible">' + (S.cibles.length
-    ? '<span class="stats-etiquette">Cible prévue</span>' + S.cibles.map(c => '<b class="stats-prix">' + echapF(c.texte) + '</b>').join('<span class="stats-ou">ou</span>')
-    : '<span class="stats-etiquette">Cible</span>') + '<p class="stats-note">' + echapF(S.cibleEtat) + '</p></div>';
+  // 1. L'objectif de la figure : le prix d'abord, en gros ; son état ; comment il se calcule.
+  h += '<div class="stats-cible"><span class="stats-etiquette">Objectif de la figure</span>' + S.cibles.map(c => '<b class="stats-prix">' + echapF(c.texte) + '</b>').join('<span class="stats-ou">ou</span>')
+    + '<p class="stats-note">' + echapF(S.cibleEtat) + '</p></div>';
   h += '<p class="stats-comment">' + echapF(S.comment) + '</p>';
-  // 2. La réussite mesurée : la phrase, la barre des issues, la comparaison au hasard.
+  // 2. Ce que ces figures ont fait sur des années, face au hasard (quand c'est mesuré).
+  if (S.annees) h += '<h4>Sur des années</h4><p class="stats-phrase">' + echapF(S.annees.phrase) + '</p>'
+    + (S.annees.verdict ? '<p class="stats-phrase"><b>' + echapF(S.annees.verdict) + '</b></p>' : '') + '<p class="stats-note">' + echapF(S.annees.source) + '</p>';
+  // 3. La réussite mesurée ici : la phrase, la barre des issues, la comparaison au hasard.
   if (S.taux) {
     const T = S.taux;
     h += '<h4>Sur ce graphique</h4><p class="stats-phrase">' + echapF(S.phrase) + '</p>';
     if (T.finis) {
-      h += barreStats([[T.atteints, 'ok', 'Cible atteinte : ' + T.atteints], [T.invalides, 'ko', 'Annulées avant la cible : ' + T.invalides], [T.expires, 'neutre', 'Délai écoulé : ' + T.expires]])
-        + '<p class="stats-legende"><span class="ok">✓ cible atteinte ' + T.atteints + '</span> <span class="ko">✗ annulée avant ' + T.invalides + '</span>' + (T.expires ? ' <span class="neutre">– délai écoulé ' + T.expires + '</span>' : '') + '</p>';
+      h += barreStats([[T.atteints, 'ok', 'Objectif atteint : ' + T.atteints], [T.invalides, 'ko', 'Annulées avant l’objectif : ' + T.invalides], [T.expires, 'neutre', 'Délai écoulé : ' + T.expires]])
+        + '<p class="stats-legende"><span class="ok">✓ objectif atteint ' + T.atteints + '</span> <span class="ko">✗ annulée avant ' + T.invalides + '</span>' + (T.expires ? ' <span class="neutre">– délai écoulé ' + T.expires + '</span>' : '') + '</p>';
     }
     if (S.temoin) {
       h += '<p class="stats-phrase">' + echapF(S.temoin.phrase) + '</p>'

@@ -879,7 +879,7 @@ function buildDropdown() {
  *  « toutes, y compris celles tombées » avant leur validation. Chacune garde sa marque d'issue et le
  *  compte de la vue est dit sur le graphique. Son choix a sa propre clé (samsara-figures-passees-v1 :
  *  'non', 'validees' ou 'toutes'). */
-const QUOI_PASSEES = 'Les figures déjà finies, à leur place, avec leur issue : ✓ cible atteinte, ✗ invalidée ou annulée, – délai écoulé, ○ sans suite. Des exemples, pas des prévisions.';
+const QUOI_PASSEES = 'Les figures déjà finies, à leur place, avec leur issue : ✓ objectif atteint, ✗ invalidée ou annulée, – délai écoulé, ○ sans suite. Des exemples, pas des prévisions.';
 function ligneFiguresPassees() {
   const on = figuresPasseesChoix !== 'non', toutes = figuresPasseesChoix === 'toutes';
   const choix = on ? `<select id="figPasseesQuelles" aria-label="Quelles figures passées" onchange="choisirFiguresPassees(this.value)">`
@@ -5188,7 +5188,7 @@ function guideChemins(E, top, bas, surBougies) {
 /** Le contexte des textes de figures : heures (fin de bougie), durée mesurée, bougie en cours. */
 function guideCtxFigures() {
   const R = GUIDE_FORMES.val, n = candles.length;
-  return { n: R ? R.n : n - 1, intervalle: chartInterval, duree: candles[n - 2].time - candles[0].time, temps: cols().time,
+  return { n: R ? R.n : n - 1, intervalle: chartInterval, symbole: activeSymbol, duree: candles[n - 2].time - candles[0].time, temps: cols().time,
     pas: n > 1 ? candles[1].time - candles[0].time : 0, maintenant: Horloges.maintenant(), j: n - 1, horizon: PARAM.guide.horizon };
 }
 /** Le style d'une figure (plan §5.1) : tirets, épaisseur, alpha des traits et de l'aplat. Une
@@ -5935,7 +5935,7 @@ function guidePasseesCompte(E) {
     ctx.fillStyle = COLORS.ink3; ctx.fillText(t, r.x + 6, r.y + r.h - 4);
   });
   E.cibles.push({ rects: [guideZone(r)], prio: 4, ico: 'figure', titre: 'Figures passées', texte: [V[1] || V[0],
-    'Marques : ✓ cible atteinte, ✗ invalidée ou annulée, – délai écoulé après la validation, ○ sans suite. Survolez une marque : la suite.',
+    'Marques : ✓ objectif atteint, ✗ invalidée ou annulée, – délai écoulé après la validation, ○ sans suite. Survolez une marque : la suite.',
     'Des exemples du passé, réussis ou non : pas un conseil.'] });
 }
 /** Lisible : le libellé de la figure passée (« ✓ Double creux : cible »), près de sa marque, s'il
