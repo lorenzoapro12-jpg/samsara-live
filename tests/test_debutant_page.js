@@ -625,9 +625,9 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       check('4 h : « Double sommet validé » posé, au plus 5 textes', roles.includes('forme') && r.items.length <= 5 && r.base === 'Double sommet validé'
         && r.items.some(i => i.role === 'forme' && r.possibles.includes(i.texte)), { base: r.base, items: r.items });
       if (roles.includes('scenario')) check('4 h : forme + scénario 1 posés → la ligne des scénarios cède ; sa bulle passe dans celle du libellé « Scénario 1 »', r.cede && !roles.includes('boite') && /La ligne des scénarios/.test(r.un), r);
-      // (Amendement E4 : la cible s'écrit « cible théorique selon l'usage des analystes : X, non garantie ».)
-      check('4 h : la bulle de la forme la définit, dit son bilan (« Mesuré sur », « fois sur ») avec la cible théorique, et « pas une prévision ni un conseil »',
-        r.forme && /^Double sommet : /.test(r.forme.texte) && /Mesuré sur/.test(r.forme.texte) && /fois sur/.test(r.forme.texte) && /[Cc]ible théorique selon l’usage des analystes : \d[\d  ]* \$, non garantie/.test(r.forme.texte) && /pas une prévision ni un conseil/.test(r.forme.texte) && !bannisBulle(r.forme.texte).length, r.forme);
+      // (Amendement E4, puis plan du 13/10/2026 : « objectif théorique selon l'usage des analystes : X, non garanti ».)
+      check('4 h : la bulle de la forme la définit, dit son bilan (« Mesuré sur », « fois sur ») avec l’objectif théorique, et « pas une prévision ni un conseil »',
+        r.forme && /^Double sommet : /.test(r.forme.texte) && /Mesuré sur/.test(r.forme.texte) && /fois sur/.test(r.forme.texte) && /[Oo]bjectif théorique selon l’usage des analystes : \d[\d  ]* \$, non garanti/.test(r.forme.texte) && /pas une prévision ni un conseil/.test(r.forme.texte) && !bannisBulle(r.forme.texte).length, r.forme);
       const e = await dessin(o.page);
       check('4 h : la ligne des scénarios renvoie au suivi en 15 min ou 1 h (quand elle est posée)', !e.items.some(i => i.role === 'boite') || e.items.some(i => /à voir en 15 min ou 1 h/.test(i.texte)), e.items);
       await o.page.evaluate(() => window.__retablir());

@@ -620,10 +620,10 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     ['double_sommet', {}], ['triangle_symetrique', { demi: true, demiSens: 1 }], ['range', {}], ['double_creux', { demi: true }], ['double_sommet', { fin: 'atteint' }], ['triangle_symetrique', { fin: 'expire_avant' }]]
     .map(([type, e]) => [type, t(G.libelleFormeDebutant(Object.assign({ type, sens: 1 }, e)) || '') || null]);
   // (Changé exprès : le côté d'une sortie se dit en mots, jamais par une flèche seule ; le nom reste.)
-  check('forme : « Double sommet validé », « ✗ Double creux invalidé », « Triangle : sortie en haut », « Rectangle : sortie en bas » ; en train de se dessiner : « Double sommet possible », « Triangle : sort en haut ? », « Prix dans un rectangle », « Double creux à valider » ; issues : « Double sommet : cible ✓ » (la forme longue dépasse : le nom reste — changé exprès, revue des figures 2), « ○ Triangle sans suite »',
+  check('forme : « Double sommet validé », « ✗ Double creux invalidé », « Triangle : sortie en haut », « Rectangle : sortie en bas » ; en train de se dessiner : « Double sommet possible », « Triangle : sort en haut ? », « Prix dans un rectangle », « Double creux à valider » ; issues : « Double sommet : objectif ✓ » (la forme longue dépasse : le nom reste — changé exprès, revue des figures 2), « ○ Triangle sans suite »',
     fo[0][1] === 'Double sommet validé' && fo[1][1] === '✗ Double creux invalidé' && fo[2][1] === 'Triangle : sortie en haut' && fo[3][1] === 'Rectangle : sortie en bas'
     && fo[4][1] === 'Double sommet possible' && fo[5][1] === 'Triangle : sort en haut ?' && fo[6][1] === 'Prix dans un rectangle' && fo[7][1] === 'Double creux à valider'
-    && fo[8][1] === 'Double sommet : cible ✓' && fo[9][1] === '○ Triangle sans suite' && fo.every(([, l]) => !l || l.length <= DEB.forme) && !fo.some(([, l]) => /[↑↓]/.test(l || '')), fo);
+    && fo[8][1] === 'Double sommet : objectif ✓' && fo[9][1] === '○ Triangle sans suite' && fo.every(([, l]) => !l || l.length <= DEB.forme) && !fo.some(([, l]) => /[↑↓]/.test(l || '')), fo);
   {
     // Une marque par issue (incohérence 119) : ✗ seulement pour une figure invalidée ou annulée ;
     // « – » pour un délai écoulé après la validation ; « ○ » pour une figure restée sans suite.
@@ -650,8 +650,8 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     check('… à valider : « s’il finit encore une heure au-dessus, la figure sera validée » ; rectangle : « entre 82 900 et 83 500 $ » ; sortie : « s’il revient franchement dedans, la sortie ne compte pas »',
       /^Double creux à valider : .*s’il finit encore une heure au-dessus, la figure sera validée\./.test(ec[1]) && /Prix dans un rectangle : il fait des allers-retours entre 82 900 et 83 500 \$/.test(ec[2])
       && /^Triangle qui se resserre : .*Le prix vient de sortir par le bas \(.*s’il revient franchement dedans, la sortie ne compte pas\./.test(ec[3]), ec);
-    check('… toujours la cible théorique (« non garantie ») avec le bilan mesuré, l’annulation dite pour les doubles, jamais « vise », aucun mot banni, aucun conseil, « pas une prévision ni un conseil »',
-      ec.every(x => /Mesuré sur/.test(x) && /cibles? théoriques? selon l’usage des analystes : \d/.test(x) && /non garanties?/.test(x) && !/vise/.test(x) && !G.motsBannis(x).length && !CONSEIL.test(x.replace('pas une prévision ni un conseil', '')) && /pas une prévision ni un conseil/.test(x))
+    check('… toujours l’objectif théorique (« non garanti », jamais « cible ») avec le bilan mesuré, l’annulation dite pour les doubles, jamais « vise », aucun mot banni, aucun conseil, « pas une prévision ni un conseil »',
+      ec.every(x => /Mesuré sur/.test(x) && /objectifs? théoriques? selon l’usage des analystes : \d/.test(x) && /non garantis?/.test(x) && !/cible/i.test(x) && !/vise/.test(x) && !G.motsBannis(x).length && !CONSEIL.test(x.replace('pas une prévision ni un conseil', '')) && /pas une prévision ni un conseil/.test(x))
       && /Annulée si le prix finit un quart d’heure au-dessus de 86 400 \$/.test(ec[0]) && /Annulée si le prix finit une heure sous 81 900 \$/.test(ec[1]), ec.map(x => [x, G.motsBannis(x)]));
   }
   // 5. La suite, en une phrase : « Si le prix finit un quart d'heure au-dessus de … ».

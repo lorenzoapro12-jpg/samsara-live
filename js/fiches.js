@@ -705,7 +705,7 @@ const echapF = s => String(s === undefined || s === null ? '' : s).replace(/&/g,
 // { exp, deb } : exp, sous « En savoir plus », n'ajoute que ce que la ligne courte (COURT) ne dit
 // pas ; deb, la ligne du menu quand la fiche n'a pas de ligne courte.
 const USAGES = {
-  guide: { exp: 'Figure en tirets : elle se forme encore. Trait plein : validée (deux clôtures au-delà, ou une et un retour réussi). Pointillés : finie sans sa cible, barrée ✗ si invalidée, « – » au délai écoulé, « ○ » sans suite.',
+  guide: { exp: 'Figure en tirets : elle se forme encore. Trait plein : validée (deux clôtures au-delà, ou une et un retour réussi). Pointillés : finie sans son objectif, barrée ✗ si invalidée, « – » au délai écoulé, « ○ » sans suite.',
     deb: 'Une figure en tirets se dessine encore ; en trait plein, elle est validée ; barrée, elle ne tient plus.' },
   scenarios: { get exp() { return 'Pendant la journée, l’encadré dit les zones touchées (✓), les scénarios tombés (✗) et celui qui suit le mieux le prix, revu à chaque clôture de ' + quartMots() + '. « ◂ » marque le plus petit écart : pas une probabilité.'; },
     deb: 'Regardez le scénario n° 1 et sa zone. La ligne du haut dit ce qui a changé depuis le matin.' },

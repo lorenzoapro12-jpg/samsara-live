@@ -191,7 +191,7 @@ const Apprendre = (function () {
         const ou = sortie ? (s ? 'au-dessus' : 'en dessous') : (s ? 'au-dessus de sa ligne' : 'sous sa ligne');
         return { variantes: [tete + ' : ' + P[1] + ' ont fini ' + ou + '.', tete + '.'], titre: tete,
           texte: [tete + ' : ' + P[1] + ' ont fini ' + ou + '.',
-            '« Validée » : sortie de sa ligne, et restée. Elle a une cible théorique, non garantie, et un niveau qui l’annule.', FIN],
+            '« Validée » : sortie de sa ligne, et restée. Elle a un objectif théorique, non garanti, et un niveau qui l’annule.', FIN],
           resume: [['Le prix est sorti ' + (s ? 'par le haut' : 'par le bas') + ' et ' + P[1] + ' ont fini ' + ou + '.'], ['C’est « validé » : sorti, et resté.']] };
       }
       if (e.type === 'figure_tombee') {
@@ -208,15 +208,15 @@ const Apprendre = (function () {
           resume: [['Le prix a fini au-delà du niveau qui annule la figure.'], ['Elle est « tombée » : sa lecture ne tient plus.']] };
       }
       if (e.type === 'figure_atteinte') {
-        const tete = nom + ' : cible atteinte';
-        return { variantes: [tete + ', ' + P[0] + ' a fini à la cible ou au-delà.', tete + '.'], titre: tete,
-          texte: [tete + ' : ' + P[0] + ' a fini à la cible théorique ou au-delà.',
-            'Cette cible est un usage des analystes, non garanti : l’atteindre ne dit rien de la suite.', FIN],
-          resume: [[majuscule(P[0]) + ' a fini à la cible théorique ou au-delà.'], ['L’atteindre ne dit rien de la suite.']] };
+        const tete = nom + ' : objectif atteint';
+        return { variantes: [tete + ', ' + P[0] + ' a fini à l’objectif ou au-delà.', tete + '.'], titre: tete,
+          texte: [tete + ' : ' + P[0] + ' a fini à l’objectif théorique ou au-delà.',
+            'Cet objectif est un usage des analystes, non garanti : l’atteindre ne dit rien de la suite.', FIN],
+          resume: [[majuscule(P[0]) + ' a fini à l’objectif théorique ou au-delà.'], ['L’atteindre ne dit rien de la suite.']] };
       }
       if (e.type === 'figure_finie') {
         const sansSuite = e.cleEtat === 'sans_suite', tete = sansSuite ? nom + ' sans suite' : nom + ' : délai écoulé';
-        const quoi = sansSuite ? (f.raison === 'pointe' ? 'le prix est resté dedans jusqu’à la pointe.' : 'le prix n’en est pas sorti à temps.') : 'ni la cible ni l’invalidation n’ont été atteintes.';
+        const quoi = sansSuite ? (f.raison === 'pointe' ? 'le prix est resté dedans jusqu’à la pointe.' : 'le prix n’en est pas sorti à temps.') : 'ni l’objectif ni l’invalidation n’ont été atteints.';
         return { variantes: [tete + (sansSuite ? ' : ' : ', ') + quoi, tete + '.'], titre: tete,
           texte: [tete + (sansSuite ? ' : ' : ', ') + quoi, 'Elle ne compte plus, ni comme réussite ni comme échec.', FIN],
           resume: [[majuscule(quoi)], ['Elle ne compte plus.']] };

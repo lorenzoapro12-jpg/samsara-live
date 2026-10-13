@@ -13,7 +13,7 @@
 //   4. aucun regard vers l'avenir, pour les 16 types et les ébauches, issues comprises ;
 //   5. bilan : comptes cohérents, ébauches → figures → confirmées, témoin, aucun « % » ;
 //   6. mots : libellés Débutant ≤ PARAM.guide.debutant.forme et sans mot banni ; Expert ≤ 80 ; bulles
-//      avec validation, invalidation, cible « non garantie » et « Mesuré sur » ; mêmes valeurs dans les
+//      avec validation, invalidation, objectif « non garanti » et « Mesuré sur » ; mêmes valeurs dans les
 //      deux modes ; l'heure de l'appareil (Fmt.heure), jamais « UTC » ni « Paris » ; aucun conseil ni intention ; (C7) des
 //      définitions sans sens attendu ;
 //   7. états vivants (figureVivante) : « franchi », « percé en mèche », jamais un changement d'état ;
@@ -282,10 +282,11 @@ titre('6. Mots : libellés, bulles, mêmes valeurs, heures');
       if (vivante) {
         nbEx++;
         const N = G.niveauxFigure(f, ctx.j, P);
-        // Débutant : validation, cible « non garantie » ; annulation quand la figure en a une.
+        // Débutant : validation, objectif « non garanti » (plus « cible » : plan du 13/10/2026) ;
+        // annulation quand la figure en a une.
         if (!/validée|sortie compte|Validée/.test(deb)) pb.push(['validation', f.type, e]);
-        if (!f.ebauche && !/cibles? théoriques?/i.test(deb)) pb.push(['cible', f.type, e]);
-        if (!f.ebauche && !/non garanties?/.test(deb)) pb.push(['non garantie', f.type, e]);
+        if (!f.ebauche && (!/objectifs? théoriques?/i.test(deb) || /cible/i.test(deb))) pb.push(['objectif', f.type, e]);
+        if (!f.ebauche && !/non garantis?/.test(deb)) pb.push(['non garanti', f.type, e]);
         if (N.invals.length && !f.ebauche && !/Annulée si|ne tient plus|annulée si/.test(deb)) pb.push(['invalidation', f.type, e, deb.slice(0, 200)]);
         if (!f.ebauche && !/objectif théorique \(convention, non garanti\)/.test(exp)) pb.push(['objectif expert', f.type, e]);
         // Mêmes valeurs dans les deux modes : chaque niveau du moment est écrit à l'identique.
@@ -299,7 +300,7 @@ titre('6. Mots : libellés, bulles, mêmes valeurs, heures');
       }
     }
   }
-  check(`${nb} bulles (${nbEx} figures vivantes) à 40 instants : « Mesuré sur », validation, invalidation, cible « non garantie », mêmes valeurs dans les deux modes, heure de l’appareil sans fuseau écrit, ni mot banni ni conseil ni sens attendu`, nb > 40 && !pb.length, pb.slice(0, 8));
+  check(`${nb} bulles (${nbEx} figures vivantes) à 40 instants : « Mesuré sur », validation, invalidation, objectif « non garanti » (jamais « cible »), mêmes valeurs dans les deux modes, heure de l’appareil sans fuseau écrit, ni mot banni ni conseil ni sens attendu`, nb > 40 && !pb.length, pb.slice(0, 8));
   const defs = Object.values(G.DEFINITION_FORME);
   check(`C7 : les ${defs.length} définitions ne disent ni « annonce », ni « souvent suivi », ni « devrait », ni « signal »`, defs.length === 16 && !defs.some(d => C7.test(d)), defs.filter(d => C7.test(d)));
 }
@@ -437,8 +438,8 @@ titre('4 ter. Rejeu repris (une bougie de plus) = rejeu complet ; repli si l’h
   check(`reprise la plus lente sur 600 clôtures : ${max.toFixed(1)} ms (≤ 60 ms)`, max <= 60, max);
 }
 
-// ── 8 bis. Cible et statistiques d'une figure (demande du 11/10/2026) ──
-titre('8 bis. Cible et statistiques : la ligne courte de la bulle et le détail');
+// ── 8 bis. Objectif et statistiques d'une figure (demandes du 11/10/2026 et du 13/10/2026) ──
+titre('8 bis. Objectif et statistiques : la ligne courte de la bulle et le détail');
 {
   const ctx = ctxDe(NN), b = R.bilan;
   const finis = x => x.atteints + x.invalides + x.expires;
@@ -451,24 +452,44 @@ titre('8 bis. Cible et statistiques : la ligne courte de la bulle et le détail'
     const l = G.resumeStatsFigure(f, b[f.type], ctx, P, '$'), O = G.ciblesFigure(f, ctx, P), x = b[f.type];
     // La cible dite est celle de la machine (niveauxFigure, ou l'objectif de la figure finie), arrondie au dollar.
     const prixOk = O.every(o => l.includes(G.prixRond(o.p, '$')));
-    const tauxOk = finis(x) ? l.includes(x.atteints + ' fois sur ' + finis(x)) : /aucun cas terminé/.test(l);
-    check(`${f.type} (${f.fin || f.phase}) : « ${l} » — cible${O.length > 1 ? 's' : ''} de la machine et taux mesuré, ▸ au bout, sans « % » ni mot banni`,
-      prixOk && tauxOk && / ▸$/.test(l) && (O.length ? /^Cible /.test(l) : /^Statistiques/.test(l)) && !/%/.test(l) && !G.motsBannis(l).length, { l, O });
+    // Hors de la mesure sur des années (le harnais n'a pas de paire) : le compte de ce graphique.
+    const tauxOk = finis(x) ? l.toLowerCase().includes('sur ce graphique : atteint ' + x.atteints + ' fois sur ' + finis(x)) : /aucun cas terminé/.test(l);
+    check(`${f.type} (${f.fin || f.phase}) : « ${l} » — objectif${O.length > 1 ? 's' : ''} de la machine et taux mesuré, ▸ au bout, sans « % » ni mot banni`,
+      prixOk && tauxOk && / ▸$/.test(l) && (O.length ? /^Objectif /.test(l) : /^(Statistiques|Sur ce graphique)/.test(l)) && !/cible/i.test(l) && !/%/.test(l) && !G.motsBannis(l).length, { l, O });
     const St = G.statsFigure(f, R, ctx, P, '$'), txt = JSON.stringify(St);
     const dern = R.formes.filter(g => g.type === f.type && !g.doublon && g.fin && ['atteint', 'invalide', 'expire'].includes(g.fin) && g.jConf !== null);
     check(`… détail : mêmes cibles, comptes du bilan (${St.taux && St.taux.atteints}/${St.taux && St.taux.finis}), ${St.dernieres.length} dernières (≤ 6, des plus récentes), sans mot banni ni conseil`,
       St.cibles.length === O.length && St.cibles.every((c, k) => c.p === O[k].p) && St.taux.atteints === x.atteints && St.taux.finis === finis(x) && St.taux.invalides === x.invalides
       && St.dernieres.length === Math.min(6, dern.length) && St.faible === (x.confirmes < P.echantillonFaible)
-      && /usage des analystes/.test(St.comment) && /rien ne la garantit/.test(St.comment) && /pas une prévision ni un conseil/.test(St.risque) && St.risque.length < 90
+      && /usage des analystes/.test(St.comment) && /rien ne le garantit/.test(St.comment) && St.annees === null && /pas une prévision ni un conseil/.test(St.risque) && St.risque.length < 90
       && !G.motsBannis(txt).length && !CONSEIL.test(txt) && !/%/.test(txt), { St, bannis: G.motsBannis(txt) });
     const lig = Object.fromEntries(St.lignes);
     check(`… le détail reprend le bilan : repérées, validées, tombées avant, atteintes, annulées, délai écoulé`,
       +String(lig['Repérées'] || lig['Figures repérées']).split(' ')[0] === x.formes && +(lig['Figures validées'] || lig['Sorties validées']) === x.confirmes
-      && +(lig['Tombées avant leur validation'] || 0) === x.invalidesAvant + x.expiresAvant && +lig['Cible atteinte'] === x.atteints && +lig['Annulées avant la cible'] === x.invalides
+      && +(lig['Tombées avant leur validation'] || 0) === x.invalidesAvant + x.expiresAvant && +lig['Objectif atteint'] === x.atteints && +lig['Annulées avant l’objectif'] === x.invalides
       && +Object.entries(lig).find(([k]) => /^Ni l’une ni l’autre/.test(k))[1] === x.expires, { lig, x });
   }
-  // Une figure tombée avant sa validation n'a plus de cible : la ligne ne promet pas de prix.
-  if (tombee) check('une figure tombée avant sa validation : « Statistiques : … », aucun prix', /^Statistiques/.test(G.resumeStatsFigure(tombee, b[tombee.type], ctx, P, '$')) && !G.statsFigure(tombee, R, ctx, P, '$').cibles.length, null);
+  // Une figure tombée avant sa validation n'a plus d'objectif : la ligne ne promet pas de prix.
+  if (tombee) check('une figure tombée avant sa validation : « Sur ce graphique : … » (ou « Statistiques »), aucun prix', /^(Statistiques|Sur ce graphique)/.test(G.resumeStatsFigure(tombee, b[tombee.type], ctx, P, '$')) && !G.statsFigure(tombee, R, ctx, P, '$').cibles.length, null);
+  // Sur des années (plan du site du 13/10/2026, idée 3) : pour BTCUSDT en 15 min, 1 h et 4 h, la
+  // ligne dit ce que ces figures ont fait face au hasard, mesuré hors du site avec ce détecteur.
+  const M = G.MESURES_FIGURES, unites = ['15m', '1h', '4h'];
+  check('mesure sur des années : les 16 types pour 15 min, 1 h et 4 h, chacun [cas, sens ‰, hasard ‰, verdict, cas, objectif ‰, hasard ‰, verdict]', M.symbole === 'BTCUSDT'
+    && unites.every(u => G.TYPES.every(t => { const m = M.u[u][t]; return m && m.length === 8 && [m[3], m[7]].every(v => ['pareil', 'plus?', 'moins?', 'PLUS', 'MOINS', 'peu'].includes(v)) && [m[1], m[2], m[5], m[6]].every(x => x === null || x >= 0 && x <= 1000); })));
+  const btc = Object.assign({}, ctx, { symbole: 'BTCUSDT', intervalle: '15m' });
+  const dc = G.ligneHasard(G.mesureFigure('double_creux', btc)), ts = G.ligneHasard(G.mesureFigure('triple_sommet', btc));
+  check('la ligne honnête : « sens prévu 5 sur 10, objectif atteint 5 sur 10, comme au hasard » ; un écart au hasard dit le chiffre du hasard',
+    dc === 'sens prévu 5 sur 10, objectif atteint 5 sur 10, comme au hasard' && ts === 'sens prévu 4 sur 10 (au hasard 5), objectif atteint 5 sur 10, comme au hasard', { dc, ts });
+  check('trop peu de cas (fanion en 1 h) : pas de ligne ; autre paire ou autre unité : pas de mesure',
+    G.ligneHasard(G.mesureFigure('fanion', Object.assign({}, btc, { intervalle: '1h' }))) === null && G.mesureFigure('double_creux', Object.assign({}, btc, { symbole: 'SOLUSDT' })) === null
+    && G.mesureFigure('double_creux', Object.assign({}, btc, { intervalle: '5m' })) === null);
+  for (const f of ex.slice(0, 3)) {
+    const l = G.resumeStatsFigure(f, b[f.type], btc, P, '$'), h = G.ligneHasard(G.mesureFigure(f.type, btc)), St = G.statsFigure(f, R, btc, P, '$'), txt = JSON.stringify(St.annees);
+    check(`BTC 15 min, ${f.type} : « ${l} » — l’objectif, puis « ces figures : » et la ligne honnête ; le détail dit les cas passés, le hasard et sa source`,
+      / ▸$/.test(l) && (h ? l.includes('ces figures : ' + h) || l.includes('Ces figures : ' + h) : true) && !/%/.test(l) && !G.motsBannis(l).length
+      && St.annees && /^(Les [\d  ]+ cas passés de cette figure : partis d’abord dans le sens prévu \d+ fois sur 10 \(au hasard : \d+\), objectif atteint \d+ fois sur 10 \(au hasard : \d+\)\.|Trop peu de cas passés)/.test(St.annees.phrase)
+      && /^Mesuré sur le bitcoin \(Binance\) en 15 min, de 2023 au 13\/10\/2026/.test(St.annees.source) && !G.motsBannis(txt).length && !CONSEIL.test(txt) && !/%/.test(txt), { l, annees: St.annees, bannis: G.motsBannis(txt) });
+  }
   // Le témoin, quand il existe, est celui du bilan.
   const avecT = ex.find(f => b[f.type].temoin && b[f.type].temoin.departs > 0);
   if (avecT) { const St = G.statsFigure(avecT, R, ctx, P, '$'); check('le repère « trajet de même taille » est celui du bilan', St.temoin && St.temoin.departs === b[avecT.type].temoin.departs && St.temoin.atteints === b[avecT.type].temoin.atteints, St.temoin); }

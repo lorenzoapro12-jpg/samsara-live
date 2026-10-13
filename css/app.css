@@ -1375,7 +1375,7 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
    champ absent du format d'alors) — un trou se voit, il n'est pas comblé. */
 .fiche-chronique { margin: 8px 0 4px; }
 .fiche-chronique-tete { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--ink-3); }
-.chron-fiche { display: block; width: 100%; height: 56px; margin: 4px 0 2px; color: var(--ink-2); background: var(--rail); border-radius: 6px; }
+.chron-fiche { display: block; width: 100%; height: 56px; margin: 4px 0 2px; color: var(--ink-2); background: var(--rail); border-radius: min(6px, var(--r-tile)); }
 .chron-fiche .chron-trou { opacity: 0.55; }
 .chron-fiche .chron-hachure { stroke: var(--ink-3); stroke-width: 1.5; }
 .fiche-chronique-pied { font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
@@ -1401,7 +1401,7 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .stats-note { width: 100%; margin: 0; font-size: 11.5px; color: var(--ink-2); }
 .stats-comment { margin: 6px 0; font-size: 11.5px; color: var(--ink-2); }
 .stats-phrase { margin: 6px 0 4px; color: var(--ink-1); }
-.stats-barre { display: flex; gap: 2px; height: 10px; margin: 4px 0; border-radius: 5px; overflow: hidden; background: var(--rail); }
+.stats-barre { display: flex; gap: 2px; height: 10px; margin: 4px 0; border-radius: min(5px, var(--r-tile)); overflow: hidden; background: var(--rail); }
 .stats-barre i { display: block; min-width: 3px; }
 .stats-barre .ok { background: var(--up); } .stats-barre .ko { background: var(--down); } .stats-barre .neutre { background: var(--ink-3); }
 .stats-barre .pale { opacity: 0.45; }
