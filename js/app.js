@@ -366,7 +366,7 @@ let debEtat = null;
 function debutant() { return (typeof modeCourant === 'function' ? modeCourant() : 'debutant') !== 'expert'; }
 
 // ============ INDICATOR STATE ============
-const overlays = { ema20: false, ema50: false, ema100: false, ema200: false, sma20: false, sma50: false, bb: false, vwap: false, ichimoku: false, sar: false, sr: false, fib: false, vp: false, liq: false, guide: guideMemorise(), scenarios: scenariosMemorise() };
+const overlays = { ema20: false, ema50: false, ema100: false, ema200: false, sma20: false, sma50: false, bb: false, vwap: false, ichimoku: false, sar: false, sr: false, fib: false, vp: false, liq: false, fourchette: false, guide: guideMemorise(), scenarios: scenariosMemorise() };
 // Le Guide (niveaux nommés, régime, formes, suite, lecture) est affiché par défaut ; le choix de
 // le masquer est gardé d'une visite à l'autre (navigation privée : affiché).
 function guideMemorise() { try { return localStorage.getItem('samsara-guide-v1') !== '0'; } catch (e) { return true; } }
@@ -506,6 +506,10 @@ const PARAM = {
     // quand la fenêtre a au moins `colonne` px, sinon repliée en onglet comme « Infos du marché ».
     colonne: 1280, colonneL: 300,
     surbrillanceMs: 8000,   // un repère choisi dans la liste reste en avant sur le tracé (ms)
+    // Fourchette de 7 jours (plan du 13/10/2026, idée 5 ; mesure marche/range-cassure) : le plus
+    // haut et le plus bas des `periodes` périodes de `heures` h closes avant celle en cours ; sa
+    // cassure est dite dans « En résumé » pendant les `phrasePeriodes` périodes qui la suivent.
+    fourchette: { periodes: 42, heures: 4, phrasePeriodes: 6 },
     // Mode Débutant : au plus `items` textes sur le tracé (phrase, repère du haut, repère du bas,
     // scénario 1, forme, ligne des scénarios), chacun sur une ligne d'au plus N caractères ;
     // « étroit » : un tracé de moins de `etroit` px (téléphone).
@@ -625,6 +629,10 @@ const INDICATORS = [
     { key: 'sr', label: 'Supports / résistances', court: 'Supports / résistances', imp: 'courant' },
     { key: 'fib', label: 'Retracements de Fibonacci', court: 'Fibonacci', imp: 'utile' },
     { key: 'liq', label: NOM_ORDRES_CARTE, court: 'Ordres en attente', imp: 'utile', paires: ['BTCUSDT'] },
+    // Plan du 13/10/2026, idée 5 : refaite avec les bougies chargées, sur les intervalles qui
+    // divisent ses périodes de 4 h (en 1 jour, rien : la ligne est grisée et le dit).
+    { key: 'fourchette', get label() { return 'Fourchette de ' + joursFourchette() + ' jours'; }, get court() { return 'Fourchette de ' + joursFourchette() + ' jours'; },
+      imp: 'utile', intervalles: ['1m', '5m', '15m', '30m', '1h', '4h'] },
   ]},
   { cat: 'agitation', titre: 'Ça bouge beaucoup ?', items: [
     { key: 'atr', label: ETIQ.atr(), court: 'ATR', imp: 'utile' },
@@ -634,8 +642,10 @@ const INDICATORS = [
 ];
 const CALQUES = INDICATORS.flatMap(c => c.items);
 const calqueDe = key => CALQUES.find(i => i.key === key) || null;
-/** La couche dessine-t-elle quelque chose sur la paire affichée ? */
-const disponible = item => !item.paires || item.paires.includes(activeSymbol);
+/** La couche dessine-t-elle quelque chose sur la paire et l'intervalle affichés ? */
+const disponible = item => (!item.paires || item.paires.includes(activeSymbol)) && (!item.intervalles || item.intervalles.includes(chartInterval));
+/** La fourchette de 7 jours : son nombre de jours, tiré de PARAM.guide.fourchette (42 × 4 h). */
+const joursFourchette = () => PARAM.guide.fourchette.periodes * PARAM.guide.fourchette.heures / 24;
 
 function isOverlay(key) { return key in overlays; }
 function isActive(key) {
@@ -788,7 +798,7 @@ function garderMonEcran() {
 // Indicateur du menu -> sa fiche de lecture (js/fiches.js) : TOUS en ont une (tests/test_fiches.js).
 const FICHE_IND = { ema20: 'ema', ema50: 'ema', ema100: 'ema', ema200: 'ema', sma20: 'ema', sma50: 'ema', bb: 'bb', vwap: 'vwap',
   ichimoku: 'ichimoku', sar: 'sar', vol: 'volume', rsi: 'rsi', macd: 'macd', stoch: 'stoch', atr: 'atr', obv: 'obv', mfi: 'mfi',
-  williamsR: 'williamsR', cci: 'cci', adx: 'adx', ao: 'ao', sr: 'sr', fib: 'fib', vp: 'vp', liq: 'liq', guide: 'guide', scenarios: 'scenarios' };
+  williamsR: 'williamsR', cci: 'cci', adx: 'adx', ao: 'ao', sr: 'sr', fib: 'fib', vp: 'vp', liq: 'liq', fourchette: 'fourchette', guide: 'guide', scenarios: 'scenarios' };
 // « Ce que dit le graphique », en tête du panneau : les deux couches du site, en mots simples, puis
 // « Le détail » et « Les chiffres du marché » (js/fiches.js) — ces deux-là ne sont pas des calques
 // de marché : ni puce dans le ruban, ni compte sur le bouton.
@@ -875,7 +885,10 @@ function ligneMenu(item, libelle, cat) {
   const imp = item.imp ? IMPORTANCES[item.imp] : '';
   const cherche = libelle + ' ' + (item.court || '') + ' ' + (f ? f.titre : '') + ' ' + (TITRES_CAT[cat] || cat) + ' ' + imp;
   const dispo = disponible(item), seul = dispo ? '' : ' disabled';
-  const note = dispo ? '' : ' <span class="ind-seul">' + item.paires.map(p => NOMS_PAIRES[p] || p).join(', ') + ' seulement</span>';
+  // Grisée : la paire (« BTC/USDT seulement ») ou l'intervalle (« pas en 1 jour ») qui la prive.
+  const horsPaire = item.paires && !item.paires.includes(activeSymbol);
+  const note = dispo ? '' : ' <span class="ind-seul">' + (horsPaire ? item.paires.map(p => NOMS_PAIRES[p] || p).join(', ') + ' seulement'
+    : 'pas en ' + ({ '1d': '1 jour', '1w': '1 semaine' }[chartInterval] || nomTf(chartInterval))) + '</span>';
   return `<label data-ind="${item.key}" data-cat="${cat}" data-cherche="${echapF(cherche)}" class="aff-ligne${dispo ? '' : ' indispo'}"><input type="checkbox"${checked}${seul} onchange="toggleAny('${item.key}')">`
     + `<span class="aff-texte"><span class="aff-nom">${echapF(libelle)}${note}</span><span class="aff-quoi">${echapF(quoi)}</span></span>`
     + (imp ? `<span class="aff-imp imp-${item.imp}" title="Importance : ${imp}">${imp}</span>` : '') + (fiche ? infoBtn(fiche) : '') + '</label>';
@@ -969,7 +982,7 @@ const LEGENDE_MAX = 7;
 /** La couleur de la pastille : celle du tracé du calque (lue dans les jetons du thème). */
 function couleurCalque(key) {
   const C = COLORS;
-  const m = { bb: C.bb_mid, vwap: C.vwap, ichimoku: C.ichi_tenkan, sar: C.sar, sr: C.sr && C.sr[0], fib: C.fib, vp: C.vp, guide: C.accent2,
+  const m = { bb: C.bb_mid, vwap: C.vwap, ichimoku: C.ichi_tenkan, sar: C.sar, sr: C.sr && C.sr[0], fib: C.fib, vp: C.vp, fourchette: C.ink3, guide: C.accent2,
     scenarios: typeof scenCouleur === 'function' ? scenCouleur('1') : C.accent,
     liq: 'linear-gradient(135deg, var(--chaleur-bid, #3ec9b6) 50%, var(--chaleur-ask, #f07a5c) 50%)' };
   if (key in m) return m[key] || C.ink3;
@@ -1213,6 +1226,11 @@ async function changeInterval(interval, label) {
   label.classList.add('active');
   chartInterval = interval;
   priceScale = 1.0; pricePan = 0;
+  // Une couche qui ne dessine rien sur cet intervalle (la fourchette de 7 jours en 1 jour) : grisée
+  // ou rendue, comptée ou non, dans la légende du ruban ou non — comme au changement de paire.
+  compterIndicateurs(); majLegende();
+  const im = document.getElementById('indMenu');
+  if (im && im.classList.contains('open')) buildDropdown();
   await afficherSerie();
   // Les scénarios du matin, s'ils n'ont pas été relus depuis une cadence (BTCUSDT seulement).
   if (activeSymbol === 'BTCUSDT' && (!previsions || Horloges.maintenant() - previsions.luA > CADENCES.previsions_lue)) fetchPrevisions();
@@ -3523,7 +3541,7 @@ function drawChart() {
   const H = canvas.height / window.devicePixelRatio;
   // Palette : jetons du thème, lus UNE fois (lireJetons) — pas un getComputedStyle par image.
   if (!jetonsLus) { lireJetons(); jetonsLus = true; }
-  geo = null; geoPrix = null; guideEtat = null; scenEtat = null; ciblesPrix = [];
+  geo = null; geoPrix = null; guideEtat = null; scenEtat = null; ciblesPrix = []; fourchetteEtat = null;
   
   ctx.clearRect(0, 0, W, H);
   if (candles.length < 2) {
@@ -4401,6 +4419,11 @@ function resolveChart(candles, padL, padR, chartH, W) {
     ctx.fillText('POC ' + Fmt.prix(minP + (pocBin + 0.5) * binH, guideUnite()), W - pad.right + 4, pad.top + 9);
   }
 
+  // --- Fourchette de 7 jours (plan du 13/10/2026, idée 5) : ses deux traits sous les bougies ; son
+  // étiquette est posée après celles du Guide et des scénarios (fourchetteLibelle), qui gardent leur place.
+  fourchetteEtat = ov('fourchette') ? fourchettePreparer({ pad, ph, W, minP, maxP, range, vs, ve, gap, pas }) : null;
+  if (fourchetteEtat) fourchetteTraits(fourchetteEtat);
+
   // Guide : bandes des niveaux nommés, SOUS les bougies (le reste du Guide est tracé après elles).
   const guide = overlays.guide ? guidePreparer({ pad, pw, ph, W, minP, maxP, range, vs, ve, gap, candleW, n: visible.length }) : null;
   guideEtat = guide;
@@ -4479,10 +4502,14 @@ function resolveChart(candles, padL, padR, chartH, W) {
     // Ce qui vient de se passer (apprendre) : sa ligne prend une place du budget, le temps du message.
     apprCeder(guide, scen);
     if (guide) guidePasseeLibelle(guide);
+    // La fourchette de 7 jours (couche choisie) : posée en dernier ; budget plein, la ligne des
+    // scénarios puis le libellé de la forme lui cèdent leur place (fourchetteLibelle).
+    if (fourchetteEtat) fourchetteLibelle(fourchetteEtat, guide, scen);
   } else {
     if (scen) scenAvantGuide(scen);
     if (guide) guideTracer(guide);
     if (scen) scenTracer(scen);
+    if (fourchetteEtat) fourchetteLibelle(fourchetteEtat, guide, scen);
   }
 
   // Time labels (X axis) — densité ET format déduits de la largeur réellement
@@ -6313,7 +6340,7 @@ function majReperes(W) {
   if (!voir) { reperesCibles = []; reperesCle = ''; if (!ul0.hidden) ouvrirReperes(false); return; }
   const E = guideEtat && overlays.guide ? guideEtat : null, Sc = scenEtat;
   const coul = couleurCible, ico = c => icoCible(c);
-  const L = (E ? E.cibles : []).concat(Sc ? Sc.cibles : []).filter(c => c.titre && !c.evenement)
+  const L = (E ? E.cibles : []).concat(Sc ? Sc.cibles : [], ciblesListe()).filter(c => c.titre && !c.evenement)
     .map(c => ({ c, p: reperesPoint(c) })).filter(x => x.p).sort((a, b) => a.p[1] - b.p[1])
     // Un repère à deux cibles (le libellé d'un scénario et sa zone) : une seule ligne, la plus haute.
     .filter((x, k, a) => a.findIndex(y => y.c.titre === x.c.titre) === k);
@@ -6358,7 +6385,9 @@ function syntheseLecture() {
     const fe = m.ferme, tombe = !m.ouvert && !!fe && ['invalide', 'sortie'].includes(fe.type);
     scenario = { rang: m.sc.rang, forme: m.sc.forme, ouvert: !!m.ouvert, tombe, sens: m.pos && m.pos.forme === 'chemin' ? m.pos.sens : 0 };
   }
-  return Guide.synthese({ prix: isNum(livePrice) ? livePrice : D.ref, unite: guideUnite(), itv: chartInterval, regime: D.regime, choix: D.choix, suite: D.suite, figures, scenario });
+  // La fourchette de 7 jours qui vient de casser : dite couche allumée ou non (plan du 13/10/2026, idée 5).
+  return Guide.synthese({ prix: isNum(livePrice) ? livePrice : D.ref, unite: guideUnite(), itv: chartInterval, regime: D.regime, choix: D.choix, suite: D.suite, figures, scenario,
+    fourchette: fourchetteDonnees(), symbole: activeSymbol });
 }
 /** L'encadré « En résumé », en tête de la liste « Sur le graphique » : la phrase en gras, le
  *  pourquoi (un trait de couleur par signal : hausse, baisse ou neutre, et les mots qui le disent),
@@ -6442,7 +6471,7 @@ if (document.getElementById('reperesListe')) {
 function cibleVue() {
   if (!reperesVu) return null;
   const E = guideEtat && overlays.guide ? guideEtat : null, Sc = scenEtat;
-  const L = (E ? E.cibles : []).concat(Sc ? Sc.cibles : []).filter(c => c.titre === reperesVu.titre);
+  const L = (E ? E.cibles : []).concat(Sc ? Sc.cibles : [], ciblesListe()).filter(c => c.titre === reperesVu.titre);
   if (!L.length) return null;
   const tous = k => [].concat(...L.map(c => c[k] || []));
   return Object.assign({}, L[0], { rects: tous('rects'), zones: tous('zones'), segs: tous('segs') });
@@ -6498,6 +6527,7 @@ function surbrillanceCalque(W, mainH) {
 function guideSurvol(W, mainH, evite) {
   if (guideEtat) guideEtat.survol = null;
   if (scenEtat) { scenEtat.survol = null; scenEtat.bulle = null; }
+  if (fourchetteEtat) fourchetteEtat.bulle = null;
   const c = cibleTenue() || guideCibleSous(crossX, crossY, mainH);
   if (c && debutant()) scenSurvolDebutant(c);   // la zone d'invalidation du scénario 1, sous la bulle
   if (c) guideBulle(c, W, mainH, evite);
@@ -6662,6 +6692,7 @@ function guideBulle(c, W, mainH, evite) {
   const lu = { x: bx, y: by, w: bw, h: bh, corps: corps.slice(), police: fC, resume: !!acces, lignes: tl.length + contenu.filter(Boolean).length, nombres: nombresDe(tl.join(' ') + ' ' + contenu.join(' ')) };
   if (Sc && Sc.survol === c) Sc.bulle = lu;
   else if (E && E.survol === c) E.bulle = lu;
+  else if (c.fourchette && fourchetteEtat) fourchetteEtat.bulle = Object.assign(lu, { titre: c.titre });
   // Fond du tracé d'abord : une bulle translucide laisserait lire la lecture et les étiquettes à travers.
   cx.fillStyle = COLORS.surface;
   cx.shadowColor = 'rgba(16,35,61,0.18)'; cx.shadowBlur = 14; cx.shadowOffsetY = 4;
@@ -6702,6 +6733,9 @@ function guideBulle(c, W, mainH, evite) {
 // • Le thème est décrit pour la carte (publierThemeCarte) : à l'ouverture et à chaque changement.
 let marqueCarte = null;    // { p, ok } : le prix venu de la carte ; ok : jugé plausible
 let ciblesPrix = [];       // cibles hors Guide qui portent un prix (supports / résistances) : refaites à chaque dessin
+/** Les cibles hors Guide et hors scénarios qui entrent aussi dans « Sur le graphique » (liste : la
+ *  fourchette de 7 jours) ; les supports / résistances n'y sont pas (leur badge dit tout). */
+const ciblesListe = () => ciblesPrix.filter(c => c.liste);
 let cibleMarque = null;    // la cible du trait du prix venu de la carte (calque)
 let lienBulle = null;      // le lien de la bulle dessinée : { rect, url, cle, bulle, ancre }
 function liaisonCarte() {
@@ -6802,6 +6836,104 @@ function dessinerMarqueCarte(P, pm, W, prixAxe) {
   // étiquette, et ce trait n'en a pas sur le tracé.
   cibleMarque = { rects: [{ x0, y0: y - 5, x1, y1: y + 5 }], segs: [[x0, y, x1, y]], prio: 1, prix: pm, coul: COLORS.accent2, titre: 'Prix venu de la carte · ' + t,
     texte: ['Le prix choisi sur la carte des ordres. Le trait reste à ce prix ; il ne suit pas le prix du moment.', 'Une description, pas une recommandation.'] };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FOURCHETTE DE 7 JOURS — le dessin (plan du 13/10/2026, idée 5 ; le calcul pur : Guide.fourchette)
+// ─────────────────────────────────────────────────────────────────────────────
+// Couche « Fourchette de 7 jours » de « Choisir l'affichage » (éteinte par défaut, gardée comme les
+// autres) : deux traits fins en tirets, à l'encre neutre (jamais l'accent), du début de la fenêtre
+// de 7 jours au bord droit ; UNE étiquette « Fourchette 7 jours », posée sans recouvrir une autre ;
+// sa bulle dit le bas, le haut et l'écart. Les traits hors de la vue ne sont pas dessinés : l'étiquette
+// le dit d'une flèche (↑, ↓, ↕) quand aucun n'est visible. L'échelle de prix ne change pas.
+let fourchetteEtat = null;   // la géométrie de la dernière image (relue par les tests), null sans la couche
+/** La fourchette de 7 jours sur l'historique chargé (Guide.fourchette), ou null : intervalle de
+ *  1 jour, historique trop court. Aucune requête : les bougies déjà là, mémorisées par état. */
+function fourchetteDonnees() {
+  if (candles.length < 2 || !KLINE_MS[chartInterval]) return null;
+  return memoized('fourchette_' + activeSymbol + '_' + chartInterval, () => {
+    const c = cols();
+    return Guide.fourchette(c.time, c.high, c.low, c.close, candles.length, KLINE_MS[chartInterval] / 1000, PARAM.guide);
+  });
+}
+/** La géométrie de la couche (g : celle de resolveChart), ou null : rien à tracer, ou une fenêtre
+ *  qui commence après la vue (on regarde le passé : la fourchette d'aujourd'hui n'y est pas). */
+function fourchettePreparer(g) {
+  const F = fourchetteDonnees();
+  if (!F || !candles[g.vs]) return null;
+  const xMax = g.W - g.pad.right, xD = g.pad.left + (F.debut - candles[g.vs].time) / g.pas * g.gap;
+  if (xD >= xMax - 20) return null;
+  const top = g.pad.top, bas = g.pad.top + g.ph, yDe = p => top + g.ph * (1 - (p - g.minP) / g.range);
+  const yH = yDe(F.haut), yB = yDe(F.bas);
+  return { F, g, x0: Math.max(g.pad.left, xD), xMax, top, bas, yH, yB, visH: yH >= top && yH <= bas, visB: yB >= top && yB <= bas, etiq: null, bulle: null };
+}
+/** Les deux traits (sous les bougies) : fins, en tirets, encre 3 du thème. */
+function fourchetteTraits(V) {
+  ctx.save();
+  ctx.strokeStyle = COLORS.ink3; ctx.lineWidth = 1; ctx.setLineDash([6, 4]);
+  for (const [y, vu] of [[V.yH, V.visH], [V.yB, V.visB]]) if (vu) { ctx.beginPath(); ctx.moveTo(V.x0, y); ctx.lineTo(V.xMax, y); ctx.stroke(); }
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+/** Les places déjà prises quand ni le Guide ni les scénarios ne sont là (comme scenPreparer) :
+ *  badges S/R ; en Complet, le texte du repère de publication et la ligne de la vue en haut à gauche. */
+function fourchetteRects(g) {
+  const rects = srBadges.slice();
+  if (debutant()) return rects;
+  const rep = geoPrix && reperePublication(geoPrix);
+  if (rep) { ctx.font = chartFont(9, 650); const lw = ctx.measureText(rep.texte).width; rects.push({ x: texteRepere(rep, geoPrix, lw) - 2, y: g.pad.top + g.ph - 22, w: lw + 4, h: 14 }); }
+  rects.push({ x: 0, y: 0, w: 240, h: 36 });
+  return rects;
+}
+/** L'étiquette « Fourchette 7 jours » et sa cible (bulle, liste « Sur le graphique »). Contre le trait
+ *  du haut, sinon celui du bas, à gauche puis à droite, d'abord hors des bougies ; aucun trait dans
+ *  la vue : au bord, avec sa flèche. En Lisible, elle tient dans le budget des textes
+ *  (PARAM.guide.debutant.items, rôle « fourchette ») : couche choisie par le lecteur, elle prend
+ *  la place de la ligne des scénarios, puis du libellé de la forme (leur tracé reste, comme pour
+ *  la ligne d'un message, apprCederRole) ; jamais celle de la phrase, des repères ou du scénario 1. */
+function fourchetteLibelle(V, guide, scen) {
+  const { F, g } = V, deb = debutant(), unite = guideUnite(), j = F.jours;
+  const rects = guide ? guide.rects : scen ? scen.rects : fourchetteRects(g);
+  const fl = V.visH || V.visB ? '' : V.yH < V.top && V.yB > V.bas ? '↕ ' : V.yB < V.top ? '↑ ' : '↓ ';
+  const t = fl + 'Fourchette ' + j + ' jours', H = deb ? 17 : 15;
+  ctx.font = chartFont(deb ? 10 : 9, 600);
+  const w = ctx.measureText(t).width + 14 + ICO, gauche = V.x0 + 6, droite = V.xMax - 2;
+  const segs = [[V.yH, V.visH], [V.yB, V.visB]].filter(x => x[1]).map(([y]) => [V.x0, y, V.xMax, y]);
+  // Contre le trait : au-dessus du haut, au-dessous du bas, puis en glissant dans la fourchette ; sans
+  // trait dans la vue, au bord de son côté (↕ : en haut, sinon en bas).
+  const enHaut = [[V.top + 2], 1], enBas = [[V.bas - H - 2], -1];
+  const ancres = fl === '↕ ' ? [enHaut, enBas] : fl === '↑ ' ? [enHaut] : fl ? [enBas]
+    : [].concat(V.visH ? [[[V.yH - H - 2, V.yH + 2], -1], [[V.yH + 2], 1]] : [], V.visB ? [[[V.yB + 2, V.yB - H - 2], 1], [[V.yB - H - 2], -1]] : []);
+  let pose = null;
+  if (!deb || debEtat) {
+    const surBougies = guideSurBougies({ g, yDe: p => V.top + g.ph * (1 - (p - g.minP) / g.range) });
+    const xs = [gauche, Math.max(gauche, (gauche + droite - w) / 2), Math.max(gauche, droite - w)].filter(x => x + w <= droite + 0.5);
+    for (const [ev, gl] of [[surBougies, 2], [null, 3], [null, 8]]) {
+      for (const [essais, vers] of ancres) { for (const x of xs) if ((pose = guidePlacer(rects, x, w, H, essais, V.top, V.bas, vers, 0, gl, ev || undefined))) break; if (pose) break; }
+      if (pose) break;
+    }
+    // Lisible, budget plein : la ligne des scénarios, puis le libellé de la forme, cèdent leur
+    // place ; sinon la place réservée est rendue et l'étiquette n'est pas posée.
+    const P = PARAM.guide.debutant;
+    if (pose && deb) for (const role of ['boite', 'forme']) { if (debEtat.items.length < P.items) break; apprCederRole(role, guide, scen); }
+    if (pose && deb && debEtat.items.length >= P.items) { const k = rects.findIndex(r => r.x === pose.x && r.y === pose.y && r.h === H); if (k >= 0) rects.splice(k, 1); pose = null; }
+  }
+  if (pose) {
+    V.etiq = { x: pose.x, y: pose.y, w, h: H, t };
+    if (deb) debItem('fourchette', t, { x: pose.x, y: pose.y, w, h: H });
+    etiquettesAFaire.push(() => {
+      ctx.font = chartFont(deb ? 10 : 9, 600);
+      if (deb) guidePastilleDebutant(ctx, pose.x, pose.y, w, H, t, COLORS.ink3, COLORS.ink1, 'niveau');
+      else guidePastille(ctx, pose.x, pose.y, w, H, t, COLORS.ink3, 'niveau');
+    });
+  }
+  // La bulle : le titre (les prix avec « Le détail », la liste les montre), le bas, le haut, l'écart,
+  // ce que ça veut dire ; l'avertissement de la page. En Lisible, elle ne s'ouvre que sur l'étiquette.
+  if (!pose && !segs.length) return;
+  ciblesPrix.push({ rects: pose ? [guideZone(pose)] : [], segs, prio: 2, ico: 'niveau', coul: COLORS.ink3, liste: true, fourchette: true,
+    titre: 'Fourchette de ' + j + ' jours' + (deb ? '' : ' · ' + Guide.chiffres(F.bas) + ' – ' + Guide.prix(F.haut, unite)),
+    texte: ['Bas ' + Guide.prix(F.bas, unite) + ', haut ' + Guide.prix(F.haut, unite) + ' : un écart de ' + Guide.prixRond(F.haut - F.bas, unite) + '.',
+      'Le prix est resté entre les deux pendant ' + j + ' jours. Beaucoup surveillent ces bords.', Guide.AVERTISSEMENT] });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -234,8 +234,10 @@ const VERBES = /\b(touche|est passé|monte|baisse|hésite|s’agite|est entre|es
 // forme : PARAM.guide.debutant.forme (26) — plan figures §5.3 et amendement C1 (« Cible touchée, à confirmer », 26).
 // « evenement » : la ligne « ce qui vient de se passer » (PR 5), une seule, aux limites de la phrase ;
 // elle prend une des 5 places (le registre et le journal la comptent comme les autres).
-const LIMITES = { phrase: [90, 48], niveau: [26, 18], scenario: [32, 32], forme: [26, 26], boite: [48, 40], evenement: [90, 48] };
-const ROLES_MAX = { phrase: 1, niveau: 2, scenario: 1, forme: 1, boite: 1, evenement: 1 };
+// « fourchette » : l'étiquette de la couche « Fourchette de 7 jours » (plan du 13/10/2026, idée 5),
+// une seule, « Fourchette 7 jours » avec sa flèche au plus (↕, ↑ ou ↓ quand ses traits sont hors de la vue).
+const LIMITES = { phrase: [90, 48], niveau: [26, 18], scenario: [32, 32], forme: [26, 26], boite: [48, 40], evenement: [90, 48], fourchette: [22, 22] };
+const ROLES_MAX = { phrase: 1, niveau: 2, scenario: 1, forme: 1, boite: 1, evenement: 1, fourchette: 1 };
 
 /** Les contrôles d'un écran Débutant (budget, limites, mots, chevauchements, 5 secondes, absents). */
 async function controlerEcran(o, nom, opts = {}) {
@@ -305,9 +307,11 @@ async function controlerEcran(o, nom, opts = {}) {
   // Le scénario MONTRÉ (rang 1 tant qu'il est ouvert ou réalisé ; sinon le suivant encore ouvert —
   // contrat de la journée, plan-scenarios.md M7) : son libellé seul, jamais deux.
   if (e.scen) check(`${nom} : un seul libellé de scénario, celui du scénario montré (${e.scen.montre || '1'}) ; ni nom du point et de la fin`, e.scen.libelles.length <= 1 && e.scen.libelles.every(l => l.rang === (e.scen.montre || '1')) && !e.scen.cibles.some(c => c.prio === 3), e.scen);
-  // Les puces du ruban : une par calque de marché choisi (opts.calques), aucune sinon.
-  check(`${nom} : boutons des chiffres du marché, Grid Bot et chiffres clés masqués ; ${opts.calques ? 'une puce par calque choisi (' + dom.puces + ')' : 'aucune puce de calque'} ; ↺ visible ; la pastille « Infos du marché » dit l'âge (infobulle)`,
-    !dom.caches.length && dom.puces === (opts.calques ? opts.calques.length : 0) && dom.kpis === 0 && dom.reset && /il y a \d+ min/.test(dom.kpiDeb || ''), dom);
+  // Les puces du ruban : une par calque de marché choisi (opts.calques ; opts.puces : des calques
+  // posés sur les bougies seulement, sans le Volume — la fourchette de 7 jours), aucune sinon.
+  const nPuces = opts.calques ? opts.calques.length : opts.puces || 0;
+  check(`${nom} : boutons des chiffres du marché, Grid Bot et chiffres clés masqués ; ${nPuces ? 'une puce par calque choisi (' + dom.puces + ')' : 'aucune puce de calque'} ; ↺ visible ; la pastille « Infos du marché » dit l'âge (infobulle)`,
+    !dom.caches.length && dom.puces === nPuces && dom.kpis === 0 && dom.reset && /il y a \d+ min/.test(dom.kpiDeb || ''), dom);
   // Le Volume, calque simple du Lisible : son seul sous-graphe, quand il est allumé (opts.calques).
   // « Mon écran » (plan du site, idée 9) : les sous-graphes qu'il pose, dans l'ordre (opts.sous).
   if (opts.sous) check(`${nom} : les sous-graphes de « Mon écran » (${e.sous.join(', ') || 'aucun'})`, e.sous.join() === opts.sous.join(), e.sous);
@@ -999,6 +1003,65 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       await o.ctx.close();
     }
 
+    // ── La fourchette de 7 jours (plan du 13/10/2026, idée 5) ──
+    // Une couche du panneau, éteinte par défaut, gardée comme les autres : deux traits fins en tirets
+    // à l'encre neutre (encre 3, jamais l'accent) et UNE étiquette, inscrite au budget des cinq textes
+    // (rôle « fourchette » : elle prend la place de la ligne des scénarios, puis du libellé de la
+    // forme) ; sa bulle, résumée comme les autres. En 1 jour, la ligne du panneau est grisée et le
+    // dit, rien n'est tracé ; le choix reste gardé.
+    titre('Écran calme : la fourchette de 7 jours');
+    for (const [vue, tactile] of [[{ width: 390, height: 844 }, true], [{ width: 1440, height: 900 }, false]]) {
+      const nom = vue.width + ' px · fourchette';
+      const o = await ouvrir(nav, { vue, tactile, prev: 'ouvert' });
+      const d0 = await o.page.evaluate(() => ({ on: overlays.fourchette, etat: fourchetteEtat }));
+      check(`${nom} : éteinte par défaut, rien de tracé`, d0.on === false && d0.etat === null, d0);
+      await cocher(o.page, 'fourchette');
+      const e = await controlerEcran(o, nom, { puces: 1 });
+      const f = await o.page.evaluate(() => {
+        const st = CanvasRenderingContext2D.prototype.stroke, traits = [];
+        CanvasRenderingContext2D.prototype.stroke = function () { if (this.canvas.id === 'chart' && this.getLineDash().join() === '6,4') traits.push(this.strokeStyle); return st.apply(this, arguments); };
+        try { crossX = crossY = null; drawChart(); } finally { CanvasRenderingContext2D.prototype.stroke = st; }
+        const t = document.createElement('canvas').getContext('2d'); t.strokeStyle = COLORS.ink3;
+        const V = fourchetteEtat;
+        return V && { jours: V.F.jours, visH: V.visH, visB: V.visB, etiq: V.etiq, traits, ink3: t.strokeStyle, garde: JSON.parse(localStorage.getItem('samsara-affichage-v1') || '{}') };
+      });
+      const it = e.items.filter(i => i.role === 'fourchette');
+      check(`${nom} : cochée, ses traits en tirets à l'encre 3 et UNE étiquette « ${it[0] ? it[0].texte : '—'} » au budget (${e.items.map(i => i.role).join(', ')}) ; gardée sous samsara-affichage-v1`,
+        !!f && f.jours === 7 && f.traits.length === [f.visH, f.visB].filter(Boolean).length && f.traits.every(c => c === f.ink3) && it.length === 1
+        && /^(?:[↕↑↓] )?Fourchette 7 jours$/.test(it[0].texte) && /^[↕↑↓]/.test(it[0].texte) === !(f.visH || f.visB) && (f.garde.ov || []).includes('fourchette'), { f, items: e.items });
+      // Sa bulle (toucher ou survol de l'étiquette) : le titre, le bas, le haut et l'écart ; résumée
+      // comme les autres (4 lignes et 3 nombres au plus), sans jargon ni conseil.
+      if (it[0] && it[0].rect) {
+        const b0 = await o.page.evaluate(() => { const r = canvas.getBoundingClientRect(); return { x: r.left, y: r.top }; });
+        const px = b0.x + it[0].rect.x + Math.min(it[0].rect.w / 2, 40), py = b0.y + it[0].rect.y + it[0].rect.h / 2;
+        if (tactile) await o.page.touchscreen.tap(px, py); else { await o.page.mouse.move(2, 2); await o.page.mouse.move(px - 10, py - 3); await o.page.mouse.move(px, py, { steps: 3 }); }
+        await o.page.waitForTimeout(150);
+        const b = await o.page.evaluate(() => { const B = fourchetteEtat && fourchetteEtat.bulle; return B && { titre: B.titre, resume: B.resume, lignes: B.lignes, nombres: B.nombres, corps: B.corps.join(' '), dans: B.y >= 0 && B.y + B.h <= geo.mainH }; });
+        check(`${nom} : sa bulle « ${b && b.titre} » dit le bas, le haut et l'écart (${b && b.lignes} lignes, ${b && b.nombres} nombres), dans le tracé, sans jargon ni conseil`,
+          !!b && b.titre === 'Fourchette de 7 jours' && /^Bas [\d\s]+ \$, haut [\d\s]+ \$ : un écart de [\d\s]+ \$\./.test(b.corps) && b.dans
+          && (b.resume ? b.lignes <= 4 && b.nombres <= 3 : b.lignes <= 6) && !bannisBulle(b.corps + ' ' + b.titre).length && !CONSEIL.test(b.corps), b);
+        await quitter(o, tactile, b0.x + 20, b0.y + e.mainH - 30);
+      }
+      // En 1 jour : grisée, non cochable, dite ; rien de tracé, le choix gardé ; de retour en 15 min, tracée.
+      const jour = await o.page.evaluate(async () => {
+        await changeInterval('1d', document.getElementById('int_1d'));
+        await new Promise(r => setTimeout(r, 1200));
+        buildDropdown();
+        const l = document.querySelector('#indMenu label[data-ind="fourchette"]');
+        crossX = crossY = null; drawChart();
+        const r = { indispo: l.classList.contains('indispo'), coupee: l.querySelector('input').disabled, dit: (l.querySelector('.ind-seul') || {}).textContent || '',
+          etat: fourchetteEtat, garde: overlays.fourchette, roles: debEtat ? debEtat.items.map(i => i.role) : [] };
+        await changeInterval('15m', document.getElementById('int_15m'));
+        await new Promise(r => setTimeout(r, 1200));
+        crossX = crossY = null; drawChart();
+        r.retour = !!fourchetteEtat;
+        return r;
+      });
+      check(`${nom} : en 1 jour, « Fourchette de 7 jours » grisée, non cochable, « ${jour.dit} », rien de tracé (le choix gardé) ; revenue en 15 min, tracée de nouveau`,
+        jour.indispo && jour.coupee && jour.dit === 'pas en 1 jour' && jour.etat === null && jour.garde === true && !jour.roles.includes('fourchette') && jour.retour, jour);
+      check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
     // Les trois calques simples de l'ancien Lisible : versés une fois dans les choix du panneau.
     titre('Ancien Lisible : ses trois calques simples versés dans le panneau');
     {

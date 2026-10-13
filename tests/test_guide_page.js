@@ -297,6 +297,25 @@ const etat = page => page.evaluate(() => {
           check(`${nom} : chaque bulle de repère reste ouverte quand la souris va vers elle, un clic dedans ouvre son détail (${suivi.length})`, suivi.length > 1 && suivi.every(x => x.tenue && x.detail), suivi.filter(x => !(x.tenue && x.detail)));
         }
       }
+      // La fourchette de 7 jours (plan du 13/10/2026, idée 5), couche allumée : ses traits en tirets à
+      // l'encre 3 (jamais l'accent), UNE étiquette posée sans en recouvrir une autre, sa bulle (le bas,
+      // le haut, l'écart) et sa ligne dans « Sur le graphique ».
+      const fo = await o.page.evaluate(() => {
+        overlays.fourchette = true; crossX = crossY = null;
+        const st = CanvasRenderingContext2D.prototype.stroke, traits = [];
+        CanvasRenderingContext2D.prototype.stroke = function () { if (this.canvas.id === 'chart' && this.getLineDash().join() === '6,4') traits.push(this.strokeStyle); return st.apply(this, arguments); };
+        try { drawChart(); } finally { CanvasRenderingContext2D.prototype.stroke = st; }
+        dessinerCalque();
+        const t = document.createElement('canvas').getContext('2d'); t.strokeStyle = COLORS.ink3; const ink3 = t.strokeStyle; t.strokeStyle = COLORS.accent;
+        const V = fourchetteEtat, c = ciblesPrix.find(x => x.fourchette);
+        const r = { V: V && { visH: V.visH, visB: V.visB, etiq: V.etiq && V.etiq.t }, traits, ink3, accent: t.strokeStyle, titre: c && c.titre, texte: c && c.texte.join(' '),
+          places: chevauchementsPlaces(), liste: [...document.querySelectorAll('#reperesListe button')].map(b => b.textContent) };
+        overlays.fourchette = false; drawChart(); dessinerCalque();
+        return r;
+      });
+      check(`${nom} : fourchette de 7 jours — traits à l'encre 3, étiquette « ${fo.V && fo.V.etiq} » sans chevauchement, bulle « ${fo.titre} » (bas, haut, écart), dans « Sur le graphique »`,
+        !!fo.V && fo.traits.length === [fo.V.visH, fo.V.visB].filter(Boolean).length && fo.traits.every(x => x === fo.ink3 && x !== fo.accent) && /^(?:[↕↑↓] )?Fourchette 7 jours$/.test(fo.V.etiq || '')
+        && !fo.places.o.length && /^Fourchette de 7 jours · [\d\s]+ – [\d\s]+ \$$/.test(fo.titre || '') && /^Bas [\d\s]+ \$, haut [\d\s]+ \$ : un écart de [\d\s]+ \$\./.test(fo.texte || '') && fo.liste.includes(fo.titre), fo);
       check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
