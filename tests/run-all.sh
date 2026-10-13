@@ -46,6 +46,9 @@ node test_fiches.js || ko=1
 etape "2c. Réglages : le détail change, jamais la valeur ; constantes du fichier lues, jamais recopiées — hors ligne"
 node test_reglages.js || ko=1
 
+etape "2c'. Calculette de risque : nombres à la française, taille des paliers, prix moyen, perte = la part choisie, achat / vente, messages, mots du Lisible, aucun stockage — hors ligne"
+node test_calculette.js || ko=1
+
 etape "2d. Indicateurs réécrits en boucles : les mêmes valeurs qu'avant, au bit près, sur 3 000 bougies réelles — hors ligne"
 node test_indicateurs_boucles.js || ko=1
 
@@ -183,6 +186,9 @@ node test_figures_passees_page.js || ko=1
 
 etape "9b⁗''''. Apprendre dans Chromium : le prix franchit un repère → une ligne dans le budget de 5 textes (ni sur le prix ni sur une étiquette), effacée seule ; deux changements → un message ; marque « nouveau » lue puis gardée ; Complet discret, cases « Aide à la lecture » gardées ; 1440 et 390 (non exécuté sans Playwright)"
 node test_apprendre_page.js || ko=1
+
+etape "9b⁗'''''. Calculette de risque dans Chromium : ouverte depuis « Outils » (rien sur l'écran de départ), saisie en direct, la bulle reste ouverte, sans mémoire, 390 et 1440 px, six thèmes (non exécuté sans Playwright)"
+node test_calculette_page.js || ko=1
 
 etape "9c. Sobriété dans Chromium : éclair, horloge, onde, calque, verre, chargement, chaleur (non exécuté sans Playwright)"
 node test_sobriete.js || ko=1

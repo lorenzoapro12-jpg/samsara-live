@@ -1,0 +1,238 @@
+// La calculette de risque (plan du site du 13/10/2026, idée 7), vérifiée dans Chromium.
+//
+//   1. OUVERTURE : rien sur l'écran de départ ; dans « Choisir l'affichage », un bloc « Outils »
+//      juste avant les « Réglages fins » (qui restent le dernier bloc), un bouton « Calculette de
+//      risque » qui ferme le panneau et ouvre la calculette dans la bulle des légendes (#fichePop) :
+//      sa tête (« Calculette de risque », ×) d'abord, le focus sur la croix (le clavier du téléphone
+//      ne surgit pas), une phrase en tête, le pied « Un calcul, pas un conseil. ».
+//   2. SAISIE : des champs texte au clavier décimal, sans saisie automatique, 16 px et 40 px de haut
+//      au doigt, au-dessus des résultats ; « 10 000 », « 80 197 », trois paliers ajoutés au bouton
+//      (la bulle ne se referme pas) : 0,02134 BTC par palier, perte 100 $ (1 % du capital), prix
+//      moyen, mise ; retirer un palier, un stop entre les paliers (un message, pas de calcul), au-dessus
+//      (vente) ; la part choisie dans la ligne de rappel.
+//   3. SANS MÉMOIRE : rien n'est écrit dans le stockage par la calculette ; fermée puis rouverte, ses
+//      champs sont vides (la part revient à sa valeur de départ).
+//   4. ÉCRAN : à 390 px (doigt) et 1440 px, dans plusieurs thèmes (Bureau 95 et son contraste,
+//      Gazette, Néon, Diazo, Aero) : la bulle dans l'écran, aucun défilement de côté (page ni bulle),
+//      aucun mot interdit du Lisible ni conseil, aucune erreur JavaScript.
+//   5. Le glossaire des légendes : un titre touché ouvre sa fiche, qui reste ouverte (le même défaut
+//      que les boutons de la calculette, corrigé dans js/fiches.js).
+//
+// Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
+// USAGE   node tests/test_calculette_page.js
+const fs = require('fs'), path = require('path'), http = require('http');
+const REPO = path.resolve(__dirname, '..');
+const Guide = require(path.join(REPO, 'js', 'guide.js'));
+
+let playwright = null;
+for (const p of ['playwright', '/opt/node22/lib/node_modules/playwright', process.env.PLAYWRIGHT_MODULE].filter(Boolean)) {
+  try { playwright = require(p); break; } catch (e) { /* suivant */ }
+}
+if (!playwright) {
+  console.log('  − NON EXÉCUTÉ : Playwright introuvable — la calculette n’est pas vérifiée à l’écran sur ce poste.');
+  process.exit(0);
+}
+let ko = 0;
+const check = (nom, ok, det) => { if (!ok) ko++; console.log(`  ${ok ? '✓' : '✗'} ${nom}${!ok && det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 600) : ''}`); };
+const titre = t => console.log(`\n── ${t} ──`);
+const CONSEIL = /\b(achetez|vendez|achète[rz]?\b|vends\b|il faut (?:acheter|vendre)|entrez|sortez|prenez position|signal d['’]achat|signal de vente|recommand(?:e|ons)|plac(?:er|ez?)\s+(?:un|des|les|vos|votre)\s+stops?)/i;
+
+// Binance simulé : bougies déterministes (une sinusoïde), prix fixe.
+function binance(url) {
+  const u = new URL(url), q = u.searchParams, now = Date.now();
+  if (u.pathname.endsWith('/klines')) {
+    const pas = { '1m': 6e4, '5m': 3e5, '15m': 9e5, '1h': 36e5, '4h': 144e5, '1d': 864e5, '1w': 6048e5 }[q.get('interval')] || 9e5;
+    const n = Math.min(1000, +q.get('limit') || 500), fin = q.get('endTime') ? Math.min(+q.get('endTime'), now) : now;
+    return Array.from({ length: n }, (_, i) => { const t = Math.floor((fin - (n - 1 - i) * pas) / pas) * pas, c = 86000 + Math.sin(i / 7) * 300, o = c + (i % 2 ? 40 : -40);
+      return [t, String(o), String(Math.max(o, c) + 60), String(Math.min(o, c) - 60), String(c), '80', t + pas - 1, String(80 * c), 50, '40', String(40 * c), '0']; });
+  }
+  if (u.pathname.endsWith('/ticker/price')) return { price: '86012.5' };
+  if (u.pathname.endsWith('/ticker/24hr')) return { lastPrice: '86012.5', openPrice: '85700', priceChangePercent: '0.4', highPrice: '87000', lowPrice: '85000', bidPrice: '86012.4', askPrice: '86012.6', quoteVolume: '1e9', count: '100' };
+  return {};
+}
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.svg': 'image/svg+xml' };
+const serveur = http.createServer((req, res) => {
+  const f = path.join(REPO, decodeURIComponent(req.url.split('?')[0]));
+  if (!f.startsWith(REPO) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end(); }
+  res.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' });
+  fs.createReadStream(f).pipe(res);
+});
+
+async function ouvrir(nav, theme, w, h, mode) {
+  const tactile = w < 500;
+  const ctx = await nav.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: tactile, isMobile: tactile });
+  const page = await ctx.newPage();
+  const erreurs = [];
+  page.on('pageerror', e => erreurs.push(e.message));
+  await page.route('**/*', r => {
+    const u = r.request().url(), host = new URL(u).host, cors = { 'access-control-allow-origin': '*' };
+    if (host.startsWith('127.0.0.1')) return r.continue();
+    if (host === 'api.binance.com' || host === 'data-api.binance.vision') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(binance(u)) });
+    if (host === 'raw.githubusercontent.com') return r.fulfill({ status: 404, headers: cors, body: '' });
+    return r.abort();
+  });
+  await page.addInitScript(([t, m]) => {
+    try { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('samsara-theme', t); if (m === 'expert') localStorage.setItem('samsara-mode', 'expert'); } catch (e) { /* */ }
+    // Toute écriture dans le stockage, notée pendant que la calculette est ouverte (window.__ecrit).
+    const set = Storage.prototype.setItem;
+    window.__ecrit = null;
+    Storage.prototype.setItem = function (k, v) { if (window.__ecrit) window.__ecrit.push({ k: String(k), v: String(v).slice(0, 200), session: this === window.sessionStorage }); return set.call(this, k, v); };
+  }, [theme, mode]);
+  await page.goto(`http://127.0.0.1:${serveur.address().port}/index.html`);
+  await page.waitForFunction(() => typeof candles !== 'undefined' && candles.length > 100
+    && (!document.documentElement.hasAttribute('data-structure-attendue') || document.documentElement.hasAttribute('data-structure-posee')), null, { timeout: 30000 }).catch(() => {});
+  await page.waitForTimeout(500);
+  return { ctx, page, erreurs, tactile };
+}
+
+/** L'état de la bulle : place, contenu, champs, résultats. */
+const lire = page => page.evaluate(() => {
+  const p = document.getElementById('fichePop'), r = p.getBoundingClientRect(), vis = el => el && el.getClientRects().length > 0;
+  const champs = [...p.querySelectorAll('.calc input')].map(i => {
+    const b = i.getBoundingClientRect(), s = getComputedStyle(i);
+    return { id: i.id, type: i.type, mode: i.inputMode, auto: i.autocomplete, valeur: i.value, taille: parseFloat(s.fontSize), haut: b.height, bas: b.bottom, gauche: b.left, droite: b.right };
+  });
+  const res = p.querySelector('.calc-resultats'), rr = res ? res.getBoundingClientRect() : null;
+  const lignes = [...p.querySelectorAll('.calc-table dt')].map(dt => [dt.textContent, dt.nextElementSibling ? dt.nextElementSibling.textContent : '']);
+  const boutons = [...p.querySelectorAll('button')].filter(vis).map(b => { const q = b.getBoundingClientRect(); return { t: b.textContent.trim(), h: q.height, w: q.width, g: q.left, d: q.right }; });
+  return { cache: p.hidden, ouverte: typeof ficheOuverte !== 'undefined' ? ficheOuverte : null, aria: p.getAttribute('aria-label'),
+    tete: p.firstElementChild && p.firstElementChild.className, titre: (p.querySelector('.fiche-titre') || {}).textContent,
+    focus: document.activeElement && document.activeElement.className, texte: p.innerText,
+    phrase: (p.querySelector('.calc > .fiche-simple') || {}).textContent, pied: (p.querySelector('.fiche-pied') || {}).textContent,
+    message: (p.querySelector('.calc-message') || {}).textContent || null, rappel: (p.querySelector('.calc-rappel') || {}).textContent || null,
+    lignes, champs, boutons, resHaut: rr ? rr.top : null,
+    boite: { g: r.left, d: r.right, h: r.top, b: r.bottom }, L: innerWidth, H: innerHeight,
+    pageLarge: document.documentElement.scrollWidth - innerWidth, bulleLarge: p.scrollWidth - p.clientWidth,
+    calc: window.__calculette || null };
+});
+/** Tape un texte dans un champ (comme au clavier : un événement « input » par caractère). */
+async function taper(page, id, t) {
+  await page.fill('#' + id, '');
+  await page.type('#' + id, t);
+}
+const valeur = (e, nom) => (e.lignes.find(l => l[0] === nom) || [])[1];
+
+(async () => {
+  await new Promise(r => serveur.listen(0, '127.0.0.1', r));
+  const nav = await playwright.chromium.launch();
+  try {
+    const CAS = [['bureau95', 390, 844, 'debutant'], ['aero', 390, 844, 'debutant'], ['bureau95-contraste', 390, 844, 'debutant'], ['gazette', 390, 844, 'expert'],
+      ['neon', 390, 844, 'debutant'], ['diazo', 390, 844, 'expert'], ['bureau95', 1440, 900, 'expert'], ['aero', 1440, 900, 'debutant'], ['gazette', 1440, 900, 'debutant']];
+    for (const [theme, w, h, mode] of CAS) {
+      titre(`${theme}, ${w} px, ${mode === 'expert' ? 'Complet' : 'Lisible'}`);
+      const o = await ouvrir(nav, theme, w, h, mode), page = o.page;
+      const fautes = [];
+      // 1. Rien sur l'écran de départ ; le bloc « Outils » du panneau.
+      const depart = await page.evaluate(() => ({ calc: [...document.querySelectorAll('.calc, .aff-outils')].filter(el => el.getClientRects().length > 0).length,
+        bouton: [...document.querySelectorAll('.header button, .header-right *')].some(b => /calculette/i.test(b.textContent || '')) }));
+      check('rien de la calculette sur l’écran de départ ni dans l’en-tête', !depart.calc && !depart.bouton, depart);
+      await page.click('#indDropdownBtn'); await page.waitForTimeout(200);
+      const menu = await page.evaluate(() => {
+        const m = document.getElementById('indMenu'), liste = m.querySelector('.ind-liste'), o = m.querySelector('.aff-outils'), b = o && o.querySelector('button');
+        const rm = m.getBoundingClientRect(), rb = b && b.getBoundingClientRect();
+        return { ouvert: m.classList.contains('open'), outils: !!o, avantFins: !!o && o.nextElementSibling === m.querySelector('details.aff-fins'),
+          finsDernier: m.querySelector('details.aff-fins') === liste.lastElementChild, bouton: b && b.textContent.trim(), classe: b && b.className,
+          dedans: !!rb && rb.left >= rm.left - 0.5 && rb.right <= rm.right + 0.5, haut: rb && rb.height, teteSans: !m.querySelector('.aff-boutons .aff-calculette'),
+          pasLigne: !(o && o.closest('label[data-ind]')) && !(o && o.querySelector('[data-ind], .cat-title[data-cat]')) };
+      });
+      check('« Choisir l’affichage » : un bloc « Outils » juste avant les « Réglages fins », qui restent le dernier bloc ; un bouton « Calculette de risque » (ni ligne d’indicateur, ni bouton de tête)',
+        menu.ouvert && menu.outils && menu.avantFins && menu.finsDernier && menu.bouton === 'Calculette de risque' && /\baff-btn\b/.test(menu.classe) && menu.teteSans && menu.pasLigne, menu);
+      check('le bouton tient dans le panneau' + (o.tactile ? ', 40 px de haut au doigt' : ''), menu.dedans && (!o.tactile || menu.haut >= 40 - 0.5), menu);
+      await page.evaluate(() => { window.__ecrit = []; });
+      await page.click('#indMenu .aff-calculette'); await page.waitForTimeout(200);
+      let e = await lire(page);
+      const menuApres = await page.evaluate(() => ({ ouvert: document.getElementById('indMenu').classList.contains('open'), aria: document.getElementById('indDropdownBtn').getAttribute('aria-expanded') }));
+      check('le bouton ferme le panneau (aria-expanded="false") et ouvre la calculette dans la bulle des légendes, sa tête d’abord', !menuApres.ouvert && menuApres.aria === 'false'
+        && !e.cache && e.ouverte === 'calculette' && /fiche-tete/.test(e.tete) && e.titre === 'Calculette de risque' && e.aria === 'Calculette de risque', [menuApres, e.cache, e.ouverte, e.tete, e.titre, e.aria]);
+      check('le focus est sur la croix, pas sur un champ (pas de clavier qui surgit)', /fiche-fermer/.test(e.focus || ''), e.focus);
+      check('une phrase en tête dit ce qu’elle fait ; le pied « Un calcul, pas un conseil. »', /taille de chaque palier/.test(e.phrase || '') && /stop saute/.test(e.phrase || '') && e.pied === 'Un calcul, pas un conseil.', [e.phrase, e.pied]);
+      check('les champs : capital, part (1 au départ), stop, un palier ; texte au clavier décimal, sans saisie automatique',
+        JSON.stringify(e.champs.map(c => c.id)) === JSON.stringify(['calcCapital', 'calcPart', 'calcStop', 'calcPalier0']) && e.champs.every(c => c.type === 'text' && c.mode === 'decimal' && c.auto === 'off')
+        && e.champs[1].valeur === '1' && e.champs.filter(c => c.id !== 'calcPart').every(c => c.valeur === ''), e.champs);
+      check('avant la saisie : une phrase d’attente, pas de calcul', e.message && /quand les champs sont remplis/.test(e.message) && !e.lignes.length, e.message);
+      // 2. La saisie : l'exemple du jour.
+      await taper(page, 'calcCapital', '10 000');
+      await taper(page, 'calcStop', '80 197');
+      await taper(page, 'calcPalier0', '82 152');
+      await page.click('#fichePop .calc-ajouter'); await page.waitForTimeout(80);
+      e = await lire(page);
+      check('« Ajouter un palier » : la bulle reste ouverte, une ligne de plus, le focus dans le nouveau champ, les valeurs gardées',
+        !e.cache && e.ouverte === 'calculette' && e.champs.length === 5 && e.champs[3].valeur === '82 152' && await page.evaluate(() => document.activeElement && document.activeElement.id) === 'calcPalier1', [e.cache, e.ouverte, e.champs.map(c => c.valeur)]);
+      await page.keyboard.type('81759');
+      await page.click('#fichePop .calc-ajouter'); await page.waitForTimeout(80);
+      await page.keyboard.type('81 365,0');
+      await page.waitForTimeout(80);
+      e = await lire(page);
+      const c = e.calc || {};
+      check('résultats en direct : 3 paliers, achat, 0,02134 BTC par palier, perte 100 $ (1 % du capital), prix moyen 81 759 $, mise 5 235 $',
+        c.ok && c.n === 3 && c.sens === 1 && Math.abs(c.quantite - 100 / 4685) < 1e-12 && Math.abs(c.perte - 100) < 1e-9
+        && valeur(e, 'Sens') === 'achat (stop dessous)' && /^0,02134 BTC \(≈ 1 745 \$\)$/.test(valeur(e, 'Quantité par palier') || '')
+        && valeur(e, 'Prix moyen, tout rempli') === '81 759 $' && valeur(e, 'Perte au stop, tout rempli') === '100 $ (1 % du capital)' && valeur(e, 'Mise, tout rempli') === '5 235 $ (52 % du capital)', [c, e.lignes]);
+      check('la ligne de rappel : « Le 1 % est la perte, pas la mise. Un trou de prix sous le stop coûterait plus. »', e.rappel === 'Le 1 % est la perte, pas la mise. Un trou de prix sous le stop coûterait plus.', e.rappel);
+      const dessous = e.champs.every(x => x.bas <= e.resHaut + 0.5);
+      check('les champs en haut, les résultats dessous', dessous, [e.champs.map(x => x.bas), e.resHaut]);
+      if (o.tactile) {
+        const petits = e.champs.filter(x => x.taille < 16 || x.haut < 40 - 0.5), btn = e.boutons.filter(b => /Retirer|Ajouter/.test(b.t) && b.h < 40 - 0.5);
+        check('au doigt : champs en 16 px et 40 px de haut (le téléphone ne zoome pas), boutons « Ajouter » / « Retirer » de 40 px', !petits.length && !btn.length, { petits, btn });
+      }
+      // La part choisie se lit dans le rappel ; retirer un palier ; un stop mélangé ; la vente.
+      await taper(page, 'calcPart', '0,5'); await page.waitForTimeout(60);
+      e = await lire(page);
+      check('part 0,5 : perte 50 $, la part dans le rappel (« Le 0,5 % est la perte… »)', valeur(e, 'Perte au stop, tout rempli') === '50 $ (0,5 % du capital)' && /^Le 0,5 % est la perte, pas la mise\./.test(e.rappel || ''), [e.lignes, e.rappel]);
+      await page.click('#fichePop button[aria-label="Retirer le palier 3"]'); await page.waitForTimeout(80);
+      e = await lire(page);
+      check('« Retirer » : la bulle reste ouverte, deux paliers, le calcul refait', !e.cache && e.ouverte === 'calculette' && e.champs.length === 3 + 2 && e.calc && e.calc.n === 2
+        && Math.abs(e.calc.quantite - 50 / (1955 + 1562)) < 1e-9, [e.cache, e.champs.map(x => x.valeur), e.calc]);
+      await taper(page, 'calcStop', '82000'); await page.waitForTimeout(60);
+      e = await lire(page);
+      check('un stop entre les paliers : un message clair, pas de calcul', e.calc && !e.calc.ok && e.calc.code === 'melange' && /sous tous les paliers \(achat\) ou au-dessus de tous \(vente\)/.test(e.message || '') && !e.lignes.length, [e.message, e.lignes]);
+      await taper(page, 'calcStop', '83 000'); await page.waitForTimeout(60);
+      e = await lire(page);
+      check('un stop au-dessus de tous les paliers : vente, « au-dessus du stop » dans le rappel', e.calc && e.calc.ok && e.calc.sens === -1 && valeur(e, 'Sens') === 'vente (stop au-dessus)' && /au-dessus du stop coûterait plus\.$/.test(e.rappel || ''), [e.lignes, e.rappel]);
+      // 4. Écran et mots, panneau rempli.
+      const dansEcran = e.boite.g >= -0.5 && e.boite.d <= e.L + 0.5 && e.boite.h >= -0.5 && e.boite.b <= e.H + 0.5;
+      const hors = e.champs.concat(e.boutons.map(b => ({ id: b.t, gauche: b.g, droite: b.d }))).filter(x => x.gauche < e.boite.g - 0.5 || x.droite > e.boite.d + 0.5).map(x => x.id);
+      check('la bulle dans l’écran, aucun défilement de côté (page ni bulle), champs et boutons dans la bulle', dansEcran && e.pageLarge <= 0 && e.bulleLarge <= 1 && !hors.length, { boite: e.boite, L: e.L, H: e.H, page: e.pageLarge, bulle: e.bulleLarge, hors });
+      const bannis = Guide.motsBannis(e.texte), conseil = e.texte.match(CONSEIL);
+      check('aucun mot interdit du Lisible (ni « ratio »), aucun conseil, dans toute la bulle', !bannis.length && !conseil && !/ratio/i.test(e.texte), { bannis, conseil: conseil && conseil[0] });
+      // 3. Sans mémoire.
+      const ecrit = await page.evaluate(() => window.__ecrit);
+      const suspects = ecrit.filter(x => x.session || /calc|risque|palier/i.test(x.k) || /80 ?197|82 ?152|81 ?759|83 ?000/.test(x.v));
+      check('rien n’est écrit dans le stockage par la calculette (ni local ni session)', !suspects.length, suspects);
+      const stock = await page.evaluate(() => ({ local: JSON.stringify(Object.assign({}, localStorage)), session: sessionStorage.length }));
+      check('aucune valeur de la calculette dans le stockage', !/80 ?197|82 ?152|calcul/i.test(stock.local) && stock.session === 0, stock);
+      await page.click('#fichePop .fiche-fermer'); await page.waitForTimeout(80);
+      const ferme = await page.evaluate(() => ({ cache: document.getElementById('fichePop').hidden, aria: document.getElementById('fichePop').getAttribute('aria-label'), focus: document.activeElement && document.activeElement.id }));
+      check('× ferme la bulle ; le focus revient au bouton « Choisir l’affichage »', ferme.cache && ferme.aria === 'Légende' && ferme.focus === 'indDropdownBtn', ferme);
+      await page.click('#indDropdownBtn'); await page.waitForTimeout(150);
+      await page.click('#indMenu .aff-calculette'); await page.waitForTimeout(120);
+      e = await lire(page);
+      check('rouverte : les champs sont vides (la part revient à 1), un seul palier — sans mémoire',
+        !e.cache && e.champs.length === 4 && e.champs[0].valeur === '' && e.champs[1].valeur === '1' && e.champs[2].valeur === '' && e.champs[3].valeur === '', e.champs.map(x => x.valeur));
+      await page.keyboard.press('Escape'); await page.waitForTimeout(60);
+      check('Échap ferme la bulle', await page.evaluate(() => document.getElementById('fichePop').hidden));
+      // 5. Le glossaire : un titre touché ouvre sa fiche, qui reste ouverte.
+      if (theme === 'bureau95' || theme === 'aero') {
+        await page.evaluate(() => ouvrirGlossaire(document.getElementById('legendesBtn')));
+        await page.click('#fichePop .glossaire-item'); await page.waitForTimeout(120);
+        const g = await page.evaluate(() => ({ cache: document.getElementById('fichePop').hidden, ouverte: ficheOuverte }));
+        check('Légendes : un titre touché ouvre sa fiche, qui reste ouverte (le clic n’est plus pris pour un clic dehors)', !g.cache && g.ouverte && g.ouverte !== 'glossaire', g);
+        await page.mouse.click(5, Math.round((await page.evaluate(() => innerHeight)) / 2)); await page.waitForTimeout(80);
+        check('un clic dehors la ferme toujours', await page.evaluate(() => document.getElementById('fichePop').hidden));
+      }
+      check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
+      if (process.env.CAPTURES) {
+        await page.click('#indDropdownBtn'); await page.waitForTimeout(150);
+        await page.click('#indMenu .aff-calculette'); await page.waitForTimeout(120);
+        await taper(page, 'calcCapital', '10 000'); await taper(page, 'calcStop', '80 197'); await taper(page, 'calcPalier0', '82 152');
+        await page.click('#fichePop .calc-ajouter'); await page.keyboard.type('81 759'); await page.click('#fichePop .calc-ajouter'); await page.keyboard.type('81 365');
+        await page.evaluate(() => document.activeElement.blur()); await page.waitForTimeout(100);
+        await page.screenshot({ path: path.join(process.env.CAPTURES, `calc-${theme}-${w}.png`) });
+      }
+      void fautes;
+      await o.ctx.close();
+    }
+  } finally { await nav.close(); serveur.close(); }
+  console.log(ko ? `\n❌ CALCULETTE À L’ÉCRAN : ${ko} contrôle(s) en échec` : '\n✅ CALCULETTE À L’ÉCRAN : TOUS LES CONTRÔLES PASSENT');
+  process.exit(ko ? 1 : 0);
+})().catch(e => { console.error(e); process.exit(1); });
