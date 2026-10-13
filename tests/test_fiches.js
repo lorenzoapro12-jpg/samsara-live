@@ -118,6 +118,18 @@ check('aucune fiche ne dit quoi acheter ou vendre', !conseils.length, conseils);
 // Les dents de la liste : les tournures retirées des fiches (RSI, liquidité, ATR) y tombent.
 const RETIREES = ['certains attendent un retour vers le milieu', 'des zones de freinage ou de rebond', 'Sert à placer les stops', 'à dimensionner les positions', 'un rebond est attendu'];
 check('la liste attrape « retour vers le milieu », « rebond », « placer les stops », « dimensionner »', RETIREES.every(t => CONSEIL.test(t)), RETIREES.filter(t => !CONSEIL.test(t)));
+// La ligne « Comment les traders l'utilisent » dit l'usage CLASSIQUE, tel que les traders le disent
+// (demande de Lorenzo du 13/10/2026 : « RSI survendu : beaucoup y guettent un rebond »). Une pratique
+// attribuée n'est pas un conseil : une phrase de cette ligne peut parler de rebond, de repli ou de
+// stop si elle dit QUI le fait (« beaucoup », « certains », « d'autres », « les traders »), et
+// aucune ne s'adresse au lecteur. Partout ailleurs, CONSEIL reste entier.
+const IMPERATIF = /\b(achetez|vendez|vends\b|il faut|entrez|sortez|prenez position|placez|recommand(?:e|ons)|signal d['’]achat|signal de vente)/i;
+const ATTRIBUE = /\b(beaucoup|certains|d['’]autres|les traders)\b/i;
+const phrasesP = t => String(t).split(/(?<=[.?!…])\s+(?=[A-ZÀÂÉÈÊÎÔÛÇ«(+−0-9])/).filter(x => x.trim());
+const pratique = t => !IMPERATIF.test(t) && phrasesP(t).every(p => !CONSEIL.test(p) || ATTRIBUE.test(p));
+check('les dents de « pratique » : « beaucoup y guettent un rebond » passe ; « un rebond est attendu », « Achetez au rebond », « Placez votre stop » non',
+  pratique('Sous 30, « survendu » : beaucoup y guettent un rebond.') && pratique('Beaucoup placent leur stop à un ou deux ATR du prix.')
+  && !pratique('Sous 30, un rebond est attendu.') && !pratique('Achetez au rebond.') && !pratique('Placez votre stop à deux ATR.') && !pratique('Beaucoup y guettent un rebond. Achetez-le.'));
 const courtes = ['funding', 'oi', 'ls', 'cvd', 'gex', 'rsi_tf', 'vix', 'prime', 'carnet'].flatMap(k => [-5, -0.5, 0.2, 1, 50, 80].map(v => T.lectureCourte(k, v)));
 check('aucune lecture courte ne dit quoi faire', courtes.every(t => !CONSEIL.test(t)));
 // Un ratio de 1 (tel qu'affiché, « 1,00 ») n'est ni « plus d'acheteurs » ni « plus de vendeurs ».
@@ -242,9 +254,11 @@ titre('9. Chaque indicateur du menu : comment les traders l’utilisent, comment
   const champs = Object.entries(T.FICHES).filter(([, f]) => f.champ);
   const champsSans = champs.filter(([, f]) => !f.traders || !f.calcul).map(([k]) => k);
   check(`les ${champs.length} champs du fichier : usage des traders et calcul en mots`, !champsSans.length, champsSans);
-  const textes = Object.entries(T.FICHES).flatMap(([k, f]) => [f.traders, typeof f.calcul === 'function' ? f.calcul(T.PARAM) : f.calcul,
+  const textes = Object.entries(T.FICHES).flatMap(([k, f]) => [typeof f.calcul === 'function' ? f.calcul(T.PARAM) : f.calcul,
     ...(f.usage ? (typeof f.usage === 'string' ? [f.usage] : [f.usage.exp, f.usage.deb]) : [])].filter(Boolean).map(t => [k, t]));
-  check('aucun de ces textes ne dit quoi acheter ou vendre', textes.every(([, t]) => !CONSEIL.test(t)), textes.filter(([, t]) => CONSEIL.test(t)));
+  const usagesT = Object.entries(T.FICHES).filter(([, f]) => f.traders).map(([k, f]) => [k, f.traders]);
+  check('aucun de ces textes ne dit quoi acheter ou vendre ; l’usage des traders, seulement comme leur pratique', textes.every(([, t]) => !CONSEIL.test(t)) && usagesT.every(([, t]) => pratique(t)),
+    textes.filter(([, t]) => CONSEIL.test(t)).concat(usagesT.filter(([, t]) => !pratique(t))));
   const perso = Object.entries(T.FICHES).filter(([k]) => k).map(([k]) => [k, T.ficheHtml(k)]).filter(([, h]) => /propriétaire|dans ce projet|nos données|ses propres données/i.test(h)).map(([k]) => k);
   check('aucune explication personnalisée (étude du propriétaire, « dans ce projet »)', !perso.length, perso);
   const debSales = COUCHES.map(k => [k, Gd.motsBannis(T.FICHES[k].usage.deb)]).filter(([, b]) => b.length);
@@ -341,8 +355,8 @@ titre('11. Les fiches disent ce que la page calcule, avec les mots de l’écran
     /bougie précédente/.test(calc('mfi')) && /bougie précédente/.test(T.FICHES.mfi.formule(T.PARAM)) && !/bougies en hausse/.test(calc('mfi')) && /tp\[j\] > tp\[j - 1\]/.test(SRC_APP));
   check('S/R : un score de récence (demi-vie) × log du volume, pas « nombre de contacts » ni « ancienneté »', /récence/.test(calc('sr')) && /logarithme de leur volume/.test(calc('sr')) && !/nombre de contacts|ancienneté/.test(calc('sr'))
     && /recency \* volW/.test(SRC_APP) && !/\d\.\d/.test(T.FICHES.sr.formule(T.PARAM)));
-  check('RSI : « suracheté » / « survendu » partout (plus « surachat » / « survente »), et rien n’annonce un retour', Object.values(T.FICHES).every(f => !/surachat|survente/.test([f.traders, f.simple, ...(f.lectures || []).map(l => l.t)].join(' ')))
-    && /« suracheté »/.test(T.FICHES.rsi.traders) && !CONSEIL.test(T.FICHES.rsi.traders + T.FICHES.stoch.traders + T.FICHES.liq.traders + T.FICHES.atr.traders + T.FICHES.atr_tf.traders));
+  check('RSI : « suracheté » / « survendu » partout (plus « surachat » / « survente »), et aucune ligne ne s’adresse au lecteur', Object.values(T.FICHES).every(f => !/surachat|survente/.test([f.traders, f.simple, ...(f.lectures || []).map(l => l.t)].join(' ')))
+    && /« suracheté »/.test(T.FICHES.rsi.traders) && ['rsi', 'stoch', 'liq', 'atr', 'atr_tf'].every(k => pratique(T.FICHES[k].traders)));
   const vix = [12, 20, 30].map(v => [T.lectureCourte('vix', v), T.phraseCarte('vix', v)]);
   const texteDe = h => h.replace(/<[^>]+>/g, '');
   check('VIX : une seule phrase pour les mêmes repères (lecture courte = carte), sans mot technique', vix.every(([a, b]) => a && texteDe(a) === texteDe(b) && !Gd.motsBannis(a).length), vix);
@@ -375,8 +389,8 @@ titre('12. Chaque fiche en trois lignes d’ado : ce que c’est, comment les tr
   check('les dents du compte des phrases : « Un. Deux ? Trois ! » = 3, « 0,5 % du prix. » = 1', phrases('Un. Deux ? Trois !').length === 3 && phrases('0,5 % du prix.').length === 1);
   const formules = tous.filter(([, t]) => /[=×÷√Σ]/.test(t));
   check('le calcul en mots, sans formule (ni =, ×, ÷, √, Σ)', !formules.length, formules);
-  const conseils2 = tous.filter(([, t]) => CONSEIL.test(t));
-  check('aucune des trois lignes ne dit quoi faire, ni n’annonce de rebond ou de retour', !conseils2.length, conseils2);
+  const conseils2 = tous.filter(([k, t]) => k.endsWith('.traders') ? !pratique(t) : CONSEIL.test(t));
+  check('aucune des trois lignes ne dit quoi faire ; rebond, repli ou stop seulement comme pratique des traders', !conseils2.length, conseils2);
   // L'écran Débutant : ses fiches (glossaire) et les calques simples se lisent sans le vocabulaire des marchés.
   const DEB = T.GLOSSAIRE_DEBUTANT.concat(['volume', 'ema', 'liq']);
   const sales2 = DEB.flatMap(k => ['quoi', 'traders', 'usage', 'calcul'].filter(c => C[k][c]).map(c => [k + '.' + c, Gd.motsBannis(ct(C[k][c]))])).filter(([, b]) => b.length);
@@ -400,7 +414,16 @@ titre('12. Chaque fiche en trois lignes d’ado : ce que c’est, comment les tr
   T.PARAM.rsi.periode = 21; T.PARAM.bb.periode = 30;
   check('les trois lignes suivent PARAM (RSI 21, Bollinger 30)', ct(C.rsi.calcul).includes('les 21 dernières périodes') && ct(C.bb.calcul).includes('des 30 derniers prix'));
   Object.assign(T.PARAM, JSON.parse(sauveP2));
-  check('RSI en trois lignes : la zone basse n’annonce rien (règle du propriétaire)', /peut pourtant continuer longtemps/.test(ct(C.rsi.traders)) && !/rebond|remont|retour/.test(ct(C.rsi.traders) + ct(C.rsi_tf.traders) + ct(C.stoch.traders) + ct(C.mfi.traders)));
+  // L'usage classique (demande du 13/10/2026) : les oscillateurs nomment leurs zones comme les
+  // traders, et la fiche RSI dit ce que beaucoup y guettent ; l'ATR, la distance du stop.
+  const OSC = ['rsi', 'rsi_tf', 'stoch', 'mfi', 'williamsR', 'cci'];
+  const oscSans = OSC.filter(k => !/« suracheté »[\s\S]*« survendu »/.test(ct(C[k].traders)));
+  check('oscillateurs (RSI, stochastique, MFI, Williams, CCI) : « suracheté » et « survendu » ; RSI survendu : « beaucoup y guettent un rebond »',
+    !oscSans.length && /« survendu » : beaucoup y guettent un rebond/.test(ct(C.rsi.traders)), { oscSans, rsi: ct(C.rsi.traders) });
+  check('ATR : l’usage n° 1 des traders (la distance du stop), dit comme leur pratique', ['atr', 'atr_tf'].every(k => /Beaucoup placent leur stop/.test(ct(C[k].traders)) && pratique(ct(C[k].traders))));
+  // Plus de réserve maison sous « En savoir plus » qui démente l'usage classique.
+  const filtres = ids.flatMap(k => T.FICHES[k].lectures.filter(l => /pas des annonces|rarement vérifiée|Fiabilité discutée|Rien ne le prouve|Rien de mathématique/.test(l.t)).map(l => k + ' : ' + l.t));
+  check('« À savoir » ne dément plus l’usage classique (« pas des annonces de retournement », « rarement vérifiée »…)', !filtres.length, filtres);
   // Les budgets de la charte des explications courtes (12/10/2026) : un mot = un groupe qui porte
   // une lettre ou un chiffre. Ce que c'est : 15 ; usage et calcul : 25 ; une lecture : 20 ; le
   // débat : 35 ; les limites : 20. La lecture Expert de la journée des scénarios (ses règles, lues
