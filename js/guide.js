@@ -3034,8 +3034,8 @@ const Guide = (function () {
    *  penchent les signaux déjà affichés, le pourquoi en lignes courtes (un signal par ligne, son
    *  sens : +1, −1 ou 0), puis les deux repères qui changeraient la lecture. Rien de nouveau n'est
    *  calculé : la tendance (régime du Guide), un repère franchi et validé, la figure en cours, le
-   *  scénario du matin montré ; et, couche allumée ou non, la fourchette de 7 jours qui vient de
-   *  casser (fourchette, sans sens). Aucun pourcentage, aucun conseil, aucune flèche seule. Honnête : un
+   *  scénario du matin montré, un repère dépassé puis repoussé (la mèche d'etatFerme, sans sens) ;
+   *  et, couche allumée ou non, la fourchette de 7 jours qui vient de casser (fourchette, sans sens). Aucun pourcentage, aucun conseil, aucune flèche seule. Honnête : un
    *  sens n'est dit que si au moins deux signaux vont dans ce sens et aucun en face ; sinon « pas
    *  de sens net », et pourquoi.
    *  o = { prix, unite, itv, regime, choix, suite, figures: [f], scenario: { rang, forme, sens,
@@ -3056,6 +3056,14 @@ const Guide = (function () {
       pourquoi.push({ texte: 'Le prix est repassé sous ' + prixR(rA, u) + ' et y reste.', sens: -1, fam: 'niveau' });
     else if (ch.dessous && ch.dessous.ferme && ch.dessous.ferme.cassure === 'valide' && ch.dessous.ferme.sens > 0)
       pourquoi.push({ texte: 'Le prix est passé au-dessus de ' + prixR(rB, u) + ' et y reste.', sens: 1, fam: 'niveau' });
+    // Un rejet sur un repère (plan du 13/10/2026, idée 6) : sur les P.mecheBougies dernières
+    // périodes closes, le prix a dépassé le repère puis a fini de nouveau de son côté (etatFerme :
+    // une mèche au-delà, sans cassure). Dit en mots tant que c'est récent, sans sens : une mèche
+    // seule ne fait pas une cassure (la règle du Guide), elle ne dit pas la suite.
+    if (ch.dessus && ch.dessus.ferme && ch.dessus.ferme.meche && ch.dessus.ferme.mecheSens > 0)
+      pourquoi.push({ texte: 'Le prix est monté au-dessus de ' + prixR(rA, u) + ', puis il a été repoussé dessous.', sens: 0, fam: 'niveau' });
+    if (ch.dessous && ch.dessous.ferme && ch.dessous.ferme.meche && ch.dessous.ferme.mecheSens < 0)
+      pourquoi.push({ texte: 'Le prix est descendu sous ' + prixR(rB, u) + ', puis il a été repoussé au-dessus.', sens: 0, fam: 'niveau' });
     // La fourchette de 7 jours vient de casser (plan du 13/10/2026, idée 5) : dite avec l'agitation
     // qui suit, SANS sens (sens 0 : la mesure ne trouve aucun sens après une cassure, la règle du
     // titre n'en tient pas compte).
