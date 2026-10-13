@@ -139,7 +139,7 @@ body::before {
 :focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--defil); border-radius: 8px; }
+::-webkit-scrollbar-thumb { background: var(--defil); border-radius: min(8px, var(--r-tile)); }
 ::-webkit-scrollbar-thumb:hover { background: var(--defil-hover); }
 /* Le <svg> des filtres hyalite : caché sans display:none (Blink ignorerait ses filtres). */
 .hyalite-filters { position: absolute; width: 0; height: 0; overflow: hidden; }
@@ -240,7 +240,7 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 .price-badge.eclair-hausse { color: var(--up-ink); }
 .price-badge.eclair-baisse { color: var(--down-ink); }
 .var24 {
-  flex-shrink: 0; padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+  flex-shrink: 0; padding: 3px 9px; border-radius: var(--r-bar); white-space: nowrap;
   font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
   background: var(--rail); color: var(--ink-2);
 }
@@ -272,7 +272,7 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 .kpi b.stat-pos { color: var(--up-ink); } .kpi b.stat-neg { color: var(--down-ink); }
 .kpis:hover .kpi i { color: var(--ink-2); }
 .kpi-age {
-  flex-shrink: 0; margin-left: 6px; padding: 2px 8px; border-radius: 999px;
+  flex-shrink: 0; margin-left: 6px; padding: 2px 8px; border-radius: var(--r-bar);
   font-size: 10px; font-weight: 650; white-space: nowrap;
   color: var(--ink-3); background: var(--rail);
 }
@@ -288,7 +288,7 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 [data-structure="planche"] .kpis.vieux .kpi-age .age-retard { display: none; }
 /* Sur une autre paire que BTC/USDT, la bande dit qu'elle parle du bitcoin (js/app.js). */
 .kpi-btc {
-  flex-shrink: 0; margin-right: 4px; padding: 2px 8px; border-radius: 999px;
+  flex-shrink: 0; margin-right: 4px; padding: 2px 8px; border-radius: var(--r-bar);
   font-size: 10px; font-weight: 700; white-space: nowrap; color: var(--ink-2); background: var(--rail);
 }
 /* Trace des dernières heures (js/chronique.js) : sur la ligne du libellé, dans la hauteur de
@@ -337,13 +337,13 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   position: fixed; z-index: 1200; display: none;
   min-width: 250px; padding: 8px;
   background: var(--card-solid); color: var(--ink-1);
-  border: 1px solid var(--hairline); border-radius: 18px;
+  border: 1px solid var(--hairline); border-radius: min(18px, var(--r-panel));
   box-shadow: var(--card-shadow);
 }
 .theme-menu.open, .paire-menu.open { display: block; }
 .paire-menu { min-width: 180px; }
 .paire-menu label {
-  display: flex; align-items: center; padding: 7px 10px; border-radius: 12px; cursor: pointer;
+  display: flex; align-items: center; padding: 7px 10px; border-radius: min(12px, var(--r-tile)); cursor: pointer;
   font-size: 12.5px; font-weight: 650; font-variant-numeric: tabular-nums;
 }
 .paire-menu label:hover { background: var(--rail); }
@@ -355,7 +355,7 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 }
 .theme-item {
   display: flex; align-items: center; gap: 11px; width: 100%;
-  padding: 7px 8px; border: 0; border-radius: 12px; background: transparent;
+  padding: 7px 8px; border: 0; border-radius: min(12px, var(--r-tile)); background: transparent;
   font: inherit; color: inherit; text-align: left; cursor: pointer;
 }
 .theme-item:hover { background: var(--rail); }
@@ -479,7 +479,7 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   display: none; position: fixed; z-index: 999;
   min-width: 270px; max-height: 60vh; overflow-y: auto; padding: 8px 0;
   background: var(--card-solid); color: var(--ink-1);
-  border: 1px solid var(--hairline); border-radius: 18px;
+  border: 1px solid var(--hairline); border-radius: min(18px, var(--r-panel));
   box-shadow: var(--card-shadow);
 }
 .ind-dropdown-menu.open { display: block; }
@@ -490,7 +490,7 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 .ind-dropdown-menu .cat-title:first-child { padding-top: 10px; }
 .ind-dropdown-menu label {
   display: flex; align-items: center; gap: 8px; margin: 0 6px; padding: 5px 10px;
-  border-radius: 10px; font-size: 12px; cursor: pointer; transition: background .15s;
+  border-radius: min(10px, var(--r-tile)); font-size: 12px; cursor: pointer; transition: background .15s;
 }
 .ind-dropdown-menu label:hover { background: var(--rail); }
 .ind-dropdown-menu label input { margin: 0; accent-color: var(--accent); }
@@ -552,7 +552,7 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   border-radius: 0; font-size: 12px; color: var(--ink-2); cursor: default; background: none;
 }
 .ind-dropdown-menu .aff-fins label.reglage:hover { background: none; color: var(--ink-2); }
-.ind-dropdown-menu .aff-fins label.puce-case { display: inline-flex; gap: 4px; margin: 0; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; }
+.ind-dropdown-menu .aff-fins label.puce-case { display: inline-flex; gap: 4px; margin: 0; padding: 2px 8px; border-radius: var(--r-bar); font-size: 11.5px; }
 .ind-dropdown-menu .aff-fins label.puce-case:hover { color: var(--ink-1); background: var(--rail); }
 /* Une couche qui ne dessine rien sur la paire affichée : grisée, et elle dit pourquoi. */
 .ind-dropdown-menu label.indispo { color: var(--ink-3); cursor: default; }
@@ -560,7 +560,7 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 /* « Figures passées » (Complet) : un choix à trois états, sa phrase dessous, en petit. */
 /* « Figures passées » (Complet) : cochée, le choix « validées seulement / toutes » sous sa phrase. */
 .ind-passees select {
-  align-self: flex-start; max-width: 100%; margin-top: 4px; padding: 2px 6px; border-radius: 8px; font: inherit; font-size: 11.5px;
+  align-self: flex-start; max-width: 100%; margin-top: 4px; padding: 2px 6px; border-radius: min(8px, var(--r-tile)); font: inherit; font-size: 11.5px;
   color: var(--ink-1); background: var(--rail); border: 1px solid var(--hairline);
 }
 @media (pointer: coarse) { .ind-passees select { min-height: 40px; } }
@@ -715,7 +715,7 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 .loading { text-align: center; padding: 48px; color: var(--ink-2); }
 .error {
   margin: 16px; padding: 40px; text-align: center;
-  color: var(--down-ink); background: var(--down-soft); border-radius: 18px;
+  color: var(--down-ink); background: var(--down-soft); border-radius: min(18px, var(--r-card));
 }
 
 /* ─── 8. Cartes ─────────────────────────────────────────────────────────────── */
@@ -782,14 +782,14 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 .stat-neg { color: var(--down-ink); font-weight: 700; }
 .badge {
   display: inline-block; white-space: nowrap;
-  padding: 2px 8px; border-radius: 999px;
+  padding: 2px 8px; border-radius: var(--r-bar);
   font-size: 9.5px; font-weight: 700; letter-spacing: 0.4px;
 }
 .badge-hausser { background: var(--up-soft); color: var(--up-ink); }
 .badge-baissier { background: var(--down-soft); color: var(--down-ink); }
 .chip {
   display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;
-  padding: 1px 8px; border-radius: 999px;
+  padding: 1px 8px; border-radius: var(--r-bar);
   font-size: 10.5px; font-weight: 650; background: var(--rail); color: var(--ink-2);
 }
 .chip.pos { background: var(--up-soft); color: var(--up-ink); }
@@ -817,9 +817,9 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 
 /* Position dans une plage (bas/haut 24 h, canal S/R) */
 .track { margin-top: 8px; }
-.track-rail { position: relative; height: 6px; border-radius: 999px; background: var(--rail); }
+.track-rail { position: relative; height: 6px; border-radius: var(--r-bar); background: var(--rail); }
 .track-fill {
-  position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; opacity: 0.55;
+  position: absolute; left: 0; top: 0; bottom: 0; border-radius: var(--r-bar); opacity: 0.55;
   background: var(--teinte);
   background: linear-gradient(90deg, color-mix(in srgb, var(--teinte) 15%, transparent), var(--teinte));
 }
@@ -831,12 +831,12 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 .track-legende b { color: var(--ink-1); font-weight: 650; }
 
 /* Jauge RSI : zones 30 / 70 teintées, un point à la valeur */
-.rsi-meter { position: relative; flex: 1 1 70px; max-width: 130px; height: 5px; border-radius: 999px; background: var(--rail); margin: 0 4px; }
+.rsi-meter { position: relative; flex: 1 1 70px; max-width: 130px; height: 5px; border-radius: var(--r-bar); background: var(--rail); margin: 0 4px; }
 .rsi-zone { position: absolute; top: 0; bottom: 0; width: 30%; }
 /* Les deux zones de la même teinte neutre : sous 30, ce n'est pas une « bonne nouvelle » (vert),
    ni au-dessus de 70 une mauvaise (rouge) — un RSI bas n'annonce aucun rebond. */
-.rsi-zone.bas { left: 0; border-radius: 999px 0 0 999px; background: var(--warn-soft); }
-.rsi-zone.haut { right: 0; border-radius: 0 999px 999px 0; background: var(--warn-soft); }
+.rsi-zone.bas { left: 0; border-radius: var(--r-bar) 0 0 var(--r-bar); background: var(--warn-soft); }
+.rsi-zone.haut { right: 0; border-radius: 0 var(--r-bar) var(--r-bar) 0; background: var(--warn-soft); }
 .rsi-dot {
   position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%;
   background: var(--accent-2); box-shadow: 0 0 0 2px var(--card-solid), 0 2px 6px rgba(0,0,0,0.2);
@@ -846,7 +846,7 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 .tf-tete { display: flex; align-items: center; gap: 8px; }
 .tf-nom {
   font-size: 10.5px; font-weight: 750; color: var(--ink-1); background: var(--rail);
-  border-radius: 7px; padding: 1px 7px; min-width: 30px; text-align: center;
+  border-radius: min(7px, var(--r-tile)); padding: 1px 7px; min-width: 30px; text-align: center;
 }
 .tf-rsi { font-size: 11px; color: var(--ink-3); }
 .tf-rsi b { color: var(--ink-1); font-size: 13px; }
@@ -855,7 +855,7 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 .tf-pied { margin-top: 6px; font-size: 10.5px; color: var(--ink-3); line-height: 1.45; }
 
 /* Barre à deux segments (L/S, bids/asks) — 2 px de surface entre les segments */
-.split { display: flex; gap: 2px; height: 8px; border-radius: 999px; overflow: hidden; margin-top: 6px; }
+.split { display: flex; gap: 2px; height: 8px; border-radius: var(--r-bar); overflow: hidden; margin-top: 6px; }
 .split > span { display: block; height: 100%; }
 .split-a { background: var(--up); }
 .split-b { flex: 1; background: var(--down); }
@@ -865,13 +865,13 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 /* Barres divergentes (CVD) centrées sur zéro */
 .dv-row { display: grid; grid-template-columns: 28px minmax(40px, 1fr) auto; align-items: center; gap: 8px; margin: 4px 0; }
 .dv-lbl { font-size: 10.5px; font-weight: 700; color: var(--ink-3); }
-.dv-bar { position: relative; height: 8px; background: var(--rail); border-radius: 999px; }
+.dv-bar { position: relative; height: 8px; background: var(--rail); border-radius: var(--r-bar); }
 .dv-axe { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--ink-3); opacity: 0.45; }
 .dv-fill { position: absolute; top: 0; bottom: 0; }
 /* Le CVD n'est ni « bien » ni « mal » : une seule teinte neutre, le côté de l'axe dit le signe (le
    vert et le rouge disent seulement « le prix monte / descend »). */
-.dv-fill.pos { background: var(--ink-3); border-radius: 0 999px 999px 0; }
-.dv-fill.neg { background: var(--ink-3); border-radius: 999px 0 0 999px; }
+.dv-fill.pos { background: var(--ink-3); border-radius: 0 var(--r-bar) var(--r-bar) 0; }
+.dv-fill.neg { background: var(--ink-3); border-radius: var(--r-bar) 0 0 var(--r-bar); }
 .dv-val { font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 
 /* Mini-axe de prix (GEX) : put wall · zéro γ · spot · call wall */
@@ -906,7 +906,7 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 
 /* État du flux */
 .etats { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
-.etat { font-size: 10.5px; font-weight: 650; padding: 2px 9px; border-radius: 999px; background: var(--up-soft); color: var(--up-ink); }
+.etat { font-size: 10.5px; font-weight: 650; padding: 2px 9px; border-radius: var(--r-bar); background: var(--up-soft); color: var(--up-ink); }
 .etat.ko { background: var(--down-soft); color: var(--down-ink); }
 
 /* Horloges : une ligne par instant affiché — nom, heure UTC, âge ; la panne nommée en clair. */
@@ -917,7 +917,7 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 .horloge-ligne .h-age { font-variant-numeric: tabular-nums; color: var(--ink-3); min-width: 72px; text-align: right; }
 .horloge-ligne .h-src, .horloge-ligne .h-seuil { flex-basis: 100%; font-size: 10px; color: var(--ink-3); }
 .horloge-ligne .h-panne { flex-basis: 100%; font-size: 10.5px; font-weight: 650; color: var(--down-ink); }
-.horloge-ecart { font-size: 11px; font-weight: 650; color: var(--warn-ink); background: var(--warn-soft); border-radius: 10px; padding: 5px 10px; margin-bottom: 6px; }
+.horloge-ecart { font-size: 11px; font-weight: 650; color: var(--warn-ink); background: var(--warn-soft); border-radius: min(10px, var(--r-tile)); padding: 5px 10px; margin-bottom: 6px; }
 
 /* Contre-expertise : ✓ retrouvé, ≈ cohérent (avec sa borne), ✗ différent (les deux valeurs). */
 .age-banner.verif { color: var(--ink-2); background: var(--rail); }
@@ -935,12 +935,12 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 .contre-ligne .c-note, .contre-raison .c-note { flex-basis: 100%; padding-left: 20px; font-size: 10px; color: var(--ink-3); }
 .contre-raison { padding: 3px 0 3px 4px; color: var(--ink-2); line-height: 1.5; }
 .contre-raison .c-note { display: block; padding-left: 0; font-weight: 650; }
-.c-nature { font-style: normal; font-size: 9.5px; color: var(--ink-3); border: 1px solid var(--rail); border-radius: 6px; padding: 0 4px; }
+.c-nature { font-style: normal; font-size: 9.5px; color: var(--ink-3); border: 1px solid var(--rail); border-radius: min(6px, var(--r-tile)); padding: 0 4px; }
 
 /* Bandeau d'âge : au-delà de la cadence (15 min), la donnée est vieille et ça doit SE VOIR. */
 .age-banner {
   display: flex !important; align-items: center; gap: 9px; margin: 0 0 8px;
-  padding: 9px 13px; border-radius: 16px;
+  padding: 9px 13px; border-radius: min(16px, var(--r-card));
   font-size: 12px; font-weight: 650;
   color: var(--down-ink); background: var(--down-soft);
 }
@@ -1103,7 +1103,7 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 .strat-section input[type="datetime-local"] {
   flex: 1; padding: 4px 8px; font-size: 11px; font-family: var(--font);
   background: var(--card); color: var(--ink-1);
-  border: 1px solid var(--hairline); border-radius: 10px;
+  border: 1px solid var(--hairline); border-radius: min(10px, var(--r-tile));
   transition: border-color .15s ease, box-shadow .15s ease;
 }
 .strat-section .strat-row select:focus, .strat-section .strat-row input:focus {
@@ -1323,7 +1323,7 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
 }
 .info-btn:hover, .info-btn:focus-visible { color: var(--accent); border-color: var(--accent); outline: none; }
 .lecture-courte {
-  margin-top: 6px; padding: 5px 8px; border-radius: 8px; font-size: 11px; line-height: 1.4;
+  margin-top: 6px; padding: 5px 8px; border-radius: min(8px, var(--r-tile)); font-size: 11px; line-height: 1.4;
   color: var(--ink-2); background: var(--rail); border-left: 2px solid var(--accent);
 }
 /* Complet : la phrase en mots se lit à côté des chiffres, un cran plus discrète qu'eux (niveau
@@ -1331,7 +1331,7 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
 html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7px; font-size: 10.5px; background: transparent; }
 /* Débutant, autre paire que BTCUSDT : les infos du marché parlent du bitcoin (js/app.js). */
 .deb-btc {
-  margin: 0 0 8px; padding: 6px 9px; border-radius: 8px; font-size: 11.5px; line-height: 1.4;
+  margin: 0 0 8px; padding: 6px 9px; border-radius: min(8px, var(--r-tile)); font-size: 11.5px; line-height: 1.4;
   color: var(--ink-1); background: var(--rail); border-left: 2px solid var(--warn);
 }
 .glossaire-plus > summary { cursor: pointer; margin-top: 10px; font-size: 11.5px; font-weight: 700; color: var(--ink-2); }
@@ -1340,7 +1340,7 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .fiche-pop {
   position: fixed; z-index: 1300; left: 50%; top: 12vh; transform: none;
   width: min(420px, calc(100vw - 24px)); max-height: 76vh; overflow-y: auto;
-  padding: 12px 16px 14px; border-radius: 16px;
+  padding: 12px 16px 14px; border-radius: min(16px, var(--r-panel));
   background: var(--card-solid); color: var(--ink-1);
   border: 1px solid var(--hairline); box-shadow: var(--card-shadow);
   font-size: 12.5px; line-height: 1.5;
@@ -1351,7 +1351,7 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .fiche-titre { font-size: 14px; margin: 0; flex: 1; color: var(--ink-1); }
 .fiche-fermer { font: inherit; font-size: 18px; line-height: 1; border: 0; background: none; color: var(--ink-3); cursor: pointer; padding: 2px 6px; border-radius: 6px; }
 .fiche-fermer:hover { color: var(--ink-1); background: var(--rail); }
-.fiche-nature { font-size: 9.5px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: var(--rail); color: var(--ink-2); }
+.fiche-nature { font-size: 9.5px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; padding: 2px 7px; border-radius: var(--r-bar); background: var(--rail); color: var(--ink-2); }
 .fiche-nature.nature-convention, .fiche-nature.nature-seuil { background: var(--warn-soft, var(--rail)); color: var(--warn-ink, var(--ink-1)); }
 .fiche-nature.nature-modèle { color: var(--accent-2); }
 .fiche-simple { margin: 8px 0; color: var(--ink-1); }
@@ -1366,11 +1366,11 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .fiche-plus > summary::-webkit-details-marker { display: none; }
 .fiche-plus > summary::after { content: '▸'; transition: transform .15s; }
 .fiche-plus[open] > summary::after { transform: rotate(90deg); }
-.fiche-plus > summary:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; border-radius: 4px; }
+.fiche-plus > summary:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; border-radius: min(4px, var(--r-tile)); }
 .fiche-valeur { margin: 6px 0; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .fiche-valeur b { color: var(--ink-1); }
 .fiche-tf { font-size: 10px; font-weight: 700; color: var(--ink-3); }
-.fiche-alerte { margin: 6px 0; padding: 6px 9px; border-radius: 8px; background: var(--warn-soft, var(--rail)); color: var(--ink-1); font-size: 11.5px; }
+.fiche-alerte { margin: 6px 0; padding: 6px 9px; border-radius: min(8px, var(--r-tile)); background: var(--warn-soft, var(--rail)); color: var(--ink-1); font-size: 11.5px; }
 /* Courbe des dernières heures de publications : trous hachurés (aucune publication lue, ou
    champ absent du format d'alors) — un trou se voit, il n'est pas comblé. */
 .fiche-chronique { margin: 8px 0 4px; }
@@ -1382,11 +1382,11 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .fiche-pop h4 { margin: 12px 0 4px; font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; color: var(--ink-3); }
 .fiche-lectures { margin: 0; padding-left: 0; list-style: none; }
 .fiche-lectures li { margin: 5px 0; color: var(--ink-2); }
-.statut { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; padding: 1px 6px; border-radius: 6px; margin-right: 4px; background: var(--rail); color: var(--ink-2); }
+.statut { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; padding: 1px 6px; border-radius: min(6px, var(--r-tile)); margin-right: 4px; background: var(--rail); color: var(--ink-2); }
 .statut-débattu { background: var(--down-soft); color: var(--down-ink); }
 .statut-convention { background: var(--warn-soft, var(--rail)); color: var(--warn-ink, var(--ink-1)); }
 .statut-mesuré { background: var(--up-soft); color: var(--up-ink); }
-.fiche-debat { margin: 10px 0; padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--down-ink); color: var(--ink-2); font-size: 11.5px; }
+.fiche-debat { margin: 10px 0; padding: 8px 10px; border-radius: min(10px, var(--r-tile)); border: 1px dashed var(--down-ink); color: var(--ink-2); font-size: 11.5px; }
 .fiche-limites, .fiche-indice { color: var(--ink-2); font-size: 11.5px; }
 .fiche-technique p { margin: 4px 0; color: var(--ink-1); font-size: 11.5px; }
 .fiche-technique dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 6px 0; font-size: 11px; }
@@ -1418,7 +1418,7 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 /* Les touches du terminal, en une ligne sous le mode : un rappel, petit et gris. */
 .fiche-touches { margin: 2px 0 8px; font-size: 11px; color: var(--ink-3); }
 .glossaire-item, .fiche-pop .lien {
-  font: inherit; font-size: 11.5px; padding: 4px 9px; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 11.5px; padding: 4px 9px; border-radius: var(--r-bar); cursor: pointer;
   border: 1px solid var(--hairline); background: var(--rail); color: var(--ink-1);
 }
 .fiche-pop .lien { padding: 1px 8px; }
@@ -1432,13 +1432,13 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .reglage { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; font-size: 12px; color: var(--ink-2); }
 .reglage select, .ligne-reglage input {
   font: inherit; font-size: 12px; color: var(--ink-1); background: var(--rail);
-  border: 1px solid var(--hairline); border-radius: 8px; padding: 4px 8px;
+  border: 1px solid var(--hairline); border-radius: min(8px, var(--r-tile)); padding: 4px 8px;
 }
 .ligne-reglage { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
 .ligne-reglage input { width: 64px; }
 .puces { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
 .puce-case {
-  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--r-bar);
   border: 1px solid var(--hairline); background: var(--rail); color: var(--ink-1); font-size: 11.5px; cursor: pointer;
 }
 .puce-case input { margin: 0; accent-color: var(--accent); }
@@ -1477,7 +1477,7 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .epingles-t { font-size: 11px; font-weight: 700; color: var(--ink-2); margin-bottom: 6px; }
 .epingles-btns { display: flex; flex-wrap: wrap; gap: 5px; }
 .epingle-btn {
-  padding: 3px 9px; border-radius: 999px; border: 1px solid var(--hairline); background: transparent;
+  padding: 3px 9px; border-radius: var(--r-bar); border: 1px solid var(--hairline); background: transparent;
   font: inherit; font-size: 11px; font-weight: 650; color: var(--ink-2); cursor: pointer;
 }
 .epingle-btn[aria-pressed="true"] { color: var(--ink-1); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
@@ -1511,7 +1511,7 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .onglet-sous {
   flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; min-height: 22px; padding: 2px 9px;
   font: inherit; font-size: 10.5px; font-weight: 650; color: var(--ink-1); cursor: pointer;
-  background: var(--pill); border: 1px solid var(--hairline); border-radius: 999px;
+  background: var(--pill); border: 1px solid var(--hairline); border-radius: var(--r-bar);
 }
 .onglet-sous::before { content: ''; flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--dot); }
 .onglet-sous:hover, .onglet-sous:focus-visible { border-color: var(--accent); outline: none; }
@@ -1661,7 +1661,7 @@ html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header-right { o
 /* Le nom d'un bouton-icône, dit à l'appui du doigt (js/app.js) : une bulle inerte, 1,2 s. */
 .nom-appui {
   position: fixed; z-index: 3000; pointer-events: none;
-  padding: 4px 10px; border-radius: 8px; white-space: nowrap;
+  padding: 4px 10px; border-radius: min(8px, var(--r-tile)); white-space: nowrap;
   font-size: 12px; font-weight: 650; color: var(--ink-1); background: var(--card-solid, var(--rail));
   border: 1px solid var(--hairline); box-shadow: var(--capsule-ombre);
 }
