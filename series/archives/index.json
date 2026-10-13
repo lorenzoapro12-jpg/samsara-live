@@ -1,17 +1,19 @@
 {
- "updated": "2026-10-13T14:51:19+00:00",
- "generator": "publier_archives.py v1.0 — archives CSV (carnet et liquidations Binance)",
- "source": "carnet : Binance depth 5 000 niveaux + carnet complet Coinbase · liquidations : flux WebSocket Binance forceOrder",
+ "updated": "2026-10-13T15:02:17+00:00",
+ "generator": "publier_archives.py v1.1 — archives CSV (carnet hebdomadaire, liquidations Binance mensuelles)",
+ "source": "carnet : Binance depth 5 000 niveaux + carnet complet Coinbase · liquidations : flux WebSocket Binance forceOrder (route /market)",
  "branche": "historique",
  "repertoire": "series/archives",
  "status": {
   "synchronisation": "à jour",
+  "noms_perimes_retires": "carnet-2026-10.csv (nommage remplacé)",
   "copie": "2 fichier(s) copié(s)"
  },
  "errors": [],
  "series": {
   "carnet": {
    "libelle": "Carnet — une ligne toutes les 5 min (Binance 5 000 niveaux + carnet complet Coinbase)",
+   "decoupage": "une semaine ISO par fichier, nommée par le lundi de la semaine",
    "colonnes": [
     "ts_utc",
     "prix_milieu",
@@ -40,18 +42,19 @@
     "cb_mur_ask_usd"
    ],
    "fichiers": [
-    "series/archives/carnet-2026-10.csv"
+    "series/archives/carnet-2026-W42.csv"
    ],
-   "lignes": 9,
-   "octets": 2444,
+   "lignes": 12,
+   "octets": 3149,
    "periode": {
     "debut": "2026-10-13T14:16:45+00:00",
-    "fin": "2026-10-13T14:49:48+00:00"
+    "fin": "2026-10-13T15:01:32+00:00"
    },
    "cadence_s": 300
   },
   "liquidations_binance": {
    "libelle": "Liquidations Binance — un ordre liquidé par ligne, sans cadence (flux d'événements)",
+   "decoupage": "un mois calendaire par fichier",
    "colonnes": [
     "ts_utc",
     "cote",
@@ -62,17 +65,21 @@
    "fichiers": [
     "series/archives/liquidations-binance-2026-10.csv"
    ],
-   "lignes": 1,
-   "octets": 82,
+   "lignes": 5,
+   "octets": 296,
    "periode": {
     "debut": "2026-10-13T14:50:40+00:00",
-    "fin": "2026-10-13T14:50:40+00:00"
+    "fin": "2026-10-13T15:01:52+00:00"
    },
    "cadence_s": null
   }
  },
  "lecture": "l'index de la branche (`index.json` à la racine) décrit les séries de positionnement, funding et intérêt ouvert ; CE fichier décrit le sous-arbre `series/archives`, que l'autre n'énumère pas",
  "meta": {
+  "decoupage": {
+   "carnet": "carnet-AAAA-Wss.csv — semaine ISO, nommée par son lundi. Le découpage mensuel a été abandonné le 13/10/2026 : 244 o par ligne × 288 lignes/jour = 2,1 Mo par mois, au-delà du seuil confortable d'un blob (~1 Mo).",
+   "liquidations-binance": "liquidations-binance-AAAA-MM.csv — mois calendaire. Le flux est rare : quelques dizaines d'ordres par jour en marché calme."
+  },
   "carnet": {
    "prix_milieu": "(meilleur bid + meilleur ask) / 2, en USDT",
    "bid_usd_*": "Σ prix × quantité des bids à moins de 0,5 / 1 / 2 % du milieu, en dollars",
@@ -89,7 +96,8 @@
    "prix": "prix moyen d'exécution (ap), à défaut le prix de l'ordre (p)",
    "qty_btc": "quantité exécutée cumulée (z), en BTC",
    "usd": "qty_btc × prix",
-   "cadence": "aucune : un flux d'événements. Un fichier absent signifie « aucune liquidation », pas « collecteur arrêté »"
+   "cadence": "aucune : un flux d'événements. Un fichier absent signifie « aucune liquidation », pas « collecteur arrêté »",
+   "piège": "le flux exige la route `/market` depuis le 23/04/2026 : sans elle la socket s'ouvre, accepte SUBSCRIBE, et ne délivre rien"
   }
  }
 }
