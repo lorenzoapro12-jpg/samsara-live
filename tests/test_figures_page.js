@@ -24,6 +24,10 @@
 //   5 bis. CIBLE ET STATISTIQUES (11/10/2026) : la bulle (résumé du Lisible compris) finit par « Cible … ·
 //      atteinte X fois sur Y ▸ » ; la toucher ouvre le détail (#fichePop) : cible en gros, réussite
 //      mesurée, barre, détail, sans mot banni ; Échap le ferme ; en Complet, un clic sur le libellé aussi.
+//   5 ter. EXEMPLES PASSÉS (plan du 13/10/2026, idée 4) : dans le détail, les derniers cas de ce type
+//      sur ce graphique, sans tri, en petites cartes (le prix avant, pendant et après, l'objectif,
+//      l'invalidation, l'issue) dans une bande qu'on fait défiler de côté ; ni la page ni le panneau
+//      ne s'élargissent ; carrées dans les thèmes carrés, couleurs du thème ; onze thèmes à 390 px.
 //   6. Aucune erreur JavaScript ; pas de défilement horizontal à 390 px.
 //   7. TEMPS (amendement E2) : le rejeu dans Chromium, processeur ralenti 4 fois, en 1 min (où il
 //      revient chaque minute) et en 15 min : ≤ 100 ms à chaque clôture. Le rejeu complet dépassant
@@ -145,6 +149,36 @@ async function ouvrir(nav, o) {
   await page.evaluate(v => { viewEnd = candles.length; viewStart = Math.max(0, candles.length - v); drawChart(); }, VUE);
   await page.waitForTimeout(300);
   return { ctx, page, erreurs };
+}
+/** Les exemples passés du panneau des statistiques (idée 4 du 13/10/2026) : la phrase, la bande, ses
+ *  cartes (taille, rayon, SVG, légende), les couleurs de l'objectif et de l'invalidation, les débords. */
+const lireExemples = page => page.evaluate(() => {
+  const p = document.getElementById('fichePop'), b = p.querySelector('.stats-exemples'), S = window.__statsFigure || { dernieres: [] }, rp = p.getBoundingClientRect();
+  const couleur = v => { const e = document.createElement('i'); e.style.color = 'var(' + v + ')'; p.appendChild(e); const c = getComputedStyle(e).color; e.remove(); return c; };
+  const phrases = [...p.querySelectorAll('.stats-phrase')].map(x => x.textContent);
+  const rb = b && b.getBoundingClientRect(), obj = b && b.querySelector('.ex-objectif'), inv = b && b.querySelector('.ex-inval');
+  const cartes = b ? [...b.querySelectorAll('.stats-exemple')].map(c => {
+    const r = c.getBoundingClientRect(), st = getComputedStyle(c), svg = c.querySelector('svg'), fc = c.querySelector('figcaption');
+    return { w: r.width, h: r.height, rayon: parseFloat(st.borderTopLeftRadius) || 0, svg: !!svg && svg.getAttribute('role') === 'img' && !!svg.querySelector('title'),
+      legende: fc ? fc.textContent : '', anim: st.animationName !== 'none' || parseFloat(st.transitionDuration) > 0 };
+  }) : [];
+  return { n: S.dernieres.length, dernieres: S.dernieres.map(d => ({ quand: d.quand, marque: d.marque })), phrases, cartes,
+    bande: b && { large: b.scrollWidth, client: b.clientWidth, g: rb.left, d: rb.right, defile: getComputedStyle(b).overflowX, snap: getComputedStyle(b).scrollSnapType, focus: b.tabIndex === 0 },
+    panneau: { g: rp.left, d: rp.right }, page: document.documentElement.scrollWidth - innerWidth, bulle: p.scrollWidth - p.clientWidth,
+    couleurs: obj && inv ? { objectif: getComputedStyle(obj).stroke, inval: getComputedStyle(inv).stroke, up: couleur('--up-ink'), down: couleur('--down-ink') } : null,
+    rTile: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--r-tile')) || 0, texte: p.innerText };
+});
+/** La bande dit les derniers cas (sans tri), un par carte, chacun avec son SVG et sa légende (date,
+ *  issue) ; elle défile de côté sans élargir ni le panneau ni la page ; aucun cas : une phrase. */
+function exemplesOk(ex, tactile) {
+  const bannis = G.motsBannis(ex.texte);
+  if (bannis.length) return false;
+  if (!ex.n) return ex.phrases.includes('Aucun cas fini sur ce graphique.') && !ex.bande;
+  const B = ex.bande;
+  return ex.phrases.includes('Les derniers cas sur ce graphique, sans tri :') && !!B && ex.cartes.length === ex.n && B.defile === 'auto' && /x/.test(B.snap) && B.focus
+    && ex.cartes.every((c, k) => c.svg && c.h >= 40 && c.w >= 130 && c.w <= 150 && c.legende.includes(ex.dernieres[k].quand) && c.legende.includes(ex.dernieres[k].marque))
+    && B.g >= ex.panneau.g - 0.5 && B.d <= ex.panneau.d + 0.5 && ex.bulle <= 1 && (!tactile || ex.page <= 0)
+    && (ex.n < 3 || B.large > B.client);   // trois cartes ne tiennent pas de front : la bande défile
 }
 /** L'état des figures dans la page : registre Débutant, figures dessinées, styles, libellés. */
 const lireEtat = page => page.evaluate(() => {
@@ -373,6 +407,9 @@ async function bulle(o, tactile) {
       check(`${mode} ${w} px : la ligne ouvre « ${d.S && d.S.titre} » : l’objectif de la figure en gros (${d.prix.join(' / ')}), sur des années si mesuré, la réussite mesurée et sa barre, le détail, sans mot banni, dans l’écran, sans changer de page`,
         d.ouvert && d.S && d.prix.length >= 1 && d.prix.length === d.S.cibles.length && d.barres >= 1 && /Sur ce graphique/i.test(d.texte) && /Objectif de la figure/i.test(d.texte) && (!d.S.annees || /Sur des années/i.test(d.texte)) && !/cible/i.test(d.texte) && /Le détail/i.test(d.texte)
         && /usage des analystes/.test(d.texte) && !G.motsBannis(d.texte).length && d.dedans && d.chemin === 'index.html' && (!tactile || d.scroll <= 0), { d: Object.assign({}, d, { texte: d.texte.slice(0, 400) }), bannis: G.motsBannis(d.texte) });
+      // Les exemples passés (plan du 13/10/2026, idée 4) : la bande des derniers cas, ou une phrase.
+      const ex = await lireExemples(o.page);
+      check(`${mode} ${w} px : exemples passés — ${ex.n ? ex.n + ' cas en petit, dans une bande à faire défiler, sans débord' : '« Aucun cas fini sur ce graphique. »'}`, exemplesOk(ex, tactile), ex);
       // Échap le referme.
       await o.page.keyboard.press('Escape'); await o.page.waitForTimeout(100);
       check(`${mode} ${w} px : Échap referme le détail`, await o.page.evaluate(() => document.getElementById('fichePop').hidden), null);
@@ -386,6 +423,35 @@ async function bulle(o, tactile) {
         check('Le détail : un clic sur le libellé de la figure ouvre sa bulle entière, un 2e clic ses statistiques détaillées', !entiere.fiche && entiere.detail && await o.page.evaluate(() => !document.getElementById('fichePop').hidden && !!window.__statsFigure), entiere);
       }
       check(`${mode} ${w} px : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
+    // ── 5 ter. Exemples passés dans chaque thème (plan du 13/10/2026, idée 4) ──
+    titre('5 ter. Exemples passés : la bande des derniers cas dans le panneau des statistiques, onze thèmes à 390 px, deux à 1440 px');
+    for (const [mode, w, h, themes] of [['debutant', 390, 844, ['bureau95', 'aero', 'bureau95-contraste', 'gazette', 'neon', 'diazo', 'codex', 'cyanotype', 'gare', 'kala', 'aero-nuit']], ['expert', 1440, 900, ['bureau95', 'aero']]]) {
+      const tactile = w < 500;
+      const o = await ouvrir(nav, { iC: seq.iC + 2, mode, w, h, theme: themes[0] });
+      const fautes = [];
+      let vu = 0;
+      for (const th of themes) {
+        await o.page.evaluate(t => { fermerFiche(); appliquerTheme(t); }, th); await o.page.waitForTimeout(350);
+        // La figure dont le type a le plus de cas finis : la bande a de quoi défiler.
+        const n = await o.page.evaluate(() => {
+          const R = GUIDE_FORMES.val, fin = g => !g.doublon && g.jConf !== null && g.jConf !== undefined && ['atteint', 'invalide', 'expire'].includes(g.fin);
+          const nb = t => R.formes.filter(g => g.type === t && fin(g)).length, f = R.formes.filter(g => !g.doublon).sort((a, b) => nb(b.type) - nb(a.type))[0];
+          return f && ouvrirStatsFigure(f) ? nb(f.type) : -1;
+        });
+        await o.page.waitForTimeout(150);
+        const ex = await lireExemples(o.page);
+        vu = Math.max(vu, ex.cartes.length);
+        if (n < 1 || !exemplesOk(ex, tactile)) fautes.push({ th, n, ex: Object.assign({}, ex, { texte: undefined }) });
+        // Carré dans les thèmes carrés ; l'objectif et l'invalidation aux couleurs de la barre des issues ; aucune animation.
+        const carre = ex.rTile === 0 ? ex.cartes.every(c => c.rayon === 0) : ex.cartes.every(c => c.rayon <= 8);
+        if (!carre || !ex.couleurs || ex.couleurs.objectif !== ex.couleurs.up || ex.couleurs.inval !== ex.couleurs.down || ex.cartes.some(c => c.anim)) fautes.push({ th, carre, couleurs: ex.couleurs, rTile: ex.rTile, rayons: ex.cartes.map(c => c.rayon) });
+      }
+      check(`${mode} ${w} px : dans ${themes.length} thèmes, la bande des derniers cas (jusqu’à ${vu} cartes) tient dans le panneau, sans défilement de côté de la page ; cartes de 40 px de haut au moins, carrées dans les thèmes carrés ; objectif et invalidation aux couleurs du thème ; sans mot banni`,
+        !fautes.length && vu >= 3, fautes.slice(0, 3));
+      check(`${mode} ${w} px : aucune erreur JavaScript (thèmes changés, panneau rouvert)`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
 

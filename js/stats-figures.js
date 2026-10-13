@@ -6,8 +6,9 @@
 // sur 10, comme au hasard ▸ », Guide.resumeStatsFigure). La toucher (ou cliquer sur la figure dont
 // la bulle est déjà ouverte en entier) ouvre ce détail, dans la bulle des légendes (#fichePop,
 // js/fiches.js) : l'objectif de la figure et comment il se calcule, ce que ces figures ont fait sur
-// des années, puis ce qui a été mesuré sur l'historique chargé (Guide.statsFigure). Les mots sont
-// ceux de tout le monde ; les barres disent les proportions sans pourcentage.
+// des années, puis ce qui a été mesuré sur l'historique chargé (Guide.statsFigure), et les derniers
+// cas de ce type en petit, à faire défiler (idée 4 du plan du 13/10/2026). Les mots sont ceux de
+// tout le monde ; les barres disent les proportions sans pourcentage.
 /** Une barre de proportions : [[nombre, classe, titre]…], la largeur de chaque part ∝ son nombre. */
 function barreStats(parts) {
   const tot = parts.reduce((a, p) => a + p[0], 0);
@@ -15,8 +16,25 @@ function barreStats(parts) {
   return '<div class="stats-barre" aria-hidden="true">' + parts.filter(p => p[0] > 0).map(p =>
     '<i class="' + p[1] + '" style="flex-grow:' + p[0] + '" title="' + echapF(p[2]) + '"></i>').join('') + '</div>';
 }
-/** Le HTML du détail : S = Guide.statsFigure(…). */
-function statsFigureHtml(S) {
+/** Les exemples passés (plan du 13/10/2026, idée 4) : les derniers cas de ce type sur ce graphique,
+ *  du plus récent au plus ancien, SANS tri par réussite — une bande qu'on fait défiler de côté, une
+ *  petite carte par cas (le prix avant, pendant et après la figure, Guide.exempleSvg) et sa légende
+ *  (la date de validation, l'issue). K = { close, n } : les clôtures de l'historique rejoué ; sans
+ *  elles, la légende seule. Aucun cas fini : une phrase. */
+function exemplesHtml(S, K) {
+  if (!S.dernieres.length) return '<h4>Exemples passés</h4><p class="stats-phrase">Aucun cas fini sur ce graphique.</p>';
+  const nom = S.titre.replace(/ : statistiques$/, '');
+  const cartes = S.dernieres.map(d => {
+    const cl = d.marque === '✓' ? 'ok' : d.marque === '✗' ? 'ko' : 'neutre';
+    const svg = K ? Guide.exempleSvg(d, K.close, K.n, PARAM.guide, nom + ', validée le ' + d.quand + ' : ' + d.issue + '. Le prix avant, pendant et après la figure.') : '';
+    return '<figure class="stats-exemple">' + svg + '<figcaption><span class="stats-marque ' + cl + '">' + echapF(d.marque || '') + '</span> <span class="stats-quand">'
+      + echapF(d.quand) + '</span><br>' + echapF(d.issue) + '</figcaption></figure>';
+  }).join('');
+  return '<h4>Exemples passés</h4><p class="stats-phrase">Les derniers cas sur ce graphique, sans tri :</p>'
+    + '<div class="stats-exemples" tabindex="0" role="group" aria-label="Les derniers cas, à faire défiler de côté">' + cartes + '</div>';
+}
+/** Le HTML du détail : S = Guide.statsFigure(…) ; K = { close, n } (les clôtures rejouées), facultatif. */
+function statsFigureHtml(S, K) {
   const nb = x => (typeof Fmt !== 'undefined' && Fmt.nombre ? Fmt.nombre(x, 0) : String(x));
   let h = '<div class="fiche-tete"><h3 class="fiche-titre">' + echapF(S.titre) + '</h3><button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>';
   // 1. L'objectif de la figure : le prix d'abord, en gros ; son état ; comment il se calcule.
@@ -41,10 +59,7 @@ function statsFigureHtml(S) {
     if (S.delai) h += '<p class="stats-phrase">' + echapF(S.delai) + '</p>';
     if (S.faible) h += '<p class="fiche-alerte">Trop peu de cas pour en tirer une règle : ces comptes peuvent beaucoup changer.</p>';
     h += '<h4>Le détail</h4><dl class="stats-table">' + S.lignes.map(([k, v]) => '<dt>' + echapF(k) + '</dt><dd>' + echapF(v) + '</dd>').join('') + '</dl>';
-    if (S.dernieres.length) {
-      h += '<h4>Les dernières, validées</h4><ul class="stats-dernieres">' + S.dernieres.map(d =>
-        '<li><span class="stats-marque ' + (d.marque === '✓' ? 'ok' : d.marque === '✗' ? 'ko' : 'neutre') + '">' + echapF(d.marque || '') + '</span> <span class="stats-quand">' + echapF(d.quand) + '</span> ' + echapF(d.issue) + '</li>').join('') + '</ul>';
-    }
+    h += exemplesHtml(S, K);
   } else h += '<p class="stats-phrase">Pas encore de mesure pour ce graphique.</p>';
   h += '<p class="fiche-pied">' + echapF(S.source) + ' ' + echapF(S.risque) + '</p>';
   return h;
@@ -54,7 +69,10 @@ function ouvrirStatsFigure(f) {
   const p = document.getElementById('fichePop'), R = typeof GUIDE_FORMES !== 'undefined' ? GUIDE_FORMES.val : null, E = typeof guideEtat !== 'undefined' ? guideEtat : null;
   if (!p || !f || !R || !E || !E.ctxF) return false;
   const S = Guide.statsFigure(f, R, E.ctxF, PARAM.guide, guideUnite());
-  p.innerHTML = statsFigureHtml(S);
+  // Les clôtures de l'historique rejoué : celles des bougies chargées tant que le rejeu porte sur le
+  // même début d'historique (ses indices sont alors ceux de candles).
+  const memeBase = typeof GUIDE_FORMES.base === 'string' && candles.length && GUIDE_FORMES.base.endsWith('|' + candles[0].time);
+  p.innerHTML = statsFigureHtml(S, memeBase ? { close: cols().close, n: R.n } : null);
   p.hidden = false;
   p.style.left = ''; p.style.top = '';
   p.scrollTop = 0;

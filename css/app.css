@@ -1425,10 +1425,33 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .stats-table { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; margin: 4px 0; font-size: 12px; }
 .stats-table dt { color: var(--ink-2); }
 .stats-table dd { margin: 0; color: var(--ink-1); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
-.stats-dernieres { list-style: none; margin: 4px 0; padding: 0; font-size: 12px; color: var(--ink-2); }
-.stats-dernieres li { margin: 3px 0; }
 .stats-marque { display: inline-block; width: 1.1em; font-weight: 800; text-align: center; }
 .stats-quand { color: var(--ink-1); font-variant-numeric: tabular-nums; }
+/* Exemples passés d'une figure (plan du 13/10/2026, idée 4) : une bande qu'on fait défiler de côté
+   (elle seule : la page et la bulle ne s'élargissent pas), une petite carte par cas, sans animation.
+   Le prix de la figure à l'encre pleine, avant et après plus pâle ; le niveau franchi en pointillé ;
+   l'objectif et l'invalidation aux couleurs de la barre des issues (✓ atteint, ✗ annulée). Carré
+   dans les thèmes carrés (--r-tile) ; en Bureau 95, la carte est creusée comme un champ. */
+.stats-exemples {
+  display: flex; gap: 8px; max-width: 100%; margin: 4px 0 6px; padding: 2px 1px 6px;
+  overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory;
+}
+.stats-exemples:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+.stats-exemple {
+  flex: 0 0 140px; min-height: 40px; margin: 0; padding: 4px 4px 5px; scroll-snap-align: start;
+  border-radius: min(8px, var(--r-tile)); background: var(--rail); box-shadow: var(--enfonce-mince, inset 0 0 0 1px var(--hairline));
+}
+.stats-exemple .ex-svg { display: block; width: 100%; height: auto; }
+.stats-exemple figcaption { margin-top: 3px; font-size: 11px; line-height: 1.3; color: var(--ink-2); }
+.ex-pendant { fill: var(--ink-3); fill-opacity: 0.12; }
+.ex-avant, .ex-apres { fill: none; stroke: var(--ink-3); stroke-width: 1.1; stroke-linejoin: round; }
+.ex-prix { fill: none; stroke: var(--ink-1); stroke-width: 1.5; stroke-linejoin: round; }
+.ex-niveau { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 2 2; }
+.ex-objectif { stroke: var(--up-ink); stroke-width: 1.2; stroke-dasharray: 4 2; }
+.ex-inval { stroke: var(--down-ink); stroke-width: 1.2; stroke-dasharray: 4 2; }
+.ex-valide { fill: var(--ink-2); }
+.ex-issue { font-size: 11px; font-weight: 800; }
+.ex-issue.ok { fill: var(--up-ink); } .ex-issue.ko { fill: var(--down-ink); } .ex-issue.neutre { fill: var(--ink-3); }
 .glossaire { display: flex; flex-wrap: wrap; gap: 5px; }
 /* Les touches du terminal, en une ligne sous le mode : un rappel, petit et gris. */
 .fiche-touches { margin: 2px 0 8px; font-size: 11px; color: var(--ink-3); }

@@ -2930,15 +2930,55 @@ const Guide = (function () {
     if (b.ouverts) L.push(['Encore en cours', String(b.ouverts)]);
     if (fam === 'lignes' && b.haut + b.bas) L.push(['Sorties par le haut / par le bas', b.haut + ' / ' + b.bas]);
     if (E.n) L.push(['Débuts repérés → devenus ' + minuscule(noms[1]), E.n + ' → ' + E.devenues + (fam === 'lignes' ? '' : ' (validés : ' + E.confirmees + ')')]);
-    // Les dernières figures de ce type validées et terminées, chacune avec son issue (les échecs aussi).
-    const vues = (res.formes || []).filter(g => g.type === f.type && !g.doublon && passeeValidee(g)).sort((x, y) => y.jFin - x.jFin).slice(0, 6);
+    // Les derniers cas de ce type, validés et terminés, du plus récent au plus ancien — les échecs
+    // aussi, SANS tri par réussite (plan du 13/10/2026, idée 4) : chacun avec son issue et ce qu'il
+    // faut pour le redessiner en petit (exempleSvg) : ses indices dans l'historique rejoué (début,
+    // validation, issue) et ses prix (le niveau franchi, l'objectif, l'invalidation).
+    const max = (P.exemples && P.exemples.max) || 6;
+    const vues = (res.formes || []).filter(g => g.type === f.type && !g.doublon && passeeValidee(g)).sort((x, y) => y.jFin - x.jFin).slice(0, max);
     S.dernieres = vues.map(g => {
       const ms = finMs(ctx, g.jConf), d = dureeMots(delaiIssue(g, ctx));
       return { quand: fini(ms) ? (ctx && ctx.pas >= 86400 ? dateVue(ms) : dateVue(ms) + ' ' + heureVue(ms)) : '—', marque: marqueIssue(g),
-        issue: ({ atteint: 'objectif atteint', invalide: 'annulée avant l’objectif', expire: 'délai écoulé' })[g.fin] + (d ? ', ' + d + ' après' : '') };
+        issue: ({ atteint: 'objectif atteint', invalide: 'annulée avant l’objectif', expire: 'délai écoulé' })[g.fin] + (d ? ', ' + d + ' après' : ''),
+        fin: g.fin, debut: g.debut, jConf: g.jConf, jFin: g.jFin, sens: g.sens, niveau: fini(g.niveau) ? g.niveau : null, objectif: g.objectif, invalidation: g.invalidation };
     });
     return S;
   }
+  /** Un cas passé en petit (plan du 13/10/2026, idée 4) : le prix (les clôtures C, indices du
+   *  rejeu) avant, pendant et après la figure — de `avant` clôtures avant son début à `apres` après
+   *  son issue (PARAM.guide.exemples), sans aller au-delà de la dernière clôture n − 1 ; la figure
+   *  sur un fond à peine marqué ; le niveau franchi jusqu'à la validation (un carré au point de
+   *  validation) ; l'objectif et l'invalidation depuis la validation ; la marque d'issue (✓ ✗ –) au
+   *  point de l'issue. d = un élément de statsFigure(…).dernieres. SVG en chaîne, PUR : role="img",
+   *  <title>, des classes (les couleurs sont celles du thème, css/app.css), aucune couleur ici.
+   *  → '' quand le cas ne se redessine pas (indices hors de l'historique, prix manquants). */
+  function exempleSvg(d, C, n, P, titre) {
+    const E = (P && P.exemples) || {}, W = E.largeur || 140, H = E.hauteur || 60, N = Math.min(n, C ? C.length : 0);
+    if (!d || ![d.debut, d.jConf, d.jFin].every(i => Number.isInteger(i) && i >= 0 && i < N) || !(d.debut <= d.jConf && d.jConf <= d.jFin)) return '';
+    const i0 = Math.max(0, d.debut - (E.avant || 0)), i1 = Math.min(N - 1, d.jFin + (E.apres || 0));
+    const vals = [];
+    for (let i = i0; i <= i1; i++) { if (!fini(C[i])) return ''; vals.push(C[i]); }
+    const lignes = [d.niveau, d.objectif, d.invalidation].filter(fini);
+    const lo = Math.min(...vals, ...lignes), hi = Math.max(...vals, ...lignes);
+    if (!(hi > lo) || i1 <= i0) return '';
+    const r1 = x => Math.round(x * 10) / 10, haut = 7, bas = 7;   // place de la marque d'issue, en haut ou en bas
+    const X = i => r1(1 + (i - i0) / (i1 - i0) * (W - 2)), Y = v => r1(haut + (hi - v) / (hi - lo) * (H - haut - bas));
+    const trace = (a, b) => { let t = ''; for (let i = a; i <= b; i++) t += (i === a ? 'M' : 'L') + X(i) + ' ' + Y(C[i]); return t; };
+    const ligne = (cl, x1, x2, v) => fini(v) ? '<line class="' + cl + '" x1="' + x1 + '" x2="' + x2 + '" y1="' + Y(v) + '" y2="' + Y(v) + '"/>' : '';
+    const issue = d.fin === 'atteint' ? 'ok' : d.fin === 'invalide' ? 'ko' : 'neutre', xF = X(d.jFin), yF = Y(C[d.jFin]);
+    const xM = Math.max(5, Math.min(W - 5, xF)), yM = yF > H / 2 ? yF - 4 : yF + 11;
+    let corps = '<rect class="ex-pendant" x="' + X(d.debut) + '" y="0" width="' + r1(Math.max(1, X(d.jFin) - X(d.debut))) + '" height="' + H + '"/>'
+      + ligne('ex-niveau', X(d.debut), X(d.jConf), d.niveau)
+      + ligne('ex-objectif', X(d.jConf), W - 1, d.objectif) + ligne('ex-inval', X(d.jConf), W - 1, d.invalidation);
+    if (d.debut > i0) corps += '<path class="ex-avant" d="' + trace(i0, d.debut) + '"/>';
+    corps += '<path class="ex-prix" d="' + trace(d.debut, d.jFin) + '"/>';
+    if (i1 > d.jFin) corps += '<path class="ex-apres" d="' + trace(d.jFin, i1) + '"/>';
+    corps += '<rect class="ex-valide" x="' + r1(X(d.jConf) - 2) + '" y="' + r1(Y(C[d.jConf]) - 2) + '" width="4" height="4"/>'
+      + (d.marque ? '<text class="ex-issue ' + issue + '" x="' + xM + '" y="' + r1(yM) + '" text-anchor="middle">' + echapXml(d.marque) + '</text>' : '');
+    const t = echapXml(titre || '');
+    return '<svg class="ex-svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + t + '"><title>' + t + '</title>' + corps + '</svg>';
+  }
+  const echapXml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   /** Les mots qui n'ont pas leur place sur l'écran Débutant (noms d'indicateurs, jargon, heures UTC,
    *  intervalles abrégés). UNE liste pour tout le site : le terminal, js/scenarios.js et la carte
    *  (tests/mots_debutant.js la relit). Bornes : `\b` ne voit pas de frontière après une lettre
@@ -3130,6 +3170,6 @@ const Guide = (function () {
     texteSuiteDebutant, prixRond, USAGES_CHIFFRES, usageChiffre, avecUsage, cleEcart, ageLu, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
     MARQUES_FIN, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, libelleFormeCourt, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant,
-    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_FORME, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, fourchette, texteCassureFourchette, synthese };
+    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_FORME, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, exempleSvg, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, fourchette, texteCassureFourchette, synthese };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;
