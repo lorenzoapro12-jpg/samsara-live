@@ -447,6 +447,11 @@ const PARAM = {
   sr: { bougies: 500, atrPeriode: 14, tolMin: 0.002, tolMax: 0.01, tolAtr: 0.6, niveauxTf: 5, niveauxRef: 4, fusionTf: 0.005,
         pivot: { '1m': 5, '5m': 5, '15m': 4, '30m': 4, '1h': 4, '4h': 3, '1d': 2, '1w': 2 },
         demiVie: { '1m': 240, '5m': 120, '15m': 60, '30m': 40, '1h': 40, '4h': 20, '1d': 10, '1w': 5 } },
+  // « Mon écran » (plan du site, idée 9, 13/10/2026) : ce que le bouton « Mon écran » du panneau
+  // rappelle tant que rien n'est gardé sous samsara-mon-ecran-v1 — ce que Lorenzo regarde d'abord :
+  // le RSI et le MACD sous le prix, les supports / résistances dessus ; le Guide et les scénarios
+  // comme à l'écran de départ (affichés) ; sans « Le détail ». Jamais posé d'office.
+  monEcran: { ov: ['sr'], sg: ['rsi', 'macd'], guide: true, scenarios: true, detail: false },
   // Guide (js/guide.js) : chaque nombre de ses libellés, de ses règles et de ses fiches est ICI.
   guide: {
     // Niveaux nommés : au plus `niveauxParCote` au-dessus et au-dessous du prix, à moins de
@@ -719,13 +724,65 @@ function revenirAuDepart() {
   appliquerSelection([], [], true);
   try { localStorage.removeItem(AFFICHAGE_CLE); } catch (e) { /* navigation privée */ }
 }
+/** Les calques de marché et les sous-graphiques allumés, triés. */
+function selectionCourante() {
+  return { ov: Object.keys(overlays).filter(k => !COUCHES_SITE.includes(k) && overlays[k]).sort(),
+    sg: Object.keys(activeSubs).filter(k => activeSubs[k]).sort() };
+}
 /** Le préréglage que la sélection affichée reproduit exactement (null : une sélection à soi). */
 function preselectionActive() {
-  const ov = Object.keys(overlays).filter(k => !COUCHES_SITE.includes(k) && overlays[k]).sort().join();
-  const sg = Object.keys(activeSubs).filter(k => activeSubs[k]).sort().join(), site = COUCHES_SITE.every(k => overlays[k]);
+  const s = selectionCourante(), ov = s.ov.join(), sg = s.sg.join(), site = COUCHES_SITE.every(k => overlays[k]);
   const p = PRESELECTIONS.find(p => p.tout ? site && Object.values(overlays).every(Boolean) && Object.values(activeSubs).every(Boolean)
     : p.ov.slice().sort().join() === ov && p.sg.slice().sort().join() === sg && (!p.site || site));
   return p ? p.id : null;
+}
+
+// ─── « Mon écran » (plan du site, idée 9, 13/10/2026) ───
+// Demande de Lorenzo : retrouver SON affichage d'un geste, sans le refaire case par case après un
+// préréglage ou « Revenir au départ ». Un instantané nommé, gardé à part (samsara-mon-ecran-v1 :
+// calques de marché, sous-graphiques, Guide, scénarios, « Le détail ») : les préréglages et
+// « Revenir au départ » changent l'affichage, jamais lui. Rappelé par le 3e bouton de la tête du
+// panneau ; « Garder cet affichage comme mon écran » le remplace par ce qui est affiché. Rien sur
+// l'écran de départ ni dans l'en-tête, aucune touche : jamais posé d'office. Sans clé, PARAM.monEcran.
+const MON_ECRAN_CLE = 'samsara-mon-ecran-v1';
+let MON_ECRAN_MEMOIRE = null;   // stockage bloqué (navigation privée) : gardé le temps de la visite
+let monEcranConfirme = false;   // la phrase « C'est gardé » du panneau, jusqu'à sa fermeture
+/** L'affichage gardé (ou celui de PARAM.monEcran), nettoyé des clés que la page ne connaît pas. */
+function monEcran() {
+  let o = MON_ECRAN_MEMOIRE;
+  if (!o) try { o = JSON.parse(localStorage.getItem(MON_ECRAN_CLE) || 'null'); } catch (e) { o = null; }
+  const d = PARAM.monEcran;
+  if (!o || typeof o !== 'object' || !Array.isArray(o.ov) || !Array.isArray(o.sg)) o = d;
+  const oui = (v, defaut) => (typeof v === 'boolean' ? v : defaut);
+  return { ov: o.ov.filter(k => k in overlays && !COUCHES_SITE.includes(k)), sg: o.sg.filter(k => k in activeSubs),
+    guide: oui(o.guide, d.guide), scenarios: oui(o.scenarios, d.scenarios), detail: oui(o.detail, d.detail) };
+}
+/** L'affichage courant est-il exactement « Mon écran » ? (le bouton est alors enfoncé) */
+function monEcranActif() {
+  const m = monEcran(), s = selectionCourante();
+  return m.ov.slice().sort().join() === s.ov.join() && m.sg.slice().sort().join() === s.sg.join()
+    && m.guide === !!overlays.guide && m.scenarios === !!overlays.scenarios && m.detail === !debutant();
+}
+/** Ce que « Mon écran » rappelle, en une ligne (l'infobulle du bouton). */
+function monEcranDit() {
+  const m = monEcran(), noms = m.ov.concat(m.sg).map(k => (calqueDe(k) || {}).court || k);
+  return 'Votre affichage : ' + (noms.length ? noms.join(', ') : 'aucun indicateur')
+    + (m.guide ? ', le Guide' : '') + (m.scenarios ? ', les scénarios' : '') + (m.detail ? ', avec « Le détail »' : '');
+}
+function appliquerMonEcran() {
+  const m = monEcran();
+  overlays.guide = m.guide; overlays.scenarios = m.scenarios;
+  choisirMode(m.detail ? 'expert' : 'debutant');
+  appliquerSelection(m.ov, m.sg, false);
+}
+/** Garde l'affichage courant comme « Mon écran » ; le panneau le dit en une phrase. */
+function garderMonEcran() {
+  const s = selectionCourante(), o = { ov: s.ov, sg: s.sg, guide: !!overlays.guide, scenarios: !!overlays.scenarios, detail: !debutant() };
+  let garde = false;
+  try { localStorage.setItem(MON_ECRAN_CLE, JSON.stringify(o)); garde = localStorage.getItem(MON_ECRAN_CLE) !== null; } catch (e) { /* navigation privée */ }
+  MON_ECRAN_MEMOIRE = garde ? null : o;
+  monEcranConfirme = true;
+  buildDropdown();
 }
 
 // Indicateur du menu -> sa fiche de lecture (js/fiches.js) : TOUS en ont une (tests/test_fiches.js).
@@ -826,20 +883,26 @@ function ligneMenu(item, libelle, cat) {
 // « Réglages fins » : replié par défaut, gardé ouvert d'une reconstruction à l'autre.
 let finsOuverts = false;
 /** Le panneau « Choisir l'affichage », le même pour tout le monde : « Tout afficher », « Revenir au
- *  départ » et les préréglages en mots ; « Ce que dit le graphique » (Guide, scénarios, Le détail,
+ *  départ », « Mon écran » et les préréglages en mots, puis « Garder cet affichage comme mon écran » ; « Ce que dit le graphique » (Guide, scénarios, Le détail,
  *  Les chiffres du marché) ; puis chaque calque de marché, rangé par question ; tout en bas, repliés,
  *  les réglages fins. Les figures passées et l'aide à la lecture se règlent avec « Le détail ». */
 function buildDropdown() {
   const menu = document.getElementById('indMenu');
   const defile = menu.scrollTop, detail = !debutant();
   let html = '<div class="ind-liste">';
-  const actif = preselectionActive();
+  const actif = preselectionActive(), monActif = monEcranActif();
   html += '<div class="aff-tete"><div class="aff-boutons">'
     + '<button type="button" class="aff-btn aff-tout" onclick="toutAfficher()" title="Tout ce qui se dessine sur le graphique ; au plus ' + SOUS_MAX + ' sous-graphiques à la fois, les autres en onglets">Tout afficher</button>'
-    + '<button type="button" class="aff-btn" onclick="revenirAuDepart()" title="Les réglages d’origine : le Guide et les scénarios, rien d’autre">Revenir au départ</button></div>'
+    + '<button type="button" class="aff-btn" onclick="revenirAuDepart()" title="Les réglages d’origine : le Guide et les scénarios, rien d’autre">Revenir au départ</button>'
+    + `<button type="button" class="aff-btn aff-mon-ecran" aria-pressed="${monActif}" onclick="appliquerMonEcran()" title="${echapF(monEcranDit())}">Mon écran</button></div>`
     + '<div class="aff-presets" role="group" aria-label="Préréglages"><span class="aff-presets-titre">Préréglages</span>'
     + PRESELECTIONS.map(p => `<button type="button" class="aff-preset" data-preset="${p.id}" aria-pressed="${p.id === actif}" title="${echapF(p.dit)}" onclick="choisirPreselection('${p.id}')">${p.nom}</button>`).join('')
-    + '</div></div>';
+    + '</div>'
+    // « Mon écran » gardé : une phrase à la place du lien, jusqu'à la fermeture du panneau (pas de fenêtre).
+    + (monEcranConfirme && monActif
+      ? '<p class="aff-garde-dit" role="status">C’est gardé : « Mon écran » rappellera cet affichage.</p>'
+      : '<button type="button" class="aff-garder" onclick="garderMonEcran()">Garder cet affichage comme mon écran</button>')
+    + '</div>';
   html += '<div class="ind-filtre"><input type="search" id="indFiltre" placeholder="Chercher un indicateur…" aria-label="Chercher un indicateur" autocomplete="off" oninput="filtrerMenu(this.value)"></div>';
   html += '<div class="cat-title" data-cat="ecran">Ce que dit le graphique</div>';
   // La légende des icônes : chaque famille d'info a la sienne, sur le graphique comme dans les listes.
@@ -1118,7 +1181,9 @@ function toggleDropdown(e) {
     return;
   }
 
-  // Rempli PUIS ouvert PUIS placé : sa hauteur décide s'il s'ouvre au-dessus du bouton.
+  // Rempli PUIS ouvert PUIS placé : sa hauteur décide s'il s'ouvre au-dessus du bouton. La phrase
+  // « C'est gardé » de « Mon écran » ne dure qu'une ouverture.
+  monEcranConfirme = false;
   buildDropdown();
   menu.classList.add('open');
   btn.setAttribute('aria-expanded', 'true');
@@ -3770,8 +3835,9 @@ function calqueDessin() {
       if (!trace) continue;   // trop réduit pour être tracé : pas de badge orphelin
       const val = getSubIndicatorValue(key, realIdx);
       if (val !== null) {
-        // Lisible : la quantité en mots (« 1,2 k bitcoins »), pas l'abréviation du Complet.
-        const txt = deb ? val + ' ' + quantiteMots() : subLabel(key) + ' ' + val;
+        // Lisible : la valeur et son unité en mots (« 1,2 k bitcoins », « 79,6 sur 100 »), pas
+        // l'abréviation du Complet.
+        const txt = deb ? valeurSousMots(key, val) : subLabel(key) + ' ' + val;
         cx.font = chartFont(9);
         const tw = cx.measureText(txt).width + 12;
         const tx = Math.min(W - 2 - tw, W - 75 + (75 - tw) / 2);   // plus large que la colonne : recalé, jamais hors du canvas
@@ -4180,6 +4246,11 @@ function resolveChart(candles, padL, padR, chartH, W) {
   // --- Supports / Résistances (Multi-TF) ---
   srBadges = [];
   if (ov('sr')) {
+    // Lisible (« Le détail » éteint) : les traits et les zones seuls, comme les moyennes — ni badge,
+    // ni prix à gauche, ni légende « S/R par intervalle : 15m 1h 4h ». « Mon écran » (plan du site,
+    // idée 9, 13/10/2026) pose ce calque en Lisible : ses huit textes dépassaient le budget de cinq
+    // et écrivaient des intervalles abrégés (mots bannis).
+    const lisible = debutant();
     const levels = getMultiTFLevels(), unite = guideUnite();
     // Tier → style visuel. Le tier est l'INTERVALLE D'ORIGINE du niveau (0 : l'intervalle affiché ;
     // 1, 2 : les intervalles de référence, getRefIntervals), pas une importance mesurée : la
@@ -4210,6 +4281,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
       if (s.dash.length) ctx.setLineDash(s.dash);
       ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
       ctx.setLineDash([]);
+      if (lisible) continue;
       
       // Badge droite — fond opaque coloré : le prix au format de la page, puis l'intervalle d'origine.
       const badgeText = Fmt.prix(lvl.price, unite, 'fin') + ' · ' + nomTf(lvl.tf);
@@ -4246,18 +4318,20 @@ function resolveChart(candles, padL, padR, chartH, W) {
     
     // Mini-légende en haut à gauche (sous le compteur) : « S/R par intervalle », un trait par
     // intervalle d'origine.
-    const legY = 38;
-    ctx.font = chartFont(8);
-    ctx.fillStyle = COLORS.text;
-    ctx.fillText('S/R par intervalle :', 18, legY + 4);
-    const lx0 = 18 + ctx.measureText('S/R par intervalle :').width + 8;
-    styles.forEach((s, i) => {
-      const lx = lx0 + i * 62;
-      ctx.fillStyle = s.color;
-      ctx.fillRect(lx, legY, 18, 3);
+    if (!lisible) {
+      const legY = 38;
+      ctx.font = chartFont(8);
       ctx.fillStyle = COLORS.text;
-      ctx.fillText(s.name, lx + 22, legY + 4);
-    });
+      ctx.fillText('S/R par intervalle :', 18, legY + 4);
+      const lx0 = 18 + ctx.measureText('S/R par intervalle :').width + 8;
+      styles.forEach((s, i) => {
+        const lx = lx0 + i * 62;
+        ctx.fillStyle = s.color;
+        ctx.fillRect(lx, legY, 18, 3);
+        ctx.fillStyle = COLORS.text;
+        ctx.fillText(s.name, lx + 22, legY + 4);
+      });
+    }
   }
   
   // --- Fibonacci Retracement ---
@@ -8041,6 +8115,32 @@ function subTitle(key) {
                 mfi: ETIQ.mfi(), williamsR: ETIQ.williamsR(), cci: ETIQ.cci(), adx: ETIQ.adx(), ao: ETIQ.ao() };
   return map[key] || key;
 }
+// Lisible (« Le détail » éteint) : le titre en mots simples, comme le Volume (plan du site, idée 9,
+// 13/10/2026). « Mon écran » met le RSI et le MACD sous le prix en Lisible : « RSI (14) » et « MACD
+// (12,26,9) » y étaient les seuls mots bannis de l'écran. Ce que mesure la courbe, d'après la ligne
+// courte de sa fiche (COURT, js/fiches.js) ; ses chiffres et son nom restent dans le Complet.
+const TITRES_SOUS_LISIBLE = {
+  rsi: 'Hausses contre baisses, de 0 à 100', macd: 'Moyenne rapide moins moyenne lente',
+  stoch: 'Place du prix : 0 en bas, 100 en haut', williamsR: 'Place du prix : −100 en bas, 0 en haut',
+  atr: 'Mouvement habituel par période', obv: 'Échanges en hausse moins en baisse', mfi: 'Hausses et quantités, de 0 à 100',
+  cci: 'Écart du prix à sa moyenne', adx: 'Netteté de la direction', ao: 'Prix récent face à sa moyenne longue',
+};
+function titreSous(key) {
+  if (!debutant()) return subTitle(key);
+  return key === 'vol' ? 'Volume : ' + quantiteMots() + ' échangés' : TITRES_SOUS_LISIBLE[key] || subTitle(key);
+}
+/** Lisible : la valeur du réticule d'un sous-graphique avec son unité en mots — « 79,6 sur 100 »,
+ *  « 63,33 $ d'écart » —, pas « bitcoins » pour tous (le badge du RSI disait « 79,6 bitcoins »). */
+function valeurSousMots(key, val) {
+  switch (key) {
+    case 'rsi': case 'mfi': case 'stoch': case 'adx': return val + ' sur 100';
+    case 'williamsR': return val + ' sur −100';
+    case 'macd': case 'ao': return val + ' ' + guideUnite() + ' d’écart';
+    case 'atr': return val + ' par période';   // déjà en prix (« 412 $ »)
+    case 'cci': return val + ' (0 : la moyenne)';
+    default: return val + ' ' + quantiteMots();   // le Volume et l'OBV : des quantités échangées
+  }
+}
 
 // Les sous-graphes en unités de PRIX (MACD, ATR, AO) : la précision de cotation de la paire (2
 // décimales sur BTC, 4 sur XRP), sur l'axe comme dans le badge du réticule — « $0.0 » sur les trois
@@ -8074,8 +8174,8 @@ function resolveSub(candles, y0, subH, W, key) {
   ctx.beginPath(); ctx.arc(pad.left + 9, y0 + 10, 3, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = COLORS.ink3; ctx.font = chartFont(9.5, 700);
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0.6px';
-  // Lisible (le Volume seul) : un titre en mots simples.
-  ctx.fillText(debutant() && key === 'vol' ? 'Volume : ' + quantiteMots() + ' échangés' : subTitle(key), pad.left + 17, y0 + 13.5);
+  // Lisible : un titre en mots simples (titreSous).
+  ctx.fillText(titreSous(key), pad.left + 17, y0 + 13.5);
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
   
   // Utiliser le range visible pour les subs aussi (des indices : aucune copie par image)

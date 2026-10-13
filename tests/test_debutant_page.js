@@ -309,7 +309,9 @@ async function controlerEcran(o, nom, opts = {}) {
   check(`${nom} : boutons des chiffres du marché, Grid Bot et chiffres clés masqués ; ${opts.calques ? 'une puce par calque choisi (' + dom.puces + ')' : 'aucune puce de calque'} ; ↺ visible ; la pastille « Infos du marché » dit l'âge (infobulle)`,
     !dom.caches.length && dom.puces === (opts.calques ? opts.calques.length : 0) && dom.kpis === 0 && dom.reset && /il y a \d+ min/.test(dom.kpiDeb || ''), dom);
   // Le Volume, calque simple du Lisible : son seul sous-graphe, quand il est allumé (opts.calques).
-  if (opts.calques) check(`${nom} : un seul sous-graphe, le Volume (${e.sous.join(', ') || 'aucun'})`, e.sous.join() === 'vol', e.sous);
+  // « Mon écran » (plan du site, idée 9) : les sous-graphes qu'il pose, dans l'ordre (opts.sous).
+  if (opts.sous) check(`${nom} : les sous-graphes de « Mon écran » (${e.sous.join(', ') || 'aucun'})`, e.sous.join() === opts.sous.join(), e.sous);
+  else if (opts.calques) check(`${nom} : un seul sous-graphe, le Volume (${e.sous.join(', ') || 'aucun'})`, e.sous.join() === 'vol', e.sous);
   else check(`${nom} : aucun sous-graphe (${e.sous.join(', ') || 'aucun'})`, !e.sous.length, e.sous);
   return e;
 }
@@ -933,6 +935,65 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length && !o2.erreurs.length, o.erreurs.concat(o2.erreurs));
       await o.ctx.close();
     }
+    // ── « Mon écran » en Lisible : le RSI et le MACD sous le prix (plan du site, idée 9, 13/10/2026) ──
+    // Jamais posé d'office (rien à la 1re visite, rien sur l'écran de départ) ; rappelé par le bouton
+    // « Mon écran » du panneau. Sans « Le détail », les sous-graphiques ont un titre en mots simples
+    // (« RSI (14) » et « MACD (12,26,9) » étaient les seuls mots bannis de l'écran) et le badge du
+    // réticule son unité en mots (il disait « 79,6 bitcoins » pour le RSI, « 63,33 bitcoins » pour le
+    // MACD). Le budget de textes du Lisible tient avec le tracé du prix raccourci, à 390 et à 360 px ;
+    // les supports / résistances y sont tracés sans leurs badges ni leur légende (huit textes de plus,
+    // et « 15m », « 4h » : des mots bannis).
+    titre('Mon écran en Lisible : RSI et MACD sous le prix, en mots simples');
+    for (const vue of [{ width: 390, height: 844 }, { width: 360, height: 740 }]) {
+      const nom = vue.width + ' × ' + vue.height + ' · Mon écran';
+      const o = await ouvrir(nav, { vue, tactile: true, prev: 'ouvert', chaleur: true });
+      const d0 = await o.page.evaluate(() => ({ garde: localStorage.getItem('samsara-mon-ecran-v1'), rsi: activeSubs.rsi, macd: activeSubs.macd, sr: overlays.sr,
+        sous: geo.sous.map(s => s.cle), texte: document.body.innerText, bouton: [...document.querySelectorAll('.aff-mon-ecran')].filter(b => b.getClientRects().length).length }));
+      check(`${nom} : 1re visite, « Mon écran » n'est pas posé (ni RSI, ni MACD, ni supports / résistances) et l'écran de départ n'en dit rien`,
+        d0.garde === null && !d0.rsi && !d0.macd && !d0.sr && !d0.sous.length && !/Mon écran/.test(d0.texte) && !d0.bouton, Object.assign({}, d0, { texte: undefined }));
+      await o.page.click('#indDropdownBtn'); await o.page.waitForTimeout(200);
+      await o.page.click('#indMenu .aff-mon-ecran'); await o.page.waitForTimeout(400);
+      const pose = await o.page.evaluate(() => ({ ov: Object.keys(overlays).filter(k => overlays[k]).sort(), sg: Object.keys(activeSubs).filter(k => activeSubs[k]),
+        mode: document.documentElement.getAttribute('data-mode'), presse: document.querySelector('#indMenu .aff-mon-ecran').getAttribute('aria-pressed') }));
+      check(`${nom} : « Mon écran » (sans rien de gardé) pose le RSI et le MACD, les supports / résistances, le Guide et les scénarios ; « Le détail » reste décoché ; bouton enfoncé`,
+        JSON.stringify(pose.ov) === JSON.stringify(['guide', 'scenarios', 'sr']) && JSON.stringify(pose.sg) === JSON.stringify(['rsi', 'macd']) && pose.mode === 'debutant' && pose.presse === 'true', pose);
+      await o.page.evaluate(() => { document.getElementById('indMenu').classList.remove('open'); document.getElementById('indDropdownBtn').setAttribute('aria-expanded', 'false'); });
+      await o.page.waitForTimeout(300);
+      const e = await controlerEcran(o, nom, { calques: ['sr', 'rsi', 'macd'], sous: ['rsi', 'macd'] });
+      // Les titres des deux sous-graphiques : en mots, entiers dans leur ligne (avant la colonne de l'axe).
+      const t = await o.page.evaluate(() => {
+        const c = document.createElement('canvas').getContext('2d'); c.font = chartFont(9.5, 700);
+        if ('letterSpacing' in c) c.letterSpacing = '0.6px';
+        return { titres: geo.sous.map(s => titreSous(s.cle)), larg: geo.sous.map(s => 16 + 17 + c.measureText(titreSous(s.cle)).width), xAxe: geo.W - 75,
+          traces: geo.sous.map(s => s.trace), part: geo.mainH / (canvas.height / devicePixelRatio - 4 - RS_HEIGHT) };
+      });
+      const tous = e.tous.filter(x => bannis(x).length || CONSEIL.test(x) || /RSI|MACD/.test(x));
+      check(`${nom} : les deux sous-graphiques tracés, titrés en mots (« ${t.titres.join(' », « ')} »), entiers avant l'axe ; rien de banni dans tout ce que le graphique écrit`,
+        t.traces.every(Boolean) && t.titres.every(x => e.tous.includes(x) && !bannis(x).length) && t.larg.every(x => x <= t.xAxe) && !tous.length, { t, tous });
+      check(`${nom} : le prix garde ${Math.round(t.part * 100)} % de la hauteur (≥ 60 %, MAIN_PART_MIN)`, t.part >= 0.6 - 1e-9, t);
+      // Les supports / résistances en Lisible : leurs traits seuls (ni badge, ni légende « S/R par
+      // intervalle », ni intervalle abrégé), comme les moyennes.
+      const sr = await o.page.evaluate(() => ({ niveaux: getMultiTFLevels().length, badges: srBadges.length }));
+      check(`${nom} : les supports / résistances tracés (${sr.niveaux} niveaux), sans badge ni légende`,
+        sr.niveaux > 0 && !sr.badges && !e.tous.some(x => /S\/R|^\d+[mhd]$| · \d+[mhd]$/.test(x)), { sr, tous: e.tous });
+      // Le réticule dans les sous-graphiques : chaque valeur avec SON unité, jamais « bitcoins ».
+      const b = await o.page.evaluate(() => {
+        const s = geo.sous[0];
+        crossX = Math.round(geo.W / 2); crossY = s.y + 20;
+        window.__ft = []; window.__ftOn = true;
+        try { calqueDessin(); } finally { window.__ftOn = false; }
+        const out = geo.sous.map(x => ({ cle: x.cle, t: window.__ft.filter(f => f.c === 'chartCalque' && f.y > x.y && f.y < x.y + 22 && f.x > geo.W - 200).map(f => f.t) }));
+        crossX = crossY = null; calqueDessin();
+        return out;
+      });
+      const lu = k => (b.find(x => x.cle === k) || { t: [] }).t;
+      check(`${nom} : le réticule dit « ${lu('rsi').join(' ')} » (RSI) et « ${lu('macd').join(' ')} » (MACD) : chacun son unité en mots, jamais « bitcoins »`,
+        lu('rsi').length === 1 && /^\d{1,3},\d sur 100$/.test(lu('rsi')[0]) && lu('macd').length === 1 && /^[−-]?\d[\d  ]*(,\d+)? \$ d’écart$/.test(lu('macd')[0])
+        && !b.some(x => x.t.some(y => /bitcoins|RSI|MACD/.test(y))), b);
+      check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
     // Les trois calques simples de l'ancien Lisible : versés une fois dans les choix du panneau.
     titre('Ancien Lisible : ses trois calques simples versés dans le panneau');
     {

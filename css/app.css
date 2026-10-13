@@ -521,7 +521,7 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 .aff-imp.imp-courant::before { background: currentColor; }
 .aff-imp.imp-utile::before { background: linear-gradient(90deg, currentColor 50%, transparent 50%); }
 .aff-imp.imp-special::before { background: transparent; }
-/* La tête du Complet : « Tout afficher », « Revenir au départ », puis les préréglages. */
+/* La tête du panneau : « Tout afficher », « Revenir au départ », « Mon écran », puis les préréglages. */
 .aff-tete { padding: 6px 12px 4px; }
 .aff-boutons, .aff-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
 .aff-presets { margin-top: 7px; }
@@ -535,6 +535,14 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 .aff-preset[aria-pressed="true"] { color: var(--pill-actif-ink); background: var(--pill-actif); border-color: transparent; font-weight: 700; }
 .aff-btn:hover, .aff-preset:hover, .aff-btn:focus-visible, .aff-preset:focus-visible { border-color: var(--accent); outline: none; }
 .aff-tete ~ .ind-filtre { margin-top: 0; padding-top: 6px; }
+/* « Mon écran » (plan du site, idée 9) : enfoncé quand l'affichage est exactement le sien. Sous les
+   préréglages, le lien qui le garde, puis la phrase qui le confirme (pas de fenêtre). */
+.aff-btn.aff-mon-ecran[aria-pressed="true"] { color: var(--pill-actif-ink); background: var(--pill-actif); border-color: transparent; }
+.aff-garder, .aff-garde-dit { display: block; margin: 5px 0 0; padding: 3px 0; font: inherit; font-size: 11px; font-weight: 600; text-align: left; }
+.aff-garder { color: var(--accent-2); background: none; border: 0; cursor: pointer; }
+.aff-garder:hover, .aff-garder:focus-visible { text-decoration: underline; outline: none; }
+.aff-garde-dit { color: var(--ink-2); }
+@media (pointer: coarse) { .aff-garder { min-height: 40px; } }
 /* « Réglages fins », repliés en bas du Complet : les réglages d'affichage (js/reglages.js). */
 .aff-fins { margin: 10px 6px 2px; border-top: 1px solid var(--hairline); }
 .aff-fins > summary {
