@@ -777,6 +777,64 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
   check('les icônes : une par famille de la légende, un nom chacune', I.LEGENDE.every(f => I.connue(f) && I.NOMS[f]) && /<svg[^>]*viewBox="0 0 10 10"/.test(I.svg('figure')) && I.svg('inconnue') === '');
   const sans = G.synthese(Object.assign({}, base, { prix: NaN }));
   check('prix absent : dit, rien d’inventé', /indisponible/.test(sans.titre) && !sans.pourquoi.length && !sans.surveiller.length, sans);
+
+  // 5. La fourchette de 7 jours (plan du 13/10/2026, idée 5 ; mesure marche/range-cassure) : le haut
+  // et le bas des 42 périodes de 4 h closes (heure UTC) avant celle en cours, refaites avec les bougies
+  // chargées ; sa cassure (une période close finit hors de la fourchette des 42 d'avant elle, la
+  // précédente ayant fini dans la sienne), dite dans « En résumé » pendant 6 périodes, sans sens.
+  const PF = P, F4 = PF.fourchette, per = F4.heures * 3600;
+  check('PARAM.guide.fourchette : 42 périodes de 4 h (7 jours), la phrase pendant 6 périodes', F4.periodes === 42 && F4.heures === 4 && F4.phrasePeriodes === 6, F4);
+  // Une série de `pas` s, commencée à mi-période, prix en vagues de ± 2 autour de 100, la dernière bougie en cours.
+  const serie = (pas, n, modif) => {
+    const T = [], H = [], L = [], C = [], t0 = Math.floor(Date.UTC(2026, 9, 1) / 1000 / per) * per + 3 * pas;
+    for (let i = 0; i < n; i++) { const c = 100 + Math.sin(i * pas / 36000) * 2; T.push(t0 + i * pas); H.push(c + 0.5); L.push(c - 0.5); C.push(c); }
+    const pc = Math.floor(T[n - 1] / per);
+    if (modif) modif({ T, H, L, C, n, pc, dans: (i, k) => Math.floor(T[i] / per) === pc - k });
+    return { T, H, L, C, n };
+  };
+  const fo = (x, pas) => G.fourchette(x.T, x.H, x.L, x.C, x.n, pas, PF);
+  const s15 = serie(900, 1000), f15 = fo(s15, 900);
+  const pcs = Math.floor(s15.T[s15.n - 1] / per), dansF = i => { const k = Math.floor(s15.T[i] / per); return k >= pcs - 42 && k < pcs; };
+  const hautAttendu = Math.max(...s15.H.filter((_, i) => dansF(i))), basAttendu = Math.min(...s15.L.filter((_, i) => dansF(i)));
+  check('fourchette en 15 min : le plus haut et le plus bas des 42 périodes de 4 h closes (bougie en cours exclue), fenêtre alignée sur 4 h UTC, 7 jours',
+    f15 && f15.haut === hautAttendu && f15.bas === basAttendu && f15.jours === 7 && f15.debut === (pcs - 42) * per && f15.fin === pcs * per && f15.debut % per === 0 && f15.cassure === null, f15);
+  // Les mêmes périodes refaites en 1 h et en 4 h : la même fourchette (au même instant).
+  const s1h = serie(3600, 300), s4h = serie(per, 80);
+  check('fourchette en 1 h et en 4 h : calculée (l’intervalle divise la période)', !!fo(s1h, 3600) && !!fo(s4h, per) && fo(s4h, per).jours === 7);
+  check('pas de fourchette : en 1 jour, avec un historique de moins de 7 jours (1 min : 3000 bougies), ou un intervalle qui ne divise pas 4 h',
+    fo(serie(86400, 60), 86400) === null && fo(serie(60, 3000), 60) === null && fo(serie(900, 600), 900) === null && fo(serie(3 * 3600, 100), 3 * 3600) === null && G.fourchette([], [], [], [], 0, 900, PF) === null);
+  // Cassure par le bas sur la dernière période close : dite ; par le haut, de même.
+  const casse = (sens, k, apres) => serie(900, 1000, x => { for (let i = 0; i < x.n - 1; i++) {
+    if (x.dans(i, k)) { const c = sens < 0 ? 90 : 110; x.C[i] = c; x.H[i] = c + 0.5; x.L[i] = c - 0.5; }
+    if (apres && Math.floor(x.T[i] / per) > x.pc - k && Math.floor(x.T[i] / per) < x.pc) { x.C[i] = 100; x.H[i] = 100.5; x.L[i] = 99.5; }
+  } });
+  const cb = fo(casse(-1, 1), 900), ch = fo(casse(1, 1), 900);
+  check('cassure du bas : la dernière période close finit sous le bas des 42 d’avant elle ; du haut, au-dessus', cb && cb.cassure && cb.cassure.sens === -1 && cb.cassure.depuis === 0 && !cb.cassure.revenu
+    && ch && ch.cassure && ch.cassure.sens === 1 && !ch.cassure.revenu, { cb: cb && cb.cassure, ch: ch && ch.cassure });
+  const c6 = fo(casse(-1, 6), 900), c7 = fo(casse(-1, 7), 900), cr = fo(casse(-1, 3, true), 900);
+  check('cassure il y a 6 périodes : encore dite ; il y a 7 : plus dite ; revenue dedans depuis : « revenu »', c6 && c6.cassure && c6.cassure.depuis === 5 && c7 && c7.cassure === null && cr && cr.cassure && cr.cassure.revenu, { c6: c6 && c6.cassure, c7: c7 && c7.cassure, cr: cr && cr.cassure });
+  // Deux périodes de suite sous le bas : seule la première est une cassure (la précédente avait fini dans SA fourchette).
+  const deux = fo(serie(900, 1000, x => { for (let i = 0; i < x.n - 1; i++) if (x.dans(i, 1) || x.dans(i, 2)) { x.C[i] = 90; x.H[i] = 90.5; x.L[i] = 89.5; } }), 900);
+  check('deux périodes de suite sous le bas : la cassure est la première (depuis 1), pas la seconde', deux && deux.cassure && deux.cassure.depuis === 1 && deux.cassure.sens === -1, deux && deux.cassure);
+  // En résumé : la phrase, sans sens (la règle du titre n'en tient pas compte), famille « niveau ».
+  const ra = syn({ regime: { cle: 'faible' }, fourchette: cb, symbole: 'BTCUSDT' }), rh = syn({ regime: { cle: 'faible' }, fourchette: ch, symbole: 'SOLUSDT' });
+  const lf = r => r.pourquoi.find(p => /fourchette de 7 jours/.test(p.texte));
+  check('En résumé, cassure du bas sur BTC/USDT : « Le prix a cassé le bas de sa fourchette de 7 jours. Attention : ça bouge souvent fort juste après, dans les deux sens. Une fois sur deux, il est revenu dedans dans la journée. »',
+    lf(ra) && lf(ra).texte === 'Le prix a cassé le bas de sa fourchette de 7 jours. Attention : ça bouge souvent fort juste après, dans les deux sens. Une fois sur deux, il est revenu dedans dans la journée.'
+    && lf(ra).sens === 0 && lf(ra).fam === 'niveau', lf(ra));
+  check('par le haut, sur une autre paire (non mesurée) : « … le haut … Il revient souvent dedans dans la journée. »',
+    lf(rh) && lf(rh).texte === 'Le prix a cassé le haut de sa fourchette de 7 jours. Attention : ça bouge souvent fort juste après, dans les deux sens. Il revient souvent dedans dans la journée.' && lf(rh).sens === 0, lf(rh));
+  const sansF = syn({ regime: { cle: 'faible' } }), avecF = syn({ regime: { cle: 'faible' }, fourchette: cb, symbole: 'BTCUSDT' });
+  const h1 = syn({ regime: { cle: 'hausse' }, fourchette: ch, symbole: 'BTCUSDT' });
+  check('la cassure ne change jamais la règle du sens : même titre et même ton avec ou sans elle ; un seul signal vers le haut reste « trop peu »',
+    sansF.ton === avecF.ton && sansF.titre === avecF.titre && h1.ton === 'calme' && /trop peu/.test(h1.regle), { sansF: sansF.titre, avecF: avecF.titre, h1: h1.regle });
+  check('rien de dit : sans fourchette, sans cassure, cassure revenue dedans, cassure trop ancienne',
+    ![syn({ fourchette: null }), syn({ fourchette: f15 }), syn({ fourchette: cr, symbole: 'BTCUSDT' }), syn({ fourchette: c7, symbole: 'BTCUSDT' })].some(lf));
+  // Charte : une idée par phrase, 15 mots au plus ; ni « range », ni « va baisser », ni volume, ni conseil.
+  const phrF = [lf(ra).texte, lf(rh).texte].flatMap(t => t.split(/(?<=\.)\s+/));
+  const nM = x => x.split(/\s+/).filter(w => /[\p{L}\d]/u.test(w)).length;
+  check('la phrase de la fourchette : chaque phrase 15 mots au plus ; aucun mot banni (« range »…), aucun %, ni « va baisser / monter », ni volume, ni conseil',
+    phrF.every(x => nM(x) <= 15) && !phrF.some(x => G.motsBannis(x).length || /%|va (baisser|monter)|volume/i.test(x) || CONSEIL.test(x)), phrF.map(x => [nM(x), x]));
 }
 
 // ── 8. Mots ──

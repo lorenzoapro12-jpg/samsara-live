@@ -2961,16 +2961,85 @@ const Guide = (function () {
   /** Un terme permis dans une bulle Débutant seulement avec son explication, dans la même bulle. */
   const EXPLIQUES_DEBUTANT = { 'repère d’options': 'une estimation, tirée des contrats d’options de la plateforme Deribit' };
 
+  // ─── 8 ter. La fourchette de 7 jours et sa cassure (plan du 13/10/2026, idée 5) ──────
+  /** La fourchette de N jours : le plus haut et le plus bas des P.fourchette.periodes périodes de
+   *  P.fourchette.heures heures CLOSES (alignées sur l'heure UTC) qui précèdent la période en cours
+   *  (42 × 4 h = 7 jours). Rien n'est demandé au réseau : les périodes sont refaites avec les
+   *  bougies déjà chargées, sur les intervalles qui divisent la période (1, 5, 15 min, 1 h, 4 h).
+   *  La cassure (définition de la mesure marche/range-cassure, demande de Lorenzo du 13/10/2026) :
+   *  la dernière période close a fini sous le bas (ou au-dessus du haut) de la fourchette des 42
+   *  périodes d'avant elle, quand la période précédente avait fini dans SA propre fourchette.
+   *  Aucun filtre de volume (la mesure : il ne change rien). Elle est rendue pendant les
+   *  P.fourchette.phrasePeriodes périodes qui la suivent ; `revenu` : une période close depuis a
+   *  fini de nouveau dedans (la phrase ne la dit plus).
+   *  T (s), H, L, C : colonnes de l'historique ; n : leur longueur, la DERNIÈRE bougie étant celle
+   *  en cours ; pas : durée d'une bougie (s). Un historique qui ne couvre pas les 7 jours (ou un
+   *  intervalle plus long que la période, ou qui ne la divise pas) : null, rien d'inventé.
+   *  → null | { haut, bas, debut, fin (s, la fenêtre), jours, cassure: null | { sens (−1 : par le
+   *  bas, +1 : par le haut), haut, bas (la fourchette cassée), t (s, début de la période qui a
+   *  cassé), depuis (périodes closes après elle), revenu } } */
+  function fourchette(T, H, L, C, n, pas, P) {
+    const F = P && P.fourchette;
+    if (!F || !(n >= 2) || !fini(pas) || pas <= 0) return null;
+    const per = F.heures * 3600, K = F.periodes;
+    if (pas > per || per % pas) return null;
+    // Les périodes closes, refaites (la bougie en cours n'y entre pas). Une période commencée
+    // avant la 1re bougie chargée est incomplète : elle ne compte pas.
+    const pc = Math.floor(T[n - 1] / per), P0 = Math.ceil(T[0] / per), hs = new Map();
+    for (let i = 0; i < n - 1; i++) {
+      const k = Math.floor(T[i] / per);
+      if (k < P0 || k >= pc) continue;
+      const q = hs.get(k);
+      if (!q) hs.set(k, { h: H[i], l: L[i], c: C[i] });
+      else { if (H[i] > q.h) q.h = H[i]; if (L[i] < q.l) q.l = L[i]; q.c = C[i]; }
+    }
+    // La fourchette des K périodes [a, a + K) ; null s'il en manque une.
+    const bornes = a => {
+      let h = -Infinity, l = Infinity;
+      for (let k = a; k < a + K; k++) { const q = hs.get(k); if (!q) return null; if (q.h > h) h = q.h; if (q.l < l) l = q.l; }
+      return { h, l };
+    };
+    const b = bornes(pc - K);
+    if (!b) return null;
+    const res = { haut: b.h, bas: b.l, debut: (pc - K) * per, fin: pc * per, jours: K * F.heures / 24, cassure: null };
+    // La plus récente cassure des `phrasePeriodes` dernières périodes closes.
+    for (let j = pc - 1; j >= pc - F.phrasePeriodes; j--) {
+      const q = hs.get(j), qp = hs.get(j - 1), bj = bornes(j - K), bp = bornes(j - 1 - K);
+      if (!q || !qp || !bj || !bp) break;
+      const sens = q.c < bj.l && !(qp.c < bp.l) ? -1 : q.c > bj.h && !(qp.c > bp.h) ? 1 : 0;
+      if (!sens) continue;
+      // Revenu dedans : une période close depuis a fini au-dessus du bas cassé (au-dessous du haut).
+      let revenu = false;
+      for (let k = j + 1; k < pc; k++) { const r = hs.get(k); if (r && (sens < 0 ? r.c >= bj.l : r.c <= bj.h)) { revenu = true; break; } }
+      res.cassure = { sens, haut: bj.h, bas: bj.l, t: j * per, depuis: pc - 1 - j, revenu };
+      break;
+    }
+    return res;
+  }
+  // La part des retours (« une fois sur deux ») n'est mesurée que sur ces paires (marche/range-cassure).
+  const FOURCHETTE_MESUREE = ['BTCUSDT'];
+  /** La ligne de « En résumé » quand la fourchette vient de casser (fourchette(…).cassure, pas
+   *  revenue dedans), sinon '' : ce qui s'est passé, l'agitation qui suit (mesurée, sans sens),
+   *  les retours (mesurés sur BTC/USDT ; ailleurs, sans chiffre). */
+  function texteCassureFourchette(fo, symbole) {
+    const k = fo && fo.cassure;
+    if (!k || k.revenu) return '';
+    return 'Le prix a cassé le ' + (k.sens < 0 ? 'bas' : 'haut') + ' de sa fourchette de ' + fo.jours + ' jours.'
+      + ' Attention : ça bouge souvent fort juste après, dans les deux sens.'
+      + (FOURCHETTE_MESUREE.includes(symbole) ? ' Une fois sur deux, il est revenu dedans dans la journée.' : ' Il revient souvent dedans dans la journée.');
+  }
+
   // ─── 9. En résumé : tout ce que la page montre, recoupé en une lecture ──────
   /** L'encadré « En résumé » (en tête de la liste « Sur le graphique ») : UNE phrase qui dit où
    *  penchent les signaux déjà affichés, le pourquoi en lignes courtes (un signal par ligne, son
    *  sens : +1, −1 ou 0), puis les deux repères qui changeraient la lecture. Rien de nouveau n'est
    *  calculé : la tendance (régime du Guide), un repère franchi et validé, la figure en cours, le
-   *  scénario du matin montré. Aucun pourcentage, aucun conseil, aucune flèche seule. Honnête : un
+   *  scénario du matin montré ; et, couche allumée ou non, la fourchette de 7 jours qui vient de
+   *  casser (fourchette, sans sens). Aucun pourcentage, aucun conseil, aucune flèche seule. Honnête : un
    *  sens n'est dit que si au moins deux signaux vont dans ce sens et aucun en face ; sinon « pas
    *  de sens net », et pourquoi.
    *  o = { prix, unite, itv, regime, choix, suite, figures: [f], scenario: { rang, forme, sens,
-   *        ouvert, tombe } | null } → { titre, ton ('hausse' | 'baisse' | 'partage' | 'calme'),
+   *        ouvert, tombe } | null, fourchette: fourchette(…) | null, symbole } → { titre, ton ('hausse' | 'baisse' | 'partage' | 'calme'),
    *  pourquoi: [{ texte, sens, fam }], surveiller: [texte], surveillerFam: [famille | null], avertissement }.
    *  fam : la famille de l'info (son icône, js/icones.js) : 'tendance', 'niveau', 'figure' ou 'scenario'. */
   function synthese(o) {
@@ -2987,6 +3056,11 @@ const Guide = (function () {
       pourquoi.push({ texte: 'Le prix est repassé sous ' + prixR(rA, u) + ' et y reste.', sens: -1, fam: 'niveau' });
     else if (ch.dessous && ch.dessous.ferme && ch.dessous.ferme.cassure === 'valide' && ch.dessous.ferme.sens > 0)
       pourquoi.push({ texte: 'Le prix est passé au-dessus de ' + prixR(rB, u) + ' et y reste.', sens: 1, fam: 'niveau' });
+    // La fourchette de 7 jours vient de casser (plan du 13/10/2026, idée 5) : dite avec l'agitation
+    // qui suit, SANS sens (sens 0 : la mesure ne trouve aucun sens après une cassure, la règle du
+    // titre n'en tient pas compte).
+    const fc = texteCassureFourchette(o.fourchette, o.symbole);
+    if (fc) pourquoi.push({ texte: fc, sens: 0, fam: 'niveau' });
     // La figure en cours qui a un sens : validée d'abord, puis sortie à valider.
     const F = (o.figures || []).filter(f => !f.fin && !f.ebauche).map(f => ({ f, e: etatForme(f) }));
     const fv = F.find(x => x.e.cle === 'confirme' && (x.f.sens === 1 || x.f.sens === -1));
@@ -3048,6 +3122,6 @@ const Guide = (function () {
     texteSuiteDebutant, prixRond, USAGES_CHIFFRES, usageChiffre, avecUsage, cleEcart, ageLu, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
     MARQUES_FIN, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, libelleFormeCourt, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant,
-    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_FORME, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, synthese };
+    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_FORME, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, fourchette, texteCassureFourchette, synthese };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;

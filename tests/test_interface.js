@@ -630,9 +630,10 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       check('tête du panneau : exactement « Tout afficher », « Revenir au départ », « Mon écran », puis les six préréglages en mots, puis « Garder cet affichage comme mon écran »',
         meme(pan.boutons, ['Tout afficher', 'Revenir au départ', 'Mon écran']) && meme(pan.presets, ['L’essentiel', 'La tendance', 'L’élan', 'Le volume', 'Le carnet', 'Tout'])
         && pan.garder === 'Garder cet affichage comme mon écran', pan);
+      // « Fourchette de 7 jours » (plan du 13/10/2026, idée 5) : rangée sous « Où le prix peut réagir ? ».
       const QUESTIONS = [['Ce que dit le graphique', ['guide', 'scenarios', 'detail', 'chiffres']], ['Dans quel sens ?', ['ema20', 'ema50', 'ema100', 'ema200', 'sma20', 'sma50', 'ichimoku', 'sar', 'vwap']],
         ['Ça s’essouffle ?', ['rsi', 'macd', 'stoch', 'williamsR', 'cci', 'mfi', 'ao']], ['Qui échange ?', ['vol', 'obv', 'vp']],
-        ['Où le prix peut réagir ?', ['sr', 'fib', 'liq', 'figuresPassees']], ['Ça bouge beaucoup ?', ['atr', 'bb', 'adx']]];
+        ['Où le prix peut réagir ?', ['sr', 'fib', 'liq', 'fourchette', 'figuresPassees']], ['Ça bouge beaucoup ?', ['atr', 'bb', 'adx']]];
       check('« Ce que dit le graphique » d’abord (Guide, scénarios, Le détail, Les chiffres du marché), puis les calques rangés par question, dans l’ordre (« Dans quel sens ? », « Ça s’essouffle ? », « Qui échange ? », « Où le prix peut réagir ? », « Ça bouge beaucoup ? »)',
         meme(pan.cats.map(c => [c.titre, c.cles.slice().sort()]), QUESTIONS.map(([t, k]) => [t, k.slice().sort()])) && meme(pan.cats.find(c => c.cat === 'ecran').cles, ['guide', 'scenarios', 'detail', 'chiffres']), pan.cats);
       const MOTS = { 'imp-courant': 'courant', 'imp-utile': 'utile', 'imp-special': 'spécialisé' };
@@ -641,7 +642,8 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       const ecran = pan.lignes.filter(l => l.cle === 'detail' || l.cle === 'chiffres'), calques = pan.lignes.filter(l => !ecran.includes(l));
       const mal = calques.filter(l => !l.coche || !l.nom || !/^[A-ZÀ-Ý].{8,}[.!?]$/.test(l.quoi) || !l.fiche || MOTS[l.classe] !== l.imp)
         .concat(ecran.filter(l => !l.coche || !l.nom || !/^[A-ZÀ-Ý].{8,}[.!?]$/.test(l.quoi) || l.imp));
-      check(`chaque ligne (${calques.length} calques, puis « Le détail » et « Les chiffres du marché ») : case, nom, phrase « C’est quoi ? », importance en MOT (courant, utile, spécialisé) et bouton de fiche pour les calques`, calques.length === 28 && ecran.length === 2 && !mal.length, mal);
+      // 29 calques : la fourchette de 7 jours s'ajoute (plan du 13/10/2026, idée 5).
+      check(`chaque ligne (${calques.length} calques, puis « Le détail » et « Les chiffres du marché ») : case, nom, phrase « C’est quoi ? », importance en MOT (courant, utile, spécialisé) et bouton de fiche pour les calques`, calques.length === 29 && ecran.length === 2 && !mal.length, mal);
       const formes = Object.keys(MOTS).map(c => (pan.lignes.find(l => l.classe === c) || {}).forme);
       const plein = f => f && !/rgba\(0, 0, 0, 0\)|transparent/.test(f.couleur), dessin = f => f && /gradient/.test(f.image);
       check('l’importance a aussi une FORME, jamais la couleur seule : disque plein (courant), demi-disque (utile), anneau (spécialisé)',

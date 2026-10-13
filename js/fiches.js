@@ -103,6 +103,9 @@ if (typeof window !== 'undefined' && window.addEventListener) window.addEventLis
 // le débat en trois phrases au plus. `simple` (et `simpleDeb`) : la définition en une phrase, lue
 // par le menu quand la fiche n'a pas de ligne courte ; la fiche montre la ligne courte (COURT).
 // Les règles de calcul et de dessin (seuils, détections) vont dans la formule.
+// La fourchette de N jours (plan du 13/10/2026, idée 5) : N tiré de PARAM.guide.fourchette (42 × 4 h).
+const joursFourchetteF = P => P.guide.fourchette.periodes * P.guide.fourchette.heures / 24;
+const derniersJoursF = () => (typeof PARAM !== 'undefined' ? 'les ' + joursFourchetteF(PARAM) + ' derniers jours' : 'les derniers jours');
 const FICHES = {
   // ── Positionnement et dérivés (fichier de 15 min) ──
   gex: {
@@ -613,6 +616,17 @@ const FICHES = {
     ],
     get limites() { return 'Un ordre peut être retiré à tout moment. Publiée toutes les ' + CADENCES.attendue_min + ' min : dernière colonne jusqu’à ' + CADENCES.attendue_min + ' min, plus l’envoi.'; },
   },
+  // Plan du 13/10/2026, idée 5 ; « mesuré » : marche/range-cassure (BTC/USDT, 2019-2026).
+  fourchette: {
+    get titre() { return typeof PARAM !== 'undefined' ? 'Fourchette de ' + joursFourchetteF(PARAM) + ' jours' : 'Fourchette des derniers jours'; }, page: 'fourchette',
+    get simple() { return 'Le plus haut et le plus bas du prix sur ' + derniersJoursF() + ', en deux lignes.'; },
+    lectures: [
+      { s: 'mesuré', t: 'Sur BTC/USDT, une sortie a souvent précédé un prix plus agité, sans sens privilégié.' },
+      { s: 'mesuré', t: 'Une sortie sur deux est revenue dedans dans la journée, à peu près comme le hasard.' },
+      { s: 'mesuré', t: 'Avec « Le détail », « En résumé » dit une sortie récente, même lignes masquées.' },
+    ],
+    get limites() { return 'Pas en 1 jour. Il faut ' + (typeof PARAM !== 'undefined' ? joursFourchetteF(PARAM) + ' jours' : 'assez') + ' de prix chargés : en 1 min, jamais.'; },
+  },
 };
 
 // ─── Valeurs et métadonnées ───────────────────────────────────────────────────
@@ -859,6 +873,9 @@ const COURT = {
   liq: { quoi: 'Une carte de chaleur : où beaucoup d’ordres d’achat ou de vente attendaient.',
     traders: 'On regarde ces gros paquets d’ordres quand le prix approche : tiennent-ils, partent-ils ? La carte dit où ils étaient.',
     calcul: 'Le serveur additionne les bitcoins en attente sur Binance, prix par prix. Plus la case est marquée, plus il y en avait.' },
+  fourchette: { quoi: P => 'Deux lignes : le plus haut et le plus bas du prix sur ' + joursFourchetteF(P) + ' jours.',
+    traders: 'Beaucoup surveillent ces deux bords. Une période finie au-delà est souvent lue comme une cassure, le départ d’un mouvement dans ce sens.',
+    calcul: P => 'Le site regroupe les prix par tranches de ' + P.guide.fourchette.heures + ' heures. Il garde le plus haut et le plus bas des ' + P.guide.fourchette.periodes + ' dernières tranches finies.' },
   // ── Le Guide, les scénarios, le dessin ──
   guide: { quoi: 'Une phrase et deux repères de prix qui décrivent le graphique.',
     usage: 'Lisez la phrase, puis les deux repères : entre eux, rien de neuf. Touchez un texte pour le détail.',
@@ -919,6 +936,10 @@ const CALCUL = {
   fib: P => 'Plus haut et plus bas des bougies visibles ; niveaux ' + P.fib.niveaux.map(x => pcF(x) + ' %').join(', ') + '. Mesurés depuis le haut si la dernière clôture visible dépasse la première, sinon depuis le bas.',
   vp: P => 'Prix de la vue en tranches (environ ' + P.vp.dollarsParTranche + ' $, entre ' + P.vp.tranchesMin + ' et ' + P.vp.tranchesMax + ' tranches). Chaque bougie visible ajoute son volume entre son bas et son haut. POC : la tranche la plus chargée. Zone de valeur : jusqu’à '
     + pcF(P.vp.zoneValeur) + ' % du total.',
+  fourchette: P => { const F = P.guide.fourchette;
+    return 'Périodes de ' + F.heures + ' h alignées sur l’heure UTC, refaites avec les bougies déjà chargées quand l’intervalle divise la période. Haut et bas : extrêmes des ' + F.periodes
+      + ' périodes closes avant celle en cours. Cassure : une période close finit sous le bas (ou au-dessus du haut) de la fourchette des ' + F.periodes + ' périodes d’avant elle, '
+      + 'la précédente ayant fini dans la sienne ; sans filtre de volume. Dite dans « En résumé » pendant les ' + F.phrasePeriodes + ' périodes suivantes, tant qu’aucune n’a fini de nouveau dedans.'; },
   liq: () => grilleLiq().pas + ', le serveur additionne les BTC posés dans le carnet Binance, par tranche de prix' + (grilleLiq().dp ? ' de ' + nbF(grilleLiq().dp) + ' $' : '') + '. Publié toutes les ' + CADENCES.attendue_min + ' min ; en Complet, l’âge de la dernière colonne est écrit en haut à droite. BTC/USDT seulement.',
   // ── Champs du fichier ──
   gex: () => 'Pour chaque option Deribit ouverte : variation de sa couverture pour ' + (prmMeta('micro.gex_usd_1pct', 'mouvement_pct') !== null ? nbF(prmMeta('micro.gex_usd_1pct', 'mouvement_pct')) + ' %' : 'un petit mouvement') + ' de prix (le « gamma ») × contrats ouverts. Calls en positif, puts en négatif (hypothèse). En dollars.',
@@ -1110,7 +1131,7 @@ function ouvrirGlossaire(ancre) {
     ['Indicateurs du fichier', ['rsi_tf', 'ema_tf', 'croisement', 'sr_tf', 'amplitude', 'atr_tf', 'volume_tf']],
     ['Le dessin du graphique', ['bougies']],
     ['Guide et scénarios du matin', ['guide', 'guide_niveaux', 'guide_regime', 'guide_formes', 'guide_suite', 'scenarios']],
-    ['Indicateurs du graphique', ['rsi', 'ema', 'vwap', 'adx', 'atr', 'volume', 'sr', 'bb', 'macd', 'stoch', 'ichimoku', 'sar', 'obv', 'mfi', 'williamsR', 'cci', 'ao', 'fib', 'vp', 'liq']]];
+    ['Indicateurs du graphique', ['rsi', 'ema', 'vwap', 'adx', 'atr', 'volume', 'sr', 'bb', 'macd', 'stoch', 'ichimoku', 'sar', 'obv', 'mfi', 'williamsR', 'cci', 'ao', 'fib', 'vp', 'liq', 'fourchette']]];
   const bouton = (i, t) => '<button type="button" class="glossaire-item" onclick="ouvrirFiche(\'' + i + '\')">' + echapF(t) + '</button>';
   const tous = groupes.map(([g, ids]) => '<h4>' + g + '</h4><div class="glossaire">' + ids.map(i => bouton(i, FICHES[i].titre)).join('') + '</div>').join('');
   p.innerHTML = '<div class="fiche-tete"><h3 class="fiche-titre">Légendes</h3><button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>'
