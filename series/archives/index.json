@@ -1,13 +1,12 @@
 {
- "updated": "2026-10-13T15:02:17+00:00",
+ "updated": "2026-10-13T15:02:31+00:00",
  "generator": "publier_archives.py v1.1 — archives CSV (carnet hebdomadaire, liquidations Binance mensuelles)",
  "source": "carnet : Binance depth 5 000 niveaux + carnet complet Coinbase · liquidations : flux WebSocket Binance forceOrder (route /market)",
  "branche": "historique",
  "repertoire": "series/archives",
  "status": {
   "synchronisation": "à jour",
-  "noms_perimes_retires": "carnet-2026-10.csv (nommage remplacé)",
-  "copie": "2 fichier(s) copié(s)"
+  "copie": "rien à copier"
  },
  "errors": [],
  "series": {
