@@ -10,7 +10,8 @@ sans bruit. Ce harnais les fait tenir :
 
 1. REGISTRE DES THÈMES — chaque <link data-theme-id> d'index.html pointe vers un fichier qui
    existe, déclare data-nom / data-mode (clair|sombre) / data-verre (aucun|givre|refraction),
-   et son data-paire désigne un thème déclaré. Identifiants uniques.
+   et son data-paire désigne un thème déclaré. Identifiants uniques. Un seul porte
+   data-defaut="1" (le thème d'une première visite) : Bureau 95, choisi le 13/10/2026.
 2. JETONS — chaque thème définit le NOYAU (liste ci-dessous) sous [data-theme="<id>"], et
    toutes ses règles sont scopées sur ce sélecteur : un thème ne fuit pas sur les autres.
 3. VERRE — un thème ne pose jamais `backdrop-filter` lui-même : il choisit --verre, que
@@ -98,6 +99,9 @@ THEMES = themes_declares()
 ids = [t["id"] for t in THEMES]
 (ok if THEMES else echec)("au moins un thème déclaré", f"{len(THEMES)} : {', '.join(ids)}")
 (ok if len(ids) == len(set(ids)) else echec)("identifiants uniques")
+defauts = [t["id"] for t in THEMES if t.get("defaut")]
+(ok if defauts == ["bureau95"] else echec)("un seul thème par défaut (data-defaut), Bureau 95 depuis le 13/10/2026",
+                                          ", ".join(defauts) or "aucun")
 for t in THEMES:
     pb = []
     if not t["href"] or not (REPO / t["href"]).exists():

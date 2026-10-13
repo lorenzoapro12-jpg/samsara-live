@@ -16,6 +16,9 @@
 //      loge un prix dans la colonne fixe de l'info-bulle ;
 //   6. au TÉLÉPHONE : barre des tâches de 40 px, cibles d'au moins 32 × 34 px, rien ne déborde ni
 //      ne se chevauche (390 et 360 px), le prix entier, la barre d'état garde un chiffre et l'âge.
+//   7. PREMIÈRE VISITE : Bureau 95 est le thème par défaut (13/10/2026) — structure posée, carte
+//      décrite, choix gardés respectés — et l'écran de départ est carré partout, panneau
+//      « Choisir l'affichage » ouvert compris (390 et 1440 px).
 //
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
 // USAGE   node tests/test_fenetres.js
@@ -202,6 +205,75 @@ const dedans = (a, b, m = 0.5) => a && b && a.g >= b.g - m && a.d <= b.d + m && 
         check('aucune erreur JavaScript', !o3.erreurs.length, o3.erreurs);
         await o3.ctx.close();
       }
+    }
+
+    // 7. Première visite (13/10/2026) : Bureau 95 est le thème par défaut. Sans aucune clé gardée,
+    // la page s'ouvre en Bureau 95, structure posée, visible ; la carte reçoit sa description ; un
+    // choix déjà fait est respecté. Et l'écran de départ est CARRÉ partout (Lorenzo, 11/10 : « en
+    // Bureau 95, tout est carré »), panneau « Choisir l'affichage » ouvert compris : aucun élément
+    // visible n'a de coin arrondi qui se voie (fond, bord ou ombre), sauf la roue de l'en-tête et
+    // les pastilles d'importance du panneau, dont le disque porte un sens (plein, demi, anneau).
+    const premiere = async (vue, cles) => {
+      const ctx = await nav.newContext({ viewport: vue, deviceScaleFactor: 1, hasTouch: vue.width < 500, isMobile: vue.width < 500 });
+      const page = await ctx.newPage(), erreurs = [];
+      page.on('pageerror', e => erreurs.push(e.message));
+      await page.route('**/*', r => {
+        const u = r.request().url(), h = new URL(u).host, cors = { 'access-control-allow-origin': '*' };
+        if (h.startsWith('127.0.0.1')) return r.continue();
+        if (h === 'api.binance.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(binance(u)) });
+        if (estPrevisions(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: previsionsFixture() });
+        if (h === 'raw.githubusercontent.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: u.includes('heatmap') ? fs.readFileSync(path.join(REPO, 'heatmap.json')) : publicationVieille() });
+        return r.abort();
+      });
+      await page.addInitScript(c => { try { if (!sessionStorage.getItem('pose')) { localStorage.clear(); for (const [k, v] of Object.entries(c)) localStorage.setItem(k, v); sessionStorage.setItem('pose', '1'); } } catch (e) { /* */ } }, cles || {});
+      await page.goto(`http://127.0.0.1:${serveur.address().port}/index.html`);
+      await page.waitForTimeout(2000);
+      return { ctx, page, erreurs };
+    };
+    const arrondis = page => page.evaluate(() => {
+      const vus = [];
+      const voit = cs => cs.backgroundColor !== 'rgba(0, 0, 0, 0)' || cs.backgroundImage !== 'none' || parseFloat(cs.borderTopWidth) > 0 || parseFloat(cs.borderLeftWidth) > 0 || cs.boxShadow !== 'none';
+      const nom = el => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\s+/).join('.') : '');
+      for (const el of document.querySelectorAll('body *')) {
+        if (!el.getClientRects().length || el.closest('.header-orb')) continue;
+        const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;
+        for (const ps of [null, '::before', '::after']) {
+          const cs = getComputedStyle(el, ps);
+          if (cs.display === 'none' || cs.visibility === 'hidden' || (ps && cs.content === 'none')) continue;
+          if (ps && el.classList.contains('aff-imp')) continue;
+          const rr = [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomLeftRadius, cs.borderBottomRightRadius].map(parseFloat);
+          if (Math.max(...rr) > 0.5 && voit(cs)) vus.push(nom(el) + (ps || '') + ' ' + cs.borderRadius);
+        }
+      }
+      return [...new Set(vus)];
+    });
+    for (const vue of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+      titre(`première visite — Bureau 95 par défaut (${vue.width} × ${vue.height})`);
+      const o = await premiere(vue);
+      const etat = await o.page.evaluate(() => ({
+        theme: document.documentElement.getAttribute('data-theme'), structure: document.documentElement.getAttribute('data-structure'),
+        posee: document.documentElement.hasAttribute('data-structure-posee'), visible: getComputedStyle(document.body).visibility,
+        garde: localStorage.getItem('samsara-theme'), carte: localStorage.getItem('samsara-theme-carte'),
+        mode: document.documentElement.getAttribute('data-mode') }));
+      let carte = null; try { carte = JSON.parse(etat.carte); } catch (e) { /* */ }
+      check('sans clé gardée : Bureau 95, structure « fenetres » posée, page visible, rien d\'écrit sous samsara-theme',
+        etat.theme === 'bureau95' && etat.structure === 'fenetres' && etat.posee && etat.visible === 'visible' && etat.garde === null, etat);
+      check('la carte reçoit la description de Bureau 95 (clair)', carte && carte.id === 'bureau95' && carte.mode === 'clair', etat.carte);
+      const depart = await arrondis(o.page);
+      check(`écran de départ (${etat.mode}) : aucun coin arrondi visible`, !depart.length, depart);
+      await o.page.evaluate(() => toggleDropdown({ stopPropagation() {} }));
+      await o.page.waitForTimeout(250);
+      const panneau = await arrondis(o.page);
+      check('« Choisir l\'affichage » ouvert : aucun coin arrondi visible', !panneau.length, panneau);
+      check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+    titre('première visite — un choix déjà fait est respecté');
+    for (const [cles, attendu] of [[{ 'samsara-theme': 'aero' }, 'aero'], [{ 'samsara-theme': 'kala' }, 'kala'], [{ 'samsara-theme-v2': 'dark' }, 'aero-nuit'], [{ 'samsara-theme': 'inconnu' }, 'bureau95']]) {
+      const o = await premiere({ width: 390, height: 844 }, cles);
+      const t = await o.page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+      check(`${JSON.stringify(cles)} → ${attendu}`, t === attendu && !o.erreurs.length, { t, erreurs: o.erreurs });
+      await o.ctx.close();
     }
   } finally { await nav.close(); serveur.close(); }
   console.log(ko ? `\n❌ FENÊTRES : ${ko} contrôle(s) en échec` : '\n✅ FENÊTRES : TOUS LES CONTRÔLES PASSENT');

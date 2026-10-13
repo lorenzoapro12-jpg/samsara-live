@@ -26,14 +26,16 @@
      coûte aucune requête. Pour en ajouter un : créer themes/<id>.css (jetons sous
      [data-theme="<id>"]) et ajouter sa ligne ici. data-mode : clair | sombre ;
      data-verre : aucun | givre | refraction (hyalite, Chromium) ; data-paire : le thème
-     jumeau de l'autre mode (touche D). tests/test_contrat.py vérifie chaque thème déclaré. -->
+     jumeau de l'autre mode (touche D) ; data-defaut="1" : le thème d'une première visite (un
+     seul, Bureau 95 depuis le 13/10/2026 ; l'ordre des lignes reste celui du menu et de la
+     touche T). tests/test_contrat.py vérifie chaque thème déclaré. -->
 <link rel="stylesheet" href="themes/aero.css" data-theme-id="aero" data-nom="Aero" data-mode="clair" data-verre="refraction" data-paire="aero-nuit">
 <link rel="stylesheet" href="themes/aero-nuit.css" data-theme-id="aero-nuit" data-nom="Aero nuit" data-mode="sombre" data-verre="refraction" data-paire="aero">
 <link rel="stylesheet" href="themes/kala.css" data-theme-id="kala" data-nom="Kāla" data-mode="sombre" data-verre="aucun">
 <!-- data-structure : le thème change aussi la STRUCTURE de la page (js/structures.js). -->
 <link rel="stylesheet" href="themes/neon.css" data-theme-id="neon" data-nom="Néon" data-mode="sombre" data-verre="aucun" data-structure="hud">
 <link rel="stylesheet" href="themes/codex.css" data-theme-id="codex" data-nom="Codex" data-mode="clair" data-verre="aucun" data-structure="codex">
-<link rel="stylesheet" href="themes/bureau95.css" data-theme-id="bureau95" data-nom="Bureau 95" data-mode="clair" data-verre="aucun" data-structure="fenetres" data-paire="bureau95-contraste">
+<link rel="stylesheet" href="themes/bureau95.css" data-theme-id="bureau95" data-nom="Bureau 95" data-mode="clair" data-verre="aucun" data-structure="fenetres" data-paire="bureau95-contraste" data-defaut="1">
 <link rel="stylesheet" href="themes/bureau95-contraste.css" data-theme-id="bureau95-contraste" data-nom="Bureau 95 contraste" data-mode="sombre" data-verre="aucun" data-structure="fenetres" data-paire="bureau95">
 <link rel="stylesheet" href="themes/gare.css" data-theme-id="gare" data-nom="Gare" data-mode="sombre" data-verre="aucun" data-structure="tableau">
 <link rel="stylesheet" href="themes/gazette.css" data-theme-id="gazette" data-nom="Gazette" data-mode="clair" data-verre="aucun" data-structure="une">
@@ -50,7 +52,9 @@
       t = localStorage.getItem('samsara-theme');
       if (!t && localStorage.getItem('samsara-theme-v2') === 'dark') t = 'aero-nuit';
     } catch (e) {}
-    var defaut = liens.length ? liens[0].getAttribute('data-theme-id') : 'aero';
+    /* Sans choix gardé : le thème marqué data-defaut (le premier du registre à défaut). */
+    var d = document.querySelector('link[data-theme-id][data-defaut]');
+    var defaut = d ? d.getAttribute('data-theme-id') : (liens.length ? liens[0].getAttribute('data-theme-id') : 'bureau95');
     var choisi = connus[t] ? t : defaut;
     document.documentElement.setAttribute('data-theme', choisi);
     /* Thème à STRUCTURE : la page reste invisible tant que js/structures.js ne l'a pas posée
