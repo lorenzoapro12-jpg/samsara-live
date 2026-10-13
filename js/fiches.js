@@ -130,7 +130,7 @@ const FICHES = {
     titre: 'Ratio long / short des gros traders', champ: 'micro.top_ls_ratio',
     simple: 'Positions acheteuses sur vendeuses des plus gros comptes Binance, pondérées par la taille.',
     lectures: [
-      { s: 'débattu', t: 'Souvent lu comme « l’argent informé » face à la foule. Rien ne le prouve.' },
+      { s: 'usuel', t: 'Souvent lu comme « l’argent informé » face à la foule.' },
     ],
     debat: 'Comme pour le ratio des comptes, les lectures contrarienne et de tendance se contredisent.',
     limites: 'Binance définit et change le périmètre des « top traders ».',
@@ -231,7 +231,7 @@ const FICHES = {
     titre: 'RSI (fichier, par échelle de temps)', champ: 'tf.*.rsi_14',
     simple: 'Force des hausses face aux baisses récentes, de 0 à 100, par échelle de temps.',
     lectures: [
-      { s: 'convention', t: 'Ces seuils sont ceux de Wilder : des noms, pas des annonces de retournement.' },
+      { s: 'convention', t: 'Ces seuils sont ceux de Wilder, l’inventeur du RSI.' },
       { s: 'usuel', t: 'En tendance forte, le RSI peut rester longtemps au-delà de ces seuils.' },
     ],
     limites: 'Bougie en cours incluse : il bouge jusqu’à la clôture. Peut différer du RSI du graphique.',
@@ -290,8 +290,9 @@ const FICHES = {
     titre: 'RSI (graphique)', page: 'rsi',
     simple: 'Force des hausses face aux baisses récentes, sur une échelle de 0 à 100.',
     lectures: [
-      { s: 'convention', t: 'Ces seuils sont ceux de Wilder : des noms, pas des annonces de retournement.' },
-      { s: 'usuel', t: 'Divergence : nouveau plus haut du prix sans celui du RSI, lu comme un essoufflement. Fiabilité discutée.' },
+      { s: 'convention', t: 'Ces seuils sont ceux de Wilder, l’inventeur du RSI. En forte tendance, certains prennent 80 et 20.' },
+      { s: 'usuel', t: 'Divergence : nouveau plus haut du prix sans celui du RSI, lu comme un essoufflement.' },
+      { s: 'usuel', t: 'En tendance forte, le RSI peut rester longtemps au-delà de ces seuils.' },
       { s: 'usuel', t: 'Beaucoup surveillent aussi le passage de 50.' },
     ],
     limites: 'Calculé sur les bougies chargées, bougie en cours incluse.',
@@ -341,7 +342,7 @@ const FICHES = {
     simple: 'Niveaux où le prix a fait demi-tour, regroupés ; les plus forts sont tracés.',
     lectures: [
       { s: 'usuel', t: 'Un niveau touché souvent, récemment et sur du volume, est jugé plus solide.' },
-      { s: 'débattu', t: 'Le « changement de rôle » d’un niveau cassé est une lecture répandue, rarement vérifiée.' },
+      { s: 'usuel', t: 'Beaucoup attendent une période finie au-delà du niveau avant de le dire cassé.' },
       { s: 'mesuré', t: 'Le style du trait dit l’intervalle d’origine (nommé sur le badge), pas l’importance.' },
     ],
     limites: 'Méthode propre à cette page : d’autres outils tracent d’autres niveaux.',
@@ -351,7 +352,7 @@ const FICHES = {
     simple: 'Une moyenne et deux bandes à quelques écarts-types : l’enveloppe normale du prix.',
     lectures: [
       { s: 'usuel', t: 'Une volatilité comprimée précède souvent un mouvement, de sens inconnu.' },
-      { s: 'convention', t: 'Toucher une bande n’est pas un signal en soi.' },
+      { s: 'convention', t: 'Bollinger lui-même le rappelle : une bande touchée n’est pas un signal en soi.' },
     ],
     limites: 'Sur le BTC, les grands écarts sont plus fréquents qu’une loi normale ne le prévoit.',
   },
@@ -396,7 +397,7 @@ const FICHES = {
       { s: 'mesuré', t: 'Mur d’options : le prix d’exercice publié. Zéro gamma : un prix calculé par le modèle.' },
       { s: 'convention', t: 'États : loin, proche, en test, percé en mèche. Cassé : deux clôtures au-delà, ou une et un retour.' },
       { s: 'convention', t: 'Lus sur les bougies closes. Pour un chiffre publié, seules les clôtures après sa lecture comptent.' },
-      { s: 'débattu', t: 'Un niveau cassé « change de rôle » : lecture répandue, rarement vérifiée.' },
+      { s: 'usuel', t: 'Un niveau cassé est souvent lu comme ayant « changé de rôle » : un support franchi devient résistance.' },
     ],
     limites: 'Distance mesurée au prix en direct. Un chiffre publié garde son heure (« lu à HH:MM »). Sans donnée, rien ; jamais 0.',
   },
@@ -516,7 +517,7 @@ const FICHES = {
     simple: 'Place de la clôture dans le range récent, de 0 (plus bas) à 100 (plus haut).',
     lectures: [
       { s: 'convention', t: 'Les seuils 80 et 20 sont une habitude, pas une loi.' },
-      { s: 'usuel', t: 'On surveille le croisement de %K et %D dans ces zones, surtout en range.' },
+      { s: 'usuel', t: 'En tendance, il peut rester longtemps collé à un bord.' },
     ],
     limites: 'Très nerveux en version rapide.',
   },
@@ -535,7 +536,7 @@ const FICHES = {
     titre: 'Parabolic SAR', page: 'sar',
     simple: 'Des points sous les bougies quand le prix monte, au-dessus quand il baisse.',
     lectures: [
-      { s: 'usuel', t: 'Souvent utilisé comme niveau de sortie qui suit le prix (« stop suiveur »).' },
+      { s: 'usuel', t: 'On l’appelle « stop suiveur » : en hausse, il ne fait que monter.' },
     ],
     limites: 'Sans tendance, les points changent de côté sans arrêt et ne disent rien.',
   },
@@ -544,7 +545,7 @@ const FICHES = {
     simple: 'Un compteur : il ajoute le volume des bougies en hausse et retire celui des baisses.',
     lectures: [
       { s: 'usuel', t: 'Seule la pente compte. Un OBV qui monte : plus de volume sur les bougies haussières.' },
-      { s: 'débattu', t: 'Cette lecture des divergences est répandue, mais rarement vérifiée.' },
+      { s: 'usuel', t: 'Beaucoup guettent un OBV qui dépasse son sommet avant le prix.' },
     ],
     limites: 'Sa valeur dépend de la première bougie chargée. Tout le volume d’une bougie compte d’un seul côté.',
   },
@@ -579,9 +580,9 @@ const FICHES = {
     titre: 'Awesome Oscillator', page: 'ao',
     simple: 'Des barres : le prix récent au-dessus ou au-dessous de sa moyenne plus longue.',
     lectures: [
-      { s: 'usuel', t: 'Au-dessus de 0 : élan haussier ; au-dessous : baissier. Barres plus courtes : l’élan faiblit.' },
+      { s: 'usuel', t: 'Barres de plus en plus courtes : l’élan faiblit.' },
       { s: 'mesuré', t: 'Ici, la couleur dit le côté de 0. Dans l’AO classique, elle dit si la barre grandit.' },
-      { s: 'usuel', t: 'Des formes de barres sont suivies : « soucoupe », « deux pics ».' },
+      { s: 'usuel', t: 'Autre forme suivie : « deux pics » du même côté de zéro.' },
     ],
     limites: 'En retard sur le prix. Proche du MACD : ne pas les compter deux fois.',
   },
@@ -589,7 +590,7 @@ const FICHES = {
     titre: 'Retracements de Fibonacci', page: 'fib',
     get simple() { return 'Des lignes à des fractions fixes (' + (typeof PARAM !== 'undefined' ? niveauxFib(PARAM, x => x > 0 && x < 1).join(', ') : 'les niveaux de Fibonacci') + ') entre le plus haut et le plus bas visibles.'; },
     lectures: [
-      { s: 'débattu', t: 'Beaucoup les regardent, ce qui peut leur donner du poids. Rien de mathématique ne fait réagir un prix.' },
+      { s: 'usuel', t: 'Beaucoup les regardent, ce qui leur donne du poids : le repère est partagé.' },
       { s: 'usuel', t: 'Repli arrêté vers 38,2 % ou 50 % : tendance jugée intacte. Au-delà de 78,6 % : mouvement presque effacé.' },
     ],
     limites: 'Les lignes bougent quand on déplace ou zoome : elles dépendent de la vue.',
@@ -721,10 +722,12 @@ function usageHtml(id) {
 // Demandes du 10/10/2026 (des explications qu'un adolescent comprend) et du 12/10/2026 (plus
 // courtes) : chaque fiche s'ouvre sur trois lignes — ce que c'est (une phrase, en gras), comment
 // les traders s'en servent (ou, pour le Guide et les scénarios, comment s'en servir), comment c'est
-// calculé ; deux phrases au plus, sans formule. C'est l'usage COURANT chez les traders (manuels,
-// plateformes), rien de propre à ce site : une pratique décrite n'est pas un conseil et ne dit pas
-// qu'elle marche ; elle dit ce que les traders SURVEILLENT, jamais ce que fera le prix (ni rebond,
-// ni « retour vers le milieu », ni stop à placer). Les nombres sont lus là où le calcul les prend
+// calculé ; deux phrases au plus, sans formule. C'est l'usage CLASSIQUE chez les traders (manuels,
+// plateformes), tel qu'ils le disent : rien de propre à ce site, rien de filtré par nos mesures
+// (demande de Lorenzo du 13/10/2026 : « RSI survendu : beaucoup y guettent un rebond »). Une
+// pratique décrite et attribuée (« beaucoup y guettent… », « beaucoup placent leur stop… ») n'est
+// pas un conseil : la ligne ne dit jamais au lecteur quoi faire, ni ce que fera le prix (pas de
+// « un rebond est attendu »). Les nombres sont lus là où le calcul les prend
 // (PARAM, meta, CADENCES) : aucun nombre avec unité écrit en dur (tests/test_fiches.js). Pour les
 // fiches que l'écran Débutant montre (GLOSSAIRE_DEBUTANT) et les calques simples, aucun mot de la
 // liste du Guide : « période » pour une bougie, « gros paquet d'ordres » pour un mur.
@@ -771,14 +774,14 @@ const COURT = {
       return 'On découpe les prix en tranches' + (t !== null ? ' de ' + nbF(t) + ' $' : '') + ' et on additionne les bitcoins de chacune. Les murs sont les plus remplies.'; } },
   // ── Indicateurs du fichier (bloc tf) ──
   rsi_tf: { quoi: 'Le RSI du graphique, calculé pour plusieurs durées.',
-    traders: 'Au-dessus de 70 : hausse récente forte ; sous 30 : baisse récente forte. Comparer les durées montre si elles s’accordent.',
+    traders: 'Au-dessus de 70, on dit « suracheté » ; sous 30, « survendu ». Quand plusieurs durées le disent ensemble, beaucoup y croient davantage.',
     calcul: () => 'Le serveur fait le calcul du graphique sur ' + bougiesMeta('tf.*.rsi_14', 'periode', 'les dernières périodes') + ' de chaque durée. La période en cours compte.' },
   ema_tf: { quoi: 'Les moyennes du prix, calculées par le serveur pour plusieurs durées.',
-    traders: 'Comme sur le graphique : le prix face aux moyennes, la courte face à la longue.',
+    traders: 'Prix au-dessus des moyennes : tendance lue à la hausse ; en dessous, à la baisse. Beaucoup comparent les durées pour voir si elles s’accordent.',
     calcul: () => { const a = prmMeta('tf.*.ema20', 'periode'), b = prmMeta('tf.*.ema50', 'periode');
       return 'Les moyennes des prix de fin' + (a !== null && b !== null ? ' des ' + nbF(a) + ' et des ' + nbF(b) + ' dernières périodes' : ' des dernières périodes') + ', les récents comptant plus. La période en cours compte.'; } },
   croisement: { quoi: 'Dit si la moyenne courte est sous la moyenne longue : un état, pas un moment.',
-    traders: 'Courte sous longue : tendance lue comme faiblissante ; au-dessus, comme renforcée. Le célèbre « death cross » parle d’autres moyennes.',
+    traders: 'Courte sous longue : tendance lue comme baissière ; au-dessus, haussière. Beaucoup guettent le moment où elles se croisent.',
     calcul: () => { const a = prmMeta('tf.*.ema20_sous_ema50', 'courte'), b = prmMeta('tf.*.ema20_sous_ema50', 'longue');
       return 'Oui si la moyenne ' + (a !== null && b !== null ? 'des ' + nbF(a) + ' dernières périodes est sous celle des ' + nbF(b) : 'courte est sous la longue') + ', à la publication.'; } },
   sr_tf: { quoi: 'Le plus bas et le plus haut récents du prix : sa fourchette.',
@@ -789,26 +792,26 @@ const COURT = {
     traders: 'Il dit si le marché a été agité ou calme. Le calme précède souvent un mouvement plus large, de sens inconnu.',
     calcul: () => 'Le plus haut moins le plus bas des ' + dernieresMeta('tf.*.amplitude_30_pct', 'bougies') + ', divisé par le plus bas.' },
   atr_tf: { quoi: 'De combien le prix bouge d’habitude en une période, pour plusieurs durées.',
-    traders: 'Une règle graduée : un mouvement de plusieurs ATR sort de l’ordinaire. Il ne dit pas le sens.',
+    traders: 'Beaucoup placent leur stop à un ou deux ATR, pris sur la durée qu’ils suivent. Un mouvement de plusieurs ATR sort de l’ordinaire.',
     calcul: () => 'Le calcul du graphique, fait par le serveur sur ' + bougiesMeta('tf.*.atr_14', 'periode', 'les dernières périodes') + ' de chaque durée.' },
   volume_tf: { quoi: 'La quantité moyenne de bitcoins échangée par période, ces derniers temps.',
     traders: 'Une période bien au-dessus de la moyenne est jugée importante. Un mouvement sur peu d’échanges, fragile.',
     calcul: () => 'La moyenne des quantités échangées sur les ' + dernieresMeta('tf.*.volume_moyen_10_btc', 'bougies') + ', période en cours comprise.' },
   // ── Indicateurs du graphique ──
   rsi: { quoi: 'Le RSI compare la force des hausses et des baisses récentes, de 0 à 100.',
-    traders: 'Au-dessus de 70, on dit « suracheté » ; sous 30, « survendu ». Le prix peut pourtant continuer longtemps.',
+    traders: 'Au-dessus de 70, on dit « suracheté » : beaucoup y guettent un repli. Sous 30, « survendu » : beaucoup y guettent un rebond.',
     calcul: P => 'On compare hausses et baisses moyennes sur les ' + P.rsi.periode + ' dernières périodes. Que des hausses : 100 ; que des baisses : 0.' },
   ema: { quoi: 'Une ligne qui suit le prix moyen récent : elle lisse les secousses.',
-    traders: 'Prix au-dessus d’une moyenne qui monte : tendance à la hausse, et inversement. Un croisement de moyennes se lit toujours après coup.',
+    traders: 'Prix au-dessus d’une moyenne qui monte : tendance à la hausse, et inversement. Beaucoup guettent aussi le croisement d’une moyenne courte et d’une longue.',
     calcul: 'La moyenne des prix de fin des dernières périodes ; leur nombre est dans le nom. L’« exponentielle » compte plus les récents.' },
   vwap: { quoi: 'Le prix moyen payé depuis le début de la journée, pondéré par les échanges.',
-    traders: 'Au-dessus, les acheteurs du jour gagnent en moyenne ; en dessous, ils perdent. Les grands investisseurs s’y comparent.',
+    traders: 'Prix au-dessus : la séance est lue comme acheteuse ; en dessous, vendeuse. Beaucoup s’en servent comme support ou résistance du jour.',
     calcul: P => 'Chaque prix compte selon ce qui s’y est échangé. Le calcul repart de zéro à ' + minuitUtcMots() + ', ou toutes les ' + P.vwap.ancrageBougies + ' périodes en journalier.' },
   adx: { quoi: 'L’ADX dit si le prix a une direction nette, sans dire laquelle.',
     traders: 'Au-dessus de 25 : marché en tendance ; sous 20 : sans direction. +DI et −DI disent quel camp pousse.',
     calcul: P => 'On compare la montée des hauts et la descente des bas, sur ' + P.adx.periode + ' périodes. L’ADX dit si un côté l’emporte.' },
   atr: { quoi: 'L’ATR dit de combien le prix bouge d’habitude en une période, sans le sens.',
-    traders: 'Une règle graduée : un mouvement de plusieurs ATR sort de l’ordinaire. Il ne dit ni le sens ni la suite.',
+    traders: 'Beaucoup placent leur stop à un ou deux ATR du prix, hors du bruit. Un mouvement de plusieurs ATR sort de l’ordinaire.',
     calcul: P => 'L’écart entre le haut et le bas de chaque période, saut depuis la précédente compris. Moyenne sur ' + P.atr.periode + ' périodes.' },
   volume: { quoi: 'Combien a été échangé pendant chaque période : barre haute, beaucoup d’échanges.',
     traders: 'Un mouvement avec beaucoup d’échanges est jugé plus solide. Une hausse aux échanges déclinants, essoufflée.',
@@ -817,34 +820,34 @@ const COURT = {
     traders: 'On regarde si le niveau tient quand le prix revient. Un niveau franchi est souvent lu comme ayant changé de rôle.',
     calcul: P => 'Sommets et creux des ' + P.sr.bougies + ' dernières périodes, regroupés quand ils sont proches. On garde les groupes récents et très échangés.' },
   bb: { quoi: 'Une moyenne et deux bandes : l’enveloppe où le prix bouge d’habitude.',
-    traders: 'Bandes serrées : marché calme, beaucoup guettent la sortie. En tendance, le prix peut longer une bande longtemps.',
+    traders: 'Bandes serrées : beaucoup guettent une sortie forte. Bande touchée : souvent lue comme un excès, sauf en tendance où le prix la longe.',
     calcul: P => 'Le milieu est la moyenne des ' + P.bb.periode + ' derniers prix de fin. Les bandes s’écartent quand ces prix se dispersent.' },
   macd: { quoi: 'Le MACD compare une moyenne rapide et une lente : le mouvement accélère-t-il ?',
-    traders: 'On regarde quand la ligne MACD croise sa ligne signal, et quand elle passe zéro. Les barres grandissent si ça accélère.',
+    traders: 'MACD au-dessus de sa ligne signal : élan lu comme haussier ; en dessous, baissier. Beaucoup guettent leur croisement et le passage de zéro.',
     calcul: P => 'La moyenne rapide (' + P.macd.rapide + ' périodes) moins la lente (' + P.macd.lente + '). La ligne signal est la moyenne de ce résultat.' },
   stoch: { quoi: 'Où finit le prix dans sa fourchette récente : 100 en haut, 0 en bas.',
-    traders: 'Au-dessus de 80, zone haute ; sous 20, zone basse. En tendance, il peut rester collé à un bord.',
+    traders: 'Au-dessus de 80, on dit « suracheté » ; sous 20, « survendu ». Beaucoup y guettent le croisement des deux lignes.',
     calcul: P => 'Le dernier prix, situé entre le haut et le bas des ' + P.stoch.k + ' dernières périodes. La 2e ligne : moyenne des ' + P.stoch.d + ' dernières valeurs.' },
   ichimoku: { quoi: 'Un nuage coloré et deux lignes : la zone d’équilibre récente du prix.',
     traders: 'Prix au-dessus du nuage : tendance vue à la hausse ; au-dessous, à la baisse ; dedans, indécis. Nuage épais : difficile à traverser.',
     calcul: P => 'Chaque ligne : le milieu entre haut et bas de ' + P.ichimoku.tenkan + ', ' + P.ichimoku.kijun + ' ou ' + P.ichimoku.senkouB + ' périodes. Le nuage est décalé vers la droite.' },
   sar: { quoi: 'Des points sous les bougies quand le prix monte, au-dessus quand il baisse.',
-    traders: 'Un changement de côté est lu comme un retournement. Sans tendance, il se trompe souvent.',
+    traders: 'Un changement de côté est lu comme un retournement. Beaucoup s’en servent aussi de stop qui suit le prix.',
     calcul: 'À chaque période, le point se rapproche du prix, plus vite à chaque nouveau record. Touché, il change de côté.' },
   obv: { quoi: 'Un compteur : les échanges se font-ils surtout dans les hausses ou les baisses ?',
     traders: 'Il monte avec le prix : hausse jugée soutenue. Le prix monte mais lui stagne : hausse jugée fragile.',
     calcul: 'On part de zéro. Chaque période en hausse ajoute ses échanges, chaque période en baisse les retire.' },
   mfi: { quoi: 'Un RSI qui tient compte des quantités échangées, de 0 à 100.',
-    traders: 'Au-dessus de 80, zone haute ; sous 20, zone basse. On guette aussi les moments où il ne suit plus le prix.',
+    traders: 'Au-dessus de 80, on dit « suracheté » ; sous 20, « survendu ». Beaucoup guettent aussi le moment où il ne suit plus le prix.',
     calcul: P => 'Sur ' + P.mfi.periode + ' périodes : l’argent échangé quand le prix moyen monte, face à celui des baisses.' },
   williamsR: { quoi: 'Où est le prix dans sa fourchette récente : 0 en haut, −100 en bas.',
-    traders: 'Au-dessus de −20, zone haute ; sous −80, zone basse. Il sert surtout quand le prix va et vient sans direction.',
+    traders: 'Au-dessus de −20, on dit « suracheté » ; sous −80, « survendu ». Beaucoup s’en servent surtout quand le prix va et vient.',
     calcul: P => 'Le dernier prix, situé entre le haut et le bas des ' + P.williamsR.periode + ' dernières périodes. C’est le stochastique retourné.' },
   cci: { quoi: 'Le CCI dit si le prix s’est éloigné de sa moyenne plus que d’habitude.',
-    traders: 'Au-delà de +100 ou de −100, le prix est loin de sa moyenne. Certains y voient un mouvement fort, d’autres un excès.',
+    traders: 'Au-dessus de +100, on dit « suracheté » ; sous −100, « survendu ». D’autres y lisent le départ d’un mouvement fort.',
     calcul: P => 'L’écart entre le prix et sa moyenne des ' + P.cci.periode + ' dernières périodes, divisé par l’écart habituel. La plupart des valeurs restent entre −100 et +100.' },
   ao: { quoi: 'Des barres : le prix récent est-il au-dessus de sa moyenne plus longue ?',
-    traders: 'On regarde le passage des barres de l’autre côté de zéro, et certaines formes. Ici, la couleur dit seulement ce côté.',
+    traders: 'Barres au-dessus de zéro : élan haussier ; au-dessous : baissier. Beaucoup guettent le passage de zéro et la forme « soucoupe ».',
     calcul: P => 'Le milieu de chaque période, moyenné sur ' + P.ao.rapide + ' périodes, moins sa moyenne sur ' + P.ao.lente + '.' },
   fib: { quoi: 'Des lignes à des fractions fixes entre le plus haut et le plus bas visibles.',
     traders: P => { const m = niveauxFib(P, x => x > 0.3 && x < 0.7);
@@ -1178,7 +1181,7 @@ function lectureCourte(id, v, v2) {
     case 'ls': if (n(v)) t = (r2(v) > 1 ? 'Plus de comptes acheteurs que vendeurs' : r2(v) < 1 ? 'Plus de comptes vendeurs qu’acheteurs' : 'Autant de comptes acheteurs que vendeurs') + ' — des comptes, pas des montants.'; break;
     case 'cvd': if (n(v)) t = v > 0 ? 'Sur 24 h, les achats au marché ont dominé.' : 'Sur 24 h, les ventes au marché ont dominé.'; break;
     case 'gex': if (n(v)) t = v > 0 ? 'Régime « long gamma » selon la convention ; lecture usuelle : mouvements amortis.' : 'Régime « short gamma » selon la convention ; lecture usuelle : mouvements amplifiés.'; break;
-    case 'rsi_tf': if (n(v)) t = v >= 70 ? 'Zone haute (au-dessus de 70) : la hausse récente a été forte.' : v <= 30 ? 'Zone basse (sous 30) : la baisse récente a été forte.' : 'Zone neutre (entre 30 et 70).'; break;
+    case 'rsi_tf': if (n(v)) t = v >= 70 ? '« Suracheté » (au-dessus de 70) : la hausse récente a été forte.' : v <= 30 ? '« Survendu » (sous 30) : la baisse récente a été forte.' : 'Zone neutre (entre 30 et 70).'; break;
     case 'vix': if (n(v)) t = phraseVix(v); break;
     case 'prime': {
       const x = n(v2) ? v2 : v, seuil = prmMeta('micro.premium_state', 'seuil_pct');
