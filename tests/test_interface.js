@@ -585,6 +585,11 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
           cases: [...document.querySelectorAll('#indMenu label[data-ind] input')].filter(c => c.checked !== isActive(c.closest('label').dataset.ind)).map(c => c.closest('label').dataset.ind),
           ouvert: document.getElementById('indMenu').classList.contains('open'), aria: document.getElementById('indDropdownBtn').getAttribute('aria-expanded'),
           garde, compte: document.getElementById('indCompte').hidden ? 0 : +document.getElementById('indCompte').textContent,
+          // « Mon écran » (plan du site, idée 9) : son bouton, ce qui est gardé, le lien et sa phrase.
+          mon: (() => { const b = document.querySelector('#indMenu .aff-mon-ecran'); return b ? b.getAttribute('aria-pressed') : null; })(),
+          monGarde: (() => { try { return JSON.parse(localStorage.getItem('samsara-mon-ecran-v1')); } catch (e) { return 'illisible'; } })(),
+          lien: !!document.querySelector('#indMenu .aff-garder'), dit: (document.querySelector('#indMenu .aff-garde-dit') || {}).textContent || null,
+          mode: modeCourant(),
         };
       }, SITE);
       const meme = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -616,11 +621,15 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
         });
         const fins = m.querySelector('details.aff-fins');
         return { boutons: [...m.querySelectorAll('.aff-boutons button')].map(txt), presets: [...m.querySelectorAll('.aff-preset')].map(txt), cats, lignes,
+          garder: (() => { const g = m.querySelector('.aff-tete > .aff-presets + .aff-garder'); return g ? txt(g) : null; })(),
           filtre: !!m.querySelector('#indFiltre'), apercu: !!m.querySelector('#indApercu'),
           fins: fins && { ouvert: fins.open, titre: txt(fins.querySelector('summary')), reglages: fins.querySelectorAll('.reglage').length, dernier: fins === m.querySelector('.ind-liste').lastElementChild } };
       });
-      check('tête du panneau : « Tout afficher », « Revenir au départ », puis les six préréglages en mots',
-        meme(pan.boutons, ['Tout afficher', 'Revenir au départ']) && meme(pan.presets, ['L’essentiel', 'La tendance', 'L’élan', 'Le volume', 'Le carnet', 'Tout']), pan);
+      // Plan du site, idée 9 (13/10/2026) : un 3e bouton, « Mon écran », et sous les préréglages le
+      // lien qui le garde — demande de Lorenzo (retrouver son affichage d'un geste).
+      check('tête du panneau : exactement « Tout afficher », « Revenir au départ », « Mon écran », puis les six préréglages en mots, puis « Garder cet affichage comme mon écran »',
+        meme(pan.boutons, ['Tout afficher', 'Revenir au départ', 'Mon écran']) && meme(pan.presets, ['L’essentiel', 'La tendance', 'L’élan', 'Le volume', 'Le carnet', 'Tout'])
+        && pan.garder === 'Garder cet affichage comme mon écran', pan);
       const QUESTIONS = [['Ce que dit le graphique', ['guide', 'scenarios', 'detail', 'chiffres']], ['Dans quel sens ?', ['ema20', 'ema50', 'ema100', 'ema200', 'sma20', 'sma50', 'ichimoku', 'sar', 'vwap']],
         ['Ça s’essouffle ?', ['rsi', 'macd', 'stoch', 'williamsR', 'cci', 'mfi', 'ao']], ['Qui échange ?', ['vol', 'obv', 'vp']],
         ['Où le prix peut réagir ?', ['sr', 'fib', 'liq', 'figuresPassees']], ['Ça bouge beaucoup ?', ['atr', 'bb', 'adx']]];
@@ -724,6 +733,57 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
         return { labels: [...document.querySelectorAll('#indicatorBar label')].filter(vis).map(l => l.id), bouton: vis(document.getElementById('indDropdownBtn')), mode: modeCourant() };
       });
       check('Revenir au départ : l’écran calme, le ruban garde ses six intervalles et le bouton, sans légende', lis.mode === 'debutant' && meme(lis.labels, ['int_1m', 'int_5m', 'int_15m', 'int_1h', 'int_4h', 'int_1d']) && lis.bouton, lis);
+
+      // I. « Mon écran » (plan du site, idée 9, 13/10/2026) : un instantané nommé de l'affichage, rappelé
+      // d'un geste, gardé à part (samsara-mon-ecran-v1) : les préréglages et « Revenir au départ » ne
+      // le touchent pas. Sans rien de gardé : le RSI et le MACD, les supports / résistances, le Guide
+      // et les scénarios, sans « Le détail » (PARAM.monEcran). Jamais de fenêtre : une phrase.
+      let fenetres = 0;
+      p7.on('dialog', d => { fenetres++; d.dismiss().catch(() => {}); });
+      await p7.click('#indDropdownBtn'); await pause(200);
+      e = await etat();
+      check('« Mon écran » : rien de gardé au départ, bouton non enfoncé (l’affichage d’origine n’est pas le sien)', e.monGarde === null && e.mon === 'false' && e.lien && !e.dit, e);
+      await p7.click('#indMenu .aff-mon-ecran'); await pause(300);
+      e = await etat();
+      check('« Mon écran » sans rien de gardé : RSI et MACD dessous, supports / résistances, Guide et scénarios, sans « Le détail » ; bouton enfoncé, aucun préréglage enfoncé ; rien de gardé sous sa clé',
+        meme(e.ov, ['sr']) && meme(e.sg, ['macd', 'rsi']) && meme(e.site, [true, true]) && e.mode === 'debutant' && e.mon === 'true' && meme(e.presse, []) && e.monGarde === null && meme(e.dessines, ['rsi', 'macd']), e);
+      // Garder un autre affichage : « La tendance », Guide masqué, avec « Le détail ».
+      await p7.click('#indMenu .aff-preset[data-preset="tendance"]'); await pause(250);
+      await p7.evaluate(() => { toggleAny('guide'); choisirMode('expert'); }); await pause(300);
+      e = await etat();
+      check('un autre affichage : « Mon écran » n’est plus enfoncé', e.mon === 'false' && e.lien, e);
+      await p7.click('#indMenu .aff-garder'); await pause(250);
+      e = await etat();
+      const TENDANCE = ['ema20', 'ema200', 'ema50', 'ichimoku'];
+      check(`« Garder cet affichage comme mon écran » : gardé sous samsara-mon-ecran-v1 (calques, sous-graphiques, Guide, scénarios, Le détail) ; une phrase le confirme dans le panneau (« ${e.dit} »), sans fenêtre ; bouton enfoncé`,
+        e.monGarde && meme(e.monGarde.ov.slice().sort(), TENDANCE) && meme(e.monGarde.sg, []) && e.monGarde.guide === false && e.monGarde.scenarios === true && e.monGarde.detail === true
+        && e.dit === 'C’est gardé : « Mon écran » rappellera cet affichage.' && !e.lien && e.ouvert && e.mon === 'true' && !fenetres, { e, fenetres });
+      const garde = JSON.stringify(e.monGarde);
+      // Les préréglages et « Revenir au départ » changent l'affichage, jamais « Mon écran ».
+      await p7.click('#indMenu .aff-preset[data-preset="volume"]'); await pause(250);
+      e = await etat();
+      check('un préréglage après : l’affichage change, « Mon écran » reste gardé tel quel, son bouton relâché, le lien revient', meme(e.sg, ['obv', 'vol']) && JSON.stringify(e.monGarde) === garde && e.mon === 'false' && e.lien && !e.dit, e);
+      await p7.click('#indMenu .aff-boutons .aff-btn:not(.aff-tout):not(.aff-mon-ecran)'); await pause(300);
+      e = await etat();
+      check('« Revenir au départ » : les réglages d’origine, « Mon écran » toujours gardé tel quel', meme(e.ov, []) && meme(e.sg, []) && e.mode === 'debutant' && JSON.stringify(e.monGarde) === garde && e.mon === 'false', e);
+      await p7.click('#indMenu .aff-mon-ecran'); await pause(300);
+      e = await etat();
+      check('« Mon écran » après « Revenir au départ » : l’affichage gardé revient (La tendance, Guide masqué, scénarios, « Le détail »), un seul clic', meme(e.ov, TENDANCE) && meme(e.sg, []) && meme(e.site, [false, true]) && e.mode === 'expert' && e.mon === 'true', e);
+      // Rouvert : gardé, et rappelé après « Revenir au départ ».
+      await p7.evaluate(() => { revenirAuDepart(); sessionStorage.setItem('__garder', '1'); });
+      await p7.reload(); await pause(1800);
+      e = await etat();
+      check('rouvert après « Revenir au départ » : l’écran de départ (« Mon écran » jamais posé d’office), sa clé gardée', meme(e.ov, []) && meme(e.sg, []) && e.mode === 'debutant' && JSON.stringify(e.monGarde) === garde, e);
+      await p7.click('#indDropdownBtn'); await pause(200);
+      await p7.click('#indMenu .aff-mon-ecran'); await pause(300);
+      e = await etat();
+      check('rouvert, « Mon écran » : l’affichage gardé revient, bouton enfoncé ; à la réouverture du panneau, le lien (pas la phrase)', meme(e.ov, TENDANCE) && meme(e.site, [false, true]) && e.mode === 'expert' && e.mon === 'true' && e.lien && !e.dit, e);
+      await p7.evaluate(() => { sessionStorage.setItem('__garder', '1'); });
+      await p7.reload(); await pause(1800);
+      await p7.click('#indDropdownBtn'); await pause(200);
+      e = await etat();
+      check('rouvert sur « Mon écran » : le bouton est enfoncé', meme(e.ov, TENDANCE) && e.mon === 'true', e);
+      await p7.evaluate(() => { document.getElementById('indMenu').classList.remove('open'); revenirAuDepart(); localStorage.removeItem('samsara-mon-ecran-v1'); });
       check('aucune erreur JavaScript', !o7.erreurs.length, o7.erreurs);
       await o7.ctx.close();
     }
