@@ -1,0 +1,90 @@
+{
+ "updated": "2026-10-13T14:19:06+00:00",
+ "generator": "publier_archives.py v1.0 — archives CSV (carnet et liquidations Binance)",
+ "source": "carnet : Binance depth 5 000 niveaux + carnet complet Coinbase · liquidations : flux WebSocket Binance forceOrder",
+ "branche": "historique",
+ "repertoire": "series/archives",
+ "status": {
+  "synchronisation": "à jour",
+  "copie": "1 fichier(s) copié(s)"
+ },
+ "errors": [],
+ "series": {
+  "carnet": {
+   "libelle": "Carnet — une ligne toutes les 5 min (Binance 5 000 niveaux + carnet complet Coinbase)",
+   "colonnes": [
+    "ts_utc",
+    "prix_milieu",
+    "bid_usd_0p5",
+    "ask_usd_0p5",
+    "bid_usd_1",
+    "ask_usd_1",
+    "bid_usd_2",
+    "ask_usd_2",
+    "desequilibre_1",
+    "mur_bid_prix",
+    "mur_bid_usd",
+    "mur_ask_prix",
+    "mur_ask_usd",
+    "cb_prix_milieu",
+    "cb_bid_usd_0p5",
+    "cb_ask_usd_0p5",
+    "cb_bid_usd_1",
+    "cb_ask_usd_1",
+    "cb_bid_usd_2",
+    "cb_ask_usd_2",
+    "cb_desequilibre_1",
+    "cb_mur_bid_prix",
+    "cb_mur_bid_usd",
+    "cb_mur_ask_prix",
+    "cb_mur_ask_usd"
+   ],
+   "fichiers": [
+    "series/archives/carnet-2026-10.csv"
+   ],
+   "lignes": 2,
+   "octets": 797,
+   "periode": {
+    "debut": "2026-10-13T14:16:45+00:00",
+    "fin": "2026-10-13T14:17:55+00:00"
+   },
+   "cadence_s": 300
+  },
+  "liquidations_binance": {
+   "libelle": "Liquidations Binance — un ordre liquidé par ligne, sans cadence (flux d'événements)",
+   "colonnes": [
+    "ts_utc",
+    "cote",
+    "prix",
+    "qty_btc",
+    "usd"
+   ],
+   "fichiers": [],
+   "lignes": 0,
+   "octets": 0,
+   "periode": null,
+   "cadence_s": null
+  }
+ },
+ "lecture": "l'index de la branche (`index.json` à la racine) décrit les séries de positionnement, funding et intérêt ouvert ; CE fichier décrit le sous-arbre `series/archives`, que l'autre n'énumère pas",
+ "meta": {
+  "carnet": {
+   "prix_milieu": "(meilleur bid + meilleur ask) / 2, en USDT",
+   "bid_usd_*": "Σ prix × quantité des bids à moins de 0,5 / 1 / 2 % du milieu, en dollars",
+   "ask_usd_*": "idem côté asks",
+   "desequilibre_1": "(bid_usd_1 − ask_usd_1) / (bid_usd_1 + ask_usd_1)",
+   "mur_*_prix": "prix du plus gros niveau UNIQUE de chaque côté à moins de 2 %",
+   "mur_*_usd": "montant de ce niveau, en dollars",
+   "cb_*": "mêmes mesures sur le carnet COMPLET Coinbase BTC-USD",
+   "cellule_vide": "source illisible à cet instant — jamais un zéro",
+   "troncature": "les colonnes Binance à 2 % sont bornées par l'API (5 000 niveaux ≈ ±1,3 %) : les colonnes cb_ couvrent vraiment ±2 %"
+  },
+  "liquidations-binance": {
+   "cote": "LONG = position longue liquidée (ordre SELL), SHORT = l'inverse",
+   "prix": "prix moyen d'exécution (ap), à défaut le prix de l'ordre (p)",
+   "qty_btc": "quantité exécutée cumulée (z), en BTC",
+   "usd": "qty_btc × prix",
+   "cadence": "aucune : un flux d'événements. Un fichier absent signifie « aucune liquidation », pas « collecteur arrêté »"
+  }
+ }
+}
