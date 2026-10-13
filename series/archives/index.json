@@ -1,12 +1,12 @@
 {
- "updated": "2026-10-13T14:19:14+00:00",
+ "updated": "2026-10-13T14:51:19+00:00",
  "generator": "publier_archives.py v1.0 — archives CSV (carnet et liquidations Binance)",
  "source": "carnet : Binance depth 5 000 niveaux + carnet complet Coinbase · liquidations : flux WebSocket Binance forceOrder",
  "branche": "historique",
  "repertoire": "series/archives",
  "status": {
-  "synchronisation": "rebasé",
-  "copie": "rien à copier"
+  "synchronisation": "à jour",
+  "copie": "2 fichier(s) copié(s)"
  },
  "errors": [],
  "series": {
@@ -42,11 +42,11 @@
    "fichiers": [
     "series/archives/carnet-2026-10.csv"
    ],
-   "lignes": 2,
-   "octets": 797,
+   "lignes": 9,
+   "octets": 2444,
    "periode": {
     "debut": "2026-10-13T14:16:45+00:00",
-    "fin": "2026-10-13T14:17:55+00:00"
+    "fin": "2026-10-13T14:49:48+00:00"
    },
    "cadence_s": 300
   },
@@ -59,10 +59,15 @@
     "qty_btc",
     "usd"
    ],
-   "fichiers": [],
-   "lignes": 0,
-   "octets": 0,
-   "periode": null,
+   "fichiers": [
+    "series/archives/liquidations-binance-2026-10.csv"
+   ],
+   "lignes": 1,
+   "octets": 82,
+   "periode": {
+    "debut": "2026-10-13T14:50:40+00:00",
+    "fin": "2026-10-13T14:50:40+00:00"
+   },
    "cadence_s": null
   }
  },
