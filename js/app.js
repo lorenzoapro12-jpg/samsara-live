@@ -4953,11 +4953,20 @@ function guideBandes(E) {
   ctx.restore();
 }
 
-/** L'explication d'un niveau (survol), dans les mots du mode. */
+/** L'explication d'un niveau (survol), dans les mots du mode. Chaque nombre y dit son usage (plan
+ *  du site, idée 8, 13/10/2026 : Guide.avecUsage) — le chiffre technique reste. */
 function guideTexteNiveau(L, exp) {
-  const R = L.niv.raisons, G = PARAM.guide, unite = guideUnite(), itv = Guide.nomIntervalle(chartInterval);
+  const R = L.niv.raisons, G = PARAM.guide, unite = guideUnite(), itv = Guide.nomIntervalle(chartInterval), m = exp ? 'expert' : 'debutant';
   const une = r => {
-    if (exp) return r.court + ' ' + Guide.prixR(r, unite) + ' — ' + r.nature + (r.lu ? ' · lu à ' + Fmt.jourHeure(r.lu) : '');
+    if (exp) {
+      // « S/R 1h 86 398 $ — mesuré · 6 demi-tours (ce qui en fait un niveau) » : le compte sort du
+      // nom court (« S/R ×6 1h ») pour dire à quoi il sert.
+      const sr = r.cle === 'sr' && isNum(r.touches);
+      return (sr ? r.court.replace(/ ×\d+/, '') : r.court) + ' ' + Guide.prixR(r, unite) + ' — ' + r.nature
+        + (sr ? ' · ' + Guide.avecUsage(r.touches + ' demi-tours', 'demiTours', m) : '')
+        + (isNum(r.btc) ? ' · ' + Guide.avecUsage(Fmt.nombre(r.btc, r.btc >= 10 ? 0 : 1) + ' BTC', 'quantite', m) : '')
+        + (r.lu ? ' · ' + Guide.avecUsage('lu à ' + Fmt.jourHeure(r.lu), 'releve', m) : '');
+    }
     let t = r.nom + ' (' + Guide.prixR(r, unite) + ') : ' + r.origine + ' — ' + r.nature + '.';
     // Un mur d'options est un prix d'exercice ; le zéro gamma, un prix calculé par le modèle. Le
     // taux est écrit à 4 décimales : la conversion affichée refait le prix placé.
@@ -4966,8 +4975,8 @@ function guideTexteNiveau(L, exp) {
     return t;
   };
   return R.map(une).concat([
-    exp ? 'Bande ± ' + Guide.prixRond(L.niv.demi, unite) + ' (' + frN(G.bandeAtr) + ' × ATR ' + G.atrPeriode + '). Cassure : 2 clôtures ' + itv + ' hors bande, ou 1 + retour réussi.'
-      : 'Bande de ± ' + Guide.prixRond(L.niv.demi, unite) + ' (' + frN(G.bandeAtr) + ' fois l’ATR ' + G.atrPeriode + ', l’écart moyen d’une bougie).',
+    exp ? Guide.avecUsage('Bande ± ' + Guide.prixRond(L.niv.demi, unite), 'bande', m) + ' = ' + frN(G.bandeAtr) + ' × ATR ' + G.atrPeriode + '. Cassure : 2 clôtures ' + itv + ' hors bande, ou 1 + retour réussi.'
+      : Guide.avecUsage('Bande de ± ' + Guide.prixRond(L.niv.demi, unite), 'bande', m) + ' (' + frN(G.bandeAtr) + ' fois l’ATR ' + G.atrPeriode + ', l’écart moyen d’une bougie).',
     exp ? '' : '« Cassé » : 2 clôtures ' + itv + ' de suite hors de la bande, ou 1 puis un retour réussi ; une mèche seule ne compte pas.'
       + (L.niv.raisons.some(r => r.lu) ? ' Pour un chiffre publié, seules les clôtures après sa lecture comptent.' : ''),
   ].filter(Boolean));
@@ -5219,13 +5228,14 @@ function guideChemins(E, top, bas, surBougies) {
   }
   ctx.font = chartFont(9, 600);
   // Les textes du survol.
-  const pc = Guide.pctParam(G.distanceMax);
-  const noms = (niv, rr) => rr.nom + ' ' + Guide.prixR(rr, unite) + Guide.tagLu(rr) + (niv.raisons.length > 1 ? ' — dans une bande de ' + niv.raisons.length + ' raisons' : '');
+  // Chaque nombre dit son usage (plan du site, idée 8) : l'heure de lecture, le rayon de recherche.
+  const pc = exp ? Guide.avecUsage(Guide.pctParam(G.distanceMax) + ' %', 'rayon', mode) : Guide.pctParam(G.distanceMax) + ' %';
+  const noms = (niv, rr) => rr.nom + ' ' + Guide.prixR(rr, unite) + Guide.tagLu(rr, 'usage') + (niv.raisons.length > 1 ? ' — dans une bande de ' + niv.raisons.length + ' raisons' : '');
   const dans = D.suite.dans ? ' Le prix est dans cette bande : les chemins partent de ses deux bords.' : '';
   const explication = c => {
     const ch = c.ch, sens = c.sens;
-    if (!ch) return 'Aucun niveau nommé à moins de ' + pc + ' % ' + (sens > 0 ? 'au-dessus' : 'au-dessous') + ' : pas de chemin de ce côté.';
-    if (exp) return 'Si clôture ' + itv + (sens > 0 ? ' > ' : ' < ') + 'seuil : ' + noms(ch.seuil, ch.rx) + '. ' + (ch.cible ? 'Niveau suivant : ' + noms(ch.cible, ch.ry) + '.' : 'Aucun autre niveau nommé à moins de ' + pc + ' %.');
+    if (!ch) return 'Aucun niveau nommé à moins de ' + pc + ' ' + (sens > 0 ? 'au-dessus' : 'au-dessous') + ' : pas de chemin de ce côté.';
+    if (exp) return 'Si clôture ' + itv + (sens > 0 ? ' > ' : ' < ') + 'seuil : ' + noms(ch.seuil, ch.rx) + '. ' + (ch.cible ? 'Niveau suivant : ' + noms(ch.cible, ch.ry) + '.' : 'Aucun autre niveau nommé à moins de ' + pc + '.');
     return 'Si une bougie ' + itv + ' clôture ' + (sens > 0 ? 'au-dessus de ' : 'sous ') + Guide.prixR(ch.rx, unite) + ' (' + noms(ch.seuil, ch.rx) + ') : '
       + (ch.cible ? 'niveau suivant ' + Guide.prixR(ch.ry, unite) + ' (' + noms(ch.cible, ch.ry) + ').' : 'aucun autre niveau proche.')
       + (c.horsS || c.horsC ? ' Le chemin sort en partie de la vue.' : '');
@@ -5711,7 +5721,7 @@ function guideTexteNiveauDebutant(L, E) {
   const seule = R.length === 1;
   if (Guide.optionsSeules(L.niv) && !seule) {
     const lu = Math.max(...R.map(r => (isNum(r.lu) ? r.lu : -Infinity)));
-    out.push('Une estimation, tirée des contrats d’options de la plateforme Deribit' + (isFinite(lu) ? ', relevée ' + Guide.ageLu(lu, now) : '') + '.');
+    out.push('Une estimation, tirée des contrats d’options de la plateforme Deribit.' + (isFinite(lu) ? ' ' + Guide.avecUsage('Relevée ' + Guide.ageLu(lu, now), 'releve', 'debutant') + '.' : ''));
   }
   for (const r of R) out.push(Guide.origineDebutant(r, E.unite, now, pas, seule));
   // Le « Haut des 24 h » du graphique (bougies, en direct) et celui de la carte des infos du marché
@@ -5725,7 +5735,8 @@ function guideTexteNiveauDebutant(L, E) {
   const pres = guidePresDebutant(L, E), rP = Guide.raisonPrincipale(L.niv), memePrix = r => !!rP && Guide.prixR(r, E.unite) === Guide.prixR(rP, E.unite);
   if (pres.length) out.push('Tout près : ' + pres.map(r => Guide.nomPhrase(r) + (memePrix(r) ? '' : ' (' + Guide.prixR(r, E.unite) + ')')).join(', ') + '.');
   out.push(Guide.texteSuiteDebutant(debChemin(L.niv, L.suivant, L.niv.dessus ? 1 : -1), E.unite, chartInterval, L.niv.dessus ? 1 : -1, now, true));
-  out.push('Bande de ± ' + Guide.prixRond(L.niv.demi, E.unite) + ' : le prix réagit rarement au dollar près.');
+  // La bande dit à quoi elle sert (plan du site, idée 8, 13/10/2026 : Guide.avecUsage).
+  out.push(Guide.avecUsage('Bande de ± ' + Guide.prixRond(L.niv.demi, E.unite), 'bande', 'debutant') + '.');
   out.push(Guide.AVERTISSEMENT);
   return out;
 }
@@ -6559,9 +6570,11 @@ function guideBulle(c, W, mainH, evite) {
     // L'état au prix live, en mots ; une bande faite d'options dit d'abord que c'est une estimation.
     if (c.niveau && c.niveau.live) texte.splice(c.optionsSeules ? 1 : 0, 0, Guide.texteEtatDebutant(c.niveau.live, c.niveau.niv, livePrice, guideUnite(), chartInterval));
   } else {
-    // Expert : l'état au prix live dans les mots de l'Expert, comme le titre et le corps de la bulle.
-    if (c.niveau && c.niveau.live) texte.unshift('Maintenant : ' + Guide.texteEtatLive(c.niveau.live, 'expert') + '.');
-    if (c.niveaux) for (const L of c.niveaux.slice().reverse()) if (L.live) texte.unshift(Guide.libelleNiveau(L.niv, 'expert', guideUnite(), true) + ' — maintenant : ' + Guide.texteEtatLive(L.live, 'expert') + '.');
+    // Expert : l'état au prix live dans les mots de l'Expert, comme le titre et le corps de la bulle ;
+    // l'écart en % dit ce qu'il mesure (idée 8) : ce qu'il reste avant le niveau, ou déjà au-delà.
+    const etatUsage = (e, niv) => (e && e.mot !== null ? Guide.avecUsage(Guide.texteEtatLive(e, 'expert'), Guide.cleEcart(e, niv, livePrice), 'expert') : Guide.texteEtatLive(e, 'expert'));
+    if (c.niveau && c.niveau.live) texte.unshift('Maintenant : ' + etatUsage(c.niveau.live, c.niveau.niv) + '.');
+    if (c.niveaux) for (const L of c.niveaux.slice().reverse()) if (L.live) texte.unshift(Guide.libelleNiveau(L.niv, 'expert', guideUnite(), true) + ' — maintenant : ' + etatUsage(L.live, L.niv) + '.');
   }
   const bw = Math.min(330, W - 32);
   // Débutant sur téléphone : la bulle est le seul endroit du détail — un corps de 12 px (titre

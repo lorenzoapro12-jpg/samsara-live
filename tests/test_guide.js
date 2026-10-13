@@ -518,10 +518,14 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     && G.raisonPrincipale(N(Rd('call_wall', 87000, { strike: 87000 }))).cle === 'call_wall' && G.raisonPrincipale(null) === null, [G.raisonPrincipale(nOpt).cle, G.raisonPrincipale(nDeux).cle]);
   check('choixDebutant : une bande faite seulement d’options passe après une mesure du même côté', G.choixDebutant({ dessus: [N(Rd('call_wall', 86500, { strike: 86500 })), N(Rd('hier_haut', 86700))], dessous: [] }).dessus.raisons[0].cle === 'hier_haut'
     && G.choixDebutant({ dessus: [N(Rd('call_wall', 86500, { strike: 86500 }))], dessous: [] }).dessus.raisons[0].cle === 'call_wall' && G.choixDebutant(null).dessus === null);
-  // La bulle d'un repère dit l'écart en dollars, sans « % » (le Lisible n'en montre aucun).
+  // La bulle d'un repère dit l'écart en dollars, sans « % » (le Lisible n'en montre aucun). Plan du
+  // site, idée 8 (13/10/2026) : l'écart, dans une phrase à lui, dit à quoi il sert — ce qu'il reste
+  // avant ce repère, ou l'écart déjà fait au-delà quand le prix l'a passé (il finissait par « au-dessus. »).
   const nE = { p: 85640, demi: 40, dessus: true, pMin: 85600, pMax: 85680, raisons: [Rd('hier_haut', 85640)] }, PL = dansPage('PARAM.guide');
   const etats = [85300, 85500, 85660, 86000, 88000].map(live => G.texteEtatDebutant(G.etatLive(nE, live, null, PL), nE, live, '$', '1h'));
-  check('bulle d’un repère, « Maintenant : … » : l’écart en dollars, aucun « % »', etats.every(x => /^Maintenant : /.test(x) && !/%/.test(x)) && etats.some(x => /\$ (au-dessus|en dessous)\.$/.test(x)), etats);
+  check('bulle d’un repère, « Maintenant : … » : l’écart en dollars, aucun « % » ; avant le repère « 340 $ au-dessus : ce qu’il reste avant ce repère », passé « 360 $ en dessous : l’écart déjà fait au-delà », dedans sans écart',
+    etats.every(x => /^Maintenant : /.test(x) && !/%/.test(x)) && /\. 340 \$ au-dessus : ce qu’il reste avant ce repère\.$/.test(etats[0]) && etats[2] === 'Maintenant : le prix est dedans.'
+    && /\. 360 \$ en dessous : l’écart déjà fait au-delà\.$/.test(etats[3]) && /\. 2 360 \$ en dessous : l’écart déjà fait au-delà\.$/.test(etats[4]), etats);
   // 2 bis. Les repères du Débutant, choisis au prix LIVE (constat de revue : une bande fusionnée qui
   // enjambait le prix nommait « au-dessus » un prix situé en dessous).
   {
@@ -653,23 +657,76 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     check('… toujours l’objectif théorique (« non garanti », jamais « cible ») avec le bilan mesuré, l’annulation dite pour les doubles, jamais « vise », aucun mot banni, aucun conseil, « pas une prévision ni un conseil »',
       ec.every(x => /Mesuré sur/.test(x) && /objectifs? théoriques? selon l’usage des analystes : \d/.test(x) && /non garantis?/.test(x) && !/cible/i.test(x) && !/vise/.test(x) && !G.motsBannis(x).length && !CONSEIL.test(x.replace('pas une prévision ni un conseil', '')) && /pas une prévision ni un conseil/.test(x))
       && /Annulée si le prix finit un quart d’heure au-dessus de 86 400 \$/.test(ec[0]) && /Annulée si le prix finit une heure sous 81 900 \$/.test(ec[1]), ec.map(x => [x, G.motsBannis(x)]));
+    // Plan du site, idée 8 (13/10/2026) : l'objectif dit sur quoi il se calcule (hauteur, ou largeur
+    // pour une figure à deux droites) ; le reste de ces bulles (lot 1) est inchangé.
+    check('… l’objectif dit sur quoi il se calcule : « 85 000 $ (la hauteur de la figure, reportée) », rectangle « (la largeur de la figure, reportée) »',
+      /selon l’usage des analystes : 85 000 \$ \(la hauteur de la figure, reportée\), non garanti/.test(ec[0]) && /\(la largeur de la figure, reportée\), non garantis/.test(ec[2]), [ec[0], ec[2]]);
   }
   // 5. La suite, en une phrase : « Si le prix finit un quart d'heure au-dessus de … ».
   const s2 = G.suite({ dessus: [N(Rd('hier_haut', 86398)), N(Rd('mur_vente', 86700, { lu: Date.parse('2026-10-08T22:51:00Z') }))], dessous: [bas] }, 86012.5);
   const sh = t(G.texteSuiteDebutant(s2.haut, '$', '15m', 1, Date.parse('2026-10-08T22:52:00Z'))), sb = t(G.texteSuiteDebutant(s2.bas, '$', '4h', -1)), sv = t(G.texteSuiteDebutant(null, '$', '15m', 1));
-  check('suite : « Si le prix finit un quart d’heure au-dessus de 86 398 $ (plus haut d’hier) : prochain repère 86 700 $ (mur de vente, relevé il y a 1 min). »',
-    sh === 'Si le prix finit un quart d’heure au-dessus de 86 398 $ (plus haut d’hier) : prochain repère 86 700 $ (mur de vente, relevé il y a 1 min).', sh);
+  // Plan du site, idée 8 (13/10/2026) : l'âge d'un chiffre publié dans une phrase à lui, qui dit à
+  // quoi il sert (il était entre parenthèses : « (mur de vente, relevé il y a 1 min) »).
+  check('suite : « Si le prix finit un quart d’heure au-dessus de 86 398 $ (plus haut d’hier) : prochain repère 86 700 $ (mur de vente). Mur de vente relevé il y a 1 min : l’âge de ce chiffre. »',
+    sh === 'Si le prix finit un quart d’heure au-dessus de 86 398 $ (plus haut d’hier) : prochain repère 86 700 $ (mur de vente). Mur de vente relevé il y a 1 min : l’âge de ce chiffre.', sh);
   // Un chiffre publié il y a moins d'une minute : pas de « relevé il y a 0 min » (rien de plus à dire).
   const s0 = t(G.texteSuiteDebutant(s2.haut, '$', '15m', 1, Date.parse('2026-10-08T22:51:30Z')));
   check('suite : un chiffre publié il y a moins d’une minute ne dit pas « il y a 0 min »', s0 === 'Si le prix finit un quart d’heure au-dessus de 86 398 $ (plus haut d’hier) : prochain repère 86 700 $ (mur de vente).', s0);
   // Dans la bulle du repère lui-même (seuilDit) : son nom et son prix sont dans le titre, pas redits.
   const sd = t(G.texteSuiteDebutant(s2.haut, '$', '15m', 1, Date.parse('2026-10-08T22:52:00Z'), true));
-  check('suite, bulle du repère : la condition sans redire le repère du titre', sd === 'Si le prix finit un quart d’heure au-dessus : prochain repère 86 700 $ (mur de vente, relevé il y a 1 min).', sd);
+  check('suite, bulle du repère : la condition sans redire le repère du titre', sd === 'Si le prix finit un quart d’heure au-dessus : prochain repère 86 700 $ (mur de vente). Mur de vente relevé il y a 1 min : l’âge de ce chiffre.', sd);
   check('suite : la durée suit l’intervalle (« une tranche de 4 h ») ; sans repère suivant, dit ; côté vide, dit', /^Si le prix finit une tranche de 4 h sous 85 900 \$ \(mur d’achat\) : aucun autre repère proche\.$/.test(sb)
     && sv === 'Aucun repère proche au-dessus.', [sb, sv]);
   check('suite et forme : aucun mot banni, aucun conseil', ![sh, sb, sv].concat(fo.map(f => f[1] || '')).some(x => G.motsBannis(x).length || CONSEIL.test(x)));
   // 6. Les écarts en dollars : à l'unité près dès 10 $.
   check('prixRond : « 84 $ » (pas « 83,57 $ »), « 24 $ », « 3,50 $ » sous 10 $', G.prixRond(83.57) === '84 $' && G.prixRond(-24) === '24 $' && G.prixRond(3.5) === '3,50 $', [G.prixRond(83.57), G.prixRond(-24), G.prixRond(3.5)]);
+}
+
+// ── 7 ter. À quoi sert chaque chiffre des bulles (plan du site, idée 8, 13/10/2026) ──
+// Demande de Lorenzo : dans le DÉTAIL d'une bulle (2e toucher), chaque nombre dit ce qu'il mesure et
+// à quoi il sert (« 264 $ au-dessus : ce qu'il reste avant ce repère »). Une table pure
+// (Guide.USAGES_CHIFFRES), lue par les bulles des repères (Lisible et Complet), la phrase,
+// « Et ensuite ? » et les figures. Le résumé (4 lignes, 3 nombres) ne change pas.
+titre('7 ter. Bulles : chaque chiffre dit ce qu’il mesure et à quoi il sert');
+{
+  const U = G.USAGES_CHIFFRES, mots = x => x.split(/\s+/).filter(w => /[\p{L}\d]/u.test(w)).length;
+  const malU = Object.entries(U).filter(([, u]) => !u.debutant || !u.expert || G.motsBannis(u.debutant).length || /[%\d]/.test(u.debutant + u.expert) || CONSEIL.test(u.debutant + ' ' + u.expert) || mots(u.debutant) > 12);
+  check(`la table des usages (${Object.keys(U).length} chiffres) : un mot pour le Lisible et un pour le Complet ; en Lisible aucun mot banni ; nulle part un %, un chiffre ni un conseil`,
+    Object.keys(U).length >= 10 && !malU.length && ['distance', 'auDela', 'releve', 'bande', 'demiTours', 'quantite', 'cas', 'objectif'].every(k => k in U), malU);
+  check('avecUsage : « 264 $ au-dessus : ce qu’il reste avant ce repère » (Lisible), « 0,31 % live (reste avant le niveau) » (Complet) ; une clé inconnue laisse le chiffre seul',
+    G.avecUsage('264 $ au-dessus', 'distance', 'debutant') === '264 $ au-dessus : ce qu’il reste avant ce repère' && G.avecUsage('0,31 % live', 'distance', 'expert') === '0,31 % live (reste avant le niveau)'
+    && G.avecUsage('12', 'inconnu', 'debutant') === '12' && G.usageChiffre('bande', 'debutant') === 'la marge où l’on dit que le prix touche le repère');
+  // L'origine d'un repère (bulle du Lisible) : chaque nombre dans une phrase à lui, avec son usage.
+  const T0 = Date.parse('2026-10-08T22:51:00Z'), apres3 = T0 + 3 * 60000;
+  const Rd = (cle, p, extra) => Object.assign({ cle, p, nom: cle, court: cle, art: 'le ' + cle, origine: '', nature: 'mesuré', detail: '', detailCourt: '' }, extra || {});
+  const mur = t(G.origineDebutant(Rd('mur_vente', 86700, { btc: 44, lu: T0 }), '$', apres3, 900));
+  const zone = t(G.origineDebutant(Rd('sr', 85600, { touches: 4, bougies: 96 }), '$', apres3, 900));
+  const opt = t(G.origineDebutant(Rd('put_wall', 85600, { strike: 85600, lu: T0, nature: 'modèle' }), '$', apres3, 900, true));
+  check('mur : « 44 BTC : ce qui attend à ce prix. Relevé il y a 3 min (…) : l’âge de ce chiffre ; les ordres ont pu bouger. »',
+    /^Mur de vente \(86 700 \$\) : le plus d’ordres de vente en attente chez Binance\. 44 BTC : ce qui attend à ce prix\. Relevé il y a 3 min.* : l’âge de ce chiffre ; les ordres ont pu bouger\.$/.test(mur), mur);
+  check('zone de retour : « 4 demi-tours : ce qui en fait un repère. »', /^Zone de retour \(85 600 \$\) : le prix a fait demi-tour ici ces .+\. 4 demi-tours : ce qui en fait un repère\.$/.test(zone), zone);
+  check('options : « Relevée il y a 3 min (…) : l’âge de ce chiffre. Un calcul, pas une mesure. »', /\. Relevée il y a 3 min.* : l’âge de ce chiffre\. Un calcul, pas une mesure\.$/.test(opt), opt);
+  const usagesL = [mur, zone, opt].concat(etatsUsage()).join(' ').split(/(?<=[.;])\s+/).filter(x => / : (ce qu|l’|la marge|ce qui)/.test(x));
+  check('ces phrases d’usage (Lisible) : 15 mots au plus, aucun mot banni, aucun %, aucun conseil', usagesL.length >= 5 && usagesL.every(x => mots(x) <= 15 && !G.motsBannis(x).length && !/%/.test(x) && !CONSEIL.test(x)),
+    usagesL.map(x => [mots(x), x]));
+  function etatsUsage() {
+    const n = { p: 85640, demi: 40, dessus: true, pMin: 85600, pMax: 85680, raisons: [Rd('hier_haut', 85640)] };
+    return [85300, 88000].map(live => G.texteEtatDebutant(G.etatLive(n, live, null, P), n, live, '$', '1h').replace(/^Maintenant : [^.]+\. /, ''));
+  }
+  // Complet : le chiffre technique reste, avec son mot d'usage (bulle d'un niveau, « Et ensuite ? »).
+  const pubU = G.niveauxPublies({ updated: '2026-10-08T22:51:00Z', liquidity: { snapshot_at: '2026-10-08T22:51:00Z', wall_bin_usd: 20, ask_walls: [[86690, 44]] }, micro: {} });
+  const srU = G.niveauxSR([{ price: 85600, touches: 4, tf: '1h' }], P, { bougies: 500 });
+  vm.runInContext('__usage = ' + JSON.stringify(pubU.concat(srU)), page.sandbox);
+  const nivC = dansPage('guideTexteNiveau({ niv: { raisons: __usage, demi: 120 } }, true)');
+  nivC.forEach(t);
+  check(`Complet, bulle d’un niveau : « ${nivC[0]} » ; « ${nivC[1]} » ; la bande dit sa marge`,
+    /^Mur ask 86 700 \$ — mesuré · 44 BTC \(quantité posée au relevé\) · lu à .+ \(âge du chiffre\)$/.test(nivC[0]) && /^S\/R 1 h 85 600 \$ — mesuré · 4 demi-tours \(ce qui en fait un niveau\)$/.test(nivC[1])
+    && /^Bande ± 120 \$ \(marge où le niveau compte comme touché\) = .+ × ATR \d+\. Cassure : /.test(nivC[2]), nivC);
+  check('Complet, l’heure de lecture dans « Et ensuite ? » : « (lu à hh:mm, âge du chiffre) »', /^ \(lu à \d\d:\d\d, âge du chiffre\)$/.test(G.tagLu(pubU[0], 'usage')), G.tagLu(pubU[0], 'usage'));
+  // Figures : l'objectif dit sur quoi il se calcule ; le nombre de cas, où il est compté.
+  check('figure (Lisible) : « (8 cas sur ce graphique) » ; Complet : « obj. 3/8 (atteint / issues connues) »',
+    /\(8 cas sur ce graphique\)\.$/.test(G.texteEcart({ atteints: 3, invalides: 3, expires: 2, ecart: 'pareil' }))
+    && /obj\. 3\/8 \(atteint \/ issues connues\)/.test(G.texteBilan({ type: 'double_sommet', formes: 9, confirmes: 8, atteints: 3, invalides: 3, expires: 2, haut: 1, bas: 2 }, { n: 1000, intervalle: '15m', duree: 5 * 86400 }, P, 'expertCompact')));
 }
 
 // ── 7 bis. En résumé ──

@@ -442,9 +442,11 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
           if (tactile) check(`${nom} : ${role}${k ? ' ' + (k + 1) : ''} : bulle en ${r.police} px (au moins 12 au téléphone), entière dans le tracé`, r.police >= 12 && r.dansTrace, r);
           const ok = { titre: !!r.titre, ohlcv: !r.ohlcv, curseur: tactile || r.curseur === 'pointer', mots: bannisBulle(r.corps + ' ' + r.titre), conseil: CONSEIL.test(r.corps), hasard: /hasard/i.test(r.corps) };
           let detail = true;
-          // L'écart au prix en dollars (« 340 $ au-dessus. »), sans « % » : en Lisible, un pourcentage
-          // se lirait comme une chance, et l'écart en dollars le dit déjà.
-          if (role === 'niveau') detail = /^Maintenant : /.test(r.corps) && /\d\s\$\s(?:au-dessus|en dessous)\.|le prix est dedans/.test(r.corps) && !/%/.test(r.corps) && /Si le prix finit|Aucun repère proche/.test(r.corps)
+          // L'écart au prix en dollars, sans « % » : en Lisible, un pourcentage se lirait comme une
+          // chance, et l'écart en dollars le dit déjà. Plan du site, idée 8 (13/10/2026) : l'écart dit à
+          // quoi il sert (« 340 $ au-dessus : ce qu’il reste avant ce repère. ») et la bande aussi.
+          if (role === 'niveau') detail = /^Maintenant : /.test(r.corps) && /\d\s\$\s(?:au-dessus|en dessous) : (?:ce qu’il reste avant ce repère|l’écart déjà fait au-delà)\.|le prix est dedans/.test(r.corps) && !/%/.test(r.corps) && /Si le prix finit|Aucun repère proche/.test(r.corps)
+            && /Bande de ± [\d\s,]+\$ : la marge où l’on dit que le prix touche le repère\./.test(r.corps)
             // Le titre : le nom entier du repère et le prix de son libellé.
             && nombres(r.vise).filter(x => x.length >= 4).every(x => nombres(r.titre).includes(x)) && / · \d/.test(r.titre);
           if (role === 'phrase') detail = (r.corps.match(/Si le prix finit|Aucun repère proche/g) || []).length >= 2;
@@ -474,7 +476,9 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
               if (tactile) await o.page.evaluate(() => { crossX = crossY = null; dessinerCalque(); });
               const k2 = (await o.page.evaluate(() => debEtat.items.filter(i => i.role === 'niveau').map(i => i.texte))).findIndex(t => pub.includes(t));
               const r2 = await viser(o, 'niveau', tactile, k2);
-              check(`${nom} : la bulle d'un repère publié dit son âge ou son heure (« relevé il y a … » ; « relevé à hh:mm » sous une minute)`, r2 && /relevée? (il y a \d+ min|à \d\d:\d\d)/.test(r2.corps), r2);
+              // Idée 8 : l'âge dans une phrase à lui (« Relevé il y a 3 min : l’âge de ce chiffre »).
+              check(`${nom} : la bulle d'un repère publié dit son âge ou son heure (« relevé il y a … » ; « relevé à hh:mm » sous une minute), et à quoi il sert (« l’âge de ce chiffre »)`,
+                r2 && /[Rr]elevée? (il y a \d+ min|à \d\d:\d\d)[^.;]* : l’âge de ce chiffre/.test(r2.corps), r2);
               if (tactile) await quitter(o, tactile, r2 ? 0 : 0, 0);
             }
           }
@@ -627,9 +631,10 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       check('4 h : « Double sommet validé » posé, au plus 5 textes', roles.includes('forme') && r.items.length <= 5 && r.base === 'Double sommet validé'
         && r.items.some(i => i.role === 'forme' && r.possibles.includes(i.texte)), { base: r.base, items: r.items });
       if (roles.includes('scenario')) check('4 h : forme + scénario 1 posés → la ligne des scénarios cède ; sa bulle passe dans celle du libellé « Scénario 1 »', r.cede && !roles.includes('boite') && /La ligne des scénarios/.test(r.un), r);
-      // (Amendement E4, puis plan du 13/10/2026 : « objectif théorique selon l'usage des analystes : X, non garanti ».)
-      check('4 h : la bulle de la forme la définit, dit son bilan (« Mesuré sur », « fois sur ») avec l’objectif théorique, et « pas une prévision ni un conseil »',
-        r.forme && /^Double sommet : /.test(r.forme.texte) && /Mesuré sur/.test(r.forme.texte) && /fois sur/.test(r.forme.texte) && /[Oo]bjectif théorique selon l’usage des analystes : \d[\d  ]* \$, non garanti/.test(r.forme.texte) && /pas une prévision ni un conseil/.test(r.forme.texte) && !bannisBulle(r.forme.texte).length, r.forme);
+      // (Amendement E4, puis plan du 13/10/2026 : « objectif théorique selon l'usage des analystes : X, non garanti » ;
+      // idée 8 du même plan : l'objectif dit sur quoi il se calcule, « X (la hauteur de la figure, reportée) ».)
+      check('4 h : la bulle de la forme la définit, dit son bilan (« Mesuré sur », « fois sur ») avec l’objectif théorique et ce sur quoi il se calcule, et « pas une prévision ni un conseil »',
+        r.forme && /^Double sommet : /.test(r.forme.texte) && /Mesuré sur/.test(r.forme.texte) && /fois sur/.test(r.forme.texte) && /[Oo]bjectif théorique selon l’usage des analystes : \d[\d  ]* \$ \(la hauteur de la figure, reportée\), non garanti/.test(r.forme.texte) && /pas une prévision ni un conseil/.test(r.forme.texte) && !bannisBulle(r.forme.texte).length, r.forme);
       const e = await dessin(o.page);
       check('4 h : la ligne des scénarios renvoie au suivi en 15 min ou 1 h (quand elle est posée)', !e.items.some(i => i.role === 'boite') || e.items.some(i => /à voir en 15 min ou 1 h/.test(i.texte)), e.items);
       await o.page.evaluate(() => window.__retablir());

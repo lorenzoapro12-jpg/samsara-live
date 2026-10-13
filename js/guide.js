@@ -108,6 +108,8 @@ const Guide = (function () {
     const m = r.nature === 'modèle', h = heureVue(r.lu);
     if (forme === 'phrase') return (m ? ', modèle,' : '') + ' lu à ' + h;
     if (forme === 'expert') return ' (' + (m ? 'modèle · ' : '') + h + ')';
+    // Dans une bulle du Complet : l'heure et son usage (idée 8, 13/10/2026).
+    if (forme === 'usage') return ' (' + (m ? 'modèle, ' : '') + 'lu à ' + h + ', ' + usageChiffre('releve', 'expert') + ')';
     return ' (' + (m ? 'modèle, ' : '') + 'lu à ' + h + ')';
   }
   /** L'heure collée au NOMBRE (formes étroites) : « 20:33 », « modèle 20:18 » ; rien si non publiée. */
@@ -1538,7 +1540,7 @@ const Guide = (function () {
     if (mode === 'expertCompact') {
       // La bulle (charte du 12/10/2026) : les comptes qui servent à lire ; tout le détail (ébauches,
       // repère sans forme, invalidées, sans issue) est dans les statistiques de la figure (▸).
-      const obj = finis ? ' · obj. ' + b.atteints + '/' + finis : '';
+      const obj = finis ? ' · ' + avecUsage('obj. ' + b.atteints + '/' + finis, 'issues', 'expert') : '';
       return 'Mesuré · hist. ' + d + ' : ' + (lignesF ? b.formes + ' repérées · sorties ↑ ' + b.haut + ' / ↓ ' + b.bas : b.formes + ' repérés · ' + b.confirmes + ' valid.') + obj + (faible ? ' · éch. faible' : '');
     }
     if (mode === 'expert') {
@@ -1883,6 +1885,47 @@ const Guide = (function () {
   }
   // Un écart en dollars se lit à l'unité près (« 84 $ », pas « 83,57 $ ») dès 10 $.
   const prixRond = (v, unite) => (Math.abs(v) >= ((unite || '$') === '$' ? 10 : 100) ? nombre(Math.round(Math.abs(v)), 0) + ' ' + (unite || '$') : prix(Math.abs(v), unite));
+  // ─── À quoi sert chaque chiffre d'une bulle (plan du site, idée 8, 13/10/2026) ───
+  // Demande de Lorenzo : dans le DÉTAIL d'une bulle (2e toucher), chaque nombre dit ce qu'il mesure
+  // et à quoi il sert — « 264 $ au-dessus : ce qu'il reste avant ce repère ». UNE table, lue par les
+  // bulles des repères (Lisible et Complet), la bulle de la phrase, « Et ensuite ? » et les figures.
+  // Le résumé (1er toucher : 4 lignes, 3 nombres) ne change pas. En Lisible, des mots simples (aucun
+  // mot banni, aucun %) ; en Complet, le chiffre technique reste et prend son mot d'usage.
+  const USAGES_CHIFFRES = {
+    distance: { debutant: 'ce qu’il reste avant ce repère', expert: 'reste avant le niveau' },
+    auDela: { debutant: 'l’écart déjà fait au-delà', expert: 'déjà au-delà' },
+    dedans: { debutant: 'l’écart au prix du repère', expert: 'écart au prix du niveau' },
+    releve: { debutant: 'l’âge de ce chiffre', expert: 'âge du chiffre' },
+    bande: { debutant: 'la marge où l’on dit que le prix touche le repère', expert: 'marge où le niveau compte comme touché' },
+    demiTours: { debutant: 'ce qui en fait un repère', expert: 'ce qui en fait un niveau' },
+    quantite: { debutant: 'ce qui attend à ce prix', expert: 'quantité posée au relevé' },
+    rayon: { debutant: 'jusqu’où l’on cherche des repères', expert: 'rayon de recherche des niveaux' },
+    objectif: { debutant: 'la hauteur de la figure, reportée', expert: 'hauteur de la figure reportée' },
+    objectifLargeur: { debutant: 'la largeur de la figure, reportée', expert: 'largeur de la figure reportée' },
+    objectifMat: { debutant: 'la longueur du mât, reportée', expert: 'longueur du mât reportée' },
+    cas: { debutant: 'sur ce graphique', expert: 'sur l’historique chargé' },
+    issues: { debutant: 'objectif atteint, sur les cas finis', expert: 'atteint / issues connues' },
+  };
+  /** Le mot d'usage d'un chiffre (clé de USAGES_CHIFFRES), dans les mots du mode ; '' si inconnu. */
+  function usageChiffre(cle, mode) {
+    const u = USAGES_CHIFFRES[cle];
+    return u ? u[mode === 'expert' ? 'expert' : 'debutant'] || '' : '';
+  }
+  /** Un chiffre suivi de son usage : « 264 $ au-dessus : ce qu'il reste avant ce repère » (Lisible),
+   *  « 0,31 % live (reste avant le niveau) » (Complet). */
+  function avecUsage(t, cle, mode) {
+    const u = usageChiffre(cle, mode);
+    return !u ? t : mode === 'expert' ? t + ' (' + u + ')' : t + ' : ' + u;
+  }
+  /** L'usage de l'écart entre le prix live et un repère (e : etatLive) : ce qu'il reste avant lui ;
+   *  l'écart déjà fait au-delà (le prix l'a passé) ; l'écart à son prix (le prix est dans sa bande). */
+  function cleEcart(e, niv, live) {
+    if (e && e.mot === 'test') return 'dedans';
+    if (!niv || !fini(live) || typeof niv.dessus !== 'boolean') return 'distance';
+    return (niv.dessus ? live > niv.p : live < niv.p) ? 'auDela' : 'distance';
+  }
+  /** L'objectif d'une figure se calcule sur sa hauteur, sa largeur (deux droites) ou son mât. */
+  const cleObjectif = f => (famille(f) === 'drapeau' ? 'objectifMat' : famille(f) === 'lignes' ? 'objectifLargeur' : 'objectif');
   /** La phrase de lecture, ses variantes de la plus riche à la plus courte (la dernière est la
    *  forme COMPACTE). o = { prix (live), unite, choix, enTest (bande où est le prix, ou null),
    *  regime, maintenant (la vue montre le passé), itv (« 15m ») }. Jamais de %, d'heure, ni de nom
@@ -1969,11 +2012,14 @@ const Guide = (function () {
     const up = ch ? ch.sens > 0 : sens > 0, per = periode(itv);
     if (!ch) return 'Aucun repère proche ' + (up ? 'au-dessus' : 'en dessous') + '.';
     const rx = ch.rx || bord(ch.seuil, up), ry = ch.ry || (ch.cible ? bord(ch.cible, !up) : null);
-    // L'âge d'un chiffre publié, seulement s'il a au moins une minute (« relevé il y a 0 min » ne dit rien).
-    const de = r => ' (' + nomPhrase(r) + (fini(r.lu) && !(fini(maintenant) && maintenant - r.lu < 60000) ? ', relevé ' + ageDebutant(r.lu, maintenant, true) : '') + ')';
-    // seuilDit : la bulle de ce repère (son nom et son prix sont dans le titre).
+    const de = r => ' (' + nomPhrase(r) + ')';
+    // L'âge d'un chiffre publié, seulement s'il a au moins une minute (« relevé il y a 0 min » ne dit
+    // rien) : une phrase à lui, qui dit à quoi il sert (idée 8, 13/10/2026).
+    const age = r => (r && fini(r.lu) && !(fini(maintenant) && maintenant - r.lu < 60000)
+      ? ' ' + avecUsage(majuscule(nomPhrase(r)) + ' relevé ' + ageDebutant(r.lu, maintenant, true), 'releve', 'debutant') + '.' : '');
+    // seuilDit : la bulle de ce repère (son nom et son prix sont dans le titre, son âge dans la bulle).
     return 'Si le prix finit ' + per[0] + (seuilDit ? (up ? ' au-dessus' : ' en dessous') : (up ? ' au-dessus de ' : ' sous ') + prixR(rx, unite) + de(rx)) + ' : '
-      + (ry ? 'prochain repère ' + prixR(ry, unite) + de(ry) + '.' : 'aucun autre repère proche.');
+      + (ry ? 'prochain repère ' + prixR(ry, unite) + de(ry) + '.' : 'aucun autre repère proche.') + (seuilDit ? '' : age(rx)) + age(ry);
   }
   /** L'état d'un repère au prix live, en mots (bulle). */
   const ETATS_DEBUTANT = {
@@ -1985,13 +2031,16 @@ const Guide = (function () {
     valide: p => 'franchi et validé (' + p[1] + ' finis au-delà)',
     valideRetour: () => 'franchi, revenu le toucher, puis reparti : validé',
   };
-  /** « Maintenant : proche du prix, 264 $ au-dessus. » e : etatLive ; live : le prix. Pas de « % » :
-   *  le Lisible n'en montre aucun, et l'écart en dollars le dit déjà. */
+  /** « Maintenant : proche du prix. 264 $ au-dessus : ce qu'il reste avant ce repère. » e : etatLive ;
+   *  live : le prix. Pas de « % » : le Lisible n'en montre aucun, et l'écart en dollars le dit déjà.
+   *  L'écart dit à quoi il sert (idée 8) : ce qu'il reste avant le repère, ou l'écart déjà fait
+   *  au-delà quand le prix l'a passé. */
   function texteEtatDebutant(e, niv, live, unite, itv) {
     if (!e || e.mot === null || !fini(live) || !niv) return 'Maintenant : prix en direct indisponible, distance inconnue.';
     const f = ETATS_DEBUTANT[e.mot], d = niv.p - live;
-    const dist = e.mot === 'test' ? '' : ', ' + prixRond(d, unite) + (d > 0 ? ' au-dessus' : ' en dessous');
-    return 'Maintenant : ' + (f ? f(periode(itv)) : e.mot) + dist + '.';
+    const etat = 'Maintenant : ' + (f ? f(periode(itv)) : e.mot) + '.';
+    if (e.mot === 'test') return etat;
+    return etat + ' ' + avecUsage(prixRond(d, unite) + (d > 0 ? ' au-dessus' : ' en dessous'), cleEcart(e, niv, live), 'debutant') + '.';
   }
   /** Le résumé d'un repère (bulle du Débutant, 1er toucher) : ce que c'est, en mots, sans chiffre
    *  (le prix est dans le titre). Le détail (âge, quantités, chemin, bande) vient au 2e toucher. */
@@ -2034,9 +2083,10 @@ const Guide = (function () {
   function origineDebutant(r, unite, maintenant, pasS, sansNom) {
     // sansNom : le nom et le prix sont déjà dans le titre de la bulle (une seule raison) : pas redits.
     const n = sansNom ? '' : nomsDebutant(r)[0] + ' (' + prixR(r, unite) + ') : ';
-    const age = fini(r.lu) ? ', relevée ' + ageLu(r.lu, maintenant) : '';
+    // Chaque nombre dans une phrase à lui, avec ce qu'il mesure et à quoi il sert (idée 8, 13/10/2026).
+    const releve = mot => (fini(r.lu) ? ' ' + avecUsage(mot + ' ' + ageLu(r.lu, maintenant), 'releve', 'debutant') : '');
     const fin = t => (sansNom ? majuscule(t) : n + t);
-    if (estOption(r)) return fin('une estimation, tirée des contrats d’options de la plateforme Deribit (des contrats sur le prix futur du BTC)' + age + '. Un calcul, pas une mesure.');
+    if (estOption(r)) return fin('une estimation, tirée des contrats d’options de la plateforme Deribit (des contrats sur le prix futur du BTC).') + (fini(r.lu) ? releve('Relevée') + '.' : '') + ' Un calcul, pas une mesure.';
     switch (r.cle) {
       case 'hier_haut': return fin('le prix le plus haut atteint hier.');
       case 'hier_bas': return fin('le prix le plus bas atteint hier.');
@@ -2044,10 +2094,13 @@ const Guide = (function () {
       case 'sem_bas': return fin('le prix le plus bas de la semaine dernière.');
       case 'h24_haut': return fin('le prix le plus haut des dernières 24 heures.');
       case 'h24_bas': return fin('le prix le plus bas des dernières 24 heures.');
-      case 'sr': { const d = fini(r.bougies) && fini(pasS) ? dernieres(r.bougies * pasS) : null; return fin((r.touches || '') + ' fois, le prix a fait demi-tour ici' + (d ? ' ces ' + d : '') + '.'); }
+      case 'sr': {
+        const d = fini(r.bougies) && fini(pasS) ? dernieres(r.bougies * pasS) : null;
+        return fin('le prix a fait demi-tour ici' + (d ? ' ces ' + d : '') + '.') + (fini(r.touches) ? ' ' + avecUsage(r.touches + ' demi-tours', 'demiTours', 'debutant') + '.' : '');
+      }
       case 'mur_achat': case 'mur_vente': {
-        const q = fini(r.btc) ? ' (' + nombre(r.btc, r.btc >= 10 ? 0 : 1) + ' BTC)' : '';
-        return fin('le plus d’ordres ' + (r.cle === 'mur_achat' ? 'd’achat' : 'de vente') + ' en attente chez Binance' + q + (fini(r.lu) ? ', relevé ' + ageLu(r.lu, maintenant) : '') + ' : ils ont pu bouger.');
+        const q = fini(r.btc) ? ' ' + avecUsage(nombre(r.btc, r.btc >= 10 ? 0 : 1) + ' BTC', 'quantite', 'debutant') + '.' : '';
+        return fin('le plus d’ordres ' + (r.cle === 'mur_achat' ? 'd’achat' : 'de vente') + ' en attente chez Binance.') + q + (fini(r.lu) ? releve('Relevé') + ' ; les ordres ont pu bouger.' : '');
       }
       default: return fin(minuscule(r.nom) + '.');
     }
@@ -2285,7 +2338,8 @@ const Guide = (function () {
    *  théorique — toujours ensemble. */
   function niveauxDebutant(f, ctx, P, unite) {
     const N = niveauxFigure(f, ctx && fini(ctx.j) ? ctx.j : (ctx && ctx.n) || 0, P), per = periode(ctx && ctx.intervalle), fam = famille(f), out = [];
-    const cible = (o, plur) => 'objectif' + (plur ? 's' : '') + ' théorique' + (plur ? 's' : '') + ' selon l’usage des analystes : ' + o + ', non garanti' + (plur ? 's' : '');
+    // L'objectif dit sur quoi il se calcule (idée 8 : chaque chiffre dit son usage).
+    const cible = (o, plur) => 'objectif' + (plur ? 's' : '') + ' théorique' + (plur ? 's' : '') + ' selon l’usage des analystes : ' + o + ' (' + usageChiffre(cleObjectif(f), 'debutant') + '), non garanti' + (plur ? 's' : '');
     const pente = fam === 'lignes' && f.type !== 'range' || fam === 'drapeau' || (fam === 'ete' && f.couL && Math.abs(f.couL.b) > 0);
     const enCeMoment = pente ? ' en ce moment' : '';
     // La 1re clôture dehors s'est jugée contre le seuil de SA bougie (journal) ; une droite en pente
@@ -2358,11 +2412,12 @@ const Guide = (function () {
   };
   /** La comparaison au repère sans forme, en mots (mesuré, avec son nombre de cas). */
   function texteEcart(b) {
-    const finis = b.atteints + b.invalides + b.expires;
+    // Le nombre de cas dit où il est compté (idée 8) : « (8 cas sur ce graphique) ».
+    const cas = (b.atteints + b.invalides + b.expires) + ' cas ' + usageChiffre('cas', 'debutant');
     switch (b.ecart) {
-      case 'pareil': return 'Objectif pas plus souvent atteint qu’un trajet de même taille pris au hasard (' + finis + ' cas).';
-      case 'plus': return 'Objectif plus souvent atteint qu’un trajet de même taille pris au hasard (' + finis + ' cas).';
-      case 'moins': return 'Objectif moins souvent atteint qu’un trajet de même taille pris au hasard (' + finis + ' cas).';
+      case 'pareil': return 'Objectif pas plus souvent atteint qu’un trajet de même taille pris au hasard (' + cas + ').';
+      case 'plus': return 'Objectif plus souvent atteint qu’un trajet de même taille pris au hasard (' + cas + ').';
+      case 'moins': return 'Objectif moins souvent atteint qu’un trajet de même taille pris au hasard (' + cas + ').';
       default: return 'Trop peu de cas pour comparer au hasard.';
     }
   }
@@ -2433,7 +2488,7 @@ const Guide = (function () {
         out.push(niveauxDebutant(f, c, P, unite));
       } else out.push(def.replace(/\.$/, '') + '.', marqueFin(f, c, 'debutant', unite));
       // La cible : dite seulement quand elle a été atteinte (une figure tombée n'en a plus).
-      if (e.cle === 'atteint' && fini(f.objectif)) out.push('Objectif théorique selon l’usage des analystes : ' + prix(f.objectif, unite) + ', non garanti ; il a été atteint.');
+      if (e.cle === 'atteint' && fini(f.objectif)) out.push('Objectif théorique selon l’usage des analystes : ' + prix(f.objectif, unite) + ' (' + usageChiffre(cleObjectif(f), 'debutant') + '), non garanti ; il a été atteint.');
     }
     if (b) out.push(bilanDebutant(f, b, c, P));
     out.push(AVERTISSEMENT_FORME);
@@ -2990,7 +3045,7 @@ const Guide = (function () {
     detecter, bilan, formesAffichees, formesDebutant, idFigure, etatForme, NOMS_FORMES, texteBilan, suite, texteSuite, VARIANTES_SUITE, tagMicro, deArt, decrire, decrireCompact, lecture, VARIANTES_LECTURE, phraseForme, TYPES, bornes,
     FAMILLES, famille, groupeVue, enAttente, candidats, avancer, niveauxFigure, figureVivante, cleFigure, niveauAbandon, wilson, ecartTemoin, dernierPoint, rangFigure, concurrentes, tombees, phaseA, classer, deuxDroites, ete, drapeau, tripleExtreme, doubleExtreme, range, ligne,
     NOMS_DEBUTANT, raisonPrincipale, choixDebutant, reperesDe, choisirReperes, VERBE_DEBUTANT, optionsSeules, libelleDebutant, libellesDebutant, formatDebutant, AVEC_POINT, titreDebutant, nomDebutant, nomPhrase, HORIZON_DEBUTANT, HORIZON_COURT, PERIODE_DEBUTANT, phrasesDebutant, phraseDebutant,
-    texteSuiteDebutant, prixRond, ageLu, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
+    texteSuiteDebutant, prixRond, USAGES_CHIFFRES, usageChiffre, avecUsage, cleEcart, ageLu, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
     MARQUES_FIN, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, libelleFormeCourt, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant,
     MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_FORME, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, synthese };

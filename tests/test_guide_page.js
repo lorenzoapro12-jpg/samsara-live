@@ -322,12 +322,30 @@ const etat = page => page.evaluate(() => {
       check('tap sur le libellé d’une bande → son explication (bulle du Guide)', apres.survol === c.titre, { apres, attendu: c.titre });
       // Débutant : le 1er tap montre le résumé de la bulle, le 2e son détail, le 3e la retire.
       await t.page.touchscreen.tap(x, y); await t.page.waitForTimeout(200);
-      const detail = await t.page.evaluate(() => ({ survol: guideEtat.survol ? guideEtat.survol.titre : null, resume: guideEtat.bulle ? guideEtat.bulle.resume : null }));
+      const detail = await t.page.evaluate(() => ({ survol: guideEtat.survol ? guideEtat.survol.titre : null, resume: guideEtat.bulle ? guideEtat.bulle.resume : null, corps: guideEtat.bulle ? guideEtat.bulle.corps.join(' ') : '' }));
       check('… un 2e tap au même endroit ouvre son détail', detail.survol === c.titre && detail.resume === false, detail);
+      // Plan du site, idée 8 (13/10/2026) : dans le détail, l'écart et la bande disent à quoi ils servent.
+      check('… le détail dit à quoi sert chaque chiffre : l’écart (« ce qu’il reste avant ce repère » ou « l’écart déjà fait au-delà ») et la bande (« la marge où l’on dit que le prix touche le repère »)',
+        /\$ (au-dessus|en dessous) : (ce qu’il reste avant ce repère|l’écart déjà fait au-delà)\.|le prix est dedans/.test(detail.corps) && /Bande de ± [\d\s,]+\$ : la marge où l’on dit que le prix touche le repère\./.test(detail.corps), detail.corps);
       await t.page.touchscreen.tap(x, y); await t.page.waitForTimeout(200);
       const retire = await t.page.evaluate(() => ({ survol: guideEtat.survol, crossX }));
       check('… un 3e tap au même endroit la retire', retire.survol === null && retire.crossX === null, retire);
     }
+    // Complet (« Le détail ») : la tête de la bulle d'un niveau garde l'écart en %, avec son usage ;
+    // la bande dit sa marge (plan du site, idée 8, 13/10/2026).
+    const cplt = await t.page.evaluate(() => {
+      choisirMode('expert'); drawChart();
+      const c = guideEtat.cibles.find(q => q.niveau && q.niveau.live && q.rects.length);
+      if (!c) return null;
+      const r = c.rects[0];
+      crossX = (r.x0 + r.x1) / 2; crossY = (r.y0 + r.y1) / 2; calqueDessin();
+      bulleDetail = cleBulle(guideEtat.survol); calqueDessin();
+      const out = { titre: guideEtat.survol && guideEtat.survol.titre, corps: guideEtat.bulle ? guideEtat.bulle.corps.join(' ') : '' };
+      crossX = crossY = null; calqueDessin(); choisirMode('debutant');
+      return out;
+    });
+    check('Complet : la bulle d’un niveau dit l’usage de l’écart en % (« reste avant le niveau », « déjà au-delà » ou « écart au prix du niveau ») et de la bande',
+      !!cplt && /^Maintenant : .+ % live \((reste avant le niveau|déjà au-delà|écart au prix du niveau)\)\./.test(cplt.corps) && /\(marge où le niveau compte comme touché\)/.test(cplt.corps), cplt);
     check('écran tactile : aucune erreur JavaScript', !t.erreurs.length, t.erreurs);
     await t.ctx.close();
 
