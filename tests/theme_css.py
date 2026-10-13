@@ -21,14 +21,14 @@ def attributs(balise):
 
 
 def themes_declares():
-    """[{id, nom, mode, verre, paire, href}] dans l'ordre d'index.html."""
+    """[{id, nom, mode, verre, paire, href, structure, defaut}] dans l'ordre d'index.html."""
     html = PAGE.read_text(encoding="utf-8")
     out = []
     for balise in re.findall(r"<link\b[^>]*\bdata-theme-id=[^>]*>", html):
         a = attributs(balise)
         out.append({"id": a.get("data-theme-id"), "nom": a.get("data-nom"), "mode": a.get("data-mode"),
                     "verre": a.get("data-verre"), "paire": a.get("data-paire"), "href": a.get("href"),
-                    "structure": a.get("data-structure")})
+                    "structure": a.get("data-structure"), "defaut": a.get("data-defaut")})
     return out
 
 

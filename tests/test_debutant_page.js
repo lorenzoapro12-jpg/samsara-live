@@ -1376,10 +1376,11 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       await o.ctx.close();
     }
 
-    // ── Les 11 thèmes : texte visible ; les structures gardent la pastille ──
+    // ── Les 11 thèmes : texte visible ; les structures gardent la pastille. Au téléphone : Aero,
+    // Gazette et Bureau 95 (le thème d'une première visite depuis le 13/10/2026) et son jumeau. ──
     titre('Thèmes et structures en Débutant');
     const THEMES = ['aero', 'aero-nuit', 'kala', 'neon', 'codex', 'bureau95', 'bureau95-contraste', 'gare', 'gazette', 'cyanotype', 'diazo'];
-    for (const [theme, vue, tactile] of THEMES.map(t => [t, { width: 1440, height: 900 }, false]).concat([['aero', { width: 390, height: 844 }, true], ['gazette', { width: 390, height: 844 }, true]])) {
+    for (const [theme, vue, tactile] of THEMES.map(t => [t, { width: 1440, height: 900 }, false]).concat([['aero', { width: 390, height: 844 }, true], ['gazette', { width: 390, height: 844 }, true], ['bureau95', { width: 390, height: 844 }, true], ['bureau95-contraste', { width: 390, height: 844 }, true]])) {
       const nom = theme + ' · ' + vue.width;
       const o = await ouvrir(nav, { vue, theme, tactile });
       scanTexte(nom, await texteVisible(o.page));

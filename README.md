@@ -5,6 +5,7 @@ Pages, il s'ouvre dans un navigateur et se rafraîchit tout seul depuis des sour
 Onze thèmes, choisis à la volée (bouton palette, touche T ; D pour le jumeau clair/sombre) — dont six
 structures de page différentes : HUD (Néon), manuscrit (Codex), fenêtres (Bureau 95 et son jumeau
 Contraste), tableau à palettes (Gare), une de journal (Gazette), planche technique (Cyanotype et Diazo).
+Bureau 95 est le thème d'une première visite.
 
 **Ce dépôt est complet** : la page, les deux producteurs et TOUS leurs calculs. Depuis le
 06/10/2026, aucun bloc de `market-data.json` ne dépend plus d'un module hors dépôt — chaque
@@ -126,8 +127,10 @@ simulé ; « non exécuté » sans Playwright).
 
 ## Thèmes : l'habillage ET la structure
 
-Cinq thèmes (bouton palette, touche T) : **Aero**, **Aero nuit**, **Kāla**, et deux thèmes qui
-changent aussi la **structure** de la page :
+Onze thèmes (bouton palette, touche T ; D passe au jumeau clair ou sombre). Le thème d'une
+première visite est **Bureau 95** (choisi le 13/10/2026), marqué `data-defaut="1"` dans le
+registre d'`index.html` ; un choix fait dans le menu est gardé (clé `samsara-theme`).
+Plusieurs thèmes changent aussi la **structure** de la page, par exemple :
 
 - **Néon** (cyberpunk, structure « poste de pilotage ») : chiffres clés dans une bande de
   télémétrie, panneau du marché en rail à gauche, console d'indicateurs sous le graphique,
@@ -304,8 +307,12 @@ Un thème est un fichier `themes/<id>.css` qui donne des valeurs aux jetons de
 
 ```html
 <link rel="stylesheet" href="themes/<id>.css" data-theme-id="<id>" data-nom="Nom"
-      data-mode="clair|sombre" data-verre="aucun|givre|refraction" data-paire="<jumeau>">
+      data-mode="clair|sombre" data-verre="aucun|givre|refraction" data-paire="<jumeau>"
+      data-structure="<structure de js/structures.js, facultatif>">
 ```
+
+Un seul thème porte en plus `data-defaut="1"` : celui d'une première visite (Bureau 95).
+L'ordre des lignes reste l'ordre du menu et de la touche T.
 
 Le plus simple est de copier un thème existant (`themes/kala.css` est le plus court) et de
 changer ses valeurs. Le graphique lit ses couleurs dans les mêmes jetons. Un thème n'entre

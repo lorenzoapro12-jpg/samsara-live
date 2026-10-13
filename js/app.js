@@ -9,11 +9,13 @@ const THEMES = Array.from(document.querySelectorAll('link[data-theme-id]')).map(
   mode: l.getAttribute('data-mode') || 'clair',
   verre: l.getAttribute('data-verre') || 'aucun',
   paire: l.getAttribute('data-paire') || null,
-  structure: l.getAttribute('data-structure') || null     // js/structures.js
+  structure: l.getAttribute('data-structure') || null,    // js/structures.js
+  defaut: l.hasAttribute('data-defaut')                    // le thème d'une première visite
 }));
 function themeCourant() {
   const id = document.documentElement.getAttribute('data-theme');
-  return THEMES.find(t => t.id === id) || THEMES[0] || { id: 'aero', nom: 'Aero', mode: 'clair', verre: 'aucun', paire: null };
+  // Repli : le thème par défaut du registre ; registre vide (harnais node) : un thème sans structure.
+  return THEMES.find(t => t.id === id) || THEMES.find(t => t.defaut) || THEMES[0] || { id: 'aero', nom: 'Aero', mode: 'clair', verre: 'aucun', paire: null };
 }
 let dark = themeCourant().mode === 'sombre';
 function appliquerTheme(id) {
@@ -38,7 +40,8 @@ function themeSuivant() {
   const i = THEMES.findIndex(t => t.id === themeCourant().id);
   appliquerTheme(THEMES[(i + 1) % THEMES.length].id);
 }
-// D : le jumeau de l'autre mode (Aero ↔ Aero nuit) ; un thème sans jumeau passe au suivant.
+// D : le jumeau de l'autre mode (Bureau 95 ↔ Bureau 95 contraste, Aero ↔ Aero nuit) ; un thème
+// sans jumeau passe au suivant.
 function themeJumeau() { const p = themeCourant().paire; if (p) appliquerTheme(p); else themeSuivant(); }
 function remplirMenuThemes() {
   const m = document.getElementById('themeMenu');

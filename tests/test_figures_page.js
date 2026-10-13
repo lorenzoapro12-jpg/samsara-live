@@ -316,7 +316,7 @@ async function bulle(o, tactile) {
 
     // ── 5. Bulles, ligne qui valide, défilement ──
     titre('5. Bulles au survol (1440) et au toucher (390), ligne qui valide visible');
-    for (const [w, h, theme] of [[1440, 900, 'aero'], [390, 844, 'aero'], [390, 844, 'kala']]) {
+    for (const [w, h, theme] of [[1440, 900, 'aero'], [390, 844, 'aero'], [390, 844, 'kala'], [390, 844, 'bureau95']]) {
       const tactile = w < 500;
       const o = await ouvrir(nav, { iC: seq.iF, mode: 'debutant', w, h, theme });
       const c5 = await o.page.evaluate(() => {
