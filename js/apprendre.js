@@ -21,13 +21,18 @@
 //      l'invalidation (une fin de bougie au-delà du niveau qui l'annule) ou l'annulation d'une
 //      ébauche ; un scénario « touche » une zone quand une bougie la recoupe (Scenarios.pas).
 //      Jamais un conseil, jamais une prévision ; chaque bulle finit par Guide.RISQUE.
-//   3. « NOUVEAU ». Ce que ce visiteur a déjà ouvert (samsara-nouveau-v1 : les natures lues, une
-//      liste JSON), et la marque à poser : une seule à la fois, sur la première nature jamais lue
-//      dans l'ordre de NATURES. Le stockage peut manquer (navigation privée) : tout est lu et écrit
-//      sous try/catch, et la page vit sans lui.
-//   4. LES CHOIX DU COMPLET (samsara-apprendre-v1) : dire ce qui vient de se passer, marquer ce qui
-//      est nouveau — chacun coupé d'un clic dans « Choisir l'affichage ». Le Lisible n'a pas de
-//      choix : les deux y sont toujours.
+//   3. LA PREMIÈRE FOIS (plan du 13/10/2026, idée 10 ; elle remplace le point rond « nouveau »).
+//      Ce que ce visiteur a déjà vu (samsara-nouveau-v1 : les natures vues ou lues, une liste
+//      JSON) ; la première fois qu'une chose apparaît à l'écran (une sorte de repère, une figure,
+//      un scénario, une figure passée), la même ligne que ce qui vient de se passer dit en une
+//      phrase ce que c'est, quelques secondes ; vue jusqu'au bout (ou sa bulle ouverte), elle est
+//      notée, et ne revient plus. Une ligne à la fois : un vrai événement du marché passe avant.
+//      Le stockage peut manquer (navigation privée) : tout est lu et écrit sous try/catch, et la
+//      page vit sans lui (la ligne revient alors à chaque visite, une fois).
+//   4. LES CHOIX DU COMPLET (samsara-apprendre-v1, { evenements, marques }) : dire ce qui vient de
+//      se passer, expliquer ce qui apparaît pour la première fois (la clé « marques » est gardée :
+//      un choix déjà fait reste fait) — chacun coupé d'un clic dans « Choisir l'affichage ». Le
+//      Lisible n'a pas de choix : les deux y sont toujours.
 // ═══════════════════════════════════════════════════════════════════════════════
 const Apprendre = (function () {
   'use strict';
@@ -156,7 +161,7 @@ const Apprendre = (function () {
    *  les phrases du 1er toucher, en variantes) }. mode 'debutant' | 'expert' ; o = { unite, itv }. */
   function textes(e, mode, o) {
     if (!e) return null;
-    const c = o || {}, T = mode === 'expert' ? expert(e, c) : lisible(e, c);
+    const c = o || {}, T = e.source === 'premiere' ? textesPremiere(e, mode) : mode === 'expert' ? expert(e, c) : lisible(e, c);
     if (!T) return null;
     T.texte = T.texte.filter(Boolean);
     return T;
@@ -270,15 +275,17 @@ const Apprendre = (function () {
     return null;
   }
 
-  // ─── 3. « Nouveau » ──────────────────────────────────────────────────────────
+  // ─── 3. La première fois (plan du 13/10/2026, idée 10) ──────────────────────
   const CLE_VUS = 'samsara-nouveau-v1', CLE_CHOIX = 'samsara-apprendre-v1', VUS_MAX = 300;
-  /** L'ordre des marques : la phrase du Lisible, puis chaque sorte de repère, le scénario, chaque
+  /** L'ordre des natures : la phrase du Lisible, puis chaque sorte de repère, le scénario, chaque
    *  sorte de figure, les figures passées, enfin chaque sorte de « ce qui vient de se passer ».
-   *  Une nature est « genre » ou « genre:sorte » (« repere:hier_haut », « figure:double_creux »). */
+   *  Une nature est « genre » ou « genre:sorte » (« repere:hier_haut », « figure:double_creux »).
+   *  Celles qui ont une phrase de première fois : les repères, le scénario, les figures, les figures
+   *  passées. La phrase du Lisible et la ligne d'un événement se disent elles-mêmes en mots. */
   const NATURES = ['phrase', 'repere', 'scenario', 'figure', 'passee', 'evenement'];
   const genre = cle => String(cle).split(':')[0];
   const magasin = s => { if (s !== undefined) return s; try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch (e) { return null; } };
-  /** Les natures déjà lues (un Set) ; vide sans stockage ou s'il est illisible. */
+  /** Les natures déjà vues ou lues (un Set) ; vide sans stockage ou s'il est illisible. */
   function lireVus(s) {
     const S = magasin(s);
     try {
@@ -286,7 +293,7 @@ const Apprendre = (function () {
       return new Set(Array.isArray(a) ? a.filter(x => typeof x === 'string') : []);
     } catch (e) { return new Set(); }
   }
-  /** Note la nature `cle` lue (en mémoire, puis dans le stockage s'il répond). → true si elle était nouvelle. */
+  /** Note la nature `cle` vue (en mémoire, puis dans le stockage s'il répond). → true si elle était nouvelle. */
   function noterVu(vus, cle, s) {
     if (!cle || vus.has(cle)) return false;
     vus.add(cle);
@@ -294,16 +301,85 @@ const Apprendre = (function () {
     try { if (S) S.setItem(CLE_VUS, JSON.stringify([...vus].slice(-VUS_MAX))); } catch (e) { /* navigation privée : en mémoire seulement */ }
     return true;
   }
-  /** La marque à poser : parmi les candidats ({ cle, … }, dans l'ordre de l'écran), le premier jamais
-   *  lu de la nature la mieux placée dans NATURES ; null si tout a été lu. */
-  function choisirMarque(cands, vus) {
+  /** Ce qu'est chaque chose, sans son nom : [la phrase entière, la courte (téléphone), la plus courte
+   *  (téléphone, polices à chasse fixe : 36 caractères avec le nom)]. Les repères : les mots de leur
+   *  bulle (Guide.quoiDebutant), raccourcis ; les figures : leur dessin, au présent (Guide.DEFINITION_FORME
+   *  dit en plus la sortie : trop long pour une ligne, et faux tant que la figure se forme). Ce
+   *  qu'on voit, jamais un sens attendu. */
+  const QUOI_REPERE = {
+    hier_haut: ['le plus haut atteint hier.', 'le plus haut d’hier.'], hier_bas: ['le plus bas atteint hier.', 'le plus bas d’hier.'],
+    h24_haut: ['le plus haut des dernières 24 h.', 'le plus haut sur 24 h.'], h24_bas: ['le plus bas des dernières 24 h.', 'le plus bas sur 24 h.'],
+    sem_haut: ['le plus haut de la semaine dernière.', 'plus haut, sem. passée.'], sem_bas: ['le plus bas de la semaine dernière.', 'plus bas, sem. passée.'],
+    sr: ['le prix y a déjà fait demi-tour.', 'déjà des demi-tours.'], mur_achat: ['beaucoup d’achats attendent ici.', 'des achats attendent.'],
+    mur_vente: ['beaucoup de ventes attendent ici.', 'des ventes attendent.'], options: ['une estimation, pas une mesure.', 'une estimation.'],
+  };
+  const QUOI_FIGURE = {
+    double_sommet: ['deux sommets à la même hauteur, avec un creux entre les deux.', 'deux sommets à la même hauteur.', '2 sommets égaux.'],
+    double_creux: ['deux creux à la même hauteur, avec un sommet entre les deux.', 'deux creux à la même hauteur.', '2 creux égaux.'],
+    triple_sommet: ['trois sommets à la même hauteur, avec des creux entre eux.', 'trois sommets à la même hauteur.', '3 sommets égaux.'],
+    triple_creux: ['trois creux à la même hauteur, avec des sommets entre eux.', 'trois creux à la même hauteur.', '3 creux égaux.'],
+    ete: ['trois sommets, celui du milieu plus haut que les deux autres.', '3 sommets, le milieu plus haut.', '3 sommets.'],
+    ete_inverse: ['trois creux, celui du milieu plus bas que les deux autres.', '3 creux, le milieu plus bas.', '3 creux.'],
+    range: ['le prix fait des allers-retours entre un plafond et un plancher.', 'allers-retours entre deux bornes.', 'entre deux bornes.'],
+    triangle_ascendant: ['un plafond plat, et des creux qui remontent vers lui.', 'plafond plat, creux qui remontent.', 'plafond plat.'],
+    triangle_descendant: ['un plancher plat, et des sommets qui descendent vers lui.', 'plancher plat, sommets qui baissent.', 'plancher plat.'],
+    triangle_symetrique: ['des sommets qui descendent, des creux qui remontent.', 'le prix se resserre.', 'le prix se resserre.'],
+    biseau_montant: ['deux droites qui montent et se rapprochent.', 'deux droites en hausse qui se serrent.', 'deux droites qui montent.'],
+    biseau_descendant: ['deux droites qui descendent et se rapprochent.', 'deux droites en baisse qui se serrent.', 'deux droites qui baissent.'],
+    canal_montant: ['le prix va et vient entre deux droites parallèles qui montent.', 'entre deux parallèles qui montent.', 'un couloir qui monte.'],
+    canal_descendant: ['le prix va et vient entre deux droites parallèles qui descendent.', 'entre deux parallèles qui baissent.', 'un couloir qui descend.'],
+    drapeau: ['un mouvement rapide (le mât), puis une pause étroite.', 'un élan, puis une pause étroite.', 'un élan, puis une pause.'],
+    fanion: ['un mouvement rapide (le mât), puis une pause qui se resserre.', 'un élan, puis une pause qui se serre.', 'élan, puis pause serrée.'],
+  };
+  const QUOI_SCENARIO = ['une hypothèse écrite le matin par Claude, une IA, suivie ici en direct.', 'une hypothèse de Claude, une IA.', 'une hypothèse de Claude.'];
+  const QUOI_PASSEE = ['un exemple du passé, et ce que le prix a fait ensuite.', 'un exemple, réussi ou non.', 'un exemple.'];
+  const RAPPEL_LISIBLE = 'Dit une seule fois. Le détail reste dans la bulle de son étiquette.';
+  const RAPPEL_EXPERT = 'Dit une seule fois ; le détail reste dans la bulle de l’étiquette.';
+  /** Le nom et ce que c'est d'une nature : { noms: [entier, court], quoi: [phrase, courte], fin }, ou
+   *  null (pas de phrase de première fois pour elle). exp : les noms du Complet pour les figures. */
+  function chose(cle, exp) {
+    const g = genre(cle), sorte = String(cle).slice(g.length + 1);
+    if (g === 'repere') {
+      const n = Gd.NOMS_DEBUTANT && Gd.NOMS_DEBUTANT[sorte], q = QUOI_REPERE[sorte], r = Gd.quoiDebutant ? Gd.quoiDebutant({ cle: sorte === 'options' ? 'call_wall' : sorte }) : '';
+      if (!n || !q) return null;
+      return { noms: [n[0], n[1]], quoi: [r ? r.charAt(0).toLowerCase() + r.slice(1) : q[0], q[0], q[1]], fin: exp ? FIN_EXPERT : FIN_DEBUTANT };
+    }
+    if (g === 'figure') {
+      const q = QUOI_FIGURE[sorte], nx = Gd.NOMS_FORMES && Gd.NOMS_FORMES[sorte];
+      if (!q) return null;
+      const noms = exp ? [nx ? nx[0] : sorte, nx ? nx[0] : sorte] : [Gd.NOM_LONG_DEBUTANT[sorte], Gd.NOM_FORME_DEBUTANT[sorte]];
+      return { noms, quoi: q, fin: exp ? 'Une lecture débattue, pas une recommandation.' : Gd.AVERTISSEMENT_FORME };
+    }
+    if (g === 'scenario' && !sorte) return { noms: ['Scénario', 'Scénario'], quoi: QUOI_SCENARIO, fin: exp ? 'Une hypothèse de Claude (une IA), pas une recommandation.' : 'Une hypothèse de Claude (une IA), pas une promesse ni un conseil.' };
+    if (g === 'passee' && !sorte) return { noms: ['Figure passée', 'Figure passée'], quoi: QUOI_PASSEE, fin: exp ? FIN_EXPERT : FIN_DEBUTANT };
+    return null;
+  }
+  /** La chose à expliquer : parmi les candidats ({ cle, … }, dans l'ordre de l'écran), le premier jamais
+   *  vu de la nature la mieux placée dans NATURES, qui a une phrase de première fois ; null sinon. */
+  function choisirPremiere(cands, vus) {
     let m = null, rm = Infinity;
     for (const c of cands || []) {
-      if (!c || !c.cle || (vus && vus.has(c.cle))) continue;
+      if (!c || !c.cle || (vus && vus.has(c.cle)) || !chose(c.cle)) continue;
       const k = NATURES.indexOf(genre(c.cle)), r = k < 0 ? NATURES.length : k;
       if (r < rm) { rm = r; m = c; }
     }
     return m;
+  }
+  /** L'« événement » de la première fois : il passe par la même ligne que ce qui vient de se passer
+   *  (une ligne à la fois), après tout ce que range ORDRE — un vrai événement du marché le remplace,
+   *  et il n'en remplace aucun. */
+  const PREMIERE = 'premiere_fois';
+  const premiere = nature => ({ type: PREMIERE, source: 'premiere', nature, cle: 'premiere|' + nature });
+  /** Les textes de la première fois : la ligne (de la plus riche à la plus courte : nom entier, puis
+   *  nom court, puis la phrase courte, puis la plus courte), le titre (son nom), la bulle (la phrase,
+   *  le rappel qu'elle ne revient pas, l'avertissement), le résumé du Lisible. */
+  function textesPremiere(e, mode) {
+    const exp = mode === 'expert', C = chose(e.nature, exp);
+    if (!C) return null;
+    const [N, n] = C.noms, [Q, q, m] = C.quoi;
+    const V = [N + ' : ' + Q, n + ' : ' + Q, N + ' : ' + q, n + ' : ' + q, n + ' : ' + m].filter((v, i, t) => t.indexOf(v) === i);
+    if (exp) return { variantes: V, titre: 'Ce qui apparaît pour la première fois', texte: [V[0], RAPPEL_EXPERT, C.fin], resume: null };
+    return { variantes: V, titre: N, texte: [V[0], RAPPEL_LISIBLE, C.fin], resume: [[majuscule(Q), majuscule(q)], ['Dit une seule fois.']] };
   }
 
   // ─── 4. Les choix du Complet ─────────────────────────────────────────────────
@@ -321,6 +397,7 @@ const Apprendre = (function () {
     try { if (S) S.setItem(CLE_CHOIX, JSON.stringify({ evenements: !!o.evenements, marques: !!o.marques })); return true; } catch (e) { return false; }
   }
 
-  return { ORDRE, rang, suivi, contexte, oublier, comparer, perime, choisir, remplace, textes, NATURES, genre, CLE_VUS, CLE_CHOIX, CHOIX_DEFAUT, lireVus, noterVu, choisirMarque, lireChoix, noterChoix };
+  return { ORDRE, rang, suivi, contexte, oublier, comparer, perime, choisir, remplace, textes, NATURES, genre, CLE_VUS, CLE_CHOIX, CHOIX_DEFAUT, lireVus, noterVu,
+    PREMIERE, premiere, choisirPremiere, lireChoix, noterChoix };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Apprendre;
