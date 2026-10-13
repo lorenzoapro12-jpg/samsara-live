@@ -835,6 +835,30 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
   const nM = x => x.split(/\s+/).filter(w => /[\p{L}\d]/u.test(w)).length;
   check('la phrase de la fourchette : chaque phrase 15 mots au plus ; aucun mot banni (« range »…), aucun %, ni « va baisser / monter », ni volume, ni conseil',
     phrF.every(x => nM(x) <= 15) && !phrF.some(x => G.motsBannis(x).length || /%|va (baisser|monter)|volume/i.test(x) || CONSEIL.test(x)), phrF.map(x => [nM(x), x]));
+
+  // 6. Un rejet sur un repère, dit en mots (plan du 13/10/2026, idée 6) : etatFerme a vu, sur les
+  // P.mecheBougies dernières périodes closes, le prix dépasser le repère puis finir de nouveau de
+  // son côté (une mèche, sans cassure). « En résumé » le dit tant que c'est récent, sans sens.
+  const M = (n, k, haut) => { const C = Array(n).fill(100), H = Array(n).fill(100.5), L = Array(n).fill(99.5);
+    if (haut) H[n - 1 - k] = 102.5; else L[n - 1 - k] = 97.5; return [C, H, L]; };
+  const fH = (k) => G.etatFerme(...M(30, k, true), 30, 101, 102, P), fB = (k) => G.etatFerme(...M(30, k, false), 30, 98, 99, P);
+  check('etatFerme : dépassé puis repoussé sur l’une des ' + P.mecheBougies + ' dernières périodes closes → mèche (vers le haut : +1, vers le bas : −1) ; plus ancien → rien',
+    fH(0).meche && fH(0).mecheSens === 1 && fH(P.mecheBougies - 1).meche && !fH(P.mecheBougies).meche && fB(1).meche && fB(1).mecheSens === -1 && !fB(P.mecheBougies + 2).meche && !fH(0).cassure,
+    [fH(0), fH(P.mecheBougies), fB(1)]);
+  const choixF = (dessus, dessous) => ({ dessus: [Object.assign({}, haut, { ferme: dessus }), loin], dessous: [Object.assign({}, bas, { ferme: dessous }), bas2] });
+  const rejH = syn({ regime: { cle: 'faible' }, choix: choixF(fH(0), null) }), rejB = syn({ regime: { cle: 'faible' }, choix: choixF(null, fB(1)) });
+  const lr = r => r.pourquoi.find(p => /repoussé/.test(p.texte));
+  check('repère du haut dépassé puis repoussé : « Le prix est monté au-dessus de 86 398 $, puis il a été repoussé dessous. » (sans sens, famille repère)',
+    lr(rejH) && lr(rejH).texte === 'Le prix est monté au-dessus de 86 398 $, puis il a été repoussé dessous.' && lr(rejH).sens === 0 && lr(rejH).fam === 'niveau', rejH.pourquoi);
+  check('repère du bas : « Le prix est descendu sous 85 600 $, puis il a été repoussé au-dessus. »',
+    lr(rejB) && lr(rejB).texte === 'Le prix est descendu sous 85 600 $, puis il a été repoussé au-dessus.' && lr(rejB).sens === 0 && lr(rejB).fam === 'niveau', rejB.pourquoi);
+  const rejT = syn({ regime: { cle: 'hausse' }, choix: choixF(fH(0), null) });
+  check('le rejet ne change pas la règle du sens (même titre qu’avant, un seul signal vers le haut : « trop peu »)', rejH.titre === sansF.titre && rejH.ton === sansF.ton && rejT.ton === 'calme' && /trop peu/.test(rejT.regle), [rejH.titre, rejT.regle]);
+  check('rien de dit : mèche trop ancienne, mèche du mauvais côté (repère du haut percé par le bas), pas de mèche',
+    ![syn({ choix: choixF(fH(P.mecheBougies), fB(P.mecheBougies + 2)) }), syn({ choix: choixF(fB(1), fH(0)) }), syn({ choix: choixF({ cassure: null, meche: false, mecheSens: 0 }, null) })].some(lr));
+  const phrR = [lr(rejH).texte, lr(rejB).texte];
+  check('le rejet : 15 mots au plus, aucun mot banni (ni « mèche »), aucun %, aucun conseil, pas de sens annoncé',
+    phrR.every(x => nM(x) <= 15) && !phrR.some(x => G.motsBannis(x).length || /%|va (baisser|monter)/.test(x) || CONSEIL.test(x)), phrR.map(x => [nM(x), x]));
 }
 
 // ── 8. Mots ──
