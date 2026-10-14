@@ -16,11 +16,21 @@ const Fmt = (function () {
   const ESP = /[  ]/g;
   const MOINS = '−';
 
+  // Formateurs gardés, un par nombre de décimales (revue du 14/10/2026, M16) : toLocaleString(…,
+  // options) en construisait un à CHAQUE nombre (≈ 20 à 90 µs), et un dessin du graphique en écrit
+  // 120 à 350. Sur un téléphone lent, le glisser saccadait. Même moteur, donc le même texte.
+  const FORMATS = new Map();
+  function formateur(d) {
+    let f = FORMATS.get(d);
+    if (!f) FORMATS.set(d, f = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }));
+    return f;
+  }
+
   /** v avec exactement dec décimales, à la française : 86 012,50 ; −1,6. */
   function nombre(v, dec) {
     if (!fini(v)) return '—';
     const d = dec === undefined ? 0 : dec;
-    const t = Math.abs(v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }).replace(ESP, ' ');
+    const t = formateur(d).format(Math.abs(v)).replace(ESP, ' ');
     return (v < 0 && Number(t.replace(/\s/g, '').replace(',', '.')) !== 0 ? MOINS : '') + t;
   }
   /** Décimales d'un PRIX selon son ordre de grandeur (cotation au centime pour BTC, 0,0001 pour XRP). */
