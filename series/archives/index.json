@@ -1,19 +1,14 @@
 {
- "updated": "2026-10-14T09:12:27+00:00",
+ "updated": "2026-10-14T09:15:31+00:00",
  "generator": "publier_archives.py v2.1 — archives du VPS (carnet, liquidations, flux insiders, tables sol-radar ; OHLCV en annuel depuis le 14/10/2026)",
  "source": "collecteurs locaux (carnet Binance/Coinbase, liquidations Binance) · ~/.hermes/archive-insiders (Binance fapi 5m, OKX rubik et liquidations, Deribit surface d'options) · base sol-radar (lecture seule)",
  "branche": "historique",
  "repertoire": "series/archives",
  "status": {
   "synchronisation": "à jour",
-  "copie": "2 fichier(s) copié(s)",
-  "insiders": "13 flux, 35 fichier(s), 0 fichier(s) écrit(s)",
-  "noms_perimes_retires": [
-   "ohlcv_1d : 111 fichier(s) mois retiré(s), contenu vérifié repris ligne à ligne",
-   "ohlcv_4h : 111 fichier(s) mois retiré(s), contenu vérifié repris ligne à ligne",
-   "ohlcv_1w : 111 fichier(s) mois retiré(s), contenu vérifié repris ligne à ligne"
-  ],
-  "sol_radar": "9 table(s), 57 fichier(s), 31 fichier(s) écrit(s), base ouverte en LECTURE SEULE"
+  "copie": "1 fichier(s) copié(s)",
+  "insiders": "13 flux, 35 fichier(s), 9 fichier(s) écrit(s)",
+  "sol_radar": "9 table(s), 57 fichier(s), 1 fichier(s) écrit(s), base ouverte en LECTURE SEULE"
  },
  "errors": [],
  "periodes_ouvertes": {
@@ -28,8 +23,10 @@
  },
  "regle_des_periodes": "un fichier par période (mois calendaire, ou ANNÉE pour les trois tables OHLCV) ; la période courante est réécrite à chaque passage, une période close ne bouge plus. Si une période close changeait, la source a gagné une ligne rétroactive : le fichier est publié ET l'anomalie est listée dans `errors`.",
  "compression": "les flux insiders sont en .jsonl.gz et les tables sol-radar en .csv.gz : lire par `gzip -dc` ou `zcat`. Le gzip est déterministe (mtime=0) — c'est ce qui rend l'idempotence possible.",
+ "chemins": "TOUS les chemins de cet index partent de la RACINE DE LA BRANCHE (« series/archives/… »), jamais du sous-arbre. C'est ce qui permet de les suivre tels quels : `git show FETCH_HEAD:<chemin>`, ou raw.githubusercontent.com/<dépôt>/<branche>/<chemin>. Un chemin relatif au sous-arbre répondrait 404 sans que rien ne le signale — défaut mesuré le 14/10/2026 sur les 35 fichiers insiders, depuis corrigé et désormais contrôlé avant chaque écriture de l'index.",
  "series": {
   "carnet": {
+   "chemin": "series/archives/",
    "libelle": "Carnet — une ligne toutes les 5 min (Binance 5 000 niveaux + carnet complet Coinbase)",
    "decoupage": "une semaine ISO par fichier, nommée par le lundi de la semaine",
    "colonnes": [
@@ -62,15 +59,16 @@
    "fichiers": [
     "series/archives/carnet-2026-W42.csv"
    ],
-   "lignes": 229,
-   "octets": 54233,
+   "lignes": 230,
+   "octets": 54467,
    "periode": {
     "debut": "2026-10-13T14:16:45+00:00",
-    "fin": "2026-10-14T09:08:58+00:00"
+    "fin": "2026-10-14T09:13:59+00:00"
    },
    "cadence_s": 300
   },
   "liquidations_binance": {
+   "chemin": "series/archives/",
    "libelle": "Liquidations Binance — un ordre liquidé par ligne, sans cadence (flux d'événements)",
    "decoupage": "un mois calendaire par fichier",
    "colonnes": [
@@ -99,49 +97,49 @@
     "decoupage": "un fichier par mois calendaire, nommé par la clé `ts` de l'enregistrement",
     "fichiers": [
      {
-      "chemin": "insiders/binance_funding_8h/binance_funding_8h-2026-04.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_funding_8h/binance_funding_8h-2026-04.jsonl.gz",
       "debut": "2026-04-14T08:00:00.003000+00:00",
       "fin": "2026-04-30T16:00:00+00:00",
       "lignes": 50,
       "octets": 655
      },
      {
-      "chemin": "insiders/binance_funding_8h/binance_funding_8h-2026-05.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_funding_8h/binance_funding_8h-2026-05.jsonl.gz",
       "debut": "2026-05-01T00:00:00+00:00",
       "fin": "2026-05-31T16:00:00.004000+00:00",
       "lignes": 93,
       "octets": 1091
      },
      {
-      "chemin": "insiders/binance_funding_8h/binance_funding_8h-2026-06.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_funding_8h/binance_funding_8h-2026-06.jsonl.gz",
       "debut": "2026-06-01T00:00:00.001000+00:00",
       "fin": "2026-06-30T16:00:00.005000+00:00",
       "lignes": 90,
       "octets": 1052
      },
      {
-      "chemin": "insiders/binance_funding_8h/binance_funding_8h-2026-07.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_funding_8h/binance_funding_8h-2026-07.jsonl.gz",
       "debut": "2026-07-01T00:00:00+00:00",
       "fin": "2026-07-31T16:00:00+00:00",
       "lignes": 93,
       "octets": 1019
      },
      {
-      "chemin": "insiders/binance_funding_8h/binance_funding_8h-2026-08.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_funding_8h/binance_funding_8h-2026-08.jsonl.gz",
       "debut": "2026-08-01T00:00:00.001000+00:00",
       "fin": "2026-08-31T16:00:00.001000+00:00",
       "lignes": 93,
       "octets": 987
      },
      {
-      "chemin": "insiders/binance_funding_8h/binance_funding_8h-2026-09.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_funding_8h/binance_funding_8h-2026-09.jsonl.gz",
       "debut": "2026-09-01T00:00:00.005000+00:00",
       "fin": "2026-09-30T16:00:00.002000+00:00",
       "lignes": 90,
       "octets": 1025
      },
      {
-      "chemin": "insiders/binance_funding_8h/binance_funding_8h-2026-10.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_funding_8h/binance_funding_8h-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00.001000+00:00",
       "fin": "2026-10-14T08:00:00.001000+00:00",
       "lignes": 41,
@@ -165,24 +163,24 @@
     "decoupage": "un fichier par mois calendaire, nommé par la clé `ts` de l'enregistrement",
     "fichiers": [
      {
-      "chemin": "insiders/binance_oi_5m/binance_oi_5m-2026-09.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_oi_5m/binance_oi_5m-2026-09.jsonl.gz",
       "debut": "2026-09-26T04:15:00+00:00",
       "fin": "2026-09-30T23:55:00+00:00",
       "lignes": 1389,
       "octets": 32188
      },
      {
-      "chemin": "insiders/binance_oi_5m/binance_oi_5m-2026-10.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_oi_5m/binance_oi_5m-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
-      "fin": "2026-10-14T08:55:00+00:00",
-      "lignes": 3852,
-      "octets": 92265
+      "fin": "2026-10-14T09:10:00+00:00",
+      "lignes": 3855,
+      "octets": 92338
      }
     ],
-    "lignes": 5241,
-    "octets": 124453,
+    "lignes": 5244,
+    "octets": 124526,
     "debut": "2026-09-26T04:15:00+00:00",
-    "fin": "2026-10-14T08:55:00+00:00",
+    "fin": "2026-10-14T09:10:00+00:00",
     "colonnes": [
      "ts",
      "btc",
@@ -198,24 +196,24 @@
     "decoupage": "un fichier par mois calendaire, nommé par la clé `ts` de l'enregistrement",
     "fichiers": [
      {
-      "chemin": "insiders/binance_premium/binance_premium-2026-09.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_premium/binance_premium-2026-09.jsonl.gz",
       "debut": "2026-09-27T21:52:22+00:00",
       "fin": "2026-09-30T23:46:00+00:00",
       "lignes": 306,
       "octets": 10482
      },
      {
-      "chemin": "insiders/binance_premium/binance_premium-2026-10.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_premium/binance_premium-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:01:01+00:00",
-      "fin": "2026-10-14T09:00:03+00:00",
-      "lignes": 1284,
-      "octets": 42708
+      "fin": "2026-10-14T09:15:04.001000+00:00",
+      "lignes": 1285,
+      "octets": 42735
      }
     ],
-    "lignes": 1590,
-    "octets": 53190,
+    "lignes": 1591,
+    "octets": 53217,
     "debut": "2026-09-27T21:52:22+00:00",
-    "fin": "2026-10-14T09:00:03+00:00",
+    "fin": "2026-10-14T09:15:04.001000+00:00",
     "colonnes": [
      "ts",
      "mark",
@@ -233,24 +231,24 @@
     "decoupage": "un fichier par mois calendaire, nommé par la clé `ts` de l'enregistrement",
     "fichiers": [
      {
-      "chemin": "insiders/binance_retails_5m/binance_retails_5m-2026-09.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_retails_5m/binance_retails_5m-2026-09.jsonl.gz",
       "debut": "2026-09-26T04:15:00+00:00",
       "fin": "2026-09-30T23:55:00+00:00",
       "lignes": 1389,
       "octets": 15949
      },
      {
-      "chemin": "insiders/binance_retails_5m/binance_retails_5m-2026-10.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_retails_5m/binance_retails_5m-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
-      "fin": "2026-10-14T08:55:00+00:00",
-      "lignes": 3852,
-      "octets": 48639
+      "fin": "2026-10-14T09:10:00+00:00",
+      "lignes": 3855,
+      "octets": 48677
      }
     ],
-    "lignes": 5241,
-    "octets": 64588,
+    "lignes": 5244,
+    "octets": 64626,
     "debut": "2026-09-26T04:15:00+00:00",
-    "fin": "2026-10-14T08:55:00+00:00",
+    "fin": "2026-10-14T09:10:00+00:00",
     "colonnes": [
      "ts",
      "btc",
@@ -266,24 +264,24 @@
     "decoupage": "un fichier par mois calendaire, nommé par la clé `ts` de l'enregistrement",
     "fichiers": [
      {
-      "chemin": "insiders/binance_taker_5m/binance_taker_5m-2026-09.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_taker_5m/binance_taker_5m-2026-09.jsonl.gz",
       "debut": "2026-09-26T04:05:00+00:00",
       "fin": "2026-09-30T23:55:00+00:00",
       "lignes": 1391,
       "octets": 23152
      },
      {
-      "chemin": "insiders/binance_taker_5m/binance_taker_5m-2026-10.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_taker_5m/binance_taker_5m-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
-      "fin": "2026-10-14T08:50:00+00:00",
-      "lignes": 3851,
-      "octets": 66732
+      "fin": "2026-10-14T09:05:00+00:00",
+      "lignes": 3854,
+      "octets": 66784
      }
     ],
-    "lignes": 5242,
-    "octets": 89884,
+    "lignes": 5245,
+    "octets": 89936,
     "debut": "2026-09-26T04:05:00+00:00",
-    "fin": "2026-10-14T08:50:00+00:00",
+    "fin": "2026-10-14T09:05:00+00:00",
     "colonnes": [
      "ts",
      "btc",
@@ -299,24 +297,24 @@
     "decoupage": "un fichier par mois calendaire, nommé par la clé `ts` de l'enregistrement",
     "fichiers": [
      {
-      "chemin": "insiders/binance_topls_5m/binance_topls_5m-2026-09.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_topls_5m/binance_topls_5m-2026-09.jsonl.gz",
       "debut": "2026-09-26T04:15:00+00:00",
       "fin": "2026-09-30T23:55:00+00:00",
       "lignes": 1389,
       "octets": 16771
      },
      {
-      "chemin": "insiders/binance_topls_5m/binance_topls_5m-2026-10.jsonl.gz",
+      "chemin": "series/archives/insiders/binance_topls_5m/binance_topls_5m-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
-      "fin": "2026-10-14T08:55:00+00:00",
-      "lignes": 3852,
-      "octets": 49545
+      "fin": "2026-10-14T09:10:00+00:00",
+      "lignes": 3855,
+      "octets": 49589
      }
     ],
-    "lignes": 5241,
-    "octets": 66316,
+    "lignes": 5244,
+    "octets": 66360,
     "debut": "2026-09-26T04:15:00+00:00",
-    "fin": "2026-10-14T08:55:00+00:00",
+    "fin": "2026-10-14T09:10:00+00:00",
     "colonnes": [
      "ts",
      "btc",
@@ -332,24 +330,24 @@
     "decoupage": "un fichier par mois calendaire, nommé par la clé `ts` de l'enregistrement",
     "fichiers": [
      {
-      "chemin": "insiders/coinbase_1h/coinbase_1h-2026-09.jsonl.gz",
+      "chemin": "series/archives/insiders/coinbase_1h/coinbase_1h-2026-09.jsonl.gz",
       "debut": "2026-09-13T08:00:00+00:00",
       "fin": "2026-09-30T23:00:00+00:00",
       "lignes": 424,
       "octets": 8175
      },
      {
-      "chemin": "insiders/coinbase_1h/coinbase_1h-2026-10.jsonl.gz",
+      "chemin": "series/archives/insiders/coinbase_1h/coinbase_1h-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
-      "fin": "2026-10-14T08:00:00+00:00",
-      "lignes": 321,
-      "octets": 5967
+      "fin": "2026-10-14T09:00:00+00:00",
+      "lignes": 322,
+      "octets": 5981
      }
     ],
-    "lignes": 745,
-    "octets": 14142,
+    "lignes": 746,
+    "octets": 14156,
     "debut": "2026-09-13T08:00:00+00:00",
-    "fin": "2026-10-14T08:00:00+00:00",
+    "fin": "2026-10-14T09:00:00+00:00",
     "colonnes": [
      "ts",
      "close",
@@ -364,24 +362,24 @@
     "decoupage": "un fichier par mois calendaire, nommé par la clé `ts` de l'enregistrement",
     "fichiers": [
      {
-      "chemin": "insiders/deribit_options_surface/deribit_options_surface-2026-09.jsonl.gz",
+      "chemin": "series/archives/insiders/deribit_options_surface/deribit_options_surface-2026-09.jsonl.gz",
       "debut": "2026-09-27T21:53:03.712823+00:00",
       "fin": "2026-09-30T23:46:02.138328+00:00",
       "lignes": 300,
       "octets": 49272
      },
      {
-      "chemin": "insiders/deribit_options_surface/deribit_options_surface-2026-10.jsonl.gz",
+      "chemin": "series/archives/insiders/deribit_options_surface/deribit_options_surface-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:01:02.728311+00:00",
-      "fin": "2026-10-14T09:00:05.922518+00:00",
-      "lignes": 1280,
-      "octets": 204218
+      "fin": "2026-10-14T09:15:06.352269+00:00",
+      "lignes": 1281,
+      "octets": 204391
      }
     ],
-    "lignes": 1580,
-    "octets": 253490,
+    "lignes": 1581,
+    "octets": 253663,
     "debut": "2026-09-27T21:53:03.712823+00:00",
-    "fin": "2026-10-14T09:00:05.922518+00:00",
+    "fin": "2026-10-14T09:15:06.352269+00:00",
     "colonnes": [
      "ts",
      "n_instruments",
@@ -400,21 +398,21 @@
     "decoupage": "un fichier par mois calendaire, nommé par la clé `ts` de l'enregistrement",
     "fichiers": [
      {
-      "chemin": "insiders/okx_funding_inverse_8h/okx_funding_inverse_8h-2026-08.jsonl.gz",
+      "chemin": "series/archives/insiders/okx_funding_inverse_8h/okx_funding_inverse_8h-2026-08.jsonl.gz",
       "debut": "2026-08-25T16:00:00+00:00",
       "fin": "2026-08-31T16:00:00+00:00",
       "lignes": 19,
       "octets": 382
      },
      {
-      "chemin": "insiders/okx_funding_inverse_8h/okx_funding_inverse_8h-2026-09.jsonl.gz",
+      "chemin": "series/archives/insiders/okx_funding_inverse_8h/okx_funding_inverse_8h-2026-09.jsonl.gz",
       "debut": "2026-09-01T00:00:00+00:00",
       "fin": "2026-09-30T16:00:00+00:00",
       "lignes": 90,
       "octets": 1347
      },
      {
-      "chemin": "insiders/okx_funding_inverse_8h/okx_funding_inverse_8h-2026-10.jsonl.gz",
+      "chemin": "series/archives/insiders/okx_funding_inverse_8h/okx_funding_inverse_8h-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
       "fin": "2026-10-14T08:00:00+00:00",
       "lignes": 41,
@@ -439,21 +437,21 @@
     "decoupage": "un fichier par mois calendaire, nommé par la clé `ts` de l'enregistrement",
     "fichiers": [
      {
-      "chemin": "insiders/okx_funding_swap_8h/okx_funding_swap_8h-2026-08.jsonl.gz",
+      "chemin": "series/archives/insiders/okx_funding_swap_8h/okx_funding_swap_8h-2026-08.jsonl.gz",
       "debut": "2026-08-25T16:00:00+00:00",
       "fin": "2026-08-31T16:00:00+00:00",
       "lignes": 19,
       "octets": 376
      },
      {
-      "chemin": "insiders/okx_funding_swap_8h/okx_funding_swap_8h-2026-09.jsonl.gz",
+      "chemin": "series/archives/insiders/okx_funding_swap_8h/okx_funding_swap_8h-2026-09.jsonl.gz",
       "debut": "2026-09-01T00:00:00+00:00",
       "fin": "2026-09-30T16:00:00+00:00",
       "lignes": 90,
       "octets": 1367
      },
      {
-      "chemin": "insiders/okx_funding_swap_8h/okx_funding_swap_8h-2026-10.jsonl.gz",
+      "chemin": "series/archives/insiders/okx_funding_swap_8h/okx_funding_swap_8h-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
       "fin": "2026-10-14T08:00:00+00:00",
       "lignes": 41,
@@ -478,14 +476,14 @@
     "decoupage": "un fichier par mois calendaire, nommé par la clé `ts` de l'enregistrement",
     "fichiers": [
      {
-      "chemin": "insiders/okx_liquidations/okx_liquidations-2026-09.jsonl.gz",
+      "chemin": "series/archives/insiders/okx_liquidations/okx_liquidations-2026-09.jsonl.gz",
       "debut": "2026-09-27T14:48:28.470000+00:00",
       "fin": "2026-09-30T19:55:00.931000+00:00",
       "lignes": 4077,
       "octets": 125364
      },
      {
-      "chemin": "insiders/okx_liquidations/okx_liquidations-2026-10.jsonl.gz",
+      "chemin": "series/archives/insiders/okx_liquidations/okx_liquidations-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:09:54.040000+00:00",
       "fin": "2026-10-14T08:47:42.467000+00:00",
       "lignes": 13044,
@@ -514,31 +512,31 @@
     "decoupage": "un fichier par mois calendaire, nommé par la clé `ts` de l'enregistrement",
     "fichiers": [
      {
-      "chemin": "insiders/okx_rubik_ls_1h/okx_rubik_ls_1h-2026-08.jsonl.gz",
+      "chemin": "series/archives/insiders/okx_rubik_ls_1h/okx_rubik_ls_1h-2026-08.jsonl.gz",
       "debut": "2026-08-28T22:00:00+00:00",
       "fin": "2026-08-31T23:00:00+00:00",
       "lignes": 74,
       "octets": 581
      },
      {
-      "chemin": "insiders/okx_rubik_ls_1h/okx_rubik_ls_1h-2026-09.jsonl.gz",
+      "chemin": "series/archives/insiders/okx_rubik_ls_1h/okx_rubik_ls_1h-2026-09.jsonl.gz",
       "debut": "2026-09-01T00:00:00+00:00",
       "fin": "2026-09-30T23:00:00+00:00",
       "lignes": 720,
       "octets": 5175
      },
      {
-      "chemin": "insiders/okx_rubik_ls_1h/okx_rubik_ls_1h-2026-10.jsonl.gz",
+      "chemin": "series/archives/insiders/okx_rubik_ls_1h/okx_rubik_ls_1h-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
-      "fin": "2026-10-14T08:00:00+00:00",
-      "lignes": 321,
-      "octets": 2319
+      "fin": "2026-10-14T09:00:00+00:00",
+      "lignes": 322,
+      "octets": 2326
      }
     ],
-    "lignes": 1115,
-    "octets": 8075,
+    "lignes": 1116,
+    "octets": 8082,
     "debut": "2026-08-28T22:00:00+00:00",
-    "fin": "2026-10-14T08:00:00+00:00",
+    "fin": "2026-10-14T09:00:00+00:00",
     "colonnes": [
      "ts",
      "ratio",
@@ -552,31 +550,31 @@
     "decoupage": "un fichier par mois calendaire, nommé par la clé `ts` de l'enregistrement",
     "fichiers": [
      {
-      "chemin": "insiders/okx_rubik_oi_1h/okx_rubik_oi_1h-2026-08.jsonl.gz",
+      "chemin": "series/archives/insiders/okx_rubik_oi_1h/okx_rubik_oi_1h-2026-08.jsonl.gz",
       "debut": "2026-08-28T22:00:00+00:00",
       "fin": "2026-08-31T23:00:00+00:00",
       "lignes": 74,
       "octets": 1862
      },
      {
-      "chemin": "insiders/okx_rubik_oi_1h/okx_rubik_oi_1h-2026-09.jsonl.gz",
+      "chemin": "series/archives/insiders/okx_rubik_oi_1h/okx_rubik_oi_1h-2026-09.jsonl.gz",
       "debut": "2026-09-01T00:00:00+00:00",
       "fin": "2026-09-30T23:00:00+00:00",
       "lignes": 720,
       "octets": 17665
      },
      {
-      "chemin": "insiders/okx_rubik_oi_1h/okx_rubik_oi_1h-2026-10.jsonl.gz",
+      "chemin": "series/archives/insiders/okx_rubik_oi_1h/okx_rubik_oi_1h-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
-      "fin": "2026-10-14T08:00:00+00:00",
-      "lignes": 321,
-      "octets": 7174
+      "fin": "2026-10-14T09:00:00+00:00",
+      "lignes": 322,
+      "octets": 7201
      }
     ],
-    "lignes": 1115,
-    "octets": 26701,
+    "lignes": 1116,
+    "octets": 26728,
     "debut": "2026-08-28T22:00:00+00:00",
-    "fin": "2026-10-14T08:00:00+00:00",
+    "fin": "2026-10-14T09:00:00+00:00",
     "colonnes": [
      "ts",
      "oi",
@@ -1207,15 +1205,15 @@
      {
       "chemin": "series/archives/sol-radar/signal_events/signal_events-2026-10.csv.gz",
       "debut": "2026-10-01T00:03:15.379695+00:00",
-      "fin": "2026-10-14T09:11:45.670019+00:00",
-      "lignes": 4818,
-      "octets": 142608
+      "fin": "2026-10-14T09:14:58.628359+00:00",
+      "lignes": 4819,
+      "octets": 142640
      }
     ],
-    "lignes": 48596,
-    "octets": 1462475,
+    "lignes": 48597,
+    "octets": 1462507,
     "debut": "2026-06-02T11:30:30.549748+00:00",
-    "fin": "2026-10-14T09:11:45.670019+00:00",
+    "fin": "2026-10-14T09:14:58.628359+00:00",
     "colonnes": [
      "id",
      "timestamp",
@@ -1233,7 +1231,7 @@
    }
   }
  },
- "total_octets": 5756468,
+ "total_octets": 5756955,
  "lecture": "l'index de la branche (`index.json` à la racine) décrit les séries de positionnement, funding et intérêt ouvert ; CE fichier décrit le sous-arbre `series/archives`, que l'autre n'énumère pas",
  "meta": {
   "decoupage": {
