@@ -529,9 +529,11 @@ const PARAM = {
   },
   // Apprendre en se servant du site (plan §10 bis, js/apprendre.js) : la ligne de ce qui vient de se
   // passer reste `dureeLisible` (`dureeComplet`) ms, plus longtemps tant que sa bulle est ouverte ;
-  // un même repère franchi n'est redit qu'après `passageMs` ; la marque « nouveau » est un point de
-  // rayon `marque` (`marqueComplet`, plus discret, en Complet).
-  apprendre: { dureeLisible: 8000, dureeComplet: 6000, passageMs: 15 * 60000, marque: 3, marqueComplet: 2.2 },
+  // un même repère franchi n'est redit qu'après `passageMs`. La première fois qu'une chose apparaît
+  // (plan du 13/10/2026, idée 10), la même ligne dit ce que c'est, aussi longtemps, et jamais moins
+  // de `pause` ms après la ligne d'avant : les explications d'une première visite ne s'enchaînent
+  // pas sans souffle.
+  apprendre: { dureeLisible: 8000, dureeComplet: 6000, passageMs: 15 * 60000, pause: 4000 },
   // Calculette de risque (js/calculette.js, plan du 13/10/2026, idée 7) : la part du capital perdue
   // si tous les paliers se remplissent puis que le stop saute (`part`, en %, la valeur de départ du
   // champ) ; de 1 à `paliersMax` paliers. Sans mémoire : rien n'est gardé d'une ouverture à l'autre.
@@ -3758,7 +3760,7 @@ function calqueDessin() {
   if (guideEtat) guideCalque();
   // Scénarios du matin : l'encadré (relu, pas recalculé).
   if (scenEtat) scenCalque();
-  // Apprendre : ce qui vient de se passer (comparé à l'image d'avant), puis la marque « nouveau ».
+  // Apprendre : ce qui vient de se passer (comparé à l'image d'avant), ou ce qui apparaît pour la première fois.
   apprCalque();
   // Le repère choisi dans la liste « Sur le graphique » : en avant, le reste estompé un moment.
   surbrillanceCalque(W, mainH);
@@ -6069,7 +6071,7 @@ function guidePasseesCompte(E) {
  *  posé ; sinon elle garde son tracé et sa marque, et sa bulle s'ouvre sur le tracé. */
 function guidePasseeLibelle(E) {
   const x = E.passeeDeb, P = PARAM.guide.debutant;
-  if (!x || !debEtat || debEtat.items.length >= P.items) return;
+  if (!x || x.item || !debEtat || debEtat.items.length >= P.items) return;   // déjà posé (apprCeder, la première fois)
   const t = Guide.libellePassee(x.f, P.forme);
   if (!t) return;
   const { g } = E, top = g.pad.top, bas = top + g.ph, H = 17;
@@ -6594,7 +6596,7 @@ function sourceResume(c, vivant, texte) {
 /** La bulle d'une cible, près du curseur, toujours dans le tracé. */
 function guideBulle(c, W, mainH, evite) {
   const E = guideEtat, Sc = scenEtat;
-  apprLu(c);   // la marque « nouveau » de sa nature s'efface ; la bulle d'un message le fait durer
+  apprLu(c);   // sa nature est lue (pas de ligne de première fois pour elle) ; la bulle d'un message le fait durer
   if (Sc && Sc.cibles.includes(c)) Sc.survol = c; else if (E && E.cibles.includes(c)) E.survol = c;
   reperesBulleTitre = c.titre;   // ce que la bulle explique (relu par les tests)
   // Le résumé (niveau 2) d'abord, avec ou sans « Le détail » (option A, 11/10/2026) ; le détail
@@ -8534,19 +8536,23 @@ function drawBandSub(y0, pad, ph, W, gap, data, color, vs, ve, levels, dataMin, 
 // scénario cèdent le temps du message (un redessin du graphique à l'arrivée, un au départ) ;
 // Complet : la même ligne, plus discrète, sans jamais redessiner le graphique, et une case pour la
 // couper (« Choisir l'affichage », samsara-apprendre-v1). Elle ne couvre ni la ligne du prix ni une
-// étiquette. Les marques « nouveau » : un petit point (pas un texte) sur la première étiquette dont
-// la bulle n'a jamais été ouverte, une à la fois ; lue, elle s'efface (samsara-nouveau-v1).
+// étiquette. LA PREMIÈRE FOIS (plan du 13/10/2026, idée 10, à la place du point rond « nouveau ») :
+// quand une chose jamais vue apparaît (une sorte de repère, une figure, un scénario, une figure
+// passée), la même ligne dit en une phrase ce que c'est, quelques secondes, puis plus jamais
+// (samsara-nouveau-v1) ; un vrai événement du marché passe avant elle.
 const apprSuivi = Apprendre.suivi();
 const apprVus = Apprendre.lireVus();
 let apprChoix = Apprendre.lireChoix();
 let apprMsg = null;          // le message en cours (apprAnnoncer)
 let apprMinuterie = null;
-const apprEtat = { ligne: null, marque: null, bulle: 0 };   // relu par les tests : la ligne et la marque posées
-/** Le calque : observer, poser la ligne du message, puis la marque « nouveau ». */
+let apprFinMsg = 0;          // l'heure où la dernière ligne est partie (la pause avant une première fois)
+let apprBulleMs = 0;         // l'heure de la dernière bulle ouverte (on lit : pas de première fois)
+const apprEtat = { ligne: null, bulle: 0 };   // relu par les tests : la ligne posée
+/** Le calque : observer, chercher une chose vue pour la première fois, poser la ligne du message. */
 function apprCalque() {
   apprObserver();
+  apprPremiere();
   apprDessiner();
-  apprMarques();
 }
 /** Compare ce que montre le dernier dessin à l'image d'avant ; annonce le plus important des
  *  changements. Le contexte (paire, intervalle, mode, début de l'historique) est remis à zéro dès que
@@ -8606,8 +8612,10 @@ function apprAnnoncer(e) {
   const avant = apprMsg;
   if (avant) apprRetirer(avant);
   const maintenant = Date.now();
-  apprMsg = { e, T, deb, fin: maintenant + (deb ? P.dureeLisible : P.dureeComplet), cede: !!(avant && avant.cede), item: null, place: null, attente: false,
-    cible: { rects: [], prio: 0, evenement: e.type, coul: COLORS.accent2, titre: T.titre, texte: T.texte, resume: T.resume } };
+  // vue : la ligne a été peinte (une première fois n'est notée vue que si elle l'a été). La cible
+  // d'une première fois porte la nature qu'elle explique : sa bulle ouverte la note lue.
+  apprMsg = { e, T, deb, fin: maintenant + (deb ? P.dureeLisible : P.dureeComplet), cede: !!(avant && avant.cede), item: null, place: null, attente: false, vue: false,
+    cible: { rects: [], prio: 0, evenement: e.source === 'premiere' ? e.cle : e.type, premiere: e.source === 'premiere' ? e.nature : null, coul: COLORS.accent2, titre: T.titre, texte: T.texte, resume: T.resume } };
   clearTimeout(apprMinuterie);
   apprMinuterie = setTimeout(apprVerifierFin, apprMsg.fin - maintenant);
 }
@@ -8617,13 +8625,16 @@ function apprRetirer(m) {
   for (const L of [guideEtat && guideEtat.cibles, scenEtat && scenEtat.cibles]) if (L && L.includes(m.cible)) L.splice(L.indexOf(m.cible), 1);
   m.item = null;
 }
-/** La fin du message : à son heure, ou plus tard si sa bulle est ouverte (lue il y a moins de 1,5 s). */
+/** La fin du message : à son heure, ou plus tard si sa bulle est ouverte (lue il y a moins de 1,5 s).
+ *  Une première fois peinte et restée jusqu'au bout est notée vue : elle ne reviendra plus (coupée
+ *  plus tôt — un événement du marché, la vue qui part dans le passé —, elle reviendra). */
 function apprVerifierFin() {
   apprMinuterie = null;
   const m = apprMsg;
   if (!m) return;
   const reste = Math.max(m.fin, apprEtat.bulle + 1500) - Date.now();
   if (reste > 0) { apprMinuterie = setTimeout(apprVerifierFin, reste); return; }
+  if (m.vue && m.e.source === 'premiere') Apprendre.noterVu(apprVus, m.e.nature);
   apprFermer();
 }
 /** Ferme le message. Une place cédée revient par un redessin ; sinon le calque seul est refait.
@@ -8631,7 +8642,7 @@ function apprVerifierFin() {
 function apprFermer(sansDessin) {
   const m = apprMsg;
   if (!m) return;
-  apprMsg = null; apprEtat.ligne = null;
+  apprMsg = null; apprEtat.ligne = null; apprFinMsg = Date.now();
   clearTimeout(apprMinuterie); apprMinuterie = null;
   apprRetirer(m);
   if (!sansDessin) { if (m.cede) scheduleDraw(); else scheduleCalque(); }
@@ -8644,13 +8655,20 @@ function apprFermer(sansDessin) {
 function apprCeder(E, S) {
   if (!debEtat || !debutant()) return;
   apprObserver(true);
+  if (!apprMsg) apprPremiere(true);   // une première fois qui attendait une place la prend ici
   const m = apprMsg;
   if (!m || !m.deb) return;
   const P = PARAM.guide.debutant;
   m.item = null; m.place = null;
+  // Une première fois est le moins important des textes : le libellé de la figure passée (posé
+  // d'ordinaire après la ligne, s'il reste une place) passe avant elle ; et elle ne fait pas céder
+  // l'étiquette de ce qu'elle explique (la figure, le scénario).
+  const prem = m.e.source === 'premiere';
+  if (prem && E) guidePasseeLibelle(E);
+  const garde = prem ? { figure: 'forme', scenario: 'scenario' }[Apprendre.genre(m.e.nature)] : null;
   for (const role of ['boite', 'forme', 'scenario']) {
     if (debEtat.items.length < P.items) break;
-    if (apprCederRole(role, E, S)) m.cede = true;
+    if (role !== garde && apprCederRole(role, E, S)) m.cede = true;
   }
   m.attente = debEtat.items.length >= P.items;   // aucune place : il n'en redemande pas
   if (!m.attente) m.item = debItem('evenement', '', null);
@@ -8737,8 +8755,8 @@ function apprDessiner() {
   if (deb) {
     cx.globalAlpha = 0.95; cx.fillStyle = COLORS.bulle;
     cx.beginPath(); cx.roundRect(pl.x, pl.y, pl.w, pl.h, rE(5)); cx.fill(); cx.globalAlpha = 1;
-    // Le trait de la couleur des marques « nouveau » (celui de la phrase est accent-2) : ce qui vient
-    // d'arriver ne se confond pas avec la lecture du moment.
+    // Le trait de la couleur de ce qui est nouveau (celui de la phrase est accent-2) : ce qui vient
+    // d'arriver, ou d'apparaître pour la première fois, ne se confond pas avec la lecture du moment.
     cx.fillStyle = COLORS.accent; cx.fillRect(pl.x + 2, pl.y + 3, 2.5, pl.h - 6);
     cx.fillStyle = COLORS.ink1; cx.fillText(pl.t, pl.x + 9, pl.y + 13);
   } else {
@@ -8751,13 +8769,16 @@ function apprDessiner() {
   m.cible.rects = [{ x0: pl.x, y0: pl.y, x1: pl.x + pl.w, y1: pl.y + pl.h }];
   if (!E.cibles.includes(m.cible)) E.cibles.push(m.cible);
   if (m.item) { m.item.texte = pl.t; m.item.rect = { x: pl.x, y: pl.y, w: pl.w, h: pl.h }; }
-  apprEtat.ligne = { type: m.e.type, texte: pl.t, rect: { x: pl.x, y: pl.y, w: pl.w, h: pl.h }, mode: deb ? 'debutant' : 'expert', fin: m.fin };
+  m.vue = true;
+  apprEtat.ligne = { type: m.e.type, nature: m.e.nature || null, texte: pl.t, rect: { x: pl.x, y: pl.y, w: pl.w, h: pl.h }, mode: deb ? 'debutant' : 'expert', fin: m.fin };
   // La clé « ? » du Lisible ne reste pas sous la ligne.
   if (deb && astucePos && pl.y < astucePos.y + astucePos.h && pl.y + pl.h > astucePos.y) astucePlacer();
 }
-/** La nature d'une cible pour les marques « nouveau » (Apprendre.NATURES), ou null (pas marquée). */
+/** La nature d'une cible (Apprendre.NATURES), ou null : ce qu'on explique la première fois, et ce
+ *  qu'une bulle ouverte note lu. La ligne d'une première fois : la nature qu'elle explique. */
 function apprNature(c) {
   if (!c) return null;
+  if (c.premiere) return c.premiere;
   if (c.evenement) return 'evenement:' + c.evenement;
   if (guideEtat && c === guideEtat.ciblePhrase) return 'phrase';
   if (c.niveau && c.niveau.niv) {
@@ -8778,39 +8799,43 @@ function apprCoin(c) {
   const q = et ? { x: et.x, y: et.y, w: et.w, h: (et.lignes ? et.lignes.length : 1) * et.h } : it;
   return q ? { x0: q.x, y0: q.y, x1: q.x + q.w, y1: q.y + q.h } : r;
 }
-/** La marque « nouveau » : un point, en haut à droite de la première étiquette jamais lue (une
- *  seule à la fois) ; plus petit et plus pâle en Complet, où une case la coupe. */
-function apprMarques() {
-  apprEtat.marque = null;
+/** La première fois (plan du 13/10/2026, idée 10) : une chose jamais vue a son étiquette peinte à
+ *  l'écran (une sorte de repère, une figure, un scénario, une figure passée) ; la ligne dit ce que
+ *  c'est (Apprendre.choisirPremiere : une seule, dans l'ordre des natures). Jamais pendant une autre
+ *  ligne ni pendant qu'une bulle est lue, ni moins de PARAM.apprendre.pause ms après l'une ou
+ *  l'autre (rien ne bouge sous le doigt de qui lit), ni pendant l'astuce du Lisible (« Touchez une
+ *  étiquette… » : une aide à la fois), ni l'onglet caché ; en Complet, si sa case est cochée.
+ *  Lisible : au calque, seulement dans une place libre du budget — elle ne fait jamais redessiner
+ *  le graphique pour arriver ; celle qui doit faire céder une place attend le prochain dessin du
+ *  graphique (apprCeder, auDessin), qui la pose sans dessin de plus. */
+function apprPremiere(auDessin) {
   const deb = debutant();
-  if (!geoPrix || (!deb && !apprChoix.marques)) return;
+  // Une étiquette sous le doigt ou le curseur : sa bulle est lue (elle sera peinte après ce calque).
+  if (crossX !== null && crossY !== null && geo && guideCibleSous(crossX, crossY, geo.mainH)) apprBulleMs = Date.now();
+  if (apprMsg || !geoPrix || (!deb && !apprChoix.marques) || (deb && astuceFin !== null)) return;
+  if ((typeof document !== 'undefined' && document.hidden) || Date.now() - Math.max(apprFinMsg, apprBulleMs) < PARAM.apprendre.pause) return;
+  if (deb && !auDessin && (!debEtat || debEtat.items.length >= PARAM.guide.debutant.items)) return;
   const cands = [];
   for (const c of [].concat(guideEtat && overlays.guide ? guideEtat.cibles : [], scenEtat ? scenEtat.cibles : [])) {
     const r = apprCoin(c);
     if (!r || r.x1 - r.x0 < 24 || r.y1 - r.y0 < 10) continue;
     const cle = apprNature(c);
-    if (cle) cands.push({ cle, r });
+    if (cle) cands.push({ cle });
   }
-  const k = Apprendre.choisirMarque(cands, apprVus);
-  if (!k) return;
-  const R = deb ? PARAM.apprendre.marque : PARAM.apprendre.marqueComplet, x = k.r.x1 - R + 0.5, y = k.r.y0 + R - 0.5;
-  cx.save();
-  cx.globalAlpha = deb ? 1 : 0.7;
-  cx.fillStyle = COLORS.bulle; cx.beginPath(); cx.arc(x, y, R + 1.2, 0, Math.PI * 2); cx.fill();
-  cx.fillStyle = COLORS.accent; cx.beginPath(); cx.arc(x, y, R, 0, Math.PI * 2); cx.fill();
-  cx.restore();
-  apprEtat.marque = { cle: k.cle, x, y, r: R };
+  const k = Apprendre.choisirPremiere(cands, apprVus);
+  if (k) apprAnnoncer(Apprendre.premiere(k.cle));
 }
-/** Une bulle s'ouvre (guideBulle) : sa nature est lue (sa marque s'efface) ; celle du message en
- *  cours le fait durer tant qu'elle reste ouverte. */
+/** Une bulle s'ouvre (guideBulle) : sa nature est lue (elle n'aura pas de ligne de première fois) ;
+ *  celle du message en cours le fait durer tant qu'elle reste ouverte. */
 function apprLu(c) {
-  if (apprMsg && c === apprMsg.cible) apprEtat.bulle = Date.now();
-  if (Apprendre.noterVu(apprVus, apprNature(c))) scheduleCalque();
+  apprBulleMs = Date.now();
+  if (apprMsg && c === apprMsg.cible) apprEtat.bulle = apprBulleMs;
+  Apprendre.noterVu(apprVus, apprNature(c));
 }
 /** Complet : « Aide à la lecture » dans « Choisir l'affichage », deux cases gardées sous
  *  samsara-apprendre-v1 (le Lisible n'a pas de choix : les deux y sont toujours). */
 const AIDES_LECTURE = [['evenements', 'Dire ce qui vient de se passer', 'Une ligne discrète, quelques secondes, quand le prix casse un niveau, qu’une figure est validée ou tombe, qu’un scénario touche sa cible ou tombe.'],
-  ['marques', 'Marquer ce qui est nouveau', 'Un petit point sur une étiquette jamais ouverte ; il s’efface quand sa bulle a été lue.']];
+  ['marques', 'Expliquer ce qui apparaît pour la première fois', 'Une ligne discrète, une seule fois, quand un repère, une figure ou un scénario apparaît pour la première fois.']];
 function apprPanneau() {
   return '<div class="cat-title aff-aide-titre">Aide à la lecture</div>' + AIDES_LECTURE.map(([k, nom, quoi]) =>
     `<label class="aff-ligne aff-aide" data-aide="${k}"><input type="checkbox"${apprChoix[k] ? ' checked' : ''} onchange="choisirApprendre('${k}', this.checked)">`
@@ -8819,7 +8844,8 @@ function apprPanneau() {
 function choisirApprendre(k, on) {
   apprChoix[k] = !!on;
   Apprendre.noterChoix(apprChoix);
-  if (k === 'evenements' && !on) apprFermer(true);
+  // La ligne en cours de l'aide coupée part aussitôt (« marques » : la première fois).
+  if (!on && apprMsg && (apprMsg.e.source === 'premiere') === (k === 'marques')) apprFermer(true);
   scheduleCalque();
 }
 

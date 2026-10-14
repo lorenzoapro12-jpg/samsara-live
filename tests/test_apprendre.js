@@ -21,9 +21,16 @@
 //      « validé » = 2 fins au-delà de la ligne, « invalidé » = une fin au-delà du niveau qui annule ;
 //   4. L'AVERTISSEMENT d'une ligne dans les bulles de figure (en cours et passées, les deux modes),
 //      pour chaque figure de la fixture ;
-//   5. « NOUVEAU » : clé versionnée, lue et écrite sous try/catch (stockage absent, qui lève,
-//      illisible), une marque à la fois dans l'ordre des natures ; les choix du Complet gardés ;
-//   6. les paramètres de la page (PARAM.apprendre, la limite de la ligne = celle de la phrase).
+//   5. LA PREMIÈRE FOIS (plan du 13/10/2026, idée 10 ; elle remplace le point rond « nouveau ») :
+//      clé versionnée, lue et écrite sous try/catch (stockage absent, qui lève, illisible) ; une
+//      chose à la fois, dans l'ordre des natures, seulement celles qui ont une phrase (pas la phrase
+//      du Lisible, pas un événement : ils se disent eux-mêmes) ; après tout ORDRE (un vrai événement
+//      passe avant, elle n'en remplace aucun) ; ses mots pour chaque sorte de repère, chaque figure,
+//      le scénario, la figure passée : une phrase, 90 caractères au plus et une variante de 48, sans
+//      mot banni, conseil, prévision ni « % », l'avertissement d'une ligne en dernier, les mots de la
+//      bulle du repère (Guide.quoiDebutant) ; les choix du Complet gardés ;
+//   6. les paramètres de la page (PARAM.apprendre, la limite de la ligne = celle de la phrase) ; plus
+//      de point rond dessiné.
 // USAGE   node tests/test_apprendre.js
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const REPO = path.resolve(__dirname, '..');
@@ -288,38 +295,78 @@ titre('4. La ligne du risque : la même, dans chaque bulle de figure (en cours, 
   check('la ligne du risque devant l’avertissement : le paragraphe reste un avertissement (le résumé l’ôte comme avant), sans nombre', estAv(G.RISQUE + ' Une lecture débattue, pas une prévision ni un conseil.') && nombresDe(G.RISQUE) === 0, null);
 }
 
-// ── 5. « Nouveau » ──
-titre('5. « Nouveau » : la mémoire des natures lues, une marque à la fois, sans stockage aussi');
+// ── 5. La première fois ──
+// Changé exprès (plan du 13/10/2026, idée 10) : le point rond « nouveau » (choisirMarque) devient une
+// ligne, la première fois qu'une chose apparaît (choisirPremiere, premiere, textes).
+titre('5. La première fois : la mémoire des natures vues, une ligne à la fois, sans stockage aussi');
 {
   const magasin = () => { const m = {}; return { m, getItem: k => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); } }; };
   const S = magasin();
   check(`clé versionnée, propre à cette mémoire (« ${A.CLE_VUS} », « ${A.CLE_CHOIX} »)`, /-v\d+$/.test(A.CLE_VUS) && /-v\d+$/.test(A.CLE_CHOIX) && A.CLE_VUS !== A.CLE_CHOIX && !/astuce|mode|theme/.test(A.CLE_VUS), null);
   let vus = A.lireVus(S);
-  check('premier passage : rien de lu', vus.size === 0, [...vus]);
-  const cands = [{ cle: 'figure:double_creux' }, { cle: 'repere:hier_haut' }, { cle: 'phrase' }, { cle: 'repere:sr' }, { cle: 'evenement:repere_casse' }];
-  check('une seule marque, la première nature de l’ordre (la phrase d’abord)', A.choisirMarque(cands, vus).cle === 'phrase', A.choisirMarque(cands, vus));
-  check('lue : noterVu → true, puis false (une fois)', A.noterVu(vus, 'phrase', S) === true && A.noterVu(vus, 'phrase', S) === false, null);
-  check('la marque passe à la suivante (un repère, dans l’ordre de l’écran)', A.choisirMarque(cands, vus).cle === 'repere:hier_haut', A.choisirMarque(cands, vus));
-  check(`gardée dans le stockage (${A.CLE_VUS} = ${S.m[A.CLE_VUS]}) et relue au rechargement`, JSON.parse(S.m[A.CLE_VUS]).includes('phrase') && A.lireVus(S).has('phrase'), S.m);
-  for (const c of cands) A.noterVu(vus, c.cle, S);
-  check('tout lu : plus aucune marque', A.choisirMarque(cands, vus) === null, null);
+  check('premier passage : rien de vu', vus.size === 0, [...vus]);
+  const cands = [{ cle: 'figure:double_creux' }, { cle: 'repere:hier_haut' }, { cle: 'phrase' }, { cle: 'repere:sr' }, { cle: 'evenement:repere_casse' }, { cle: 'repere:inconnu' }];
+  const ch = () => { const k = A.choisirPremiere(cands, vus); return k ? k.cle : null; };
+  check('une seule chose, la première nature de l’ordre qui a une phrase (un repère : la phrase du Lisible et un événement se disent eux-mêmes)', ch() === 'repere:hier_haut', ch());
+  check('vue : noterVu → true, puis false (une fois)', A.noterVu(vus, 'repere:hier_haut', S) === true && A.noterVu(vus, 'repere:hier_haut', S) === false, null);
+  check('la suivante : l’autre repère (dans l’ordre de l’écran), puis la figure', ch() === 'repere:sr' && (A.noterVu(vus, 'repere:sr', S), ch() === 'figure:double_creux'), ch());
+  check(`gardée dans le stockage (${A.CLE_VUS} = ${S.m[A.CLE_VUS]}) et relue au rechargement : plus jamais`, JSON.parse(S.m[A.CLE_VUS]).includes('repere:hier_haut') && A.lireVus(S).has('repere:hier_haut') && A.choisirPremiere([{ cle: 'repere:hier_haut' }], A.lireVus(S)) === null, S.m);
+  A.noterVu(vus, 'figure:double_creux', S);
+  check('tout vu : plus aucune ligne (ni pour une nature sans phrase)', ch() === null, null);
   const leve = { getItem() { throw new Error('bloqué'); }, setItem() { throw new Error('bloqué'); } };
   let okLeve = true;
-  try { const v = A.lireVus(leve); A.noterVu(v, 'phrase', leve); okLeve = v.has('phrase') && A.lireChoix(leve).evenements === true && A.noterChoix({ evenements: false, marques: true }, leve) === false; } catch (e) { okLeve = false; }
+  try { const v = A.lireVus(leve); A.noterVu(v, 'scenario', leve); okLeve = v.has('scenario') && A.choisirPremiere([{ cle: 'scenario' }], v) === null && A.lireChoix(leve).evenements === true && A.noterChoix({ evenements: false, marques: true }, leve) === false; } catch (e) { okLeve = false; }
   check('stockage qui lève (navigation privée) : rien ne casse, la mémoire de la page suffit', okLeve, null);
   check('stockage absent (null) : rien ne casse', A.lireVus(null).size === 0 && A.noterVu(new Set(), 'x', null) === true, null);
   const abime = { getItem: () => '{pas du json', setItem() {} };
   check('stockage illisible : vide, sans erreur', A.lireVus(abime).size === 0 && A.lireChoix(abime).marques === true, null);
   const S2 = magasin();
-  check('Complet : les deux aides allumées d’origine', JSON.stringify(A.lireChoix(S2)) === JSON.stringify({ evenements: true, marques: true }), A.lireChoix(S2));
+  check('Complet : les deux aides allumées d’origine (la clé « marques » gardée : un choix déjà fait reste fait)', JSON.stringify(A.lireChoix(S2)) === JSON.stringify({ evenements: true, marques: true }), A.lireChoix(S2));
   A.noterChoix({ evenements: false, marques: false }, S2);
   check('un clic coupe : le choix est gardé (relu tel quel)', JSON.stringify(A.lireChoix(S2)) === JSON.stringify({ evenements: false, marques: false }) && /"evenements":false/.test(S2.m[A.CLE_CHOIX]), S2.m);
+  // La priorité : après tout ORDRE.
+  const p = A.premiere('repere:sr');
+  check(`l’« événement » de la première fois (« ${p.type} », clé « ${p.cle} ») passe après tout ORDRE : chaque vrai événement le remplace, il n’en remplace aucun`,
+    p.type === A.PREMIERE && p.nature === 'repere:sr' && !A.ORDRE.includes(p.type) && A.rang(p) === A.ORDRE.length && A.ORDRE.every(t => A.remplace(p, { type: t }) && !A.remplace({ type: t }, p)) && A.remplace(null, p), null);
+  // Les mots, pour chaque nature qui a une phrase.
+  const natures = Object.keys(G.NOMS_DEBUTANT).map(k => 'repere:' + k).concat(Object.keys(G.NOM_FORME_DEBUTANT).map(t => 'figure:' + t), ['scenario', 'passee']);
+  const mal = [], longs = [], courts = [], phrases = [], nb = [], av = [], malX = [], exact = [];
+  for (const n of natures) {
+    const D = A.textes(p.nature === n ? p : A.premiere(n), 'debutant', { unite: '$', itv: '15m' }), X = A.textes(A.premiere(n), 'expert', { unite: '$', itv: '15m' });
+    if (!D || !X) { mal.push({ n, absent: true }); continue; }
+    const tout = [D.titre].concat(D.variantes, D.texte, [].concat(...(D.resume || []))).join(' \n ');
+    if (G.motsBannis(tout).length || CONSEIL.test(tout) || PREVISION.test(tout) || /%/.test(tout)) mal.push({ n, bannis: G.motsBannis(tout), t: tout.slice(0, 160) });
+    if (D.variantes.some(v => v.length > P.guide.debutant.evenement)) longs.push({ n, v: D.variantes });
+    // Et une de 36 au plus : à 390 px, les polices à chasse fixe (Néon, Diazo, Cyanotype) n'en tiennent pas plus.
+    if (!D.variantes.some(v => v.length <= P.guide.debutant.evenementEtroit) || !D.variantes.some(v => v.length <= 36)) courts.push({ n, v: D.variantes });
+    // Une phrase : un seul point final, aucune phrase qui commence après un point.
+    if (D.variantes.concat(X.variantes).some(v => !/\.$/.test(v) || /[.!?]\s+\p{Lu}/u.test(v))) phrases.push({ n, v: D.variantes });
+    for (const ph of D.resume || []) for (const v of ph) if (nombresDe(D.titre) + nombresDe(v) > P.guide.debutant.bulleNombres) nb.push({ n, v });
+    if (!AVERT(D.texte[D.texte.length - 1]) || !AVERT(X.texte[X.texte.length - 1]) || X.resume !== null) av.push(n);
+    if (CONSEIL.test(X.variantes.concat(X.texte).join(' ').replace(/pas une recommandation/g, '')) || PREVISION.test(X.variantes.join(' '))) malX.push(n);
+    // Les mots de la bulle du repère (Guide.quoiDebutant), dans la ligne entière.
+    if (n.startsWith('repere:')) {
+      const q = G.quoiDebutant({ cle: n === 'repere:options' ? 'call_wall' : n.slice(7) });
+      if (!D.variantes[0].includes(q.charAt(0).toLowerCase() + q.slice(1)) || !D.variantes[0].startsWith(G.NOMS_DEBUTANT[n.slice(7)][0] + ' : ')) exact.push({ n, v: D.variantes[0], q });
+    } else if (n.startsWith('figure:') && !D.variantes[0].startsWith(G.NOM_LONG_DEBUTANT[n.slice(7)] + ' : ')) exact.push({ n, v: D.variantes[0] });
+  }
+  check(`${natures.length} natures (${Object.keys(G.NOMS_DEBUTANT).length} sortes de repère, ${Object.keys(G.NOM_FORME_DEBUTANT).length} figures, le scénario, la figure passée) : chacune a sa phrase, sans mot banni, conseil, prévision ni « % »`, natures.length === 28 && !mal.length, mal.slice(0, 3));
+  check(`Lisible : chaque variante en ${P.guide.debutant.evenement} caractères au plus, et toujours une de ${P.guide.debutant.evenementEtroit} au plus (téléphone), et une de 36 au plus (chasse fixe au téléphone)`, !longs.length && !courts.length, longs.concat(courts).slice(0, 3));
+  check('une phrase, une idée : un seul point, à la fin (les deux modes)', !phrases.length, phrases.slice(0, 3));
+  check(`résumé du Lisible : ${P.guide.debutant.bulleNombres} nombres au plus par phrase, titre compris`, !nb.length, nb.slice(0, 3));
+  check('les deux modes : l’avertissement d’une ligne en dernier ; le Complet sans résumé, sans conseil', !av.length && !malX.length, { av, malX });
+  check('les mots EXACTS : le nom de l’étiquette (Lisible), puis, pour un repère, les mots de sa bulle (Guide.quoiDebutant)', !exact.length, exact.slice(0, 3));
+  const ex = A.textes(A.premiere('repere:hier_haut'), 'debutant', {});
+  check(`exemple : « ${ex.variantes[0]} »`, ex.variantes[0] === 'Haut d’hier : le prix le plus haut atteint hier.' && ex.titre === 'Haut d’hier', ex);
+  check('aucune phrase pour une nature inconnue, la phrase du Lisible ou un événement', ['repere:inconnu', 'figure:inconnue', 'phrase', 'evenement:repere_casse', 'scenario:x'].every(n => A.textes(A.premiere(n), 'debutant', {}) === null && A.choisirPremiere([{ cle: n }], new Set()) === null), null);
 }
 
 // ── 6. La page ──
 titre('6. La page : paramètres et chargement');
 {
-  check('PARAM.apprendre : durées (Lisible plus longue que Complet), passage, rayons des marques (Complet plus discret)', P.apprendre && P.apprendre.dureeLisible > P.apprendre.dureeComplet && P.apprendre.dureeComplet >= 4000 && P.apprendre.passageMs >= 60000 && P.apprendre.marqueComplet < P.apprendre.marque, P.apprendre);
+  // Changé exprès (idée 10 du 13/10/2026) : plus de rayons de marque ; la pause entre deux lignes.
+  check('PARAM.apprendre : durées (Lisible plus longue que Complet), passage, pause avant une première fois (plus courte que la ligne), plus de rayon de marque', P.apprendre && P.apprendre.dureeLisible > P.apprendre.dureeComplet && P.apprendre.dureeComplet >= 4000 && P.apprendre.passageMs >= 60000
+    && P.apprendre.pause >= 1000 && P.apprendre.pause < P.apprendre.dureeComplet && !('marque' in P.apprendre) && !('marqueComplet' in P.apprendre), P.apprendre);
   check('la ligne du Lisible a la limite de la phrase (90, 48 au téléphone)', P.guide.debutant.evenement === P.guide.debutant.phrase && P.guide.debutant.evenementEtroit === P.guide.debutant.phraseEtroit, P.guide.debutant);
   const html = fs.readFileSync(path.join(REPO, 'index.html'), 'utf8');
   const iA = html.indexOf('<script defer src="js/apprendre.js"'), iG = html.indexOf('<script defer src="js/guide.js"'), iApp = html.indexOf('<script defer src="js/app.js"');
@@ -338,6 +385,8 @@ titre('6. La page : paramètres et chargement');
     i0 > 0 && i1 > i0 && bloc.length > 5000 && !CONSEIL.test(bloc) && !ACCUSE.test(bloc) && minuteries.length === 2 && minuteries.every(m => /^setTimeout\(apprVerifierFin, /.test(m))
     && /function apprAnnoncer[\s\S]*?apprMinuterie = setTimeout\(apprVerifierFin/.test(bloc) && /function apprVerifierFin[\s\S]*?if \(!m\) return;/.test(bloc), { minuteries, conseil: (bloc.match(CONSEIL) || [])[0], accuse: (bloc.match(ACCUSE) || [])[0] });
   check('dans la page, le cœur est chargé (Apprendre.suivi) et sa mémoire lue', vm.runInContext('typeof Apprendre === "object" && apprVus instanceof Set && typeof apprCalque === "function"', PAGE) === true, null);
+  check('js/app.js, bloc « Apprendre » : plus de point rond « nouveau » (ni apprMarques ni arc dessiné) ; la première fois passe par la ligne (apprPremiere → apprAnnoncer ; au dessin du graphique, apprCeder, quand elle doit faire céder une place), notée vue à la fin de la ligne seulement si elle a été peinte',
+    !/apprMarques|\.arc\(|apprEtat\.marque/.test(bloc) && /function apprPremiere\(auDessin\)[\s\S]*?apprAnnoncer\(Apprendre\.premiere\(/.test(bloc) && /function apprCeder\(E, S\)[\s\S]*?if \(!apprMsg\) apprPremiere\(true\);/.test(bloc) && /if \(m\.vue && m\.e\.source === 'premiere'\) Apprendre\.noterVu\(apprVus, m\.e\.nature\);\s*apprFermer\(\);/.test(bloc), null);
 }
 
 console.log(ko ? `\n❌ APPRENDRE : ${ko} contrôle(s) en échec` : '\n✅ APPRENDRE : TOUS LES CONTRÔLES PASSENT');

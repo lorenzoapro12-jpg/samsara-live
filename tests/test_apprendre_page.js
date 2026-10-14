@@ -3,9 +3,10 @@
 // un repère comme le ferait le marché (fetchPrice de la page). Le cœur pur est vérifié par
 // test_apprendre.js.
 //
+//   Les sections 1 à 3 jouent un visiteur qui a déjà tout vu (samsara-nouveau-v1 rempli) : la ligne
+//   de la première fois ne s'y mêle pas aux événements (elle a sa section, 4).
 //   1. LISIBLE (1440 au survol, 390 au toucher) :
-//      · au chargement : aucune ligne ; UNE marque « nouveau » (un point, pas un texte), sur le
-//        libellé de la 1re nature jamais lue ;
+//      · au chargement : aucune ligne ;
 //      · le prix live passe au-delà de la bande du repère du dessus : UNE ligne « ce qui vient de se
 //        passer », dans le budget (au plus 5 textes, journal de fillText = registre), ni sur la ligne
 //        du prix, ni sur le badge, ni sur un autre texte ; ses mots exacts (« pas encore cassé ») ;
@@ -13,8 +14,6 @@
 //        ligne du risque ; elle s'efface seule (PARAM.apprendre.dureeLisible, horloge avancée), la
 //        place cédée revient ; rien n'est redit ensuite ;
 //      · le prix repasse sous la bande : la ligne au présent s'efface aussitôt (plus vraie) ;
-//      · la marque lue (sa bulle ouverte) s'efface et ne revient pas au rechargement
-//        (samsara-nouveau-v1) ;
 //      · la vue dans le passé : aucun message (ni au retour au présent) ; les bulles des figures
 //        passées et des figures en cours ont la ligne du risque ;
 //      · le menu du Lisible n'a pas de case (les deux aides y sont toujours).
@@ -22,9 +21,22 @@
 //      1re cible du scénario 1 touchée ET le repère franchi → UN message, le plus important
 //      (Apprendre.ORDRE : la cible du scénario) ; la bulle du scénario a la ligne du risque.
 //   3. COMPLET (1440 et 390) : la même ligne, discrète (9 px, encre pâle), sans redessiner le
-//      graphique ni à l'arrivée ni au départ ; une marque plus petite ; « Aide à la lecture » dans
-//      « Choisir l'affichage » : décochées, plus de ligne ni de marque, choix gardé au rechargement
+//      graphique ni à l'arrivée ni au départ ; « Aide à la lecture » dans « Choisir l'affichage » :
+//      décochées, plus de ligne, ni d'événement ni de première fois, choix gardé au rechargement
 //      (samsara-apprendre-v1) ; ni « Débutant » ni « Expert » écrit.
+//   4. LA PREMIÈRE FOIS (plan du 13/10/2026, idée 10 ; elle remplace le point rond « nouveau »),
+//      visiteur nouveau (stockage vide) :
+//      · Lisible (1440, 390) : pas pendant l'astuce « Touchez une étiquette… » ; puis UNE ligne dit
+//        ce qu'est une chose jamais vue, à l'écran (sa phrase exacte), dans le budget des 5 textes,
+//        ni sur le prix ni sur un texte ; jamais d'arc dessiné ; à son heure elle part, sa place
+//        rendue, notée vue (samsara-nouveau-v1) ; une pause, puis la suivante (une autre chose) ;
+//        un vrai événement du marché la remplace aussitôt, et elle revient ensuite (pas notée) ;
+//        sa bulle (résumé : 4 lignes, 3 nombres, sans mot banni) la note lue ; rechargé : ce qui a
+//        été vu ne revient jamais ;
+//      · Complet (1440, 390) : la ligne discrète, sans redessiner le graphique ;
+//      · six thèmes à 390 px (aero, bureau95, bureau95-contraste, gazette, neon, diazo) : la ligne
+//        dans le budget, aux couleurs du thème (encre 1, trait accent, fond bulle), carrée quand les
+//        étiquettes le sont.
 //   Partout : aucune erreur JavaScript ; pas de défilement horizontal à 390 px.
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
 // USAGE   node tests/test_apprendre_page.js
@@ -79,6 +91,9 @@ function scenarios() {
     }
   } });
 }
+// Toutes les natures qui ont une ligne de première fois (et la phrase) : le visiteur des sections 1 à
+// 3 les a déjà vues ; la première fois a sa section (4).
+const TOUT_VU = ['phrase', 'scenario', 'passee'].concat(Object.keys(G.NOMS_DEBUTANT).map(k => 'repere:' + k), Object.keys(G.NOM_FORME_DEBUTANT).map(t => 'figure:' + t));
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.svg': 'image/svg+xml' };
 const serveur = http.createServer((req, res) => {
   const f = path.join(REPO, decodeURIComponent(req.url.split('?')[0]));
@@ -87,8 +102,9 @@ const serveur = http.createServer((req, res) => {
   fs.createReadStream(f).pipe(res);
 });
 
-/** Ouvre la page. o : mode, w, h, scen (les scénarios du matin servis). Le stockage n'est vidé qu'au
- *  1er chargement de l'onglet : un rechargement garde les marques lues et les choix. */
+/** Ouvre la page. o : mode, w, h, scen (les scénarios du matin servis), theme (aero d'origine), vus
+ *  (les natures déjà vues : TOUT_VU, ou rien). Le stockage n'est vidé qu'au 1er chargement de
+ *  l'onglet : un rechargement garde ce qui a été vu et les choix. */
 async function ouvrir(nav, o) {
   etat.live = null; etat.scen = !!o.scen;
   const tactile = o.w < 500;
@@ -107,13 +123,14 @@ async function ouvrir(nav, o) {
     }
     return r.abort();
   });
-  await page.addInitScript(([m, scen]) => {
+  await page.addInitScript(([m, scen, theme, vus]) => {
     try {
       if (!sessionStorage.getItem('__ouvert')) {
         sessionStorage.setItem('__ouvert', '1');
         localStorage.clear();
-        localStorage.setItem('samsara-theme', 'aero'); localStorage.setItem('samsara-mode', m);
+        localStorage.setItem('samsara-theme', theme); localStorage.setItem('samsara-mode', m);
         if (!scen) localStorage.setItem('samsara-scenarios-v1', '0');
+        if (vus) localStorage.setItem('samsara-nouveau-v1', JSON.stringify(vus));
       }
     } catch (e) { /* */ }
     // Le journal des textes et des points dessinés (canvas, texte, police, couleur), actif entre deux marqueurs.
@@ -127,7 +144,7 @@ async function ouvrir(nav, o) {
       if (window.__ftOn) window.__arc.push({ c: this.canvas && this.canvas.id, x, y, r });
       return a0.apply(this, arguments);
     };
-  }, [o.mode, !!o.scen]);
+  }, [o.mode, !!o.scen, o.theme || 'aero', o.vus || null]);
   await page.goto(`http://127.0.0.1:${serveur.address().port}/index.html`);
   await attendre(page, !!o.scen);
   return { ctx, page, erreurs, tactile, w: o.w };
@@ -154,7 +171,7 @@ async function prix(o, p) {
   await o.page.evaluate(() => fetchPrice());
   await o.page.waitForTimeout(200);
 }
-/** Un dessin forcé, journalisé : les textes du tracé, le registre, la ligne, la marque, les points. */
+/** Un dessin forcé, journalisé : les textes du tracé, le registre, la ligne, les arcs du calque, l'astuce. */
 const cadre = page => page.evaluate(() => {
   crossX = crossY = null; bulleDetail = null;
   window.__ft = []; window.__arc = []; window.__ftOn = true;
@@ -164,13 +181,13 @@ const cadre = page => page.evaluate(() => {
   const fil = (NOMS_PAIRES[activeSymbol] || activeSymbol) + '  ·  ' + Guide.nomIntervalle(chartInterval);
   const trace = window.__ft.filter(e => (e.c === 'chart' || e.c === 'chartCalque') && e.t !== fil && e.x >= 14 && e.x < xAxe && e.y >= 0 && e.y <= mainH - 20);
   const yLive = isNum(live) ? geoPrix.top + geoPrix.ph * (1 - (live - geoPrix.minP) / geoPrix.range) : null;
-  const R = debutant() ? PARAM.apprendre.marque : PARAM.apprendre.marqueComplet;
   return {
     W, mainH, xAxe, yLive, live, etroit: W - 16 - 75 < PARAM.guide.debutant.etroit, top: geoPrix.top, bas: geoPrix.top + geoPrix.ph, mode: document.documentElement.getAttribute('data-mode'),
     trace: trace.map(e => e.t), journal: trace.map(e => ({ t: e.t, police: e.police, coul: e.coul })),
     items: debEtat ? debEtat.items.map(i => ({ role: i.role, texte: i.texte, rect: i.rect })) : null, nItemsMax: PARAM.guide.debutant.items,
-    ligne: apprEtat.ligne, marque: apprEtat.marque, msg: apprMsg ? { type: apprMsg.e.type, cede: apprMsg.cede, fin: apprMsg.fin } : null, maintenant: Date.now(),
-    points: window.__arc.filter(a => a.c === 'chartCalque' && Math.abs(a.r - R) < 1e-6).length,
+    ligne: apprEtat.ligne, msg: apprMsg ? { type: apprMsg.e.type, nature: apprMsg.e.nature || null, cede: apprMsg.cede, fin: apprMsg.fin } : null, maintenant: Date.now(),
+    // Le point rond « nouveau » n'existe plus (idée 10 du 13/10/2026) : aucun arc sur le calque.
+    arcs: window.__arc.filter(a => a.c === 'chartCalque').length, astuce: astuceFin !== null,
     rects: (guideEtat ? guideEtat.rects : []).concat(scenEtat ? scenEtat.rects : []),
     badge: isNum(live) ? { x: xAxe, y: yLive - 10, w: 75, h: 20 } : null,
     encre3: COLORS.ink3, boite: scenEtat && scenEtat.boite ? { cede: !!scenEtat.boite.cede } : null,
@@ -198,12 +215,11 @@ const repereDessous = (page, sous) => page.evaluate(sous => {
   return L ? { p: L.niv.p, lo: L.niv.lo, hi: L.niv.hi } : null;
 }, sous || null);
 /** Le centre d'une cible (sa zone de survol) où guideCibleSous la trouve bien : 'ligne' (le message),
- *  'marque' (l'étiquette marquée), ou un filtre sur les cibles. */
+ *  ou un filtre sur les cibles. */
 const pointCible = (page, quoi) => page.evaluate(quoi => {
   const b = canvas.getBoundingClientRect(), mainH = geo.mainH;
   const toutes = [].concat(guideEtat ? guideEtat.cibles : [], scenEtat ? scenEtat.cibles : []);
   const C = quoi === 'ligne' ? toutes.filter(c => apprMsg && c === apprMsg.cible)
-    : quoi === 'marque' ? toutes.filter(c => apprEtat.marque && apprNature(c) === apprEtat.marque.cle)
     : quoi === 'passee' ? toutes.filter(c => c.passee) : quoi === 'figure' ? toutes.filter(c => c.figure)
     : quoi === 'scenario' ? toutes.filter(c => scenEtat && scenEtat.cibles.includes(c) && c.scenario) : [];
   for (const c of C) for (const r of (c.rects || []).concat(c.zones || [])) {
@@ -258,26 +274,14 @@ function controlerLisible(e, nom) {
     // ── 1. Lisible ──
     for (const [w, h] of [[1440, 900], [390, 844]]) {
       titre(`1. Lisible · ${w} px (${w < 500 ? 'toucher' : 'survol'})`);
-      let o = await ouvrir(nav, { mode: 'debutant', w, h });
+      // Un visiteur qui a déjà tout vu : aucune ligne de première fois (section 4).
+      let o = await ouvrir(nav, { mode: 'debutant', w, h, vus: TOUT_VU });
       const P = await o.page.evaluate(() => PARAM.apprendre);
       // Au chargement.
       await prix(o, null);
       const e0 = await cadre(o.page);
-      check(`au chargement : aucun message, aucune ligne ; ${e0.trace.length} textes (≤ ${e0.nItemsMax})`, !e0.msg && !e0.ligne && !e0.items.some(i => i.role === 'evenement') && e0.trace.length <= e0.nItemsMax, { msg: e0.msg, items: e0.items });
-      check(`UNE marque « nouveau » (« ${e0.marque && e0.marque.cle} »), un point de ${P.marque} px et pas un texte`, !!e0.marque && e0.points === 1 && e0.trace.length === e0.items.length, { marque: e0.marque, points: e0.points });
+      check(`au chargement : aucun message, aucune ligne ; ${e0.trace.length} textes (≤ ${e0.nItemsMax}) ; aucun point rond « nouveau » (${e0.arcs} arc)`, !e0.msg && !e0.ligne && !e0.items.some(i => i.role === 'evenement') && e0.trace.length <= e0.nItemsMax && e0.arcs === 0 && e0.trace.length === e0.items.length, { msg: e0.msg, items: e0.items, arcs: e0.arcs });
       check(`pas de défilement horizontal`, !e0.defile, null);
-      // La marque : elle est sur une étiquette ; sa bulle lue, elle s'efface.
-      const cleLue = e0.marque && e0.marque.cle;
-      const pm = await pointCible(o.page, 'marque');
-      check(`la marque est sur une étiquette qu'on peut ${o.tactile ? 'toucher' : 'survoler'} (« ${pm && pm.cle} »)`, !!pm && pm.cle === cleLue, pm);
-      if (pm) {
-        await montrer(o, pm);
-        const lu = await o.page.evaluate(k => ({ vus: apprVus.has(k), stocke: (() => { try { return JSON.parse(localStorage.getItem('samsara-nouveau-v1') || '[]'); } catch (e) { return null; } })() }), cleLue);
-        await ailleurs(o);
-        const e1 = await cadre(o.page);
-        check(`sa bulle ouverte : « ${cleLue} » lue, gardée (samsara-nouveau-v1) ; la marque n'y est plus (maintenant : « ${e1.marque ? e1.marque.cle : 'aucune'} »), un point au plus`,
-          lu.vus && Array.isArray(lu.stocke) && lu.stocke.includes(cleLue) && (!e1.marque || e1.marque.cle !== cleLue) && e1.points <= 1, { lu, marque: e1.marque, points: e1.points });
-      }
       // Le prix live passe au-delà de la bande du repère du dessus.
       const p0 = await o.page.evaluate(() => livePrice);
       const rd = await repereDessus(o.page);
@@ -306,7 +310,7 @@ function controlerLisible(e, nom) {
         check(`${o.tactile ? '2e toucher' : 'clic'} : le DÉTAIL dit le mot (« cassé » = 2 fins au-delà) et l’avertissement (« pas une prévision ni un conseil », une fois), sans conseil`,
           !!b2 && !b2.resume && /pas une prévision ni un conseil/.test(b2.corps) && !b2.corps.includes(G.RISQUE) && /2 quarts d’heure/.test(b2.corps) && !CONSEIL.test(b2.corps) && !/%/.test(b2.corps), b2);
         const lu = await o.page.evaluate(() => apprVus.has('evenement:repere_passe'));
-        check('la bulle du message lue : sa nature notée (plus de marque pour elle)', lu, null);
+        check('la bulle du message lue : sa nature notée lue', lu, null);
         await ailleurs(o);
       }
       // Elle s'efface seule ; la place revient.
@@ -321,15 +325,14 @@ function controlerLisible(e, nom) {
       await o.page.evaluate(() => { dessinerCalque(); drawChart(); dessinerCalque(); });
       const r4 = await o.page.evaluate(() => ({ msg: !!apprMsg, n: window.__evts.length }));
       check('le prix reste au-delà : rien n’est redit (aucun changement, aucun message)', !r4.msg && r4.n === nEv, r4);
-      // Rechargement : la marque lue ne revient pas ; rien n'est dit au chargement (le prix déjà au-delà).
+      // Rechargement : rien n'est dit au chargement (le prix déjà au-delà).
       await o.page.reload();
       await attendre(o.page, false);
       const e6 = await cadre(o.page);
-      check(`rechargé : la marque lue (« ${cleLue} ») ne revient pas (maintenant « ${e6.marque ? e6.marque.cle : 'aucune'} ») ; aucun message au chargement`,
-        !!cleLue && (!e6.marque || e6.marque.cle !== cleLue) && e6.points <= 1 && !e6.msg && !e6.ligne, { marque: e6.marque, msg: e6.msg });
+      check('rechargé : aucun message au chargement', !e6.msg && !e6.ligne && e6.arcs === 0, { msg: e6.msg, arcs: e6.arcs });
       // Un nouvel onglet : le prix passe, puis repasse sous la bande — la ligne au présent (plus vraie) s'efface aussitôt.
       await o.ctx.close();
-      o = await ouvrir(nav, { mode: 'debutant', w, h });
+      o = await ouvrir(nav, { mode: 'debutant', w, h, vus: TOUT_VU });
       const rd1 = await repereDessus(o.page);
       if (rd1) {
         await prix(o, rd1.hi + Math.max(2, (rd1.hi - rd1.lo) * 0.3));
@@ -384,7 +387,7 @@ function controlerLisible(e, nom) {
     // ── 2. Deux changements dans la même image ──
     for (const [w, h] of [[1440, 900], [390, 844]]) {
       titre(`2. Lisible · ${w} px : deux changements ensemble, un seul message (scénarios du matin servis)`);
-      const o = await ouvrir(nav, { mode: 'debutant', w, h, scen: true });
+      const o = await ouvrir(nav, { mode: 'debutant', w, h, scen: true, vus: TOUT_VU });
       const s0 = await o.page.evaluate(() => ({ montre: scenEtat && scenEtat.montre ? scenEtat.montre.sc.rang : null, cle: scenEtat && scenEtat.montre ? scenEtat.montre.sv.cle : null, msg: !!apprMsg }));
       check(`le scénario 1 est montré, suivi en direct (« ${s0.cle} ») ; aucun message au chargement`, s0.montre === '1' && ['rien', 'avant'].includes(s0.cle) && !s0.msg, s0);
       // La bulle du scénario : l’avertissement une fois, au détail ; le résumé dit « pas une prévision ».
@@ -422,11 +425,11 @@ function controlerLisible(e, nom) {
     // ── 3. Complet ──
     for (const [w, h] of [[1440, 900], [390, 844]]) {
       titre(`3. Complet · ${w} px`);
-      let o = await ouvrir(nav, { mode: 'expert', w, h });
+      let o = await ouvrir(nav, { mode: 'expert', w, h, vus: TOUT_VU });
       const P = await o.page.evaluate(() => PARAM.apprendre);
       await prix(o, null);
       const e0 = await cadre(o.page);
-      check(`au chargement : aucune ligne ; UNE marque plus discrète (un point de ${P.marqueComplet} px < ${P.marque})`, !e0.msg && !e0.ligne && !!e0.marque && e0.points === 1 && e0.marque.r === P.marqueComplet && P.marqueComplet < P.marque, { msg: e0.msg, marque: e0.marque, points: e0.points });
+      check('au chargement : aucune ligne ; aucun point rond « nouveau »', !e0.msg && !e0.ligne && e0.arcs === 0, { msg: e0.msg, arcs: e0.arcs });
       const rd = await repereDessus(o.page);
       check(`une bande au-dessus du prix (${rd && G.chiffres(rd.lo)} – ${rd && G.chiffres(rd.hi)})`, !!rd, null);
       if (!rd) { await o.ctx.close(); continue; }
@@ -464,8 +467,11 @@ function controlerLisible(e, nom) {
         const t = document.querySelector('#indMenu .aff-aide-titre'), cases = [...document.querySelectorAll('#indMenu .aff-aide')];
         return { titre: t ? t.textContent : null, cases: cases.map(c => ({ k: c.dataset.aide, coche: c.querySelector('input').checked, texte: c.innerText })), texte: document.getElementById('indMenu').innerText };
       });
-      check(`« Choisir l’affichage » : « ${m0.titre} », deux cases cochées d’origine (${m0.cases.map(c => c.k).join(', ')})`,
-        m0.titre === 'Aide à la lecture' && m0.cases.length === 2 && m0.cases.every(c => c.coche) && m0.cases[0].k === 'evenements' && m0.cases[1].k === 'marques', m0.cases);
+      // Changé exprès (idée 10 du 13/10/2026) : « Marquer ce qui est nouveau » devient « Expliquer ce
+      // qui apparaît pour la première fois » (plus de point : une ligne) ; la clé « marques » reste.
+      check(`« Choisir l’affichage » : « ${m0.titre} », deux cases cochées d’origine (${m0.cases.map(c => c.k).join(', ')}), la 2e « Expliquer ce qui apparaît pour la première fois »`,
+        m0.titre === 'Aide à la lecture' && m0.cases.length === 2 && m0.cases.every(c => c.coche) && m0.cases[0].k === 'evenements' && m0.cases[1].k === 'marques'
+        && /^Expliquer ce qui apparaît pour la première fois/.test(m0.cases[1].texte), m0.cases);
       check('ni « Débutant » ni « Expert » écrit dans le panneau', !MODES_ECRITS.test(m0.texte), null);
       // Un message en cours, puis la case décochée : il part aussitôt.
       if (rb) {
@@ -477,13 +483,15 @@ function controlerLisible(e, nom) {
         await o.page.click('#indMenu .aff-aide[data-aide="evenements"] input');
         await o.page.click('#indMenu .aff-aide[data-aide="marques"] input');
         await o.page.waitForTimeout(200);
-        const r3 = await o.page.evaluate(() => { dessinerCalque(); return { ligne: !!apprEtat.ligne, msg: !!apprMsg, marque: apprEtat.marque, choix: Object.assign({}, apprChoix), stocke: localStorage.getItem('samsara-apprendre-v1') }; });
-        check(`un message en cours (${avant ? 'posé' : 'absent'}), puis les deux cases décochées : la ligne part aussitôt, plus de marque ; gardé (${r3.stocke})`,
-          avant && !r3.ligne && !r3.msg && !r3.marque && r3.choix.evenements === false && r3.choix.marques === false && /"evenements":false/.test(r3.stocke || '') && /"marques":false/.test(r3.stocke || ''), r3);
+        const r3 = await o.page.evaluate(() => { dessinerCalque(); return { ligne: !!apprEtat.ligne, msg: !!apprMsg, choix: Object.assign({}, apprChoix), stocke: localStorage.getItem('samsara-apprendre-v1') }; });
+        check(`un message en cours (${avant ? 'posé' : 'absent'}), puis les deux cases décochées : la ligne part aussitôt ; gardé (${r3.stocke})`,
+          avant && !r3.ligne && !r3.msg && r3.choix.evenements === false && r3.choix.marques === false && /"evenements":false/.test(r3.stocke || '') && /"marques":false/.test(r3.stocke || ''), r3);
         await o.page.click('#indDropdownBtn');
         await o.page.waitForTimeout(200);
       }
-      // Rechargé : le choix est gardé ; un nouveau franchissement ne dit rien.
+      // Rechargé : le choix est gardé ; un nouveau franchissement ne dit rien ; une chose jamais vue
+      // (oubliée exprès) n'a pas de ligne non plus.
+      await o.page.evaluate(() => { localStorage.setItem('samsara-nouveau-v1', JSON.stringify(JSON.parse(localStorage.getItem('samsara-nouveau-v1') || '[]').filter(k => !/^repere:/.test(k)))); });
       await o.page.reload();
       await attendre(o.page, false);
       await o.page.click('#indDropdownBtn');
@@ -493,9 +501,158 @@ function controlerLisible(e, nom) {
       await o.page.waitForTimeout(200);
       const rd3 = await repereDessus(o.page);
       if (rd3) await prix(o, rd3.hi + Math.max(2, (rd3.hi - rd3.lo) * 0.3));
+      await o.ctx.clock.fastForward(P.pause + 500);
+      await prix(o, rd3 ? rd3.hi + Math.max(3, (rd3.hi - rd3.lo) * 0.35) : null);
       const e4 = await cadre(o.page);
-      check(`rechargé : les cases restent décochées (${m1.join(', ')}) ; le prix franchit une bande, rien n’est dit ; aucune marque`, m1.length === 2 && m1.every(c => !c) && !!rd3 && !e4.msg && !e4.ligne && !e4.marque && e4.points === 0, { m1, msg: e4.msg, marque: e4.marque });
+      const jamais = await o.page.evaluate(() => [].concat(guideEtat ? guideEtat.cibles : [], scenEtat ? scenEtat.cibles : [])
+        .filter(c => { const r = apprCoin(c); return r && r.x1 - r.x0 >= 24 && r.y1 - r.y0 >= 10; }).map(apprNature).filter(k => k && /^repere:/.test(k) && !apprVus.has(k)));
+      check(`rechargé : les cases restent décochées (${m1.join(', ')}) ; le prix franchit une bande, rien n’est dit ; des repères jamais vus à l’écran (${[...new Set(jamais)].join(', ')}), aucune ligne pour eux`,
+        m1.length === 2 && m1.every(c => !c) && !!rd3 && !e4.msg && !e4.ligne && e4.arcs === 0 && jamais.length > 0, { m1, msg: e4.msg, jamais });
       check('aucune erreur JavaScript ; pas de défilement horizontal', !o.erreurs.length && !e4.defile, o.erreurs);
+      await o.ctx.close();
+    }
+
+    // ── 4. La première fois (plan du 13/10/2026, idée 10) ──
+    for (const [w, h] of [[1440, 900], [390, 844]]) {
+      titre(`4. La première fois · Lisible · ${w} px (${w < 500 ? 'toucher' : 'survol'}) : un visiteur nouveau`);
+      const o = await ouvrir(nav, { mode: 'debutant', w, h });
+      const P = await o.page.evaluate(() => PARAM.apprendre);
+      // Les natures annoncées (dans l'ordre), et les choses jamais vues dont l'étiquette est peinte.
+      await o.page.evaluate(() => { window.__prem = []; const a0 = apprAnnoncer; apprAnnoncer = function (e) { if (e && e.source === 'premiere') window.__prem.push(e.nature); return a0.apply(this, arguments); }; });
+      const visibles = () => o.page.evaluate(() => [...new Set([].concat(guideEtat && overlays.guide ? guideEtat.cibles : [], scenEtat ? scenEtat.cibles : [])
+        .filter(c => { const r = apprCoin(c); return r && r.x1 - r.x0 >= 24 && r.y1 - r.y0 >= 10; }).map(apprNature).filter(k => k && Apprendre.textes(Apprendre.premiere(k), 'debutant', {})))]);
+      const stocke = () => o.page.evaluate(() => { try { return JSON.parse(localStorage.getItem('samsara-nouveau-v1') || '[]'); } catch (e) { return null; } });
+      const attendreLigne = async p => { await prix(o, p === undefined ? null : p); await o.page.waitForFunction(() => apprEtat.ligne, null, { timeout: 4000 }).catch(() => {}); return cadre(o.page); };
+      // a. Pendant l'astuce « Touchez une étiquette… » : rien (une aide à la fois).
+      await prix(o, null);
+      const e0 = await cadre(o.page);
+      check(`au chargement, l’astuce « Touchez une étiquette… » ${e0.astuce ? 'affichée' : 'ABSENTE'} : aucune ligne pendant elle (une aide à la fois) ; aucun point rond (${e0.arcs} arc)`, e0.astuce && !e0.msg && !e0.ligne && e0.arcs === 0, { astuce: e0.astuce, msg: e0.msg, arcs: e0.arcs });
+      // b. L'astuce partie : UNE ligne dit ce qu'est une chose jamais vue, à l'écran.
+      const vis0 = await visibles();
+      await o.ctx.clock.fastForward(8500);
+      const e1 = await attendreLigne();
+      const n1 = e1.msg && e1.msg.nature;
+      const t1 = n1 ? await o.page.evaluate(n => Apprendre.textes(Apprendre.premiere(n), 'debutant', {}).variantes, n1) : [];
+      check(`l’astuce partie : UNE ligne de première fois (« ${e1.ligne && e1.ligne.texte} »), pour « ${n1} », une chose jamais vue dont l’étiquette est à l’écran (${vis0.join(', ')}) ; sa phrase exacte`,
+        !!e1.msg && e1.msg.type === 'premiere_fois' && !!e1.ligne && e1.ligne.nature === n1 && vis0.includes(n1) && t1.includes(e1.ligne.texte) && !e1.astuce, { msg: e1.msg, ligne: e1.ligne, vis0, t1 });
+      controlerLisible(e1, 'première fois');
+      check('aucun arc dessiné (plus de point rond) ; pas encore notée vue pendant qu’elle est là', e1.arcs === 0 && !(await stocke()).includes(n1), { arcs: e1.arcs });
+      // c. À son heure, elle part, sa place rendue, notée vue ; une pause, puis la suivante (une autre chose).
+      await o.ctx.clock.fastForward(P.dureeLisible + 300);
+      await prix(o, null);
+      const e2 = await cadre(o.page);
+      const vus2 = await stocke();
+      check(`après ${P.dureeLisible / 1000} s : elle part, sa place rendue (${e2.trace.length} textes = registre) ; « ${n1} » notée vue (samsara-nouveau-v1) ; pendant la pause de ${P.pause / 1000} s, aucune autre`,
+        !e2.msg && !e2.ligne && !e2.items.some(i => i.role === 'evenement') && e2.trace.length === e2.items.length && Array.isArray(vus2) && vus2.includes(n1), { msg: e2.msg, items: e2.items.map(i => i.role), vus2 });
+      await o.ctx.clock.fastForward(P.pause + 300);
+      const e3 = await attendreLigne();
+      const vis3 = await visibles(), n2 = e3.msg && e3.msg.nature;
+      const reste = vis3.filter(k => !vus2.includes(k));
+      check(`la pause passée : ${reste.length ? `la suivante, « ${n2} » (« ${e3.ligne && e3.ligne.texte} »), une autre chose jamais vue` : 'plus rien de jamais vu à l’écran, aucune ligne'}`,
+        reste.length ? !!e3.msg && e3.msg.type === 'premiere_fois' && n2 !== n1 && reste.includes(n2) && !!e3.ligne : !e3.msg, { msg: e3.msg, reste, vis3 });
+      if (reste.length && e3.ligne) {
+        controlerLisible(e3, 'la suivante');
+        // d. Un vrai événement du marché passe avant : il la remplace aussitôt ; elle n'est pas notée.
+        const rd = await repereDessus(o.page);
+        if (rd) {
+          const haut = rd.hi + Math.max(2, (rd.hi - rd.lo) * 0.3);
+          await prix(o, haut);
+          await o.page.waitForFunction(() => apprMsg && apprMsg.e.source !== 'premiere', null, { timeout: 4000 }).catch(() => {});
+          const r4 = await o.page.evaluate(n => ({ type: apprMsg && apprMsg.e.type, ligne: apprEtat.ligne && apprEtat.ligne.texte, vu: apprVus.has(n) }), n2);
+          check(`le prix franchit le repère du dessus pendant la ligne : l’événement (« ${r4.ligne} ») la remplace aussitôt ; « ${n2} » coupée, pas notée`, r4.type === 'repere_passe' && !!r4.ligne && !r4.vu, r4);
+          // Elle revient ensuite (l'événement fini, la pause passée).
+          await o.ctx.clock.fastForward(P.dureeLisible + P.pause + 600);
+          const e5 = await attendreLigne(haut);
+          check(`l’événement fini, la pause passée : « ${n2} » revient (« ${e5.ligne && e5.ligne.texte} »)`, !!e5.msg && e5.msg.type === 'premiere_fois' && e5.msg.nature === n2 && !!e5.ligne, { msg: e5.msg, ligne: e5.ligne });
+          // e. Sa bulle : le résumé, dans ses limites ; ouverte, elle note la chose lue.
+          const pl = await pointCible(o.page, 'ligne');
+          if (pl) {
+            await montrer(o, pl);
+            const b = await lireBulle(o.page);
+            const lu = await o.page.evaluate(n => apprVus.has(n), n2);
+            check(`${o.tactile ? '1er toucher' : 'survol'} : le RÉSUMÉ de « ${b && b.titre} » (${b && b.lignes} lignes ≤ 4, ${b && b.nombres} nombres ≤ 3, sans mot banni) ; ouverte, « ${n2} » est lue`,
+              !!b && b.estMessage && b.resume && b.lignes <= b.P.bulleLignes && b.nombres <= b.P.bulleNombres && !/%/.test(b.corps) && !G.motsBannis(b.titre + ' ' + b.corps).length && lu, { b, lu });
+            await ailleurs(o);
+          } else check('la ligne mène à sa bulle', false, null);
+        } else check('un repère du dessus', false, null);
+      }
+      // f. Rechargé : ce qui a été vu ne revient jamais (plusieurs tours de ligne et de pause).
+      const vus6 = await stocke();
+      await o.page.reload();
+      await attendre(o.page, false);
+      await o.page.evaluate(() => { window.__prem = []; const a0 = apprAnnoncer; apprAnnoncer = function (e) { if (e && e.source === 'premiere') window.__prem.push(e.nature); return a0.apply(this, arguments); }; });
+      const ast = await o.page.evaluate(() => astuceFin !== null);
+      for (let k = 0; k < 4; k++) { await prix(o, null); await o.ctx.clock.fastForward(P.dureeLisible + P.pause + 600); }
+      await prix(o, null);
+      const r6 = await o.page.evaluate(() => ({ prem: window.__prem.slice(), arcs: 0 }));
+      const revus = r6.prem.filter(n => vus6.includes(n));
+      check(`rechargé (l’astuce ${ast ? 'revient' : 'ne revient pas'}) : ce qui a été vu (${vus6.filter(n => !/^evenement:/.test(n)).join(', ')}) ne revient jamais ; annoncées ensuite : ${r6.prem.join(', ') || 'aucune'}`,
+        !ast && vus6.includes(n1) && !revus.length && new Set(r6.prem).size === r6.prem.length, { revus, prem: r6.prem, vus6 });
+      const e7 = await cadre(o.page);
+      check('aucune erreur JavaScript ; pas de défilement horizontal', !o.erreurs.length && !e7.defile, o.erreurs);
+      await o.ctx.close();
+    }
+    // Complet : la ligne discrète, sans redessiner le graphique.
+    for (const [w, h] of [[1440, 900], [390, 844]]) {
+      titre(`4. La première fois · Complet · ${w} px`);
+      const o = await ouvrir(nav, { mode: 'expert', w, h });
+      const P = await o.page.evaluate(() => PARAM.apprendre);
+      const dc0 = await o.page.evaluate(() => window.__dc);
+      await prix(o, null);
+      await o.page.waitForFunction(() => apprEtat.ligne, null, { timeout: 4000 }).catch(() => {});
+      const r1 = await o.page.evaluate(() => {
+        window.__ft = []; window.__ftOn = true; dessinerCalque(); window.__ftOn = false;
+        const L = apprEtat.ligne, j = L ? window.__ft.find(x => x.c === 'chartCalque' && x.t === L.texte) : null;
+        const live = livePrice, yLive = geoPrix.top + geoPrix.ph * (1 - (live - geoPrix.minP) / geoPrix.range);
+        return { dc: window.__dc, type: apprMsg && apprMsg.e.type, nature: apprMsg && apprMsg.e.nature, ligne: L, j, encre3: COLORS.ink3, yLive, xAxe: canvas.width / devicePixelRatio - 75,
+          rects: (guideEtat ? guideEtat.rects : []).concat(scenEtat ? scenEtat.rects : []), fin: apprMsg && apprMsg.fin, maintenant: Date.now(),
+          textes: apprMsg && apprMsg.e.nature ? Apprendre.textes(apprMsg.e, 'expert', {}).variantes : [], defile: document.documentElement.scrollWidth > window.innerWidth + 1 };
+      });
+      check(`au chargement (rien vu) : UNE ligne de première fois (« ${r1.ligne && r1.ligne.texte} », « ${r1.nature} »), ${P.dureeComplet / 1000} s ; discrète (${r1.j && r1.j.police}, ${r1.j && r1.j.coul})`,
+        r1.type === 'premiere_fois' && !!r1.ligne && r1.ligne.mode === 'expert' && r1.textes.includes(r1.ligne.texte) && r1.fin - r1.maintenant <= P.dureeComplet
+        && !!r1.j && /\b9px\b/.test(r1.j.police) && String(r1.j.coul).toLowerCase() === String(r1.encre3).toLowerCase(), r1);
+      if (r1.ligne) {
+        const r = r1.ligne.rect;
+        check('elle ne couvre ni la ligne du prix, ni le badge, ni une étiquette ; sans redessiner le graphique', !(r.y < r1.yLive + 4 && r.y + r.h > r1.yLive - 4) && r.x + r.w <= r1.xAxe + 0.5 && r1.rects.every(q => !chevauche(r, q)) && r1.dc === dc0,
+          { r, yLive: r1.yLive, sous: r1.rects.filter(q => chevauche(r, q)), dc: [dc0, r1.dc] });
+      }
+      // À son heure (forcée, comme en section 3 : une horloge avancée ferait aussi tourner les relectures).
+      const dc1 = await o.page.evaluate(() => window.__dc);
+      await o.page.evaluate(() => { if (apprMsg) { apprMsg.fin = Date.now(); clearTimeout(apprMinuterie); apprVerifierFin(); } });
+      await o.page.waitForTimeout(200);
+      const r2 = await o.page.evaluate(n => ({ dc: window.__dc, msg: !!apprMsg, vu: apprVus.has(n) }), r1.nature);
+      check(`à son heure, elle part (calque seul : ${r2.dc - dc1} dessin du graphique), « ${r1.nature} » notée vue`, !r2.msg && r2.dc === dc1 && r2.vu, r2);
+      check('aucune erreur JavaScript ; pas de défilement horizontal', !o.erreurs.length && !r1.defile, o.erreurs);
+      await o.ctx.close();
+    }
+    // Six thèmes à 390 px : la ligne aux couleurs du thème, carrée quand les étiquettes le sont.
+    titre('4. La première fois · six thèmes à 390 px');
+    for (const theme of ['aero', 'bureau95', 'bureau95-contraste', 'gazette', 'neon', 'diazo']) {
+      const o = await ouvrir(nav, { mode: 'debutant', w: 390, h: 844, theme });
+      // Le trait et le fond posés par la ligne (fillRect, roundRect), journalisés.
+      await o.page.evaluate(() => {
+        window.__rr = []; const r0 = CanvasRenderingContext2D.prototype.roundRect, f0 = CanvasRenderingContext2D.prototype.fillRect;
+        CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) { if (window.__ftOn) window.__rr.push({ c: this.canvas && this.canvas.id, x, y, w, h, r, coul: String(this.fillStyle) }); return r0.apply(this, arguments); };
+        CanvasRenderingContext2D.prototype.fillRect = function (x, y, w, h) { if (window.__ftOn) window.__rr.push({ c: this.canvas && this.canvas.id, x, y, w, h, trait: true, coul: String(this.fillStyle) }); return f0.apply(this, arguments); };
+        astuceCacher();
+      });
+      await prix(o, null);
+      await o.page.waitForFunction(() => apprEtat.ligne, null, { timeout: 4000 }).catch(() => {});
+      const e = await cadre(o.page);
+      const st = await o.page.evaluate(() => {
+        const L = apprEtat.ligne;
+        window.__ft = []; window.__rr = []; window.__ftOn = true; dessinerCalque(); window.__ftOn = false;
+        const j = L ? window.__ft.find(x => x.c === 'chartCalque' && x.t === L.texte) : null;
+        const fond = L ? window.__rr.find(x => x.c === 'chartCalque' && !x.trait && Math.abs(x.x - L.rect.x) < 0.5 && Math.abs(x.y - L.rect.y) < 0.5) : null;
+        const trait = L ? window.__rr.find(x => x.c === 'chartCalque' && x.trait && x.x > L.rect.x && x.x < L.rect.x + 6 && x.y > L.rect.y && x.y < L.rect.y + L.rect.h) : null;
+        const n = c => { const k = document.createElement('canvas').getContext('2d'); k.fillStyle = c; return k.fillStyle; };
+        return { theme: document.documentElement.getAttribute('data-theme'), j: j && n(j.coul), ink1: n(COLORS.ink1), accent: n(COLORS.accent), trait: trait && n(trait.coul), fond: fond && { r: fond.r, coul: n(fond.coul) }, bulle: n(COLORS.bulle), rayon: COLORS.etiqRayon, rE5: rE(5) };
+      });
+      const carre = st.rayon === 0 ? !!st.fond && st.fond.r === 0 : !!st.fond;
+      const okTheme = !!e.ligne && e.msg && e.msg.type === 'premiere_fois' && st.j === st.ink1 && st.trait === st.accent && !!st.fond && st.fond.coul === st.bulle && carre && !e.defile && e.arcs === 0;
+      check(`${theme} : la ligne « ${e.ligne && e.ligne.texte} » — encre 1, trait accent, fond bulle${st.rayon === 0 ? ', carrée (étiquettes carrées)' : ''} ; pas de défilement de côté`, okTheme, { st, ligne: e.ligne, msg: e.msg });
+      if (e.ligne) controlerLisible(e, theme);
+      check(`${theme} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
   } catch (e) {
