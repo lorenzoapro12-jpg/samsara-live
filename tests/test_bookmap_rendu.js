@@ -50,6 +50,18 @@ for (let c = 0; c < G.W; c++) for (let k = 0; k < G.H; k++) {
 const sansEncodage = () => { const c = Object.assign({}, hm); delete c.encodage; return c; };
 // Prix de référence : la plus basse cellule ask de la dernière colonne qui en a.
 const pMid = (() => { const a = CELLULES.filter(x => x.cote === 'ask'), cMax = Math.max(...a.map(x => x.c)); return Math.min(...a.filter(x => x.c === cMax).map(x => x.pb)) * G.dp; })();
+// Prix du MILIEU de la carte publiée (colonne W / 2) : entre le plus haut bid et le plus bas ask
+// publiés autour d'elle (± 5 colonnes, une colonne peut être vide). Les contrôles qui visent le
+// milieu de la fenêtre publiée se cadrent sur ce prix-là, pas sur pMid (celui de la dernière
+// colonne) : le 14/10/2026, le cours avait perdu 1 500 $ en 12 h, et aucune cellule publiée ne
+// tombait plus dans « milieu de la carte, pMid ± 600 $ » (la section 4 plantait sur une cible
+// introuvable, et tout ce qui la suit ne tournait plus ; 4b et 27 ne trouvaient aucun pixel).
+// Repli : pMid.
+const pMilieu = (() => {
+  const c0 = Math.floor(G.W / 2), proches = CELLULES.filter(x => Math.abs(x.c - c0) <= 5);
+  const b = proches.filter(x => x.cote === 'bid').map(x => x.pb), a = proches.filter(x => x.cote === 'ask').map(x => x.pb);
+  return b.length && a.length ? (Math.max(...b) + Math.min(...a)) / 2 * G.dp : pMid;
+})();
 // ── Binance simulé, à l'heure de SON serveur ─────────────────────────────────
 // S.now() = Date.now() + S.decalage : l'horloge du serveur peut différer de celle de la page
 // (horloge locale décalée), et avancer d'un coup (veille, onglet caché). Tout est engendré à la
@@ -276,8 +288,8 @@ async function filNoir(page, x, y) {
     // Cadrage sur le milieu de la carte publiée (le fichier du dépôt peut dater de plusieurs
     // jours : la vue par défaut, sur le présent, ne la montrerait pas).
     {
-      const tm = G.t0 + G.dt * 720;
-      await page.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [tm - 3600e3, tm + 3600e3, pMid - 600, pMid + 600]);
+      const tm = G.t0 + G.dt * Math.floor(G.W / 2);
+      await page.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [tm - 3600e3, tm + 3600e3, pMilieu - 600, pMilieu + 600]);
       await page.waitForTimeout(400);
       Object.assign(v, (await etat(page)).vue);
     }
@@ -306,7 +318,7 @@ async function filNoir(page, x, y) {
     {
       await page.evaluate(() => { const s = document.getElementById('rFusionP'); s.value = '1'; s.dispatchEvent(new Event('input')); });
       // Toute la fenêtre publiée sur la largeur de la carte : ~70 s par pixel, deux colonnes par pixel.
-      const vue = { t1: G.t0, t2: G.t0 + G.W * G.dt, p1: pMid - 900, p2: pMid + 900 };
+      const vue = { t1: G.t0, t2: G.t0 + G.W * G.dt, p1: pMilieu - 900, p2: pMilieu + 900 };
       await page.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [vue.t1, vue.t2, vue.p1, vue.p2]);
       await page.waitForTimeout(400);
       const tpp = (vue.t2 - vue.t1) / zoneW, pp = (vue.p2 - vue.p1) / zoneH;
@@ -836,7 +848,7 @@ async function filNoir(page, x, y) {
       // par défaut ; le guide, allumé par défaut, aussi) : le pixel comparé doit être celui de la chaleur seule.
       for (const k of ['guide', 'live', 'executions', 'prix', 'bidask', 'murs', 'gamma', 'profil']) await p27.click(`button[data-calque="${k}"]`);
       const zw = await p27.evaluate(() => window.__carte.etat().mise.chaleur.w), zh = await p27.evaluate(() => window.__carte.etat().mise.chaleur.h);
-      await p27.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [G.t0, G.t0 + G.W * G.dt, pMid - 900, pMid + 900]);
+      await p27.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [G.t0, G.t0 + G.W * G.dt, pMilieu - 900, pMilieu + 900]);
       await p27.waitForTimeout(300);
       const rc = await p27.evaluate(() => { const r = document.getElementById('carte').getBoundingClientRect(); return { x: r.left, y: r.top }; });
       await p27.mouse.move(rc.x + zw * 0.6, rc.y + zh * 0.5); await p27.mouse.down();
@@ -1110,7 +1122,7 @@ async function filNoir(page, x, y) {
       let p37;
       ({ page: p37, erreurs } = await ouvrir(nav, { encodage: true, reglages: { calques: { memoire: true } } }));
       const tm = G.t0 + G.dt * Math.floor(G.W / 2);
-      await p37.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [tm - 4 * 3600e3, tm + 3600e3, pMid - 700, pMid + 700]);
+      await p37.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [tm - 4 * 3600e3, tm + 3600e3, pMilieu - 700, pMilieu + 700]);
       await p37.waitForTimeout(600);
       let e = await etat(p37);
       const s = BM.seuilPresence(10, encodage);
@@ -1154,7 +1166,7 @@ async function filNoir(page, x, y) {
       // Sans encodage publié : éteinte, et dit.
       let p37b;
       ({ page: p37b, erreurs } = await ouvrir(nav, { reglages: { calques: { memoire: true } } }));
-      await p37b.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [tm - 4 * 3600e3, tm + 3600e3, pMid - 700, pMid + 700]);
+      await p37b.evaluate(([a, b, c, d]) => window.__carte.cadrer(a, b, c, d), [tm - 4 * 3600e3, tm + 3600e3, pMilieu - 700, pMilieu + 700]);
       await p37b.waitForTimeout(600);
       const eb = await etat(p37b);
       check('encodage non publié : aucune barre, « encodage non publié : aucun seuil en BTC » sur la carte',
