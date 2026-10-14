@@ -45,6 +45,19 @@ const Calculette = (function () {
     }
     return /^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(s) ? Number(s) : null;
   }
+  /** Le texte d'un champ réécrit à la française, à la sortie du champ (revue du 14/10, vA-9) :
+   *  « 80000 » → « 80 000 », « 82152.5 » → « 82 152,5 ». Le pavé numérique du téléphone n'a pas de
+   *  touche espace, et un zéro en trop sur le stop se voit mal sans elle. Les décimales tapées sont
+   *  gardées (au plus 8), sans zéro inutile ; un texte vide ou illisible reste tel quel (le message
+   *  dit lequel). → le texte à mettre dans le champ. */
+  function ecrireNombre(t) {
+    const v = lireNombre(t);
+    if (v === null) return t === undefined || t === null ? '' : String(t);
+    let d = 0;
+    while (d < 8 && Math.abs(Math.round(v * Math.pow(10, d)) / Math.pow(10, d) - v) > 1e-9 * Math.max(1, Math.abs(v))) d++;
+    // Un nombre si petit qu'il s'écrirait « 0 » : le texte tapé reste (il ne doit pas devenir zéro).
+    return v !== 0 && Number(v.toFixed(d)) === 0 ? String(t) : F.nombre(v, d);
+  }
 
   // Les messages quand il n'y a pas de calcul : une phrase courte, jamais un conseil.
   const MESSAGES = {
@@ -113,31 +126,56 @@ const Calculette = (function () {
   /** Un montant (perte, mise) : sans centimes à partir de 100, ni quand il est rond. */
   const montant = (v, u) => F.nombre(v, Math.abs(v) >= 100 || Math.abs(Math.round(v) - v) < 0.005 ? 0 : 2) + ' ' + (u || '$');
   /** Une part en % telle qu'on la lit : la part choisie comme elle a été tapée (« 1 % », « 0,5 % »,
-   *  « 0,25 % ») ; une part calculée, peu de chiffres (« 52 % », « 7,3 % »). */
+   *  « 0,25 % ») ; une part calculée, peu de chiffres (« 52 % », « 7,3 % »). Jamais « 0,00 % » pour
+   *  une part non nulle (revue du 14/10, fonctionnement-7) : au moins un chiffre utile (« 0,001 % »). */
   function partMots(x, calculee) {
     const p = x * 100, juste = k => Math.abs(Math.round(p * Math.pow(10, k)) / Math.pow(10, k) - p) < 1e-9;
-    const d = p >= 10 ? 0 : calculee ? (juste(0) ? 0 : 1) : juste(0) ? 0 : juste(1) ? 1 : 2;
+    let d = p >= 10 ? 0 : calculee ? (juste(0) ? 0 : 1) : juste(0) ? 0 : juste(1) ? 1 : 2;
+    while (p > 0 && d < 8 && Number(p.toFixed(d)) === 0) d++;
     return F.nombre(p, d) + ' %';
   }
-  /** Les lignes du résultat ([nom, valeur]…) et la ligne de rappel. o = { base ('BTC'), unite ('$') }. */
+  /** Combien de fois le capital (« × 8,3 », « × 83 », « × 1,1 ») : une décimale sous 10, jamais
+   *  « × 1 » pour une mise plus grande que le capital. */
+  function fois(x) {
+    let d = x >= 9.95 ? 0 : 1;
+    while (d < 2 && Number(x.toFixed(d)) <= 1) d++;
+    if (d && Math.abs(Math.round(x) - x) < 1e-9) d = 0;
+    return '× ' + F.nombre(x, d);
+  }
+  /** Les lignes du résultat ([nom, valeur, complément?]…), la ligne d'alerte et la ligne de rappel.
+   *  o = { base ('BTC'), unite ('$') }.
+   *  Revue du 14/10 (vA-9) : le stop est redit, avec son écart au prix moyen en complément (une ligne
+   *  sous le prix, qui n'élargit pas la colonne des valeurs) : un zéro en trop ou en moins s'y voit. Revue du 14/10 (vision-3, fonctionnement-7) : quand la mise dépasse le capital,
+   *  une ligne d'alerte le dit (« 830 % du capital » seul ne dit pas qu'il faudrait emprunter) ; le
+   *  fait seulement, aucun conseil. Vide sinon. */
   function textes(r, o) {
-    if (!r || !r.ok) return { message: r ? r.message : MESSAGES.vide, lignes: [], rappel: '' };
+    if (!r || !r.ok) return { message: r ? r.message : MESSAGES.vide, lignes: [], alerte: '', rappel: '' };
     const c = o || {}, base = c.base || 'BTC', u = c.unite || '$', q = quantiteAffichee(r.quantite);
+    const ecartStop = partMots(Math.abs(r.prixMoyen - r.stop) / r.prixMoyen, true);
     const lignes = [
       ['Sens', r.sens > 0 ? 'achat (stop dessous)' : 'vente (stop au-dessus)'],
       ['Quantité par palier', F.nombre(q.v, q.d) + ' ' + base + ' (≈ ' + montant(r.mise / r.n, u) + ')'],
       ['Prix moyen, tout rempli', F.prix(r.prixMoyen, u)],
+      ['Stop', F.prix(r.stop, u), 'à ' + ecartStop + (r.sens > 0 ? ' sous le' : ' au-dessus du') + ' prix moyen'],
       ['Perte au stop, tout rempli', montant(r.perte, u) + ' (' + partMots(r.part) + ' du capital)'],
       ['Mise, tout rempli', montant(r.mise, u) + ' (' + partMots(r.partMise, true) + ' du capital)'],
     ];
+    const alerte = r.partMise > 1 + 1e-9 ? 'La mise dépasse le capital (' + fois(r.partMise) + '). Tout remplir demande d’emprunter (effet de levier).' : '';
     const rappel = 'Le ' + partMots(r.part) + ' est la perte, pas la mise. Un trou de prix ' + (r.sens > 0 ? 'sous le' : 'au-dessus du') + ' stop coûterait plus.';
-    return { message: '', lignes, rappel };
+    return { message: '', lignes, alerte, rappel };
   }
   // Les phrases fixes du panneau (relues par les tests : mots du Lisible, pas de conseil).
-  const PHRASE = 'Elle donne la taille de chaque palier, la même pour tous. Si tous se remplissent puis que le stop saute, la perte vaut la part risquée.';
+  // Revue du 14/10 (textes-14) : « le prix touche le stop » au lieu de « le stop saute », jamais
+  // expliqué ; la phrase est tournée autrement pour rester sous 15 mots (charte).
+  const PHRASE = 'Elle donne la taille de chaque palier, la même pour tous. Une fois tout rempli, si le prix touche le stop, on perd la part risquée.';
   const PIED = 'Un calcul, pas un conseil.';
+  // Les noms des champs, chacun dit en mots simples (revue du 14/10, textes-14) : [nom, ce qu'il
+  // veut dire], dans l'étiquette même, pas une ligne d'aide sous le champ (le clavier du téléphone
+  // couvre déjà le bas du panneau). « Un ordre », pas « un achat » : la calculette fait aussi la
+  // vente (stop au-dessus des paliers).
+  const NOMS = { part: ['Part risquée', '(% du capital perdu au stop)'], stop: ['Stop', '(prix où la perte est coupée)'], paliers: ['Paliers', '(prix où un ordre attend)'] };
 
-  return { lireNombre, calculer, textes, MESSAGES, PHRASE, PIED, decQuantite, quantiteAffichee, partMots };
+  return { lireNombre, ecrireNombre, calculer, textes, MESSAGES, PHRASE, PIED, NOMS, decQuantite, quantiteAffichee, partMots, fois };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Calculette;
 
@@ -147,9 +185,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Calculette
 // et le clavier en couvre le bas), les résultats dessous, recalculés à chaque saisie. Les boutons
 // qui changent le contenu du panneau arrêtent leur clic (event.stopPropagation()) : sans cela, le
 // bouton cliqué, détaché par le changement, ferait refermer la bulle (js/fiches.js).
+/** Le nom d'un champ, et ce qu'il veut dire en plus petit (nom : un texte, ou [nom, définition]). */
+const calcNomHtml = nom => Array.isArray(nom) ? echapF(nom[0]) + ' <span class="calc-def">' + echapF(nom[1]) + '</span>' : echapF(nom);
 /** La ligne d'un champ : son nom, le champ (texte, clavier décimal, sans saisie automatique). */
 function calcChamp(id, nom, valeur, extra) {
-  return '<div class="ligne-reglage calc-ligne"><label class="calc-nom" for="' + id + '">' + echapF(nom) + '</label>'
+  return '<div class="ligne-reglage calc-ligne"><label class="calc-nom" for="' + id + '">' + calcNomHtml(nom) + '</label>'
     + '<input id="' + id + '" type="text" inputmode="decimal" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="next" value="' + echapF(valeur || '') + '">'
     + (extra || '') + '</div>';
 }
@@ -168,13 +208,13 @@ function ouvrirCalculette(ancre) {
   if (!p) return false;
   const { unite } = calcUnites();
   p.innerHTML = '<div class="fiche-tete"><h3 class="fiche-titre">Calculette de risque</h3><button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>'
-    + '<div class="calc" oninput="calculetteMaj()" onkeydown="calculetteTouche(event)">'
+    + '<div class="calc" oninput="calculetteMaj()" onkeydown="calculetteTouche(event)" onchange="calculetteSortie(event)">'
     + '<p class="fiche-simple">' + echapF(Calculette.PHRASE) + '</p>'
     + '<div class="calc-champs">'
     + calcChamp('calcCapital', 'Capital (' + unite + ')', '')
-    + calcChamp('calcPart', 'Part risquée (%)', Fmt.nombre(PARAM.risque.part, Number.isInteger(PARAM.risque.part) ? 0 : 1))
-    + calcChamp('calcStop', 'Stop (prix)', '')
-    + '<fieldset class="calc-paliers"><legend class="calc-legende">Paliers (prix)</legend><div id="calcPaliers">' + calcPaliersHtml(['']) + '</div></fieldset>'
+    + calcChamp('calcPart', Calculette.NOMS.part, Fmt.nombre(PARAM.risque.part, Number.isInteger(PARAM.risque.part) ? 0 : 1))
+    + calcChamp('calcStop', Calculette.NOMS.stop, '')
+    + '<fieldset class="calc-paliers"><legend class="calc-legende">' + calcNomHtml(Calculette.NOMS.paliers) + '</legend><div id="calcPaliers">' + calcPaliersHtml(['']) + '</div></fieldset>'
     + '</div>'
     + '<div class="calc-resultats" id="calcResultats" aria-live="polite"></div>'
     + '</div>'
@@ -228,9 +268,21 @@ function calculetteMaj() {
   const T = Calculette.textes(r, calcUnites());
   window.__calculette = r;   // relu par les tests
   z.innerHTML = r.ok
-    ? '<dl class="stats-table calc-table">' + T.lignes.map(([k, v]) => '<dt>' + echapF(k) + '</dt><dd>' + echapF(v) + '</dd>').join('') + '</dl>'
+    ? '<dl class="stats-table calc-table">' + T.lignes.map(([k, v, c]) => '<dt>' + echapF(k) + '</dt><dd>' + echapF(v) + (c ? ' <span class="calc-sous">' + echapF(c) + '</span>' : '') + '</dd>').join('') + '</dl>'
+      + (T.alerte ? '<p class="calc-alerte">' + echapF(T.alerte) + '</p>' : '')
       + '<p class="calc-rappel">' + echapF(T.rappel) + '</p>'
     : '<p class="calc-message' + (r.code === 'vide' ? ' calc-attente' : '') + '">' + echapF(T.message) + '</p>';
+}
+/** En quittant un champ modifié (« change », qui remonte jusqu'à .calc), son nombre réécrit à la
+ *  française : « 80000 » → « 80 000 » (revue du 14/10, vA-9). Le nombre lu ne change pas (sauf
+ *  au-delà de 8 décimales) ; le calcul est refait quand même, pour rester juste. */
+function calculetteSortie(e) {
+  const i = e && e.target;
+  if (!i || i.tagName !== 'INPUT') return;
+  const t = Calculette.ecrireNombre(i.value);
+  if (t === i.value) return;
+  i.value = t;
+  calculetteMaj();
 }
 /** Entrée dans un champ : le champ suivant ; après le dernier, le clavier se range. */
 function calculetteTouche(e) {

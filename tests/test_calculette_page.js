@@ -17,6 +17,9 @@
 //      aucun mot interdit du Lisible ni conseil, aucune erreur JavaScript.
 //   5. Le glossaire des légendes : un titre touché ouvre sa fiche, qui reste ouverte (le même défaut
 //      que les boutons de la calculette, corrigé dans js/fiches.js).
+//   6. REVUE DU 14/10 (C5, M1, N2) : les noms disent « part risquée », « stop », « palier » en mots
+//      simples ; un nombre tapé sans espace (« 81700 ») est réécrit « 81 700 » en quittant le champ ;
+//      le stop est redit ; une mise plus grande que le capital est dite, en couleur d'alerte.
 //
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
 // USAGE   node tests/test_calculette_page.js
@@ -100,6 +103,7 @@ const lire = page => page.evaluate(() => {
     focus: document.activeElement && document.activeElement.className, texte: p.innerText,
     phrase: (p.querySelector('.calc > .fiche-simple') || {}).textContent, pied: (p.querySelector('.fiche-pied') || {}).textContent,
     message: (p.querySelector('.calc-message') || {}).textContent || null, rappel: (p.querySelector('.calc-rappel') || {}).textContent || null,
+    alerte: (p.querySelector('.calc-alerte') || {}).textContent || null,
     lignes, champs, boutons, resHaut: rr ? rr.top : null,
     boite: { g: r.left, d: r.right, h: r.top, b: r.bottom }, L: innerWidth, H: innerHeight,
     pageLarge: document.documentElement.scrollWidth - innerWidth, bulleLarge: p.scrollWidth - p.clientWidth,
@@ -145,7 +149,11 @@ const valeur = (e, nom) => (e.lignes.find(l => l[0] === nom) || [])[1];
       check('le bouton ferme le panneau (aria-expanded="false") et ouvre la calculette dans la bulle des légendes, sa tête d’abord', !menuApres.ouvert && menuApres.aria === 'false'
         && !e.cache && e.ouverte === 'calculette' && /fiche-tete/.test(e.tete) && e.titre === 'Calculette de risque' && e.aria === 'Calculette de risque', [menuApres, e.cache, e.ouverte, e.tete, e.titre, e.aria]);
       check('le focus est sur la croix, pas sur un champ (pas de clavier qui surgit)', /fiche-fermer/.test(e.focus || ''), e.focus);
-      check('une phrase en tête dit ce qu’elle fait ; le pied « Un calcul, pas un conseil. »', /taille de chaque palier/.test(e.phrase || '') && /stop saute/.test(e.phrase || '') && e.pied === 'Un calcul, pas un conseil.', [e.phrase, e.pied]);
+      // Revue du 14/10 (N2) : « le prix touche le stop » au lieu de « le stop saute ».
+      check('une phrase en tête dit ce qu’elle fait ; le pied « Un calcul, pas un conseil. »', /taille de chaque palier/.test(e.phrase || '') && /le prix touche le stop/.test(e.phrase || '') && e.pied === 'Un calcul, pas un conseil.', [e.phrase, e.pied]);
+      const noms = await page.evaluate(() => [...document.querySelectorAll('#fichePop .calc-nom, #fichePop .calc-legende')].map(l => l.textContent));
+      check('revue du 14/10 : les noms disent les mots (« Part risquée (% du capital perdu au stop) », « Stop (prix où la perte est coupée) », « Paliers (prix où un ordre attend) »)',
+        noms.includes('Part risquée (% du capital perdu au stop)') && noms.includes('Stop (prix où la perte est coupée)') && noms.includes('Paliers (prix où un ordre attend)'), noms);
       check('les champs : capital, part (1 au départ), stop, un palier ; texte au clavier décimal, sans saisie automatique',
         JSON.stringify(e.champs.map(c => c.id)) === JSON.stringify(['calcCapital', 'calcPart', 'calcStop', 'calcPalier0']) && e.champs.every(c => c.type === 'text' && c.mode === 'decimal' && c.auto === 'off')
         && e.champs[1].valeur === '1' && e.champs.filter(c => c.id !== 'calcPart').every(c => c.valeur === ''), e.champs);
@@ -169,6 +177,9 @@ const valeur = (e, nom) => (e.lignes.find(l => l[0] === nom) || [])[1];
         && valeur(e, 'Sens') === 'achat (stop dessous)' && /^0,02134 BTC \(≈ 1 745 \$\)$/.test(valeur(e, 'Quantité par palier') || '')
         && valeur(e, 'Prix moyen, tout rempli') === '81 759 $' && valeur(e, 'Perte au stop, tout rempli') === '100 $ (1 % du capital)' && valeur(e, 'Mise, tout rempli') === '5 235 $ (52 % du capital)', [c, e.lignes]);
       check('la ligne de rappel : « Le 1 % est la perte, pas la mise. Un trou de prix sous le stop coûterait plus. »', e.rappel === 'Le 1 % est la perte, pas la mise. Un trou de prix sous le stop coûterait plus.', e.rappel);
+      // Revue du 14/10 (M1) : le stop redit avec son écart ; « 81759 » tapé sans espace, réécrit en quittant le champ.
+      check('revue du 14/10 : « Stop 80 197 $ à 1,9 % sous le prix moyen » ; « 81759 » devenu « 81 759 » en quittant le champ ; pas d’alerte à 52 %',
+        valeur(e, 'Stop') === '80 197 $ à 1,9 % sous le prix moyen' && e.champs[4].valeur === '81 759' && e.alerte === null, [valeur(e, 'Stop'), e.champs.map(x => x.valeur), e.alerte]);
       const dessous = e.champs.every(x => x.bas <= e.resHaut + 0.5);
       check('les champs en haut, les résultats dessous', dessous, [e.champs.map(x => x.bas), e.resHaut]);
       if (o.tactile) {
@@ -189,7 +200,24 @@ const valeur = (e, nom) => (e.lignes.find(l => l[0] === nom) || [])[1];
       await taper(page, 'calcStop', '83 000'); await page.waitForTimeout(60);
       e = await lire(page);
       check('un stop au-dessus de tous les paliers : vente, « au-dessus du stop » dans le rappel', e.calc && e.calc.ok && e.calc.sens === -1 && valeur(e, 'Sens') === 'vente (stop au-dessus)' && /au-dessus du stop coûterait plus\.$/.test(e.rappel || ''), [e.lignes, e.rappel]);
-      // 4. Écran et mots, panneau rempli.
+      // 6. Revue du 14/10 (C5, M1) : au pavé numérique, « 81700 » sans espace ; Entrée passe au champ
+      // suivant et le stop devient « 81 700 ». Paliers 82 152 et 81 759, 0,5 % : mise de 160 % du
+      // capital, dite par une ligne d'alerte sous la table (couleur --warn-ink, le jeton du thème).
+      await taper(page, 'calcStop', '81700'); await page.keyboard.press('Enter'); await page.waitForTimeout(80);
+      e = await lire(page);
+      const al = await page.evaluate(() => {
+        const a = document.querySelector('#fichePop .calc-alerte'), t = document.querySelector('#fichePop .calc-table');
+        if (!a || !t) return null;
+        const sonde = document.createElement('span'); sonde.style.color = 'var(--warn-ink)'; document.getElementById('fichePop').appendChild(sonde);
+        const attendu = getComputedStyle(sonde).color; sonde.remove();
+        return { couleur: getComputedStyle(a).color, attendu, sousTable: a.getBoundingClientRect().top >= t.getBoundingClientRect().bottom - 0.5, visible: a.getClientRects().length > 0 };
+      });
+      check('revue du 14/10 : le stop tapé « 81700 » est réécrit « 81 700 » en quittant le champ, et redit dans le résultat',
+        (e.champs.find(x => x.id === 'calcStop') || {}).valeur === '81 700' && /^81 700 \$ à 0,3 % sous le prix moyen$/.test(valeur(e, 'Stop') || ''), [e.champs.map(x => x.valeur), valeur(e, 'Stop')]);
+      check('revue du 14/10 : mise de 160 % du capital → « La mise dépasse le capital (× 1,6). Tout remplir demande d’emprunter (effet de levier). », sous la table, en couleur d’alerte',
+        e.calc && e.calc.ok && e.calc.partMise > 1 && valeur(e, 'Mise, tout rempli') === '16 038 $ (160 % du capital)'
+        && e.alerte === 'La mise dépasse le capital (× 1,6). Tout remplir demande d’emprunter (effet de levier).' && al && al.visible && al.sousTable && al.couleur === al.attendu, [valeur(e, 'Mise, tout rempli'), e.alerte, al]);
+      // 4. Écran et mots, panneau rempli (avec la ligne d'alerte).
       const dansEcran = e.boite.g >= -0.5 && e.boite.d <= e.L + 0.5 && e.boite.h >= -0.5 && e.boite.b <= e.H + 0.5;
       const hors = e.champs.concat(e.boutons.map(b => ({ id: b.t, gauche: b.g, droite: b.d }))).filter(x => x.gauche < e.boite.g - 0.5 || x.droite > e.boite.d + 0.5).map(x => x.id);
       check('la bulle dans l’écran, aucun défilement de côté (page ni bulle), champs et boutons dans la bulle', dansEcran && e.pageLarge <= 0 && e.bulleLarge <= 1 && !hors.length, { boite: e.boite, L: e.L, H: e.H, page: e.pageLarge, bulle: e.bulleLarge, hors });
