@@ -215,7 +215,9 @@ const MESURES = () => {
       cy.classList.add('vieux'); const vieux = lire();
       return { etiquette: getComputedStyle(a, '::before').content, frais, vieux, texte: a.textContent };
     });
-    check('indice de révision : étiquette posée, valeur inchangée (l\'âge en minutes)', /Ind\. de révision/.test(ind.etiquette) && /^(\d+ min|—)$/.test(ind.texte), ind);
+    // Revue du 14/10/2026 (M7) : l'âge suit la règle de tous les âges (Fmt.duree) : « 8 h 14 », plus « 494 min ».
+    check('indice de révision : étiquette posée, valeur inchangée (l\'âge, en minutes sous 90 min puis en heures)', /Ind\. de révision/.test(ind.etiquette) && /^(\d+ min|\d+ h( \d\d)?|—)$/.test(ind.texte)
+      && !(+((/^(\d+) min$/.exec(ind.texte) || [])[1]) >= 90), ind);
     check('indice de révision : △ au crayon rouge seulement en retard (.vieux)', ind.frais === 'none' && /△/.test(ind.vieux), ind);
 
     // ─── 7. Étiquette du dernier prix ───

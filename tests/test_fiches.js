@@ -390,7 +390,8 @@ titre('11. Les fiches disent ce que la page calcule, avec les mots de l’écran
   const lq = T.FICHES.liq;
   check('carte : un seul nom (« Ordres en attente (carte) »), plus de note sur les colonnes d’avant le 08/10, l’âge dit avec la cadence publiée', lq.titre === 'Ordres en attente (carte)' && !/08\/10/.test(lq.formule(T.PARAM))
     && lq.limites.includes('toutes les ' + T.CADENCES.attendue_min + ' min') && !/quart d’heure|vingtaine/.test(lq.limites));
-  check('guide et scénarios : masquables dans « Choisir l’affichage », dans les deux modes (plus de « + Indicateurs » ni de « + Affichage »)', ['guide', 'scenarios'].every(k => /Masquable dans « Choisir l’affichage », dans les deux modes/.test(T.FICHES[k].limites)
+  // Revue du 14/10/2026 (C18) : « dans les deux modes » parlait d'un mode qui n'existe plus ; retiré.
+  check('guide et scénarios : masquables dans « Choisir l’affichage », sans « dans les deux modes » (plus de « + Indicateurs » ni de « + Affichage »)', ['guide', 'scenarios'].every(k => /Masquable dans « Choisir l’affichage »\.$/.test(T.FICHES[k].limites) && !/deux modes/.test(T.FICHES[k].limites)
     && !/« \+ (Affichage|Indicateurs) »/.test(T.FICHES[k].limites)));
   check('la couche Guide : un seul nom, du menu (LIBELLES_ECRAN) à la fiche et au glossaire', vm.runInContext('LIBELLES_ECRAN.guide', page.sandbox) === T.FICHES.guide.titreDeb);
   check('« Et ensuite ? » : la marge de futur reçoit aussi les flèches des scénarios (elle ne disparaît pas avec le seul Guide)', /flèches des scénarios/.test(T.FICHES.guide_suite.limites) && !/ne sert qu’à dessiner ces chemins/.test(T.FICHES.guide_suite.limites));
@@ -469,6 +470,67 @@ titre('12. Chaque fiche en trois lignes d’ado : ce que c’est, comment les tr
       .concat(f.lectures.filter(l => l.mode !== 'expert').map((l, i) => ['lecture ' + i, l.t, 20]))
       .filter(([, t, n]) => t && nMots(t) > n).map(([c, t, n]) => k + '.' + c + ' ' + nMots(t) + '/' + n); });
   check('budgets de la charte : ce que c’est ≤ 15 mots, usage et calcul ≤ 25, lecture ≤ 20, débat ≤ 35, limites ≤ 20', !hors.length, hors);
+}
+
+// ── 13. Petits textes justes (revue du 14/10/2026, C18, C19, C20, C21, M17) ──
+titre('13. Petits textes justes : plus de « Complet / Lisible », deux avertissements, pluriels, apostrophes, touches');
+{
+  const Gd = require(path.join(REPO, 'js/guide.js')), Sc = require(path.join(REPO, 'js/scenarios.js'));
+  const ev = c => vm.runInContext(c, page.sandbox);
+  const texte = h => String(h).replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/g, ' ');
+  // Le code des pages sans ses commentaires (/* */, // et <!-- -->) : ce qui peut s'écrire à l'écran.
+  const sansComm = t => t.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\'"])\/\/.*$/gm, '$1');
+  const JS = fs.readdirSync(path.join(REPO, 'js')).filter(f => /\.js$/.test(f)).map(f => 'js/' + f);
+  const code = f => sansComm(fs.readFileSync(path.join(REPO, f), 'utf8'));
+  const visibleHtml = f => fs.readFileSync(path.join(REPO, f), 'utf8').replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<!--[\s\S]*?-->/g, '');
+
+  // C18 : le mode « Complet / Lisible » n'existe plus ; aucun texte visible ne le nomme.
+  const ANCIEN = /\b(Complet|Lisible)\b/;
+  const fichesAncien = Object.keys(T.FICHES).filter(k => ANCIEN.test(texte(T.ficheHtml(k))));
+  check(`C18 : aucune des ${Object.keys(T.FICHES).length} fiches (« En savoir plus » compris) ne dit « Complet » ni « Lisible »`, !fichesAncien.length, fichesAncien);
+  ev('ouvrirGlossaire()');
+  const glossaire = ev('document.getElementById("fichePop").innerHTML');
+  check('C18 : les Légendes non plus', /Légendes/.test(glossaire) && !ANCIEN.test(texte(glossaire)), texte(glossaire).slice(0, 200));
+  const pub = texte(ev('phraseCarte("sources", 7, 8)'));
+  check('C18 : Infos du marché, une info manque : « détail avec « Les chiffres du marché » », plus « en mode Complet »', /1 info manque .+avec « Les chiffres du marché »/.test(pub) && !ANCIEN.test(pub), pub);
+  const jsAncien = JS.filter(f => ANCIEN.test(code(f)));
+  check('C18 : aucune chaîne du code (js/*.js, hors commentaires) ne dit « Complet » ni « Lisible »', !jsAncien.length, jsAncien);
+  check('C18 : index.html non plus (le bouton du Grid Bot dit « ▶ Tout l’historique »)', !ANCIEN.test(visibleHtml('index.html')) && /▶ Tout l’historique/.test(visibleHtml('index.html')));
+
+  // C19 : deux avertissements, ceux de la charte, partagés ; plus de « pas une promesse / recommandation ».
+  check('C19 : les deux phrases de la charte, et elles seules (AVERTISSEMENT_FORME retiré)', Gd.AVERTISSEMENT === 'Une description, pas un conseil.'
+    && Gd.AVERTISSEMENT_CLAUDE === 'Une hypothèse de Claude (une IA), pas un conseil.' && !('AVERTISSEMENT_FORME' in Gd), Object.keys(Gd).filter(k => /AVERT/.test(k)));
+  const VIEUX = /pas une (promesse|recommandation)|pas une prévision ni un conseil|pas une promesse ni un conseil/;
+  const vieux = JS.concat(['index.html', 'bookmap.html']).filter(f => VIEUX.test(code(f)));
+  check('C19 : aucun texte ne dit « pas une promesse », « pas une recommandation », « pas une prévision ni un conseil »', !vieux.length, vieux);
+  const st = Gd.statsFigure({ type: 'double_sommet', sens: -1, phase: 'forme' }, null, { intervalle: '15m' }, {}, '$');
+  check('C19 : la ligne du risque des statistiques d’une figure est l’avertissement partagé', st && st.risque === Gd.AVERTISSEMENT, st && st.risque);
+
+  // C20 : un même état pour tous les scénarios se dit au pluriel.
+  const plur = typeof Sc.etatPluriel === 'function' ? ['terminé', 'réalisé ✓', 'invalidé ✗', 'partiel', 'noté', 'sorti ↑ ✗', 'en cours', 'indécis'].map(Sc.etatPluriel) : null;
+  check('C20 : « terminés », « réalisés ✓ », « invalidés ✗ », « partiels », « notés », « sortis ↑ ✗ » ; « en cours » et « indécis » tels quels',
+    JSON.stringify(plur) === JSON.stringify(['terminés', 'réalisés ✓', 'invalidés ✗', 'partiels', 'notés', 'sortis ↑ ✗', 'en cours', 'indécis']), plur);
+  const trois = st => ({ F: { etat: 'ok' }, items: [1, 2, 3].map(r => ({ sc: { rang: String(r), statut: st }, sv: { cle: 'avant', fini: true } })) });
+  const l1 = ev('scenResumeLigneDebutant(' + JSON.stringify(trois('⏳')) + ')'), l2 = ev('scenResumeLigneDebutant(' + JSON.stringify(trois('✅')) + ')');
+  check('C20 : la bulle des scénarios dit « les 3 terminés. » et « Journal : les 3 réalisés ✓. » (plus « les 3 terminé »)',
+    l1 && /les 3 terminés\.$/.test(l1[1]) && l2 && /^Journal : les 3 réalisés ✓\.$/.test(l2[1]), [l1, l2]);
+
+  // C21 : l'apostrophe ’ partout, comme le terminal le faisait déjà presque partout (infobulles du
+  // Grid Bot et des Infos du marché comprises). Une apostrophe droite entre deux lettres, hors
+  // commentaires, est un texte oublié.
+  const LET = '[A-Za-zÀ-ÖØ-öø-ÿŒœ]', droite = new RegExp(LET + "\\\\?'" + LET, 'g');
+  const apos = JS.map(f => [f, code(f).match(droite) || []]).concat([['index.html', visibleHtml('index.html').match(droite) || []]]).filter(([, m]) => m.length);
+  check('C21 : aucune apostrophe droite dans les textes (js/*.js, index.html)', !apos.length, apos.map(([f, m]) => f + ' : ' + m.slice(0, 4).join(' ')));
+  check('C21 : les dents du contrôle (l’apostrophe droite repérée, échappée ou non ; « d’ordres » non)', "x = 'peu d\\'ordres'".match(droite) && '`l\'axe`'.match(droite) && !'peu d’ordres'.match(droite));
+
+  // M17 : la ligne des touches, un seul nom pour le bouton ↺, cachée sans souris.
+  const rac = ev('RACCOURCIS_TERMINAL');
+  check('M17 : les touches disent « R ou F revient au présent » (plus « vue de départ » ni « (ici, comme R) »), et les Légendes les montrent',
+    /R ou F revient au présent/.test(rac) && !/vue de départ|comme R/.test(rac) && glossaire.includes('<p class="fiche-touches">' + rac + '</p>'), rac);
+  const btn = (/<button[^>]*id="resetBtn"[^>]*>/.exec(fs.readFileSync(path.join(REPO, 'index.html'), 'utf8')) || [''])[0];
+  check('M17 : le bouton ↺ s’appelle « Revenir au présent » (nom lu et infobulle), plus « Réinitialiser le zoom »', /aria-label="Revenir au présent"/.test(btn) && /title="Revenir au présent/.test(btn) && !/Réinitialiser/.test(btn), btn);
+  const css = fs.readFileSync(path.join(REPO, 'css/app.css'), 'utf8');
+  check('M17 : sans souris (hover: none), la ligne des touches est cachée', /@media \(hover: none\) \{\s*\.fiche-touches \{ display: none; \}/.test(css));
 }
 
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }

@@ -81,7 +81,20 @@ const Fmt = (function () {
   }
   /** « heure de l'appareil (UTC+2) » : la mention unique du fuseau, en mots. */
   const fuseauMots = ms => 'heure de l’appareil (' + fuseau(ms) + ')';
+  /** Un âge en minutes, en mots : « 47 min » jusqu'à DUREE_HEURES min, puis « 1 h 31 », « 5 h ».
+   *  UNE règle pour tous les âges du site (revue du 14/10/2026, M7 : au même moment, une bulle
+   *  disait « il y a 2 h », le voyant « 91 min », la pastille « 300 min » au lieu de 5 h). Le seuil
+   *  vit ici et non dans PARAM (js/app.js) : horloges.js et guide.js, chargés avant, s'en servent
+   *  aussi hors de la page. */
+  const DUREE_HEURES = 90;
+  function duree(min) {
+    if (!fini(min)) return '—';
+    const m = Math.max(0, Math.floor(min));
+    if (m < DUREE_HEURES) return m + ' min';
+    const h = Math.floor(m / 60), r = m % 60;
+    return h + ' h' + (r ? ' ' + String(r).padStart(2, '0') : '');
+  }
 
-  return { MOINS, nombre, decimalesPrix, decimalesLecture, prix, cote, pct, compact, signe, heure, heureSec, jour, jourHeure, memeJour, fuseau, fuseauMots };
+  return { MOINS, nombre, decimalesPrix, decimalesLecture, prix, cote, pct, compact, signe, heure, heureSec, jour, jourHeure, memeJour, fuseau, fuseauMots, DUREE_HEURES, duree };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Fmt;

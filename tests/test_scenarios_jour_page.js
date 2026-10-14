@@ -50,7 +50,8 @@ const proche = (a, b, tol) => (a === null && b === null) || (a !== null && b !==
 // Le budget d'une bulle sans « Le détail » (charte du 12/10/2026 ; revue du 14/10/2026, M6 et C16) :
 // au plus PARAM.guide.debutant.bulleMots mots hors avertissement, comptés comme les fiches (un groupe
 // qui porte une lettre ou un chiffre), et un seul avertissement.
-const AVERTISSEMENTS = ['Une description, pas un conseil.', 'Une hypothèse de Claude (une IA), pas un conseil.', 'Une lecture débattue, pas une prévision ni un conseil.'];
+// Les deux avertissements de la charte (revue du 14/10/2026, C19 : la troisième formule est retirée).
+const AVERTISSEMENTS = ['Une description, pas un conseil.', 'Une hypothèse de Claude (une IA), pas un conseil.'];
 const motsBulle = t => AVERTISSEMENTS.reduce((x, a) => x.split(a).join(' '), t).split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
 const avertissements = t => (t.match(/pas une? (?:conseil|prévision ni un conseil)/g) || []).length;
 const BULLE_MOTS = +(require('fs').readFileSync(path.join(__dirname, '..', 'js', 'app.js'), 'utf8').match(/\bbulleMots: (\d+)/) || [0, 0])[1];

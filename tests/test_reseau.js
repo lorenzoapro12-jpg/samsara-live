@@ -73,12 +73,14 @@ Object.defineProperty(feed, 'innerHTML', { get: () => html, set: v => { rendus++
   check('première lecture : celle du script de tête, reprise (aucune requête de plus)', lectures.filter(x => /market-data/.test(x.url)).length === 1);
   check('première lecture : cartes rendues, une onde du voyant', rendus === 1 && ajouts.filter(k => k === 'ping').length === 1, { rendus, ajouts });
   // Un tour une minute plus tard : rien n'est attendu.
-  ages.push({ textContent: '2' });
+  // Revue du 14/10/2026 (M7) : le nombre porte son unité (Fmt.duree : « 3 min », « 1 h 31 »), une
+  // seule règle pour tous les âges ; « 300 min » ne se lit plus.
+  ages.push({ textContent: '2 min' });
   maintenant += MIN;
   await T.fetchMarket();
   check('une minute plus tard (rien d’attendu) : aucune requête, cartes intactes, pas d’onde',
     lectures.filter(x => /market-data/.test(x.url)).length === 1 && rendus === 1 && ajouts.filter(k => k === 'ping').length === 1);
-  check('… mais l’âge affiché avance (3 min)', ages[0].textContent === '3', ages);
+  check('… mais l’âge affiché avance (« 3 min », l’unité dans le nombre)', ages[0].textContent === '3 min', ages);
   // La publication suivante est attendue : relue chaque tour ; la même publication → rien.
   maintenant = Date.parse(publication.updated) + (T.CADENCES.attendue_min * 60 + T.CADENCES.marge_publication_s) * 1000;
   await T.fetchMarket();

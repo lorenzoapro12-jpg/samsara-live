@@ -134,7 +134,8 @@ const NB = '\\d{1,3}(?: \\d{3})*';   // partie entière à la française (espace
     // 500 niveaux couvrent ≈ ±0,13 % : la carte annonçait « ±1 % ». La bande affichée doit
     // être couverte, et la couverture réelle doit se lire.
     ['Carnet live : bande couverte (pas « ±1 % »)', /Carnet en direct ±0,1 %/.test(html) && !/Carnet en direct ±1 %/.test(html)],
-    ['Carnet live : couverture réelle affichée', /vus jusqu'à ±(\d+,\d\d|—) %/.test(html)],
+    // Revue du 14/10/2026 (C21) : le terminal écrit l’apostrophe ’ partout (« vus jusqu’à », « n’interroge »).
+    ['Carnet live : couverture réelle affichée', /vus jusqu’à ±(\d+,\d\d|—) %/.test(html)],
     ['Tape live : taker buy en %', /Taker buy\s*[\d.,]+\s*%/.test(html)],
     ['Tape live : delta net signé', /Delta net/.test(html)],
     ['Bloc « non live » : perp depuis le fichier', html.includes(fr(DATA.micro.mark_price, 1))],
@@ -144,7 +145,7 @@ const NB = '\\d{1,3}(?: \\d{3})*';   // partie entière à la française (espace
     ['Piège du basis documenté dans la page', /Deux cadences différentes ne se soustraient/.test(html)],
     ['Spread en 2 décimales', /spread\s*<b>\d+,\d\d\s*pts/.test(html)],
     ['Fenêtre du tape affichée', /fenêtre\s*(\d+\s*s|—)/.test(html)],
-    ['Mention : cette page n\'interroge que Binance', /cette page n'interroge que Binance/.test(html)],
+    ['Mention : cette page n\'interroge que Binance', /cette page n’interroge que Binance/.test(html)],
     ['Aucun motif interdit dans le panneau', fb.find(html, fbList.terms).length === 0],
     ['Aucun motif interdit dans la SOURCE publiée', fb.find(SRC, fbList.terms).length === 0],
     ['Avertissement spot ≠ swap', /comparez-le à votre <b>spot<\/b>/.test(html)],

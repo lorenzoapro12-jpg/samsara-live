@@ -610,13 +610,14 @@ async function controlerTerminalMarque(page, p, nom, deb, erreurs) {
       const { page: C, erreurs: eC } = await nouvelOnglet(ctx);
       await C.goto(ORIGINE() + '/bookmap.html');
       await pretCarte(C, true);
+      // Revue du 14/10/2026 (C21) : les phrases de couleur de la carte s’écrivent « peu d’ordres », avec ’.
       const clair = async (nom) => {
         const s = await lireTon(C);
         check(`${nom} : ton clair (thème « ${s.theme.terminal} »), fond de page clair (${s.bg}), cadre à l'accent d'Aero (${s.theme.accentCadre})`,
           s.theme.ton === 'clair' && s.theme.terminal === 'aero' && lum(s.bg) > 0.7 && s.theme.accentCadre === '#0b84b0', s.theme);
         check(`${nom} : les mots des couleurs sont ceux du ton clair (${s.mots.join(', ')} ; « ${s.theme.mots.palette} »)`,
-          s.mots.includes('maintenant:orange') && s.mots.includes('bandes:foncées') && s.mots.includes('prix:noire') && /^Bleu très pâle : peu d'ordres/.test(s.theme.mots.palette)
-          && /Bleu très pâle : peu d'ordres/.test(s.intro) && /trait orange|orange/.test(s.intro) && !/Bleu foncé : peu|blanc : le plus/.test(s.intro) && s.options.some(o => /bleu très pâle → bleu → bleu nuit/.test(o)), { mots: s.mots, intro: s.intro.slice(0, 400), options: s.options });
+          s.mots.includes('maintenant:orange') && s.mots.includes('bandes:foncées') && s.mots.includes('prix:noire') && /^Bleu très pâle : peu d’ordres/.test(s.theme.mots.palette)
+          && /Bleu très pâle : peu d’ordres/.test(s.intro) && /trait orange|orange/.test(s.intro) && !/Bleu foncé : peu|blanc : le plus/.test(s.intro) && s.options.some(o => /bleu très pâle → bleu → bleu nuit/.test(o)), { mots: s.mots, intro: s.intro.slice(0, 400), options: s.options });
         check(`${nom} : la chaleur est peinte avec la palette claire (${s.peints} pixels lus, ${s.horsPalette} hors de cette palette)`, s.peints >= 50 && s.horsPalette <= s.peints * 0.05, s);
         return s;
       };
@@ -632,7 +633,7 @@ async function controlerTerminalMarque(page, p, nom, deb, erreurs) {
         JSON.stringify(S2.lut) === JSON.stringify(R0.lut) && S2.theme.fond === R0.theme.fond && S2.theme.accent === R0.theme.accent && S2.theme.prix === R0.theme.prix, { S2: S2.theme, R0: R0.theme });
       check(`kala : les mêmes mots que la carte sombre d'avant (légende : ${S2.mots.join(', ')} ; explication ; options)`,
         JSON.stringify(S2.theme.mots) === JSON.stringify(R0.theme.mots) && JSON.stringify(S2.mots) === JSON.stringify(R0.mots) && S2.intro.length > 100 && S2.intro === R0.intro && JSON.stringify(S2.options) === JSON.stringify(R0.options)
-        && /Bleu foncé : peu d'ordres/.test(S2.intro), { mots: [S2.theme.mots, R0.theme.mots, S2.mots, R0.mots], intro: [S2.intro.slice(0, 300), R0.intro.slice(0, 300)], options: [S2.options, R0.options] });
+        && /Bleu foncé : peu d’ordres/.test(S2.intro), { mots: [S2.theme.mots, R0.theme.mots, S2.mots, R0.mots], intro: [S2.intro.slice(0, 300), R0.intro.slice(0, 300)], options: [S2.options, R0.options] });
       check(`kala : la chaleur repeinte avec la palette sombre (${S2.peints} pixels lus, ${S2.horsPalette} hors de cette palette)`, S2.peints >= 50 && S2.horsPalette <= S2.peints * 0.05, S2);
       await T.evaluate(() => appliquerTheme('aero'));
       await C.waitForTimeout(1500);

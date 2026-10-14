@@ -9,7 +9,8 @@
 //        son libellé prend une place du budget (au plus 5 textes sur le tracé, journal de fillText) ;
 //      · sa bulle : le résumé d'abord (4 lignes et 3 nombres au plus, sans « % » ni mot banni,
 //        ce qui s'est passé ensuite, et le compte de la vue s'il tient), puis le détail au 2e
-//        toucher ou au clic (le compte, « pas une prévision ni un conseil ») ;
+//        toucher ou au clic (le compte, « Une description, pas un conseil. » : l'avertissement
+//        partagé, revue du 14/10/2026, C19) ;
 //      · retour au présent : plus rien ; un vrai glisser de souris (1440) : la page = la sélection pure ;
 //      · le menu du Lisible n'a pas l'option.
 //   2. COMPLET (1440 et 390) : « Figures passées » non par défaut (rien, pas de ligne du compte) ;
@@ -257,8 +258,9 @@ async function choisir(o, v) {
         console.log(`  · résumé : ${b1 ? b1.corps : '—'}${b1 && cptDans(b1.corps) ? '' : '  (compte : dans le détail)'}`);
         await detail(o, pt);
         const b2 = await lireBulle(o.page);
-        check(`${o.tactile ? '2e toucher' : 'clic'} : le DÉTAIL — la définition, la validation, l’issue, le compte de la vue, « pas une prévision ni un conseil » ; sans « % » ni mot banni`,
-          b2 && b2.id === p.deb.id && !b2.resume && /Figure validée/.test(b2.corps) && cptDans(b2.corps) && /pas une prévision ni un conseil/.test(b2.corps.replace(/\s+/g, ' '))
+        // Revue du 14/10/2026 (C19) : la fin est l'avertissement partagé (plus « pas une prévision ni un conseil »).
+        check(`${o.tactile ? '2e toucher' : 'clic'} : le DÉTAIL — la définition, la validation, l’issue, le compte de la vue, « ${G.AVERTISSEMENT} » ; sans « % » ni mot banni`,
+          b2 && b2.id === p.deb.id && !b2.resume && /Figure validée/.test(b2.corps) && cptDans(b2.corps) && b2.corps.replace(/\s+/g, ' ').includes(G.AVERTISSEMENT) && !/pas une prévision ni/.test(b2.corps)
           && !/%/.test(b2.titre + b2.corps) && !G.motsBannis(b2.titre + ' ' + b2.corps).length && !MODES_ECRITS.test(b2.corps), b2 && b2.corps.slice(0, 500));
         await ailleurs(o);
       }
@@ -327,8 +329,9 @@ async function choisir(o, v) {
         if (pt) {
           await montrer(o, pt);
           const b = await lireBulle(o.page);
-          check(`bulle « ${b && b.titre} » : ce qui s’est passé ensuite, le compte de la vue, « pas une prévision ni une recommandation », entière dans le tracé`,
-            b && b.id === pt.id && /^Exemple passé : (validé|jamais validé)/.test(b.texte) && sansBlancs(b.texte).includes(sansBlancs(V[0])) && /pas une prévision ni une recommandation/.test(b.texte)
+          // Revue du 14/10/2026 (C19) : « Une description, pas un conseil. » (plus « pas une prévision ni une recommandation »).
+          check(`bulle « ${b && b.titre} » : ce qui s’est passé ensuite, le compte de la vue, « ${G.AVERTISSEMENT} », entière dans le tracé`,
+            b && b.id === pt.id && /^Exemple passé : (validé|jamais validé)/.test(b.texte) && sansBlancs(b.texte).includes(sansBlancs(V[0])) && sansBlancs(b.texte).includes(sansBlancs(G.AVERTISSEMENT)) && !/recommandation/.test(b.texte)
             && !MODES_ECRITS.test(b.titre + b.texte) && b.b.y >= 0 && b.b.y + b.b.h <= b.mainH, b && { titre: b.titre, texte: b.texte.slice(0, 400), b: b.b });
           await ailleurs(o);
         }

@@ -390,7 +390,7 @@ const FICHES = {
       { s: 'convention', t: 'Régime, états « cassé » ou « percé en mèche », objectifs : des règles usuelles, nommées dans leur fiche.' },
       { s: 'débattu', t: 'Murs d’options et zéro gamma viennent d’un modèle : ils sont marqués « modèle ».' },
     ],
-    limites: 'Pas une prévision : aucun chemin privilégié, aucune probabilité. Masquable dans « Choisir l’affichage », dans les deux modes.',
+    limites: 'Pas une prévision : aucun chemin privilégié, aucune probabilité. Masquable dans « Choisir l’affichage ».',
   },
   guide_niveaux: {
     titre: 'Guide — niveaux nommés', page: 'guide', nature: 'mesure',
@@ -442,8 +442,8 @@ const FICHES = {
         + 'Objectifs : la hauteur reportée depuis la ligne franchie (doubles, triples, épaule-tête-épaule, rectangle), la largeur à l’ouverture (triangles, biseaux, canaux), la longueur du mât (drapeaux, fanions). '
         + 'Invalidations : clôture au-delà de l’extrême (doubles, triples) ; de la tête puis, une fois validée, de l’épaule droite (épaule-tête-épaule) ; retour au-delà du milieu (deux droites, rectangle) ; recul de plus de la moitié du mât, ou retour au-delà de l’extrême de la pause (drapeaux). '
         + 'Bilan : une figure compte depuis la clôture où son dernier pivot est connu ; un double devenu triple ne compte qu’une fois et sort du dénominateur des validations. '
-        + 'Dessin : un nouveau pivot sur une droite la refait (même nom, même début) ; une figure validée porte un trait fin à son niveau d’invalidation ; en Complet, la bulle cite les figures récemment ratées, annulées ou sans suite. '
-        + 'Délais : ' + g.expiration + ' bougies pour valider, ' + g.horizon + ' pour atteindre l’objectif (objectif et invalidation jugés tous deux en clôture). À l’écran : au plus ' + g.formesMax + ' figures en Complet (une seule en Lisible) ; une figure annulée ou ratée reste ' + g.garderInvalide + ' bougies, une ébauche annulée ' + g.garderEbauche + ', un objectif atteint ' + g.garderFini + ' (Complet). « Échantillon faible » sous ' + g.echantillonFaible + ' cas. Repère sans forme : au plus ' + g.temoinDeparts + ' départs rejoués.';
+        + 'Dessin : un nouveau pivot sur une droite la refait (même nom, même début) ; une figure validée porte un trait fin à son niveau d’invalidation ; avec « Le détail », la bulle cite les figures récemment ratées, annulées ou sans suite. '
+        + 'Délais : ' + g.expiration + ' bougies pour valider, ' + g.horizon + ' pour atteindre l’objectif (objectif et invalidation jugés tous deux en clôture). À l’écran : au plus ' + g.formesMax + ' figures avec « Le détail » (une seule sans) ; une figure annulée ou ratée reste ' + g.garderInvalide + ' bougies, une ébauche annulée ' + g.garderEbauche + ', un objectif atteint ' + g.garderFini + ' (avec « Le détail »). « Échantillon faible » sous ' + g.echantillonFaible + ' cas. Repère sans forme : au plus ' + g.temoinDeparts + ' départs rejoués.';
     },
     lectures: [
       { s: 'convention', t: 'États : ébauche, formée, sortie à valider (1 clôture sur 2), validée, objectif atteint ; ✗ annulée avant la validation, ratée après.' },
@@ -451,7 +451,7 @@ const FICHES = {
       { s: 'convention', t: 'Un passage en mèche se dit « percé en mèche, à valider », jamais une validation.' },
       { s: 'convention', t: 'Objectif théorique et invalidation suivent des conventions de l’usage, non garanties (règles plus bas).' },
       { s: 'convention', t: 'Figure annulée ou ratée : une ✗ sur le niveau franchi, jamais sur un prix de clôture.' },
-      { s: 'débattu', t: 'Le sens « attendu » d’une figure est débattu. En Complet, la page montre le partage mesuré des sorties.' },
+      { s: 'débattu', t: 'Le sens « attendu » d’une figure est débattu. Avec « Le détail », la page montre le partage mesuré des sorties.' },
       { s: 'débattu', t: 'Les figures sont subjectives. Des règles fixes les rendent reproductibles, pas efficaces.' },
       { s: 'mesuré', t: 'Bilan : le même détecteur rejoué sur l’historique chargé, sans regarder l’avenir.' },
       { s: 'mesuré', t: 'Objectif et invalidation ne sont pas à la même distance. Un repère sans forme sert de témoin (Wilson 95 %).' },
@@ -499,7 +499,7 @@ const FICHES = {
       { s: 'convention', mode: 'debutant', t: '« Aucun scénario ne tient plus » : rien de neuf avant le prochain point du matin.' },
       { s: 'convention', mode: 'expert', get t() { return journeeExpert(typeof PARAM !== 'undefined' ? PARAM : null); } },
     ],
-    limites: 'Pas une prévision garantie. Une bougie sur deux zones : « ordre inconnu ». Masquable dans « Choisir l’affichage », dans les deux modes.',
+    limites: 'Pas une prévision garantie. Une bougie sur deux zones : « ordre inconnu ». Masquable dans « Choisir l’affichage ».',
   },
   // ── Le dessin lui-même ──
   // La forme d'une bougie est une CONVENTION du thème (jeton --bougie-forme) : la fiche dit celle
@@ -953,7 +953,7 @@ const CALCUL = {
       + 'la précédente ayant fini dans la sienne ; sans filtre de volume. Dite dans « En résumé » pendant les ' + F.phrasePeriodes + ' périodes suivantes, tant qu’aucune n’a fini de nouveau dedans ; '
       // Revue du 14/10/2026 (C1) : la couche garde alors la fourchette cassée, pas le nouveau bas.
       + 'les deux lignes gardent alors la fourchette cassée.'; },
-  liq: () => grilleLiq().pas + ', le serveur additionne les BTC posés dans le carnet Binance, par tranche de prix' + (grilleLiq().dp ? ' de ' + nbF(grilleLiq().dp) + ' $' : '') + '. Publié toutes les ' + CADENCES.attendue_min + ' min ; en Complet, l’âge de la dernière colonne est écrit en haut à droite. BTC/USDT seulement.',
+  liq: () => grilleLiq().pas + ', le serveur additionne les BTC posés dans le carnet Binance, par tranche de prix' + (grilleLiq().dp ? ' de ' + nbF(grilleLiq().dp) + ' $' : '') + '. Publié toutes les ' + CADENCES.attendue_min + ' min ; avec « Le détail », l’âge de la dernière colonne est écrit en haut à droite. BTC/USDT seulement.',
   // ── Champs du fichier ──
   gex: () => 'Pour chaque option Deribit ouverte : variation de sa couverture pour ' + (prmMeta('micro.gex_usd_1pct', 'mouvement_pct') !== null ? nbF(prmMeta('micro.gex_usd_1pct', 'mouvement_pct')) + ' %' : 'un petit mouvement') + ' de prix (le « gamma ») × contrats ouverts. Calls en positif, puts en négatif (hypothèse). En dollars.',
   ls: 'Comptes Binance nets acheteurs divisés par comptes nets vendeurs, sur le perpétuel BTC. Un point par heure.',
@@ -1134,9 +1134,11 @@ function infoBtn(id) {
  *  dans les deux modes : seules les classes .debutant-seul / .expert-seul changent. */
 const GLOSSAIRE_DEBUTANT = ['guide', 'guide_niveaux', 'scenarios', 'bougies', 'sr_tf', 'vix', 'cvd', 'carnet'];
 /** Les touches du terminal (js/app.js), dans l'ordre de la légende de la carte : une même touche
- *  veut dire la même chose sur les deux pages (M le mode, ? l'aide de la page, R la vue de départ,
- *  F le présent) ; I ouvre les infos du marché (le terminal seul). */
-const RACCOURCIS_TERMINAL = 'Touches : ? cette aide · R revient à la vue de départ · F suit le présent (ici, comme R) · I les infos du marché · T / D le thème.';
+ *  veut dire la même chose sur les deux pages (? l'aide de la page, R et F le présent) ; I ouvre les
+ *  infos du marché (le terminal seul). R et F font ce que fait le bouton ↺ : un seul nom, celui du
+ *  bouton, « Revenir au présent » (revue du 14/10/2026, M17 : il en avait trois). Sans souris, la
+ *  ligne est cachée (css/app.css, comme sur la carte). */
+const RACCOURCIS_TERMINAL = 'Touches : ? cette aide · R ou F revient au présent · I les infos du marché · T / D le thème.';
 function ouvrirGlossaire(ancre) {
   const p = document.getElementById('fichePop');
   if (!p) return;
@@ -1203,7 +1205,7 @@ function phraseCarte(cle, v, v2, sujet) {
     // Elle compte les blocs de la DERNIÈRE publication (status), pas des sources ni leur âge
     // (le bandeau d'âge le dit) : « Toutes les données publiées sont arrivées » se lisait au-dessus
     // de « Données figées depuis 45 min ».
-    case 'sources': if (n(v) && n(v2)) t = v >= v2 ? 'La dernière publication est complète.' : (v2 - v) + (v2 - v > 1 ? ' infos manquent' : ' info manque') + ' dans la dernière publication (détail en mode Complet).'; break;
+    case 'sources': if (n(v) && n(v2)) t = v >= v2 ? 'La dernière publication est complète.' : (v2 - v) + (v2 - v > 1 ? ' infos manquent' : ' info manque') + ' dans la dernière publication (détail avec « Les chiffres du marché »).'; break;
     default: t = null;
   }
   return t ? '<div class="lecture-courte sans-chiffres">' + echapF(t) + '</div>' : '';

@@ -19,7 +19,9 @@
 //      commence par la marque de son issue (✓ ✗ –), une marque par issue ; titre, résumé et détail
 //      sans mot banni, sans « % », sans conseil ; le résumé dit ce qui s'est passé ENSUITE (cible
 //      atteinte ou non) avec trois nombres au plus (titre compris) ; le détail dit le compte et
-//      « pas une prévision ni un conseil » ; Complet : « Exemple passé », sans conseil ;
+//      « Une description, pas un conseil. » ; avec « Le détail » : « Exemple passé », sans conseil
+//      (revue du 14/10/2026, C19 : l'avertissement partagé, à la place de « pas une prévision ni un
+//      conseil » et de « pas une prévision ni une recommandation ») ;
 //   6. justes quand une bougie se ferme (rejeu repris) et quand l'historique s'allonge au début
 //      (identité par les DATES : Guide.idFigure avec les heures) ;
 //   7. temps : la sélection sur tout l'historique ≤ 1 ms.
@@ -175,15 +177,15 @@ titre('5. Les mots : libellé, titre, résumé, détail (Lisible) ; bulle (Compl
     const dit = f.fin === 'atteint' ? ensuite.every(t => /a atteint l’objectif/.test(t)) : ensuite.every(t => /sans atteindre son objectif|ni atteint son objectif/.test(t) && !/tombée|annul/.test(t));
     if (!dit || !/^Après sa validation/.test(ensuite[0]) || ensuite.some(t => nombres(t) > 1) || cpt.some(t => nombres(t) > 2) || tous.some(t => /%/.test(t) || G.motsBannis(t).length || CONSEIL.test(t))) malR.push({ f: f.type + ':' + f.fin, ensuite, cpt });
     const D = x.texte.join(' ');
-    if (/%/.test(D) || G.motsBannis(D).length || CONSEIL.test(D) || !D.includes(compte[0]) || !/pas une prévision ni un conseil/.test(x.texte[x.texte.length - 1]) || !/Figure validée/.test(D) || !/Mesuré sur/.test(D)) malD.push({ f: f.type, bannis: G.motsBannis(D), D: D.slice(0, 200) });
+    if (/%/.test(D) || G.motsBannis(D).length || CONSEIL.test(D) || !D.includes(compte[0]) || x.texte[x.texte.length - 1] !== G.AVERTISSEMENT || !/Figure validée/.test(D) || !/Mesuré sur/.test(D)) malD.push({ f: f.type, bannis: G.motsBannis(D), D: D.slice(0, 200) });
     const e = G.texteFigurePassee(f, R.bilan[f.type], ctx, P, '$', 'expert', G.texteComptePassees(r.compte, 'expert', 'validees', 1));
-    if (e.titre.indexOf(marques[f.fin] + ' Passée · ') !== 0 || !/^Exemple passé : validé /.test(e.texte[0]) || !/après la validation/.test(e.texte[0]) || CONSEIL.test(e.texte.join(' ')) || !/pas une prévision ni une recommandation/.test(e.texte[e.texte.length - 1])) malX.push({ t: e.titre, x: e.texte[0] });
+    if (e.titre.indexOf(marques[f.fin] + ' Passée · ') !== 0 || !/^Exemple passé : validé /.test(e.texte[0]) || !/après la validation/.test(e.texte[0]) || CONSEIL.test(e.texte.join(' ')) || e.texte[e.texte.length - 1] !== G.AVERTISSEMENT) malX.push({ t: e.titre, x: e.texte[0] });
   }
   check(`libellé (${VAL.length} figures validées) : ≤ ${P.debutant.forme} caractères, la marque de son issue d’abord (✓ objectif atteint, ✗ invalidée, – délai écoulé), sans mot banni ni « % »`, !malL.length && ['atteint', 'invalide', 'expire'].every(k => vus.has(k)), malL.slice(0, 4));
   check('titre : « ✓ Exemple passé : … », sans nombre ni mot banni', !malT.length, malT.slice(0, 3));
   check('résumé : ce qui s’est passé ENSUITE (objectif atteint, ou pas), un nombre au plus, puis le compte (deux au plus) — trois au plus en tout, sans « % », mot banni ni conseil', !malR.length, malR.slice(0, 2));
-  check('détail : définition, validation, issue, le compte de la vue, le bilan mesuré, « pas une prévision ni un conseil » ; sans « % », mot banni ni conseil', !malD.length, malD.slice(0, 2));
-  check('Complet : « ✓ Passée · … », « Exemple passé : validé … après la validation », « pas une prévision ni une recommandation », sans conseil', !malX.length, malX.slice(0, 2));
+  check('détail : définition, validation, issue, le compte de la vue, le bilan mesuré, « Une description, pas un conseil. » ; sans « % », mot banni ni conseil', !malD.length, malD.slice(0, 2));
+  check('Le détail : « ✓ Passée · … », « Exemple passé : validé … après la validation », « Une description, pas un conseil. », sans conseil', !malX.length, malX.slice(0, 2));
   // Toutes les issues, tombées comprises (Complet « toutes ») : une marque par issue.
   const issues = {};
   for (const f of R.formes.filter(x => !x.doublon && tombee(x)).concat(ebs.filter(tombee))) issues[f.fin] = G.marqueIssue(f);

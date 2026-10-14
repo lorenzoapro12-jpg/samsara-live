@@ -153,8 +153,10 @@ const dedans = (a, b, m = 0.5) => a && b && a.g >= b.g - m && a.d <= b.d + m && 
         b.nKpis > 0 && b.deborde <= 1 && b.kpis.every(k => dedans(k, b.cycle)) && dedans(b.age, b.etat), { deborde: b.deborde, cycle: b.cycle, kpis: b.kpis, age: b.age });
       const retard = await p.evaluate(() => { const a = document.querySelector('#cycle .kpi-age'), cy = document.getElementById('cycle');
         return { vieux: cy.classList.contains('vieux'), texte: a.textContent, icone: getComputedStyle(a, '::before').backgroundImage }; });
-      check(`publication en retard (« ${retard.texte} ») : les minutes restent, l'icône d'avertissement s'ajoute`,
-        retard.vieux && /\d+ min/.test(retard.texte) && /^url\("data:image\/svg/.test(retard.icone), retard);
+      // Revue du 14/10/2026 (M7) : l'âge suit la règle de tous les âges (Fmt.duree) : « 3 h », plus « 180 min ».
+      const minutes = (/^(\d+) min$/.exec(retard.texte) || [])[1];
+      check(`publication en retard (« ${retard.texte} ») : l'âge reste, en minutes sous 90 min puis en heures, l'icône d'avertissement s'ajoute`,
+        retard.vieux && /^(\d+ min|\d+ h( \d\d)?)$/.test(retard.texte) && !(minutes >= 90) && /^url\("data:image\/svg/.test(retard.icone), retard);
       // 5. Fenêtre active : le marché live au survol
       await p.keyboard.press('i'); await p.waitForTimeout(400);
       await p.mouse.move(700, 450); await p.waitForTimeout(100);

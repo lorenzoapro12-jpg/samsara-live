@@ -148,9 +148,10 @@ const Apprendre = (function () {
   const ordinal = k => (k === 1 ? '1re' : k + 'e');
   const majuscule = t => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
   // L'avertissement : UNE ligne courte en fin de bulle (charte du 12/10/2026), sans la ligne du
-  // risque devant (deux phrases pour une seule idée).
-  const FIN_DEBUTANT = 'Une description, pas une prévision ni un conseil.';
-  const FIN_EXPERT = 'Une description, pas une recommandation.';
+  // risque devant (deux phrases pour une seule idée). Les deux phrases du Guide, les mêmes avec ou
+  // sans « Le détail » (revue du 14/10/2026, C19 : « pas une recommandation », « pas une promesse
+  // ni un conseil », « pas une prévision ni un conseil » se côtoyaient).
+  const FIN = Gd.AVERTISSEMENT, FIN_CLAUDE = Gd.AVERTISSEMENT_CLAUDE;
   /** Le repère en mots : son prix (celui de son libellé) et son nom (« le plus haut d'hier »). */
   function repereMots(niv, unite) {
     const r = niv ? Gd.raisonPrincipale(niv) : null;
@@ -176,7 +177,7 @@ const Apprendre = (function () {
         return { variantes: V, titre: 'Le prix passe un repère',
           texte: ['Le prix vient de passer ' + au + de + '.',
             '« Cassé » seulement si ' + P[1] + ' finissent ' + cote + '. Avant, le prix peut revenir.',
-            FIN_DEBUTANT],
+            FIN],
           resume: [['Le prix vient de passer ' + au + de + '.', 'Le prix vient de passer ' + au + '.'], ['« Cassé » : ' + P[1] + ' finis ' + cote + ' ; avant, le prix peut revenir.']] };
       }
       const V = ['Le prix a cassé ' + X + ' : ' + P[1] + ' ont fini ' + cote + ', c’est validé.', 'Le prix a cassé ' + X + ' : ' + P[1] + ' ont fini ' + cote + '.',
@@ -184,13 +185,12 @@ const Apprendre = (function () {
       return { variantes: V, titre: 'Repère cassé',
         texte: ['Le prix a cassé ' + X + de + ' : il est passé ' + cote + ' et ' + P[1] + ' ont fini de ce côté' + (e.retest ? ', avec un retour sur le repère entre les deux' : '') + '.',
           '« Cassé » : passé de l’autre côté, et resté. Le prix peut encore revenir.',
-          FIN_DEBUTANT],
+          FIN],
         resume: [['Le prix est passé ' + cote + ' de ' + X + de + ' et ' + P[1] + ' ont fini de ce côté.', 'Le prix est passé ' + cote + ' de ' + X + ' et ' + P[1] + ' ont fini de ce côté.'],
           ['C’est « cassé » : passé de l’autre côté, et resté.']] };
     }
     if (e.source === 'figure') {
       const f = e.f, nom = (Gd.NOM_FORME_DEBUTANT && Gd.NOM_FORME_DEBUTANT[f.type]) || 'Figure', fam = Gd.famille(f), sortie = fam === 'lignes' || fam === 'drapeau';
-      const FIN = Gd.AVERTISSEMENT_FORME;
       if (e.type === 'figure_validee') {
         const s = f.sens > 0, tete = sortie ? nom + ' : sortie ' + (s ? 'en haut' : 'en bas') + ' validée' : nom + ' validé';
         const ou = sortie ? (s ? 'au-dessus' : 'en dessous') : (s ? 'au-dessus de sa ligne' : 'sous sa ligne');
@@ -231,8 +231,10 @@ const Apprendre = (function () {
       return null;
     }
     if (e.source === 'scenario') {
-      const sc = e.sc || {}, nomS = nomScenario(sc), n = (sc.cibles || []).length, FIN = 'Une hypothèse de Claude (une IA), pas une promesse ni un conseil.';
-      const qui = 'Écrit le matin par Claude, une IA ; suivi en direct ici. La note officielle : le journal, le lendemain.';
+      // Claude est nommé par le titre (« Scénario 1 de Claude ») et par l'avertissement : la phrase
+      // « Écrit le matin par Claude, une IA » le disait une 3e fois (revue du 14/10/2026, C19).
+      const sc = e.sc || {}, nomS = nomScenario(sc), n = (sc.cibles || []).length;
+      const qui = 'Suivi en direct ici. La note officielle : le journal, le lendemain.';
       let tete, quoi, mot;
       if (e.type === 'scenario_cible') { tete = nomS + ' : ' + ordinal(e.k) + ' cible touchée'; quoi = 'le prix a atteint sa zone.'; mot = '« Touchée » : le prix est entré dans sa zone, même un instant.'; }
       else if (e.type === 'scenario_realise') { tete = nomS + ' réalisé'; quoi = 'le prix a touché ' + (n > 1 ? 'ses ' + n + ' cibles dans l’ordre' : 'sa cible') + (sc.invalidation !== null && sc.invalidation !== undefined ? ', avant l’invalidation.' : '.'); mot = 'Allé au bout de ce qu’il disait : cela ne dit rien de la suite.'; }
@@ -243,7 +245,7 @@ const Apprendre = (function () {
       // « Scénario 1 : 1re cible touchée, le prix… » : pas deux deux-points dans la même phrase.
       const sep = e.type === 'scenario_cible' ? ', ' : ' : ';
       return { variantes: [tete + sep + quoi, tete + '.'], titre: nomS + ' de Claude',
-        texte: [tete + sep + quoi, mot, qui, FIN], resume: [[majuscule(quoi)], [mot]] };
+        texte: [tete + sep + quoi, mot, qui, FIN_CLAUDE], resume: [[majuscule(quoi)], [mot]] };
     }
     return null;
   }
@@ -255,16 +257,16 @@ const Apprendre = (function () {
       const regle = 'Cassure : 2 clôtures au-delà de la bande, ou 1 après un retour sur elle ; une mèche ne casse rien.';
       if (e.type === 'repere_passe') {
         const V = ['Niveau ' + X + ' franchi ' + fl + ' · bougie pas encore close : la cassure se juge en clôture', 'Niveau ' + X + ' franchi ' + fl + ' · non clos', X + ' franchi ' + fl];
-        return { variantes: V, titre, texte: ['Le prix en direct est passé ' + (e.sens > 0 ? 'au-dessus' : 'en dessous') + ' de la bande ' + X + ' : au-delà, bougie pas encore close.', regle, FIN_EXPERT], resume: null };
+        return { variantes: V, titre, texte: ['Le prix en direct est passé ' + (e.sens > 0 ? 'au-dessus' : 'en dessous') + ' de la bande ' + X + ' : au-delà, bougie pas encore close.', regle, FIN], resume: null };
       }
       const etat = 'cassé ' + (e.sens > 0 ? 'vers le haut' : 'vers le bas') + ' (' + (e.retest ? 'validé par un retour réussi' : '2/2 clôtures, validé') + ')';
       return { variantes: ['Niveau ' + X + ' : ' + etat, 'Niveau ' + X + ' cassé ' + fl + (e.retest ? ' · retour réussi' : ' 2/2'), X + ' cassé ' + fl],
-        titre, texte: ['Niveau ' + X + ' : ' + etat + '.', regle, FIN_EXPERT], resume: null };
+        titre, texte: ['Niveau ' + X + ' : ' + etat + '.', regle, FIN], resume: null };
     }
     if (e.source === 'figure') {
       const f = e.f, nom = (Gd.NOMS_FORMES[f.type] || ['Figure'])[0], et = Gd.etatForme(f);
       const regle = 'Validation : 2 clôtures au-delà de la ligne (ou 1 + retour) ; invalidation : 1 clôture au-delà ; objectif jugé en clôture.';
-      return { variantes: [nom + ' : ' + et.texte, nom + ' : ' + et.court], titre, texte: [nom + ' : ' + et.texte + '.', regle, 'Une lecture débattue, pas une recommandation.'], resume: null };
+      return { variantes: [nom + ' : ' + et.texte, nom + ' : ' + et.court], titre, texte: [nom + ' : ' + et.texte + '.', regle, FIN], resume: null };
     }
     if (e.source === 'scenario') {
       const sc = e.sc || {}, nomS = nomScenario(sc);
@@ -272,7 +274,7 @@ const Apprendre = (function () {
         scenario_tombe: e.cleEtat === 'sortie' ? 'sorti par le ' + (e.haut ? 'haut' : 'bas') : 'invalidé (invalidation touchée avant la dernière cible)' }[e.type];
       if (!etat) return null;
       return { variantes: [nomS + ' : ' + etat + ' · suivi en direct', nomS + ' : ' + etat], titre,
-        texte: [nomS + ' : ' + etat + ' (suivi en direct).', 'Touchée : une bougie recoupe la zone. Note officielle : le journal, le lendemain.', 'Une hypothèse de Claude (une IA), pas une recommandation.'], resume: null };
+        texte: [nomS + ' : ' + etat + ' (suivi en direct).', 'Touchée : une bougie recoupe la zone. Note officielle : le journal, le lendemain.', FIN_CLAUDE], resume: null };
     }
     return null;
   }
@@ -345,16 +347,16 @@ const Apprendre = (function () {
     if (g === 'repere') {
       const n = Gd.NOMS_DEBUTANT && Gd.NOMS_DEBUTANT[sorte], q = QUOI_REPERE[sorte], r = Gd.quoiDebutant ? Gd.quoiDebutant({ cle: sorte === 'options' ? 'call_wall' : sorte }) : '';
       if (!n || !q) return null;
-      return { noms: [n[0], n[1]], quoi: [r ? r.charAt(0).toLowerCase() + r.slice(1) : q[0], q[0], q[1]], fin: exp ? FIN_EXPERT : FIN_DEBUTANT };
+      return { noms: [n[0], n[1]], quoi: [r ? r.charAt(0).toLowerCase() + r.slice(1) : q[0], q[0], q[1]], fin: FIN };
     }
     if (g === 'figure') {
       const q = QUOI_FIGURE[sorte], nx = Gd.NOMS_FORMES && Gd.NOMS_FORMES[sorte];
       if (!q) return null;
       const noms = exp ? [nx ? nx[0] : sorte, nx ? nx[0] : sorte] : [Gd.NOM_LONG_DEBUTANT[sorte], Gd.NOM_FORME_DEBUTANT[sorte]];
-      return { noms, quoi: q, fin: exp ? 'Une lecture débattue, pas une recommandation.' : Gd.AVERTISSEMENT_FORME };
+      return { noms, quoi: q, fin: FIN };
     }
-    if (g === 'scenario' && !sorte) return { noms: ['Scénario', 'Scénario'], quoi: QUOI_SCENARIO, fin: exp ? 'Une hypothèse de Claude (une IA), pas une recommandation.' : 'Une hypothèse de Claude (une IA), pas une promesse ni un conseil.' };
-    if (g === 'passee' && !sorte) return { noms: ['Figure passée', 'Figure passée'], quoi: QUOI_PASSEE, fin: exp ? FIN_EXPERT : FIN_DEBUTANT };
+    if (g === 'scenario' && !sorte) return { noms: ['Scénario', 'Scénario'], quoi: QUOI_SCENARIO, fin: FIN_CLAUDE };
+    if (g === 'passee' && !sorte) return { noms: ['Figure passée', 'Figure passée'], quoi: QUOI_PASSEE, fin: FIN };
     return null;
   }
   /** La chose à expliquer : parmi les candidats ({ cle, … }, dans l'ordre de l'écran), le premier jamais
