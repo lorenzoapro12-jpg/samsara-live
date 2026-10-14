@@ -406,8 +406,9 @@ async function bulle(o, tactile) {
       await o.page.waitForTimeout(300);
       const d = await o.page.evaluate(() => { const p = document.getElementById('fichePop'), r = p.getBoundingClientRect(); return { ouvert: !p.hidden, texte: p.innerText, prix: [...p.querySelectorAll('.stats-prix')].map(x => x.textContent), barres: p.querySelectorAll('.stats-barre').length, S: window.__statsFigure,
         dedans: r.left >= 0 && r.right <= innerWidth + 0.5 && r.top >= 0 && r.bottom <= innerHeight + 0.5, chemin: location.pathname.replace(/^.*\//, ''), scroll: document.documentElement.scrollWidth - innerWidth }; });
-      check(`${mode} ${w} px : la ligne ouvre « ${d.S && d.S.titre} » : l’objectif de la figure en gros (${d.prix.join(' / ')}), sur des années si mesuré, la réussite mesurée et sa barre, le détail, sans mot banni, dans l’écran, sans changer de page`,
-        d.ouvert && d.S && d.prix.length >= 1 && d.prix.length === d.S.cibles.length && d.barres >= 1 && /Sur ce graphique/i.test(d.texte) && /Objectif de la figure/i.test(d.texte) && (!d.S.annees || /Sur des années/i.test(d.texte)) && !/cible/i.test(d.texte) && /Le détail/i.test(d.texte)
+      // Le tableau s'intitule « Les chiffres » : « Le détail » ne nomme plus que la case (revue du 14/10/2026, M9).
+      check(`${mode} ${w} px : la ligne ouvre « ${d.S && d.S.titre} » : l’objectif de la figure en gros (${d.prix.join(' / ')}), sur des années si mesuré, la réussite mesurée et sa barre, les chiffres, sans mot banni, dans l’écran, sans changer de page`,
+        d.ouvert && d.S && d.prix.length >= 1 && d.prix.length === d.S.cibles.length && d.barres >= 1 && /Sur ce graphique/i.test(d.texte) && /Objectif de la figure/i.test(d.texte) && (!d.S.annees || /Sur des années/i.test(d.texte)) && !/cible/i.test(d.texte) && /Les chiffres/i.test(d.texte)
         && /usage des analystes/.test(d.texte) && !G.motsBannis(d.texte).length && d.dedans && d.chemin === 'index.html' && (!tactile || d.scroll <= 0), { d: Object.assign({}, d, { texte: d.texte.slice(0, 400) }), bannis: G.motsBannis(d.texte) });
       // Les exemples passés (plan du 13/10/2026, idée 4) : la bande des derniers cas, ou une phrase.
       const ex = await lireExemples(o.page);
