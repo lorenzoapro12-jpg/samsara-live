@@ -559,6 +559,9 @@ const PARAM = {
   // (« ✅ gagne et bat le marché », Sharpe 25, « ∞ »). `operationsVisees` : le nombre que la note
   // propose d'atteindre en élargissant la période.
   gridBot: { operationsMin: 10, operationsVisees: 30 },
+  // Axe du temps (revue du 14/10, C17) : une étiquette qui commencerait à moins de `ecartMin` px de
+  // la fin de la précédente est sautée (à 360 px en Planche, « 23:4502:45 » : 1 px d'écart).
+  axeTemps: { ecartMin: 6 },
   // Scénarios du matin (js/scenarios.js) : les nombres de leur dessin et de leurs mots.
   scenarios: {
     point: '07h00',               // l'heure du point du matin dans la routine (à Paris) ; affichée à l'heure de l'appareil (heurePointMatin)
@@ -4646,22 +4649,31 @@ function resolveChart(candles, padL, padR, chartH, W) {
   const tickAvailW = W - pad.left - pad.right;
   const intraday = ['1m','5m','15m','1h','4h'].includes(chartInterval);
   // Jour et heure de l'appareil (js/format.js) ; le fuseau est dit une fois, à l'horloge de la barre.
-  const fmtTick = t => {
+  // Intraday étroit : l'heure seule, sauf sur la 1re étiquette de chaque jour quand la vue couvre plus
+  // d'un jour : elle écrit la date (« 09/10 »). Revue du 14/10 (C17) : en 1 h et 4 h au téléphone,
+  // l'axe n'écrivait que des heures sur 2 à 8 jours ; la plage datée n'est qu'avec « Le détail ».
+  const plusieursJours = !Fmt.memeJour(visible[0].time * 1000, visible[visible.length - 1].time * 1000);
+  const fmtTick = (t, tPrec) => {
     if (chartInterval === '1d' || chartInterval === '1w') return Fmt.jour(t);
-    // Intraday étroit : garder l'heure seule (la plage datée est en haut à gauche)
-    if (intraday && tickAvailW < 420) return Fmt.heure(t);
+    if (intraday && tickAvailW < 420) return plusieursJours && (tPrec == null || !Fmt.memeJour(t, tPrec)) ? Fmt.jour(t) : Fmt.heure(t);
     return Fmt.jour(t) + ' ' + Fmt.heure(t);
   };
   const tickW = ctx.measureText(fmtTick(visible[0].time * 1000)).width;
   const numLabels = Math.min(6, Math.max(2, Math.floor(tickAvailW / (tickW + 18))));
+  // La 1re étiquette, poussée contre le bord gauche, pouvait toucher la 2e (marge du futur, Planche) :
+  // une étiquette trop proche de la précédente est sautée (revue du 14/10, C17).
+  let finPrec = -Infinity, tPrec = null;
   for (let j = 0; j < numLabels; j++) {
     const idx = Math.round((visible.length - 1) * j / (numLabels - 1));
     if (idx >= visible.length) continue;
-    const label = fmtTick(visible[idx].time * 1000);
+    const t = visible[idx].time * 1000;
+    const label = fmtTick(t, tPrec);
     const lw = ctx.measureText(label).width;
     // Centré sur la bougie, puis contraint à l'intérieur du tracé
     const tx = Math.max(pad.left, Math.min(W - pad.right - lw, pad.left + gap * idx - lw / 2));
+    if (tx < finPrec + PARAM.axeTemps.ecartMin) continue;
     ctx.fillText(label, tx, chartH - 3);
+    finPrec = tx + lw; tPrec = t;
   }
   
   // ─── Trade markers (backtest) ───
