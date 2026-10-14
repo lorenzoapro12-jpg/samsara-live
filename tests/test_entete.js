@@ -21,6 +21,11 @@
 //   7. « Choisir l'affichage » à l'écran en Complet, ruban plein (« Tout afficher » : sa légende
 //      au plus long) : à 1440 px, dans le ruban et l'écran ; à 1024 px (le ruban défile), épinglé
 //      au bord droit, ruban défilé au début comme à la fin ; à 390 px, en tête.
+//  7b. RUBAN DU TÉLÉPHONE AVEC UN CALQUE (revue du 14/10, C24), 11 thèmes, 390 et 360 px : au
+//      départ, avec la fourchette, avec « Mon écran » (et « Le détail » à 390 px), les six
+//      intervalles et « Affichage » entiers dans le ruban et hors du fondu, le bouton en tête ;
+//      Bureau 95, pas de bout de puce sans texte à côté du bouton collant ; Planche (Cyanotype,
+//      Diazo), une lettre par case dans la page et sur le canvas.
 //   8. RACCOURCIS : une touche tapée dans un champ (ou un texte éditable), ou avec Ctrl, ne
 //      déclenche rien. I les infos du marché ; R et F la vue au présent (les touches de la carte).
 //   9. GEX sans couleur hausse / baisse dans les chiffres clés ; cartes : prix publié plus petit
@@ -379,6 +384,96 @@ const lireEntete = page => page.evaluate(() => {
         check(`${w} px, ruban ${r.deborde ? 'défilé au ' + bout : 'sans défilement'} : « Choisir l’affichage » entier dans le ruban et l’écran (x ${r.b[0]}–${r.b[1]}, ruban ${r.z[0]}–${r.z[1]}), rien par-dessus`,
           (w === 1440 || r.deborde) && r.b[0] >= r.z[0] && r.b[1] <= r.z[1] && r.b[1] <= r.vw && r.dessus, r);
       }
+      await o.ctx.close();
+    }
+    // ── Revue du 14/10, C24 : le ruban du téléphone avec un calque ─────────────
+    // Dès qu'un calque était allumé, « Affichage » passait en tête (voulu) mais les intervalles
+    // gardaient leur largeur : « 1 j » pâli sous le fondu du bord, coupé ou hors de l'écran (Aero,
+    // Kāla, Néon, Codex, Gare, Gazette, Planche) ; en Gare à 360 px, « Affichage » sous le fondu dès
+    // le départ ; en Bureau 95, un carré de couleur seul à gauche du bouton collant, une lettre à sa
+    // droite. Le fondu se lit dans le mask-image calculé (1er arrêt), le voile de Bureau 95 dans les
+    // ombres pleines du bouton. « Le détail » (le compte sur le bouton) : à 390 px seulement.
+    titre('5b. Téléphone, un calque allumé : six intervalles et « Affichage » entiers, hors du fondu ; Bureau 95 sans bout de puce ; Planche sans ligature (revue du 14/10, C24)');
+    const lireRuban = page => page.evaluate(() => {
+      const b = document.getElementById('indicatorBar'), z = b.getBoundingClientRect();
+      const g = z.left + b.clientLeft, d = g + b.clientWidth;   // la boîte qui rogne ce qui défile
+      const cs = getComputedStyle(b), m = [cs.maskImage, cs.webkitMaskImage].find(x => x && x !== 'none');
+      let fondu = null;   // où le fondu commence (null : pas de fondu)
+      if (m) {
+        const pos = (m.match(/^linear-gradient\(90deg, rgb\(0, 0, 0\) (.+), rgba\(0, 0, 0, 0\)\)$/) || [])[1];
+        try { fondu = z.left + Function('return ' + pos.replace(/([\d.]+)%/g, (_, n) => z.width * n / 100).replace(/px/g, '').replace(/calc|max|min/g, f => (f === 'calc' ? '' : 'Math.' + f)))(); } catch (e) { fondu = z.left; }
+      }
+      const btn = b.querySelector('.ind-dropdown'), q = btn.getBoundingClientRect(), collant = getComputedStyle(btn).position === 'sticky';
+      // Ce que couvre le bouton collant : son cadre et ses ombres pleines (sans flou) de chaque côté.
+      let cg = q.left, cd = q.right;
+      if (collant) for (const o of getComputedStyle(btn).boxShadow.split(/,(?![^(]*\))/)) {
+        const n = o.replace(/rgba?\([^)]*\)/, '').trim().split(/\s+/).map(parseFloat);
+        if (/inset/.test(o) || n.length < 3 || n[2]) continue;
+        if (n[0] < 0) cg = Math.min(cg, q.left + n[0]); else cd = Math.max(cd, q.right + n[0]);
+      }
+      const R = r => [Math.round(r.left), Math.round(r.right)];
+      const ints = ['1m', '5m', '15m', '1h', '4h', '1d'].map(k => {
+        const r = document.getElementById('int_' + k).getBoundingClientRect();
+        return { k, x: R(r), ok: r.left >= g - 0.5 && r.right <= d + 0.5 && (fondu === null || r.right <= fondu + 0.5) && (!collant || r.right <= cg + 0.5) };
+      });
+      // Bureau 95 : le bout d'élément visible juste à gauche de ce que couvre le bouton, et à sa droite.
+      let bout = 0, droite = 0;
+      if (collant) for (const e of b.children) {
+        if (e === btn || !e.getClientRects().length) continue;
+        const r = e.getBoundingClientRect();
+        if (r.left < cg - 0.5 && r.right > cg + 0.5) bout = Math.max(bout, cg - Math.max(r.left, g));
+        if (r.right > cd + 0.5 && r.left < d - 0.5) droite = Math.max(droite, Math.min(r.right, d) - Math.max(r.left, cd));
+      }
+      return { calques: document.documentElement.getAttribute('data-calques'), ints: ints.filter(i => !i.ok), fondu: fondu === null ? null : Math.round(fondu), ruban: [Math.round(g), Math.round(d)],
+        btn: R(q), collant, btnOk: q.left >= g - 0.5 && q.right <= d + 0.5 && (fondu === null || collant || q.right <= fondu + 0.5),
+        enTete: q.right <= document.getElementById('int_1m').getBoundingClientRect().left + 0.5, bout: Math.round(bout), droite: Math.round(droite),
+        page: document.documentElement.scrollWidth - innerWidth };
+    });
+    const pret = page => page.waitForFunction(() => (!document.documentElement.hasAttribute('data-structure-attendue') || document.documentElement.hasAttribute('data-structure-posee')) && document.fonts.status === 'loaded', null, { timeout: 8000 }).catch(() => {});
+    const auDebut = page => page.evaluate(() => { const m = document.getElementById('indMenu'); if (m) m.classList.remove('open'); const r = document.getElementById('indicatorBar'); r.scrollLeft = 0; ajusterRuban(); });
+    const THEMES11 = ['aero', 'aero-nuit', 'kala', 'neon', 'codex', 'bureau95', 'bureau95-contraste', 'gare', 'gazette', 'cyanotype', 'diazo'];
+    for (const theme of THEMES11) for (const [w, mode] of [[390, 'debutant'], [360, 'debutant'], [390, 'expert']]) {
+      const o = await ouvrir(nav, { vue: { width: w, height: 844 }, mode, theme });
+      const p = o.page;
+      await pret(p);
+      const etats = mode === 'expert' ? [['Le détail', null]] : [['départ', null], ['fourchette', () => { overlays.fourchette = true; majLegende(); drawChart(); }], ['Mon écran', () => appliquerMonEcran()]];
+      for (const [etat, faire] of etats) {
+        if (faire) await p.evaluate(faire);
+        await auDebut(p); await p.waitForTimeout(150);
+        const r = await lireRuban(p), nom = `${theme} · ${w} · ${etat}`;
+        const calque = etat !== 'départ';
+        check(`${nom} : les six intervalles et « Affichage » entiers dans le ruban, hors du fondu${r.collant ? ', aucun sous le bouton collant' : calque ? ', le bouton en tête' : ''} (bouton ${r.btn.join('–')}, fondu dès ${r.fondu === null ? '—' : r.fondu}, ruban ${r.ruban.join('–')})`,
+          r.calques === (calque ? '1' : '0') && !r.ints.length && r.btnOk && (r.collant || !calque || r.enTete) && r.page <= 0, r);
+        if (r.collant && calque) check(`${nom} : Bureau 95, à gauche du bouton collant, pas de bout de puce sans texte (${r.bout} px) ; rien à sa droite (${r.droite} px)`,
+          (r.bout <= 1 || r.bout >= 28) && r.droite <= 0, r);
+      }
+      check(`${theme} · ${w} · ${mode} : aucune erreur de script`, !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+    // Planche : Overpass Mono liait « ffi » et « fi » dans une seule case (« Aﬃchage », « ﬁchier »).
+    // Une lettre par case dans la page et sur le canvas (même après un changement de taille) ; les
+    // autres thèmes gardent leur rendu (le canvas d'Aero n'est pas touché, ni après un aller-retour).
+    for (const theme of ['cyanotype', 'diazo', 'aero']) {
+      const o = await ouvrir(nav, { vue: { width: 390, height: 844 }, mode: 'debutant', theme });
+      const p = o.page;
+      await pret(p);
+      const lire = () => p.evaluate(() => {
+        const court = document.querySelector('#indDropdownBtn .aff-court'), s = getComputedStyle(court);
+        const large = t => { const e = document.createElement('span'); e.textContent = t; e.style.font = s.font; e.style.whiteSpace = 'pre'; court.parentNode.appendChild(e); const l = e.getBoundingClientRect().width; e.remove(); return Math.round(l * 100) / 100; };
+        ctx.save(); ctx.font = chartFont(12); const fi = [ctx.measureText('fichier').width, ctx.measureText('fxchier').width].map(x => Math.round(x * 100) / 100); ctx.restore();
+        return { theme: document.documentElement.dataset.theme, ligatures: s.fontVariantLigatures, mot: [large('Affichage'), large('Axxichage')], fi, rendu: [ctx.textRendering, cx.textRendering] };
+      });
+      const planche = theme !== 'aero';
+      let r = await lire();
+      check(`${theme} · 390 : ${planche ? '« Affichage » et « fichier » (canvas) aussi larges que « Axxichage » et « fxchier » : une lettre par case' : 'ligatures et rendu du canvas d’avant'} (${r.mot.join(' / ')} ; ${r.fi.join(' / ')} ; ${r.rendu.join(', ')})`,
+        planche ? r.ligatures === 'none' && Math.abs(r.mot[0] - r.mot[1]) < 0.5 && Math.abs(r.fi[0] - r.fi[1]) < 0.5 && r.rendu.every(x => x === 'optimizeSpeed')
+          : r.ligatures === 'normal' && r.rendu.every(x => x === 'auto'), r);
+      await p.setViewportSize({ width: 360, height: 800 }); await p.waitForTimeout(500);
+      await p.evaluate(t => { appliquerTheme(t === 'aero' ? 'cyanotype' : 'aero'); appliquerTheme(t); }, theme); await p.waitForTimeout(300);
+      r = await lire();
+      check(`${theme} · 360, après un changement de taille et un aller-retour de thème : le même rendu (${r.rendu.join(', ')})`,
+        r.theme === theme && r.rendu.every(x => x === (planche ? 'optimizeSpeed' : 'auto')) && (!planche || Math.abs(r.fi[0] - r.fi[1]) < 0.5), r);
+      check(`${theme} : aucune erreur de script`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
     // ── Modales au téléphone : la barre du bas ne cache pas leur dernière ligne ──
