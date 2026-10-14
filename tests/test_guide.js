@@ -739,9 +739,29 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
   const base = { prix: 86000, unite: '$', itv: '1h', choix, suite, figures: [], scenario: null };
   const syn = x => { const r = G.synthese(Object.assign({}, base, x)); [r.titre, r.regle].concat(r.pourquoi.map(p => p.texte), r.surveiller).forEach(t); return r; };
   const figure = (sens, extra) => Object.assign({ type: 'double_creux', famille: 'extremes', sens, phase: 'confirme', fin: null }, extra || {});
-  // 1. Le sens n'est dit qu'avec au moins deux signaux d'accord et aucun en face.
-  const h = syn({ regime: { cle: 'hausse' }, figures: [figure(1)] });
+  // 1. Le sens n'est dit qu'avec au moins deux signaux d'accord et aucun en face. Revue du 14/10/2026
+  // (C2) : le 2e signal était une figure validée (« il pointe vers le haut ») ; une figure ne compte
+  // plus, c'est le scénario de Claude qui fait le 2e signal (note du contradicteur).
+  const h = syn({ regime: { cle: 'hausse' }, scenario: { rang: '1', forme: 'chemin', ouvert: true, sens: 1 } });
   check('deux signaux vers le haut, aucun en face : « penchent plutôt vers la hausse »', h.ton === 'hausse' && /penchent plutôt vers la hausse/.test(h.titre) && h.pourquoi.filter(p => p.sens > 0).length === 2, h);
+  // Une figure validée (revue du 14/10/2026, C2) : dite pour son objectif, sans sens ni direction ;
+  // seule avec la tendance, elle ne fait jamais pencher le titre (le 08/10 à 15:40, « Double sommet
+  // validé : il pointe vers le bas » faisait « penchent plutôt vers la baisse »). Sur BTCUSDT en 1 h
+  // (double creux mesuré « moins? », lu comme au hasard, C7), la ligne finit comme la bulle.
+  const vH = syn({ regime: { cle: 'hausse' }, figures: [figure(1, { objectif: 87412.6 })], symbole: 'BTCUSDT' });
+  const vB = syn({ regime: { cle: 'baisse' }, figures: [figure(-1, { type: 'double_sommet', objectif: 81158.3 })], symbole: 'BTCUSDT', itv: '15m' });
+  const vC = syn({ regime: { cle: 'hausse' }, figures: [figure(-1, { type: 'double_sommet', objectif: 81158.3 })] });
+  const vS = syn({ regime: { cle: 'faible' }, figures: [figure(1)] });
+  const ligneF = r => r.pourquoi.find(p => p.fam === 'figure');
+  check('figure validée : sens 0, « Double sommet validé : objectif 81 158 $, comme au hasard. », rien sur la direction',
+    [vH, vB, vC, vS].every(r => ligneF(r) && ligneF(r).sens === 0 && !/pointe|vers le (haut|bas)|hausse|baisse/.test(ligneF(r).texte))
+    && /^Double sommet validé : objectif 81 158 \$, comme au hasard\.$/.test(ligneF(vB).texte) && /^Double creux validé : objectif 87 413 \$, comme au hasard\.$/.test(ligneF(vH).texte),
+    [vH, vB, vC, vS].map(r => ligneF(r)));
+  check('une figure validée ne fait jamais pencher le titre : avec la tendance seule, « Pas de sens net pour l’instant »',
+    [vH, vB].every(r => r.ton === 'calme' && /^Pas de sens net pour l’instant\.$/.test(r.titre) && /Un seul signal/.test(r.regle)) && vC.ton === 'calme' && vS.ton === 'calme' && /hésite/.test(vS.titre),
+    [vH, vB, vC, vS].map(r => [r.ton, r.titre, r.regle]));
+  check('sans mesure sur des années (autre paire, ou objectif inconnu) : pas de « comme au hasard », toujours sans sens',
+    /^Double sommet validé : objectif 81 158 \$\.$/.test(ligneF(vC).texte) && /^Double creux validé\.$/.test(ligneF(vS).texte), [ligneF(vC), ligneF(vS)]);
   check('la lecture dit ce qui la ferait tomber (le repère du bas)', h.surveiller.some(x => /tombe si le prix finit une heure sous/.test(x)), h.surveiller);
   const b = syn({ regime: { cle: 'baisse' }, scenario: { rang: '1', forme: 'chemin', ouvert: true, sens: -1 } });
   check('tendance et scénario vers le bas : baisse ; le scénario est dit « de Claude »', b.ton === 'baisse' && b.pourquoi.some(p => /de Claude/.test(p.texte) && p.sens < 0), b);
@@ -763,7 +783,7 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
   const st = syn({ regime: { cle: 'faible', compression: true }, scenario: { rang: '1', forme: 'chemin', ouvert: false, tombe: true, sens: 0 } });
   check('scénario tombé et calme du prix : dits, sans sens', st.pourquoi.some(p => /ne tient plus/.test(p.texte)) && st.pourquoi.some(p => /bouge peu/.test(p.texte)) && st.ton === 'calme', st.pourquoi);
   // 4. Charte : une idée par phrase, 15 mots au plus ; aucun %, aucun mot technique ; l'avertissement une fois.
-  const tous = [h, b, c, u, z, d, dm, fa, st];
+  const tous = [h, b, c, u, z, d, dm, fa, st, vH, vB, vC, vS];
   const phrases = [].concat(...tous.map(r => [r.titre, r.regle].concat(r.pourquoi.map(p => p.texte), r.surveiller)));
   const longues = phrases.filter(x => x.split(/\s+/).filter(w => /[\p{L}\d]/u.test(w)).length > 15);
   check('chaque phrase : 15 mots au plus (charte)', !longues.length, longues);
