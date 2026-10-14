@@ -31,6 +31,9 @@
 //      l'ancien Lisible sont versés dans le panneau.
 //  10. STRUCTURES de thème en Débutant : pastille « Infos du marché », manchette masquée.
 //  11. SOBRIÉTÉ : survoler une cible ne redessine pas le graphique ; au repos, rien.
+//  12. AXE DU TEMPS au téléphone (revue du 14/10, C17) : une vue de plusieurs jours (1 h, 4 h) écrit
+//      la date sur la 1re étiquette de chaque jour ; deux étiquettes jamais à moins de
+//      PARAM.axeTemps.ecartMin px (Planche à 360 px, marge du futur) ; 15 min d'un seul jour : l'heure.
 //
 // Harnais de tests/test_guide_page.js : Binance simulé, fichier publié avec murs et options près
 // du prix, scénarios du matin (tests/fixtures/previsions.json), horloge fixée au 08/10/2026 22:52
@@ -704,6 +707,45 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         && /Mesuré sur/.test(r.forme.texte) && !/vise/.test(r.forme.texte) && !bannisBulle(r.forme.texte).length, r.forme);
       check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();
+    }
+
+    // ── Axe du temps au téléphone (revue du 14/10, C17) ──
+    // En 1 h et 4 h, l'axe n'écrivait que des heures sur 2 à 8 jours (« 06:00 22:00 14:00… ») : rien
+    // ne disait le jour, et la plage datée n'existe qu'avec « Le détail ». En Planche à 360 px, avec
+    // la marge du futur (flèche du scénario montré, forcée ici), la 1re étiquette, poussée contre le
+    // bord gauche, touchait la 2e (« 23:4502:45 », 1 px d'écart).
+    titre('Axe du temps au téléphone : la date sur la 1re étiquette de chaque jour, rien de collé');
+    {
+      /** Les étiquettes de l'axe du temps (la rangée la plus basse du tracé) et les jours de la vue. */
+      const axeTemps = page => page.evaluate(() => {
+        crossX = crossY = null; if (typeof bulleDetail !== 'undefined') bulleDetail = null;
+        window.__ft = []; window.__ftOn = true; drawChart(); window.__ftOn = false;
+        const ax = window.__ft.filter(e => e.c === 'chart' && /^\d\d[:/]\d\d$/.test(e.t)), y = Math.max(...ax.map(e => e.y));
+        const m = document.createElement('canvas').getContext('2d'); m.font = chartFont(9);
+        const vis = candles.slice(Math.max(0, viewStart), Math.min(candles.length, viewEnd));
+        return { etiq: ax.filter(e => e.y === y).map(e => ({ t: e.t, x: e.x, fin: e.x + m.measureText(e.t).width })),
+          jours: [...new Set(vis.map(c => Fmt.jour(c.time * 1000)))], ecartMin: PARAM.axeTemps.ecartMin };
+      });
+      const colle = a => a.etiq.slice(1).map((e, k) => +(e.x - a.etiq[k].fin).toFixed(1)).filter(g => g < a.ecartMin - 0.01);
+      for (const [theme, L, fleche] of [['bureau95', 390, false], ['aero', 390, false], ['cyanotype', 360, true], ['diazo', 360, true]]) {
+        const o = await ouvrir(nav, { vue: { width: L, height: 844 }, tactile: true, theme, avant: { 'samsara-astuce-tap-v1': '1' } });
+        if (fleche) await o.page.evaluate(() => { window.scenFleches = () => true; });
+        const nom = `${theme} ${L} px`;
+        const a15 = await axeTemps(o.page);
+        check(`${nom} · 15 min, vue d'un seul jour : l'heure seule (« ${a15.etiq.map(e => e.t).join(' ')} »)`, a15.jours.length === 1 && a15.etiq.length >= 3 && a15.etiq.every(e => /:/.test(e.t)), a15);
+        check(`${nom} · 15 min : aucune étiquette à moins de ${a15.ecartMin} px de la précédente`, !colle(a15).length, { ecarts: colle(a15), etiq: a15.etiq });
+        for (const itv of ['1h', '4h']) {
+          await o.page.evaluate(async i => { await changeInterval(i, document.getElementById('int_' + i)); }, itv);
+          await o.page.waitForFunction(i => chartInterval === i && candles.length > 30, itv, { timeout: 15000 }).catch(() => {});
+          await o.page.waitForTimeout(300);
+          const a = await axeTemps(o.page), dates = a.etiq.filter(e => /\//.test(e.t)).map(e => a.jours.indexOf(e.t));
+          check(`${nom} · ${itv}, vue de ${a.jours.length} jours : la 1re étiquette est une date, chaque date est un jour de la vue, dans l'ordre (« ${a.etiq.map(e => e.t).join(' ')} »)`,
+            a.jours.length >= 3 && /\//.test(a.etiq[0].t) && dates.length >= 2 && dates.every((d, k) => d >= 0 && (k === 0 || d > dates[k - 1])), a);
+          check(`${nom} · ${itv} : aucune étiquette à moins de ${a.ecartMin} px de la précédente`, !colle(a).length, { ecarts: colle(a), etiq: a.etiq });
+        }
+        check(`${nom} · aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+        await o.ctx.close();
+      }
     }
 
     // ── La clé « ? » et l'astuce : la clé toujours là en Lisible, l'astuce une fois ──
