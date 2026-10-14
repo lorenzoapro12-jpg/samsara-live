@@ -391,10 +391,22 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   font-size: 11px;
 }
 .indicator-bar::-webkit-scrollbar { display: none; }
-/* Ruban plus large que l'écran : un fondu à droite dit qu'il défile (classe posée par le JS). */
+/* Ruban plus large que l'écran : un fondu à droite dit qu'il défile (classe posée par le JS). Quand
+   « 1 j » tient dans le ruban, le fondu commence après lui, jamais dessus (revue du 14/10, C24) : au
+   téléphone, avec un calque, le bouton passe en tête et « 1 j » finit près du bord, où le fondu le
+   pâlissait. --fin-1j : où finit « 1 j » dans le ruban (ajusterRuban, js/app.js). */
 .indicator-bar.deborde {
-  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
-  mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+  -webkit-mask-image: linear-gradient(90deg, #000 max(calc(100% - 36px), var(--fin-1j, 0px)), transparent);
+  mask-image: linear-gradient(90deg, #000 max(calc(100% - 36px), var(--fin-1j, 0px)), transparent);
+}
+/* Bureau 95 : pas de fondu, le bouton reste collé au bord droit. Une puce de la légende glissait
+   dessous et n'en montrait qu'un carré de couleur, sans texte ; à sa droite, une lettre dépassait
+   dans la marge du ruban (revue du 14/10, C24). Un voile plein de la couleur du fond, de chaque côté
+   du bouton : à gauche, sur le bout trop court pour montrer un mot (--voile, ajusterRuban,
+   js/app.js ; jamais sur un élément entier) ; à droite, sur la marge du ruban. Le relief est gardé. */
+:root[data-structure="fenetres"] .indicator-bar.deborde > .ind-dropdown {
+  box-shadow: inset 1px 0 var(--relief-3), inset 2px 0 var(--relief-1),
+    calc(-1 * var(--voile, 0px)) 0 0 var(--surface), 6px 0 0 var(--surface);
 }
 /* « Choisir l'affichage » n'est jamais hors de vue en Complet, où le ruban
    défile : à 1440 px il était rogné au bord droit (x 1366–1490 pour 1427 px utiles) ; au
@@ -637,6 +649,11 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
    feuilles Cyanotype et Diazo écrivent « UTC » en dur après elle : le fuseau de l'appareil, posé
    par js/structures.js dans data-fuseau, le remplace (sélecteur plus précis que celui du thème). */
 html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { content: attr(data-fuseau); }
+/* Planche : la police à chasse fixe (Overpass Mono) liait « ffi » et « fi » dans une seule case
+   (« Aﬃchage », « ﬁchier ») ; une lettre par case, partout dans la page (revue du 14/10, C24). Le
+   bouton « Affichage » s'élargit de 14 px : le ruban du téléphone a ses réglages serrés plus bas.
+   Le canvas suit (ligaturesCanvas, js/app.js). */
+html[data-structure="planche"] { font-variant-ligatures: none; }
 /* Planche : la case « Ind. de révision » tient dans sa colonne, même quand la date de révision
    s'allonge (publication d'un autre jour : « 10/10 23:18 » au lieu de « 23:18 ») et resserre les
    colonnes. Son titre débordait de 7 px à 1024 px : le cartouche débordait, et ajusterKpis
@@ -1699,14 +1716,22 @@ html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header-right { o
   /* En retard, la pastille porte l'âge (« en retard · 25 min ») : « Infos · » cède, pour que
      les boutons restent sur la 2e rangée (le titre et le nom accessible disent « Infos du marché »). */
   :where(html):not([data-chiffres="1"]) .kpi-deb .deb-quoi { display: none; }
-  /* La barre : les six intervalles et « Affichage » sur une seule rangée. */
-  :where(html):not([data-calques="1"]) .indicator-bar { flex-wrap: nowrap; justify-content: space-between; gap: 2px; padding: 4px 6px; }
-  :where(html):not([data-calques="1"]) .indicator-bar label { padding: 7px 7px; }
-  :where(html):not([data-calques="1"]) .ind-dropdown-btn { padding: 7px 9px; gap: 3px; }
+  /* La barre : les six intervalles et « Affichage » sur une seule rangée. Avec un calque aussi
+     (revue du 14/10, C24) : le bouton passe en tête et la légende défile après « 1 j » ; les
+     intervalles et le bouton gardent les mêmes réglages serrés (même poids de sélecteur), sinon
+     « 1 j » finissait sous le fondu du bord ou hors du ruban. Les puces de la légende ne changent pas. */
+  :where(html):not([data-calques="1"]) .indicator-bar { flex-wrap: nowrap; justify-content: space-between; }
+  :where(html):not([data-calques="1"]) .indicator-bar, :where(html)[data-calques="1"] .indicator-bar { gap: 2px; padding: 4px 6px; }
+  :where(html):not([data-calques="1"]) .indicator-bar label, :where(html)[data-calques="1"] .indicator-bar label:where([id^="int_"]) { padding: 7px 7px; }
+  :where(html):not([data-calques="1"]) .ind-dropdown-btn, :where(html)[data-calques="1"] .ind-dropdown-btn { padding: 7px 9px; gap: 3px; }
 }
 @media (max-width: 400px) {
-  :where(html):not([data-calques="1"]) .indicator-bar label { padding: 6px 5px; }
-  :where(html):not([data-calques="1"]) .ind-dropdown-btn { padding: 6px 7px; }
+  :where(html):not([data-calques="1"]) .indicator-bar label, :where(html)[data-calques="1"] .indicator-bar label:where([id^="int_"]) { padding: 6px 5px; }
+  :where(html):not([data-calques="1"]) .ind-dropdown-btn, :where(html)[data-calques="1"] .ind-dropdown-btn { padding: 6px 7px; }
+  /* Gare : ses plaques de voie gardent leurs 36 px de large (des cibles au pouce) ; la place se
+     gagne sur leurs marges, 1 px au lieu de 2 (revue du 14/10, C24 : à 360 px, le ruban débordait
+     de 6 px dès le départ et « Affichage » passait sous le fondu). */
+  :root[data-structure="tableau"] .indicator-bar label[id^="int_"] { margin: 0 1px; }
 }
 
 /* ─── Au doigt (pointer: coarse) : des cibles d'au moins 40 × 40 px ──────────────────────────────

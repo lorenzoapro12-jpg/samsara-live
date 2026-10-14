@@ -565,6 +565,9 @@ const PARAM = {
   // Axe du temps (revue du 14/10, C17) : une étiquette qui commencerait à moins de `ecartMin` px de
   // la fin de la précédente est sautée (à 360 px en Planche, « 23:4502:45 » : 1 px d'écart).
   axeTemps: { ecartMin: 6 },
+  // Ruban (revue du 14/10, C24) : en Bureau 95, le bout d'une puce (ou d'un intervalle) coupé par le
+  // bouton collant est caché tant qu'il fait au plus `boutMax` px : son carré de couleur, une lettre.
+  ruban: { boutMax: 30 },
   // Scénarios du matin (js/scenarios.js) : les nombres de leur dessin et de leurs mots.
   scenarios: {
     point: '07h00',               // l'heure du point du matin dans la routine (à Paris) ; affichée à l'heure de l'appareil (heurePointMatin)
@@ -1816,6 +1819,7 @@ function resizeCanvas() {
     calque.style.width = innerW + 'px'; calque.style.height = innerH + 'px';
     calque.style.left = cs.paddingLeft; calque.style.top = cs.paddingTop;
   }
+  ligaturesCanvas();
 }
 let resizeRaf = 0;
 window.addEventListener('resize', () => {
@@ -3491,6 +3495,15 @@ const ETIQ_OVERLAYS = { ema20: 'EMA 20', ema50: 'EMA 50', ema100: 'EMA 100', ema
 // (jeton --police-graphique), à défaut celle de l'interface (--font).
 let POLICE_GRAPHIQUE = "'Segoe UI Variable Text','Segoe UI Variable',-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,'Segoe UI',Roboto,sans-serif";
 function chartFont(px, poids) { return (poids || 500) + ' ' + px + 'px ' + POLICE_GRAPHIQUE; }
+// Quand la page coupe ses ligatures (css/app.css : la Planche, police à chasse fixe, une lettre par
+// case), le canvas les coupe aussi (revue du 14/10, C24 : « fichier 07:33 » s'écrivait « ﬁchier »,
+// « fi » dans une seule case). Lu par lireJetons ; les autres thèmes gardent le rendu d'avant. Le
+// réglage du contexte est perdu quand le canvas change de taille : resizeCanvas le repose.
+let LIGATURES_PAGE = 'normal';
+function ligaturesCanvas() {
+  const rendu = LIGATURES_PAGE === 'none' ? 'optimizeSpeed' : 'auto';
+  for (const c of [ctx, cx]) if (c && 'textRendering' in c) c.textRendering = rendu;
+}
 // « #rgb », « #rrggbb » ou « rgb(a)(r, g, b…) » → [r, g, b] ; sinon null.
 function rvb(c) {
   const h = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec((c || '').trim());
@@ -3545,6 +3558,8 @@ function lireJetons() {
   COLORS.bandeAlpha = num('--bande-alpha', 0.08);
   COLORS.aura = num('--aura', 0);
   POLICE_GRAPHIQUE = v('--police-graphique', v('--font', POLICE_GRAPHIQUE));
+  LIGATURES_PAGE = cs.fontVariantLigatures || 'normal';
+  ligaturesCanvas();
   // Crochets du graphique : défauts = le graphique d'avant.
   const forme = v('--bougie-forme', 'pleine');
   COLORS.bougieForme = Object.prototype.hasOwnProperty.call(FORMES_BOUGIE, forme) ? forme : 'pleine';
@@ -9731,10 +9746,34 @@ function ajusterKpis() {
   }
 }
 // Le ruban défile quand il ne tient pas : le fondu de droite ne s'affiche qu'à ce moment-là.
+// Deux mesures pour css/app.css (revue du 14/10, C24 : au téléphone, avec un calque, « 1 j » finissait
+// sous le fondu ; en Bureau 95, une puce coupée sous le bouton collant ne montrait qu'un carré) :
+// - --fin-1j : où finit « 1 j » dans le ruban ; le fondu commence après lui (0 quand le bord du ruban
+//   le coupe : le fondu habituel dit alors qu'il continue) ;
+// - --voile : en Bureau 95, l'élément que le bouton collant coupe à sa gauche ; quand ce qui en
+//   dépasse est trop court pour montrer un mot (PARAM.ruban.boutMax px au plus : un carré de couleur,
+//   une lettre), un voile de la couleur du fond le cache. Un élément entier n'est jamais voilé.
+// Relues à chaque défilement : ce qui est coupé change avec lui.
 function ajusterRuban() {
   const r = document.getElementById('indicatorBar');
-  if (r && r.classList) r.classList.toggle('deborde', r.scrollWidth > r.clientWidth + 1
-    && r.scrollLeft + r.clientWidth < r.scrollWidth - 2);
+  if (!r || !r.classList) return;
+  const deborde = r.scrollWidth > r.clientWidth + 1 && r.scrollLeft + r.clientWidth < r.scrollWidth - 2;
+  r.classList.toggle('deborde', deborde);
+  const j = document.getElementById('int_1d'), b = r.querySelector && r.querySelector('.ind-dropdown');
+  const boite = e => (e && e.getBoundingClientRect ? e.getBoundingClientRect() : null);
+  const zr = deborde && r.style ? boite(r) : null, zj = zr && boite(j), zb = zj && boite(b);
+  if (!zb) return;
+  const pose = (k, v) => { if (r.style.getPropertyValue(k) !== v) r.style.setProperty(k, v); };
+  const g = zr.left + r.clientLeft;   // le bord gauche de ce qui se voit du ruban
+  pose('--fin-1j', (zj.right <= g + r.clientWidth + 0.5 ? Math.round(zj.right - zr.left) : 0) + 'px');
+  let voile = 0;
+  for (const e of r.children || []) {
+    const q = e !== b && boite(e);
+    if (!q || !q.width || q.left >= zb.left - 0.5 || q.right <= zb.left + 0.5) continue;
+    const bout = zb.left - Math.max(q.left, g);
+    if (bout <= PARAM.ruban.boutMax) voile = Math.max(voile, Math.ceil(bout) + 1);
+  }
+  pose('--voile', voile + 'px');
 }
 
 // Bandeau d'âge. Il est injecté DANS le même innerHTML que les cartes, donc il
