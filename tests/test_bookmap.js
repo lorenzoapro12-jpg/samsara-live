@@ -977,6 +977,24 @@ titre('9. Liaison : le prix passé par l\'adresse est lu, VALIDÉ, jamais inject
     /themeCourant\(\)/.test(pub) && /t\.mode/.test(pub) && /--accent/.test(pub) && /lireJetons\(\);[^\n]*publierThemeCarte\(\)/.test(app) && /\n  liaisonCarte\(\);/.test(app) && /function liaisonCarte\(\) \{[\s\S]*?publierThemeCarte\(\)/.test(app), pub.slice(0, 200));
   check('aucune liste de thèmes clairs / sombres dans la carte (bookmap.html, js/bookmap.js, css/bookmap.css)',
     ['bookmap.html', 'js/bookmap.js', 'css/bookmap.css'].every(f => !/aero|kala|gazette|bureau95|cyanotype|diazo|codex|neon|gare\b/i.test(fs.readFileSync(path.join(REPO, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, ''))));
+  // Thèmes carrés jusqu'au bout (revue du 14/10, M18) : la carte restait arrondie, même ouverte
+  // depuis Bureau 95, le thème par défaut. Le terminal dit « carré » (un oui ou un non, jamais le
+  // nom), lu dans ses jetons (--r-tile, comme les étiquettes du graphique) ; la carte pose
+  // data-theme-carre et sa feuille met tous ses coins à 0 par --r-angle.
+  const tc = L.lireTheme(L.decrireTheme('x', 'clair', '#000080', true)), ta = L.lireTheme(L.decrireTheme('x', 'sombre', '#22e6ff', false));
+  check('thème carré décrit puis relu : carre vrai ; arrondi, une description d\'avant (sans carre) ou carre piégé (« true » en texte, 1) : faux',
+    tc && tc.carre === true && ta && ta.carre === false && t.carre === false && L.lireTheme('{"id":"x","mode":"clair","carre":"true"}').carre === false && L.lireTheme('{"id":"x","mode":"clair","carre":1}').carre === false, { tc, ta, t });
+  const racine = { at: {}, style: { p: {}, setProperty(k, v) { this.p[k] = v; }, removeProperty(k) { delete this.p[k]; } },
+    setAttribute(k, v) { this.at[k] = String(v); }, removeAttribute(k) { delete this.at[k]; } };
+  L.poserTheme(racine, tc); const pose = racine.at['data-theme-carre'];
+  L.poserTheme(racine, ta); const ote = racine.at['data-theme-carre'];
+  L.poserTheme(racine, tc); L.poserTheme(racine, null);
+  check('poserTheme : data-theme-carre posé pour un thème carré, ôté pour un thème arrondi et sans thème', pose === '1' && ote === undefined && racine.at['data-theme-carre'] === undefined, { pose, ote, fin: racine.at });
+  check('le terminal décrit « carré » d\'après --r-tile (0), passé à decrireTheme', /parseFloat\([^\n]*getPropertyValue\('--r-tile'\)\) === 0/.test(pub) && /decrireTheme\([^\n]*,\s*carre\)\)/.test(pub), pub.slice(0, 400));
+  const cssCarte = fs.readFileSync(path.join(REPO, 'css/bookmap.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const rayonsDurs = (cssCarte.match(/border-radius:\s*[^;}]+/g) || []).filter(r => !/^border-radius:\s*(min\(\d+px, var\(--r-angle\)\)|50%)\s*$/.test(r));
+  check('css/bookmap.css : chaque coin passe par min(Npx, var(--r-angle)) (les ronds numérotés exceptés) ; --r-angle à 0 sous data-theme-carre',
+    !rayonsDurs.length && /:root\[data-theme-carre\]\s*\{\s*--r-angle:\s*0px;\s*\}/.test(cssCarte) && /:root \{[^}]*--r-angle:\s*999px/.test(cssCarte), rayonsDurs);
 }
 
 // ── 10. Palette claire et mots des couleurs ──────────────────────────────────

@@ -719,6 +719,9 @@
       pastille: v('--carte-pastille', 'rgba(9,12,20,0.86)'), murBid: v('--carte-mur-bid', '#3ee6b5'),
       murAsk: v('--carte-mur-ask', '#ff7a93'), gamma: v('--carte-gamma', '#c9a7ff'), live: v('--carte-live', '#7cc4ff'),
       publie: v('--carte-publie', '#ffd166'), panneau: v('--carte-panneau', '#0c1019'),
+      // Le plus grand rayon des pastilles dessinées (arrondi) : 0 quand le thème du terminal est
+      // carré, comme les coins de la feuille (revue du 14/10, M18).
+      rAngle: (r => (isFinite(r) ? Math.max(0, r) : Infinity))(parseFloat(v('--r-angle', ''))),
     });
   }
 
@@ -1080,6 +1083,7 @@
     return { x: x0, y: y0, w, h };
   }
   function arrondi(x, y, w, h, r) {
+    if (C.rAngle < r) r = C.rAngle;   // thème carré : angles vifs (--r-angle, lu par lireCouleurs)
     ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
     ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   }
@@ -1808,7 +1812,7 @@
     if (e.key === Liaison.CLE_THEME || e.key === null) suivreTheme();
   });
   /** Le thème décrit par le terminal, posé sur <html> (js/liaison.js) ; puis tout ce qui tient sa
-   *  couleur hors de la feuille est relu : couleurs du canevas, motif « non observé », palettes (les
+   *  couleur hors de la feuille est relu : couleurs et coins du canevas, motif « non observé », palettes (les
    *  calques gardés sont repeints), mots des couleurs, légende, explication, affichage. */
   function suivreTheme() {
     Liaison.poserTheme(document.documentElement, lireTheme());
@@ -3740,7 +3744,8 @@
       mode: MODE,
       // Le thème suivi (ton, accent du cadre, couleurs du canevas) et le prix venu du terminal.
       theme: { ton: ton(), terminal: document.documentElement.getAttribute('data-theme-terminal'), accentCadre: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
-        fond: C.fond, accent: C.accent, prix: C.prix, mots: Object.assign({}, motsCouleurs(), { palette: couleursDebutant() }) },
+        fond: C.fond, accent: C.accent, prix: C.prix, mots: Object.assign({}, motsCouleurs(), { palette: couleursDebutant() }),
+        carre: document.documentElement.hasAttribute('data-theme-carre'), rAngle: C.rAngle },
       marque: MARQUE && { p: MARQUE.p, posee: MARQUE.posee, y: Z && E.vue ? Y(MARQUE.p) : null, tenir: !!E.tenir },
       lien: { visible: !bulleInfo.hidden && !lectureLien.hidden, adresse: lectureAdresse },
       // Les textes écrits SUR la chaleur au dernier rendu (le budget de l'écran débutant), et les lignes

@@ -4,11 +4,16 @@
    couleur d'accent, posés sur <html data-theme-mode> avant le premier rendu). Sombre par défaut
    (aucun thème décrit) ; claire, la chaleur a sa palette claire (js/bookmap-calc.js, BM.PALETTES :
    peu d'ordres ≈ le fond, beaucoup = foncé). Les feuilles de thème du terminal ne sont pas lues.
+   Un thème CARRÉ du terminal (data-theme-carre, posé par js/liaison.js) met tous les angles à 0.
    Contrat de performance (tests/test_contrat.py) : ni flou, ni mix-blend-mode, ni
    animation infinie, ni @import ; aucune ressource externe.
    ══════════════════════════════════════════════════════════════════════════════ */
 :root {
   color-scheme: dark;
+  /* Le plus grand rayon permis : chaque coin s'écrit min(Npx, var(--r-angle)). Aucun plafond par
+     défaut ; 0 quand le thème du terminal est carré (ci-dessous). Lu aussi par js/bookmap.js pour
+     les pastilles dessinées. Les ronds numérotés (.num) restent ronds : ce sont ceux de la carte. */
+  --r-angle: 999px;
   --police-carte: 'Segoe UI Variable Text', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;
   --fond-page: #070910;
   --carte-fond: #090c14;
@@ -53,6 +58,10 @@
   --statut-bord: rgba(255, 90, 122, 0.5);
   --lecture-max: 440px;    /* largeur maximale de la lecture au pointeur (lue aussi par js/bookmap.js) */
 }
+/* Thème CARRÉ du terminal (ses coins sont à 0 ; un oui ou un non, jamais son nom) : la carte aussi,
+   boutons, pastilles, panneaux et étiquettes dessinées. Avant, elle restait arrondie, même ouverte
+   depuis Bureau 95, le thème par défaut (revue du 14/10, M18 ; décision du 11/10 « carré partout »). */
+:root[data-theme-carre] { --r-angle: 0px; }
 /* Thème CLAIR du terminal : la carte claire. Fond presque blanc, encres foncées ; les couleurs
    des repères foncées d'autant (turquoise, rose, violet restent leurs noms) ; « maintenant » en
    orange (le jaune ne se lit pas sur du blanc) ; la ligne du prix du Complet en noir. La ligne
@@ -123,7 +132,7 @@ body {
 .barre-gauche { display: flex; align-items: baseline; gap: 12px; min-width: 0; flex: 0 1 auto; }
 .barre h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: 0.2px; white-space: nowrap; }
 .barre .sous { font-weight: 400; color: var(--ink-3); font-size: 12px; margin-left: 6px; }
-.retour { color: var(--ink-2); text-decoration: none; font-size: 12.5px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--bord); }
+.retour { color: var(--ink-2); text-decoration: none; font-size: 12.5px; padding: 4px 8px; border-radius: min(8px, var(--r-angle)); border: 1px solid var(--bord); }
 .retour:hover, .retour:focus-visible { color: var(--ink-1); background: var(--surface-2); }
 .calques { display: flex; flex-wrap: nowrap; gap: 4px; flex: 1 1 0; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
 .barre-droite { display: flex; gap: 6px; flex: 0 0 auto; }
@@ -133,10 +142,10 @@ body {
    plus longs que les anciens, et la rangée garde autant de puces entièrement visibles. */
 .puce, .bouton {
   font: inherit; font-size: 12px; color: var(--ink-2); background: transparent;
-  border: 1px solid var(--bord); border-radius: 999px; padding: 4px 8px; cursor: pointer;
+  border: 1px solid var(--bord); border-radius: min(999px, var(--r-angle)); padding: 4px 8px; cursor: pointer;
 }
 .puce, .bouton { white-space: nowrap; }
-.bouton { border-radius: 8px; }
+.bouton { border-radius: min(8px, var(--r-angle)); }
 .puce:hover, .bouton:hover { color: var(--ink-1); background: var(--surface-2); }
 .puce[aria-pressed="true"], .bouton[aria-pressed="true"], .bouton[aria-expanded="true"] {
   color: var(--actif-ink); background: var(--actif); border-color: var(--actif-bord);
@@ -151,13 +160,13 @@ body {
 .statut {
   position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px);
   background: var(--statut-fond); color: var(--statut-ink); border: 1px solid var(--statut-bord);
-  border-radius: 8px; padding: 5px 9px; font-size: 12px; pointer-events: none;
+  border-radius: min(8px, var(--r-angle)); padding: 5px 9px; font-size: 12px; pointer-events: none;
 }
 
 /* ─── Lecture au pointeur ─── */
 .lecture {
   position: fixed; left: 0; top: 0; z-index: 20; pointer-events: none;
-  background: var(--carte-pastille); border: 1px solid var(--bord); border-radius: 8px;
+  background: var(--carte-pastille); border: 1px solid var(--bord); border-radius: min(8px, var(--r-angle));
   padding: 6px 9px; font-size: 12px; line-height: 1.45; color: var(--ink-2); max-width: min(var(--lecture-max), 92vw);
   box-shadow: 0 8px 24px rgba(var(--ombre), 0.45);
 }
@@ -179,7 +188,7 @@ body {
   position: fixed; z-index: 30; top: calc(var(--haut-barre, 52px) + 6px); right: 12px; width: min(360px, calc(100vw - 24px));
   max-height: calc(100vh - var(--haut-barre, 52px) - 14px); max-height: calc(100dvh - var(--haut-barre, 52px) - 14px);
   overflow: auto; overscroll-behavior: contain;
-  background: var(--surface); border: 1px solid var(--bord); border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--bord); border-radius: min(12px, var(--r-angle));
   padding: 10px 14px 14px; box-shadow: 0 18px 50px rgba(var(--ombre), 0.55);
 }
 .panneau-flottant.large { width: min(560px, calc(100vw - 24px)); }
@@ -196,9 +205,9 @@ body {
 .liste-rafales li b { color: var(--ink-1); font-weight: 600; }
 .liste-rafales .achat { color: var(--up); }
 .liste-rafales .vente { color: var(--down); }
-.fermer { font: inherit; font-size: 18px; line-height: 1; background: none; border: 0; color: var(--ink-2); cursor: pointer; padding: 4px 6px; border-radius: 6px; }
+.fermer { font: inherit; font-size: 18px; line-height: 1; background: none; border: 0; color: var(--ink-2); cursor: pointer; padding: 4px 6px; border-radius: min(6px, var(--r-angle)); }
 .fermer:hover { color: var(--ink-1); background: var(--surface-2); }
-fieldset { border: 1px solid var(--bord); border-radius: 10px; margin: 10px 0; padding: 6px 10px 10px; }
+fieldset { border: 1px solid var(--bord); border-radius: min(10px, var(--r-angle)); margin: 10px 0; padding: 6px 10px 10px; }
 legend { color: var(--ink-2); font-size: 12px; padding: 0 4px; }
 label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-2); margin-top: 8px; }
 label output, .champ output { color: var(--ink-1); font-weight: 600; }
@@ -208,13 +217,13 @@ label output, .champ output { color: var(--ink-1); font-weight: 600; }
 select, input[type="range"] { width: 100%; }
 select {
   font: inherit; font-size: 12.5px; color: var(--ink-1); background: var(--surface-2);
-  border: 1px solid var(--bord); border-radius: 8px; padding: 5px 8px;
+  border: 1px solid var(--bord); border-radius: min(8px, var(--r-angle)); padding: 5px 8px;
 }
 input[type="range"] { accent-color: var(--carte-live); }
 .barre-couleurs { margin: 6px 0 2px; }
 /* Une rampe par côté peint (deux pour « bid / ask teintés ») ; le contour ne prend pas de place,
    pour que chaque libellé de .grad tombe sous SA couleur. */
-#barreCouleurs .rampe { height: 12px; border-radius: 3px; background-size: 100% 100%; image-rendering: pixelated; outline: 1px solid var(--bord); }
+#barreCouleurs .rampe { height: 12px; border-radius: min(3px, var(--r-angle)); background-size: 100% 100%; image-rendering: pixelated; outline: 1px solid var(--bord); }
 .rampe-nom { display: block; font-size: 11px; color: var(--ink-3); margin: 6px 0 2px; }
 .grad { position: relative; height: 15px; font-size: 11px; color: var(--ink-3); margin-top: 4px; }
 .grad span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
@@ -238,7 +247,7 @@ input[type="range"] { accent-color: var(--carte-live); }
 /* « Comment lire cette carte » : posée sur la carte, sans prendre le pointeur (hors de ses boutons). */
 .guide-intro {
   position: absolute; left: 8px; bottom: 8px; z-index: 5; width: min(430px, calc(100% - 16px)); max-height: calc(100% - 16px); overflow: hidden;
-  background: var(--surface); border: 1px solid var(--accent-bord); border-radius: 12px; padding: 6px 12px 10px;
+  background: var(--surface); border: 1px solid var(--accent-bord); border-radius: min(12px, var(--r-angle)); padding: 6px 12px 10px;
   box-shadow: 0 12px 34px rgba(var(--ombre), 0.5); pointer-events: none; font-size: 12.5px; color: var(--ink-2);
 }
 .guide-intro h2 { font-size: 14px; margin: 4px 0; color: var(--ink-1); }
@@ -253,7 +262,7 @@ input[type="range"] { accent-color: var(--carte-live); }
   width: 19px; height: 19px; border-radius: 50%; background: var(--carte-accent); color: var(--carte-sur-accent); font-weight: 700; font-size: 11px;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.pastille-couleur { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; }
+.pastille-couleur { display: inline-block; width: 10px; height: 10px; border-radius: min(2px, var(--r-angle)); vertical-align: -1px; }
 .mot-couleur { white-space: nowrap; }
 .liste-journal time { color: var(--ink-3); }
 .liste-journal .sym { display: inline-block; min-width: 1.1em; text-align: center; font-weight: 700; }
@@ -323,7 +332,7 @@ html:not([data-mode="expert"]) .resume-carte.ouvert { height: auto; max-height: 
    pointeur ; un fondu unique à l'apparition. */
 .indice-tap {
   position: absolute; left: 50%; bottom: 34px; transform: translateX(-50%); z-index: 4; pointer-events: none;
-  background: var(--surface); color: var(--ink-1); border: 1px solid var(--accent-bord); border-radius: 999px;
+  background: var(--surface); color: var(--ink-1); border: 1px solid var(--accent-bord); border-radius: min(999px, var(--r-angle));
   padding: 5px 12px; font-size: 12.5px; white-space: nowrap; box-shadow: 0 6px 18px rgba(var(--ombre), 0.45);
   animation: indice-fondu 300ms ease-out 1;
 }
@@ -381,13 +390,13 @@ html:not([data-mode="expert"]) .statut { bottom: 26px; white-space: nowrap; over
 .mini-cle {
   position: absolute; z-index: 3; left: 8px; top: 8px; pointer-events: none;
   display: flex; flex-direction: column; gap: 3px; padding: 4px 8px 5px;
-  background: var(--surface); border: 1px solid var(--bord); border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--bord); border-radius: min(8px, var(--r-angle));
   font-size: 11px; line-height: 1.25; color: var(--ink-2); white-space: nowrap;
 }
 .mini-cle[hidden] { display: none; }
 .mc-ligne { display: flex; align-items: center; gap: 5px; }
 .mc-ligne b { min-width: 3.3em; color: var(--ink-1); font-weight: 600; }
-.mc-rampe { flex-shrink: 0; width: 56px; height: 8px; border-radius: 2px; background-size: 100% 100%; image-rendering: pixelated; outline: 1px solid var(--bord); }
+.mc-rampe { flex-shrink: 0; width: 56px; height: 8px; border-radius: min(2px, var(--r-angle)); background-size: 100% 100%; image-rendering: pixelated; outline: 1px solid var(--bord); }
 .mc-sens { font-size: 10.5px; color: var(--ink-3); }
 
 /* ─── Au doigt (pointer: coarse) : des cibles d'au moins 40 × 40 px dans la barre ───

@@ -51,8 +51,10 @@ PLAGES_LATIN = ("U+0020-007E,U+00A0-00FF,U+0100-017F,U+0131,U+0152-0153,U+02BC,U
                 "U+03A3,U+03B3,U+03C3,U+2720,U+2766,U+2767,U+25C6,U+2756")
 # Police de TITRE aux chiffres proportionnels : ses chiffres sont RETIRÉS du sous-ensemble. Un
 # chiffre écrit dans un titre retombe alors sur la police système (chiffres tabulaires et lisibles) :
-# « jamais pour un nombre », par construction et non par discipline.
-PLAGES_LATIN_SANS_CHIFFRES = PLAGES_LATIN.replace("U+0020-007E", "U+0020-002F,U+003A-007E")
+# « jamais pour un nombre », par construction et non par discipline. Ses parenthèses « ( » et « ) »
+# aussi (U+0028-0029) : en Pixelify Sans, elles se lisaient comme des accolades, « RSI {graphique} »
+# (revue du 14/10, M19) ; elles viennent de la police système, comme les chiffres.
+PLAGES_LATIN_SANS_CHIFFRES = PLAGES_LATIN.replace("U+0020-007E", "U+0020-0027,U+002A-002F,U+003A-007E")
 FONCTIONS = "kern,liga,clig,calt,ccmp,locl,mark,mkmk,lnum,tnum,pnum,onum,case,smcp,c2sc"
 
 # « cible=base+marque:position » : Ā ā (macron au-dessus), Ṃ ṃ (point souscrit). Une marque peut
@@ -79,8 +81,8 @@ POLICES = [
     dict(sortie="eb-garamond.woff2", famille="EB Garamond", origine="EB Garamond", theme="Codex",
          dossier="ebgaramond", source="EBGaramond[wght].ttf", licence="ebgaramond.OFL.txt", horodatage=3874129694),
     # Bureau 95 : barres de titre, « Démarrer », bandeau du menu et titre SEULEMENT. Ses chiffres
-    # sont proportionnels (et son 5 ressemble à son S) : retirés, ils viennent de la police système.
-    # Une seule graisse servie (instance 700).
+    # sont proportionnels (et son 5 ressemble à son S), ses parenthèses ressemblent à des
+    # accolades : retirés, ils viennent de la police système. Une seule graisse servie (instance 700).
     dict(sortie="bureau95-titres.woff2", famille="Pixelify Sans", origine="Pixelify Sans", theme="Bureau 95",
          dossier="pixelifysans", source="PixelifySans[wght].ttf", licence="pixelifysans.OFL.txt",
          instance={"wght": 700}, composes=COMPOSES_SAMSARA, plages=PLAGES_LATIN_SANS_CHIFFRES),
@@ -178,7 +180,7 @@ def lisezmoi():
         if p.get("texte"):
             details.append("lettres du titre seulement : « " + p["texte"] + " »")
         elif p.get("plages") == PLAGES_LATIN_SANS_CHIFFRES:
-            details.append("plages : PLAGES_LATIN sans les chiffres (ils retombent sur la police système)")
+            details.append("plages : PLAGES_LATIN sans les chiffres ni les parenthèses (ils retombent sur la police système)")
         elif p.get("plages", PLAGES_LATIN) != PLAGES_LATIN:
             details.append("plages : PLAGES_LATIN" + (" + " + p["plages"][len(PLAGES_LATIN) + 1:] if p["plages"].startswith(PLAGES_LATIN) else " remplacées"))
         if details:

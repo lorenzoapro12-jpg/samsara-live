@@ -22,7 +22,8 @@
 //      l'adresse change, sans erreur ; un prix juste, puis faux : marqué, puis effacé.
 //   8. THÈME : la carte prend le ton du terminal (Aero : fond clair, accent du thème, mots du ton
 //      clair, chaleur peinte avec la palette claire) ; un changement de thème dans l'autre onglet la
-//      suit sans recharger ; kala : la carte sombre d'avant (mêmes couleurs, mêmes mots).
+//      suit sans recharger ; kala : la carte sombre d'avant (mêmes couleurs, mêmes mots). Bureau 95,
+//      thème carré : tous les angles de la carte à 0, puis ses coins d'avant en Aero (revue du 14/10, M18).
 //
 // Harnais : celui de tests/test_debutant_page.js pour le terminal (Binance simulé autour de 86 000,
 // horloge fixée au 08/10/2026 22:52 UTC, scénarios du matin, murs et options près du prix), et
@@ -574,7 +575,7 @@ async function controlerTerminalMarque(page, p, nom, deb, erreurs) {
     }
 
     // ── 8. Thème ──────────────────────────────────────────────────────────────
-    titre('8. Thème : la carte prend le ton du terminal, et le suit d\'un onglet à l\'autre');
+    titre('8. Thème : la carte prend le ton du terminal et ses angles carrés, et le suit d\'un onglet à l\'autre');
     {
       // La carte de référence : jamais ouverte par un terminal (aucun thème décrit) — la carte sombre d'avant.
       const ctxR = await contexte(nav, { vue: { width: 1440, height: 900 } }); ouverts.push(ctxR);
@@ -635,9 +636,28 @@ async function controlerTerminalMarque(page, p, nom, deb, erreurs) {
         JSON.stringify(S2.theme.mots) === JSON.stringify(R0.theme.mots) && JSON.stringify(S2.mots) === JSON.stringify(R0.mots) && S2.intro.length > 100 && S2.intro === R0.intro && JSON.stringify(S2.options) === JSON.stringify(R0.options)
         && /Bleu foncé : peu d’ordres/.test(S2.intro), { mots: [S2.theme.mots, R0.theme.mots, S2.mots, R0.mots], intro: [S2.intro.slice(0, 300), R0.intro.slice(0, 300)], options: [S2.options, R0.options] });
       check(`kala : la chaleur repeinte avec la palette sombre (${S2.peints} pixels lus, ${S2.horsPalette} hors de cette palette)`, S2.peints >= 50 && S2.horsPalette <= S2.peints * 0.05, S2);
+      // Thèmes carrés jusqu'au bout (revue du 14/10, M18) : la carte restait arrondie, même ouverte
+      // depuis Bureau 95, le thème par défaut. Le terminal passe en Bureau 95 : la carte suit et met
+      // tous ses angles à 0 (boutons, pastille « Guide », explication, pastilles dessinées) ; les ronds
+      // numérotés restent ronds. De retour en Aero, ses coins d'avant.
+      const coins = pg => pg.evaluate(() => {
+        const r = s => { const e = document.querySelector(s); return e ? getComputedStyle(e).borderTopLeftRadius : null; };
+        const th = window.__carte.etat().theme;
+        return { carre: th.carre, rAngle: th.rAngle, retour: r('.retour'), puce: r('.puce'), bouton: r('.bouton'), intro: r('.guide-intro'), select: r('select'), num: r('.intro-liste .num') };
+      });
+      const arrondis = k => !k.carre && k.rAngle > 6 && k.retour === '8px' && k.puce === '999px' && k.bouton === '8px' && k.intro === '12px' && k.select === '8px' && k.num === '50%';
+      const K0 = await coins(C);
+      check('kala : la carte garde ses coins arrondis (boutons 8 px, pastille « Guide » en pilule, explication 12 px)', arrondis(K0), K0);
+      await T.evaluate(() => appliquerTheme('bureau95'));
+      await C.waitForTimeout(1500);
+      const K1 = await coins(C);
+      check('le terminal passe en Bureau 95 : la carte suit, tous ses angles à 0 (boutons, « Guide », explication, listes, pastilles dessinées), les ronds numérotés gardés',
+        K1.carre && K1.rAngle === 0 && ['retour', 'puce', 'bouton', 'intro', 'select'].every(k => K1[k] === '0px') && K1.num === '50%', K1);
       await T.evaluate(() => appliquerTheme('aero'));
       await C.waitForTimeout(1500);
       await clair('retour à Aero dans l\'autre onglet');
+      const K2 = await coins(C);
+      check('retour à Aero : la carte retrouve ses coins d\'avant', arrondis(K2), K2);
       check('thème suivi : aucune erreur JavaScript (terminal, carte)', !eT.length && !eC.length, { eT, eC });
       await ctx.close(); await ctxR.close();
     }

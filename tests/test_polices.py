@@ -17,7 +17,8 @@ est la seule source, et ce harnais la confronte à ce qui est réellement servi 
 4. chaque @font-face servi pointe vers une police déclarée, sous le nom que POLICES lui donne ;
 5. (avec fontTools) dans le fichier lui-même : aucun nom réservé dans les noms de famille,
    glyphes composés présents, instance statique sans table fvar, plage d'axe respectée, aucun
-   chiffre dans une police déclarée sans chiffres (PLAGES_LATIN_SANS_CHIFFRES).
+   chiffre ni parenthèse dans une police déclarée sans chiffres (PLAGES_LATIN_SANS_CHIFFRES ;
+   les parenthèses depuis la revue du 14/10, M19 : en Pixelify Sans, « RSI {graphique} »).
 
 Sans réseau ; les contrôles 1 à 4 sans fontTools.
 USAGE
@@ -66,6 +67,23 @@ doublons = sorted({p["sortie"] for p in POLICES if sum(q["sortie"] == p["sortie"
 CLES = ("sortie", "famille", "origine", "theme", "dossier", "source", "licence")
 incompletes = [p.get("sortie", "?") + " : " + ", ".join(k for k in CLES if not p.get(k)) for p in POLICES if not all(p.get(k) for k in CLES)]
 (echec if incompletes else ok)("chaque entrée : sortie, famille, origine, thème, source, licence", " | ".join(incompletes))
+
+
+def points(plages):
+    """« U+0020-0027,U+002A » → l'ensemble des points de code couverts."""
+    s = set()
+    for m in re.finditer(r"U\+([0-9A-Fa-f]+)(?:-([0-9A-Fa-f]+))?", plages):
+        a = int(m.group(1), 16)
+        s.update(range(a, int(m.group(2) or m.group(1), 16) + 1))
+    return s
+
+
+# Sans fontTools : la plage d'une police de titre « sans chiffres » ne garde ni chiffre ni « ( » « ) »
+# (revue du 14/10, M19 : les parenthèses de Pixelify Sans se lisaient comme des accolades).
+_pts = points(fab.PLAGES_LATIN_SANS_CHIFFRES)
+_gardes = [chr(u) for u in list(range(0x30, 0x3A)) + [0x28, 0x29] if u in _pts]
+(echec if _gardes or not {0x27, 0x2A, 0x41, 0x7E} <= _pts else ok)(
+    "PLAGES_LATIN_SANS_CHIFFRES : ni chiffre ni parenthèse", " ".join(_gardes) or f"{len(_pts)} points gardés")
 
 titre("2. Licences jointes, noms réservés respectés (OFL, condition 3)")
 for p in POLICES:
@@ -134,9 +152,11 @@ if TTFont:
         pb = [f"nom {i} « {v} » contient « {r} »" for r in fab.noms_reserves(lic) for i, v in noms.items()
               if r.lower().replace(" ", "") in v.lower().replace(" ", "")]
         pb += [f"glyphe composé U+{s.split('=')[0]} absent" for s in p.get("composes", []) if int(s.split("=")[0], 16) not in cmap]
-        # Police de titre déclarée SANS chiffres : aucun ne doit y rester (ils viennent de la police système).
+        # Police de titre déclarée SANS chiffres : aucun ne doit y rester (ils viennent de la police système),
+        # ni « ( » « ) » (des accolades en Pixelify Sans : revue du 14/10, M19).
         if p.get("plages") == fab.PLAGES_LATIN_SANS_CHIFFRES:
             pb += [f"chiffre « {chr(u)} » présent (police déclarée sans chiffres)" for u in range(0x30, 0x3A) if u in cmap]
+            pb += [f"parenthèse « {chr(u)} » présente (police déclarée sans chiffres)" for u in (0x28, 0x29) if u in cmap]
         inst = p.get("instance") or {}
         if inst:
             axes = {a.axisTag: (a.minValue, a.maxValue) for a in f["fvar"].axes} if "fvar" in f else {}
