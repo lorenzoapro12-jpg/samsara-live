@@ -2615,7 +2615,9 @@
       // (Débutant : seulement « pas d'exemple » — l'explication se pose loin du prix et des repères.)
       + (ouvert && R.calques.guide && !vus.has(i + 1) && !(deb && (GU.caches.has(i + 1) || GU.sansPlace.has(i + 1))) ? ' <i>' + (GU.caches.has(i + 1) ? '(caché sous ce cadre)' : GU.sansPlace.has(i + 1) ? '(visible, mais sans place libre pour son numéro)' : '(pas d’exemple dans cette vue)') + '</i>' : '') + '</span></li>').join('');
     if (deb) {
-      document.getElementById('guideIntroNote').textContent = (survol ? 'Touchez ou survolez' : 'Touchez') + ' un repère pour le lire. Tout voir : «\u00a0Le détail\u00a0», dans «\u00a0Choisir l’affichage\u00a0».';
+      // Écran étroit ou bas (.detail, css/bookmap.css) : la note tient en une ligne, sa seconde phrase
+      // finissait à moitié cachée sous « J'ai compris » (revue du 14/10, C34).
+      document.getElementById('guideIntroNote').innerHTML = (survol ? 'Touchez ou survolez' : 'Touchez') + ' un repère pour le lire.<span class="detail"> Tout voir : «\u00a0Le détail\u00a0», dans «\u00a0Choisir l’affichage\u00a0».</span>';
       return;
     }
     document.getElementById('guideIntroNote').textContent = (R.calques.guide ? 'Les numéros montrent un exemple réel de chacun. Vert ou turquoise : côté achat ; rouge ou rose : côté vente. Rond : échangé ; rectangle : en attente.' : 'Calque Guide éteint : pas de numéros sur la carte.')

@@ -76,12 +76,17 @@ function ouvrirThemes(e) {
 // l'écran — 87 px visibles sur 540). S'il ne tient d'aucun côté, il prend le plus grand et y
 // défile, sans recouvrir son bouton ; tout est borné à 8 px des bords. `gauche` : aligné sur le
 // bord gauche du bouton, sinon sur son bord droit. `ecart` : distance au bouton (8 px).
+// Bouton sous l'en-tête (ruban ou liste en bas de l'écran : Planche) : au-dessus, le menu s'arrête
+// à 8 px sous l'en-tête comme sous un bord, et défile un peu plus. Il montait jusqu'en haut de
+// l'écran et coupait la rangée d'icônes à mi-hauteur (revue du 14/10, C28).
 function placerMenu(menu, ancre, gauche, ecart) {
   const M = 8, e = ecart === undefined ? 8 : ecart, H = window.innerHeight, L = window.innerWidth;
   const r = ancre.getBoundingClientRect();
   menu.style.maxHeight = ''; menu.style.overflowY = '';
   let h = menu.offsetHeight, top;
-  const dessous = H - M - (r.bottom + e), dessus = r.top - e - M;
+  const tete = document.querySelector('.header'), basTete = tete ? tete.getBoundingClientRect().bottom : 0;
+  const plafond = r.top >= basTete ? Math.max(M, basTete + M) : M;
+  const dessous = H - M - (r.bottom + e), dessus = r.top - e - plafond;
   const borner = max => { menu.style.maxHeight = Math.max(0, max) + 'px'; menu.style.overflowY = 'auto'; h = menu.offsetHeight; };
   if (h <= dessous) top = r.bottom + e;
   else if (h <= dessus) top = r.top - e - h;
@@ -3550,6 +3555,8 @@ function lireJetons() {
   COLORS.hairline = v('--hairline', 'rgba(127,127,127,0.18)');
   COLORS.reticule = v('--reticule', 'rgba(127,127,127,0.4)');
   COLORS.bulle = v('--bulle', 'rgba(255,255,255,0.94)');
+  // Un thème plat (--ombre-douce: none) n'a pas d'ombre floue sous ses bulles (fondBulle).
+  COLORS.ombreBulle = v('--ombre-douce', 'none') !== 'none';
   COLORS.warn = v('--warn', '#f0a50b');
   COLORS.sess = [v('--sess-asie', 'rgba(255,152,0,0.75)'), v('--sess-europe', 'rgba(33,150,243,0.75)'), v('--sess-us', 'rgba(156,39,176,0.75)')];
   COLORS.sr = [v('--sr-1', '#ce93d8'), v('--sr-2', '#26c6da'), v('--sr-3', '#ffc107')];
@@ -3872,11 +3879,22 @@ function calqueDessin() {
   // Repère de la publication (market-data.json) : un trait vertical pointillé à `updated`, un
   // point au prix publié. JAMAIS relié à la ligne de prix : c'est un relevé daté, pas un tracé —
   // l'écart entre ce point et la bougie dit ce que la publication ne sait pas encore.
+  // Tracé sur le calque, au-dessus des étiquettes du graphique : il s'interrompt sur celles que le
+  // Guide et les scénarios ont posées (leurs places, guidePlacer), il barrait « obj. 84 |503 $ »
+  // (revue du 14/10, C33).
   const rep = P && !deb && reperePublication(P);
   if (rep) {
     cx.save();
     cx.strokeStyle = COLORS.ink3; cx.lineWidth = 1; cx.setLineDash([3, 3]);
-    cx.beginPath(); cx.moveTo(rep.x, P.top); cx.lineTo(rep.x, P.top + P.ph); cx.stroke();
+    const poses = [].concat(guideEtat ? guideEtat.rects : [], scenEtat && !(guideEtat && scenEtat.rects === guideEtat.rects) ? scenEtat.rects : [])
+      .filter(q => rep.x >= q.x - 1 && rep.x <= q.x + q.w + 1).sort((a, b) => a.y - b.y);
+    let y0 = P.top;
+    cx.beginPath();
+    for (const q of poses.concat({ y: P.top + P.ph, h: 0 })) {
+      if (q.y > y0) { cx.moveTo(rep.x, y0); cx.lineTo(rep.x, Math.min(q.y, P.top + P.ph)); }
+      y0 = Math.max(y0, q.y + q.h);
+    }
+    cx.stroke();
     cx.setLineDash([]);
     if (rep.y !== null) {
       cx.fillStyle = COLORS.ink1; cx.strokeStyle = COLORS.surface; cx.lineWidth = 1.5;
@@ -3947,10 +3965,7 @@ function calqueDessin() {
       const tX = onRight ? Math.max(16, crossX - 145) : Math.min(W - 160, crossX + 12);
       const tY = Math.max(30, Math.min(mainH - 103, crossY - 65));
       cx.save();
-      cx.fillStyle = COLORS.bulle;
-      cx.shadowColor = 'rgba(16,35,61,0.18)'; cx.shadowBlur = 14; cx.shadowOffsetY = 4;
-      cx.beginPath(); cx.roundRect(tX, tY, 135, 90, rE(10)); cx.fill();
-      cx.shadowColor = 'transparent'; cx.shadowBlur = 0; cx.shadowOffsetY = 0;
+      fondBulle(cx, tX, tY, 135, 90, rE(10), COLORS.bulle);
       cx.fillStyle = candle.close >= candle.open ? COLORS.candleUp : COLORS.candleDown; cx.beginPath(); cx.roundRect(tX + 6, tY + 10, 3, 70, rE(1.5)); cx.fill();
       cx.font = chartFont(10, 600);
       [['Début', candle.open], ['Haut', candle.high], ['Bas', candle.low], ['Fin', candle.close]].forEach(([m, v], k) => {
@@ -3974,10 +3989,7 @@ function calqueDessin() {
       const onRight = crossX > W / 2;
       const tX = onRight ? Math.max(16, crossX - tw - 10) : Math.min(W - tw - 25, crossX + 12);
       const tY = Math.max(30, Math.min(mainH - 85, crossY - 65));
-      cx.fillStyle = COLORS.bulle;
-      cx.shadowColor = 'rgba(16,35,61,0.18)'; cx.shadowBlur = 14; cx.shadowOffsetY = 4;
-      cx.beginPath(); cx.roundRect(tX, tY, tw, 72, rE(10)); cx.fill();
-      cx.shadowColor = 'transparent'; cx.shadowBlur = 0; cx.shadowOffsetY = 0;
+      fondBulle(cx, tX, tY, tw, 72, rE(10), COLORS.bulle);
       // Filet de la couleur de la bougie à gauche : la direction se lit sans encadrer la donnée.
       cx.fillStyle = cColor; cx.beginPath(); cx.roundRect(tX + 6, tY + 10, 3, 52, rE(1.5)); cx.fill();
       cx.fillStyle = COLORS.ink1;
@@ -4126,10 +4138,15 @@ function drawRangeSelector(candles, W, H) {
   // Compteur bougies sur le RS. Le nombre de bougies vues (« 50/3 000 ») est écrit en haut à
   // gauche du tracé : le répéter ici le mettait sous la légende des sessions et hors du cadre,
   // le cadre des bougies vues étant presque toujours collé à droite.
-  ctx.fillStyle = COLORS.text; ctx.font = chartFont(8);
+  // Sur un fond, comme la légende des sessions qui le suit : écrit à même le sélecteur, il était
+  // barré par la mini-courbe quand elle passait dessus (revue du 14/10, C33).
+  ctx.font = chartFont(8);
   const rsTxt = Fmt.nombre(candles.length) + ' bougies';
-  ctx.fillText(rsTxt, padL + 4, rsY + 12);
   const rsTxtFin = padL + 4 + ctx.measureText(rsTxt).width;
+  ctx.fillStyle = COLORS.bulle; ctx.strokeStyle = COLORS.hairline; ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.roundRect(padL + 2, rsY + 4, rsTxtFin - padL, 11, rE(3)); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = COLORS.text;
+  ctx.fillText(rsTxt, padL + 4, rsY + 12);
   
   // Légende sessions — fond opaque, à droite du RS ; à gauche (après le compteur) quand le cadre
   // des bougies vues est à droite, pour ne jamais le couvrir.
@@ -6801,6 +6818,22 @@ function sourceResume(c, vivant, texte) {
   const R = c.resume.map(p => (Array.isArray(p) ? p : [p]));
   return R;
 }
+/** Le fond d'une bulle du graphique (bulle d'une cible, infobulle des bougies) : le chemin
+ *  roundRect(x, y, w, h, r) rempli de `fonds`, l'un sur l'autre, l'ombre douce sous le premier.
+ *  Un thème plat (--ombre-douce: none : Bureau 95, Gare, Gazette, Planche) n'a aucune ombre floue :
+ *  la bulle y portait pourtant la sienne, écrite en dur ; elle est cernée d'un filet d'1 px, comme
+ *  une infobulle de 1995 (revue du 14/10, C30). */
+function fondBulle(cx, x, y, w, h, r, ...fonds) {
+  cx.beginPath(); cx.roundRect(x, y, w, h, r);
+  fonds.forEach((f, k) => {
+    if (k === 0 && COLORS.ombreBulle) { cx.shadowColor = 'rgba(16,35,61,0.18)'; cx.shadowBlur = 14; cx.shadowOffsetY = 4; }
+    cx.fillStyle = f; cx.fill();
+    cx.shadowColor = 'transparent'; cx.shadowBlur = 0; cx.shadowOffsetY = 0;
+  });
+  if (COLORS.ombreBulle) return;
+  cx.strokeStyle = COLORS.hairline; cx.lineWidth = 1;
+  cx.beginPath(); cx.roundRect(Math.round(x) + 0.5, Math.round(y) + 0.5, Math.round(w) - 1, Math.round(h) - 1, r); cx.stroke();
+}
 /** La bulle d'une cible, près du curseur, toujours dans le tracé. */
 function guideBulle(c, W, mainH, evite) {
   const E = guideEtat, Sc = scenEtat;
@@ -6928,11 +6961,7 @@ function guideBulle(c, W, mainH, evite) {
   else if (E && E.survol === c) E.bulle = lu;
   else if (c.fourchette && fourchetteEtat) fourchetteEtat.bulle = Object.assign(lu, { titre: c.titre });
   // Fond du tracé d'abord : une bulle translucide laisserait lire la lecture et les étiquettes à travers.
-  cx.fillStyle = COLORS.surface;
-  cx.shadowColor = 'rgba(16,35,61,0.18)'; cx.shadowBlur = 14; cx.shadowOffsetY = 4;
-  cx.beginPath(); cx.roundRect(bx, by, bw, bh, rE(8)); cx.fill();
-  cx.shadowColor = 'transparent'; cx.shadowBlur = 0; cx.shadowOffsetY = 0;
-  cx.fillStyle = COLORS.bulle; cx.fill();
+  fondBulle(cx, bx, by, bw, bh, rE(8), COLORS.surface, COLORS.bulle);
   cx.fillStyle = c.coul || COLORS.accent2; cx.fillRect(bx + 5, by + 8, 3, bh - 16);
   cx.fillStyle = COLORS.ink1; cx.font = chartFont(fT, 700);
   tl.forEach((l, k) => cx.fillText(l, bx + 14, by + 16 + (hT - 14) + k * hT));
