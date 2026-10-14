@@ -811,19 +811,38 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
   const cb = fo(casse(-1, 1), 900), ch = fo(casse(1, 1), 900);
   check('cassure du bas : la dernière période close finit sous le bas des 42 d’avant elle ; du haut, au-dessus', cb && cb.cassure && cb.cassure.sens === -1 && cb.cassure.depuis === 0 && !cb.cassure.revenu
     && ch && ch.cassure && ch.cassure.sens === 1 && !ch.cassure.revenu, { cb: cb && cb.cassure, ch: ch && ch.cassure });
+  // Revue du 14/10/2026 (C1, C4) : l'heure dite est la FIN de la période qui a cassé (pas son début) ;
+  // la fenêtre de la fourchette cassée est gardée pour la couche du graphique.
+  check('cassure : tFin = fin de la période qui a cassé (t + 4 h), debut = début de la fenêtre cassée (t − 42 × 4 h)',
+    cb.cassure.tFin === cb.cassure.t + per && cb.cassure.debut === cb.cassure.t - 42 * per && cb.cassure.tFin === cb.fin, cb.cassure);
   const c6 = fo(casse(-1, 6), 900), c7 = fo(casse(-1, 7), 900), cr = fo(casse(-1, 3, true), 900);
   check('cassure il y a 6 périodes : encore dite ; il y a 7 : plus dite ; revenue dedans depuis : « revenu »', c6 && c6.cassure && c6.cassure.depuis === 5 && c7 && c7.cassure === null && cr && cr.cassure && cr.cassure.revenu, { c6: c6 && c6.cassure, c7: c7 && c7.cassure, cr: cr && cr.cassure });
   // Deux périodes de suite sous le bas : seule la première est une cassure (la précédente avait fini dans SA fourchette).
   const deux = fo(serie(900, 1000, x => { for (let i = 0; i < x.n - 1; i++) if (x.dans(i, 1) || x.dans(i, 2)) { x.C[i] = 90; x.H[i] = 90.5; x.L[i] = 89.5; } }), 900);
   check('deux périodes de suite sous le bas : la cassure est la première (depuis 1), pas la seconde', deux && deux.cassure && deux.cassure.depuis === 1 && deux.cassure.sens === -1, deux && deux.cassure);
+  check('cassureDite : la cassure tant que le prix n’est pas revenu dedans, sinon null (la même règle pour « En résumé », la barre et la couche)',
+    G.cassureDite(cb) === cb.cassure && G.cassureDite(deux) === deux.cassure && G.cassureDite(cr) === null && G.cassureDite(c7) === null && G.cassureDite(f15) === null && G.cassureDite(null) === null);
   // En résumé : la phrase, sans sens (la règle du titre n'en tient pas compte), famille « niveau ».
-  const ra = syn({ regime: { cle: 'faible' }, fourchette: cb, symbole: 'BTCUSDT' }), rh = syn({ regime: { cle: 'faible' }, fourchette: ch, symbole: 'SOLUSDT' });
+  // Revue du 14/10/2026 (C4) : avec l'heure de la cassure (fin de la période, heure de l'appareil) ;
+  // « juste après » pendant la 1re période seulement, puis « pas revenu dedans depuis ».
+  const hc = G.heureVueSi(cb.cassure.tFin * 1000), hh = G.heureVueSi(ch.cassure.tFin * 1000);
+  const ra = syn({ regime: { cle: 'faible' }, fourchette: cb, symbole: 'BTCUSDT', maintenant: cb.cassure.tFin * 1000 + 60000 }), rh = syn({ regime: { cle: 'faible' }, fourchette: ch, symbole: 'SOLUSDT' });
   const lf = r => r.pourquoi.find(p => /fourchette de 7 jours/.test(p.texte));
-  check('En résumé, cassure du bas sur BTC/USDT : « Le prix a cassé le bas de sa fourchette de 7 jours. Attention : ça bouge souvent fort juste après, dans les deux sens. Une fois sur deux, il est revenu dedans dans la journée. »',
-    lf(ra) && lf(ra).texte === 'Le prix a cassé le bas de sa fourchette de 7 jours. Attention : ça bouge souvent fort juste après, dans les deux sens. Une fois sur deux, il est revenu dedans dans la journée.'
+  check('En résumé, cassure du bas sur BTC/USDT : « Le prix a cassé le bas de sa fourchette de 7 jours à ' + hc + '. Attention : ça bouge souvent fort juste après, dans les deux sens. Une fois sur deux, il est revenu dedans dans la journée. »',
+    lf(ra) && lf(ra).texte === 'Le prix a cassé le bas de sa fourchette de 7 jours à ' + hc + '. Attention : ça bouge souvent fort juste après, dans les deux sens. Une fois sur deux, il est revenu dedans dans la journée.'
     && lf(ra).sens === 0 && lf(ra).fam === 'niveau', lf(ra));
-  check('par le haut, sur une autre paire (non mesurée) : « … le haut … Il revient souvent dedans dans la journée. »',
-    lf(rh) && lf(rh).texte === 'Le prix a cassé le haut de sa fourchette de 7 jours. Attention : ça bouge souvent fort juste après, dans les deux sens. Il revient souvent dedans dans la journée.' && lf(rh).sens === 0, lf(rh));
+  check('par le haut, sur une autre paire (non mesurée) : « … le haut … à ' + hh + '. … Il revient souvent dedans dans la journée. »',
+    lf(rh) && lf(rh).texte === 'Le prix a cassé le haut de sa fourchette de 7 jours à ' + hh + '. Attention : ça bouge souvent fort juste après, dans les deux sens. Il revient souvent dedans dans la journée.' && lf(rh).sens === 0, lf(rh));
+  // Le lendemain (la phrase reste jusqu'à 24 h) : « hier à … » ; après la 1re période, plus de « juste après ».
+  const dT = new Date(deux.cassure.tFin * 1000), lendemain = new Date(dT.getFullYear(), dT.getMonth(), dT.getDate() + 1, 1, 0).getTime();
+  const r6 = syn({ regime: { cle: 'faible' }, fourchette: deux, symbole: 'BTCUSDT', maintenant: lendemain }), h6 = G.heureVueSi(deux.cassure.tFin * 1000);
+  check('cassure dite le lendemain, une période plus tard (pas revenu dedans) : « … de 7 jours hier à ' + h6 + '. Il n’est pas revenu dedans depuis. … » (plus de « juste après »)',
+    lf(r6) && lf(r6).texte === 'Le prix a cassé le bas de sa fourchette de 7 jours hier à ' + h6 + '. Il n’est pas revenu dedans depuis. Une fois sur deux, il est revenu dedans dans la journée.', lf(r6));
+  // La barre du téléphone (revue du 14/10/2026, C1) : la 1re phrase de la cassure à la place du titre ; sinon le titre.
+  check('barre du téléphone : la cassure dite (« Le prix a cassé le bas … à ' + hc + '. »), sinon le titre',
+    ra.barre === 'Le prix a cassé le bas de sa fourchette de 7 jours à ' + hc + '.' && r6.barre === 'Le prix a cassé le bas de sa fourchette de 7 jours hier à ' + h6 + '.'
+    && syn({ regime: { cle: 'faible' } }).barre === syn({ regime: { cle: 'faible' } }).titre && syn({ fourchette: cr, symbole: 'BTCUSDT' }).barre === syn({ fourchette: cr, symbole: 'BTCUSDT' }).titre,
+    [ra.barre, r6.barre]);
   const sansF = syn({ regime: { cle: 'faible' } }), avecF = syn({ regime: { cle: 'faible' }, fourchette: cb, symbole: 'BTCUSDT' });
   const h1 = syn({ regime: { cle: 'hausse' }, fourchette: ch, symbole: 'BTCUSDT' });
   check('la cassure ne change jamais la règle du sens : même titre et même ton avec ou sans elle ; un seul signal vers le haut reste « trop peu »',
@@ -831,7 +850,7 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
   check('rien de dit : sans fourchette, sans cassure, cassure revenue dedans, cassure trop ancienne',
     ![syn({ fourchette: null }), syn({ fourchette: f15 }), syn({ fourchette: cr, symbole: 'BTCUSDT' }), syn({ fourchette: c7, symbole: 'BTCUSDT' })].some(lf));
   // Charte : une idée par phrase, 15 mots au plus ; ni « range », ni « va baisser », ni volume, ni conseil.
-  const phrF = [lf(ra).texte, lf(rh).texte].flatMap(t => t.split(/(?<=\.)\s+/));
+  const phrF = [lf(ra).texte, lf(rh).texte, lf(r6).texte].flatMap(t => t.split(/(?<=\.)\s+/));
   const nM = x => x.split(/\s+/).filter(w => /[\p{L}\d]/u.test(w)).length;
   check('la phrase de la fourchette : chaque phrase 15 mots au plus ; aucun mot banni (« range »…), aucun %, ni « va baisser / monter », ni volume, ni conseil',
     phrF.every(x => nM(x) <= 15) && !phrF.some(x => G.motsBannis(x).length || /%|va (baisser|monter)|volume/i.test(x) || CONSEIL.test(x)), phrF.map(x => [nM(x), x]));
@@ -845,18 +864,31 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
   check('etatFerme : dépassé puis repoussé sur l’une des ' + P.mecheBougies + ' dernières périodes closes → mèche (vers le haut : +1, vers le bas : −1) ; plus ancien → rien',
     fH(0).meche && fH(0).mecheSens === 1 && fH(P.mecheBougies - 1).meche && !fH(P.mecheBougies).meche && fB(1).meche && fB(1).mecheSens === -1 && !fB(P.mecheBougies + 2).meche && !fH(0).cassure,
     [fH(0), fH(P.mecheBougies), fB(1)]);
+  check('etatFerme : l’indice de la bougie de la mèche (mecheI), pour en dire l’heure (revue du 14/10/2026, C4)', fH(0).mecheI === 29 && fB(1).mecheI === 28 && fH(P.mecheBougies - 1).mecheI === 30 - P.mecheBougies, [fH(0).mecheI, fB(1).mecheI]);
   const choixF = (dessus, dessous) => ({ dessus: [Object.assign({}, haut, { ferme: dessus }), loin], dessous: [Object.assign({}, bas, { ferme: dessous }), bas2] });
   const rejH = syn({ regime: { cle: 'faible' }, choix: choixF(fH(0), null) }), rejB = syn({ regime: { cle: 'faible' }, choix: choixF(null, fB(1)) });
   const lr = r => r.pourquoi.find(p => /repoussé/.test(p.texte));
-  check('repère du haut dépassé puis repoussé : « Le prix est monté au-dessus de 86 398 $, puis il a été repoussé dessous. » (sans sens, famille repère)',
-    lr(rejH) && lr(rejH).texte === 'Le prix est monté au-dessus de 86 398 $, puis il a été repoussé dessous.' && lr(rejH).sens === 0 && lr(rejH).fam === 'niveau', rejH.pourquoi);
-  check('repère du bas : « Le prix est descendu sous 85 600 $, puis il a été repoussé au-dessus. »',
-    lr(rejB) && lr(rejB).texte === 'Le prix est descendu sous 85 600 $, puis il a été repoussé au-dessus.' && lr(rejB).sens === 0 && lr(rejB).fam === 'niveau', rejB.pourquoi);
+  // Revue du 14/10/2026 (C4) : « il a été » tombe, pour garder 15 mots avec l'heure (ci-dessous).
+  check('repère du haut dépassé puis repoussé : « Le prix est monté au-dessus de 86 398 $, puis repoussé dessous. » (sans sens, famille repère)',
+    lr(rejH) && lr(rejH).texte === 'Le prix est monté au-dessus de 86 398 $, puis repoussé dessous.' && lr(rejH).sens === 0 && lr(rejH).fam === 'niveau', rejH.pourquoi);
+  check('repère du bas : « Le prix est descendu sous 85 600 $, puis repoussé au-dessus. »',
+    lr(rejB) && lr(rejB).texte === 'Le prix est descendu sous 85 600 $, puis repoussé au-dessus.' && lr(rejB).sens === 0 && lr(rejB).fam === 'niveau', rejB.pourquoi);
+  // Son heure (ferme.mecheT, ms : la fin de la période de la mèche, posée par la page) : « à 10:15 »
+  // le jour même, « hier à … » le lendemain, « le 12 à … » au-delà (en 1 jour, 3 bougies).
+  const tM = Date.UTC(2026, 9, 8, 10, 15), hM = G.heureVueSi(tM), dM = new Date(tM);
+  const avecT = f => Object.assign({}, f, { mecheT: tM });
+  const rejHt = syn({ regime: { cle: 'faible' }, choix: choixF(avecT(fH(0)), null), maintenant: tM + 60000 });
+  const rejBt = syn({ regime: { cle: 'faible' }, choix: choixF(null, avecT(fB(1))), maintenant: new Date(dM.getFullYear(), dM.getMonth(), dM.getDate() + 1, 12, 0).getTime() });
+  const rejB3 = syn({ regime: { cle: 'faible' }, choix: choixF(null, avecT(fB(1))), maintenant: new Date(dM.getFullYear(), dM.getMonth(), dM.getDate() + 2, 12, 0).getTime() });
+  check('le rejet dit son heure : « … puis repoussé dessous à ' + hM + '. », « … repoussé au-dessus hier à ' + hM + '. », « … au-dessus le ' + dM.getDate() + ' à ' + hM + '. »',
+    lr(rejHt) && lr(rejHt).texte === 'Le prix est monté au-dessus de 86 398 $, puis repoussé dessous à ' + hM + '.'
+    && lr(rejBt) && lr(rejBt).texte === 'Le prix est descendu sous 85 600 $, puis repoussé au-dessus hier à ' + hM + '.'
+    && lr(rejB3) && lr(rejB3).texte === 'Le prix est descendu sous 85 600 $, puis repoussé au-dessus le ' + dM.getDate() + ' à ' + hM + '.', [rejHt, rejBt, rejB3].map(r => lr(r) && lr(r).texte));
   const rejT = syn({ regime: { cle: 'hausse' }, choix: choixF(fH(0), null) });
   check('le rejet ne change pas la règle du sens (même titre qu’avant, un seul signal vers le haut : « trop peu »)', rejH.titre === sansF.titre && rejH.ton === sansF.ton && rejT.ton === 'calme' && /trop peu/.test(rejT.regle), [rejH.titre, rejT.regle]);
   check('rien de dit : mèche trop ancienne, mèche du mauvais côté (repère du haut percé par le bas), pas de mèche',
     ![syn({ choix: choixF(fH(P.mecheBougies), fB(P.mecheBougies + 2)) }), syn({ choix: choixF(fB(1), fH(0)) }), syn({ choix: choixF({ cassure: null, meche: false, mecheSens: 0 }, null) })].some(lr));
-  const phrR = [lr(rejH).texte, lr(rejB).texte];
+  const phrR = [lr(rejH).texte, lr(rejB).texte, lr(rejHt).texte, lr(rejBt).texte, lr(rejB3).texte];
   check('le rejet : 15 mots au plus, aucun mot banni (ni « mèche »), aucun %, aucun conseil, pas de sens annoncé',
     phrR.every(x => nM(x) <= 15) && !phrR.some(x => G.motsBannis(x).length || /%|va (baisser|monter)/.test(x) || CONSEIL.test(x)), phrR.map(x => [nM(x), x]));
 }

@@ -294,7 +294,8 @@ const Guide = (function () {
    *  dernières bougies ; elle est validée par la clôture suivante au-delà (2 clôtures
    *  successives), ou par une clôture au-delà après un retour sur la bande (clôture dans la bande,
    *  ou mèche qui y revient) — le « retour réussi ».
-   *  → { cassure: null | 'demi' | 'valide', sens: ±1, retest, enRetour, meche, mecheSens, cote } */
+   *  → { cassure: null | 'demi' | 'valide', sens: ±1, retest, enRetour, meche, mecheSens, mecheI
+   *  (l'indice de la bougie de la mèche, pour en dire l'heure : revue du 14/10/2026, C4), cote } */
   function etatFerme(C, H, L, n, lo, hi, P, iMin) {
     const res = { cassure: null, sens: 0, retest: false, enRetour: false, meche: false, mecheSens: 0, cote: 0 };
     if (n < 2 || !fini(lo) || !fini(hi)) return res;
@@ -321,8 +322,8 @@ const Guide = (function () {
     if (!res.cassure) {
       const s = res.cote;
       for (let k = n - 1; k >= Math.max(iMin || 0, n - P.mecheBougies); k--) {
-        if (s <= 0 && H[k] > hi && C[k] <= hi) { res.meche = true; res.mecheSens = 1; break; }
-        if (s >= 0 && L[k] < lo && C[k] >= lo) { res.meche = true; res.mecheSens = -1; break; }
+        if (s <= 0 && H[k] > hi && C[k] <= hi) { res.meche = true; res.mecheSens = 1; res.mecheI = k; break; }
+        if (s >= 0 && L[k] < lo && C[k] >= lo) { res.meche = true; res.mecheSens = -1; res.mecheI = k; break; }
       }
     }
     return res;
@@ -3016,8 +3017,9 @@ const Guide = (function () {
    *  en cours ; pas : durée d'une bougie (s). Un historique qui ne couvre pas les 7 jours (ou un
    *  intervalle plus long que la période, ou qui ne la divise pas) : null, rien d'inventé.
    *  → null | { haut, bas, debut, fin (s, la fenêtre), jours, cassure: null | { sens (−1 : par le
-   *  bas, +1 : par le haut), haut, bas (la fourchette cassée), t (s, début de la période qui a
-   *  cassé), depuis (périodes closes après elle), revenu } } */
+   *  bas, +1 : par le haut), haut, bas, debut (s, la fourchette cassée et le début de sa fenêtre),
+   *  t (s, début de la période qui a cassé), tFin (s, sa fin : l'heure dite de la cassure),
+   *  depuis (périodes closes après elle), revenu } } */
   function fourchette(T, H, L, C, n, pas, P) {
     const F = P && P.fourchette;
     if (!F || !(n >= 2) || !fini(pas) || pas <= 0) return null;
@@ -3051,23 +3053,35 @@ const Guide = (function () {
       // Revenu dedans : une période close depuis a fini au-dessus du bas cassé (au-dessous du haut).
       let revenu = false;
       for (let k = j + 1; k < pc; k++) { const r = hs.get(k); if (r && (sens < 0 ? r.c >= bj.l : r.c <= bj.h)) { revenu = true; break; } }
-      res.cassure = { sens, haut: bj.h, bas: bj.l, t: j * per, depuis: pc - 1 - j, revenu };
+      res.cassure = { sens, haut: bj.h, bas: bj.l, debut: (j - K) * per, t: j * per, tFin: (j + 1) * per, depuis: pc - 1 - j, revenu };
       break;
     }
     return res;
   }
   // La part des retours (« une fois sur deux ») n'est mesurée que sur ces paires (marche/range-cassure).
   const FOURCHETTE_MESUREE = ['BTCUSDT'];
-  /** La ligne de « En résumé » quand la fourchette vient de casser (fourchette(…).cassure, pas
-   *  revenue dedans), sinon '' : ce qui s'est passé, l'agitation qui suit (mesurée, sans sens),
-   *  les retours (mesurés sur BTC/USDT ; ailleurs, sans chiffre). */
-  function texteCassureFourchette(fo, symbole) {
-    const k = fo && fo.cassure;
-    if (!k || k.revenu) return '';
-    return 'Le prix a cassé le ' + (k.sens < 0 ? 'bas' : 'haut') + ' de sa fourchette de ' + fo.jours + ' jours.'
-      + ' Attention : ça bouge souvent fort juste après, dans les deux sens.'
-      + (FOURCHETTE_MESUREE.includes(symbole) ? ' Une fois sur deux, il est revenu dedans dans la journée.' : ' Il revient souvent dedans dans la journée.');
+  /** La cassure DITE (fourchette(…).cassure, le prix pas revenu dedans), sinon null : une seule
+   *  règle pour « En résumé », la barre du téléphone et la couche du graphique (revue du
+   *  14/10/2026, C1 : la couche garde alors le bord cassé, au lieu du nouveau bas). */
+  const cassureDite = fo => (fo && fo.cassure && !fo.cassure.revenu ? fo.cassure : null);
+  /** L'heure de la cassure : la FIN de la période qui a cassé (pas son début), heure de l'appareil ;
+   *  « à 18:00 », sinon « hier à 18:00 » (la phrase reste jusqu'à 24 h : une heure seule se lirait
+   *  comme celle d'aujourd'hui). maintenant (ms) : l'horloge de la page. */
+  const quandCassure = (k, maintenant) => (k ? quandDeb(k.tFin * 1000, { maintenant }) : '');
+  /** La ligne de « En résumé » quand la fourchette vient de casser (cassureDite), sinon '' : ce qui
+   *  s'est passé et quand, l'agitation qui suit (mesurée, sans sens) pendant la 1re période
+   *  seulement, puis « pas revenu dedans » ; les retours (mesurés sur BTC/USDT ; ailleurs, sans
+   *  chiffre). Revue du 14/10/2026 (C4) : sans heure, « juste après » se lisait pendant 24 h comme
+   *  si ça venait d'arriver. La 1re phrase seule est aussi celle de la barre du téléphone. */
+  function phrasesCassureFourchette(fo, symbole, maintenant) {
+    const k = cassureDite(fo);
+    if (!k) return [];
+    const q = quandCassure(k, maintenant);
+    return ['Le prix a cassé le ' + (k.sens < 0 ? 'bas' : 'haut') + ' de sa fourchette de ' + fo.jours + ' jours' + (q ? ' ' + q : '') + '.',
+      k.depuis === 0 ? 'Attention : ça bouge souvent fort juste après, dans les deux sens.' : 'Il n’est pas revenu dedans depuis.',
+      FOURCHETTE_MESUREE.includes(symbole) ? 'Une fois sur deux, il est revenu dedans dans la journée.' : 'Il revient souvent dedans dans la journée.'];
   }
+  const texteCassureFourchette = (fo, symbole, maintenant) => phrasesCassureFourchette(fo, symbole, maintenant).join(' ');
 
   // ─── 9. En résumé : tout ce que la page montre, recoupé en une lecture ──────
   /** L'encadré « En résumé » (en tête de la liste « Sur le graphique ») : UNE phrase qui dit où
@@ -3079,12 +3093,15 @@ const Guide = (function () {
    *  sens n'est dit que si au moins deux signaux vont dans ce sens et aucun en face ; sinon « pas
    *  de sens net », et pourquoi.
    *  o = { prix, unite, itv, regime, choix, suite, figures: [f], scenario: { rang, forme, sens,
-   *        ouvert, tombe } | null, fourchette: fourchette(…) | null, symbole } → { titre, ton ('hausse' | 'baisse' | 'partage' | 'calme'),
-   *  pourquoi: [{ texte, sens, fam }], surveiller: [texte], surveillerFam: [famille | null], avertissement }.
+   *        ouvert, tombe } | null, fourchette: fourchette(…) | null, symbole, maintenant (ms : l'heure
+   *        des faits datés) } → { titre, ton ('hausse' | 'baisse' | 'partage' | 'calme'),
+   *  pourquoi: [{ texte, sens, fam }], surveiller: [texte], surveillerFam: [famille | null], avertissement,
+   *  barre (la phrase de la barre du téléphone : celle de la cassure de la fourchette quand elle est
+   *  dite, sinon le titre ; revue du 14/10/2026, C1) }.
    *  fam : la famille de l'info (son icône, js/icones.js) : 'tendance', 'niveau', 'figure' ou 'scenario'. */
   function synthese(o) {
     const u = o.unite, per = periode(o.itv)[0], pourquoi = [];
-    if (!fini(o.prix)) return { titre: 'Prix en direct indisponible pour l’instant.', ton: 'calme', regle: '', pourquoi: [], surveiller: [], avertissement: AVERTISSEMENT };
+    if (!fini(o.prix)) return { titre: 'Prix en direct indisponible pour l’instant.', ton: 'calme', regle: '', pourquoi: [], surveiller: [], avertissement: AVERTISSEMENT, barre: 'Prix en direct indisponible pour l’instant.' };
     const r = o.regime;
     if (r && r.cle === 'hausse') pourquoi.push({ texte: 'Tendance : le prix monte depuis un moment.', sens: 1, fam: 'tendance' });
     else if (r && r.cle === 'baisse') pourquoi.push({ texte: 'Tendance : le prix baisse depuis un moment.', sens: -1, fam: 'tendance' });
@@ -3099,16 +3116,19 @@ const Guide = (function () {
     // Un rejet sur un repère (plan du 13/10/2026, idée 6) : sur les P.mecheBougies dernières
     // périodes closes, le prix a dépassé le repère puis a fini de nouveau de son côté (etatFerme :
     // une mèche au-delà, sans cassure). Dit en mots tant que c'est récent, sans sens : une mèche
-    // seule ne fait pas une cassure (la règle du Guide), elle ne dit pas la suite.
+    // seule ne fait pas une cassure (la règle du Guide), elle ne dit pas la suite. Son heure (revue
+    // du 14/10/2026, C4) : la fin de la période de la mèche (ferme.mecheT, ms), « à 10:15 », « hier
+    // à 02:00 » ; « il a été » tombe pour tenir en 15 mots avec l'heure.
+    const quandM = f => (fini(f.mecheT) ? ' ' + quandDeb(f.mecheT, { maintenant: o.maintenant }) : '');
     if (ch.dessus && ch.dessus.ferme && ch.dessus.ferme.meche && ch.dessus.ferme.mecheSens > 0)
-      pourquoi.push({ texte: 'Le prix est monté au-dessus de ' + prixR(rA, u) + ', puis il a été repoussé dessous.', sens: 0, fam: 'niveau' });
+      pourquoi.push({ texte: 'Le prix est monté au-dessus de ' + prixR(rA, u) + ', puis repoussé dessous' + quandM(ch.dessus.ferme) + '.', sens: 0, fam: 'niveau' });
     if (ch.dessous && ch.dessous.ferme && ch.dessous.ferme.meche && ch.dessous.ferme.mecheSens < 0)
-      pourquoi.push({ texte: 'Le prix est descendu sous ' + prixR(rB, u) + ', puis il a été repoussé au-dessus.', sens: 0, fam: 'niveau' });
+      pourquoi.push({ texte: 'Le prix est descendu sous ' + prixR(rB, u) + ', puis repoussé au-dessus' + quandM(ch.dessous.ferme) + '.', sens: 0, fam: 'niveau' });
     // La fourchette de 7 jours vient de casser (plan du 13/10/2026, idée 5) : dite avec l'agitation
     // qui suit, SANS sens (sens 0 : la mesure ne trouve aucun sens après une cassure, la règle du
-    // titre n'en tient pas compte).
-    const fc = texteCassureFourchette(o.fourchette, o.symbole);
-    if (fc) pourquoi.push({ texte: fc, sens: 0, fam: 'niveau' });
+    // titre n'en tient pas compte). Avec son heure (revue du 14/10/2026, C4).
+    const fcs = phrasesCassureFourchette(o.fourchette, o.symbole, o.maintenant);
+    if (fcs.length) pourquoi.push({ texte: fcs.join(' '), sens: 0, fam: 'niveau' });
     // La figure en cours qui a un sens : validée d'abord, puis sortie à valider.
     const F = (o.figures || []).filter(f => !f.fin && !f.ebauche).map(f => ({ f, e: etatForme(f) }));
     const fv = F.find(x => x.e.cle === 'confirme' && (x.f.sens === 1 || x.f.sens === -1));
@@ -3159,7 +3179,9 @@ const Guide = (function () {
     else if (xH || xB) surveiller.push('Un sens apparaîtrait si le prix finit ' + per + ' au-delà ' + (xH && xB ? 'de l’un d’eux.' : 'de ce repère.'));
     // La famille de chaque ligne (son icône) : un repère de prix nommé ; la règle qui changerait la lecture n'en a pas.
     const surveillerFam = surveiller.map(t => (/^(Au-dessus|En dessous|Le prix est)/.test(t) ? 'niveau' : null));
-    return { titre, ton, regle, pourquoi, surveiller, surveillerFam, avertissement: AVERTISSEMENT };
+    // La barre du téléphone (#reperesResume) : la cassure dite d'abord, à la place du titre (revue du
+    // 14/10/2026, C1 : « Pas de sens net » seul cachait la cassure derrière la liste fermée).
+    return { titre, ton, regle, pourquoi, surveiller, surveillerFam, avertissement: AVERTISSEMENT, barre: fcs.length ? fcs[0] : titre };
   }
 
   return { pctParam, nombre, prix, chiffres, pct, nomIntervalle, duree, heureVue, heureUTC: HEURE_UTC_EXPORT, niveauxDuJour, niveauxSR, niveauxPublies, choisirNiveaux, libelleNiveau,
@@ -3170,6 +3192,6 @@ const Guide = (function () {
     texteSuiteDebutant, prixRond, USAGES_CHIFFRES, usageChiffre, avecUsage, cleEcart, ageLu, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
     MARQUES_FIN, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, libelleFormeCourt, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant,
-    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_FORME, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, exempleSvg, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, fourchette, texteCassureFourchette, synthese };
+    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_FORME, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, exempleSvg, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, fourchette, cassureDite, quandCassure, phrasesCassureFourchette, texteCassureFourchette, synthese };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;

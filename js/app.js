@@ -4759,6 +4759,8 @@ function guideDonnees() {
       niv.iMin = iMin;
       if (lu > -Infinity) niv.lu = lu;     // etatLive : pas de mèche lue sur une bougie ouverte avant la lecture
       niv.ferme = Guide.etatFerme(K.close, K.high, K.low, n - 1, niv.lo, niv.hi, G, iMin);
+      // L'heure du rejet, dite dans « En résumé » : la fin de la période de la mèche (revue du 14/10/2026, C4).
+      if (niv.ferme.meche) niv.ferme.mecheT = (K.time[niv.ferme.mecheI] + pas) * 1000;
     }
     const adx = memoized('sub_adx', calcADX, K.high, K.low, K.close, PARAM.adx.periode);
     const emaC = memoized('guide_ema_' + G.emaCourte, calcEMA, K.close, G.emaCourte);
@@ -6368,9 +6370,10 @@ function majReperes(W) {
   const n = L.length;
   document.getElementById('reperesTitre').textContent = colonne && !ouverte ? 'Sur le graphique' : colonne ? 'Sur le graphique' + (n ? ' · ' + n + ' repère' + (n > 1 ? 's' : '') : ' : aucun repère dans la vue')
     : n ? (n > 1 ? 'Lire les ' + n + ' repères en entier' : 'Lire le repère en entier') : 'Aucun repère dans la vue';
-  // Téléphone (liste fermée sous sa barre) : la phrase du résumé en tête de la barre, lisible sans toucher.
+  // Téléphone (liste fermée sous sa barre) : la phrase du résumé en tête de la barre, lisible sans toucher ;
+  // la cassure de la fourchette quand elle est dite, à la place du titre (R.barre ; revue du 14/10/2026, C1).
   const res = document.getElementById('reperesResume');
-  if (res) { res.textContent = R && !colonne ? R.titre : ''; res.hidden = !R || colonne; }
+  if (res) { res.textContent = R && !colonne ? R.barre || R.titre : ''; res.hidden = !R || colonne; }
   const ul = document.getElementById('reperesListe');
   ul.textContent = '';
   if (R) ul.append(syntheseElement(R));
@@ -6403,7 +6406,7 @@ function syntheseLecture() {
   }
   // La fourchette de 7 jours qui vient de casser : dite couche allumée ou non (plan du 13/10/2026, idée 5).
   return Guide.synthese({ prix: isNum(livePrice) ? livePrice : D.ref, unite: guideUnite(), itv: chartInterval, regime: D.regime, choix: D.choix, suite: D.suite, figures, scenario,
-    fourchette: fourchetteDonnees(), symbole: activeSymbol });
+    fourchette: fourchetteDonnees(), symbole: activeSymbol, maintenant: Horloges.maintenant() });
 }
 /** L'encadré « En résumé », en tête de la liste « Sur le graphique » : la phrase en gras, le
  *  pourquoi (un trait de couleur par signal : hausse, baisse ou neutre, et les mots qui le disent),
@@ -6862,6 +6865,10 @@ function dessinerMarqueCarte(P, pm, W, prixAxe) {
 // de 7 jours au bord droit ; UNE étiquette « Fourchette 7 jours », posée sans recouvrir une autre ;
 // sa bulle dit le bas, le haut et l'écart. Les traits hors de la vue ne sont pas dessinés : l'étiquette
 // le dit d'une flèche (↑, ↓, ↕) quand aucun n'est visible. L'échelle de prix ne change pas.
+// Cassure dite (Guide.cassureDite : le prix pas revenu dedans) : les traits GARDENT la fourchette
+// cassée, et l'étiquette et la bulle disent « cassée par le bas à 18:00 » (revue du 14/10/2026, C1 :
+// les traits suivaient le nouveau bas, le bord cassé disparaissait et la bulle disait « resté entre
+// les deux »).
 let fourchetteEtat = null;   // la géométrie de la dernière image (relue par les tests), null sans la couche
 /** La fourchette de 7 jours sur l'historique chargé (Guide.fourchette), ou null : intervalle de
  *  1 jour, historique trop court. Aucune requête : les bougies déjà là, mémorisées par état. */
@@ -6877,11 +6884,13 @@ function fourchetteDonnees() {
 function fourchettePreparer(g) {
   const F = fourchetteDonnees();
   if (!F || !candles[g.vs]) return null;
-  const xMax = g.W - g.pad.right, xD = g.pad.left + (F.debut - candles[g.vs].time) / g.pas * g.gap;
+  // La fourchette tracée : la cassée tant que la cassure est dite, sinon celle d'aujourd'hui.
+  const k = Guide.cassureDite(F), T = k || F;
+  const xMax = g.W - g.pad.right, xD = g.pad.left + (T.debut - candles[g.vs].time) / g.pas * g.gap;
   if (xD >= xMax - 20) return null;
   const top = g.pad.top, bas = g.pad.top + g.ph, yDe = p => top + g.ph * (1 - (p - g.minP) / g.range);
-  const yH = yDe(F.haut), yB = yDe(F.bas);
-  return { F, g, x0: Math.max(g.pad.left, xD), xMax, top, bas, yH, yB, visH: yH >= top && yH <= bas, visB: yB >= top && yB <= bas, etiq: null, bulle: null };
+  const yH = yDe(T.haut), yB = yDe(T.bas);
+  return { F, k, pH: T.haut, pB: T.bas, g, x0: Math.max(g.pad.left, xD), xMax, top, bas, yH, yB, visH: yH >= top && yH <= bas, visB: yB >= top && yB <= bas, etiq: null, bulle: null };
 }
 /** Les deux traits (sous les bougies) : fins, en tirets, encre 3 du thème. */
 function fourchetteTraits(V) {
@@ -6908,12 +6917,16 @@ function fourchetteRects(g) {
  *  la place de la ligne des scénarios, puis du libellé de la forme (leur tracé reste, comme pour
  *  la ligne d'un message, apprCederRole) ; jamais celle de la phrase, des repères ou du scénario 1. */
 function fourchetteLibelle(V, guide, scen) {
-  const { F, g } = V, deb = debutant(), unite = guideUnite(), j = F.jours;
+  const { F, g } = V, cas = V.k, deb = debutant(), unite = guideUnite(), j = F.jours;
   const rects = guide ? guide.rects : scen ? scen.rects : fourchetteRects(g);
   const fl = V.visH || V.visB ? '' : V.yH < V.top && V.yB > V.bas ? '↕ ' : V.yB < V.top ? '↑ ' : '↓ ';
-  const t = fl + 'Fourchette ' + j + ' jours', H = deb ? 17 : 15;
+  // Cassure dite (revue du 14/10/2026, C1) : « … cassée par le bas à 18:00 », sinon sans l'heure,
+  // sinon « … cassée » : la plus longue qui trouve une place (360 px, police large, tracé chargé).
+  const q = cas ? Guide.quandCassure(cas, Horloges.maintenant()) : '', cote = cas && (cas.sens < 0 ? 'bas' : 'haut'), base = fl + 'Fourchette ' + j + ' jours';
+  const textes = cas ? [q && base + ' cassée par le ' + cote + ' ' + q, base + ' cassée par le ' + cote, base + ' cassée'].filter(Boolean) : [base], H = deb ? 17 : 15;
   ctx.font = chartFont(deb ? 10 : 9, 600);
-  const w = ctx.measureText(t).width + 14 + ICO, gauche = V.x0 + 6, droite = V.xMax - 2;
+  const gauche = V.x0 + 6, droite = V.xMax - 2, larg = x => ctx.measureText(x).width + 14 + ICO;
+  let t = textes[0], w = larg(t);
   const segs = [[V.yH, V.visH], [V.yB, V.visB]].filter(x => x[1]).map(([y]) => [V.x0, y, V.xMax, y]);
   // Contre le trait : au-dessus du haut, au-dessous du bas, puis en glissant dans la fourchette ; sans
   // trait dans la vue, au bord de son côté (↕ : en haut, sinon en bas).
@@ -6923,9 +6936,13 @@ function fourchetteLibelle(V, guide, scen) {
   let pose = null;
   if (!deb || debEtat) {
     const surBougies = guideSurBougies({ g, yDe: p => V.top + g.ph * (1 - (p - g.minP) / g.range) });
-    const xs = [gauche, Math.max(gauche, (gauche + droite - w) / 2), Math.max(gauche, droite - w)].filter(x => x + w <= droite + 0.5);
-    for (const [ev, gl] of [[surBougies, 2], [null, 3], [null, 8]]) {
-      for (const [essais, vers] of ancres) { for (const x of xs) if ((pose = guidePlacer(rects, x, w, H, essais, V.top, V.bas, vers, 0, gl, ev || undefined))) break; if (pose) break; }
+    for (const tt of textes) {
+      t = tt; w = larg(t);
+      const xs = [gauche, Math.max(gauche, (gauche + droite - w) / 2), Math.max(gauche, droite - w)].filter(x => x + w <= droite + 0.5);
+      for (const [ev, gl] of [[surBougies, 2], [null, 3], [null, 8]]) {
+        for (const [essais, vers] of ancres) { for (const x of xs) if ((pose = guidePlacer(rects, x, w, H, essais, V.top, V.bas, vers, 0, gl, ev || undefined))) break; if (pose) break; }
+        if (pose) break;
+      }
       if (pose) break;
     }
     // Lisible, budget plein : la ligne des scénarios, puis le libellé de la forme, cèdent leur
@@ -6945,11 +6962,14 @@ function fourchetteLibelle(V, guide, scen) {
   }
   // La bulle : le titre (les prix avec « Le détail », la liste les montre), le bas, le haut, l'écart,
   // ce que ça veut dire ; l'avertissement de la page. En Lisible, elle ne s'ouvre que sur l'étiquette.
+  // Cassure dite : le titre dit « cassée par le bas », la 1re phrase (celle du résumé) son heure ;
+  // plus de « resté entre les deux », devenu faux (revue du 14/10/2026, C1).
   if (!pose && !segs.length) return;
+  const pB = V.pB, pH = V.pH, bornes = 'Bas ' + Guide.prix(pB, unite) + ', haut ' + Guide.prix(pH, unite) + ' : un écart de ' + Guide.prixRond(pH - pB, unite) + '.';
   ciblesPrix.push({ rects: pose ? [guideZone(pose)] : [], segs, prio: 2, ico: 'niveau', coul: COLORS.ink3, liste: true, fourchette: true,
-    titre: 'Fourchette de ' + j + ' jours' + (deb ? '' : ' · ' + Guide.chiffres(F.bas) + ' – ' + Guide.prix(F.haut, unite)),
-    texte: ['Bas ' + Guide.prix(F.bas, unite) + ', haut ' + Guide.prix(F.haut, unite) + ' : un écart de ' + Guide.prixRond(F.haut - F.bas, unite) + '.',
-      'Le prix est resté entre les deux pendant ' + j + ' jours. Beaucoup surveillent ces bords.', Guide.AVERTISSEMENT] });
+    titre: 'Fourchette de ' + j + ' jours' + (cas ? ' cassée par le ' + cote : '') + (deb ? '' : ' · ' + Guide.chiffres(pB) + ' – ' + Guide.prix(pH, unite)),
+    texte: cas ? ['Le prix en est sorti ' + (q ? q + ', ' : '') + 'après ' + j + ' jours entre ses bords.', bornes, 'Beaucoup surveillent ces bords.', Guide.AVERTISSEMENT]
+      : [bornes, 'Le prix est resté entre les deux pendant ' + j + ' jours. Beaucoup surveillent ces bords.', Guide.AVERTISSEMENT] });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
