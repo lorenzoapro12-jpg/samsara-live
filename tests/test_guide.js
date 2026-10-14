@@ -762,11 +762,14 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
   const base = { prix: 86000, unite: '$', itv: '1h', choix, suite, figures: [], scenario: null };
   const syn = x => { const r = G.synthese(Object.assign({}, base, x)); [r.titre, r.regle].concat(r.pourquoi.map(p => p.texte), r.surveiller).forEach(t); return r; };
   const figure = (sens, extra) => Object.assign({ type: 'double_creux', famille: 'extremes', sens, phase: 'confirme', fin: null }, extra || {});
-  // 1. Le sens n'est dit qu'avec au moins deux signaux d'accord et aucun en face. Revue du 14/10/2026
-  // (C2) : le 2e signal était une figure validée (« il pointe vers le haut ») ; une figure ne compte
-  // plus, c'est le scénario de Claude qui fait le 2e signal (note du contradicteur).
+  // 1. Le titre décrit ce qui se passe, il ne penche plus (revue du 14/10/2026, Q1 : Lorenzo a choisi
+  // « Décrire » le 14/10). Avant, la tendance et le scénario de Claude vers le haut (deux signaux,
+  // aucun en face) faisaient « Les signaux penchent plutôt vers la hausse. », avec la règle « Plusieurs
+  // signaux vont vers le haut, aucun vers le bas. ». Les lignes du pourquoi gardent leur sens (leur couleur).
+  const DESCRIPTIONS = 'Ce sont des descriptions, pas des prévisions.';
   const h = syn({ regime: { cle: 'hausse' }, scenario: { rang: '1', forme: 'chemin', ouvert: true, sens: 1 } });
-  check('deux signaux vers le haut, aucun en face : « penchent plutôt vers la hausse »', h.ton === 'hausse' && /penchent plutôt vers la hausse/.test(h.titre) && h.pourquoi.filter(p => p.sens > 0).length === 2, h);
+  check('tendance et scénario vers le haut : « Le prix monte depuis un moment ; le scénario 1 de Claude aussi. » ; règle « Ce sont des descriptions, pas des prévisions. »',
+    h.titre === 'Le prix monte depuis un moment ; le scénario 1 de Claude aussi.' && h.regle === DESCRIPTIONS && h.ton === 'calme' && h.pourquoi.filter(p => p.sens > 0).length === 2, h);
   // Une figure validée (revue du 14/10/2026, C2) : dite pour son objectif, sans sens ni direction ;
   // seule avec la tendance, elle ne fait jamais pencher le titre (le 08/10 à 15:40, « Double sommet
   // validé : il pointe vers le bas » faisait « penchent plutôt vers la baisse »). Sur BTCUSDT en 1 h
@@ -780,8 +783,11 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
     [vH, vB, vC, vS].every(r => ligneF(r) && ligneF(r).sens === 0 && !/pointe|vers le (haut|bas)|hausse|baisse/.test(ligneF(r).texte))
     && /^Double sommet validé : objectif 81 158 \$, comme au hasard\.$/.test(ligneF(vB).texte) && /^Double creux validé : objectif 87 413 \$, comme au hasard\.$/.test(ligneF(vH).texte),
     [vH, vB, vC, vS].map(r => ligneF(r)));
-  check('une figure validée ne fait jamais pencher le titre : avec la tendance seule, « Pas de sens net pour l’instant »',
-    [vH, vB].every(r => r.ton === 'calme' && /^Pas de sens net pour l’instant\.$/.test(r.titre) && /Un seul signal/.test(r.regle)) && vC.ton === 'calme' && vS.ton === 'calme' && /hésite/.test(vS.titre),
+  // Revue du 14/10/2026 (Q1) : le titre décrit la tendance (avant : « Pas de sens net pour l’instant »,
+  // la figure ne comptant plus depuis C2) ; une figure validée n'y entre jamais.
+  check('une figure validée ne change jamais le titre : « Le prix monte depuis un moment. », « Le prix baisse depuis un moment. », « Le prix hésite, sans direction claire. »',
+    [vH, vB, vC, vS].every(r => r.ton === 'calme' && r.regle === DESCRIPTIONS) && vH.titre === 'Le prix monte depuis un moment.' && vB.titre === 'Le prix baisse depuis un moment.'
+    && vC.titre === vH.titre && vS.titre === 'Le prix hésite, sans direction claire.' && vB.titre === syn({ regime: { cle: 'baisse' }, itv: '15m' }).titre,
     [vH, vB, vC, vS].map(r => [r.ton, r.titre, r.regle]));
   // Revue du 14/10/2026 (C15) : « En résumé » (montré avec « Le détail ») nomme chaque figure comme
   // son étiquette du graphique (libelleFormeCourt), pour les 16 types ; l'ETE inversé s'appelait
@@ -794,16 +800,20 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
     { noms2, rate: finie('invalide'), annule: finie('invalide_avant') });
   check('sans mesure sur des années (autre paire, ou objectif inconnu) : pas de « comme au hasard », toujours sans sens',
     /^Double sommet validé : objectif 81 158 \$\.$/.test(ligneF(vC).texte) && /^Double creux validé\.$/.test(ligneF(vS).texte), [ligneF(vC), ligneF(vS)]);
-  check('la lecture dit ce qui la ferait tomber (le repère du bas)', h.surveiller.some(x => /tombe si le prix finit une heure sous/.test(x)), h.surveiller);
+  // Revue du 14/10/2026 (Q1) : « À surveiller » donne les repères proches, sans dernière ligne « Cette
+  // lecture tombe si le prix finit une heure sous le repère du bas. » (elle parlait du sens du titre).
+  check('à surveiller : les deux repères proches, plus de « Cette lecture tombe si… »', h.surveiller.length === 2 && /^Au-dessus : /.test(h.surveiller[0]) && /^En dessous : /.test(h.surveiller[1]), h.surveiller);
   const b = syn({ regime: { cle: 'baisse' }, scenario: { rang: '1', forme: 'chemin', ouvert: true, sens: -1 } });
-  check('tendance et scénario vers le bas : baisse ; le scénario est dit « de Claude »', b.ton === 'baisse' && b.pourquoi.some(p => /de Claude/.test(p.texte) && p.sens < 0), b);
+  check('tendance et scénario vers le bas : « Le prix baisse depuis un moment ; le scénario 1 de Claude aussi. » ; la ligne du scénario est dite « de Claude »',
+    b.titre === 'Le prix baisse depuis un moment ; le scénario 1 de Claude aussi.' && b.ton === 'calme' && b.pourquoi.some(p => /de Claude/.test(p.texte) && p.sens < 0), b);
   const c = syn({ regime: { cle: 'hausse' }, scenario: { rang: '1', forme: 'chemin', ouvert: true, sens: -1 } });
-  check('signaux opposés : « se contredisent : pas de sens net »', c.ton === 'partage' && /pas de sens net/.test(c.titre), c);
+  check('tendance et scénario opposés (avant : « Les signaux se contredisent ») : « Le prix monte depuis un moment ; le scénario 1 de Claude le voit baisser. »',
+    c.titre === 'Le prix monte depuis un moment ; le scénario 1 de Claude le voit baisser.' && c.ton === 'calme' && c.regle === DESCRIPTIONS, c);
   const u = syn({ regime: { cle: 'hausse' } });
-  check('un seul signal : pas de sens net, et la règle le dit (« trop peu »)', u.ton === 'calme' && /Pas de sens net/.test(u.titre) && /trop peu/.test(u.regle), u);
+  check('la tendance seule (avant : « Pas de sens net pour l’instant », « c’est trop peu ») : « Le prix monte depuis un moment. »', u.titre === 'Le prix monte depuis un moment.' && u.ton === 'calme' && u.regle === DESCRIPTIONS, u);
   const z = syn({ regime: { cle: 'faible' }, scenario: { rang: '1', forme: 'range', ouvert: true, sens: 0 } });
   // « fourchette » est réservé à celle de 7 jours (revue du 14/10/2026, M3) : le range du scénario se dit « entre deux bornes ».
-  check('tendance faible, scénario en range : le prix hésite, aucun signal ne penche ; « entre deux bornes », pas « fourchette »', z.ton === 'calme' && /hésite/.test(z.titre) && z.pourquoi.every(p => p.sens === 0) && /Aucun signal/.test(z.regle)
+  check('tendance faible, scénario en range : « Le prix hésite, sans direction claire. », lignes sans sens ; « entre deux bornes », pas « fourchette »', z.titre === 'Le prix hésite, sans direction claire.' && z.pourquoi.every(p => p.sens === 0) && z.regle === DESCRIPTIONS
     && z.pourquoi.some(p => /^Scénario n° 1 de Claude, ce matin : le prix reste entre deux bornes\.$/.test(p.texte)) && !z.pourquoi.some(p => /fourchette/.test(p.texte)), z);
   check('à surveiller : un repère de chaque côté, le plus parlant à prix égal (« le plus haut d’hier »)', /^Au-dessus : 86 398 \$, le plus haut d’hier\.$/.test(z.surveiller[0]) && /^En dessous : 85 600 \$, une zone de retour\.$/.test(z.surveiller[1]), z.surveiller);
   // 2. Le prix dans une bande : elle est dite, puis le repère suivant de chaque côté.
@@ -816,8 +826,36 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
   check('figure finie (objectif atteint) : « plus de signal »', fa.pourquoi.some(p => /objectif déjà atteint, plus de signal/.test(p.texte) && p.sens === 0), fa.pourquoi);
   const st = syn({ regime: { cle: 'faible', compression: true }, scenario: { rang: '1', forme: 'chemin', ouvert: false, tombe: true, sens: 0 } });
   check('scénario tombé et calme du prix : dits, sans sens', st.pourquoi.some(p => /ne tient plus/.test(p.texte)) && st.pourquoi.some(p => /bouge peu/.test(p.texte)) && st.ton === 'calme', st.pourquoi);
+  // Le contrôle qui aurait attrapé le défaut (revue du 14/10/2026, Q1), sur toutes les combinaisons de
+  // tendance, repère franchi (dessus ou dessous), figure validée et scénario montré : le titre ne
+  // penche jamais (le 08/10 à 12:00, tendance et repère franchi faisaient « Les signaux penchent
+  // plutôt vers la baisse. »), la boîte n'a jamais le ton d'un sens, la règle est toujours la même ;
+  // le titre ne dit que la tendance et le scénario (un repère franchi ou une figure ne le changent
+  // pas) ; les lignes du pourquoi restent, avec le sens de ce qu'elles décrivent ; « À surveiller »
+  // ne dit plus ce qui ferait « tomber » une lecture ou « apparaître » un sens.
+  const fermeV = s => ({ cassure: 'valide', sens: s, meche: false, mecheSens: 0 });
+  const REG = ['hausse', 'baisse', 'incertaine', 'faible', 'sans', 'inconnu', null];
+  const SCN = [null, { rang: '1', forme: 'chemin', ouvert: true, sens: 1 }, { rang: '2', forme: 'chemin', ouvert: true, sens: -1 }, { rang: '1', forme: 'range', ouvert: true, sens: 0 },
+    { rang: '1', forme: 'chemin', ouvert: false, tombe: true, sens: 0 }];
+  const CHX = [choix, { dessus: [Object.assign({}, haut, { ferme: fermeV(-1) }), loin], dessous: [bas, bas2] }, { dessus: [haut, loin], dessous: [Object.assign({}, bas, { ferme: fermeV(1) }), bas2] }];
+  const FIG = [[], [figure(1, { objectif: 87412.6 })], [figure(-1, { type: 'double_sommet', objectif: 81158.3 })]];
+  const combi = [];
+  for (const rg of REG) for (const sc of SCN) for (const k of [0, 1, 2]) for (const fg of FIG) {
+    const x = { regime: rg && { cle: rg }, scenario: sc, choix: CHX[k], figures: fg, symbole: 'BTCUSDT' };
+    combi.push({ x, k, r: syn(x), seul: G.synthese(Object.assign({}, base, { regime: x.regime, scenario: sc, symbole: 'BTCUSDT' })) });
+  }
+  const penche = combi.filter(({ r }) => r.ton !== 'calme' || r.regle !== DESCRIPTIONS || /penche|signaux|sens net|contredis/i.test(r.titre));
+  check(`${combi.length} combinaisons : aucun titre ne penche (ni « penchent », ni « signaux », ni « sens net »), ton « calme », règle « ${DESCRIPTIONS} »`,
+    combi.length === 315 && !penche.length, penche.slice(0, 3).map(({ x, r }) => [x, r.titre, r.ton, r.regle]));
+  const autre = combi.filter(({ r, seul }) => r.titre !== seul.titre);
+  check('le titre ne dit que la tendance et le scénario : un repère franchi ou une figure validée ne le changent pas', !autre.length, autre.slice(0, 3).map(({ x, r, seul }) => [x, r.titre, seul.titre]));
+  const garde = combi.filter(({ k, r }) => k && !r.pourquoi.some(p => p.fam === 'niveau' && p.sens === (k === 1 ? -1 : 1) && /et y reste\.$/.test(p.texte)));
+  check('les lignes du pourquoi restent des descriptions avec leur sens : « Le prix est repassé sous 86 398 $ et y reste. » (−1), « … passé au-dessus de 85 600 $ … » (+1)',
+    !garde.length && combi.some(({ k, r }) => k === 1 && r.pourquoi.some(p => p.texte === 'Le prix est repassé sous 86 398 $ et y reste.')), garde.slice(0, 2).map(({ x, r }) => [x, r.pourquoi]));
+  const prevoit = combi.filter(({ r }) => r.surveiller.some(x => /tombe|apparaîtr|\bsens\b|lecture/.test(x)));
+  check('« À surveiller » : les repères proches seulement, plus de « Cette lecture tombe si… » ni « Un sens apparaîtrait si… »', !prevoit.length, prevoit.slice(0, 2).map(({ r }) => r.surveiller));
   // 4. Charte : une idée par phrase, 15 mots au plus ; aucun %, aucun mot technique ; l'avertissement une fois.
-  const tous = [h, b, c, u, z, d, dm, fa, st, vH, vB, vC, vS];
+  const tous = [h, b, c, u, z, d, dm, fa, st, vH, vB, vC, vS].concat(combi.map(k => k.r));
   const phrases = [].concat(...tous.map(r => [r.titre, r.regle].concat(r.pourquoi.map(p => p.texte), r.surveiller)));
   const longues = phrases.filter(x => x.split(/\s+/).filter(w => /[\p{L}\d]/u.test(w)).length > 15);
   check('chaque phrase : 15 mots au plus (charte)', !longues.length, longues);
@@ -913,8 +951,10 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
     [ra.barre, r6.barre]);
   const sansF = syn({ regime: { cle: 'faible' } }), avecF = syn({ regime: { cle: 'faible' }, fourchette: cb, symbole: 'BTCUSDT' });
   const h1 = syn({ regime: { cle: 'hausse' }, fourchette: ch, symbole: 'BTCUSDT' });
-  check('la cassure ne change jamais la règle du sens : même titre et même ton avec ou sans elle ; un seul signal vers le haut reste « trop peu »',
-    sansF.ton === avecF.ton && sansF.titre === avecF.titre && h1.ton === 'calme' && /trop peu/.test(h1.regle), { sansF: sansF.titre, avecF: avecF.titre, h1: h1.regle });
+  // Revue du 14/10/2026 (Q1) : le titre décrit la tendance (avant, h1 disait « Pas de sens net pour
+  // l’instant », un seul signal vers le haut étant « trop peu »).
+  check('la cassure ne change jamais le titre : même titre et même ton avec ou sans elle ; tendance en hausse : « Le prix monte depuis un moment. »',
+    sansF.ton === avecF.ton && sansF.titre === avecF.titre && h1.ton === 'calme' && h1.titre === 'Le prix monte depuis un moment.' && h1.regle === DESCRIPTIONS, { sansF: sansF.titre, avecF: avecF.titre, h1: [h1.titre, h1.regle] });
   check('rien de dit : sans fourchette, sans cassure, cassure revenue dedans, cassure trop ancienne',
     ![syn({ fourchette: null }), syn({ fourchette: f15 }), syn({ fourchette: cr, symbole: 'BTCUSDT' }), syn({ fourchette: c7, symbole: 'BTCUSDT' })].some(lf));
   // Charte : une idée par phrase, 15 mots au plus ; ni « range », ni « va baisser », ni volume, ni conseil.
@@ -985,7 +1025,8 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
     && lr(rejBt) && lr(rejBt).texte === 'Le prix est descendu sous 85 600 $, puis repoussé au-dessus hier à ' + hM + '.'
     && lr(rejB3) && lr(rejB3).texte === 'Le prix est descendu sous 85 600 $, puis repoussé au-dessus le ' + dM.getDate() + ' à ' + hM + '.', [rejHt, rejBt, rejB3].map(r => lr(r) && lr(r).texte));
   const rejT = syn({ regime: { cle: 'hausse' }, choix: choixF(fH(0), null) });
-  check('le rejet ne change pas la règle du sens (même titre qu’avant, un seul signal vers le haut : « trop peu »)', rejH.titre === sansF.titre && rejH.ton === sansF.ton && rejT.ton === 'calme' && /trop peu/.test(rejT.regle), [rejH.titre, rejT.regle]);
+  // Revue du 14/10/2026 (Q1) : avec la tendance en hausse, le titre la décrit (avant : « trop peu »).
+  check('le rejet ne change pas le titre (même titre qu’avant ; tendance en hausse : « Le prix monte depuis un moment. »)', rejH.titre === sansF.titre && rejH.ton === sansF.ton && rejT.ton === 'calme' && rejT.titre === 'Le prix monte depuis un moment.' && rejT.regle === DESCRIPTIONS, [rejH.titre, rejT.titre, rejT.regle]);
   check('rien de dit : mèche trop ancienne, mèche du mauvais côté (repère du haut percé par le bas), pas de mèche',
     ![syn({ choix: choixF(fH(P.mecheBougies), fB(P.mecheBougies + 2)) }), syn({ choix: choixF(fB(1), fH(0)) }), syn({ choix: choixF({ cassure: null, meche: false, mecheSens: 0 }, null) })].some(lr));
   const phrR = [lr(rejH).texte, lr(rejB).texte, lr(rejHt).texte, lr(rejBt).texte, lr(rejB3).texte];

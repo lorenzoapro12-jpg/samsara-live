@@ -3183,27 +3183,28 @@ const Guide = (function () {
   }
 
   // ─── 9. En résumé : tout ce que la page montre, recoupé en une lecture ──────
-  /** L'encadré « En résumé » (en tête de la liste « Sur le graphique ») : UNE phrase qui dit où
-   *  penchent les signaux déjà affichés, le pourquoi en lignes courtes (un signal par ligne, son
-   *  sens : +1, −1 ou 0), puis les deux repères qui changeraient la lecture. Rien de nouveau n'est
-   *  calculé : la tendance (régime du Guide), un repère franchi et validé, la figure en cours (sans
-   *  sens : son objectif, revue du 14/10/2026, C2), le scénario du matin montré, un repère dépassé
-   *  puis repoussé (la mèche d'etatFerme, sans sens) ;
+  /** L'encadré « En résumé » (en tête de la liste « Sur le graphique ») : UNE phrase qui DÉCRIT ce
+   *  qui se passe, sans pencher (le mouvement du prix, puis le scénario de Claude montré s'il a un
+   *  sens ; revue du 14/10/2026, Q1, « Décrire » choisi par Lorenzo), la règle « Ce sont des
+   *  descriptions, pas des prévisions. », le pourquoi en lignes courtes (une info par ligne, avec le
+   *  sens de ce qu'elle décrit : +1, −1 ou 0, sa couleur), puis les repères proches. Rien de nouveau
+   *  n'est calculé : la tendance (régime du Guide), un repère franchi et validé, la figure en cours
+   *  (sans sens : son objectif, revue du 14/10/2026, C2), le scénario du matin montré, un repère
+   *  dépassé puis repoussé (la mèche d'etatFerme, sans sens) ;
    *  et, couche allumée ou non, la fourchette de 7 jours qui vient de casser (fourchette, sans sens) ;
    *  enfin l'agitation attendue du point du matin (agitation, sans sens). Aucun pourcentage, sauf
-   *  l'écart de cette agitation (revue du 14/10/2026, Q3), aucun conseil, aucune flèche seule. Honnête : un
-   *  sens n'est dit que si au moins deux signaux vont dans ce sens et aucun en face ; sinon « pas
-   *  de sens net », et pourquoi.
+   *  l'écart de cette agitation (revue du 14/10/2026, Q3), aucun conseil, aucune flèche seule. Aucune
+   *  prévision : rien n'est compté pour dire où penchent les signaux.
    *  o = { prix, unite, itv, regime, choix, suite, figures: [f], scenario: { rang, forme, sens,
    *        ouvert, tombe } | null, fourchette: fourchette(…) | null, symbole, maintenant (ms : l'heure
    *        des faits datés), agitation: [phrase] | null (Scenarios.texteAmpleur) } → { titre, ton
-   *  ('hausse' | 'baisse' | 'partage' | 'calme'),
+   *  (toujours 'calme' : la boîte ne prend la couleur d'aucun sens),
    *  pourquoi: [{ texte, sens, fam }], surveiller: [texte], surveillerFam: [famille | null], avertissement,
    *  barre (la phrase de la barre du téléphone : celle de la cassure de la fourchette quand elle est
    *  dite, sinon le titre ; revue du 14/10/2026, C1) }.
    *  fam : la famille de l'info (son icône, js/icones.js) : 'tendance', 'niveau', 'figure' ou 'scenario'. */
   function synthese(o) {
-    const u = o.unite, per = periode(o.itv)[0], pourquoi = [];
+    const u = o.unite, pourquoi = [];
     if (!fini(o.prix)) return { titre: 'Prix en direct indisponible pour l’instant.', ton: 'calme', regle: '', pourquoi: [], surveiller: [], avertissement: AVERTISSEMENT, barre: 'Prix en direct indisponible pour l’instant.' };
     const r = o.regime;
     if (r && r.cle === 'hausse') pourquoi.push({ texte: 'Tendance : le prix monte depuis un moment.', sens: 1, fam: 'tendance' });
@@ -3261,19 +3262,25 @@ const Guide = (function () {
     else if (sc && sc.ouvert && (sc.sens === 1 || sc.sens === -1)) pourquoi.push({ texte: 'Scénario n° ' + sc.rang + ' de Claude, ce matin : ' + (sc.sens > 0 ? 'vers le haut.' : 'vers le bas.'), sens: sc.sens, fam: 'scenario' });
     if (r && r.compression) pourquoi.push({ texte: 'Le prix bouge peu : ce calme ne dit pas le sens du prochain mouvement.', sens: 0, fam: 'tendance' });
     // L'agitation attendue, calculée au point du matin (revue du 14/10/2026, Q3 de Lorenzo : « Les
-    // deux ») : ce que nos mesures prévoient, l'ampleur, jamais le sens (sens 0 : le titre n'en tient
-    // pas compte). Sa source et son heure sont dans la phrase.
+    // deux ») : l'ampleur, jamais le sens (sens 0 ; le titre ne la lit pas). Sa source et son heure
+    // sont dans la phrase.
     if (Array.isArray(o.agitation) && o.agitation.length) pourquoi.push({ texte: o.agitation.join(' '), sens: 0, fam: 'tendance', agitation: true });
-    const haut = pourquoi.filter(x => x.sens > 0).length, bas = pourquoi.filter(x => x.sens < 0).length;
-    // regle : comment la phrase est tirée des signaux, en mots (le « comment » du pourquoi).
-    let ton, titre, regle;
-    if (haut >= 2 && !bas) { ton = 'hausse'; titre = 'Les signaux penchent plutôt vers la hausse.'; regle = 'Plusieurs signaux vont vers le haut, aucun vers le bas.'; }
-    else if (bas >= 2 && !haut) { ton = 'baisse'; titre = 'Les signaux penchent plutôt vers la baisse.'; regle = 'Plusieurs signaux vont vers le bas, aucun vers le haut.'; }
-    else if (haut && bas) { ton = 'partage'; titre = 'Les signaux se contredisent : pas de sens net.'; regle = 'Certains signaux vont vers le haut, d’autres vers le bas.'; }
-    else if (haut || bas) { ton = 'calme'; titre = 'Pas de sens net pour l’instant.'; regle = 'Un seul signal va vers ' + (haut ? 'le haut' : 'le bas') + ' : c’est trop peu.'; }
-    else { ton = 'calme'; titre = 'Pas de sens net : le prix hésite.'; regle = 'Aucun signal ne penche d’un côté.'; }
-    // Les repères qui changeraient la lecture : ceux de « Et ensuite ? » (o.suite). Le prix est
-    // dans une bande : elle est dite, puis le repère suivant de chaque côté.
+    // Le titre DÉCRIT, il ne penche plus (revue du 14/10/2026, Q1 : Lorenzo a choisi « Décrire » le
+    // 14/10). Il comptait les signaux : deux vers le bas, aucun vers le haut, et il écrivait « Les
+    // signaux penchent plutôt vers la baisse. » (le 08/10 de 11:30 à 12:30 : tendance et repère
+    // franchi). Un titre qui penche se lit comme une prévision, alors que nos mesures ne trouvent
+    // pas le sens de la suite mieux que le hasard (tendance, figures, cassures). Il dit le mouvement
+    // du prix (la tendance), puis le scénario de Claude montré quand il a un sens, « aussi » s'il va
+    // du même côté. Les lignes du pourquoi restent, chacune avec le sens de ce qu'elle décrit.
+    const mvt = r && r.cle === 'hausse' ? 1 : r && r.cle === 'baisse' ? -1 : 0;
+    const scL = pourquoi.find(x => x.fam === 'scenario' && x.sens);
+    const titre = (mvt > 0 ? 'Le prix monte depuis un moment' : mvt < 0 ? 'Le prix baisse depuis un moment'
+      : r && r.cle === 'incertaine' ? 'Le prix bouge fort, sans sens clair'
+        : r && (r.cle === 'faible' || r.cle === 'sans') ? 'Le prix hésite, sans direction claire' : 'Tendance pas encore connue')
+      + (!scL ? '.' : ' ; le scénario ' + sc.rang + ' de Claude ' + (scL.sens === mvt ? 'aussi.' : 'le voit ' + (scL.sens > 0 ? 'monter.' : 'baisser.')));
+    const ton = 'calme', regle = 'Ce sont des descriptions, pas des prévisions.';
+    // Les repères proches : ceux de « Et ensuite ? » (o.suite). Le prix est dans une bande : elle
+    // est dite, puis le repère suivant de chaque côté.
     const S = o.suite || {}, nom = x => nomsDebutant(x)[2], surveiller = [];
     // À prix égal, la raison la plus parlante (hier, semaine, 24 h, mur, zone de retour).
     const parlante = (r, niv) => (r && niv ? niv.raisons.filter(x => chiffresR(x) === chiffresR(r)).sort((a, b) => rangRaison(a) - rangRaison(b))[0] || r : r);
@@ -3286,14 +3293,10 @@ const Guide = (function () {
     const suivant = S.dans ? ', prochain repère : ' : ' : ';
     surveiller.push(xH ? 'Au-dessus' + suivant + prixR(xH, u) + ', ' + nom(xH) + '.' : 'Aucun repère proche au-dessus.',
       xB ? 'En dessous' + suivant + prixR(xB, u) + ', ' + nom(xB) + '.' : 'Aucun repère proche en dessous.');
-    if (S.dans) {
-      if (ton === 'hausse') surveiller.push('Cette lecture tombe si le prix finit ' + per + ' sous cette zone.');
-      else if (ton === 'baisse') surveiller.push('Cette lecture tombe si le prix finit ' + per + ' au-dessus de cette zone.');
-      else surveiller.push('Un sens apparaîtrait si le prix finit ' + per + ' hors de cette zone.');
-    } else if (ton === 'hausse' && xB) surveiller.push('Cette lecture tombe si le prix finit ' + per + ' sous le repère du bas.');
-    else if (ton === 'baisse' && xH) surveiller.push('Cette lecture tombe si le prix finit ' + per + ' au-dessus du repère du haut.');
-    else if (xH || xB) surveiller.push('Un sens apparaîtrait si le prix finit ' + per + ' au-delà ' + (xH && xB ? 'de l’un d’eux.' : 'de ce repère.'));
-    // La famille de chaque ligne (son icône) : un repère de prix nommé ; la règle qui changerait la lecture n'en a pas.
+    // Plus de dernière ligne « Cette lecture tombe si le prix finit … au-dessus du repère du haut. »
+    // ni « Un sens apparaîtrait si … » (revue du 14/10/2026, Q1) : elles parlaient du sens du titre,
+    // qui n'en a plus, et faisaient d'un repère franchi l'annonce d'un sens.
+    // La famille de chaque ligne (son icône) : un repère de prix nommé (« Aucun repère proche… » n'en a pas).
     const surveillerFam = surveiller.map(t => (/^(Au-dessus|En dessous|Le prix est)/.test(t) ? 'niveau' : null));
     // La barre du téléphone (#reperesResume) : la cassure dite d'abord, à la place du titre (revue du
     // 14/10/2026, C1 : « Pas de sens net » seul cachait la cassure derrière la liste fermée).
