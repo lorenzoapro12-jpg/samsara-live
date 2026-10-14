@@ -237,7 +237,9 @@ const nombres = t => (t.match(/\d{1,3}(?:[\s  ]\d{3})+|\d+/g) || []).map(x =>
 // Le budget d'une bulle sans « Le détail » (charte du 12/10/2026 ; revue du 14/10/2026, M6 et C16) :
 // au plus PARAM.guide.debutant.bulleMots mots hors avertissement, comptés comme les fiches (un groupe
 // qui porte une lettre ou un chiffre), et un seul avertissement.
-const AVERTISSEMENTS = ['Une description, pas un conseil.', 'Une hypothèse de Claude (une IA), pas un conseil.', 'Une lecture débattue, pas une prévision ni un conseil.'];
+// Les deux avertissements de la charte, partagés (revue du 14/10/2026, C19 : « Une lecture débattue,
+// pas une prévision ni un conseil. » n'existe plus).
+const AVERTISSEMENTS = ['Une description, pas un conseil.', 'Une hypothèse de Claude (une IA), pas un conseil.'];
 const motsBulle = t => AVERTISSEMENTS.reduce((x, a) => x.split(a).join(' '), t).split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
 const avertissements = t => (t.match(/pas une? (?:conseil|prévision ni un conseil)/g) || []).length;
 const BULLE_MOTS = +(fs.readFileSync(path.join(__dirname, '..', 'js', 'app.js'), 'utf8').match(/\bbulleMots: (\d+)/) || [0, 0])[1];
@@ -673,8 +675,9 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       // idée 8 du même plan : l'objectif dit sur quoi il se calcule, « X (la hauteur de la figure, reportée) ».)
       // Changé exprès, revue du 14/10/2026 (M6) : le nom, dans le titre, n'est plus redit en tête ;
       // « Objectif théorique : X (sa hauteur, reportée), non garanti ».
-      check('4 h : la bulle de la forme la définit, dit son bilan (« Mesuré sur », « fois sur ») avec l’objectif théorique et ce sur quoi il se calcule, et « pas une prévision ni un conseil »',
-        r.forme && /^Le prix a buté deux fois sur le même plafond\. /.test(r.forme.texte) && /Mesuré sur/.test(r.forme.texte) && /fois sur/.test(r.forme.texte) && /[Oo]bjectif théorique : \d[\d  ]* \$ \(sa hauteur, reportée\), non garanti/.test(r.forme.texte) && /pas une prévision ni un conseil/.test(r.forme.texte) && !bannisBulle(r.forme.texte).length, r.forme);
+      // Revue du 14/10/2026 (C19) : la fin est l'avertissement partagé, plus « pas une prévision ni un conseil ».
+      check('4 h : la bulle de la forme la définit, dit son bilan (« Mesuré sur », « fois sur ») avec l’objectif théorique et ce sur quoi il se calcule, et « Une description, pas un conseil. »',
+        r.forme && /^Le prix a buté deux fois sur le même plafond\. /.test(r.forme.texte) && /Mesuré sur/.test(r.forme.texte) && /fois sur/.test(r.forme.texte) && /[Oo]bjectif théorique : \d[\d  ]* \$ \(sa hauteur, reportée\), non garanti/.test(r.forme.texte) && r.forme.texte.replace(/\s+/g, ' ').includes(AVERTISSEMENTS[0]) && !/pas une prévision ni/.test(r.forme.texte) && !bannisBulle(r.forme.texte).length, r.forme);
       const e = await dessin(o.page);
       check('4 h : la ligne des scénarios renvoie au suivi en 15 min ou 1 h (quand elle est posée)', !e.items.some(i => i.role === 'boite') || e.items.some(i => /à voir en 15 min ou 1 h/.test(i.texte)), e.items);
       await o.page.evaluate(() => window.__retablir());
@@ -1279,7 +1282,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       const o = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
       await o.page.keyboard.press('?'); await o.page.waitForTimeout(200);
       const l = await o.page.evaluate(() => { const p = document.getElementById('fichePop'), t = p && p.querySelector('.fiche-touches'); return { ouvert: !!p && !p.hidden, titre: p && (p.querySelector('.fiche-titre') || {}).textContent, ligne: t && t.getClientRects().length ? t.innerText : null, h: t ? t.getBoundingClientRect().height : 0 }; });
-      check(`? ouvre les Légendes, avec la ligne des touches, sans M (« ${l.ligne} »)`, l.ouvert && l.titre === 'Légendes' && !/\bM\b/.test(l.ligne || '') && !/Lisible|Complet/.test(l.ligne || '') && /\? cette aide/.test(l.ligne || '') && /\bR revient à la vue de départ/.test(l.ligne || '') && /\bF suit le présent/.test(l.ligne || '') && /\bI les infos du marché/.test(l.ligne || '') && !bannis(l.ligne || '').length, l);
+      check(`? ouvre les Légendes, avec la ligne des touches, sans M (« ${l.ligne} »)`, l.ouvert && l.titre === 'Légendes' && !/\bM\b/.test(l.ligne || '') && !/Lisible|Complet/.test(l.ligne || '') && /\? cette aide/.test(l.ligne || '') && /\bR ou F revient au présent/.test(l.ligne || '') && !/vue de départ/.test(l.ligne || '') && /\bI les infos du marché/.test(l.ligne || '') && !bannis(l.ligne || '').length, l);
       await o.page.keyboard.press('Escape');
       // M : plus de bascule ; ni mode, ni chiffres, ni écriture.
       await o.page.evaluate(() => { window.__ecrits = []; const f = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { window.__ecrits.push(k + '=' + v); return f.apply(this, arguments); }; });
@@ -1296,6 +1299,14 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       }
       check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();
+      // Revue du 14/10/2026 (M17) : au téléphone (sans souris), pas de ligne de touches dans les
+      // Légendes ; le bouton ↺ n'a qu'un nom, « Revenir au présent ».
+      const t = await ouvrir(nav, { vue: { width: 390, height: 844 }, tactile: true });
+      await t.page.evaluate(() => ouvrirGlossaire()); await t.page.waitForTimeout(200);
+      const lt = await t.page.evaluate(() => { const p = document.getElementById('fichePop'), x = p && p.querySelector('.fiche-touches'), b = document.getElementById('resetBtn');
+        return { ouvert: !!p && !p.hidden, existe: !!x, vue: !!x && x.getClientRects().length > 0, reset: b && b.getAttribute('aria-label') }; });
+      check('390 px, au doigt : les Légendes s’ouvrent sans la ligne des touches ; le bouton ↺ s’appelle « Revenir au présent »', lt.ouvert && lt.existe && !lt.vue && lt.reset === 'Revenir au présent', lt);
+      await t.ctx.close();
     }
 
     // ── Sobriété : survoler une cible ne redessine pas le graphique ; au repos, rien ──

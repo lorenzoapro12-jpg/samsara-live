@@ -917,7 +917,8 @@ titre('7g. Mode débutant : la convention du « sens du prix » vient des consta
   const GD = BM.GUIDE, src = fs.readFileSync(path.join(REPO, 'js/bookmap.js'), 'utf8');
   check(`fenêtre de tendance (${GD.tendanceMs / 60e3} min) et seuil « stable » (${GD.tendancePct} %) positifs`, GD.tendanceMs > 0 && GD.tendancePct > 0 && GD.tendanceMs % 60e3 === 0, [GD.tendanceMs, GD.tendancePct]);
   // La légende (Expert) qui dit la convention la tire des constantes : jamais un « 15 min » ou un « 0,1 % » écrit en dur.
-  const l = src.split('\n').filter(x => /Sans «' \+ NB \+ 'Le détail' \+ NB \+ '» : une ligne, d\\'abord le sens du prix/.test(x));
+  // Revue du 14/10/2026 (C21) : la source écrit « d’abord » avec ’ (plus « d\'abord »).
+  const l = src.split('\n').filter(x => /Sans «' \+ NB \+ 'Le détail' \+ NB \+ '» : une ligne, d’abord le sens du prix/.test(x));
   check('légende : la convention de tendance est tirée de BM.GUIDE (tendanceMs, tendancePct), rien en dur',
     l.length === 1 && /BM\.age\(GD\.tendanceMs\)/.test(l[0]) && /GD\.tendancePct/.test(l[0]) && !/15 min|0,1 %/.test(l[0]), l);
   // Le nombre de repères débutants : la constante que la légende écrit (« deux repères au plus ») est
@@ -1013,18 +1014,19 @@ titre('10. Carte claire : palette ordonnée et lisible sur le fond ; les mots de
   check('les palettes sombres sont celles d\'avant (classique : bleu nuit → … → blanc, mêmes points)',
     JSON.stringify(BM.PALETTES.sombre.classique) === JSON.stringify([[0, [12, 20, 60]], [0.18, [20, 60, 160]], [0.38, [0, 170, 220]], [0.58, [90, 230, 120]], [0.76, [250, 230, 60]], [0.9, [255, 130, 30]], [1, [255, 250, 240]]]));
   // Les mots : ceux du ton affiché, jamais ceux de l'autre.
+  // (Revue du 14/10/2026, C21 : les phrases s’écrivent « peu d’ordres », avec ’ ; les motifs aussi.)
   const S = BM.motsCouleurs('sombre'), K = BM.motsCouleurs('clair');
   check('sombre : « Bleu foncé : peu d’ordres … blanc : le plus d’ordres », trait « jaune », bandes « claires », ligne « blanche » (et un ton inconnu : sombre)',
-    /^Bleu foncé : peu d'ordres à ce prix ; puis bleu clair, vert, jaune, orange ; blanc : le plus d'ordres\.$/.test(BM.phrasePalette('classique', 'sombre')) && S.maintenant === 'jaune' && S.bandes === 'claires' && S.prix === 'blanche' && S.arc === 'blanc'
+    /^Bleu foncé : peu d’ordres à ce prix ; puis bleu clair, vert, jaune, orange ; blanc : le plus d’ordres\.$/.test(BM.phrasePalette('classique', 'sombre')) && S.maintenant === 'jaune' && S.bandes === 'claires' && S.prix === 'blanche' && S.arc === 'blanc'
     && BM.motsCouleurs(undefined) === S && BM.motsCouleurs('gris') === S);
   check('clair : « Bleu très pâle : peu d’ordres … bleu nuit : le plus d’ordres », trait « orange », bandes « foncées », ligne « noire » — aucun « bleu foncé : peu d’ordres », aucun « blanc : le plus »',
-    /^Bleu très pâle : peu d'ordres/.test(BM.phrasePalette('classique', 'clair')) && /bleu nuit : le plus d'ordres\.$/.test(BM.phrasePalette('classique', 'clair'))
+    /^Bleu très pâle : peu d’ordres/.test(BM.phrasePalette('classique', 'clair')) && /bleu nuit : le plus d’ordres\.$/.test(BM.phrasePalette('classique', 'clair'))
     && K.maintenant === 'orange' && K.bandes === 'foncées' && K.prix === 'noire' && K.arc === 'noir'
     && Object.values(K.palette).every(t => !/Bleu foncé : peu|blanc : le plus|clair, le plus|sombre, peu/.test(t)), K.palette);
   check('teintés : « sombre, peu … clair, le plus » (sombre) ; « pâle, peu … foncé, le plus » (clair)',
-    /sombre, peu d'ordres à ce prix ; clair, le plus d'ordres/.test(BM.phrasePalette('cote', 'sombre')) && /pâle, peu d'ordres à ce prix ; foncé, le plus d'ordres/.test(BM.phrasePalette('cote', 'clair')));
+    /sombre, peu d’ordres à ce prix ; clair, le plus d’ordres/.test(BM.phrasePalette('cote', 'sombre')) && /pâle, peu d’ordres à ce prix ; foncé, le plus d’ordres/.test(BM.phrasePalette('cote', 'clair')));
   check('cividis : « Bleu foncé … jaune : le plus » (sombre) ; « Jaune pâle … bleu nuit : le plus » (clair)',
-    /^Bleu foncé : peu d'ordres à ce prix ; puis gris ; jaune : le plus d'ordres\.$/.test(BM.phrasePalette('cividis', 'sombre')) && /^Jaune pâle : peu d'ordres à ce prix ; puis jaune, gris ; bleu nuit : le plus d'ordres\.$/.test(BM.phrasePalette('cividis', 'clair')));
+    /^Bleu foncé : peu d’ordres à ce prix ; puis gris ; jaune : le plus d’ordres\.$/.test(BM.phrasePalette('cividis', 'sombre')) && /^Jaune pâle : peu d’ordres à ce prix ; puis jaune, gris ; bleu nuit : le plus d’ordres\.$/.test(BM.phrasePalette('cividis', 'clair')));
   // Les mots suivent les COULEURS : la couleur nommée « peu » est la plus proche de son nom parmi les noms dits, de même pour « le plus ».
   const nommee = { 'bleu foncé': [12, 30, 90], 'bleu très pâle': [222, 234, 247], 'bleu nuit': [10, 25, 80], 'blanc': [255, 255, 255], 'jaune pâle': [242, 237, 210], 'jaune': [250, 225, 70] };
   const dist = (c, m) => Math.hypot(...c.map((v, i) => v - nommee[m][i]));
@@ -1041,6 +1043,26 @@ titre('10. Carte claire : palette ordonnée et lisible sur le fond ; les mots de
   const lg = fs.readFileSync(path.join(REPO, 'bookmap.html'), 'utf8');
   check('bookmap.html : les mots de couleur de la légende sont marqués (data-mot : maintenant, bandes, prix, arc), réécrits au ton affiché',
     ['maintenant', 'bandes', 'prix', 'arc'].every(k => new RegExp('data-mot="' + k + '"').test(lg)) && /trait <span data-mot="maintenant">jaune<\/span>/.test(lg) && /bandes <span data-mot="bandes">claires<\/span>/.test(lg));
+}
+
+titre('Revue du 14/10/2026 : l’apostrophe ’ dans les textes de la carte, la ligne des touches');
+{
+  // C21 (textes-18) : la carte écrivait « Choisir l'affichage », « d'ordres »… avec l’apostrophe droite,
+  // le terminal avec ’. Hors commentaires, plus aucune apostrophe droite entre deux lettres.
+  const LET = '[A-Za-zÀ-ÖØ-öø-ÿŒœ]', droite = new RegExp(LET + "\\\\?'" + LET, 'g');
+  const sansComm = t => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\'"])\/\/.*$/gm, '$1');
+  for (const f of ['js/bookmap.js', 'js/bookmap-calc.js']) {
+    const vus = sansComm(fs.readFileSync(path.join(REPO, f), 'utf8')).match(droite) || [];
+    check(`${f} : aucune apostrophe droite dans les textes (${vus.length})`, !vus.length, vus.slice(0, 6));
+  }
+  const html = fs.readFileSync(path.join(REPO, 'bookmap.html'), 'utf8')
+    .replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<!--[\s\S]*?-->/g, '');
+  const vusH = html.match(droite) || [];
+  check(`bookmap.html : aucune apostrophe droite dans le texte ni les titres (${vusH.length})`, !vusH.length, vusH.slice(0, 6));
+  // C21 (textes-21) : « Touches (les mêmes que sur le terminal) : ? : comment lire… » enchaînait deux deux-points.
+  const touches = (/<p>(Touches[^<]*)<\/p>/.exec(html) || [])[1] || '';
+  check('légende de la carte : la ligne des touches, un seul deux-points par phrase', !!touches && touches.split(/\. /).every(ph => (ph.match(/ : /g) || []).length <= 1)
+    && /\? pour lire cette carte/.test(touches), touches);
 }
 
 console.log(ko ? `\n❌ CARTE : ${ko} contrôle(s) en échec` : '\n✅ CARTE : TOUS LES CONTRÔLES PASSENT');

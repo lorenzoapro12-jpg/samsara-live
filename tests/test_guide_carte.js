@@ -16,6 +16,8 @@ const REPO = path.resolve(__dirname, '..');
 let ko = 0;
 const check = (nom, ok, det) => { if (!ok) ko++; console.log(`  ${ok ? '✓' : '✗'} ${nom}${!ok && det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 240) : ''}`); };
 const titre = t => console.log(`\n── ${t} ──`);
+// Revue du 14/10/2026 (C21, textes-18) : le guide écrit « d’achat », « d’ordres »… avec l’apostrophe ’ ;
+// les motifs et les phrases attendues ci-dessous aussi (les intitulés des contrôles ne changent pas).
 // Mots interdits (texte montré ET fichiers de la carte, commentaires compris).
 const CONSEIL = /\b(achetez|vendez|ach[eè]te[rz]?|vends|il faut (?:acheter|vendre)|entrez|sortez|prenez position|signal d['’]achat|signal de vente|recommand(?:e|ons))\b/i;
 const ACCUSE = /spoof|manipul|leurre|tromper|tromperie|faux (?:mur|ordre)s?|fake|bluff|pi[eè]ge/i;
@@ -52,7 +54,7 @@ const t0 = Date.UTC(2026, 9, 8, 14, 5, 7);
 }
 check('écart signé avec le vrai signe moins', BM.pourcent(-0.2) === '−0,20 %' && BM.pourcent(0.123) === '+0,12 %', [BM.pourcent(-0.2), BM.pourcent(0.123)]);
 check('écart absent → « — », jamais 0', BM.pourcent(NaN) === '—' && BM.duree(null) === '—' && BM.duree(undefined) === '—');
-check('durée sous une minute : en mots, pas « 5,3 s »', BM.duree(5300) === 'moins d\'une minute' && BM.duree(125e3) === BM.age(125e3));
+check('durée sous une minute : en mots, pas « 5,3 s »', BM.duree(5300) === 'moins d’une minute' && BM.duree(125e3) === BM.age(125e3));
 check('prix exact : décimales seulement s\'il en a', BM.prixExact(81000) === BM.prix(81000) && /,5/.test(BM.prixExact(81000.5)));
 
 // ── 2. Le carnet vu par le guide ─────────────────────────────────────────────
@@ -120,11 +122,11 @@ const murs = { bid: pb, ask: pa, seuil: S0.seuil };
 const deb = BM.phraseResume(r, murs, 'debutant', 'il y a 2,0 s'), exp = BM.phraseResume(r, murs, 'expert', 'il y a 2,0 s'), crt = BM.phraseResume(r, murs, 'debutant', 'il y a 2,0 s', { court: true });
 garder(deb, exp, crt);
 const sp = x => x.replace(/[\u202f\u00a0]/g, ' ');
-check('débutant : l\'âge d\'abord, la bande en % ET en dollars, les deux quantités en BTC', /^Carnet lu il y a 2,0 s, à ±0,27 % du prix \(≈ ±275 \$ : tout ce que le carnet lu couvre\) : 100 BTC d'ordres d'achat, 87,0 BTC d'ordres de vente — 1,1 fois plus côté achat\./.test(sp(deb)), deb);
+check('débutant : l\'âge d\'abord, la bande en % ET en dollars, les deux quantités en BTC', /^Carnet lu il y a 2,0 s, à ±0,27 % du prix \(≈ ±275 \$ : tout ce que le carnet lu couvre\) : 100 BTC d’ordres d’achat, 87,0 BTC d’ordres de vente — 1,1 fois plus côté achat\./.test(sp(deb)), deb);
 check('débutant : le mur le plus proche, sa tranche, « x % sous le prix » / « au-dessus du prix »', sp(deb).includes('99 940–99 960 $ (0,05 % sous le prix)') && sp(deb).includes('100 100–100 120 $ (0,08 % au-dessus du prix)'), deb);
-check('débutant : « Photo de l\'instant, pas une prévision. »', /Photo de l'instant, pas une prévision\.$/.test(deb), deb);
+check('débutant : « Photo de l\'instant, pas une prévision. »', /Photo de l’instant, pas une prévision\.$/.test(deb), deb);
 check('court (écran étroit, ou phrase qui ne tient pas) : « photo, pas une prévision » juste après l\'âge, achat / vente en BTC, murs proches, bien plus court', /^Carnet lu il y a 2,0 s \(photo, pas une prévision\) : achat 100 BTC \/ vente 87,0 BTC à ±275 \$\. Murs proches : 99 940 \$ \(achat\) · 100 100 \$ \(vente\)\.$/.test(sp(crt)) && crt.length < deb.length * 0.6, crt);
-check('expert : les chiffres seuls (pas de phrase)', !/ordres d'achat/.test(exp) && /×/.test(exp) && exp.split(' · ').length === 4 && /^carnet en direct il y a 2,0 s · /.test(exp), exp);   // « en direct », plus « live » (revue du 14/10/2026, M12)
+check('expert : les chiffres seuls (pas de phrase)', !/ordres d’achat/.test(exp) && /×/.test(exp) && exp.split(' · ').length === 4 && /^carnet en direct il y a 2,0 s · /.test(exp), exp);   // « en direct », plus « live » (revue du 14/10/2026, M12)
 check('aucune direction annoncée (pas de « va monter / baisser », pas de probabilité)', !/monter|baisser|hausse|baisse|probab|chance/i.test(deb + exp + crt), deb);
 const r0 = BM.resumeCarnet(Object.assign({}, C, { b: new Map(), a: C.a }));
 const p0 = BM.phraseResume(r0, { bid: null, ask: pa, seuil: 10 }, 'debutant', 'il y a 1 s'), p00 = BM.phraseResume(r0, { bid: null, ask: null, seuil: 19 }, 'debutant', 'il y a 1 s');
@@ -211,13 +213,13 @@ for (const mode of ['debutant', 'expert']) for (const m of cas) {
   check(`${mode} ${m.source} ${m.cote} ${m.note || ''} : court ≤ 40 signes et ne commence pas par « $ »`, t.court.length <= 40 && !/^\$/.test(t.court) && t.lignes.every(l => !/^\$/.test(l)), t);
 }
 const tD = BM.texteMur(cas[0], 'debutant', now), tE = BM.texteMur(cas[0], 'expert', now);
-check('débutant : « Mur d\'achat · 16,0 BTC · là depuis 1 h 10 », la variation en 2e ligne', tD.lignes[0] === 'Mur d\'achat · 16,0 BTC · là depuis 1 h 10' && /grossit/.test(tD.lignes[1]) && tD.court === 'Mur d\'achat 16,0 BTC · depuis 1 h 10', tD);
+check('débutant : « Mur d\'achat · 16,0 BTC · là depuis 1 h 10 », la variation en 2e ligne', tD.lignes[0] === 'Mur d’achat · 16,0 BTC · là depuis 1 h 10' && /grossit/.test(tD.lignes[1]) && tD.court === 'Mur d’achat 16,0 BTC · depuis 1 h 10', tD);
 check('expert : une ligne de chiffres', tE.lignes.length === 1 && /^Bid 16,0 BTC · 1 h 10/.test(tE.lignes[0]), tE);
 const tA = BM.texteMur(cas[1], 'debutant', now), tB = BM.texteMur(cas[2], 'debutant', now);
-check('série au bord de ce qui est lu : « déjà là à la première lecture » ; vue commencer : « apparu il y a moins d\'une minute » ; une seule ligne', tA.lignes[0] === 'Mur de vente · 123 BTC · déjà là à la première lecture' && tB.lignes[0] === 'Mur de vente · 16,0 BTC · apparu il y a moins d\'une minute' && tA.lignes.length === 1 && tB.lignes.length === 1, [tA, tB]);
+check('série au bord de ce qui est lu : « déjà là à la première lecture » ; vue commencer : « apparu il y a moins d\'une minute » ; une seule ligne', tA.lignes[0] === 'Mur de vente · 123 BTC · déjà là à la première lecture' && tB.lignes[0] === 'Mur de vente · 16,0 BTC · apparu il y a moins d’une minute' && tA.lignes.length === 1 && tB.lignes.length === 1, [tA, tB]);
 const tPx = BM.texteMur(cas[3], 'debutant', now), tBd = BM.texteMur(cas[4], 'debutant', now);
-check('prix passé dans la tranche : ni « depuis » ni « grossit » ; « rien à comparer »', tPx.lignes[0] === 'Mur d\'achat · 16,0 BTC' && /le prix était à ce niveau il y a moins de 10 min : rien à comparer/.test(tPx.lignes[1]) && tPx.court === 'Mur d\'achat 16,0 BTC · prix passé ici', tPx);
-check('entré dans la bande lue : « là depuis au moins 1 min », « vient d\'entrer… rien à comparer », jamais « grossit »', tBd.lignes[0] === 'Mur d\'achat · 50,0 BTC · là depuis au moins 1 min' && /vient d'entrer dans la bande que le carnet lu couvre : rien à comparer/.test(tBd.lignes[1]) && !/grossit/.test(tBd.lignes.join(' ')), tBd);
+check('prix passé dans la tranche : ni « depuis » ni « grossit » ; « rien à comparer »', tPx.lignes[0] === 'Mur d’achat · 16,0 BTC' && /le prix était à ce niveau il y a moins de 10 min : rien à comparer/.test(tPx.lignes[1]) && tPx.court === 'Mur d’achat 16,0 BTC · prix passé ici', tPx);
+check('entré dans la bande lue : « là depuis au moins 1 min », « vient d\'entrer… rien à comparer », jamais « grossit »', tBd.lignes[0] === 'Mur d’achat · 50,0 BTC · là depuis au moins 1 min' && /vient d’entrer dans la bande que le carnet lu couvre : rien à comparer/.test(tBd.lignes[1]) && !/grossit/.test(tBd.lignes.join(' ')), tBd);
 const tSt = BM.texteMur(cas[5], 'debutant', now);
 check('stable et récent (2 min) : une seule ligne (pas d\'histoire à dire)', tSt.lignes.length === 1 && tSt.lignes[0] === 'Mur de vente · 21,2 BTC · là depuis 2 min', tSt);
 const tP = BM.texteMur(cas[6], 'debutant', now);
@@ -246,21 +248,21 @@ for (const ev of evs) {
   check(`${ev.type} ${ev.cote || ''} : court ≤ 40 signes, heure de l'appareil sur la carte (sans « UTC »), symbole`, ev.court.length <= 40 && !/^\$/.test(ev.court) && (ev.carte.includes(BM.heure(t0)) || ev.carte.includes(BM.heure(t0, true))) && !/UTC/.test(ev.texte + ev.carte + ev.court) && ev.s && ev.cle, ev);
 }
 check('fin hors classement (« toujours là », « interrompu ») : pas d\'évènement', BM.evenementFinMur({ fin: 'la', cote: 'b', p: 1, q0: 1, t: 1 }) === null && BM.evenementFinMur({ fin: 'interrompu', cote: 'b', p: 1, q0: 1, t: 1 }) === null);
-check('retiré : la phrase COMMENCE par la plus grande taille lue, puis le reste à la fin', /^Gros ordre d'achat de 12,5 BTC \(sa plus grande taille lue\) à 99 987,50 \$ retiré : ses derniers 0,340 BTC partis sans échange/.test(sp(evs[0].texte)) && /^Gros ordre de vente de 12,5 BTC retiré sans échange à 100 100 \$ \(un seul prix\)$/.test(sp(evs[4].texte)), [evs[0].texte, evs[4].texte]);
+check('retiré : la phrase COMMENCE par la plus grande taille lue, puis le reste à la fin', /^Gros ordre d’achat de 12,5 BTC \(sa plus grande taille lue\) à 99 987,50 \$ retiré : ses derniers 0,340 BTC partis sans échange/.test(sp(evs[0].texte)) && /^Gros ordre de vente de 12,5 BTC retiré sans échange à 100 100 \$ \(un seul prix\)$/.test(sp(evs[4].texte)), [evs[0].texte, evs[4].texte]);
 {
   // Disparu, échanges incertains (relevé réel : « 0,035 BTC … jusqu'à 15,6 BTC plus tôt ») : la
   // plus grande taille d'abord, puis ce qui en a été retiré et échangé au cours de sa vie.
   const ei = BM.evenementFinMur({ fin: 'incertain', cote: 'b', p: 81798, q0: 0.035, qMax: 15.6, echange: 3.5, retire: 12, t: t0 });
   garder(ei);
-  check('disparu, échanges incertains : « de 15,6 BTC (sa plus grande taille lue) », retiré / échangé au cours de sa vie, le reste dit en dernier', /^Gros ordre d'achat de 15,6 BTC \(sa plus grande taille lue\) disparu à 81 798 \$, échanges incertains : au moins 12,0 BTC retirés, 3,50 BTC échangés au cours de sa vie ; on ne sait pas si ses derniers 0,035 BTC ont été échangés/.test(sp(ei.texte)) && ei.q === 15.6, ei);
+  check('disparu, échanges incertains : « de 15,6 BTC (sa plus grande taille lue) », retiré / échangé au cours de sa vie, le reste dit en dernier', /^Gros ordre d’achat de 15,6 BTC \(sa plus grande taille lue\) disparu à 81 798 \$, échanges incertains : au moins 12,0 BTC retirés, 3,50 BTC échangés au cours de sa vie ; on ne sait pas si ses derniers 0,035 BTC ont été échangés/.test(sp(ei.texte)) && ei.q === 15.6, ei);
 }
 check('absorbé : les BTC ÉCHANGÉS, « entièrement échangé »', /absorbé \(entièrement échangé\) : 13,0 BTC échangés/.test(evs[1].texte) && evs[1].q === 13, evs[1]);
 check('« gros ordre » au prix exact : « (un seul prix) » ; « mur » : une tranche', evs.slice(0, 6).every(e => /^Gros ordre d/.test(e.texte) && /un seul prix/.test(e.texte)) && /^Mur de vente apparu : 31,0 BTC entre 100 100 et 100 120.\$/.test(sp(evs[10].texte)), evs.map(e => e.texte));
-check('rafale : « d\'un seul coup (même milliseconde) », un seul prix s\'il n\'y en a qu\'un', /d'un seul coup \(même milliseconde\), de 80 936 à 80 943 \$/.test(sp(evs[6].texte)) && /, à 80.998 \$/.test(sp(evs[7].texte)), [evs[6].texte, evs[7].texte]);
+check('rafale : « d\'un seul coup (même milliseconde) », un seul prix s\'il n\'y en a qu\'un', /d’un seul coup \(même milliseconde\), de 80 936 à 80 943 \$/.test(sp(evs[6].texte)) && /, à 80.998 \$/.test(sp(evs[7].texte)), [evs[6].texte, evs[7].texte]);
 // Revue du 14/10 (M12) : « en direct » partout, plus « live » dans un texte lu.
-check('prix qui passe un mur : prix en direct, « percé, pas cassé », la règle de travail dite', /^Le prix \(en direct\) passe sous le mur d'achat/.test(evs[8].texte) && /Percé, pas « cassé »/.test(sp(evs[8].texte)) && /deux clôtures 1 min/.test(evs[8].texte) && /règle de travail, non mesurée/.test(evs[8].texte), evs[8].texte);
-check('niveau d\'options : « niveau d\'options « mur de gamma » », « modèle » et « lu à »', /niveau d'options « mur de gamma » 81 000 \$ \(modèle ; fichier lu à \d\d:\d\d\)/.test(sp(evs[9].texte)) && sp(evs[9].texte).includes('lu à ' + BM.heure(t0 - 900e3) + ')') && evs[9].t === t0 + 30e3, evs[9]);
-check('mur fondu : de 25 à 6 BTC, les échanges dits, « le prix n\'y est pas allé »', /de 25,0 à 6,00 BTC en moins d'une minute \(3,00 BTC échangés à ces prix ; le prix n'y est pas allé\)/.test(evs[11].texte), evs[11].texte);
+check('prix qui passe un mur : prix en direct, « percé, pas cassé », la règle de travail dite', /^Le prix \(en direct\) passe sous le mur d’achat/.test(evs[8].texte) && /Percé, pas « cassé »/.test(sp(evs[8].texte)) && /deux clôtures 1 min/.test(evs[8].texte) && /règle de travail, non mesurée/.test(evs[8].texte), evs[8].texte);
+check('niveau d\'options : « niveau d\'options « mur de gamma » », « modèle » et « lu à »', /niveau d’options « mur de gamma » 81 000 \$ \(modèle ; fichier lu à \d\d:\d\d\)/.test(sp(evs[9].texte)) && sp(evs[9].texte).includes('lu à ' + BM.heure(t0 - 900e3) + ')') && evs[9].t === t0 + 30e3, evs[9]);
+check('mur fondu : de 25 à 6 BTC, les échanges dits, « le prix n\'y est pas allé »', /de 25,0 à 6,00 BTC en moins d’une minute \(3,00 BTC échangés à ces prix ; le prix n’y est pas allé\)/.test(evs[11].texte), evs[11].texte);
 check('symboles du journal = ceux de BM.FINS_MURS et BM.SYMBOLES_GUIDE (rien de renommé)', evs[0].s === BM.FINS_MURS.retire.s && evs[1].s === BM.FINS_MURS.echange.s && evs[5].s === BM.SYMBOLES_GUIDE.apparu.s && evs[8].s === BM.SYMBOLES_GUIDE.sous.s);
 // Retiré pour l'essentiel PUIS touché : jamais « absorbé ». Le suivi réel (BM.SuiviMurs), lecture par lecture.
 {
@@ -276,7 +278,7 @@ check('symboles du journal = ceux de BM.FINS_MURS et BM.SYMBOLES_GUIDE (rien de 
   const f = fins[0] || {};
   garder(f);
   check('15 BTC retirés à 14,5 puis 0,5 échangé : « retiré pour l\'essentiel », les deux quantités dites, jamais « absorbé »', fins.length === 1 && f.type === 'essentiel' && !/absorbé/.test(f.texte + f.carte + f.court)
-    && /retiré pour l'essentiel : 14,5 BTC retirés, 0,500 BTC échangés à 80 900 \$ \(jusqu'à 15,0 BTC/.test(sp(f.texte)), fins);
+    && /retiré pour l’essentiel : 14,5 BTC retirés, 0,500 BTC échangés à 80 900 \$ \(jusqu’à 15,0 BTC/.test(sp(f.texte)), fins);
   // Le même suivi : un niveau vu en ENTRANT dans la bande lue (la lecture d'avant s'arrêtait au-dessus) est marqué.
   const S2 = new BM.SuiviMurs(BM.MURS.seuilsBtc, 2000);
   S2.lecture(dep([[80950, 1], [80930, 1]], 1), 0, 100, hz);
@@ -401,7 +403,7 @@ titre('11b. suivreNommes + seuil lissé : un passage progressif est vu, un seuil
     check(`prix qui descend de ${pas} $ par lecture à travers un mur nommé : UN passage, au bon niveau, une fois le prix sous le mur`, r.tr.length === 1 && r.tr[0].p === 99900 && r.tr[0].mid < 99900, r.tr);
     const ev = r.tr[0] && BM.evenementTraverse({ cote: 'b', p: r.tr[0].p, pas: 20, q: r.tr[0].q, qAvant: r.tr[0].qAvant, t: t0 });
     if (ev) garder(ev);
-    check('le passage d\'un mur approché dit sa taille quand il était nommé ET à la lecture d\'avant', !ev || r.tr[0].qAvant === null || /BTC quand il était nommé, .+ BTC à la lecture d'avant\)/.test(ev.texte), ev && ev.texte);
+    check('le passage d\'un mur approché dit sa taille quand il était nommé ET à la lecture d\'avant', !ev || r.tr[0].qAvant === null || /BTC quand il était nommé, .+ BTC à la lecture d’avant\)/.test(ev.texte), ev && ev.texte);
   }
   // Le prix approche le mur puis repart : aucun passage.
   const allerRetour = [0, 10, 20, 30, 40, 50, 60, 70, 60, 50, 40, 30, 20, 10, 0].map(d => livre(100000 - d));
@@ -571,7 +573,7 @@ titre('13. Mode débutant : phrase du haut, étiquettes, sens du prix, journal e
     ages: { recentes: 2000, anciennes: 120e3, ronds: 1500, ligne: 10e3, autre: 4 * 60e3 } });
   debTextes.push(...det);
   const dS = det.map(sp);
-  check('résumé ouvert : 6 lignes (prix, ordres en attente, les deux côtés, âges dont l\'autre plateforme, scénario au Terminal, photo pas prévision)', det.length === 6 && /^Prix : de 100.000 \$ à 100.120 \$ en 15 min \(\+0,12 %\)/.test(dS[0]) && /120 BTC à l'achat, 60,0 BTC à la vente/.test(dS[1])
+  check('résumé ouvert : 6 lignes (prix, ordres en attente, les deux côtés, âges dont l\'autre plateforme, scénario au Terminal, photo pas prévision)', det.length === 6 && /^Prix : de 100.000 \$ à 100.120 \$ en 15 min \(\+0,12 %\)/.test(dS[0]) && /120 BTC à l’achat, 60,0 BTC à la vente/.test(dS[1])
     && /^Au-dessus : Mur de vente · 100.060 \$ \(36,1 BTC entre 100.060 et 100.080 \$\)\. Au-dessous : rien de marquant\./.test(dS[2]) && /^Âges : couleurs récentes 2,0 s, plus anciennes 2 min · ronds 1,5 s · ligne du prix 10 s · autre plateforme 4 min\.$/.test(dS[3])
     && /^Le scénario du matin de Claude est sur le Terminal/.test(dS[4]) && /pas une prévision.+Le détail/.test(dS[5]), dS);
   check('résumé ouvert : jamais « : » en tête de ligne (espace insécable avant)', det.every(l => !/ [:;?!]/.test(l)), det);
@@ -625,10 +627,10 @@ titre('13. Mode débutant : phrase du haut, étiquettes, sens du prix, journal e
       ap('b', 82420, tk + 70e3), BM.evenementMurApparu({ cote: 'a', p: 82540, pas: 20, q: 60, t: tk + 80e3 }), ap('b', 82500, tk + 130e3, 2)];
     const fourchette = () => ({ bas: 82490, haut: 82505 });
     const jd = BM.journalDebutant(liste, fourchette), tx = jd.map(x => sp(x.texte));
-    const gb = tx.find(t => /gros ordres? d'achat posés?, \d+ disparus?/.test(t)), ga = tx.find(t => /gros ordre de vente posé, 1 disparu/.test(t));
+    const gb = tx.find(t => /gros ordres? d’achat posés?, \d+ disparus?/.test(t)), ga = tx.find(t => /gros ordre de vente posé, 1 disparu/.test(t));
     check(`journal débutant : 8 évènements → ${jd.length} lignes ; au prix, regroupés par côté (« ${gb} », « ${ga} »)`,
-      jd.length === 4 && /^Près du prix du moment : 3 gros ordres d'achat posés, 2 disparus \(\d\d:\d\d–\d\d:\d\d\)$/.test(gb || '') && /^Près du prix du moment : 1 gros ordre de vente posé, 1 disparu \(\d\d:\d\d(–\d\d:\d\d)?\)$/.test(ga || ''), tx);
-    check('journal débutant : un gros ordre à plus d\'une tranche du prix et un mur nommé gardent leur phrase', tx.some(t => /^Gros ordre d'achat posé : 14,5 BTC à 82.420 \$$/.test(t)) && tx.some(t => /^Mur de vente apparu entre 82.540 et 82.560/.test(t)), tx);
+      jd.length === 4 && /^Près du prix du moment : 3 gros ordres d’achat posés, 2 disparus \(\d\d:\d\d–\d\d:\d\d\)$/.test(gb || '') && /^Près du prix du moment : 1 gros ordre de vente posé, 1 disparu \(\d\d:\d\d(–\d\d:\d\d)?\)$/.test(ga || ''), tx);
+    check('journal débutant : un gros ordre à plus d\'une tranche du prix et un mur nommé gardent leur phrase', tx.some(t => /^Gros ordre d’achat posé : 14,5 BTC à 82.420 \$$/.test(t)) && tx.some(t => /^Mur de vente apparu entre 82.540 et 82.560/.test(t)), tx);
     check('journal débutant : jamais « (un seul prix) », et rangé du plus ancien au plus récent', !tx.some(t => /un seul prix/.test(t)) && jd.every((x, i) => !i || jd[i - 1].t <= x.t), jd);
     check('journal débutant : prix inconnu à cet instant : la phrase est gardée telle quelle', BM.journalDebutant(liste.slice(0, 2), () => null).length === 2);
     debTextes.push(...tx);

@@ -171,7 +171,7 @@ STRUCTURES.fenetres = {
     //    décor, comme le titre.
     c.decor('div', 'f95-titre', cc, cc.firstChild, 'Graphique');
     c.deplacer($('indicatorBar'), cc, $('chart'));
-    const etat = c.conteneur('div', 'f95-etat', cc, null, "Barre d'état : dernière publication");
+    const etat = c.conteneur('div', 'f95-etat', cc, null, "Barre d’état : dernière publication");
     c.deplacer($('cycle'), etat);
     // 2. Fenêtre « Infos du marché » (le nom du bouton qui l'ouvre, dans les deux modes)
     c.decor('div', 'f95-titre', fp, fp.firstChild, 'Infos du marché');
@@ -220,7 +220,7 @@ STRUCTURES.fenetres = {
 const CHUTE_RETRAIT_MS = 400;   // retrait de .gare-chute : après le passage du volet (0,22 s, CSS)
 const CHUTE_PRIX_MS = 5000;     // prix : au plus une chute par intervalle (il change chaque seconde)
 STRUCTURES.tableau = {
-  nom: "Tableau d'affichage",
+  nom: "Tableau d’affichage",
   construire() {
     const c = chantier(), $ = id => document.getElementById(id);
     const tete = document.querySelector('.header');

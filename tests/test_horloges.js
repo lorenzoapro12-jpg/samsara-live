@@ -127,6 +127,24 @@ const MD = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'contre',
   const c = vm.runInContext('texteAgeCouche()', page.sandbox);
   check(`âge de la couche : « ${c.texte} »`, /^Ordres en attente \(carte\) · dernière colonne il y a (9|10) min · publiée il y a 7 min$/.test(c.texte) && c.vieux === false);
 
+  // Revue du 14/10/2026 (M7, fonctionnement-12) : au même moment, la bulle d'un mur disait « il y a
+  // 2 h », le voyant « 91 min » ; à 5 h de retard, la pastille disait « 300 min ». Une seule règle
+  // (Fmt.duree) : les minutes jusqu'à 90, puis « 1 h 31 », « 5 h ».
+  titre('5. Une seule règle pour les âges : « 89 min », « 1 h 31 », « 5 h »');
+  const Fm = require(path.join(REPO, 'js/format.js')), Gd = require(path.join(REPO, 'js/guide.js'));
+  check('Fmt.duree : 89 min, 1 h 30, 1 h 31, 5 h, 5 h 03', Fm.duree(89) === '89 min' && Fm.duree(90) === '1 h 30' && Fm.duree(91) === '1 h 31' && Fm.duree(300) === '5 h' && Fm.duree(303) === '5 h 03',
+    [89, 90, 91, 300, 303].map(Fm.duree));
+  const tA = Date.now(), ages = [91, 300].map(m => [H.texteAge(m * 60000), Gd.ageDebutant(tA - m * 60000, tA, true)]);
+  check(`bulle et carte Horloges disent le même âge : ${JSON.stringify(ages)}`, ages[0][0] === 'il y a 1 h 31' && ages[0][1] === 'il y a 1 h 31' && ages[1][0] === 'il y a 5 h' && ages[1][1] === 'il y a 5 h', ages);
+  const voyant = vm.runInContext('titreVoyant(91, "fige")', page.sandbox), pastille = vm.runInContext('titreKpiDeb(300)', page.sandbox);
+  const bandeau = page.T.ageBannerHtml({ updated: new Date(Date.now() - 300 * 60000).toISOString() }).replace(/<[^>]+>/g, '');
+  check('voyant « il y a 1 h 31 », pastille « il y a 5 h », bandeau « figées depuis 5 h » (jamais « 91 min » ni « 300 min »)',
+    /il y a 1 h 31 \(/.test(voyant) && /il y a 5 h \(/.test(pastille) && /figées depuis 5 h :/.test(bandeau) && !/91 min|300 min/.test(voyant + pastille + bandeau), { voyant, pastille, bandeau });
+  page.T.setData(Object.assign({}, DATA, { updated: new Date(Date.now() - 300 * 60000).toISOString() }));
+  page.T.renderFeedTo(page.T.el('feed'));
+  const f5 = page.T.el('feed').innerHTML;
+  check('cartes des infos du marché à 5 h : « il y a 5 h », plus de « 300 min »', /il y a <span data-age-de="[^"]+">5 h<\/span>/.test(f5) && !/300<\/span> min|300 min/.test(f5), (f5.match(/data-age-de="[^"]+">[^<]*<\/span>[^<]{0,8}/g) || []).slice(0, 3));
+
   console.log(ko ? `\n❌ HORLOGES : ${ko} contrôle(s) en échec` : '\n✅ HORLOGES : TOUS LES CONTRÔLES PASSENT');
   process.exit(ko ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

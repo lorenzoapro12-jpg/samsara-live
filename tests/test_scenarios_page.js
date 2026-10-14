@@ -246,7 +246,9 @@ const etat = page => page.evaluate(() => {
       check(`${nom} : libellé du rang 1 fermé = son état, marqué « ${mode === 'expert' ? '· direct' : '(en direct)'} » (jamais les niveaux seuls)`,
         lib ? marque.test(lib.t) && /invalid/.test(lib.t) : !!(B && B.replie && /Scénario 1\b.*invalid.*direct/.test(B.lignes[0])), [lib, B && B.lignes[0]]);
       if (B && B.replie && /Scénario 1\b/.test(B.lignes[0])) check(`${nom} : ligne repliée qui nomme le rang 1 : son état, marqué en direct`, /invalid.*direct/.test(B.lignes[0]), B.lignes[0]);
-      // Un tap (ou survol) sur l'encadré : la bulle tient dans le tracé, « pas une recommandation » compris.
+      // Un tap (ou survol) sur l'encadré : la bulle tient dans le tracé, l'avertissement compris
+      // (revue du 14/10/2026, C19 : « Une hypothèse de Claude (une IA), pas un conseil. », celui de la
+      // charte, plus « pas une recommandation »).
       const c = e && e.cibles.find(q => q.prio <= 1 && q.rects.length && /^Scénarios/.test(q.titre));
       if (!c) check(`${nom} : l’encadré à toucher`, false, e && e.cibles.map(q => [q.prio, q.titre]));
       else {
@@ -262,7 +264,8 @@ const etat = page => page.evaluate(() => {
         const b = await o.page.evaluate(() => (scenEtat && scenEtat.bulle ? scenEtat.bulle : null));
         const vu = b ? b.corps.join(' ') : '';
         check(`${nom} : bulle de l’encadré dans le tracé (haut ≥ 0, bas ≤ ${e.mainH} px)`, b && b.y >= 0 && b.y + b.h <= e.mainH, b && { y: b.y, h: b.h, mainH: e.mainH });
-        check(`${nom} : la bulle MONTRE le suivi en direct, la note du journal et « pas une recommandation »`, /en direct/i.test(vu) && /journal/.test(vu) && /pas une recommandation/.test(vu), b && b.corps);
+        check(`${nom} : la bulle MONTRE le suivi en direct, la note du journal et « Une hypothèse de Claude (une IA), pas un conseil. »`, /en direct/i.test(vu) && /journal/.test(vu)
+          && /Une hypothèse de Claude \(une IA\), pas un conseil\./.test(vu.replace(/\s+/g, ' ')) && !/pas une recommandation/.test(vu), b && b.corps);
       }
       check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();

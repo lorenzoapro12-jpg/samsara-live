@@ -2921,10 +2921,10 @@ const STRATEGIES = {};
 // savoir que Bollinger n'achète QUE sur la bande basse (d'où un backtest qui ne fait rien).
 const STRAT_DESC = {
   bb_grid:   'achète à chaque niveau dès que le prix touche la bande de Bollinger basse. Plage auto : bande basse → bande médiane, donc aucune entrée tant que le prix ne descend pas jusque-là.',
-  rsi_grid:  'n\'arme la grille que si le RSI passe sous le seuil de survente (prix qui chute). Plage auto : prix courant ±5 %.',
-  ema_grid:  'achète les replis sur l\'EMA tant que la tendance reste haussière. Plage auto : EMA → prix courant.',
-  sr_grid:   'grille PERMANENTE bornée par le support et la résistance les plus proches. Repli sur ±5 % si aucun niveau n\'atteint le score minimum.',
-  dumb_grid: 'témoin sans aucun signal : grille fixe ±5 % toujours active. C\'est la référence que les autres doivent battre.',
+  rsi_grid:  'n’arme la grille que si le RSI passe sous le seuil de survente (prix qui chute). Plage auto : prix courant ±5 %.',
+  ema_grid:  'achète les replis sur l’EMA tant que la tendance reste haussière. Plage auto : EMA → prix courant.',
+  sr_grid:   'grille PERMANENTE bornée par le support et la résistance les plus proches. Repli sur ±5 % si aucun niveau n’atteint le score minimum.',
+  dumb_grid: 'témoin sans aucun signal : grille fixe ±5 % toujours active. C’est la référence que les autres doivent battre.',
 };
 
 function registerStrategy(key, def) { STRATEGIES[key] = def; }
@@ -6234,7 +6234,7 @@ function guidePasseesCompte(E) {
   });
   E.cibles.push({ rects: [guideZone(r)], prio: 4, ico: 'figure', titre: 'Figures passées', texte: [V[1] || V[0],
     'Marques : ✓ objectif atteint, ✗ annulée ou ratée, – délai écoulé après la validation, ○ sans suite. Survolez une marque : la suite.',
-    'Des exemples du passé, réussis ou non : pas un conseil.'] });
+    Guide.AVERTISSEMENT] });   // l'avertissement unique (revue du 14/10/2026, C19)
 }
 /** Lisible : le libellé de la figure passée (« ✓ Double creux : cible »), près de sa marque, s'il
  *  reste une place dans le budget des textes (PARAM.guide.debutant.items) une fois tout le reste
@@ -6754,7 +6754,7 @@ function debTenir(texte, facultatifs, courts) {
   for (const x of facultatifs) if (texte.includes(x) && n + motsDe(x) <= max) { garde.add(x); n += motsDe(x); }
   return texte.filter(t => !F.has(t) || garde.has(t));
 }
-/** Un avertissement de fin de bulle (« Une description, pas une recommandation. ») : en résumé, la
+/** Un avertissement de fin de bulle (« Une description, pas un conseil. ») : en résumé, la
  *  ligne d'accès au détail le redit (« pas une prévision »). */
 const estAvertissement = t => { const s = t.replace(Guide.RISQUE + ' ', ''); return s.length < 90 && /recommandation|conseil/.test(s); };
 /** Le résumé d'une bulle du Débutant (niveau 2) : ses phrases, dans l'ordre, tant que la bulle
@@ -6848,7 +6848,7 @@ function guideBulle(c, W, mainH, evite) {
   bulleVue = acces ? cle : null;   // tapGraphique : un 2e toucher sur ce résumé ouvre le détail
   // La bulle tient TOUJOURS dans le tracé (téléphone : un tracé de 380 px) : sinon la version courte
   // de l'explication (texteCourt), puis les paragraphes du début, un renvoi à la fiche et le
-  // dernier paragraphe (« pas une recommandation ») — jamais une phrase coupée au bord de l'écran.
+  // dernier paragraphe (« pas un conseil ») — jamais une phrase coupée au bord de l'écran.
   // Entre deux paragraphes, une ligne vide ; serrée (5 px) quand la place manque.
   let sep = hC;
   // « Voir sur la carte des ordres ▸ » (liaison avec la carte) : une ligne réservée au bas de la bulle, hors du
@@ -6877,7 +6877,7 @@ function guideBulle(c, W, mainH, evite) {
       garde.push(p);
     }
     paras = garde.concat([suite], dernier ? [dernier] : []);
-    // Encore trop haut (titre long, écran minuscule) : le renvoi part, « pas une recommandation » reste.
+    // Encore trop haut (titre long, écran minuscule) : le renvoi part, « pas un conseil » reste.
     while (paras.length > 1 && hDe(aplatir(paras)) > hMax) paras.shift();
   }
   const corps = aplatir(paras);
@@ -7060,7 +7060,7 @@ function dessinerMarqueCarte(P, pm, W, prixAxe) {
   // Le trait lui-même est sa cible (une bande de 10 px) : le Lisible n'ouvre une bulle que sur une
   // étiquette, et ce trait n'en a pas sur le tracé.
   cibleMarque = { rects: [{ x0, y0: y - 5, x1, y1: y + 5 }], segs: [[x0, y, x1, y]], prio: 1, prix: pm, coul: COLORS.accent2, titre: 'Prix venu de la carte · ' + t,
-    texte: ['Le prix choisi sur la carte des ordres. Le trait reste à ce prix ; il ne suit pas le prix du moment.', 'Une description, pas une recommandation.'] };
+    texte: ['Le prix choisi sur la carte des ordres. Le trait reste à ce prix ; il ne suit pas le prix du moment.', Guide.AVERTISSEMENT] };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -7618,8 +7618,8 @@ function scenCible(S, it, rects, segs, zones, prio) {
   // Sur la ligne du suivi en direct, à sa suite (une ligne de moins, charte du 12/10/2026).
   const lj = it.j ? Scenarios.ligneJourExpert(it.j, S.jour, ctxE) : null;
   if (lj) { const k = texte.findIndex(l => /^Suivi en direct/.test(l)); if (k < 0) texte.push(lj + '.'); else texte[k] = texte[k].replace(/\.$/, '') + ' · ' + lj + '.'; }
-  // L'avertissement, une fois, court.
-  texte.push('Une hypothèse de Claude (une IA), pas une recommandation.');
+  // L'avertissement, une fois, court : celui de Claude, le même partout (revue du 14/10/2026, C19).
+  texte.push(Guide.AVERTISSEMENT_CLAUDE);
   S.cibles.push({ rects, segs, zones, prio, coul: it.coul, scenario: it.sc.id, titre: scenTitre(it.sc, S.mode), texte });
 }
 /** Flèche et repères numérotés d'un chemin ENCORE OUVERT, dans la marge de futur : de la dernière
@@ -7847,7 +7847,7 @@ function scenReperes(S, top, bas) {
       }
       if (pose) break;
     }
-    S.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs: [[x, top, x, bas]], prio: 3, coul: COLORS.ink3, ico: 'moment', titre: nomsTous[0], texte: [expl, exp ? 'Une description, pas une recommandation.' : 'Une description, pas un conseil.'] });
+    S.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs: [[x, top, x, bas]], prio: 3, coul: COLORS.ink3, ico: 'moment', titre: nomsTous[0], texte: [expl, Guide.AVERTISSEMENT] });
     if (!pose) continue;
     etiquettesAFaire.push(() => {
       ctx.font = chartFont(8.5, 650);
@@ -8137,10 +8137,11 @@ function scenBoite(S, top, bas) {
 }
 /** L'explication de l'encadré (survol du titre ou des notes). sansBilan : la ligne du bilan est
  *  déjà dite (encadré replié) ; seule sa règle suit. court : la version des écrans courts — ce qui
- *  est en direct ou officiel, un renvoi à la fiche, et « pas une recommandation ». */
+ *  est en direct ou officiel, un renvoi à la fiche, et « pas un conseil ». */
 function scenTexteBoite(S, sansBilan, court) {
   const F = S.F, P = PARAM.scenarios, exp = S.exp, out = [];
-  const fin = exp ? 'Une hypothèse de Claude (une IA), pas une recommandation.' : 'Une hypothèse de Claude (une IA), pas un conseil.';
+  // Le même avertissement avec ou sans « Le détail » (revue du 14/10/2026, C19).
+  const fin = Guide.AVERTISSEMENT_CLAUDE;
   const officiel = exp ? 'États : suivi en direct (bougies ' + S.itv + ') ; officiel : le journal, le lendemain (bougies 1 min).' : '« (en direct) » : suivi par le site ; la note officielle (journal) vient le lendemain.';
   if (court && F) {
     // Les lignes courtes des scénarios (niveaux, invalidation, état), le bilan, ce qui est en direct.
@@ -8251,8 +8252,9 @@ function scenResumeLigneDebutant(S) {
   const E = S.items.map(i => Object.assign({ r: i.sc.rang === 'S' ? 'semaine' : i.sc.rang }, Scenarios.etatCourtDebutant(i.sc, i.sv)));
   const une = new Set(E.map(e => e.marque)).size === 1;
   const tete = une ? ({ '(en direct)': 'En direct : ', '(journal)': 'Journal : ' })[E[0].marque] || '' : '';
-  // Tous dans le même état : dit une fois (« En direct : les 3 en cours. »).
-  const etats = E.length > 1 && une && new Set(E.map(e => e.etat)).size === 1 ? tete + (E.length === 2 ? 'les deux ' : 'les ' + E.length + ' ') + E[0].etat
+  // Tous dans le même état : dit une fois, au pluriel (« En direct : les 3 en cours. », « les 3
+  // terminés » ; revue du 14/10/2026, C20 : « les 3 terminé »).
+  const etats = E.length > 1 && une && new Set(E.map(e => e.etat)).size === 1 ? tete + (E.length === 2 ? 'les deux ' : 'les ' + E.length + ' ') + Scenarios.etatPluriel(E[0].etat)
     : tete + E.map(e => e.r + ' ' + e.etat + (!une && e.marque ? ' ' + e.marque : '')).join(' · ');
   return ['Hypothèses de Claude (une IA), écrites au point du matin.', etats + '.'];
 }
@@ -8283,7 +8285,7 @@ function scenTexteDebutant(S, it, court, cede) {
   if (nomP && e >= 0 && n + motsDe(nomP) <= max) { out.splice(e + 1, 0, nomP); n += motsDe(nomP); }
   const autres = cede ? [scenAutresDebutant(S, it), scenAutresDebutant(S, it, true)].find(a => a && n + motsDe(a) <= max) : null;
   if (autres) out.push(autres);
-  out.push('Une hypothèse de Claude (une IA), pas un conseil.');
+  out.push(Guide.AVERTISSEMENT_CLAUDE);
   return out;
 }
 /** La phrase courte des autres scénarios, pour la bulle du scénario montré quand la ligne des
@@ -8297,7 +8299,8 @@ function scenAutresDebutant(S, it, bref) {
   const E = A.map(i => Object.assign({ r: i.sc.rang === 'S' ? 'semaine' : i.sc.rang }, Scenarios.etatCourtDebutant(i.sc, i.sv)));
   const une = new Set(E.map(e => e.marque)).size === 1, marque = une && E[0].marque ? ' ' + E[0].marque : '';
   const tete = bref ? 'Les autres : ' : it.sc.rang === '1' ? 'Les autres, classés après lui : ' : 'Les autres scénarios : ';
-  const etats = E.length > 1 && une && new Set(E.map(e => e.etat)).size === 1 ? E[0].etat : E.map(e => e.r + ' ' + e.etat + (!une && e.marque ? ' ' + e.marque : '')).join(', ');
+  // Plusieurs dans le même état : le mot au pluriel (« Les autres : invalidés ✗ », revue du 14/10/2026, C20).
+  const etats = E.length > 1 && une && new Set(E.map(e => e.etat)).size === 1 ? Scenarios.etatPluriel(E[0].etat) : E.map(e => e.r + ' ' + e.etat + (!une && e.marque ? ' ' + e.marque : '')).join(', ');
   return tete + etats + marque + '.';
 }
 /** Le libellé du scénario 1, près du trait de son premier niveau (le haut d'un range), à gauche
@@ -8378,7 +8381,7 @@ function scenLibelleDebutant(S, it, top, bas) {
  *  l'ordre, ce que veut dire « (en direct) ». */
 function scenTexteLigneDebutant(S) {
   const F = S.F, out = [];
-  const avert = 'Une hypothèse de Claude (une IA), pas un conseil.';
+  const avert = Guide.AVERTISSEMENT_CLAUDE;
   const hP = heurePointMatin();
   const chaque = 'Chaque matin' + (hP ? ' vers ' + hP : '') + ', Claude (une IA) écrit trois scénarios pour environ 24 h, classés du plus au moins probable, sans pourcentage.';
   if (!F) {
@@ -9240,11 +9243,13 @@ let etatAffiche = null;
 /** Le titre du voyant et de la barre des tâches : ce qu'il mesure (l'âge des infos du marché,
  *  publiées toutes les N min — pas le prix, lu à la seconde) et son état. Revue du 14/10 (C11) :
  *  Binance injoignable, il disait encore « Le prix du haut est lu à la seconde ». Il dit maintenant
- *  pourquoi le prix n'arrive pas ; la teinte, elle, reste celle de l'âge de la publication. */
+ *  pourquoi le prix n'arrive pas ; la teinte, elle, reste celle de l'âge de la publication. L'âge
+ *  suit la règle de tous les âges du site (Fmt.duree : « 91 min », puis « 1 h 31 », « 5 h » ;
+ *  revue du 14/10/2026, M7). */
 function titreVoyant(min, etat) {
   if (min === null) return 'Infos du marché : heure de publication inconnue';
   const p = Horloges.sources.prix;
-  return 'Infos du marché publiées il y a ' + min + ' min (attendues toutes les ' + CADENCES.attendue_min + ' min)'
+  return 'Infos du marché publiées il y a ' + Fmt.duree(min) + ' (attendues toutes les ' + CADENCES.attendue_min + ' min)'
     + (etat === 'fige' ? ' : la publication s’est arrêtée' : etat === 'retard' ? ' : en retard' : '') + '. '
     + (p && p.classe ? 'Le prix du haut n’arrive pas : ' + p.libelle + '.' : 'Le prix du haut est lu à la seconde.');
 }
@@ -9269,7 +9274,8 @@ function majAges(nouvelle) {
   const td = document.getElementById('taskbarDot');
   if (td) { td.style.background = teinte; td.title = titre; }
   if (min !== null && document.querySelectorAll) {
-    const n = String(min);
+    // L'âge et son unité (« 25 min », « 1 h 31 ») : Fmt.duree, comme partout (revue du 14/10/2026, M7).
+    const n = Fmt.duree(min);
     for (const el of document.querySelectorAll('[data-age-de]')) if (el.textContent !== n) el.textContent = n;
     const cy = document.getElementById('cycle');
     if (cy && cy.classList.contains('vieux') !== (etat === 'retard' || etat === 'fige')) {
@@ -9277,7 +9283,7 @@ function majAges(nouvelle) {
       ajusterKpis();       // la pastille d'âge s'allonge (« en retard · ») : la bande se remesure
     }
     const kd = cy && cy.querySelector ? cy.querySelector('.kpi-deb') : null;
-    if (kd && kd.title !== titreKpiDeb(n)) { kd.title = titreKpiDeb(n); kd.setAttribute('aria-label', ariaKpiDeb(n)); }
+    if (kd && kd.title !== titreKpiDeb(min)) { kd.title = titreKpiDeb(min); kd.setAttribute('aria-label', ariaKpiDeb(min)); }
   }
 }
 // L'onde du voyant : UNE par publication NOUVELLE, deux passages puis le calme. Avant : à chaque
@@ -9457,7 +9463,7 @@ async function renderLive() {
     : ratio >= RL.ratioMarque ? 'déséquilibre acheteur marqué' : ratio >= RL.ratioLeger ? 'léger penchant acheteur'
     : ratio <= 1 / RL.ratioMarque ? 'déséquilibre vendeur marqué' : ratio <= 1 / RL.ratioLeger ? 'léger penchant vendeur' : 'équilibré';
   const autresBandes = mesures.slice(1).map(([b, m]) => bandeTxt(b) + ' : ' + (!m ? '—' : m.couverte ? '<b>' + fmtNum(m.ratio, 2) + '</b>' : 'non couverte')).join(' · ');
-  html += mCard('💧', 'Carnet en direct ' + bandeTxt(BANDE), 'Binance spot · ' + Fmt.nombre(RL.niveaux) + ' niveaux, vus jusqu\'à ±'
+  html += mCard('💧', 'Carnet en direct ' + bandeTxt(BANDE), 'Binance spot · ' + Fmt.nombre(RL.niveaux) + ' niveaux, vus jusqu’à ±'
     + (isFinite(couv) ? fmtNum(couv, 2) : '—') + ' % · instantané', '',
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">' + volumes + '</div>'
     + '<div style="margin-top:6px;font-size:15px;font-weight:800">Ratio bid/ask '
@@ -9481,7 +9487,7 @@ async function renderLive() {
   // 5 — CE QUI N'EST PAS EN DIRECT ICI, ET POURQUOI
   // Mêmes précisions que les chiffres clés et les cartes : funding 4 décimales sur 8 h, 1 une
   // fois annualisé, L/S 2, variation 24 h 2.
-  const ageTxt = ageMin === null ? 'inconnu' : ageMin + ' min';
+  const ageTxt = ageMin === null ? 'inconnu' : Fmt.duree(ageMin);
   html += mCard('🕐', 'Ce qui n’est pas en direct ici', 'lu dans les infos du marché publiées — âge ' + ageTxt, '',
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">'
     + 'Perp (mark) <b>' + (isNum(mi.mark_price) ? fmtPx(mi.mark_price) : '—') + '</b>'
@@ -9499,7 +9505,7 @@ async function renderLive() {
     + '<div style="margin-top:8px;font-size:11px;color:var(--ink-2);line-height:1.45">'
     + 'Le basis se lit entre le perp et le spot publiés au même instant. Deux cadences différentes ne se soustraient '
     + 'jamais : le perp publié retranché du spot en direct donnerait un écart faux de plusieurs centaines de points.<br><br>'
-    + 'Ces blocs viennent des infos du marché, publiées toutes les ' + CADENCES.attendue_min + ' min : cette page n\'interroge que Binance '
+    + 'Ces blocs viennent des infos du marché, publiées toutes les ' + CADENCES.attendue_min + ' min : cette page n’interroge que Binance '
     + 'en direct, les autres sources (OKX, Deribit, Yahoo) sont rassemblées avant la publication et arrivent avec '
     + 'leurs ' + CADENCES.attendue_min + ' minutes. Pour comparer honnêtement, ce prix-ci est du <b>spot Binance</b> : comparez-le '
     + 'à votre <b>spot</b> OKX, jamais à un swap — le basis perp/spot fait 20 à 50 pts et ce n&#39;est pas '
@@ -9690,14 +9696,14 @@ function renderCycle(d) {
     // .age-retard : le texte de la pastille reste « 25 min », que Gare et la Planche habillent à
     // leur façon) ; elle reste visible au téléphone, seule de la bande.
     + '<span class="kpi-age" title="Âge des infos du marché (publiées toutes les ' + CADENCES.attendue_min + ' min)">'
-    + (ageK === null ? '—' : '<span class="age-retard"></span>' + ageDe(d.updated, ageK) + ' min') + '</span>'
+    + (ageK === null ? '—' : '<span class="age-retard"></span>' + ageDe(d.updated, ageK)) + '</span>'
     // Débutant : une seule pastille, qui ouvre les cartes ; son âge dans l'infobulle (collé au prix
     // en direct, « il y a 18 min » se lisait comme l'âge du prix). « en retard » au-delà du seuil,
     // avec l'âge qui avance : c'est alors l'âge d'une publication manquée, il se lit.
     + '<span class="kpi-deb sans-chiffres" role="button" tabindex="0" title="' + titreKpiDeb(ageK) + '" aria-label="' + ariaKpiDeb(ageK) + '">'
     // (Au téléphone, « Infos · » cède : « en retard · 25 min ▸ » tient à côté des boutons.)
     + '<span class="deb-frais">Infos du marché ▸</span><span class="deb-retard"><span class="deb-quoi">Infos<span class="deb-mot"> du marché</span> · </span>en retard'
-    + (ageK === null ? '' : ' · ' + ageDe(d.updated, ageK) + ' min') + '<span class="deb-fleche"> ▸</span></span></span>';
+    + (ageK === null ? '' : ' · ' + ageDe(d.updated, ageK)) + '<span class="deb-fleche"> ▸</span></span></span>';
   cy.classList.toggle('vieux', ageK !== null && ageK > CADENCES.vieux_min);
   cy.classList.toggle('a-epingles', ep.length > 0);
   const cad = chronique.cadence();
@@ -9720,11 +9726,12 @@ const ariaKpiDeb = min => 'Infos du marché — ' + titreKpiDeb(min);
   });
   if (cy && typeof ResizeObserver !== 'undefined') new ResizeObserver(() => ajusterKpis()).observe(cy);
 })();
-const titreKpiDeb = min => (min === null ? 'Infos publiées : âge inconnu' : 'Infos publiées il y a ' + min + ' min') + ' (toutes les ' + CADENCES.attendue_min + ' min'
+const titreKpiDeb = min => (min === null ? 'Infos publiées : âge inconnu' : 'Infos publiées il y a ' + Fmt.duree(min)) + ' (toutes les ' + CADENCES.attendue_min + ' min'
   + (min !== null && min > CADENCES.vieux_min ? ' : en retard' : '') + '). Le prix du haut est en direct.';
 function renderFeed() { renderFeedTo(document.getElementById('feed')); }
-// Un âge en minutes, réécrit sur place à chaque tour par majAges().
-const ageDe = (updated, min) => '<span data-age-de="' + escHtml(updated) + '">' + min + '</span>';
+// Un âge et son unité (« 25 min », « 1 h 31 » : Fmt.duree, la règle de tous les âges du site, revue
+// du 14/10/2026, M7), réécrit sur place à chaque tour par majAges().
+const ageDe = (updated, min) => '<span data-age-de="' + escHtml(updated) + '">' + Fmt.duree(min) + '</span>';
 // Ce qui ne tient pas dans la bande est masqué EN ENTIER, en partant de la fin (ordre d'utilité).
 // Les traces (js/chronique.js) passent APRÈS les valeurs : on place d'abord les valeurs seules,
 // puis on rend leur trace aux premières tant qu'elles tiennent. Une valeur n'est jamais masquée
@@ -9791,7 +9798,7 @@ const envDebutant = h => '<div class="env-deb sans-chiffres">' + h + '</div>';
 const prixDeb = v => (isNum(v) ? escHtml(Guide.prix(v, '$')) : '—');
 const btcDeb = v => (isNum(v) ? escHtml(Guide.nombre(v, v >= 10 ? 0 : 1)) + ' BTC' : '—');
 // « il y a 18 min » (l'âge est réécrit sur place chaque minute, majAges).
-const ilYaDeb = (updated, min) => (min === null ? 'âge inconnu' : 'il y a ' + ageDe(updated, min) + ' min');
+const ilYaDeb = (updated, min) => (min === null ? 'âge inconnu' : 'il y a ' + ageDe(updated, min));
 // Où est une valeur dans [lo, hi], de 0 à 1 (ou null).
 const positionDans = (v, lo, hi) => (isNum(v) && isNum(lo) && isNum(hi) && hi > lo ? Math.max(0, Math.min(1, (v - lo) / (hi - lo))) : null);
 function ageBannerHtml(d) {
@@ -9808,10 +9815,10 @@ function ageBannerHtml(d) {
   const fige = min > CADENCES.fige_min, n = ageDe(d.updated, min);
   return '<div class="age-banner' + (fige ? '' : ' retard') + '" style="display:block">'
     + (fige
-        ? modes('Données figées depuis ' + n + ' min — la publication s’est arrêtée',
-          'Données figées depuis ' + n + ' min : la publication s’est arrêtée.')
-        : modes('Dernière publication il y a ' + n + ' min (cadence attendue : ' + CADENCES.attendue_min + ' min)',
-          'Dernière publication il y a ' + n + ' min (attendue toutes les ' + CADENCES.attendue_min + ' min).'))
+        ? modes('Données figées depuis ' + n + ' — la publication s’est arrêtée',
+          'Données figées depuis ' + n + ' : la publication s’est arrêtée.')
+        : modes('Dernière publication il y a ' + n + ' (cadence attendue : ' + CADENCES.attendue_min + ' min)',
+          'Dernière publication il y a ' + n + ' (attendue toutes les ' + CADENCES.attendue_min + ' min).'))
     + '</div>';
 }
 
@@ -9858,7 +9865,7 @@ function renderFeedTo(container) {
   // réservé à la fourchette de 7 jours). Un seul prix en grand à l'écran, celui du haut, en direct ;
   // le prix publié, plus petit (Expert) ou en ligne (Débutant), avec son âge.
   html += mCard('📊', btcTitre('Plus bas et plus haut des 24 h'), modes('Binance spot · publié à ' + hhmm
-      + (ageMin !== null ? ' (il y a ' + ageDe(d.updated, ageMin) + ' min — le prix du haut est en direct)' : ''), 'Binance · le prix du haut est en direct'), '',
+      + (ageMin !== null ? ' (il y a ' + ageDe(d.updated, ageMin) + ' — le prix du haut est en direct)' : ''), 'Binance · le prix du haut est en direct'), '',
     envExpert('<div class="hero hero-publie"><span class="hero-lbl">Prix publié</span><span class="hero-val">' + fmtUsd(b.price) + '</span>'
     + '<span class="' + chipCls(b.change_24h_pct) + '">' + pctSigne(b.change_24h_pct) + ' en 24 h</span></div>')
     + envDebutant('<div class="fine">' + (autrePaire ? 'Prix du bitcoin publié ' : 'Prix publié ') + ilYaDeb(d.updated, ageMin) + ' : <b style="color:var(--ink-1)">' + prixDeb(b.price) + '</b></div>')
@@ -10008,7 +10015,7 @@ function renderFeedTo(container) {
       + '<span class="fine">Ratio <b>bid/ask</b> ' + bandeTxt(cle) + ' : <b>'
       + fmtNum(bt.ratio,2) + '</b></span></div>'
       + splitHtml(bt.bid_btc, bt.ask_btc, 'Bids&nbsp;<b>' + fmtNum(bt.bid_btc,1) + ' BTC</b>', 'Asks&nbsp;<b>' + fmtNum(bt.ask_btc,1) + ' BTC</b>')
-      + '<div class="fine" style="margin-top:4px">' + autres + ' · carnet vu jusqu\'à ±' + fmtNum(lq.couverture_pct,2) + ' %</div>'
+      + '<div class="fine" style="margin-top:4px">' + autres + ' · carnet vu jusqu’à ±' + fmtNum(lq.couverture_pct,2) + ' %</div>'
       + (perso ? '<div class="fine">Sur le profil publié (à ' + lq.wall_bin_usd + ' $ près) : ' + perso + '</div>' : '')
       + lectureCourte('carnet', bt.ratio)
       // La tranche est LUE dans le fichier (`wall_bin_usd`) ; absente, on ne l'invente pas.
@@ -10018,7 +10025,7 @@ function renderFeedTo(container) {
                    mursFusionnes(lq, 'bid', Array.isArray(lq.profil_bids) ? RC.trancheX : 1, RC.murs, RC.murMin), lq.mid) + '</div>'
       + '<div class="fine" style="margin-top:8px">Instantané du carnet à la publication — un mur peut être retiré à tout moment.</div>';
   } else {
-    liqBody = '<div class="fine">Format ancien (scores d\'intensité sans unité) — en attente de la prochaine publication.</div>';
+    liqBody = '<div class="fine">Format ancien (scores d’intensité sans unité) — en attente de la prochaine publication.</div>';
   }
   // Débutant : « Ordres en attente » — la barre achat / vente près du prix, une phrase, et ce que
   // vaut une photo du carnet.
@@ -10059,7 +10066,7 @@ function renderFeedTo(container) {
     // (Le nom et la version du programme de publication — `generator` — ne sont plus affichés :
     // une note de développeur, pas une information du lecteur.)
     + '<div class="fine" style="margin-top:8px">Sources : ' + escHtml(nomsSources(d.source)) + '</div>';
-  const ageFlux = 'il y a ' + (ageMin === null ? '—' : ageDe(d.updated, ageMin)) + ' min' + (vieille ? ' · en retard' : '');
+  const ageFlux = 'il y a ' + (ageMin === null ? '—' : ageDe(d.updated, ageMin)) + (vieille ? ' · en retard' : '');
   html += mCard('🔌', modes('Flux', 'Publication'), modes('Blocs de la dernière publication · ' + ageFlux, 'Dernière publication · ' + ageFlux), '',
     envExpert(stBody) + envDebutant('<div class="hero"><span class="hero-val' + (nOk < nTot ? ' stat-neg' : '') + '" style="font-size:19px">' + nOk + '/' + nTot + ' infos publiées</span></div>')
     + phraseCarte('sources', nOk, nTot));
@@ -10574,7 +10581,7 @@ function showStratStats(result) {
   html +=
     '<div>Opérations closes : <span class="stat-val">' + result.tradeCount + '</span> | Gagnantes : <span title="Part des opérations closes en profit" class="' + (result.winRate >= 50 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.nombre(result.winRate, 1) + ' %</span></div>' +
     '<div>Résultat : <span title="Profit ou perte, frais de 0,1 % déjà déduits" class="' + (result.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' ' + unite + '</span> (' + Fmt.pct(ret, 2) + ')</div>' +
-    '<div>Perte max : <span title="Plus forte baisse depuis un sommet du capital (drawdown)" class="stat-neg">' + Fmt.nombre(result.maxDrawdownPct, 1) + ' %</span>' + (juge ? ' | Ratio de Sharpe : <span title="Rendement par unité de risque, annualisé. Au-delà de 1 c\'est bon ; sur une fenêtre courte il ne veut rien dire." class="stat-val">' + nombreBot(result.sharpe, 3) + '</span>' : '') + '</div>' +
+    '<div>Perte max : <span title="Plus forte baisse depuis un sommet du capital (drawdown)" class="stat-neg">' + Fmt.nombre(result.maxDrawdownPct, 1) + ' %</span>' + (juge ? ' | Ratio de Sharpe : <span title="Rendement par unité de risque, annualisé. Au-delà de 1 c’est bon ; sur une fenêtre courte il ne veut rien dire." class="stat-val">' + nombreBot(result.sharpe, 3) + '</span>' : '') + '</div>' +
     '<div>' + (juge ? 'Gains / pertes : <span title="Total des gains divisé par le total des pertes. Au-dessus de 1, la grille gagne." class="stat-val">' + nombreBot(result.profitFactor, 2) + '</span> | ' : '') + 'Gain moyen : <span title="Gain moyen par opération gagnante" class="stat-pos">' + Fmt.nombre(result.avgWin, 2) + ' ' + unite + '</span> | Perte moyenne : <span title="Perte moyenne par opération perdante" class="stat-neg">' + Fmt.nombre(result.avgLoss, 2) + ' ' + unite + '</span></div>';
   // Le « trop peu » est dit en tête : la note ne garde que le moyen d'en avoir plus.
   if (!juge) html += '<div class="strat-note">Visez ' + PARAM.gridBot.operationsVisees + ' opérations closes : élargissez la période avec les champs « Du » / « Au ».</div>';

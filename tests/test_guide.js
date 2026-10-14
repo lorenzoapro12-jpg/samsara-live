@@ -666,8 +666,10 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
       && /^Triangle qui se resserre : .*Le prix vient de sortir par le bas\. Il a fini une tranche de 4 h sous .*S’il revient franchement dedans, la sortie ne compte pas\./.test(ec[3]), ec);
     // (Revue du 14/10/2026, M6 : « selon l'usage des analystes » part de la bulle du Débutant ;
     // « théorique » et « non garanti » restent, les statistiques de la figure disent d'où il vient.)
-    check('… toujours l’objectif théorique (« non garanti », jamais « cible ») avec le bilan mesuré, l’annulation dite pour les doubles, jamais « vise », aucun mot banni, aucun conseil, « pas une prévision ni un conseil »',
-      ec.every(x => /Mesuré sur/.test(x) && /[Oo]bjectifs? théoriques? : \d/.test(x) && /non garantis?/.test(x) && !/cible/i.test(x) && !/vise/.test(x) && !G.motsBannis(x).length && !CONSEIL.test(x.replace('pas une prévision ni un conseil', '')) && /pas une prévision ni un conseil/.test(x))
+    // (Revue du 14/10/2026, C19 : la fin est l'avertissement partagé de la charte, « Une description,
+    // pas un conseil. », plus « pas une prévision ni un conseil ».)
+    check('… toujours l’objectif théorique (« non garanti », jamais « cible ») avec le bilan mesuré, l’annulation dite pour les doubles, jamais « vise », aucun mot banni, aucun conseil, « Une description, pas un conseil. »',
+      ec.every(x => /Mesuré sur/.test(x) && /[Oo]bjectifs? théoriques? : \d/.test(x) && /non garantis?/.test(x) && !/cible/i.test(x) && !/vise/.test(x) && !G.motsBannis(x).length && !CONSEIL.test(x.replace(G.AVERTISSEMENT, '')) && x.endsWith(G.AVERTISSEMENT) && !/pas une prévision ni/.test(x))
       && /Annulée si le prix finit un quart d’heure au-dessus de 86 400 \$/.test(ec[0]) && /Annulée si le prix finit une heure sous 81 900 \$/.test(ec[1]), ec.map(x => [x, G.motsBannis(x)]));
     // Plan du site, idée 8 (13/10/2026) : l'objectif dit sur quoi il se calcule (hauteur, ou largeur
     // pour une figure à deux droites) — en moins de mots depuis la revue du 14/10/2026 (M6, N6) :

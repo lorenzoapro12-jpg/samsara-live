@@ -19,6 +19,8 @@
 // succès et leurs échecs.
 // ═══════════════════════════════════════════════════════════════════════════════
 const Horloges = (function () {
+  // Les formats communs (js/format.js, chargé avant ; hors navigateur, lu par require).
+  const Fm = typeof Fmt !== 'undefined' ? Fmt : require('./format.js');
   const ECHANTILLONS = 5;          // décalage : meilleur aller-retour parmi les N derniers
   const ECART_SIGNALE_MS = 1000;   // en deçà, l'horloge du poste n'est pas signalée
 
@@ -178,15 +180,15 @@ const Horloges = (function () {
   }
 
   /** « il y a 3 min », « dans 12 min », « < 5 s ». Grain : 5 s sous la minute (le texte ne
-   *  change pas à chaque seconde), la minute ensuite, l'heure au-delà de 90 min. PUR. */
+   *  change pas à chaque seconde), la minute ensuite, l'heure au-delà de 90 min (« 1 h 31 »,
+   *  « 5 h » : Fmt.duree, la règle de tous les âges du site, revue du 14/10/2026, M7). PUR. */
   function texteAge(ms) {
     if (ms === null || !isFinite(ms)) return '—';
     const futur = ms < 0, a = Math.abs(ms) / 1000;
     let x;
     if (a < 5) return futur ? 'dans < 5 s' : '< 5 s';
     if (a < 60) x = Math.floor(a / 5) * 5 + ' s';
-    else if (a < 90 * 60) x = Math.floor(a / 60) + ' min';
-    else if (a < 48 * 3600) { const h = Math.floor(a / 3600), m = Math.floor(a % 3600 / 60); x = h + ' h ' + String(m).padStart(2, '0'); }
+    else if (a < 48 * 3600) x = Fm.duree(a / 60);
     else x = Math.floor(a / 86400) + ' j';
     return (futur ? 'dans ' : 'il y a ') + x;
   }

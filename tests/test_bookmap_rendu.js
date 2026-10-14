@@ -26,6 +26,8 @@ if (!playwright) {
 let ko = 0;
 const check = (nom, ok, det) => { if (!ok) ko++; console.log(`  ${ok ? '✓' : '✗'} ${nom}${!ok && det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 300) : ''}`); };
 const titre = t => console.log(`\n── ${t} ──`);
+// Revue du 14/10/2026 (C21, textes-18) : les textes de la carte s’écrivent avec l’apostrophe ’ ; les
+// motifs qui les lisent (« Choisir l’affichage », « d’ordres », « l’appareil »…) l’attendent aussi.
 
 // ── Binance simulé ───────────────────────────────────────────────────────────
 const MAINTENANT = Date.now();
@@ -456,6 +458,20 @@ async function filNoir(page, x, y) {
       check(`le carnet en direct repart (${n1} → ${e11.live.n} lectures), erreur effacée`, e11.live.n > n1 + 1 && !/carnet en direct/.test(e11.statut), { n1, n: e11.live.n, statut: e11.statut });
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p11.close();
+    }
+
+    // Revue du 14/10/2026 (C21, textes-21) : une réponse au format inattendu ({} au lieu d'une liste)
+    // faisait écrire au statut le message JavaScript brut, en anglais (« t is not iterable »).
+    titre('11b. Réponse au format inattendu : « données illisibles », jamais le message JavaScript brut');
+    {
+      const intercept = (u, k) => (k === 'aggTrades' ? { status: 200, body: '{}' } : null);
+      let p11b;
+      ({ page: p11b, erreurs } = await ouvrir(nav, { encodage: true, intercept }));
+      await p11b.waitForFunction(() => /données illisibles/.test(window.__carte.etat().statut), null, { timeout: 9000 }).catch(() => {});
+      const st = (await etat(p11b)).statut;
+      check(`statut : « … : données illisibles — nouvel essai dans … » (« ${st} »)`, /: données illisibles( —|$| ·)/.test(st) && !/iterable|TypeError|undefined|null/.test(st), st);
+      check('aucune erreur JavaScript', !erreurs.length, erreurs);
+      await p11b.close();
     }
 
     // ════ Carnet live : échelle, instants, lectures périmées ═══════════════════
@@ -1404,15 +1420,15 @@ async function filNoir(page, x, y) {
       check('guide allumé par défaut, destin des murs éteint, mode débutant (terminal sans mode)', e0.guide.allume && !e0.reglages.calques.destin && e0.guide.mode === 'debutant', e0.guide);
       debutMur = Date.now();
       // La phrase commence par la plus grande taille lue (« Gros ordre d'achat de 30,0 BTC … retiré »).
-      await p44.waitForFunction(() => window.__carte.etat().guide.journal.some(j => /^Gros ordre d'achat de .+ BTC.* (retiré|disparu)/.test(j.texte)), null, { timeout: 40000 }).catch(() => {});
+      await p44.waitForFunction(() => window.__carte.etat().guide.journal.some(j => /^Gros ordre d’achat de .+ BTC.* (retiré|disparu)/.test(j.texte)), null, { timeout: 40000 }).catch(() => {});
       const j44 = (await etat(p44)).guide.journal;
-      check('gros ordre posé puis retiré, « Destin » éteint : au journal du guide (« Gros ordre d\'achat de 30,0 BTC … retiré … (un seul prix) »)', j44.some(j => /^Gros ordre d'achat de 30,0 BTC.* (retiré|disparu).+un seul prix/.test(j.texte) || /^Gros ordre d'achat de .+ BTC.* retiré.+un seul prix/.test(j.texte)), j44);
+      check('gros ordre posé puis retiré, « Destin » éteint : au journal du guide (« Gros ordre d\'achat de 30,0 BTC … retiré … (un seul prix) »)', j44.some(j => /^Gros ordre d’achat de 30,0 BTC.* (retiré|disparu).+un seul prix/.test(j.texte) || /^Gros ordre d’achat de .+ BTC.* retiré.+un seul prix/.test(j.texte)), j44);
       await p44.click('#btnJournal'); await p44.waitForTimeout(300);
       const lj = await p44.evaluate(() => document.getElementById('listeJournal').innerText);
       // Débutant : l'ordre était posé à 15 $ du prix (moins d'une tranche de 20 $) : il est dit dans la ligne
       // regroupée « Près du prix du moment … » (BM.journalDebutant), sans symbole, à l'heure de l'appareil.
       check('panneau « Ce qui vient de se passer » (Débutant) : heure de l\'appareil et phrase en clair (sans symbole), jamais « UTC » ; l\'ordre posé au prix du moment est regroupé',
-        /\d\d:\d\d:\d\d Près du prix du moment.: \d+ gros ordres? d'achat (posés?|disparus?)/.test(lj) && !/UTC/.test(lj) && !/un seul prix/.test(lj), lj.slice(0, 200));
+        /\d\d:\d\d:\d\d Près du prix du moment.: \d+ gros ordres? d’achat (posés?|disparus?)/.test(lj) && !/UTC/.test(lj) && !/un seul prix/.test(lj), lj.slice(0, 200));
       await p44.keyboard.press('Escape');
       // b et c portent sur les puces des calques (cachées en Débutant) : la page passe en Expert par
       // la case « Le détail » (ce qui contrôle aussi la bascule), puis revient en Débutant.
@@ -1421,12 +1437,12 @@ async function filNoir(page, x, y) {
       // Expert : chaque évènement, à l'heure de l'appareil (comme l'axe de la carte), avec sa phrase entière.
       await p44.click('#btnJournal'); await p44.waitForTimeout(300);
       const ljx = await p44.evaluate(() => ({ liste: document.getElementById('listeJournal').innerText, note: document.getElementById('journalNote').innerText }));
-      check('panneau « Ce qui vient de se passer » (Expert) : heure de l\'appareil et phrase, jamais « UTC »', /\d\d:\d\d:\d\d .+Gros ordre d'achat/.test(ljx.liste) && /heure de l'appareil/i.test(ljx.note) && !/UTC/.test(ljx.note + ljx.liste), ljx.liste.slice(0, 200));
+      check('panneau « Ce qui vient de se passer » (Expert) : heure de l\'appareil et phrase, jamais « UTC »', /\d\d:\d\d:\d\d .+Gros ordre d’achat/.test(ljx.liste) && /heure de l’appareil/i.test(ljx.note) && !/UTC/.test(ljx.note + ljx.liste), ljx.liste.slice(0, 200));
       await p44.keyboard.press('Escape');
       // a (jumeau Expert) : le même panneau, à l'heure de l'appareil, la phrase experte et sa note.
       await p44.click('#btnJournal'); await p44.waitForTimeout(300);
       const ljX = await p44.evaluate(() => ({ liste: document.getElementById('listeJournal').innerText, note: document.getElementById('journalNote').innerText }));
-      check('panneau « Ce qui vient de se passer » (Expert) : heure de l\'appareil et phrase experte, note « Heure de l\'appareil, comme l\'axe… »', /\d\d:\d\d:\d\d .+Gros ordre d'achat/.test(ljX.liste) && /^Heure de l'appareil, comme l'axe de la carte/.test(ljX.note) && !/UTC/.test(ljX.note + ljX.liste), { l: ljX.liste.slice(0, 200), n: ljX.note.slice(0, 80) });
+      check('panneau « Ce qui vient de se passer » (Expert) : heure de l\'appareil et phrase experte, note « Heure de l\'appareil, comme l\'axe… »', /\d\d:\d\d:\d\d .+Gros ordre d’achat/.test(ljX.liste) && /^Heure de l’appareil, comme l’axe de la carte/.test(ljX.note) && !/UTC/.test(ljX.note + ljX.liste), { l: ljX.liste.slice(0, 200), n: ljX.note.slice(0, 80) });
       await p44.keyboard.press('Escape'); await p44.waitForTimeout(200);
       // b. Le guide seul lit le carnet (chaleur live, carnet latéral, bid / ask et destin éteints).
       for (const k of ['live', 'dom', 'bidask']) await p44.click(`button[data-calque="${k}"]`);
@@ -1680,7 +1696,7 @@ async function filNoir(page, x, y) {
         morceaux.push(['indice', await p45.evaluate(() => document.getElementById('indiceTap').textContent)]);
         // Les couleurs dans l'ORDRE de la palette classique (l'orange dit plus d'ordres que le jaune) :
         // jamais « plus c'est clair », faux pour l'orange.
-        const coul = morceaux.filter(([n]) => n === 'légende' || n === 'explication').map(([n, t]) => [n, /Bleu foncé : peu d'ordres à ce prix ; puis bleu clair, vert, jaune, orange ; blanc : le plus d'ordres\./.test(t) && !/Plus c'est clair/.test(t)]);
+        const coul = morceaux.filter(([n]) => n === 'légende' || n === 'explication').map(([n, t]) => [n, /Bleu foncé : peu d’ordres à ce prix ; puis bleu clair, vert, jaune, orange ; blanc : le plus d’ordres\./.test(t) && !/Plus c’est clair/.test(t)]);
         check('légende et explication : « Bleu foncé : peu … ; puis bleu clair, vert, jaune, orange ; blanc : le plus d\'ordres »', coul.length === 2 && coul.every(([, ok]) => ok), coul);
         // « Blanc » ne désigne plus deux choses : le prix est « la ligne à fil noir », jamais « la ligne blanche ».
         const lb = morceaux.filter(([n]) => n === 'légende' || n === 'explication').map(([n, t]) => [n, /Ligne à fil noir = le prix/.test(t) && !/Ligne blanche = le prix|ligne blanche =/i.test(t)]);
@@ -1703,11 +1719,11 @@ async function filNoir(page, x, y) {
         await p45.mouse.move(rc.x + x.x + x.w / 2 + 1, rc.y + x.y + x.h / 2); await p45.mouse.move(rc.x + x.x + x.w / 2, rc.y + x.y + x.h / 2); await p45.waitForTimeout(300);
         const lu = await lecture(p45), ls = lu.split('\n'), sp2 = t => t.replace(/[\u202f\u00a0]/g, ' ');
         check('survol d\'une étiquette : sa phrase entière (« … d\'ordres … en attente … », « à tout moment ») et la ligne des âges',
-          /(Beaucoup d'ordres|Mur d’achat|Mur de vente|ordres d'achat|ordres de vente)/.test(lu) && /à tout moment/.test(lu) && /^Âges : couleurs récentes .+ · ronds .+ · ligne du prix /m.test(lu), lu);
+          /(Beaucoup d’ordres|Mur d’achat|Mur de vente|ordres d’achat|ordres de vente)/.test(lu) && /à tout moment/.test(lu) && /^Âges : couleurs récentes .+ · ronds .+ · ligne du prix /m.test(lu), lu);
         // (Plus, depuis la liaison avec le terminal, une 4e ligne : le lien « Voir sur le graphique ▸ » —
         // contrôlé ici à part, avec son adresse : le prix du repère.)
         check('… le nom de l\'étiquette en titre, sa phrase juste après, ni prix ni case sous le pointeur (« Ici (… ) ») : 3 lignes, puis le seul lien « Voir sur le graphique ▸ »',
-          ls.length === 4 && sp2(ls[0]) === sp2(x.texte) && /^([\d,]+ BTC d'ordres (d'achat|de vente) en attente |Le prix est dans cette zone)/.test(sp2(ls[1])) && !/^Ici \(/m.test(lu) && /^Âges : /.test(ls[2]) && ls[3] === 'Voir sur le graphique ▸', { ls, t: x.texte });
+          ls.length === 4 && sp2(ls[0]) === sp2(x.texte) && /^([\d,]+ BTC d’ordres (d’achat|de vente) en attente |Le prix est dans cette zone)/.test(sp2(ls[1])) && !/^Ici \(/m.test(lu) && /^Âges : /.test(ls[2]) && ls[3] === 'Voir sur le graphique ▸', { ls, t: x.texte });
         const ln = await p45.evaluate(() => { const a = document.querySelector('#lecture a'); return a && { href: a.getAttribute('href'), n: document.querySelectorAll('#lecture a').length, vu: !a.hidden && a.getClientRects().length > 0 }; });
         check(`… ce lien mène au graphique du terminal, au prix du repère (« ${ln && ln.href} » ; repère ${x.lien})`,
           !!ln && ln.n === 1 && ln.vu && typeof x.lien === 'number' && ln.href === 'index.html#prix=' + String(Math.round(x.lien * 100) / 100), { ln, lien: x.lien });
@@ -1733,7 +1749,7 @@ async function filNoir(page, x, y) {
           return lecture(pg);
         };
         if (![tc, pc].every(isFinite)) check('case du carnet live visée', false, { tc, pc, L: { n: L.n, deb: L.deb.slice(-4), fin: L.fin.slice(-4) } });
-        const luD = await viser(p45), mD = luD.match(/Ici \(([^)]*)\) : ([\d,]+) BTC d'ordres (d'achat|de vente) en attente/);
+        const luD = await viser(p45), mD = luD.match(/Ici \(([^)]*)\) : ([\d,]+) BTC d’ordres (d’achat|de vente) en attente/);
         // Une bulle d'échanges commune aux deux modes (mêmes seaux), visée à son centre — près du prix (là
         // où sont les échanges), hors des repères débutants (étiquette, cadre, trait d'un mur).
         const pb = (Math.floor((e.debutant.dernierPrix - 47) / 20) + 0.5) * 20;
@@ -1995,7 +2011,7 @@ async function filNoir(page, x, y) {
         let pg;
         ({ page: pg, erreurs } = await ouvrir(nav, { encodage: true, mode: 'debutant', intercept: deuxCotes }));
         const g = await etat(pg), li = await pg.evaluate(() => [...document.querySelectorAll('#guideIntroListe > li')].map(l => l.innerText));
-        const reps = g.guide.reperes.map(r => r.n), sansEx = li.filter(t => /pas d'exemple dans cette vue/.test(t)).length;
+        const reps = g.guide.reperes.map(r => r.n), sansEx = li.filter(t => /pas d’exemple dans cette vue/.test(t)).length;
         check(`45f. explication ouverte, 3 points, sans mot interdit ; repères ${reps.join(', ')} posés (ou « pas d'exemple dans cette vue »)`, g.guide.intro && li.length === 3 && !interdits(li.join('\n')).length && reps.length + sansEx >= 3, { li, reps, mal: interdits(li.join('\n')) });
         const tc = g.textesCarte, et = tc.filter(t => !t.repere);
         check(`pendant l'explication : seulement les étiquettes (${et.length} ≤ 2) et les numéros des repères (${tc.length - et.length} ≤ 3)`, et.length <= 2 && tc.length - et.length <= 3, tc);
@@ -2143,16 +2159,23 @@ async function filNoir(page, x, y) {
       await pg.keyboard.press('Escape'); await pg.waitForTimeout(300);
       e = await etat(pg);
       const ailleurs = e.pastillesCompletes.concat(e.textesCarte.map(t => t.texte), [jn.note, jn.liste, lg.texte, e.statut]).filter(t => /\bUTC\b/.test(t));
-      check('46f. aucune autre heure UTC : pastilles, carte, journal, légende à l\'heure de l\'appareil', !ailleurs.length && /^Heure de l'appareil, comme l'axe de la carte/.test(jn.note), { ailleurs: ailleurs.slice(0, 3), note: jn.note.slice(0, 80) });
+      check('46f. aucune autre heure UTC : pastilles, carte, journal, légende à l\'heure de l\'appareil', !ailleurs.length && /^Heure de l’appareil, comme l’axe de la carte/.test(jn.note), { ailleurs: ailleurs.slice(0, 3), note: jn.note.slice(0, 80) });
       check('46g. légende : bouton de mode qui dit l\'action, « 15 dernières minutes », le résumé réellement affiché, garde des rafales tirée du code',
-         /^Avec « Le détail » : les chiffres seuls\. C'est la même case que sur le terminal/.test(lg.mode.replace(/\u00a0/g, ' ')) && /des 15 dernières minutes/.test(lg.zones) && /FINIT par «.pas une prévision.»/.test(lg.resume) && !/dès le début/.test(lg.resume)
+         /^Avec « Le détail » : les chiffres seuls\. C’est la même case que sur le terminal/.test(lg.mode.replace(/\u00a0/g, ' ')) && /des 15 dernières minutes/.test(lg.zones) && /FINIT par «.pas une prévision.»/.test(lg.resume) && !/dès le début/.test(lg.resume)
         && lg.rafales.includes('pendant ' + BM.nombre(BM.RAFALES.gardeMs / 3600e3, 0, 1) + ' h') && /bouton «.≡ Rafales.» \(en haut à droite\) en liste les 20 plus récentes/.test(lg.rafales) && /écrit dans le rond, avec «.BTC.», à partir de [\d,]+ BTC/.test(lg.bulles), lg);
+      // (Revue du 14/10/2026, C21 : « Et sur la carte : G : le guide… L : la légende » enchaînait deux
+      // deux-points ; « Sur la carte seule : G le guide, J le journal, L la légende ».)
       check('46h. légende : « Plusieurs horloges », gestes complets (L, + / −, Ctrl + molette), ronds (pas « bulles ») pour les échanges, plus de note périmée « avant le 08/10 »',
-        /Plusieurs horloges sur une même surface/.test(lg.texte) && !/Trois horloges/.test(lg.texte) && /L : la légende/.test(lg.texte) && /\+ \/ − : zoom/.test(lg.texte) && /Ctrl \+ molette/.test(lg.texte) && !/\bbulles?\b/i.test(lg.texte) && !/avant le 08\/10/.test(lg.texte), lg.texte.slice(0, 200));
+        /Plusieurs horloges sur une même surface/.test(lg.texte) && !/Trois horloges/.test(lg.texte) && /L la légende/.test(lg.texte) && /\+ \/ − : zoom/.test(lg.texte) && /Ctrl \+ molette/.test(lg.texte) && !/\bbulles?\b/i.test(lg.texte) && !/avant le 08\/10/.test(lg.texte), lg.texte.slice(0, 200));
       // Les touches communes au terminal et à la carte (?, R, F), dites dans la légende avec le même sens ;
       // plus de touche M (« Le détail » est une case du panneau, 11/10/2026).
+      // Revue du 14/10/2026 (C21) : « Touches (les mêmes que sur le terminal) : ? : comment lire… » enchaînait
+      // deux deux-points ; « ? pour lire cette carte » maintenant, et au plus un deux-points par phrase.
       check('46h. légende : les touches communes au terminal, ? (aide), R (vue de départ), F (suivre le présent), sans M',
-        !/\bM : /.test(lg.texte) && !/Lisible \/ Complet/.test(lg.texte) && /\? : comment lire cette carte/.test(lg.texte) && /R ou double-clic : revenir à la vue de départ/.test(lg.texte) && /F : suivre le présent/.test(lg.texte), lg.texte.slice(0, 200));
+        !/\bM : /.test(lg.texte) && !/Lisible \/ Complet/.test(lg.texte) && /\? pour lire cette carte/.test(lg.texte) && /R ou double-clic : revenir à la vue de départ/.test(lg.texte) && /F : suivre le présent/.test(lg.texte), lg.texte.slice(0, 200));
+      const touches46 = lg.texte.split('\n').find(l => /^Touches/.test(l)) || '';
+      check('46h. légende : la ligne des touches, un seul deux-points par phrase (plus de « terminal) : ? : »)',
+        !!touches46 && touches46.split(/\. /).every(ph => (ph.match(/ : /g) || []).length <= 1) && !/: \? :/.test(touches46), touches46);
       check('46i. volume et CVD en BTC (la quantité échangée, comme les ronds)', /^Volume \(BTC\) par /.test(e.textes.volume || '') && /^CVD spot \(BTC\) cumulé depuis .+ · [+−]?[\d ]+(,\d+)? BTC$/.test(e.textes.cvd || ''), [e.textes.volume, e.textes.cvd]);
       check('46j. puces et pastilles : « Gros paquets » (fichier de 15 min) et « Destin des gros ordres », plus de calque « Murs »',
         await pg.evaluate(() => { const t = [...document.querySelectorAll('#calques button')].map(b => b.textContent); return t.includes('Gros paquets') && t.includes('Destin des gros ordres') && !t.includes('Murs') && !t.includes('Destin des murs'); })
@@ -2273,7 +2296,7 @@ async function filNoir(page, x, y) {
           return { texte: b.innerText.trim(), exp: b.getAttribute('aria-expanded'), ctl: b.getAttribute('aria-controls'), coupe: b.scrollWidth > b.clientWidth + 1, adroite: !!b.closest('.barre-droite') && r.right <= innerWidth,
             ancien: !!document.getElementById('btnReglages') || !!document.getElementById('reglages'), puces: document.querySelectorAll('#calques .puce').length }; });
         check(`47a. Complet, 1440 px : à droite de la barre, « ${b0.texte} » (entier), à la place de « Réglages » ; les ${b0.puces} puces des calques restent`,
-          /^(Choisir l'affichage|Affichage)$/.test(b0.texte) && !b0.coupe && b0.adroite && b0.ctl === 'affichage' && b0.exp === 'false' && !b0.ancien && b0.puces === 16, b0);
+          /^(Choisir l’affichage|Affichage)$/.test(b0.texte) && !b0.coupe && b0.adroite && b0.ctl === 'affichage' && b0.exp === 'false' && !b0.ancien && b0.puces === 16, b0);
         let a = await ouvrirAff(pg);
         const ks = a.cases.map(c => c.k);
         check(`47b. ouvert (aria-expanded ${a.exp}), dans l’écran ; en tête « Tout afficher » et « Revenir au départ », puis ${a.questions.length} questions, puis les réglages fins repliés`,
@@ -2344,7 +2367,7 @@ async function filNoir(page, x, y) {
             const b = document.getElementById('btnAffichage');
             return { der: [Math.round(der.top), Math.round(der.bottom)], p: [Math.round(r.top), Math.round(r.bottom)], deborde: p.scrollWidth > p.clientWidth + 1, coupe: b.scrollWidth > b.clientWidth + 1, texte: b.innerText.trim(), page: document.documentElement.scrollWidth - innerWidth }; });
           check(`47l. ${mode === 'expert' ? 'Complet' : 'Lisible'}, ${w} px : le panneau tient dans l’écran (${a.r.join(',')} pour ${a.vue.join('×')}), sa dernière ligne se voit en bas ; le bouton dit « ${bas.texte} », entier`,
-            a.ouvert && a.dans && bas.der[0] >= bas.p[0] - 0.5 && bas.der[1] <= bas.p[1] + 0.5 && !bas.deborde && !bas.coupe && bas.page <= 0 && /^(Choisir l'affichage|Affichage)$/.test(bas.texte), { a: a.r, bas });
+            a.ouvert && a.dans && bas.der[0] >= bas.p[0] - 0.5 && bas.der[1] <= bas.p[1] + 0.5 && !bas.deborde && !bas.coupe && bas.page <= 0 && /^(Choisir l’affichage|Affichage)$/.test(bas.texte), { a: a.r, bas });
           check('aucune erreur JavaScript', !erreurs.length, erreurs);
           await pg.close();
         }
@@ -2593,12 +2616,12 @@ async function filNoir(page, x, y) {
           const lg = await pg.evaluate(() => document.getElementById('legende').innerText);
           await pg.keyboard.press('Escape');
           check('50g. légende claire : « Bleu très pâle : peu d’ordres … bleu nuit : le plus d’ordres », « trait orange » ; jamais « Bleu foncé : peu », « blanc : le plus », « trait jaune » ; les ronds en mots et en forme',
-            /Bleu très pâle : peu d'ordres à ce prix ; puis bleu, de plus en plus foncé ; bleu nuit : le plus d'ordres\./.test(lg) && /trait orange/.test(lg) && !/Bleu foncé : peu|blanc : le plus|trait jaune/.test(lg)
+            /Bleu très pâle : peu d’ordres à ce prix ; puis bleu, de plus en plus foncé ; bleu nuit : le plus d’ordres\./.test(lg) && /trait orange/.test(lg) && !/Bleu foncé : peu|blanc : le plus|trait jaune/.test(lg)
             && /Ligne à fil noir = le prix/.test(lg) && /Vert, avec ▲[^\n]*acheteurs/.test(lg) && /Rouge, avec ▼[^\n]*vendeurs/.test(lg) && !interdits(lg).length, lg.slice(0, 600));
           await pg.keyboard.press('?'); await pg.waitForTimeout(500);
           const intro = await pg.evaluate(() => document.getElementById('guideIntro').innerText);
           check('50h. explication claire : les mêmes mots (« Bleu très pâle … bleu nuit », « orange »), ▲ et ▼ ; jamais ceux de la carte sombre',
-            /Bleu très pâle : peu d'ordres/.test(intro) && /bleu nuit : le plus d'ordres/.test(intro) && /orange/.test(intro) && /▲/.test(intro) && /▼/.test(intro) && !/Bleu foncé : peu|blanc : le plus|trait jaune/.test(intro) && !interdits(intro).length, intro.slice(0, 600));
+            /Bleu très pâle : peu d’ordres/.test(intro) && /bleu nuit : le plus d’ordres/.test(intro) && /orange/.test(intro) && /▲/.test(intro) && /▼/.test(intro) && !/Bleu foncé : peu|blanc : le plus|trait jaune/.test(intro) && !interdits(intro).length, intro.slice(0, 600));
           await pg.click('#guideIntroOk'); await pg.waitForTimeout(300);
           // Le Complet clair : la légende dit aussi la ligne et l'arc de sa couleur (noire, noir).
           await poserDetail(pg, true); await pg.waitForTimeout(800);

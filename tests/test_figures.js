@@ -471,7 +471,7 @@ titre('8 bis. Objectif et statistiques : la ligne courte de la bulle et le déta
     check(`… détail : mêmes cibles, comptes du bilan (${St.taux && St.taux.atteints}/${St.taux && St.taux.finis}), ${St.dernieres.length} dernières (≤ 6, des plus récentes), sans mot banni ni conseil`,
       St.cibles.length === O.length && St.cibles.every((c, k) => c.p === O[k].p) && St.taux.atteints === x.atteints && St.taux.finis === finis(x) && St.taux.invalides === x.invalides
       && St.dernieres.length === Math.min(6, dern.length) && St.faible === (x.confirmes < P.echantillonFaible)
-      && /usage des analystes/.test(St.comment) && /rien ne le garantit/.test(St.comment) && St.annees === null && /pas une prévision ni un conseil/.test(St.risque) && St.risque.length < 90
+      && /usage des analystes/.test(St.comment) && /rien ne le garantit/.test(St.comment) && St.annees === null && St.risque === G.AVERTISSEMENT   // revue du 14/10/2026, C19 : l'avertissement partagé
       && !G.motsBannis(txt).length && !CONSEIL.test(txt) && !/%/.test(txt), { St, bannis: G.motsBannis(txt) });
     // Les exemples passés (plan du 13/10/2026, idée 4) : les derniers cas de ce type, validés et
     // finis, du plus récent au plus ancien, SANS tri par réussite ; chacun avec ce qu'il faut pour

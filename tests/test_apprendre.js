@@ -294,7 +294,8 @@ titre('4. La ligne du risque : la même, dans chaque bulle de figure (en cours, 
   check(`${n} figures de la fixture : le dernier paragraphe de chaque bulle (en cours et passée, Lisible et Complet) est l’avertissement, une ligne courte`, n > 50 && !mal.length, mal.slice(0, 5));
   // Le résumé du Lisible : elle ne compte pas comme un avertissement à ôter, ni comme des nombres.
   const estAv = vm.runInContext('estAvertissement', PAGE);
-  check('la ligne du risque devant l’avertissement : le paragraphe reste un avertissement (le résumé l’ôte comme avant), sans nombre', estAv(G.RISQUE + ' Une lecture débattue, pas une prévision ni un conseil.') && nombresDe(G.RISQUE) === 0, null);
+  // (Revue du 14/10/2026, C19 : l'avertissement partagé, à la place de « Une lecture débattue, pas une prévision ni un conseil. ».)
+  check('la ligne du risque devant l’avertissement : le paragraphe reste un avertissement (le résumé l’ôte comme avant), sans nombre', estAv(G.RISQUE + ' ' + G.AVERTISSEMENT) && nombresDe(G.RISQUE) === 0, null);
 }
 
 // ── 5. La première fois ──

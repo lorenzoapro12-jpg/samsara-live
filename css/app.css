@@ -1488,6 +1488,10 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .glossaire { display: flex; flex-wrap: wrap; gap: 5px; }
 /* Les touches du terminal, en une ligne sous le mode : un rappel, petit et gris. */
 .fiche-touches { margin: 2px 0 8px; font-size: 11px; color: var(--ink-3); }
+/* Sans souris (téléphone), pas de clavier : la ligne des touches se cache, comme sur la carte
+   (js/bookmap.js ne les écrit que sous hover: hover). Revue du 14/10/2026, M17 : elle prenait 2 à
+   3 lignes en tête des Légendes. */
+@media (hover: none) { .fiche-touches { display: none; } }
 .glossaire-item, .fiche-pop .lien {
   font: inherit; font-size: 11.5px; padding: 4px 9px; border-radius: var(--r-bar); cursor: pointer;
   border: 1px solid var(--hairline); background: var(--rail); color: var(--ink-1);

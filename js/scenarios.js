@@ -539,6 +539,10 @@ const Scenarios = (function () {
     sortie: haut => 'sorti ' + (haut ? '↑' : '↓') + ' ✗', ambigu: 'indécis', termine: 'terminé', large: 'à voir en 15 min ou 1 h', incomplet: 'données manquantes',
     journal: { '✅': 'réalisé ✓', '❌': 'invalidé ✗', '◐': 'partiel', '⌛': 'rien atteint', '⚠': 'indécis' },
   };
+  /** Un état court dit pour plusieurs scénarios à la fois (« les 3 terminés », « les deux invalidés
+   *  ✗ ») : le mot s'accorde (revue du 14/10/2026, C20 : « En direct : les 3 terminé. » chaque
+   *  matin avant le nouveau point). « en cours », « indécis », « rien atteint » ne changent pas. */
+  const etatPluriel = etat => String(etat).replace(/^(terminé|réalisé|invalidé|partiel|noté|sorti)(?= |$)/, '$1s');
   /** → { etat, marque } : marque « (en direct) » (calculé ici), « (journal) » (note officielle), ou
    *  rien (un renvoi : bougies trop larges, historique trop court). */
   function etatCourtDebutant(S, sv) {
@@ -1434,7 +1438,7 @@ const Scenarios = (function () {
 
   return { FORMAT, RANGS, STATUTS, chiffres, prix, heureVue, heureUTC: HEURE_UTC_EXPORT, heureParis: HEURE_PARIS_EXPORT, pointMs, instantPoint, jourGroupe, dateUTC, zone, lire, vivants, estAncien, ouvert, compte, suiviVide, pas, plier, etat, etatLarge, suivre, copie,
     niveaux, originePremiere, libelle, quand, creneau, motsStatut, texteEtat, titre, ligne, texteBilan, REGLE_BILAN, REGLE_BILAN_SUITE, explication, ligneEtats, noteLarge, manque, etatIncomplet, NOMS_RANG, COURTS_RANG, SENS_RANG,
-    ETATS_COURTS_DEBUTANT, etatCourtDebutant, ligneBoiteDebutant, libelleDebutant, libellesDebutant, ligneDebutant, origineDebutant, etatLongDebutant, enteteDebutant, explicationDebutant, enonceVu, enonceDebutant, SENS_RANG_DEBUTANT, jourVu,
+    ETATS_COURTS_DEBUTANT, etatPluriel, etatCourtDebutant, ligneBoiteDebutant, libelleDebutant, libellesDebutant, ligneDebutant, origineDebutant, etatLongDebutant, enteteDebutant, explicationDebutant, enonceVu, enonceDebutant, SENS_RANG_DEBUTANT, jourVu,
     PJ_DEFAUT, touchesValides, dansMarge, pointe, distanceZone, ouvertJour, position, fermeture, fondu, reste, grilleOk, decider, rejouerJour, horsNiveaux, classerJour, estRealise, raison, raisonCourte, pointeDe, jourSiAutre, ligneJourDebutant, libellesJourDebutant,
     texteResteDebutant, ligneDebutantJour, ligneCourteDebutant, distancesDebutant, phraseMeneurDebutant, COMMENT_DEBUTANT, phraseJourExpert, nomNet, phraseNomDebutant, suffixeExpert, ligneResteExpert, ligneJourExpert, regleJourExpert, momentDebutant };
 })();

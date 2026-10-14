@@ -1874,12 +1874,13 @@ const Guide = (function () {
   function heureVueSi(ms) {
     return fini(ms) ? Fm.heure(ms) : null;
   }
-  /** L'âge d'un chiffre publié, en mots : « il y a 4 min (07:33) » ; sans `maintenant`, l'heure
-   *  seule. */
+  /** L'âge d'un chiffre publié, en mots : « il y a 4 min (07:33) », « il y a 1 h 31 » ; sans
+   *  `maintenant`, l'heure seule. Au-delà de 90 min, la règle de tous les âges du site (Fmt.duree) :
+   *  91 min s'arrondissait à « 2 h » quand le voyant disait « 91 min » (revue du 14/10/2026, M7). */
   function ageDebutant(lu, maintenant, sansHeure) {
     if (!fini(lu)) return '';
     const hp = heureVueSi(lu), m = fini(maintenant) ? Math.max(0, Math.round((maintenant - lu) / 60000)) : null;
-    const age = m === null ? null : m < 90 ? m + ' min' : Math.round(m / 60) + ' h';
+    const age = m === null ? null : Fm.duree(m);
     if (age === null) return hp ? 'à ' + hp : '';
     return 'il y a ' + age + (hp && !sansHeure ? ' (' + hp + ')' : '');
   }
@@ -2479,9 +2480,11 @@ const Guide = (function () {
   const RISQUE = 'Personne ne sait prédire le prix : rien n’est promis.';
   /** L'avertissement de fin de bulle, UNE ligne courte (charte des explications courtes, 12/10/2026) :
    *  il remplace, dans les bulles du graphique, la ligne du risque suivie d'un second avertissement
-   *  (deux phrases pour une seule idée). RISQUE reste exporté pour les textes qui le citent encore. */
+   *  (deux phrases pour une seule idée). RISQUE reste exporté pour les textes qui le citent encore.
+   *  Deux phrases seulement, les mêmes partout, avec ou sans « Le détail » : celle-ci, et celle de
+   *  Claude pour ses scénarios (revue du 14/10/2026, C19 : six formules circulaient, « pas une
+   *  recommandation », « pas une promesse ni un conseil », « pas une prévision ni un conseil »…). */
   const AVERTISSEMENT = 'Une description, pas un conseil.';
-  const AVERTISSEMENT_FORME = 'Une lecture débattue, pas une prévision ni un conseil.';
   const AVERTISSEMENT_CLAUDE = 'Une hypothèse de Claude (une IA), pas un conseil.';
   /** La bulle d'une figure en Débutant : ce qu'on voit et ce qui manque, les niveaux du moment
    *  (validation, annulation, cible), le bilan mesuré, l'avertissement. ctx : voir plus haut.
@@ -2529,7 +2532,7 @@ const Guide = (function () {
     }
     const bilan = b ? bilanDebutant(f, b, c, P) : '';
     if (bilan) out.push(bilan);
-    out.push(AVERTISSEMENT_FORME);
+    out.push(AVERTISSEMENT);
     const T = out.filter(Boolean);
     T.facultatifs = bilan ? [bilan] : [];
     return T;
@@ -2661,7 +2664,7 @@ const Guide = (function () {
       tbE.length ? 'Ébauches annulées récemment : ' + nomsDe(tbE) : ''].filter(Boolean);
     if (recents.length) out.push(recents.join(' · ') + '.');
     if (x.concurrentes && x.concurrentes.length) out.push('Lecture concurrente : ' + x.concurrentes.map(g => nomC(g).toLowerCase() + ' (' + etatForme(g).court + ')').join(', ') + ' ; une seule est montrée.');
-    out.push(AVERTISSEMENT_FORME);
+    out.push(AVERTISSEMENT);
     return out;
   }
   /** Le titre de la bulle d'une figure. */
@@ -2797,7 +2800,7 @@ const Guide = (function () {
       }
       const J = texteJournal(f, ctx, unite);
       if (J) texte.push(J);
-      texte.push('Un exemple passé : pas une prévision ni une recommandation.');
+      texte.push(AVERTISSEMENT);
       return { titre, texte, resume: null };
     }
     const nomL = NOM_LONG_DEBUTANT[f.type], dm = dureeMots(d), apres = dm ? ' ' + dm + ' plus tard' : '';
@@ -2816,7 +2819,7 @@ const Guide = (function () {
     const texte = [def, valide ? 'Figure validée' + qc + ' ; objectif théorique selon l’usage des analystes : ' + prix(f.objectif, unite) + ', non garanti.' : '',
       // Ce qui s'est passé ensuite : la marque de fin (quand, pourquoi) et le délai, sans redire le résumé.
       valide && dm && marqueFin(f, ctx, 'debutant', unite) ? marqueFin(f, ctx, 'debutant', unite).replace(/\.$/, '') + ' (' + dm + ' après la validation).' : marqueFin(f, ctx, 'debutant', unite) || (valide ? ensuite[0] : '')]
-      .concat(C.length ? [C[0]] : [], b ? [bilanDebutant(f, b, ctx, P)] : [], ['Un exemple du passé, pas une prévision ni un conseil.']);
+      .concat(C.length ? [C[0]] : [], b ? [bilanDebutant(f, b, ctx, P)] : [], [AVERTISSEMENT]);
     return { titre, texte: texte.filter(Boolean), resume: [ensuite, C] };
   }
   // ── Les statistiques d'une figure (demande du 11/10/2026) : la cible et le taux de réussite
@@ -2965,7 +2968,7 @@ const Guide = (function () {
       comment: 'Comment il se calcule : ' + commentCible(f) + ' C’est l’usage des analystes, pas une mesure du site, et rien ne le garantit.',
       annees: annees(f, ctx), taux: null, phrase: '', temoin: null, delai: null, lignes: [], dernieres: [], faible: false,
       source: 'Mesuré par le site sur ' + (dernieres(ctx && ctx.duree) ? 'les ' + dernieres(ctx.duree) : 'l’historique') + ' de ce graphique (' + nomIntervalle(ctx && ctx.intervalle) + '), sans regarder l’avenir : à chaque instant, seul le passé est connu.',
-      risque: 'Des comptes du passé, pas une prévision ni un conseil.' };
+      risque: AVERTISSEMENT };
     if (!b) return S;
     const finis = b.atteints + b.invalides + b.expires, T = b.temoin || { departs: 0, atteints: 0 }, E = b.ebauches || { n: 0, devenues: 0, confirmees: 0 };
     S.taux = { atteints: b.atteints, invalides: b.invalides, expires: b.expires, finis, ouverts: b.ouverts };
@@ -3265,6 +3268,6 @@ const Guide = (function () {
     texteSuiteDebutant, prixRond, USAGES_CHIFFRES, usageChiffre, avecUsage, cleEcart, ageLu, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
     MARQUES_FIN, motEchec, nomFormeDetail, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, libelleFormeCourt, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant,
-    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_FORME, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, exempleSvg, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, fourchette, cassureDite, quandCassure, phrasesCassureFourchette, texteCassureFourchette, synthese };
+    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, exempleSvg, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, fourchette, cassureDite, quandCassure, phrasesCassureFourchette, texteCassureFourchette, synthese };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;
