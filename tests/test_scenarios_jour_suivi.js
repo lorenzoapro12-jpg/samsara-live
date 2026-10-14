@@ -247,7 +247,8 @@ titre('8. Bulles Débutant : heure des fermetures, « seul » d’un range, vers
   const sl = S.phraseMeneurDebutant(x.J);
   check(`« seul » d’un range : « ${sl} »`, x.J.cas === 'seul' && x.J.seul.sc.forme === 'range' && !/ce qu’il décrit/.test(sl), sl);
   const xs = instant(F08, k15, '2026-10-08T15:25Z');
-  if (xs.J.cas === 'seul' && xs.J.seul.pos.e >= 0.5) check(`« seul », prix près d’une limite : « ${S.phraseMeneurDebutant(xs.J)} »`, /plus près de sa limite (basse|haute) \([\d ]+ \$, marge comprise\) que du milieu de la fourchette/.test(S.phraseMeneurDebutant(xs.J)), S.phraseMeneurDebutant(xs.J));
+  // (Changé exprès, revue du 14/10/2026, M3 : « fourchette » est réservé à celle de 7 jours ; « que du milieu », sans le mot.)
+  if (xs.J.cas === 'seul' && xs.J.seul.pos.e >= 0.5) check(`« seul », prix près d’une limite : « ${S.phraseMeneurDebutant(xs.J)} »`, /plus près de sa limite (basse|haute) \([\d ]+ \$, marge comprise\) que du milieu\.$/.test(S.phraseMeneurDebutant(xs.J)) && !/fourchette/.test(S.phraseMeneurDebutant(xs.J)), S.phraseMeneurDebutant(xs.J));
   const y = instant(F08, k15, '2026-10-08T13:50Z');
   const courts = y.J.items.map(i => S.ligneDebutantJour(i, y.J, true));
   check(`version courte : chaque scénario dit son niveau (« ${courts.join(' » « ')} »)`, /^1\. entre 81 436 et 83 947 \$ — /.test(courts[0]) && courts.slice(1).every(t => /^\d\. vers [\d ]+ \$/.test(t)) && courts.every(t => !/sa zone(?! \(dès)/.test(t) || /de sa zone \(dès [\d ]+ \$\)|dans sa zone/.test(t)), courts);

@@ -2,7 +2,7 @@
 // un vrai navigateur (Chromium, Playwright) — plan §10 quater, point 6 :
 //
 //   1. GRAPHIQUE → CARTE, à la souris (1440) : la bulle de chacun des deux repères du Lisible porte
-//      « Voir sur la carte ▸ » (bookmap.html#prix=<prix du repère>) ; survoler, puis cliquer le
+//      « Voir sur la carte des ordres ▸ » (bookmap.html#prix=<prix du repère>) ; survoler, puis cliquer le
 //      repère n'ouvre que la bulle ; la bulle reste en place pendant que la souris va vers son lien ;
 //      seul le lien navigue. La carte s'ouvre centrée sur ce prix, le prix marqué (trait en tirets,
 //      étiquette sur l'axe), au plus 2 textes sur la chaleur (Lisible). Sur le trait, la lecture
@@ -157,7 +157,7 @@ async function contexte(nav, o) {
     window.__ft = []; window.__ftOn = false;
     const f0 = CanvasRenderingContext2D.prototype.fillText;
     CanvasRenderingContext2D.prototype.fillText = function (t, x, y) {
-      if (window.__ftOn) window.__ft.push({ c: this.canvas && this.canvas.id, t: String(t), x, y });
+      if (window.__ftOn) window.__ft.push({ c: this.canvas && this.canvas.id, t: String(t), x, y, w: this.measureText(String(t)).width });
       return f0.apply(this, arguments);
     };
   });
@@ -190,7 +190,9 @@ const lireBulle = page => page.evaluate(() => {
   const L = lienBulle, c = guideEtat && guideEtat.survol;
   return { lien: L && { url: L.url, cle: L.cle, rect: Object.assign({}, L.rect), bulle: Object.assign({}, L.bulle) },
     titre: c ? c.titre : null, p: c && c.niveau ? c.niveau.niv.p : null, detail: bulleDetail,
-    dessine: window.__ft.filter(e => e.c === 'chartCalque' && e.t === 'Voir sur la carte ▸').map(e => ({ x: e.x, y: e.y })),
+    // Le texte du lien : « Voir sur la carte des ordres ▸ » (revue du 14/10/2026, M3 : « la carte »
+    // seule voulait aussi dire une case d'« Infos du marché », dans la même bulle).
+    dessine: window.__ft.filter(e => e.c === 'chartCalque' && e.t === 'Voir sur la carte des ordres ▸').map(e => ({ x: e.x, y: e.y, w: e.w })),
     titres: window.__ft.filter(e => e.c === 'chartCalque').map(e => e.t),
     chemin: location.pathname.replace(/^.*\//, '') + location.hash, curseur: canvas.style.cursor, croix: [crossX, crossY],
     W: canvas.width / devicePixelRatio, mainH: geo ? geo.mainH : null };
@@ -313,10 +315,11 @@ async function controlerTerminalMarque(page, p, nom, deb, erreurs) {
         const x = it.rect.x + Math.min(it.rect.w / 2, 40), y = it.rect.y + it.rect.h / 2;
         const b = await viserT(page, x, y, false);
         const attendu = b.p === null ? null : adresse('bookmap.html', b.p);
-        check(`repère ${k + 1} (« ${it.texte} ») survolé : sa bulle s'ouvre, elle porte « Voir sur la carte ▸ » → ${b.lien && b.lien.url}`,
+        check(`repère ${k + 1} (« ${it.texte} ») survolé : sa bulle s'ouvre, elle porte « Voir sur la carte des ordres ▸ » → ${b.lien && b.lien.url}`,
           !!b.titre && !!b.lien && b.lien.url === attendu && /^bookmap\.html#prix=\d+(\.\d+)?$/.test(b.lien.url), b);
-        const dans = b.lien && b.dessine.length === 1 && b.dessine.every(q => q.x >= b.lien.bulle.x && q.x <= b.lien.bulle.x + b.lien.bulle.w && q.y >= b.lien.rect.y && q.y <= b.lien.bulle.y + b.lien.bulle.h);
-        check(`repère ${k + 1} : le lien est dessiné une fois, en dernière ligne de la bulle, et la bulle tient dans le tracé`,
+        // Le texte entier du lien tient dans la bulle (il est plus long depuis la revue du 14/10/2026, M3).
+        const dans = b.lien && b.dessine.length === 1 && b.dessine.every(q => q.x >= b.lien.bulle.x && q.x + q.w <= b.lien.bulle.x + b.lien.bulle.w - 8 && q.y >= b.lien.rect.y && q.y <= b.lien.bulle.y + b.lien.bulle.h);
+        check(`repère ${k + 1} : le lien est dessiné une fois, en entier dans la dernière ligne de la bulle, et la bulle tient dans le tracé`,
           dans && b.lien.bulle.x >= 0 && b.lien.bulle.x + b.lien.bulle.w <= b.W - 75 && b.lien.bulle.y >= 0 && b.lien.bulle.y + b.lien.bulle.h <= b.mainH, b);
         check(`repère ${k + 1} : survoler ne navigue pas (${b.chemin})`, b.chemin === 'index.html', b.chemin);
         if (!premier) premier = { it, x, y, p: b.p };
@@ -371,7 +374,8 @@ async function controlerTerminalMarque(page, p, nom, deb, erreurs) {
       else {
         const x = it.rect.x + Math.min(it.rect.w / 2, 40), y = it.rect.y + it.rect.h / 2;
         let b = await viserT(page, x, y, true);
-        check(`un toucher sur « ${it.texte} » : la bulle (résumé) avec « Voir sur la carte ▸ », sans naviguer (${b.chemin})`, !!b.titre && !!b.lien && b.lien.url === adresse('bookmap.html', b.p) && b.chemin === 'index.html', b);
+        check(`un toucher sur « ${it.texte} » : la bulle (résumé) avec « Voir sur la carte des ordres ▸ », en entier dans la bulle à 390 px, sans naviguer (${b.chemin})`, !!b.titre && !!b.lien && b.lien.url === adresse('bookmap.html', b.p) && b.chemin === 'index.html'
+          && b.dessine.length === 1 && b.dessine.every(q => q.x >= b.lien.bulle.x && q.x + q.w <= b.lien.bulle.x + b.lien.bulle.w - 8), b);
         check(`au doigt, le lien est une cible de 40 px de haut au moins (${b.lien && b.lien.rect.h}), sur toute la largeur de la bulle`, !!b.lien && b.lien.rect.h >= 40 && b.lien.rect.w === b.lien.bulle.w, b.lien);
         const p = b.p;
         b = await viserT(page, x, y, true);
@@ -409,7 +413,7 @@ async function controlerTerminalMarque(page, p, nom, deb, erreurs) {
       for (const [nom, c] of [['support / résistance', cb.sr[0]], ['repère du Guide', cb.guide[0]]]) {
         if (!c) continue;
         const b = await viserT(page, c.x, c.y, false);
-        check(`${nom} (« ${c.titre} ») : sa bulle porte « Voir sur la carte ▸ » → ${b.lien && b.lien.url}`, !!b.lien && b.lien.cle === c.titre && b.lien.url === adresse('bookmap.html', c.prix) && b.dessine.length === 1 && b.chemin === 'index.html', b);
+        check(`${nom} (« ${c.titre} ») : sa bulle porte « Voir sur la carte des ordres ▸ » → ${b.lien && b.lien.url}`, !!b.lien && b.lien.cle === c.titre && b.lien.url === adresse('bookmap.html', c.prix) && b.dessine.length === 1 && b.chemin === 'index.html', b);
       }
       check('Complet : aucune erreur JavaScript', !erreurs.length, erreurs);
 
@@ -423,7 +427,7 @@ async function controlerTerminalMarque(page, p, nom, deb, erreurs) {
       for (const [nom, c] of [['support / résistance', cs.sr[0]], ['repère du Guide', cs.guide[0]]]) {
         if (!c) continue;
         const b = await viserT(page, c.x, c.y, false);
-        check(`SOL/USDT, ${nom} (« ${c.titre} ») : la bulle s'ouvre, sans « Voir sur la carte ▸ »`, (b.titre === c.titre || b.titres.includes(c.titre)) && !b.lien && !b.dessine.length, { titre: b.titre, lien: b.lien, dessine: b.dessine, titres: b.titres.slice(0, 12) });
+        check(`SOL/USDT, ${nom} (« ${c.titre} ») : la bulle s'ouvre, sans « Voir sur la carte des ordres ▸ »`, (b.titre === c.titre || b.titres.includes(c.titre)) && !b.lien && !b.dessine.length, { titre: b.titre, lien: b.lien, dessine: b.dessine, titres: b.titres.slice(0, 12) });
       }
       await page.mouse.move(2, 2);
       await page.evaluate(() => { location.hash = '#prix=86000'; });
@@ -486,7 +490,7 @@ async function controlerTerminalMarque(page, p, nom, deb, erreurs) {
         check(`${nomM} : le trait se vise (un point du trait où il est la seule cible)`, !!pt, pt);
         if (pt) {
           const b = await viserT(page, pt.x, pt.y, false);
-          check(`${nomM} : survoler le trait : « Prix venu de la carte · … », et « Voir sur la carte ▸ » au même prix`, b.titres.some(t => /^Prix venu de la carte · /.test(t)) && !!b.lien && b.lien.url === adresse('bookmap.html', x.lien), b);
+          check(`${nomM} : survoler le trait : « Prix venu de la carte · … », et « Voir sur la carte des ordres ▸ » au même prix`, b.titres.some(t => /^Prix venu de la carte · /.test(t)) && !!b.lien && b.lien.url === adresse('bookmap.html', x.lien), b);
         }
       }
       await ctx.close();

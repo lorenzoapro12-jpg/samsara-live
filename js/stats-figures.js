@@ -49,8 +49,9 @@ function statsFigureHtml(S, K) {
     const T = S.taux;
     h += '<h4>Sur ce graphique</h4><p class="stats-phrase">' + echapF(S.phrase) + '</p>';
     if (T.finis) {
-      h += barreStats([[T.atteints, 'ok', 'Objectif atteint : ' + T.atteints], [T.invalides, 'ko', 'Annulées avant l’objectif : ' + T.invalides], [T.expires, 'neutre', 'Délai écoulé : ' + T.expires]])
-        + '<p class="stats-legende"><span class="ok">✓ objectif atteint ' + T.atteints + '</span> <span class="ko">✗ annulée avant ' + T.invalides + '</span>' + (T.expires ? ' <span class="neutre">– délai écoulé ' + T.expires + '</span>' : '') + '</p>';
+      // « ratées » après la validation, « annulées » avant : un mot par issue (revue du 14/10/2026, M5).
+      h += barreStats([[T.atteints, 'ok', 'Objectif atteint : ' + T.atteints], [T.invalides, 'ko', 'Ratées avant l’objectif : ' + T.invalides], [T.expires, 'neutre', 'Délai écoulé : ' + T.expires]])
+        + '<p class="stats-legende"><span class="ok">✓ objectif atteint ' + T.atteints + '</span> <span class="ko">✗ ratée avant ' + T.invalides + '</span>' + (T.expires ? ' <span class="neutre">– délai écoulé ' + T.expires + '</span>' : '') + '</p>';
     }
     if (S.temoin) {
       h += '<p class="stats-phrase">' + echapF(S.temoin.phrase) + '</p>'

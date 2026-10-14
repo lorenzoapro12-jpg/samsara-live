@@ -155,6 +155,9 @@ titre('5. Drapeau : l’invalidation en 2 clôtures est dite comme telle');
 titre('6. Heures : la date quand l’instant n’est pas aujourd’hui');
 {
   const R = SERIES['15m'].R, f = R.formes.find(x => (x.fin === 'invalide' || x.fin === 'invalide_avant') && x.jFin > 100);
+  // Le mot de l'issue : « Raté » après la validation, « Annulé » avant (changé exprès, revue du
+  // 14/10/2026, M5 : plus « Invalidé »).
+  const Mot = f.fin === 'invalide' ? 'Raté' : 'Annulé';
   // La même figure lue comme si les bougies duraient 4 h et 1 j : temps 0 = la 1re bougie.
   const t0 = 1759276800;   // 01/10/2025 00:00 UTC
   for (const [pas, nomItv] of [[14400, '4h'], [86400, '1d']]) {
@@ -162,10 +165,10 @@ titre('6. Heures : la date quand l’instant n’est pas aujourd’hui');
     const ctx = { n: f.jFin + 30, j: f.jFin + 30, intervalle: nomItv, temps, pas, horizon: P.horizon, maintenant: fin + 5 * 86400000 };
     const d = G.marqueFin(f, ctx, 'debutant', '$'), e = G.marqueFin(f, ctx, 'expert', '$'), jr = new Date(fin).toISOString();
     const jour = String(new Date(fin).getDate()), hFin = Fm.heure(fin);
-    check(`${nomItv}, 5 jours après : Débutant « Invalidé le ${jour} à ${hFin} » (heure de l’appareil, sans fuseau écrit)`, d.indexOf('Invalidé le ' + jour + ' à ' + hFin + ' :') === 0 && !/UTC|Paris/.test(d + e), d.slice(0, 80));
+    check(`${nomItv}, 5 jours après : Débutant « ${Mot} le ${jour} à ${hFin} » (heure de l’appareil, sans fuseau écrit)`, d.indexOf(Mot + ' le ' + jour + ' à ' + hFin + ' :') === 0 && !/UTC|Paris/.test(d + e), d.slice(0, 80));
     check(`${nomItv}, 5 jours après : Expert porte la date ${Fm.jour(fin)}`, e.includes(Fm.jour(fin)), e.slice(0, 80));
     const hier = G.marqueFin(f, Object.assign({}, ctx, { maintenant: fin + 86400000 }), 'debutant', '$');
-    check(`${nomItv}, le lendemain : « hier à ${hFin} » ou la date`, (hier.indexOf('Invalidé hier à ' + hFin + ' :') === 0 || hier.indexOf('Invalidé le ' + jour + ' à ' + hFin + ' :') === 0) && !/UTC|Paris/.test(hier), hier.slice(0, 60));
+    check(`${nomItv}, le lendemain : « hier à ${hFin} » ou la date`, (hier.indexOf(Mot + ' hier à ' + hFin + ' :') === 0 || hier.indexOf(Mot + ' le ' + jour + ' à ' + hFin + ' :') === 0) && !/UTC|Paris/.test(hier), hier.slice(0, 60));
     if (pas === 86400) {
       const ex = G.texteFormeExpert(f, R.bilan[f.type], ctx, P, '$');
       const tx = Array.isArray(ex) ? ex.join(' ') : String(ex);
@@ -175,7 +178,7 @@ titre('6. Heures : la date quand l’instant n’est pas aujourd’hui');
   const ctxJour = { n: f.jFin + 2, j: f.jFin + 2, intervalle: '15m', temps: T, pas: 900, horizon: P.horizon, maintenant: (T[f.jFin] + 1800) * 1000 };
   const court = G.marqueFin(f, ctxJour, 'debutant', '$');
   const hCourt = Fm.heure((T[f.jFin] + 900) * 1000);
-  check(`15 min, une demi-heure après : « Invalidé à ${hCourt} » sans date ni fuseau`, court.indexOf('Invalidé à ' + hCourt + ' :') === 0 && !/UTC|Paris/.test(court), court.slice(0, 60));
+  check(`15 min, une demi-heure après : « ${Mot} à ${hCourt} » sans date ni fuseau`, court.indexOf(Mot + ' à ' + hCourt + ' :') === 0 && !/UTC|Paris/.test(court), court.slice(0, 60));
 }
 
 // ── 7. Récemment tombées ──

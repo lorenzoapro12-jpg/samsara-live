@@ -165,7 +165,11 @@ titre('5. Mots : côté et prix de la ✗, mèche, cible, 1re clôture dehors, d
   check('✗ Débutant : « le prix a fini une heure au-dessus de 85 447 $ (le milieu de la figure) »', /le prix a fini une heure au-dessus de 85 447 \$ \(le milieu de la figure\)/.test(dD) && !/revenu au milieu/.test(dD), dD);
   check('✗ Expert : « clôture > 84 670 $ (haut de la pause) », jamais « au bout de la pause »', /clôture > 84 670 \$ \(haut de la pause\)/.test(fE) && !/au bout/.test(fE + fD + dE) && /au-dessus de 84 670 \$ \(le haut de la pause\)/.test(fD), [fE, fD, dE]);
   check('… sans prix répété', (dD.match(/85 447/g) || []).length === 1 && (fE.match(/84 670/g) || []).length === 1, [dD, fE]);
-  check('état : « invalidé (clôture repassée au-dessus de son milieu) », « … au-dessus du haut de la pause »', G.etatForme(lignes).texte === 'invalidé (clôture repassée au-dessus de son milieu)' && G.etatForme(drap).texte === 'invalidé (clôture au-dessus du haut de la pause)', [G.etatForme(lignes).texte, G.etatForme(drap).texte]);
+  // (Changé exprès, revue du 14/10/2026, M5 : « raté » après la validation, « annulé » avant ; plus « invalidé ».)
+  const lignesA = Object.assign({}, lignes, { fin: 'invalide_avant' });
+  check('état : « raté (clôture repassée au-dessus de son milieu) », « … au-dessus du haut de la pause » ; avant la validation : « annulé (…) »', G.etatForme(lignes).texte === 'raté (clôture repassée au-dessus de son milieu)' && G.etatForme(drap).texte === 'raté (clôture au-dessus du haut de la pause)'
+    && G.etatForme(lignesA).texte === 'annulé (clôture repassée au-dessus de son milieu)' && G.etatForme(lignes).court === '✗ raté' && G.etatForme(lignesA).court === '✗ annulé'
+    && /^Raté /.test(dD) && /^✗ raté /.test(dE) && /^Annulé /.test(G.marqueFin(lignesA, ctx, 'debutant', '$')) && !/ne tient plus/.test(dD), [G.etatForme(lignes).texte, G.etatForme(drap).texte, G.etatForme(lignesA).texte, dD, dE]);
   // Mèche seule : la bougie en cours est passée sous la borne basse, le prix est revenu dedans.
   const f = { type: 'drapeau', famille: 'drapeau', sens: -1, hautL: { a: 84700, b: 0 }, basL: { a: 84200, b: 0 }, mat: { i0: 0, p0: 86000, i1: 5, p1: 84100, h: 1900 }, debutPause: 5, debut: 0, depart: 10,
     apex: Infinity, extremePause: 84700, bande: 20, tol: 100, phase: 'formation', journal: [] };
@@ -185,17 +189,19 @@ titre('5. Mots : côté et prix de la ✗, mèche, cible, 1re clôture dehors, d
   const tC = G.texteFormeDebutant(fc, null, ctx, P, '$').join(' ');
   check('confirmée : « Figure validée … » (accord avec « figure »)', /Figure validée /.test(tC) && !/(^|\. )Validée /.test(tC), tC);
   check('durée de l’historique : « 500 j, soit 1,4 an », sans parenthèses imbriquées', G.duree(500 * 86400) === '500 j, soit 1,4 an' && G.duree(1000 * 86400) === '1 000 j, soit 2,7 ans', [G.duree(500 * 86400), G.duree(1000 * 86400)]);
-  // Expert : les ébauches annulées à part des figures invalidées.
+  // Expert : les ébauches annulées à part des figures ratées. (Changé exprès, revue du 14/10/2026,
+  // M5 : « Ratées récemment » (après la validation) et « Annulées récemment » (avant), plus
+  // « Invalidées récemment », qui mêlait les deux.)
   const eb = { type: 'double_sommet', ebauche: true, s: -1, fin: 'abandon', jFin: 140, raison: 'depasse', pAbandon: 85100, abandonP: 85050, journal: [] };
   const tx = G.texteFormeExpert(fc, null, ctx, P, '$', { tombees: [lignes, eb] }).join(' ');
-  check('Expert : « Invalidées récemment » ne cite que des figures ; les ébauches annulées ont leur ligne', /Invalidées récemment : Biseau montant/.test(tx) && !/Invalidées récemment[^·.]*ébauche/i.test(tx) && /Ébauches annulées récemment : Double sommet/.test(tx), tx);
-  // Une figure restée sans suite (sortie jamais validée) n'a pas été invalidée : elle a sa propre
-  // ligne, jamais sous « Invalidées récemment » (incohérence 120).
-  const ss = Object.assign({}, lignes, { fin: 'expire_avant' });
-  const tx2 = G.texteFormeExpert(fc, null, ctx, P, '$', { tombees: [lignes, ss, eb] }).join(' ');
-  const inv2 = (tx2.match(/Invalidées récemment : [^·.]*/) || [''])[0];
-  check('Expert : une figure « sans suite » sous « Sans suite récemment », jamais sous « Invalidées récemment »', /Invalidées récemment : Biseau montant/.test(tx2) && (inv2.match(/Biseau montant/g) || []).length === 1 && !/sans suite/.test(inv2)
-    && /Sans suite récemment : Biseau montant/.test(tx2), tx2);
+  check('Expert : « Ratées récemment » ne cite que des figures ; les ébauches annulées ont leur ligne', /Ratées récemment : Biseau montant/.test(tx) && !/Ratées récemment[^·.]*ébauche/i.test(tx) && /Ébauches annulées récemment : Double sommet/.test(tx) && !/Invalidées/.test(tx), tx);
+  // Une figure restée sans suite (sortie jamais validée) n'a pas raté : elle a sa propre ligne,
+  // jamais sous « Ratées récemment » (incohérence 120) ; une figure annulée avant sa validation non plus.
+  const ss = Object.assign({}, lignes, { fin: 'expire_avant' }), an = Object.assign({}, lignes, { type: 'canal_montant', fin: 'invalide_avant' });
+  const tx2 = G.texteFormeExpert(fc, null, ctx, P, '$', { tombees: [lignes, ss, an, eb] }).join(' ');
+  const inv2 = (tx2.match(/Ratées récemment : [^·.]*/) || [''])[0];
+  check('Expert : une figure « sans suite » sous « Sans suite récemment », une annulée sous « Annulées récemment », jamais sous « Ratées récemment »', /Ratées récemment : Biseau montant/.test(tx2) && (inv2.match(/Biseau montant/g) || []).length === 1 && !/sans suite|[Cc]anal/.test(inv2)
+    && /Sans suite récemment : Biseau montant/.test(tx2) && /Annulées récemment : Canal montant/.test(tx2), tx2);
 }
 
 // ── 6. Trait d'invalidation ──

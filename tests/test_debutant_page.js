@@ -1348,8 +1348,9 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       await o.page.evaluate(() => { const k = document.querySelector('#cycle .kpi-deb'); if (k) k.click(); });
       await o.page.waitForTimeout(500);
       const t = await o.page.evaluate(() => { const box = document.getElementById(innerWidth <= 768 ? 'marketModalBody' : 'feed'); return box ? box.innerText : ''; });
-      check(`SOL · ${vue.width} : « Ces infos parlent du bitcoin (en dollars), pas de SOL/USDT. », titres « Bitcoin : … », « le prix publié du bitcoin est … de sa fourchette »`,
-        /Ces infos parlent du bitcoin \(en dollars\), pas de SOL\/USDT\./.test(t) && /Bitcoin : fourchette des 24 h/i.test(t) && /le prix publié du bitcoin est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(t) && !/le prix (publié )?est (dans le haut|dans le bas|au milieu)/.test(t), t.slice(0, 500));
+      // (Changé exprès, revue du 14/10/2026, M3 : « Plus bas et plus haut des 24 h », sans « fourchette ».)
+      check(`SOL · ${vue.width} : « Ces infos parlent du bitcoin (en dollars), pas de SOL/USDT. », titres « Bitcoin : … », « le prix publié du bitcoin est … », sans « fourchette »`,
+        /Ces infos parlent du bitcoin \(en dollars\), pas de SOL\/USDT\./.test(t) && /Bitcoin : plus bas et plus haut des 24 h/i.test(t) && /le prix publié du bitcoin est (dans le haut|dans le bas|au milieu)\./.test(t) && !/le prix (publié )?est (dans le haut|dans le bas|au milieu)/.test(t) && !/fourchette/i.test(t), t.slice(0, 500));
       scanTexte(`SOL · ${vue.width}, cartes ouvertes`, await texteVisible(o.page));
       check(`SOL · ${vue.width} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();

@@ -257,8 +257,10 @@ const FICHES = {
     limites: 'Un état qui peut durer des semaines, sans date de croisement.',
   },
   sr_tf: {
-    titreDeb: 'Fourchette (plus bas, plus haut)',
-    simpleDeb: 'Le plus bas et le plus haut récents (5 jours pour la carte) : le prix est-il en haut, au milieu, en bas ?',
+    // Le nom de sa case d'« Infos du marché », avec sa durée : « fourchette » est réservé à celle de
+    // 7 jours, et « carte » à la carte des ordres (revue du 14/10/2026, M3).
+    titreDeb: 'Plus bas et plus haut des 5 jours',
+    simpleDeb: 'Le plus bas et le plus haut récents : le prix est-il en haut, au milieu, en bas ?',
     titre: 'Support / résistance (fichier)', champ: 'tf.*.support_30',
     simple: 'Le plus bas et le plus haut des dernières bougies de l’échelle de temps.',
     lectures: [
@@ -396,7 +398,7 @@ const FICHES = {
     lectures: [
       { s: 'mesuré', t: 'Hauts et bas d’hier (journée UTC) et des 24 h, lus sur les bougies. Période incomplète : pas affiché.' },
       { s: 'usuel', t: 'Zone de N demi-tours : N pivots regroupés, sur l’intervalle affiché seulement. Souvent lue comme support ou résistance.' },
-      { s: 'mesuré', t: 'Mur du carnet : la tranche la plus chargée à la publication. Un mur déjà dépassé n’est pas affiché.' },
+      { s: 'mesuré', t: 'Mur d’achat ou de vente : la tranche la plus chargée à la publication. Un mur déjà dépassé n’est pas affiché.' },
       { s: 'mesuré', t: 'Mur d’options : le prix d’exercice publié. Zéro gamma : un prix calculé par le modèle.' },
       { s: 'convention', t: 'États : loin, proche, en test, percé en mèche. Cassé : deux clôtures au-delà, ou une et un retour.' },
       { s: 'convention', t: 'Lus sur les bougies closes. Pour un chiffre publié, seules les clôtures après sa lecture comptent.' },
@@ -420,7 +422,8 @@ const FICHES = {
   guide_formes: {
     titre: 'Guide — figures chartistes', page: 'guide', nature: 'convention',
     titreDeb: 'Les figures du graphique',
-    simpleDeb: 'Une figure en tirets se dessine ; en trait plein, elle est validée ; en pointillés, finie, barrée « ✗ » si défaite.',
+    // Un mot par issue (revue du 14/10/2026, M5) : « annulée » avant la validation, « ratée » après.
+    simpleDeb: 'Une figure en tirets se dessine ; en trait plein, elle est validée ; en pointillés, finie, avec « ✗ » si annulée ou ratée.',
     simple: 'Seize figures détectées par des règles fixes, sur bougies closes ; états de l’ébauche à l’objectif, délai écoulé –, sans suite ○.',
     formule: P => {
       const g = P.guide, E = g.ete, L = g.lignes, D = g.drapeau;
@@ -434,15 +437,15 @@ const FICHES = {
         + 'Objectifs : la hauteur reportée depuis la ligne franchie (doubles, triples, épaule-tête-épaule, rectangle), la largeur à l’ouverture (triangles, biseaux, canaux), la longueur du mât (drapeaux, fanions). '
         + 'Invalidations : clôture au-delà de l’extrême (doubles, triples) ; de la tête puis, une fois validée, de l’épaule droite (épaule-tête-épaule) ; retour au-delà du milieu (deux droites, rectangle) ; recul de plus de la moitié du mât, ou retour au-delà de l’extrême de la pause (drapeaux). '
         + 'Bilan : une figure compte depuis la clôture où son dernier pivot est connu ; un double devenu triple ne compte qu’une fois et sort du dénominateur des validations. '
-        + 'Dessin : un nouveau pivot sur une droite la refait (même nom, même début) ; une figure validée porte un trait fin à son niveau d’invalidation ; en Complet, la bulle cite les figures récemment invalidées, sans suite ou annulées. '
-        + 'Délais : ' + g.expiration + ' bougies pour valider, ' + g.horizon + ' pour atteindre l’objectif (objectif et invalidation jugés tous deux en clôture). À l’écran : au plus ' + g.formesMax + ' figures en Complet (une seule en Lisible) ; une figure invalidée reste ' + g.garderInvalide + ' bougies, une ébauche annulée ' + g.garderEbauche + ', un objectif atteint ' + g.garderFini + ' (Complet). « Échantillon faible » sous ' + g.echantillonFaible + ' cas. Repère sans forme : au plus ' + g.temoinDeparts + ' départs rejoués.';
+        + 'Dessin : un nouveau pivot sur une droite la refait (même nom, même début) ; une figure validée porte un trait fin à son niveau d’invalidation ; en Complet, la bulle cite les figures récemment ratées, annulées ou sans suite. '
+        + 'Délais : ' + g.expiration + ' bougies pour valider, ' + g.horizon + ' pour atteindre l’objectif (objectif et invalidation jugés tous deux en clôture). À l’écran : au plus ' + g.formesMax + ' figures en Complet (une seule en Lisible) ; une figure annulée ou ratée reste ' + g.garderInvalide + ' bougies, une ébauche annulée ' + g.garderEbauche + ', un objectif atteint ' + g.garderFini + ' (Complet). « Échantillon faible » sous ' + g.echantillonFaible + ' cas. Repère sans forme : au plus ' + g.temoinDeparts + ' départs rejoués.';
     },
     lectures: [
-      { s: 'convention', t: 'États : ébauche, formée, sortie à valider (1 clôture sur 2), validée, objectif atteint, invalidée ✗.' },
+      { s: 'convention', t: 'États : ébauche, formée, sortie à valider (1 clôture sur 2), validée, objectif atteint ; ✗ annulée avant la validation, ratée après.' },
       { s: 'convention', t: 'Délai écoulé : un – sur la ligne de validation. Sans suite : un ○, jamais une croix.' },
       { s: 'convention', t: 'Un passage en mèche se dit « percé en mèche, à valider », jamais une validation.' },
       { s: 'convention', t: 'Objectif théorique et invalidation suivent des conventions de l’usage, non garanties (règles plus bas).' },
-      { s: 'convention', t: 'Figure tombée : une ✗ sur le niveau franchi, jamais sur un prix de clôture.' },
+      { s: 'convention', t: 'Figure annulée ou ratée : une ✗ sur le niveau franchi, jamais sur un prix de clôture.' },
       { s: 'débattu', t: 'Le sens « attendu » d’une figure est débattu. En Complet, la page montre le partage mesuré des sorties.' },
       { s: 'débattu', t: 'Les figures sont subjectives. Des règles fixes les rendent reproductibles, pas efficaces.' },
       { s: 'mesuré', t: 'Bilan : le même détecteur rejoué sur l’historique chargé, sans regarder l’avenir.' },
@@ -719,8 +722,8 @@ const echapF = s => String(s === undefined || s === null ? '' : s).replace(/&/g,
 // { exp, deb } : exp, sous « En savoir plus », n'ajoute que ce que la ligne courte (COURT) ne dit
 // pas ; deb, la ligne du menu quand la fiche n'a pas de ligne courte.
 const USAGES = {
-  guide: { exp: 'Figure en tirets : elle se forme encore. Trait plein : validée (deux clôtures au-delà, ou une et un retour réussi). Pointillés : finie sans son objectif, barrée ✗ si invalidée, « – » au délai écoulé, « ○ » sans suite.',
-    deb: 'Une figure en tirets se dessine encore ; en trait plein, elle est validée ; barrée, elle ne tient plus.' },
+  guide: { exp: 'Figure en tirets : elle se forme encore. Trait plein : validée (deux clôtures au-delà, ou une et un retour réussi). Pointillés : finie sans son objectif, ✗ si annulée ou ratée, « – » au délai écoulé, « ○ » sans suite.',
+    deb: 'Une figure en tirets se dessine encore ; en trait plein, elle est validée ; avec une ✗, elle est annulée ou ratée.' },
   scenarios: { get exp() { return 'Pendant la journée, l’encadré dit les zones touchées (✓), les scénarios tombés (✗) et celui qui suit le mieux le prix, revu à chaque clôture de ' + quartMots() + '. « ◂ » marque le plus petit écart : pas une probabilité.'; },
     deb: 'Regardez le scénario n° 1 et sa zone. La ligne du haut dit ce qui a changé depuis le matin.' },
 };
@@ -744,7 +747,7 @@ function usageHtml(id) {
 // « un rebond est attendu »). Les nombres sont lus là où le calcul les prend
 // (PARAM, meta, CADENCES) : aucun nombre avec unité écrit en dur (tests/test_fiches.js). Pour les
 // fiches que l'écran Débutant montre (GLOSSAIRE_DEBUTANT) et les calques simples, aucun mot de la
-// liste du Guide : « période » pour une bougie, « gros paquet d'ordres » pour un mur.
+// liste du Guide : « période » pour une bougie ; un mur se nomme comme sur le graphique (« mur d'achat »).
 // La ligne des traders est AUSSI `traders` de la fiche (une seule version).
 // Une chaîne, ou une fonction de PARAM.
 const COURT = {
@@ -798,8 +801,8 @@ const COURT = {
     traders: 'Courte sous longue : tendance lue comme baissière ; au-dessus, haussière. Beaucoup guettent le moment où elles se croisent.',
     calcul: () => { const a = prmMeta('tf.*.ema20_sous_ema50', 'courte'), b = prmMeta('tf.*.ema20_sous_ema50', 'longue');
       return 'Oui si la moyenne ' + (a !== null && b !== null ? 'des ' + nbF(a) + ' dernières périodes est sous celle des ' + nbF(b) : 'courte est sous la longue') + ', à la publication.'; } },
-  sr_tf: { quoi: 'Le plus bas et le plus haut récents du prix : sa fourchette.',
-    traders: 'Ces deux bornes sont surveillées quand le prix s’en approche. Les franchir est lu comme une sortie de la fourchette.',
+  sr_tf: { quoi: 'Le plus bas et le plus haut récents du prix.',
+    traders: 'Ces deux bornes sont surveillées quand le prix s’en approche. En franchir une est lu comme une cassure.',
     calcul: () => { const v = prmMeta('tf.*.support_30', 'bougies');
       return 'Le plus bas et le plus haut des ' + (v !== null ? nbF(v) + ' ' : '') + 'dernières périodes, pour plusieurs durées. La période en cours compte.'; } },
   amplitude: { quoi: 'L’écart entre le plus haut et le plus bas récents, en pourcentage.',
@@ -882,7 +885,9 @@ const COURT = {
     calcul: 'Le site lit le mouvement récent et les prix proches où quelque chose s’est passé. Il garde le plus proche de chaque côté.' },
   guide_niveaux: { quoi: 'Les prix les plus proches où il s’est passé quelque chose, de chaque côté.',
     usage: 'Touchez un repère : son origine, la place du prix, le repère suivant s’il est dépassé.',
-    calcul: 'Chaque repère vient des données : haut ou bas d’hier, gros paquet d’ordres, zone de demi-tours. Des repères proches forment une bande.' },
+    // Les noms lus sur le graphique, expliqués (revue du 14/10/2026, M4 : la fiche disait « gros
+    // paquet d'ordres » et « zone de demi-tours », le graphique « Mur d'achat » et « Zone de retour »).
+    calcul: 'Repères : haut ou bas d’hier, mur d’achat ou de vente (un gros paquet d’ordres). Zone de retour : le prix y a fait demi-tour.' },
   guide_regime: { quoi: 'Le mouvement du prix en un mot : il monte, baisse, hésite ou s’agite.',
     usage: 'Le mot est le verbe de la phrase du haut. Il décrit le passé récent, pas la suite.',
     calcul: 'Le site regarde si le prix a une direction nette et si deux mesures s’accordent. Sinon : « hésite », ou « s’agite » s’il bouge fort.' },
@@ -1184,7 +1189,9 @@ function phraseCarte(cle, v, v2, sujet) {
   };
   let t = null;
   switch (cle) {
-    case 'fourchette': if (n(v)) t = 'Sur ' + (v2 || '24 h') + ', ' + (sujet || 'le prix') + ' est ' + (v >= 2 / 3 ? 'dans le haut' : v <= 1 / 3 ? 'dans le bas' : 'au milieu') + ' de sa fourchette.'; break;
+    // Sans « de sa fourchette » : le mot est réservé à celle de 7 jours, la case dit déjà « Plus bas
+    // et plus haut des 24 h » (revue du 14/10/2026, M3).
+    case 'fourchette': if (n(v)) t = 'Sur ' + (v2 || '24 h') + ', ' + (sujet || 'le prix') + ' est ' + (v >= 2 / 3 ? 'dans le haut' : v <= 1 / 3 ? 'dans le bas' : 'au milieu') + '.'; break;
     case 'vix': if (n(v)) t = phraseVix(v); break;
     case 'cvd': if (n(v)) t = v >= 0 ? 'Sur 24 h, les achats immédiats ont dépassé les ventes immédiates de ' + dollars(v) + '.' : 'Sur 24 h, les ventes immédiates ont dépassé les achats immédiats de ' + dollars(v) + '.'; break;
     // Elle compte les blocs de la DERNIÈRE publication (status), pas des sources ni leur âge

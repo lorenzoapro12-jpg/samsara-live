@@ -287,7 +287,8 @@ titre('6. Mots : libellés, bulles, mêmes valeurs, heures');
         if (!/validée|sortie compte|Validée/.test(deb)) pb.push(['validation', f.type, e]);
         if (!f.ebauche && (!/objectifs? théoriques?/i.test(deb) || /cible/i.test(deb))) pb.push(['objectif', f.type, e]);
         if (!f.ebauche && !/non garantis?/.test(deb)) pb.push(['non garanti', f.type, e]);
-        if (N.invals.length && !f.ebauche && !/Annulée si|ne tient plus|annulée si/.test(deb)) pb.push(['invalidation', f.type, e, deb.slice(0, 200)]);
+        // (Changé exprès, revue du 14/10/2026, M5 : validée, « la figure est ratée » ; plus « ne tient plus ».)
+        if (N.invals.length && !f.ebauche && !/Annulée si|la figure est ratée|annulée si/.test(deb)) pb.push(['invalidation', f.type, e, deb.slice(0, 200)]);
         if (!f.ebauche && !/objectif théorique \(convention, non garanti\)/.test(exp)) pb.push(['objectif expert', f.type, e]);
         // Mêmes valeurs dans les deux modes : chaque niveau du moment est écrit à l'identique.
         const niv = N.confirme ? [N.invals[0].p, N.objectifs[0].p] : N.sorties.map(x => x.seuil).concat(N.invals.filter(v => v.clotures === 1).map(v => v.p));
@@ -408,10 +409,12 @@ titre('6 bis. Figure tombée avant validation : la définition s’arrête avant
   const faux = [];
   for (const f of tombees) {
     const t = G.texteFormeDebutant(f, R.bilan[f.type], ctxDe(f.jFin + 2), P, '$').join(' ');
-    // (Mots changés exprès : « tombée avant d’être validée » ; la cible d'une figure tombée n'est plus dite.)
-    if (/puis (il|le prix) (est passé|en est sorti|est sorti)|puis il en est sorti/.test(t) || !/la figure est tombée avant d’être validée/.test(t) || /[Cc]ible théorique/.test(t)) faux.push({ type: f.type, t: t.slice(0, 200) });
+    // (Mots changés exprès : « jamais été validée » (revue du 14/10/2026, M5 : plus « tombée ») ; la cible
+    // d'une figure finie avant sa validation n'est plus dite ; sa marque dit « Annulé » ou « Sans suite », jamais « raté ».)
+    if (/puis (il|le prix) (est passé|en est sorti|est sorti)|puis il en est sorti/.test(t) || !/la figure n’a jamais été validée/.test(t) || /[Cc]ible théorique/.test(t)
+      || !(f.fin === 'invalide_avant' ? /Annulé /.test(t) : /Sans suite /.test(t)) || /[Rr]até|tombée|[Ii]nvalidé|ne tient plus/.test(t)) faux.push({ type: f.type, t: t.slice(0, 200) });
   }
-  check(`${tombees.length} figures tombées avant validation : « la figure est tombée avant d’être validée », jamais « puis … sorti », pas de cible`, tombees.length > 5 && !faux.length, faux.slice(0, 3));
+  check(`${tombees.length} figures finies avant validation : « la figure n’a jamais été validée », « Annulé » ou « Sans suite », jamais « raté » ni « tombée » ni « puis … sorti », pas de cible`, tombees.length > 5 && !faux.length, faux.slice(0, 3));
 }
 
 // ── 4 ter. Rejeu repris d'une clôture à l'autre : le même résultat qu'un rejeu complet ──
@@ -473,9 +476,12 @@ titre('8 bis. Objectif et statistiques : la ligne courte de la bulle et le déta
     check(`… exemples : les ${St.dernieres.length} derniers cas (≤ ${P.exemples.max}, PARAM.guide.exemples), du plus récent au plus ancien, sans tri par réussite, avec début, validation, issue, sens, niveau, objectif, invalidation`,
       P.exemples.max === 6 && St.dernieres.length === Math.min(P.exemples.max, dern.length) && champsOk, St.dernieres.map(d => [d.debut, d.jConf, d.jFin, d.fin, d.niveau]));
     const lig = Object.fromEntries(St.lignes);
-    check(`… le détail reprend le bilan : repérées, validées, tombées avant, atteintes, annulées, délai écoulé`,
+    // (Changé exprès, revue du 14/10/2026, M5 : « Annulées avant d’être validées » et « Ratées avant
+    // l’objectif », un mot par issue ; les sans suite ont leur ligne.)
+    check(`… le détail reprend le bilan : repérées, validées, annulées avant d’être validées, sans suite, atteintes, ratées, délai écoulé`,
       +String(lig['Repérées'] || lig['Figures repérées']).split(' ')[0] === x.formes && +(lig['Figures validées'] || lig['Sorties validées']) === x.confirmes
-      && +(lig['Tombées avant leur validation'] || 0) === x.invalidesAvant + x.expiresAvant && +lig['Objectif atteint'] === x.atteints && +lig['Annulées avant l’objectif'] === x.invalides
+      && +(lig['Annulées avant d’être validées'] || 0) === x.invalidesAvant && +(lig['Sans suite (jamais validées)'] || 0) === x.expiresAvant && +lig['Objectif atteint'] === x.atteints && +lig['Ratées avant l’objectif'] === x.invalides
+      && !Object.keys(lig).some(k => /[Tt]ombée|[Ii]nvalidée|Annulées avant l’objectif/.test(k))
       && +Object.entries(lig).find(([k]) => /^Ni l’une ni l’autre/.test(k))[1] === x.expires, { lig, x });
   }
   // Une figure tombée avant sa validation n'a plus d'objectif : la ligne ne promet pas de prix.
@@ -552,7 +558,12 @@ titre('8 bis. Objectif et statistiques : la ligne courte de la bulle et le déta
   }
   // Le témoin, quand il existe, est celui du bilan.
   const avecT = ex.find(f => b[f.type].temoin && b[f.type].temoin.departs > 0);
-  if (avecT) { const St = G.statsFigure(avecT, R, ctx, P, '$'); check('le repère « trajet de même taille » est celui du bilan', St.temoin && St.temoin.departs === b[avecT.type].temoin.departs && St.temoin.atteints === b[avecT.type].temoin.atteints, St.temoin); }
+  if (avecT) { const St = G.statsFigure(avecT, R, ctx, P, '$'); check('le repère « trajet de même taille » est celui du bilan', St.temoin && St.temoin.departs === b[avecT.type].temoin.departs && St.temoin.atteints === b[avecT.type].temoin.atteints, St.temoin);
+    // Revue du 14/10/2026 (M5) : « x fois sur 10 » d'abord, comme la ligne des années, le compte brut
+    // entre parenthèses (« 1 441 fois sur 2 538 » côtoyait « 5 fois sur 10 »).
+    const T0 = St.temoin, x10 = T0 && Math.round(T0.atteints / T0.departs * 10), fr = n => n.toLocaleString('fr-FR').replace(/\s/g, ' ');
+    check(`le repère se dit « ${x10} fois sur 10 (${T0 && T0.atteints} sur ${T0 && T0.departs}) » : sur 10 d'abord, le compte brut entre parenthèses`,
+      !!T0 && T0.phrase.includes(' : ' + x10 + ' fois sur 10 (' + fr(T0.atteints) + ' sur ' + fr(T0.departs) + ').') && !/\d fois sur \d{2,}(?!\d)/.test(T0.phrase.replace(/fois sur 10 \(/, '')), T0 && T0.phrase); }
 }
 
 // ── 9. Temps ──

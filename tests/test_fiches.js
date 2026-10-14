@@ -144,7 +144,9 @@ check('ratio affiché « 1,00 » (L/S, carnet) : « Autant de… », jamais « P
   const Gd = require(path.join(REPO, 'js/guide.js'));
   const ph = [['fourchette', 0, '24 h'], ['fourchette', 0.5, '5 jours'], ['fourchette', 0.9], ['vix', 12], ['vix', 20], ['vix', 30], ['cvd', 1.2e8], ['cvd', -3.4e7], ['sources', 9, 9], ['sources', 7, 9], ['sources', 8, 9]].map(a => T.phraseCarte(...a));
   check(`${ph.length} phrases des cartes : chacune « lecture-courte sans-chiffres », sans conseil ni mot technique`, ph.every(h => /^<div class="lecture-courte sans-chiffres">[^<]+<\/div>$/.test(h) && !CONSEIL.test(h) && !Gd.motsBannis(h).length), ph);
-  check('fourchette : « Sur 24 h, le prix est dans le bas de sa fourchette. » ; écart achats/ventes arrondi en millions (« 120 millions $ », « 34 millions $ », jamais un nombre à 7 chiffres)', /^<div[^>]*>Sur 24 h, le prix est dans le bas de sa fourchette\.<\/div>$/.test(ph[0]) && /de 120 millions \$\./.test(ph[6]) && /de 34 millions \$\./.test(ph[7])
+  // (Changé exprès, revue du 14/10/2026, M3 : « fourchette » est réservé à celle de 7 jours ; la case
+  // s'appelle « Plus bas et plus haut des 24 h », la phrase ne dit plus « de sa fourchette ».)
+  check('position dans la case : « Sur 24 h, le prix est dans le bas. », sans « fourchette » ; écart achats/ventes arrondi en millions (« 120 millions $ », « 34 millions $ », jamais un nombre à 7 chiffres)', /^<div[^>]*>Sur 24 h, le prix est dans le bas\.<\/div>$/.test(ph[0]) && !/fourchette/.test(ph.slice(0, 3).join(' ')) && /de 120 millions \$\./.test(ph[6]) && /de 34 millions \$\./.test(ph[7])
     && /de 3,4 millions \$\./.test(T.phraseCarte('cvd', 3356931)) && /de 1,2 million \$\./.test(T.phraseCarte('cvd', -1.2e6)) && /de 845 000 \$\./.test(T.phraseCarte('cvd', 845000)) && !/\d{1,3}(?: \d{3}){2}/.test(ph[6] + ph[7] + T.phraseCarte('cvd', 3356931)) && /2 infos manquent dans la dernière publication/.test(ph[9]) && /1 info manque dans la dernière publication/.test(ph[10])
     && /La dernière publication est complète\./.test(ph[8]) && !/sont arrivées|sources? manque/.test(ph.join(' ')), [ph[0], ph[6], ph[8], ph[9]]);
   check('valeur absente ou clé inconnue : aucune phrase (rien d’inventé)', T.phraseCarte('vix', null) === '' && T.phraseCarte('fourchette', NaN) === '' && T.phraseCarte('inconnue', 1) === '' && T.phraseCarte('sources', 3) === '');
@@ -173,10 +175,16 @@ check('ratio affiché « 1,00 » (L/S, carnet) : « Autant de… », jamais « P
   T.activeSymbol = sym;
   // La phrase dit « le prix publié » : le prix du haut de la page est en direct, celui de la
   // carte est celui de la publication (les deux pouvaient se contredire sans le dire).
-  check('SOL/USDT : cartes identiques dans les deux modes ; le Débutant dit « Ces infos parlent du bitcoin », « Bitcoin : fourchette des 24 h », « le prix publié du bitcoin est … de sa fourchette »', dS === eS && /Ces infos parlent du bitcoin \(en dollars\), pas de SOL\/USDT\./.test(dS)
-    && /Bitcoin : fourchette des 24 h/.test(dS) && /le prix publié du bitcoin est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(dS) && !/le prix (publié )?est (dans le haut|dans le bas|au milieu)/.test(dS), dS.slice(0, 400));
+  // (Changé exprès, revue du 14/10/2026, M3 : « Plus bas et plus haut des 24 h » et « … des 5 jours »,
+  // plus « Fourchette des … » ; le mot est réservé à la fourchette de 7 jours du graphique.)
+  check('SOL/USDT : cartes identiques dans les deux modes ; le Débutant dit « Ces infos parlent du bitcoin », « Bitcoin : plus bas et plus haut des 24 h », « le prix publié du bitcoin est … »', dS === eS && /Ces infos parlent du bitcoin \(en dollars\), pas de SOL\/USDT\./.test(dS)
+    && /Bitcoin : plus bas et plus haut des 24 h/.test(dS) && /le prix publié du bitcoin est (dans le haut|dans le bas|au milieu)\./.test(dS) && !/le prix (publié )?est (dans le haut|dans le bas|au milieu)/.test(dS), dS.slice(0, 400));
   const dB = rendre(null);
-  check('BTC/USDT : « le prix publié », pas de mention « Ces infos parlent du bitcoin » ; haut et bas publiés dits « publié »', !/Ces infos parlent du bitcoin/.test(dB) && /le prix publié est (dans le haut|dans le bas|au milieu) de sa fourchette/.test(dB) && !/bitcoin est (dans le haut|dans le bas|au milieu)/.test(dB) && /Haut publié/.test(dB) && /Bas publié/.test(dB));
+  check('BTC/USDT : « le prix publié », pas de mention « Ces infos parlent du bitcoin » ; haut et bas publiés dits « publié »', !/Ces infos parlent du bitcoin/.test(dB) && /le prix publié est (dans le haut|dans le bas|au milieu)\./.test(dB) && !/bitcoin est (dans le haut|dans le bas|au milieu)/.test(dB) && /Haut publié/.test(dB) && /Bas publié/.test(dB));
+  // Revue du 14/10/2026 (M3) : un seul nom par chose. Les cases d'« Infos du marché » ne disent plus
+  // « fourchette » (deux « bas » à 640 $ d'écart portaient le même mot) ; elles portent leur durée.
+  check('Infos du marché : « Plus bas et plus haut des 24 h » et « … des 5 jours », jamais « fourchette » ; le glossaire porte la durée', /Plus bas et plus haut des 24 h/.test(dB) && /Plus bas et plus haut des 5 jours/.test(dB) && !/[Ff]ourchette/.test(dB)
+    && T.FICHES.sr_tf.titreDeb === 'Plus bas et plus haut des 5 jours' && !/fourchette|carte/i.test(T.FICHES.sr_tf.simpleDeb + ' ' + T.courtTexte(T.COURT.sr_tf.quoi) + ' ' + T.courtTexte(T.COURT.sr_tf.traders)), dB.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 600));
 }
 check('chaque fiche se termine par « Une description, pas un conseil. » (une ligne, une fois)', Object.keys(T.FICHES).every(k => /<p class="fiche-pied">Une description, pas un conseil\.<\/p>$/.test(T.ficheHtml(k)) && (T.ficheHtml(k).match(/pas un conseil/g) || []).length === 1));
 
@@ -370,6 +378,14 @@ titre('11. Les fiches disent ce que la page calcule, avec les mots de l’écran
   const fg = T.FICHES.guide_formes, txtF = [fg.simple, fg.simpleDeb, ...fg.lectures.map(l => l.t), T.FICHES.guide.usage.exp, T.FICHES.guide.usage.deb].join(' ');
   check('figures : « validée » (plus « confirmée »), en tirets tant qu’elles se forment, une marque par issue (✗, –, ○)', !/« confirmé »|à confirmer|confirmée|confirmations/.test(txtF) && /en tirets/.test(fg.simpleDeb) && /en tirets/.test(T.FICHES.guide.usage.exp) && /en tirets/.test(T.FICHES.guide.usage.deb)
     && /délai écoulé –/.test(fg.simple) && /sans suite ○/.test(fg.simple) && /jamais sur un prix de clôture/.test(txtF));
+  // Revue du 14/10/2026 (M4) : la fiche « Les repères de prix » emploie les noms lus sur le graphique
+  // sans « Le détail » (Guide.NOMS_DEBUTANT), chacun dit en mots simples ; « gros paquet d'ordres »
+  // et « zone de demi-tours » seuls ne s'y retrouvaient pas.
+  // (« mur de vente » s'y écrit « mur d’achat ou de vente ».)
+  const calcN = T.courtTexte(T.COURT.guide_niveaux.calcul).toLowerCase(), nomsN = ['sr', 'mur_achat'].map(k => Gd.NOMS_DEBUTANT[k][0].toLowerCase());
+  check('repères : la fiche dit « mur d’achat ou de vente » et « zone de retour », les noms du graphique, chacun expliqué',
+    nomsN.every(n => calcN.includes(n)) && Gd.NOMS_DEBUTANT.mur_vente[0] === 'Mur de vente' && /mur d’achat ou de vente \(un gros paquet d’ordres\)/.test(calcN) && /zone de retour : le prix y a fait demi-tour/.test(calcN)
+    && !/zone de demi-tours/.test(calcN), { calcN, nomsN });
   check('repères du Guide : l’heure de lecture sans « UTC » (heure de l’appareil)', !/UTC/.test([T.FICHES.guide_niveaux.simple, T.FICHES.guide_niveaux.limites, ...T.FICHES.guide_niveaux.lectures.map(l => l.t)].join(' ').replace(/journée UTC/g, '')));
 }
 

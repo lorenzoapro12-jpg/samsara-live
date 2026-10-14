@@ -423,9 +423,13 @@ titre('6. Et ensuite ? et lecture du moment : des niveaux nommés, aucune direct
   check('côté sans niveau nommé : dit dans chaque variante', aucun.every(x => /aucun niveau/.test(x)), aucun);
   check('un pourcentage de PARAM n’est jamais arrondi à 0 (« 0,4 % »)', G.pctParam(0.004) === '0,4' && G.pctParam(0.06) === '6');
   // L'issue d'une forme est datée : « vient d'être » ne se dit que pour la dernière bougie close.
-  const fi = { type: 'double_sommet', fin: 'invalide', sens: -1 };
+  // (Changé exprès, revue du 14/10/2026, M5 : « raté » après la validation, « annulé » avant ;
+  // plus « invalidé ».)
+  const fi = { type: 'double_sommet', fin: 'invalide', sens: -1 }, fa = { type: 'double_sommet', fin: 'invalide_avant', sens: -1 };
   const p17 = t(G.phraseForme(fi, '$', { bougies: 17, itv: '1d', date: '21/09' })), p1 = G.phraseForme(fi, '$', { bougies: 1, itv: '1d', date: '07/10' });
-  check('forme invalidée il y a 17 bougies 1 jour : « a été invalidé il y a 17 bougies 1 jour (21/09) » ; la veille : « vient d’être invalidé »', p17 === 'un double sommet a été invalidé il y a 17 bougies 1 jour (21/09)' && /vient d’être invalidé/.test(p1), [p17, p1]);
+  const a17 = t(G.phraseForme(fa, '$', { bougies: 17, itv: '1d', date: '21/09' })), a1 = G.phraseForme(fa, '$', { bougies: 1, itv: '1d', date: '07/10' });
+  check('forme ratée il y a 17 bougies 1 jour : « a raté il y a 17 bougies 1 jour (21/09) » ; la veille : « vient de rater » ; avant sa validation : « a été annulé », « vient d’être annulé »',
+    p17 === 'un double sommet a raté il y a 17 bougies 1 jour (21/09)' && /vient de rater$/.test(p1) && a17 === 'un double sommet a été annulé il y a 17 bougies 1 jour (21/09)' && /vient d’être annulé$/.test(a1), [p17, p1, a17, a1]);
   // Lecture compacte (téléphone) : les prix et leurs heures, la compression dite.
   const lc = t(G.lecture({ prix: 81686, unite: '$', choix: choixDans, enTest: bande, regime: { cle: 'baisse', compression: true }, forme: null, court: true, compact: true }));
   check(`lecture compacte : « Prix 81 686 $ dans la bande 81 670 (lu à ${h2103}) – 81 891 $. Volatilité comprimée. »`, lc === 'Prix 81 686 $ dans la bande 81 670 (lu à ' + h2103 + ') – 81 891 $. Volatilité comprimée.', lc);
@@ -624,8 +628,9 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     ['double_sommet', {}], ['triangle_symetrique', { demi: true, demiSens: 1 }], ['range', {}], ['double_creux', { demi: true }], ['double_sommet', { fin: 'atteint' }], ['triangle_symetrique', { fin: 'expire_avant' }]]
     .map(([type, e]) => [type, t(G.libelleFormeDebutant(Object.assign({ type, sens: 1 }, e)) || '') || null]);
   // (Changé exprès : le côté d'une sortie se dit en mots, jamais par une flèche seule ; le nom reste.)
-  check('forme : « Double sommet validé », « ✗ Double creux invalidé », « Triangle : sortie en haut », « Rectangle : sortie en bas » ; en train de se dessiner : « Double sommet possible », « Triangle : sort en haut ? », « Prix dans un rectangle », « Double creux à valider » ; issues : « Double sommet : objectif ✓ » (la forme longue dépasse : le nom reste — changé exprès, revue des figures 2), « ○ Triangle sans suite »',
-    fo[0][1] === 'Double sommet validé' && fo[1][1] === '✗ Double creux invalidé' && fo[2][1] === 'Triangle : sortie en haut' && fo[3][1] === 'Rectangle : sortie en bas'
+  // (Changé exprès, revue du 14/10/2026, M5 : « ✗ Double creux raté », plus « invalidé ».)
+  check('forme : « Double sommet validé », « ✗ Double creux raté », « Triangle : sortie en haut », « Rectangle : sortie en bas » ; en train de se dessiner : « Double sommet possible », « Triangle : sort en haut ? », « Prix dans un rectangle », « Double creux à valider » ; issues : « Double sommet : objectif ✓ » (la forme longue dépasse : le nom reste — changé exprès, revue des figures 2), « ○ Triangle sans suite »',
+    fo[0][1] === 'Double sommet validé' && fo[1][1] === '✗ Double creux raté' && fo[2][1] === 'Triangle : sortie en haut' && fo[3][1] === 'Rectangle : sortie en bas'
     && fo[4][1] === 'Double sommet possible' && fo[5][1] === 'Triangle : sort en haut ?' && fo[6][1] === 'Prix dans un rectangle' && fo[7][1] === 'Double creux à valider'
     && fo[8][1] === 'Double sommet : objectif ✓' && fo[9][1] === '○ Triangle sans suite' && fo.every(([, l]) => !l || l.length <= DEB.forme) && !fo.some(([, l]) => /[↑↓]/.test(l || '')), fo);
   {
@@ -633,7 +638,9 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     // « – » pour un délai écoulé après la validation ; « ○ » pour une figure restée sans suite.
     const issue = (fin, e) => G.libelleFormeDebutant(Object.assign({ type: 'double_sommet', sens: -1, fin }, e || {})) || '';
     const L = { invalide: issue('invalide'), invalide_avant: issue('invalide_avant'), abandon: issue('abandon', { ebauche: true }), expire: issue('expire'), expire_avant: issue('expire_avant') };
-    check('une marque par issue : ✗ invalidée / annulée, « – » délai écoulé, « ○ » sans suite ; jamais ✗ pour une figure qui n’a pas été défaite', /^✗ /.test(L.invalide) && /^✗ /.test(L.invalide_avant) && /^✗ .*annulé/.test(L.abandon)
+    // Un mot par issue (revue du 14/10/2026, M5) : « raté » après la validation, « annulé » avant
+    // (figure jamais validée ou ébauche) ; plus « invalidé ».
+    check('une marque par issue : ✗ ratée / annulée, « – » délai écoulé, « ○ » sans suite ; jamais ✗ pour une figure qui n’a pas échoué', /^✗ .*raté$/.test(L.invalide) && /^✗ .*annulé$/.test(L.invalide_avant) && /^✗ .*annulé/.test(L.abandon)
       && /^– /.test(L.expire) && !/✗/.test(L.expire) && /^○ .*sans suite/.test(L.expire_avant) && !/✗/.test(L.expire_avant)
       && G.MARQUES_FIN.invalide === '✗' && G.MARQUES_FIN.abandon === '✗' && G.MARQUES_FIN.expire === '–' && G.MARQUES_FIN.expire_avant === '○' && !('atteint' in G.MARQUES_FIN), L);
   }
@@ -760,6 +767,15 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
   check('une figure validée ne fait jamais pencher le titre : avec la tendance seule, « Pas de sens net pour l’instant »',
     [vH, vB].every(r => r.ton === 'calme' && /^Pas de sens net pour l’instant\.$/.test(r.titre) && /Un seul signal/.test(r.regle)) && vC.ton === 'calme' && vS.ton === 'calme' && /hésite/.test(vS.titre),
     [vH, vB, vC, vS].map(r => [r.ton, r.titre, r.regle]));
+  // Revue du 14/10/2026 (C15) : « En résumé » (montré avec « Le détail ») nomme chaque figure comme
+  // son étiquette du graphique (libelleFormeCourt), pour les 16 types ; l'ETE inversé s'appelait
+  // « Tête-épaules à l'envers » à côté d'une étiquette « Épaule-tête-épaule inversé ».
+  const noms2 = G.TYPES.map(type => { const f = { type, sens: 1, phase: 'confirme', fin: null }, l = ligneF(syn({ regime: { cle: 'faible' }, figures: [f] }));
+    return [type, l && l.texte, G.libelleFormeCourt(f)]; }).filter(([, l, e]) => !l || l.indexOf(e + ' validé') !== 0);
+  const finie = fin => ligneF(syn({ regime: { cle: 'faible' }, figures: [{ type: 'ete_inverse', sens: 1, fin, jFin: 3 }] }));
+  check('« En résumé » : la figure porte le nom de son étiquette (« Épaule-tête-épaule inversé validé », 16 types) ; finie : « raté » après sa validation, « annulé » avant',
+    !noms2.length && /^Épaule-tête-épaule inversé : raté, plus de signal\.$/.test(finie('invalide').texte) && /^Épaule-tête-épaule inversé : annulé, plus de signal\.$/.test(finie('invalide_avant').texte),
+    { noms2, rate: finie('invalide'), annule: finie('invalide_avant') });
   check('sans mesure sur des années (autre paire, ou objectif inconnu) : pas de « comme au hasard », toujours sans sens',
     /^Double sommet validé : objectif 81 158 \$\.$/.test(ligneF(vC).texte) && /^Double creux validé\.$/.test(ligneF(vS).texte), [ligneF(vC), ligneF(vS)]);
   check('la lecture dit ce qui la ferait tomber (le repère du bas)', h.surveiller.some(x => /tombe si le prix finit une heure sous/.test(x)), h.surveiller);
@@ -770,7 +786,9 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
   const u = syn({ regime: { cle: 'hausse' } });
   check('un seul signal : pas de sens net, et la règle le dit (« trop peu »)', u.ton === 'calme' && /Pas de sens net/.test(u.titre) && /trop peu/.test(u.regle), u);
   const z = syn({ regime: { cle: 'faible' }, scenario: { rang: '1', forme: 'range', ouvert: true, sens: 0 } });
-  check('tendance faible, scénario en fourchette : le prix hésite, aucun signal ne penche', z.ton === 'calme' && /hésite/.test(z.titre) && z.pourquoi.every(p => p.sens === 0) && /Aucun signal/.test(z.regle), z);
+  // « fourchette » est réservé à celle de 7 jours (revue du 14/10/2026, M3) : le range du scénario se dit « entre deux bornes ».
+  check('tendance faible, scénario en range : le prix hésite, aucun signal ne penche ; « entre deux bornes », pas « fourchette »', z.ton === 'calme' && /hésite/.test(z.titre) && z.pourquoi.every(p => p.sens === 0) && /Aucun signal/.test(z.regle)
+    && z.pourquoi.some(p => /^Scénario n° 1 de Claude, ce matin : le prix reste entre deux bornes\.$/.test(p.texte)) && !z.pourquoi.some(p => /fourchette/.test(p.texte)), z);
   check('à surveiller : un repère de chaque côté, le plus parlant à prix égal (« le plus haut d’hier »)', /^Au-dessus : 86 398 \$, le plus haut d’hier\.$/.test(z.surveiller[0]) && /^En dessous : 85 600 \$, une zone de retour\.$/.test(z.surveiller[1]), z.surveiller);
   // 2. Le prix dans une bande : elle est dite, puis le repère suivant de chaque côté.
   const d = G.synthese(Object.assign({}, base, { prix: 86398, suite: G.suite(choix, 86398), regime: { cle: 'faible' } }));
