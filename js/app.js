@@ -646,8 +646,10 @@ const INDICATORS = [
     { key: 'liq', label: NOM_ORDRES_CARTE, court: 'Ordres en attente', imp: 'utile', paires: ['BTCUSDT'] },
     // Plan du 13/10/2026, idée 5 : refaite avec les bougies chargées, sur les intervalles qui
     // divisent ses périodes de 4 h (en 1 jour, rien : la ligne est grisée et le dit).
+    // cherche : des mots cachés que la recherche du panneau trouve aussi, jamais affichés (revue du
+    // 14/10/2026, M15 : « range » ne trouvait rien, alors que tous les traders disent « range »).
     { key: 'fourchette', get label() { return 'Fourchette de ' + joursFourchette() + ' jours'; }, get court() { return 'Fourchette de ' + joursFourchette() + ' jours'; },
-      imp: 'utile', intervalles: ['1m', '5m', '15m', '30m', '1h', '4h'] },
+      imp: 'utile', intervalles: ['1m', '5m', '15m', '30m', '1h', '4h'], cherche: 'range plage canal consolidation' },
   ]},
   { cat: 'agitation', titre: 'Ça bouge beaucoup ?', items: [
     { key: 'atr', label: ETIQ.atr(), court: 'ATR', imp: 'utile' },
@@ -877,8 +879,11 @@ function montrerApercu(key) {
   const a = document.getElementById('indApercu');
   if (a) a.innerHTML = apercuPanneau(key);
 }
-/** Le filtre du panneau : sur le libellé, le nom court, le titre de la fiche, la question et
- *  l'importance, sans accents. */
+/** Les mots cachés des outils, que la recherche trouve aussi (la calculette : « levier », « position »,
+ *  « taille » ; revue du 14/10/2026, M15). */
+const CHERCHE_OUTILS = 'stop paliers levier position taille';
+/** Le filtre du panneau : sur le libellé, le nom court, le titre de la fiche, la question,
+ *  l'importance et les mots cachés de la ligne (item.cherche), sans accents. */
 function filtrerMenu(t) {
   menuFiltre = t;
   const q = sansAccents(t.trim());
@@ -887,8 +892,9 @@ function filtrerMenu(t) {
   for (const c of menu.querySelectorAll('.cat-title[data-cat]')) c.hidden = !menu.querySelector('label[data-cat="' + c.dataset.cat + '"]:not([hidden])');
   // L'aide à la lecture n'est pas un indicateur : masquée pendant une recherche.
   for (const el of menu.querySelectorAll('.aff-aide, .aff-aide-titre, .aff-legende')) el.hidden = !!q;
-  // Les outils non plus, sauf si la recherche les nomme (« calculette », « risque »…).
-  for (const el of menu.querySelectorAll('.aff-outils')) el.hidden = !!q && !sansAccents(el.textContent + ' stop paliers').includes(q);
+  // Les outils non plus, sauf si la recherche les nomme (« calculette », « risque »…) ou dit un de
+  // leurs mots cachés (CHERCHE_OUTILS).
+  for (const el of menu.querySelectorAll('.aff-outils')) el.hidden = !!q && !sansAccents(el.textContent + ' ' + CHERCHE_OUTILS).includes(q);
   const vide = menu.querySelector('.ind-aucun');
   if (vide) vide.hidden = !!menu.querySelector('label[data-ind]:not([hidden])');
 }
@@ -900,7 +906,7 @@ function ligneMenu(item, libelle, cat) {
   const fiche = item.fiche || FICHE_IND[item.key], f = fiche && typeof FICHES !== 'undefined' ? FICHES[fiche] : null;
   const quoi = item.quoi || QUOI_ECRAN[item.key] || quoiCourt(fiche);
   const imp = item.imp ? IMPORTANCES[item.imp] : '';
-  const cherche = libelle + ' ' + (item.court || '') + ' ' + (f ? f.titre : '') + ' ' + (TITRES_CAT[cat] || cat) + ' ' + imp;
+  const cherche = libelle + ' ' + (item.court || '') + ' ' + (f ? f.titre : '') + ' ' + (TITRES_CAT[cat] || cat) + ' ' + imp + (item.cherche ? ' ' + item.cherche : '');
   const dispo = disponible(item), seul = dispo ? '' : ' disabled';
   // Grisée : la paire (« BTC/USDT seulement ») ou l'intervalle (« pas en 1 jour ») qui la prive.
   const horsPaire = item.paires && !item.paires.includes(activeSymbol);
@@ -973,14 +979,15 @@ function buildDropdown() {
 }
 /** La ligne « Figures passées » du Complet (plan §8), sous la question « Où le prix peut réagir ? » :
  *  une case comme les autres lignes (cochée : les figures validées), et, cochée, un choix de plus :
- *  « toutes, y compris celles tombées » avant leur validation. Chacune garde sa marque d'issue et le
+ *  « toutes, y compris les jamais validées ». Chacune garde sa marque d'issue et le
  *  compte de la vue est dit sur le graphique. Son choix a sa propre clé (samsara-figures-passees-v1 :
  *  'non', 'validees' ou 'toutes'). */
-const QUOI_PASSEES = 'Les figures déjà finies, à leur place, avec leur issue : ✓ objectif atteint, ✗ invalidée ou annulée, – délai écoulé, ○ sans suite. Des exemples, pas des prévisions.';
+// Un mot par issue (revue du 14/10/2026, M5) : « annulée » avant la validation, « ratée » après.
+const QUOI_PASSEES = 'Les figures déjà finies, à leur place, avec leur issue : ✓ objectif atteint, ✗ annulée ou ratée, – délai écoulé, ○ sans suite. Des exemples, pas des prévisions.';
 function ligneFiguresPassees() {
   const on = figuresPasseesChoix !== 'non', toutes = figuresPasseesChoix === 'toutes';
   const choix = on ? `<select id="figPasseesQuelles" aria-label="Quelles figures passées" onchange="choisirFiguresPassees(this.value)">`
-    + `<option value="validees"${toutes ? '' : ' selected'}>validées seulement</option><option value="toutes"${toutes ? ' selected' : ''}>toutes, y compris celles tombées</option></select>` : '';
+    + `<option value="validees"${toutes ? '' : ' selected'}>validées seulement</option><option value="toutes"${toutes ? ' selected' : ''}>toutes, y compris les jamais validées</option></select>` : '';
   return `<label data-ind="figuresPassees" data-cat="reaction" data-cherche="${echapF('Figures passées anciennes figures chartistes exemples issue ' + TITRES_CAT.reaction + ' ' + QUOI_PASSEES)}" class="aff-ligne ind-passees">`
     + `<input type="checkbox" id="figPassees"${on ? ' checked' : ''} onchange="choisirFiguresPassees(this.checked ? 'validees' : 'non')">`
     + `<span class="aff-texte"><span class="aff-nom">Figures passées</span><span class="aff-quoi">${echapF(QUOI_PASSEES)}</span>${choix}</span>`
@@ -1608,7 +1615,7 @@ function tapGraphique(clientX, clientY) {
   const ty = clientY - rect.top;
   // Colonne de prix → ignorer
   if (tx > rect.width - 55) return;
-  // Le lien « Voir sur la carte ▸ » de la bulle ouverte : il navigue (rien d'autre ne le fait).
+  // Le lien « Voir sur la carte des ordres ▸ » de la bulle ouverte : il navigue (rien d'autre ne le fait).
   const L = lienBulle && lienBulle.rect;
   if (L && tx >= L.x && tx <= L.x + L.w && ty >= L.y && ty <= L.y + L.h) {
     if (lienBulle.action) { lienBulle.action(); return true; }
@@ -4387,7 +4394,7 @@ function resolveChart(candles, padL, padR, chartH, W) {
       const tw = ctx.measureText(badgeText).width + 14;
       const bx = W - pad.right - tw - 4, by = y - 10;
       srBadges.push({ x: bx, y: by, w: tw, h: 20 });
-      // Sa bulle (liaison avec la carte : elle porte « Voir sur la carte ▸ »).
+      // Sa bulle (liaison avec la carte : elle porte « Voir sur la carte des ordres ▸ »).
       ciblesPrix.push({ rects: [{ x0: bx, y0: by, x1: bx + tw, y1: by + 20 }], segs: [[pad.left, y, W - pad.right, y]], prio: 1, prix: lvl.price, coul: s.color,
         titre: 'Support / résistance · ' + Fmt.prix(lvl.price, unite, 'fin') + ' · ' + nomTf(lvl.tf),
         texte: ['Un prix où le marché a déjà fait demi-tour (sommets et creux des bougies ' + nomTf(lvl.tf) + ', regroupés quand ils sont proches).', 'Un niveau ne dit pas ce que fera le prix.'] });
@@ -5834,10 +5841,11 @@ function guideTexteNiveauDebutant(L, E) {
     out.push('Une estimation, tirée des contrats d’options de la plateforme Deribit.' + (isFinite(lu) ? ' ' + Guide.avecUsage('Relevée ' + Guide.ageLu(lu, now), 'releve', 'debutant') + '.' : ''));
   }
   for (const r of R) out.push(Guide.origineDebutant(r, E.unite, now, pas, seule));
-  // Le « Haut des 24 h » du graphique (bougies, en direct) et celui de la carte des infos du marché
-  // (publié, 24 h glissantes de Binance) peuvent différer : la bulle dit pourquoi.
+  // Le « Haut des 24 h » du graphique (bougies, en direct) et celui de la case des infos du marché
+  // (publié, 24 h glissantes de Binance) peuvent différer : la bulle dit pourquoi. Une « case », pas
+  // une « carte » : la même bulle finit par « Voir sur la carte des ordres ▸ » (revue du 14/10/2026, M3).
   if (activeSymbol === 'BTCUSDT' && R.some(r => /^h24_/.test(r.cle)))
-    out.push('La carte « Fourchette des 24 h » peut dire un autre chiffre : ses 24 h ne commencent pas à la même minute.');
+    out.push('La case « Plus bas et plus haut des 24 h » peut dire un autre chiffre. Ses 24 h ne commencent pas à la même minute.');
   // « Tout près » : les autres prix de sa bande Expert À CÔTÉ de ce repère seulement — à moins
   // d'une demi-bande (au moins 0,25 × ATR), du même côté du prix, jamais l'autre repère de l'écran
   // ni le repère suivant (une bande fusionnée de 200 $ qui enjambe le prix appelait « tout près »
@@ -6130,7 +6138,7 @@ function guidePasseesCompte(E) {
     ctx.fillStyle = COLORS.ink3; ctx.fillText(t, r.x + 6, r.y + r.h - 4);
   });
   E.cibles.push({ rects: [guideZone(r)], prio: 4, ico: 'figure', titre: 'Figures passées', texte: [V[1] || V[0],
-    'Marques : ✓ objectif atteint, ✗ invalidée ou annulée, – délai écoulé après la validation, ○ sans suite. Survolez une marque : la suite.',
+    'Marques : ✓ objectif atteint, ✗ annulée ou ratée, – délai écoulé après la validation, ○ sans suite. Survolez une marque : la suite.',
     'Des exemples du passé, réussis ou non : pas un conseil.'] });
 }
 /** Lisible : le libellé de la figure passée (« ✓ Double creux : cible »), près de sa marque, s'il
@@ -6717,7 +6725,7 @@ function guideBulle(c, W, mainH, evite) {
   // dernier paragraphe (« pas une recommandation ») — jamais une phrase coupée au bord de l'écran.
   // Entre deux paragraphes, une ligne vide ; serrée (5 px) quand la place manque.
   let sep = hC;
-  // « Voir sur la carte ▸ » (liaison avec la carte) : une ligne réservée au bas de la bulle, hors du
+  // « Voir sur la carte des ordres ▸ » (liaison avec la carte) : une ligne réservée au bas de la bulle, hors du
   // résumé compté ; plus haute au doigt (une cible de 32 px).
   // La bulle d'une figure (en cours ou passée) : sa cible et le taux mesuré de son type, en une
   // ligne de la couleur des liens, au même endroit ; elle ouvre les statistiques détaillées.
@@ -6804,7 +6812,7 @@ function guideBulle(c, W, mainH, evite) {
 // ─────────────────────────────────────────────────────────────────────────────
 // LIAISON AVEC LA CARTE (bookmap.html) — le cœur commun : js/liaison.js
 // ─────────────────────────────────────────────────────────────────────────────
-// • « Voir sur la carte ▸ » : la bulle d'un repère de prix (les repères du Guide, les supports /
+// • « Voir sur la carte des ordres ▸ » : la bulle d'un repère de prix (les repères du Guide, les supports /
 //   résistances du Complet, le prix venu de la carte) porte ce lien en dernière ligne, hors de son
 //   résumé compté. Toucher le repère ouvre sa bulle, comme avant ; seul le lien navigue
 //   (bookmap.html#prix=…). La carte ne montre que BTC/USDT : sur une autre paire, pas de lien.
@@ -6840,19 +6848,22 @@ function prixMarqueCarte() {
   }
   return marqueCarte.p;
 }
-/** L'adresse de « Voir sur la carte ▸ » pour la cible c : son prix (repère du Guide, ou c.prix),
+/** L'adresse de « Voir sur la carte des ordres ▸ » pour la cible c : son prix (repère du Guide, ou c.prix),
  *  sur BTC/USDT seulement, plausible ; sinon null. */
 function adresseCarte(c) {
   const p = isNum(c.prix) ? c.prix : c.niveau && c.niveau.niv && isNum(c.niveau.niv.p) ? c.niveau.niv.p : null;
   const ref = isNum(livePrice) ? livePrice : candles.length ? candles[candles.length - 1].close : null;
   return activeSymbol === 'BTCUSDT' && Liaison.plausible(p, ref) ? Liaison.adresse('bookmap.html', p) : null;
 }
+/** Le texte du lien : la page nommée comme son titre, « la carte des ordres » (revue du 14/10/2026,
+ *  M3 : « la carte » seule voulait aussi dire une case d'« Infos du marché », dans la même bulle). */
+const LIEN_CARTE = 'Voir sur la carte des ordres ▸';
 /** La ligne du lien, au bas de la bulle (bx, by, bw, bh), sous un filet ; sa zone de clic gardée. */
 function poserLienCarte(adresse, cle, bx, by, bw, bh, hLien, fC) {
   const y0 = by + bh - hLien;
   cx.fillStyle = COLORS.hairline; cx.fillRect(bx + 14, y0, bw - 28, 1);
   cx.font = chartFont(fC, 650); cx.fillStyle = COLORS.accent2;
-  cx.fillText('Voir sur la carte ▸', bx + 14, y0 + hLien / 2 + fC * 0.36);
+  cx.fillText(LIEN_CARTE, bx + 14, y0 + hLien / 2 + fC * 0.36);
   lienBulle = { rect: { x: bx, y: y0 - 2, w: bw, h: hLien + 8 }, url: adresse, cle, bulle: { x: bx, y: by, w: bw, h: bh }, ancre: ancreBulle ? { x: ancreBulle.x, y: ancreBulle.y } : { x: crossX, y: crossY } };
 }
 /** La figure d'une cible (en cours ou passée) et sa ligne de statistiques ; sinon null. */
@@ -6872,7 +6883,7 @@ function poserLienStats(stats, lignes, cle, bx, by, bw, bh, hLien, fC, hC) {
 /** La souris va-t-elle vers la bulle ouverte, ou est-elle dessus ? Sur la bulle (son lien compris),
  *  ou sortie de son repère vers elle (dans le couloir qui va de l'ancre à la bulle) : la bulle reste
  *  où elle est. Toute bulle, avec ou sans lien : on doit pouvoir aller cliquer « le détail » ou
- *  « Voir sur la carte ▸ » (demande du 12/10/2026). Encore sur son repère : faux, la bulle le suit. */
+ *  « Voir sur la carte des ordres ▸ » (demande du 12/10/2026). Encore sur son repère : faux, la bulle le suit. */
 function versBulle(x, y) {
   const r = versBulle0(x, y);
   bulleTenue = r ? bulleOuverte.cle : null;
@@ -8944,7 +8955,7 @@ function apprLu(c) {
 }
 /** Complet : « Aide à la lecture » dans « Choisir l'affichage », deux cases gardées sous
  *  samsara-apprendre-v1 (le Lisible n'a pas de choix : les deux y sont toujours). */
-const AIDES_LECTURE = [['evenements', 'Dire ce qui vient de se passer', 'Une ligne discrète, quelques secondes, quand le prix casse un niveau, qu’une figure est validée ou tombe, qu’un scénario touche sa cible ou tombe.'],
+const AIDES_LECTURE = [['evenements', 'Dire ce qui vient de se passer', 'Une ligne discrète, quelques secondes, quand le prix casse un niveau, qu’une figure est validée, annulée ou ratée, qu’un scénario touche sa cible ou tombe.'],
   ['marques', 'Expliquer ce qui apparaît pour la première fois', 'Une ligne discrète, une seule fois, quand un repère, une figure ou un scénario apparaît pour la première fois.']];
 function apprPanneau() {
   return '<div class="cat-title aff-aide-titre">Aide à la lecture</div>' + AIDES_LECTURE.map(([k, nom, quoi]) =>
@@ -9254,11 +9265,12 @@ async function renderLive() {
     + '<div style="margin-top:6px;font-size:12px;font-variant-numeric:tabular-nums">Bid <b>' + fmtPx2(bid) + '</b> · Ask <b>' + fmtPx2(ask)
     + '</b> · spread <b>' + fmtPx2(sprd) + ' pts</b> (' + fmtNum(sprd / px * 10000, 2) + ' bp)</div>');
 
-  // 2 — FOURCHETTE DES 24 H
-  html += mCard('📊', 'Fourchette des 24 h', 'haut / bas des 24 h · position du spot', '',
+  // 2 — PLUS BAS ET PLUS HAUT DES 24 H (le nom de la case d'« Infos du marché » ; « fourchette » est
+  // réservé à celle de 7 jours : revue du 14/10/2026, M3)
+  html += mCard('📊', 'Plus bas et plus haut des 24 h', 'haut / bas des 24 h · position du spot', '',
     '<div style="font-size:12px;font-variant-numeric:tabular-nums">Haut <b>' + fmtPx(hi) + '</b> · Bas <b>' + fmtPx(lo)
     + '</b></div>' + liveBar(rank)
-    + '<div style="margin-top:5px;font-size:12px">Position dans la fourchette : <b>' + fmtNum(rank, 1) + ' %</b>'
+    + '<div style="margin-top:5px;font-size:12px">Position entre bas et haut : <b>' + fmtNum(rank, 1) + ' %</b>'
     + ' · amplitude <b>' + fmtNum((hi / lo - 1) * 100) + ' %</b></div>'
     + '<div style="margin-top:5px;font-size:11px;color:var(--ink-2)">Volume 24 h <b>' + fmtBig(parseFloat(t24.quoteVolume))
     + '</b> · ' + Fmt.nombre(parseInt(t24.count, 10)) + ' trades</div>');
@@ -9638,10 +9650,11 @@ function renderFeedTo(container) {
   const autrePaire = activeSymbol !== 'BTCUSDT', sujet = autrePaire ? 'le prix publié du bitcoin' : 'le prix publié';
   // Expert aussi : sur une autre paire, chaque titre de carte qui parle du bitcoin le dit.
   const btcTitre = t => (autrePaire ? 'Bitcoin : ' + t.charAt(0).toLowerCase() + t.slice(1) : t);
-  // « Fourchette des 24 h » dans les deux modes (l'Expert disait « Marché live » : ce n'est pas
-  // du direct). Un seul prix en grand à l'écran, celui du haut, en direct ; le prix publié, plus
-  // petit (Expert) ou en ligne (Débutant), avec son âge.
-  html += mCard('📊', btcTitre('Fourchette des 24 h'), modes('Binance spot · publié à ' + hhmm
+  // « Plus bas et plus haut des 24 h » dans les deux modes (l'Expert disait « Marché live » : ce
+  // n'est pas du direct ; « Fourchette des 24 h » jusqu'à la revue du 14/10/2026, M3 : le mot est
+  // réservé à la fourchette de 7 jours). Un seul prix en grand à l'écran, celui du haut, en direct ;
+  // le prix publié, plus petit (Expert) ou en ligne (Débutant), avec son âge.
+  html += mCard('📊', btcTitre('Plus bas et plus haut des 24 h'), modes('Binance spot · publié à ' + hhmm
       + (ageMin !== null ? ' (il y a ' + ageDe(d.updated, ageMin) + ' min — le prix du haut est en direct)' : ''), 'Binance · le prix du haut est en direct'), '',
     envExpert('<div class="hero hero-publie"><span class="hero-lbl">Prix publié</span><span class="hero-val">' + fmtUsd(b.price) + '</span>'
     + '<span class="' + chipCls(b.change_24h_pct) + '">' + pctSigne(b.change_24h_pct) + ' en 24 h</span></div>')
@@ -9692,15 +9705,16 @@ function renderFeedTo(container) {
   }
   indBody += '<div class="fiches-ligne">' + ['rsi_tf', 'croisement', 'ema_tf', 'sr_tf', 'amplitude', 'atr_tf'].map(f =>
     '<span class="fiche-lien">' + FICHES[f].titre.replace(/ \((fichier|graphique)[^)]*\)/, '') + infoBtn(f) + '</span>').join('') + '</div>';
-  // Débutant : « Fourchette des 5 jours » — la jauge des bougies 4 h (bas et haut de leur
-  // fenêtre, lue dans sr_window_h) et une phrase ; le reste est en Expert.
+  // Débutant : « Plus bas et plus haut des 5 jours » — la jauge des bougies 4 h (bas et haut de
+  // leur fenêtre, lue dans sr_window_h) et une phrase ; le reste est en Expert. Plus « Fourchette
+  // des 5 jours » (revue du 14/10/2026, M3) : ses bornes ne sont pas celles de la fourchette de 7 jours.
   const t4 = tf['4h'];
   const fen4 = t4 ? (t4.sr_window_h || srH['4h']) : null;
   const fenMots = h => (h % 24 === 0 ? (h / 24) + (h / 24 > 1 ? ' jours' : ' jour') : h + ' heures');
   const fenCourt = h => (h % 24 === 0 ? (h / 24) + ' j' : h + ' h');
   const indDeb = t4 ? trackHtml(t4.last_close, t4.support_30, t4.resistance_30, 'Bas ' + fenCourt(fen4) + '&nbsp;<b>' + prixDeb(t4.support_30) + '</b>', 'Haut ' + fenCourt(fen4) + '&nbsp;<b>' + prixDeb(t4.resistance_30) + '</b>')
     + phraseCarte('fourchette', positionDans(t4.last_close, t4.support_30, t4.resistance_30), fenMots(fen4), sujet) : '<div class="fine">En attente de la prochaine publication.</div>';
-  html += mCard('📈', modes(btcTitre('Indicateurs'), btcTitre('Fourchette des ' + (fen4 ? fenMots(fen4) : '5 jours'))), modes('Binance 4 h / 1 h / 1 j · RSI Wilder · bougie en cours incluse', 'Publié ' + ilYaDeb(d.updated, ageMin)), '',
+  html += mCard('📈', modes(btcTitre('Indicateurs'), btcTitre('Plus bas et plus haut des ' + (fen4 ? fenMots(fen4) : '5 jours'))), modes('Binance 4 h / 1 h / 1 j · RSI Wilder · bougie en cours incluse', 'Publié ' + ilYaDeb(d.updated, ageMin)), '',
     envExpert(indBody) + envDebutant(indDeb));
 
   // ── 4. MICROSTRUCTURE ──

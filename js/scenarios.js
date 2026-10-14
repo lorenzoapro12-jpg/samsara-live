@@ -1246,8 +1246,9 @@ const Scenarios = (function () {
     if (jour.cas === 'aucunNeColle') return 'Aucun scénario en cours ne colle au prix : chacun est plus près de son invalidation que de sa zone (' + regle + ').';
     if (jour.cas === 'seul') {
       const s = jour.seul, p = s.pos, loin = p && p.e >= colleDe(jour);
-      // Un range décrit la fourchette où le prix EST : il dit sa limite la plus proche.
-      const t = !loin ? '' : p.forme === 'range' ? ' Le prix est plus près de sa limite ' + (p.bord === 'haut' ? 'haute' : 'basse') + ' (' + dollars(p.niveauBord) + ', marge comprise) que du milieu de la fourchette.' : ' Le prix est plus près de son invalidation que de sa zone.';
+      // Un range décrit les bornes où le prix EST : il dit sa limite la plus proche. « fourchette » est
+      // réservé à celle de 7 jours (revue du 14/10/2026, M3) : « que du milieu », sans le mot.
+      const t = !loin ? '' : p.forme === 'range' ? ' Le prix est plus près de sa limite ' + (p.bord === 'haut' ? 'haute' : 'basse') + ' (' + dollars(p.niveauBord) + ', marge comprise) que du milieu.' : ' Le prix est plus près de son invalidation que de sa zone.';
       return 'Un seul scénario est encore en cours : le ' + s.sc.rang + '.' + t;
     }
     // (Débutant : jamais « bougies » — la liste des mots du Guide ; tests/test_scenarios_jour.js.)

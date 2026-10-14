@@ -140,13 +140,15 @@ titre('4. Le compte en mots : les réussites et les échecs');
     && G.texteComptePassees(c(5, 2), 'expert', 'validees', 5)[1] === 'Dans cette vue : 5 figures validées, 2 ont atteint leur objectif.', [G.texteComptePassees(c(5, 2), 'debutant'), G.texteComptePassees(c(5, 2), 'expert', 'validees', 5)]);
   check('les échecs sont dits : « aucune n’a atteint son objectif », « 1 a atteint son objectif », « elle n’a pas atteint son objectif »', /aucune n’a atteint son objectif/.test(G.texteComptePassees(c(3, 0), 'debutant')[0])
     && /, 1 a atteint son objectif\.$/.test(G.texteComptePassees(c(4, 1), 'debutant')[0]) && /elle n’a pas atteint son objectif/.test(G.texteComptePassees(c(1, 0), 'expert', 'validees', 1)[0]), null);
-  check('Complet « toutes » : les tombées avant validation sont comptées ; « (les 6 plus récentes sont tracées) » quand la vue en a plus', /; 7 tombées avant leur validation \(les 6 plus récentes sont tracées\)\.$/.test(G.texteComptePassees(c(5, 2, 7), 'expert', 'toutes', 6)[0])
+  // (Changé exprès, revue du 14/10/2026, M5 : « jamais validées » (annulées ou sans suite), plus « tombées ».)
+  check('Complet « toutes » : les figures jamais validées sont comptées ; « (les 6 plus récentes sont tracées) » quand la vue en a plus', /; 7 jamais validées \(les 6 plus récentes sont tracées\)\.$/.test(G.texteComptePassees(c(5, 2, 7), 'expert', 'toutes', 6)[0])
+    && / · 7 jamais validées$/.test(G.texteComptePassees(c(5, 2, 7), 'expert', 'toutes', 6)[2]) && / ; aucune figure non validée\.$/.test(G.texteComptePassees(c(5, 2, 0), 'expert', 'toutes', 5)[1])
     && !/tracées/.test(G.texteComptePassees(c(5, 2), 'expert', 'validees', 5)[0]), G.texteComptePassees(c(5, 2, 7), 'expert', 'toutes', 6));
   // Sur la fixture : les nombres dits sont ceux du compte, dans chaque vue.
   let mal = [];
   for (const [vs, ve] of VUES.filter((v, k) => k % 5 === 0)) {
     const r = G.figuresPassees(R, vs, ve, 'toutes', 'expert'), k = r.compte, t = G.texteComptePassees(k, 'expert', 'toutes', r.liste.length)[1];
-    const m = /^Dans cette vue : (?:(\d+) figures? validées?, (?:(\d+) (?:ont|a) atteint|(aucune) n’a|(toutes|les deux) ont|elle (n’)?a)|aucune figure validée terminée).* ; (?:(\d+) tombées?|aucune tombée)/.exec(t);
+    const m = /^Dans cette vue : (?:(\d+) figures? validées?, (?:(\d+) (?:ont|a) atteint|(aucune) n’a|(toutes|les deux) ont|elle (n’)?a)|aucune figure validée terminée).* ; (?:(\d+) jamais validées?|aucune figure non validée)/.exec(t);
     const v = m ? +(m[1] || 0) : -1, a = !m ? -1 : m[2] ? +m[2] : m[3] ? 0 : m[4] ? v : m[1] === '1' ? (m[5] ? 0 : 1) : 0, tb = m ? +(m[6] || 0) : -1;
     if (v !== k.validees || a !== k.atteintes || tb !== k.tombees) mal.push({ vs, ve, t, k });
   }
@@ -169,7 +171,8 @@ titre('5. Les mots : libellé, titre, résumé, détail (Lisible) ; bulle (Compl
     if (x.titre.indexOf(marques[f.fin] + ' Exemple passé : ') !== 0 || nombres(x.titre) || G.motsBannis(x.titre).length) malT.push(x.titre);
     // Le résumé : chaque variante sans « % » ni mot banni ; la plus riche de « ensuite » ≤ 1 nombre, le compte ≤ 2.
     const [ensuite, cpt] = x.resume, tous = ensuite.concat(cpt);
-    const dit = f.fin === 'atteint' ? ensuite.every(t => /a atteint l’objectif/.test(t)) : ensuite.every(t => /sans atteindre son objectif|ni l’objectif/.test(t));
+    // (Changé exprès, revue du 14/10/2026, M5 : délai écoulé, « n’a ni atteint son objectif ni raté ».)
+    const dit = f.fin === 'atteint' ? ensuite.every(t => /a atteint l’objectif/.test(t)) : ensuite.every(t => /sans atteindre son objectif|ni atteint son objectif/.test(t) && !/tombée|annul/.test(t));
     if (!dit || !/^Après sa validation/.test(ensuite[0]) || ensuite.some(t => nombres(t) > 1) || cpt.some(t => nombres(t) > 2) || tous.some(t => /%/.test(t) || G.motsBannis(t).length || CONSEIL.test(t))) malR.push({ f: f.type + ':' + f.fin, ensuite, cpt });
     const D = x.texte.join(' ');
     if (/%/.test(D) || G.motsBannis(D).length || CONSEIL.test(D) || !D.includes(compte[0]) || !/pas une prévision ni un conseil/.test(x.texte[x.texte.length - 1]) || !/Figure validée/.test(D) || !/Mesuré sur/.test(D)) malD.push({ f: f.type, bannis: G.motsBannis(D), D: D.slice(0, 200) });

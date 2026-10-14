@@ -305,7 +305,9 @@ async function bulle(o, tactile) {
     // à chaque instant : il ouvre la page avant l'invalidation et fait avancer les clôtures dedans.
     titre('4. Invalidation : ✗ pendant ' + P.garderInvalide + ' bougies, de plus en plus pâle, puis plus rien');
     {
-      const nomI = G.NOM_FORME_DEBUTANT[inv.f.type], alphas = [];
+      // Le mot de l'issue : « raté » après la validation, « annulé » avant (changé exprès, revue du
+      // 14/10/2026, M5 : plus « invalidé »).
+      const nomI = G.NOM_FORME_DEBUTANT[inv.f.type], alphas = [], mot = G.motEchec(inv.f), Mot = mot.charAt(0).toUpperCase() + mot.slice(1);
       let okLib = true, vuApres = null, avant = null;
       const o = await ouvrir(nav, { iC: inv.iI - 1, mode: 'debutant', w: 1440, h: 900 });
       await o.page.evaluate(rows => { window.__K = rows; }, K);
@@ -320,19 +322,19 @@ async function bulle(o, tactile) {
         await avancer(inv.iI + k);
         const e = await lireEtat(o.page);
         if (k <= P.garderInvalide) {
-          if (!(e.debForme && e.debForme.t === '✗ ' + nomI + ' invalidé' && e.debForme.croix)) okLib = false;
+          if (!(e.debForme && e.debForme.t === '✗ ' + nomI + ' ' + mot && e.debForme.croix)) okLib = false;
           alphas.push(e.debForme ? e.debForme.a : null);
         } else vuApres = e.debForme;
         if (k === 0) {
           const b = await bulle(o, false);
           const hInv = Fm.heure(K[inv.iI][0] * 1000);
-          check(`bulle Débutant : « Invalidé à ${hInv} » (heure de l’appareil), jamais « UTC » ni « heure de Paris »`, b && b.texte.includes('Invalidé à ' + hInv + ' :') && !/UTC|Paris/.test(b.texte), b && b.texte.slice(0, 300));
+          check(`bulle Débutant : « ${Mot} à ${hInv} » (heure de l’appareil), jamais « UTC » ni « heure de Paris », ni « invalidé » ni « ne tient plus »`, b && b.texte.includes(Mot + ' à ' + hInv + ' :') && !/UTC|Paris/.test(b.texte) && !/[Ii]nvalidé|ne tient plus|tombée/.test(b.texte), b && b.texte.slice(0, 300));
           await o.page.mouse.move(2, 2);
         }
       }
       check(`la figure est dessinée vivante à la clôture d’avant (« ${avant && avant.debForme ? avant.debForme.t : '—'} »)`, avant && avant.debForme && avant.debForme.type === inv.f.type && !avant.debForme.croix, avant && avant.debForme);
-      check(`« ✗ ${nomI} invalidé » avec sa croix pendant ${P.garderInvalide} bougies`, okLib, alphas);
-      check('… de plus en plus pâle (alpha lu dans l’état de dessin), puis plus rien', alphas.every((a, k) => a !== null && (!k || a < alphas[k - 1])) && (!vuApres || vuApres.t !== '✗ ' + nomI + ' invalidé'), { alphas, vuApres });
+      check(`« ✗ ${nomI} ${mot} » avec sa croix pendant ${P.garderInvalide} bougies`, okLib, alphas);
+      check('… de plus en plus pâle (alpha lu dans l’état de dessin), puis plus rien', alphas.every((a, k) => a !== null && (!k || a < alphas[k - 1])) && (!vuApres || vuApres.t !== '✗ ' + nomI + ' ' + mot), { alphas, vuApres });
       check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();
       // Une page ouverte après coup n'a pas vu la figure vivante : pas de ✗ pour elle.
@@ -343,7 +345,7 @@ async function bulle(o, tactile) {
       const x = await ouvrir(nav, { iC: inv.iI, mode: 'expert', w: 1440, h: 900 });
       const b = await bulle(x, false);
       const hInvX = Fm.heure(K[inv.iI][0] * 1000);
-      check(`bulle Expert : « invalidé à ${hInvX} » (heure de l’appareil, sans « UTC » ni « Paris ») et le journal (« Observé »)`, b && b.texte.includes('invalidé à ' + hInvX + ' :') && !/UTC|Paris/.test(b.texte) && /Observé/.test(b.texte), b && b.texte.slice(0, 400));
+      check(`bulle Expert : « ${mot} à ${hInvX} » (heure de l’appareil, sans « UTC » ni « Paris ») et le journal (« Observé »)`, b && b.texte.includes(mot + ' à ' + hInvX + ' :') && !/UTC|Paris/.test(b.texte) && /Observé/.test(b.texte) && !/[Ii]nvalidé/.test(b.texte), b && b.texte.slice(0, 400));
       check('aucune erreur JavaScript', !x.erreurs.length, x.erreurs);
       await x.ctx.close();
     }
@@ -375,7 +377,7 @@ async function bulle(o, tactile) {
       const b = await bulle(o, tactile);
       const bannis = b ? G.motsBannis(b.corps) : null;
       check(`${w} px · ${theme} : ${tactile ? 'toucher' : 'survol'} du libellé → bulle avec validation, invalidation, cible et « Mesuré sur », sans mot banni, entière dans le tracé`,
-        b && /validée/.test(b.texte) && /Annulée si|ne tient plus/.test(b.texte) && /objectif théorique/i.test(b.texte) && !/cible/i.test(b.texte) && /Mesuré sur/.test(b.texte) && !bannis.length && b.b && b.b.y >= 0 && b.b.y + b.b.h <= b.mainH,
+        b && /validée/.test(b.texte) && /Annulée si|la figure est ratée/.test(b.texte) && /objectif théorique/i.test(b.texte) && !/cible/i.test(b.texte) && /Mesuré sur/.test(b.texte) && !bannis.length && b.b && b.b.y >= 0 && b.b.y + b.b.h <= b.mainH,
         b && { bannis, b: b.b, mainH: b.mainH, texte: b.texte.slice(0, 300) });
       if (tactile) check(`${w} px : pas de défilement horizontal`, c5 && c5.scroll <= 0, c5);
       check(`${w} px · ${theme} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);

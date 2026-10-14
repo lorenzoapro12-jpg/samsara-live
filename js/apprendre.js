@@ -196,21 +196,23 @@ const Apprendre = (function () {
         const ou = sortie ? (s ? 'au-dessus' : 'en dessous') : (s ? 'au-dessus de sa ligne' : 'sous sa ligne');
         return { variantes: [tete + ' : ' + P[1] + ' ont fini ' + ou + '.', tete + '.'], titre: tete,
           texte: [tete + ' : ' + P[1] + ' ont fini ' + ou + '.',
-            '« Validée » : sortie de sa ligne, et restée. Elle a un objectif théorique, non garanti, et un niveau qui l’annule.', FIN],
+            '« Validée » : sortie de sa ligne, et restée. Elle a un objectif théorique, non garanti, et un niveau où elle serait ratée.', FIN],
           resume: [['Le prix est sorti ' + (s ? 'par le haut' : 'par le bas') + ' et ' + P[1] + ' ont fini ' + ou + '.'], ['C’est « validé » : sorti, et resté.']] };
       }
       if (e.type === 'figure_tombee') {
+        // Un mot par issue (revue du 14/10/2026, M5) : « annulé » avant la validation (ébauche, ou
+        // figure jamais validée), « raté » après ; plus « possible annulé », « invalidé », « tombée ».
         if (e.cleEtat === 'abandon') {
-          const tete = nom + ' possible annulé';
+          const tete = nom + ' annulé';
           return { variantes: [tete + ' : la figure ne s’est pas formée.', '✗ ' + tete + '.'], titre: tete,
             texte: [tete + ' : la figure ne s’est pas formée.', 'Il lui manquait son dernier point : elle ne compte plus.', FIN],
             resume: [['La figure possible ne s’est pas formée.'], ['Elle ne compte plus.']] };
         }
-        const tete = nom + ' invalidé';
-        return { variantes: [tete + ' : le prix a fini au-delà du niveau qui l’annule.', '✗ ' + tete + '.'], titre: tete,
-          texte: [tete + ' : le prix a fini ' + P[0] + ' au-delà du niveau qui l’annule.',
-            'Sa lecture ne tient plus. Aucune figure ne réussit à coup sûr.', FIN],
-          resume: [['Le prix a fini au-delà du niveau qui annule la figure.'], ['Elle est « tombée » : sa lecture ne tient plus.']] };
+        const rate = Gd.motEchec(f) === 'raté', tete = nom + ' ' + Gd.motEchec(f), niv = rate ? 'du niveau qui le fait rater' : 'du niveau qui l’annule';
+        return { variantes: [tete + ' : le prix a fini au-delà ' + niv + '.', '✗ ' + tete + '.'], titre: tete,
+          texte: [tete + ' : le prix a fini ' + P[0] + ' au-delà ' + niv + '.',
+            'Elle ne compte plus. Aucune figure ne réussit à coup sûr.', FIN],
+          resume: [['Le prix a fini au-delà ' + (rate ? 'du niveau qui fait rater la figure.' : 'du niveau qui annule la figure.')], [rate ? 'Elle est « ratée » : elle ne compte plus.' : 'Elle est « annulée » : elle ne compte plus.']] };
       }
       if (e.type === 'figure_atteinte') {
         const tete = nom + ' : objectif atteint';

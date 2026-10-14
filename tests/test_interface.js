@@ -657,6 +657,21 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       // « Réglages fins », qui restent le dernier bloc ; ni ligne d'indicateur ni bouton de tête.
       check('« Outils » : un seul bouton, « Calculette de risque », juste avant les « Réglages fins »',
         pan.outils && meme(pan.outils.boutons, ['Calculette de risque']) && pan.outils.avantFins && pan.fins && pan.fins.dernier, pan.outils);
+      // Revue du 14/10/2026, M15 [vision-10] : « range » ne trouvait rien (« Aucun indicateur ne
+      // correspond. ») ; des mots cachés le mènent à la fourchette, « levier » à la calculette.
+      const cherche = async (mot) => {
+        await p7.fill('#indFiltre', mot); await pause(100);
+        return p7.evaluate(() => {
+          const m = document.getElementById('indMenu'), vide = m.querySelector('.ind-aucun');
+          return { lignes: [...m.querySelectorAll('label[data-ind]:not([hidden])')].map(l => l.dataset.ind),
+            aucun: !!vide && !vide.hidden, outils: !m.querySelector('.aff-outils').hidden };
+        });
+      };
+      const rech = { range: await cherche('range'), consolidation: await cherche('Consolidation'), levier: await cherche('levier'), stop: await cherche('stop'), rien: await cherche('zzzz') };
+      rech.vide = await cherche('');
+      check('recherche : « range » et « consolidation » trouvent la « Fourchette de 7 jours » ; « levier » et « stop » trouvent la calculette ; un mot inconnu ne trouve toujours rien',
+        meme(rech.range.lignes, ['fourchette']) && !rech.range.aucun && rech.consolidation.lignes.includes('fourchette')
+        && rech.levier.outils && rech.stop.outils && rech.rien.aucun && !rech.rien.outils && !rech.vide.aucun && rech.vide.outils, rech);
 
       // B. Les préréglages : chacun REMPLACE la sélection ; Guide et scénarios restent comme ils sont
       // (sauf « L'essentiel ») ; « Tout » allume tout. Gardés sous samsara-affichage-v1.

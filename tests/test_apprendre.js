@@ -246,7 +246,9 @@ for (const e of evts) for (const itv of ITV) {
     repere_casse: () => v0.includes('cassé') && v0.includes(per[1] + ' ont fini ' + cote) && /c’est validé/.test(v0) && X.variantes[0].includes(e.retest ? 'validé par un retour réussi' : '2/2 clôtures, validé'),
     repere_passe: () => D.variantes.some(v => v.includes('cassé seulement si ' + per[1] + ' finissent ' + cote)) && D.variantes.slice(1).every(v => /pas encore cassé/.test(v)) && /bougie pas encore close/.test(X.variantes[0]),
     figure_validee: () => /validée?(?!\p{L})/u.test(v0) && v0.includes(per[1] + ' ont fini ') && X.variantes[0].includes(G.etatForme(e.f).texte),
-    figure_tombee: () => (e.cleEtat === 'abandon' ? /annulé : la figure ne s’est pas formée\./.test(v0) : /invalidé : le prix a fini au-delà du niveau qui l’annule\./.test(v0)) && X.variantes[0].includes(G.etatForme(e.f).texte),
+    // (Changé exprès, revue du 14/10/2026, M5 : « raté » après la validation, « annulé » avant ; plus « invalidé ».)
+    figure_tombee: () => (e.cleEtat === 'abandon' ? /annulé : la figure ne s’est pas formée\./.test(v0)
+      : e.f.fin === 'invalide' ? /raté : le prix a fini au-delà du niveau qui le fait rater\./.test(v0) : /annulé : le prix a fini au-delà du niveau qui l’annule\./.test(v0)) && !/invalidé|possible annulé|tombée/.test(D.variantes.concat(D.texte).join(' ')) && X.variantes[0].includes(G.etatForme(e.f).texte),
     figure_atteinte: () => v0.includes('objectif atteint, ' + per[0] + ' a fini à l’objectif ou au-delà.'),
     figure_finie: () => /sans suite : le prix (?:n’en est pas sorti à temps|est resté dedans jusqu’à la pointe)\.|: délai écoulé, ni l’objectif ni l’invalidation n’ont été atteints\./.test(v0),
     scenario_cible: () => v0.includes((e.k === 1 ? '1re' : e.k + 'e') + ' cible touchée, le prix a atteint sa zone.'),
@@ -262,7 +264,7 @@ check(`Lisible : chaque variante de la ligne en ${P.guide.debutant.evenement} ca
 check(`Lisible : toujours une variante de ${P.guide.debutant.evenementEtroit} caractères au plus (téléphone)`, !courts.length, courts.slice(0, 3));
 check(`Lisible : chaque phrase du résumé, titre compris, ${P.guide.debutant.bulleNombres} nombres au plus`, !nb.length, nb.slice(0, 3));
 check('les deux modes : le dernier paragraphe est l’avertissement, une ligne courte (« pas une recommandation », « ni un conseil »), sans seconde phrase de risque', !risque.length, [...new Set(risque)]);
-check('les mots sont EXACTS (la règle du code dite dans la ligne : « cassé » = 2 fins au-delà, « validé », « invalidé », « touchée »…) pour chaque intervalle', !exact.length, exact.slice(0, 3));
+check('les mots sont EXACTS (la règle du code dite dans la ligne : « cassé » = 2 fins au-delà, « validé », « annulé » ou « raté », « touchée »…) pour chaque intervalle', !exact.length, exact.slice(0, 3));
 {
   const D = A.textes({ type: 'repere_casse', source: 'repere', sens: 1, niv: evts[0].niv }, 'debutant', { unite: '$', itv: '15m' });
   check(`exemple Lisible : « ${D.variantes[0]} »`, D.variantes[0] === 'Le prix a cassé 84 145 $ : 2 quarts d’heure ont fini au-dessus, c’est validé.', D.variantes);
