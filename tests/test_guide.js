@@ -831,6 +831,20 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
   check('les icônes : une par famille de la légende, un nom chacune', I.LEGENDE.every(f => I.connue(f) && I.NOMS[f]) && /<svg[^>]*viewBox="0 0 10 10"/.test(I.svg('figure')) && I.svg('inconnue') === '');
   const sans = G.synthese(Object.assign({}, base, { prix: NaN }));
   check('prix absent : dit, rien d’inventé', /indisponible/.test(sans.titre) && !sans.pourquoi.length && !sans.surveiller.length, sans);
+  // 4 bis. L'agitation attendue du point du matin (revue du 14/10/2026, N4 ; Q3 de Lorenzo : « Les
+  // deux ») : une ligne de plus, sans sens, qui ne compte pas dans la lecture ; le seul % permis ici.
+  const AG = ['Écart attendu entre plus bas et plus haut d’ici demain 06:00 : en général 4,2 %.', 'Une fois sur dix, plus de 6,1 % (calcul de 06:31).'];
+  const ag = syn({ regime: { cle: 'baisse' }, scenario: { rang: '1', forme: 'chemin', ouvert: true, sens: -1 }, agitation: AG });
+  const lAg = ag.pourquoi.filter(p => p.agitation);
+  check('agitation : une ligne du pourquoi, la dernière, sans sens (famille tendance)', lAg.length === 1 && ag.pourquoi[ag.pourquoi.length - 1] === lAg[0]
+    && lAg[0].sens === 0 && lAg[0].fam === 'tendance' && lAg[0].texte === AG.join(' '), ag.pourquoi);
+  check('agitation : la lecture ne change pas (titre, ton, règle, à surveiller ceux du cas sans elle)', ag.titre === b.titre && ag.ton === b.ton && ag.regle === b.regle
+    && JSON.stringify(ag.surveiller) === JSON.stringify(b.surveiller) && JSON.stringify(ag.pourquoi.filter(p => !p.agitation)) === JSON.stringify(b.pourquoi), [ag, b]);
+  const phrasesAg = lAg.length ? lAg[0].texte.split(/(?<=\.)\s+/) : [];
+  check('agitation : 15 mots au plus par phrase, aucun mot banni, aucun conseil, aucun sens dit', phrasesAg.length === 2
+    && phrasesAg.every(x => x.split(/\s+/).filter(w => /[\p{L}\d]/u.test(w)).length <= 15 && !G.motsBannis(x).length && !CONSEIL.test(x) && !/hausse|baisse|monte|descend|grimpe|chute/i.test(x)), phrasesAg);
+  check('le % : seulement dans la ligne d’agitation', [ag.titre, ag.regle].concat(ag.pourquoi.filter(p => !p.agitation).map(p => p.texte), ag.surveiller).every(x => !/%/.test(x)));
+  check('agitation absente (undefined, null, []) : aucune ligne ajoutée', [undefined, null, []].every(a => !syn({ regime: { cle: 'baisse' }, agitation: a }).pourquoi.some(p => p.agitation)));
 
   // 5. La fourchette de 7 jours (plan du 13/10/2026, idée 5 ; mesure marche/range-cassure) : le haut
   // et le bas des 42 périodes de 4 h closes (heure UTC) avant celle en cours, refaites avec les bougies

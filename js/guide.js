@@ -3189,12 +3189,15 @@ const Guide = (function () {
    *  calculé : la tendance (régime du Guide), un repère franchi et validé, la figure en cours (sans
    *  sens : son objectif, revue du 14/10/2026, C2), le scénario du matin montré, un repère dépassé
    *  puis repoussé (la mèche d'etatFerme, sans sens) ;
-   *  et, couche allumée ou non, la fourchette de 7 jours qui vient de casser (fourchette, sans sens). Aucun pourcentage, aucun conseil, aucune flèche seule. Honnête : un
+   *  et, couche allumée ou non, la fourchette de 7 jours qui vient de casser (fourchette, sans sens) ;
+   *  enfin l'agitation attendue du point du matin (agitation, sans sens). Aucun pourcentage, sauf
+   *  l'écart de cette agitation (revue du 14/10/2026, Q3), aucun conseil, aucune flèche seule. Honnête : un
    *  sens n'est dit que si au moins deux signaux vont dans ce sens et aucun en face ; sinon « pas
    *  de sens net », et pourquoi.
    *  o = { prix, unite, itv, regime, choix, suite, figures: [f], scenario: { rang, forme, sens,
    *        ouvert, tombe } | null, fourchette: fourchette(…) | null, symbole, maintenant (ms : l'heure
-   *        des faits datés) } → { titre, ton ('hausse' | 'baisse' | 'partage' | 'calme'),
+   *        des faits datés), agitation: [phrase] | null (Scenarios.texteAmpleur) } → { titre, ton
+   *  ('hausse' | 'baisse' | 'partage' | 'calme'),
    *  pourquoi: [{ texte, sens, fam }], surveiller: [texte], surveillerFam: [famille | null], avertissement,
    *  barre (la phrase de la barre du téléphone : celle de la cassure de la fourchette quand elle est
    *  dite, sinon le titre ; revue du 14/10/2026, C1) }.
@@ -3257,6 +3260,10 @@ const Guide = (function () {
     else if (sc && sc.ouvert && sc.forme === 'range') pourquoi.push({ texte: 'Scénario n° ' + sc.rang + ' de Claude, ce matin : le prix reste entre deux bornes.', sens: 0, fam: 'scenario' });
     else if (sc && sc.ouvert && (sc.sens === 1 || sc.sens === -1)) pourquoi.push({ texte: 'Scénario n° ' + sc.rang + ' de Claude, ce matin : ' + (sc.sens > 0 ? 'vers le haut.' : 'vers le bas.'), sens: sc.sens, fam: 'scenario' });
     if (r && r.compression) pourquoi.push({ texte: 'Le prix bouge peu : ce calme ne dit pas le sens du prochain mouvement.', sens: 0, fam: 'tendance' });
+    // L'agitation attendue, calculée au point du matin (revue du 14/10/2026, Q3 de Lorenzo : « Les
+    // deux ») : ce que nos mesures prévoient, l'ampleur, jamais le sens (sens 0 : le titre n'en tient
+    // pas compte). Sa source et son heure sont dans la phrase.
+    if (Array.isArray(o.agitation) && o.agitation.length) pourquoi.push({ texte: o.agitation.join(' '), sens: 0, fam: 'tendance', agitation: true });
     const haut = pourquoi.filter(x => x.sens > 0).length, bas = pourquoi.filter(x => x.sens < 0).length;
     // regle : comment la phrase est tirée des signaux, en mots (le « comment » du pourquoi).
     let ton, titre, regle;

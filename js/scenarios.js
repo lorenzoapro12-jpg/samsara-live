@@ -131,9 +131,53 @@ const Scenarios = (function () {
         : { bas: bornes[0] * (1 - marge / 100), haut: bornes[1] * (1 + marge / 100) },
     };
   }
+  // ─── 1 bis. L'agitation attendue et les heures à retenir (revue du 14/10/2026, Q3 : « Les deux ») ───
+  // Deux clés FACULTATIVES du fichier, écrites par la routine du matin (previsions_json.py) depuis le
+  // labo des signaux : « ampleur » (l'écart attendu entre plus bas et plus haut d'ici 24 h, calculé au
+  // point : ampleur.py) et « moments » (les CPI et FOMC des 48 h qui suivent : evenements.py). Ni l'une
+  // ni l'autre ne dit un SENS : nos mesures prévoient l'agitation, pas la direction.
+  /** « ampleur » → { groupe, calcul, debut, fin (ms), typique, dix (%) }, ou null (absente, illisible,
+   *  « une fois sur dix » sous le typique). */
+  function lireAmpleur(a) {
+    if (!a || typeof a !== 'object' || Array.isArray(a)) return null;
+    const calcul = dateUTC(a.calcul_utc), fin = dateUTC(a.fin_utc), debut = dateUTC(a.debut_utc);
+    const t = a.typique_pct, d = a.une_fois_sur_dix_pct;
+    if (!fini(calcul) || !fini(fin) || !(fin > calcul) || !fini(t) || !fini(d) || !(t > 0 && t <= d && d < 100)) return null;
+    return { groupe: typeof a.groupe === 'string' ? a.groupe : null, calcul, debut: fini(debut) ? debut : null, fin, typique: t, dix: d };
+  }
+  /** « moments » → [{ t (ms), nom }] lisibles, dans l'ordre ([] si absente). */
+  function lireMoments(m) {
+    if (!Array.isArray(m)) return [];
+    return m.filter(x => x && typeof x === 'object' && typeof x.nom === 'string' && x.nom.trim())
+      .map(x => ({ t: dateUTC(x.utc), nom: x.nom.trim() })).filter(x => fini(x.t)).sort((a, b) => a.t - b.t);
+  }
+  /** Les annonces que la page sait dire, avec ce que NOTRE mesure a trouvé (mémoire reaction-cpi :
+   *  56 CPI de 2022 à 2026, l'agitation × 2 à 4 de 15 min à 4 h, le sens seulement la 1re heure). Le
+   *  FOMC est écrit dans le fichier, mais sans phrase mesurée de ce genre : il n'est pas dessiné. */
+  const MOMENTS = {
+    CPI: { nom: 'Chiffres américains de l’inflation (CPI)', court: 'Inflation américaine (CPI)', micro: 'CPI',
+      effet: 'Souvent 2 à 4 fois plus agité pendant quelques heures, dans les deux sens.' },
+  };
+  /** Les heures à retenir d'un fichier lu (F.moments), celles que la page sait dire, avec leurs mots. */
+  const momentsConnus = F => (F && Array.isArray(F.moments) ? F.moments.filter(m => MOMENTS[m.nom]).map(m => Object.assign({ t: m.t, cle: m.nom }, MOMENTS[m.nom])) : []);
+  /** La ligne d'agitation, SANS sens : l'écart attendu entre plus bas et plus haut jusqu'à la fin de la
+   *  fenêtre du calcul, puis le « une fois sur dix », avec l'heure du calcul (au point du matin). Deux
+   *  phrases de 15 mots au plus (charte du 12/10/2026). null sans ampleur, ou hors de sa fenêtre (un
+   *  écart d'hier ne se lit pas comme celui d'aujourd'hui). Heures et jour de l'appareil.
+   *  → ['Écart attendu entre plus bas et plus haut d’ici demain 06:00 : en général 4,2 %.',
+   *     'Une fois sur dix, plus de 6,1 % (calcul de 06:31).'] */
+  function texteAmpleur(A, maintenant) {
+    if (!A || !fini(A.fin) || !fini(A.calcul) || !fini(maintenant) || maintenant >= A.fin || maintenant < A.calcul) return null;
+    const jF = jourVu(A.fin), quand = jF === jourVu(maintenant) ? '' : jF === jourVu(maintenant + 86400000) ? 'demain ' : 'le ' + jF + ' ';
+    const pc = v => Fm.nombre(v, 1) + ' %';
+    return ['Écart attendu entre plus bas et plus haut d’ici ' + quand + heureVue(A.fin) + ' : en général ' + pc(A.typique) + '.',
+      'Une fois sur dix, plus de ' + pc(A.dix) + ' (calcul de ' + heureVue(A.calcul) + ').'];
+  }
+
   /** Le fichier (objet JSON déjà lu) → { etat: 'ok' | 'attente' | 'illisible', … }.
    *  ok : groupe, emis, prixEmission, marge, scenarios (triés 1, 2, 3, S), precedents, bilan
-   *  (l'ordre du premier mouvement, ou null), ancien (les rangs 1 à 3 sont tous finis), statuts.
+   *  (l'ordre du premier mouvement, ou null), ancien (les rangs 1 à 3 sont tous finis), statuts ;
+   *  ampleur (ou null) et moments ([]), facultatives, aussi dans un fichier d'attente.
    *  maintenant (ms) : sert seulement à « ancien » et à garder un S encore ouvert. */
   function lire(d, maintenant) {
     if (!d || typeof d !== 'object' || Array.isArray(d)) return { etat: 'illisible', raison: 'pas un objet JSON' };
@@ -147,7 +191,9 @@ const Scenarios = (function () {
     if (o && fini(o.matins) && fini(o.reussis) && o.matins >= 0 && o.reussis >= 0 && o.reussis <= o.matins) bilan = { matins: o.matins, reussis: o.reussis, regle: typeof o.regle === 'string' ? o.regle : null };
     const base = { updated: dateUTC(d.updated), groupe: typeof d.groupe === 'string' ? d.groupe : null, note, statuts, bilan,
       precedents: Array.isArray(d.precedents) ? d.precedents.filter(p => p && typeof p.groupe === 'string' && Array.isArray(p.scenarios))
-        .map(p => ({ groupe: p.groupe, scenarios: p.scenarios.filter(x => x && typeof x === 'object') })) : [] };
+        .map(p => ({ groupe: p.groupe, scenarios: p.scenarios.filter(x => x && typeof x === 'object') })) : [],
+      // Facultatives (revue du 14/10/2026, Q3) : absentes ou illisibles, rien ne change.
+      ampleur: lireAmpleur(d.ampleur), moments: lireMoments(d.moments) };
     if (!base.groupe || !d.scenarios.length) return Object.assign(base, { etat: 'attente', scenarios: [] });
     const margeDefaut = fini(d.marge_pct) ? d.marge_pct : null;
     const tous = d.scenarios.map(x => scenario(x, margeDefaut));
@@ -1440,6 +1486,7 @@ const Scenarios = (function () {
     niveaux, originePremiere, libelle, quand, creneau, motsStatut, texteEtat, titre, ligne, texteBilan, REGLE_BILAN, REGLE_BILAN_SUITE, explication, ligneEtats, noteLarge, manque, etatIncomplet, NOMS_RANG, COURTS_RANG, SENS_RANG,
     ETATS_COURTS_DEBUTANT, etatPluriel, etatCourtDebutant, ligneBoiteDebutant, libelleDebutant, libellesDebutant, ligneDebutant, origineDebutant, etatLongDebutant, enteteDebutant, explicationDebutant, enonceVu, enonceDebutant, SENS_RANG_DEBUTANT, jourVu,
     PJ_DEFAUT, touchesValides, dansMarge, pointe, distanceZone, ouvertJour, position, fermeture, fondu, reste, grilleOk, decider, rejouerJour, horsNiveaux, classerJour, estRealise, raison, raisonCourte, pointeDe, jourSiAutre, ligneJourDebutant, libellesJourDebutant,
-    texteResteDebutant, ligneDebutantJour, ligneCourteDebutant, distancesDebutant, phraseMeneurDebutant, COMMENT_DEBUTANT, phraseJourExpert, nomNet, phraseNomDebutant, suffixeExpert, ligneResteExpert, ligneJourExpert, regleJourExpert, momentDebutant };
+    texteResteDebutant, ligneDebutantJour, ligneCourteDebutant, distancesDebutant, phraseMeneurDebutant, COMMENT_DEBUTANT, phraseJourExpert, nomNet, phraseNomDebutant, suffixeExpert, ligneResteExpert, ligneJourExpert, regleJourExpert, momentDebutant,
+    lireAmpleur, lireMoments, MOMENTS, momentsConnus, texteAmpleur };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Scenarios;

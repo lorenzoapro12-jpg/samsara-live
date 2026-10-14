@@ -106,6 +106,56 @@ titre('2. Lecture : complet, attente, ancien, mal formé');
     && !S.lire(copie(sem), ms('2026-10-09T07:00Z')).scenarios.some(s => s.rang === 'S'));
 }
 
+// ── 2 bis. Agitation attendue et heures à retenir (revue du 14/10/2026, N4 ; Q3 de Lorenzo : « Les deux ») ──
+titre('2 bis. « ampleur » et « moments » : facultatives, sans sens, la source et l’heure dites');
+{
+  const G = require(path.join(REPO, 'js/guide.js'));
+  const F = S.lire(copie(FIX), H3);
+  check('la fixture porte « ampleur » (calcul au point, fenêtre de 24 h) : lue telle quelle',
+    F.ampleur && F.ampleur.calcul === EMIS && F.ampleur.fin === ms('2026-10-10T04:00Z') && F.ampleur.typique === 3.07 && F.ampleur.dix === 6.19, F.ampleur);
+  check('« moments » lus dans l’ordre (CPI, FOMC) ; seul le CPI a des mots (le FOMC n’a pas de phrase mesurée)',
+    F.moments.map(m => m.nom).join() === 'CPI,FOMC' && S.momentsConnus(F).length === 1 && S.momentsConnus(F)[0].cle === 'CPI' && S.momentsConnus(F)[0].t === ms('2026-10-09T06:40Z'), [F.moments, S.momentsConnus(F)]);
+  // Absentes : le fichier d'avant se lit comme avant (rien d'inventé).
+  const sans = copie(FIX); delete sans.ampleur; delete sans.moments;
+  const Fs = S.lire(sans, H3);
+  check('absentes (fichier d’avant le 14/10) : ampleur null, aucun moment, le reste identique',
+    Fs.etat === 'ok' && Fs.ampleur === null && Array.isArray(Fs.moments) && !Fs.moments.length && S.momentsConnus(Fs).length === 0
+    && JSON.stringify(Object.assign({}, Fs, { ampleur: 0, moments: 0 })) === JSON.stringify(Object.assign({}, F, { ampleur: 0, moments: 0 })));
+  // Illisibles : ignorées, jamais une erreur, le reste lu.
+  const mal = [null, 'x', [], { calcul_utc: 'hier', fin_utc: '2026-10-10T04:00Z', typique_pct: 3, une_fois_sur_dix_pct: 6 },
+    { calcul_utc: '2026-10-09T04:40Z', fin_utc: '2026-10-09T04:00Z', typique_pct: 3, une_fois_sur_dix_pct: 6 },
+    { calcul_utc: '2026-10-09T04:40Z', fin_utc: '2026-10-10T04:00Z', typique_pct: '3', une_fois_sur_dix_pct: 6 },
+    { calcul_utc: '2026-10-09T04:40Z', fin_utc: '2026-10-10T04:00Z', typique_pct: 7, une_fois_sur_dix_pct: 6 },
+    { calcul_utc: '2026-10-09T04:40Z', fin_utc: '2026-10-10T04:00Z', typique_pct: 0, une_fois_sur_dix_pct: 6 }];
+  check('« ampleur » mal formée (texte, liste, date illisible, fin avant le calcul, % non numérique, typique > une fois sur dix, 0) : ignorée',
+    mal.every(a => { const d = copie(FIX); d.ampleur = a; const x = S.lire(d, H3); return x.etat === 'ok' && x.ampleur === null; }));
+  const dm = copie(FIX); dm.moments = [null, 3, { utc: 'demain', nom: 'CPI' }, { utc: '2026-10-09T06:40Z' }, { utc: '2026-10-09T06:40Z', nom: '  ' }, { utc: '2026-10-09T08:00Z', nom: 'CPI' }];
+  const Fm2 = S.lire(dm, H3), dm2 = copie(FIX); dm2.moments = { utc: '2026-10-09T06:40Z', nom: 'CPI' };
+  check('« moments » mal formés : chaque entrée illisible écartée (une seule gardée) ; pas une liste → aucun',
+    Fm2.etat === 'ok' && Fm2.moments.length === 1 && Fm2.moments[0].t === ms('2026-10-09T08:00Z') && S.lire(dm2, H3).moments.length === 0, Fm2.moments);
+  const A2 = S.lire(Object.assign(copie(ATTENTE), { ampleur: FIX.ampleur, moments: FIX.moments }), H3);
+  check('fichier d’attente : les deux clés lues aussi', A2.etat === 'attente' && A2.ampleur && A2.moments.length === 2);
+  // La ligne d'agitation : deux phrases, la fin de la fenêtre et l'heure du calcul à l'heure de l'appareil.
+  const L1 = t(S.texteAmpleur(F.ampleur, H3)), fin = F.ampleur.fin;
+  const quand = Fm.jour(fin) === Fm.jour(H3) ? '' : 'demain ';
+  check('« Écart attendu entre plus bas et plus haut d’ici [demain] HH:MM : en général 3,1 %. » puis « Une fois sur dix, plus de 6,2 % (calcul de HH:MM). »',
+    Array.isArray(L1) && L1.length === 2 && L1[0] === 'Écart attendu entre plus bas et plus haut d’ici ' + quand + Fm.heure(fin) + ' : en général 3,1 %.'
+    && L1[1] === 'Une fois sur dix, plus de 6,2 % (calcul de ' + Fm.heure(EMIS) + ').', L1);
+  const M = S.momentsConnus(F)[0];
+  const phrases = L1.concat([M.nom, M.court, M.micro, M.effet]);
+  const longues = phrases.filter(x => x.split(/\s+/).filter(w => /[\p{L}\d]/u.test(w)).length > 15);
+  check('charte : chaque phrase 15 mots au plus, aucun mot banni, aucun conseil', !longues.length && !phrases.some(x => G.motsBannis(x).length || CONSEIL.test(x)), { longues, bannis: phrases.map(G.motsBannis) });
+  check('SANS sens : ni hausse, ni baisse, ni monter, ni descendre, ni vers', !phrases.some(x => /hausse|baisse|mont|descen|\bvers\b|haussi|baissi|grimp|chut/i.test(x)), phrases);
+  check('le CPI : « Chiffres américains de l’inflation (CPI) » ; sa bulle : « Souvent 2 à 4 fois plus agité pendant quelques heures, dans les deux sens. »',
+    M.nom === 'Chiffres américains de l’inflation (CPI)' && M.effet === 'Souvent 2 à 4 fois plus agité pendant quelques heures, dans les deux sens.', M);
+  check('hors de la fenêtre (avant le calcul, à la fin ou après) ou sans ampleur : aucune ligne (un écart d’hier ne se lit pas comme celui du jour)',
+    S.texteAmpleur(F.ampleur, EMIS - 60000) === null && S.texteAmpleur(F.ampleur, fin) === null && S.texteAmpleur(F.ampleur, fin + 3600e3) === null
+    && S.texteAmpleur(null, H3) === null && S.texteAmpleur(F.ampleur, NaN) === null);
+  const apres = fin - 3600e3, L2 = S.texteAmpleur(F.ampleur, apres);
+  check('le jour de la fin : « d’ici HH:MM » (sans « demain ») si c’est aujourd’hui sur l’appareil',
+    L2 && (Fm.jour(fin) === Fm.jour(apres) ? L2[0].includes('d’ici ' + Fm.heure(fin) + ' :') : L2[0].includes('d’ici demain ')), L2);
+}
+
 // ── 3. Suivi d'un chemin ──
 titre('3. Suivi en direct d’un chemin (règle de noter.py)');
 // Fichier minimal : cibles 100 puis 110, invalidation 90, marge 1 % → zones [99, 101], [108,9 ; 111,1], [89,1 ; 90,9].

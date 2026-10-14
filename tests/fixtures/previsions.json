@@ -169,5 +169,23 @@
   "◐": "partiel",
   "⌛": "rien de touché",
   "⚠": "ambigu"
- }
+ },
+ "ampleur": {
+  "groupe": "2026-10-09",
+  "calcul_utc": "2026-10-09T04:40Z",
+  "debut_utc": "2026-10-09T04:00Z",
+  "fin_utc": "2026-10-10T04:00Z",
+  "typique_pct": 3.07,
+  "une_fois_sur_dix_pct": 6.19
+ },
+ "moments": [
+  {
+   "utc": "2026-10-09T06:40Z",
+   "nom": "CPI"
+  },
+  {
+   "utc": "2026-10-10T18:00Z",
+   "nom": "FOMC"
+  }
+ ]
 }
