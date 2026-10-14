@@ -632,8 +632,10 @@ const etat = page => page.evaluate(() => {
         check(`15:40, 390 px · expert : la ligne de la figure est sans sens (« ${lf.texte} »), avec l'objectif de sa bulle et « comme au hasard »`,
           r.type === 'double_sommet' && lf.sens === 0 && !!obj && lf.texte === 'Double sommet validé : objectif ' + obj + ', comme au hasard.' && / comme au hasard ▸$/.test(r.stats || '') && r.liste.includes(lf.texte),
           { ligne: lf, stats: r.stats });
+        // Revue du 14/10/2026 (Q1, « Décrire ») : le titre décrit la tendance ; il disait « Pas de sens net
+        // pour l’instant. » après C2.
         check(`15:40, 390 px · expert : la figure ne fait plus pencher le titre ni la barre (« ${r.titre} » ; avant : « penchent plutôt vers la baisse »)`,
-          r.ton === 'calme' && r.titre === 'Pas de sens net pour l’instant.' && r.barre === r.titre && !r.pourquoi.some(p => p.fam === 'figure' && p.sens), { titre: r.titre, barre: r.barre, pourquoi: r.pourquoi });
+          r.ton === 'calme' && r.titre === 'Le prix baisse depuis un moment.' && r.barre === r.titre && !r.pourquoi.some(p => p.fam === 'figure' && p.sens), { titre: r.titre, barre: r.barre, pourquoi: r.pourquoi });
         check('15:40 : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
         await o.ctx.close();
         o = await H.ouvrir(nav, H.harnais(X, '2026-10-09T02:30:00Z'), { vue: { width: 390, height: 844 }, tactile: true, theme: 'bureau95', mode: 'debutant' });
@@ -642,6 +644,38 @@ const etat = page => page.evaluate(() => {
           r.type === 'triple_creux' && /ces figures : sens prévu 4 sur 10, objectif atteint 5 sur 10, comme au hasard ▸$/.test(r.stats || '') && !/\(au hasard/.test(r.stats || ''), r.stats);
         check('09/10 02:30 : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
         await o.ctx.close();
+      } finally { H.arreter(); }
+    }
+
+    // « En résumé » décrit sans pencher (revue du 14/10/2026, Q1 : Lorenzo a choisi « Décrire »), sur la
+    // journée réelle du 08/10 rejouée. À 12:00 UTC, la tendance en baisse et le repère repassé dessous
+    // (deux « signaux », aucun en face) faisaient « Les signaux penchent plutôt vers la baisse. », dans
+    // la boîte et sur la barre du téléphone, avec « Cette lecture tombe si le prix finit un quart d'heure
+    // au-dessus du repère du haut. ». Lancé avant la correction, ce bloc échoue.
+    titre('« En résumé » décrit sans pencher (08/10 rejoué, 12:00 UTC) : titre, règle, barre, colonne');
+    {
+      const H = require('./scenarios-jour-harnais.js'), X = require('./fixtures/rejeu-jour-0810.json');
+      const lire = () => {
+        crossX = crossY = null; bulleDetail = null; drawChart(); dessinerCalque();
+        const R = syntheseLecture(), el = document.getElementById('synthese'), res = document.getElementById('reperesResume');
+        return { titre: R && R.titre, regle: R && R.regle, ton: R && R.ton, pourquoi: R ? R.pourquoi : [], barre: res && !res.hidden ? res.textContent : null,
+          boite: el && { titre: el.querySelector('.synthese-titre').textContent, regle: (el.querySelector('.synthese-regle') || {}).textContent || null, classe: el.className, texte: el.textContent } };
+      };
+      try {
+        for (const [vue, theme] of [[{ width: 390, height: 844 }, 'bureau95'], [{ width: 1440, height: 900 }, 'gazette']]) {
+          const o = await H.ouvrir(nav, H.harnais(X, '2026-10-08T12:00:00Z'), { vue, tactile: vue.width < 500, theme, mode: 'expert' });
+          const r = await o.page.evaluate(lire), nom = `12:00, ${vue.width} px · ${theme}`;
+          check(`${nom} : le titre décrit (« ${r.titre} » ; avant : « Les signaux penchent plutôt vers la baisse. »), ${vue.width < 768 ? 'la barre du téléphone aussi' : 'dans la colonne'}`,
+            r.titre === 'Le prix baisse depuis un moment.' && r.ton === 'calme' && !!r.boite && r.boite.titre === r.titre && /\bton-calme\b/.test(r.boite.classe)
+            && (vue.width < 768 ? r.barre === r.titre : r.barre === null), { titre: r.titre, ton: r.ton, barre: r.barre, boite: r.boite && r.boite.classe });
+          check(`${nom} : la règle « Ce sont des descriptions, pas des prévisions. » ; les lignes restent, avec leur sens (tendance −1, repère repassé dessous −1)`,
+            r.regle === 'Ce sont des descriptions, pas des prévisions.' && !!r.boite && r.boite.regle === r.regle && r.pourquoi.some(p => p.fam === 'tendance' && p.sens === -1)
+            && r.pourquoi.some(p => /^Le prix est repassé sous [\d\s]+ \$ et y reste\.$/.test(p.texte) && p.sens === -1), { regle: r.regle, pourquoi: r.pourquoi });
+          check(`${nom} : rien ne penche ni ne prévoit dans la boîte (ni « penchent », ni « Cette lecture tombe si… », ni « Un sens apparaîtrait si… »)`,
+            !!r.boite && !/penche|signaux|sens net|tombe si|apparaîtrait/.test(r.boite.texte), r.boite && r.boite.texte);
+          check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+          await o.ctx.close();
+        }
       } finally { H.arreter(); }
     }
 
