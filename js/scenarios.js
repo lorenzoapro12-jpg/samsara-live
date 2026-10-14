@@ -475,14 +475,18 @@ const Scenarios = (function () {
     const m = nb(S.marge) + ' %';
     const z = v => { const [a, b] = zone(v, S.marge); return chiffres(a) + ' – ' + prix(b); };
     const avecO = v => { const o = origine(S, v); return prix(v) + (o ? entreP(o) : ''); };
-    // « Le détail » : l'énoncé redirait le titre de la bulle (« S1 86 500 > 87 200 … »).
-    if (S.enonce && !exp) out.push(S.enonce + '.');
+    // L'énoncé de Claude en 1re ligne, avec « Le détail » aussi (revue du 14/10/2026, N5) : le titre
+    // (« S1 (rang 1) 81 850 · inv 85 766 ») ne le redit pas, et c'est lui qui nomme l'annonce du jour
+    // (CPI). Avec « Le détail » (6 lignes au plus), en tête du paragraphe des cibles : la bulle ne
+    // grandit pas d'un paragraphe (au téléphone, elle couvrirait le libellé qu'on vient de toucher).
+    const en = S.enonce ? S.enonce.replace(/\.?\s*$/, '.') + ' ' : '';
+    if (en && !exp) out.push(en.trim());
     if (exp) {
       // « Le détail » : 6 lignes au plus, en style compact (charte des explications courtes, 12/10/2026).
       if (S.forme === 'chemin') {
-        out.push('Cibles : ' + S.cibles.map(avecO).join(' > ') + (S.invalidation !== null ? ' ; inv. ' + avecO(S.invalidation) : '') + '.');
+        out.push(en + 'Cibles : ' + S.cibles.map(avecO).join(' > ') + (S.invalidation !== null ? ' ; inv. ' + avecO(S.invalidation) : '') + '.');
         out.push('Zones ± ' + m + ' : ' + S.cibles.map(z).join(' · ') + (S.invalidation !== null ? ' · inv. ' + z(S.invalidation) : '') + '.');
-      } else out.push('Range ' + chiffres(S.range[0]) + ' – ' + prix(S.range[1]) + ', toléré ± ' + m + ' : ' + chiffres(S.zones.bas) + ' – ' + prix(S.zones.haut) + '.');
+      } else out.push(en + 'Range ' + chiffres(S.range[0]) + ' – ' + prix(S.range[1]) + ', toléré ± ' + m + ' : ' + chiffres(S.zones.bas) + ' – ' + prix(S.zones.haut) + '.');
       out.push('Émis ' + Fm.jour(S.emis) + ' ' + heureVue(S.emis) + (fini(S.prixEmission) ? ' à ' + prix(S.prixEmission) : '') + ' · fin ' + Fm.jour(S.fin) + ' ' + heureVue(S.fin)
         + (fini(S.horizon) ? ' (' + nb(Math.round(S.horizon * 10) / 10) + ' h)' : '') + '.');
       const et = texteEtat(Object.assign({}, S, { statut: '⏳' }), sv, c.statuts, mode, c);
@@ -675,18 +679,56 @@ const Scenarios = (function () {
    *  Claude n'y passent que sans jargon (origineDebutant). La base du hasard reste en Expert. */
   function explicationDebutant(S, sv, P, ctx) {
     // Choix 1B : aucun pourcentage en Débutant, pas même la marge des zones — elles sont dites en dollars.
-    // Charte du 12/10/2026 : 4 lignes au plus (qui et quand, ce qu'il dit, où il en est, son rang) ;
-    // out.iEtat : la ligne de l'état, où l'app ajoute les distances.
+    // Charte du 12/10/2026 : ce qu'il dit, son rang et jusqu'à quand, où il en est ; out.iEtat : la
+    // ligne de l'état, où l'app ajoute les distances ; out.iRang : celle du rang, out.valable : la
+    // même sans le rang (écran court).
+    // Revue du 14/10/2026 (M6 : 50 mots par bulle ; vision-15 : deux heures sans dire pourquoi) :
+    // « Écrit par Claude (une IA) le … à … » part — le titre (« Scénario 1 de Claude ») et
+    // l'avertissement de fin disent qui ; l'heure d'écriture reste avec « Le détail ».
+    // ctx.suivi : l'app ajoute la distance à la sortie d'un range (« encore 564 $ avant d'en sortir
+    // par le bas ») ; sans elle, ses bornes élargies sont dites ici, avec ce qu'elles font (N6).
     const c = ctx || {}, out = [];
-    const emP = heureVueSi(S.emis), finP = heureVueSi(S.fin);
-    out.push('Écrit par Claude (une IA) le ' + jourVu(S.emis) + (emP ? ' à ' + emP : '') + ', valable jusqu’au ' + jourVu(S.fin) + (finP ? ' ' + finP : '') + '.');
-    if (S.forme === 'chemin') out.push('Le prix va vers ' + S.cibles.map(prix).join(' puis ') + (S.invalidation !== null ? ', sans toucher ' + prix(S.invalidation) + ' avant' : '') + '.');
-    else out.push('Le prix reste entre ' + chiffres(S.range[0]) + ' et ' + prix(S.range[1]) + ', sans sortir de ' + chiffres(S.zones.bas) + ' – ' + prix(S.zones.haut) + '.');
+    const finP = heureVueSi(S.fin), valable = 'Valable jusqu’au ' + jourVu(S.fin) + (finP ? ' ' + finP : '') + '.';
+    const quoi = S.forme === 'chemin' ? 'Le prix va vers ' + S.cibles.map(prix).join(' puis ') + (S.invalidation !== null ? ', sans toucher ' + prix(S.invalidation) + ' avant' : '') + '.'
+      : 'Le prix reste entre ' + chiffres(S.range[0]) + ' et ' + prix(S.range[1]) + '.';
+    const bornes = S.forme === 'range' && !c.suivi ? ' Sorti s’il passe sous ' + prix(S.zones.bas) + ' ou au-dessus de ' + prix(S.zones.haut) + '.' : '';
+    out.push((enonceDebutant(S, quoi) || quoi) + bornes);
+    out.iRang = out.length;
+    out.push(SENS_RANG_DEBUTANT[S.rang] + ' ' + valable);
+    out.valable = valable;
     out.iEtat = out.length;
     out.push(etatBulleDebutant(S, sv, c.maintenant));
     if (propre(S.note)) out.push('Note du journal : ' + S.note);
-    out.push(SENS_RANG[S.rang]);
     return out;
+  }
+  /** Le sens du rang, court, pour la bulle du Débutant (revue du 14/10/2026, M6) ; SENS_RANG reste
+   *  celui de « Le détail ». */
+  const SENS_RANG_DEBUTANT = {
+    '1': 'Le plus probable selon Claude, sans pourcentage.',
+    '2': 'Entre le 1 et le 3 selon Claude, sans pourcentage.',
+    '3': 'Le moins probable selon Claude, sans pourcentage.',
+    S: 'Sur la semaine, hors classement.',
+  };
+  /** Les chiffres d'un texte sans leurs espaces (« 81 850 » → « 81850 »), pour les comparer. */
+  const sansEspaces = t => String(t).replace(/[\s  ]/g, '');
+  /** L'énoncé de Claude tel qu'il l'a écrit, sans point final ni « Semaine : » (le titre le dit) ;
+   *  null s'il manque ou porte un mot de la liste du Guide. */
+  function enonceVu(S) {
+    if (!propre(S.enonce)) return null;
+    const t = (S.rang === 'S' ? S.enonce.replace(/^semaine\s*:\s*/i, '') : S.enonce).replace(/[.\s]*$/, '');
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  /** L'énoncé de Claude pour la bulle du Débutant, tel qu'il l'a écrit (revue du 14/10/2026, N5 :
+   *  chargé mais montré nulle part, alors que c'est lui qui nomme l'annonce du jour, le CPI) ; null
+   *  s'il manque ou porte un mot de la liste du Guide. Un niveau du scénario qu'il ne dit pas :
+   *  l'invalidation seule, « Sans toucher 85 500 $ avant. » ; une cible ou une borne, la phrase en
+   *  mots (quoi) entière. */
+  function enonceDebutant(S, quoi) {
+    const t = enonceVu(S);
+    if (!t) return null;
+    const e = sansEspaces(t), dit = v => e.includes(sansEspaces(chiffres(v)));
+    if (!(S.forme === 'range' ? S.range : S.cibles).every(dit)) return t + '.' + (quoi ? ' ' + quoi : '');
+    return t + '.' + (S.forme === 'chemin' && S.invalidation !== null && !dit(S.invalidation) ? ' Sans toucher ' + prix(S.invalidation) + ' avant.' : '');
   }
   /** L'état d'un scénario en une phrase courte (bulle Débutant), sans point final : « Invalidé ✗
    *  (en direct) entre 20:00 et 20:15 : zone de 85 500 $ touchée avant celle de 86 500 $ ». */
@@ -696,9 +738,13 @@ const Scenarios = (function () {
     const cle = sv ? sv.cle : null;
     if (!e.marque) return maj(etatLongDebutant(S, sv, maintenant));
     if (sv.fini && OUVERTS_JOUR.includes(cle)) return 'Terminé (en direct) ; la note du journal suivra';
-    const r = ['invalide', 'sortie', 'ambigu', 'realise'].includes(cle) ? (raison(S, sv, 'debutant') || '').replace(/^non tranché : /, '') || null : null;
+    // La raison courte (revue du 14/10/2026, M6) : sans « (81 436 $ moins la marge) » ni « (le journal
+    // le compte) », que « Le détail » garde.
+    const r = ['invalide', 'sortie', 'ambigu', 'realise'].includes(cle) ? (raison(S, sv, 'debutant', true) || '').replace(/^non tranché : /, '') || null : null;
     const q = cle === 'cible' && fini(sv.t) ? momentDebutant(sv.t, sv.pas || 0, maintenant) : momentFerme(S, sv, maintenant);
-    return maj(e.etat) + ' (en direct)' + q + (r ? ' : ' + r : '');
+    // Deux phrases (revue du 14/10/2026, M6 : « couper en deux les phrases à deux-points ») : l'état
+    // et son moment, puis sa raison.
+    return maj(e.etat) + ' (en direct)' + q + (r ? '. ' + maj(r) : '');
   }
 
 
@@ -964,10 +1010,11 @@ const Scenarios = (function () {
   /** Le nom d'un créneau de bougie, pour un débutant : « le même quart d'heure ». */
   const memeCreneau = pasMs => (pasMs === 60000 ? 'la même minute' : pasMs === 900000 ? 'le même quart d’heure' : pasMs === 3600000 ? 'la même heure' : pasMs > 0 ? 'les mêmes ' + Math.round(pasMs / 60000) + ' minutes' : 'le même moment');
   /** Un contact seulement en mèche, pour un débutant (sans « mèche ») : compté par le journal. */
-  const BREF = ', par un passage bref du prix (le journal le compte)';
-  /** Pourquoi un scénario s'est fermé, en mots. → texte (sans majuscule ni point). */
-  function raison(S, sv, mode) {
-    const exp = mode === 'expert', f = fermeture(S, sv);
+  const BREF_LONG = ', par un passage bref du prix (le journal le compte)', BREF_COURT = ', par un passage bref du prix';
+  /** Pourquoi un scénario s'est fermé, en mots. → texte (sans majuscule ni point). court (bulle du
+   *  Débutant, revue du 14/10/2026, M6) : sans la marge d'une limite ni « (le journal le compte) ». */
+  function raison(S, sv, mode, court) {
+    const exp = mode === 'expert', f = fermeture(S, sv), BREF = court ? BREF_COURT : BREF_LONG;
     if (!f || f.journal) return null;
     if (f.type === 'invalide') {
       const z = f.zone, prochaine = S.cibles[sv.premier ? Math.min(1, S.cibles.length - 1) : 0];
@@ -976,7 +1023,7 @@ const Scenarios = (function () {
     }
     if (f.type === 'sortie') {
       if (exp) return 'borne ' + (f.haut ? 'haute ' : 'basse ') + chiffres(f.niveau) + ' dépassée' + (f.meche ? ' (en mèche : contact, règle du journal)' : '');
-      return 'passé ' + (f.haut ? 'au-dessus de ' : 'au-dessous de ') + dollars(f.niveau) + ' (' + prix(f.borne) + (f.haut ? ' plus' : ' moins') + ' la marge)' + (f.meche ? BREF : '');
+      return 'passé ' + (f.haut ? 'au-dessus de ' : 'au-dessous de ') + dollars(f.niveau) + (court ? '' : ' (' + prix(f.borne) + (f.haut ? ' plus' : ' moins') + ' la marge)') + (f.meche ? BREF : '');
     }
     if (f.type === 'ambigu') {
       if (exp) return (S.forme === 'range' ? 'les deux bornes' : 'cible et invalidation') + ' dans la même bougie : ordre inconnu';
@@ -1140,13 +1187,15 @@ const Scenarios = (function () {
     if (!p || p.forme !== 'range') return false;
     return p.bord === 'bas' ? p.dBord < S.range[0] - S.zones.bas : p.dBord < S.zones.haut - S.range[1];
   }
-  /** « Valables jusqu'à demain 06:20 : encore 13 h 25. » (heure de l'appareil) */
-  function texteResteDebutant(jour, maintenant) {
+  /** « Valables jusqu'à demain 06:20 : encore 13 h 25. » (heure de l'appareil) ; court (bulle de la
+   *  ligne, revue du 14/10/2026, M6) : « Valables jusqu'à demain 06:20, sans nouvelle prévision. » */
+  function texteResteDebutant(jour, maintenant, court) {
     if (!jour || !fini(jour.fin)) return null;
     const h = heureVueSi(jour.fin), r = reste(jour.fin - maintenant);
     const jF = jourVu(jour.fin), jA = jourVu(maintenant), demain = jourVu(maintenant + 86400000);
     const quand = jF === jA ? 'aujourd’hui' : jF === demain ? 'demain' : 'le ' + jF;
     if (!r) return 'Terminés depuis ' + quand + (h ? ' ' + h : '') + ' ; ' + (jour.notes ? 'le journal les a notés.' : 'la note du journal suivra.');
+    if (court) return 'Valables jusqu’à ' + quand + (h ? ' ' + h : '') + ', sans nouvelle prévision.';
     return 'Valables jusqu’à ' + quand + (h ? ' ' + h : '') + ' (encore ' + r + '). Pas de nouvelle prévision d’ici là.';
   }
   /** La ligne d'un scénario dans la bulle du Débutant : ce qu'il dit, son état, ses distances.
@@ -1168,7 +1217,7 @@ const Scenarios = (function () {
    *  réalisé ici, la ZONE touchée (« 3. zone de 84 500 $ touchée ✓ (en direct) … : dès 83 655 $, par
    *  un passage bref du prix »), jamais
    *  « vers 84 500 $ — réalisé ✓ » (le prix n'y est peut-être jamais allé, A3). */
-  function ligneCourteDebutant(S, sv, maintenant, sansRaison) {
+  function ligneCourteDebutant(S, sv, maintenant, sansRaison, sansMoment) {
     const e = etatCourtDebutant(S, sv);
     const quoi = S.forme === 'range' ? 'entre ' + chiffres(S.range[0]) + ' et ' + prix(S.range[1]) : 'vers ' + S.cibles.map(prix).join(' puis ');
     const real = S.statut === '⏳' && S.forme === 'chemin' && sv && sv.cle === 'realise';
@@ -1177,7 +1226,9 @@ const Scenarios = (function () {
     // bref du prix » pour un contact en mèche — jamais une réalisation sans ce mot.
     const f = sansRaison ? fermeture(S, sv) : null;
     const r = sansRaison ? (f && !f.journal && f.meche ? 'par un passage bref du prix' : null) : raisonCourte(S, sv);
-    return MARQUES_RANG[S.rang] + ' ' + corps + (e.marque ? ' ' + e.marque : '') + momentFerme(S, sv, maintenant) + (r ? (sansRaison ? ', ' : ' : ') + r : '');
+    // sansMoment (la bulle de la ligne des scénarios, revue du 14/10/2026, M6 : 50 mots) : sans le
+    // créneau de la fermeture, que la bulle du scénario garde.
+    return MARQUES_RANG[S.rang] + ' ' + corps + (e.marque ? ' ' + e.marque : '') + (sansMoment ? '' : momentFerme(S, sv, maintenant)) + (r ? (sansRaison ? ', ' : ' : ') + r : '');
   }
   /** Pourquoi un scénario s'est fermé ici, en peu de mots (écrans courts, Débutant), avec le bord de
    *  zone franchi et « par un passage bref du prix » pour un contact en mèche (compté par le
@@ -1199,6 +1250,16 @@ const Scenarios = (function () {
    *  « il est à 1 239 $ de sa limite haute (83 500 $ plus la marge, soit 84 335 $) » ; fermé : sa raison. */
   function distancesDebutant(it, court) {
     const S = it.sc, p = it.pos;
+    // 'bulle' (la bulle du scénario montré, Débutant) : chaque distance dit à quoi elle sert (revue du
+    // 14/10/2026, N6 : « à 564 $ de sa limite basse » ne le disait pas) ; 'bulleCourte' (la ligne des
+    // scénarios a cédé sa place, M6 : 50 mots) : la distance à sa zone seulement, comme 'mini'.
+    if (court === 'bulle' || court === 'bulleCourte') {
+      if (!p) return null;
+      if (p.forme === 'range') return 'encore ' + dollars(p.dBord) + ' avant d’en sortir par le ' + (p.bord === 'haut' ? 'haut' : 'bas') + ' (' + dollars(p.niveauBord) + ')';
+      const z = p.bordCible === null ? 'dans sa zone' : 'encore ' + dollars(p.dCible) + ' avant sa zone';
+      if (court === 'bulleCourte' || !p.zoneInv) return z;
+      return z + (p.bordInv === null ? ', et dans celle qui l’invaliderait' : ', ' + dollars(p.dInv) + ' avant l’invalidation');
+    }
     // 'mini' (une ligne de la bulle des scénarios du matin) : une seule distance, la plus utile.
     if (court === 'mini') return !p ? null : p.forme === 'range' ? 'à ' + dollars(p.dBord) + ' de sa limite ' + (p.bord === 'haut' ? 'haute' : 'basse')
       : p.bordCible === null ? 'dans sa zone' : 'à ' + dollars(p.dCible) + ' de sa zone';
@@ -1365,7 +1426,7 @@ const Scenarios = (function () {
 
   return { FORMAT, RANGS, STATUTS, chiffres, prix, heureVue, heureUTC: HEURE_UTC_EXPORT, heureParis: HEURE_PARIS_EXPORT, pointMs, instantPoint, jourGroupe, dateUTC, zone, lire, vivants, estAncien, ouvert, compte, suiviVide, pas, plier, etat, etatLarge, suivre, copie,
     niveaux, originePremiere, libelle, quand, creneau, motsStatut, texteEtat, titre, ligne, texteBilan, REGLE_BILAN, REGLE_BILAN_SUITE, explication, ligneEtats, noteLarge, manque, etatIncomplet, NOMS_RANG, COURTS_RANG, SENS_RANG,
-    ETATS_COURTS_DEBUTANT, etatCourtDebutant, ligneBoiteDebutant, libelleDebutant, libellesDebutant, ligneDebutant, origineDebutant, etatLongDebutant, enteteDebutant, explicationDebutant, jourVu,
+    ETATS_COURTS_DEBUTANT, etatCourtDebutant, ligneBoiteDebutant, libelleDebutant, libellesDebutant, ligneDebutant, origineDebutant, etatLongDebutant, enteteDebutant, explicationDebutant, enonceVu, enonceDebutant, SENS_RANG_DEBUTANT, jourVu,
     PJ_DEFAUT, touchesValides, dansMarge, pointe, distanceZone, ouvertJour, position, fermeture, fondu, reste, grilleOk, decider, rejouerJour, horsNiveaux, classerJour, estRealise, raison, raisonCourte, pointeDe, jourSiAutre, ligneJourDebutant, libellesJourDebutant,
     texteResteDebutant, ligneDebutantJour, ligneCourteDebutant, distancesDebutant, phraseMeneurDebutant, COMMENT_DEBUTANT, phraseJourExpert, nomNet, phraseNomDebutant, suffixeExpert, ligneResteExpert, ligneJourExpert, regleJourExpert, momentDebutant };
 })();

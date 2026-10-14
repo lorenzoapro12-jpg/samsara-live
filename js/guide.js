@@ -1906,8 +1906,10 @@ const Guide = (function () {
     demiTours: { debutant: 'ce qui en fait un repère', expert: 'ce qui en fait un niveau' },
     quantite: { debutant: 'ce qui attend à ce prix', expert: 'quantité posée au relevé' },
     rayon: { debutant: 'jusqu’où l’on cherche des repères', expert: 'rayon de recherche des niveaux' },
-    objectif: { debutant: 'la hauteur de la figure, reportée', expert: 'hauteur de la figure reportée' },
-    objectifLargeur: { debutant: 'la largeur de la figure, reportée', expert: 'largeur de la figure reportée' },
+    // Revue du 14/10/2026 (M6, N6) : « sa hauteur, reportée » pour « la hauteur de la figure,
+    // reportée » — l'objectif tient dans une phrase de 15 mots.
+    objectif: { debutant: 'sa hauteur, reportée', expert: 'hauteur de la figure reportée' },
+    objectifLargeur: { debutant: 'sa largeur, reportée', expert: 'largeur de la figure reportée' },
     objectifMat: { debutant: 'la longueur du mât, reportée', expert: 'longueur du mât reportée' },
     cas: { debutant: 'sur ce graphique', expert: 'sur l’historique chargé' },
     issues: { debutant: 'objectif atteint, sur les cas finis', expert: 'atteint / issues connues' },
@@ -2012,20 +2014,23 @@ const Guide = (function () {
     return V[V.length - 1];
   }
   /** Un chemin « Et ensuite ? » en une phrase : « Si le prix finit un quart d'heure au-dessus de
-   *  82 827 $ (zone de retour), le repère suivant est 83 105 $ (haut d'hier). » Un chiffre
-   *  publié dit son âge. ch null : le côté sans repère proche, dit. */
+   *  82 827 $ : prochain repère 83 105 $. » Un chiffre publié dit son âge. ch null : le côté sans
+   *  repère proche, dit. */
   function texteSuiteDebutant(ch, unite, itv, sens, maintenant, seuilDit) {
     const up = ch ? ch.sens > 0 : sens > 0, per = periode(itv);
     if (!ch) return 'Aucun repère proche ' + (up ? 'au-dessus' : 'en dessous') + '.';
     const rx = ch.rx || bord(ch.seuil, up), ry = ch.ry || (ch.cible ? bord(ch.cible, !up) : null);
-    const de = r => ' (' + nomPhrase(r) + ')';
     // L'âge d'un chiffre publié, seulement s'il a au moins une minute (« relevé il y a 0 min » ne dit
     // rien) : une phrase à lui, qui dit à quoi il sert (idée 8, 13/10/2026).
     const age = r => (r && fini(r.lu) && !(fini(maintenant) && maintenant - r.lu < 60000)
       ? ' ' + avecUsage(majuscule(nomPhrase(r)) + ' relevé ' + ageDebutant(r.lu, maintenant, true), 'releve', 'debutant') + '.' : '');
     // seuilDit : la bulle de ce repère (son nom et son prix sont dans le titre, son âge dans la bulle).
-    return 'Si le prix finit ' + per[0] + (seuilDit ? (up ? ' au-dessus' : ' en dessous') : (up ? ' au-dessus de ' : ' sous ') + prixR(rx, unite) + de(rx)) + ' : '
-      + (ry ? 'prochain repère ' + prixR(ry, unite) + de(ry) + '.' : 'aucun autre repère proche.') + (seuilDit ? '' : age(rx)) + age(ry);
+    // Revue du 14/10/2026 (M6) : « Si le prix finit un quart d'heure au-dessus de 82 787 $ (plus bas
+    // d'hier) : prochain repère 83 048 $ (zone de retour). » faisait 21 mots, l'exemple « Avant » de
+    // la charte (15 au plus) : les noms partent, comme dans son exemple « Après » ; les libellés du
+    // graphique les portent, et l'âge d'un chiffre publié, qui suit, nomme encore le sien.
+    return 'Si le prix finit ' + per[0] + (seuilDit ? (up ? ' au-dessus' : ' en dessous') : (up ? ' au-dessus de ' : ' sous ') + prixR(rx, unite)) + ' : '
+      + (ry ? 'prochain repère ' + prixR(ry, unite) + '.' : 'aucun autre repère proche.') + (seuilDit ? '' : age(rx)) + age(ry);
   }
   /** L'état d'un repère au prix live, en mots (bulle). */
   const ETATS_DEBUTANT = {
@@ -2352,8 +2357,11 @@ const Guide = (function () {
    *  théorique — toujours ensemble. */
   function niveauxDebutant(f, ctx, P, unite) {
     const N = niveauxFigure(f, ctx && fini(ctx.j) ? ctx.j : (ctx && ctx.n) || 0, P), per = periode(ctx && ctx.intervalle), fam = famille(f), out = [];
-    // L'objectif dit sur quoi il se calcule (idée 8 : chaque chiffre dit son usage).
-    const cible = (o, plur) => 'objectif' + (plur ? 's' : '') + ' théorique' + (plur ? 's' : '') + ' selon l’usage des analystes : ' + o + ' (' + usageChiffre(cleObjectif(f), 'debutant') + '), non garanti' + (plur ? 's' : '');
+    // L'objectif dit sur quoi il se calcule (idée 8 : chaque chiffre dit son usage). Revue du
+    // 14/10/2026 (M6 : 50 mots par bulle, 15 par phrase ; « Double sommet », 75) : « selon l'usage
+    // des analystes » part de la bulle du Débutant — « théorique » et « non garanti » restent, et les
+    // statistiques de la figure disent d'où il vient ; les phrases à point-virgule sont coupées en deux.
+    const cible = (o, plur) => 'objectif' + (plur ? 's' : '') + ' théorique' + (plur ? 's' : '') + ' : ' + o + ' (' + usageChiffre(cleObjectif(f), 'debutant') + '), non garanti' + (plur ? 's' : '');
     const pente = fam === 'lignes' && f.type !== 'range' || fam === 'drapeau' || (fam === 'ete' && f.couL && Math.abs(f.couL.b) > 0);
     const enCeMoment = pente ? ' en ce moment' : '';
     // La 1re clôture dehors s'est jugée contre le seuil de SA bougie (journal) ; une droite en pente
@@ -2361,19 +2369,22 @@ const Guide = (function () {
     const evDemi = f.demi ? (f.journal || []).filter(x => x.quoi === 'demi').pop() : null, seuilDemi = evDemi && fini(evDemi.seuil) ? evDemi.seuil : null;
     if (N.confirme) {
       const o = N.objectifs[0], iv = N.invals[0];
-      out.push('Figure validée ' + (fini(f.jConf) && heureVueSi(finMs(ctx, f.jConf)) ? quandDeb(finMs(ctx, f.jConf), ctx) : '') + (f.retest ? ', après un court retour vers la ligne' : '') + '. Si le prix finit ' + per[0] + ' ' + sousSur(iv.s) + prix(iv.p, unite)
-        + ', la figure est ratée. ' + cible(prix(o.p, unite)).replace(/^o/, 'O') + '.');
+      const q = fini(f.jConf) && heureVueSi(finMs(ctx, f.jConf)) ? quandDeb(finMs(ctx, f.jConf), ctx) : '';
+      // « Ratée si … », comme « Annulée si … » avant la validation (revue du 14/10/2026, M5 et M6).
+      out.push('Figure validée' + (q ? ' ' + q : '') + (f.retest ? ', après un court retour' : '') + '. Ratée si le prix finit ' + per[0] + ' ' + sousSur(iv.s) + prix(iv.p, unite)
+        + '. ' + cible(prix(o.p, unite)).replace(/^o/, 'O') + '.');
       return out.join(' ');
     }
     if (fam === 'extremes' || fam === 'ete' || fam === 'drapeau') {
       const x = N.sorties[0], o = N.objectifs[0], s = x.s;
       const quoi = fam === 'extremes' ? (f.sens < 0 ? 'le creux entre les sommets' : 'le sommet entre les creux') : fam === 'ete' ? 'la ligne des deux ' + (f.sens < 0 ? 'creux' : 'sommets') : 'le ' + (s > 0 ? 'haut' : 'bas') + ' de la pause';
-      const marge = Math.abs(x.seuil - x.ligne) >= 0.5 ? ' (' + quoi + enCeMoment + ', avec une marge)' : ' (' + quoi + enCeMoment + ')';
+      // Le seuil dit à quoi il sert (« Validée si … ») ; d'où il vient (le creux, la marge) et le court
+      // retour qui valide aussi sont dans « Le détail » (charte, règle 5 : règles de détection).
       const dejaFini = seuilDemi !== null && pente && Math.abs(seuilDemi - x.seuil) >= 0.5
-        ? 'Il a fini ' + per[0] + ' ' + sousSur(s) + prix(seuilDemi, unite) + ' (' + quoi + ' à ce moment-là) ; s’il finit encore ' + per[0] + ' ' + sousSur(s) + prix(x.seuil, unite) + ' (son niveau en ce moment)'
-        : 'Il a fini ' + per[0] + ' ' + sousSur(s) + prix(x.seuil, unite) + marge + ' ; s’il finit encore ' + per[0] + ' ' + dessous(s);
+        ? 'Il a fini ' + per[0] + ' ' + sousSur(s) + prix(seuilDemi, unite) + ' (le niveau d’alors). ' + majuscule(quoi) + ' est à ' + prix(x.seuil, unite) + ' en ce moment. S’il finit encore ' + per[0] + ' ' + dessous(s)
+        : 'Il a fini ' + per[0] + ' ' + sousSur(s) + prix(x.seuil, unite) + '. S’il finit encore ' + per[0] + ' ' + dessous(s);
       let t = (f.demi ? dejaFini + ', la figure sera validée. S’il revient franchement dedans, la sortie ne compte pas.'
-        : 'La figure serait validée si le prix finit ' + per[1] + ' de suite ' + sousSur(s) + prix(x.seuil, unite) + marge + ' ; un court retour entre les deux compte aussi.');
+        : 'Figure validée si le prix finit ' + per[1] + ' de suite ' + sousSur(s) + prix(x.seuil, unite) + '.');
       // Une ébauche : UN niveau d'annulation, celui que la machine applique (le plus haut ou le plus
       // bas des bougies, pas leur fin) ; l'extrême et la tête sont l'affaire de ce niveau.
       if (f.ebauche && fini(f.abandonP)) t += ' Annulée si le prix ' + (f.s > 0 ? 'monte au-dessus de ' : 'descend sous ') + prix(f.abandonP, unite) + ', même un instant.';
@@ -2383,7 +2394,7 @@ const Guide = (function () {
         else if (iv.raison === 'sortie_contraire') t += ' Annulée aussi si le prix finit ' + per[1] + ' de suite ' + sousSur(iv.s) + prix(iv.p, unite) + '.';
         else t += ' Annulée si le prix finit ' + per[0] + ' ' + sousSur(iv.s) + prix(iv.p, unite) + (iv.raison === 'tete' ? ' (la tête)' : '') + '.';
       }
-      t += ' Si elle est validée, ' + cible(prix(o.p, unite)) + '.';
+      t += ' Une fois validée, ' + cible(prix(o.p, unite)) + '.';
       return t;
     }
     // Deux droites : une sortie d'un côté ou de l'autre.
@@ -2393,36 +2404,39 @@ const Guide = (function () {
     if (f.demi) {
       const x = x1, s = x.s;
       const s0 = seuilDemi !== null ? seuilDemi : x.seuil, bouge = pente && Math.abs(s0 - x.seuil) >= 0.5;
-      t = 'Le prix vient de sortir ' + (s > 0 ? 'par le haut' : 'par le bas') + ' (il a fini ' + per[0] + ' ' + sousSur(s) + prix(s0, unite) + (bouge ? ', le niveau de la ligne à ce moment-là' : '') + '). S’il finit encore ' + per[0] + ' dehors'
-        + (bouge ? ' (' + sousSur(s) + prix(x.seuil, unite) + ' en ce moment)' : '') + ', la sortie sera validée ; s’il revient franchement dedans, la sortie ne compte pas.';
-      t += ' Si elle est validée, ' + cible(prix((s > 0 ? oH : oB).p, unite)) + '.';
+      t = 'Le prix vient de sortir ' + (s > 0 ? 'par le haut' : 'par le bas') + '. Il a fini ' + per[0] + ' ' + sousSur(s) + prix(s0, unite) + (bouge ? ' (la ligne d’alors)' : '') + '.'
+        + (bouge ? ' La ligne est à ' + prix(x.seuil, unite) + ' en ce moment.' : '') + ' S’il finit encore ' + per[0] + ' dehors, la sortie sera validée. S’il revient franchement dedans, la sortie ne compte pas.';
+      t += ' Une fois validée, ' + cible(prix((s > 0 ? oH : oB).p, unite)) + '.';
     } else {
-      t = 'Une sortie compte quand le prix finit ' + per[1] + ' de suite au-dessus de ' + prix(hautB.seuil, unite) + ' ou sous ' + prix(basB.seuil, unite) + enCeMoment
-        + ' ; un court retour entre les deux compte aussi. Si elle est validée, ' + cible(prix(oH.p, unite) + ' par le haut, ' + prix(oB.p, unite) + ' par le bas', true) + '.';
+      // Les deux objectifs en une phrase de 15 mots, ce sur quoi ils se calculent dans la suivante.
+      t = 'Une sortie compte si le prix finit ' + per[1] + ' de suite dehors. Dehors : au-dessus de ' + prix(hautB.seuil, unite) + ' ou sous ' + prix(basB.seuil, unite) + enCeMoment
+        + '. Une fois validée, objectifs théoriques : ' + prix(oH.p, unite) + ' par le haut, ' + prix(oB.p, unite) + ' par le bas. Calculés avec ' + usageChiffre(cleObjectif(f), 'debutant').replace(/, reportée$/, ' reportée') + ', non garantis.';
       if (fini(N.pointe)) { const ms = finMs(ctx, Math.floor(N.pointe)); t += ' Sans sortie avant la pointe' + (fini(ms) && heureVueSi(ms) ? ' (vers ' + quandVu(ms, ctx && ctx.maintenant) + ')' : '') + ' : sans suite.'; }
     }
     if (f.ebauche) t += ' Annulée si le prochain ' + (f.s > 0 ? 'sommet' : 'creux') + ' s’écarte de sa droite.';
     return t;
   }
   /** La définition d'une figure (bulle Débutant d'une figure validée ou tombée) : ce qu'on voit,
-   *  jamais un sens attendu. */
+   *  jamais un sens attendu. Revue du 14/10/2026 (M6) : des phrases de 19 à 24 mots, pour 15 au
+   *  plus (charte) — ce qu'on voit, puis, dans une phrase à elle, la sortie (« Puis … »), que
+   *  texteFormeDebutant retire quand la figure n'a jamais été validée. */
   const DEFINITION_FORME = {
-    double_sommet: 'Double sommet : le prix a buté deux fois sur le même plafond, puis il est passé sous le creux entre les deux.',
-    double_creux: 'Double creux : le prix a buté deux fois sur le même plancher, puis il est passé au-dessus du sommet entre les deux.',
-    triple_sommet: 'Triple sommet : le prix a buté trois fois sur le même plafond, puis il est passé sous les creux entre eux.',
-    triple_creux: 'Triple creux : le prix a buté trois fois sur le même plancher, puis il est passé au-dessus des sommets entre eux.',
-    ete: 'Tête-épaules : trois sommets, celui du milieu plus haut, puis le prix est passé sous la ligne qui joint les deux creux.',
-    ete_inverse: 'Tête-épaules à l’envers : trois creux, celui du milieu plus bas, puis le prix est passé au-dessus de la ligne qui joint les deux sommets.',
-    range: 'Rectangle : le prix a fait des allers-retours entre un plafond et un plancher, puis il en est sorti.',
-    triangle_ascendant: 'Triangle à plafond plat : sous un plafond plat, les creux remontaient ; puis le prix en est sorti.',
-    triangle_descendant: 'Triangle à plancher plat : sur un plancher plat, les sommets descendaient ; puis le prix en est sorti.',
-    triangle_symetrique: 'Triangle qui se resserre : les sommets descendaient, les creux remontaient ; puis le prix en est sorti.',
-    biseau_montant: 'Biseau qui monte : deux droites qui montent et se rapprochent ; puis le prix en est sorti.',
-    biseau_descendant: 'Biseau qui descend : deux droites qui descendent et se rapprochent ; puis le prix en est sorti.',
-    canal_montant: 'Canal qui monte : le prix allait et venait entre deux droites parallèles qui montent ; puis il en est sorti.',
-    canal_descendant: 'Canal qui descend : le prix allait et venait entre deux droites parallèles qui descendent ; puis il en est sorti.',
-    drapeau: 'Drapeau : un mouvement rapide (le mât), une pause étroite, puis le prix est sorti de la pause dans le sens du mât.',
-    fanion: 'Fanion : un mouvement rapide (le mât), une pause qui se resserre, puis le prix est sorti de la pause dans le sens du mât.',
+    double_sommet: 'Double sommet : le prix a buté deux fois sur le même plafond. Puis il est passé sous le creux entre les deux.',
+    double_creux: 'Double creux : le prix a buté deux fois sur le même plancher. Puis il est passé au-dessus du sommet entre les deux.',
+    triple_sommet: 'Triple sommet : le prix a buté trois fois sur le même plafond. Puis il est passé sous les creux entre eux.',
+    triple_creux: 'Triple creux : le prix a buté trois fois sur le même plancher. Puis il est passé au-dessus des sommets entre eux.',
+    ete: 'Tête-épaules : trois sommets, celui du milieu plus haut. Puis le prix est passé sous la ligne qui joint les deux creux.',
+    ete_inverse: 'Tête-épaules à l’envers : trois creux, celui du milieu plus bas. Puis le prix est passé au-dessus de la ligne qui joint les deux sommets.',
+    range: 'Rectangle : le prix a fait des allers-retours entre un plafond et un plancher. Puis il en est sorti.',
+    triangle_ascendant: 'Triangle à plafond plat : sous un plafond plat, les creux remontaient. Puis le prix en est sorti.',
+    triangle_descendant: 'Triangle à plancher plat : sur un plancher plat, les sommets descendaient. Puis le prix en est sorti.',
+    triangle_symetrique: 'Triangle qui se resserre : les sommets descendaient, les creux remontaient. Puis le prix en est sorti.',
+    biseau_montant: 'Biseau qui monte : deux droites qui montent et se rapprochent. Puis le prix en est sorti.',
+    biseau_descendant: 'Biseau qui descend : deux droites qui descendent et se rapprochent. Puis le prix en est sorti.',
+    canal_montant: 'Canal qui monte : le prix allait et venait entre deux droites parallèles qui montent. Puis il en est sorti.',
+    canal_descendant: 'Canal qui descend : le prix allait et venait entre deux droites parallèles qui descendent. Puis il en est sorti.',
+    drapeau: 'Drapeau : un mouvement rapide (le mât), suivi d’une pause étroite. Puis le prix est sorti de la pause dans le sens du mât.',
+    fanion: 'Fanion : un mouvement rapide (le mât), suivi d’une pause qui se resserre. Puis le prix est sorti de la pause dans le sens du mât.',
   };
   /** La comparaison au repère sans forme, en mots (mesuré, avec son nombre de cas). */
   function texteEcart(b) {
@@ -2470,13 +2484,17 @@ const Guide = (function () {
   const AVERTISSEMENT_FORME = 'Une lecture débattue, pas une prévision ni un conseil.';
   const AVERTISSEMENT_CLAUDE = 'Une hypothèse de Claude (une IA), pas un conseil.';
   /** La bulle d'une figure en Débutant : ce qu'on voit et ce qui manque, les niveaux du moment
-   *  (validation, annulation, cible), le bilan mesuré, l'avertissement. ctx : voir plus haut. */
+   *  (validation, annulation, cible), le bilan mesuré, l'avertissement. ctx : voir plus haut.
+   *  Revue du 14/10/2026 (M6 : « Double sommet », 75 mots pour 50) : le nom de la figure, déjà dans
+   *  le titre de la bulle, n'est plus redit en tête (charte, règle 3) ; le bilan mesuré est
+   *  facultatif (out.facultatifs : la bulle le garde s'il tient, la ligne des statistiques reste). */
   function texteFormeDebutant(f, b, ctx, P, unite) {
     const e = etatForme(f), out = [], c = Object.assign({}, ctx || {});
     if (!c.intervalle && c.itv) c.intervalle = c.itv;
+    const sansNom = d => majuscule(d.replace(/^[^:]{2,40} : /, ''));
     if (['ebauche', 'formation', 'dedans', 'demi'].includes(e.cle)) {
       const vu = vuDebutant(f, c, unite);
-      out.push(famille(f) === 'lignes' ? vu : libelleFormeDebutant(f) + ' : ' + minuscule(vu));
+      out.push(vu);
       // Né d'un double sur les mêmes creux (sommets) : dit à la clôture où il naît.
       if (f.deDouble && fini(c.n) && c.n - 1 - (f.ebauche ? f.t0 : f.t) <= 0) {
         const pts = f.sens < 0 ? 'sommet' : 'creux';
@@ -2495,20 +2513,26 @@ const Guide = (function () {
       // Finie avant sa validation : la définition s'arrête avant « puis … sorti » (ce n'est pas arrivé).
       // « jamais validée » : annulée ou sans suite, la marque de fin qui suit le dit (revue du
       // 14/10/2026, M5 : plus « tombée », qui disait aussi l'échec après la validation).
-      else if (def && f.jConf == null) def = def.replace(/\s*[,;]\s*puis .*$/, '') + ' ; la figure n’a jamais été validée.';
+      else if (def && f.jConf == null) def = def.replace(/\s*Puis .*$/, '') + ' La figure n’a jamais été validée.';
       // Sortie validée : le côté, en mots.
       else if (cote && fini(f.sens)) def = def.replace(/en est sorti\./, 'en est sorti ' + (f.sens > 0 ? 'par le haut' : 'par le bas') + '.');
+      if (def) def = sansNom(def);
       if (e.cle === 'confirme') {
         out.push(def);
         if (f.ebauche && f.pend) { const d = quandDeb(finMs(c, f.pend.conf), c); out.push('Le dernier ' + (f.s > 0 ? 'sommet' : 'creux') + ' n’est pas encore acquis' + (d ? ' (' + d.replace(/^à /, 'jusqu’à ') + ')' : '') + '.'); }
         out.push(niveauxDebutant(f, c, P, unite));
       } else out.push(def.replace(/\.$/, '') + '.', marqueFin(f, c, 'debutant', unite));
       // La cible : dite seulement quand elle a été atteinte (une figure tombée n'en a plus).
-      if (e.cle === 'atteint' && fini(f.objectif)) out.push('Objectif théorique selon l’usage des analystes : ' + prix(f.objectif, unite) + ' (' + usageChiffre(cleObjectif(f), 'debutant') + '), non garanti ; il a été atteint.');
+      // Atteint : la marque de fin dit déjà l'objectif, son prix et son heure ; reste ce sur quoi il se
+      // calcule (idée 8).
+      if (e.cle === 'atteint' && fini(f.objectif)) out.push('Cet objectif théorique : ' + usageChiffre(cleObjectif(f), 'debutant') + '.');
     }
-    if (b) out.push(bilanDebutant(f, b, c, P));
+    const bilan = b ? bilanDebutant(f, b, c, P) : '';
+    if (bilan) out.push(bilan);
     out.push(AVERTISSEMENT_FORME);
-    return out.filter(Boolean);
+    const T = out.filter(Boolean);
+    T.facultatifs = bilan ? [bilan] : [];
+    return T;
   }
   /** L'état vivant en mots, en tête de bulle (calque) : seule la fin de la bougie compte. Le prix
    *  live et le plus haut (plus bas) de la bougie en cours sont dits chacun pour lui. */
@@ -2967,7 +2991,9 @@ const Guide = (function () {
     L.push(['Objectif atteint', String(b.atteints)], ['Ratées avant l’objectif', String(b.invalides)], ['Ni l’une ni l’autre à temps (' + P.horizon + ' ' + per[3] + ')', String(b.expires)]);
     if (b.ouverts) L.push(['Encore en cours', String(b.ouverts)]);
     if (fam === 'lignes' && b.haut + b.bas) L.push(['Sorties par le haut / par le bas', b.haut + ' / ' + b.bas]);
-    if (E.n) L.push(['Débuts repérés → devenus ' + minuscule(noms[1]), E.n + ' → ' + E.devenues + (fam === 'lignes' ? '' : ' (validés : ' + E.confirmees + ')')]);
+    // Le compte dit ce qu'il compte (revue du 14/10/2026, N6 : « 25 → 16 (validés : 10) » ne le
+    // disait pas) : « 16 sur 25, dont 10 validés ».
+    if (E.n) L.push(['Débuts repérés devenus ' + minuscule(noms[1]), E.devenues + ' sur ' + E.n + (fam === 'lignes' ? '' : ', dont ' + E.confirmees + (E.confirmees > 1 ? ' validés' : ' validé'))]);
     // Les derniers cas de ce type, validés et terminés, du plus récent au plus ancien — les échecs
     // aussi, SANS tri par réussite (plan du 13/10/2026, idée 4) : chacun avec son issue et ce qu'il
     // faut pour le redessiner en petit (exempleSvg) : ses indices dans l'historique rejoué (début,

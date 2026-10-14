@@ -352,8 +352,10 @@ const etat = page => page.evaluate(() => {
       const detail = await t.page.evaluate(() => ({ survol: guideEtat.survol ? guideEtat.survol.titre : null, resume: guideEtat.bulle ? guideEtat.bulle.resume : null, corps: guideEtat.bulle ? guideEtat.bulle.corps.join(' ') : '' }));
       check('… un 2e tap au même endroit ouvre son détail', detail.survol === c.titre && detail.resume === false, detail);
       // Plan du site, idée 8 (13/10/2026) : dans le détail, l'écart et la bande disent à quoi ils servent.
-      check('… le détail dit à quoi sert chaque chiffre : l’écart (« ce qu’il reste avant ce repère » ou « l’écart déjà fait au-delà ») et la bande (« la marge où l’on dit que le prix touche le repère »)',
-        /\$ (au-dessus|en dessous) : (ce qu’il reste avant ce repère|l’écart déjà fait au-delà)\.|le prix est dedans/.test(detail.corps) && /Bande de ± [\d\s,]+\$ : la marge où l’on dit que le prix touche le repère\./.test(detail.corps), detail.corps);
+      // (Changé exprès, revue du 14/10/2026, M6 : la bande ne reste que si la bulle tient en 50 mots ;
+      // quand elle est dite, elle dit toujours à quoi elle sert.)
+      check('… le détail dit à quoi sert chaque chiffre : l’écart (« ce qu’il reste avant ce repère » ou « l’écart déjà fait au-delà ») et la bande quand elle est dite (« la marge où l’on dit que le prix touche le repère »)',
+        /\$ (au-dessus|en dessous) : (ce qu’il reste avant ce repère|l’écart déjà fait au-delà)\.|le prix est dedans/.test(detail.corps) && (!/Bande de ±/.test(detail.corps) || /Bande de ± [\d\s,]+\$ : la marge où l’on dit que le prix touche le repère\./.test(detail.corps)), detail.corps);
       await t.page.touchscreen.tap(x, y); await t.page.waitForTimeout(200);
       const retire = await t.page.evaluate(() => ({ survol: guideEtat.survol, crossX }));
       check('… un 3e tap au même endroit la retire', retire.survol === null && retire.crossX === null, retire);

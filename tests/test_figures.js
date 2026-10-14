@@ -287,8 +287,9 @@ titre('6. Mots : libellés, bulles, mêmes valeurs, heures');
         if (!/validée|sortie compte|Validée/.test(deb)) pb.push(['validation', f.type, e]);
         if (!f.ebauche && (!/objectifs? théoriques?/i.test(deb) || /cible/i.test(deb))) pb.push(['objectif', f.type, e]);
         if (!f.ebauche && !/non garantis?/.test(deb)) pb.push(['non garanti', f.type, e]);
-        // (Changé exprès, revue du 14/10/2026, M5 : validée, « la figure est ratée » ; plus « ne tient plus ».)
-        if (N.invals.length && !f.ebauche && !/Annulée si|la figure est ratée|annulée si/.test(deb)) pb.push(['invalidation', f.type, e, deb.slice(0, 200)]);
+        // (Changé exprès, revue du 14/10/2026, M5 : validée, « la figure est ratée » ; plus « ne tient plus » ;
+        // puis M6 : « Ratée si … », comme « Annulée si … », en une phrase de 15 mots au plus.)
+        if (N.invals.length && !f.ebauche && !/Annulée si|Ratée si|annulée si/.test(deb)) pb.push(['invalidation', f.type, e, deb.slice(0, 200)]);
         if (!f.ebauche && !/objectif théorique \(convention, non garanti\)/.test(exp)) pb.push(['objectif expert', f.type, e]);
         // Mêmes valeurs dans les deux modes : chaque niveau du moment est écrit à l'identique.
         const niv = N.confirme ? [N.invals[0].p, N.objectifs[0].p] : N.sorties.map(x => x.seuil).concat(N.invals.filter(v => v.clotures === 1).map(v => v.p));
@@ -304,6 +305,11 @@ titre('6. Mots : libellés, bulles, mêmes valeurs, heures');
   check(`${nb} bulles (${nbEx} figures vivantes) à 40 instants : « Mesuré sur », validation, invalidation, objectif « non garanti » (jamais « cible »), mêmes valeurs dans les deux modes, heure de l’appareil sans fuseau écrit, ni mot banni ni conseil ni sens attendu`, nb > 40 && !pb.length, pb.slice(0, 8));
   const defs = Object.values(G.DEFINITION_FORME);
   check(`C7 : les ${defs.length} définitions ne disent ni « annonce », ni « souvent suivi », ni « devrait », ni « signal »`, defs.length === 16 && !defs.some(d => C7.test(d)), defs.filter(d => C7.test(d)));
+  // La preuve (revue du 14/10/2026, M6 : les 16 définitions faisaient des phrases de 19 à 24 mots) :
+  // 15 mots par phrase au plus, comptés comme les fiches (un groupe qui porte une lettre ou un chiffre).
+  const motsF = x => x.split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
+  const defLongues = defs.flatMap(d => d.split(/(?<=\.)\s+/)).filter(p => motsF(p) > 15);
+  check(`M6 : chaque phrase des ${defs.length} définitions fait 15 mots au plus (charte du 12/10/2026)`, !defLongues.length, defLongues);
 }
 
 // ── 7. États vivants, ébauches à la clôture ──
@@ -411,7 +417,8 @@ titre('6 bis. Figure tombée avant validation : la définition s’arrête avant
     const t = G.texteFormeDebutant(f, R.bilan[f.type], ctxDe(f.jFin + 2), P, '$').join(' ');
     // (Mots changés exprès : « jamais été validée » (revue du 14/10/2026, M5 : plus « tombée ») ; la cible
     // d'une figure finie avant sa validation n'est plus dite ; sa marque dit « Annulé » ou « Sans suite », jamais « raté ».)
-    if (/puis (il|le prix) (est passé|en est sorti|est sorti)|puis il en est sorti/.test(t) || !/la figure n’a jamais été validée/.test(t) || /[Cc]ible théorique/.test(t)
+    // (Revue du 14/10/2026, M6 : « Puis … » est une phrase à elle, « La figure n'a jamais été validée » aussi.)
+    if (/[Pp]uis (il|le prix) (est passé|en est sorti|est sorti)|[Pp]uis il en est sorti/.test(t) || !/[Ll]a figure n’a jamais été validée/.test(t) || /[Cc]ible théorique/.test(t)
       || !(f.fin === 'invalide_avant' ? /Annulé /.test(t) : /Sans suite /.test(t)) || /[Rr]até|tombée|[Ii]nvalidé|ne tient plus/.test(t)) faux.push({ type: f.type, t: t.slice(0, 200) });
   }
   check(`${tombees.length} figures finies avant validation : « la figure n’a jamais été validée », « Annulé » ou « Sans suite », jamais « raté » ni « tombée » ni « puis … sorti », pas de cible`, tombees.length > 5 && !faux.length, faux.slice(0, 3));
