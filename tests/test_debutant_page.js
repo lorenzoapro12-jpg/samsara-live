@@ -1078,33 +1078,50 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
     // MACD). Le budget de textes du Lisible tient avec le tracé du prix raccourci, à 390 et à 360 px ;
     // les supports / résistances y sont tracés sans leurs badges ni leur légende (huit textes de plus,
     // et « 15m », « 4h » : des mots bannis).
-    titre('Mon écran en Lisible : RSI et MACD sous le prix, en mots simples');
+    // Revue du 14/10/2026 (M21, M14 ; oui de Lorenzo à Q4) : « Mon écran » pose aussi le Volume (trois
+    // sous-graphiques, SOUS_MAX), et le RSI et le MACD sont nommés dans leur titre — « RSI · hausses
+    // contre baisses, 0 à 100 », « MACD · moyenne rapide moins lente ». Une exception limitée à ces
+    // deux titres : la liste des mots bannis ne change pas, et RSI / MACD ne s'écrivent nulle part
+    // ailleurs dans le graphique. Lancé avant la correction, ce bloc échoue (ni Volume, ni noms).
+    titre('Mon écran en Lisible : Volume, RSI et MACD sous le prix, RSI et MACD nommés en quelques mots');
+    // Les deux titres permis, et le seul mot banni de chacun : le nom de l'indicateur.
+    const NOMMES = { rsi: 'RSI · hausses contre baisses, 0 à 100', macd: 'MACD · moyenne rapide moins lente' };
     for (const vue of [{ width: 390, height: 844 }, { width: 360, height: 740 }]) {
       const nom = vue.width + ' × ' + vue.height + ' · Mon écran';
       const o = await ouvrir(nav, { vue, tactile: true, prev: 'ouvert', chaleur: true });
-      const d0 = await o.page.evaluate(() => ({ garde: localStorage.getItem('samsara-mon-ecran-v1'), rsi: activeSubs.rsi, macd: activeSubs.macd, sr: overlays.sr,
+      const d0 = await o.page.evaluate(() => ({ garde: localStorage.getItem('samsara-mon-ecran-v1'), vol: activeSubs.vol, rsi: activeSubs.rsi, macd: activeSubs.macd, sr: overlays.sr,
         sous: geo.sous.map(s => s.cle), texte: document.body.innerText, bouton: [...document.querySelectorAll('.aff-mon-ecran')].filter(b => b.getClientRects().length).length }));
-      check(`${nom} : 1re visite, « Mon écran » n'est pas posé (ni RSI, ni MACD, ni supports / résistances) et l'écran de départ n'en dit rien`,
-        d0.garde === null && !d0.rsi && !d0.macd && !d0.sr && !d0.sous.length && !/Mon écran/.test(d0.texte) && !d0.bouton, Object.assign({}, d0, { texte: undefined }));
+      check(`${nom} : 1re visite, « Mon écran » n'est pas posé (ni Volume, ni RSI, ni MACD, ni supports / résistances) et l'écran de départ n'en dit rien`,
+        d0.garde === null && !d0.vol && !d0.rsi && !d0.macd && !d0.sr && !d0.sous.length && !/Mon écran/.test(d0.texte) && !d0.bouton, Object.assign({}, d0, { texte: undefined }));
       await o.page.click('#indDropdownBtn'); await o.page.waitForTimeout(200);
       await o.page.click('#indMenu .aff-mon-ecran'); await o.page.waitForTimeout(400);
       const pose = await o.page.evaluate(() => ({ ov: Object.keys(overlays).filter(k => overlays[k]).sort(), sg: Object.keys(activeSubs).filter(k => activeSubs[k]),
-        mode: document.documentElement.getAttribute('data-mode'), presse: document.querySelector('#indMenu .aff-mon-ecran').getAttribute('aria-pressed') }));
-      check(`${nom} : « Mon écran » (sans rien de gardé) pose le RSI et le MACD, les supports / résistances, le Guide et les scénarios ; « Le détail » reste décoché ; bouton enfoncé`,
-        JSON.stringify(pose.ov) === JSON.stringify(['guide', 'scenarios', 'sr']) && JSON.stringify(pose.sg) === JSON.stringify(['rsi', 'macd']) && pose.mode === 'debutant' && pose.presse === 'true', pose);
+        mode: document.documentElement.getAttribute('data-mode'), presse: document.querySelector('#indMenu .aff-mon-ecran').getAttribute('aria-pressed'), itv: chartInterval }));
+      check(`${nom} : « Mon écran » (sans rien de gardé) pose le Volume, le RSI et le MACD, les supports / résistances, le Guide et les scénarios ; « Le détail » reste décoché ; l'intervalle affiché reste (${pose.itv}) ; bouton enfoncé`,
+        JSON.stringify(pose.ov) === JSON.stringify(['guide', 'scenarios', 'sr']) && JSON.stringify(pose.sg) === JSON.stringify(['vol', 'rsi', 'macd']) && pose.mode === 'debutant' && pose.presse === 'true' && pose.itv === '15m', pose);
       await o.page.evaluate(() => { document.getElementById('indMenu').classList.remove('open'); document.getElementById('indDropdownBtn').setAttribute('aria-expanded', 'false'); });
       await o.page.waitForTimeout(300);
-      const e = await controlerEcran(o, nom, { calques: ['sr', 'rsi', 'macd'], sous: ['rsi', 'macd'] });
-      // Les titres des deux sous-graphiques : en mots, entiers dans leur ligne (avant la colonne de l'axe).
+      const e = await controlerEcran(o, nom, { calques: ['sr', 'vol', 'rsi', 'macd'], sous: ['vol', 'rsi', 'macd'] });
+      // Les titres des trois sous-graphiques, tels que resolveSub les dessine (sa police, sa place
+      // avant la colonne de l'axe) : en mots, entiers dans leur ligne ; le RSI et le MACD nommés.
       const t = await o.page.evaluate(() => {
         const c = document.createElement('canvas').getContext('2d'); c.font = chartFont(9.5, 700);
         if ('letterSpacing' in c) c.letterSpacing = '0.6px';
-        return { titres: geo.sous.map(s => titreSous(s.cle)), larg: geo.sous.map(s => 16 + 17 + c.measureText(titreSous(s.cle)).width), xAxe: geo.W - 75,
+        ctx.save(); ctx.font = c.font; if ('letterSpacing' in ctx) ctx.letterSpacing = '0.6px';
+        const titres = geo.sous.map(s => titreSous(s.cle, geo.W - 75 - 33));
+        // Trop étroit (360 px en Cyanotype et Diazo) : le titre du RSI sans son échelle ; celui du MACD n'a pas de forme courte.
+        const etroit = { rsi: titreSous('rsi', 100), macd: titreSous('macd', 100) };
+        ctx.restore();
+        return { titres, larg: titres.map(x => 16 + 17 + c.measureText(x).width), xAxe: geo.W - 75, etroit,
           traces: geo.sous.map(s => s.trace), part: geo.mainH / (canvas.height / devicePixelRatio - 4 - RS_HEIGHT) };
       });
-      const tous = e.tous.filter(x => bannis(x).length || CONSEIL.test(x) || /RSI|MACD/.test(x));
-      check(`${nom} : les deux sous-graphiques tracés, titrés en mots (« ${t.titres.join(' », « ')} »), entiers avant l'axe ; rien de banni dans tout ce que le graphique écrit`,
-        t.traces.every(Boolean) && t.titres.every(x => e.tous.includes(x) && !bannis(x).length) && t.larg.every(x => x <= t.xAxe) && !tous.length, { t, tous });
+      const nommes = Object.values(NOMMES), tous = e.tous.filter(x => !nommes.includes(x) && (bannis(x).length || CONSEIL.test(x) || /RSI|MACD/.test(x)));
+      check(`${nom} : les trois sous-graphiques tracés, titrés en mots (« ${t.titres.join(' », « ')} »), entiers avant l'axe ; le RSI et le MACD nommés`,
+        t.traces.every(Boolean) && JSON.stringify(t.titres) === JSON.stringify(['Volume : bitcoins échangés', NOMMES.rsi, NOMMES.macd]) && t.titres.every(x => e.tous.includes(x)) && t.larg.every(x => x <= t.xAxe), t);
+      check(`${nom} : l'exception est limitée aux deux titres — leur seul mot banni est leur nom ; RSI et MACD restent bannis ; rien d'autre de banni, ni conseil, ni « RSI » / « MACD » dans tout ce que le graphique écrit`,
+        bannis(NOMMES.rsi).join() === 'RSI' && bannis(NOMMES.macd).join() === 'MACD' && bannis('RSI').length === 1 && bannis('MACD').length === 1 && !CONSEIL.test(nommes.join(' ')) && !tous.length, { tous });
+      check(`${nom} : trop étroit, « ${t.etroit.rsi} » (le RSI sans son échelle) et « ${t.etroit.macd} »`,
+        t.etroit.rsi === 'RSI · hausses contre baisses' && t.etroit.macd === NOMMES.macd, t.etroit);
       check(`${nom} : le prix garde ${Math.round(t.part * 100)} % de la hauteur (≥ 60 %, MAIN_PART_MIN)`, t.part >= 0.6 - 1e-9, t);
       // Les supports / résistances en Lisible : leurs traits seuls (ni badge, ni légende « S/R par
       // intervalle », ni intervalle abrégé), comme les moyennes. Mais chaque trait reste touchable :
@@ -1130,9 +1147,10 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         return out;
       });
       const lu = k => (b.find(x => x.cle === k) || { t: [] }).t;
-      check(`${nom} : le réticule dit « ${lu('rsi').join(' ')} » (RSI) et « ${lu('macd').join(' ')} » (MACD) : chacun son unité en mots, jamais « bitcoins »`,
+      // (Le Volume compte des bitcoins : lui seul les dit.)
+      check(`${nom} : le réticule dit « ${lu('vol').join(' ')} » (Volume), « ${lu('rsi').join(' ')} » (RSI) et « ${lu('macd').join(' ')} » (MACD) : chacun son unité en mots, « bitcoins » pour le Volume seul`,
         lu('rsi').length === 1 && /^\d{1,3},\d sur 100$/.test(lu('rsi')[0]) && lu('macd').length === 1 && /^[−-]?\d[\d  ]*(,\d+)? \$ d’écart$/.test(lu('macd')[0])
-        && !b.some(x => x.t.some(y => /bitcoins|RSI|MACD/.test(y))), b);
+        && lu('vol').length === 1 && / bitcoins$/.test(lu('vol')[0]) && !b.some(x => x.t.some(y => /RSI|MACD/.test(y) || (x.cle !== 'vol' && /bitcoins/.test(y)))), b);
       check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }

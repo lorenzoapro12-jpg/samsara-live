@@ -466,9 +466,13 @@ const PARAM = {
         demiVie: { '1m': 240, '5m': 120, '15m': 60, '30m': 40, '1h': 40, '4h': 20, '1d': 10, '1w': 5 } },
   // « Mon écran » (plan du site, idée 9, 13/10/2026) : ce que le bouton « Mon écran » du panneau
   // rappelle tant que rien n'est gardé sous samsara-mon-ecran-v1 — ce que Lorenzo regarde d'abord :
-  // le RSI et le MACD sous le prix, les supports / résistances dessus ; le Guide et les scénarios
-  // comme à l'écran de départ (affichés) ; sans « Le détail ». Jamais posé d'office.
-  monEcran: { ov: ['sr'], sg: ['rsi', 'macd'], guide: true, scenarios: true, detail: false },
+  // le Volume, le RSI et le MACD sous le prix (trois sous-graphiques, SOUS_MAX), les supports /
+  // résistances dessus ; le Guide et les scénarios comme à l'écran de départ (affichés) ; sans « Le
+  // détail ». Jamais posé d'office. Le Volume manquait (revue du 14/10/2026, M21 ; oui de Lorenzo à
+  // Q4). `itv` : l'intervalle rappelé — null, rien de choisi : le bouton garde l'intervalle affiché ;
+  // « Garder cet affichage » note celui de l'écran. La paire n'en fait pas partie (les scénarios du
+  // matin ne parlent que de BTC/USDT).
+  monEcran: { ov: ['sr'], sg: ['vol', 'rsi', 'macd'], guide: true, scenarios: true, detail: false, itv: null },
   // Guide (js/guide.js) : chaque nombre de ses libellés, de ses règles et de ses fiches est ICI.
   guide: {
     // Niveaux nommés : au plus `niveauxParCote` au-dessus et au-dessous du prix, à moins de
@@ -802,6 +806,10 @@ function preselectionActive() {
 // « Revenir au départ » changent l'affichage, jamais lui. Rappelé par le 3e bouton de la tête du
 // panneau ; « Garder cet affichage comme mon écran » le remplace par ce qui est affiché. Rien sur
 // l'écran de départ ni dans l'en-tête, aucune touche : jamais posé d'office. Sans clé, PARAM.monEcran.
+// Il garde aussi l'intervalle (revue du 14/10/2026, M21 ; oui de Lorenzo à Q4) : on revenait en
+// 15 min à chaque fois. Rappelé au bouton seulement, jamais au chargement (la page s'ouvre en 15 min,
+// celui que précharge index.html) ; un « Mon écran » gardé avant le 14/10 n'en a pas : l'intervalle
+// affiché reste.
 const MON_ECRAN_CLE = 'samsara-mon-ecran-v1';
 let MON_ECRAN_MEMOIRE = null;   // stockage bloqué (navigation privée) : gardé le temps de la visite
 let monEcranConfirme = false;   // la phrase « C'est gardé » du panneau, jusqu'à sa fermeture
@@ -815,14 +823,17 @@ function monEcranGarde() {
 function monEcran() {
   const d = PARAM.monEcran, o = monEcranGarde() || d;
   const oui = (v, defaut) => (typeof v === 'boolean' ? v : defaut);
+  // L'intervalle : un de ceux du ruban (#int_…), sinon aucun (l'intervalle affiché reste).
+  const itv = typeof o.itv === 'string' && /^\d+[mhdw]$/.test(o.itv) && document.getElementById('int_' + o.itv) ? o.itv : null;
   return { ov: o.ov.filter(k => k in overlays && !COUCHES_SITE.includes(k)), sg: o.sg.filter(k => k in activeSubs),
-    guide: oui(o.guide, d.guide), scenarios: oui(o.scenarios, d.scenarios), detail: oui(o.detail, d.detail) };
+    guide: oui(o.guide, d.guide), scenarios: oui(o.scenarios, d.scenarios), detail: oui(o.detail, d.detail), itv };
 }
 /** L'affichage courant est-il exactement « Mon écran » ? (le bouton est alors enfoncé) */
 function monEcranActif() {
   const m = monEcran(), s = selectionCourante();
   return m.ov.slice().sort().join() === s.ov.join() && m.sg.slice().sort().join() === s.sg.join()
-    && m.guide === !!overlays.guide && m.scenarios === !!overlays.scenarios && m.detail === !debutant();
+    && m.guide === !!overlays.guide && m.scenarios === !!overlays.scenarios && m.detail === !debutant()
+    && (!m.itv || m.itv === chartInterval);
 }
 /** Ce que « Mon écran » rappelle, en une ligne (l'infobulle du bouton). Rien de gardé : « Affichage
  *  proposé », pas « Votre affichage ». Le Guide porte le nom de sa ligne du panneau, « Repères et
@@ -830,17 +841,20 @@ function monEcranActif() {
 function monEcranDit() {
   const m = monEcran(), noms = m.ov.concat(m.sg).map(k => (calqueDe(k) || {}).court || k);
   return (monEcranGarde() ? 'Votre affichage : ' : 'Affichage proposé : ') + (noms.length ? noms.join(', ') : 'aucun indicateur')
-    + (m.guide ? ', les repères et la phrase de lecture' : '') + (m.scenarios ? ', les scénarios' : '') + (m.detail ? ', avec « Le détail »' : '');
+    + (m.guide ? ', les repères et la phrase de lecture' : '') + (m.scenarios ? ', les scénarios' : '') + (m.detail ? ', avec « Le détail »' : '')
+    + (m.itv ? ', en ' + Guide.nomIntervalle(m.itv) : '');
 }
 function appliquerMonEcran() {
   const m = monEcran();
   overlays.guide = m.guide; overlays.scenarios = m.scenarios;
   choisirMode(m.detail ? 'expert' : 'debutant');
   appliquerSelection(m.ov, m.sg, false);
+  // Son intervalle, comme un toucher sur le ruban (la paire affichée reste).
+  if (m.itv && m.itv !== chartInterval) changeInterval(m.itv, document.getElementById('int_' + m.itv));
 }
-/** Garde l'affichage courant comme « Mon écran » ; le panneau le dit en une phrase. */
+/** Garde l'affichage courant comme « Mon écran », avec son intervalle ; le panneau le dit en une phrase. */
 function garderMonEcran() {
-  const s = selectionCourante(), o = { ov: s.ov, sg: s.sg, guide: !!overlays.guide, scenarios: !!overlays.scenarios, detail: !debutant() };
+  const s = selectionCourante(), o = { ov: s.ov, sg: s.sg, guide: !!overlays.guide, scenarios: !!overlays.scenarios, detail: !debutant(), itv: chartInterval };
   let garde = false;
   try { localStorage.setItem(MON_ECRAN_CLE, JSON.stringify(o)); garde = localStorage.getItem(MON_ECRAN_CLE) !== null; } catch (e) { /* navigation privée */ }
   MON_ECRAN_MEMOIRE = garde ? null : o;
@@ -8746,15 +8760,24 @@ function subTitle(key) {
 // 13/10/2026). « Mon écran » met le RSI et le MACD sous le prix en Lisible : « RSI (14) » et « MACD
 // (12,26,9) » y étaient les seuls mots bannis de l'écran. Ce que mesure la courbe, d'après la ligne
 // courte de sa fiche (COURT, js/fiches.js) ; ses chiffres et son nom restent dans le Complet.
+// Le RSI et le MACD y portent leur nom, celui que tous les traders emploient (revue du 14/10/2026,
+// M14 ; oui de Lorenzo à Q4 ; charte, règle 1) : une exception limitée à ces DEUX titres —
+// Guide.MOTS_BANNIS_DEBUTANT ne change pas, les bulles, la phrase et « En résumé » restent sans.
 const TITRES_SOUS_LISIBLE = {
-  rsi: 'Hausses contre baisses, de 0 à 100', macd: 'Moyenne rapide moins moyenne lente',
+  rsi: 'RSI · hausses contre baisses, 0 à 100', macd: 'MACD · moyenne rapide moins lente',
   stoch: 'Place du prix : 0 en bas, 100 en haut', williamsR: 'Place du prix : −100 en bas, 0 en haut',
   atr: 'Mouvement habituel par période', obv: 'Échanges en hausse moins en baisse', mfi: 'Hausses et quantités, de 0 à 100',
   cci: 'Écart du prix à sa moyenne', adx: 'Netteté de la direction', ao: 'Prix récent face à sa moyenne longue',
 };
-function titreSous(key) {
+// Sans l'échelle quand le titre entier passerait sur la colonne de l'axe (360 px en Cyanotype et
+// Diazo, polices à chasse fixe : 23 px de trop). L'échelle reste dite par le réticule (« sur 100 »).
+const TITRES_SOUS_LISIBLE_COURTS = { rsi: 'RSI · hausses contre baisses' };
+/** Le titre d'un sous-graphique ; `place` (px, avec la police déjà posée sur ctx) : sa forme courte
+ *  s'il en a une et que le titre entier n'y tient pas. */
+function titreSous(key, place) {
   if (!debutant()) return subTitle(key);
-  return key === 'vol' ? 'Volume : ' + quantiteMots() + ' échangés' : TITRES_SOUS_LISIBLE[key] || subTitle(key);
+  const t = key === 'vol' ? 'Volume : ' + quantiteMots() + ' échangés' : TITRES_SOUS_LISIBLE[key] || subTitle(key);
+  return place > 0 && TITRES_SOUS_LISIBLE_COURTS[key] && ctx.measureText(t).width > place ? TITRES_SOUS_LISIBLE_COURTS[key] : t;
 }
 /** Lisible : la valeur du réticule d'un sous-graphique avec son unité en mots — « 79,6 sur 100 »,
  *  « 63,33 $ d'écart » —, pas « bitcoins » pour tous (le badge du RSI disait « 79,6 bitcoins »). */
@@ -8801,8 +8824,8 @@ function resolveSub(candles, y0, subH, W, key) {
   ctx.beginPath(); ctx.arc(pad.left + 9, y0 + 10, 3, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = COLORS.ink3; ctx.font = chartFont(9.5, 700);
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0.6px';
-  // Lisible : un titre en mots simples (titreSous).
-  ctx.fillText(titreSous(key), pad.left + 17, y0 + 13.5);
+  // Lisible : un titre en mots simples (titreSous), entier avant la colonne de l'axe.
+  ctx.fillText(titreSous(key, W - pad.right - pad.left - 17), pad.left + 17, y0 + 13.5);
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
   
   // Utiliser le range visible pour les subs aussi (des indices : aucune copie par image)
