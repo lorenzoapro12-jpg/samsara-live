@@ -75,6 +75,8 @@ function ouvrirStatsFigure(f) {
   // même début d'historique (ses indices sont alors ceux de candles).
   const memeBase = typeof GUIDE_FORMES.base === 'string' && candles.length && GUIDE_FORMES.base.endsWith('|' + candles[0].time);
   p.innerHTML = statsFigureHtml(S, memeBase ? { close: cols().close, n: R.n } : null);
+  // « 2 918 fois sur 5 » puis « 103. » à la ligne : plus jamais (revue du 14/10/2026, C8).
+  Fmt.insecables(p);
   p.hidden = false;
   p.style.left = ''; p.style.top = '';
   p.scrollTop = 0;

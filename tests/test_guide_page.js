@@ -557,6 +557,55 @@ const etat = page => page.evaluate(() => {
         await o.ctx.close();
       } finally { H.arreter(); }
     }
+
+    // Fins de ligne (revue du 14/10/2026, C8), sur la journée réelle du 08/10 rejouée à 15:40 UTC, avec
+    // « Le détail ». On lisait à 1440 px « prochain repère : 83 956 » puis « $, une zone de retour. »
+    // et « + ZG 80 » puis « 186 » dans « Sur le graphique » ; au téléphone, « put wall 80 » puis « 000 $ »
+    // dans les Infos du marché ; une bulle commençait une ligne par « : Zéro gamma » ou finissait par
+    // « « ». Lancé avant la correction, ce bloc échoue.
+    titre('Fins de ligne (08/10 rejoué, 15:40 UTC, Le détail) : « Sur le graphique », Infos du marché, bulles');
+    {
+      const H = require('./scenarios-jour-harnais.js'), X = require('./fixtures/rejeu-jour-0810.json');
+      const { coupuresLignes } = require('./fins-de-ligne');
+      // Les lignes écrites dans les bulles du graphique, réticule posé sur chaque repère (résumé, puis
+      // détail) : celles qui commencent par « : ; ? ! » $ % » ou finissent par « « ».
+      const bulles = () => {
+        const vu = [], f = CanvasRenderingContext2D.prototype.fillText;
+        CanvasRenderingContext2D.prototype.fillText = function (t) { if (this.canvas.id === 'chartCalque') vu.push(String(t)); return f.apply(this, arguments); };
+        crossX = crossY = null; bulleDetail = null;
+        const E = guideEtat && overlays.guide ? guideEtat : null;
+        for (const c of (E ? E.cibles : []).concat(scenEtat ? scenEtat.cibles : [], ciblesPrix)) {
+          const p = reperesPoint(c);
+          if (!p) continue;
+          crossX = p[0]; crossY = p[1]; bulleDetail = null; crossListe = false; ancreBulle = null; dessinerCalque();
+          bulleDetail = cleBulle(c); ancreBulle = null; dessinerCalque();
+        }
+        CanvasRenderingContext2D.prototype.fillText = f;
+        crossX = crossY = null; bulleDetail = null; dessinerCalque();
+        return { n: vu.length, fautes: vu.filter(t => /^[:;?!»$%]/.test(t) || /«$/.test(t)) };
+      };
+      try {
+        for (const [w, themes] of [[1440, ['bureau95', 'aero', 'neon', 'gazette', 'diazo']], [390, ['bureau95', 'aero', 'neon', 'gazette', 'diazo', 'cyanotype']]]) {
+          const tactile = w < 500, coupees = [], lignes = [];
+          const o = await H.ouvrir(nav, H.harnais(X, '2026-10-08T15:40:00Z'), { vue: { width: w, height: tactile ? 844 : 900 }, tactile, theme: themes[0], mode: 'expert' });
+          let n = 0;
+          for (const th of themes) {
+            await o.page.evaluate(t => appliquerTheme(t), th); await o.page.waitForTimeout(400);
+            if (tactile) { await o.page.evaluate(() => { ouvrirReperes(true); openMarketModal(); }); await o.page.waitForTimeout(300); }
+            for (const sel of ['#reperesListe', tactile ? '#marketModalBody' : '#feed']) for (const c of await coupuresLignes(o.page, sel)) coupees.push(th + ' · ' + sel + ' : ' + c);
+            if (tactile) { await o.page.evaluate(() => { closeMarketModal(); ouvrirReperes(false); }); await o.page.waitForTimeout(200); }
+            const b = await o.page.evaluate(bulles);
+            n += b.n;
+            for (const t of b.fautes) lignes.push(th + ' : ' + t);
+          }
+          check(`${w} px · ${themes.length} thèmes : dans « Sur le graphique » (« En résumé » compris) et les Infos du marché, aucune ligne ne commence par « : ; ? ! » $ % » ni ne finit par « « », aucun nombre n’est coupé de ses milliers ou de son unité`,
+            !coupees.length, coupees.slice(0, 6));
+          check(`${w} px · ${themes.length} thèmes : aucune ligne des bulles (${n} écrites) ne commence par « : ; ? ! » $ % » ni ne finit par « « »`, n > 0 && !lignes.length, lignes.slice(0, 6));
+          check(`${w} px : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+          await o.ctx.close();
+        }
+      } finally { H.arreter(); }
+    }
   } finally { await nav.close(); serveur.close(); }
   console.log(ko ? `\n❌ GUIDE À L'ÉCRAN : ${ko} contrôle(s) en échec` : '\n✅ GUIDE À L\'ÉCRAN : TOUS LES CONTRÔLES PASSENT');
   process.exit(ko ? 1 : 0);

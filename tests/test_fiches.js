@@ -533,6 +533,36 @@ titre('13. Petits textes justes : plus de « Complet / Lisible », deux avertiss
   check('M17 : sans souris (hover: none), la ligne des touches est cachée', /@media \(hover: none\) \{\s*\.fiche-touches \{ display: none; \}/.test(css));
 }
 
+// ── 14. Fins de ligne (revue du 14/10/2026, C8) ──────────────────────────────
+// On lisait « 2 918 fois sur 5 » puis « 103. » à la ligne, « 83 956 » puis « $, une zone de retour »,
+// « sous 30, « » puis « survendu » » ; une bulle du graphique commençait une ligne par « : prochain
+// repère ». Une seule règle (Fmt.colle) dit quels morceaux restent ensemble : la page (Fmt.insecables,
+// contrôlée à l'écran par les tests de page) et les bulles (guideLignes, ici).
+titre('14. Fins de ligne : un nombre avec ses milliers et son unité, « : ; ? ! » » avec leur mot, « « » avec le sien');
+{
+  const Fm = require(path.join(REPO, 'js/format.js'));
+  const lies = [['5', '103.'], ['956', '$,'], ['repère', ':'], ['accélère-t-il', '?'], ['«', 'survendu'], ['survendu', '»'], ['tri', ':'], ['24', 'h.'], ['1', 'h'], ['h', '31'],
+    ['30', 'min'], ['80', '000'], ['54,8', 'k'], ['0,5', 'BTC'], ['−3,5', '%).'], ['M', '$']];
+  const libres = [['sur', '5'], ['3', 'hausses'], ['2', 'Mèches'], ['5', '1000'], ['RSI', '14'], ['à', 'la'], ['h', '3']];
+  check('Fmt.colle lie « 5 103. », « 956 $, », « repère : », « il ? », « « survendu », « survendu » », « 1 h 31 », « 30 min », « 80 000 », « 54,8 k », « 0,5 BTC »…',
+    lies.every(([a, b]) => Fm.colle(a, b)), lies.filter(([a, b]) => !Fm.colle(a, b)));
+  check('… et laisse libres « sur 5 », « 3 hausses », « 2 Mèches », « 5 1000 », « RSI 14 », « à la »', !libres.some(([a, b]) => Fm.colle(a, b)), libres.filter(([a, b]) => Fm.colle(a, b)));
+  check('Fmt.insecables sans DOM (tests en node, carte) rend son argument sans rien toucher', Fm.insecables(null) === null && T.el('fichePop') === Fm.insecables(T.el('fichePop')));
+  // Les bulles : guideLignes, police à chasse fixe simulée (6 px par signe), de 120 à 320 px (les
+  // largeurs des bulles ; plus étroit, un groupe plus large que la ligne reste en mots).
+  const lignes = vm.runInContext('guideLignes', page.sandbox), g = { measureText: t => ({ width: [...t].length * 6 }) };
+  const phrases = ['Le prix est passé au-dessus de 82 787 $ (plus bas d’hier) : prochain repère 83 048 $ (zone de retour).',
+    'La carte « Fourchette des 24 h » peut dire un autre chiffre : ses 24 h ne commencent pas à la même minute.',
+    'Sur ce graphique : atteint 2 918 fois sur 5 103. Le mouvement accélère-t-il ? Sous 30, on dit « survendu ».'];
+  const fautes = [];
+  for (const p of phrases) for (let w = 120; w <= 320; w += 2) {
+    const L = lignes(g, p, w);
+    L.forEach((l, k) => { if (k && (/^[:;?!»$%]/.test(l) || /«$/.test(L[k - 1]) || (/\d$/.test(L[k - 1]) && /^(\d{3}(?!\d)|h\b|min\b)/.test(l)))) fautes.push(w + ' px : ' + L[k - 1] + ' ⏎ ' + l); });
+    if (L.join(' ') !== p) fautes.push(w + ' px : texte changé « ' + L.join(' ') + ' »');
+  }
+  check('guideLignes (bulles du graphique), de 120 à 320 px : aucune ligne ne commence par « : ; ? ! » $ % » ni ne finit par « « », aucun nombre coupé, aucun mot perdu', !fautes.length, fautes.slice(0, 4));
+}
+
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 console.log(ko ? `\n❌ LÉGENDES : ${ko} contrôle(s) en échec` : '\n✅ LÉGENDES : TOUS LES CONTRÔLES PASSENT');
 process.exit(ko ? 1 : 0);

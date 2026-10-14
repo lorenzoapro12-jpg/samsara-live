@@ -1049,7 +1049,9 @@ function ficheHtml(id) {
     const md = typeof marketData !== 'undefined' ? marketData : null;
     const age = md && md.updated ? Math.max(0, Math.round((Date.now() - Date.parse(md.updated)) / 60000)) : null;
     if (vals.length) valeur = vals.map(([t, v]) => (t ? '<span class="fiche-tf">' + t + '</span> ' : '') + '<b>' + echapF(fmtValF(v)) + '</b>').join(' · ')
-      + (m && m.unite ? ' <span class="fiche-unite">' + echapF(m.unite) + '</span>' : '')
+      // &nbsp; : la valeur et son unité, deux balises, ne se séparent pas en fin de ligne (revue du
+      // 14/10/2026, C8 ; Fmt.insecables ne lie que dans un même texte).
+      + (m && m.unite ? '&nbsp;<span class="fiche-unite">' + echapF(m.unite) + '</span>' : '')
       + (age !== null ? ' <span class="fiche-age">· publié il y a ' + age + ' min</span>' : '');
   }
   // « En savoir plus » : seulement ce que les lignes courtes ne disent pas.
@@ -1097,6 +1099,8 @@ function ouvrirFiche(id, ancre) {
   const p = document.getElementById('fichePop');
   if (!p || !FICHES[id]) return;
   p.innerHTML = ficheHtml(id);
+  // Aucune ligne ne commence par « : » ni ne coupe un nombre (revue du 14/10/2026, C8).
+  Fmt.insecables(p);
   p.setAttribute('aria-label', 'Légende');
   // « En savoir plus » : replié sur l'écran calme, ouvert avec « Le détail » (qui veut tout voir).
   const plus = p.querySelector('.fiche-plus');

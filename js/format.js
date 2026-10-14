@@ -95,6 +95,53 @@ const Fmt = (function () {
     return h + ' h' + (r ? ' ' + String(r).padStart(2, '0') : '');
   }
 
-  return { MOINS, nombre, decimalesPrix, decimalesLecture, prix, cote, pct, compact, signe, heure, heureSec, jour, jourHeure, memeJour, fuseau, fuseauMots, DUREE_HEURES, duree };
+  // ─── Fins de ligne (revue du 14/10/2026, C8) ───
+  // « 2 918 fois sur 5 » puis « 103. » à la ligne se lisait comme une autre statistique ; « $ »,
+  // « : » ou « » » commençaient une ligne, « « » en finissait une. Les chaînes gardent leurs espaces
+  // simples (voir plus haut) : on dit seulement, au moment d'écrire, où la ligne ne se coupe pas.
+  const APRES_NOMBRE = /^(?:\d{3}(?!\d)|(?:BTC|ETH|SOL|XRP|USDT?|UTC|min|h|j|jours?|semaines?|k|M|Md|millions?|milliards?|pts|bp)(?![\p{L}\d]))/u;
+  /** Vrai si l'espace entre les morceaux a et b (sans espace) ne doit pas couper la ligne : un nombre
+   *  et ses milliers ou son unité (« 1 h 31 » aussi), « : ; ? ! » $ % » et le mot d'avant, « « » et
+   *  le mot d'après. Une seule règle : les bulles du graphique (guideLignes) et le texte de la page. */
+  const colle = (a, b) => /^[:;?!»$%]/.test(b) || /«$/.test(a)
+    || (/\d$/.test(a) && APRES_NOMBRE.test(b)) || (a === 'h' && /^\d{2}(?!\d)/.test(b));
+  const HORS_TEXTE = '.insec, svg, option, select, textarea, script, style, title';
+  /** Dans le texte déjà écrit sous racine, chaque suite de morceaux que colle() lie va dans un
+   *  <span class="insec"> (css/app.css : white-space: nowrap). Le texte ne change pas, caractère pour
+   *  caractère (textContent identique : les tests et la recherche le lisent tel quel). Une espace en
+   *  tête de nœud se lie au dernier mot du nœud d'avant (« <b>83 956</b> $ »). */
+  function insecables(racine) {
+    if (!racine || !racine.ownerDocument || typeof NodeFilter === 'undefined') return racine;
+    const doc = racine.ownerDocument, w = doc.createTreeWalker(racine, NodeFilter.SHOW_TEXT), noeuds = [];
+    for (let n = w.nextNode(); n; n = w.nextNode()) noeuds.push(n);
+    let fin = '';
+    for (const n of noeuds) {
+      const m = n.data.match(/\S+|\s+/g) || [], avant = fin;
+      fin = /\S$/.test(n.data) ? m[m.length - 1] : '';
+      if (n.data.indexOf(' ') < 0 || !n.parentElement || n.parentElement.closest(HORS_TEXTE)) continue;
+      // lie[k] : l'espace m[k] ne coupe pas (en tête de nœud, elle se lie au nœud d'avant).
+      const lie = m.map((x, k) => x === ' ' && k + 1 < m.length && (k ? colle(m[k - 1], m[k + 1]) : !!avant && colle(avant, m[1])));
+      // Un texte posé seul dans une boîte flex ou grille : un span de plus y serait une case de plus.
+      if (!lie.includes(true) || /flex|grid/.test(doc.defaultView.getComputedStyle(n.parentElement).display)) continue;
+      const frag = doc.createDocumentFragment();
+      let k = 0, libre = '';
+      while (k < m.length) {
+        if (!lie[k] && !(lie[k + 1] && m[k].trim())) { libre += m[k++]; continue; }
+        let j = lie[k] ? k + 1 : k;
+        while (lie[j + 1]) j += 2;
+        if (libre) { frag.append(libre); libre = ''; }
+        const s = doc.createElement('span');
+        s.className = 'insec';
+        s.textContent = m.slice(k, j + 1).join('');
+        frag.append(s);
+        k = j + 1;
+      }
+      if (libre) frag.append(libre);
+      n.replaceWith(frag);
+    }
+    return racine;
+  }
+
+  return { MOINS, nombre, decimalesPrix, decimalesLecture, prix, cote, pct, compact, signe, heure, heureSec, jour, jourHeure, memeJour, fuseau, fuseauMots, DUREE_HEURES, duree, colle, insecables };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Fmt;
