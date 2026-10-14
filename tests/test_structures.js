@@ -9,7 +9,9 @@
 //      observateur (MutationObserver, ResizeObserver) né avec elle est débranché ;
 //   3. le décor ajouté — tout [data-decor], posé par chantier().decor — est muet (aria-hidden) et
 //      n'intercepte pas le pointeur (pointer-events: none), qu'il porte du texte ou non ;
-//   4. aucune erreur JavaScript.
+//   4. aucune erreur JavaScript ;
+//   5. le canvas SUIT SON CADRE, pas seulement la fenêtre : le cadre rétrécit, le bas du canvas
+//      (la mini-carte et ses poignées) y tient encore (revue du 14/10, visuel-b-3).
 //
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
 // USAGE   node tests/test_structures.js
@@ -241,6 +243,27 @@ async function squelette(page) {
         check(`${t.id.padEnd(9)} : la fiche porte la courbe des dernières heures, visible`, fc.ok, fc);
         const cal = await agesDuCalque(o.page);
         check(`${t.id.padEnd(9)} : le calque porte l’âge de la couche et le repère de la publication`, cal.couche && cal.repere, cal.vus);
+        // Le cadre du graphique rétrécit de 40 px sans que la fenêtre change (marge du bas agrandie,
+        // comme quand la rangée des infos du marché se remplit), puis revient : trois images plus
+        // tard, le canvas le remplit sans dépasser. Revue du 14/10 (visuel-b-3, visuel-c-1) : seuls
+        // Bureau 95 et la Planche se remesuraient, la mini-carte était rognée de 11 à 43 px en
+        // Codex, Gare, Néon et Gazette.
+        const cadre = await o.page.evaluate(async () => {
+          const cc = document.querySelector('.chart-container'), cv = document.getElementById('chart');
+          const images = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r))));
+          const ecart = () => { const cs = getComputedStyle(cc), r = cc.getBoundingClientRect(), v = cv.getBoundingClientRect();
+            return { bas: +(v.bottom - (r.bottom - parseFloat(cs.paddingBottom) - parseFloat(cs.borderBottomWidth))).toFixed(1),
+                     hauteur: +(v.height - (cc.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom))).toFixed(1) }; };
+          const pb = cc.style.paddingBottom;
+          cc.style.paddingBottom = (parseFloat(getComputedStyle(cc).paddingBottom) + 40) + 'px';
+          await images();
+          const retreci = ecart();
+          cc.style.paddingBottom = pb;
+          await images();
+          return { retreci, revenu: ecart() };
+        });
+        check(`${t.id.padEnd(9)} : le canvas suit son cadre quand il rétrécit puis revient (dépasse de ${cadre.retreci.bas} puis ${cadre.revenu.bas} px)`,
+          [cadre.retreci, cadre.revenu].every(e => e.bas <= 1 && Math.abs(e.hauteur) <= 1), cadre);
         check(`${t.id.padEnd(9)} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
         await o.ctx.close();
       }

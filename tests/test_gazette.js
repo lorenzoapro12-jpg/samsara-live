@@ -12,7 +12,8 @@
 //   4. LE DÉMONTAGE débranche ses observateurs et annule ses minuteries ;
 //   5. LA MISE EN PAGE : le graphique garde sa place (1440 × 900, 1280 × 720), la légende du cliché
 //      ne mord pas le canvas, la plaque ne se chevauche pas, rien ne déborde ; au téléphone, la
-//      cote reste affichée ; une manchette qui change de hauteur fait remesurer le graphique ;
+//      cote reste affichée ; une manchette qui change de hauteur fait remesurer le graphique ; la
+//      flèche du prix (▲/▼) ne déplace rien, sa place est toujours réservée (revue du 14/10) ;
 //   6. LES ENCRES PROPRES au thème (tampon, édition périmée, âge vieux, valeur négative citée)
 //      tiennent 4,5:1 sur leur fond réel ;
 //   7. LA PLAQUE est composée dans la police renommée (« Samsara Gazette Titre »), servie par le dépôt.
@@ -71,7 +72,7 @@ function publicationVieille() {
   md.updated = new Date(Date.now() - 3 * 3600e3).toISOString();
   return JSON.stringify(md);
 }
-async function ouvrir(nav, vue, theme) {
+async function ouvrir(nav, vue, theme, mode = 'expert') {
   const ctx = await nav.newContext({ viewport: vue, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
   const erreurs = [], externes = [];
@@ -87,11 +88,11 @@ async function ouvrir(nav, vue, theme) {
   });
   // Observateurs et minuteries : chaque MutationObserver est noté (branché / débranché) ; chaque
   // setTimeout posé DEPUIS js/structures.js est suivi jusqu'à son annulation ou son échéance.
-  await page.addInitScript(t => {
+  await page.addInitScript(([t, m]) => {
     // Mode Expert : ce test mesure les éléments denses (chiffres clés, heure de publication, couche de
     // chaleur, étiquettes de l'axe…), masqués en Débutant (le mode par défaut) ; leur version Débutant
-    // est vérifiée dans test_debutant_page.js.
-    try { localStorage.clear(); localStorage.setItem('samsara-mode', 'expert'); localStorage.setItem('samsara-theme', t); } catch (e) { /* */ }
+    // est vérifiée dans test_debutant_page.js. (Débutant ici : la flèche du prix, écran de départ.)
+    try { localStorage.clear(); localStorage.setItem('samsara-mode', m); localStorage.setItem('samsara-theme', t); } catch (e) { /* */ }
     window.__observateurs = [];
     const MO = window.MutationObserver;
     window.MutationObserver = class extends MO {
@@ -111,13 +112,31 @@ async function ouvrir(nav, vue, theme) {
       return id;
     };
     window.clearTimeout = function (id) { window.__minuteries.delete(id); return ct.call(window, id); };
-  }, theme);
+  }, [theme, mode]);
   await page.goto(`http://127.0.0.1:${serveur.address().port}/index.html`);
   await page.waitForTimeout(2200);
   await page.evaluate(() => document.fonts && document.fonts.ready);
   await page.waitForTimeout(200);
   return { ctx, page, erreurs, externes };
 }
+
+// La flèche du prix (▲/▼, posée quand le prix bouge, retirée au prix suivant s'il ne bouge pas) ne
+// déplace ni le prix, ni la variation 24 h, ni le graphique : sa place est toujours réservée. Revue
+// du 14/10 (visuel-c-1) : à 375-390 px, en Débutant, elle poussait la variation sur une 2e ligne et
+// l'en-tête sautait de 23 px une à deux fois par seconde. La variation est écrite par la page à
+// −2,26 % (celle du constat, plus large que celle du jeu d'essai). Positions sans / ▲ / ▼.
+const flecheImmobile = page => page.evaluate(() => {
+  ecrirePrixEntete(livePrice, -2.26);
+  const p = document.getElementById('price'), avant = p.className, out = {};
+  const pos = s => { const b = document.querySelector(s).getBoundingClientRect(); return Math.round(b.left) + ',' + Math.round(b.top); };
+  for (const c of ['', 'price-up', 'price-down']) {
+    p.className = 'price-badge' + (c ? ' ' + c : '');
+    out[c || 'sans flèche'] = `prix ${pos('#price')} · variation ${pos('#var24')} · graphique ${pos('.chart-container')}`;
+  }
+  p.className = avant;
+  out.immobile = out['sans flèche'] === out['price-up'] && out['sans flèche'] === out['price-down'];
+  return out;
+});
 
 (async () => {
   await new Promise(r => serveur.listen(0, '127.0.0.1', r));
@@ -280,13 +299,23 @@ async function ouvrir(nav, vue, theme) {
         check(`${v} : l'oreille du cours prend la largeur, le titre cède`, !!m.og && !m.h1 && !m.od, m);
       }
       check(`${v} : aucun débordement horizontal, manchette entière`, !m.debordeX && !m.manCoupee, m);
+      const fl = await flecheImmobile(x.page);
+      check(`${v} : la flèche du prix ne déplace ni le prix, ni la variation 24 h, ni le graphique`, fl.immobile, fl);
       check(`${v} : aucune erreur JavaScript`, !x.erreurs.length, x.erreurs);
       await x.ctx.close();
     }
+    // L'écran de départ au téléphone (Débutant), aux deux largeurs où l'en-tête sautait.
+    for (const w of [375, 390]) {
+      const d = await ouvrir(nav, { width: w, height: 812 }, 'gazette', 'debutant');
+      const fl = await flecheImmobile(d.page);
+      check(`${w} × 812, Débutant : la flèche du prix ne déplace ni le prix, ni la variation 24 h, ni le graphique`, fl.immobile, fl);
+      check(`${w} × 812, Débutant : aucune erreur JavaScript`, !d.erreurs.length, d.erreurs);
+      await d.ctx.close();
+    }
 
     // Une manchette qui change de hauteur à l'édition (deux lignes → une) : le graphique se remesure
-    // (js/app.js ne le remesure qu'au redimensionnement de la fenêtre). 820 px : la manchette
-    // complète tient sur deux lignes.
+    // (la manchette le demande ; depuis la revue du 14/10, js/app.js suit aussi son cadre,
+    // suivreCadre). 820 px : la manchette complète tient sur deux lignes.
     const z = await ouvrir(nav, { width: 820, height: 900 }, 'gazette');
     const rz = await z.page.evaluate(async () => {
       const man = document.querySelector('.gazette-manchette'), h0 = man.offsetHeight;

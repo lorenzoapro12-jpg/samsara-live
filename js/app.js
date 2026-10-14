@@ -1752,6 +1752,29 @@ window.addEventListener('resize', () => {
   // (majLegende reprend aussi ajusterRuban : la légende reposée selon la nouvelle largeur.)
   resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; resizeCanvas(); drawChart(); ajusterKpis(); majLegende(); });
 });
+// Le graphique suit aussi son CADRE, pas seulement la fenêtre. Après le premier dessin, le cadre
+// rétrécit dans plusieurs thèmes (rangée des infos du marché remplie en Codex et Gare, Néon,
+// en-tête de la Gazette sur deux lignes) : le bas du canvas, la mini-carte et ses poignées, était
+// rogné de 11 à 43 px (revue du 14/10, visuel-b-3 et visuel-c-1). Une image au plus par
+// changement ; rien si le canvas a déjà la taille du cadre (un appel direct, ou l'observateur de
+// Bureau 95 ou de la Planche, l'a remesuré) : ni second dessin, ni boucle.
+function suivreCadre() {
+  if (typeof ResizeObserver === 'undefined') return;
+  const cadre = canvas.parentElement;
+  let image = 0;
+  new ResizeObserver(() => {
+    if (image) return;
+    image = requestAnimationFrame(() => {
+      image = 0;
+      const cs = getComputedStyle(cadre);
+      const w = cadre.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const h = cadre.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      if (Math.round(w) === Math.round(parseFloat(canvas.style.width))
+        && Math.round(h) === Math.round(parseFloat(canvas.style.height))) return;
+      resizeCanvas(); drawChart();
+    });
+  }).observe(cadre);
+}
 
 // ============ API ============
 // Cache klines pour éviter les 429 Binance
@@ -10371,6 +10394,7 @@ async function init() {
   majLegende(); compterIndicateurs();
   resizeCanvas();
   drawChart();             // « Chargement… » plutôt qu'un cadre vide
+  suivreCadre();           // puis le canvas suit son cadre, dans tous les thèmes
   // Tout part EN MÊME TEMPS : prix, bougies, publication — et les trois sont déjà en vol depuis
   // le script de tête d'index.html (prechargee). Avant, le prix était attendu avant les bougies,
   // et les bougies avant les cartes (premier dessin à 1,55 s, mesuré en local).

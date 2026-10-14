@@ -234,6 +234,14 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 }
 .price-badge.price-up::before { border-bottom: 8px solid var(--up); }
 .price-badge.price-down::before { border-top: 8px solid var(--down); }
+/* Gazette (structure « une ») : la place de la flèche est TOUJOURS réservée, vide quand le prix
+   n'a pas bougé. Sans elle, à 375-390 px, chaque flèche poussait la variation 24 h sur une 2e
+   ligne : l'en-tête grandissait de 23 px puis rapetissait, une à deux fois par seconde, et tout
+   le dessous sautait sous le doigt (revue du 14/10, visuel-c-1). Même boîte que la flèche. */
+:root[data-structure="une"] .price-badge:not(.price-up):not(.price-down)::before {
+  content: ''; width: 0; height: 0;
+  border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid transparent;
+}
 /* Éclair du prix : la couleur du sens, posée par une classe et retirée 450 ms plus tard (deux
    images par changement), sans transition — une animation de couleur repeignait le chiffre à
    chaque image : 70 % du CPU de la page au repos. */
