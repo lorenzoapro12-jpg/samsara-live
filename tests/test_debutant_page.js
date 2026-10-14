@@ -230,6 +230,13 @@ async function cocher(page, k) {
   await page.waitForTimeout(150);
 }
 const nombres = t => (t.match(/\d{1,3}(?:[\s  ]\d{3})+|\d+/g) || []).map(x => x.replace(/[\s  ]/g, ''));
+// Le budget d'une bulle sans « Le détail » (charte du 12/10/2026 ; revue du 14/10/2026, M6 et C16) :
+// au plus PARAM.guide.debutant.bulleMots mots hors avertissement, comptés comme les fiches (un groupe
+// qui porte une lettre ou un chiffre), et un seul avertissement.
+const AVERTISSEMENTS = ['Une description, pas un conseil.', 'Une hypothèse de Claude (une IA), pas un conseil.', 'Une lecture débattue, pas une prévision ni un conseil.'];
+const motsBulle = t => AVERTISSEMENTS.reduce((x, a) => x.split(a).join(' '), t).split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
+const avertissements = t => (t.match(/pas une? (?:conseil|prévision ni un conseil)/g) || []).length;
+const BULLE_MOTS = +(fs.readFileSync(path.join(__dirname, '..', 'js', 'app.js'), 'utf8').match(/\bbulleMots: (\d+)/) || [0, 0])[1];
 const VERBES = /\b(touche|est passé|monte|baisse|hésite|s’agite|est entre|est sous|est au-dessus|est sans repère|indisponible)\b/;
 // forme : PARAM.guide.debutant.forme (26) — plan figures §5.3 et amendement C1 (« Cible touchée, à confirmer », 26).
 // « evenement » : la ligne « ce qui vient de se passer » (PR 5), une seule, aux limites de la phrase ;
@@ -458,20 +465,27 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
           // chance, et l'écart en dollars le dit déjà. Plan du site, idée 8 (13/10/2026) : l'écart dit à
           // quoi il sert (« 340 $ au-dessus : ce qu’il reste avant ce repère. ») et la bande aussi.
           if (role === 'niveau') detail = /^Maintenant : /.test(r.corps) && /\d\s\$\s(?:au-dessus|en dessous) : (?:ce qu’il reste avant ce repère|l’écart déjà fait au-delà)\.|le prix est dedans/.test(r.corps) && !/%/.test(r.corps) && /Si le prix finit|Aucun repère proche/.test(r.corps)
-            && /Bande de ± [\d\s,]+\$ : la marge où l’on dit que le prix touche le repère\./.test(r.corps)
+            // (Changé exprès, revue du 14/10/2026, M6 : la bande et « Tout près » ne restent que si la
+            // bulle tient en 50 mots ; quand elle est dite, la bande dit toujours à quoi elle sert.)
+            && (!/Bande de ±/.test(r.corps) || /Bande de ± [\d\s,]+\$ : la marge où l’on dit que le prix touche le repère\./.test(r.corps))
             // Le titre : le nom entier du repère et le prix de son libellé.
             && nombres(r.vise).filter(x => x.length >= 4).every(x => nombres(r.titre).includes(x)) && / · \d/.test(r.titre);
           if (role === 'phrase') detail = (r.corps.match(/Si le prix finit|Aucun repère proche/g) || []).length >= 2;
           // Le libellé est celui du scénario MONTRÉ (le 1, ou le suivant encore ouvert s'il est tombé) :
           // sa bulle ne redit pas les autres (charte du 12/10/2026 : la bulle de la ligne les liste).
           const mo = (e.scen && e.scen.montre) || '1', autres = ['1', '2', '3'].filter(x => x !== mo);
-          if (role === 'scenario') detail = new RegExp('^Scénario ' + mo + ' de Claude$').test(r.titre) && !autres.some(x => new RegExp('(^|\\s)' + x + '\\. ').test(r.corps)) && /sans pourcentage/.test(r.corps) && /Une hypothèse de Claude \(une IA\), pas un conseil/.test(r.corps);
+          // (Revue du 14/10/2026, C16 : quand la ligne a cédé sa place, la bulle dit « Les autres … » au
+          // lieu du rang ; jamais « place prise ».)
+          if (role === 'scenario') detail = new RegExp('^Scénario ' + mo + ' de Claude$').test(r.titre) && !autres.some(x => new RegExp('(^|\\s)' + x + '\\. ').test(r.corps)) && (/sans pourcentage/.test(r.corps) || /Les autres/.test(r.corps)) && /Une hypothèse de Claude \(une IA\), pas un conseil/.test(r.corps) && !/place prise/.test(r.corps);
           if (role === 'boite') detail = /\b1\. /.test(r.corps) && /\b2\. /.test(r.corps) && /\b3\. /.test(r.corps) && /journal/.test(r.corps);
           // Choix 1B : le classement est celui de Claude (une IA), sans pourcentage ; le seul « % »
           // admis est la marge d'une zone (« ± 0,3 % »), qui n'est pas une probabilité.
           if (role === 'scenario' || role === 'boite') detail = detail && /Claude[ ,(]+une IA/.test(r.corps) && !/%/.test(r.corps.replace(/±\s*[\d,]+\s*%/g, '') + r.titre);
           check(`${nom} : ${role}${k ? ' ' + (k + 1) : ''} « ${r.vise} » → sa bulle (${r.titre}), le détail attendu, sans infobulle des prix${tactile ? '' : ', curseur main'}, sans jargon ni base du hasard`,
             ok.titre && ok.ohlcv && ok.curseur && !ok.mots.length && !ok.conseil && !ok.hasard && detail, { r, ok, detail });
+          // La preuve de la revue du 14/10/2026 (M6, C16) : le détail tient dans son budget, un seul avertissement.
+          check(`${nom} : ${role}${k ? ' ' + (k + 1) : ''} : le détail tient en ${BULLE_MOTS} mots hors avertissement (${motsBulle(r.corps)}), un seul avertissement`,
+            motsBulle(r.corps) <= BULLE_MOTS && avertissements(r.corps) === 1 && !/place prise/.test(r.corps), r.corps);
           // Le résumé (1er toucher ou survol) : le même titre, 4 lignes et 3 nombres au plus, une phrase
           // au moins quand le titre en laisse la place, et la ligne qui mène au détail.
           const c1 = r.court;
@@ -563,8 +577,9 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       // Sa bulle (toucher ou survol) tient dans le tracé et dit le suivi en direct, le journal, l'avertissement.
       const r = await viser(o, 'boite', tactile);
       const b = await o.page.evaluate(() => (scenEtat && scenEtat.bulle ? { y: scenEtat.bulle.y, h: scenEtat.bulle.h, mainH: geo.mainH } : null));
+      // (Revue du 14/10/2026, M6 : « (en direct) », le même pour tous, est dit une fois, en tête de phrase.)
       check(`fermé · ${vue.width}×${vue.height} : la bulle de la ligne tient dans le tracé et dit le suivi en direct, le journal et « pas un conseil »`,
-        r && b && b.y >= 0 && b.y + b.h <= b.mainH && /en direct/.test(r.corps) && /journal/.test(r.corps) && /Une hypothèse de Claude \(une IA\), pas un conseil/.test(r.corps), { b, corps: r && r.corps });
+        r && b && b.y >= 0 && b.y + b.h <= b.mainH && /[Ee]n direct/.test(r.corps) && /journal/.test(r.corps) && /Une hypothèse de Claude \(une IA\), pas un conseil/.test(r.corps), { b, corps: r && r.corps });
       check(`fermé · ${vue.width} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
@@ -642,11 +657,16 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       // live ; « Double sommet validé » est le libellé de la clôture, le texte posé l'un des possibles.)
       check('4 h : « Double sommet validé » posé, au plus 5 textes', roles.includes('forme') && r.items.length <= 5 && r.base === 'Double sommet validé'
         && r.items.some(i => i.role === 'forme' && r.possibles.includes(i.texte)), { base: r.base, items: r.items });
-      if (roles.includes('scenario')) check('4 h : forme + scénario 1 posés → la ligne des scénarios cède ; sa bulle passe dans celle du libellé « Scénario 1 »', r.cede && !roles.includes('boite') && /La ligne des scénarios/.test(r.un), r);
+      // (Changé exprès, revue du 14/10/2026, C16 : plus « La ligne des scénarios (place prise) : » suivi de
+      // toute sa bulle, mais la phrase courte des autres scénarios, et un seul avertissement.)
+      if (roles.includes('scenario')) check('4 h : forme + scénario 1 posés → la ligne des scénarios cède ; la bulle du libellé « Scénario 1 » dit les autres (« Les autres … »), un seul avertissement, sans « place prise »',
+        r.cede && !roles.includes('boite') && /Les autres/.test(r.un) && !/place prise/.test(r.un) && avertissements(r.un) === 1 && motsBulle(r.un) <= BULLE_MOTS, r);
       // (Amendement E4, puis plan du 13/10/2026 : « objectif théorique selon l'usage des analystes : X, non garanti » ;
       // idée 8 du même plan : l'objectif dit sur quoi il se calcule, « X (la hauteur de la figure, reportée) ».)
+      // Changé exprès, revue du 14/10/2026 (M6) : le nom, dans le titre, n'est plus redit en tête ;
+      // « Objectif théorique : X (sa hauteur, reportée), non garanti ».
       check('4 h : la bulle de la forme la définit, dit son bilan (« Mesuré sur », « fois sur ») avec l’objectif théorique et ce sur quoi il se calcule, et « pas une prévision ni un conseil »',
-        r.forme && /^Double sommet : /.test(r.forme.texte) && /Mesuré sur/.test(r.forme.texte) && /fois sur/.test(r.forme.texte) && /[Oo]bjectif théorique selon l’usage des analystes : \d[\d  ]* \$ \(la hauteur de la figure, reportée\), non garanti/.test(r.forme.texte) && /pas une prévision ni un conseil/.test(r.forme.texte) && !bannisBulle(r.forme.texte).length, r.forme);
+        r.forme && /^Le prix a buté deux fois sur le même plafond\. /.test(r.forme.texte) && /Mesuré sur/.test(r.forme.texte) && /fois sur/.test(r.forme.texte) && /[Oo]bjectif théorique : \d[\d  ]* \$ \(sa hauteur, reportée\), non garanti/.test(r.forme.texte) && /pas une prévision ni un conseil/.test(r.forme.texte) && !bannisBulle(r.forme.texte).length, r.forme);
       const e = await dessin(o.page);
       check('4 h : la ligne des scénarios renvoie au suivi en 15 min ou 1 h (quand elle est posée)', !e.items.some(i => i.role === 'boite') || e.items.some(i => /à voir en 15 min ou 1 h/.test(i.texte)), e.items);
       await o.page.evaluate(() => window.__retablir());
@@ -677,8 +697,9 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       });
       // (Amendement C1 : au prix live, le libellé peut dire « … à valider »…)
       check('« Double creux possible » posé, au plus 5 textes', r.base === 'Double creux possible' && r.items.some(i => i.role === 'forme' && r.possibles.includes(i.texte)) && r.items.length <= 5, { base: r.base, items: r.items });
-      check('sa bulle : ce qu’on voit, ce qui la validerait (« serait validée si le prix finit 2 quarts d’heure de suite au-dessus de »), le bilan mesuré, aucun prix visé, aucun mot banni',
-        r.forme && /^Double creux possible : le prix a rebondi deux fois vers /.test(r.forme.texte) && /serait validée si le prix finit 2 quarts d’heure de suite au-dessus de /.test(r.forme.texte)
+      // (Changé exprès, revue du 14/10/2026, M6 : le nom, dans le titre, n'est plus redit ; « Figure validée si … ».)
+      check('sa bulle : ce qu’on voit, ce qui la validerait (« Figure validée si le prix finit 2 quarts d’heure de suite au-dessus de »), le bilan mesuré, aucun prix visé, aucun mot banni',
+        r.forme && /^Le prix a rebondi deux fois vers /.test(r.forme.texte) && /Figure validée si le prix finit 2 quarts d’heure de suite au-dessus de /.test(r.forme.texte)
         && /Mesuré sur/.test(r.forme.texte) && !/vise/.test(r.forme.texte) && !bannisBulle(r.forme.texte).length, r.forme);
       check('aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
       await o.ctx.close();

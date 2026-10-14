@@ -184,7 +184,9 @@ titre('5. Mots : côté et prix de la ✗, mèche, cible, 1re clôture dehors, d
   const fb = { type: 'biseau_montant', famille: 'lignes', hautL: { a: 80000, b: 10 }, basL: { a: 79000, b: 12 }, debut: 0, depart: 60, apex: 1000, bande: 20, tol: 100, phase: 'formation', hauteur: 1000,
     demi: true, demiSens: -1, jDemi: 100, journal: [{ j: 100, quoi: 'demi', s: -1, c: 80150, seuil: 80180 }] };
   const tB = G.texteFormeDebutant(fb, null, Object.assign({}, ctx, { j: 110, n: 110 }), P, '$').join(' ');
-  check('1re clôture dehors : « il a fini une heure sous 80 180 $, le niveau de la ligne à ce moment-là », puis le seuil d’en ce moment (80 300 $)', /il a fini une heure sous 80 180 \$, le niveau de la ligne à ce moment-là/.test(tB) && /sous 80 300 \$ en ce moment/.test(tB), tB);
+  // (Changé exprès, revue du 14/10/2026, M6 : une phrase de 15 mots au plus — le seuil d'alors, puis
+  // celui d'en ce moment, chacun dans sa phrase.)
+  check('1re clôture dehors : « Il a fini une heure sous 80 180 $ (la ligne d’alors). La ligne est à 80 300 $ en ce moment. »', /Il a fini une heure sous 80 180 \$ \(la ligne d’alors\)\. La ligne est à 80 300 \$ en ce moment\./.test(tB), tB);
   const fc = { type: 'double_sommet', famille: 'extremes', sens: -1, phase: 'confirme', jConf: 120, invalidation: 85000, objectif: 83000, niveau: 84000, a: { i: 10, p: 85000 }, b: { i: 30, p: 84990 }, journal: [] };
   const tC = G.texteFormeDebutant(fc, null, ctx, P, '$').join(' ');
   check('confirmée : « Figure validée … » (accord avec « figure »)', /Figure validée /.test(tC) && !/(^|\. )Validée /.test(tC), tC);

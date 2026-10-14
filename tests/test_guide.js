@@ -656,33 +656,47 @@ titre('7b. Débutant : libellés, phrase, forme, suite — courts, en mots simpl
     const tr = { type: 'triangle_symetrique', hautL: { a: 84000, b: -10 }, basL: { a: 82000, b: 10 }, hauteur: 1900, apex: 100, demi: true, demiSens: -1, jDemi: 40, debut: 5 };
     const b = { type: 'double_sommet', formes: 6, confirmes: 3, atteints: 1, invalides: 1, expires: 0, haut: 1, bas: 2, ebauches: { n: 0, devenues: 0, confirmees: 0 }, temoin: { departs: 300, atteints: 90 } };
     const ec = [[ds, '15m'], [dc, '1h'], [rg, '15m'], [tr, '4h']].map(([f, itv]) => t(G.texteFormeDebutant(f, b, { duree: 5 * 86400, itv, j: 41 }, P, '$').join(' ')));
-    check('en train de se dessiner : « Double sommet possible : le prix a buté deux fois entre 86 350 et 86 400 $. La figure serait validée si le prix finit 2 quarts d’heure de suite sous 85 700 $ (le creux entre les sommets) ; un court retour entre les deux compte aussi. »',
-      /^Double sommet possible : le prix a buté deux fois entre 86 350 et 86 400 \$\. La figure serait validée si le prix finit 2 quarts d’heure de suite sous 85 700 \$ \(le creux entre les sommets\) ; un court retour entre les deux compte aussi\./.test(ec[0]), ec[0]);
-    check('… à valider : « s’il finit encore une heure au-dessus, la figure sera validée » ; rectangle : « entre 82 900 et 83 500 $ » ; sortie : « s’il revient franchement dedans, la sortie ne compte pas »',
-      /^Double creux à valider : .*s’il finit encore une heure au-dessus, la figure sera validée\./.test(ec[1]) && /Prix dans un rectangle : il fait des allers-retours entre 82 900 et 83 500 \$/.test(ec[2])
-      && /^Triangle qui se resserre : .*Le prix vient de sortir par le bas \(.*s’il revient franchement dedans, la sortie ne compte pas\./.test(ec[3]), ec);
+    // (Changé exprès, revue du 14/10/2026, M6 : 50 mots par bulle, 15 par phrase. Le nom, déjà dans le
+    // titre de la bulle, n'est plus redit en tête ; « Figure validée si … » dit le seuil, sans son origine ni
+    // le court retour, qui restent dans « Le détail » ; les phrases à point-virgule sont coupées.)
+    check('en train de se dessiner : « Le prix a buté deux fois entre 86 350 et 86 400 $. Figure validée si le prix finit 2 quarts d’heure de suite sous 85 700 $. »',
+      /^Le prix a buté deux fois entre 86 350 et 86 400 \$\. Figure validée si le prix finit 2 quarts d’heure de suite sous 85 700 \$\. Annulée si /.test(ec[0]), ec[0]);
+    check('… à valider : « S’il finit encore une heure au-dessus, la figure sera validée » ; rectangle : « entre 82 900 et 83 500 $ » ; sortie : « S’il revient franchement dedans, la sortie ne compte pas »',
+      /^Le prix a rebondi deux fois .*Il a fini une heure au-dessus de 82 600 \$\. S’il finit encore une heure au-dessus, la figure sera validée\./.test(ec[1]) && /Prix dans un rectangle : il fait des allers-retours entre 82 900 et 83 500 \$/.test(ec[2])
+      && /^Triangle qui se resserre : .*Le prix vient de sortir par le bas\. Il a fini une tranche de 4 h sous .*S’il revient franchement dedans, la sortie ne compte pas\./.test(ec[3]), ec);
+    // (Revue du 14/10/2026, M6 : « selon l'usage des analystes » part de la bulle du Débutant ;
+    // « théorique » et « non garanti » restent, les statistiques de la figure disent d'où il vient.)
     check('… toujours l’objectif théorique (« non garanti », jamais « cible ») avec le bilan mesuré, l’annulation dite pour les doubles, jamais « vise », aucun mot banni, aucun conseil, « pas une prévision ni un conseil »',
-      ec.every(x => /Mesuré sur/.test(x) && /objectifs? théoriques? selon l’usage des analystes : \d/.test(x) && /non garantis?/.test(x) && !/cible/i.test(x) && !/vise/.test(x) && !G.motsBannis(x).length && !CONSEIL.test(x.replace('pas une prévision ni un conseil', '')) && /pas une prévision ni un conseil/.test(x))
+      ec.every(x => /Mesuré sur/.test(x) && /[Oo]bjectifs? théoriques? : \d/.test(x) && /non garantis?/.test(x) && !/cible/i.test(x) && !/vise/.test(x) && !G.motsBannis(x).length && !CONSEIL.test(x.replace('pas une prévision ni un conseil', '')) && /pas une prévision ni un conseil/.test(x))
       && /Annulée si le prix finit un quart d’heure au-dessus de 86 400 \$/.test(ec[0]) && /Annulée si le prix finit une heure sous 81 900 \$/.test(ec[1]), ec.map(x => [x, G.motsBannis(x)]));
     // Plan du site, idée 8 (13/10/2026) : l'objectif dit sur quoi il se calcule (hauteur, ou largeur
-    // pour une figure à deux droites) ; le reste de ces bulles (lot 1) est inchangé.
-    check('… l’objectif dit sur quoi il se calcule : « 85 000 $ (la hauteur de la figure, reportée) », rectangle « (la largeur de la figure, reportée) »',
-      /selon l’usage des analystes : 85 000 \$ \(la hauteur de la figure, reportée\), non garanti/.test(ec[0]) && /\(la largeur de la figure, reportée\), non garantis/.test(ec[2]), [ec[0], ec[2]]);
+    // pour une figure à deux droites) — en moins de mots depuis la revue du 14/10/2026 (M6, N6) :
+    // « sa hauteur, reportée » ; le rectangle, ses deux objectifs dans une phrase, le calcul dans la suivante.
+    check('… l’objectif dit sur quoi il se calcule : « 85 000 $ (sa hauteur, reportée) », rectangle « Calculés avec sa largeur reportée »',
+      /objectif théorique : 85 000 \$ \(sa hauteur, reportée\), non garanti/.test(ec[0]) && /objectifs théoriques : 84 100 \$ par le haut, 82 300 \$ par le bas\. Calculés avec sa largeur reportée, non garantis\./.test(ec[2]), [ec[0], ec[2]]);
+    // La preuve du budget (revue du 14/10/2026, M6) : chaque phrase de ces bulles fait 15 mots au plus,
+    // comptés comme les fiches (un groupe qui porte une lettre ou un chiffre).
+    const longues = ec.flatMap(x => x.split(/(?<=[.!?])\s+(?=[A-ZÀÂÉÈÊÎÔÛÇ«0-9])/)).filter(p => p.split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length > 15);
+    check('… chaque phrase de ces bulles : 15 mots au plus (charte du 12/10/2026)', !longues.length, longues);
   }
   // 5. La suite, en une phrase : « Si le prix finit un quart d'heure au-dessus de … ».
   const s2 = G.suite({ dessus: [N(Rd('hier_haut', 86398)), N(Rd('mur_vente', 86700, { lu: Date.parse('2026-10-08T22:51:00Z') }))], dessous: [bas] }, 86012.5);
   const sh = t(G.texteSuiteDebutant(s2.haut, '$', '15m', 1, Date.parse('2026-10-08T22:52:00Z'))), sb = t(G.texteSuiteDebutant(s2.bas, '$', '4h', -1)), sv = t(G.texteSuiteDebutant(null, '$', '15m', 1));
   // Plan du site, idée 8 (13/10/2026) : l'âge d'un chiffre publié dans une phrase à lui, qui dit à
   // quoi il sert (il était entre parenthèses : « (mur de vente, relevé il y a 1 min) »).
-  check('suite : « Si le prix finit un quart d’heure au-dessus de 86 398 $ (plus haut d’hier) : prochain repère 86 700 $ (mur de vente). Mur de vente relevé il y a 1 min : l’âge de ce chiffre. »',
-    sh === 'Si le prix finit un quart d’heure au-dessus de 86 398 $ (plus haut d’hier) : prochain repère 86 700 $ (mur de vente). Mur de vente relevé il y a 1 min : l’âge de ce chiffre.', sh);
+  // (Changé exprès, revue du 14/10/2026, M6 : la phrase faisait 21 mots, l'exemple « Avant » de la
+  // charte ; sans les noms entre parenthèses, comme son exemple « Après » — l'âge nomme le mur.)
+  check('suite : « Si le prix finit un quart d’heure au-dessus de 86 398 $ : prochain repère 86 700 $. Mur de vente relevé il y a 1 min : l’âge de ce chiffre. »',
+    sh === 'Si le prix finit un quart d’heure au-dessus de 86 398 $ : prochain repère 86 700 $. Mur de vente relevé il y a 1 min : l’âge de ce chiffre.', sh);
   // Un chiffre publié il y a moins d'une minute : pas de « relevé il y a 0 min » (rien de plus à dire).
   const s0 = t(G.texteSuiteDebutant(s2.haut, '$', '15m', 1, Date.parse('2026-10-08T22:51:30Z')));
-  check('suite : un chiffre publié il y a moins d’une minute ne dit pas « il y a 0 min »', s0 === 'Si le prix finit un quart d’heure au-dessus de 86 398 $ (plus haut d’hier) : prochain repère 86 700 $ (mur de vente).', s0);
+  check('suite : un chiffre publié il y a moins d’une minute ne dit pas « il y a 0 min »', s0 === 'Si le prix finit un quart d’heure au-dessus de 86 398 $ : prochain repère 86 700 $.', s0);
+  // La preuve (revue du 14/10/2026, M6) : la phrase de la suite tient en 15 mots (règle des fiches).
+  check('suite : 15 mots au plus (charte du 12/10/2026 ; elle en faisait 21)', s0.split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length <= 15, s0);
   // Dans la bulle du repère lui-même (seuilDit) : son nom et son prix sont dans le titre, pas redits.
   const sd = t(G.texteSuiteDebutant(s2.haut, '$', '15m', 1, Date.parse('2026-10-08T22:52:00Z'), true));
-  check('suite, bulle du repère : la condition sans redire le repère du titre', sd === 'Si le prix finit un quart d’heure au-dessus : prochain repère 86 700 $ (mur de vente). Mur de vente relevé il y a 1 min : l’âge de ce chiffre.', sd);
-  check('suite : la durée suit l’intervalle (« une tranche de 4 h ») ; sans repère suivant, dit ; côté vide, dit', /^Si le prix finit une tranche de 4 h sous 85 900 \$ \(mur d’achat\) : aucun autre repère proche\.$/.test(sb)
+  check('suite, bulle du repère : la condition sans redire le repère du titre', sd === 'Si le prix finit un quart d’heure au-dessus : prochain repère 86 700 $. Mur de vente relevé il y a 1 min : l’âge de ce chiffre.', sd);
+  check('suite : la durée suit l’intervalle (« une tranche de 4 h ») ; sans repère suivant, dit ; côté vide, dit', /^Si le prix finit une tranche de 4 h sous 85 900 \$ : aucun autre repère proche\.$/.test(sb)
     && sv === 'Aucun repère proche au-dessus.', [sb, sv]);
   check('suite et forme : aucun mot banni, aucun conseil', ![sh, sb, sv].concat(fo.map(f => f[1] || '')).some(x => G.motsBannis(x).length || CONSEIL.test(x)));
   // 6. Les écarts en dollars : à l'unité près dès 10 $.

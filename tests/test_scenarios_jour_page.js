@@ -7,9 +7,9 @@
 //      · scenEtat.jour de la page = classerJour pur sur les mêmes bougies (cas, meneur, montré,
 //        écarts à 0,01 près, fondus) ; les deux modes donnent les mêmes valeurs ;
 //      · Débutant : au plus 5 textes, un seul libellé (celui du montré, le 1), la ligne du cas D
-//        (« En direct : zone du 2 ✓ · scén. 3 ✗ ▸ » : la fermeture fraîche du 3 y est dite aussi), sa bulle : les trois lignes numérotées, « Ce
-//        classement ne change pas pendant la journée », « pas de nouvelle prévision » ; aucun mot
-//        banni, aucun « % » ; aucune marque dessinée pour un scénario qui n'est pas montré ;
+//        (« En direct : zone du 2 ✓ · scén. 3 ✗ ▸ » : la fermeture fraîche du 3 y est dite aussi), sa bulle : les trois lignes numérotées, « Du plus
+//        au moins probable, selon Claude », « sans nouvelle prévision », 50 mots au plus (revue du 14/10/2026, M6) ; aucun
+//        mot banni, aucun « % » ; aucune marque dessinée pour un scénario qui n'est pas montré ;
 //      · Expert : « Seul encore en cours : 1 », les distances en $ sur la ligne ouverte, les
 //        pastilles « ✓ S2 15:15–15:30 » (le 2) et « ✗ S3 15:15–15:30 » (le 3) — créneaux dits à l'heure
 //        de l'appareil (Fmt.heure, attendus calculés : ici en UTC), sans « UTC » —, le fondu du 3
@@ -19,6 +19,9 @@
 //      18:40 : le fondu du 1 est fini (0), sa pastille ✗ reste en Expert ;
 //   3. M8 : une figure forcée pendant le fondu d'une fermeture → c'est le LIBELLÉ qui cède, la
 //      ligne reste, au plus 5 textes ;
+//   3 bis. M6, C16 (revue du 14/10/2026) : à 09:00, 14:10, 15:40 et 17:40, au téléphone, chaque bulle
+//      du Débutant au 2e toucher tient en 50 mots hors avertissement, un seul avertissement, jamais
+//      « place prise » ; à 14:10, la ligne cède et la bulle du scénario 1 dit « Les autres … » ;
 //   4. SOBRIÉTÉ : survol → aucun drawChart ; tick de prix → le calque seul, jour inchangé ; une
 //      minute de plus (queue des bougies changée) → un drawChart, jour recalculé.
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
@@ -44,6 +47,13 @@ const CONSEIL = /\b(achetez|vendez|ach[eè]te[rz]?|vends|il faut (acheter|vendre
 const bannis = t => motsBannis(t);
 const A2 = /écart (relatif )?0,\d|en tête/;
 const proche = (a, b, tol) => (a === null && b === null) || (a !== null && b !== null && Math.abs(a - b) <= tol);
+// Le budget d'une bulle sans « Le détail » (charte du 12/10/2026 ; revue du 14/10/2026, M6 et C16) :
+// au plus PARAM.guide.debutant.bulleMots mots hors avertissement, comptés comme les fiches (un groupe
+// qui porte une lettre ou un chiffre), et un seul avertissement.
+const AVERTISSEMENTS = ['Une description, pas un conseil.', 'Une hypothèse de Claude (une IA), pas un conseil.', 'Une lecture débattue, pas une prévision ni un conseil.'];
+const motsBulle = t => AVERTISSEMENTS.reduce((x, a) => x.split(a).join(' '), t).split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
+const avertissements = t => (t.match(/pas une? (?:conseil|prévision ni un conseil)/g) || []).length;
+const BULLE_MOTS = +(require('fs').readFileSync(path.join(__dirname, '..', 'js', 'app.js'), 'utf8').match(/\bbulleMots: (\d+)/) || [0, 0])[1];
 
 /** Les textes dessinés sur le tracé pendant un drawChart forcé (journal de fillText). */
 const textes = page => page.evaluate(() => {
@@ -94,8 +104,10 @@ const capt = async (o, nom) => { if (process.env.SCEN_CAPTURES) await o.page.scr
         check(`${nom} : ligne du cas D (« ${L} »)`, !!L && /^En direct : zone du 2( \(80 806 \$\))? ✓( · scén\. 3 ✗)? ▸$/.test(L) && /scén\. 3 ✗/.test(L) && L.length <= (etroit ? 40 : 48), L);
         check(`${nom} : aucune marque dessinée pour un scénario non montré`, e.items.every(i => i.rang === e.montre || !i.marques.length), e.items);
         const b = await bulle(o.page);
-        check(`${nom} : bulle de la ligne : 1., 2., 3., « Ce classement ne change pas pendant la journée », « Pas de nouvelle prévision »`,
-          ['1. ', '2. ', '3. '].every(m => b.split('\n').some(l => l.startsWith(m))) && /Ce classement ne change pas pendant la journée/.test(b) && /[Pp]as de nouvelle prévision/.test(b), b);
+        // (Changé exprès, revue du 14/10/2026, M6 : cette bulle faisait 131 mots pour 50. Le classement
+        // en une phrase ; « sans nouvelle prévision » dit qu'il ne change pas d'ici la fin.)
+        check(`${nom} : bulle de la ligne : « Du plus au moins probable, selon Claude », 1., 2., 3., « sans nouvelle prévision », ${BULLE_MOTS} mots au plus hors avertissement`,
+          ['1. ', '2. ', '3. '].every(m => b.split('\n').some(l => l.startsWith(m))) && /^Du plus au moins probable, selon Claude\./.test(b) && /sans nouvelle prévision/.test(b) && motsBulle(b) <= BULLE_MOTS && avertissements(b) === 1, b);
         check(`${nom} : jamais « suit le mieux » quand un seul scénario est en cours (M5)`, !/suit (le )?mieux/.test(b + ' ' + L), b);
         const tout = T.concat([b]).join('\n');
         check(`${nom} : aucun « % », aucun mot banni, aucun conseil (tracé et bulle)`, !/%/.test(tout) && !bannis(T.join(' ')).length && !CONSEIL.test(tout), { pct: /%/.test(tout), bannis: bannis(T.join(' ')) });
@@ -180,8 +192,47 @@ const capt = async (o, nom) => { if (process.env.SCEN_CAPTURES) await o.page.scr
       });
       const roles = r.items.map(i => i.role);
       check('M8 : la forme est posée, la ligne reste, le libellé du scénario cède ; au plus 5 textes', roles.includes('forme') && roles.includes('boite') && !roles.includes('scenario') && r.cede && r.items.length <= 5, r);
-      check('M8 : la bulle de la ligne reprend celle du libellé', /Le libellé du scénario \(place prise\)/.test(r.bulle), r.bulle);
+      // (Changé exprès, revue du 14/10/2026, C16 : plus « Le libellé du scénario (place prise) : » suivi de
+      // sa bulle ; la ligne dit déjà ce que vise le scénario et son état. Seul l'énoncé de Claude, quand il
+      // y en a un, est repris — les scénarios de ce rejeu n'en ont pas.)
+      check('M8 : la bulle de la ligne ne dit pas « place prise », un seul avertissement, 50 mots au plus', !/place prise/.test(r.bulle) && avertissements(r.bulle) === 1 && motsBulle(r.bulle) <= BULLE_MOTS, r.bulle);
       check('M8 : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
+    // ── La preuve de la revue du 14/10/2026 (M6, C16) : chaque bulle du Débutant, au 2e toucher, tient
+    // dans le budget de la charte (50 mots hors avertissement, un seul avertissement), sur le marché
+    // réel du 08/10 : 09:00 et 14:10 (une figure, le scénario 1 et la ligne se disputent la place : la
+    // ligne cède, la bulle du scénario 1 en faisait plus de 200, « place prise » et deux avertissements),
+    // 15:40, 17:40 (des fermetures). Une figure qui dit son état au prix en direct n'y est pas comptée :
+    // cette phrase-là n'est pas encore raccourcie (dit dans le commit).
+    titre('M6, C16 : chaque bulle du Débutant tient dans son budget (390 px)');
+    for (const quand of ['09:00', '14:10', '15:40', '17:40']) {
+      const h = H.harnais(X, '2026-10-08T' + quand + ':00Z');
+      const o = await H.ouvrir(nav, h, { vue: { width: 390, height: 844 }, mode: 'debutant', tactile: true });
+      const B = await o.page.evaluate(() => {
+        const E = guideEtat, Sc = scenEtat, out = [];
+        const L = (E ? E.cibles : []).concat(Sc ? Sc.cibles : []);
+        for (const c of L) {
+          const p = reperesPoint(c);
+          if (!p) continue;
+          crossX = p[0]; crossY = p[1]; bulleDetail = cleBulle(c); crossListe = false; ancreBulle = null;
+          dessinerCalque();
+          const bl = (Sc && Sc.survol === c && Sc.bulle) || (E && E.survol === c && E.bulle) || null;
+          out.push({ titre: c.titre, vivant: !!(c.figure && c.figure.v && (c.figure.v.cle || c.figure.v.etiq)), cede: !!(Sc && Sc.boite && Sc.boite.cede && c === Sc.cibleUn), corps: bl ? bl.corps.join(' ') : '' });
+        }
+        crossX = crossY = null; bulleDetail = null; dessinerCalque();
+        return out;
+      });
+      const comptees = B.filter(b => b.corps && !b.vivant), trop = comptees.filter(b => motsBulle(b.corps) > BULLE_MOTS || avertissements(b.corps) !== 1 || /place prise/.test(b.corps));
+      check(`${quand} : ${comptees.length} bulles, chacune ${BULLE_MOTS} mots au plus hors avertissement, un seul avertissement, jamais « place prise » (${comptees.map(b => b.titre + ' ' + motsBulle(b.corps)).join(' · ')})`,
+        comptees.length >= 4 && !trop.length, trop.map(b => [b.titre, motsBulle(b.corps), b.corps]));
+      if (quand === '14:10') {
+        const un = B.find(b => b.cede);
+        check('14:10 : la ligne a cédé sa place ; la bulle du scénario 1 dit le scénario nommé (« le scénario 2 suit le mieux le prix ») et les autres (« Les autres… : »), sans le texte de la ligne',
+          !!un && /scénario 2 suit le mieux le prix/.test(un.corps) && /Les autres(, classés après lui)? : /.test(un.corps) && !/selon Claude\./.test(un.corps), un);
+      }
+      check(`${quand} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
 

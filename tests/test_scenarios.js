@@ -406,8 +406,26 @@ titre('6 bis. Débutant : une ligne d’état marquée, un libellé court, une b
   check('origine sans jargon : « plus haut du 08/10 (83 521), EMA 20 1d » → « plus haut du 08/10, 83 521 » ; « mur de calls (modèle) » → rien', S.origineDebutant('plus haut du 08/10 (83 521), EMA 20 1d') === 'plus haut du 08/10, 83 521' && S.origineDebutant('mur de calls (modèle)') === null, [S.origineDebutant('plus haut du 08/10 (83 521), EMA 20 1d'), S.origineDebutant('mur de calls (modèle)')]);
   const hPoint = Fm.heure(S.pointMs(F.groupe, P.point));
   check('en-tête : « Écrits par Claude (une IA) ce matin, au point de ' + hPoint + '. » (heure de l’appareil, sans « heure de Paris »)', S.enteteDebutant(F, P, H3) === 'Écrits par Claude (une IA) ce matin, au point de ' + hPoint + '.', S.enteteDebutant(F, P, H3));
+  // N5 (revue du 14/10/2026) : l'énoncé de Claude était chargé mais montré nulle part (le jour du CPI,
+  // c'est lui qui le nommait). Débutant : à la place de « Le prix va vers … », l'invalidation qu'il ne
+  // dit pas ajoutée ; un énoncé qui porte un mot banni (« Range ») laisse la phrase en mots. « Le
+  // détail » : en 1re ligne.
+  const ex1D = S.explicationDebutant(F.scenarios[0], null, P, {}), ex3D = S.explicationDebutant(F.scenarios[2], null, P, {});
+  check('N5 : bulle du Débutant, l’énoncé de Claude d’abord (« Hausse vers 86 500 puis 87 200. Sans toucher 85 500 $ avant. ») ; « Range … » (mot banni) : la phrase en mots',
+    ex1D[0] === 'Hausse vers 86 500 puis 87 200. Sans toucher 85 500 $ avant.' && /^Le prix reste entre 85 600 et 86 400 \$\./.test(ex3D[0]) && !G.motsBannis(ex3D.join(' ')).length, [ex1D[0], ex3D[0]]);
+  const ex1E = S.explication(F.scenarios[0], null, 'expert', P, { itv: '15 min' });
+  check('N5 : « Le détail », l’énoncé en 1re ligne, en tête du paragraphe des cibles', /^Hausse vers 86 500 puis 87 200\. Cibles : 86 500 \$/.test(ex1E[0]), ex1E.slice(0, 2));
+  // M6 (revue du 14/10/2026) : la bulle d'un scénario du Débutant tient en 50 mots hors avertissement
+  // (charte du 12/10/2026), comptés comme les fiches ; avant, « Écrit par Claude (une IA) le … à … »,
+  // les bornes « sans sortir de … » et le rang la portaient au-delà.
+  const motsS = x => x.split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length, bulleMots = dansPage('PARAM.guide.debutant.bulleMots');
+  const tropS = [];
+  for (const sc of F.scenarios) for (const sv of SV) { const x = S.explicationDebutant(sc, sv, P, {}).join(' '); if (motsS(x) > bulleMots) tropS.push([motsS(x), x]); }
+  check(`M6 : ${F.scenarios.length * SV.length} bulles de scénario du Débutant, ${bulleMots} mots au plus chacune`, bulleMots === 50 && !tropS.length, tropS.slice(0, 2));
   const exR = S.explicationDebutant(F.scenarios[2], null, P, {}).join(' ');
-  check('range, bulle : ses bornes élargies en dollars (« sans sortir de 85 343 – 86 659 $ »), aucun « ± N % »', /sans sortir de \d{1,3}(?: \d{3})* – \d{1,3}(?: \d{3})* \$/.test(exR) && !/%/.test(exR), exR);
+  // (Changé exprès, revue du 14/10/2026, N6 : « sans sortir de 85 343 – 86 659 $ » ne disait pas à quoi
+  // servent ces deux prix ; la phrase dit maintenant ce qu'ils font.)
+  check('range, bulle : ses bornes élargies en dollars, avec ce qu’elles font (« Sorti s’il passe sous 85 343 $ ou au-dessus de 86 659 $ »), aucun « ± N % »', /Sorti s’il passe sous \d{1,3}(?: \d{3})* \$ ou au-dessus de \d{1,3}(?: \d{3})* \$\./.test(exR) && !/%/.test(exR), exR);
 }
 
 // ── 7. Dans la page ──

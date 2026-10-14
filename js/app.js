@@ -524,6 +524,10 @@ const PARAM = {
                 // Bulle résumée (le détail au 2e toucher) : 4 lignes au plus, titre et ligne
                 // d'accès au détail compris, et 3 nombres au plus (demande du 10/10/2026).
                 bulleLignes: 4, bulleNombres: 3,
+                // Le détail d'une bulle sans « Le détail » (charte des explications courtes du 12/10/2026) :
+                // au plus `bulleMots` mots hors avertissement, comptés comme les fiches (un groupe qui porte
+                // une lettre ou un chiffre) ; revue du 14/10/2026, M6 et C16.
+                bulleMots: 50,
                 // La ligne « ce qui vient de se passer » (plan §10 bis) : une ligne, comme la phrase.
                 evenement: 90, evenementEtroit: 48 },
   },
@@ -5693,15 +5697,17 @@ function guideRegimeBadge(E, x, W) {
   const ico = Icones.tendance(r.cle === 'hausse' ? 1 : r.cle === 'baisse' ? -1 : 0);
   guidePastille(ctx, x, 19, w, 15, tt, coul, ico);
   const G = PARAM.guide, itv = Guide.nomIntervalle(chartInterval);
-  const valeurs = r.cle === 'inconnu' ? 'Pas assez de bougies pour l’ADX.' : 'ADX ' + Math.round(r.adx) + ', +DI ' + Math.round(r.pdi) + ', −DI ' + Math.round(r.mdi)
-    + (r.emaHaut === null ? '' : ', EMA ' + G.emaCourte + (r.emaHaut ? ' au-dessus de' : ' sous') + ' l’EMA ' + G.emaLongue) + ' (dernière bougie ' + itv + ' close).';
+  // Chaque chiffre dit à quoi il sert, dans les mots de l'Expert (plan du 13/10/2026, idée 8 ; revue
+  // du 14/10/2026, N6 : le badge du régime ne le disait pas) — les mots d'usage remplacent la phrase
+  // d'explication qui les précédait hors de « Le détail ».
+  const valeurs = r.cle === 'inconnu' ? 'Pas assez de bougies pour l’ADX.' : 'ADX ' + Math.round(r.adx) + ' (force du mouvement, pas son sens), +DI ' + Math.round(r.pdi) + ' et −DI ' + Math.round(r.mdi) + ' (côté qui domine)'
+    + (r.emaHaut === null ? '' : ', EMA ' + G.emaCourte + (r.emaHaut ? ' au-dessus de' : ' sous') + ' l’EMA ' + G.emaLongue + ' (sens de la tendance)') + ' ; dernière bougie ' + itv + ' close.';
   // La règle en une ligne compacte (le détail et ses raisons : la fiche du régime).
   E.cibles.push({ rects: [{ x0: x, y0: 17, x1: x + w, y1: 36 }], prio: 0, ico, titre: Guide.texteRegime(r, 'debutant', G),
-    texte: (E.exp ? [] : ['L’ADX mesure la force d’un mouvement, pas son sens. +DI et −DI disent quel côté domine.'])
-      .concat([valeurs,
+    texte: [valeurs,
         'Règle : ADX ≥ ' + G.adxTendance + ' tendance, ≤ ' + G.adxSans + ' sans tendance, entre les deux faible. Sens : +DI/−DI et EMA ' + G.emaCourte + '/' + G.emaLongue + ' ; s’ils divergent, « sens incertain ».',
         'Compression : bandes de Bollinger parmi les ' + G.bbPercentile + ' % les plus étroites des ' + G.bbFenetre + ' dernières bougies.',
-        'Décrit le passé récent, pas la suite.']) });
+        'Décrit le passé récent, pas la suite.'] });
 }
 
 /** Calque : état de chaque niveau au prix LIVE, lecture du moment. Ne recalcule rien. */
@@ -5844,18 +5850,29 @@ function guideTexteNiveauDebutant(L, E) {
   // Le « Haut des 24 h » du graphique (bougies, en direct) et celui de la case des infos du marché
   // (publié, 24 h glissantes de Binance) peuvent différer : la bulle dit pourquoi. Une « case », pas
   // une « carte » : la même bulle finit par « Voir sur la carte des ordres ▸ » (revue du 14/10/2026, M3).
-  if (activeSymbol === 'BTCUSDT' && R.some(r => /^h24_/.test(r.cle)))
-    out.push('La case « Plus bas et plus haut des 24 h » peut dire un autre chiffre. Ses 24 h ne commencent pas à la même minute.');
+  // Revue du 14/10/2026 (M6 : « Bas des 24 h », 62 mots pour 50) : en une phrase courte, et
+  // facultative comme « Tout près » et la bande (debTenir) — l'état, ce qu'est le repère et la suite
+  // restent toujours.
+  const note24 = activeSymbol === 'BTCUSDT' && R.some(r => /^h24_/.test(r.cle)) ? 'La case des 24 h peut différer : elle part d’une autre minute.' : null;
+  if (note24) out.push(note24);
   // « Tout près » : les autres prix de sa bande Expert À CÔTÉ de ce repère seulement — à moins
   // d'une demi-bande (au moins 0,25 × ATR), du même côté du prix, jamais l'autre repère de l'écran
   // ni le repère suivant (une bande fusionnée de 200 $ qui enjambe le prix appelait « tout près »
   // le repère de l'autre côté). Un prix égal à celui du repère n'est pas redit.
   const pres = guidePresDebutant(L, E), rP = Guide.raisonPrincipale(L.niv), memePrix = r => !!rP && Guide.prixR(r, E.unite) === Guide.prixR(rP, E.unite);
-  if (pres.length) out.push('Tout près : ' + pres.map(r => Guide.nomPhrase(r) + (memePrix(r) ? '' : ' (' + Guide.prixR(r, E.unite) + ')')).join(', ') + '.');
+  const tout = pres.length ? 'Tout près : ' + pres.map(r => Guide.nomPhrase(r) + (memePrix(r) ? '' : ' (' + Guide.prixR(r, E.unite) + ')')).join(', ') + '.' : null;
+  if (tout) out.push(tout);
+  // La bande dit à quoi elle sert (plan du site, idée 8, 13/10/2026 : Guide.avecUsage) ; avant la
+  // suite, qui dit ce qui changerait la lecture (charte, règle 7).
+  const bande = Guide.avecUsage('Bande de ± ' + Guide.prixRond(L.niv.demi, E.unite), 'bande', 'debutant') + '.';
+  out.push(bande);
   out.push(Guide.texteSuiteDebutant(debChemin(L.niv, L.suivant, L.niv.dessus ? 1 : -1), E.unite, chartInterval, L.niv.dessus ? 1 : -1, now, true));
-  // La bande dit à quoi elle sert (plan du site, idée 8, 13/10/2026 : Guide.avecUsage).
-  out.push(Guide.avecUsage('Bande de ± ' + Guide.prixRond(L.niv.demi, E.unite), 'bande', 'debutant') + '.');
   out.push(Guide.AVERTISSEMENT);
+  // guideBulle les garde s'ils tiennent, une fois l'état au prix live posé en tête (debTenir).
+  out.facultatifs = [note24, tout, bande].filter(Boolean);
+  // Un mur trop long même sans rien de facultatif (revue du 14/10/2026, M6 : 54 mots pour 50) : son
+  // heure reste, avec son usage ; « les ordres ont pu bouger » part le premier.
+  out.courts = out.filter(t => / ; les ordres ont pu bouger\.$/.test(t)).map(t => [t, t.replace(/ ; les ordres ont pu bouger\.$/, '.')]);
   return out;
 }
 /** Le résumé de la bulle de la phrase (1er toucher) : le sens des mots employés, sans chiffre. */
@@ -5879,24 +5896,30 @@ function guideTextePhraseDebutant(E, phrase) {
   // La fenêtre de l'ADX (lissé deux fois : les bougies plus anciennes comptent un peu aussi), en durée.
   const env = Guide.environ(n * pas), sur = env ? 'sur ' + env + ', ' : '';
   // « Monte » et « Baisse » demandent aussi la moyenne courte du bon côté de la longue (Guide.regime).
-  const long = ', comme la tendance plus longue';
+  const long = ', comme la tendance longue';
   const out = [];
   if (/touche/.test(phrase)) out.push('« Touche » : le prix est en ce moment dans la bande de ce repère.');
   if (/est passé/.test(phrase)) out.push('« Est passé » : ' + per[1] + ' de suite ont fini au-delà de ce repère.');
   // Le sens du verbe, seulement s'il est dans la phrase affichée (sinon : ce que dit le mouvement).
+  // Revue du 14/10/2026 (M6 : 63 mots pour 50, une phrase de 18) : « descend nettement » pour « va
+  // nettement vers le bas » ; le mouvement d'une phrase qui ne le nomme pas est facultatif (debTenir).
   const verbe = Guide.VERBE_DEBUTANT[r.cle], dit = verbe && new RegExp('\\b' + verbe + '\\b').test(phrase);
-  const tete = dit ? '« ' + verbe.charAt(0).toUpperCase() + verbe.slice(1) + ' » : ' : 'Le mouvement : ';
-  const sens = { hausse: 'le prix va nettement vers le haut' + long, baisse: 'le prix va nettement vers le bas' + long,
+  const sens = { hausse: 'le prix monte nettement' + long, baisse: 'le prix descend nettement' + long,
     faible: 'le prix n’a pas de direction nette', sans: 'le prix n’a pas de direction nette', incertaine: 'le prix bouge nettement, sans sens clair' }[r.cle];
-  out.push(sens ? tete + sur + sens + '.' : 'Pas encore assez d’historique pour dire si le prix monte ou baisse.');
-  if (isNum(var24Courant) && ((r.cle === 'hausse' && var24Courant < 0) || (r.cle === 'baisse' && var24Courant > 0)))
-    out.push('La variation en haut (' + texteVar24(var24Courant, true) + ') porte sur 24 h : sur moins long, le sens peut changer.');
-  if (r.compression) out.push('Le prix bouge moins que d’habitude ces ' + Guide.dernieres(G.bbFenetre * pas) + '.');
+  const tS = !sens ? 'Pas encore assez d’historique pour dire si le prix monte ou baisse.'
+    : dit ? '« ' + verbe.charAt(0).toUpperCase() + verbe.slice(1) + ' » : ' + sur + sens + '.' : (sur + sens).charAt(0).toUpperCase() + (sur + sens).slice(1) + '.';
+  out.push(tS);
+  const fac = dit ? [] : [tS];
+  if (isNum(var24Courant) && ((r.cle === 'hausse' && var24Courant < 0) || (r.cle === 'baisse' && var24Courant > 0))) {
+    const v = 'La variation en haut (' + texteVar24(var24Courant) + ') porte sur 24 h. Sur moins long, le sens peut changer.';
+    out.push(v); fac.push(v);
+  }
+  if (r.compression) { const c = 'Le prix bouge moins que d’habitude ces ' + Guide.dernieres(G.bbFenetre * pas) + '.'; out.push(c); fac.push(c); }
   // Les deux chemins partent des deux repères de l'écran (aucun autre seuil).
   const S = E.debSel || {};
   out.push(Guide.texteSuiteDebutant(debChemin(S.dessus, S.suivantHaut, 1), E.unite, itv, 1, now), Guide.texteSuiteDebutant(debChemin(S.dessous, S.suivantBas, -1), E.unite, itv, -1, now));
   out.push(Guide.AVERTISSEMENT);
-  return out;
+  return debTenir(out, fac);
 }
 /** Les bougies visibles, gêne « douce » des étiquettes du Guide (essayées d'abord sans les couvrir). */
 function guideSurBougies(E) {
@@ -5951,7 +5974,8 @@ function guideDebutant(E) {
       if (pose) break;
     }
     const zones = L.visible ? [{ x0: g.pad.left, y0: L.yH - 3, x1: xMax, y1: L.yB + 3 }] : [];
-    E.cibles.push({ rects: pose ? [guideZone(pose)] : [], zones, prio: 1, niveau: L, titre: Guide.titreDebutant(L.niv, E.unite), texte: guideTexteNiveauDebutant(L, E), optionsSeules: Guide.optionsSeules(L.niv) });
+    const tN = guideTexteNiveauDebutant(L, E);
+    E.cibles.push({ rects: pose ? [guideZone(pose)] : [], zones, prio: 1, niveau: L, titre: Guide.titreDebutant(L.niv, E.unite), texte: tN, facultatifs: tN.facultatifs, courts: tN.courts, optionsSeules: Guide.optionsSeules(L.niv) });
     if (!pose) continue;
     L.etiq = { x: xp, y: pose.y, w, h: H, t };
     debItem('niveau', t, { x: xp, y: pose.y, w, h: H });
@@ -6348,7 +6372,8 @@ function guideCalqueDebutant(E) {
   if (E.itemPhrase) { E.itemPhrase.texte = ph.t; E.itemPhrase.rect = { x, y, w, h }; }
 }
 /** Débutant : le budget. La ligne des scénarios est la seule qui cède, et seulement quand la forme
- *  ET le libellé du scénario 1 sont posés : sa bulle passe alors dans celle du libellé. */
+ *  ET le libellé du scénario 1 sont posés : sa phrase courte (les autres scénarios) passe alors dans
+ *  la bulle du libellé. */
 function debArbitrer() {
   if (!debEtat) return;
   const roles = debEtat.items.map(i => i.role), S = scenEtat, B = S && S.boite;
@@ -6357,10 +6382,13 @@ function debArbitrer() {
   B.cede = true;
   debEtat.items = debEtat.items.filter(i => i.role !== 'boite');
   if (B.cible) S.cibles = S.cibles.filter(c => c !== B.cible);
-  if (B.cible && S.cibleUn) {
-    S.cibleUn.texte = S.cibleUn.texte.concat(['La ligne des scénarios (place prise) :'], B.cible.texte);
-    // Écran court : la ligne elle-même, en une phrase, avant l'avertissement final.
-    if (S.cibleUn.texteCourt && B.texte) { const tc = S.cibleUn.texteCourt; S.cibleUn.texteCourt = tc.slice(0, -1).concat(['La ligne des scénarios (place prise) : « ' + B.texte.replace(/\s*▸$/, '') + ' ».'], tc.slice(-1)); }
+  // Revue du 14/10/2026 (C16, textes-3, vision-15) : la bulle du libellé ne reçoit plus « La ligne des
+  // scénarios (place prise) : » suivi de tout le texte de la ligne (220 mots, deux avertissements),
+  // mais la phrase courte des autres scénarios, avant son seul avertissement.
+  const it = S.cibleUn && (S.items || []).find(i => i.sc.id === S.cibleUn.scenario);
+  if (B.cible && it) {
+    S.cibleUn.texte = scenTexteDebutant(S, it, false, true);
+    if (S.cibleUn.texteCourt) S.cibleUn.texteCourt = scenTexteDebutant(S, it, true, true);
   }
 }
 
@@ -6634,6 +6662,26 @@ const nombresDe = t => {
     if (m[0].length > 1 || /^[\u00a0\u202f ]?(?:%|\$|h\b|min\b|j\b|BTC|fois)/.test(s.slice(m.index + 1))) n++;
   return n;
 };
+/** Les mots d'un texte, comptés comme les fiches (tests/test_fiches.js) : un groupe séparé par des
+ *  espaces qui porte une lettre ou un chiffre (« 82 787 $ » : 2). Le budget des bulles du Débutant
+ *  (PARAM.guide.debutant.bulleMots ; revue du 14/10/2026, M6). */
+const motsDe = t => String(t).split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
+/** Le détail d'une bulle du Débutant dans son budget (revue du 14/10/2026, M6 : « une phrase, un
+ *  repère, un avertissement ») : ses phrases facultatives (texte.facultatifs, de la plus utile à la
+ *  moins utile) restent, à leur place, tant que le corps (sans l'avertissement, le dernier
+ *  paragraphe) tient en PARAM.guide.debutant.bulleMots mots. Un corps trop long même sans elles
+ *  prend d'abord les versions courtes de courts ([long, court]). → un nouveau tableau. */
+function debTenir(texte, facultatifs, courts) {
+  const F = new Set(facultatifs || []), garde = new Set(), max = PARAM.guide.debutant.bulleMots;
+  let n = motsDe(texte.slice(0, -1).filter(t => !F.has(t)).join(' '));
+  for (const [l, c] of courts || []) {
+    const i = texte.indexOf(l);
+    if (n > max && i >= 0) { texte = texte.slice(); texte[i] = c; n -= motsDe(l) - motsDe(c); }
+  }
+  if (!F.size) return texte;
+  for (const x of facultatifs) if (texte.includes(x) && n + motsDe(x) <= max) { garde.add(x); n += motsDe(x); }
+  return texte.filter(t => !F.has(t) || garde.has(t));
+}
 /** Un avertissement de fin de bulle (« Une description, pas une recommandation. ») : en résumé, la
  *  ligne d'accès au détail le redit (« pas une prévision »). */
 const estAvertissement = t => { const s = t.replace(Guide.RISQUE + ' ', ''); return s.length < 90 && /recommandation|conseil/.test(s); };
@@ -6685,12 +6733,17 @@ function guideBulle(c, W, mainH, evite) {
   if (c.figure && E && E.ctxF) {
     const cF = Object.assign({}, E.ctxF, { vivant: c.figure.v, live: isNum(livePrice) ? livePrice : null }), R = GUIDE_FORMES.val;
     if (debutant() && R) texte = Guide.texteFormeDebutant(c.figure.f, R.bilan[c.figure.f.type], cF, PARAM.guide, guideUnite());
+    const fac = debutant() ? texte.facultatifs || c.texte.facultatifs : null;
     vivant = c.figure.v ? Guide.texteVivantFigure(c.figure.f, c.figure.v, cF, debutant() ? 'debutant' : 'expert', guideUnite()) : '';
     if (vivant) texte.unshift(vivant);
+    // Le budget du détail, état vivant compris (revue du 14/10/2026, M6) : le bilan mesuré s'il tient.
+    if (fac) texte = debTenir(texte, fac);
   }
   if (debutant()) {
     // L'état au prix live, en mots ; une bande faite d'options dit d'abord que c'est une estimation.
     if (c.niveau && c.niveau.live) texte.splice(c.optionsSeules ? 1 : 0, 0, Guide.texteEtatDebutant(c.niveau.live, c.niveau.niv, livePrice, guideUnite(), chartInterval));
+    // Le budget du détail, état compris (revue du 14/10/2026, M6).
+    texte = debTenir(texte, c.facultatifs, c.courts);
   } else {
     // Expert : l'état au prix live dans les mots de l'Expert, comme le titre et le corps de la bulle ;
     // l'écart en % dit ce qu'il mesure (idée 8) : ce qu'il reste avant le niveau, ou déjà au-delà.
@@ -8110,7 +8163,9 @@ function scenResumeDebutant(S, it) {
   const sc = it.sc, e = Scenarios.etatCourtDebutant(sc, it.sv), maj = t => t.charAt(0).toUpperCase() + t.slice(1);
   const sansRang = t => maj(String(t || '').replace(/^\S+\s+/, '')).replace(/\.?$/, '.');
   const quoi = sc.forme === 'range' ? 'Le prix reste entre ' + Scenarios.chiffres(sc.range[0]) + ' et ' + Scenarios.prix(sc.range[1]) : 'Le prix va vers ' + sc.cibles.map(Scenarios.prix).join(' puis ');
-  return [[sansRang(Scenarios.ligneDebutant(sc, it.sv, S.maintenant)), sansRang(Scenarios.ligneCourteDebutant(sc, it.sv, S.maintenant, true)), quoi + ' — ' + e.etat + (e.marque ? ' ' + e.marque : '') + '.']];
+  // L'énoncé de Claude d'abord, s'il tient (revue du 14/10/2026, N5 : c'est lui qui nomme le CPI).
+  const en = Scenarios.enonceDebutant(sc, quoi + '.'), etat = ' — ' + e.etat + (e.marque ? ' ' + e.marque : '') + '.';
+  return [(en ? [en.replace(/\.$/, '') + etat] : []).concat([sansRang(Scenarios.ligneDebutant(sc, it.sv, S.maintenant)), sansRang(Scenarios.ligneCourteDebutant(sc, it.sv, S.maintenant, true)), quoi + etat])];
 }
 /** Le résumé de la ligne des scénarios (Débutant, 1er toucher) : ce que sont les scénarios, puis
  *  l'état de chacun, la marque dite une fois quand elle est la même pour tous. */
@@ -8124,25 +8179,49 @@ function scenResumeLigneDebutant(S) {
     : tete + E.map(e => e.r + ' ' + e.etat + (!une && e.marque ? ' ' + e.marque : '')).join(' · ');
   return ['Hypothèses de Claude (une IA), écrites au point du matin.', etats + '.'];
 }
-function scenTexteDebutant(S, it, court) {
-  const P = PARAM.scenarios, F = S.F;
-  // Charte des explications courtes (12/10/2026) : qui et quand, ce qu'il dit, où il en est, son
-  // rang, puis l'avertissement — les autres scénarios sont dans la bulle de la ligne.
-  const ex = Scenarios.explicationDebutant(it.sc, it.sv, P, { itv: S.itv, statuts: F.statuts, maintenant: S.maintenant });
+/** cede : la ligne des scénarios a cédé sa place (debArbitrer) ; sa phrase courte, celle des autres
+ *  scénarios, vient avant l'avertissement. */
+function scenTexteDebutant(S, it, court, cede) {
+  const P = PARAM.scenarios, F = S.F, suivi = !!(it.j && S.jour);
+  // Charte des explications courtes (12/10/2026) : ce qu'il dit, son rang et jusqu'à quand, où il en
+  // est, puis l'avertissement — les autres scénarios sont dans la bulle de la ligne.
+  const ex = Scenarios.explicationDebutant(it.sc, it.sv, P, { itv: S.itv, statuts: F.statuts, maintenant: S.maintenant, suivi });
   const k = ex.iEtat;
-  // La journée : sur la ligne de l'état, où en est le prix (distances) ; puis, s'il a le plus
-  // petit écart, une phrase courte (une règle de calcul, jamais une prévision).
-  if (it.j && S.jour) {
-    const d = it.j.ouvert ? Scenarios.distancesDebutant(it.j) : null;
-    if (d) ex[k] += ' : ' + d;
-    const nomP = Scenarios.phraseNomDebutant(S.jour, it.j, true);
-    if (nomP) ex.splice(k + 1, 0, nomP);
-  }
+  // La journée : sur la ligne de l'état, où en est le prix, chaque distance avec ce qu'elle mesure
+  // (revue du 14/10/2026, N6). La ligne cédée : la distance à sa zone seulement (M6 : 50 mots).
+  const d = suivi && it.j.ouvert ? Scenarios.distancesDebutant(it.j, cede ? 'bulleCourte' : 'bulle') : null;
+  if (d) ex[k] += ' : ' + d;
   const out = ex.map((t, i) => (i === k ? t + '.' : t));
-  // Écran court : sans le rang (le classement est dit dans la bulle de la ligne).
-  if (court) out.splice(out.length - 1, 1);
+  // Écran court, ou ligne cédée : sans le rang (le classement est dit dans la bulle de la ligne, ou
+  // par la phrase des autres scénarios) ; jusqu'à quand rejoint ce qu'il dit.
+  if (court || cede) { out[0] += ' ' + ex.valable; out.splice(ex.iRang, 1); }
+  // Revue du 14/10/2026 (M6, C16) : au plus PARAM.guide.debutant.bulleMots mots hors avertissement.
+  // Ce qui suit vient s'il tient, dans cet ordre : sous la ligne de l'état, le scénario au plus petit
+  // écart (une règle de calcul, jamais une prévision ; quand la ligne a cédé sa place, il n'est dit
+  // nulle part ailleurs), puis les autres scénarios quand la ligne a cédé sa place (ils ne sont plus
+  // lisibles ailleurs), en version courte s'il le faut.
+  const e = out.indexOf(ex[k] + '.'), max = PARAM.guide.debutant.bulleMots;
+  let n = motsDe(out.join(' '));
+  const nomP = suivi ? Scenarios.phraseNomDebutant(S.jour, it.j, true) : null;
+  if (nomP && e >= 0 && n + motsDe(nomP) <= max) { out.splice(e + 1, 0, nomP); n += motsDe(nomP); }
+  const autres = cede ? [scenAutresDebutant(S, it), scenAutresDebutant(S, it, true)].find(a => a && n + motsDe(a) <= max) : null;
+  if (autres) out.push(autres);
   out.push('Une hypothèse de Claude (une IA), pas un conseil.');
   return out;
+}
+/** La phrase courte des autres scénarios, pour la bulle du scénario montré quand la ligne des
+ *  scénarios a cédé sa place (revue du 14/10/2026, C16 : elle recevait « La ligne des scénarios
+ *  (place prise) : » puis tout le texte de la ligne, avertissement compris — 220 mots). Leur état
+ *  en mots, la marque dite une fois : « Les autres, classés après lui : 2 en cours, 3 invalidé ✗
+ *  (en direct). » ; bref : « Les autres : … » ; null s'il n'y en a pas. */
+function scenAutresDebutant(S, it, bref) {
+  const A = (S.items || []).filter(i => i !== it && i.sc.id !== it.sc.id);
+  if (!A.length) return null;
+  const E = A.map(i => Object.assign({ r: i.sc.rang === 'S' ? 'semaine' : i.sc.rang }, Scenarios.etatCourtDebutant(i.sc, i.sv)));
+  const une = new Set(E.map(e => e.marque)).size === 1, marque = une && E[0].marque ? ' ' + E[0].marque : '';
+  const tete = bref ? 'Les autres : ' : it.sc.rang === '1' ? 'Les autres, classés après lui : ' : 'Les autres scénarios : ';
+  const etats = E.length > 1 && une && new Set(E.map(e => e.etat)).size === 1 ? E[0].etat : E.map(e => e.r + ' ' + e.etat + (!une && e.marque ? ' ' + e.marque : '')).join(', ');
+  return tete + etats + marque + '.';
 }
 /** Le libellé du scénario 1, près du trait de son premier niveau (le haut d'un range), à gauche
  *  de la marge de futur ; un niveau hors de la vue est nommé au bord, avec sa flèche. */
@@ -8221,10 +8300,8 @@ function scenLibelleDebutant(S, it, top, bas) {
 /** La bulle de la ligne des scénarios : chaque scénario en mots, le classement, la mesure de
  *  l'ordre, ce que veut dire « (en direct) ». */
 function scenTexteLigneDebutant(S) {
-  const F = S.F, P = PARAM.scenarios, out = [];
-  // Charte du 12/10/2026 : une ligne courte par scénario, trois autres au plus, l'avertissement.
-  // « (en direct) » et le journal vont avec l'avertissement : une bulle coupée les garde.
-  const fin = '« (en direct) » : suivi par le site ; la note officielle (journal) vient le lendemain. Une hypothèse de Claude (une IA), pas un conseil.';
+  const F = S.F, out = [];
+  const avert = 'Une hypothèse de Claude (une IA), pas un conseil.';
   const hP = heurePointMatin();
   const chaque = 'Chaque matin' + (hP ? ' vers ' + hP : '') + ', Claude (une IA) écrit trois scénarios pour environ 24 h, classés du plus au moins probable, sans pourcentage.';
   if (!F) {
@@ -8234,26 +8311,45 @@ function scenTexteLigneDebutant(S) {
       const e = previsionsEchec, h = e ? Fmt.jourHeure(e.a) : null;
       out.push('Fichier des scénarios illisible' + (e ? ' (' + scenRaison(e.raison) + (h ? ', ' + h : '') + ')' : '') + ' : rien n’est dessiné.');
     }
-    out.push(chaque, 'Une hypothèse de Claude (une IA), pas un conseil.');
+    out.push(chaque, avert);
     return out;
   }
-  const J = S.jour;
-  out.push(Scenarios.enteteDebutant(F, P, S.maintenant).replace(/\.$/, '') + ' ; classés du plus au moins probable, sans pourcentage.' + (J ? ' Ce classement ne change pas pendant la journée.' : ''));
-  // Chaque scénario : ce qu'il dit en peu de mots, son état (marqué), et où en est le prix.
-  for (const it of S.items) {
-    const j = it.j, d = j && J && j.ouvert ? Scenarios.distancesDebutant(j, 'mini') : null;
-    const nom = j && J && J.meneur === j ? ', suit le mieux le prix' : '';
-    out.push(Scenarios.ligneCourteDebutant(it.sc, it.sv, S.maintenant, true).replace(/^(\d\. )(vers|entre) /, (x, a, b) => a + b.charAt(0).toUpperCase() + b.slice(1) + ' ') + (d ? ' : ' + d : '') + nom + '.');
-  }
-  // Le temps restant (aucune nouvelle prévision), ce qui est au-delà de tous les niveaux, le scénario
-  // qui suit le mieux le prix : une ligne.
-  // « Un seul scénario est encore en cours » : les lignes le disent déjà ; seule la suite reste.
-  const r = J ? Scenarios.texteResteDebutant(J, S.maintenant) : null, m = J ? (Scenarios.phraseMeneurDebutant(J) || '').replace(/^Un seul scénario est encore en cours : le \S+\.$/, '') || null : null;
-  const jour = [r, J && J.hors ? 'Le prix est allé au-delà de tous les niveaux du matin.' : null, m].filter(Boolean).join(' ');
-  if (jour) out.push(jour);
-  const b = F.bilan;
-  if (b && b.matins > 0) out.push('Le 1er mouvement annoncé par Claude est venu en premier ' + b.reussis + ' fois sur ' + b.matins + (b.matins > 1 ? ' matins' : ' matin') + (b.matins < P.echantillonFaible ? ' : trop peu pour juger.' : '.'));
-  out.push(fin);
+  // Revue du 14/10/2026 (M6 : cette bulle faisait 131 mots pour un budget de 50,
+  // PARAM.guide.debutant.bulleMots) : une ligne courte par scénario (son état ; « (en direct) » dit
+  // une fois quand il est le même pour tous ; sans distance : celle du scénario montré est dans sa
+  // bulle, avec ce qu'elle mesure, N6), le classement, le sens de « en direct » et du journal,
+  // l'avertissement. Le titre dit déjà l'heure du point ; le bilan de l'ordre, une statistique,
+  // reste avec « Le détail » (charte, règle 5). Viennent ensuite, s'ils tiennent dans le budget :
+  // jusqu'à quand, « par un passage bref du prix » pour une invalidation (une réalisation le dit
+  // toujours), le scénario au plus petit écart, le reste de la journée (au-delà de tous les
+  // niveaux, trop tôt, aucun ne colle…). Quatre scénarios (la semaine en plus) remplissent presque
+  // le budget à eux seuls.
+  const J = S.jour, max = PARAM.guide.debutant.bulleMots, BREF = ', par un passage bref du prix';
+  const E = S.items.map(i => Scenarios.etatCourtDebutant(i.sc, i.sv)), marques = new Set(E.map(e => e.marque)), une = marques.size === 1 ? E[0].marque : null;
+  const lignes = S.items.map(it => {
+    const l = Scenarios.ligneCourteDebutant(it.sc, it.sv, S.maintenant, true, true).replace(/^(\d\. )(vers|entre) /, (x, a, b) => a + b.charAt(0).toUpperCase() + b.slice(1) + ' ');
+    return une ? l.replace(' ' + une, '') : l;
+  });
+  const brefs = lignes.map((l, i) => { const b = l.endsWith(BREF) && !/✓/.test(l); if (b) lignes[i] = l.slice(0, -BREF.length); return b; });
+  let n = motsDe(lignes.join(' '));
+  const prendre = (...v) => { const x = v.find(a => a && n + motsDe(a) <= max) || null; if (x) n += motsDe(x); return x; };
+  const classe = prendre('Du plus au moins probable, selon Claude.');
+  const marque = une === '(journal)' ? prendre('Journal : la note officielle, le lendemain.')
+    : une === '(en direct)' ? prendre('En direct : calcul du site. Le journal note le lendemain.')
+      : une === null ? prendre('« (en direct) » : calcul du site. « (journal) » : la note du lendemain.') : null;
+  const r = J ? prendre(Scenarios.texteResteDebutant(J, S.maintenant, true)) : null;
+  brefs.forEach((b, i) => { if (b && prendre(BREF)) lignes[i] += BREF; });
+  const iNom = J ? S.items.findIndex(it => it.j && J.meneur === it.j) : -1;
+  if (iNom >= 0 && prendre(', suit le mieux le prix')) lignes[iNom] += ', suit le mieux le prix';
+  // Le nom du plus petit écart est sur sa ligne (« suit le mieux le prix ») ; les autres cas de la
+  // journée ont leur phrase (« Un seul scénario est encore en cours » : les lignes le disent déjà).
+  const net = J && J.cas === 'meneur' && J.meneur && !J.remplace && Scenarios.nomNet(J);
+  const m = J && !net ? (Scenarios.phraseMeneurDebutant(J) || '').replace(/^Un seul scénario est encore en cours : le \S+\.\s*/, '') || null : null;
+  const hors = J && J.hors ? prendre('Le prix est allé au-delà de tous les niveaux du matin.') : null;
+  const meneur = prendre(m);
+  if (classe) out.push(classe);
+  for (const x of lignes.map(l => l + '.').concat([r, hors, meneur, marque])) if (x) out.push(x);
+  out.push(avert);
   return out;
 }
 /** La ligne des scénarios, en haut à droite du tracé : sur la rangée de la phrase si elles y
@@ -8288,19 +8384,22 @@ function scenTexteCourtLigne(S, texte) {
 }
 /** M8 (arbitrage du budget Débutant) : quand la ligne porte l'indication d'une fermeture, c'est le
  *  libellé du scénario qui cède (sa zone reste dessinée, sans texte) ; la bulle de la ligne reprend
- *  celle du libellé. → true si le libellé a cédé. */
+ *  de celle du libellé ce qu'elle ne dit pas (l'énoncé de Claude). → true si le libellé a cédé. */
 function scenCederLibelle() {
   const S = scenEtat, B = S && S.boite;
   if (!(B && B.deb && B.prioritaire && S.libelleDeb)) return false;
   const k = etiquettesAFaire.indexOf(S.libelleDeb.dessin);
   if (k >= 0) etiquettesAFaire.splice(k, 1);
   debEtat.items = debEtat.items.filter(i => i.role !== 'scenario');
-  // La bulle de la ligne reprend le libellé en bref (sa version courte, sans l'en-tête, les autres
-  // scénarios ni l'avertissement, déjà dans la ligne) : la bulle longue tient encore à l'écran.
+  // La bulle de la ligne reprend du libellé ce qu'elle ne dit pas déjà (sa ligne « 1. … » dit ce qu'il
+  // vise et son état) : l'énoncé de Claude, avant le seul avertissement. Revue du 14/10/2026 (C16,
+  // textes-3) : plus de « Le libellé du scénario (place prise) : » suivi de sa bulle. L'énoncé vient
+  // s'il tient dans le budget de la bulle (M6, PARAM.guide.debutant.bulleMots).
   if (S.cibleUn) {
     S.cibles = S.cibles.filter(c => c !== S.cibleUn);
-    const lc = (S.cibleUn.texteCourt || []).slice(1, -1).filter(l => !/^Les autres scénarios/.test(l));
-    if (B.cible && lc.length) B.cible.texte = B.cible.texte.slice(0, -1).concat(['Le libellé du scénario (place prise) :'], lc, B.cible.texte.slice(-1));
+    const it = (S.items || []).find(i => i.sc.id === S.cibleUn.scenario), en = it ? Scenarios.enonceVu(it.sc) : null;
+    const ph = en ? 'Le scénario ' + (it.sc.rang === 'S' ? 'de la semaine' : it.sc.rang) + ' en mots de Claude : « ' + en + ' ».' : null;
+    if (B.cible && ph && motsDe(B.cible.texte.slice(0, -1).join(' ')) + motsDe(ph) <= PARAM.guide.debutant.bulleMots) B.cible.texte = B.cible.texte.slice(0, -1).concat([ph], B.cible.texte.slice(-1));
   }
   S.libelles = S.libelles.filter(l => l.t !== S.libelleDeb.t);
   S.libelleDeb = null; S.libelleCede = true;
