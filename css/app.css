@@ -259,6 +259,12 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 .var24:empty { display: none; }
 .var24.pos { background: var(--up-soft); color: var(--up-ink); }
 .var24.neg { background: var(--down-soft); color: var(--down-ink); }
+/* Aero (le seul thème clair sans structure) : le fond translucide de la pastille prenait le mauve
+   de l'en-tête, « −2,26 % en 24 h » n'y tenait que 3,5:1 (3,4 en hausse) pour un texte de 10,5 px.
+   Un fond opaque, l'encre à peine mêlée à --card-solid (sur qui l'encre tient 4,5:1, test_palette) :
+   4,8 et 4,6:1. Les thèmes sombres gardent leur fond (6 à 12:1). Revue du 14/10, C32. */
+:root:not([data-structure]) .var24.pos { background: light-dark(color-mix(in srgb, var(--up-ink) 6%, var(--card-solid)), var(--up-soft)); }
+:root:not([data-structure]) .var24.neg { background: light-dark(color-mix(in srgb, var(--down-ink) 6%, var(--card-solid)), var(--down-soft)); }
 
 /* Chiffres clés de la dernière publication (15 min). Ce qui ne tient pas en largeur est
    masqué en entier, en commençant par la fin (js : ajusterKpis) — jamais coupé à moitié. */
@@ -646,6 +652,13 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   .ind-apercu { position: sticky; top: 0; bottom: auto; margin: -8px 0 -8px; min-height: 100%; max-height: none; box-sizing: border-box;
     padding: 14px 16px; border-top: 0; border-left: 1px solid var(--hairline); }
 }
+/* Bureau 95, téléphone : l'aperçu collant, opaque, couvrait le relief de la fenêtre (une ombre
+   intérieure) à gauche, à droite et en bas, et dépassait de 5 px sa marge de 3 px : le panneau
+   n'avait plus de bord, la phrase du résumé dessous paraissait coupée. Il s'arrête au bas visible du
+   panneau et porte le relief (revue du 14/10, C31). */
+@media (max-width: 768px) {
+  :root[data-structure="fenetres"] .ind-apercu { bottom: -3px; margin-bottom: -3px; box-shadow: var(--releve); }
+}
 .ind-compte {
   min-width: 16px; padding: 0 5px; border-radius: var(--r-bar); font-size: 10px; line-height: 16px; text-align: center;
   background: var(--accent); color: var(--card-solid);
@@ -684,6 +697,17 @@ html[data-structure="planche"] { font-variant-ligatures: none; }
   :root[data-structure="planche"] .plan-cartouche > #updated { flex-direction: column; line-height: 1.1; }
   :root[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { margin-left: 0; }
 }
+/* Planche, téléphone : les cinq colonnes égales coupaient « CVD 24H −118,98 M $ » (le « $ » sous la
+   case voisine, 12 px de trop à 390, 18 à 360). Les colonnes suivent leur contenu : rien ne déborde,
+   la grille reste dans la cartouche, la hauteur des rangées ne change pas (revue du 14/10, C26). */
+@media (max-width: 768px) {
+  :root[data-structure="planche"] .plan-cartouche > .kpis { grid-template-columns: repeat(5, minmax(min-content, auto)); }
+}
+/* Le décor de la barre du bas (« Format A0 · éch. 1:1 », « Information voyageurs · ») ne porte aucune
+   valeur : là où il passait sur deux lignes, poussait « Saṃsāra » sous son icône et collait le point
+   vivant à la paire, il s'efface (Planche sous 390 px, Gare sous 380 px ; revue du 14/10, C29). */
+@media (max-width: 389px) { :root[data-structure="planche"] .aero-taskbar .plan-format { display: none; } }
+@media (max-width: 379px) { :root[data-structure="tableau"] .aero-taskbar .gare-info { display: none; } }
 
 /* ─── 6. Graphique ──────────────────────────────────────────────────────────── */
 .main-area { display: flex; flex: 1; min-height: 0; gap: var(--gap); overflow: hidden; }
@@ -1375,7 +1399,11 @@ html[data-structure-attendue]:not([data-structure-posee]) body { visibility: hid
 :where(html):not([data-calques="1"]) .legende-seule { display: none !important; }
 .info-btn {
   display: inline-flex; align-items: center; justify-content: center; vertical-align: 1px;
-  width: 15px; height: 15px; margin-left: 5px; padding: 0; border-radius: 50%;
+  width: 15px; height: 15px; margin-left: 5px; padding: 0;
+  /* Rond (un signe, PR #47), mais carré dans un thème carré (--r-bar à 0 : Gazette, Planche) : un
+     rond au bout de lignes toutes carrées détonnait (revue du 14/10, C30). Un thème aux coins
+     arrondis, même petits (Néon, Codex, Gare), le garde rond. */
+  border-radius: min(50%, var(--r-bar) * 1000);
   border: 1px solid var(--hairline); background: transparent; color: var(--ink-3);
   font: 700 9.5px/1 Georgia, 'Times New Roman', serif; font-style: italic; cursor: pointer;
   text-transform: none; letter-spacing: 0;
@@ -1407,8 +1435,17 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .fiche-pop:not([style*="left"]) { left: calc(50% - min(210px, 50vw - 12px)); }
 .fiche-pop[hidden] { display: none; }
 .fiche-tete { display: flex; align-items: center; gap: 8px; }
+/* Un long panneau (statistiques d'une figure, glossaire, calculette) défile : son titre et sa croix
+   restent en haut, sur le fond du panneau. Il montait avec le texte : on ne savait plus de quelle
+   figure il s'agissait, et Bureau 95 perdait sa barre de titre (revue du 14/10, M8). L'en-tête
+   s'étend sur la marge haute du panneau (12 px), comme le filtre du panneau d'affichage. */
+.fiche-tete { position: sticky; top: -12px; z-index: 1; margin-top: -12px; padding-top: 12px; background: var(--card-solid); }
+/* Bureau 95 : la barre de titre (sa règle garde sa place et son fond) s'arrête sous le cadre de 3 px
+   de la fenêtre, qu'elle redessine au-dessus d'elle : le texte qui défile n'y passe pas. */
+:root[data-structure="fenetres"] .fiche-tete { top: 0; box-shadow: 0 -1px var(--surface), 0 -2px var(--relief-2), 0 -3px var(--relief-1); }
 .fiche-titre { font-size: 14px; margin: 0; flex: 1; color: var(--ink-1); }
-.fiche-fermer { font: inherit; font-size: 18px; line-height: 1; border: 0; background: none; color: var(--ink-3); cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+/* La croix suit le rayon du thème : à angles vifs dans un thème carré (Gazette : 6 px au survol). */
+.fiche-fermer { font: inherit; font-size: 18px; line-height: 1; border: 0; background: none; color: var(--ink-3); cursor: pointer; padding: 2px 6px; border-radius: min(6px, var(--r-tile)); }
 .fiche-fermer:hover { color: var(--ink-1); background: var(--rail); }
 .fiche-nature { font-size: 9.5px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; padding: 2px 7px; border-radius: var(--r-bar); background: var(--rail); color: var(--ink-2); }
 .fiche-nature.nature-convention, .fiche-nature.nature-seuil { background: var(--warn-soft, var(--rail)); color: var(--warn-ink, var(--ink-1)); }
@@ -1430,6 +1467,10 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .fiche-valeur b { color: var(--ink-1); }
 .fiche-tf { font-size: 10px; font-weight: 700; color: var(--ink-3); }
 .fiche-alerte { margin: 6px 0; padding: 6px 9px; border-radius: min(8px, var(--r-tile)); background: var(--warn-soft, var(--rail)); color: var(--ink-1); font-size: 11.5px; }
+/* Bureau 95 contraste (le jumeau sombre) : le fond de l'alerte est le noir du panneau, « Trop peu
+   de cas… » n'y était plus encadré ; un filet --warn l'entoure. Le jumeau clair garde sa case
+   jaune, sans filet (revue du 14/10, C31). */
+:root[data-structure="fenetres"] .fiche-alerte { box-shadow: inset 0 0 0 1px light-dark(transparent, var(--warn)); }
 /* Courbe des dernières heures de publications : trous hachurés (aucune publication lue, ou
    champ absent du format d'alors) — un trou se voit, il n'est pas comblé. */
 .fiche-chronique { margin: 8px 0 4px; }
@@ -1452,6 +1493,12 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .fiche-technique dt { color: var(--ink-3); }
 .fiche-technique dd { margin: 0; color: var(--ink-2); word-break: break-word; }
 .fiche-pied { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--hairline); font-size: 10.5px; color: var(--ink-3); }
+/* Calculette : « Un calcul, pas un conseil. » reste collé en bas du panneau, sur son fond, même
+   quand les paliers le font défiler (Planche au téléphone : il était sous le pli). Il s'étend sur
+   la marge basse du panneau (14 px ; 12 en Bureau 95, dont il redessine le bas du relief). Revue du
+   14/10, C28. */
+.calc ~ .fiche-pied { position: sticky; bottom: -14px; margin-bottom: -14px; padding-bottom: 14px; background: var(--card-solid); }
+:root[data-structure="fenetres"] .calc ~ .fiche-pied { bottom: -12px; margin-bottom: -12px; padding-bottom: 12px; box-shadow: inset 0 -1px var(--relief-4), inset 0 -2px var(--relief-3); }
 /* Statistiques détaillées d'une figure (js/stats-figures.js) : la cible en gros, puis les comptes. */
 .stats-cible { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 8px 0 2px; }
 .stats-etiquette { font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--ink-3); width: 100%; }
@@ -1512,6 +1559,14 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 @media (max-width: 768px) {
   /* Au-dessus de la barre des tâches (fixe, au-dessus de tout) : elle cachait le bas de la fiche. */
   .fiche-pop { left: 8px !important; right: 8px; top: auto !important; bottom: calc(30px + 2 * var(--gutter) + 4px); width: auto; max-height: 70vh; }
+  /* Planche : la cartouche est entre le graphique et la barre des tâches ; le panneau s'arrêtait au
+     milieu de son bouton « Infos du marché » (la moitié basse des lettres dépassait). Il descend
+     jusqu'à la barre des tâches et couvre la cartouche (revue du 14/10, C28). */
+  :root[data-structure="planche"] .fiche-pop { bottom: calc(30px + var(--gutter) + 4px); }
+}
+@media (max-width: 400px) {
+  /* La barre des tâches n'y a plus que 24 px de haut. */
+  :root[data-structure="planche"] .fiche-pop { bottom: calc(24px + var(--gutter) + 4px); }
 }
 
 /* ─── Réglages d'affichage (js/reglages.js), dans les « Réglages fins » du panneau ─── */

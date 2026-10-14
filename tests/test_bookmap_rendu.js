@@ -1943,6 +1943,10 @@ async function filNoir(page, x, y) {
           const yP = g0.debutant.yPrix !== null ? g0.mise.chaleur.y + g0.debutant.yPrix : null;
           check(`45d. première visite au téléphone : l'explication (y ${Math.round(ir.top)}–${Math.round(ir.bottom)}) laisse la rangée du prix visible (y ${yP && Math.round(yP)}), ${g0.guide.reperes.length} numéros posés (≥ 2), jamais « caché sous ce cadre »`,
             yP !== null && (yP < ir.top - 8 || yP > ir.bottom + 8) && g0.guide.reperes.length >= 2 && !/caché sous ce cadre/.test(ir.txt), { ir, yP, rep: g0.guide.reperes });
+          // Revue du 14/10 (C34) : la note de pied tient en une ligne au téléphone ; sa seconde phrase
+          // (« Tout voir : … ») finissait à moitié cachée sous « J'ai compris ».
+          const nt = await pg.evaluate(() => { const n = document.getElementById('guideIntroNote'); return { h: n.getBoundingClientRect().height, lh: parseFloat(getComputedStyle(n).lineHeight), txt: n.innerText }; });
+          check(`45d. la note de l'explication tient en une ligne (« ${nt.txt} »)`, nt.h > 0 && nt.h <= nt.lh * 1.5 && !/Tout voir/.test(nt.txt), nt);
         }
         await pg.click('#guideIntroOk'); await pg.waitForTimeout(500);
         const i1 = (await etat(pg)).debutant.indice;
