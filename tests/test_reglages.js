@@ -7,6 +7,9 @@
 //      constantes inhabituelles) ; la heatmap se fusionne par MAX, jamais en affinant ;
 //   3. ce que la page va chercher elle-même (⚡) est libre : profondeur, bandes, nombre de
 //      trades, seuils de lecture — et une bande non couverte est dite, pas tronquée.
+// Et (revue du 14/10, C9 et C10) : un seuil vide ou hors bornes n'est jamais gardé, « marqué »
+// reste au-dessus de « léger », le panneau reste ouvert quand le clavier du téléphone s'ouvre
+// sur un seuil ; une bande non couverte écrit « — », pas « 0,0 BTC ».
 //
 // USAGE   node tests/test_reglages.js
 const fs = require('fs'), path = require('path'), { execFileSync } = require('child_process');
@@ -177,8 +180,71 @@ l1.then(async h => {
   check('seuils des achats au marché changés : la part affichée est la même', t1 && t1 === (h3b.match(/Taker buy (\d+,\d %)/) || [])[1], [t1]);
   await lireLive(r => { r.live.niveaux = 5000; });
   check('5 000 niveaux : demandés tels quels', live.appels.some(u => /depth.*limit=5000/.test(u)));
+  // Revue du 14/10 (C10) : une bande non couverte écrivait « Bids 0,0 BTC · Asks 0,0 BTC »
+  // (« personne n'achète ni ne vend »). 500 niveaux couvrent ici ±0,06 % : ±1 % ne l'est pas.
+  const carte = x => x.slice(x.indexOf('Carnet en direct'), x.indexOf('Tape en direct'));
+  const h4 = carte(await lireLive(r => { r.live.bandes = [1]; }));
+  check('bande non couverte : « Bids — · Asks — (carnet reçu trop court) », jamais « 0,0 BTC »',
+    h4.includes('Bids — · Asks — (carnet reçu trop court)') && !/0,0 BTC/.test(h4) && h4.includes('bande non couverte par le carnet reçu'), h4.replace(/<[^>]+>/g, ' ').slice(0, 260));
+  check('bande couverte : les volumes en BTC, comme avant', /Bids <b>[\d\s\u202f\u00a0]+,\d BTC<\/b> · Asks <b>[\d\s\u202f\u00a0]+,\d BTC<\/b>/.test(carte(h)), carte(h).replace(/<[^>]+>/g, ' ').slice(0, 200));
+  seuils();
   fin();
 }).catch(e => { console.error(e); process.exit(1); });
+
+// ── 6. Seuils du ⚡ : jamais vides, jamais hors bornes (revue du 14/10, C9) ──────────
+// Avant : vider « marqué ≥ » gardait 0, taper 0,5 (sous le minimum) le gardait aussi, et le ⚡
+// disait « déséquilibre acheteur marqué » pour un carnet presque équilibré, même rechargé.
+function seuils() {
+  const vm = require('vm');
+  titre('6. Seuils de lecture du ⚡ : un champ vide ne change rien, une valeur est bornée, « marqué » reste au-dessus de « léger »');
+  const D = T.REGLAGES_DEFAUT.live;
+  const p = chargerPage({ stockage: { 'samsara-mode': 'expert' } });
+  vm.runInContext('drawChart = () => {}', p.sandbox);
+  const changer = (cle, valeur) => {
+    const c = p.T.el('r_live_' + cle);
+    c.id = 'r_live_' + cle; c.value = valeur;
+    vm.runInContext('changerReglage', p.sandbox)(c);
+    const L = p.T.REGLAGES.live, champs = ['ratioMarque', 'ratioLeger', 'takerDominant', 'takerLeger'].map(k => p.T.el('r_live_' + k).value);
+    return { marque: L.ratioMarque, leger: L.ratioLeger, dominant: L.takerDominant, achLeger: L.takerLeger, champs, garde: p.stockage['samsara-reglages-v1'] || null };
+  };
+  let e = changer('ratioMarque', '');
+  check('« marqué ≥ » vidé : la valeur ne change pas, le champ la remontre, rien n’est enregistré', e.marque === D.ratioMarque && e.champs[0] === String(D.ratioMarque) && e.garde === null, e);
+  e = changer('ratioMarque', '0.5');
+  check('« marqué ≥ » à 0,5 (sous le minimum) : borné à 1,01, puis échangé avec « léger ≥ » 1,1 ; gardé et montré tel quel',
+    e.marque === D.ratioLeger && e.leger === 1.01 && e.champs[0] === String(D.ratioLeger) && e.champs[1] === '1.01' && JSON.parse(e.garde).live.ratioLeger === 1.01, e);
+  e = changer('ratioMarque', '16');
+  check('« marqué ≥ » à 16 (au-dessus du maximum) : 5, le maximum', e.marque === 5 && e.champs[0] === '5', e);
+  changer('ratioMarque', '1.4');
+  e = changer('ratioLeger', '1.6');
+  check('« léger ≥ » 1,6 au-dessus de « marqué ≥ » 1,4 : les deux seuils sont échangés, dans les champs aussi', e.marque === 1.6 && e.leger === 1.4 && e.champs[0] === '1.6' && e.champs[1] === '1.4', e);
+  e = changer('takerLeger', '20');
+  check('achats au marché, « léger ≥ » 20 : 50,5, le minimum', e.achLeger === 50.5 && e.champs[3] === '50.5' && e.dominant === D.takerDominant, e);
+  e = changer('takerDominant', '  ');
+  check('achats au marché, « dominant ≥ » vidé : inchangé', e.dominant === D.takerDominant && e.champs[2] === String(D.takerDominant), e);
+  // Ce qui était déjà gardé hors bornes (avant ce correctif) est relu à sa valeur par défaut.
+  const rel = chargerPage({ stockage: { 'samsara-reglages-v1': JSON.stringify({ live: { ratioMarque: 0.5, ratioLeger: 1.1, takerDominant: 99, takerLeger: 'x' } }) } }).T.REGLAGES.live;
+  check('relu au chargement : 0,5 · 99 · « x » gardés → valeurs par défaut', rel.ratioMarque === D.ratioMarque && rel.ratioLeger === 1.1 && rel.takerDominant === D.takerDominant && rel.takerLeger === D.takerLeger, rel);
+  const inv = chargerPage({ stockage: { 'samsara-reglages-v1': JSON.stringify({ live: { ratioMarque: 1.05, ratioLeger: 1.2, takerDominant: 52, takerLeger: 58 } }) } }).T.REGLAGES.live;
+  check('relu au chargement : « marqué » sous « léger » → échangés', inv.ratioMarque === 1.2 && inv.ratioLeger === 1.05 && inv.takerDominant === 58 && inv.takerLeger === 52, inv);
+  const rg = p.sandbox.reglagesHtml(), bornes = vm.runInContext('LIVE_SEUILS', p.sandbox);
+  check('les bornes des champs sont celles que la page impose (LIVE_SEUILS)', Object.entries(bornes).every(([k, [mn, mx]]) => new RegExp('id="r_live_' + k + '" min="' + mn + '" max="' + mx + '"').test(rg)), rg.match(/<input type="number"[^>]+>/g));
+
+  // Le clavier d'un téléphone redimensionne la fenêtre : le panneau reste ouvert pendant qu'on
+  // écrit dans un de ses champs (avant : seulement dans le filtre ; un seuil le fermait).
+  const ecoute = [];
+  const pf = chargerPage({ stockage: { 'samsara-mode': 'expert' }, globaux: { window: { innerWidth: 1440, innerHeight: 900, devicePixelRatio: 1,
+    addEventListener: (t, f) => { if (t === 'resize') ecoute.push(f); }, removeEventListener() {}, matchMedia: () => ({ matches: false, addEventListener() {} }), location: { href: 'file:///' } } } });
+  const fermeMenus = ecoute.filter(f => /indMenu/.test(String(f)));
+  const menu = pf.T.el('indMenu');
+  let ferme = 0;
+  menu.classList = { add() {}, remove: k => { if (k === 'open') ferme++; }, toggle() {}, contains: () => true };
+  menu.contains = el => !!el && el.dansMenu === true;
+  const resteOuvert = actif => { pf.sandbox.document.activeElement = actif; ferme = 0; fermeMenus.forEach(f => f()); return ferme === 0; };
+  check('clavier ouvert sur un seuil (« dominant ≥ ») : le panneau reste ouvert', fermeMenus.length === 1 && resteOuvert({ tagName: 'INPUT', type: 'number', id: 'r_live_takerDominant', dansMenu: true }), fermeMenus.length);
+  check('… sur le filtre aussi, comme avant', resteOuvert({ tagName: 'INPUT', type: 'search', id: 'indFiltre', dansMenu: true }));
+  check('une case cochée du panneau, ou un champ hors du panneau : il se ferme, comme avant',
+    !resteOuvert({ tagName: 'INPUT', type: 'checkbox', dansMenu: true }) && !resteOuvert({ tagName: 'INPUT', type: 'number', dansMenu: false }) && !resteOuvert(null));
+}
 
 function await_(f) { return f(); }
 function fin() {

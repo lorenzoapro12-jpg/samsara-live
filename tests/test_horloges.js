@@ -9,7 +9,9 @@
 //   3. décalage = S − (s + r)/2, l'aller-retour le plus court des 5 derniers gagne ; l'écart
 //      n'est dit qu'au-delà d'une seconde ;
 //   4. dans la page : un prix refusé (451), une publication illisible, un ⚡ limité notent la
-//      bonne classe ; la carte « Horloges » la dit ; la couche de chaleur porte ses deux âges.
+//      bonne classe ; la carte « Horloges » la dit ; la couche de chaleur porte ses deux âges ;
+//      la bulle du voyant dit un prix qui n'arrive pas, et le graphique sans bougies dit Binance
+//      injoignable au lieu de « Chargement… » (revue du 14/10, C11).
 // USAGE   node tests/test_horloges.js
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const REPO = path.resolve(__dirname, '..');
@@ -89,6 +91,26 @@ const MD = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'contre',
   check('prix lu → succès noté', HP.sources.prix && HP.sources.prix.ok && !HP.sources.prix.classe);
   mode = '451'; await page.T.fetchPrice();
   check('prix refusé (451) → « refus régional (HTTP 451) » noté pour le prix', HP.sources.prix.classe === 'refus_regional');
+  // Revue du 14/10 (C11) : Binance injoignable, la bulle du voyant disait encore « Le prix du haut
+  // est lu à la seconde ». Elle suit maintenant le prix à chaque lecture ; la teinte ne bouge pas.
+  {
+    const dot = page.T.el('dot'), td = page.T.el('taskbarDot');
+    const teinte = { ok: 'var(--up)', retard: 'var(--warn)', fige: 'var(--down)', inconnu: 'var(--ink-3)' }[page.T.etatPublication(page.T.marketData.updated).etat];
+    check(`prix refusé : la bulle du voyant le dit tout de suite (« ${dot.title.split('. ')[1]} »), barre des tâches de même ; la teinte reste celle de l’âge de la publication`,
+      /Le prix du haut n’arrive pas : refus régional \(HTTP 451\)\.$/.test(dot.title) && !/lu à la seconde/.test(dot.title) && td.title === dot.title && dot.style.background === teinte, [dot.title, dot.style.background, teinte]);
+    mode = 'ok'; await page.T.fetchPrice();
+    check('prix revenu : « Le prix du haut est lu à la seconde » à la lecture suivante', /Le prix du haut est lu à la seconde\.$/.test(dot.title), dot.title);
+    // Le graphique sans bougies : « Chargement… » tant qu'aucune lecture n'a échoué, sinon il dit la
+    // panne, sur deux lignes (une idée par ligne ; elles tiennent à 360 px, test_entete les mesure).
+    const attente = () => vm.runInContext('texteAttente()', page.sandbox).join(' / ');
+    const a0 = attente();
+    HP.noter('bougies', new TypeError('Failed to fetch'));   // ce que note fetchKlines quand Binance et son miroir ne répondent pas
+    const a1 = attente();
+    HP.noter('bougies');
+    check(`graphique sans bougies : « ${a0} », puis, Binance injoignable, « ${a1} »`, /^Chargement BTC\/USDT · /.test(a0)
+      && a1 === 'Binance injoignable depuis ce poste / Nouvel essai bientôt' && HP.sources.bougies.classe === null && /^Chargement/.test(attente()), [a0, a1]);
+    mode = '451'; await page.T.fetchPrice();
+  }
   mode = 'json'; await page.T.fetchMarket(true);
   check('market-data.json illisible → « JSON invalide », dit dans les cartes', HP.sources.marche.classe === 'json' && /JSON invalide/.test(page.T.el('feed').innerHTML));
   mode = '429'; await vm.runInContext('renderLive', page.sandbox)();

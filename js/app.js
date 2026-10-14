@@ -1230,12 +1230,17 @@ document.addEventListener('click', (e) => {
   if (b && m) b.setAttribute('aria-expanded', String(m.classList.contains('open')));
 });
 // Fermer les menus si la fenêtre est redimensionnée
-// (sauf le menu des indicateurs pendant qu'on tape dans son filtre : le clavier d'un téléphone
-// redimensionne la fenêtre).
+// (sauf le menu des indicateurs pendant qu'on écrit dans un de ses champs : le clavier d'un
+// téléphone redimensionne la fenêtre). Revue du 14/10 (C9) : seul le filtre était épargné, un
+// seuil des Réglages fins fermait le panneau avant la première touche. Une case ou une liste
+// n'ouvre pas de clavier : elle ferme le panneau, comme avant.
+const CHAMP_TAPE = /^(text|search|number|tel|url|email|password)$/;
 window.addEventListener('resize', () => {
+  const a = document.activeElement;
+  const ecrit = !!a && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && CHAMP_TAPE.test(a.type)));
   for (const id of ['indMenu', 'themeMenu', 'paireMenu']) {
     const m = document.getElementById(id);
-    if (id === 'indMenu' && m.contains(document.activeElement) && document.activeElement.id === 'indFiltre') continue;
+    if (id === 'indMenu' && ecrit && m.contains(a)) continue;
     m.classList.remove('open');
   }
 });
@@ -2250,6 +2255,7 @@ function ecrirePrixEntete(price, var24) {
     v.className = 'var24' + (var24 > 0 ? ' pos' : var24 < 0 ? ' neg' : '');
   }
 }
+let pannePrixDite = '';   // la panne du prix que la bulle du voyant dit ('' : le prix arrive)
 async function fetchPrice() {
   const sym = activeSymbol;
   try {
@@ -2285,7 +2291,13 @@ async function fetchPrice() {
     // L'étiquette de prix du graphique suit le prix à la seconde (calque), dans la même image.
     if (price !== avant) prixSurGraphique();
   } catch(e) { if (sym === activeSymbol) Horloges.noter('prix', e); }
-  finally { horloge(); }
+  finally {
+    horloge();
+    // La bulle du voyant dit tout de suite que le prix n'arrive plus, ou qu'il est revenu (revue
+    // du 14/10, C11) : majAges seulement quand la panne change, pas à chaque seconde.
+    const panne = (Horloges.sources.prix || {}).libelle || '';
+    if (panne !== pannePrixDite) { pannePrixDite = panne; majAges(); }
+  }
 }
 // L'horloge de la barre des tâches avance dans la MÊME tâche que le prix, donc la même image :
 // un rendu par seconde au lieu de deux (5 à 11 ms/s mesurés), et rien quand l'onglet est caché
@@ -3580,6 +3592,14 @@ function masqueEtiquettes(prix, top, ph, minP, maxP, range) {
   for (let i = 0; i <= GRILLE_N; i++) if (Math.abs(top + (ph / GRILLE_N) * i - yTag) < 15) m |= 1 << i;
   return m;
 }
+/** Ce que le graphique écrit tant qu'il n'a pas de bougies, une ligne par élément. Revue du 14/10
+ *  (C11) : Binance et son miroir injoignables, il disait « Chargement… » sans fin. Une lecture des
+ *  bougies en échec le dit ; fetchKlines réessaie toutes les CADENCES.bougies, seule. */
+function texteAttente() {
+  const b = Horloges.sources.bougies;
+  if (b && b.classe) return ['Binance injoignable depuis ce poste', 'Nouvel essai bientôt'];
+  return ['Chargement ' + (NOMS_PAIRES[activeSymbol] || activeSymbol) + ' · ' + Guide.nomIntervalle(chartInterval) + '…'];
+}
 function drawChart() {
   scaleSeq++;   // une frame = un calcul d'échelle : invalide le cache de priceWindow()
   const W = canvas.width / window.devicePixelRatio;
@@ -3591,7 +3611,9 @@ function drawChart() {
   ctx.clearRect(0, 0, W, H);
   if (candles.length < 2) {
     ctx.save(); ctx.fillStyle = COLORS.ink3 || '#5f6e8c'; ctx.font = chartFont(12, 600); ctx.textAlign = 'center';
-    ctx.fillText('Chargement ' + (NOMS_PAIRES[activeSymbol] || activeSymbol) + ' · ' + Guide.nomIntervalle(chartInterval) + '…', (W - 50) / 2, H / 2); ctx.restore();
+    const lignes = texteAttente();   // une ligne par élément, centrées sous le milieu (18 px : 12 px et l'interligne)
+    lignes.forEach((t, i) => ctx.fillText(t, (W - 50) / 2, H / 2 + (i - (lignes.length - 1) / 2) * 18));
+    ctx.restore();
     dessinerCalque();
     return;
   }
@@ -9024,11 +9046,15 @@ function etatPublication(updated) {
 }
 let etatAffiche = null;
 /** Le titre du voyant et de la barre des tâches : ce qu'il mesure (l'âge des infos du marché,
- *  publiées toutes les N min — pas le prix, lu à la seconde) et son état. */
+ *  publiées toutes les N min — pas le prix, lu à la seconde) et son état. Revue du 14/10 (C11) :
+ *  Binance injoignable, il disait encore « Le prix du haut est lu à la seconde ». Il dit maintenant
+ *  pourquoi le prix n'arrive pas ; la teinte, elle, reste celle de l'âge de la publication. */
 function titreVoyant(min, etat) {
   if (min === null) return 'Infos du marché : heure de publication inconnue';
+  const p = Horloges.sources.prix;
   return 'Infos du marché publiées il y a ' + min + ' min (attendues toutes les ' + CADENCES.attendue_min + ' min)'
-    + (etat === 'fige' ? ' : la publication s’est arrêtée' : etat === 'retard' ? ' : en retard' : '') + '. Le prix du haut est lu à la seconde.';
+    + (etat === 'fige' ? ' : la publication s’est arrêtée' : etat === 'retard' ? ' : en retard' : '') + '. '
+    + (p && p.classe ? 'Le prix du haut n’arrive pas : ' + p.libelle + '.' : 'Le prix du haut est lu à la seconde.');
 }
 /** Âge de la publication affichée, à chaque tour : voyant (teinte, titre), barre des tâches,
  *  âges écrits dans la page ([data-age-de], posés par renderFeedTo), teinte « vieux » et
@@ -9185,7 +9211,10 @@ async function renderLive() {
   const mesures = RL.bandes.map(b => [b, bandeLive(depth, px, b)]);
   const BANDE = RL.bandes[0], m0 = mesures[0][1] || {};
   const couv = isNum(m0.couverture) ? m0.couverture : NaN;
-  const bv = m0.couverte ? m0.bid : 0, av = m0.couverte ? m0.ask : 0;
+  // Revue du 14/10 (C10) : une bande que le carnet reçu ne couvre pas écrivait « Bids 0,0 BTC ·
+  // Asks 0,0 BTC » (« personne n'achète ni ne vend »). Sans mesure, « — », et on dit pourquoi.
+  const volumes = m0.couverte ? 'Bids <b>' + fmtNum(m0.bid, 1) + ' BTC</b> · Asks <b>' + fmtNum(m0.ask, 1) + ' BTC</b>'
+    : 'Bids — · Asks —' + (m0.couverte === false ? ' (carnet reçu trop court)' : '');
   const ratio = m0.couverte ? m0.ratio : NaN;
   // ── tape : 500 derniers trades. isBuyerMaker=true -> l'acheteur était PASSIF -> vente agressive ──
   let buy = 0, sell = 0;
@@ -9237,7 +9266,7 @@ async function renderLive() {
   const autresBandes = mesures.slice(1).map(([b, m]) => bandeTxt(b) + ' : ' + (!m ? '—' : m.couverte ? '<b>' + fmtNum(m.ratio, 2) + '</b>' : 'non couverte')).join(' · ');
   html += mCard('💧', 'Carnet en direct ' + bandeTxt(BANDE), 'Binance spot · ' + Fmt.nombre(RL.niveaux) + ' niveaux, vus jusqu\'à ±'
     + (isFinite(couv) ? fmtNum(couv, 2) : '—') + ' % · instantané', '',
-    '<div style="font-size:12px;font-variant-numeric:tabular-nums">Bids <b>' + fmtNum(bv, 1) + ' BTC</b> · Asks <b>' + fmtNum(av, 1) + ' BTC</b></div>'
+    '<div style="font-size:12px;font-variant-numeric:tabular-nums">' + volumes + '</div>'
     + '<div style="margin-top:6px;font-size:15px;font-weight:800">Ratio bid/ask '
     + (isFinite(ratio) ? fmtNum(ratio, 2) : '—') + '</div>'
     + (autresBandes ? '<div style="margin-top:4px;font-size:11.5px;font-variant-numeric:tabular-nums">' + autresBandes + '</div>' : '')
