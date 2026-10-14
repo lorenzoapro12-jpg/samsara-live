@@ -3,7 +3,10 @@
 //
 //   1. MENUS : « Choisir l'affichage », Thème, Paire s'ouvrent dans l'écran — sous leur bouton, ou au-dessus
 //      quand la place manque en dessous (bouton dans une barre basse : Néon, barres des tâches),
-//      bornés à 8 px des bords, défilants s'ils sont plus hauts que l'écran.
+//      bornés à 8 px des bords, défilants s'ils sont plus hauts que l'écran. Dans chaque thème, deux
+//      couleurs qui ne trompent pas (revue du 14/10, C13 et C14) : « Tout afficher » a l'habit des
+//      autres boutons, pas celui d'un bouton enfoncé ; « En résumé » est à l'encre neutre, et seule
+//      la barre d'un résumé en hausse ou en baisse prend leur couleur.
 //   2. CROCHETS DU GRAPHIQUE (jetons de thème lus par lireJetons) : sans jeton, le graphique
 //      d'avant (rampe de chaleur historique à l'octet près, bougies pleines, grille pleine) ; avec
 //      un jeton, la FORME change — bougies creuses ou en barres, grille en trait mixte, police
@@ -115,11 +118,49 @@ async function menu(page, bouton, id) {
 }
 const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 && m.gauche >= 8 - 0.5 && m.droite <= m.L - 8 + 0.5;
 
+/** Deux couleurs qui ne trompent pas (revue du 14/10, C13 et C14), dans le thème de la page, menu
+ *  « Choisir l'affichage » ouvert. « Tout afficher » est une action : il a l'habit de « Revenir au
+ *  départ », pas celui d'un bouton enfoncé (rempli de l'accent, il valait « Mon écran » enfoncé en
+ *  Codex, Gare et Bureau 95 contraste). « En résumé » : la boîte (fond, cadre) est la même quel que
+ *  soit le ton, à l'encre neutre --ink-3 ; un résumé neutre a sa barre loin des quatre couleurs de
+ *  hausse et de baisse (elle valait --down en Gazette, --down-ink en Codex, --up en Néon) ; seule la
+ *  barre d'un résumé en hausse ou en baisse prend --up-ink ou --down-ink. */
+async function deuxCouleurs(page, id) {
+  const co = await page.evaluate(() => {
+    const habit = b => { const s = getComputedStyle(b); return [s.backgroundColor, s.backgroundImage, s.color, s.borderTopColor, s.fontWeight].join(' | '); };
+    const jeton = n => { const i = document.createElement('i'); i.style.color = `var(${n})`; document.body.append(i); const c = getComputedStyle(i).color; i.remove(); return c; };
+    const tout = document.querySelector('#indMenu .aff-boutons .aff-tout'), mon = document.querySelector('#indMenu .aff-boutons .aff-mon-ecran');
+    const revenir = document.querySelector('#indMenu .aff-boutons .aff-btn:not(.aff-tout):not(.aff-mon-ecran)');
+    if (!tout || !mon || !revenir) return null;
+    const avant = mon.getAttribute('aria-pressed'); mon.setAttribute('aria-pressed', 'true');
+    const presse = habit(mon); mon.setAttribute('aria-pressed', avant);
+    const li = document.getElementById('synthese');
+    let tons = null;
+    if (li) {
+      const cls = li.className; tons = {};
+      for (const t of ['partage', 'calme', 'hausse', 'baisse']) { li.className = 'synthese ton-' + t; const s = getComputedStyle(li); tons[t] = { barre: s.borderLeftColor, cadre: s.borderTopColor, fond: s.backgroundColor }; }
+      li.className = cls;
+    }
+    return { tout: habit(tout), revenir: habit(revenir), presse, tons,
+      J: { ink3: jeton('--ink-3'), up: jeton('--up'), down: jeton('--down'), upInk: jeton('--up-ink'), downInk: jeton('--down-ink') } };
+  });
+  check(`${id.padEnd(9)} · « Tout afficher » habillé comme « Revenir au départ », pas comme un bouton enfoncé`, !!co && co.tout === co.revenir && co.tout !== co.presse, co && { tout: co.tout, revenir: co.revenir, presse: co.presse });
+  if (!co || !co.tons) return check(`${id.padEnd(9)} · « En résumé » présent (Le détail, colonne ouverte à 1440 px)`, false, co && co.tons);
+  // « color(srgb r g b / a) » (color-mix) ou « rgb(r, g, b) » → [r, g, b] sur 255.
+  const rvb = s => { const v = (s.match(/[\d.]+/g) || []).slice(0, 3).map(Number); return /^color\(srgb/.test(s) ? v.map(x => Math.round(x * 255)) : v; };
+  const ecart = (a, b) => Math.max(...rvb(a).map((x, k) => Math.abs(x - rvb(b)[k])));
+  const { tons: T, J } = co, sens = [J.up, J.down, J.upInk, J.downInk];
+  const neutres = ['partage', 'calme'].map(t => ({ t, barre: T[t].barre, loin: Math.min(...sens.map(c => ecart(T[t].barre, c))) }));
+  const boite = Object.values(T).every(x => x.fond === T.partage.fond && x.cadre === T.partage.cadre) && ecart(T.partage.cadre, J.ink3) <= 1;
+  check(`${id.padEnd(9)} · « En résumé » : boîte à l'encre neutre, barre neutre loin de la hausse et de la baisse (écart ≥ 24), barre en hausse --up-ink, en baisse --down-ink`,
+    boite && neutres.every(n => n.barre === J.ink3 && n.loin >= 24) && T.hausse.barre === J.upInk && T.baisse.barre === J.downInk, { tons: T, J, neutres });
+}
+
 (async () => {
   await new Promise(r => serveur.listen(0, '127.0.0.1', r));
   const nav = await playwright.chromium.launch();
   try {
-    titre('1. Menus : dans l\'écran, au-dessus du bouton quand la place manque en dessous');
+    titre('1. Menus : dans l\'écran, au-dessus du bouton quand la place manque en dessous ; deux couleurs qui ne trompent pas');
     const MENUS = [['Affichage', '#indDropdownBtn', 'indMenu'], ['Thème', '#themeBtn', 'themeMenu'], ['Paire', '#paireBtn', 'paireMenu']];
     for (const t of THEMES) {
       const o = await ouvrir(nav, t.id, { width: 1440, height: 900 });
@@ -129,6 +170,7 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
         // Sous le bouton quand il y a la place ; sinon AU-DESSUS (jamais par-dessus le bouton).
         const cote = place ? m.haut >= m.boutonBas : m.bas <= m.boutonHaut;
         check(`${t.id.padEnd(9)} · menu ${nom.padEnd(11)} entier dans l'écran, ${place ? 'sous' : 'au-dessus de'} son bouton`, dansLEcran(m) && cote, m);
+        if (nom === 'Affichage') await deuxCouleurs(o.page, t.id);
       }
       check(`${t.id.padEnd(9)} · aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();

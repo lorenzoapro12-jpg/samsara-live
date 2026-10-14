@@ -538,7 +538,9 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
   font: inherit; font-size: 11.5px; font-weight: 650; padding: 4px 11px; border-radius: var(--r-bar); cursor: pointer;
   color: var(--ink-1); background: var(--rail); border: 1px solid var(--hairline);
 }
-.aff-btn.aff-tout { color: var(--card-solid); background: var(--accent); border-color: transparent; }
+/* « Tout afficher » (.aff-tout) est une action, pas un état : il garde l'habit des autres .aff-btn.
+   Rempli de l'accent (PR #29), il avait l'air enfoncé, ou plus allumé que l'affichage en cours
+   (revue du 14/10, C14). Le fond plein reste au seul bouton enfoncé (aria-pressed). */
 .aff-preset { font-size: 11px; font-weight: 600; color: var(--ink-2); background: transparent; }
 .aff-preset[aria-pressed="true"] { color: var(--pill-actif-ink); background: var(--pill-actif); border-color: transparent; font-weight: 700; }
 .aff-btn:hover, .aff-preset:hover, .aff-btn:focus-visible, .aff-preset:focus-visible { border-color: var(--accent); outline: none; }
@@ -1045,11 +1047,15 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 /* L'icône de la famille d'une info (js/icones.js), la même que sur le graphique, dans sa couleur. */
 .reperes-ico { flex: 0 0 13px; width: 13px; height: 13px; margin-top: 2px; }
 /* « En résumé » (js/app.js, syntheseElement) : en tête de la liste, mis en valeur. La phrase en
-   gras ; un trait de couleur par signal (hausse, baisse, neutre) que les mots disent aussi. */
+   gras ; un trait de couleur par signal (hausse, baisse, neutre) que les mots disent aussi.
+   La boîte est à l'encre neutre du thème (--ink-3), plus à son accent (revue du 14/10, C13) :
+   l'accent est la baisse en Gazette et Codex, la hausse en Néon et Bureau 95, et « pas de sens
+   net » s'affichait dans la couleur d'un sens. Seule la barre d'un résumé en hausse ou en baisse
+   prend leur couleur (ci-dessous). */
 .reperes-liste li.synthese {
   margin: 6px 0 8px; padding: 10px 12px 9px; border-radius: min(var(--r-tile), 10px);
-  background: color-mix(in srgb, var(--accent) 9%, var(--card-solid)); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  border-left: 4px solid var(--accent); color: var(--ink-1); font: 500 12.5px/1.4 var(--font);
+  background: color-mix(in srgb, var(--ink-3) 9%, var(--card-solid)); border: 1px solid color-mix(in srgb, var(--ink-3) 35%, transparent);
+  border-left: 4px solid var(--ink-3); color: var(--ink-1); font: 500 12.5px/1.4 var(--font);
 }
 .reperes-liste li.synthese.ton-hausse { border-left-color: var(--up-ink); }
 .reperes-liste li.synthese.ton-baisse { border-left-color: var(--down-ink); }
