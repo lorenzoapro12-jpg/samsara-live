@@ -235,8 +235,16 @@ const VERBES = /\b(touche|est passé|monte|baisse|hésite|s’agite|est entre|es
 // « evenement » : la ligne « ce qui vient de se passer » (PR 5), une seule, aux limites de la phrase ;
 // elle prend une des 5 places (le registre et le journal la comptent comme les autres).
 // « fourchette » : l'étiquette de la couche « Fourchette de 7 jours » (plan du 13/10/2026, idée 5),
-// une seule, « Fourchette 7 jours » avec sa flèche au plus (↕, ↑ ou ↓ quand ses traits sont hors de la vue).
-const LIMITES = { phrase: [90, 48], niveau: [26, 18], scenario: [32, 32], forme: [26, 26], boite: [48, 40], evenement: [90, 48], fourchette: [22, 22] };
+// une seule (etiqFourchette). 48 caractères et non plus 22 (revue du 14/10/2026, M2) : ses deux
+// bornes hors de la vue, elle donne leurs prix, « ↕ Fourchette 7 jours : 80 394 – 84 352 $ » (39) ;
+// sa place en pixels est contrôlée à part.
+const LIMITES = { phrase: [90, 48], niveau: [26, 18], scenario: [32, 32], forme: [26, 26], boite: [48, 40], evenement: [90, 48], fourchette: [48, 48] };
+// L'étiquette de la fourchette sans cassure (revue du 14/10/2026, M2) : ses deux traits dans la vue,
+// « Fourchette 7 jours » ; un seul, la borne qu'il est, sans flèche (« Bas 7 jours », « Haut 7 jours » :
+// seul « Fourchette 7 jours », il passait pour un repère parmi d'autres) ; aucun, la flèche (↕, ↑ ou
+// ↓), puis les deux prix quand ils tiennent.
+const etiqFourchette = (t, visH, visB) => visH && visB ? t === 'Fourchette 7 jours' : visH !== visB ? t === (visB ? 'Bas' : 'Haut') + ' 7 jours'
+  : /^[↕↑↓] Fourchette(?: 7 jours(?: : [\d  ]+ – [\d  ]+ \$)?| : [\d  ]+ – [\d  ]+ \$)$/.test(t || '');
 const ROLES_MAX = { phrase: 1, niveau: 2, scenario: 1, forme: 1, boite: 1, evenement: 1, fourchette: 1 };
 
 /** Les contrôles d'un écran Débutant (budget, limites, mots, chevauchements, 5 secondes, absents). */
@@ -981,10 +989,18 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         t.traces.every(Boolean) && t.titres.every(x => e.tous.includes(x) && !bannis(x).length) && t.larg.every(x => x <= t.xAxe) && !tous.length, { t, tous });
       check(`${nom} : le prix garde ${Math.round(t.part * 100)} % de la hauteur (≥ 60 %, MAIN_PART_MIN)`, t.part >= 0.6 - 1e-9, t);
       // Les supports / résistances en Lisible : leurs traits seuls (ni badge, ni légende « S/R par
-      // intervalle », ni intervalle abrégé), comme les moyennes.
-      const sr = await o.page.evaluate(() => ({ niveaux: getMultiTFLevels().length, badges: srBadges.length }));
+      // intervalle », ni intervalle abrégé), comme les moyennes. Mais chaque trait reste touchable :
+      // une cible sans étiquette, dont la bulle le nomme en mots entiers (revue du 14/10/2026, C6 :
+      // les toucher n'ouvrait que la boîte des bougies).
+      const sr = await o.page.evaluate(() => {
+        const g = geoPrix, vus = getMultiTFLevels().slice(0, 6).filter(l => l.price > g.minP && l.price < g.maxP), c = ciblesPrix.filter(x => /^Support \/ résistance · /.test(x.titre || ''));
+        return { niveaux: getMultiTFLevels().length, badges: srBadges.length, vus: vus.map(l => l.price), cibles: c.map(x => ({ prix: x.prix, rects: x.rects.length, segs: x.segs.length, titre: x.titre })),
+          bannis: Guide.motsBannis(c.map(x => x.titre + ' ' + x.texte.join(' ')).join(' ')) };
+      });
       check(`${nom} : les supports / résistances tracés (${sr.niveaux} niveaux), sans badge ni légende`,
         sr.niveaux > 0 && !sr.badges && !e.tous.some(x => /S\/R|^\d+[mhd]$| · \d+[mhd]$/.test(x)), { sr, tous: e.tous });
+      check(`${nom} : chacun de leurs ${sr.vus.length} traits dans la vue est touchable, sans étiquette (« ${sr.cibles.length ? sr.cibles[0].titre : '—'} »), sans mot banni`,
+        sr.vus.every(p => sr.cibles.some(x => x.prix === p)) && sr.cibles.every(x => !x.rects && x.segs === 1 && / · repéré sur les \p{L}/u.test(x.titre)) && !sr.bannis.length, sr);
       // Le réticule dans les sous-graphiques : chaque valeur avec SON unité, jamais « bitcoins ».
       const b = await o.page.evaluate(() => {
         const s = geo.sous[0];
@@ -1028,7 +1044,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       const it = e.items.filter(i => i.role === 'fourchette');
       check(`${nom} : cochée, ses traits en tirets à l'encre 3 et UNE étiquette « ${it[0] ? it[0].texte : '—'} » au budget (${e.items.map(i => i.role).join(', ')}) ; gardée sous samsara-affichage-v1`,
         !!f && f.jours === 7 && f.traits.length === [f.visH, f.visB].filter(Boolean).length && f.traits.every(c => c === f.ink3) && it.length === 1
-        && /^(?:[↕↑↓] )?Fourchette 7 jours$/.test(it[0].texte) && /^[↕↑↓]/.test(it[0].texte) === !(f.visH || f.visB) && (f.garde.ov || []).includes('fourchette'), { f, items: e.items });
+        && etiqFourchette(it[0].texte, f.visH, f.visB) && (f.garde.ov || []).includes('fourchette'), { f, items: e.items });
       // Sa bulle (toucher ou survol de l'étiquette) : le titre, le bas, le haut et l'écart ; résumée
       // comme les autres (4 lignes et 3 nombres au plus), sans jargon ni conseil.
       if (it[0] && it[0].rect) {

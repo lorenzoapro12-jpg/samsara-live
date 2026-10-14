@@ -38,6 +38,12 @@ if (!playwright) {
 let ko = 0;
 const check = (nom, ok, det) => { if (!ok) ko++; console.log(`  ${ok ? '✓' : '✗'} ${nom}${!ok && det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 500) : ''}`); };
 const titre = t => console.log(`\n── ${t} ──`);
+// L'étiquette de la fourchette de 7 jours sans cassure (revue du 14/10/2026, M2) : ses deux traits
+// dans la vue, « Fourchette 7 jours » ; un seul, la borne qu'il est, sans flèche (« Bas 7 jours »,
+// « Haut 7 jours » : seul « Fourchette 7 jours », il passait pour un repère parmi d'autres) ; aucun,
+// la flèche, puis les deux prix quand ils tiennent.
+const etiqFourchette = (t, visH, visB) => visH && visB ? t === 'Fourchette 7 jours' : visH !== visB ? t === (visB ? 'Bas' : 'Haut') + ' 7 jours'
+  : /^[↕↑↓] Fourchette(?: 7 jours(?: : [\d  ]+ – [\d  ]+ \$)?| : [\d  ]+ – [\d  ]+ \$)$/.test(t || '');
 
 // L'horloge du harnais et de la page : MAINTENANT au lancement, puis le temps qui passe.
 const MAINTENANT = Date.parse('2026-10-08T22:52:00Z'), DECALAGE = MAINTENANT - Date.now();
@@ -299,7 +305,9 @@ const etat = page => page.evaluate(() => {
       }
       // La fourchette de 7 jours (plan du 13/10/2026, idée 5), couche allumée : ses traits en tirets à
       // l'encre 3 (jamais l'accent), UNE étiquette posée sans en recouvrir une autre, sa bulle (le bas,
-      // le haut, l'écart) et sa ligne dans « Sur le graphique ».
+      // le haut, l'écart) et sa ligne dans « Sur le graphique ». Un seul trait dans la vue (le haut, sur
+      // ces bougies simulées) : l'étiquette dit « Haut 7 jours », plus « Fourchette 7 jours » (revue du
+      // 14/10/2026, M2 ; etiqFourchette).
       const fo = await o.page.evaluate(() => {
         overlays.fourchette = true; crossX = crossY = null;
         const st = CanvasRenderingContext2D.prototype.stroke, traits = [];
@@ -314,7 +322,7 @@ const etat = page => page.evaluate(() => {
         return r;
       });
       check(`${nom} : fourchette de 7 jours — traits à l'encre 3, étiquette « ${fo.V && fo.V.etiq} » sans chevauchement, bulle « ${fo.titre} » (bas, haut, écart), dans « Sur le graphique »`,
-        !!fo.V && fo.traits.length === [fo.V.visH, fo.V.visB].filter(Boolean).length && fo.traits.every(x => x === fo.ink3 && x !== fo.accent) && /^(?:[↕↑↓] )?Fourchette 7 jours$/.test(fo.V.etiq || '')
+        !!fo.V && fo.traits.length === [fo.V.visH, fo.V.visB].filter(Boolean).length && fo.traits.every(x => x === fo.ink3 && x !== fo.accent) && etiqFourchette(fo.V.etiq, fo.V.visH, fo.V.visB)
         && !fo.places.o.length && /^Fourchette de 7 jours · [\d\s]+ – [\d\s]+ \$$/.test(fo.titre || '') && /^Bas [\d\s]+ \$, haut [\d\s]+ \$ : un écart de [\d\s]+ \$\./.test(fo.texte || '') && fo.liste.includes(fo.titre), fo);
       check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
@@ -424,6 +432,91 @@ const etat = page => page.evaluate(() => {
             check(`${nom} : au 1er toucher, le résumé de la bulle dit « sorti à ${r.heure} »`, !!B && B.resume && B.titre === 'Fourchette de 7 jours cassée par le bas' && B.corps.startsWith('Le prix en est sorti à ' + r.heure), B);
           }
           check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+          await o.ctx.close();
+        }
+      } finally { H.arreter(); }
+    }
+
+    // Chaque trait se nomme (revue du 14/10/2026, C6 et M2), sur la journée réelle du 08/10 rejouée à
+    // 15:40 UTC, 390 px, Lisible. « Mon écran » posait trois traits de supports / résistances sans nom
+    // (83 048, 82 228 et 81 773 $) : les toucher n'ouvrait que la boîte des bougies, et la puce du
+    // ruban avait la couleur du trait le plus fin. La fourchette cochée en 15 min pendant la ligne
+    // « première fois » restait un trait gris sans nom ; en 1 h, son seul trait visible (le bas)
+    // s'appelait « Fourchette 7 jours » ; ses deux bornes hors de la vue, « ↕ Fourchette 7 jours »,
+    // sans les prix. Lancé avant la correction, ce bloc échoue.
+    titre('Chaque trait se nomme (08/10 rejoué, 15:40 UTC, 390 px, Lisible)');
+    {
+      const H = require('./scenarios-jour-harnais.js'), X = require('./fixtures/rejeu-jour-0810.json');
+      // L'état de la fourchette (redessinée ou non), du registre des textes et de la ligne du message.
+      const lireF = dessiner => {
+        if (dessiner) { crossX = crossY = null; bulleDetail = null; drawChart(); dessinerCalque(); }
+        const V = fourchetteEtat, c = ciblesPrix.find(x => x.fourchette);
+        return { appr: apprMsg ? { src: apprMsg.e.source, nature: apprMsg.e.nature || null, ligne: !!apprMsg.item } : null,
+          items: debEtat ? debEtat.items.map(i => i.role + ' : ' + i.texte) : [], texte: c ? c.texte : [],
+          V: V && { etiq: V.etiq && V.etiq.t, rect: V.etiq && { x: V.etiq.x, y: V.etiq.y, w: V.etiq.w, h: V.etiq.h }, visH: V.visH, visB: V.visB, yH: V.yH, yB: V.yB, top: V.top, bas: V.bas },
+          prix2: V && ' : ' + Guide.chiffres(V.pB) + ' – ' + Guide.prix(V.pH, guideUnite()) };
+      };
+      try {
+        for (const theme of ['bureau95', 'diazo']) {
+          const nom = '390 px · ' + theme;
+          // A. « Mon écran » : chaque trait de support / résistance est une cible (le trait seul : aucun
+          // texte de plus au budget) ; sa bulle dit ce qu'il est, son prix et où il a été repéré.
+          let o = await H.ouvrir(nav, H.harnais(X, '2026-10-08T15:40:00Z'), { vue: { width: 390, height: 844 }, tactile: true, theme, mode: 'debutant' });
+          await o.page.waitForTimeout(800);
+          await o.page.evaluate(() => appliquerMonEcran()); await o.page.waitForTimeout(1200);
+          const m = await o.page.evaluate(() => {
+            crossX = crossY = null; bulleDetail = null; drawChart(); dessinerCalque();
+            const g = geoPrix, b = canvas.getBoundingClientRect(), t = document.createElement('canvas').getContext('2d');
+            const norm = c => { t.fillStyle = '#000'; t.fillStyle = c; return t.fillStyle; }, lbl = document.getElementById('lbl_sr');
+            const cibles = ciblesPrix.filter(c => /^Support \/ résistance/.test(c.titre || ''));
+            return { mode: document.documentElement.getAttribute('data-mode'), textes: debEtat ? debEtat.items.length : -1,
+              cibles: cibles.map(c => ({ titre: c.titre, prix: c.prix, rects: c.rects.length, segs: c.segs.length })),
+              bannis: Guide.motsBannis(cibles.map(c => c.titre + ' ' + c.texte.join(' ')).join(' ')),
+              lignes: getMultiTFLevels().slice(0, 6).filter(l => l.price > g.minP && l.price < g.maxP)
+                .map(l => ({ prix: l.price, tier: l.tier, x: b.left + 150, y: b.top + g.top + g.ph * (1 - (l.price - g.minP) / (g.maxP - g.minP)) })),
+              puce: lbl ? norm(getComputedStyle(lbl).getPropertyValue('--dot').trim()) : null, plusVoyant: norm(COLORS.sr[2]) };
+          });
+          check(`${nom} : « Mon écran » pose ${m.lignes.length} traits de supports / résistances, chacun touchable (une cible, le trait seul) ; ${m.textes} textes sur le tracé (≤ 5)`,
+            m.mode === 'debutant' && m.lignes.length >= 3 && m.lignes.every(l => m.cibles.some(c => c.prix === l.prix)) && m.cibles.every(c => !c.rects && c.segs === 1) && m.textes >= 0 && m.textes <= 5, m);
+          check(`${nom} : leurs bulles disent « ${m.cibles.length ? m.cibles[0].titre : '—'} » : le trait, son prix, où il a été repéré, en mots entiers, sans mot banni`,
+            m.cibles.length > 0 && m.cibles.every(c => /^Support \/ résistance · [\d  ]+ \$ · repéré sur les (?:quarts d’heure|heures|tranches de 4 h)$/.test(c.titre)) && !m.bannis.length, { cibles: m.cibles, bannis: m.bannis });
+          const vu = m.lignes.slice().sort((a, b) => b.tier - a.tier)[0];
+          if (vu) { await o.page.evaluate(() => { crossX = crossY = null; bulleDetail = null; }); await o.page.touchscreen.tap(vu.x, vu.y); await o.page.waitForTimeout(400); }
+          const bt = await o.page.evaluate(() => (bulleOuverte ? reperesBulleTitre : null));
+          check(`${nom} : toucher le trait le plus voyant (${vu && Math.round(vu.prix)} $) ouvre sa bulle (« ${bt} »)`, !!vu && !!bt && bt === (m.cibles.find(c => c.prix === vu.prix) || {}).titre, { vu, bt });
+          check(`${nom} : la puce « Supports / résistances » du ruban a la couleur du trait le plus voyant (${m.puce})`, !!m.puce && m.puce === m.plusVoyant, { puce: m.puce, plusVoyant: m.plusVoyant });
+          check(`${nom} · « Mon écran » : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+          await o.ctx.close();
+          // B. La fourchette cochée en 15 min pendant la ligne « première fois » (après l'astuce du
+          // Lisible, qui l'empêche) : la ligne cède sa place, le seul trait visible est nommé.
+          o = await H.ouvrir(nav, H.harnais(X, '2026-10-08T15:40:00Z'), { vue: { width: 390, height: 844 }, tactile: true, theme, mode: 'debutant' });
+          for (let k = 0; k < 15 && !(await o.page.evaluate(() => astuceFin === null && Date.now() - Math.max(apprFinMsg, apprBulleMs) > PARAM.apprendre.pause)); k++) await o.page.waitForTimeout(1000);
+          await o.page.evaluate(() => appliquerSelection(['fourchette'], [], false)); await o.page.waitForTimeout(600);
+          let f = await o.page.evaluate(lireF, false);
+          check(`${nom} : la fourchette cochée en 15 min pendant la ligne « première fois » (${f.appr && f.appr.nature}) : la ligne lui cède sa place, le trait est nommé « ${f.V && f.V.etiq} »`,
+            !!f.appr && f.appr.src === 'premiere' && !f.appr.ligne && !!f.V && !f.V.visH && f.V.visB && f.V.etiq === 'Bas 7 jours' && f.items.includes('fourchette : Bas 7 jours')
+            && !f.items.some(x => x.startsWith('evenement')) && f.items.length <= 5, f);
+          // C. En 1 h, le seul trait visible (le bas) : « Bas 7 jours » ; la bulle dit où est le haut.
+          await o.page.evaluate(async () => { await changeInterval('1h', document.getElementById('int_1h')); }); await o.page.waitForTimeout(1500);
+          f = await o.page.evaluate(lireF, true);
+          check(`${nom} : en 1 h, le seul trait visible (le bas) s'appelle « ${f.V && f.V.etiq} » ; sa bulle ajoute « Le haut est hors de la vue, au-dessus. » après les bornes`,
+            !!f.V && !f.V.visH && f.V.visB && f.V.etiq === 'Bas 7 jours' && f.items.includes('fourchette : Bas 7 jours')
+            && /^Bas [\d  ]+ \$, haut [\d  ]+ \$ : un écart de [\d  ]+ \$\.$/.test(f.texte[0] || '') && f.texte[1] === 'Le haut est hors de la vue, au-dessus.', f);
+          if (f.V && f.V.rect) {
+            const b0 = await o.page.evaluate(() => { const q = canvas.getBoundingClientRect(); crossX = crossY = null; bulleDetail = null; return { x: q.left, y: q.top }; });
+            await o.page.touchscreen.tap(b0.x + f.V.rect.x + Math.min(f.V.rect.w / 2, 40), b0.y + f.V.rect.y + f.V.rect.h / 2); await o.page.waitForTimeout(300);
+            const B = await o.page.evaluate(() => { const q = fourchetteEtat && fourchetteEtat.bulle; return q && { titre: q.titre, corps: q.corps.join(' '), resume: q.resume, lignes: q.lignes, nombres: q.nombres }; });
+            check(`${nom} : au 1er toucher de « Bas 7 jours », la bulle dit où est le haut (${B && B.lignes} lignes, ${B && B.nombres} nombres${B && B.resume ? ', résumée' : ''})`,
+              !!B && B.titre === 'Fourchette de 7 jours' && B.corps.includes('Le haut est hors de la vue, au-dessus.') && (B.resume ? B.lignes <= 4 && B.nombres <= 3 : B.lignes <= 6), B);
+          }
+          // D. Les deux bornes hors de la vue (échelle resserrée, 15 min) : la flèche et les deux prix.
+          await o.page.evaluate(async () => { await changeInterval('15m', document.getElementById('int_15m')); }); await o.page.waitForTimeout(1500);
+          await o.page.evaluate(() => { priceScale = 0.35; pricePan = 0.5; });
+          f = await o.page.evaluate(lireF, true);
+          check(`${nom} : les deux bornes hors de la vue, l'étiquette donne les deux prix (« ${f.V && f.V.etiq} »)`,
+            !!f.V && !f.V.visH && !f.V.visB && f.V.yH < f.V.top && f.V.yB > f.V.bas && ['↕ Fourchette 7 jours' + f.prix2, '↕ Fourchette' + f.prix2].includes(f.V.etiq)
+            && f.items.includes('fourchette : ' + f.V.etiq), f);
+          check(`${nom} · fourchette : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
           await o.ctx.close();
         }
       } finally { H.arreter(); }
