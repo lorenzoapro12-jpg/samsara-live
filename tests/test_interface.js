@@ -586,7 +586,9 @@ async function deuxCouleurs(page, id) {
           P.roundRect = function (x, y, w, h) { if (this.canvas.id === 'chart') l.push({ x, y, w, h }); return rr.apply(this, arguments); };
           try { drawChart(); } finally { P.fillText = ft; P.strokeRect = sr; P.roundRect = rr; }
           const leg = l.find(r => r.w === 130 && r.h === 14), cadre = leg && c.find(r => r.y === leg.y - 2), rs = t.find(x => / bougies$/.test(x.t));
-          return { leg, cadre, rs, nombres: t.filter(x => /^\d[\d  ]*\/\d[\d  ]*$/.test(x.t)) };
+          // Les dates de l'axe du temps (« 13/09 », au téléphone depuis le 14/10/2026, revue C17) ne
+          // sont pas le compteur : jour et mois, deux chiffres chacun.
+          return { leg, cadre, rs, nombres: t.filter(x => /^\d[\d  ]*\/\d[\d  ]*$/.test(x.t) && !/^\d\d\/\d\d$/.test(x.t)) };
         };
         const n = candles.length, droite = lire(n - 50, n), gauche = lire(0, 50);
         lire(n - 50, n);
