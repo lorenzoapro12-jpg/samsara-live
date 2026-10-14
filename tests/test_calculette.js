@@ -11,6 +11,10 @@
 //      aucun conseil ; la quantité affichée arrondie vers le bas (la perte ne dépasse jamais la part).
 //   5. LA PAGE : la part de départ dans PARAM ; le bloc « Outils » juste avant les « Réglages
 //      fins » (qui restent le dernier bloc), dans les deux modes ; aucun stockage dans le fichier.
+//   6. REVUE DU 14/10 (C5, M1, N2) : une mise plus grande que le capital est dite (« × 8,3 », il
+//      faudrait emprunter), sans conseil, et seulement au-delà du capital ; jamais « 0,00 % » ; le
+//      stop redit avec son écart au prix moyen ; les nombres réécrits « 80 000 » en quittant un
+//      champ (même nombre relu) ; « palier », « stop » et « part risquée » dits en mots simples.
 //
 // USAGE   node tests/test_calculette.js
 const fs = require('fs'), path = require('path'), vm = require('vm');
@@ -91,20 +95,25 @@ check('le message nomme le palier fautif (« Le palier 2 n’est pas un nombre l
 const mel = C.calculer({ capital: '10 000', part: '1', stop: '82 000', paliers: ['82 152', '81 759'] });
 check('stop mélangé : « Le stop doit être sous tous les paliers (achat) ou au-dessus de tous (vente). »', mel.message === 'Le stop doit être sous tous les paliers (achat) ou au-dessus de tous (vente).', mel.message);
 const Te = C.textes(mel, {});
-check('sans calcul, aucune ligne de résultat ni rappel : le message seul', Te.message === mel.message && !Te.lignes.length && !Te.rappel, Te);
+check('sans calcul, aucune ligne de résultat, ni alerte, ni rappel : le message seul', Te.message === mel.message && !Te.lignes.length && !Te.alerte && !Te.rappel, Te);
 
 // ── 4. Mots ──
 titre('4. Les mots : courts, ceux du Lisible, jamais un conseil');
-const TOUS = [C.PHRASE, C.PIED, T.rappel, Tv.rappel, ...T.lignes.flat(), ...Tv.lignes.flat(), ...Object.values(C.MESSAGES).map(m => (typeof m === 'function' ? m(2) : m)),
-  'Calculette de risque', 'Capital ($)', 'Part risquée (%)', 'Stop (prix)', 'Paliers (prix)', 'Palier 1', 'Ajouter un palier', 'Retirer', 'Outils'];
+// Revue du 14/10 : les noms des champs disent ce qu'ils veulent dire (N2), et la ligne d'alerte d'une
+// mise plus grande que le capital (C5) passe par les mêmes règles de mots.
+const ALERTE = C.textes(C.calculer({ capital: '10 000', part: '1', stop: '82 900', paliers: ['83 000'] }), { base: 'BTC', unite: '$' });
+const TOUS = [C.PHRASE, C.PIED, T.rappel, Tv.rappel, ALERTE.alerte || '', ...T.lignes.flat(), ...Tv.lignes.flat(), ...Object.values(C.MESSAGES).map(m => (typeof m === 'function' ? m(2) : m)),
+  'Calculette de risque', 'Capital ($)', ...Object.values(C.NOMS).map(n => n.join(' ')), 'Palier 1', 'Ajouter un palier', 'Retirer', 'Outils'];
 const longues = TOUS.flatMap(phrases).filter(p => mots(p).length > 15);
 check('une idée par phrase, 15 mots au plus', !longues.length, longues);
 const bannis = TOUS.filter(t => Guide.motsBannis(t).length || /ratio/i.test(t));
 check('aucun mot interdit du Lisible (Guide.MOTS_BANNIS_DEBUTANT), ni « ratio »', !bannis.length, bannis);
 const conseils = TOUS.filter(t => CONSEIL.test(t));
 check('aucun conseil (« entrez », « achetez », « placez votre stop »…), ni « achet » / « vend »', !conseils.length && !TOUS.some(t => /achet|vend/i.test(t)), conseils);
-check('la phrase de tête dit ce qu’elle fait : la taille de chaque palier, la part risquée si tous se remplissent puis que le stop saute',
-  /taille de chaque palier/.test(C.PHRASE) && /tous se remplissent/.test(C.PHRASE) && /stop saute/.test(C.PHRASE) && /part risquée/.test(C.PHRASE), C.PHRASE);
+// Revue du 14/10 (textes-14, N2) : « le prix touche le stop » remplace « le stop saute », pas expliqué
+// (« Une fois tout rempli » au lieu de « Si tous se remplissent puis que » : 15 mots au plus).
+check('la phrase de tête dit ce qu’elle fait : la taille de chaque palier, la part risquée une fois tout rempli si le prix touche le stop',
+  /taille de chaque palier/.test(C.PHRASE) && /tout rempli/.test(C.PHRASE) && /si le prix touche le stop/.test(C.PHRASE) && !/stop saute/.test(C.PHRASE) && /part risquée/.test(C.PHRASE), C.PHRASE);
 check('le pied : « Un calcul, pas un conseil. »', C.PIED === 'Un calcul, pas un conseil.', C.PIED);
 
 // ── 5. La page ──
@@ -133,7 +142,64 @@ for (const [nom, stock] of [['Lisible', {}], ['Complet', { 'samsara-mode': 'expe
       /^<div class="fiche-tete"><h3 class="fiche-titre">Calculette de risque<\/h3><button type="button" class="fiche-fermer"/.test(p) && p.includes(C.PHRASE.replace(/’/g, '’'))
       && /id="calcPart"[^>]*value="1"/.test(p) && /<p class="fiche-pied">Un calcul, pas un conseil\.<\/p>$/.test(p) && (p.match(/inputmode="decimal"/g) || []).length === 4
       && JSON.stringify(page.stockage) === avant, p.slice(0, 300));
+    // Revue du 14/10 (N2) : chaque mot dit dans l'étiquette même, pas une ligne d'aide de plus.
+    check('les étiquettes disent les mots : « Part risquée (% du capital perdu au stop) », « Stop (prix où la perte est coupée) », « Paliers (prix où un ordre attend) »',
+      /<label class="calc-nom" for="calcPart">Part risquée <span class="calc-def">\(% du capital perdu au stop\)<\/span><\/label>/.test(p)
+      && /<label class="calc-nom" for="calcStop">Stop <span class="calc-def">\(prix où la perte est coupée\)<\/span><\/label>/.test(p)
+      && /<legend class="calc-legende">Paliers <span class="calc-def">\(prix où un ordre attend\)<\/span><\/legend>/.test(p)
+      && !/calc-aide|<small/.test(p), p.slice(p.indexOf('calc-champs'), p.indexOf('calc-champs') + 900));
+    // Revue du 14/10 (M1, vA-9) : en quittant un champ (« change »), « 80000 » devient « 80 000 ».
+    check('le panneau réécrit un champ à sa sortie (« change » sur .calc → calculetteSortie)', /<div class="calc"[^>]*onchange="calculetteSortie\(event\)"/.test(p)
+      && vm.runInContext('typeof calculetteSortie === "function"', page.sandbox));
   }
+}
+
+// ── 6. Revue du 14/10 ──
+titre('6. Revue du 14/10 : mise au-delà du capital, stop redit, « 80 000 », mots expliqués');
+{
+  // C5 (vision-3) : stop 100 $ sous un palier à 83 000 → mise 83 000 $, 830 % du capital.
+  const L8 = Object.fromEntries(ALERTE.lignes);
+  check('mise de 830 % du capital : la ligne d’alerte « La mise dépasse le capital (× 8,3). Tout remplir demande d’emprunter (effet de levier). »',
+    L8['Mise, tout rempli'] === '83 000 $ (830 % du capital)' && ALERTE.alerte === 'La mise dépasse le capital (× 8,3). Tout remplir demande d’emprunter (effet de levier).', [ALERTE.lignes, ALERTE.alerte]);
+  // C5 (fonctionnement-7) : le cas courant, deux paliers et un stop 1 000 $ sous le premier → 110 %.
+  const courant = C.textes(C.calculer({ capital: '10 000', part: '1', stop: '82 000', paliers: ['83 000', '82 500'] }), {});
+  check('cas courant (paliers 83 000 et 82 500, stop 82 000) : 110 % du capital, alerte « × 1,1 »',
+    Object.fromEntries(courant.lignes)['Mise, tout rempli'] === '11 033 $ (110 % du capital)' && /^La mise dépasse le capital \(× 1,1\)\./.test(courant.alerte), [courant.lignes, courant.alerte]);
+  const extreme = C.textes(C.calculer({ capital: '10 000', part: '1', stop: '82 990', paliers: ['83 000'] }), {});
+  check('stop à 10 $ du palier : « × 83 » (8 300 %)', /\(× 83\)/.test(extreme.alerte), extreme.alerte);
+  // Pas d'alerte quand la mise tient dans le capital, même tout juste (100 % pile).
+  const pile = C.calculer({ capital: '10 000', part: '1', stop: '79 200', paliers: ['80 000'] }), Tp = C.textes(pile, {});
+  check('aucune alerte à 52 % (l’exemple du jour), ni à 100 % pile du capital', !T.alerte && !Tv.alerte && proche(pile.partMise, 1) && !Tp.alerte, [T.alerte, pile.partMise, Tp.alerte]);
+  check('l’alerte dit le fait, sans conseil (ni « trop proche », ni « réduisez », ni « éloignez »)',
+    !CONSEIL.test(ALERTE.alerte) && !/trop proche|rédui|éloign|baiss|il faut|devr/i.test(ALERTE.alerte), ALERTE.alerte);
+  check('combien de fois le capital : « × 8,3 », « × 83 », « × 1,1 », « × 2 », jamais « × 1 » au-delà du capital',
+    C.fois(8.3) === '× 8,3' && C.fois(83) === '× 83' && C.fois(1.1033) === '× 1,1' && C.fois(2) === '× 2' && C.fois(1.004) !== '× 1' && C.fois(1.004) !== '× 1,0', [C.fois(8.3), C.fois(83), C.fois(1.1033), C.fois(2), C.fois(1.004)]);
+  // C5 (fonctionnement-7) : une part de 0,001 % ne s'écrit plus « 0,00 % ».
+  const mini = C.textes(C.calculer({ capital: '10 000', part: '0,001', stop: '82 000', paliers: ['83 000', '82 500'] }), {});
+  check('part de 0,001 % : « 0,001 % » dans la perte et le rappel, jamais « 0,00 % »',
+    C.partMots(0.00001) === '0,001 %' && Object.fromEntries(mini.lignes)['Perte au stop, tout rempli'] === '0,10 $ (0,001 % du capital)' && /^Le 0,001 % est la perte/.test(mini.rappel)
+    && ![...mini.lignes.flat(), mini.rappel].some(t => /(^|[^\d,])0,0+ %/.test(t)), [mini.lignes, mini.rappel]);
+  check('les parts déjà justes ne changent pas (« 1 % », « 0,5 % », « 0,25 % », « 52 % », « 7,3 % »)',
+    C.partMots(0.01) === '1 %' && C.partMots(0.005) === '0,5 %' && C.partMots(0.0025) === '0,25 %' && C.partMots(0.52, true) === '52 %' && C.partMots(0.073, true) === '7,3 %');
+  // M1 (vA-9) : le stop redit, avec son écart au prix moyen (un calcul, pas un conseil).
+  const un = C.textes(C.calculer({ capital: '10000', part: '1', stop: '80000', paliers: ['83000'] }), {}), s1 = un.lignes.find(l => l[0] === 'Stop');
+  check('le stop redit : « Stop | 80 000 $ | à 3,6 % sous le prix moyen », entre le prix moyen et la perte',
+    !!s1 && s1[1] === '80 000 $' && s1[2] === 'à 3,6 % sous le prix moyen' && un.lignes.map(l => l[0]).join(' / ') === 'Sens / Quantité par palier / Prix moyen, tout rempli / Stop / Perte au stop, tout rempli / Mise, tout rempli', un.lignes);
+  const sv = Tv.lignes.find(l => l[0] === 'Stop'), sj = T.lignes.find(l => l[0] === 'Stop');
+  check('vente : « 86 000 $, à 1,8 % au-dessus du prix moyen » ; l’exemple du jour : « 80 197 $, à 1,9 % sous le prix moyen »',
+    !!sv && sv[1] === '86 000 $' && sv[2] === 'à 1,8 % au-dessus du prix moyen' && !!sj && sj[1] === '80 197 $' && sj[2] === 'à 1,9 % sous le prix moyen', [sv, sj]);
+  const zero = C.textes(C.calculer({ capital: '10000', part: '1', stop: '8000', paliers: ['83000'] }), {}).lignes.find(l => l[0] === 'Stop');
+  check('un zéro en moins sur le stop (8 000) se voit : « 8 000 $, à 90 % sous le prix moyen »', !!zero && zero[1] === '8 000 $' && zero[2] === 'à 90 % sous le prix moyen', zero);
+  // M1 (vA-9) : les nombres réécrits à la française en quittant le champ ; le même nombre relu.
+  const ECRITS = [['80000', '80 000'], ['10000', '10 000'], ['83 000', '83 000'], ['82152.5', '82 152,5'], ['81 365,0', '81 365'], ['0,5', '0,5'], ['1', '1'], ['0,001', '0,001'],
+    ['1.000.000', '1 000 000'], ['$83200', '83 200'], ['1,5 %', '1,5'], ['', ''], ['abc', 'abc'], ['80 000 x', '80 000 x'], ['0,000000001', '0,000000001']];
+  const malEcrits = ECRITS.filter(([t, v]) => C.ecrireNombre(t) !== v).map(([t, v]) => [t, v, C.ecrireNombre(t)]);
+  check(`${ECRITS.length} textes réécrits en quittant le champ : « 80000 » → « 80 000 », « 82152.5 » → « 82 152,5 » ; vide ou illisible : tel quel`, !malEcrits.length, malEcrits);
+  const relus = LECTURES.filter(([t, v]) => v !== null && C.lireNombre(C.ecrireNombre(t)) !== v).map(([t, v]) => [t, v, C.ecrireNombre(t)]);
+  check('chaque écriture lisible, une fois réécrite, se relit en le même nombre', !relus.length, relus);
+  // N2 (textes-14) : les trois mots dits en mots simples, dans les noms mêmes.
+  check('« part risquée », « stop », « palier » : chacun avec ce qu’il veut dire',
+    C.NOMS.part.join(' ') === 'Part risquée (% du capital perdu au stop)' && C.NOMS.stop.join(' ') === 'Stop (prix où la perte est coupée)' && C.NOMS.paliers.join(' ') === 'Paliers (prix où un ordre attend)', C.NOMS);
 }
 
 console.log(ko ? `\n❌ CALCULETTE : ${ko} contrôle(s) en échec` : '\n✅ CALCULETTE : TOUS LES CONTRÔLES PASSENT');

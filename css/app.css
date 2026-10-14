@@ -1490,6 +1490,14 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .calc-message { margin: 4px 0; font-weight: 650; color: var(--ink-1); }
 .calc-message.calc-attente { font-weight: 400; color: var(--ink-2); }
 .calc-rappel { margin: 6px 0 0; font-size: 11.5px; color: var(--ink-2); }
+/* Revue du 14/10. C5 : une mise plus grande que le capital se dit en couleur d'alerte, comme
+   l'écart d'horloge. N2 : ce que veut dire un nom de champ, en plus petit sous le nom (dans la
+   légende des paliers, à sa suite, en casse ordinaire). M1 : l'écart du stop au prix moyen, sous
+   son prix, sans élargir la colonne des valeurs. */
+.calc-alerte { margin: 6px 0 0; padding: 5px 8px; font-size: 12px; font-weight: 650; color: var(--warn-ink); background: var(--warn-soft); border-radius: min(8px, var(--r-tile)); }
+.calc-def { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.calc-nom .calc-def { display: block; font-size: 11px; line-height: 1.25; }
+.calc-sous { display: block; font-size: 11px; font-weight: 400; color: var(--ink-2); }
 @media (pointer: coarse) {
   .calc .calc-ligne input { font-size: 16px; min-height: 40px; }
   .calc .glossaire-item { min-height: 40px; }
