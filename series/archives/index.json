@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-14T09:02:48+00:00",
+ "updated": "2026-10-14T09:03:06+00:00",
  "generator": "publier_archives.py v2.0 — archives du VPS (carnet, liquidations, flux insiders, tables sol-radar)",
  "source": "collecteurs locaux (carnet Binance/Coinbase, liquidations Binance) · ~/.hermes/archive-insiders (Binance fapi 5m, OKX rubik et liquidations, Deribit surface d'options) · base sol-radar (lecture seule)",
  "branche": "historique",
