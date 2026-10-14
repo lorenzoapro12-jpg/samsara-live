@@ -36,6 +36,10 @@
 //  12. AU DOIGT (écran tactile, 360 et 390 px, aero et kala, deux modes) : chaque bouton de
 //      l'en-tête et chaque intervalle du ruban couvre un carré de 40 × 40 px ; aucune zone sur
 //      « Choisir l'affichage » ; le nom d'un bouton-icône dit à l'appui.
+//  12b. AU DOIGT, THÈMES À STRUCTURE (revue du 14/10, C25 ; les 8 thèmes, 360 et 390 px, deux modes) :
+//      la même cible de 40 × 40 px (Bureau 95 : 32 × 34), pendant l'onde du voyant, sans prendre le
+//      dessin d'un voisin ; dans les 11 thèmes, les boutons du panneau à 40 px de haut, la croix des
+//      fiches à 40 × 40 px (Bureau 95 : 32 × 34).
 //  13. ÉPINGLER (1440, 1024 et 390 px) : depuis « Infos du marché » (avec les chiffres du marché),
 //      un chiffre choisi reste dans l'en-tête ensuite sans eux (en tête de la bande avec), gardé
 //      sur l'appareil.
@@ -621,6 +625,102 @@ const lireEntete = page => page.evaluate(() => {
         check(`${nom} : un vrai toucher sur Légendes : « ${t.nom} » s’affiche et les légendes s’ouvrent`, t.nom === 'Légendes' && t.ouvert, t);
       }
       check(`${nom} : aucune erreur de script`, !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
+    // ── Revue du 14/10, C25 : au doigt, les thèmes à structure et les panneaux ──────────────
+    // Les zones de 40 × 40 px du §8 n'existaient que sans structure (aero, kala). En Bureau 95, le thème
+    // par défaut, « 1 j » faisait 29 × 22 px ; ailleurs, des boutons ronds de 26 px à 29 px de centre à
+    // centre, la paire de 23 px, « Infos du marché » de 21 px ; dans les 11 thèmes, les boutons du
+    // panneau 27 px de haut et la croix des fiches 24 × 22. Même mesure qu'au §8 (le carré centré,
+    // 17 × 17 points) : 40 × 40 px, Bureau 95 32 × 34 (ceux de sa barre des tâches), pendant l'onde du
+    // voyant (en Néon, il prenait le toucher de « Thème »). Le ruban défile : rien n'est exigé au-delà
+    // de son bord, et un intervalle caché (hors du ruban, sous « Affichage » collant) est amené au milieu.
+    // Là où le ruban est plein (Néon, Gazette, Planche, 360 px, Lisible), un intervalle étroit a ses
+    // 40 px de haut et l'écart à ses voisins. Aucune zone ne prend un autre bouton : chaque point du dessin d'un
+    // bouton le touche, lui. Non exigé (dessin du thème) : la pastille de Bureau 95 (barre d'état de la
+    // fenêtre) et de Néon (bande à coins coupés).
+    titre('8b. Au doigt, thèmes à structure (360 et 390 px, écran tactile) : chaque bouton de l’en-tête et du ruban, 40 × 40 px (Bureau 95 : 32 × 34), sans prendre un voisin ; panneau et croix des fiches (revue du 14/10, C25)');
+    for (const theme of ['bureau95', 'bureau95-contraste', 'neon', 'codex', 'gare', 'gazette', 'cyanotype', 'diazo']) for (const mode of ['debutant', 'expert']) for (const w of [360, 390]) {
+      const o = await ouvrir(nav, { vue: { width: w, height: 800 }, mode, theme, ageS: 25 * 60 });
+      const nom = `${theme} · ${mode} · ${w}`;
+      const m = await o.page.evaluate(([fen, serre]) => {
+        const vis = e => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
+        const [L, H] = fen ? [32, 34] : [40, 40], hl = L / 2 - 0.5, hh = H / 2 - 0.5;
+        const dot = document.getElementById('dot');
+        if (dot) dot.classList.add('ping');   // l'onde du voyant
+        const cycle = document.getElementById('cycle'), structure = document.documentElement.dataset.structure;
+        const nomDe = b => b.id || (typeof b.className === 'string' ? b.className.split(' ')[0] : b.tagName);
+        const pastille = !fen && structure !== 'hud' ? ', .kpi-deb' : '';
+        const cibles = [...document.querySelectorAll('.header-right > .ico-btn:not(#reglagesBtn), #paireBtn, .indicator-bar label[id^="int_"]' + pastille)].filter(vis);
+        const affichage = document.getElementById('indDropdownBtn');
+        const autre = (h, b) => [...cibles, affichage].find(c => c !== b && (c.contains(h) || (c.classList.contains('kpi-deb') && h === cycle)));
+        const mesures = cibles.map(b => {
+          const bar = b.closest('.indicator-bar');
+          const dedans = () => { const q = b.getBoundingClientRect(), z = bar.getBoundingClientRect(), g = z.left + bar.clientLeft, y = q.top + q.height / 2;
+            return q.left >= g - 0.5 && q.right <= g + bar.clientWidth + 0.5 && [q.left + 1, q.left + q.width / 2, q.right - 1].every(x => b.contains(document.elementFromPoint(x, y))); };
+          if (bar && !dedans()) b.scrollIntoView({ block: 'nearest', inline: 'center' });
+          const zb = bar && bar.getBoundingClientRect(), bg = bar ? zb.left + bar.clientLeft : -1e9, bd = bar ? bg + bar.clientWidth : 1e9;
+          const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          const a = h => !!h && (b.contains(h) || (b.classList.contains('kpi-deb') && h === cycle));
+          const ext = (dx, dy) => { let d = 0; while (d < 60 && a(document.elementFromPoint(cx + dx * (d + 0.5), cy + dy * (d + 0.5)))) d += 0.5; return d; };
+          const zone = [ext(-1, 0) + ext(1, 0), ext(0, -1) + ext(0, 1)];
+          let rates = 0;
+          for (let i = -8; i <= 8; i++) for (let j = -8; j <= 8; j++) { const x = cx + i * hl / 8; if (x >= bg && x <= bd && !a(document.elementFromPoint(x, cy + j * hh / 8))) rates++; }
+          // Le dessin du bouton : aucun point ne touche un autre bouton (grille de 3 px, 1 px du bord).
+          const pris = new Set();
+          for (let x = r.left + 1; x < r.right - 0.5; x += 3) for (let y = r.top + 1; y < r.bottom - 0.5; y += 3) { const h = document.elementFromPoint(x, y), c = h && autre(h, b); if (c) pris.add(nomDe(c)); }
+          // Ruban plein : un intervalle plus étroit que sa zone a ses 40 px de haut et au moins son dessin.
+          const etroit = serre && bar && r.width < L;
+          const ok = etroit ? zone[1] >= H && zone[0] >= Math.floor(r.width) : !rates;
+          return { id: nomDe(b), dessin: [Math.round(r.width), Math.round(r.height)], zone, rates, etroit, ok, pris: [...pris] };
+        });
+        // « Affichage » : aucun point de son cadre ne touche un autre bouton.
+        const prisAff = new Set();
+        if (affichage && vis(affichage)) {
+          if (affichage.closest('.indicator-bar')) affichage.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          const r = affichage.getBoundingClientRect();
+          for (let x = r.left + 1; x < r.right - 0.5; x += 2) for (let y = r.top + 1; y < r.bottom - 0.5; y += 2) { const h = document.elementFromPoint(x, y), c = h && autre(h, affichage); if (c) prisAff.add(nomDe(c)); }
+        }
+        return { mesures, prisAff: [...prisAff], dot: dot ? getComputedStyle(dot).pointerEvents : null, page: document.documentElement.scrollWidth - innerWidth };
+      }, [/^bureau95/.test(theme), w === 360 && mode === 'debutant' && /neon|gazette|cyanotype|diazo/.test(theme)]);
+      const attendu = /^bureau95/.test(theme) ? 7 : mode === 'debutant' ? (theme === 'neon' ? 11 : 12) : 13;
+      const exige = /^bureau95/.test(theme) ? '32 × 34' : '40 × 40';
+      check(`${nom} : ${m.mesures.length} cibles (${m.mesures.map(c => c.id + ' ' + c.zone.join('×') + (c.etroit ? '*' : '')).join(', ')}) — chacune couvre un carré de ${exige} px${m.mesures.some(c => c.etroit) ? ' (* ruban plein : 40 px de haut et l’écart aux voisins)' : ''}, voyant en onde`,
+        m.mesures.length === attendu && m.mesures.every(c => c.ok) && m.dot === 'none', { mal: m.mesures.filter(c => !c.ok), dot: m.dot });
+      check(`${nom} : aucune zone ne prend le dessin d’un autre bouton, ni « Choisir l’affichage » ; pas de défilement de côté`,
+        m.mesures.every(c => !c.pris.length) && !m.prisAff.length && m.page <= 0, { pris: m.mesures.filter(c => c.pris.length), aff: m.prisAff, page: m.page });
+      await o.ctx.close();
+    }
+    // Le panneau « Choisir l'affichage » et la croix des fiches, dans les 11 thèmes (390 px, tactile).
+    for (const theme of ['aero', 'aero-nuit', 'kala', 'neon', 'codex', 'bureau95', 'bureau95-contraste', 'gare', 'gazette', 'cyanotype', 'diazo']) {
+      const o = await ouvrir(nav, { vue: { width: 390, height: 844 }, mode: 'debutant', theme });
+      await o.page.evaluate(() => document.getElementById('indDropdownBtn').click());
+      await o.page.waitForTimeout(300);
+      const btns = await o.page.evaluate(() => [...document.querySelectorAll('#indMenu .aff-boutons .aff-btn, #indMenu .aff-preset')].filter(b => b.getClientRects().length)
+        .map(b => ({ t: b.textContent.trim(), h: Math.round(b.getBoundingClientRect().height * 10) / 10 })));
+      await o.page.evaluate(() => document.getElementById('indDropdownBtn').click());
+      await o.page.evaluate(() => ouvrirGlossaire(document.getElementById('legendesBtn')));
+      await o.page.waitForTimeout(400);
+      const croix = await o.page.evaluate(fen => {
+        const b = document.querySelector('#fichePop .fiche-fermer');
+        if (!b || !b.getClientRects().length) return null;
+        const [L, H] = fen ? [32, 34] : [40, 40], hl = L / 2 - 0.5, hh = H / 2 - 0.5;
+        const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        const ext = (dx, dy) => { let d = 0; while (d < 60 && b.contains(document.elementFromPoint(cx + dx * (d + 0.5), cy + dy * (d + 0.5)))) d += 0.5; return d; };
+        const zone = [ext(-1, 0) + ext(1, 0), ext(0, -1) + ext(0, 1)];
+        let rates = 0;
+        for (let i = -8; i <= 8; i++) for (let j = -8; j <= 8; j++) if (!b.contains(document.elementFromPoint(cx + i * hl / 8, cy + j * hh / 8))) rates++;
+        // Bureau 95 : la croix est dans la barre de titre, au ras du haut et du bord droit de la
+        // fenêtre : sa zone a ses 32 × 34 px, à gauche et sous elle plutôt que centrée.
+        // La zone ne déborde pas de la fiche (qui défile) : centrée en Bureau 95, elle la faisait
+        // défiler de côté de 7 px (vu par test_calculette_page).
+        const p = document.getElementById('fichePop');
+        return { dessin: [Math.round(r.width), Math.round(r.height)], zone, ok: fen ? zone[0] >= L && zone[1] >= H : !rates, cote: p.scrollWidth - p.clientWidth };
+      }, /^bureau95/.test(theme));
+      check(`${theme} · 390 : les ${btns.length} boutons du panneau « Choisir l’affichage » font 40 px de haut au doigt ; la croix des fiches (${croix && croix.dessin.join(' × ')}, zone ${croix && croix.zone.join(' × ')}) : ${/^bureau95/.test(theme) ? '32 × 34 px au moins' : 'un carré de 40 × 40 px'}, sans faire défiler la fiche de côté`,
+        btns.length >= 9 && btns.every(b => b.h >= 39.5) && !!croix && croix.ok && croix.cote <= 1, { btns: btns.filter(b => b.h < 39.5), croix });
+      check(`${theme} · 390 : aucune erreur de script`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
 

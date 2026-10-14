@@ -1742,7 +1742,7 @@ html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header-right { o
    voisins s'en écartent, eux ne changent pas). Entre deux boutons ronds, 42 px de centre à centre : le
    rendu au sous-pixel décale la zone de toucher de près d'un pixel. Les rangées s'écartent de 14 px
    (6 + 6 pour les zones des deux rangées, et 2 entre elles). Thèmes sans structure (aero,
-   kala) : les structures rangent ces boutons ailleurs, à leur façon. */
+   kala) : les structures rangent ces boutons ailleurs, leurs zones sont écrites plus bas (C25). */
 @media (pointer: coarse) {
   html:not([data-structure]) .header .ico-btn:not(#reglagesBtn), html:not([data-structure]) .header .paire-btn,
   html:not([data-structure]) .indicator-bar label[id^="int_"] { position: relative; }
@@ -1808,4 +1808,95 @@ html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header-right { o
 @media (pointer: coarse) and (max-width: 400px) {
   html[data-chiffres="1"]:not([data-structure]) .header-right > #feedBtn.ico-btn { margin-left: 2px; }
   html[data-chiffres="1"]:not([data-structure]) .header-right > #themeBtn.ico-btn { margin-right: 2px; }
+}
+
+/* ─── Au doigt : les thèmes à structure et les panneaux (revue du 14/10, C25) ────────────────────
+   Les zones de 40 × 40 px ci-dessus ne valaient que pour Aero, Aero nuit et Kāla. En Bureau 95, le
+   thème par défaut, « 1 j » faisait 29 × 22 px ; ailleurs, des boutons ronds de 26 px à 29 px de
+   centre à centre, la paire de 23 px, « Infos du marché » de 21 px. Même principe (un ::before
+   transparent, centré, le dessin des boutons ne change pas), écrit structure par structure : en
+   retirant seulement :not([data-structure]), les zones se chevauchaient et prenaient la cible du
+   voisin (mesuré). Bureau 95 : au moins ses 32 × 34 px (ceux de sa barre des tâches) ; aller jusqu'à
+   40 changerait son dessin. Dans l'en-tête et le ruban, seuls des écarts bougent : la marge de
+   l'en-tête, l'écart entre ses rangées en Complet, la marge des boutons ronds et des intervalles. */
+@media (pointer: coarse) {
+  /* Dans les 11 thèmes : les boutons du panneau « Choisir l'affichage » à 40 px de haut (comme
+     « Calculette de risque ») ; la croix des fiches, une zone de 40 × 40 px autour de son dessin.
+     Bureau 95 : la croix (16 × 14) est au ras du haut et du bord droit de la fiche, qui défile ;
+     centrée, sa zone dépassait de 7 px et la fiche défilait de côté : elle s'étend vers la gauche
+     et vers le bas (33 × 34 au moins). */
+  .aff-boutons .aff-btn, .aff-preset { min-height: 40px; }
+  .fiche-fermer { position: relative; }
+  .fiche-fermer::before { content: ''; position: absolute; inset: min(0px, calc(50% - 20px)); }
+  :root[data-structure="fenetres"] .fiche-fermer::before { inset: -10px -4px -14px -13px; }
+  /* Le voyant (sans action au doigt) : pendant son onde, il prenait le toucher de « Thème » (Néon). */
+  :root[data-structure] #dot { pointer-events: none; }
+}
+@media (pointer: coarse) and (max-width: 480px) {
+  /* La demi-zone : 20 px (40 × 40) ; Bureau 95, 16 × 17 (32 × 34). */
+  :root[data-structure] { --zone-l: 20px; --zone-h: 20px; }
+  :root[data-structure="fenetres"] { --zone-l: 16px; --zone-h: 17px; }
+  :where(:root[data-structure]) :is(.header-right > .ico-btn:not(#reglagesBtn), .paire-btn, .indicator-bar label[id^="int_"]) { position: relative; }
+  :root[data-structure] :is(.header-right > .ico-btn:not(#reglagesBtn), .paire-btn, .indicator-bar label[id^="int_"])::before {
+    content: ''; position: absolute; inset: min(0px, calc(50% - var(--zone-h))) min(0px, calc(50% - var(--zone-l)));
+  }
+  /* Un intervalle : sa zone passe SOUS ses voisins. Là où le ruban n'a pas toute la place (Néon,
+     Gazette et Planche à 360 px, en Lisible : il est presque plein), elle prend l'écart et ses 40 px
+     de haut, jamais le bouton d'à côté. */
+  :root[data-structure] .indicator-bar label[id^="int_"]::before { z-index: -1; }
+  /* « Infos du marché » (Lisible) : la zone de la bande qui la porte, sous la pastille et les chiffres
+     épinglés (même action). Avec des chiffres épinglés, la bande garde son rognage. Bureau 95 : la
+     pastille est dans la barre d'état de la fenêtre, à 3 px de son bord ; Néon : la bande à coins
+     coupés rogne sa zone à 27 px de haut (l'agrandir changerait leur dessin). */
+  :root[data-structure]:not([data-chiffres="1"]):not([data-structure="fenetres"]) #cycle:not(.a-epingles) { position: relative; overflow: visible; isolation: isolate; }
+  :root[data-structure]:not([data-chiffres="1"]):not([data-structure="fenetres"]) #cycle:not(.a-epingles):not(:empty)::before {
+    content: ''; position: absolute; inset: min(0px, calc(50% - 20px)); z-index: -1;
+  }
+  /* L'en-tête rogne ce qui le dépasse : 8 px au-dessus de la paire et sous les boutons ronds ; en
+     Complet, les deux premiers boutons sont sous la paire : 16 px entre les rangées. Bureau 95, Complet :
+     1 px de plus sous la paire. */
+  :root:is([data-structure="hud"], [data-structure="codex"], [data-structure="tableau"], [data-structure="planche"]) .header { padding-top: 8px; padding-bottom: 8px; }
+  :root[data-chiffres="1"]:is([data-structure="hud"], [data-structure="codex"], [data-structure="tableau"], [data-structure="planche"]) .header { row-gap: 16px; }
+  :root[data-structure="fenetres"] .header { padding-bottom: 6px; }
+  /* Lisible : les boutons ronds à 42 px de centre à centre (la place est libre à leur gauche) ; en
+     Néon, « Thème » s'écarte du coin arrondi de l'en-tête, qui rognait sa zone. */
+  :root[data-structure]:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header-right > .ico-btn:not(#reglagesBtn) { margin: 0 6.5px; }
+  :root[data-structure="hud"] .header-right > #themeBtn.ico-btn:not(#reglagesBtn) { margin-right: 12px; }
+  /* Les bandes : la zone de la pastille entre l'en-tête et le ruban (Codex, Gare), au-dessus de la
+     barre du bas (Planche) ; Gazette : les boutons sous la manchette, le ruban sous la cote. */
+  :root[data-structure="codex"] .codex-registre { padding-top: 4px; padding-bottom: 4px; }
+  :root[data-structure="tableau"] .gare-tableau { padding-top: 4px; padding-bottom: 4px; }
+  :root[data-structure="planche"]:not([data-chiffres="1"]) .plan-cartouche { padding-bottom: 3px; }
+  :root[data-structure="une"] .gazette-folio { padding-top: 4px; }
+  :root[data-structure="une"] .indicator-bar { margin-top: 0; }
+  /* Le ruban défile, donc rogne : 40 px de haut à l'intérieur (34 en Bureau 95, Gare : déjà). */
+  :root:is([data-structure="hud"], [data-structure="codex"], [data-structure="planche"]) .indicator-bar { padding-top: 6px; padding-bottom: 6px; }
+  :root[data-structure="une"] .indicator-bar { padding-top: 7px; padding-bottom: 7px; }
+  /* Les intervalles plus étroits que leur zone s'écartent d'autant (largeurs mesurées : Néon 28 px,
+     Codex 22 à 36, Gare 36, Bureau 95 « 1 j » 28) ; Néon, Lisible : « 1 min » s'écarte du coin
+     arrondi du ruban, et l'écart fixe cède la place à ces marges (à 360 px, « Affichage » sortait du
+     ruban). Avec un calque, les six intervalles et « Affichage » tiennent encore dans le ruban (C24).
+     Bureau 95 : les trois larges se touchent, « 1 j » s'écarte de « 4 h ». */
+  :root[data-structure="hud"]:not([data-calques="1"]) .indicator-bar { gap: 0; }
+  :root[data-structure="hud"]:not([data-calques="1"]) .indicator-bar #int_1m { margin-left: 3px; }
+  :root[data-structure="hud"]:not([data-calques="1"]) .indicator-bar #int_5m { margin-left: 1px; }
+  :root[data-structure="hud"] .indicator-bar :is(#int_1h, #int_4h, #int_1d) { margin: 0 6px; }
+  :root[data-structure="codex"] .indicator-bar :is(#int_1m, #int_5m) { margin: 0 2px; }
+  :root[data-structure="codex"] .indicator-bar :is(#int_1h, #int_4h) { margin: 0 8px; }
+  :root[data-structure="codex"] .indicator-bar #int_1d { margin: 0 9.5px; }
+  :root[data-structure="tableau"] .indicator-bar :is(#int_1h, #int_4h, #int_1d) { margin: 0 2px; }
+  :root[data-structure="fenetres"] .indicator-bar :is(#int_5m, #int_15m) { margin-left: -1px; }
+  :root[data-structure="fenetres"] .indicator-bar #int_1d { margin-left: 2px; }
+}
+/* Gazette (29 à 32 px) et Planche (30 px) : la place n'existe qu'au-delà de 380 px, ou en « Le détail »,
+   où le ruban défile déjà (à 360 px, en Lisible, avec un calque, « 1 j » sortirait du ruban : C24). */
+@media (pointer: coarse) and (min-width: 381px) and (max-width: 480px) {
+  :root[data-structure="une"] .indicator-bar :is(#int_1h, #int_4h) { margin: 0 4px; }
+  :root[data-structure="une"] .indicator-bar #int_1d { margin: 0 5.5px; }
+  :root[data-structure="planche"] .indicator-bar :is(#int_1h, #int_4h, #int_1d) { margin: 0 5px; }
+}
+@media (pointer: coarse) and (max-width: 380px) {
+  :root[data-mode="expert"][data-structure="une"] .indicator-bar :is(#int_1h, #int_4h) { margin: 0 4px; }
+  :root[data-mode="expert"][data-structure="une"] .indicator-bar #int_1d { margin: 0 5.5px; }
+  :root[data-mode="expert"][data-structure="planche"] .indicator-bar :is(#int_1h, #int_4h, #int_1d) { margin: 0 5px; }
 }
