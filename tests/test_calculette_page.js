@@ -20,6 +20,9 @@
 //   6. REVUE DU 14/10 (C5, M1, N2) : les noms disent « part risquée », « stop », « palier » en mots
 //      simples ; un nombre tapé sans espace (« 81700 ») est réécrit « 81 700 » en quittant le champ ;
 //      le stop est redit ; une mise plus grande que le capital est dite, en couleur d'alerte.
+//   7. REVUE DU 14/10 (N3, vision-4 ; « Les deux » de Lorenzo à Q3) : sous les résultats d'un achat,
+//      la ligne mesurée (source et condition dites), sous le rappel, dans la bulle, aux jetons du
+//      thème, sans « : » ni « jours » en tête de ligne ; aucune avant un calcul ni en vente.
 //
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
 // USAGE   node tests/test_calculette_page.js
@@ -104,6 +107,7 @@ const lire = page => page.evaluate(() => {
     phrase: (p.querySelector('.calc > .fiche-simple') || {}).textContent, pied: (p.querySelector('.fiche-pied') || {}).textContent,
     message: (p.querySelector('.calc-message') || {}).textContent || null, rappel: (p.querySelector('.calc-rappel') || {}).textContent || null,
     alerte: (p.querySelector('.calc-alerte') || {}).textContent || null,
+    mesure: (p.querySelector('.calc-mesure') || {}).textContent || null,
     lignes, champs, boutons, resHaut: rr ? rr.top : null,
     boite: { g: r.left, d: r.right, h: r.top, b: r.bottom }, L: innerWidth, H: innerHeight,
     pageLarge: document.documentElement.scrollWidth - innerWidth, bulleLarge: p.scrollWidth - p.clientWidth,
@@ -115,6 +119,27 @@ async function taper(page, id, t) {
   await page.type('#' + id, t);
 }
 const valeur = (e, nom) => (e.lignes.find(l => l[0] === nom) || [])[1];
+/** Revue du 14/10 (N3) : la ligne mesurée, à l'écran. La bulle défile jusqu'en bas (au téléphone, la
+ *  ligne est sous le pli) ; la ligne doit être sous le rappel (et sous l'alerte s'il y en a une), dans
+ *  la bulle, visible une fois défilée, en --ink-2 (le jeton du thème), et ses morceaux liés (« (2019-2026) : »,
+ *  « 7 jours, ») chacun sur une seule ligne. */
+const lireMesure = page => page.evaluate(() => {
+  const p = document.getElementById('fichePop'), m = p.querySelector('.calc-mesure');
+  if (!m) return null;
+  p.scrollTop = p.scrollHeight;
+  const r = m.getBoundingClientRect(), b = p.getBoundingClientRect(), rap = p.querySelector('.calc-rappel'), al = p.querySelector('.calc-alerte');
+  const sonde = document.createElement('span'); sonde.style.color = 'var(--ink-2)'; p.appendChild(sonde);
+  const attendu = getComputedStyle(sonde).color; sonde.remove();
+  const lies = [...m.querySelectorAll('.insec')].map(s => ({ t: s.textContent, lignes: s.getClientRects().length }));
+  const res = { couleur: getComputedStyle(m).color, attendu, taille: parseFloat(getComputedStyle(m).fontSize),
+    sousRappel: !!rap && r.top >= rap.getBoundingClientRect().bottom - 0.5, sousAlerte: !al || r.top >= al.getBoundingClientRect().bottom - 0.5,
+    dernier: m === p.querySelector('.calc-resultats').lastElementChild,
+    dedans: r.left >= b.left - 0.5 && r.right <= b.right + 0.5, visible: r.height > 0 && r.top >= b.top - 0.5 && r.bottom <= b.bottom + 0.5,
+    lies };
+  p.scrollTop = 0;
+  return res;
+});
+const LIGNE_MESUREE = 'Mesuré sur BTC (2019-2026) : paliers au bas d’une fourchette de 7 jours, stop juste dessous. Tout s’est rempli puis le prix a touché le stop, 6 fois sur 10.';
 
 (async () => {
   await new Promise(r => serveur.listen(0, '127.0.0.1', r));
@@ -158,6 +183,8 @@ const valeur = (e, nom) => (e.lignes.find(l => l[0] === nom) || [])[1];
         JSON.stringify(e.champs.map(c => c.id)) === JSON.stringify(['calcCapital', 'calcPart', 'calcStop', 'calcPalier0']) && e.champs.every(c => c.type === 'text' && c.mode === 'decimal' && c.auto === 'off')
         && e.champs[1].valeur === '1' && e.champs.filter(c => c.id !== 'calcPart').every(c => c.valeur === ''), e.champs);
       check('avant la saisie : une phrase d’attente, pas de calcul', e.message && /quand les champs sont remplis/.test(e.message) && !e.lignes.length, e.message);
+      // Revue du 14/10 (N3) : la mesure ne s'affiche qu'avec un calcul, et ne remplit aucun champ.
+      check('revue du 14/10 : avant la saisie, pas de ligne mesurée ; aucun champ prérempli', e.mesure === null && !/Mesuré/.test(e.texte), [e.mesure, e.champs.map(x => x.valeur)]);
       // 2. La saisie : l'exemple du jour.
       await taper(page, 'calcCapital', '10 000');
       await taper(page, 'calcStop', '80 197');
@@ -177,6 +204,14 @@ const valeur = (e, nom) => (e.lignes.find(l => l[0] === nom) || [])[1];
         && valeur(e, 'Sens') === 'achat (stop dessous)' && /^0,02134 BTC \(≈ 1 745 \$\)$/.test(valeur(e, 'Quantité par palier') || '')
         && valeur(e, 'Prix moyen, tout rempli') === '81 759 $' && valeur(e, 'Perte au stop, tout rempli') === '100 $ (1 % du capital)' && valeur(e, 'Mise, tout rempli') === '5 235 $ (52 % du capital)', [c, e.lignes]);
       check('la ligne de rappel : « Le 1 % est la perte, pas la mise. Un trou de prix sous le stop coûterait plus. »', e.rappel === 'Le 1 % est la perte, pas la mise. Un trou de prix sous le stop coûterait plus.', e.rappel);
+      // Revue du 14/10 (N3, vision-4) : avant, rien ne disait que cette perte « tout rempli » est l'issue
+      // la plus fréquente de la méthode mesurée. La ligne dit sa source et sa condition.
+      const me = await lireMesure(page);
+      check('revue du 14/10 : sous le rappel, la ligne mesurée « Mesuré sur BTC (2019-2026) : paliers au bas d’une fourchette de 7 jours, stop juste dessous. Tout s’est rempli puis le prix a touché le stop, 6 fois sur 10. »',
+        e.mesure === LIGNE_MESUREE && !!me && me.sousRappel && me.dernier, [e.mesure, me]);
+      check('la ligne mesurée dans la bulle, visible une fois la bulle défilée, en --ink-2 (le jeton du thème) ; « (2019-2026) : » et « 7 jours, » chacun sur une seule ligne',
+        !!me && me.dedans && me.visible && me.couleur === me.attendu && me.taille >= 11
+        && ['(2019-2026) :', '7 jours,'].every(t => me.lies.some(x => x.t === t && x.lignes === 1)), me);
       // Revue du 14/10 (M1) : le stop redit avec son écart ; « 81759 » tapé sans espace, réécrit en quittant le champ.
       check('revue du 14/10 : « Stop 80 197 $ à 1,9 % sous le prix moyen » ; « 81759 » devenu « 81 759 » en quittant le champ ; pas d’alerte à 52 %',
         valeur(e, 'Stop') === '80 197 $ à 1,9 % sous le prix moyen' && e.champs[4].valeur === '81 759' && e.alerte === null, [valeur(e, 'Stop'), e.champs.map(x => x.valeur), e.alerte]);
@@ -200,6 +235,7 @@ const valeur = (e, nom) => (e.lignes.find(l => l[0] === nom) || [])[1];
       await taper(page, 'calcStop', '83 000'); await page.waitForTimeout(60);
       e = await lire(page);
       check('un stop au-dessus de tous les paliers : vente, « au-dessus du stop » dans le rappel', e.calc && e.calc.ok && e.calc.sens === -1 && valeur(e, 'Sens') === 'vente (stop au-dessus)' && /au-dessus du stop coûterait plus\.$/.test(e.rappel || ''), [e.lignes, e.rappel]);
+      check('revue du 14/10 : en vente, pas de ligne mesurée (la mesure ne porte que sur des achats)', e.mesure === null, e.mesure);
       // 6. Revue du 14/10 (C5, M1) : au pavé numérique, « 81700 » sans espace ; Entrée passe au champ
       // suivant et le stop devient « 81 700 ». Paliers 82 152 et 81 759, 0,5 % : mise de 160 % du
       // capital, dite par une ligne d'alerte sous la table (couleur --warn-ink, le jeton du thème).
@@ -217,6 +253,8 @@ const valeur = (e, nom) => (e.lignes.find(l => l[0] === nom) || [])[1];
       check('revue du 14/10 : mise de 160 % du capital → « La mise dépasse le capital (× 1,6). Tout remplir demande d’emprunter (effet de levier). », sous la table, en couleur d’alerte',
         e.calc && e.calc.ok && e.calc.partMise > 1 && valeur(e, 'Mise, tout rempli') === '16 038 $ (160 % du capital)'
         && e.alerte === 'La mise dépasse le capital (× 1,6). Tout remplir demande d’emprunter (effet de levier).' && al && al.visible && al.sousTable && al.couleur === al.attendu, [valeur(e, 'Mise, tout rempli'), e.alerte, al]);
+      const me2 = await lireMesure(page);
+      check('revue du 14/10 : de nouveau en achat, la ligne mesurée revient, sous l’alerte et le rappel, en dernier', e.mesure === LIGNE_MESUREE && !!me2 && me2.sousAlerte && me2.sousRappel && me2.dernier && me2.visible, [e.mesure, me2]);
       // 4. Écran et mots, panneau rempli (avec la ligne d'alerte).
       const dansEcran = e.boite.g >= -0.5 && e.boite.d <= e.L + 0.5 && e.boite.h >= -0.5 && e.boite.b <= e.H + 0.5;
       const hors = e.champs.concat(e.boutons.map(b => ({ id: b.t, gauche: b.g, droite: b.d }))).filter(x => x.gauche < e.boite.g - 0.5 || x.droite > e.boite.d + 0.5).map(x => x.id);

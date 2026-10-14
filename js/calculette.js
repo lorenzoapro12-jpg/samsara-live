@@ -15,6 +15,9 @@
 //     perdent à la fermeture du panneau (#fichePop, la bulle des légendes, js/fiches.js).
 //   • Un calcul, pas un conseil : aucun mot qui pousse à agir ; la ligne de rappel dit ce que la
 //     règle ne couvre pas (un trou de prix au-delà du stop coûte plus).
+//   • Revue du 14/10 (N3, vision-4 ; « Les deux » de Lorenzo à Q3) : sous les résultats d'un achat,
+//     ce que notre mesure des paliers a trouvé, avec sa condition et sa source (MESURE). Aucune
+//     valeur conseillée, aucun champ prérempli.
 // Le cœur (lecture des nombres, calcul, mots) est pur et testé dans node (tests/test_calculette.js) ;
 // le panneau (ouvrirCalculette) est en bas du fichier, testé dans Chromium (test_calculette_page.js).
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -147,9 +150,11 @@ const Calculette = (function () {
    *  Revue du 14/10 (vA-9) : le stop est redit, avec son écart au prix moyen en complément (une ligne
    *  sous le prix, qui n'élargit pas la colonne des valeurs) : un zéro en trop ou en moins s'y voit. Revue du 14/10 (vision-3, fonctionnement-7) : quand la mise dépasse le capital,
    *  une ligne d'alerte le dit (« 830 % du capital » seul ne dit pas qu'il faudrait emprunter) ; le
-   *  fait seulement, aucun conseil. Vide sinon. */
+   *  fait seulement, aucun conseil. Vide sinon.
+   *  Revue du 14/10 (N3) : mesure = la ligne mesurée (MESURE), pour un achat seulement (la mesure
+   *  ne porte que sur des achats) ; vide en vente et sans calcul. */
   function textes(r, o) {
-    if (!r || !r.ok) return { message: r ? r.message : MESSAGES.vide, lignes: [], alerte: '', rappel: '' };
+    if (!r || !r.ok) return { message: r ? r.message : MESSAGES.vide, lignes: [], alerte: '', rappel: '', mesure: '' };
     const c = o || {}, base = c.base || 'BTC', u = c.unite || '$', q = quantiteAffichee(r.quantite);
     const ecartStop = partMots(Math.abs(r.prixMoyen - r.stop) / r.prixMoyen, true);
     const lignes = [
@@ -162,8 +167,15 @@ const Calculette = (function () {
     ];
     const alerte = r.partMise > 1 + 1e-9 ? 'La mise dépasse le capital (' + fois(r.partMise) + '). Tout remplir demande d’emprunter (effet de levier).' : '';
     const rappel = 'Le ' + partMots(r.part) + ' est la perte, pas la mise. Un trou de prix ' + (r.sens > 0 ? 'sous le' : 'au-dessus du') + ' stop coûterait plus.';
-    return { message: '', lignes, alerte, rappel };
+    return { message: '', lignes, alerte, rappel, mesure: r.sens > 0 ? MESURE : '' };
   }
+  // Ce que notre mesure a trouvé (revue du 14/10, N3 [vision-4] ; oui de Lorenzo à Q3, 14/10) :
+  // marche/paliers/rapport.md, BTC 1 h 2019 → 12/10/2026, « tout rempli puis stop » 59 % puis 62 %
+  // des trades. Ce chiffre ne vaut que dans ce cas (avec un stop sous le plus bas de 14 jours, c'est
+  // 4 fois sur 10) : la condition est dite, la calculette ne connaît pas la fourchette de l'utilisateur.
+  // Au passé (un fait mesuré, pas une prévision) ; aucune valeur conseillée (ni nombre de paliers, ni
+  // écart, ni stop) ; deux phrases de 15 mots au plus (charte).
+  const MESURE = 'Mesuré sur BTC (2019-2026) : paliers au bas d’une fourchette de 7 jours, stop juste dessous. Tout s’est rempli puis le prix a touché le stop, 6 fois sur 10.';
   // Les phrases fixes du panneau (relues par les tests : mots du Lisible, pas de conseil).
   // Revue du 14/10 (textes-14) : « le prix touche le stop » au lieu de « le stop saute », jamais
   // expliqué ; la phrase est tournée autrement pour rester sous 15 mots (charte).
@@ -175,7 +187,7 @@ const Calculette = (function () {
   // vente (stop au-dessus des paliers).
   const NOMS = { part: ['Part risquée', '(% du capital perdu au stop)'], stop: ['Stop', '(prix où la perte est coupée)'], paliers: ['Paliers', '(prix où un ordre attend)'] };
 
-  return { lireNombre, ecrireNombre, calculer, textes, MESSAGES, PHRASE, PIED, NOMS, decQuantite, quantiteAffichee, partMots, fois };
+  return { lireNombre, ecrireNombre, calculer, textes, MESSAGES, PHRASE, PIED, NOMS, MESURE, decQuantite, quantiteAffichee, partMots, fois };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Calculette;
 
@@ -271,7 +283,11 @@ function calculetteMaj() {
     ? '<dl class="stats-table calc-table">' + T.lignes.map(([k, v, c]) => '<dt>' + echapF(k) + '</dt><dd>' + echapF(v) + (c ? ' <span class="calc-sous">' + echapF(c) + '</span>' : '') + '</dd>').join('') + '</dl>'
       + (T.alerte ? '<p class="calc-alerte">' + echapF(T.alerte) + '</p>' : '')
       + '<p class="calc-rappel">' + echapF(T.rappel) + '</p>'
+      + (T.mesure ? '<p class="calc-mesure">' + echapF(T.mesure) + '</p>' : '')
     : '<p class="calc-message' + (r.code === 'vide' ? ' calc-attente' : '') + '">' + echapF(T.message) + '</p>';
+  // La ligne mesurée (revue du 14/10, N3) : « 7 jours » et le « : » restent avec leur mot (C8).
+  const m = z.querySelector('.calc-mesure');
+  if (m) Fmt.insecables(m);
 }
 /** En quittant un champ modifié (« change », qui remonte jusqu'à .calc), son nombre réécrit à la
  *  française : « 80000 » → « 80 000 » (revue du 14/10, vA-9). Le nombre lu ne change pas (sauf
