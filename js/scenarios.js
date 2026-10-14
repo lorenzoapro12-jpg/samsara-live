@@ -570,16 +570,18 @@ const Scenarios = (function () {
     const e = etatCourtDebutant(it.sc, it.sv), corps = e.etat + (e.marque ? ' ' + e.marque : '') + ' ▸';
     // « Scénario du matin » : le libellé près de la zone dit déjà « Scénario 1 » (deux lignes
     // « Scénario 1 » l'une sous l'autre se lisaient comme deux scénarios).
-    const pre = it.sc.rang === '1' ? ['Scénario du matin : ', 'Scénario : ', 'Scén. : '] : ['Scénario de la semaine : ', 'Semaine : '];
+    // Jamais « Scén. » : une abréviation sur l'écran de départ (revue du 14/10/2026, M10).
+    const pre = it.sc.rang === '1' ? ['Scénario du matin : ', 'Scénario : '] : ['Scénario de la semaine : ', 'Semaine : '];
     return premiere(pre.map(p => p + corps), max, mesure, maxPx);
   }
   /** Les libellés possibles du scénario près de sa zone (au plus `max` caractères), du plus riche
-   *  au plus court : « Scén. 1 : reste 81 000–83 500 $ » (un range dit son verbe : sans lui, « 81 000
-   *  – 83 500 $ » se lisait « va de 81 000 à 83 500 »), « Scénario 1 : vers 84 300 $ ↑ », après la
-   *  1re cible « Scénario 1 : ensuite 86 000 $ ↑ » ; le dernier, « Scén. 1 », toujours. fleche ('↑' |
-   *  '↓') : le niveau est hors de la vue. L'app essaie chacun tant qu'aucun n'a trouvé sa place. */
+   *  au plus court : « Scénario 1 : reste 81 000–83 500 $ » (un range dit son verbe : sans lui,
+   *  « 81 000 – 83 500 $ » se lisait « va de 81 000 à 83 500 »), « Scénario 1 : vers 84 300 $ ↑ »,
+   *  après la 1re cible « Scénario 1 : ensuite 86 000 $ ↑ » ; le dernier, « Scénario 1 », toujours.
+   *  Le mot entier, jamais « Scén. » ni « Sem. » (revue du 14/10/2026, M10). fleche ('↑' | '↓') : le
+   *  niveau est hors de la vue. L'app essaie chacun tant qu'aucun n'a trouvé sa place. */
   function libellesDebutant(S, sv, max, fleche) {
-    const f = fleche ? fleche + ' ' : '', noms = S.rang === 'S' ? ['Semaine', 'Sem.'] : ['Scénario ' + S.rang, 'Scén. ' + S.rang];
+    const f = fleche ? fleche + ' ' : '', noms = [S.rang === 'S' ? 'Semaine' : 'Scénario ' + S.rang];
     const V = [];
     if (S.forme === 'range') {
       const a = chiffres(S.range[0]), b = chiffres(S.range[1]), B = prix(S.range[1]);
@@ -597,7 +599,7 @@ const Scenarios = (function () {
       const s = f ? '' : S.cibles[k] >= ref ? ' ↑' : ' ↓', mot = k ? 'ensuite ' : 'vers ';
       for (const n of noms) for (const c of [mot + prix(S.cibles[k]) + s, mot + chiffres(S.cibles[k]) + s]) V.push(f + n + ' : ' + c);
     }
-    V.push(f + noms[1]);
+    V.push(f + noms[0]);
     return V.filter((t, i) => i === V.length - 1 || !(max > 0) || t.length <= max);
   }
   /** Le libellé du scénario près de sa zone : le premier de libellesDebutant qui tient
@@ -1093,20 +1095,22 @@ const Scenarios = (function () {
     // Un autre scénario réalisé : « zone du 2 (80 806 $) ✓ » — jamais « réalisé » pour un scénario
     // qui n'est peut-être pas dessiné (A3) ; « (journal) » quand c'est la note du fichier.
     const zoneR = (avecNiv) => 'zone du ' + r1.sc.rang + (avecNiv && niveauRealise(r1) ? ' (' + niveauRealise(r1) + ')' : '') + ' ✓';
+    // Le mot entier, jamais « Scén. » : la ligne est sur l'écran de départ (revue du 14/10/2026, M10).
+    // Elle garde son budget de caractères : une forme trop longue laisse sa place à la suivante.
     const unFerme = !un.ouvert && !estRealise(un);
     if (unFerme) {
       const mot = motFerme(un), journal = un.sc.statut !== '⏳';
       if (journal) {
         const etatJ = etatJournal(un.sc.statut);
-        V.push('Scén. 1 ' + etatJ + ' (journal) ▸');
+        V.push('Scénario 1 ' + etatJ + ' (journal) ▸');
         return premiere(V, max, mesure, maxPx);
       }
       const croix = mot === 'indécis' ? 'indécis' : mot + ' ✗', court = mot === 'indécis' ? 'indécis' : '✗';
       // (Un autre réalisé par la note du journal : pas sur cette ligne, qui dirait les deux marques.)
-      if (r1 && r1.sc.statut === '⏳') V.push('Scén. 1 ' + mot + ' · ' + zoneR(false) + ' (en direct) ▸', 'Scén. 1 ' + court + ' · ' + zoneR(false) + ' (en direct) ▸');
-      else if (!r1 && men && men === M) V.push('Scén. 1 ' + court + ' (en direct) · ' + leN(men) + ' suit mieux ▸');
-      else if (!r1 && jour.cas === 'seul') V.push('Scén. 1 ' + court + ' · seul ' + leN(jour.seul) + ' en cours (en direct) ▸');
-      V.push('Scén. 1 ' + croix + ' (en direct) ▸', 'Scén. 1 ' + court + ' (en direct) ▸');
+      if (r1 && r1.sc.statut === '⏳') V.push('Scénario 1 ' + mot + ' · ' + zoneR(false) + ' (en direct) ▸', 'Scénario 1 ' + court + ' · ' + zoneR(false) + ' (en direct) ▸');
+      else if (!r1 && men && men === M) V.push('Scénario 1 ' + court + ' (en direct) · ' + leN(men) + ' suit mieux ▸');
+      else if (!r1 && jour.cas === 'seul') V.push('Scénario 1 ' + court + ' · seul ' + leN(jour.seul) + ' en cours (en direct) ▸');
+      V.push('Scénario 1 ' + croix + ' (en direct) ▸', 'Scénario 1 ' + court + ' (en direct) ▸');
       return premiere(V, max, mesure, maxPx);
     }
     if (estRealise(un)) return base();
@@ -1116,12 +1120,16 @@ const Scenarios = (function () {
     // pendant le fondu (et garde alors sa place, M8) ; ensuite, sa croix reste dans les bulles.
     const FF = (jour.frais || []).filter(i => i !== un && i.ferme && !estRealise(i) && i.sc.rang !== 'S');
     const rangsFF = FF.map(i => i.sc.rang).join(' et '), croixFF = FF.every(i => motFerme(i) === 'indécis') ? 'indécis' : '✗';
+    // « scénario 3 », « scénarios 2 et 3 » (le pluriel que « scén. » cachait) ; l'état d'une note du
+    // journal s'accorde aussi (« invalidés ✗ »).
+    const nomFF = (FF.length > 1 ? 'scénarios ' : 'scénario ') + rangsFF, NomFF = 'S' + nomFF.slice(1);
+    const accordFF = t => (FF.length > 1 ? t.replace(/^(réalisé|invalidé|partiel)\b/, '$1s') : t);
     if (r1) {
       const mq = marqueDe(r1);
       if (mq === '(journal)') V.push(zoneR(true).replace(/^z/, 'Z') + ' (journal) ▸', zoneR(false).replace(/^z/, 'Z') + ' (journal) ▸');
       else {
         // La réalisation ET la fermeture fraîche d'un autre (même contact, souvent) : les deux.
-        if (FF.length && FF.every(i => i.sc.statut === '⏳')) V.push('En direct : ' + zoneR(true) + ' · scén. ' + rangsFF + ' ' + croixFF + ' ▸', 'En direct : ' + zoneR(false) + ' · scén. ' + rangsFF + ' ' + croixFF + ' ▸');
+        if (FF.length && FF.every(i => i.sc.statut === '⏳')) V.push('En direct : ' + zoneR(true) + ' · ' + nomFF + ' ' + croixFF + ' ▸', 'En direct : ' + zoneR(false) + ' · ' + nomFF + ' ' + croixFF + ' ▸');
         if (k) V.push('En direct : ' + ordinal(k) + ' cible ✓ · ' + zoneR(false) + ' ▸');
         V.push('En direct : ' + zoneR(true) + ' ▸', 'En direct : ' + zoneR(false) + ' ▸');
       }
@@ -1129,12 +1137,12 @@ const Scenarios = (function () {
     }
     if (FF.length) {
       const x = FF[0];
-      if (x.sc.statut !== '⏳') V.push('Scén. ' + rangsFF + ' ' + etatJournal(x.sc.statut) + ' (journal) ▸', 'Scén. ' + rangsFF + ' (journal) ▸');
+      if (x.sc.statut !== '⏳') V.push(NomFF + ' ' + accordFF(etatJournal(x.sc.statut)) + ' (journal) ▸', NomFF + ' (journal) ▸');
       else {
         const mot = FF.length === 1 ? motFerme(x) : null, h = FF.length === 1 && fini(x.ferme.t) && !jourSiAutre(x.ferme.t, maintenant) ? heureVueSi(x.ferme.t) : null;
         const long = mot && mot !== 'indécis' ? mot + ' ✗' : croixFF;
-        if (h) V.push('Scén. ' + rangsFF + ' ' + long + ' vers ' + h + ' (en direct) ▸');
-        V.push('Scén. ' + rangsFF + ' ' + long + ' (en direct) ▸', 'Scén. ' + rangsFF + ' ' + croixFF + ' (en direct) ▸');
+        if (h) V.push(NomFF + ' ' + long + ' vers ' + h + ' (en direct) ▸');
+        V.push(NomFF + ' ' + long + ' (en direct) ▸', NomFF + ' ' + croixFF + ' (en direct) ▸');
       }
       return premiere(V, max, mesure, maxPx);
     }
@@ -1151,29 +1159,29 @@ const Scenarios = (function () {
     return base();
   }
   /** Le libellé du scénario MONTRÉ (Débutant) quand il est réalisé ou fermé, toujours avec sa marque
-   *  (la ligne peut avoir cédé sa place) : « Scén. 2 : zone ✓ (en direct) » (jamais « atteint » ni
-   *  le niveau seul coché, A3 : c'est la ZONE qui a été touchée ; le libellé est posé sur elle) ;
-   *  « Scén. 1 ✗ vers 17:15 (en direct) » (heure de l'appareil du créneau du contact) ; une note du
-   *  journal, « (journal) ». Un range encore ouvert dont le prix est sorti des bornes mais pas de la
-   *  marge : « Scén. 1 : tient jusqu’à 80 622 $ » (le bord toléré, que la boîte seule ne montre pas).
-   *  Les autres cas : libellesDebutant. */
+   *  (la ligne peut avoir cédé sa place) : « Scénario 2 : zone ✓ (en direct) » (jamais « atteint »
+   *  ni le niveau seul coché, A3 : c'est la ZONE qui a été touchée ; le libellé est posé sur elle) ;
+   *  « Scénario 1 ✗ vers 17:15 (en direct) » (heure de l'appareil du créneau du contact) ; une note
+   *  du journal, « (journal) ». Un range encore ouvert dont le prix est sorti des bornes mais pas de
+   *  la marge : « Scénario 1 : tient jusqu’à 80 622 $ » (le bord toléré, que la boîte seule ne montre
+   *  pas). Le mot entier, jamais « Scén. » (revue du 14/10/2026, M10). Les autres cas : libellesDebutant. */
   function libellesJourDebutant(it, max, fleche, maintenant) {
     const S = it.sc, f = fleche ? fleche + ' ' : '', mq = marqueDe(it);
     const garder = V => V.map(t => f + t).filter((t, i, W) => i === W.length - 1 || !(max > 0) || t.length <= max);
     if (estRealise(it)) {
       if (S.forme === 'range') return libellesDebutant(S, it.sv, max, fleche);
-      return garder(['Scénario ' + S.rang + ' : zone ✓ ' + mq, 'Scén. ' + S.rang + ' : zone ✓ ' + mq, 'Scén. ' + S.rang + ' ✓ ' + mq]);
+      return garder(['Scénario ' + S.rang + ' : zone ✓ ' + mq, 'Scénario ' + S.rang + ' ✓ ' + mq]);
     }
     if (!it.ouvert && it.ferme) {
-      if (it.ferme.journal) { const e = etatJournal(S.statut); return garder(['Scén. ' + S.rang + ' ' + e + ' (journal)', 'Scén. ' + S.rang + ' (journal)']); }
+      if (it.ferme.journal) { const e = etatJournal(S.statut); return garder(['Scénario ' + S.rang + ' ' + e + ' (journal)', 'Scénario ' + S.rang + ' (journal)']); }
       // Un contact d'un autre jour (de l'appareil, après minuit) : « hier 23:30 », jamais l'heure seule.
       const j = fini(it.ferme.t) ? jourSiAutre(it.ferme.t, maintenant) : '', h0 = fini(it.ferme.t) ? heureVueSi(it.ferme.t) : null;
       const h = h0 ? (j ? j + ' ' + h0 : 'vers ' + h0) : null, mot = motFerme(it), ind = mot === 'indécis', croix = ind ? 'indécis' : mot + ' ✗', c = ind ? 'indécis' : '✗';
-      return garder((h ? ['Scén. ' + S.rang + ' ' + croix + ' ' + h + ' (en direct)', 'Scén. ' + S.rang + ' ' + c + ' ' + h + ' (en direct)'] : [])
-        .concat(['Scén. ' + S.rang + ' ' + croix + ' (en direct)', 'Scén. ' + S.rang + ' ' + c + ' (en direct)']));
+      return garder((h ? ['Scénario ' + S.rang + ' ' + croix + ' ' + h + ' (en direct)', 'Scénario ' + S.rang + ' ' + c + ' ' + h + ' (en direct)'] : [])
+        .concat(['Scénario ' + S.rang + ' ' + croix + ' (en direct)', 'Scénario ' + S.rang + ' ' + c + ' (en direct)']));
     }
     if (it.ouvert && it.pos && it.pos.forme === 'range' && dansMarge(it)) {
-      const n = dollars(it.pos.niveauBord), noms = ['Scénario ' + S.rang, 'Scén. ' + S.rang];
+      const n = dollars(it.pos.niveauBord), noms = ['Scénario ' + S.rang];
       const V = [];
       for (const nm of noms) V.push(nm + ' : tient jusqu’à ' + n);
       for (const nm of noms) V.push(nm + ' : jusqu’à ' + n);

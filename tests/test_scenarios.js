@@ -386,16 +386,25 @@ titre('6 bis. Débutant : une ligne d’état marquée, un libellé court, une b
   check('fichier d’attente, absent, de la veille : « Scénarios du matin : … », « … indisponibles », « Scénarios d’hier : terminés ▸ »', /^Scénarios du matin : /.test(att) && abs === 'Scénarios du matin : indisponibles' && anc === 'Scénarios d’hier : terminés ▸', [att, abs, anc]);
   const toutes = lignes.map(l => l[2]).concat(renvois, [lj, att, abs, anc]);
   check('lignes : aucun « ordre » (un mot de bourse), aucun mot banni, aucun pourcentage', toutes.every(l => !/\bordres?\b/i.test(l) && !G.motsBannis(l).length && !/%/.test(l)), toutes.filter(l => /\bordres?\b/i.test(l) || G.motsBannis(l).length || /%/.test(l)));
-  // Le libellé près de la zone : ≤ 32 caractères, une flèche au plus.
+  // Le libellé près de la zone : ≤ DEB.scenario caractères (35 : « Scénario » en entier, revue du
+  // 14/10/2026, M10), une flèche au plus.
   const libs = [];
   for (const sc of F.scenarios) for (const fl of [null, '↑', '↓']) for (const sv of [null, { cle: 'cible', k: 1 }]) for (const max of [DEB.scenario, 20]) libs.push([sc.rang, fl, max, t(S.libelleDebutant(sc, sv, max, null, 0, fl))]);
   check('libellé du scénario : ≤ ' + DEB.scenario + ' caractères, une flèche au plus (hors de la vue, la flèche de tête remplace celle du sens)',
     libs.every(([, , max, l]) => l.length <= Math.max(max, 9) && (l.match(/[↑↓]/g) || []).length <= 1) && libs.every(([, , max, l]) => max < DEB.scenario || l.length <= DEB.scenario), libs.filter(([, , max, l]) => l.length > DEB.scenario || (l.match(/[↑↓]/g) || []).length > 1));
-  check('libellé : « Scénario 1 : vers 86 500 $ ↑ », après la 1re cible « Scénario 1 : ensuite 87 200 $ ↑ » ; range avec son verbe et son unité « Scén. 3 : reste 85 600–86 400 $ » (sans « reste », il se lisait « va de … à … »), « Scénario 3 : 85 600 – 86 400 $ » en repli',
+  // Changé exprès (revue du 14/10/2026, M10) : « Scénario 3 : reste … » en entier, le dernier repli
+  // « Scénario 3 » (l'écran de départ ne montre plus « Scén. »).
+  check('libellé : « Scénario 1 : vers 86 500 $ ↑ », après la 1re cible « Scénario 1 : ensuite 87 200 $ ↑ » ; range avec son verbe et son unité « Scénario 3 : reste 85 600–86 400 $ » (sans « reste », il se lisait « va de … à … »), « Scénario 3 : 85 600 – 86 400 $ » en repli',
     S.libelleDebutant(un, null, DEB.scenario) === 'Scénario 1 : vers 86 500 $ ↑' && S.libelleDebutant(un, { cle: 'cible', k: 1 }, DEB.scenario) === 'Scénario 1 : ensuite 87 200 $ ↑'
-    && S.libelleDebutant(F.scenarios[2], null, DEB.scenario) === 'Scén. 3 : reste 85 600–86 400 $' && S.libellesDebutant(F.scenarios[2], null, DEB.scenario).includes('Scénario 3 : 85 600 – 86 400 $')
-    && S.libellesDebutant(F.scenarios[2], null, DEB.scenario).slice(-1)[0] === 'Scén. 3' && S.libellesDebutant(F.scenarios[2], null, DEB.scenario).every(l => l.length <= DEB.scenario) && S.libelleDebutant(un, null, DEB.scenario, null, 0, '↑') === '↑ Scénario 1 : vers 86 500 $',
+    && S.libelleDebutant(F.scenarios[2], null, DEB.scenario) === 'Scénario 3 : reste 85 600–86 400 $' && S.libellesDebutant(F.scenarios[2], null, DEB.scenario).includes('Scénario 3 : 85 600 – 86 400 $')
+    && S.libellesDebutant(F.scenarios[2], null, DEB.scenario).slice(-1)[0] === 'Scénario 3' && S.libellesDebutant(F.scenarios[2], null, DEB.scenario).every(l => l.length <= DEB.scenario) && S.libelleDebutant(un, null, DEB.scenario, null, 0, '↑') === '↑ Scénario 1 : vers 86 500 $',
     [S.libelleDebutant(un, null, DEB.scenario), S.libelleDebutant(F.scenarios[2], null, DEB.scenario), S.libelleDebutant(un, null, DEB.scenario, null, 0, '↑')]);
+  // La preuve de la revue du 14/10/2026 (M10) : aucune forme proposée au Débutant, libellé ou
+  // ligne, n'abrège « Scénario » ni « Semaine » (avant : « Scén. 3 : reste … », « Scén. : … »).
+  const formes = libs.map(l => l[3]).concat(toutes, ...F.scenarios.flatMap(sc => [null, '↑'].flatMap(fl => [null, { cle: 'cible', k: 1 }].map(sv => S.libellesDebutant(sc, sv, DEB.scenario, fl).map(t)))),
+    ...[DEB.boite, DEB.boiteEtroit, 20].map(max => [t(S.ligneBoiteDebutant(F, [{ sc: un, sv: { cle: 'invalide' } }], H3, max, P))]));
+  const abreges = formes.filter(l => /\b[Ss]cén\.|\bSem\./.test(l));
+  check(`M10 : aucune des ${formes.length} formes du Débutant n'abrège « Scénario » ou « Semaine » (« Scén. », « Sem. »)`, formes.length > 50 && !abreges.length, abreges);
   // La bulle : chaque scénario en mots, ses origines sans jargon, aucun pourcentage hors la marge.
   const bul = [];
   for (const sc of F.scenarios) for (const sv of SV) { bul.push(t(S.ligneDebutant(sc, sv))); bul.push(...t(S.explicationDebutant(sc, sv, P, {}))); }

@@ -815,6 +815,11 @@ async function deuxCouleurs(page, id) {
       await p7.click('#indDropdownBtn'); await pause(200);
       e = await etat();
       check('« Mon écran » : rien de gardé au départ, bouton non enfoncé (l’affichage d’origine n’est pas le sien)', e.monGarde === null && e.mon === 'false' && e.lien && !e.dit, e);
+      // La preuve de la revue du 14/10/2026 (M11) : rien de gardé, l'infobulle ne dit pas « Votre
+      // affichage » ; le Guide y porte le nom de sa ligne du panneau.
+      const ditAvant = await p7.evaluate(() => document.querySelector('#indMenu .aff-mon-ecran').title);
+      check(`« Mon écran », rien de gardé : l’infobulle dit « Affichage proposé : … », le Guide sous le nom de sa ligne (« ${ditAvant} »)`,
+        /^Affichage proposé : /.test(ditAvant) && /les repères et la phrase de lecture/.test(ditAvant) && !/Guide/.test(ditAvant), ditAvant);
       await p7.click('#indMenu .aff-mon-ecran'); await pause(300);
       e = await etat();
       check('« Mon écran » sans rien de gardé : RSI et MACD dessous, supports / résistances, Guide et scénarios, sans « Le détail » ; bouton enfoncé, aucun préréglage enfoncé ; rien de gardé sous sa clé',
@@ -831,6 +836,8 @@ async function deuxCouleurs(page, id) {
         e.monGarde && meme(e.monGarde.ov.slice().sort(), TENDANCE) && meme(e.monGarde.sg, []) && e.monGarde.guide === false && e.monGarde.scenarios === true && e.monGarde.detail === true
         && e.dit === 'C’est gardé : « Mon écran » rappellera cet affichage.' && !e.lien && e.ouvert && e.mon === 'true' && !fenetres, { e, fenetres });
       const garde = JSON.stringify(e.monGarde);
+      const ditGarde = await p7.evaluate(() => document.querySelector('#indMenu .aff-mon-ecran').title);
+      check(`« Mon écran » gardé : l’infobulle dit « Votre affichage : … » (« ${ditGarde} »)`, /^Votre affichage : EMA/.test(ditGarde) && !/Guide|repères/.test(ditGarde), ditGarde);   // revue du 14/10/2026, M11
       // Les préréglages et « Revenir au départ » changent l'affichage, jamais « Mon écran ».
       await p7.click('#indMenu .aff-preset[data-preset="volume"]'); await pause(250);
       e = await etat();

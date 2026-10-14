@@ -266,11 +266,17 @@ async function filNoir(page, x, y) {
     check('aucune erreur de source', Object.values(e.erreurs).every(v => !v), e.erreurs);
 
     titre('2. Chaque calque porte son âge SUR la carte');
-    for (const [nom, motif] of [['carte publiée', /^Carte publiée · dernière colonne il y a /], ['carnet live', /^Carnet live · dernier il y a /],
+    for (const [nom, motif] of [['carte publiée', /^Carte publiée · dernière colonne il y a /], ['carnet en direct', /^Carnet en direct · dernier il y a /],
       ['exécutions', /^Exécutions · dernière il y a /], ['gros paquets', /^Gros paquets · lus il y a /], ['gamma', /^Gamma \(Deribit\) · il y a /]]) {
       // Les murs et le gamma partent de leur instant de lecture : on élargit la vue si besoin.
       check(`pastille d'âge : ${nom}`, e.pastilles.some(t => motif.test(t)), e.pastilles);
     }
+    // La preuve de la revue du 14/10/2026 (M12) : « Carnet en direct », jamais « live » — pastilles,
+    // puces (texte et infobulle) et légende, en mode Expert.
+    const vusE = await page.evaluate(() => [...document.querySelectorAll('#calques .puce')].map(b => b.textContent + ' : ' + b.title)
+      .concat(document.getElementById('legende').textContent));
+    const anglaisE = e.pastillesCompletes.concat(vusE).filter(t => /\blive\b/i.test(t)).map(t => t.slice(0, 90));
+    check(`aucun « live » dans les pastilles, les ${vusE.length - 1} puces et la légende (« Carnet en direct », « En direct »)`, vusE.length > 10 && !anglaisE.length, anglaisE);
     check('bougies (volume, CVD, ligne de prix) : leur âge est écrit', /bougies lues il y a [\d,]+ s/.test(e.textes.volume || ''), e.textes.volume);
 
     titre('3. Le prix est une ligne SUR la chaleur');
@@ -371,7 +377,7 @@ async function filNoir(page, x, y) {
     ({ page, erreurs } = await ouvrir(nav, { encodage: false }));
     e = await etat(page);
     check('aucune erreur JavaScript', !erreurs.length, erreurs);
-    check('carnet live sur une échelle PROPRE, annoncée', e.live && e.live.ref === 'propre' && e.pastilles.some(t => /^Carnet live/.test(t)), e.live);
+    check('carnet en direct sur une échelle PROPRE, annoncée', e.live && e.live.ref === 'propre' && e.pastilles.some(t => /^Carnet en direct/.test(t)), e.live);
     const leg = await page.evaluate(() => document.getElementById('encodageEtat').textContent);
     check('légende : « encodage NON publié », aucune référence inventée', /NON publié/.test(leg), leg);
     await page.close();
@@ -441,13 +447,13 @@ async function filNoir(page, x, y) {
       ({ page: p11, erreurs } = await ouvrir(nav, { encodage: true, intercept }));
       const n1 = (await etat(p11)).live.n;
       pendre = 1;
-      await p11.waitForFunction(() => /carnet live : pas de réponse en 5 s/.test(window.__carte.etat().statut), null, { timeout: 9000 }).catch(() => {});
+      await p11.waitForFunction(() => /carnet en direct : pas de réponse en 5 s/.test(window.__carte.etat().statut), null, { timeout: 9000 }).catch(() => {});
       const st = (await etat(p11)).statut;
-      check('statut : « carnet live : pas de réponse en 5 s — nouvel essai dans … »', /carnet live : pas de réponse en 5 s — nouvel essai dans/.test(st), st);
+      check('statut : « carnet en direct : pas de réponse en 5 s — nouvel essai dans … »', /carnet en direct : pas de réponse en 5 s — nouvel essai dans/.test(st), st);
       // Délai de 5 s, puis nouvel essai après 2 × la cadence (recul), puis la cadence.
       await p11.waitForFunction(n => window.__carte.etat().live.n >= n + 2, n1, { timeout: 15000 }).catch(() => {});
       const e11 = await etat(p11);
-      check(`le carnet live repart (${n1} → ${e11.live.n} lectures), erreur effacée`, e11.live.n > n1 + 1 && !/carnet live/.test(e11.statut), { n1, n: e11.live.n, statut: e11.statut });
+      check(`le carnet en direct repart (${n1} → ${e11.live.n} lectures), erreur effacée`, e11.live.n > n1 + 1 && !/carnet en direct/.test(e11.statut), { n1, n: e11.live.n, statut: e11.statut });
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p11.close();
     }
@@ -464,7 +470,7 @@ async function filNoir(page, x, y) {
       await p12.waitForTimeout(600);
       const apres = await etat(p12);
       check(`après : même échelle que la carte publiée, lectures d'avant gardées (${avant.live && avant.live.n} → ${apres.live.n})`,
-        apres.live.ref === 'publiee' && apres.live.deb0 === (avant.live && avant.live.deb0) && apres.pastilles.some(t => /^Carnet live/.test(t)), apres.live);
+        apres.live.ref === 'publiee' && apres.live.deb0 === (avant.live && avant.live.deb0) && apres.pastilles.some(t => /^Carnet en direct/.test(t)), apres.live);
       // La lecture au pointeur du live donne des BTC (l'encodage publié), et la valeur MESURÉE.
       const L = await p12.evaluate(() => window.__carte.lectures());
       const e = apres, mid = (e.vue.p1 + e.vue.p2) / 2;
@@ -478,7 +484,8 @@ async function filNoir(page, x, y) {
         lu = await p12.evaluate(() => document.getElementById('lecture').innerText);
         if (/Live [^\n]*intensité/.test(lu)) break;
       }
-      check('lecture du live (lu avant l\'arrivée de heatmap.json) : en BTC, valeur mesurée', /Live [^\n]*intensité \d+ → (plus gros niveau|somme de la tranche)/.test(lu) && /mesuré : [\d,]+ BTC/.test(lu), lu);
+      // « En direct », plus « Live » (revue du 14/10/2026, M12).
+      check('lecture du live (lu avant l\'arrivée de heatmap.json) : en BTC, valeur mesurée', /En direct [^\n]*intensité \d+ → (plus gros niveau|somme de la tranche)/.test(lu) && /mesuré : [\d,]+ BTC/.test(lu), lu);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p12.close();
     }
@@ -497,7 +504,7 @@ async function filNoir(page, x, y) {
       await p13.waitForTimeout(2500);
       const e1 = await etat(p13);
       check('heatmap.json republié sans encodage : relu', e1.publiee && !e1.publiee.encodage, e1.publiee);
-      check(`live : échelle propre annoncée, chaleur non nulle (${e1.live.nonNuls} cellules)`, e1.live.ref === 'propre' && e1.live.nonNuls > 10 && e1.pastilles.some(t => /^Carnet live/.test(t)), e1.live);
+      check(`live : échelle propre annoncée, chaleur non nulle (${e1.live.nonNuls} cellules)`, e1.live.ref === 'propre' && e1.live.nonNuls > 10 && e1.pastilles.some(t => /^Carnet en direct/.test(t)), e1.live);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await p13.close();
     }
@@ -969,7 +976,8 @@ async function filNoir(page, x, y) {
       ({ page: p30, erreurs } = await ouvrir(nav, { encodage: true, vue: { width: 844, height: 390 }, contexte: { deviceScaleFactor: 3 } }));
       const e30 = await etat(p30), H = e30.mise.chaleur.h, W = e30.mise.chaleur.w;
       const pas = e30.posees.filter(p => p.pastille);
-      const noms = ['Carte publiée', 'Live', 'Exécutions', 'Gros paquets', 'Gamma'];
+      // « En direct », plus « Live » (revue du 14/10/2026, M12).
+      const noms = ['Carte publiée', 'En direct', 'Exécutions', 'Gros paquets', 'Gamma'];
       check(`carte de ${W} × ${H} px : ${pas.length} pastilles (${pas.map(p => p.texte.split(' ·')[0]).join(', ')}), toutes dans la carte`,
         noms.every(n => pas.some(p => p.texte.startsWith(n))) && pas.every(p => p.y >= 0 && p.y + p.h <= H + 0.5 && p.x >= 0 && p.x + p.w <= W + 0.5), pas);
       // Première visite : l'explication couvre presque toute la carte basse. Les pastilles passent
@@ -1445,7 +1453,7 @@ async function filNoir(page, x, y) {
       ({ page: p44b, erreurs } = await ouvrir(nav, { encodage: true, stockage: { 'samsara-carte-intro-v1': 'vue', 'samsara-mode': 'expert' } }));
       const e44b = await etat(p44b);
       check('rechargée après « J\'ai compris » : l\'explication ne revient pas', e44b.guide.intro === false, e44b.guide.intro);
-      check('mode expert (lu dans samsara-mode du terminal) : le résumé en chiffres seuls', e44b.guide.mode === 'expert' && /^carnet live il y a /.test(e44b.guide.resume), e44b.guide.resume);
+      check('mode expert (lu dans samsara-mode du terminal) : le résumé en chiffres seuls', e44b.guide.mode === 'expert' && /^carnet en direct il y a /.test(e44b.guide.resume), e44b.guide.resume);
       await p44b.keyboard.press('?'); await p44b.waitForTimeout(400);
       check('touche ? : l\'explication revient sur demande', (await etat(p44b)).guide.intro === true);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
@@ -1485,10 +1493,10 @@ async function filNoir(page, x, y) {
         ({ page: pg, erreurs } = await ouvrir(nav, { encodage: true, vue: { width: w, height: h }, attendre: false }));
         await pg.waitForTimeout(400);
         const avant = await pg.evaluate(() => document.getElementById('carte').clientHeight);
-        await pg.waitForFunction(() => window.__carte && /^carnet live il y a /.test(window.__carte.etat().guide.resume), null, { timeout: 15000 }).catch(() => {});
+        await pg.waitForFunction(() => window.__carte && /^carnet en direct il y a /.test(window.__carte.etat().guide.resume), null, { timeout: 15000 }).catch(() => {});
         const d = await pg.evaluate(() => { const c = document.getElementById('carte'), r = document.getElementById('resumeCarte'); return { ch: c.clientHeight, barre: document.querySelector('.barre').getBoundingClientRect().height, visible: !r.hidden, texte: r.textContent, defil: document.documentElement.scrollWidth - innerWidth }; });
         check(`Expert, ${w} × ${h} : résumé en chiffres affiché sans changer la taille de la carte (${avant} → ${d.ch} px), en-tête ${Math.round(d.barre)} px ≤ 82`,
-          d.visible && /^carnet live il y a /.test(d.texte) && d.ch === avant && d.ch >= Math.min(400, h - 120) && d.barre <= 82 && d.defil <= 0, d);
+          d.visible && /^carnet en direct il y a /.test(d.texte) && d.ch === avant && d.ch >= Math.min(400, h - 120) && d.barre <= 82 && d.defil <= 0, d);
         check('aucune erreur JavaScript', !erreurs.length, erreurs);
         await pg.close();
       }
@@ -1679,6 +1687,9 @@ async function filNoir(page, x, y) {
         check('légende et explication : « Ligne à fil noir = le prix » (jamais « Ligne blanche = le prix »)', lb.length === 2 && lb.every(([, ok]) => ok), lb);
         const mal = morceaux.map(([n, t]) => [n, interdits(t)]).filter(([, l]) => l.length);
         check(`mots interdits : aucun dans ${morceaux.map(m => m[0]).join(', ')}`, !mal.length, mal);
+        // La preuve de la revue du 14/10/2026 (M12) : « en direct », jamais « live » (« Carnet live »).
+        const anglais = morceaux.filter(([, t]) => /\blive\b/i.test(t)).map(([n]) => n);
+        check('aucun « live » dans le texte du Débutant (« Carnet en direct », comme le panneau ⚡)', !anglais.length, anglais);
         // A10 : « bulle » désigne le détail au toucher ; les échanges sont des « ronds ».
         const bul = morceaux.filter(([, t]) => /\bbulles?\b/i.test(t)).map(([n]) => n);
         check('le mot « bulle » n\'est jamais employé pour les échanges en Débutant (on dit « ronds »)', !bul.length, bul);
@@ -1788,7 +1799,7 @@ async function filNoir(page, x, y) {
         check('45b. case « Le détail » cochée : data-mode et samsara-mode = expert, la case cochée, « Choisir l’affichage », Rafales et toutes les puces visibles',
           x.mode === 'expert' && x.cle === 'expert' && caseJuste(itX, 'expert') && x.affichage && x.rafales && x.puces === 16, { x, itX });
         // Les cinq pastilles de la section 2 : murs et gamma viennent du fichier de 15 min, relu en Expert.
-        const motifs = [/^Carte publiée · /, /^Carnet live · /, /^Exécutions · /, /^Gros paquets · lus il y a /, /^Gamma \(Deribit\) · /];
+        const motifs = [/^Carte publiée · /, /^Carnet en direct · /, /^Exécutions · /, /^Gros paquets · lus il y a /, /^Gamma \(Deribit\) · /];
         await p45.waitForFunction(ms => { const p = window.__carte.etat().pastilles; return ms.every(m => p.some(t => new RegExp(m).test(t))); }, motifs.map(m => m.source), { timeout: 15000 }).catch(() => {});
         const eX5 = await etat(p45);
         check('Expert : les 5 pastilles d\'âge de la section 2 sont là, panneaux du côté et du bas rouverts', motifs.every(m => eX5.pastilles.some(t => m.test(t))) && eX.mise.dom.w > 0 && eX.mise.vol.h > 0 && eX.mise.cvd.h > 0, { p: eX5.pastilles, dom: eX.mise.dom, vol: eX.mise.vol });
@@ -1919,7 +1930,7 @@ async function filNoir(page, x, y) {
         }
         await pg.click('#guideIntroOk'); await pg.waitForTimeout(500);
         const i1 = (await etat(pg)).debutant.indice;
-        check('45d. indice « Touchez pour le détail » : caché sous l\'explication, montré après', !i0 && i1, [i0, i1]);
+        check('45d. indice « Touchez pour tout lire » : caché sous l\'explication, montré après', !i0 && i1, [i0, i1]);
         const h = await pg.evaluate(() => ({ h: document.querySelector('.barre').getBoundingClientRect().height, defil: document.documentElement.scrollWidth - innerWidth }));
         check(`en-tête ${Math.round(h.h)} px ≤ 82, aucun défilement horizontal`, h.h <= 82 && h.defil <= 0, h);
         let b = await bande(pg);
@@ -2157,7 +2168,7 @@ async function filNoir(page, x, y) {
         const tm = (e.finCarte + e.live.deb0) / 2, lt = await viserTP(tm, pV);
         const hm = await pg.evaluate(t => Fmt.heure(t), tm);
         check(`46l. la lecture est celle du point visé (${hm}), pas une lecture d'avant`, lt.includes(' · ' + hm), lt.slice(0, 60));
-        check('46l. entre la fin de la carte publiée et le début du live : « non observé », jamais une bulle muette', /Carnet : non observé ici \(ni carte publiée, ni carnet live\)/.test(lt), lt.slice(0, 160));
+        check('46l. entre la fin de la carte publiée et le début du live : « non observé », jamais une bulle muette', /Carnet : non observé ici \(ni carte publiée, ni carnet en direct\)/.test(lt), lt.slice(0, 160));
       } else check('46l. un intervalle entre la carte publiée et le live, pour le contrôle', false, [e.finCarte, e.live && e.live.deb0]);
       check('aucune erreur JavaScript', !erreurs.length, erreurs);
       await pg.close();

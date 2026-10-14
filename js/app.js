@@ -528,9 +528,12 @@ const PARAM = {
     fourchette: { periodes: 42, heures: 4, phrasePeriodes: 6 },
     // Mode Débutant : au plus `items` textes sur le tracé (phrase, repère du haut, repère du bas,
     // scénario 1, forme, ligne des scénarios), chacun sur une ligne d'au plus N caractères ;
-    // « étroit » : un tracé de moins de `etroit` px (téléphone).
+    // « étroit » : un tracé de moins de `etroit` px (téléphone). `scenario` : 35 = 32 + les 3
+    // lettres de « Scénario » écrit en entier au lieu de « Scén. » (revue du 14/10/2026, M10) ; un
+    // libellé garde ainsi ce qu'il disait (« tient », « reste », l'heure). La place en pixels décide
+    // toujours en dernier : un libellé qui ne tient pas laisse essayer le suivant, plus court.
     debutant: { items: 5, etroit: 520, phrase: 90, phraseEtroit: 48, niveau: 26, niveauEtroit: 18,
-                scenario: 32, forme: 26, boite: 48, boiteEtroit: 40,
+                scenario: 35, forme: 26, boite: 48, boiteEtroit: 40,
                 ecartAtr: 0.5,          // deux repères à l'écran : au moins 0,5 × ATR l'un de l'autre
                 marge: 0.07,            // échelle : 7 % de l'amplitude au-dessus et au-dessous (place des libellés)
                 // Bulle résumée (le détail au 2e toucher) : 4 lignes au plus, titre et ligne
@@ -729,7 +732,7 @@ function masquerCalque(key) { if (isActive(key)) toggleAny(key); }
 // (plan, section 5.1). « Revenir au départ » : l'écran de la première visite (le Guide et les
 // scénarios, sans calque de marché, sans « Le détail » ni « Les chiffres du marché »).
 const PRESELECTIONS = [
-  { id: 'essentiel', nom: 'L’essentiel', ov: [], sg: [], site: true, dit: 'Le Guide et les scénarios, rien d’autre (comme « Revenir au départ »)' },
+  { id: 'essentiel', nom: 'L’essentiel', ov: [], sg: [], site: true, dit: 'Les repères, la phrase de lecture et les scénarios, rien d’autre (comme « Revenir au départ »)' },
   { id: 'tendance', nom: 'La tendance', ov: ['ema20', 'ema50', 'ema200', 'ichimoku'], sg: [], dit: 'EMA 20, EMA 50, EMA 200, Ichimoku' },
   { id: 'elan', nom: 'L’élan', ov: [], sg: ['rsi', 'macd', 'stoch'], dit: 'RSI, MACD, Stochastique' },
   { id: 'volume', nom: 'Le volume', ov: ['vp', 'vwap'], sg: ['vol', 'obv'], dit: 'Volume, OBV, profil de volume, VWAP' },
@@ -793,12 +796,15 @@ function preselectionActive() {
 const MON_ECRAN_CLE = 'samsara-mon-ecran-v1';
 let MON_ECRAN_MEMOIRE = null;   // stockage bloqué (navigation privée) : gardé le temps de la visite
 let monEcranConfirme = false;   // la phrase « C'est gardé » du panneau, jusqu'à sa fermeture
-/** L'affichage gardé (ou celui de PARAM.monEcran), nettoyé des clés que la page ne connaît pas. */
-function monEcran() {
+/** L'affichage gardé par la personne (stockage, ou mémoire de la visite), ou null : rien de gardé. */
+function monEcranGarde() {
   let o = MON_ECRAN_MEMOIRE;
   if (!o) try { o = JSON.parse(localStorage.getItem(MON_ECRAN_CLE) || 'null'); } catch (e) { o = null; }
-  const d = PARAM.monEcran;
-  if (!o || typeof o !== 'object' || !Array.isArray(o.ov) || !Array.isArray(o.sg)) o = d;
+  return o && typeof o === 'object' && Array.isArray(o.ov) && Array.isArray(o.sg) ? o : null;
+}
+/** L'affichage gardé (ou celui de PARAM.monEcran), nettoyé des clés que la page ne connaît pas. */
+function monEcran() {
+  const d = PARAM.monEcran, o = monEcranGarde() || d;
   const oui = (v, defaut) => (typeof v === 'boolean' ? v : defaut);
   return { ov: o.ov.filter(k => k in overlays && !COUCHES_SITE.includes(k)), sg: o.sg.filter(k => k in activeSubs),
     guide: oui(o.guide, d.guide), scenarios: oui(o.scenarios, d.scenarios), detail: oui(o.detail, d.detail) };
@@ -809,11 +815,13 @@ function monEcranActif() {
   return m.ov.slice().sort().join() === s.ov.join() && m.sg.slice().sort().join() === s.sg.join()
     && m.guide === !!overlays.guide && m.scenarios === !!overlays.scenarios && m.detail === !debutant();
 }
-/** Ce que « Mon écran » rappelle, en une ligne (l'infobulle du bouton). */
+/** Ce que « Mon écran » rappelle, en une ligne (l'infobulle du bouton). Rien de gardé : « Affichage
+ *  proposé », pas « Votre affichage ». Le Guide porte le nom de sa ligne du panneau, « Repères et
+ *  phrase de lecture » (revue du 14/10/2026, M11). */
 function monEcranDit() {
   const m = monEcran(), noms = m.ov.concat(m.sg).map(k => (calqueDe(k) || {}).court || k);
-  return 'Votre affichage : ' + (noms.length ? noms.join(', ') : 'aucun indicateur')
-    + (m.guide ? ', le Guide' : '') + (m.scenarios ? ', les scénarios' : '') + (m.detail ? ', avec « Le détail »' : '');
+  return (monEcranGarde() ? 'Votre affichage : ' : 'Affichage proposé : ') + (noms.length ? noms.join(', ') : 'aucun indicateur')
+    + (m.guide ? ', les repères et la phrase de lecture' : '') + (m.scenarios ? ', les scénarios' : '') + (m.detail ? ', avec « Le détail »' : '');
 }
 function appliquerMonEcran() {
   const m = monEcran();
@@ -950,7 +958,7 @@ function buildDropdown() {
   const actif = preselectionActive(), monActif = monEcranActif();
   html += '<div class="aff-tete"><div class="aff-boutons">'
     + '<button type="button" class="aff-btn aff-tout" onclick="toutAfficher()" title="Tout ce qui se dessine sur le graphique ; au plus ' + SOUS_MAX + ' sous-graphiques à la fois, les autres en onglets">Tout afficher</button>'
-    + '<button type="button" class="aff-btn" onclick="revenirAuDepart()" title="Les réglages d’origine : le Guide et les scénarios, rien d’autre">Revenir au départ</button>'
+    + '<button type="button" class="aff-btn" onclick="revenirAuDepart()" title="Les réglages d’origine : les repères, la phrase de lecture et les scénarios, rien d’autre">Revenir au départ</button>'
     + `<button type="button" class="aff-btn aff-mon-ecran" aria-pressed="${monActif}" onclick="appliquerMonEcran()" title="${echapF(monEcranDit())}">Mon écran</button></div>`
     + '<div class="aff-presets" role="group" aria-label="Préréglages"><span class="aff-presets-titre">Préréglages</span>'
     + PRESELECTIONS.map(p => `<button type="button" class="aff-preset" data-preset="${p.id}" aria-pressed="${p.id === actif}" title="${echapF(p.dit)}" onclick="choisirPreselection('${p.id}')">${p.nom}</button>`).join('')
@@ -1129,7 +1137,7 @@ function apresChangementChiffres() {
 }
 // La clé « ? » de l'écran sans le détail, toujours là : un bouton (pas un texte du graphique : hors du budget des
 // 5 textes) qui ouvre l'explication de l'écran (la fiche du Guide). La toute première fois (clé
-// samsara-astuce-tap-v1), l'astuce l'accompagne : « Touchez une étiquette pour le détail » (écran
+// samsara-astuce-tap-v1), l'astuce l'accompagne : « Touchez une étiquette pour la lire » (écran
 // tactile) ou « Survolez… » (souris), cachée au premier toucher du graphique ou au bout de 8 s ;
 // seule la clé reste. Posée dans un coin du tracé, là où elle ne couvre ni une étiquette, ni la
 // ligne qui valide une figure, ni la ligne du prix.
@@ -1149,7 +1157,9 @@ function astuceMontrer() {
   a.hidden = false;
   if (ph && ph.hidden && !astuceVue()) {
     const tactile = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-    ph.textContent = (tactile ? 'Touchez' : 'Survolez') + ' une étiquette pour le détail';
+    // « Le détail » est réservé au nom de la case : « pour le détail » faisait croire qu'il fallait
+    // la cocher pour lire une bulle (revue du 14/10/2026, M9).
+    ph.textContent = (tactile ? 'Touchez' : 'Survolez') + ' une étiquette pour la lire';
     ph.hidden = false;
     clearTimeout(astuceFin);
     astuceFin = setTimeout(astuceCacher, 8000);
@@ -6160,7 +6170,7 @@ function guideFormeDebutant(E, f, t, garder) {
   E.cibles.push({ rects: pose ? [guideZone(pose)] : [], segs: tr.segs, prio: 2, figure: entree, titre: Guide.titreForme(f, 'debutant', ctxF), texte: Guide.texteFormeDebutant(f, b, ctxF, G, unite) });
   if (pose) entree.item = debItem('forme', t, { x: pose.x, y: pose.y, w: Math.min(w, ctx.measureText(t).width + 14 + ICO), h: H });
   // Sans place pour son nom : il passe dans la bulle de la phrase (une chute ne passe jamais inaperçue).
-  else E.debNote = t + (f.fin ? ' — ' + Guide.marqueFin(f, ctxF, 'debutant', unite) : ' (touchez ou survolez le tracé pour le détail).');
+  else E.debNote = t + (f.fin ? ' — ' + Guide.marqueFin(f, ctxF, 'debutant', unite) : ' (touchez ou survolez le tracé pour tout lire).');
   E.debForme = entree;
   return true;
 }
@@ -6516,7 +6526,8 @@ function majReperes(W) {
   reperesCle = cle;
   const n = L.length;
   document.getElementById('reperesTitre').textContent = colonne && !ouverte ? 'Sur le graphique' : colonne ? 'Sur le graphique' + (n ? ' · ' + n + ' repère' + (n > 1 ? 's' : '') : ' : aucun repère dans la vue')
-    : n ? (n > 1 ? 'Lire les ' + n + ' repères en entier' : 'Lire le repère en entier') : 'Aucun repère dans la vue';
+    // Sans « en entier » : la liste garde les noms courts de « Le détail » (revue du 14/10/2026, M10).
+    : n ? (n > 1 ? 'Lire les ' + n + ' repères' : 'Lire le repère') : 'Aucun repère dans la vue';
   // Téléphone (liste fermée sous sa barre) : la phrase du résumé en tête de la barre, lisible sans toucher ;
   // la cassure de la fourchette quand elle est dite, à la place du titre (R.barre ; revue du 14/10/2026, C1).
   const res = document.getElementById('reperesResume');
@@ -6812,7 +6823,8 @@ function guideBulle(c, W, mainH, evite) {
   let acces = null;
   if (!detail) {
     const tactile = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-    const a = (tactile ? 'Touchez encore' : 'Cliquez') + ' : le détail · pas une prévision', src = sourceResume(c, vivant, texte);
+    // « tout lire », pas « le détail » : ce mot est le nom de la case (revue du 14/10/2026, M9).
+    const a = (tactile ? 'Touchez encore' : 'Cliquez') + ' : tout lire · pas une prévision', src = sourceResume(c, vivant, texte);
     // Avec « Le détail », le titre porte les prix (« 83 048 – 83 210 · S/R ×6 … ») : le résumé
     // compte ses nombres à part, pour dire quand même, en mots, ce qu'est le repère.
     const R = resumeBulle(src || texte, bw - 20, PARAM.guide.debutant.bulleLignes - tl.length, PARAM.guide.debutant.bulleNombres - (debutant() ? nombresDe(c.titre) : 0));
@@ -9587,7 +9599,10 @@ const tuile = (lbl, val, sub, fiche, lecture) => '<div class="tuile"><div class=
   + (sub ? '<div class="sub">' + sub + '</div>' : '') + (lecture || '') + '</div>';
 
 // Les chiffres clés de l'en-tête, dans leur ordre d'utilité : [libellé, chemin dans market-data].
-const KPIS_ENTETE = [['RSI 4h', 'tf.4h.rsi_14'], ['Funding an.', 'micro.funding_annual_pct'], ['OI 24h', 'micro.oi_change_24h_pct'],
+// « RSI 4 h » (avec l'espace, comme partout) et « Taux annuel » plutôt que « Funding an. », mot
+// anglais coupé (revue du 14/10/2026, M12). La manchette de la Gazette cite le financement par ce
+// libellé (GAZETTE_CLES, js/structures.js).
+const KPIS_ENTETE = [['RSI 4\u00a0h', 'tf.4h.rsi_14'], ['Taux annuel', 'micro.funding_annual_pct'], ['OI 24h', 'micro.oi_change_24h_pct'],
   ['CVD 24h', 'micro.cvd_24h_usd'], ['GEX', 'micro.gex_usd_1pct'], ['L/S', 'micro.ls_ratio'], ['DXY', 'macro.dxy_spot'], ['VIX', 'macro.vix']];
 // Mêmes précisions que les cartes et le panneau ⚡ (funding annualisé 1 décimale, OI 1, L/S 2).
 function valeurKpi(chemin, d) {
@@ -9671,7 +9686,7 @@ function renderCycle(d) {
   cy.classList.toggle('vieux', ageK !== null && ageK > CADENCES.vieux_min);
   cy.classList.toggle('a-epingles', ep.length > 0);
   const cad = chronique.cadence();
-  cy.title = 'Dernière publication (cadence ' + (cad ? 'mesurée ' + Math.round(cad / 60000) : 'attendue ' + CADENCES.attendue_min) + ' min) — cliquer pour le détail';
+  cy.title = 'Dernière publication (cadence ' + (cad ? 'mesurée ' + Math.round(cad / 60000) : 'attendue ' + CADENCES.attendue_min) + ' min) — cliquer pour ouvrir les infos du marché';
   ajusterKpis();
 }
 // Le nom accessible commence par le texte visible (« Infos du marché »), l'âge ensuite.
@@ -10636,11 +10651,12 @@ function showWalkForward() {
 
   const div = document.getElementById('stratStats');
   div.style.display = 'block';
-  let html = '<div style="color:var(--accent);font-weight:700;margin-bottom:6px">🔬 Test de robustesse (walk-forward, ' + wf.segments.length + ' segments)</div>';
+  let html = '<div style="color:var(--accent);font-weight:700;margin-bottom:6px">🔬 Test de robustesse (walk-forward, ' + wf.segments.length + ' périodes)</div>';
 
   for (const seg of wf.segments) {
     html += '<div style="margin-bottom:4px;font-size:10px">';
-    html += '<b>S' + seg.segment + '</b> Entraînement : <span class="stat-val">' + Fmt.pct(seg.inSample.return, 2) + '</span> (Sharpe ' + Fmt.nombre(seg.inSample.sharpe, 2) + ') ';
+    // « P1, P2… » (périodes) : « S1 » désigne déjà le scénario 1 (revue du 14/10/2026, M12).
+    html += '<b>P' + seg.segment + '</b> Entraînement : <span class="stat-val">' + Fmt.pct(seg.inSample.return, 2) + '</span> (Sharpe ' + Fmt.nombre(seg.inSample.sharpe, 2) + ') ';
     html += '→ Suite : <span class="' + (seg.outSample.return >= 0 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.pct(seg.outSample.return, 2) + '</span> (Sharpe ' + Fmt.nombre(seg.outSample.sharpe, 2) + ')';
     html += '</div>';
   }

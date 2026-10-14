@@ -83,7 +83,8 @@ async function survoler(o, rect, doigt) {
         const B = scenEtat.boite;
         return { roles: debEtat.items.map(i => i.role), textes: debEtat.items.map(i => i.texte), cede: !!(B && B.cede), prio: !!(B && B.prioritaire), ligne: B && B.texte, frais: scenEtat.jour.frais.map(i => i.sc.rang) };
       });
-      check(`${vue.width} : le 2 et le 3 frais, la ligne dit les deux (« ${r.ligne} »)`, r.frais.join() === '2,3' && /zone du 3 .*✓ · scén\. 2 ✗/.test(r.ligne || ''), r);
+      // « scénario 2 » en entier, jamais « scén. » (revue du 14/10/2026, M10).
+      check(`${vue.width} : le 2 et le 3 frais, la ligne dit les deux (« ${r.ligne} »)`, r.frais.join() === '2,3' && /zone du 3 .*✓ · scénario 2 ✗/.test(r.ligne || ''), r);
       // 1440 : la figure trouve sa place (l'arbitrage joue) ; 390 : elle peut ne pas en trouver, la ligne reste posée.
       const avecForme = r.roles.includes('forme');
       check(`${vue.width} : ${avecForme ? 'figure posée, ' : 'figure sans place, '}ligne prioritaire et posée${avecForme ? ', libellé cédé' : ''} ; ${r.roles.length} textes ≤ 5`, (avecForme ? !r.roles.includes('scenario') : vue.width < 500) && r.roles.includes('boite') && r.prio && !r.cede && r.roles.length <= 5, r);

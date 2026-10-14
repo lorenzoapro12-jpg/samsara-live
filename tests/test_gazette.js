@@ -167,12 +167,13 @@ const flecheImmobile = page => page.evaluate(() => {
       lu.valeurs.length > 0 && lu.valeurs.every(v => permis.has(v)), { valeurs: lu.valeurs, permis: [...permis] });
     check('chaque chiffre clé cité (≠ « — ») figure dans la manchette',
       cites.filter(v => v && v !== '—').every(v => lu.valeurs.includes(v)), { cites, valeurs: lu.valeurs });
-    // Revue du 14/10 (C27) : la manchette cherchait « Funding », la cote dit « Funding an. » ; la
-    // clause du financement manquait sans bruit. Le taux cité est annualisé : il est suivi de « par an ».
+    // Revue du 14/10 (C27, M12) : la manchette cherche le financement par le libellé exact de la cote,
+    // « Taux annuel » (avant : « Funding » contre « Funding an. », la clause manquait sans bruit). Le
+    // taux cité est annualisé : il est suivi de « par an ».
     const fin = lu.cote[lu.financement];
     check(`le financement de la cote (« ${lu.financement} » : « ${fin} ») est cité, suivi de « par an » (taux annualisé)`,
-      typeof fin === 'string' && (fin === '—' ? !/financement/.test(lu.titre) : lu.titre.startsWith('Le financement des perpétuels à ' + fin + ' par\u00a0an')),
-      { financement: lu.financement, fin, titre: lu.titre });
+      lu.financement === lu.cles.financement && typeof fin === 'string' && (fin === '—' ? !/financement/.test(lu.titre) : lu.titre.startsWith('Le financement des perpétuels à ' + fin + ' par\u00a0an')),
+      { financement: lu.financement, cles: lu.cles.financement, fin, titre: lu.titre });
     check('hors des valeurs citées, aucun nombre (seulement « 24 h » et les libellés de la cote)',
       !/\d/.test(lu.horsValeurs.replace(/24[\s\u00a0]?h/g, '')), lu.horsValeurs);
     const oi = lu.cote[lu.cles.interet];
@@ -182,7 +183,8 @@ const flecheImmobile = page => page.evaluate(() => {
     check('aucune tournure de conseil (liste de tests/test_fiches.js)', !!CONSEIL && !CONSEIL.test(lu.titre + ' ' + lu.chapeau), lu.titre);
 
     // Les données factices citent le libellé du financement par GAZETTE_CLES, comme la page (revue du
-    // 14/10, C27 : écrit « Funding » en dur, il cachait que la cote dit « Funding an. »).
+    // 14/10, C27 et M12 : écrit « Funding » en dur, il cachait que la cote disait « Funding an. »,
+    // devenu « Taux annuel »).
     const cas = await p.evaluate(() => {
       const F = GAZETTE_CLES.financement;
       const de = obj => lib => (lib in obj ? obj[lib] : null);

@@ -244,7 +244,7 @@ const etat = page => page.evaluate(() => {
         } else { await o.page.click('#reperesHandle'); await o.page.waitForTimeout(200); }
         const ouverte = await o.page.evaluate(() => { const r = document.getElementById('reperesListe').getBoundingClientRect(); return r.height > 40 && r.top >= 0 && r.bottom <= innerHeight + 1; });
         const barre = await o.page.evaluate(() => document.getElementById('reperesTitre').textContent);
-        check(`${nom} : le titre de la liste ouverte compte les repères (« ${barre} »)`, enColonne ? /^Sur le graphique · \d+ repères$/.test(barre) : /^Lire les \d+ repères en entier$/.test(barre), barre);
+        check(`${nom} : le titre de la liste ouverte compte les repères (« ${barre} »)`, enColonne ? /^Sur le graphique · \d+ repères$/.test(barre) : /^Lire les \d+ repères$/.test(barre), barre);   // sans « en entier » (revue du 14/10/2026, M10)
         // « En résumé » : en tête de la liste, la phrase en gras, le pourquoi, les repères à surveiller,
         // l'avertissement unique ; au téléphone, la phrase est aussi sur la barre (lisible sans toucher).
         const sy = await o.page.evaluate(() => {

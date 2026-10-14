@@ -1111,13 +1111,14 @@
         // « depuis » : la plus ancienne lecture GARDÉE (la moitié ancienne s'oublie quand c'est plein).
         const debut = E.live.deb[0], xs = X(debut);
         if (exp && xs > 0 && xs < Z.chaleur.w) tirets(xs, C.live);
-        const l = ['Carnet live · dernier il y a ' + BM.age(now - axe(E.carnetA)) + (E.liveRef === 'publiee' ? '' : ' · échelle propre'),
+        const l = ['Carnet en direct · dernier il y a ' + BM.age(now - axe(E.carnetA)) + (E.liveRef === 'publiee' ? '' : ' · échelle propre'),
           BM.nombre(R.niveauxLive, 0, 0) + ' niveaux / ' + BM.nombre(CADENCE_CARNET[R.niveauxLive] / 1000, 0, 1) + ' s · ' + BM.nombre(R.dpLive, 0, 2) + ' $ · depuis ' + BM.jourHeure(debut, now, true),
           E.liveRef === 'publiee' ? 'même échelle que la carte publiée' : 'échelle propre : NON comparable à la carte publiée'];
         if (horlogeTexte) { l.push(horlogeTexte); horlogeTexte = null; }
-        pastille(l, Math.max(8, xs + 8), 8, C.live, 'left', 'Live · ' + BM.age(now - axe(E.carnetA)) + (E.liveRef === 'publiee' ? '' : ' · échelle propre'));
+        // « En direct », pas « Live » : le même nom que le panneau ⚡ (revue du 14/10/2026, M12).
+        pastille(l, Math.max(8, xs + 8), 8, C.live, 'left', 'En direct · ' + BM.age(now - axe(E.carnetA)) + (E.liveRef === 'publiee' ? '' : ' · échelle propre'));
       } else if (E.erreurs.carnet) {
-        pastille(['Carnet live indisponible', E.erreurs.carnet], Z.chaleur.w - 8, 8, C.down, 'right', 'Live indisponible');
+        pastille(['Carnet en direct indisponible', E.erreurs.carnet], Z.chaleur.w - 8, 8, C.down, 'right', 'En direct indisponible');
       }
     }
     // Trou entre la carte publiée et le carnet live : non observé, et dit.
@@ -1710,7 +1711,7 @@
     if (j) j.title = exp ? 'Ce qui vient de se passer : gros ordres apparus, retirés, absorbés, murs nommés, rafales, niveaux d\'options (J)'
       : 'Ce qui vient de se passer : gros ordres posés, retirés ou échangés, murs, grosses vagues d\'échanges (J)';
   }
-  /** Téléphone, mode débutant : « Touchez pour le détail », UNE fois (après l'explication), jusqu'au
+  /** Téléphone, mode débutant : « Touchez pour tout lire », UNE fois (après l'explication), jusqu'au
    *  premier appui sur la carte ou 8 s ; la clé INDICE_CLE l'empêche de revenir. */
   const indiceEl = document.getElementById('indiceTap');
   let indiceMinuteur = null;
@@ -2338,7 +2339,7 @@
       // Vue passée : les murs et les zones décrivent le présent, hors de la vue — dit en une boîte.
       if (xnow > W) for (const y of [H / 2, 40, H - 40]) {
         const b = poserBoite([['Guide : murs et zones au présent, à droite →'], ['Guide : le présent est à droite →']], W - 6, y, 'right', C.accent, 30, null, null);
-        if (b) { GU.etiquettes.push(Object.assign(b, { texte: 'Guide : le présent est à droite →', long: 'murs, zones et résumé décrivent le dernier carnet live : revenir au présent (bouton Suivre ou touche F) pour les voir' })); break; }
+        if (b) { GU.etiquettes.push(Object.assign(b, { texte: 'Guide : le présent est à droite →', long: 'murs, zones et résumé décrivent le dernier carnet en direct : revenir au présent (bouton Suivre ou touche F) pour les voir' })); break; }
       }
       return;
     }
@@ -2358,7 +2359,7 @@
       const yc = (f.ya + f.yb) / 2, b = poserBoite(vs, f.x0 + 6, yc, 'left', coul, 70, [f.x0 + 6, f.x0 - 150, f.x0 - 300], 'zone' + z.cote);
       if (!b) continue;
       for (const m of dz) dansZone.add(m);
-      GU.etiquettes.push(Object.assign(b, { texte: vs[0].join(' '), lien: prixLien(z.cote, z.pBas, z.pHaut), long: nomZ.toLowerCase() + ' (zone chargée) ' + ou + ' : ' + BM.btc(z.q) + ' BTC d\'ordres ' + mot + ' en attente' + (w ? ', ' + dont : '') + ' (dernier carnet live, mesuré ; seuils : convention). Les ordres peuvent être retirés à tout moment.' }));
+      GU.etiquettes.push(Object.assign(b, { texte: vs[0].join(' '), lien: prixLien(z.cote, z.pBas, z.pHaut), long: nomZ.toLowerCase() + ' (zone chargée) ' + ou + ' : ' + BM.btc(z.q) + ' BTC d\'ordres ' + mot + ' en attente' + (w ? ', ' + dont : '') + ' (dernier carnet en direct, mesuré ; seuils : convention). Les ordres peuvent être retirés à tout moment.' }));
     }
     // Murs en mots : bord droit dans une colonne fixe juste avant « maintenant » (une largeur
     // d'étiquette au plus vers la gauche) ; faute de place, la version courte, jamais plus loin.
@@ -2369,7 +2370,7 @@
       const t = BM.texteMur(m, MODE, now), coul = m.cote === 'bid' ? C.murBid : C.murAsk;
       const b = poserBoite([t.lignes, [t.court]], xn, y, 'right', coul, 34, [xn - 10, xn - 10 - Math.min(230, W * 0.2)], (m.source === 'live' ? 'mur' : 'pub') + m.cote + m.p);
       const lieu = 'tranche ' + BM.prix(m.p) + '–' + BM.prix(m.p + m.pas) + ' $ (somme des ordres de la tranche)';
-      if (b) GU.etiquettes.push(Object.assign(b, { texte: t.lignes.join(' · '), lien: prixLien(m.cote, m.p, m.p + m.pas), long: t.lignes.join(' · ') + ' · ' + lieu + (m.source === 'live' ? ' · carnet live (mesuré)' + (m.publiee ? ', puis carte publiée' : '') + ' : beaucoup d\'ordres ' + (m.cote === 'bid' ? 'd\'achat' : 'de vente') + ' en attente ici ; ils peuvent être retirés à tout moment' : ' · fichier de 15 min') }));
+      if (b) GU.etiquettes.push(Object.assign(b, { texte: t.lignes.join(' · '), lien: prixLien(m.cote, m.p, m.p + m.pas), long: t.lignes.join(' · ') + ' · ' + lieu + (m.source === 'live' ? ' · carnet en direct (mesuré)' + (m.publiee ? ', puis carte publiée' : '') + ' : beaucoup d\'ordres ' + (m.cote === 'bid' ? 'd\'achat' : 'de vente') + ' en attente ici ; ils peuvent être retirés à tout moment' : ' · fichier de 15 min') }));
     }
     // Places gardées des murs qui ne sont plus nommés : oubliées.
     const vus = new Set(affiches.map(m => (m.source === 'live' ? 'mur' : 'pub') + m.cote + m.p));
@@ -2434,7 +2435,7 @@
         const age = 'il y a ' + BM.age(Date.now() - GU.lu);
         long = BM.phraseResume(GU.resume, GU.proches, MODE, age);
         txt = long;
-      } else txt = long = E.carnet ? 'Carnet live pas lu depuis ' + BM.age(Date.now() - E.carnetA) + ' : résumé suspendu (il ne décrit que le présent).' : 'Carnet live : lecture…';
+      } else txt = long = E.carnet ? 'Carnet en direct pas lu depuis ' + BM.age(Date.now() - E.carnetA) + ' : résumé suspendu (il ne décrit que le présent).' : 'Carnet en direct : lecture…';
     }
     if (el.textContent !== txt) el.textContent = txt;
     if (el.title !== long) el.title = long;
@@ -2492,7 +2493,8 @@
     const deborde = el.classList.contains('ouvert') ? Math.max(0, el.offsetHeight - BANDE_DEB_PX) : 0;
     const marge = deborde ? -deborde + 'px' : '';
     if (el.style.marginBottom !== marge) el.style.marginBottom = marge;
-    const titre = 'Un appui : le détail de cette ligne';
+    // « Le détail » est le nom de la case (revue du 14/10/2026, M9) : l'appui ouvre la phrase entière.
+    const titre = 'Un appui : la phrase entière';
     if (el.title !== titre) el.title = titre;
     if (el.hidden) { el.hidden = false; RECT = null; RESUME_FORME.cle = null; }
   }
@@ -2603,7 +2605,7 @@
       // (Débutant : seulement « pas d'exemple » — l'explication se pose loin du prix et des repères.)
       + (ouvert && R.calques.guide && !vus.has(i + 1) && !(deb && (GU.caches.has(i + 1) || GU.sansPlace.has(i + 1))) ? ' <i>' + (GU.caches.has(i + 1) ? '(caché sous ce cadre)' : GU.sansPlace.has(i + 1) ? '(visible, mais sans place libre pour son numéro)' : '(pas d\'exemple dans cette vue)') + '</i>' : '') + '</span></li>').join('');
     if (deb) {
-      document.getElementById('guideIntroNote').textContent = (survol ? 'Touchez ou survolez' : 'Touchez') + ' un repère pour le détail. Tout voir : «\u00a0Le détail\u00a0», dans «\u00a0Choisir l\'affichage\u00a0».';
+      document.getElementById('guideIntroNote').textContent = (survol ? 'Touchez ou survolez' : 'Touchez') + ' un repère pour le lire. Tout voir : «\u00a0Le détail\u00a0», dans «\u00a0Choisir l\'affichage\u00a0».';
       return;
     }
     document.getElementById('guideIntroNote').textContent = (R.calques.guide ? 'Les numéros montrent un exemple réel de chacun. Vert ou turquoise : côté achat ; rouge ou rose : côté vente. Rond : échangé ; rectangle : en attente.' : 'Calque Guide éteint : pas de numéros sur la carte.')
@@ -2853,7 +2855,8 @@
   function carnetLateral() {
     const a = Z.dom;
     ctx.fillStyle = C.panneau; ctx.fillRect(a.x, a.y, a.w, a.h);
-    texte('Carnet live', a.x + 6, 10, C.ink2, 10, 'left', true);
+    // « Carnet en direct » (revue du 14/10/2026, M12) ; étroit (64 px), « Carnet » seul tient.
+    texte(Z.etroit ? 'Carnet' : 'Carnet en direct', a.x + 6, 10, C.ink2, 10, 'left', true);
     const k = E.carnet;
     if (!k) { texte(E.erreurs.carnet ? 'indisponible' : '…', a.x + 6, 26, C.ink3, 10); return; }
     // Un pas MULTIPLE de la tranche du carnet live : chaque barre réunit le même nombre de
@@ -3038,12 +3041,12 @@
     };
     const pub = grillePublieeAffichee();
     const lu = [pub ? cel(pub, 'Carte', pub.encodage, PUB.coupe) : null,
-      estVu('live') && !LIVE.vide ? cel(E.live, 'Live', E.liveRef === 'publiee' ? E.pub && E.pub.encodage : null, LIVE.coupe) : null];
+      estVu('live') && !LIVE.vide ? cel(E.live, 'En direct', E.liveRef === 'publiee' ? E.pub && E.pub.encodage : null, LIVE.coupe) : null];
     // Coinbase est peint SOUS la carte de Binance : sa ligne seulement là où il se voit.
     if (!lu.includes('vu') && estVu('loin') && E.loin && !LOIN.vide) cel(E.loin, 'Coinbase (USD)', E.loin.encodage, LOIN.coupe, vueLoin());
     // Ni carte publiée ni carnet live à cet instant (entre la fin de l'une et le début de l'autre) :
     // dit, comme en Débutant — jamais une bulle muette.
-    if (!lu[0] && !lu[1]) l.push(t > maintenant() ? 'Après «\u00a0maintenant\u00a0» : rien n\'est encore lu' : 'Carnet : non observé ici (ni carte publiée, ni carnet live)');
+    if (!lu[0] && !lu[1]) l.push(t > maintenant() ? 'Après «\u00a0maintenant\u00a0» : rien n\'est encore lu' : 'Carnet : non observé ici (ni carte publiée, ni carnet en direct)');
     if (estVu('executions') && E.exec.seaux.size) {
       // La bulle SURVOLÉE (la plus haute qui contient le pointeur), sinon le seau sous le pointeur :
       // la même grille de seaux que le dessin, jamais une fenêtre centrée sur le pointeur.
@@ -3372,22 +3375,25 @@
   // Les puces des calques : [clé, nom, ce que c'est et comment s'en servir]. Le texte s'affiche au
   // survol de la puce et dans la Légende (Expert), pour le toucher. Une manière de regarder,
   // jamais quoi faire.
+  // Un 4e élément, s'il y est : le nom court de la puce. « Carnet en direct » (revue du 14/10/2026,
+  // M12 : plus « Carnet live ») s'écrit « En direct » sur la puce, pour que la rangée garde autant de
+  // puces entières qu'avant ; son infobulle, la Légende et le panneau gardent le nom entier.
   const NOMS_CALQUES = [
-    ['guide', 'Guide', 'Les murs (zones et tranches nettement plus chargées du carnet live) et les événements racontés en mots, avec le résumé du haut et le journal. Laissez-le allumé pour lire la carte sans tout décoder.'],
+    ['guide', 'Guide', 'Les murs (zones et tranches nettement plus chargées du carnet en direct) et les événements racontés en mots, avec le résumé du haut et le journal. Laissez-le allumé pour lire la carte sans tout décoder.'],
     ['publiee', 'Carte publiée', 'L’historique du carnet publié par le serveur (24 h toutes les 15 min, les 30 dernières minutes chaque minute), une colonne par minute. Sert à voir où de gros ordres sont restés posés pendant des heures.'],
-    ['live', 'Carnet live', 'Le carnet Binance lu par la page toutes les quelques secondes, depuis son ouverture. Sert à voir les ordres qui apparaissent ou disparaissent en ce moment.'],
+    ['live', 'Carnet en direct', 'Le carnet Binance lu par la page toutes les quelques secondes, depuis son ouverture. Sert à voir les ordres qui apparaissent ou disparaissent en ce moment.', 'En direct'],
     ['executions', 'Exécutions', 'Les échanges réels au marché, en ronds : vert quand les achats dominent, rouge quand ce sont les ventes. Sert à voir où, et avec quelle force, le prix a été poussé.'],
     ['prix', 'Prix', 'La ligne du prix (clôtures 1 min, puis prix moyen de chaque seconde). C’est le repère de tout le reste : à garder allumé.'],
     ['bidask', 'Bid / ask', 'Le meilleur prix d’achat (bid) et de vente (ask) à chaque lecture du carnet. Sert, en zoom serré, à voir l’écart entre acheteurs et vendeurs.'],
     ['murs', 'Gros paquets', 'Les tranches de 20 $ les plus chargées d’ordres à la dernière publication (fichier de 15 min), sans seuil : des « gros paquets », pas les murs du guide. Sert à repérer les prix où de gros ordres attendent ; ils peuvent être retirés.'],
     ['gamma', 'Gamma', 'Des niveaux tirés des options Deribit : mur de calls, mur de puts, zéro gamma. Un modèle, pas une mesure : à lire comme des repères possibles.'],
     ['profil', 'Profil', 'À gauche, le volume échangé à chaque prix de la vue. Lecture répandue : les prix très échangés seraient des zones où le prix ralentit.'],
-    ['dom', 'Carnet latéral', 'À droite, la somme des ordres du dernier carnet live, par tranche. Sert à voir de quel côté les ordres s’accumulent maintenant.'],
+    ['dom', 'Carnet latéral', 'À droite, la somme des ordres du dernier carnet en direct, par tranche. Sert à voir de quel côté les ordres s’accumulent maintenant.'],
     ['volume', 'Volume', 'En bas, les achats (au-dessus) et les ventes (au-dessous) au marché par période. Sert à juger si un mouvement est soutenu par des échanges.'],
     ['cvd', 'CVD', 'Achats au marché moins ventes au marché, cumulés depuis le bord gauche de la vue. Une courbe qui monte : les acheteurs pressés dominent sur la période.'],
     ['memoire', 'Mémoire', 'Au bord droit : à chaque prix, la part du temps visible où la tranche portait au moins le seuil choisi (somme des ordres posés). Sert à distinguer une zone souvent chargée d’un ordre fugace ; une présence passée, ni support ni résistance.'],
     ['rafales', 'Rafales', 'Des traits verticaux là où un gros volume s’est échangé d’un même côté dans la même milliseconde. Sert à repérer les accélérations brutales.'],
-    ['destin', 'Destin des gros ordres', 'Ce que devient chaque gros niveau de prix du carnet live (un ou plusieurs ordres, à un seul prix) quand il disparaît : retiré, échangé, en partie… Sert à voir si les gros ordres tiennent quand le prix arrive.'],
+    ['destin', 'Destin des gros ordres', 'Ce que devient chaque gros niveau de prix du carnet en direct (un ou plusieurs ordres, à un seul prix) quand il disparaît : retiré, échangé, en partie… Sert à voir si les gros ordres tiennent quand le prix arrive.'],
     ['loin', 'Profondeur Coinbase', 'Le carnet complet de Coinbase sur ±10 % (5 min × 100 $). Sert à voir les gros ordres loin du prix, hors de la bande lue chez Binance.'],
   ];
   /** Allume ou éteint un calque — la puce, le panneau « Choisir l'affichage » et la touche G passent
@@ -3482,9 +3488,9 @@
     z.addEventListener('wheel', e => {
       if (z.scrollWidth > z.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { z.scrollLeft += e.deltaY; e.preventDefault(); }
     }, { passive: false });
-    for (const [k, nom, aide] of NOMS_CALQUES) {
+    for (const [k, nom, aide, court] of NOMS_CALQUES) {
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'puce'; b.textContent = nom; b.dataset.calque = k; b.title = nom + ' : ' + aide;
+      b.type = 'button'; b.className = 'puce'; b.textContent = court || nom; b.dataset.calque = k; b.title = nom + ' : ' + aide;
       b.setAttribute('aria-pressed', R.calques[k] ? 'true' : 'false');
       b.addEventListener('click', () => { poserCalque(k, !R.calques[k]); apresCalques(); });
       z.appendChild(b);
@@ -3591,7 +3597,7 @@
     tx('rafalesNote', 'Les ' + RF.liste + ' dernières rafales ≥ ' + BM.nombre(R.rafaleMin, 0, 2) + ' BTC, la plus récente d\'abord. ' + BM.TEXTE_RAFALES[0].toUpperCase() + BM.TEXTE_RAFALES.slice(1) + '.');
     // Destin des gros ordres : seuils, marques, attente et limites tirés de BM.MURS / BM.FINS_MURS.
     const MU = BM.MURS, FM = BM.FINS_MURS;
-    tx('legDestin', 'Chaque niveau de prix EXACT du carnet live brut qui atteint le seuil choisi (' + lst(MU.seuilsBtc) + ' BTC) est suivi de lecture en lecture : un trait à son prix, de la première lecture où il atteint ce seuil à sa fin. Tous les seuils sont suivis ensemble : en changer ne remet rien à zéro. '
+    tx('legDestin', 'Chaque niveau de prix EXACT du carnet en direct brut qui atteint le seuil choisi (' + lst(MU.seuilsBtc) + ' BTC) est suivi de lecture en lecture : un trait à son prix, de la première lecture où il atteint ce seuil à sa fin. Tous les seuils sont suivis ensemble : en changer ne remet rien à zéro. '
       + 'Entre deux lectures, on compte les exécutions à ce prix et du côté qui le touche (un bid par une vente au marché, un ask par un achat) dans deux fenêtres tirées des instants d\'envoi et de réception des lectures et de l\'horloge Binance ± u : '
       + 'la fenêtre étroite (exécutions certainement entre les deux lectures, X_N) et la fenêtre large (toutes celles qui ont pu y être, X_W). '
       + 'Mesuré : « au moins … retirés » = baisse de la taille moins X_W, une borne basse de ce qui a été annulé ou réduit ; X_N est échangé à coup sûr, X_W − X_N est incertain. '
@@ -3607,16 +3613,16 @@
     tx('legPaletteDeb', couleursDebutant());
     tx('legSensDeb', '«' + NB + 'En hausse' + NB + '» : plus de ' + n2(GD.tendancePct) + ' % en ' + BM.age(GD.tendanceMs) + ' ; «' + NB + 'stable' + NB + '» sous ' + n2(GD.tendanceRetourPct) + ' %. Le mot change au plus une fois par ' + (GD.tendanceGardeMs === 60e3 ? 'minute' : BM.age(GD.tendanceGardeMs)) + '.');
     tx('legGuide', 'Il relit ce que la carte montre et l\'écrit en mots ; il ne mesure rien de neuf, et ne dit ni pourquoi ni ce qui va suivre. Mesuré : lu dans les données ; convention : un seuil choisi par ce code ; modèle : les niveaux d\'options. '
-      + 'Heures du guide : celles de l\'appareil, comme l\'axe du temps (le fuseau est écrit dans son angle). Le guide ne décrit le présent qu\'avec un carnet live de moins de ' + BM.VALIDITE.cadences + ' cadences ; sur une vue passée, il ne dessine que les marques du journal.');
-    tx('legGuideMurs', 'Les ' + GD.parCote + ' tranches de ' + GD.trancheUsd + NB + '$ les plus chargées de chaque côté du prix, dans le dernier carnet live (mesuré), à ±' + n2(GD.procheMaxPct) + ' % au plus et dans la bande lue. '
+      + 'Heures du guide : celles de l\'appareil, comme l\'axe du temps (le fuseau est écrit dans son angle). Le guide ne décrit le présent qu\'avec un carnet en direct de moins de ' + BM.VALIDITE.cadences + ' cadences ; sur une vue passée, il ne dessine que les marques du journal.');
+    tx('legGuideMurs', 'Les ' + GD.parCote + ' tranches de ' + GD.trancheUsd + NB + '$ les plus chargées de chaque côté du prix, dans le dernier carnet en direct (mesuré), à ±' + n2(GD.procheMaxPct) + ' % au plus et dans la bande lue. '
       + '«' + NB + 'Mur' + NB + '» : au moins ' + n2(GD.murMinBtc) + ' BTC et ' + n2(GD.murFacteur) + ' fois la tranche médiane de la bande lue (convention' + (GU.seuil && GU.seuil.mediane !== null ? ' ; en ce moment médiane ' + BM.btc(GU.seuil.mediane) + ' BTC, seuil ' + BM.btc(GU.seuil.seuil) + ' BTC' : '') + ') ; la médiane est celle des ' + GD.seuilLectures + ' dernières lectures (elle ne saute pas d\'une lecture à l\'autre), et un mur déjà nommé le reste jusqu\'à ' + pc(GD.murSortiePart) + ' de ce seuil (il ne clignote pas). La tranche du prix et sa voisine de chaque côté ne sont jamais nommées. '
       + '«' + NB + 'Là depuis' + NB + '» : depuis quand la tranche porte au moins ce seuil de sortie à chaque lecture ; une lecture manquée, la tranche hors de la bande lue ou le prix dans la tranche arrêtent la série («' + NB + 'au moins' + NB + '», ou «' + NB + 'rien à comparer' + NB + '»). '
-      + 'Au-delà du carnet live gardé, la carte publiée prend le relais si elle s\'arrête moins de ' + GD.trouMaxMs / 60e3 + ' min avant lui. «' + NB + 'Grossit' + NB + '» / «' + NB + 'diminue' + NB + '» : variation sur ' + BM.age(GD.fenetreMs) + ', dite au-delà de ' + n2(GD.varMinBtc) + ' BTC et de ' + pc(GD.varMinPart) + ' de la taille d\'avant (convention).');
+      + 'Au-delà du carnet en direct gardé, la carte publiée prend le relais si elle s\'arrête moins de ' + GD.trouMaxMs / 60e3 + ' min avant lui. «' + NB + 'Grossit' + NB + '» / «' + NB + 'diminue' + NB + '» : variation sur ' + BM.age(GD.fenetreMs) + ', dite au-delà de ' + n2(GD.varMinBtc) + ' BTC et de ' + pc(GD.varMinPart) + ' de la taille d\'avant (convention).');
     tx('legGuideZones', GD.zoneTranches + ' tranches de ' + GD.trancheUsd + NB + '$ consécutives sommées, d\'au moins ' + n2(GD.zoneMinBtc) + ' BTC et ' + n2(GD.zoneFacteur) + ' fois la zone médiane du même côté (convention), la plus proche du prix hors de sa tranche. Un cadre avant «' + NB + 'maintenant' + NB + '», une marque au bord droit. '
       + 'Quand le prix y entre, elle reste dessinée, pour voir si ses ordres sont échangés ou retirés. Une zone dessinée le reste tant qu\'elle porte au moins ' + n2(GD.zoneMinBtc) + ' BTC et ' + pc(GD.zoneSortiePart) + ' du seuil d\'entrée du moment ; en dessous, encore ' + GD.zoneGarde + ' lectures, puis elle s\'efface. '
-      + 'Le plus gros mur nommé dans une zone est dit dans sa phrase (le même carnet n\'est pas écrit deux fois). Sans «' + NB + 'Le détail' + NB + '» : ' + (GD.textesDebutant === 2 ? 'deux' : GD.textesDebutant) + ' repères au plus, un de chaque côté du prix (la zone de ce côté, sinon le mur le plus proche), d\'au plus ' + BM.ETIQUETTE_MAX + ' signes ; jamais sur la ligne de prix des ' + BM.nombre(GD.tendanceMs / 60e3, 0, 1) + ' dernières minutes ni sur la rangée du prix ; seulement avec un carnet live frais.');
-    tx('legGuideResume', 'Le DERNIER carnet live seul (prix de référence : milieu meilleur bid / meilleur ask de cette lecture) : ordres posés à ±' + n2(GD.bandePct) + ' % du prix, moins si le carnet lu ne va pas si loin (il le dit) ; «' + NB + 'à peu près autant' + NB + '» sous ' + n2(GD.rapportNet) + ' fois (convention). '
-      + 'Une photo de l\'instant, pas une prévision : plus d\'ordres d\'un côté ne dit pas où ira le prix. Avec «' + NB + 'Le détail' + NB + '» : les chiffres seuls — l\'âge du carnet live, le rapport achat / vente et ses deux quantités, puis, de chaque côté, la tranche la plus proche du prix qui porte au moins le seuil «' + NB + 'mur' + NB + '» (ou «' + NB + 'aucune' + NB + '»). '
+      + 'Le plus gros mur nommé dans une zone est dit dans sa phrase (le même carnet n\'est pas écrit deux fois). Sans «' + NB + 'Le détail' + NB + '» : ' + (GD.textesDebutant === 2 ? 'deux' : GD.textesDebutant) + ' repères au plus, un de chaque côté du prix (la zone de ce côté, sinon le mur le plus proche), d\'au plus ' + BM.ETIQUETTE_MAX + ' signes ; jamais sur la ligne de prix des ' + BM.nombre(GD.tendanceMs / 60e3, 0, 1) + ' dernières minutes ni sur la rangée du prix ; seulement avec un carnet en direct frais.');
+    tx('legGuideResume', 'Le DERNIER carnet en direct seul (prix de référence : milieu meilleur bid / meilleur ask de cette lecture) : ordres posés à ±' + n2(GD.bandePct) + ' % du prix, moins si le carnet lu ne va pas si loin (il le dit) ; «' + NB + 'à peu près autant' + NB + '» sous ' + n2(GD.rapportNet) + ' fois (convention). '
+      + 'Une photo de l\'instant, pas une prévision : plus d\'ordres d\'un côté ne dit pas où ira le prix. Avec «' + NB + 'Le détail' + NB + '» : les chiffres seuls — l\'âge du carnet en direct, le rapport achat / vente et ses deux quantités, puis, de chaque côté, la tranche la plus proche du prix qui porte au moins le seuil «' + NB + 'mur' + NB + '» (ou «' + NB + 'aucune' + NB + '»). '
       + 'Sans «' + NB + 'Le détail' + NB + '» : une ligne, d\'abord le sens du prix — «' + NB + 'en hausse / en baisse / stable sur ' + BM.age(GD.tendanceMs) + NB + '» : le dernier prix comparé à la moyenne des clôtures de ' + GD.tendanceRefMin + ' minutes centrées sur ' + BM.age(GD.tendanceMs) + ' plus tôt ; «' + NB + 'en hausse / en baisse' + NB + '» au-delà de ±' + BM.nombre(GD.tendancePct, 0, 2) + ' %, de retour à «' + NB + 'stable' + NB + '» sous ±' + BM.nombre(GD.tendanceRetourPct, 0, 2) + ' %, un mot tenu au moins ' + BM.age(GD.tendanceGardeMs) + ' (convention) ; une minute manquante : rien n\'est écrit —, précédé du dernier prix ; puis le côté le plus chargé (même seuil, tenu ' + BM.age(GD.sensGardeMs) + ' avant de changer de mot) quand les deux côtés ont un repère, sinon le côté sans repère ; et l\'âge de la plus vieille valeur : «' + NB + 'à jour' + NB + '» sous ' + BM.age(GD.ageFraisMs) + ', puis en secondes entières ; elle FINIT par «' + NB + 'pas une prévision' + NB + '». Moins de ' + BM.nombre(ETROIT_PX, 0, 0) + NB + 'px de large, ou ligne qui ne tient pas dans la bande : la version courte (le prix et son sens, l\'âge, «' + NB + 'pas une prévision' + NB + '») ; un appui ouvre le détail.');
     tx('legGuideJournal', 'Bouton Journal (touche J), à l\'heure de l\'appareil. Gros ordres : au moins ' + n2(BM.MURS.seuilsBtc[E.murs.indice(seuilJournal())]) + ' BTC à un même prix (réglage «' + NB + 'Destin des gros ordres' + NB + '», ' + n2(GD.journalMurBtc) + ' BTC au moins) apparus (restés ' + GD.vieMinMs / 1000 + ' s ; un ordre vu en entrant dans la bande lue n\'est pas «' + NB + 'apparu' + NB + '»), retirés, absorbés. '
       + '«' + NB + 'Absorbé' + NB + '» = entièrement échangé ; un ordre retiré pour l\'essentiel puis touché est dit «' + NB + 'retiré pour l\'essentiel' + NB + '» (échanges sous ' + pc(GD.absorbePart) + ' de sa plus grande taille). '
@@ -3629,7 +3635,7 @@
     const pub = E.pub ? 'dernière colonne il y a ' + BM.age(maintenant() - BM.instantDerniereColonne(E.pub)) : 'pas encore lue';
     tx('legGuideLimites', 'Un mur peut être retiré à tout moment, avant d\'être touché : «' + NB + 'beaucoup d\'ordres en attente' + NB + '» n\'est pas une promesse. La chaleur, les murs et les gros paquets montrent des INTENTIONS (ordres posés) ; seuls les ronds et les rafales sont des échanges. '
       + 'Couverture : le carnet Binance lu ici couvre en ce moment ' + cv + (R.niveauxLive < nivMax ? ' ; davantage à ' + BM.nombre(nivMax, 0, 0) + ' niveaux (Choisir l’affichage › Réglages fins)' : '') + ' ; la profondeur Coinbase va à ±' + LOIN_BANDE_PCT + ' %, à sa propre échelle. '
-      + 'Délais : carte publiée — ' + pub + ' ; gros paquets et gamma du fichier de 15 min (heure de lecture écrite) ; carnet live toutes les ' + BM.nombre(CADENCE_CARNET[R.niveauxLive] / 1000, 0, 1) + ' s. Les niveaux d\'options reposent sur une hypothèse (modèle).');
+      + 'Délais : carte publiée — ' + pub + ' ; gros paquets et gamma du fichier de 15 min (heure de lecture écrite) ; carnet en direct toutes les ' + BM.nombre(CADENCE_CARNET[R.niveauxLive] / 1000, 0, 1) + ' s. Les niveaux d\'options reposent sur une hypothèse (modèle).');
     const e = $('encodageEtat'), encL = E.loin && E.loin.encodage;
     // La profondeur Coinbase : même palette, AUTRE échelle — les graduations de la barre ne s'y appliquent pas.
     const loinTxt = R.calques.loin && E.loin ? ' Les graduations de la barre valent pour la carte de Binance' + (enc && enc.ref_btc && E.pub ? ' (référence ' + BM.nombre(enc.ref_btc, 0, 2) + ' BTC, tranches de ' + BM.nombre(E.pub.dp, 0, 2) + ' $)' : '')
@@ -3661,7 +3667,7 @@
     // Les noms appris (A13) : « historique de la carte », « échanges », « ordres en attente », « prix » —
     // deux sources du même nom ne font qu'une ligne.
     const noms = deb ? { carte: 'historique de la carte', direct: 'historique de la carte', historique: 'échanges', bougies: 'prix', executions: 'échanges', carnet: 'ordres en attente', horloge: 'heure de Binance' }
-      : { carte: 'carte publiée', direct: 'carte publiée (30 dernières min)', fichier: 'fichier 15 min', bougies: 'bougies', executions: 'exécutions', historique: 'exécutions publiées (24 h)', profondeur: 'profondeur Coinbase', carnet: 'carnet live', horloge: 'horloge Binance' };
+      : { carte: 'carte publiée', direct: 'carte publiée (30 dernières min)', fichier: 'fichier 15 min', bougies: 'bougies', executions: 'exécutions', historique: 'exécutions publiées (24 h)', profondeur: 'profondeur Coinbase', carnet: 'carnet en direct', horloge: 'horloge Binance' };
     const dits = new Set();
     for (const [k, v] of Object.entries(E.erreurs)) {
       if (!v || (deb && (!noms[k] || dits.has(noms[k])))) continue;

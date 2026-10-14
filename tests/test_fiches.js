@@ -52,7 +52,10 @@ T.setData(Object.assign({}, DATA, { meta: { version: 1, champs: META } }));
 const sansFormule = champs.filter(([k, f]) => !T.ficheHtml(k).includes(esc(META[f.champ].formule))).map(([k]) => k);
 check('chaque fiche affiche la formule PUBLIÉE, mot pour mot', !sansFormule.length, sansFormule);
 const rt = T.ficheHtml('amplitude');
-check('nom trompeur signalé quand le producteur le déclare (range_24h_pct ⇒ via son alias)', META['tf.*.range_24h_pct'].nom_trompeur && /Nom trompeur|range_24h_pct/.test(rt));
+// Changé exprès (revue du 14/10/2026, M13) : la fiche ne nomme plus l'ancien champ `range_24h_pct`
+// (elle parlait du code) ; le fait que le producteur déclare reste, en mots : pas sur 24 h.
+check('nom trompeur déclaré par le producteur (range_24h_pct) : la fiche « Amplitude » garde le fait en mots (« pas sur 24 h »), sans le nom du champ',
+  META['tf.*.range_24h_pct'].nom_trompeur && /pas sur 24 h/.test(rt) && !/range_24h_pct/.test(rt), rt.slice(0, 300));
 const ema = T.ficheHtml('ema_tf');
 check('poids résiduel de l’amorce affiché pour l’EMA (paramètre publié)', ema.includes(String(META['tf.*.ema20'].params.poids_amorce_pct)));
 T.setData(Object.assign({}, DATA, { meta: undefined }));
@@ -207,6 +210,22 @@ T.COLORS.bougieForme = formeAvant;
 check(`la fiche suit la forme du thème (${Object.keys(T.FORMES_BOUGIE).join(', ')})`, parForme.every(([, ok]) => ok), parForme);
 check('aucun seuil en pixels écrit à la main dans js/fiches.js', !/<\s*\d+\s*px/.test(SRC_FICHES.replace(/^\s*\/\/.*$/gm, '')));
 check('la fiche est dans le glossaire', /'bougies'/.test(SRC_FICHES.slice(SRC_FICHES.indexOf('function ouvrirGlossaire'))));
+
+// La preuve de la revue du 14/10/2026 (M13) : une fiche parle du marché, pas du code ni de la page.
+// Ni nom de fichier ou de champ entre accents graves, ni état en capitales (POSITIVE…), ni « ce
+// code », ni « un état de la page », ni « (fichier) » dans un titre ou un groupe du glossaire.
+{
+  const CODE = /`|\.html\b|\b(?:POSITIVE|NEGATIVE|EXTREME|NEUTRAL)\b|\bce code\b|état de la page|\(fichier\b/;
+  const titresF = Object.entries(T.FICHES).flatMap(([k, f]) => [f.titre, f.titreDeb].filter(Boolean).map(t => [k, t]));
+  const groupes = [...SRC_FICHES.slice(SRC_FICHES.indexOf('function ouvrirGlossaire')).matchAll(/\['([^'\]]+)', \['/g)].map(m => m[1]);
+  const codeVu = textes.concat(titresF).filter(([, t]) => CODE.test(t)).concat(groupes.filter(g => /fichier/i.test(g)).map(g => ['glossaire', g]));
+  check(`M13 : aucune fiche (${textes.length + titresF.length} textes) ni groupe du glossaire (${groupes.join(', ')}) ne parle du code ou de la page`,
+    groupes.length >= 5 && groupes.includes('Indicateurs publiés') && !codeVu.length, codeVu);
+  // M9 : « Le détail » est le nom d'une case ; une fiche dit « pour le lire », jamais « pour le détail ».
+  const usages = Object.entries(T.COURT).flatMap(([k, c]) => [c.quoi, c.usage, c.traders].filter(x => typeof x === 'string').map(t => [k, t]));
+  const detail = usages.filter(([, t]) => /pour le détail|: le détail\b/.test(t));
+  check(`M9 : aucune ligne courte des fiches (${usages.length}) ne dit « pour le détail »`, usages.length > 20 && !detail.length, detail);
+}
 
 // ── 8. Cadences : une table (js/cadences.js), lue par les minuteries, les seuils et les étiquettes ──
 titre('8. Cadences : une table, lue partout — aucun nombre recopié');
