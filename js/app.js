@@ -995,10 +995,13 @@ function choisirFiguresPassees(v) { figuresPasseesPoser(v); drawChart(); buildDr
 // lbl_<calque> des pastilles d'avant (la Planche range les sept premières sur sa 1re rangée), et
 // sont reposées quand la fenêtre change de taille. Aucun calque de marché : ni titre ni puce.
 const LEGENDE_MAX = 7;
-/** La couleur de la pastille : celle du tracé du calque (lue dans les jetons du thème). */
+/** La couleur de la pastille : celle du tracé du calque (lue dans les jetons du thème). Supports /
+ *  résistances : celle du trait le plus voyant, le plein et épais du plus long intervalle de
+ *  référence (C.sr[2], C.sr[1] en 1 jour), et non plus le fin de l'intervalle affiché (revue du
+ *  14/10/2026, C6). */
 function couleurCalque(key) {
   const C = COLORS;
-  const m = { bb: C.bb_mid, vwap: C.vwap, ichimoku: C.ichi_tenkan, sar: C.sar, sr: C.sr && C.sr[0], fib: C.fib, vp: C.vp, fourchette: C.ink3, guide: C.accent2,
+  const m = { bb: C.bb_mid, vwap: C.vwap, ichimoku: C.ichi_tenkan, sar: C.sar, sr: C.sr && C.sr[Math.min(2, getRefIntervals(chartInterval).length)], fib: C.fib, vp: C.vp, fourchette: C.ink3, guide: C.accent2,
     scenarios: typeof scenCouleur === 'function' ? scenCouleur('1') : C.accent,
     liq: 'linear-gradient(135deg, var(--chaleur-bid, #3ec9b6) 50%, var(--chaleur-ask, #f07a5c) 50%)' };
   if (key in m) return m[key] || C.ink3;
@@ -1255,6 +1258,9 @@ async function changeInterval(interval, label) {
 const NOMS_PAIRES = { BTCUSDT: 'BTC/USDT', SOLUSDT: 'SOL/USDT', XRPUSDT: 'XRP/USDT', TAOUSDT: 'TAO/USDT', BTCSOL: 'BTC/SOL' };
 /** L'intervalle en Expert, écrit comme dans le ruban : « 15m », « 4h », « 1 j » (jamais « 1D »), « 1 sem. ». */
 const nomTf = tf => ({ '1d': '1 j', '1w': '1 sem.' })[tf] || tf;
+/** L'intervalle en mots du Lisible, au pluriel : « quarts d’heure », « heures », « tranches de 4 h »,
+ *  « journées », « semaines » (Guide.PERIODE_DEBUTANT) ; jamais « 15m » ni « 4h », mots bannis. */
+const nomTfMots = tf => (Guide.PERIODE_DEBUTANT[tf] || [])[3] || ({ '1w': 'semaines' })[tf] || 'périodes';
 /** L'actif de base de la paire affichée, l'unité du volume : BTC (BTC/USDT et BTC/SOL), SOL, XRP, TAO. */
 const uniteVolume = () => (NOMS_PAIRES[activeSymbol] || activeSymbol).split('/')[0];
 function ouvrirPaires(e) {
@@ -4338,7 +4344,15 @@ function resolveChart(candles, padL, padR, chartH, W) {
       if (s.dash.length) ctx.setLineDash(s.dash);
       ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
       ctx.setLineDash([]);
-      if (lisible) continue;
+      // Lisible : sans badge (aucun texte de plus sur le tracé), mais le trait reste touchable : sa
+      // bulle dit ce qu'il est, son prix et où il a été repéré, en mots entiers (revue du 14/10/2026,
+      // C6 : « Mon écran » posait 3 à 6 traits sans nom, et les toucher n'ouvrait que la boîte des bougies).
+      if (lisible) {
+        ciblesPrix.push({ rects: [], segs: [[pad.left, y, W - pad.right, y]], prio: 1, prix: lvl.price, coul: s.color,
+          titre: 'Support / résistance · ' + Fmt.prix(lvl.price, unite) + ' · repéré sur les ' + nomTfMots(lvl.tf),
+          texte: ['Un prix où le marché a déjà fait demi-tour.', 'Un niveau ne dit pas ce que fera le prix.'] });
+        continue;
+      }
       
       // Badge droite — fond opaque coloré : le prix au format de la page, puis l'intervalle d'origine.
       const badgeText = Fmt.prix(lvl.price, unite, 'fin') + ' · ' + nomTf(lvl.tf);
@@ -4542,7 +4556,8 @@ function resolveChart(candles, padL, padR, chartH, W) {
     apprCeder(guide, scen);
     if (guide) guidePasseeLibelle(guide);
     // La fourchette de 7 jours (couche choisie) : posée en dernier ; budget plein, la ligne des
-    // scénarios puis le libellé de la forme lui cèdent leur place (fourchetteLibelle).
+    // scénarios, le libellé de la forme, puis la ligne « première fois » lui cèdent leur place
+    // (fourchetteLibelle ; revue du 14/10/2026, M2).
     if (fourchetteEtat) fourchetteLibelle(fourchetteEtat, guide, scen);
   } else {
     if (scen) scenAvantGuide(scen);
@@ -6886,8 +6901,9 @@ function dessinerMarqueCarte(P, pm, W, prixAxe) {
 // Couche « Fourchette de 7 jours » de « Choisir l'affichage » (éteinte par défaut, gardée comme les
 // autres) : deux traits fins en tirets, à l'encre neutre (jamais l'accent), du début de la fenêtre
 // de 7 jours au bord droit ; UNE étiquette « Fourchette 7 jours », posée sans recouvrir une autre ;
-// sa bulle dit le bas, le haut et l'écart. Les traits hors de la vue ne sont pas dessinés : l'étiquette
-// le dit d'une flèche (↑, ↓, ↕) quand aucun n'est visible. L'échelle de prix ne change pas.
+// sa bulle dit le bas, le haut et l'écart. Les traits hors de la vue ne sont pas dessinés : un seul
+// visible, l'étiquette nomme sa borne (« Bas 7 jours ») ; aucun, elle le dit d'une flèche (↑, ↓, ↕)
+// et des deux prix (revue du 14/10/2026, M2). L'échelle de prix ne change pas.
 // Cassure dite (Guide.cassureDite : le prix pas revenu dedans) : les traits GARDENT la fourchette
 // cassée, et l'étiquette et la bulle disent « cassée par le bas à 18:00 » (revue du 14/10/2026, C1 :
 // les traits suivaient le nouveau bas, le bord cassé disparaissait et la bulle disait « resté entre
@@ -6934,11 +6950,13 @@ function fourchetteRects(g) {
   return rects;
 }
 /** L'étiquette « Fourchette 7 jours » et sa cible (bulle, liste « Sur le graphique »). Contre le trait
- *  du haut, sinon celui du bas, à gauche puis à droite, d'abord hors des bougies ; aucun trait dans
- *  la vue : au bord, avec sa flèche. En Lisible, elle tient dans le budget des textes
- *  (PARAM.guide.debutant.items, rôle « fourchette ») : couche choisie par le lecteur, elle prend
- *  la place de la ligne des scénarios, puis du libellé de la forme (leur tracé reste, comme pour
- *  la ligne d'un message, apprCederRole) ; jamais celle de la phrase, des repères ou du scénario 1. */
+ *  du haut, sinon celui du bas, à gauche puis à droite, d'abord hors des bougies ; un seul trait
+ *  dans la vue : « Bas 7 jours » ou « Haut 7 jours » ; aucun : au bord, avec sa flèche et les deux
+ *  prix. En Lisible, elle tient dans le budget des textes (PARAM.guide.debutant.items, rôle
+ *  « fourchette ») : couche choisie par le lecteur, elle prend la place de la ligne des scénarios,
+ *  puis du libellé de la forme (leur tracé reste, comme pour la ligne d'un message,
+ *  apprCederRole), puis de la ligne « première fois » ; jamais celle de la phrase, des repères, du
+ *  scénario 1 ou d'un vrai événement du marché. */
 function fourchetteLibelle(V, guide, scen) {
   const { F, g } = V, cas = V.k, deb = debutant(), unite = guideUnite(), j = F.jours;
   const rects = guide ? guide.rects : scen ? scen.rects : fourchetteRects(g);
@@ -6946,7 +6964,15 @@ function fourchetteLibelle(V, guide, scen) {
   // Cassure dite (revue du 14/10/2026, C1) : « … cassée par le bas à 18:00 », sinon sans l'heure,
   // sinon « … cassée » : la plus longue qui trouve une place (360 px, police large, tracé chargé).
   const q = cas ? Guide.quandCassure(cas, Horloges.maintenant()) : '', cote = cas && (cas.sens < 0 ? 'bas' : 'haut'), base = fl + 'Fourchette ' + j + ' jours';
-  const textes = cas ? [q && base + ' cassée par le ' + cote + ' ' + q, base + ' cassée par le ' + cote, base + ' cassée'].filter(Boolean) : [base], H = deb ? 17 : 15;
+  // Sans cassure (revue du 14/10/2026, M2) : un seul trait dans la vue dit quelle borne il est,
+  // « Bas 7 jours » ou « Haut 7 jours », sans flèche (à côté de « Bas », une ↑ se lirait comme un sens
+  // du prix) ; seul « Fourchette 7 jours », il passait pour un repère parmi d'autres. Aucun trait
+  // dans la vue : la flèche et les deux prix (« ↕ Fourchette 7 jours : 80 394 – 84 352 $ », sans
+  // « 7 jours » s'il le faut : Diazo, Cyanotype, Néon, Gare à 360 px), sinon le nom seul ; la plus
+  // longue qui trouve une place.
+  const seul = V.visH !== V.visB ? (V.visB ? 'Bas ' : 'Haut ') + j + ' jours' : '', prix2 = ' : ' + Guide.chiffres(V.pB) + ' – ' + Guide.prix(V.pH, unite);
+  const textes = cas ? [q && base + ' cassée par le ' + cote + ' ' + q, base + ' cassée par le ' + cote, base + ' cassée'].filter(Boolean)
+    : seul ? [seul] : fl ? [base + prix2, fl + 'Fourchette' + prix2, base] : [base], H = deb ? 17 : 15;
   ctx.font = chartFont(deb ? 10 : 9, 600);
   const gauche = V.x0 + 6, droite = V.xMax - 2, larg = x => ctx.measureText(x).width + 14 + ICO;
   let t = textes[0], w = larg(t);
@@ -6968,10 +6994,13 @@ function fourchetteLibelle(V, guide, scen) {
       }
       if (pose) break;
     }
-    // Lisible, budget plein : la ligne des scénarios, puis le libellé de la forme, cèdent leur
-    // place ; sinon la place réservée est rendue et l'étiquette n'est pas posée.
+    // Lisible, budget plein : la ligne des scénarios, puis le libellé de la forme, puis la ligne
+    // « première fois » (le moins important des textes, apprCeder) cèdent leur place ; sinon la
+    // place réservée est rendue et l'étiquette n'est pas posée. Juste après avoir coché la couche
+    // en 15 min, la ligne « première fois » gardait la 5e place : un trait gris sans nom (revue
+    // du 14/10/2026, M2).
     const P = PARAM.guide.debutant;
-    if (pose && deb) for (const role of ['boite', 'forme']) { if (debEtat.items.length < P.items) break; apprCederRole(role, guide, scen); }
+    if (pose && deb) for (const role of ['boite', 'forme', 'evenement']) { if (debEtat.items.length < P.items) break; apprCederRole(role, guide, scen); }
     if (pose && deb && debEtat.items.length >= P.items) { const k = rects.findIndex(r => r.x === pose.x && r.y === pose.y && r.h === H); if (k >= 0) rects.splice(k, 1); pose = null; }
   }
   if (pose) {
@@ -6986,13 +7015,15 @@ function fourchetteLibelle(V, guide, scen) {
   // La bulle : le titre (les prix avec « Le détail », la liste les montre), le bas, le haut, l'écart,
   // ce que ça veut dire ; l'avertissement de la page. En Lisible, elle ne s'ouvre que sur l'étiquette.
   // Cassure dite : le titre dit « cassée par le bas », la 1re phrase (celle du résumé) son heure ;
-  // plus de « resté entre les deux », devenu faux (revue du 14/10/2026, C1).
+  // plus de « resté entre les deux », devenu faux (revue du 14/10/2026, C1). Un seul trait dans la
+  // vue : juste après les bornes, où est l'autre (revue du 14/10/2026, M2).
   if (!pose && !segs.length) return;
   const pB = V.pB, pH = V.pH, bornes = 'Bas ' + Guide.prix(pB, unite) + ', haut ' + Guide.prix(pH, unite) + ' : un écart de ' + Guide.prixRond(pH - pB, unite) + '.';
+  const hors = V.visH === V.visB ? null : V.visB ? 'Le haut est hors de la vue, au-dessus.' : 'Le bas est hors de la vue, en dessous.';
   ciblesPrix.push({ rects: pose ? [guideZone(pose)] : [], segs, prio: 2, ico: 'niveau', coul: COLORS.ink3, liste: true, fourchette: true,
     titre: 'Fourchette de ' + j + ' jours' + (cas ? ' cassée par le ' + cote : '') + (deb ? '' : ' · ' + Guide.chiffres(pB) + ' – ' + Guide.prix(pH, unite)),
-    texte: cas ? ['Le prix en est sorti ' + (q ? q + ', ' : '') + 'après ' + j + ' jours entre ses bords.', bornes, 'Beaucoup surveillent ces bords.', Guide.AVERTISSEMENT]
-      : [bornes, 'Le prix est resté entre les deux pendant ' + j + ' jours. Beaucoup surveillent ces bords.', Guide.AVERTISSEMENT] });
+    texte: (cas ? ['Le prix en est sorti ' + (q ? q + ', ' : '') + 'après ' + j + ' jours entre ses bords.', bornes, hors, 'Beaucoup surveillent ces bords.', Guide.AVERTISSEMENT]
+      : [bornes, hors, 'Le prix est resté entre les deux pendant ' + j + ' jours. Beaucoup surveillent ces bords.', Guide.AVERTISSEMENT]).filter(Boolean) });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -8582,7 +8613,8 @@ function drawBandSub(y0, pad, ph, W, gap, data, color, vs, ve, levels, dataMin, 
 // étiquette. LA PREMIÈRE FOIS (plan du 13/10/2026, idée 10, à la place du point rond « nouveau ») :
 // quand une chose jamais vue apparaît (une sorte de repère, une figure, un scénario, une figure
 // passée), la même ligne dit en une phrase ce que c'est, quelques secondes, puis plus jamais
-// (samsara-nouveau-v1) ; un vrai événement du marché passe avant elle.
+// (samsara-nouveau-v1) ; un vrai événement du marché passe avant elle, et, budget plein, elle cède
+// sa place à l'étiquette de la fourchette (apprCederRole 'evenement' ; revue du 14/10/2026, M2).
 const apprSuivi = Apprendre.suivi();
 const apprVus = Apprendre.lireVus();
 let apprChoix = Apprendre.lireChoix();
@@ -8738,6 +8770,14 @@ function apprCederRole(role, E, S) {
     if (S.cibleUn) S.cibleUn.rects = [];
     S.libelles = S.libelles.filter(l => l.t !== S.libelleDeb.t);
     S.libelleDeb = null; S.libelleCede = true;
+  } else if (role === 'evenement') {
+    // La ligne « première fois » seule (un vrai événement du marché garde sa place) : rendue
+    // comme à sa fin, mais en attente (pas de redessin pour en redemander une) ; jamais peinte,
+    // elle n'est pas notée vue et reviendra (fourchetteLibelle, revue du 14/10/2026, M2).
+    const m = apprMsg;
+    if (!(m && m.deb && m.item && m.e.source === 'premiere')) return false;
+    apprRetirer(m);
+    m.attente = true;
   }
   return debEtat.items.length < avant;
 }
