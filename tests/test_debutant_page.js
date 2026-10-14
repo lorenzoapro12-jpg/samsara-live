@@ -805,34 +805,39 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
     {
       // Revue du 14/10 (C35) : une bulle trop haute pour passer au-dessus de la clé (au téléphone, la
       // place manque aussi à sa droite) se faisait cacher une ligne par le « ? ». La clé s'efface tant
-      // que la bulle est ouverte, sans que la bulle bouge, et revient à sa fermeture. À 360 × 740 au
-      // doigt, la bulle du scénario 1 (2e toucher) recouvre la place de la clé.
-      const o = await ouvrir(nav, { vue: { width: 360, height: 740 }, tactile: true, avant: { 'samsara-astuce-tap-v1': '1' } });
-      const cibles = await o.page.evaluate(() => { const b = canvas.getBoundingClientRect(); return debEtat.items.filter(i => i.rect).map(i => ({ texte: i.texte, x: b.left + i.rect.x + Math.min(i.rect.w / 2, 40), y: b.top + i.rect.y + i.rect.h / 2 })); });
-      const lire = () => o.page.evaluate(() => {
-        const k = document.getElementById('cleAide'), rk = k.getBoundingClientRect(), cb = canvas.getBoundingClientRect(), B = bulleOuverte;
-        const q = { x: rk.left - cb.left, y: rk.top - cb.top, w: rk.width, h: rk.height };
-        return { bulle: B && [B.x, B.y, B.w, B.h].map(Math.round), vue: getComputedStyle(k).visibility === 'visible' && !k.closest('[hidden]'),
-          dessous: !!B && q.x < B.x + B.w && q.x + q.w > B.x && q.y < B.y + B.h && q.y + q.h > B.y };
-      });
-      const res = [];
-      for (const c of cibles) {
-        await o.page.evaluate(() => { crossX = crossY = null; bulleDetail = null; dessinerCalque(); });
-        await o.page.touchscreen.tap(c.x, c.y); await o.page.waitForTimeout(200);
-        await o.page.touchscreen.tap(c.x, c.y); await o.page.waitForTimeout(250);
-        const r = await lire();
-        await o.page.evaluate(() => dessinerCalque());   // une image de plus : la bulle reste où elle est
-        const r2 = await lire();
-        await o.page.evaluate(() => { crossX = crossY = null; bulleDetail = null; dessinerCalque(); });
-        const ferme = await lire();
-        res.push({ texte: c.texte, bulle: r.bulle, dessous: r.dessous, cleVue: r.vue, stable: JSON.stringify(r2.bulle) === JSON.stringify(r.bulle) && r2.vue === r.vue, revient: ferme.vue });
+      // que la bulle est ouverte, sans que la bulle bouge, et revient à sa fermeture. Deux tailles au
+      // doigt, 360 × 740 et 320 × 640 : depuis que les bulles tiennent en 50 mots (revue du 14/10, M6),
+      // aucune ne recouvre plus la clé à 360 × 740 ; à 320 × 640, la bulle du scénario 1 (2e toucher)
+      // la recouvre encore. Le contrôle veut au moins une bulle dessus, toutes tailles confondues.
+      const res = [], erreursC35 = [];
+      for (const vue of [{ width: 360, height: 740 }, { width: 320, height: 640 }]) {
+        const o = await ouvrir(nav, { vue, tactile: true, avant: { 'samsara-astuce-tap-v1': '1' } });
+        const cibles = await o.page.evaluate(() => { const b = canvas.getBoundingClientRect(); return debEtat.items.filter(i => i.rect).map(i => ({ texte: i.texte, x: b.left + i.rect.x + Math.min(i.rect.w / 2, 40), y: b.top + i.rect.y + i.rect.h / 2 })); });
+        const lire = () => o.page.evaluate(() => {
+          const k = document.getElementById('cleAide'), rk = k.getBoundingClientRect(), cb = canvas.getBoundingClientRect(), B = bulleOuverte;
+          const q = { x: rk.left - cb.left, y: rk.top - cb.top, w: rk.width, h: rk.height };
+          return { bulle: B && [B.x, B.y, B.w, B.h].map(Math.round), vue: getComputedStyle(k).visibility === 'visible' && !k.closest('[hidden]'),
+            dessous: !!B && q.x < B.x + B.w && q.x + q.w > B.x && q.y < B.y + B.h && q.y + q.h > B.y };
+        });
+        for (const c of cibles) {
+          await o.page.evaluate(() => { crossX = crossY = null; bulleDetail = null; dessinerCalque(); });
+          await o.page.touchscreen.tap(c.x, c.y); await o.page.waitForTimeout(200);
+          await o.page.touchscreen.tap(c.x, c.y); await o.page.waitForTimeout(250);
+          const r = await lire();
+          await o.page.evaluate(() => dessinerCalque());   // une image de plus : la bulle reste où elle est
+          const r2 = await lire();
+          await o.page.evaluate(() => { crossX = crossY = null; bulleDetail = null; dessinerCalque(); });
+          const ferme = await lire();
+          res.push({ vue: vue.width + '×' + vue.height, texte: c.texte, bulle: r.bulle, dessous: r.dessous, cleVue: r.vue, stable: JSON.stringify(r2.bulle) === JSON.stringify(r.bulle) && r2.vue === r.vue, revient: ferme.vue });
+        }
+        erreursC35.push(...o.erreurs);
+        await o.ctx.close();
       }
       const dessous = res.filter(r => r.bulle && r.dessous);
-      check(`360 px (doigt) : la clé « ? » ne se voit jamais par-dessus une bulle ouverte (sous ${dessous.length} bulle(s) : ${dessous.map(r => r.texte).join(', ')})`, dessous.length >= 1 && dessous.every(r => !r.cleVue), res);
+      check(`360 × 740 et 320 × 640 (doigt) : la clé « ? » ne se voit jamais par-dessus une bulle ouverte (sous ${dessous.length} bulle(s) : ${dessous.map(r => r.vue + ' ' + r.texte).join(', ')})`, dessous.length >= 1 && dessous.every(r => !r.cleVue), res);
       check('… une bulle qui laisse sa place libre la garde visible ; la bulle ne bouge pas d’une image à l’autre ; la clé revient à la fermeture',
         res.filter(r => r.bulle && !r.dessous).every(r => r.cleVue) && res.every(r => r.stable && r.revient), res);
-      check('… aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
-      await o.ctx.close();
+      check('… aucune erreur JavaScript', !erreursC35.length, erreursC35);
     }
 
     // ── ↺ : revenir au présent ──
