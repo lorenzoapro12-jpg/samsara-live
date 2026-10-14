@@ -28,6 +28,7 @@
 //      sur ce graphique, sans tri, en petites cartes (le prix avant, pendant et après, l'objectif,
 //      l'invalidation, l'issue) dans une bande qu'on fait défiler de côté ; ni la page ni le panneau
 //      ne s'élargissent ; carrées dans les thèmes carrés, couleurs du thème ; onze thèmes à 390 px.
+//      Aucune ligne du panneau ne coupe un nombre ni ne commence par « : » (revue du 14/10/2026, C8).
 //   6. Aucune erreur JavaScript ; pas de défilement horizontal à 390 px.
 //   7. TEMPS (amendement E2) : le rejeu dans Chromium, processeur ralenti 4 fois, en 1 min (où il
 //      revient chaque minute) et en 15 min : ≤ 100 ms à chaque clôture. Le rejeu complet dépassant
@@ -40,6 +41,7 @@ const REPO = path.resolve(__dirname, '..');
 const G = require(path.join(REPO, 'js/guide.js'));
 const Fm = require(path.join(REPO, 'js/format.js'));
 const { chargerPage } = require('./bac');
+const { coupuresLignes } = require('./fins-de-ligne');
 
 let playwright = null;
 for (const p of ['playwright', '/opt/node22/lib/node_modules/playwright', process.env.PLAYWRIGHT_MODULE].filter(Boolean)) {
@@ -434,7 +436,7 @@ async function bulle(o, tactile) {
     for (const [mode, w, h, themes] of [['debutant', 390, 844, ['bureau95', 'aero', 'bureau95-contraste', 'gazette', 'neon', 'diazo', 'codex', 'cyanotype', 'gare', 'kala', 'aero-nuit']], ['expert', 1440, 900, ['bureau95', 'aero']]]) {
       const tactile = w < 500;
       const o = await ouvrir(nav, { iC: seq.iC + 2, mode, w, h, theme: themes[0] });
-      const fautes = [];
+      const fautes = [], coupees = [];
       let vu = 0;
       for (const th of themes) {
         await o.page.evaluate(t => { fermerFiche(); appliquerTheme(t); }, th); await o.page.waitForTimeout(350);
@@ -447,6 +449,7 @@ async function bulle(o, tactile) {
         await o.page.waitForTimeout(150);
         const ex = await lireExemples(o.page);
         vu = Math.max(vu, ex.cartes.length);
+        for (const c of await coupuresLignes(o.page, '#fichePop')) coupees.push(th + ' : ' + c);
         if (n < 1 || !exemplesOk(ex, tactile)) fautes.push({ th, n, ex: Object.assign({}, ex, { texte: undefined }) });
         // Carré dans les thèmes carrés ; l'objectif et l'invalidation aux couleurs de la barre des issues ; aucune animation.
         const carre = ex.rTile === 0 ? ex.cartes.every(c => c.rayon === 0) : ex.cartes.every(c => c.rayon <= 8);
@@ -454,6 +457,10 @@ async function bulle(o, tactile) {
       }
       check(`${mode} ${w} px : dans ${themes.length} thèmes, la bande des derniers cas (jusqu’à ${vu} cartes) tient dans le panneau, sans défilement de côté de la page ; cartes de 40 px de haut au moins, carrées dans les thèmes carrés ; objectif et invalidation aux couleurs du thème ; sans mot banni`,
         !fautes.length && vu >= 3, fautes.slice(0, 3));
+      // Revue du 14/10/2026, C8 : on lisait « 2 918 fois sur 5 » puis « 103. » à la ligne, « (15 » puis
+      // « min) », « sans tri » puis « : » seul.
+      check(`${mode} ${w} px : dans ${themes.length} thèmes, aucune ligne du panneau des statistiques ne commence par « : ; ? ! » $ % » ni ne finit par « « », aucun nombre n’est coupé de ses milliers ou de son unité`,
+        !coupees.length, coupees.slice(0, 6));
       check(`${mode} ${w} px : aucune erreur JavaScript (thèmes changés, panneau rouvert)`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }

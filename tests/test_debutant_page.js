@@ -44,6 +44,7 @@ const fs = require('fs'), path = require('path'), http = require('http');
 const REPO = path.resolve(__dirname, '..');
 const { previsionsFixture, previsionsAttente, estPrevisions } = require('./previsions-fixture');
 const Guide = require('../js/guide.js');
+const { coupuresLignes } = require('./fins-de-ligne');
 
 let playwright = null;
 for (const p of ['playwright', '/opt/node22/lib/node_modules/playwright', process.env.PLAYWRIGHT_MODULE].filter(Boolean)) {
@@ -1443,6 +1444,24 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       // aussi ce que « Le détail » ajoute (le badge, les chemins).
       const mal = fiches.filter(f => bannis(f.simple + ' ' + f.titre).length || /badge en haut|à droite de la dernière bougie|Bollinger|Indicateurs »/.test(f.simple) || !f.replie || !f.gras);
       check('fiches du Guide sur l\'écran calme : titre, pastille et lignes courtes en gras, sans badge ni chemins dessinés ni jargon ; le reste replié sous « En savoir plus »', !mal.length && fiches.find(f => f.id === 'guide_regime').plus.includes('pas de badge'), mal.length ? mal : fiches.map(f => f.titre));
+      // Fins de ligne (revue du 14/10/2026, C8) : on lisait « sous 30, « » puis « survendu » », « incluse »
+      // puis « : », « accélère-t-il » puis « ? » seul, « il y a 24 » puis « h ». Toutes les fiches, « En
+      // savoir plus » ouvert, puis le panneau « Choisir l'affichage », en Aero et en Bureau 95 (le thème
+      // par défaut, aux lettres plus larges).
+      const coupees = [];
+      for (const th of ['aero', 'bureau95']) {
+        await o.page.evaluate(t => { fermerFiche(); appliquerTheme(t); }, th); await o.page.waitForTimeout(250);
+        for (const id of await o.page.evaluate(() => Object.keys(FICHES))) {
+          await o.page.evaluate(id => { ouvrirFiche(id); for (const d of document.querySelectorAll('#fichePop details')) d.open = true; }, id);
+          for (const c of await coupuresLignes(o.page, '#fichePop')) coupees.push(th + ' · ' + id + ' : ' + c);
+        }
+        await o.page.evaluate(() => { fermerFiche(); document.getElementById('indDropdownBtn').click(); }); await o.page.waitForTimeout(300);
+        for (const c of await coupuresLignes(o.page, '#indMenu')) coupees.push(th + ' · panneau : ' + c);
+        await o.page.evaluate(() => document.getElementById('indDropdownBtn').click()); await o.page.waitForTimeout(200);
+      }
+      await o.page.evaluate(() => appliquerTheme('aero'));
+      check('fins de ligne : dans toutes les fiches et le panneau « Choisir l’affichage », en Aero et Bureau 95, aucune ligne ne commence par « : ; ? ! » $ % » ni ne finit par « « », aucun nombre n’est coupé de ses milliers ou de son unité',
+        !coupees.length, coupees.slice(0, 6));
       // Avec « Le détail », les mêmes Légendes (une seule version) ; « Toutes les fiches » ouvert, les
       // sept groupes de toujours.
       await o.page.evaluate(() => fermerFiche());

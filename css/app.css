@@ -143,6 +143,10 @@ body::before {
 ::-webkit-scrollbar-thumb:hover { background: var(--defil-hover); }
 /* Le <svg> des filtres hyalite : caché sans display:none (Blink ignorerait ses filtres). */
 .hyalite-filters { position: absolute; width: 0; height: 0; overflow: hidden; }
+/* Fins de ligne (revue du 14/10/2026, C8) : un nombre et ses milliers ou son unité, « : ; ? ! » »
+   et leur mot, « « » et le sien, posés ensemble par Fmt.insecables (js/format.js), ne se coupent
+   plus ; l'âge des infos du marché (« 25 min », « 1 h 31 »), réécrit chaque minute, non plus. */
+.insec, [data-age-de] { white-space: nowrap; }
 
 /* ─── 3. Les six surfaces ────────────────────────────────────────────────────── */
 .header, .indicator-bar, .chart-container, .feed-panel, .strat-section, .reperes-section, .aero-taskbar {

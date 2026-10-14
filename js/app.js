@@ -909,7 +909,7 @@ function montrerApercu(key) {
   if (key === menuApercu) return;
   menuApercu = key;
   const a = document.getElementById('indApercu');
-  if (a) a.innerHTML = apercuPanneau(key);
+  if (a) { a.innerHTML = apercuPanneau(key); Fmt.insecables(a); }   // fins de ligne : revue du 14/10/2026, C8
 }
 /** Les mots cachés des outils, que la recherche trouve aussi (la calculette : « levier », « position »,
  *  « taille » ; revue du 14/10/2026, M15). */
@@ -995,6 +995,9 @@ function buildDropdown() {
     + '<div class="aff-fins-corps">' + (typeof reglagesHtml === 'function' ? reglagesHtml() : '') + '</div></details>';
   html += '</div><div class="ind-apercu" id="indApercu" aria-live="polite">' + apercuPanneau(menuApercu) + '</div>';
   menu.innerHTML = html;
+  // « accélère-t-il » puis « ? » seul, « Le « » puis « i » » : plus de fin de ligne au mauvais endroit
+  // (revue du 14/10/2026, C8).
+  Fmt.insecables(menu);
   // Survol, toucher et clavier montrent l'explication dans l'aperçu (sans rien cocher de plus).
   for (const l of menu.querySelectorAll('label[data-ind]')) {
     const k = l.dataset.ind;
@@ -4981,12 +4984,15 @@ function guideCouper(g, texte, w) {
   return lo ? texte.slice(0, lo).trimEnd() + '…' : '';
 }
 /** Découpe en lignes de largeur ≤ w (mots entiers ; un mot trop long est coupé). Un nombre et
- *  son unité ne sont jamais séparés : « 80 685 $ », « 15 min » restent sur une ligne. */
+ *  son unité ne sont jamais séparés : « 80 685 $ », « 15 min » restent sur une ligne. Ni « : ; ? !
+ *  » » du mot d'avant, ni « « » du mot d'après : la règle du texte de la page, Fmt.colle (revue du
+ *  14/10/2026, C8 : une bulle commençait une ligne par « : prochain repère »). Un groupe plus large
+ *  que la ligne reste en mots : coupé, il se lirait encore moins. */
 function guideLignes(g, texte, w, max) {
   const mots = [];
   for (const m of String(texte).split(' ')) {
     const k = mots.length - 1;
-    if (k >= 0 && /\d$/.test(mots[k]) && /^(\d{3}(?:\D|$)|\$|%|SOL\b|UTC\b|min\b|h\b|j\b|jours?\b|semaines?\b)/.test(m)) mots[k] += ' ' + m;
+    if (k >= 0 && Fmt.colle(mots[k].slice(mots[k].lastIndexOf(' ') + 1), m) && g.measureText(mots[k] + ' ' + m).width <= w) mots[k] += ' ' + m;
     else mots.push(m);
   }
   const out = [];
@@ -6561,6 +6567,8 @@ function majReperes(W) {
     m.textContent = x.c.titre;
     b.append(i || t, m); li.append(b); ul.append(li);
   });
+  // « 83 956 » puis « $, une zone de retour » à la ligne : plus jamais (revue du 14/10/2026, C8).
+  Fmt.insecables(ul);
 }
 /** « En résumé » (Guide.synthese) : tout ce que la page montre déjà (tendance, repère franchi,
  *  figure en cours, scénario du matin), recoupé en une phrase, au présent (la dernière bougie,
@@ -10087,6 +10095,8 @@ function renderFeedTo(container) {
     + (autrePaire ? '<div class="deb-btc">Ces infos parlent du bitcoin (en dollars), pas de ' + escHtml(NOMS_PAIRES[activeSymbol] || activeSymbol) + '.</div>' : '') + html;
   for (const b of container.querySelectorAll ? container.querySelectorAll('.epingle-btn') : []) b.addEventListener('click', () => basculerEpingle(b.dataset.chemin));
   brancherContre(container);
+  // « put wall 80 » puis « 000 $ » à la ligne : plus jamais (revue du 14/10/2026, C8).
+  Fmt.insecables(container);
 }
 
 // ═══ CHRONIQUE (traces des chiffres clés, courbe des fiches) ══════════════════════
