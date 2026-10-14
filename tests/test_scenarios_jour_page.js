@@ -7,7 +7,7 @@
 //      · scenEtat.jour de la page = classerJour pur sur les mêmes bougies (cas, meneur, montré,
 //        écarts à 0,01 près, fondus) ; les deux modes donnent les mêmes valeurs ;
 //      · Débutant : au plus 5 textes, un seul libellé (celui du montré, le 1), la ligne du cas D
-//        (« En direct : zone du 2 ✓ · scén. 3 ✗ ▸ » : la fermeture fraîche du 3 y est dite aussi), sa bulle : les trois lignes numérotées, « Du plus
+//        (« En direct : zone du 2 ✓ · scénario 3 ✗ ▸ » : la fermeture fraîche du 3 y est dite aussi), sa bulle : les trois lignes numérotées, « Du plus
 //        au moins probable, selon Claude », « sans nouvelle prévision », 50 mots au plus (revue du 14/10/2026, M6) ; aucun
 //        mot banni, aucun « % » ; aucune marque dessinée pour un scénario qui n'est pas montré ;
 //      · Expert : « Seul encore en cours : 1 », les distances en $ sur la ligne ouverte, les
@@ -97,11 +97,13 @@ const capt = async (o, nom) => { if (process.env.SCEN_CAPTURES) await o.page.scr
         const lib = e.libelles;
         // Changé délibérément (revue) : à 15:40 le prix est sous la borne basse (81 436 $), encore dans
         // la marge : le libellé dit le bord toléré (« tient jusqu’à 80 622 $ ») au lieu de « reste … ».
-        check(`${nom} : un seul libellé de scénario, celui du montré (le 1) : « Scén. 1 : tient jusqu’à 80 622 $ »`, lib.length === 1 && lib[0].rang === '1' && /^Scén(ario|\.) 1 : (tient )?jusqu’à 80 622 \$$/.test(lib[0].t), lib);
+        // « Scénario » en entier, jamais « Scén. » (revue du 14/10/2026, M10).
+        check(`${nom} : un seul libellé de scénario, celui du montré (le 1) : « Scénario 1 : tient jusqu’à 80 622 $ »`, lib.length === 1 && lib[0].rang === '1' && /^Scénario 1 : (tient )?jusqu’à 80 622 \$$/.test(lib[0].t), lib);
         const L = e.boite && e.boite.texte;
         // Changé délibérément (revue) : « zone du 2 (niveau) ✓ », jamais « réalisé » pour un scénario non dessiné.
         // Changé délibérément (revue, round 2) : le 3, fermé à 15:15–15:30 (fait frais), est dit avec la réalisation du 2.
-        check(`${nom} : ligne du cas D (« ${L} »)`, !!L && /^En direct : zone du 2( \(80 806 \$\))? ✓( · scén\. 3 ✗)? ▸$/.test(L) && /scén\. 3 ✗/.test(L) && L.length <= (etroit ? 40 : 48), L);
+        // « scénario 3 » en entier, jamais « scén. » (revue du 14/10/2026, M10) ; toujours 48 / 40 caractères au plus.
+        check(`${nom} : ligne du cas D (« ${L} »)`, !!L && /^En direct : zone du 2( \(80 806 \$\))? ✓( · scénario 3 ✗)? ▸$/.test(L) && /scénario 3 ✗/.test(L) && L.length <= (etroit ? 40 : 48), L);
         check(`${nom} : aucune marque dessinée pour un scénario non montré`, e.items.every(i => i.rang === e.montre || !i.marques.length), e.items);
         const b = await bulle(o.page);
         // (Changé exprès, revue du 14/10/2026, M6 : cette bulle faisait 131 mots pour 50. Le classement
@@ -146,9 +148,9 @@ const capt = async (o, nom) => { if (process.env.SCEN_CAPTURES) await o.page.scr
       check(`17:40 · ${nom} : le 1 sorti en fondu (0 < fondu < 1), le 2 réalisé et montré`, e.jour.fondu[0] > 0 && e.jour.fondu[0] < 1 && e.jour.realises.join() === '2' && e.jour.montre === '2', e.jour);
       if (mode === 'debutant') {
         // Changé délibérément (revue) : le libellé d'un état porte sa marque « (en direct) » (la ligne peut céder sa place).
-        check(`17:40 · ${nom} : libellé « Scénario 2 : zone ✓ (en direct) » (ou son repli), jamais « atteint »`, e.libelles.length === 1 && /^Scén(ario|\.) 2 : zone ✓ \(en direct\)$/.test(e.libelles[0].t), e.libelles);
+        check(`17:40 · ${nom} : libellé « Scénario 2 : zone ✓ (en direct) » (ou son repli), jamais « atteint »`, e.libelles.length === 1 && /^Scénario 2 : zone ✓ \(en direct\)$/.test(e.libelles[0].t), e.libelles);
         const L = e.boite && e.boite.texte;
-        check(`17:40 · ${nom} : ligne du cas F (« ${L} »)`, !!L && (etroit ? /^Scén\. 1 (✗|sorti) · zone du 2 ✓ \(en direct\) ▸$/ : /^Scén\. 1 sorti · zone du 2 ✓ \(en direct\) ▸$/).test(L) && L.length <= (etroit ? 40 : 48), L);
+        check(`17:40 · ${nom} : ligne du cas F (« ${L} »)`, !!L && (etroit ? /^Scénario 1 (✗|sorti) · zone du 2 ✓ \(en direct\) ▸$/ : /^Scénario 1 sorti · zone du 2 ✓ \(en direct\) ▸$/).test(L) && L.length <= (etroit ? 40 : 48), L);
         const m2 = (e.items.find(i => i.rang === '2') || {}).marques || [];
         check(`17:40 · ${nom} : une coche dessinée (sans texte) sur la zone du 2`, m2.length === 1 && m2[0].ok && !m2[0].texte, m2);
         const T = await textes(o.page);

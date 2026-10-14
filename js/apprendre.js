@@ -255,7 +255,7 @@ const Apprendre = (function () {
       const regle = 'Cassure : 2 clôtures au-delà de la bande, ou 1 après un retour sur elle ; une mèche ne casse rien.';
       if (e.type === 'repere_passe') {
         const V = ['Niveau ' + X + ' franchi ' + fl + ' · bougie pas encore close : la cassure se juge en clôture', 'Niveau ' + X + ' franchi ' + fl + ' · non clos', X + ' franchi ' + fl];
-        return { variantes: V, titre, texte: ['Le prix live est passé ' + (e.sens > 0 ? 'au-dessus' : 'en dessous') + ' de la bande ' + X + ' : au-delà, bougie pas encore close.', regle, FIN_EXPERT], resume: null };
+        return { variantes: V, titre, texte: ['Le prix en direct est passé ' + (e.sens > 0 ? 'au-dessus' : 'en dessous') + ' de la bande ' + X + ' : au-delà, bougie pas encore close.', regle, FIN_EXPERT], resume: null };
       }
       const etat = 'cassé ' + (e.sens > 0 ? 'vers le haut' : 'vers le bas') + ' (' + (e.retest ? 'validé par un retour réussi' : '2/2 clôtures, validé') + ')';
       return { variantes: ['Niveau ' + X + ' : ' + etat, 'Niveau ' + X + ' cassé ' + fl + (e.retest ? ' · retour réussi' : ' 2/2'), X + ' cassé ' + fl],
@@ -335,8 +335,9 @@ const Apprendre = (function () {
   };
   const QUOI_SCENARIO = ['une hypothèse écrite le matin par Claude, une IA, suivie ici en direct.', 'une hypothèse de Claude, une IA.', 'une hypothèse de Claude.'];
   const QUOI_PASSEE = ['un exemple du passé, et ce que le prix a fait ensuite.', 'un exemple, réussi ou non.', 'un exemple.'];
-  const RAPPEL_LISIBLE = 'Dit une seule fois. Le détail reste dans la bulle de son étiquette.';
-  const RAPPEL_EXPERT = 'Dit une seule fois ; le détail reste dans la bulle de l’étiquette.';
+  // « Le détail » est le nom de la case : la bulle garde « l'explication » (revue du 14/10/2026, M9).
+  const RAPPEL_LISIBLE = 'Dit une seule fois. L’explication reste dans la bulle de son étiquette.';
+  const RAPPEL_EXPERT = 'Dit une seule fois ; l’explication reste dans la bulle de l’étiquette.';
   /** Le nom et ce que c'est d'une nature : { noms: [entier, court], quoi: [phrase, courte], fin }, ou
    *  null (pas de phrase de première fois pour elle). exp : les noms du Complet pour les figures. */
   function chose(cle, exp) {

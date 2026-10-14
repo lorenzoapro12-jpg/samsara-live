@@ -183,7 +183,9 @@ const FICHES = {
       { s: 'usuel', t: 'Une prime positive est souvent lue comme une demande institutionnelle.' },
       { s: 'mesuré', t: 'Elle compare des dollars à des USDT. Un USDT sous 1 $ la rend négative à lui seul.' },
       { s: 'mesuré', t: 'La prime « hors USDT » compare des dollars à des dollars.' },
-      { s: 'convention', t: 'Les états POSITIVE / NEGATIVE / EXTREME sont des seuils de ce code, pas une norme.' },
+      // Les états en mots, ceux de la case d'« Infos du marché » (MOTS_PRIME) : pas de code en
+      // capitales ni de « ce code » (revue du 14/10/2026, M13).
+      { s: 'convention', t: 'Les mots « positive », « négative », « très positive » suivent des seuils du site, pas une norme.' },
     ],
     limites: 'Deux carnets lus à quelques millisecondes d’écart. Vers 0,01 % d’écart, c’est du bruit.',
   },
@@ -225,13 +227,14 @@ const FICHES = {
     simple: 'Les tranches de prix où le plus de BTC sont posés, à l’achat et à la vente.',
     lectures: [
       { s: 'usuel', t: 'Souvent lus comme des supports (achat) ou des résistances (vente) possibles.' },
-      { s: 'mesuré', t: 'Un mur peut être retiré à tout moment. La carte (bookmap.html) montre son histoire.' },
+      { s: 'mesuré', t: 'Un mur peut être retiré à tout moment. La carte des ordres montre son histoire.' },
     ],
     limites: 'Une photo à la publication, dans la bande couverte par le carnet.',
   },
   // ── Indicateurs du fichier (bloc tf) ──
   rsi_tf: {
-    titre: 'RSI (fichier, par échelle de temps)', champ: 'tf.*.rsi_14',
+    // « publié » plutôt que « fichier » : le lecteur ne voit pas de fichier (revue du 14/10/2026, M13).
+    titre: 'RSI (publié, par échelle de temps)', champ: 'tf.*.rsi_14',
     simple: 'Force des hausses face aux baisses récentes, de 0 à 100, par échelle de temps.',
     lectures: [
       { s: 'convention', t: 'Ces seuils sont ceux de Wilder, l’inventeur du RSI.' },
@@ -240,7 +243,7 @@ const FICHES = {
     limites: 'Bougie en cours incluse : il bouge jusqu’à la clôture. Peut différer du RSI du graphique.',
   },
   ema_tf: {
-    titre: 'EMA 20 / EMA 50 (fichier)', champ: 'tf.*.ema20',
+    titre: 'EMA 20 / EMA 50 (publiées)', champ: 'tf.*.ema20',
     simple: 'Moyennes des clôtures sur 20 et 50 bougies, les plus récentes pesant plus.',
     lectures: [
       { s: 'usuel', t: 'Courte au-dessus de la longue : hausse à court terme. Un croisement arrive toujours après le mouvement.' },
@@ -252,7 +255,8 @@ const FICHES = {
     simple: 'Dit si la moyenne courte est sous la longue : un état, pas un croisement daté.',
     lectures: [
       { s: 'usuel', t: 'Vrai : la tendance courte est plus faible que la longue sur cet horizon.' },
-      { s: 'mesuré', t: 'Le « death cross » des manuels : SMA 50 sous SMA 200, en journalier. L’ancien champ `death_cross_4h` n’en était pas un.' },
+      // Sans la phrase sur l'ancien champ du fichier : elle parlait du code (revue du 14/10/2026, M13).
+      { s: 'mesuré', t: 'Le « death cross » des manuels : SMA 50 sous SMA 200, en journalier.' },
     ],
     limites: 'Un état qui peut durer des semaines, sans date de croisement.',
   },
@@ -261,7 +265,7 @@ const FICHES = {
     // 7 jours, et « carte » à la carte des ordres (revue du 14/10/2026, M3).
     titreDeb: 'Plus bas et plus haut des 5 jours',
     simpleDeb: 'Le plus bas et le plus haut récents : le prix est-il en haut, au milieu, en bas ?',
-    titre: 'Support / résistance (fichier)', champ: 'tf.*.support_30',
+    titre: 'Support / résistance (publiés)', champ: 'tf.*.support_30',
     simple: 'Le plus bas et le plus haut des dernières bougies de l’échelle de temps.',
     lectures: [
       { s: 'usuel', t: 'Le prix entre les deux : sa place dans son canal récent.' },
@@ -270,13 +274,14 @@ const FICHES = {
     limites: 'La fenêtre change avec l’échelle de temps, affichée à côté de la valeur.',
   },
   amplitude: {
-    titre: 'Amplitude (fichier)', champ: 'tf.*.amplitude_30_pct',
+    titre: 'Amplitude (publiée)', champ: 'tf.*.amplitude_30_pct',
     simple: 'Écart entre le plus haut et le plus bas récents, en % du plus bas.',
     lectures: [{ s: 'usuel', t: 'Grande amplitude : marché agité ; petite : compression.' }],
-    limites: 'Le champ historique `range_24h_pct` ne couvre jamais 24 h.',
+    // Le fait garde sa place, sans le nom de l'ancien champ (revue du 14/10/2026, M13).
+    limites: 'Mesurée sur les dernières bougies de l’échelle de temps, pas sur 24 h.',
   },
   atr_tf: {
-    titre: 'ATR (fichier)', champ: 'tf.*.atr_14',
+    titre: 'ATR (publié)', champ: 'tf.*.atr_14',
     simple: 'Amplitude moyenne d’une bougie, en dollars : l’échelle normale du mouvement.',
     lectures: [
       { s: 'usuel', t: 'Une fraction d’ATR est souvent lue comme du bruit. Aucun seuil universel.' },
@@ -285,7 +290,7 @@ const FICHES = {
     limites: 'Moyenne de Wilder, bougie en cours incluse. Une moyenne simple donnerait un peu autre chose.',
   },
   volume_tf: {
-    titre: 'Volume moyen (fichier)', champ: 'tf.*.volume_moyen_10_btc',
+    titre: 'Volume moyen (publié)', champ: 'tf.*.volume_moyen_10_btc',
     simple: 'Quantité moyenne de BTC échangée par bougie, sur les dernières bougies.',
     lectures: [{ s: 'usuel', t: 'La moyenne sert de référence : une bougie se juge par rapport à elle.' }],
     limites: 'La bougie en cours, incomplète, tire la moyenne vers le bas.',
@@ -482,7 +487,8 @@ const FICHES = {
       { s: 'mesuré', t: 'Tiré du journal : le chemin le mieux classé avec invalidation. Compté s’il touche sa 1re zone ou celle-ci.' },
       { s: 'mesuré', t: '« Juste » : la 1re zone d’abord. Avec peu de matins notés (« échantillon faible »), cela ne prouve rien.' },
       { s: 'convention', t: 'L’encadré est un SUIVI EN DIRECT, au créneau d’une bougie près. La note officielle est celle du journal.' },
-      { s: 'convention', t: 'Le journal note le lendemain, sur des bougies d’une minute. Hors encadré, un état de la page porte « (en direct) ».' },
+      // Sans « un état de la page » : la fiche parle du scénario, pas de la page (revue du 14/10/2026, M13).
+      { s: 'convention', t: 'Le journal note le lendemain, sur des bougies d’une minute. Avant sa note, l’état porte « (en direct) ».' },
       { s: 'convention', t: 'Historique trop court pour remonter au point du matin : le suivi se dit « incomplet ».' },
       { s: 'débattu', t: 'Les niveaux d’un modèle d’options (murs, zéro gamma) sont marqués « (modèle) ».' },
       // Pendant la journée (js/scenarios.js, section 5) : aucune nouvelle prévision, les scénarios du
@@ -881,7 +887,7 @@ const COURT = {
     calcul: P => 'Le site regroupe les prix par tranches de ' + P.guide.fourchette.heures + ' heures. Il garde le plus haut et le plus bas des ' + P.guide.fourchette.periodes + ' dernières tranches finies.' },
   // ── Le Guide, les scénarios, le dessin ──
   guide: { quoi: 'Une phrase et deux repères de prix qui décrivent le graphique.',
-    usage: 'Lisez la phrase, puis les deux repères : entre eux, rien de neuf. Touchez un texte pour le détail.',
+    usage: 'Lisez la phrase, puis les deux repères : entre eux, rien de neuf. Touchez un texte pour le lire.',
     calcul: 'Le site lit le mouvement récent et les prix proches où quelque chose s’est passé. Il garde le plus proche de chaque côté.' },
   guide_niveaux: { quoi: 'Les prix les plus proches où il s’est passé quelque chose, de chaque côté.',
     usage: 'Touchez un repère : son origine, la place du prix, le repère suivant s’il est dépassé.',
@@ -1136,7 +1142,7 @@ function ouvrirGlossaire(ancre) {
   if (!p) return;
   const groupes = [['Positionnement et dérivés', ['gex', 'ls', 'top_ls', 'taker', 'funding', 'oi', 'cvd', 'prime']],
     ['Macro', ['dxy', 'vix']], ['Carnet', ['carnet', 'murs']],
-    ['Indicateurs du fichier', ['rsi_tf', 'ema_tf', 'croisement', 'sr_tf', 'amplitude', 'atr_tf', 'volume_tf']],
+    ['Indicateurs publiés', ['rsi_tf', 'ema_tf', 'croisement', 'sr_tf', 'amplitude', 'atr_tf', 'volume_tf']],
     ['Le dessin du graphique', ['bougies']],
     ['Guide et scénarios du matin', ['guide', 'guide_niveaux', 'guide_regime', 'guide_formes', 'guide_suite', 'scenarios']],
     ['Indicateurs du graphique', ['rsi', 'ema', 'vwap', 'adx', 'atr', 'volume', 'sr', 'bb', 'macd', 'stoch', 'ichimoku', 'sar', 'obv', 'mfi', 'williamsR', 'cci', 'ao', 'fib', 'vp', 'liq', 'fourchette']]];

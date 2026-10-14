@@ -544,8 +544,9 @@ const lireEntete = page => page.evaluate(() => {
       check(`${nom} : sans les chiffres du marché, le choix n’est pas montré (le panneau parle en mots)`, mode === 'expert' || cache, cache);
       if (mode !== 'expert') { await chiffres(true); await o.page.waitForTimeout(300); }
       const choix = await o.page.evaluate(c => [...document.querySelectorAll(c + ' .epingle-btn')].map(b => b.textContent), corps);
+      // « RSI 4 h » et « Taux annuel » : ni « 4h » collé ni « Funding an. » (revue du 14/10/2026, M12).
       check(`${nom} : le panneau propose les huit chiffres de l’en-tête, sous leurs noms de l’en-tête`,
-        choix.join('|') === 'RSI 4h|Funding an.|OI 24h|CVD 24h|GEX|L/S|DXY|VIX', choix);
+        choix.join('|') === 'RSI 4\u00a0h|Taux annuel|OI 24h|CVD 24h|GEX|L/S|DXY|VIX', choix);
       for (const c of ['macro.vix', 'micro.funding_annual_pct']) await o.page.click(`${corps} .epingle-btn[data-chemin="${c}"]`);
       await fermerPanneau(); await o.page.waitForTimeout(450);
       if (mode !== 'expert') { await chiffres(false); await o.page.waitForTimeout(450); }
@@ -563,8 +564,8 @@ const lireEntete = page => page.evaluate(() => {
       });
       const a = await lire();
       const attendus = mode === 'expert' ? a.vus.slice(0, 2) : a.vus;
-      check(`${nom} : panneau fermé, les deux épinglés (Funding an., VIX) sont dans l’en-tête${mode === 'expert' ? ', en tête de la bande' : ', seuls'}, entiers, ni sur le prix ni sur un bouton`,
-        attendus.slice().sort().join('|') === 'Funding an.|VIX' && a.entiers && !a.surPrix && !a.surBouton
+      check(`${nom} : panneau fermé, les deux épinglés (Taux annuel, VIX) sont dans l’en-tête${mode === 'expert' ? ', en tête de la bande' : ', seuls'}, entiers, ni sur le prix ni sur un bouton`,
+        attendus.slice().sort().join('|') === 'Taux annuel|VIX' && a.entiers && !a.surPrix && !a.surBouton
         && (mode === 'expert' ? a.vus.length > 2 : a.vus.length === 2), a);
       // (Pas de rechargement ici : le script d'ouverture vide le stockage à chaque chargement.)
       check(`${nom} : gardés sur l’appareil`, JSON.parse(a.stocke || '[]').sort().join('|') === 'macro.vix|micro.funding_annual_pct', a.stocke);
@@ -576,7 +577,7 @@ const lireEntete = page => page.evaluate(() => {
       await fermerPanneau(); await o.page.waitForTimeout(450);
       if (mode !== 'expert') { await chiffres(false); await o.page.waitForTimeout(450); }
       const c = await lire();
-      check(`${nom} : décochés, l’en-tête revient comme avant`, mode === 'expert' ? c.vus[0] === 'RSI 4h' : c.vus.length === 0, c);
+      check(`${nom} : décochés, l’en-tête revient comme avant`, mode === 'expert' ? c.vus[0] === 'RSI 4\u00a0h' : c.vus.length === 0, c);
       check(`${nom} : aucune erreur de script`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }

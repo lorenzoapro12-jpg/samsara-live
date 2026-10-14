@@ -59,7 +59,8 @@ function statsFigureHtml(S, K) {
     }
     if (S.delai) h += '<p class="stats-phrase">' + echapF(S.delai) + '</p>';
     if (S.faible) h += '<p class="fiche-alerte">Trop peu de cas pour en tirer une règle : ces comptes peuvent beaucoup changer.</p>';
-    h += '<h4>Le détail</h4><dl class="stats-table">' + S.lignes.map(([k, v]) => '<dt>' + echapF(k) + '</dt><dd>' + echapF(v) + '</dd>').join('') + '</dl>';
+    // « Les chiffres » : « Le détail » est le nom de la case (revue du 14/10/2026, M9).
+    h += '<h4>Les chiffres</h4><dl class="stats-table">' + S.lignes.map(([k, v]) => '<dt>' + echapF(k) + '</dt><dd>' + echapF(v) + '</dd>').join('') + '</dl>';
     h += exemplesHtml(S, K);
   } else h += '<p class="stats-phrase">Pas encore de mesure pour ce graphique.</p>';
   h += '<p class="fiche-pied">' + echapF(S.source) + ' ' + echapF(S.risque) + '</p>';

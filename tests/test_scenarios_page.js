@@ -255,7 +255,8 @@ const etat = page => page.evaluate(() => {
         await o.page.waitForTimeout(250);
         // D'abord le résumé, qui mène au détail ; un 2e toucher (ou un clic) ouvre le détail.
         const b0 = await o.page.evaluate(() => (scenEtat && scenEtat.bulle ? scenEtat.bulle : null));
-        check(`${nom} : la bulle de l’encadré s’ouvre sur son résumé, qui mène au détail (« ${tactile ? 'Touchez encore' : 'Cliquez'} : le détail »)`, b0 && /(Touchez encore|Cliquez) : le détail/.test(b0.corps.join(' ')), b0 && b0.corps);
+        // « tout lire » : « Le détail » est réservé au nom de la case (revue du 14/10/2026, M9).
+        check(`${nom} : la bulle de l’encadré s’ouvre sur son résumé, qui mène au détail (« ${tactile ? 'Touchez encore' : 'Cliquez'} : tout lire »)`, b0 && /(Touchez encore|Cliquez) : tout lire/.test(b0.corps.join(' ')), b0 && b0.corps);
         if (tactile) await o.page.touchscreen.tap(x, y); else await o.page.mouse.click(x, y);
         await o.page.waitForTimeout(250);
         const b = await o.page.evaluate(() => (scenEtat && scenEtat.bulle ? scenEtat.bulle : null));

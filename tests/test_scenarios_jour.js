@@ -20,6 +20,9 @@ const fs = require('fs'), path = require('path');
 const S = require('../js/scenarios.js');
 const Guide = require('../js/guide.js');
 const Fm = require('../js/format.js');
+// Le budget du libellé Débutant, lu dans PARAM.guide.debutant.scenario (js/app.js) : 35 depuis la
+// revue du 14/10/2026 (M10 : « Scénario » écrit en entier, 3 lettres de plus que « Scén. »).
+const LIB = +(fs.readFileSync(path.join(__dirname, '..', 'js', 'app.js'), 'utf8').match(/\bscenario: (\d+), forme:/) || [])[1];
 const FX = path.join(__dirname, 'fixtures');
 let ko = 0;
 const check = (nom, ok, det) => { if (!ok) ko++; console.log(`  ${ok ? '✓' : '✗'} ${nom}${!ok && det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 600) : ''}`); };
@@ -166,9 +169,10 @@ check('17:30 : le 1 sorti (bougie 17:15–17:30) → plus aucun ouvert', a1730 &
   // Changé délibérément (revue) : « zone du 2 ✓ » au lieu de « le 2 réalisé ✓ » (jamais « réalisé »
   // sur le tracé pour un scénario peut-être pas dessiné) ; le libellé porte sa marque « (en direct) »
   // (la ligne peut céder sa place) et dit « zone ✓ », jamais le niveau seul coché (A3).
-  check(`17:40 : ligne F « ${l48} » / « ${l40} »`, l48 === 'Scén. 1 sorti · zone du 2 ✓ (en direct) ▸' && l40 === 'Scén. 1 ✗ · zone du 2 ✓ (en direct) ▸', [l48, l40]);
-  const lib = S.libellesJourDebutant(J.montre, 32, null);
-  check(`17:40 : libellé du montré « ${lib[0]} » : dit « zone », jamais « atteint » (A3), marqué « (en direct) », ≤ 32`, lib[0] === 'Scénario 2 : zone ✓ (en direct)' && lib.every(t => !/atteint/.test(t) && /\(en direct\)$/.test(t) && t.length <= 32), lib);
+  // Changé exprès (revue du 14/10/2026, M10) : « Scénario 1 » en entier, jamais « Scén. 1 ».
+  check(`17:40 : ligne F « ${l48} » / « ${l40} »`, l48 === 'Scénario 1 sorti · zone du 2 ✓ (en direct) ▸' && l40 === 'Scénario 1 ✗ · zone du 2 ✓ (en direct) ▸', [l48, l40]);
+  const lib = S.libellesJourDebutant(J.montre, LIB, null);
+  check(`17:40 : libellé du montré « ${lib[0]} » : dit « zone », jamais « atteint » (A3), marqué « (en direct) », ≤ ${LIB}`, lib[0] === 'Scénario 2 : zone ✓ (en direct)' && lib.every(t => !/atteint/.test(t) && /\(en direct\)$/.test(t) && t.length <= LIB), lib);
   check('M10 : le fondu part de la CLÔTURE de la bougie du contact (17:30) : à 17:40, 1 − 10/60', proche(J.items[0].fondu, 1 - 10 / 60, 1e-9), J.items[0].fondu);
 }
 // Rejeu incrémental = rejeu d'un coup.
@@ -254,28 +258,31 @@ titre('5. Lignes Débutant (cas A à I) : longueurs, marques, mots');
   { const x = instant(F08, k15, '13:50'), t = S.ligneJourDebutant(F08, x.J, x.items, x.now, 48, {});
     check(`C (13:50, le 2 nommé ET au plus petit écart) : « ${t} »`, S.nomNet(x.J) && x.J.meneur && x.J.meneur.sc.rang === '2' && t === 'En direct : le 2 (80 806 $) suit mieux le prix ▸', [t, x.J.cas, S.nomNet(x.J)]); }
   // Changé délibérément (revue, round 2) : le 3 s'est fermé dans la même heure (un fait frais) ; la
-  // ligne dit les deux tant qu'elle tient (à 40 caractères : « zone du 2 ✓ · scén. 3 ✗ »).
-  check(`D (15:40, le 2 réalisé, le 1 ouvert, le 3 fermé depuis peu) : « ${d15.t} »`, d15.t === 'En direct : zone du 2 (80 806 $) ✓ · scén. 3 ✗ ▸', d15.t);
+  // ligne dit les deux tant qu'elle tient. Revue du 14/10/2026 (M10) : « scénario 3 » en entier ;
+  // dans 48 caractères, le niveau du 2 cède alors sa place (il reste dans la bulle et le libellé).
+  check(`D (15:40, le 2 réalisé, le 1 ouvert, le 3 fermé depuis peu) : « ${d15.t} »`, d15.t === 'En direct : zone du 2 ✓ · scénario 3 ✗ ▸', d15.t);
   // Rang 1 en chemin (le 3 du 08/10 en tête), le range en 2 : E et F « invalidé ».
   const fx = JSON.parse(JSON.stringify(X08.fichier));
   const [r0, r1, r2] = fx.scenarios; r2.rang = '1'; r0.rang = '2'; r1.rang = '3'; r1.cibles = [Math.round(r1.prix_emission * 0.96)];
   const FE = S.lire(fx, Date.parse('2026-10-08T04:30Z'));
   for (const h of ['15:40', '18:00']) { const x = instant(FE, k15, h); pousser('rang 1 chemin ' + h + ' (' + x.J.cas + ')', FE, x.J, x.items, x.now); }
   const e15 = lignes.find(l => l.nom.startsWith('rang 1 chemin 15:40') && l.max === 48);
-  check(`E (rang 1 invalidé, un autre ouvert et montré) : « ${e15.t} »`, /^Scén\. 1 (✗|invalidé ✗)/.test(e15.t) && /\(en direct\)/.test(e15.t), e15);
+  check(`E (rang 1 invalidé, un autre ouvert et montré) : « ${e15.t} »`, /^Scénario 1 (✗|invalidé ✗)/.test(e15.t) && /\(en direct\)/.test(e15.t), e15);
   // Journal ❌ sur le rang 1 (I).
   const fj = JSON.parse(JSON.stringify(X08.fichier)); fj.scenarios[0].statut = '❌'; fj.scenarios[0].premier_ok = 'haut'; fj.scenarios[0].resolu_utc = '2026-10-08T12:00Z';
   const FI = S.lire(fj, Date.parse('2026-10-08T04:30Z'));
   { const x = instant(FI, k15, '14:05'); pousser('journal ❌ 14:05 (' + x.J.cas + ')', FI, x.J, x.items, x.now); }
   const i14 = lignes.filter(l => l.nom.startsWith('journal'));
-  check(`I (journal ❌ sur le rang 1) : « ${i14.map(l => l.t).join(' » / « ')} »`, i14.every(l => /^Scén\. 1 .*\(journal\)/.test(l.t) && !/en direct/.test(l.t)), i14);
+  check(`I (journal ❌ sur le rang 1) : « ${i14.map(l => l.t).join(' » / « ')} »`, i14.every(l => /^Scénario 1 .*\(journal\)/.test(l.t) && !/en direct/.test(l.t)), i14);
   for (const l of lignes) {
     const okLong = l.t.length <= l.max, mots = bannis(l.t), conseil = CONSEIL.test(l.t), pct = /%/.test(l.t);
     const marque = /\(journal\)/.test(l.t) ? !/en direct/i.test(l.t) : /\(en direct\)|^En direct : /.test(l.t);
     // Règle 3 : la ligne ne commence pas par le nom du scénario du libellé posé.
     const r3 = !l.montre || !new RegExp('^Scén(ario|\\.) ' + l.montre + '\\b').test(l.t);
-    check(`${l.nom} : « ${l.t} » (${l.t.length} ≤ ${l.max}) ; ${/\(journal\)/.test(l.t) ? '« (journal) » seul' : '« (en direct) »'} ; sans mot banni, %, conseil ; ne commence pas par « Scén. ${l.montre} »`,
-      okLong && marque && !mots.length && !conseil && !pct && r3, { l, mots });
+    // La preuve de la revue du 14/10/2026 (M10) : jamais « Scén. » ni « scén. » sur cette ligne.
+    const abrege = /\b[Ss]cén\./.test(l.t);
+    check(`${l.nom} : « ${l.t} » (${l.t.length} ≤ ${l.max}) ; ${/\(journal\)/.test(l.t) ? '« (journal) » seul' : '« (en direct) »'} ; sans mot banni, %, conseil, ni « Scén. » ; ne commence pas par « Scénario ${l.montre} »`,
+      okLong && marque && !mots.length && !conseil && !pct && r3 && !abrege, { l, mots });
   }
 }
 

@@ -23,8 +23,9 @@ const Icones = (() => {
   };
   const PLEIN = { scenario: true };
   const TRAIT = 1.7;          // épaisseur, en unités de la grille (≈ 1,4 px à 8 px)
-  // Les noms des familles (titres, légende) : en mots simples.
-  const NOMS = { niveau: 'Repère de prix', figure: 'Figure chartiste', scenario: 'Scénario du matin de Claude',
+  // Les noms des familles (titres, légende) : en mots simples. « Figure chartiste » était du jargon
+  // dans le panneau d'un débutant (revue du 14/10/2026, M11).
+  const NOMS = { niveau: 'Repère de prix', figure: 'Figure (dessin du prix)', scenario: 'Scénario du matin de Claude',
     tendance: 'Tendance', suite: 'Et ensuite ?', moment: 'Heure à retenir', lecture: 'Ce que dit le graphique' };
   // L'ordre de la légende.
   const LEGENDE = ['niveau', 'figure', 'scenario', 'tendance', 'suite', 'moment'];

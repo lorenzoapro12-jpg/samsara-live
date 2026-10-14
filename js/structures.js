@@ -314,10 +314,11 @@ STRUCTURES.tableau = {
 // recule, sinon stable. Aucun seuil (rien de nouveau à déclarer), aucun adjectif : un compte
 // rendu, pas un avis. Un niveau (le financement) ou un état (le GEX) se cite sans verbe ; une
 // clause dont la valeur est « — » est omise.
-// Le financement est le libellé exact de la cote, « Funding an. » (KPIS_ENTETE, js/app.js) : avec
-// « Funding », la clause disparaissait sans bruit (revue du 14/10, C27). Le taux est annualisé : la
-// manchette dit « par an », sinon il se lirait comme un taux par période, ce qui serait faux.
-const GAZETTE_CLES = { financement: 'Funding an.', interet: 'OI 24h', cvd: 'CVD 24h', gex: 'GEX' };
+// Le financement est cité par le libellé exact de la cote, « Taux annuel » (KPIS_ENTETE, js/app.js) :
+// avec un autre libellé, la clause disparaissait sans bruit (revue du 14/10, C27 ; M12 : « Funding an. »
+// était de l'anglais coupé). Le taux est annualisé : la manchette dit « par an », sinon il se lirait
+// comme un taux par période, ce qui serait faux.
+const GAZETTE_CLES = { financement: 'Taux annuel', interet: 'OI 24h', cvd: 'CVD 24h', gex: 'GEX' };
 const verbeGazette = t => t[0] === '+' ? 'progresse' : t[0] === '−' ? 'recule' : 'stable';
 /** La manchette, en segments [texte, est-une-valeur]. `lire(libellé)` rend le texte affiché du
  *  chiffre clé (ou null) ; `heure`, le texte affiché de #updated. Fonction pure. */

@@ -249,7 +249,9 @@ const VERBES = /\b(touche|est passé|monte|baisse|hésite|s’agite|est entre|es
 // une seule (etiqFourchette). 48 caractères et non plus 22 (revue du 14/10/2026, M2) : ses deux
 // bornes hors de la vue, elle donne leurs prix, « ↕ Fourchette 7 jours : 80 394 – 84 352 $ » (39) ;
 // sa place en pixels est contrôlée à part.
-const LIMITES = { phrase: [90, 48], niveau: [26, 18], scenario: [32, 32], forme: [26, 26], boite: [48, 40], evenement: [90, 48], fourchette: [48, 48] };
+// scenario : 35 et non plus 32 (revue du 14/10/2026, M10) : « Scénario » en entier, jamais « Scén. »
+// (PARAM.guide.debutant.scenario).
+const LIMITES = { phrase: [90, 48], niveau: [26, 18], scenario: [35, 35], forme: [26, 26], boite: [48, 40], evenement: [90, 48], fourchette: [48, 48] };
 // L'étiquette de la fourchette sans cassure (revue du 14/10/2026, M2) : ses deux traits dans la vue,
 // « Fourchette 7 jours » ; un seul, la borne qu'il est, sans flèche (« Bas 7 jours », « Haut 7 jours » :
 // seul « Fourchette 7 jours », il passait pour un repère parmi d'autres) ; aucun, la flèche (↕, ↑ ou
@@ -308,7 +310,8 @@ async function controlerEcran(o, nom, opts = {}) {
     check(`${nom} : les prix de la phrase sont ceux des libellés des repères`, pn.every(x => pl.includes(x)), { pn, pl });
     check(`${nom} : aucun repère d'options quand une autre bande existe du même côté`, e.items.filter(i => i.role === 'niveau').every(i => !/option/i.test(i.texte)), e.items.map(i => i.texte));
   }
-  if (!opts.sansScenarios) check(`${nom} : « Scénario 1 » (ou la ligne des scénarios) est à l'écran`, e.items.some(i => /^(↑ |↓ )?Scén(ario|\.) 1|^Scénarios? /.test(i.texte)), e.items.map(i => i.texte));
+  // « Scénario » en entier, plus « Scén. » (revue du 14/10/2026, M10).
+  if (!opts.sansScenarios) check(`${nom} : « Scénario 1 » (ou la ligne des scénarios) est à l'écran`, e.items.some(i => /^(↑ |↓ )?Scénario 1|^Scénarios? /.test(i.texte)), e.items.map(i => i.texte));
   const dom = await o.page.evaluate(() => {
     const vis = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
     return { prix: document.getElementById('price').textContent, var24: vis(document.getElementById('var24')) ? document.getElementById('var24').textContent : null,
@@ -493,10 +496,11 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
           // Le résumé (1er toucher ou survol) : le même titre, 4 lignes et 3 nombres au plus, une phrase
           // au moins quand le titre en laisse la place, et la ligne qui mène au détail.
           const c1 = r.court;
-          if (c1.resume) check(`${nom} : ${role}${k ? ' ' + (k + 1) : ''} : le résumé d'abord (${c1.lignes} lignes, ${c1.nombres} nombres), « ${tactile ? 'Touchez encore' : 'Cliquez'} : le détail · pas une prévision »`,
-            r.resume === false && c1.titre === r.titre && c1.lignes <= 4 && c1.nombres <= 3 && new RegExp((tactile ? 'Touchez encore' : 'Cliquez') + ' : le détail · pas une prévision$').test(c1.corps)
+          // « tout lire », pas « le détail » : ce mot est le nom de la case (revue du 14/10/2026, M9).
+          if (c1.resume) check(`${nom} : ${role}${k ? ' ' + (k + 1) : ''} : le résumé d'abord (${c1.lignes} lignes, ${c1.nombres} nombres), « ${tactile ? 'Touchez encore' : 'Cliquez'} : tout lire · pas une prévision »`,
+            r.resume === false && c1.titre === r.titre && c1.lignes <= 4 && c1.nombres <= 3 && new RegExp((tactile ? 'Touchez encore' : 'Cliquez') + ' : tout lire · pas une prévision$').test(c1.corps) && !/le détail/i.test(c1.corps)
             && c1.corps.length < r.corps.length && !bannisBulle(c1.corps).length, c1);
-          else check(`${nom} : ${role}${k ? ' ' + (k + 1) : ''} : bulle déjà courte, entière d'emblée (${c1.lignes} lignes), sans renvoi au détail`, c1.lignes <= 6 && !/ : le détail · /.test(c1.corps), c1);
+          else check(`${nom} : ${role}${k ? ' ' + (k + 1) : ''} : bulle déjà courte, entière d'emblée (${c1.lignes} lignes), sans renvoi au détail`, c1.lignes <= 6 && !/ : (le détail|tout lire) · /.test(c1.corps), c1);
           if (role === 'niveau' && k === 0) {
             // Un chiffre publié (mur du carnet, options) garde son âge dans la bulle.
             const pub = await o.page.evaluate(() => guideEtat.niveaux.filter(L => L.niv.raisons.some(r => isFinite(r.lu))).map(L => L.etiq && L.etiq.t));
@@ -573,10 +577,10 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       const ligne = e.items.find(i => i.role === 'boite');
       // Changé délibérément (contrat de la journée, plan-scenarios.md A4) : quand le rang 1 tombe, le
       // scénario encore ouvert qui suit est montré (son libellé) et la ligne dit la fermeture du 1 :
-      // elle commence par « Scén. 1 » et contient « ✗ », ou dit « Aucun scénario » ; toujours marquée
+      // elle commence par « Scénario 1 » (en entier : revue du 14/10/2026, M10) et contient « ✗ », ou dit « Aucun scénario » ; toujours marquée
       // « (en direct) » ; jamais un libellé qui nomme le scénario 1 par ses niveaux.
-      check(`fermé · ${vue.width} : la ligne dit la fermeture du rang 1 (« Scén. 1 … ✗ » ou « Aucun scénario »), marquée « (en direct) » ; jamais de libellé « Scénario 1 : … »`,
-        ligne && (/^Scén\. 1\b.*✗/.test(ligne.texte) || /^Aucun (scénario|ne)\b|^Scénarios : aucun\b/.test(ligne.texte)) && /\(en direct\)/.test(ligne.texte) && /▸$/.test(ligne.texte)
+      check(`fermé · ${vue.width} : la ligne dit la fermeture du rang 1 (« Scénario 1 … ✗ » ou « Aucun scénario »), marquée « (en direct) » ; jamais de libellé « Scénario 1 : … »`,
+        ligne && (/^Scénario 1\b.*✗/.test(ligne.texte) || /^Aucun (scénario|ne)\b|^Scénarios : aucun\b/.test(ligne.texte)) && /\(en direct\)/.test(ligne.texte) && /▸$/.test(ligne.texte)
         && !e.items.some(i => i.role === 'scenario' && /^(↑ |↓ )?Scén(ario|\.) 1 :/.test(i.texte)), e.items);
       // Sa bulle (toucher ou survol) tient dans le tracé et dit le suivi en direct, le journal, l'avertissement.
       const r = await viser(o, 'boite', tactile);
@@ -751,7 +755,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
     // ── La clé « ? » et l'astuce : la clé toujours là en Lisible, l'astuce une fois ──
     // La clé est un bouton (hors du budget des 5 textes) posé dans un coin du tracé, jamais sur un
     // texte, ni sur la ligne qui valide une figure, ni sur la ligne du prix ; elle ouvre la fiche du
-    // Guide. L'astuce (« Touchez / Survolez une étiquette pour le détail ») l'accompagne la toute
+    // Guide. L'astuce (« Touchez / Survolez une étiquette pour la lire » : revue du 14/10/2026, M9) l'accompagne la toute
     // première fois, puis s'efface ; la clé reste.
     titre('Clé « ? » et astuce : la clé toujours là en Lisible, l’astuce une fois, jamais sur un texte');
     /** La clé et l'astuce telles qu'elles se voient (coordonnées du canvas). */
@@ -781,7 +785,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       await ctx.clock.install({ time: maintenant() });
       const o = await ouvrir(nav, { ctx, tactile: true });
       const a = await lireCle(o.page);
-      check('tactile, 1re visite : « Touchez une étiquette pour le détail » à côté de la clé « ? », sur aucun texte ni aucune ligne', a.phrase === 'Touchez une étiquette pour le détail' && cleBienPosee(a), a);
+      check('tactile, 1re visite : « Touchez une étiquette pour la lire » à côté de la clé « ? », sur aucun texte ni aucune ligne', a.phrase === 'Touchez une étiquette pour la lire' && cleBienPosee(a), a);
       const b = await o.page.evaluate(() => canvas.getBoundingClientRect());
       await o.page.touchscreen.tap(b.left + b.width / 2, b.top + b.height - 60); await o.page.waitForTimeout(200);
       const apres = await lireCle(o.page);
@@ -794,7 +798,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       // Souris (1440 px) : « Survolez… », une fois, cachée au bout de 8 s ; la clé reste.
       const o3 = await ouvrir(nav, { vue: { width: 1440, height: 900 } });
       const a3 = await lireCle(o3.page);
-      check('souris : « Survolez une étiquette pour le détail », une fois, à côté de la clé', a3.phrase === 'Survolez une étiquette pour le détail' && cleBienPosee(a3), a3);
+      check('souris : « Survolez une étiquette pour la lire », une fois, à côté de la clé', a3.phrase === 'Survolez une étiquette pour la lire' && cleBienPosee(a3), a3);
       await o3.page.clock.runFor(9000); await o3.page.waitForTimeout(100);
       const a4 = await lireCle(o3.page);
       check('… l’astuce cachée au bout de 8 s ; la clé reste, sur aucun texte', a4.phrase === null && a4.stockee === '1' && cleBienPosee(a4), a4);
@@ -1516,7 +1520,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       const entreH = sc && sc.rect && haut && e.yLive !== null && sc.rect.y < e.yLive && sc.rect.y + sc.rect.h > haut.yH;
       const bord = sc && sc.rect && (sc.rect.y <= e.top + 17 + 4 + 1 || sc.rect.y + sc.rect.h >= e.top + e.ph - 2 * 17 - 4 - 1);
       check(`range · ${theme} · ${w} : le libellé du scénario 1 est posé (« ${sc && sc.texte} »), dans les deux rangées du haut (ou du bas), jamais entre la ligne du prix et un repère`,
-        sc && sc.rect && bord && !entre && !entreH && /^Scén(ario|\.) 1/.test(sc.texte), { sc, top: e.top, ph: e.ph, yLive: e.yLive, bas, haut });
+        sc && sc.rect && bord && !entre && !entreH && /^Scénario 1/.test(sc.texte), { sc, top: e.top, ph: e.ph, yLive: e.yLive, bas, haut });   // en entier (revue du 14/10/2026, M10)
       if (sc && w === 360) {
         const r = await viser(o, 'scenario', true);
         check(`range · ${theme} · ${w} : le toucher du libellé ouvre la bulle du scénario 1 (« reste entre »)`, r && /^Scénario 1 de Claude$/.test(r.titre) && /reste entre/.test(r.corps), r);
@@ -1529,7 +1533,8 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       const o = await ouvrir(nav, { vue: { width: 1440, height: 900 }, prev: 'range2' });
       const e = await controlerEcran(o, 'range2 · 1440');
       const sc = e.items.find(i => i.role === 'scenario');
-      check(`range2 : « ${sc && sc.texte} » dit son verbe (« reste »)`, sc && /^Scén(ario|\.) 1 : reste /.test(sc.texte), e.items);
+      // « Scénario » en entier : le budget de 35 caractères garde le verbe (revue du 14/10/2026, M10).
+      check(`range2 : « ${sc && sc.texte} » dit son verbe (« reste »)`, sc && /^Scénario 1 : reste /.test(sc.texte), e.items);
       const p = await o.page.evaluate(() => {
         const S = scenEtat, un = S && S.items.find(i => i.sc.rang === '1');
         if (!un) return null;

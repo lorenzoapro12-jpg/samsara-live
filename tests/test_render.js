@@ -243,7 +243,7 @@ try {
       const hors = couleurs.filter(t => !/ en 24 h$|^EMA 20 /.test(t));
       const kpiCol = (k.match(/<span class="kpi"[^>]*>(?:(?!<\/span><\/span>|<span class="kpi").)*?<b class=/g) || []).length;
       return ['Vert et rouge réservés au prix : funding, OI, CVD (chiffres clés et cartes), prime, ratio du carnet sans couleur hausse / baisse',
-        k.includes('Funding an.') && k.includes('CVD 24h') && !kpiCol && couleurs.some(t => / en 24 h$/.test(t)) && !hors.length && /dv-fill/.test(h)];
+        k.includes('Taux annuel') && k.includes('CVD 24h') && !kpiCol && couleurs.some(t => / en 24 h$/.test(t)) && !hors.length && /dv-fill/.test(h)];
     })(),
     ['Aucun motif interdit dans le RENDU', hitsFeed.length === 0],
     ['Aucun motif interdit dans la SOURCE publiée', hitsSrc.length === 0],

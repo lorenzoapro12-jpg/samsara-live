@@ -18,9 +18,13 @@
 // Les heures dites sont celles de l'appareil (Fmt.heure, Fmt.jour), sans « UTC » ni « heure de
 // Paris » : les attendus sont calculés avec Fmt, pour tenir dans n'importe quel fuseau.
 // USAGE   node tests/test_scenarios_jour_stable.js
+const fs = require('fs'), path = require('path');
 const S = require('../js/scenarios.js');
 const Guide = require('../js/guide.js');
 const Fm = require('../js/format.js');
+// Le budget du libellé Débutant, lu dans PARAM.guide.debutant.scenario (js/app.js) : 35 depuis la
+// revue du 14/10/2026 (M10 : « Scénario » écrit en entier, 3 lettres de plus que « Scén. »).
+const LIB = +(fs.readFileSync(path.join(__dirname, '..', 'js', 'app.js'), 'utf8').match(/\bscenario: (\d+), forme:/) || [])[1];
 const { reel, synth } = require('./scenarios-jour-0910');
 let ko = 0;
 const check = (nom, ok, det) => { if (!ok) ko++; console.log(`  ${ok ? '✓' : '✗'} ${nom}${!ok && det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 700) : ''}`); };
@@ -107,17 +111,18 @@ titre('3. Fait frais : la ligne le dit, et le garde une heure (suite synthétiqu
   const x = at(Date.parse('2026-10-09T19:08Z')), J = x.J;
   const L48 = S.ligneJourDebutant(x.F, J, x.items, x.now, 48, {}), L40 = S.ligneJourDebutant(x.F, J, x.items, x.now, 40, {});
   check(`19:08 : le 3 réalisé et le 2 invalidé (même bougie), frais ; ligne « ${L48} » / « ${L40} »`, J.frais.map(i => i.sc.rang).join() === '2,3'
-    && L48 === 'En direct : zone du 3 (84 500 $) ✓ · scén. 2 ✗ ▸' && L40 === 'En direct : zone du 3 ✓ · scén. 2 ✗ ▸', [J.frais.map(i => i.sc.rang), L48, L40]);
+    // « scénario 2 » en entier (revue du 14/10/2026, M10) : dans 48 caractères, le niveau du 3 cède sa place.
+    && L48 === 'En direct : zone du 3 ✓ · scénario 2 ✗ ▸' && L40 === 'En direct : zone du 3 ✓ · scénario 2 ✗ ▸', [J.frais.map(i => i.sc.rang), L48, L40]);
   const y = at(Date.parse('2026-10-09T20:20Z'));
   check('20:20 (plus d’une heure après la fin de la bougie de 19:00) : le 2 et le 3 ne sont plus frais', !y.J.frais.some(i => i.sc.rang !== '1'), y.J.frais.map(i => i.sc.rang));
-  // Le 2 seul fermé depuis peu, le 1 ouvert et rien de réalisé (le 3 rendu neutre) : « Scén. 2 … ✗ ».
+  // Le 2 seul fermé depuis peu, le 1 ouvert et rien de réalisé (le 3 rendu neutre) : « Scénario 2 … ✗ ».
   const z = at(Date.parse('2026-10-09T19:30Z'));
   const items = z.items.map(i => (i.sc.rang === '3' ? { sc: i.sc, sv: Object.assign({}, i.sv, { cle: 'rien', k: 0, t: null }) } : i));
   const Jz = S.classerJour(items, z.J.prix, z.F, z.now, { grille: true, sortiTot: true, prec: z.F.scenarios[0].id, cas: 'meneur', ordre: [] }, PJ);
   const Lz = S.ligneJourDebutant(z.F, Jz, items, z.now, 48, {});
   // L'heure de la fermeture : le début de la bougie du contact (19:00 UTC), à l'heure de l'appareil.
   const t2 = Date.parse('2026-10-09T19:00Z'), h2 = (Fm.memeJour(t2, z.now) ? 'vers ' : 'hier ') + Fm.heure(t2);
-  check(`le 2 seul fermé depuis peu : « ${Lz} » (« ${h2} » ou sans heure)`, Lz === 'Scén. 2 invalidé ✗ ' + h2 + ' (en direct) ▸' || Lz === 'Scén. 2 invalidé ✗ (en direct) ▸', Lz);
+  check(`le 2 seul fermé depuis peu : « ${Lz} » (« ${h2} » ou sans heure)`, Lz === 'Scénario 2 invalidé ✗ ' + h2 + ' (en direct) ▸' || Lz === 'Scénario 2 invalidé ✗ (en direct) ▸', Lz);
   const tous = [L48, L40, Lz];
   check('lignes : sans mot banni, sans %, sans conseil', tous.every(t => !Guide.motsBannis(t).length && !/%/.test(t) && !CONSEIL.test(t)), tous);
 }
@@ -148,8 +153,8 @@ titre('5. Après minuit (heure de l’appareil) : « hier » devant les créneau
     : aucuneVeille ? c.concat(l).every(t => !/hier/.test(t)) : true, c);
   check('heures de l’appareil : ni « UTC » ni « heure de Paris »', c.concat(l).every(t => !/UTC|Paris|\d\dh\d\d/.test(t)), c.concat(l));
   const fermesNR = J.items.filter(i => i.ferme && i.ferme.type !== 'realise');
-  const lib = fermesNR.map(i => S.libellesJourDebutant(i, 32, null, x.now)[0]);
-  check(`libellés : « ${lib.join(' » « ')} »`, lib.length && lib.every((t, k) => (veille(fermesNR[k].ferme.t) ? t.includes(' hier ' + Fm.heure(fermesNR[k].ferme.t) + ' ') : !/hier/.test(t)) && t.length <= 32), lib);
+  const lib = fermesNR.map(i => S.libellesJourDebutant(i, LIB, null, x.now)[0]);
+  check(`libellés : « ${lib.join(' » « ')} »`, lib.length && lib.every((t, k) => (veille(fermesNR[k].ferme.t) ? t.includes(' hier ' + Fm.heure(fermesNR[k].ferme.t) + ' ') : !/hier/.test(t)) && t.length <= LIB), lib);
   const y = journee(synth, new Map())(Date.parse('2026-10-09T21:30Z'));
   check('le même jour : pas de « hier »', y.J.items.every(i => !/hier/.test(S.ligneDebutantJour(i, y.J, true))));
 }

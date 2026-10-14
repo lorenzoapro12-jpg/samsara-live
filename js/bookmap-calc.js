@@ -1734,7 +1734,7 @@
       // moins le seuil de la lecture (pas les gros paquets du fichier, ni les zones).
       const ec = m => BM.pourcent(m.ecartPct), sq = isFinite(seuil) ? ' ≥ ' + BM.btc(seuil) + ' BTC' : '';
       const proche = (cote, m) => 'tranche ' + cote + sq + ' la plus proche ' + (m ? tranche(m.p, m.pas) + ' (' + ec(m) + ')' : ': aucune');
-      return ['carnet live ' + age, '±' + pct + (r.reduite ? ' (bande lue)' : '') + ' : achat / vente ' + (r.rapport === null ? '—' : '×' + BM.nombre(r.rapport, 2, 2)) + ' (' + BM.btc(r.qB) + ' / ' + BM.btc(r.qA) + ' BTC)',
+      return ['carnet en direct ' + age, '±' + pct + (r.reduite ? ' (bande lue)' : '') + ' : achat / vente ' + (r.rapport === null ? '—' : '×' + BM.nombre(r.rapport, 2, 2)) + ' (' + BM.btc(r.qB) + ' / ' + BM.btc(r.qA) + ' BTC)',
         proche('bid', mb), proche('ask', ma),
       ].join(' · ');
     }
@@ -2020,7 +2020,7 @@
     if (m.source === 'publie') {
       const lu = 'lu à ' + BM.jourHeure(m.luA, maintenant), paquet = 'Gros paquet ' + (achat ? 'd\'achats' : 'de ventes');
       return mode === 'expert' ? { lignes: ['Gros paquet ' + ba.toLowerCase() + ' ' + q + ' · fichier 15 min ' + lu], court: 'Gros paquet ' + ba.toLowerCase() + ' · ' + q }
-        : { lignes: [paquet + ' · ' + q + ' · ' + lu, 'fichier de 15 min (' + (m.periment ? 'carnet live pas lu en ce moment' : 'carnet live pas encore lu') + ')'], court: paquet + ' · ' + q };
+        : { lignes: [paquet + ' · ' + q + ' · ' + lu, 'fichier de 15 min (' + (m.periment ? 'carnet en direct pas lu en ce moment' : 'carnet en direct pas encore lu') + ')'], court: paquet + ' · ' + q };
     }
     const ms = m.depuis !== null && m.depuis !== undefined ? Math.max(0, maintenant - m.depuis) : null;
     const v = m.variation || null, fen = BM.age(o.fenetreMs);
@@ -2159,7 +2159,7 @@
   BM.evenementMurApparu = function (x) {
     const nom = nomMur(x.cote), q = BM.btc(x.q) + ' BTC', hc = BM.heure(x.t);
     return { t: x.t, type: 'murApparu', cote: x.cote, p: x.p + x.pas / 2, q: x.q, s: BM.SYMBOLES_GUIDE.apparu.s,
-      texte: nom + ' apparu : ' + q + ' entre ' + BM.prix(x.p) + ' et ' + BM.prix(x.p + x.pas) + DOL + ' (tranche de ' + x.pas + DOL + ', carnet live)',
+      texte: nom + ' apparu : ' + q + ' entre ' + BM.prix(x.p) + ' et ' + BM.prix(x.p + x.pas) + DOL + ' (tranche de ' + x.pas + DOL + ', carnet en direct)',
       carte: nom + ' apparu à ' + hc + ' (' + q + ')', court: '+ mur ' + coteMot(x.cote) + ' ' + q + ' ' + hc,
       debutant: nom + ' apparu entre ' + BM.prix(x.p) + ' et ' + BM.prix(x.p + x.pas) + DOL + ' (' + q + ')', cle: 'murApparu' + x.cote + Math.round(x.p) };
   };
@@ -2191,7 +2191,7 @@
   BM.evenementTraverse = function (x) {
     const sous = x.cote === 'b', lieu = sous ? 'sous le mur d\'achat' : 'au-dessus du mur de vente', S = BM.SYMBOLES_GUIDE[sous ? 'sous' : 'sur'].s;
     return { t: x.t, type: 'traverse', cote: x.cote, p: sous ? x.p : x.p + x.pas, q: x.q, s: S,
-      texte: 'Le prix (live) passe ' + lieu + ' ' + tranche(x.p, x.pas) + ' (' + BM.btc(x.q) + ' BTC ' + (x.qAvant !== null && x.qAvant !== undefined ? 'quand il était nommé, ' + BM.btc(x.qAvant) + ' BTC à la lecture d\'avant' : 'à la lecture d\'avant') + '). Percé, pas «' + NB + 'cassé' + NB + '» : il faudrait deux clôtures 1 min '
+      texte: 'Le prix (en direct) passe ' + lieu + ' ' + tranche(x.p, x.pas) + ' (' + BM.btc(x.q) + ' BTC ' + (x.qAvant !== null && x.qAvant !== undefined ? 'quand il était nommé, ' + BM.btc(x.qAvant) + ' BTC à la lecture d\'avant' : 'à la lecture d\'avant') + '). Percé, pas «' + NB + 'cassé' + NB + '» : il faudrait deux clôtures 1 min '
         + (sous ? 'sous' : 'au-dessus de') + ' ce niveau, ou une clôture puis un retour testé (règle de travail, non mesurée).',
       carte: 'Prix passé ' + lieu + ' à ' + BM.heure(x.t), court: S + (sous ? ' sous mur achat ' : ' sur mur vente ') + BM.prix(x.p) + ' ' + BM.heure(x.t),
       debutant: 'Le prix passe ' + (sous ? 'sous le mur d\'achat à ' + BM.prix(x.p) : 'au-dessus du mur de vente à ' + BM.prix(x.p + x.pas)) + DOL, cle: 'traverse' + x.cote + Math.round(x.p) };

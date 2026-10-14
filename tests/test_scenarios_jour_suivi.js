@@ -14,7 +14,7 @@
 //   5. les coches : la chaîne stricte avant l'invalidation, aucune après (06/10, le 2 invalidé à
 //      13:30 puis touché le 07/10), aucune sur une note ❌ du journal ;
 //   6. une note ❌ du journal sans heure de résolution ne s'efface pas d'un coup ;
-//   7. libellés Débutant d'un état : toujours « (en direct) » ou « (journal) », ≤ 32 caractères ;
+//   7. libellés Débutant d'un état : toujours « (en direct) » ou « (journal) », ≤ LIB caractères ;
 //      un range dont le prix est dans la marge : « tient jusqu’à … $ » ; la ligne ne montre jamais
 //      ⚠ comme ✗, et une réalisation notée par le journal porte « (journal) » ;
 //   8. bulles : l'heure d'une fermeture (heure de l'appareil, Fmt.heure) ; « seul » sur un range dit sa limite ;
@@ -24,6 +24,9 @@ const fs = require('fs'), path = require('path');
 const S = require('../js/scenarios.js');
 const Guide = require('../js/guide.js');
 const Fm = require('../js/format.js');
+// Le budget du libellé Débutant, lu dans PARAM.guide.debutant.scenario (js/app.js) : 35 depuis la
+// revue du 14/10/2026 (M10 : « Scénario » écrit en entier, 3 lettres de plus que « Scén. »).
+const LIB = +(fs.readFileSync(path.join(__dirname, '..', 'js', 'app.js'), 'utf8').match(/\bscenario: (\d+), forme:/) || [])[1];
 const FX = path.join(__dirname, 'fixtures');
 let ko = 0;
 const check = (nom, ok, det) => { if (!ok) ko++; console.log(`  ${ok ? '✓' : '✗'} ${nom}${!ok && det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 600) : ''}`); };
@@ -63,7 +66,7 @@ titre('1. 4 h, 1 jour, historique incomplet : « nonSuivi », jamais « aucun »
     check(`${nom} : cas « nonSuivi », montré = le rang 1, aucun nom`, J.cas === 'nonSuivi' && J.montre && J.montre.sc.rang === '1' && !J.meneur, [J.cas, J.montre && J.montre.sc.rang]);
     check(`${nom} : ni « Aucun scénario », ni « ne tient plus », ni phrase Expert de la journée`, !textes.some(t => /Aucun scénario|ne tient plus|aucun ne tient/i.test(t)) && !S.phraseJourExpert(J).length && !S.phraseMeneurDebutant(J), textes);
     check(`${nom} : la ligne Débutant reste celle d'avant le suivi (« … à voir en 15 min ou 1 h » ou « données manquantes »)`, /à voir en 15 min ou 1 h|données manquantes/.test(textes[textes.length - 2]), textes.slice(-2));
-    const lib = S.libellesJourDebutant(J.montre, 32, null);
+    const lib = S.libellesJourDebutant(J.montre, LIB, null);
     check(`${nom} : un libellé Débutant pour le rang 1 (« ${lib[0]} »)`, /^Scén(ario|\.) 1\b/.test(lib[0]) && !/✗|✓/.test(lib[0]), lib);
   }
   // Un scénario déjà noté ❌ par le journal, les deux autres non suivis : toujours « nonSuivi ».
@@ -206,24 +209,24 @@ titre('7. Libellés et ligne Débutant : marques, ⚠, journal, marge d’un ran
     const J = S.classerJour([x].concat([a, b, c].filter(s => s.rang !== x.sc.rang).map(s => it(s, sv(s.forme === 'range' ? 'dedans' : 'rien')))), 100000, F, T0 + 3 * 3600e3, { grille: true, sortiTot: true, prec: 'X1', cas: 'meneur' }, PJ);
     const y = J.items.find(i => i.sc.rang === x.sc.rang);
     for (const fl of [null, '↑']) {
-      const L = S.libellesJourDebutant(y, 32, fl);
+      const L = S.libellesJourDebutant(y, LIB, fl);
       tous.push(...L);
       const attendue = x.sc.statut !== '⏳' ? /\(journal\)$/ : /\(en direct\)$/;
-      check(`${nom}${fl ? ' (hors vue)' : ''} : « ${L[0]} » … « ${L[L.length - 1]} » : chacun marqué, ≤ 32`, L.every(t => attendue.test(t) && t.length <= 32), L);
+      check(`${nom}${fl ? ' (hors vue)' : ''} : « ${L[0]} » … « ${L[L.length - 1]} » : chacun marqué, ≤ ${LIB}`, L.every(t => attendue.test(t) && t.length <= LIB), L);
     }
-    if (nom === 'journal ⚠') check('journal ⚠ : « indécis », jamais ✗', S.libellesJourDebutant(y, 32, null).every(t => !/✗/.test(t)));
+    if (nom === 'journal ⚠') check('journal ⚠ : « indécis », jamais ✗', S.libellesJourDebutant(y, LIB, null).every(t => !/✗/.test(t)));
   }
   check('libellés : aucun « atteint », aucun mot banni', tous.every(t => !/atteint/.test(t) && !Guide.motsBannis(t).length), tous.filter(t => /atteint/.test(t)));
   // Heure de la fermeture dans le libellé (heure de l'appareil).
   const Jh = S.classerJour([it(b, sv('invalide', 0, { t: Date.parse('2026-10-08T15:15Z') })), it(a, sv('dedans')), it(c, sv('rien'))], 100000, F, Date.parse('2026-10-08T15:40Z'), { grille: true, sortiTot: true, prec: 'X1', cas: 'meneur' }, PJ);
-  const Lh = S.libellesJourDebutant(Jh.items.find(i => i.sc === b), 32, null);
+  const Lh = S.libellesJourDebutant(Jh.items.find(i => i.sc === b), LIB, null);
   const hF = Fm.heure(Date.parse('2026-10-08T15:15Z'));
   check(`fermeture : l’heure de l’appareil dans le libellé (« ${Lh[0]} », attendu « vers ${hF} »)`, Lh[0].endsWith(' vers ' + hF + ' (en direct)') && !/UTC|Paris/.test(Lh.join(' ')), Lh);
   // Ligne : ⚠ du journal sur le rang 1.
   const fa = JSON.parse(JSON.stringify(X08.fichier)); fa.scenarios[0].statut = '⚠';
   const FA = S.lire(fa, T0), xa = instant(FA, k15, '2026-10-08T14:05Z');
   const la = [48, 40].map(m => S.ligneJourDebutant(FA, xa.J, xa.items, xa.now, m, {}));
-  check(`rang 1 noté ⚠ : « ${la.join(' » / « ')} » (indécis, jamais ✗ ; « (journal) » seul)`, la.every(t => /^Scén\. 1 indécis \(journal\) ▸$/.test(t)), la);
+  check(`rang 1 noté ⚠ : « ${la.join(' » / « ')} » (indécis, jamais ✗ ; « (journal) » seul)`, la.every(t => /^Scénario 1 indécis \(journal\) ▸$/.test(t)), la);   // « Scénario » en entier (revue du 14/10/2026, M10)
   // Ligne : le 2 réalisé par le journal, le 1 ouvert → « (journal) ».
   const fr = JSON.parse(JSON.stringify(X08.fichier)); fr.scenarios[1].statut = '✅';
   const FR = S.lire(fr, T0), xr = instant(FR, k15, '2026-10-08T12:00Z');
@@ -231,10 +234,10 @@ titre('7. Libellés et ligne Débutant : marques, ⚠, journal, marge d’un ran
   check(`le 2 réalisé par le journal, le 1 ouvert : « ${lr.join(' » / « ')} »`, lr.every(t => /\(journal\) ▸$/.test(t) && !/en direct/i.test(t) && /^Zone du 2/.test(t)), lr);
   // Range : prix sous la borne basse, dans la marge (08/10 ~15:40-17:15 : 81 436 – 83 947, toléré dès 80 622).
   const x = instant(F08, k15, '2026-10-08T16:40Z'), un = x.J.items[0];
-  const Lm = S.libellesJourDebutant(un, 32, null);
-  check(`range dans sa marge (prix ${Math.round(x.J.prix)}) : « ${Lm[0]} »`, un.ouvert && S.dansMarge(un) && /^Scén(ario|\.) 1 : tient jusqu’à 80 622 \$$/.test(Lm[0]) && Lm[0].length <= 32, [x.J.prix, Lm]);
+  const Lm = S.libellesJourDebutant(un, LIB, null);
+  check(`range dans sa marge (prix ${Math.round(x.J.prix)}) : « ${Lm[0]} »`, un.ouvert && S.dansMarge(un) && /^Scénario 1 : tient jusqu’à 80 622 \$$/.test(Lm[0]) && Lm[0].length <= LIB, [x.J.prix, Lm]);
   const xin = instant(F08, k15, '2026-10-08T12:00Z');
-  check('range dans ses bornes : le libellé habituel « reste … »', !S.dansMarge(xin.J.items[0]) && /reste/.test(S.libellesJourDebutant(xin.J.items[0], 32, null)[0]), S.libellesJourDebutant(xin.J.items[0], 32, null));
+  check('range dans ses bornes : le libellé habituel « reste … »', !S.dansMarge(xin.J.items[0]) && /reste/.test(S.libellesJourDebutant(xin.J.items[0], LIB, null)[0]), S.libellesJourDebutant(xin.J.items[0], LIB, null));
 }
 
 titre('8. Bulles Débutant : heure des fermetures, « seul » d’un range, version courte');
