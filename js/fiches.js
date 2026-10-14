@@ -939,7 +939,9 @@ const CALCUL = {
   fourchette: P => { const F = P.guide.fourchette;
     return 'Périodes de ' + F.heures + ' h alignées sur l’heure UTC, refaites avec les bougies déjà chargées quand l’intervalle divise la période. Haut et bas : extrêmes des ' + F.periodes
       + ' périodes closes avant celle en cours. Cassure : une période close finit sous le bas (ou au-dessus du haut) de la fourchette des ' + F.periodes + ' périodes d’avant elle, '
-      + 'la précédente ayant fini dans la sienne ; sans filtre de volume. Dite dans « En résumé » pendant les ' + F.phrasePeriodes + ' périodes suivantes, tant qu’aucune n’a fini de nouveau dedans.'; },
+      + 'la précédente ayant fini dans la sienne ; sans filtre de volume. Dite dans « En résumé » pendant les ' + F.phrasePeriodes + ' périodes suivantes, tant qu’aucune n’a fini de nouveau dedans ; '
+      // Revue du 14/10/2026 (C1) : la couche garde alors la fourchette cassée, pas le nouveau bas.
+      + 'les deux lignes gardent alors la fourchette cassée.'; },
   liq: () => grilleLiq().pas + ', le serveur additionne les BTC posés dans le carnet Binance, par tranche de prix' + (grilleLiq().dp ? ' de ' + nbF(grilleLiq().dp) + ' $' : '') + '. Publié toutes les ' + CADENCES.attendue_min + ' min ; en Complet, l’âge de la dernière colonne est écrit en haut à droite. BTC/USDT seulement.',
   // ── Champs du fichier ──
   gex: () => 'Pour chaque option Deribit ouverte : variation de sa couverture pour ' + (prmMeta('micro.gex_usd_1pct', 'mouvement_pct') !== null ? nbF(prmMeta('micro.gex_usd_1pct', 'mouvement_pct')) + ' %' : 'un petit mouvement') + ' de prix (le « gamma ») × contrats ouverts. Calls en positif, puts en négatif (hypothèse). En dollars.',

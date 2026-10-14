@@ -382,6 +382,52 @@ const etat = page => page.evaluate(() => {
       pubS.length > 0 && pubS.every(L => L.heures.every(h => nFoisS(texteS(L), h) >= L.heures.filter(x => x === h).length) && !/…/.test(texteS(L))), pubS);
     check('sans scénarios : aucune erreur JavaScript', !s.erreurs.length, s.erreurs);
     await s.ctx.close();
+
+    // La fourchette CASSÉE (revue du 14/10/2026, C1 et C4), sur la journée réelle du 08/10 rejouée :
+    // à 16:20 UTC, la période de 4 h finie à 16:00 UTC a fini sous le bas de la fourchette de 7 jours
+    // (82 227,56). Couche allumée : les traits gardent ce bord cassé (avant : redessinés au nouveau
+    // bas, 80 914), l'étiquette et la bulle disent « cassée par le bas à <heure> » (avant : « resté
+    // entre les deux ») ; au téléphone avec « Le détail », la barre dit la cassure à la place du titre
+    // (avant : « Pas de sens net pour l'instant. »). L'heure est celle de l'appareil (Fmt.heure).
+    titre('Fourchette cassée (08/10 rejoué, 16:20 UTC) : bord cassé gardé, heure dite, barre du téléphone');
+    {
+      const H = require('./scenarios-jour-harnais.js'), X = require('./fixtures/rejeu-jour-0810.json');
+      try {
+        for (const [vue, mode, tactile] of [[{ width: 390, height: 844 }, 'expert', true], [{ width: 390, height: 844 }, 'debutant', true], [{ width: 1440, height: 900 }, 'expert', false]]) {
+          const nom = vue.width + ' px · ' + mode;
+          const o = await H.ouvrir(nav, H.harnais(X, '2026-10-08T16:20:00Z'), { vue, tactile, theme: 'bureau95', mode });
+          const r = await o.page.evaluate(() => {
+            overlays.fourchette = true; crossX = crossY = null; bulleDetail = null; drawChart(); dessinerCalque();
+            const F = fourchetteDonnees(), V = fourchetteEtat, c = ciblesPrix.find(x => x.fourchette), res = document.getElementById('reperesResume');
+            return { cassure: F && F.cassure, bas: F && F.bas, pB: V && V.pB, pH: V && V.pH, etiq: V && V.etiq && V.etiq.t, rect: V && V.etiq && { x: V.etiq.x, y: V.etiq.y, w: V.etiq.w, h: V.etiq.h },
+              titre: c && c.titre, texte: c && c.texte.join(' '), heure: F && F.cassure ? Fmt.heure(F.cassure.tFin * 1000) : null,
+              barre: res && !res.hidden ? res.textContent : null, titreR: (syntheseLecture() || {}).titre,
+              bannis: Guide.motsBannis([c && c.titre, c && c.texte.join(' '), V && V.etiq && V.etiq.t, res && res.textContent].join(' ')),
+              liste: [...document.querySelectorAll('#reperesListe button')].map(b => b.textContent), items: typeof debEtat !== 'undefined' && debEtat ? debEtat.items.map(i => i.role + ' : ' + i.texte) : [] };
+          });
+          const k = r.cassure || {};
+          check(`${nom} : la cassure du 08/10 est vue (par le bas, bord 82 227,56, période finie à 16:00 UTC, pas revenue dedans)`,
+            k.sens === -1 && Math.abs(k.bas - 82227.56) < 0.01 && k.tFin === Date.parse('2026-10-08T16:00:00Z') / 1000 && k.depuis === 0 && !k.revenu && r.bas < k.bas, r.cassure);
+          check(`${nom} : les traits gardent le bord cassé (${r.pB}), pas le nouveau bas (${r.bas})`, r.pB === k.bas && r.pH === k.haut, { pB: r.pB, pH: r.pH, bas: r.bas });
+          check(`${nom} : l'étiquette dit « cassée par le bas à ${r.heure} » (« ${r.etiq} »)`, vue.width >= 1440 ? r.etiq === 'Fourchette 7 jours cassée par le bas à ' + r.heure
+            : /^Fourchette 7 jours cassée(?: par le bas(?: à \d\d:\d\d)?)?$/.test(r.etiq || '') && (mode !== 'debutant' || r.items.includes('fourchette : ' + r.etiq)), { etiq: r.etiq, items: r.items });
+          check(`${nom} : la bulle « ${r.titre} » dit la cassure et son heure, plus « resté entre les deux » ; ni elle, ni l'étiquette, ni la barre n'ont de mot banni`,
+            /^Fourchette de 7 jours cassée par le bas(?: · 82 228 – [\d\s]+ \$)?$/.test(r.titre || '') && (r.texte || '').startsWith('Le prix en est sorti à ' + r.heure + ', après 7 jours entre ses bords.')
+            && /Bas 82 228 \$, haut [\d\s]+ \$ : un écart de [\d\s]+ \$\./.test(r.texte || '') && !/resté entre les deux/.test(r.texte || '') && !r.bannis.length, { titre: r.titre, texte: r.texte, bannis: r.bannis });
+          if (mode === 'expert') check(`${nom} : ${vue.width < 768 ? 'la barre du téléphone dit la cassure à la place du titre (« ' + r.barre + ' »)' : 'pas de barre (colonne) ; la ligne de la fourchette est dans « Sur le graphique »'}`,
+            (vue.width < 768 ? r.barre === 'Le prix a cassé le bas de sa fourchette de 7 jours à ' + r.heure + '.' && r.titreR !== r.barre : r.barre === null) && r.liste.includes(r.titre), { barre: r.barre, titre: r.titreR, liste: r.liste });
+          // Lisible au doigt : le résumé de la bulle (1er toucher) dit déjà l'heure.
+          if (mode === 'debutant' && r.rect) {
+            const b0 = await o.page.evaluate(() => { const q = canvas.getBoundingClientRect(); return { x: q.left, y: q.top }; });
+            await o.page.touchscreen.tap(b0.x + r.rect.x + Math.min(r.rect.w / 2, 40), b0.y + r.rect.y + r.rect.h / 2); await o.page.waitForTimeout(200);
+            const B = await o.page.evaluate(() => { const q = fourchetteEtat && fourchetteEtat.bulle; return q && { titre: q.titre, corps: q.corps.join(' '), resume: q.resume }; });
+            check(`${nom} : au 1er toucher, le résumé de la bulle dit « sorti à ${r.heure} »`, !!B && B.resume && B.titre === 'Fourchette de 7 jours cassée par le bas' && B.corps.startsWith('Le prix en est sorti à ' + r.heure), B);
+          }
+          check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+          await o.ctx.close();
+        }
+      } finally { H.arreter(); }
+    }
   } finally { await nav.close(); serveur.close(); }
   console.log(ko ? `\n❌ GUIDE À L'ÉCRAN : ${ko} contrôle(s) en échec` : '\n✅ GUIDE À L\'ÉCRAN : TOUS LES CONTRÔLES PASSENT');
   process.exit(ko ? 1 : 0);
