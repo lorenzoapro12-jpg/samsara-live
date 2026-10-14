@@ -14,6 +14,7 @@
 //   3. CALQUE : au survol, le graphique n'est pas redessiné (le réticule est sur le calque) ;
 //      le calque épouse le graphique et laisse passer le pointeur ; l'étiquette du dernier prix
 //      suit le prix sans redessiner le graphique ; au repos, sans donnée nouvelle, aucun dessin ;
+//      un dessin écrit ses nombres avec des formateurs gardés, pas un par nombre (revue du 14/10) ;
 //   4. VERRE : sur Aero, l'anneau suspend son flou pendant le survol ; en rendu logiciel
 //      (Chromium sans GPU : SwiftShader), hyalite n'est pas chargé, et le poste s'en souvient ;
 //      ?glass=force le charge quand même ;
@@ -198,6 +199,16 @@ async function ouvrir(nav, theme, o = {}) {
     await attendre(11000);   // deux queues de bougies (5 s) inchangées, dix lectures du prix inchangé
     const r1 = await k.page.evaluate(() => window.__t.dessins);
     check(`au repos, sans donnée nouvelle (11 s) : ${r1 - r0} dessin du graphique`, r1 === r0, { r0, r1 });
+    // Revue du 14/10/2026 (M16) : chaque nombre du graphique passait par toLocaleString(…, options),
+    // qui construit un formateur à CHAQUE appel. Un dessin en écrivait 120 à 350, soit les deux tiers
+    // de son temps : le glisser saccadait sur un téléphone lent. Fmt.nombre garde ses formateurs.
+    const nbLoc = await k.page.evaluate(() => {
+      const L = Number.prototype.toLocaleString; let n = 0;
+      Number.prototype.toLocaleString = function () { n++; return L.apply(this, arguments); };
+      try { drawChart(); drawChart(); } finally { Number.prototype.toLocaleString = L; }
+      return n / 2;
+    });
+    check(`un dessin du graphique : ${nbLoc} nombre(s) écrit(s) par toLocaleString, un formateur refait à chaque fois (10 au plus)`, nbLoc <= 10, nbLoc);
     check('aucune erreur JavaScript (Kāla)', !k.erreurs.length, k.erreurs);
 
     // ── 5. Chargement ──
