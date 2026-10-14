@@ -154,7 +154,9 @@ const flecheImmobile = page => page.evaluate(() => {
       const valeurs = [...man.querySelectorAll('.gazette-valeur')].map(s => s.textContent);
       const horsValeurs = [...man.querySelectorAll('.gazette-titre, .gazette-chapeau')].map(el =>
         [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('|')).join(' / ');
-      return { cote, cles: GAZETTE_CLES, valeurs, horsValeurs, titre: man.querySelector('.gazette-titre').textContent,
+      // Le libellé du financement dans la cote, lu à sa source (KPIS_ENTETE), pas dans GAZETTE_CLES.
+      const financement = (KPIS_ENTETE.find(k => k[1] === 'micro.funding_annual_pct') || [])[0];
+      return { cote, cles: GAZETTE_CLES, financement, valeurs, horsValeurs, titre: man.querySelector('.gazette-titre').textContent,
                chapeau: man.querySelector('.gazette-chapeau').textContent, heure: document.getElementById('updated').textContent.trim() };
     });
     const cites = Object.values(lu.cles).map(l => lu.cote[l]);
@@ -165,6 +167,12 @@ const flecheImmobile = page => page.evaluate(() => {
       lu.valeurs.length > 0 && lu.valeurs.every(v => permis.has(v)), { valeurs: lu.valeurs, permis: [...permis] });
     check('chaque chiffre clé cité (≠ « — ») figure dans la manchette',
       cites.filter(v => v && v !== '—').every(v => lu.valeurs.includes(v)), { cites, valeurs: lu.valeurs });
+    // Revue du 14/10 (C27) : la manchette cherchait « Funding », la cote dit « Funding an. » ; la
+    // clause du financement manquait sans bruit. Le taux cité est annualisé : il est suivi de « par an ».
+    const fin = lu.cote[lu.financement];
+    check(`le financement de la cote (« ${lu.financement} » : « ${fin} ») est cité, suivi de « par an » (taux annualisé)`,
+      typeof fin === 'string' && (fin === '—' ? !/financement/.test(lu.titre) : lu.titre.startsWith('Le financement des perpétuels à ' + fin + ' par\u00a0an')),
+      { financement: lu.financement, fin, titre: lu.titre });
     check('hors des valeurs citées, aucun nombre (seulement « 24 h » et les libellés de la cote)',
       !/\d/.test(lu.horsValeurs.replace(/24[\s\u00a0]?h/g, '')), lu.horsValeurs);
     const oi = lu.cote[lu.cles.interet];
@@ -173,28 +181,31 @@ const flecheImmobile = page => page.evaluate(() => {
       attendu ? new RegExp('intérêt ouvert ' + attendu + '\\b').test(lu.titre) : !/intérêt ouvert/.test(lu.titre), lu.titre);
     check('aucune tournure de conseil (liste de tests/test_fiches.js)', !!CONSEIL && !CONSEIL.test(lu.titre + ' ' + lu.chapeau), lu.titre);
 
+    // Les données factices citent le libellé du financement par GAZETTE_CLES, comme la page (revue du
+    // 14/10, C27 : écrit « Funding » en dur, il cachait que la cote dit « Funding an. »).
     const cas = await p.evaluate(() => {
+      const F = GAZETTE_CLES.financement;
       const de = obj => lib => (lib in obj ? obj[lib] : null);
       const txt = segs => segs.map(s => s[0]).join('');
       const vals = segs => segs.filter(s => s[1]).map(s => s[0]);
-      const plein = { Funding: '+0.2%', 'OI 24h': '−2.6%', 'CVD 24h': '−$98.81M', GEX: 'long γ' };
+      const plein = { [F]: '+0.2%', 'OI 24h': '−2.6%', 'CVD 24h': '−$98.81M', GEX: 'long γ' };
       const m = manchetteGazette(de(plein), '13:03');
       return {
         titre: txt(m.titre), valeursTitre: vals(m.titre), valeursChapeau: vals(m.chapeau), chapeau: txt(m.chapeau),
         hausse: txt(manchetteGazette(de({ 'OI 24h': '+2.6%' }), '').titre),
         nul: txt(manchetteGazette(de({ 'OI 24h': '0.0%' }), '').titre),
-        tiret: txt(manchetteGazette(de({ Funding: '+0.2%', 'OI 24h': '—' }), '').titre),
+        tiret: txt(manchetteGazette(de({ [F]: '+0.2%', 'OI 24h': '—' }), '').titre),
         trait: txt(manchetteGazette(de({ 'OI 24h': '-2.6%' }), '').titre),
         absent: txt(manchetteGazette(de({}), '').titre),
-        vide: txt(manchetteGazette(de({ Funding: '—', 'OI 24h': '—' }), '').titre),
+        vide: txt(manchetteGazette(de({ [F]: '—', 'OI 24h': '—' }), '').titre),
         identite: (() => { const v = '−$1,234.5K'; const r = manchetteGazette(de({ 'CVD 24h': v }), ''); return vals(r.chapeau)[0] === v; })(),
       };
     });
-    check('cas complet : valeurs recopiées telles quelles, verbe « recule » pour « −2.6% »',
-      cas.titre === 'Le financement des perpétuels à +0.2%\u00a0; l’intérêt ouvert recule\u00a0: −2.6% en\u00a024\u00a0h'
+    check('cas complet : valeurs recopiées telles quelles, « par an » après le financement, verbe « recule » pour « −2.6% »',
+      cas.titre === 'Le financement des perpétuels à +0.2% par\u00a0an\u00a0; l’intérêt ouvert recule\u00a0: −2.6% en\u00a024\u00a0h'
       && JSON.stringify(cas.valeursTitre) === '["+0.2%","−2.6%"]' && JSON.stringify(cas.valeursChapeau) === '["−$98.81M","long γ","13:03"]', cas);
     check('« +2.6% » → progresse ; « 0.0% » → stable', /progresse\u00a0: \+2\.6%/.test(cas.hausse) && /stable\u00a0: 0\.0%/.test(cas.nul), [cas.hausse, cas.nul]);
-    check('une clause « — » est omise', cas.tiret === 'Le financement des perpétuels à +0.2%', cas.tiret);
+    check('une clause « — » est omise', cas.tiret === 'Le financement des perpétuels à +0.2% par\u00a0an', cas.tiret);
     check('seul le signe moins affiché (U+2212) fait « recule » : un trait d\'union n\'est pas un signe', /stable\u00a0: -2\.6%/.test(cas.trait), cas.trait);
     check('sans cote : « Édition en attente » ; cote sans valeur : « La cote de l’édition »', cas.absent === 'Édition en attente' && cas.vide === 'La cote de l’édition', [cas.absent, cas.vide]);
     check('la valeur rendue est la chaîne reçue (aucun reformatage)', cas.identite);

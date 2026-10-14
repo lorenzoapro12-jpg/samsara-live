@@ -151,11 +151,14 @@ const CH = ['micro.cvd_24h_usd', 'micro.oi_change_24h_pct', 'tf.4h.rsi_14'];
 
   titre('4. Cache localStorage (commodité, 48 h au plus)');
   {
+    // La 1re session a l'horloge du test, comme la 2e (revue du 14/10, C27) : sans `maintenant`,
+    // Date.now() jetait du cache les points du 07/10 (plus de 48 h), et la 2e session relisait tout.
     const st = memoire();
-    const c = K.creer({ url: URL0, chemins: CH, stockage: st, fetch: faux(depot(alterne(40, 15))) });
+    const c = K.creer({ url: URL0, chemins: CH, stockage: st, fetch: faux(depot(alterne(40, 15))), maintenant: () => T0 });
     c.ajouter(pub(T0));
     await c.parcourir();
     const gardes = JSON.parse(st.getItem(K.C.CLE)).points.length;
+    check('1re session : tous ses points sont gardés dans le cache', gardes > 0 && gardes === c.points().length, { gardes, points: c.points().length });
     // Session suivante, 30 min plus tard, deux publications de plus.
     const commits = [{ m: pub(T0 + 30 * MIN) }, { h: 1 }, { m: pub(T0 + 15 * MIN) }, { h: 1 }].concat(alterne(40, 15));
     const f = faux(depot(commits));
