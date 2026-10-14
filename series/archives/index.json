@@ -1,14 +1,14 @@
 {
- "updated": "2026-10-14T09:01:49+00:00",
+ "updated": "2026-10-14T09:02:48+00:00",
  "generator": "publier_archives.py v2.0 — archives du VPS (carnet, liquidations, flux insiders, tables sol-radar)",
  "source": "collecteurs locaux (carnet Binance/Coinbase, liquidations Binance) · ~/.hermes/archive-insiders (Binance fapi 5m, OKX rubik et liquidations, Deribit surface d'options) · base sol-radar (lecture seule)",
  "branche": "historique",
  "repertoire": "series/archives",
  "status": {
   "synchronisation": "à jour",
-  "copie": "2 fichier(s) copié(s)",
-  "insiders": "13 flux, 35 fichier(s), 35 fichier(s) écrit(s)",
-  "sol_radar": "9 table(s), 360 fichier(s), 360 fichier(s) écrit(s), base ouverte en LECTURE SEULE"
+  "copie": "rien à copier",
+  "insiders": "13 flux, 35 fichier(s), 0 fichier(s) écrit(s)",
+  "sol_radar": "9 table(s), 360 fichier(s), 0 fichier(s) écrit(s), base ouverte en LECTURE SEULE"
  },
  "errors": [],
  "mois_ouverts": [
@@ -584,786 +584,786 @@
     "fichiers": [
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2017-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2017-08-17",
+      "fin": "2017-08-31",
       "lignes": 15,
       "octets": 935
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2017-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2017-09-01",
+      "fin": "2017-09-30",
       "lignes": 30,
       "octets": 1730
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2017-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2017-10-01",
+      "fin": "2017-10-31",
       "lignes": 31,
       "octets": 1770
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2017-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2017-11-01",
+      "fin": "2017-11-30",
       "lignes": 30,
       "octets": 1780
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2017-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2017-12-01",
+      "fin": "2017-12-31",
       "lignes": 31,
       "octets": 1908
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2018-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-01-01",
+      "fin": "2018-01-31",
       "lignes": 31,
       "octets": 1945
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2018-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-02-01",
+      "fin": "2018-02-28",
       "lignes": 28,
       "octets": 1755
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2018-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-03-01",
+      "fin": "2018-03-31",
       "lignes": 31,
       "octets": 1907
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2018-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-04-01",
+      "fin": "2018-04-30",
       "lignes": 30,
       "octets": 1855
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2018-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-05-01",
+      "fin": "2018-05-31",
       "lignes": 31,
       "octets": 1905
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2018-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-06-01",
+      "fin": "2018-06-30",
       "lignes": 30,
       "octets": 1859
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2018-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-07-01",
+      "fin": "2018-07-31",
       "lignes": 31,
       "octets": 1907
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2018-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-08-01",
+      "fin": "2018-08-31",
       "lignes": 31,
       "octets": 1920
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2018-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-09-01",
+      "fin": "2018-09-30",
       "lignes": 30,
       "octets": 1848
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2018-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-10-01",
+      "fin": "2018-10-31",
       "lignes": 31,
       "octets": 1849
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2018-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-11-01",
+      "fin": "2018-11-30",
       "lignes": 30,
       "octets": 1872
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2018-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-12-01",
+      "fin": "2018-12-31",
       "lignes": 31,
       "octets": 1926
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2019-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-01-01",
+      "fin": "2019-01-31",
       "lignes": 31,
       "octets": 1902
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2019-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-02-01",
+      "fin": "2019-02-28",
       "lignes": 28,
       "octets": 1732
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2019-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-03-01",
+      "fin": "2019-03-31",
       "lignes": 31,
       "octets": 1880
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2019-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-04-01",
+      "fin": "2019-04-30",
       "lignes": 30,
       "octets": 1836
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2019-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-05-01",
+      "fin": "2019-05-31",
       "lignes": 31,
       "octets": 1935
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2019-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-06-01",
+      "fin": "2019-06-30",
       "lignes": 30,
       "octets": 1877
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2019-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-07-01",
+      "fin": "2019-07-31",
       "lignes": 31,
       "octets": 1929
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2019-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-08-01",
+      "fin": "2019-08-31",
       "lignes": 31,
       "octets": 1946
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2019-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-09-01",
+      "fin": "2019-09-30",
       "lignes": 30,
       "octets": 1884
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2019-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-10-01",
+      "fin": "2019-10-31",
       "lignes": 31,
       "octets": 1937
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2019-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-11-01",
+      "fin": "2019-11-30",
       "lignes": 30,
       "octets": 1880
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2019-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-12-01",
+      "fin": "2019-12-31",
       "lignes": 31,
       "octets": 1916
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2020-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-01-01",
+      "fin": "2020-01-31",
       "lignes": 31,
       "octets": 1934
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2020-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-02-01",
+      "fin": "2020-02-29",
       "lignes": 29,
       "octets": 1798
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2020-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-03-01",
+      "fin": "2020-03-31",
       "lignes": 31,
       "octets": 1943
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2020-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-04-01",
+      "fin": "2020-04-30",
       "lignes": 30,
       "octets": 1867
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2020-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-05-01",
+      "fin": "2020-05-31",
       "lignes": 31,
       "octets": 1913
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2020-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-06-01",
+      "fin": "2020-06-30",
       "lignes": 30,
       "octets": 1859
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2020-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-07-01",
+      "fin": "2020-07-31",
       "lignes": 31,
       "octets": 1920
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2020-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-08-01",
+      "fin": "2020-08-31",
       "lignes": 52,
       "octets": 2962
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2020-09.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-09-01",
+      "fin": "2020-09-30",
       "lignes": 60,
       "octets": 3384
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2020-10.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-10-01",
+      "fin": "2020-10-31",
       "lignes": 62,
       "octets": 3432
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2020-11.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-11-01",
+      "fin": "2020-11-30",
       "lignes": 60,
       "octets": 3359
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2020-12.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-12-01",
+      "fin": "2020-12-31",
       "lignes": 62,
       "octets": 3460
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2021-01.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2021-01-01",
+      "fin": "2021-01-31",
       "lignes": 62,
       "octets": 3536
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2021-02.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2021-02-01",
+      "fin": "2021-02-28",
       "lignes": 56,
       "octets": 3292
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2021-03.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2021-03-01",
+      "fin": "2021-03-31",
       "lignes": 62,
       "octets": 3599
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2021-04.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2021-04-01",
+      "fin": "2021-04-30",
       "lignes": 60,
       "octets": 3534
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2021-05.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2021-05-01",
+      "fin": "2021-05-31",
       "lignes": 62,
       "octets": 3656
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2021-06.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2021-06-01",
+      "fin": "2021-06-30",
       "lignes": 60,
       "octets": 3527
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2021-07.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2021-07-01",
+      "fin": "2021-07-31",
       "lignes": 62,
       "octets": 3616
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2021-08.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2021-08-01",
+      "fin": "2021-08-31",
       "lignes": 62,
       "octets": 3628
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2021-09.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2021-09-01",
+      "fin": "2021-09-30",
       "lignes": 60,
       "octets": 3446
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2021-10.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2021-10-01",
+      "fin": "2021-10-31",
       "lignes": 62,
       "octets": 3492
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2021-11.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2021-11-01",
+      "fin": "2021-11-30",
       "lignes": 60,
       "octets": 3394
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2021-12.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2021-12-01",
+      "fin": "2021-12-31",
       "lignes": 62,
       "octets": 3473
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2022-01.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2022-01-01",
+      "fin": "2022-01-31",
       "lignes": 62,
       "octets": 3415
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2022-02.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2022-02-01",
+      "fin": "2022-02-28",
       "lignes": 56,
       "octets": 3121
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2022-03.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2022-03-01",
+      "fin": "2022-03-31",
       "lignes": 62,
       "octets": 3453
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2022-04.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2022-04-01",
+      "fin": "2022-04-30",
       "lignes": 60,
       "octets": 3305
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2022-05.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2022-05-01",
+      "fin": "2022-05-31",
       "lignes": 62,
       "octets": 3428
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2022-06.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2022-06-01",
+      "fin": "2022-06-30",
       "lignes": 60,
       "octets": 3335
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2022-07.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2022-07-01",
+      "fin": "2022-07-31",
       "lignes": 62,
       "octets": 3439
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2022-08.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2022-08-01",
+      "fin": "2022-08-31",
       "lignes": 62,
       "octets": 3443
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2022-09.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2022-09-01",
+      "fin": "2022-09-30",
       "lignes": 60,
       "octets": 3335
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2022-10.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2022-10-01",
+      "fin": "2022-10-31",
       "lignes": 62,
       "octets": 3375
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2022-11.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2022-11-01",
+      "fin": "2022-11-30",
       "lignes": 60,
       "octets": 3351
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2022-12.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2022-12-01",
+      "fin": "2022-12-31",
       "lignes": 62,
       "octets": 3367
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2023-01.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2023-01-01",
+      "fin": "2023-01-31",
       "lignes": 62,
       "octets": 3433
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2023-02.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2023-02-01",
+      "fin": "2023-02-28",
       "lignes": 56,
       "octets": 3116
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2023-03.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2023-03-01",
+      "fin": "2023-03-31",
       "lignes": 62,
       "octets": 3409
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2023-04.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2023-04-01",
+      "fin": "2023-04-30",
       "lignes": 60,
       "octets": 3240
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2023-05.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2023-05-01",
+      "fin": "2023-05-31",
       "lignes": 62,
       "octets": 3327
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2023-06.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2023-06-01",
+      "fin": "2023-06-30",
       "lignes": 60,
       "octets": 3256
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2023-07.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2023-07-01",
+      "fin": "2023-07-31",
       "lignes": 62,
       "octets": 3322
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2023-08.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2023-08-01",
+      "fin": "2023-08-31",
       "lignes": 62,
       "octets": 3326
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2023-09.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2023-09-01",
+      "fin": "2023-09-30",
       "lignes": 60,
       "octets": 3209
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2023-10.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2023-10-01",
+      "fin": "2023-10-31",
       "lignes": 62,
       "octets": 3353
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2023-11.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2023-11-01",
+      "fin": "2023-11-30",
       "lignes": 60,
       "octets": 3310
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2023-12.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2023-12-01",
+      "fin": "2023-12-31",
       "lignes": 62,
       "octets": 3453
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2024-01.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2024-01-01",
+      "fin": "2024-01-31",
       "lignes": 62,
       "octets": 3455
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2024-02.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2024-02-01",
+      "fin": "2024-02-29",
       "lignes": 58,
       "octets": 3255
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2024-03.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2024-03-01",
+      "fin": "2024-03-31",
       "lignes": 62,
       "octets": 3495
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2024-04.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-04-01",
+      "fin": "2024-04-30",
       "lignes": 80,
       "octets": 4391
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2024-05.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-05-01",
+      "fin": "2024-05-31",
       "lignes": 93,
       "octets": 5008
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2024-06.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-06-01",
+      "fin": "2024-06-30",
       "lignes": 90,
       "octets": 4833
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2024-07.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-07-01",
+      "fin": "2024-07-31",
       "lignes": 93,
       "octets": 5005
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2024-08.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-08-01",
+      "fin": "2024-08-31",
       "lignes": 93,
       "octets": 5048
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2024-09.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-09-01",
+      "fin": "2024-09-30",
       "lignes": 90,
       "octets": 4851
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2024-10.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-10-01",
+      "fin": "2024-10-31",
       "lignes": 93,
       "octets": 5067
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2024-11.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-11-01",
+      "fin": "2024-11-30",
       "lignes": 90,
       "octets": 4937
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2024-12.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-12-01",
+      "fin": "2024-12-31",
       "lignes": 93,
       "octets": 5087
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2025-01.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-01-01",
+      "fin": "2025-01-31",
       "lignes": 93,
       "octets": 5117
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2025-02.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-02-01",
+      "fin": "2025-02-28",
       "lignes": 84,
       "octets": 4638
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2025-03.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-03-01",
+      "fin": "2025-03-31",
       "lignes": 93,
       "octets": 5075
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2025-04.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-04-01",
+      "fin": "2025-04-30",
       "lignes": 90,
       "octets": 4909
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2025-05.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-05-01",
+      "fin": "2025-05-31",
       "lignes": 93,
       "octets": 5030
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2025-06.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-06-01",
+      "fin": "2025-06-30",
       "lignes": 90,
       "octets": 4902
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2025-07.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-07-01",
+      "fin": "2025-07-31",
       "lignes": 93,
       "octets": 5049
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2025-08.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-08-01",
+      "fin": "2025-08-31",
       "lignes": 93,
       "octets": 5041
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2025-09.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-09-01",
+      "fin": "2025-09-30",
       "lignes": 90,
       "octets": 4860
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2025-10.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-10-01",
+      "fin": "2025-10-31",
       "lignes": 93,
       "octets": 5119
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2025-11.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-11-01",
+      "fin": "2025-11-30",
       "lignes": 90,
       "octets": 4929
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2025-12.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-12-01",
+      "fin": "2025-12-31",
       "lignes": 93,
       "octets": 5007
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2026-01.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-01-01",
+      "fin": "2026-01-31",
       "lignes": 93,
       "octets": 4974
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2026-02.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-02-01",
+      "fin": "2026-02-28",
       "lignes": 84,
       "octets": 4543
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2026-03.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-03-01",
+      "fin": "2026-03-31",
       "lignes": 93,
       "octets": 5009
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2026-04.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-04-01",
+      "fin": "2026-04-30",
       "lignes": 90,
       "octets": 4817
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2026-05.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-05-01",
+      "fin": "2026-05-31",
       "lignes": 93,
       "octets": 4942
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2026-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-06-01",
+      "fin": "2026-06-30",
       "lignes": 90,
       "octets": 5189
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2026-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-07-01",
+      "fin": "2026-07-31",
       "lignes": 93,
       "octets": 5194
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2026-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-08-01",
+      "fin": "2026-08-31",
       "lignes": 93,
       "octets": 5088
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2026-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-09-01",
+      "fin": "2026-09-30",
       "lignes": 90,
       "octets": 4804
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2026-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-10-01",
+      "fin": "2026-10-14",
       "lignes": 42,
       "octets": 2464
      }
     ],
     "lignes": 6519,
     "octets": 366602,
-    "debut": "BTC/USDT",
-    "fin": "TAO/USDT",
+    "debut": "2017-08-17",
+    "fin": "2026-10-14",
     "colonnes": [
      "symbol",
      "date",
@@ -1389,786 +1389,786 @@
     "fichiers": [
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2017-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2017-08-17 04:00:00",
+      "fin": "2017-08-31 20:00:00",
       "lignes": 89,
       "octets": 4628
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2017-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2017-09-01 00:00:00",
+      "fin": "2017-09-30 20:00:00",
       "lignes": 180,
       "octets": 9177
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2017-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2017-10-01 00:00:00",
+      "fin": "2017-10-31 20:00:00",
       "lignes": 186,
       "octets": 9492
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2017-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2017-11-01 00:00:00",
+      "fin": "2017-11-30 20:00:00",
       "lignes": 180,
       "octets": 9541
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2017-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2017-12-01 00:00:00",
+      "fin": "2017-12-31 20:00:00",
       "lignes": 186,
       "octets": 10455
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2018-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-01-01 00:00:00",
+      "fin": "2018-01-31 20:00:00",
       "lignes": 186,
       "octets": 10575
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2018-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-02-01 00:00:00",
+      "fin": "2018-02-28 20:00:00",
       "lignes": 161,
       "octets": 9142
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2018-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-03-01 00:00:00",
+      "fin": "2018-03-31 20:00:00",
       "lignes": 186,
       "octets": 10482
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2018-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-04-01 00:00:00",
+      "fin": "2018-04-30 20:00:00",
       "lignes": 180,
       "octets": 10034
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2018-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-05-01 00:00:00",
+      "fin": "2018-05-31 20:00:00",
       "lignes": 186,
       "octets": 10411
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2018-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-06-01 00:00:00",
+      "fin": "2018-06-30 20:00:00",
       "lignes": 178,
       "octets": 9948
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2018-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-07-01 00:00:00",
+      "fin": "2018-07-31 20:00:00",
       "lignes": 185,
       "octets": 10294
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2018-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-08-01 00:00:00",
+      "fin": "2018-08-31 20:00:00",
       "lignes": 186,
       "octets": 10448
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2018-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-09-01 00:00:00",
+      "fin": "2018-09-30 20:00:00",
       "lignes": 180,
       "octets": 10019
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2018-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-10-01 00:00:00",
+      "fin": "2018-10-31 20:00:00",
       "lignes": 186,
       "octets": 10157
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2018-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-11-01 00:00:00",
+      "fin": "2018-11-30 20:00:00",
       "lignes": 179,
       "octets": 9957
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2018-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-12-01 00:00:00",
+      "fin": "2018-12-31 20:00:00",
       "lignes": 186,
       "octets": 10417
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2019-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-01-01 00:00:00",
+      "fin": "2019-01-31 20:00:00",
       "lignes": 186,
       "octets": 10233
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2019-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-02-01 00:00:00",
+      "fin": "2019-02-28 20:00:00",
       "lignes": 168,
       "octets": 9268
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2019-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-03-01 00:00:00",
+      "fin": "2019-03-31 20:00:00",
       "lignes": 185,
       "octets": 10098
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2019-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-04-01 00:00:00",
+      "fin": "2019-04-30 20:00:00",
       "lignes": 180,
       "octets": 10004
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2019-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-05-01 00:00:00",
+      "fin": "2019-05-31 20:00:00",
       "lignes": 184,
       "octets": 10443
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2019-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-06-01 00:00:00",
+      "fin": "2019-06-30 20:00:00",
       "lignes": 180,
       "octets": 10317
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2019-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-07-01 00:00:00",
+      "fin": "2019-07-31 20:00:00",
       "lignes": 186,
       "octets": 10778
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2019-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-08-01 00:00:00",
+      "fin": "2019-08-31 20:00:00",
       "lignes": 185,
       "octets": 10596
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2019-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-09-01 00:00:00",
+      "fin": "2019-09-30 20:00:00",
       "lignes": 180,
       "octets": 10270
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2019-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-10-01 00:00:00",
+      "fin": "2019-10-31 20:00:00",
       "lignes": 186,
       "octets": 10530
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2019-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-11-01 00:00:00",
+      "fin": "2019-11-30 20:00:00",
       "lignes": 180,
       "octets": 10237
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2019-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-12-01 00:00:00",
+      "fin": "2019-12-31 20:00:00",
       "lignes": 186,
       "octets": 10483
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2020-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-01-01 00:00:00",
+      "fin": "2020-01-31 20:00:00",
       "lignes": 186,
       "octets": 10575
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2020-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-02-01 00:00:00",
+      "fin": "2020-02-29 20:00:00",
       "lignes": 173,
       "octets": 9898
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2020-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-03-01 00:00:00",
+      "fin": "2020-03-31 20:00:00",
       "lignes": 186,
       "octets": 10768
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2020-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-04-01 00:00:00",
+      "fin": "2020-04-30 20:00:00",
       "lignes": 180,
       "octets": 10236
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2020-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-05-01 00:00:00",
+      "fin": "2020-05-31 20:00:00",
       "lignes": 186,
       "octets": 10646
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2020-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-06-01 00:00:00",
+      "fin": "2020-06-30 20:00:00",
       "lignes": 180,
       "octets": 10152
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2020-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-07-01 00:00:00",
+      "fin": "2020-07-31 20:00:00",
       "lignes": 186,
       "octets": 10495
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2020-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2020-08-01 00:00:00",
+      "fin": "2020-08-31 20:00:00",
       "lignes": 311,
       "octets": 16498
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2020-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2020-09-01 00:00:00",
+      "fin": "2020-09-30 20:00:00",
       "lignes": 360,
       "octets": 18693
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2020-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2020-10-01 00:00:00",
+      "fin": "2020-10-31 20:00:00",
       "lignes": 372,
       "octets": 19035
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2020-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2020-11-01 00:00:00",
+      "fin": "2020-11-30 20:00:00",
       "lignes": 360,
       "octets": 18733
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2020-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2020-12-01 00:00:00",
+      "fin": "2020-12-31 20:00:00",
       "lignes": 372,
       "octets": 19394
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2021-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-01-01 00:00:00",
+      "fin": "2021-01-31 20:00:00",
       "lignes": 372,
       "octets": 19917
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2021-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-02-01 00:00:00",
+      "fin": "2021-02-28 20:00:00",
       "lignes": 336,
       "octets": 18374
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2021-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-03-01 00:00:00",
+      "fin": "2021-03-31 20:00:00",
       "lignes": 372,
       "octets": 20150
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2021-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-04-01 00:00:00",
+      "fin": "2021-04-30 20:00:00",
       "lignes": 360,
       "octets": 19775
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2021-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-05-01 00:00:00",
+      "fin": "2021-05-31 20:00:00",
       "lignes": 372,
       "octets": 20485
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2021-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-06-01 00:00:00",
+      "fin": "2021-06-30 20:00:00",
       "lignes": 360,
       "octets": 19766
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2021-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-07-01 00:00:00",
+      "fin": "2021-07-31 20:00:00",
       "lignes": 372,
       "octets": 20111
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2021-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-08-01 00:00:00",
+      "fin": "2021-08-31 20:00:00",
       "lignes": 372,
       "octets": 20259
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2021-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-09-01 00:00:00",
+      "fin": "2021-09-30 20:00:00",
       "lignes": 360,
       "octets": 18969
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2021-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-10-01 00:00:00",
+      "fin": "2021-10-31 20:00:00",
       "lignes": 372,
       "octets": 19344
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2021-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-11-01 00:00:00",
+      "fin": "2021-11-30 20:00:00",
       "lignes": 360,
       "octets": 18722
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2021-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-12-01 00:00:00",
+      "fin": "2021-12-31 20:00:00",
       "lignes": 372,
       "octets": 19164
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2022-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-01-01 00:00:00",
+      "fin": "2022-01-31 20:00:00",
       "lignes": 372,
       "octets": 19007
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2022-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-02-01 00:00:00",
+      "fin": "2022-02-28 20:00:00",
       "lignes": 336,
       "octets": 17266
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2022-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-03-01 00:00:00",
+      "fin": "2022-03-31 20:00:00",
       "lignes": 372,
       "octets": 19003
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2022-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-04-01 00:00:00",
+      "fin": "2022-04-30 20:00:00",
       "lignes": 360,
       "octets": 18432
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2022-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-05-01 00:00:00",
+      "fin": "2022-05-31 20:00:00",
       "lignes": 372,
       "octets": 19024
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2022-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-06-01 00:00:00",
+      "fin": "2022-06-30 20:00:00",
       "lignes": 360,
       "octets": 18428
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2022-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-07-01 00:00:00",
+      "fin": "2022-07-31 20:00:00",
       "lignes": 372,
       "octets": 19014
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2022-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-08-01 00:00:00",
+      "fin": "2022-08-31 20:00:00",
       "lignes": 372,
       "octets": 19053
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2022-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-09-01 00:00:00",
+      "fin": "2022-09-30 20:00:00",
       "lignes": 360,
       "octets": 18372
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2022-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-10-01 00:00:00",
+      "fin": "2022-10-31 20:00:00",
       "lignes": 372,
       "octets": 18700
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2022-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-11-01 00:00:00",
+      "fin": "2022-11-30 20:00:00",
       "lignes": 360,
       "octets": 18438
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2022-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-12-01 00:00:00",
+      "fin": "2022-12-31 20:00:00",
       "lignes": 372,
       "octets": 18400
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2023-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-01-01 00:00:00",
+      "fin": "2023-01-31 20:00:00",
       "lignes": 372,
       "octets": 18952
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2023-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-02-01 00:00:00",
+      "fin": "2023-02-28 20:00:00",
       "lignes": 336,
       "octets": 17232
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2023-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-03-01 00:00:00",
+      "fin": "2023-03-31 20:00:00",
       "lignes": 372,
       "octets": 18932
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2023-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-04-01 00:00:00",
+      "fin": "2023-04-30 20:00:00",
       "lignes": 360,
       "octets": 17809
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2023-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-05-01 00:00:00",
+      "fin": "2023-05-31 20:00:00",
       "lignes": 372,
       "octets": 18300
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2023-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-06-01 00:00:00",
+      "fin": "2023-06-30 20:00:00",
       "lignes": 360,
       "octets": 17750
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2023-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-07-01 00:00:00",
+      "fin": "2023-07-31 20:00:00",
       "lignes": 372,
       "octets": 18330
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2023-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-08-01 00:00:00",
+      "fin": "2023-08-31 20:00:00",
       "lignes": 372,
       "octets": 18095
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2023-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-09-01 00:00:00",
+      "fin": "2023-09-30 20:00:00",
       "lignes": 360,
       "octets": 17482
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2023-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-10-01 00:00:00",
+      "fin": "2023-10-31 20:00:00",
       "lignes": 372,
       "octets": 18434
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2023-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-11-01 00:00:00",
+      "fin": "2023-11-30 20:00:00",
       "lignes": 360,
       "octets": 18273
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2023-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-12-01 00:00:00",
+      "fin": "2023-12-31 20:00:00",
       "lignes": 372,
       "octets": 19115
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2024-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2024-01-01 00:00:00",
+      "fin": "2024-01-31 20:00:00",
       "lignes": 372,
       "octets": 19065
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2024-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2024-02-01 00:00:00",
+      "fin": "2024-02-29 20:00:00",
       "lignes": 348,
       "octets": 17945
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2024-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2024-03-01 00:00:00",
+      "fin": "2024-03-31 20:00:00",
       "lignes": 372,
       "octets": 19486
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2024-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-04-01 00:00:00",
+      "fin": "2024-04-30 20:00:00",
       "lignes": 477,
       "octets": 24192
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2024-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-05-01 00:00:00",
+      "fin": "2024-05-31 20:00:00",
       "lignes": 558,
       "octets": 27982
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2024-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-06-01 00:00:00",
+      "fin": "2024-06-30 20:00:00",
       "lignes": 540,
       "octets": 26828
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2024-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-07-01 00:00:00",
+      "fin": "2024-07-31 20:00:00",
       "lignes": 558,
       "octets": 27918
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2024-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-08-01 00:00:00",
+      "fin": "2024-08-31 20:00:00",
       "lignes": 558,
       "octets": 28052
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2024-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-09-01 00:00:00",
+      "fin": "2024-09-30 20:00:00",
       "lignes": 540,
       "octets": 27072
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2024-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-10-01 00:00:00",
+      "fin": "2024-10-31 20:00:00",
       "lignes": 558,
       "octets": 28117
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2024-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-11-01 00:00:00",
+      "fin": "2024-11-30 20:00:00",
       "lignes": 540,
       "octets": 27689
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2024-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-12-01 00:00:00",
+      "fin": "2024-12-31 20:00:00",
       "lignes": 558,
       "octets": 28613
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2025-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-01-01 00:00:00",
+      "fin": "2025-01-31 20:00:00",
       "lignes": 558,
       "octets": 28611
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2025-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-02-01 00:00:00",
+      "fin": "2025-02-28 20:00:00",
       "lignes": 504,
       "octets": 25834
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2025-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-03-01 00:00:00",
+      "fin": "2025-03-31 20:00:00",
       "lignes": 558,
       "octets": 28231
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2025-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-04-01 00:00:00",
+      "fin": "2025-04-30 20:00:00",
       "lignes": 540,
       "octets": 27238
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2025-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-05-01 00:00:00",
+      "fin": "2025-05-31 20:00:00",
       "lignes": 558,
       "octets": 28255
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2025-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-06-01 00:00:00",
+      "fin": "2025-06-30 20:00:00",
       "lignes": 540,
       "octets": 27160
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2025-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-07-01 00:00:00",
+      "fin": "2025-07-31 20:00:00",
       "lignes": 558,
       "octets": 28026
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2025-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-08-01 00:00:00",
+      "fin": "2025-08-31 20:00:00",
       "lignes": 558,
       "octets": 28161
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2025-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-09-01 00:00:00",
+      "fin": "2025-09-30 20:00:00",
       "lignes": 540,
       "octets": 27046
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2025-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-10-01 00:00:00",
+      "fin": "2025-10-31 20:00:00",
       "lignes": 558,
       "octets": 28559
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2025-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-11-01 00:00:00",
+      "fin": "2025-11-30 20:00:00",
       "lignes": 540,
       "octets": 27483
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2025-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-12-01 00:00:00",
+      "fin": "2025-12-31 20:00:00",
       "lignes": 558,
       "octets": 27855
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2026-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-01-01 00:00:00",
+      "fin": "2026-01-31 20:00:00",
       "lignes": 558,
       "octets": 27762
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2026-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-02-01 00:00:00",
+      "fin": "2026-02-28 20:00:00",
       "lignes": 504,
       "octets": 25244
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2026-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-03-01 00:00:00",
+      "fin": "2026-03-31 20:00:00",
       "lignes": 558,
       "octets": 27948
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2026-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-04-01 00:00:00",
+      "fin": "2026-04-30 20:00:00",
       "lignes": 540,
       "octets": 26800
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2026-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-05-01 00:00:00",
+      "fin": "2026-05-31 20:00:00",
       "lignes": 558,
       "octets": 27440
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2026-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-06-01 00:00:00",
+      "fin": "2026-06-30 20:00:00",
       "lignes": 540,
       "octets": 26830
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2026-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-07-01 00:00:00",
+      "fin": "2026-07-31 08:00:00",
       "lignes": 549,
       "octets": 26530
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2026-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-08-01 08:00:00",
+      "fin": "2026-08-31 20:00:00",
       "lignes": 312,
       "octets": 15993
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2026-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-09-01 00:00:00",
+      "fin": "2026-09-30 20:00:00",
       "lignes": 540,
       "octets": 26860
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2026-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-10-01 00:00:00",
+      "fin": "2026-10-13 12:00:00",
       "lignes": 108,
       "octets": 5749
      }
     ],
     "lignes": 38694,
     "octets": 2003008,
-    "debut": "BTC/USDT",
-    "fin": "TAO/USDT",
+    "debut": "2017-08-17 04:00:00",
+    "fin": "2026-10-13 12:00:00",
     "colonnes": [
      "symbol",
      "date",
@@ -2194,786 +2194,786 @@
     "fichiers": [
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2017-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2017-08-14",
+      "fin": "2017-08-28",
       "lignes": 3,
       "octets": 284
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2017-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2017-09-04",
+      "fin": "2017-09-25",
       "lignes": 4,
       "octets": 329
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2017-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2017-10-02",
+      "fin": "2017-10-30",
       "lignes": 5,
       "octets": 370
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2017-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2017-11-06",
+      "fin": "2017-11-27",
       "lignes": 4,
       "octets": 341
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2017-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2017-12-04",
+      "fin": "2017-12-25",
       "lignes": 4,
       "octets": 341
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2018-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-01-01",
+      "fin": "2018-01-29",
       "lignes": 5,
       "octets": 386
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2018-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-02-05",
+      "fin": "2018-02-26",
       "lignes": 4,
       "octets": 343
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2018-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-03-05",
+      "fin": "2018-03-26",
       "lignes": 4,
       "octets": 338
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2018-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-04-02",
+      "fin": "2018-04-30",
       "lignes": 5,
       "octets": 380
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2018-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-05-07",
+      "fin": "2018-05-28",
       "lignes": 4,
       "octets": 330
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2018-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-06-04",
+      "fin": "2018-06-25",
       "lignes": 4,
       "octets": 339
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2018-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-07-02",
+      "fin": "2018-07-30",
       "lignes": 5,
       "octets": 379
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2018-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-08-06",
+      "fin": "2018-08-27",
       "lignes": 4,
       "octets": 336
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2018-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-09-03",
+      "fin": "2018-09-24",
       "lignes": 4,
       "octets": 341
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2018-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-10-01",
+      "fin": "2018-10-29",
       "lignes": 5,
       "octets": 368
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2018-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-11-05",
+      "fin": "2018-11-26",
       "lignes": 4,
       "octets": 337
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2018-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2018-12-03",
+      "fin": "2018-12-31",
       "lignes": 5,
       "octets": 377
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2019-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-01-07",
+      "fin": "2019-01-28",
       "lignes": 4,
       "octets": 340
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2019-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-02-04",
+      "fin": "2019-02-25",
       "lignes": 4,
       "octets": 331
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2019-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-03-04",
+      "fin": "2019-03-25",
       "lignes": 4,
       "octets": 338
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2019-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-04-01",
+      "fin": "2019-04-29",
       "lignes": 5,
       "octets": 381
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2019-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-05-06",
+      "fin": "2019-05-27",
       "lignes": 4,
       "octets": 341
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2019-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-06-03",
+      "fin": "2019-06-24",
       "lignes": 4,
       "octets": 340
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2019-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-07-01",
+      "fin": "2019-07-29",
       "lignes": 5,
       "octets": 387
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2019-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-08-05",
+      "fin": "2019-08-26",
       "lignes": 4,
       "octets": 338
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2019-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-09-02",
+      "fin": "2019-09-30",
       "lignes": 5,
       "octets": 388
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2019-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-10-07",
+      "fin": "2019-10-28",
       "lignes": 4,
       "octets": 339
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2019-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-11-04",
+      "fin": "2019-11-25",
       "lignes": 4,
       "octets": 339
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2019-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2019-12-02",
+      "fin": "2019-12-30",
       "lignes": 5,
       "octets": 384
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2020-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-01-06",
+      "fin": "2020-01-27",
       "lignes": 4,
       "octets": 339
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2020-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-02-03",
+      "fin": "2020-02-24",
       "lignes": 4,
       "octets": 337
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2020-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-03-02",
+      "fin": "2020-03-30",
       "lignes": 5,
       "octets": 382
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2020-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-04-06",
+      "fin": "2020-04-27",
       "lignes": 4,
       "octets": 338
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2020-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-05-04",
+      "fin": "2020-05-25",
       "lignes": 4,
       "octets": 334
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2020-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-06-01",
+      "fin": "2020-06-29",
       "lignes": 5,
       "octets": 374
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2020-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "BTC/USDT",
+      "debut": "2020-07-06",
+      "fin": "2020-07-27",
       "lignes": 4,
       "octets": 335
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2020-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2020-08-03",
+      "fin": "2020-08-31",
       "lignes": 9,
       "octets": 561
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2020-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2020-09-07",
+      "fin": "2020-09-28",
       "lignes": 8,
       "octets": 507
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2020-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2020-10-05",
+      "fin": "2020-10-26",
       "lignes": 8,
       "octets": 499
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2020-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2020-11-02",
+      "fin": "2020-11-30",
       "lignes": 10,
       "octets": 602
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2020-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2020-12-07",
+      "fin": "2020-12-28",
       "lignes": 8,
       "octets": 514
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2021-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-01-04",
+      "fin": "2021-01-25",
       "lignes": 8,
       "octets": 512
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2021-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-02-01",
+      "fin": "2021-02-22",
       "lignes": 8,
       "octets": 533
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2021-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-03-01",
+      "fin": "2021-03-29",
       "lignes": 10,
       "octets": 614
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2021-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-04-05",
+      "fin": "2021-04-26",
       "lignes": 8,
       "octets": 524
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2021-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-05-03",
+      "fin": "2021-05-31",
       "lignes": 10,
       "octets": 611
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2021-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-06-07",
+      "fin": "2021-06-28",
       "lignes": 8,
       "octets": 529
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2021-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-07-05",
+      "fin": "2021-07-26",
       "lignes": 8,
       "octets": 529
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2021-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-08-02",
+      "fin": "2021-08-30",
       "lignes": 10,
       "octets": 603
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2021-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-09-06",
+      "fin": "2021-09-27",
       "lignes": 8,
       "octets": 515
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2021-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-10-04",
+      "fin": "2021-10-25",
       "lignes": 8,
       "octets": 517
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2021-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-11-01",
+      "fin": "2021-11-29",
       "lignes": 10,
       "octets": 605
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2021-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2021-12-06",
+      "fin": "2021-12-27",
       "lignes": 8,
       "octets": 506
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2022-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-01-03",
+      "fin": "2022-01-31",
       "lignes": 10,
       "octets": 592
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2022-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-02-07",
+      "fin": "2022-02-28",
       "lignes": 8,
       "octets": 511
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2022-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-03-07",
+      "fin": "2022-03-28",
       "lignes": 8,
       "octets": 509
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2022-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-04-04",
+      "fin": "2022-04-25",
       "lignes": 8,
       "octets": 507
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2022-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-05-02",
+      "fin": "2022-05-30",
       "lignes": 10,
       "octets": 597
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2022-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-06-06",
+      "fin": "2022-06-27",
       "lignes": 8,
       "octets": 511
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2022-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-07-04",
+      "fin": "2022-07-25",
       "lignes": 8,
       "octets": 507
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2022-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-08-01",
+      "fin": "2022-08-29",
       "lignes": 10,
       "octets": 596
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2022-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-09-05",
+      "fin": "2022-09-26",
       "lignes": 8,
       "octets": 515
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2022-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-10-03",
+      "fin": "2022-10-31",
       "lignes": 10,
       "octets": 596
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2022-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-11-07",
+      "fin": "2022-11-28",
       "lignes": 8,
       "octets": 524
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2022-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2022-12-05",
+      "fin": "2022-12-26",
       "lignes": 8,
       "octets": 496
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2023-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-01-02",
+      "fin": "2023-01-30",
       "lignes": 10,
       "octets": 586
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2023-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-02-06",
+      "fin": "2023-02-27",
       "lignes": 8,
       "octets": 511
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2023-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-03-06",
+      "fin": "2023-03-27",
       "lignes": 8,
       "octets": 505
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2023-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-04-03",
+      "fin": "2023-04-24",
       "lignes": 8,
       "octets": 510
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2023-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-05-01",
+      "fin": "2023-05-29",
       "lignes": 10,
       "octets": 591
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2023-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-06-05",
+      "fin": "2023-06-26",
       "lignes": 8,
       "octets": 503
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2023-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-07-03",
+      "fin": "2023-07-31",
       "lignes": 10,
       "octets": 584
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2023-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-08-07",
+      "fin": "2023-08-28",
       "lignes": 8,
       "octets": 503
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2023-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-09-04",
+      "fin": "2023-09-25",
       "lignes": 8,
       "octets": 503
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2023-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-10-02",
+      "fin": "2023-10-30",
       "lignes": 10,
       "octets": 575
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2023-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-11-06",
+      "fin": "2023-11-27",
       "lignes": 8,
       "octets": 509
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2023-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2023-12-04",
+      "fin": "2023-12-25",
       "lignes": 8,
       "octets": 504
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2024-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2024-01-01",
+      "fin": "2024-01-29",
       "lignes": 10,
       "octets": 590
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2024-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2024-02-05",
+      "fin": "2024-02-26",
       "lignes": 8,
       "octets": 522
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2024-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "SOL/USDT",
+      "debut": "2024-03-04",
+      "fin": "2024-03-25",
       "lignes": 8,
       "octets": 519
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2024-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-04-01",
+      "fin": "2024-04-29",
       "lignes": 14,
       "octets": 769
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2024-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-05-06",
+      "fin": "2024-05-27",
       "lignes": 12,
       "octets": 696
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2024-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-06-03",
+      "fin": "2024-06-24",
       "lignes": 12,
       "octets": 679
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2024-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-07-01",
+      "fin": "2024-07-29",
       "lignes": 15,
       "octets": 816
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2024-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-08-05",
+      "fin": "2024-08-26",
       "lignes": 12,
       "octets": 679
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2024-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-09-02",
+      "fin": "2024-09-30",
       "lignes": 15,
       "octets": 810
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2024-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-10-07",
+      "fin": "2024-10-28",
       "lignes": 12,
       "octets": 685
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2024-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-11-04",
+      "fin": "2024-11-25",
       "lignes": 12,
       "octets": 699
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2024-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2024-12-02",
+      "fin": "2024-12-30",
       "lignes": 15,
       "octets": 825
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2025-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-01-06",
+      "fin": "2025-01-27",
       "lignes": 12,
       "octets": 697
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2025-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-02-03",
+      "fin": "2025-02-24",
       "lignes": 12,
       "octets": 693
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2025-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-03-03",
+      "fin": "2025-03-31",
       "lignes": 15,
       "octets": 819
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2025-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-04-07",
+      "fin": "2025-04-28",
       "lignes": 12,
       "octets": 683
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2025-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-05-05",
+      "fin": "2025-05-26",
       "lignes": 12,
       "octets": 690
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2025-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-06-02",
+      "fin": "2025-06-30",
       "lignes": 15,
       "octets": 823
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2025-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-07-07",
+      "fin": "2025-07-28",
       "lignes": 12,
       "octets": 694
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2025-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-08-04",
+      "fin": "2025-08-25",
       "lignes": 12,
       "octets": 689
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2025-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-09-01",
+      "fin": "2025-09-29",
       "lignes": 15,
       "octets": 817
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2025-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-10-06",
+      "fin": "2025-10-27",
       "lignes": 12,
       "octets": 690
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2025-11.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-11-03",
+      "fin": "2025-11-24",
       "lignes": 12,
       "octets": 693
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2025-12.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2025-12-01",
+      "fin": "2025-12-29",
       "lignes": 15,
       "octets": 815
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2026-01.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-01-05",
+      "fin": "2026-01-26",
       "lignes": 12,
       "octets": 673
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2026-02.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-02-02",
+      "fin": "2026-02-23",
       "lignes": 12,
       "octets": 676
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2026-03.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-03-02",
+      "fin": "2026-03-30",
       "lignes": 15,
       "octets": 801
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2026-04.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-04-06",
+      "fin": "2026-04-27",
       "lignes": 12,
       "octets": 682
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2026-05.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-05-04",
+      "fin": "2026-05-25",
       "lignes": 12,
       "octets": 675
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2026-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-06-01",
+      "fin": "2026-06-29",
       "lignes": 15,
       "octets": 774
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2026-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-07-06",
+      "fin": "2026-07-27",
       "lignes": 12,
       "octets": 651
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2026-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-08-03",
+      "fin": "2026-08-31",
       "lignes": 15,
       "octets": 792
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2026-09.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-09-07",
+      "fin": "2026-09-28",
       "lignes": 12,
       "octets": 675
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2026-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-10-05",
+      "fin": "2026-10-12",
       "lignes": 6,
       "octets": 428
      }
     ],
     "lignes": 934,
     "octets": 58649,
-    "debut": "BTC/USDT",
-    "fin": "TAO/USDT",
+    "debut": "2017-08-14",
+    "fin": "2026-10-12",
     "colonnes": [
      "symbol",
      "date",
@@ -2997,44 +2997,44 @@
     "fichiers": [
      {
       "chemin": "series/archives/sol-radar/funding_rates/funding_rates-2026-05.csv.gz",
-      "debut": "SOL/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-05-31T15:33:32.357885+00:00",
+      "fin": "2026-05-31T16:56:04.083584+00:00",
       "lignes": 6,
       "octets": 456
      },
      {
       "chemin": "series/archives/sol-radar/funding_rates/funding_rates-2026-06.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-06-02T08:28:31.570674+00:00",
+      "fin": "2026-06-30T20:31:40.723359+00:00",
       "lignes": 478,
       "octets": 14098
      },
      {
       "chemin": "series/archives/sol-radar/funding_rates/funding_rates-2026-07.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-07-01T00:30:27.156408+00:00",
+      "fin": "2026-07-31T20:31:46.074677+00:00",
       "lignes": 559,
       "octets": 16198
      },
      {
       "chemin": "series/archives/sol-radar/funding_rates/funding_rates-2026-08.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-08-01T00:30:25.699242+00:00",
+      "fin": "2026-08-16T20:30:49.367225+00:00",
       "lignes": 288,
       "octets": 8531
      },
      {
       "chemin": "series/archives/sol-radar/funding_rates/funding_rates-2026-10.csv.gz",
-      "debut": "BTC/USDT",
-      "fin": "TAO/USDT",
+      "debut": "2026-10-05T12:22:33.678648+00:00",
+      "fin": "2026-10-14T08:30:51.502499+00:00",
       "lignes": 165,
       "octets": 5508
      }
     ],
     "lignes": 1496,
     "octets": 44791,
-    "debut": "BTC/USDT",
-    "fin": "TAO/USDT",
+    "debut": "2026-05-31T15:33:32.357885+00:00",
+    "fin": "2026-10-14T08:30:51.502499+00:00",
     "colonnes": [
      "symbol",
      "timestamp",
@@ -3060,44 +3060,44 @@
     "fichiers": [
      {
       "chemin": "series/archives/sol-radar/orderbook_snapshots/orderbook_snapshots-2026-05.csv.gz",
-      "debut": "1",
-      "fin": "6",
+      "debut": "2026-05-31T15:33:32.604348+00:00",
+      "fin": "2026-05-31T16:56:04.348616+00:00",
       "lignes": 6,
       "octets": 781
      },
      {
       "chemin": "series/archives/sol-radar/orderbook_snapshots/orderbook_snapshots-2026-06.csv.gz",
-      "debut": "7",
-      "fin": "484",
+      "debut": "2026-06-02T08:28:31.820429+00:00",
+      "fin": "2026-06-30T20:31:40.985459+00:00",
       "lignes": 478,
       "octets": 41988
      },
      {
       "chemin": "series/archives/sol-radar/orderbook_snapshots/orderbook_snapshots-2026-07.csv.gz",
-      "debut": "485",
-      "fin": "1043",
+      "debut": "2026-07-01T00:30:27.439391+00:00",
+      "fin": "2026-07-31T20:31:46.370462+00:00",
       "lignes": 559,
       "octets": 47706
      },
      {
       "chemin": "series/archives/sol-radar/orderbook_snapshots/orderbook_snapshots-2026-08.csv.gz",
-      "debut": "1044",
-      "fin": "1331",
+      "debut": "2026-08-01T00:30:25.990445+00:00",
+      "fin": "2026-08-16T20:30:49.629637+00:00",
       "lignes": 288,
       "octets": 24318
      },
      {
       "chemin": "series/archives/sol-radar/orderbook_snapshots/orderbook_snapshots-2026-10.csv.gz",
-      "debut": "1332",
-      "fin": "1496",
+      "debut": "2026-10-05T12:22:33.942752+00:00",
+      "fin": "2026-10-14T08:30:51.783998+00:00",
       "lignes": 165,
       "octets": 14718
      }
     ],
     "lignes": 1496,
     "octets": 129511,
-    "debut": "1",
-    "fin": "6",
+    "debut": "2026-05-31T15:33:32.604348+00:00",
+    "fin": "2026-10-14T08:30:51.783998+00:00",
     "colonnes": [
      "id",
      "symbol",
@@ -3121,37 +3121,37 @@
     "fichiers": [
      {
       "chemin": "series/archives/sol-radar/gex_snapshots/gex_snapshots-2026-06.csv.gz",
-      "debut": "1",
-      "fin": "145",
+      "debut": "2026-06-06T08:18:43.649275+00:00",
+      "fin": "2026-06-30T20:05:53.294038+00:00",
       "lignes": 145,
       "octets": 188115
      },
      {
       "chemin": "series/archives/sol-radar/gex_snapshots/gex_snapshots-2026-07.csv.gz",
-      "debut": "146",
-      "fin": "331",
+      "debut": "2026-07-01T00:05:02.828370+00:00",
+      "fin": "2026-07-31T20:05:58.196011+00:00",
       "lignes": 186,
       "octets": 233301
      },
      {
       "chemin": "series/archives/sol-radar/gex_snapshots/gex_snapshots-2026-08.csv.gz",
-      "debut": "332",
-      "fin": "427",
+      "debut": "2026-08-01T00:05:02.307328+00:00",
+      "fin": "2026-08-16T20:05:02.564167+00:00",
       "lignes": 96,
       "octets": 110439
      },
      {
       "chemin": "series/archives/sol-radar/gex_snapshots/gex_snapshots-2026-10.csv.gz",
-      "debut": "428",
-      "fin": "434",
+      "debut": "2026-10-13T14:18:06.029428+00:00",
+      "fin": "2026-10-14T08:06:01.519565+00:00",
       "lignes": 7,
       "octets": 9550
      }
     ],
     "lignes": 434,
     "octets": 541405,
-    "debut": "1",
-    "fin": "434",
+    "debut": "2026-06-06T08:18:43.649275+00:00",
+    "fin": "2026-10-14T08:06:01.519565+00:00",
     "colonnes": [
      "id",
      "timestamp",
@@ -3175,37 +3175,37 @@
     "fichiers": [
      {
       "chemin": "series/archives/sol-radar/coinbase_premium/coinbase_premium-2026-06.csv.gz",
-      "debut": "1",
-      "fin": "145",
+      "debut": "2026-06-06T08:18:44.264294+00:00",
+      "fin": "2026-06-30T20:05:53.799202+00:00",
       "lignes": 145,
       "octets": 5191
      },
      {
       "chemin": "series/archives/sol-radar/coinbase_premium/coinbase_premium-2026-07.csv.gz",
-      "debut": "146",
-      "fin": "331",
+      "debut": "2026-07-01T00:05:03.306302+00:00",
+      "fin": "2026-07-31T20:05:58.655609+00:00",
       "lignes": 186,
       "octets": 6474
      },
      {
       "chemin": "series/archives/sol-radar/coinbase_premium/coinbase_premium-2026-08.csv.gz",
-      "debut": "332",
-      "fin": "427",
+      "debut": "2026-08-01T00:05:02.800078+00:00",
+      "fin": "2026-08-16T20:05:03.101673+00:00",
       "lignes": 96,
       "octets": 3354
      },
      {
       "chemin": "series/archives/sol-radar/coinbase_premium/coinbase_premium-2026-10.csv.gz",
-      "debut": "428",
-      "fin": "434",
+      "debut": "2026-10-13T14:18:06.498396+00:00",
+      "fin": "2026-10-14T08:06:01.956083+00:00",
       "lignes": 7,
       "octets": 387
      }
     ],
     "lignes": 434,
     "octets": 15406,
-    "debut": "1",
-    "fin": "434",
+    "debut": "2026-06-06T08:18:44.264294+00:00",
+    "fin": "2026-10-14T08:06:01.956083+00:00",
     "colonnes": [
      "id",
      "timestamp",
@@ -3230,37 +3230,37 @@
     "fichiers": [
      {
       "chemin": "series/archives/sol-radar/macro_snapshots/macro_snapshots-2026-06.csv.gz",
-      "debut": "3",
-      "fin": "10",
+      "debut": "2026-06-29 20:24:54",
+      "fin": "2026-06-30 20:30:52",
       "lignes": 8,
       "octets": 218
      },
      {
       "chemin": "series/archives/sol-radar/macro_snapshots/macro_snapshots-2026-07.csv.gz",
-      "debut": "11",
-      "fin": "196",
+      "debut": "2026-07-01 00:30:01",
+      "fin": "2026-07-31 20:30:57",
       "lignes": 186,
       "octets": 2786
      },
      {
       "chemin": "series/archives/sol-radar/macro_snapshots/macro_snapshots-2026-08.csv.gz",
-      "debut": "197",
-      "fin": "292",
+      "debut": "2026-08-01 00:30:01",
+      "fin": "2026-08-16 20:30:01",
       "lignes": 96,
       "octets": 1402
      },
      {
       "chemin": "series/archives/sol-radar/macro_snapshots/macro_snapshots-2026-10.csv.gz",
-      "debut": "293",
-      "fin": "348",
+      "debut": "2026-10-05 12:18:21",
+      "fin": "2026-10-14 08:30:53",
       "lignes": 56,
       "octets": 937
      }
     ],
     "lignes": 346,
     "octets": 5343,
-    "debut": "11",
-    "fin": "348",
+    "debut": "2026-06-29 20:24:54",
+    "fin": "2026-10-14 08:30:53",
     "colonnes": [
      "id",
      "timestamp",
@@ -3279,44 +3279,44 @@
     "fichiers": [
      {
       "chemin": "series/archives/sol-radar/signal_events/signal_events-2026-06.csv.gz",
-      "debut": "1",
-      "fin": "11639",
+      "debut": "2026-06-02T11:30:30.549748+00:00",
+      "fin": "2026-06-30T23:59:53.726231+00:00",
       "lignes": 11038,
       "octets": 350020
      },
      {
       "chemin": "series/archives/sol-radar/signal_events/signal_events-2026-07.csv.gz",
-      "debut": "11640",
-      "fin": "22708",
+      "debut": "2026-07-01T00:12:50.611866+00:00",
+      "fin": "2026-07-31T23:54:00.532646+00:00",
       "lignes": 11069,
       "octets": 328044
      },
      {
       "chemin": "series/archives/sol-radar/signal_events/signal_events-2026-08.csv.gz",
-      "debut": "22709",
-      "fin": "33665",
+      "debut": "2026-08-01T00:00:16.822460+00:00",
+      "fin": "2026-08-31T23:44:19.019611+00:00",
       "lignes": 10957,
       "octets": 322471
      },
      {
       "chemin": "series/archives/sol-radar/signal_events/signal_events-2026-09.csv.gz",
-      "debut": "33666",
-      "fin": "44379",
+      "debut": "2026-09-01T00:06:14.824674+00:00",
+      "fin": "2026-09-30T23:58:14.607177+00:00",
       "lignes": 10714,
       "octets": 319332
      },
      {
       "chemin": "series/archives/sol-radar/signal_events/signal_events-2026-10.csv.gz",
-      "debut": "44380",
-      "fin": "49195",
+      "debut": "2026-10-01T00:03:15.379695+00:00",
+      "fin": "2026-10-14T08:50:32.301493+00:00",
       "lignes": 4816,
       "octets": 142549
      }
     ],
     "lignes": 48594,
     "octets": 1462416,
-    "debut": "1",
-    "fin": "49195",
+    "debut": "2026-06-02T11:30:30.549748+00:00",
+    "fin": "2026-10-14T08:50:32.301493+00:00",
     "colonnes": [
      "id",
      "timestamp",
