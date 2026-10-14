@@ -463,6 +463,15 @@ titre('8 bis. Objectif et statistiques : la ligne courte de la bulle et le déta
       && St.dernieres.length === Math.min(6, dern.length) && St.faible === (x.confirmes < P.echantillonFaible)
       && /usage des analystes/.test(St.comment) && /rien ne le garantit/.test(St.comment) && St.annees === null && /pas une prévision ni un conseil/.test(St.risque) && St.risque.length < 90
       && !G.motsBannis(txt).length && !CONSEIL.test(txt) && !/%/.test(txt), { St, bannis: G.motsBannis(txt) });
+    // Les exemples passés (plan du 13/10/2026, idée 4) : les derniers cas de ce type, validés et
+    // finis, du plus récent au plus ancien, SANS tri par réussite ; chacun avec ce qu'il faut pour
+    // le redessiner (indices du rejeu, sens, niveau franchi, objectif, invalidation).
+    const attendus = dern.slice().sort((a, b2) => b2.jFin - a.jFin).slice(0, P.exemples.max);
+    const champsOk = St.dernieres.every((d, k) => { const g = attendus[k]; return g && d.debut === g.debut && d.jConf === g.jConf && d.jFin === g.jFin && d.sens === g.sens && d.fin === g.fin
+      && d.objectif === g.objectif && d.invalidation === g.invalidation && (d.niveau === null || d.niveau === g.niveau) && Number.isInteger(d.debut) && d.debut <= d.jConf && d.jConf <= d.jFin
+      && (d.sens === 1 || d.sens === -1) && Number.isFinite(d.objectif) && Number.isFinite(d.invalidation) && d.marque === G.marqueIssue(g); });
+    check(`… exemples : les ${St.dernieres.length} derniers cas (≤ ${P.exemples.max}, PARAM.guide.exemples), du plus récent au plus ancien, sans tri par réussite, avec début, validation, issue, sens, niveau, objectif, invalidation`,
+      P.exemples.max === 6 && St.dernieres.length === Math.min(P.exemples.max, dern.length) && champsOk, St.dernieres.map(d => [d.debut, d.jConf, d.jFin, d.fin, d.niveau]));
     const lig = Object.fromEntries(St.lignes);
     check(`… le détail reprend le bilan : repérées, validées, tombées avant, atteintes, annulées, délai écoulé`,
       +String(lig['Repérées'] || lig['Figures repérées']).split(' ')[0] === x.formes && +(lig['Figures validées'] || lig['Sorties validées']) === x.confirmes
@@ -489,6 +498,36 @@ titre('8 bis. Objectif et statistiques : la ligne courte de la bulle et le déta
       / ▸$/.test(l) && (h ? l.includes('ces figures : ' + h) || l.includes('Ces figures : ' + h) : true) && !/%/.test(l) && !G.motsBannis(l).length
       && St.annees && /^(Les [\d  ]+ cas passés de cette figure : partis d’abord dans le sens prévu \d+ fois sur 10 \(au hasard : \d+\), objectif atteint \d+ fois sur 10 \(au hasard : \d+\)\.|Trop peu de cas passés)/.test(St.annees.phrase)
       && /^Mesuré sur le bitcoin \(Binance\) en 15 min, de 2023 au 13\/10\/2026/.test(St.annees.source) && !G.motsBannis(txt).length && !CONSEIL.test(txt) && !/%/.test(txt), { l, annees: St.annees, bannis: G.motsBannis(txt) });
+  }
+  // Un exemple passé en petit (idée 4) : Guide.exempleSvg, sur les clôtures du rejeu.
+  {
+    const E = P.exemples, cas = [];
+    for (const t of G.TYPES) { const f = R.formes.find(g => g.type === t && !g.doublon); if (f) cas.push(...G.statsFigure(f, R, ctx, P, '$').dernieres); }
+    const issues = new Set(cas.map(d => d.fin));
+    check(`des exemples de chaque issue trouvés (${cas.length} cas : ${[...issues].join(', ')})`, cas.length >= 6 && issues.has('atteint') && issues.has('invalide'), [...issues]);
+    const fautes = [];
+    for (const d of cas) {
+      const svg = G.exempleSvg(d, C, NN, P, 'Double creux, validée le 12/10 : objectif atteint.');
+      const nombres = attr => [...svg.matchAll(new RegExp(attr + '="(-?[\\d.]+)"', 'g'))].map(m => +m[1]);
+      const xs = nombres('x').concat(nombres('x1'), nombres('x2')), ys = nombres('y').concat(nombres('y1'), nombres('y2'));
+      const pts = [...svg.matchAll(/class="ex-(?:avant|prix|apres)" d="([^"]+)"/g)].map(m => m[1].split(/[ML]/).filter(Boolean).length).reduce((a, x) => a + x, 0);
+      const i0 = Math.max(0, d.debut - E.avant), i1 = Math.min(NN - 1, d.jFin + E.apres);
+      const parts = (d.debut > i0 ? 1 : 0) + (i1 > d.jFin ? 1 : 0);
+      const mal = !/^<svg class="ex-svg" width="140" height="60" viewBox="0 0 140 60" role="img" aria-label="[^"]+"><title>[^<]+<\/title>/.test(svg)
+        || !/class="ex-pendant"/.test(svg) || !/class="ex-prix"/.test(svg) || !/class="ex-objectif"/.test(svg) || !/class="ex-inval"/.test(svg) || !/class="ex-valide"/.test(svg)
+        || (d.niveau !== null && !/class="ex-niveau"/.test(svg))
+        || !new RegExp('<text class="ex-issue (ok|ko|neutre)"[^>]*>' + d.marque + '</text>').test(svg)
+        || /#[0-9a-f]{3}|rgb|hsl|fill=|stroke=|style=/i.test(svg)
+        || xs.some(x => x < -2.5 || x > 142) || ys.some(y => y < -0.5 || y > 60.5)
+        || pts !== (i1 - i0 + 1) + parts;   // chaque clôture de la fenêtre, une fois (plus les jonctions avant/pendant/après)
+      if (mal) fautes.push({ d: [d.debut, d.jConf, d.jFin, d.fin], pts, attendu: i1 - i0 + 1 + parts, svg: svg.slice(0, 200) });
+    }
+    check(`chaque cas en petit : un SVG (role="img", <title>), le prix de ${E.avant} clôtures avant à ${E.apres} après, la figure marquée, le niveau franchi, l’objectif, l’invalidation, la marque d’issue ; des classes, aucune couleur écrite ; tout dans le cadre`,
+      !fautes.length, fautes.slice(0, 2));
+    const d0 = cas[0];
+    check('un cas qui sort de l’historique (indices au-delà de la dernière clôture, ou prix manquant) : rien de dessiné',
+      G.exempleSvg(Object.assign({}, d0, { jFin: NN + 5 }), C, NN, P, 't') === '' && G.exempleSvg(d0, C.slice(0, d0.jFin), NN, P, 't') === '' && G.exempleSvg(null, C, NN, P, 't') === '', null);
+    check('le titre est échappé (pas de balise injectée)', !G.exempleSvg(d0, C, NN, P, '<b>"x"</b>').includes('<b>'), null);
   }
   // Le témoin, quand il existe, est celui du bilan.
   const avecT = ex.find(f => b[f.type].temoin && b[f.type].temoin.departs > 0);

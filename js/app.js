@@ -493,6 +493,10 @@ const PARAM = {
     expiration: 60, horizon: 60, garderFini: 20, garderInvalide: 6, garderEbauche: 3, formesMax: 2, echantillonFaible: 20,
     // Repère « sans forme » du bilan : au plus `temoinDeparts` départs rejoués en tout.
     temoinDeparts: 30000,
+    // Exemples passés d'une figure (panneau des statistiques, plan du 13/10/2026, idée 4) : les
+    // `max` derniers cas de ce type, chacun redessiné en `largeur` × `hauteur` px, de `avant`
+    // clôtures avant le début de la figure à `apres` clôtures après son issue.
+    exemples: { max: 6, avant: 15, apres: 15, largeur: 140, hauteur: 60 },
     // Marge de « futur » à droite de la dernière bougie (chemins conditionnels) : une fraction
     // de la largeur du tracé, bornée en pixels, jamais plus de `futurMaxFraction` du tracé.
     // Elle s'ouvre quand quelque chose s'y dessine : le Guide (hors Débutant) ou la flèche d'un
