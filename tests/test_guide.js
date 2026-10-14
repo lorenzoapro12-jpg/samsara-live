@@ -908,6 +908,38 @@ titre('7 bis. En résumé : la lecture recoupée, honnête, courte, sans chiffre
   const nM = x => x.split(/\s+/).filter(w => /[\p{L}\d]/u.test(w)).length;
   check('la phrase de la fourchette : chaque phrase 15 mots au plus ; aucun mot banni (« range »…), aucun %, ni « va baisser / monter », ni volume, ni conseil',
     phrF.every(x => nM(x) <= 15) && !phrF.some(x => G.motsBannis(x).length || /%|va (baisser|monter)|volume/i.test(x) || CONSEIL.test(x)), phrF.map(x => [nM(x), x]));
+  // La phrase du haut du graphique (Lisible) dit la cassure pendant ses 24 h (revue du 14/10/2026,
+  // N1 ; oui de Lorenzo à Q2), à la place de la lecture du moment ; rien n'est ajouté le reste du
+  // temps. Sa bulle reprend la phrase mesurée de « En résumé ». Avant : la phrase ne la disait jamais.
+  {
+    const DEB = dansPage('PARAM.guide.debutant');
+    const oP = x => Object.assign({ prix: 86012.5, unite: '$', choix: { dessus: [haut], dessous: [bas] }, enTest: null, regime: { cle: 'faible' }, itv: '15m' }, x);
+    const hm = cb.cassure.tFin * 1000 + 60000, V = G.phrasesDebutant(oP({ fourchette: cb, horloge: hm })), sansF = G.phrasesDebutant(oP({}));
+    check('phrase du haut, fourchette cassée par le bas : « Fourchette de 7 jours cassée par le bas à ' + hc + '. », puis sans « de », sans l’heure, sans « 7 jours » ; la compacte tient en ' + DEB.phraseEtroit,
+      V[0] === 'Fourchette de 7 jours cassée par le bas à ' + hc + '.' && V[1] === 'Fourchette 7 jours cassée par le bas à ' + hc + '.' && V.includes('Fourchette de 7 jours cassée par le bas.')
+      && V[V.length - 1] === 'Fourchette cassée par le bas.' && V.every(v => /^Fourchette .*cassée par le bas/.test(v)) && G.phraseDebutant(oP({ fourchette: cb, horloge: hm }), DEB.phraseEtroit).length <= DEB.phraseEtroit, V);
+    check('… par le haut : « … cassée par le haut … » ; vue dans le passé : jamais « Maintenant, » (elle porte son heure)',
+      G.phrasesDebutant(oP({ fourchette: ch, horloge: ch.cassure.tFin * 1000 + 60000 }))[0] === 'Fourchette de 7 jours cassée par le haut à ' + hh + '.'
+      && G.phrasesDebutant(oP({ fourchette: cb, horloge: hm, maintenant: true }))[0] === V[0]);
+    const Vh = G.phrasesDebutant(oP({ fourchette: deux, horloge: lendemain }));
+    check('… le lendemain : « … hier à ' + h6 + '. », jamais l’heure seule (elle se lirait comme celle d’aujourd’hui)',
+      Vh[0] === 'Fourchette de 7 jours cassée par le bas hier à ' + h6 + '.' && Vh.filter(v => v.includes(h6)).every(v => v.includes('hier à ' + h6)), Vh);
+    check('rien d’ajouté le reste du temps : sans fourchette, sans cassure, revenue dedans, trop ancienne (au-delà de 24 h), prix absent : la phrase de toujours',
+      [null, f15, cr, c7].every(f => JSON.stringify(G.phrasesDebutant(oP({ fourchette: f, horloge: hm }))) === JSON.stringify(sansF))
+      && /indisponible/.test(G.phrasesDebutant(oP({ prix: null, fourchette: cb, horloge: hm }))[0]), sansF);
+    const VV = V.concat(Vh);
+    check('… chaque variante : 15 mots au plus, aucun mot banni, ni %, ni conseil', VV.every(v => nM(v) <= 15 && !G.motsBannis(v).length && !/%/.test(v) && !CONSEIL.test(v)), VV);
+    // Sa bulle : la phrase mesurée de « En résumé » ; la 1re phrase (avec l'heure) seulement quand le
+    // titre n'a pas gardé l'heure et « 7 jours » ; les bords de la fourchette cassée ; l'avertissement.
+    const L = G.phrasesCassureFourchette(cb, 'BTCUSDT', hm), b1 = G.bulleCassureDebutant(cb, 'BTCUSDT', hm, V[0], '$'), b2 = G.bulleCassureDebutant(cb, 'BTCUSDT', hm, 'Fourchette cassée par le bas.', '$');
+    const prixB = G.prix(cb.cassure.bas, '$'), prixH = G.prix(cb.cassure.haut, '$');
+    check('bulle de la phrase : « Bas …, haut …. », puis la phrase mesurée (« Attention : ça bouge souvent fort juste après, dans les deux sens. ») et les retours ; le résumé du 1er toucher, la phrase mesurée',
+      !!b1 && JSON.stringify(b1.texte) === JSON.stringify(['Bas ' + prixB + ', haut ' + prixH + '.', L[1], L[2], G.AVERTISSEMENT]) && JSON.stringify(b1.resume) === JSON.stringify([L[1], L[2]])
+      && L[1] === 'Attention : ça bouge souvent fort juste après, dans les deux sens.', b1);
+    check('… titre sans l’heure : la bulle commence par « Le prix a cassé le bas de sa fourchette de 7 jours à ' + hc + '. » ; le lendemain, « Il n’est pas revenu dedans depuis. » ; rien pour une cassure revenue',
+      !!b2 && b2.texte[0] === L[0] && b2.texte.length === 5 && G.bulleCassureDebutant(deux, 'BTCUSDT', lendemain, Vh[0], '$').resume[0] === 'Il n’est pas revenu dedans depuis.'
+      && G.bulleCassureDebutant(cr, 'BTCUSDT', hm, '', '$') === null, { b2, lend: G.bulleCassureDebutant(deux, 'BTCUSDT', lendemain, Vh[0], '$') });
+  }
 
   // 6. Un rejet sur un repère, dit en mots (plan du 13/10/2026, idée 6) : etatFerme a vu, sur les
   // P.mecheBougies dernières périodes closes, le prix dépasser le repère puis finir de nouveau de

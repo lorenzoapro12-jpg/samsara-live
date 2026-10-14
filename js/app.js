@@ -675,7 +675,8 @@ const INDICATORS = [
     { key: 'fib', label: 'Retracements de Fibonacci', court: 'Fibonacci', imp: 'utile' },
     { key: 'liq', label: NOM_ORDRES_CARTE, court: 'Ordres en attente', imp: 'utile', paires: ['BTCUSDT'] },
     // Plan du 13/10/2026, idée 5 : refaite avec les bougies chargées, sur les intervalles qui
-    // divisent ses périodes de 4 h (en 1 jour, rien : la ligne est grisée et le dit).
+    // divisent ses périodes de 4 h (en 1 jour, rien : la ligne est grisée et le dit) ; en 1 min,
+    // avec des bougies de 4 h demandées à part (fourchetteDonnees ; revue du 14/10/2026, N1).
     // cherche : des mots cachés que la recherche du panneau trouve aussi, jamais affichés (revue du
     // 14/10/2026, M15 : « range » ne trouvait rien, alors que tous les traders disent « range »).
     { key: 'fourchette', get label() { return 'Fourchette de ' + joursFourchette() + ' jours'; }, get court() { return 'Fourchette de ' + joursFourchette() + ' jours'; },
@@ -5887,7 +5888,8 @@ function debVue() { return geoPrix && isNum(geoPrix.minP) && isNum(geoPrix.maxP)
 /** Les phrases possibles à ce dessin (le prix live ne change que la bande « touchée ») : pour
  *  décider si la ligne des scénarios partage la rangée de la phrase sans la raccourcir. */
 function debPhrases(D, maintenant) {
-  const ch = debReperes(D), base = { prix: ch.prix, unite: guideUnite(), choix: D.choix, reperes: ch, regime: D.regime, maintenant, itv: chartInterval, vue: debVue() };
+  const ch = debReperes(D), base = { prix: ch.prix, unite: guideUnite(), choix: D.choix, reperes: ch, regime: D.regime, maintenant, itv: chartInterval, vue: debVue(),
+    fourchette: fourchetteDonnees(), horloge: Horloges.maintenant() };
   return [null, ch.dessus, ch.dessous].filter((x, k) => !k || x).map(enTest => Guide.phrasesDebutant(Object.assign({}, base, { enTest })));
 }
 /** La hauteur des rangées du haut du tracé en Débutant : la phrase (si le Guide est affiché), la
@@ -6449,11 +6451,17 @@ function guideCalqueDebutant(E) {
   // partagent la rangée.
   const memo = debHautMemo, etroit = g.pw < P.etroit;
   const maxPx = E.xMax - g.pad.left - 8 - (memo && memo.partage ? memo.wLigne + 12 : 0);
-  const o = { prix: isNum(livePrice) ? livePrice : null, unite: E.unite, choix: E.D.choix, reperes: E.debSel, enTest, regime: E.D.regime, maintenant: !E.finVue, itv: chartInterval, vue: debVue() };
-  const cle = [o.prix === null, enTest ? enTest.p : '-', maxPx, o.maintenant].join('|');
+  const o = { prix: isNum(livePrice) ? livePrice : null, unite: E.unite, choix: E.D.choix, reperes: E.debSel, enTest, regime: E.D.regime, maintenant: !E.finVue, itv: chartInterval, vue: debVue(),
+    fourchette: fourchetteDonnees(), horloge: Horloges.maintenant() };
+  // La fourchette de 7 jours vient de casser : pendant 24 h, la phrase la dit, et sa bulle reprend la
+  // phrase mesurée de « En résumé » (revue du 14/10/2026, N1 ; oui de Lorenzo à Q2). Ses mots (son
+  // heure : « à 18:00 », puis « hier à 18:00 ») entrent dans la clé.
+  const fc = o.prix === null ? [] : Guide.phrasesCassureDebutant(o.fourchette, o.horloge);
+  const cle = [o.prix === null, enTest ? enTest.p : '-', maxPx, o.maintenant, fc.join('|')].join('|');
   if (!E.phraseCache || E.phraseCache.cle !== cle) {
     const ph = debPhraseChoisir(cx, o, maxPx, etroit);
-    E.phraseCache = { cle, ph, texte: guideTextePhraseDebutant(E, ph.t), resume: guideResumePhraseDebutant(E, ph.t) };
+    const bc = fc.length ? Guide.bulleCassureDebutant(o.fourchette, activeSymbol, o.horloge, ph.t, E.unite) : null;
+    E.phraseCache = { cle, ph, texte: bc ? bc.texte : guideTextePhraseDebutant(E, ph.t), resume: bc ? bc.resume : guideResumePhraseDebutant(E, ph.t) };
     // Accessibilité : la phrase du graphique est aussi son nom.
     try { canvas.setAttribute('aria-label', ph.t); } catch (e) { /* hors navigateur */ }
   }
@@ -7123,18 +7131,54 @@ function dessinerMarqueCarte(P, pm, W, prixAxe) {
 // les traits suivaient le nouveau bas, le bord cassé disparaissait et la bulle disait « resté entre
 // les deux »).
 let fourchetteEtat = null;   // la géométrie de la dernière image (relue par les tests), null sans la couche
-/** La fourchette de 7 jours sur l'historique chargé (Guide.fourchette), ou null : intervalle de
- *  1 jour, historique trop court. Aucune requête : les bougies déjà là, mémorisées par état. */
+/** La fourchette de 7 jours (Guide.fourchette), ou null tant qu'elle n'est pas connue. D'abord sur
+ *  l'historique chargé, sans requête (mémorisée par état) ; quand il ne la donne pas (en 1 min,
+ *  3 000 bougies font 50 h ; en 1 jour, la bougie dépasse la période ; en 5 min, avant les pages
+ *  anciennes), sur les bougies de la période elle-même (fourchetteSecours). Revue du 14/10/2026, N1
+ *  (oui de Lorenzo à Q2) : la phrase du haut du graphique dit la cassure quel que soit
+ *  l'intervalle affiché ; « En résumé », sa barre et la couche lisent la même. */
 function fourchetteDonnees() {
-  if (candles.length < 2 || !KLINE_MS[chartInterval]) return null;
-  return memoized('fourchette_' + activeSymbol + '_' + chartInterval, () => {
+  const F = candles.length >= 2 && KLINE_MS[chartInterval] ? memoized('fourchette_' + activeSymbol + '_' + chartInterval, () => {
     const c = cols();
     return Guide.fourchette(c.time, c.high, c.low, c.close, candles.length, KLINE_MS[chartInterval] / 1000, PARAM.guide);
-  });
+  }) : null;
+  return F || fourchetteSecours(activeSymbol);
 }
-/** La géométrie de la couche (g : celle de resolveChart), ou null : rien à tracer, ou une fenêtre
- *  qui commence après la vue (on regarde le passé : la fourchette d'aujourd'hui n'y est pas). */
+// Les bougies de la période de la fourchette (4 h), par paire : une petite page, juste les périodes
+// que Guide.fourchette lit (les 42 de la fourchette, les 6 de la phrase, la précédente et celle en
+// cours), relue quand une nouvelle période commence (au plus une fois par CADENCES.bougies, échec
+// compris). → { F, fin (ms : fin de la période en cours), essai (ms) }
+const FOURCHETTE_SECOURS = new Map(), fourchetteSecoursEnVol = new Set();
+function fourchetteSecours(sym) {
+  const e = FOURCHETTE_SECOURS.get(sym), t = Horloges.maintenant();
+  if ((!e || t >= e.fin) && !(e && t - e.essai < CADENCES.bougies)) fourchetteSecoursLire(sym);
+  return e ? e.F : null;
+}
+async function fourchetteSecoursLire(sym) {
+  if (fourchetteSecoursEnVol.has(sym)) return;
+  fourchetteSecoursEnVol.add(sym);
+  const P = PARAM.guide.fourchette, per = P.heures * 36e5, avant = FOURCHETTE_SECOURS.get(sym);
+  // Le plus long intervalle qui divise la période (4 h : les bougies de 4 h elles-mêmes).
+  const itv = Object.keys(KLINE_MS).filter(k => KLINE_MS[k] <= per && per % KLINE_MS[k] === 0).pop(), pas = KLINE_MS[itv];
+  const n = Math.min(1000, (P.periodes + P.phrasePeriodes + 2) * per / pas);
+  const page = s => fetch(`https://api.binance.com/api/v3/klines?symbol=${s}&interval=${itv}&limit=${n}`).then(r => Horloges.verifier(r).json());
+  try {
+    const d = sym === 'BTCSOL' ? ratioCandles(...await Promise.all([page('BTCUSDT'), page('SOLUSDT')])) : (await page(sym)).map(toCandle);
+    if (!d.length) throw new Error('aucune bougie');
+    const F = Guide.fourchette(d.map(c => c.time), d.map(c => c.high), d.map(c => c.low), d.map(c => c.close), d.length, pas / 1000, PARAM.guide);
+    FOURCHETTE_SECOURS.set(sym, { F, fin: (Math.floor(d[d.length - 1].time * 1000 / per) + 1) * per, essai: Horloges.maintenant() });
+    if (sym === activeSymbol) scheduleDraw();
+  } catch (e) {
+    console.error('Fourchette (bougies de ' + itv + '):', sym, e.message);
+    FOURCHETTE_SECOURS.set(sym, Object.assign({ F: null, fin: 0 }, avant, { essai: Horloges.maintenant() }));
+  } finally { fourchetteSecoursEnVol.delete(sym); }
+}
+/** La géométrie de la couche (g : celle de resolveChart), ou null : rien à tracer, un intervalle où
+ *  la couche n'est pas offerte (1 jour : la fourchette y est connue pour la phrase, revue du
+ *  14/10/2026, N1, mais la ligne du panneau reste grisée), ou une fenêtre qui commence après la vue
+ *  (on regarde le passé : la fourchette d'aujourd'hui n'y est pas). */
 function fourchettePreparer(g) {
+  if (!disponible(calqueDe('fourchette'))) return null;
   const F = fourchetteDonnees();
   if (!F || !candles[g.vs]) return null;
   // La fourchette tracée : la cassée tant que la cassure est dite, sinon celle d'aujourd'hui.

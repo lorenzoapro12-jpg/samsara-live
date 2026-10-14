@@ -634,7 +634,9 @@ const FICHES = {
       { s: 'mesuré', t: 'Une sortie sur deux est revenue dedans dans la journée, à peu près comme le hasard.' },
       { s: 'mesuré', t: 'Avec « Le détail », « En résumé » dit une sortie récente, même lignes masquées.' },
     ],
-    get limites() { return 'Pas en 1 jour. Il faut ' + (typeof PARAM !== 'undefined' ? joursFourchetteF(PARAM) + ' jours' : 'assez') + ' de prix chargés : en 1 min, jamais.'; },
+    // Revue du 14/10/2026, N1 : sans assez de prix chargés (en 1 min), elle est refaite avec des
+    // tranches de 4 h demandées à part ; « en 1 min, jamais » ne vaut plus.
+    limites: 'Pas en 1 jour.',
   },
 };
 
@@ -948,9 +950,12 @@ const CALCUL = {
   vp: P => 'Prix de la vue en tranches (environ ' + P.vp.dollarsParTranche + ' $, entre ' + P.vp.tranchesMin + ' et ' + P.vp.tranchesMax + ' tranches). Chaque bougie visible ajoute son volume entre son bas et son haut. POC : la tranche la plus chargée. Zone de valeur : jusqu’à '
     + pcF(P.vp.zoneValeur) + ' % du total.',
   fourchette: P => { const F = P.guide.fourchette;
-    return 'Périodes de ' + F.heures + ' h alignées sur l’heure UTC, refaites avec les bougies déjà chargées quand l’intervalle divise la période. Haut et bas : extrêmes des ' + F.periodes
+    // Revue du 14/10/2026 (N1, oui de Lorenzo à Q2) : quel que soit l'intervalle, et dite aussi par
+    // la phrase du haut du graphique.
+    return 'Périodes de ' + F.heures + ' h alignées sur l’heure UTC, refaites avec les bougies déjà chargées quand l’intervalle divise la période et qu’elles suffisent, '
+      + 'sinon avec des bougies de ' + F.heures + ' h demandées à part. Haut et bas : extrêmes des ' + F.periodes
       + ' périodes closes avant celle en cours. Cassure : une période close finit sous le bas (ou au-dessus du haut) de la fourchette des ' + F.periodes + ' périodes d’avant elle, '
-      + 'la précédente ayant fini dans la sienne ; sans filtre de volume. Dite dans « En résumé » pendant les ' + F.phrasePeriodes + ' périodes suivantes, tant qu’aucune n’a fini de nouveau dedans ; '
+      + 'la précédente ayant fini dans la sienne ; sans filtre de volume. Dite dans « En résumé » et, sans « Le détail », par la phrase du haut du graphique, pendant les ' + F.phrasePeriodes + ' périodes suivantes, tant qu’aucune n’a fini de nouveau dedans ; '
       // Revue du 14/10/2026 (C1) : la couche garde alors la fourchette cassée, pas le nouveau bas.
       + 'les deux lignes gardent alors la fourchette cassée.'; },
   liq: () => grilleLiq().pas + ', le serveur additionne les BTC posés dans le carnet Binance, par tranche de prix' + (grilleLiq().dp ? ' de ' + nbF(grilleLiq().dp) + ' $' : '') + '. Publié toutes les ' + CADENCES.attendue_min + ' min ; avec « Le détail », l’âge de la dernière colonne est écrit en haut à droite. BTC/USDT seulement.',
