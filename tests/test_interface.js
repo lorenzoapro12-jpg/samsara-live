@@ -32,6 +32,11 @@
 //      qu'un clic échange, le prix à 60 % ; la légende du ruban (calques allumés, la croix masque).
 //   8. LE PANNEAU TIENT DANS L'ÉCRAN, à 360, 390 et 1440 px, dans neuf thèmes et les deux modes
 //      (le bouton des « Outils » compris).
+//   9. GESTES, MENUS ET CLAVIER (revue du 14/10, C23, C36, C37) : au doigt, la dernière ligne
+//      visible du panneau se coche au 1er toucher ; le menu des thèmes, resté ouvert après un thème
+//      qui change la structure, se replace contre son bouton ; après un zoom à deux doigts, le doigt
+//      resté posé fait glisser le graphique ; au clavier, Tab atteint les six intervalles, Entrée et
+//      Espace les choisissent, Échap dit le panneau fermé, le filtre est vide à chaque ouverture.
 //
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
 // USAGE   node tests/test_interface.js
@@ -76,8 +81,8 @@ const serveur = http.createServer((req, res) => {
   fs.createReadStream(f).pipe(res);
 });
 
-async function ouvrir(nav, theme, vue, fuseau) {
-  const ctx = await nav.newContext(Object.assign({ viewport: vue, deviceScaleFactor: 1 }, fuseau ? { timezoneId: fuseau } : {}));
+async function ouvrir(nav, theme, vue, fuseau, tactile) {
+  const ctx = await nav.newContext(Object.assign({ viewport: vue, deviceScaleFactor: 1 }, fuseau ? { timezoneId: fuseau } : {}, tactile ? { hasTouch: true, isMobile: true } : {}));
   const page = await ctx.newPage();
   const erreurs = [];
   page.on('pageerror', e => erreurs.push(e.message));
@@ -879,6 +884,126 @@ async function deuxCouleurs(page, id) {
       check(`${th.padEnd(9)} : panneau entier dans l’écran, sans débord de côté (réglages fins ouverts compris) ; bouton entier, « Affichage » au téléphone`, !fautes.length, fautes.slice(0, 4));
       check(`${th.padEnd(9)} : aucune erreur JavaScript`, !o8.erreurs.length, o8.erreurs);
       await o8.ctx.close();
+    }
+
+    // ─── 9. Gestes, menus et clavier (revue du 14/10 : C23, C36, C37) ───
+    titre('9. Gestes, menus et clavier : la dernière case au doigt, le menu des thèmes, le doigt après un zoom, le clavier');
+    // C23 : au 1er toucher, l'aperçu du bas du panneau grandissait sous le doigt et prenait le clic
+    // de la dernière ligne visible : rien ne se cochait. Page neuve à chaque toucher (l'aperçu part de
+    // son état de 1re ouverture) ; on vise la case, puis le nom de la ligne.
+    for (const th of ['bureau95', 'gazette', 'diazo', 'codex', 'neon']) {
+      const res = {};
+      for (const vise of ['case', 'nom']) {
+        const o9 = await ouvrir(nav, th, { width: 390, height: 844 }, null, true);
+        await o9.page.tap('#indDropdownBtn'); await o9.page.waitForTimeout(300);
+        const L = await o9.page.evaluate(() => {
+          const libres = [...document.querySelectorAll('#indMenu label[data-ind]')].map(l => {
+            const i = l.querySelector('input'), r = i.getBoundingClientRect(), n = l.querySelector('.aff-nom').getBoundingClientRect();
+            const c = { x: r.x + r.width / 2, y: r.y + r.height / 2 }, t = { x: n.x + 20, y: n.y + n.height / 2 };
+            return { k: l.dataset.ind, c, t, libre: !i.disabled && document.elementFromPoint(c.x, c.y) === i && l.contains(document.elementFromPoint(t.x, t.y)) };
+          }).filter(l => l.libre);
+          return libres[libres.length - 1] || null;
+        });
+        if (L) {
+          const p = vise === 'case' ? L.c : L.t;
+          const avant = await o9.page.evaluate(k => document.querySelector(`#indMenu label[data-ind="${k}"] input`).checked, L.k);
+          await o9.page.touchscreen.tap(p.x, p.y); await o9.page.waitForTimeout(400);
+          const apres = await o9.page.evaluate(k => ({ coche: document.querySelector(`#indMenu label[data-ind="${k}"] input`).checked, apercu: menuApercu, ouvert: document.getElementById('indMenu').classList.contains('open') }), L.k);
+          res[vise] = { ligne: L.k, y: Math.round(p.y), bascule: apres.coche !== avant, apercu: apres.apercu, ouvert: apres.ouvert, erreurs: o9.erreurs };
+        }
+        await o9.ctx.close();
+      }
+      const ok = v => !!v && v.bascule && v.apercu === v.ligne && v.ouvert && !v.erreurs.length;
+      check(`${th.padEnd(9)} · 390 px au doigt : la dernière ligne visible du panneau (« ${res.case && res.case.ligne} ») se coche au 1er toucher, sur sa case comme sur son nom ; l’aperçu la montre ensuite`, ok(res.case) && ok(res.nom), res);
+    }
+    // C36 : le menu des thèmes reste ouvert après un choix (pour comparer) ; un thème qui change la
+    // structure déplace le bouton Thème : le menu se replace contre lui, entier dans l'écran (il
+    // flottait au milieu de l'écran, sa dernière ligne dessous).
+    for (const [de, vers] of [['bureau95', 'kala'], ['neon', 'bureau95'], ['aero', 'gazette']]) {
+      const o9 = await ouvrir(nav, de, { width: 390, height: 844 }, null, true);
+      await o9.page.tap('#themeBtn'); await o9.page.waitForTimeout(250);
+      await o9.page.tap(`#themeMenu .theme-item[onclick*="'${vers}'"]`); await o9.page.waitForTimeout(400);
+      const m = await o9.page.evaluate(() => {
+        const m = document.getElementById('themeMenu'), rm = m.getBoundingClientRect(), rb = document.getElementById('themeBtn').getBoundingClientRect();
+        return { theme: document.documentElement.dataset.theme, ouvert: m.classList.contains('open'), haut: rm.top, bas: rm.bottom, gauche: rm.left, droite: rm.right,
+          boutonHaut: rb.top, boutonBas: rb.bottom, boutonGauche: rb.left, boutonDroite: rb.right, H: innerHeight, L: innerWidth };
+      });
+      const contre = (m.haut >= m.boutonBas - 0.5 && m.haut - m.boutonBas <= 9) || (m.bas <= m.boutonHaut + 0.5 && m.boutonHaut - m.bas <= 9);
+      const enFace = m.gauche <= m.boutonDroite && m.droite >= m.boutonGauche;
+      check(`${de} → ${vers} · 390 px au doigt : le menu des thèmes reste ouvert, entier dans l’écran, contre le bouton Thème qui a changé de place`, m.theme === vers && dansLEcran(m) && contre && enFace, m);
+      check(`${de} → ${vers} · aucune erreur JavaScript`, !o9.erreurs.length, o9.erreurs);
+      await o9.ctx.close();
+    }
+    // C36 : après un zoom à deux doigts, lever un doigt figeait le graphique jusqu'au toucher suivant.
+    // Événements tactiles de la page (le pilote ne lève pas un seul des deux doigts) ; témoin : le même
+    // glisser sous un seul doigt, depuis la même vue.
+    {
+      const o9 = await ouvrir(nav, BASE, { width: 390, height: 844 }, null, true);
+      const z = await o9.page.evaluate(async () => {
+        const c = canvas, b = c.getBoundingClientRect(), y = b.top + b.height * 0.45, mx = b.left + b.width / 2;
+        const T = (id, x) => new Touch({ identifier: id, target: c, clientX: x, clientY: y });
+        const ev = (type, touches, changed) => c.dispatchEvent(new TouchEvent(type, { touches, targetTouches: touches, changedTouches: changed, bubbles: true, cancelable: true }));
+        const attendre = ms => new Promise(r => setTimeout(r, ms));
+        const glisser = async (id, x0) => { let t; for (let i = 1; i <= 10; i++) { t = T(id, x0 + i * 15); ev('touchmove', [t], [t]); await attendre(16); } return t; };
+        resetView(); await attendre(50);
+        let a = T(0, mx - 40), d = T(1, mx + 40);
+        ev('touchstart', [a], [a]); ev('touchstart', [a, d], [d]);
+        for (let i = 1; i <= 6; i++) { a = T(0, mx - 40 - i * 8); d = T(1, mx + 40 + i * 8); ev('touchmove', [a, d], [a, d]); await attendre(16); }
+        const zoom = [viewStart, viewEnd], depart = 50;
+        ev('touchend', [d], [a]);
+        const mode = touchMode, x0 = d.clientX;
+        d = await glisser(1, x0); await attendre(50);
+        const glisse = zoom[0] - viewStart;
+        ev('touchend', [], [d]);
+        viewStart = zoom[0]; viewEnd = zoom[1]; drawChart(); await attendre(30);
+        let t = T(5, x0); ev('touchstart', [t], [t]); t = await glisser(5, x0); await attendre(50);
+        const temoin = zoom[0] - viewStart; ev('touchend', [], [t]);
+        return { zoomVisible: zoom[1] - zoom[0], depart, mode, glisse, temoin };
+      });
+      check(`390 px : zoom à deux doigts (${z.depart} → ${z.zoomVisible} bougies), un doigt levé, l’autre glisse de 150 px : le graphique suit (${z.glisse} bougies), comme sous un seul doigt (${z.temoin})`,
+        z.zoomVisible < z.depart && z.mode === 'pan' && z.glisse > 0 && z.glisse === z.temoin, z);
+      check('… aucune erreur JavaScript', !o9.erreurs.length, o9.erreurs);
+      await o9.ctx.close();
+    }
+    // C37 : au clavier, les intervalles étaient hors d'atteinte ; Échap laissait aria-expanded à
+    // « true » ; un texte tapé dans le filtre restait à la réouverture du panneau.
+    {
+      const o9 = await ouvrir(nav, BASE, { width: 1440, height: 900 });
+      const p9 = o9.page;
+      const etat = () => p9.evaluate(() => ({ ouvert: document.getElementById('indMenu').classList.contains('open'), aria: document.getElementById('indDropdownBtn').getAttribute('aria-expanded'),
+        filtre: (document.getElementById('indFiltre') || {}).value, lignes: document.querySelectorAll('#indMenu label[data-ind]:not([hidden])').length, total: document.querySelectorAll('#indMenu label[data-ind]').length }));
+      await p9.click('#indDropdownBtn'); await p9.waitForTimeout(200);
+      await p9.keyboard.press('Escape'); await p9.waitForTimeout(100);
+      const e1 = await etat();
+      check('1440 px, clavier : Échap ferme le panneau, et son bouton le dit fermé (aria-expanded « false »)', !e1.ouvert && e1.aria === 'false', e1);
+      await p9.click('#indDropdownBtn'); await p9.waitForTimeout(200);
+      await p9.click('#indFiltre'); await p9.keyboard.type('ema'); await p9.waitForTimeout(100);
+      const tape = await etat();
+      await p9.evaluate(() => document.body.click()); await p9.waitForTimeout(150);   // un clic ailleurs le ferme
+      await p9.click('#indDropdownBtn'); await p9.waitForTimeout(200);
+      const e2 = await etat();
+      check(`… « ema » tapé dans le filtre (${tape.lignes} lignes), panneau fermé puis rouvert : filtre vide, les ${e2.total} lignes`, tape.filtre === 'ema' && tape.lignes < tape.total && e2.ouvert && e2.filtre === '' && e2.lignes === e2.total, { tape, e2 });
+      // Le focus clavier sur une ligne du panneau montre toujours son aperçu.
+      await p9.focus('#indFiltre'); await p9.keyboard.press('Tab'); await p9.keyboard.press('Tab'); await p9.waitForTimeout(100);
+      const f = await p9.evaluate(() => { const l = document.activeElement && document.activeElement.closest('label[data-ind]'); return { ligne: l && l.dataset.ind, apercu: menuApercu }; });
+      check(`… au clavier, la ligne atteinte par Tab (« ${f.ligne} ») a son aperçu`, !!f.ligne && f.apercu === f.ligne, f);
+      await p9.keyboard.press('Escape'); await p9.waitForTimeout(100);
+      await p9.evaluate(() => { if (document.activeElement) document.activeElement.blur(); });
+      const INT = ['int_1m', 'int_5m', 'int_15m', 'int_1h', 'int_4h', 'int_1d'], vus = [];
+      for (let i = 0; i < 80 && !vus.includes('int_1d'); i++) { await p9.keyboard.press('Tab'); vus.push(await p9.evaluate(() => document.activeElement && document.activeElement.id)); }
+      const ordre = vus.filter(v => INT.includes(v));
+      check('… Tab passe par les six intervalles, dans l’ordre du ruban', JSON.stringify(ordre) === JSON.stringify(INT), vus);
+      const y0 = await p9.evaluate(() => scrollY);
+      await p9.focus('#int_1h'); await p9.keyboard.press('Enter'); await p9.waitForTimeout(500);
+      const en = await p9.evaluate(() => ({ itv: chartInterval, coches: [...document.querySelectorAll('[id^="int_"]')].filter(l => l.getAttribute('aria-checked') === 'true').map(l => l.id) }));
+      await p9.focus('#int_4h'); await p9.keyboard.press(' '); await p9.waitForTimeout(500);
+      const es = await p9.evaluate(y0 => ({ itv: chartInterval, coches: [...document.querySelectorAll('[id^="int_"]')].filter(l => l.getAttribute('aria-checked') === 'true').map(l => l.id),
+        roles: [...document.querySelectorAll('[id^="int_"]')].every(l => l.getAttribute('role') === 'radio' && l.tabIndex === 0), defile: scrollY - y0 }), y0);
+      check('… Entrée choisit « 1 h », Espace « 4 h » sans faire défiler la page ; chaque intervalle est un bouton radio, aria-checked suit le choix',
+        en.itv === '1h' && JSON.stringify(en.coches) === '["int_1h"]' && es.itv === '4h' && JSON.stringify(es.coches) === '["int_4h"]' && es.roles && es.defile === 0, { en, es });
+      await p9.evaluate(() => changeInterval('15m', document.getElementById('int_15m')));
+      check('… aucune erreur JavaScript', !o9.erreurs.length, o9.erreurs);
+      await o9.ctx.close();
     }
   } finally { await nav.close(); serveur.close(); }
   console.log(ko ? `\n❌ INTERFACE : ${ko} contrôle(s) en échec` : '\n✅ INTERFACE : TOUS LES CONTRÔLES PASSENT');

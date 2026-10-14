@@ -144,12 +144,13 @@
   <span class="section-title legende-seule" id="legendeTitre">À l’écran</span>
   <span class="sep legende-seule"></span>
   <span class="section-title">Intervalle</span>
-  <label id="int_1m" onclick="changeInterval('1m',this)"><span class="ind-label">1 min</span></label>
-  <label id="int_5m" onclick="changeInterval('5m',this)"><span class="ind-label">5 min</span></label>
-  <label id="int_15m" class="active" onclick="changeInterval('15m',this)"><span class="ind-label">15 min</span></label>
-  <label id="int_1h" onclick="changeInterval('1h',this)"><span class="ind-label">1 h</span></label>
-  <label id="int_4h" onclick="changeInterval('4h',this)"><span class="ind-label">4 h</span></label>
-  <label id="int_1d" onclick="changeInterval('1d',this)"><span class="ind-label">1 j</span></label>
+  <!-- Au clavier aussi (revue du 14/10, C37) : Tab atteint chaque intervalle, Entrée ou Espace le choisit. -->
+  <label id="int_1m" role="radio" aria-checked="false" tabindex="0" onclick="changeInterval('1m',this)" onkeydown="toucheIntervalle(event,this)"><span class="ind-label">1 min</span></label>
+  <label id="int_5m" role="radio" aria-checked="false" tabindex="0" onclick="changeInterval('5m',this)" onkeydown="toucheIntervalle(event,this)"><span class="ind-label">5 min</span></label>
+  <label id="int_15m" class="active" role="radio" aria-checked="true" tabindex="0" onclick="changeInterval('15m',this)" onkeydown="toucheIntervalle(event,this)"><span class="ind-label">15 min</span></label>
+  <label id="int_1h" role="radio" aria-checked="false" tabindex="0" onclick="changeInterval('1h',this)" onkeydown="toucheIntervalle(event,this)"><span class="ind-label">1 h</span></label>
+  <label id="int_4h" role="radio" aria-checked="false" tabindex="0" onclick="changeInterval('4h',this)" onkeydown="toucheIntervalle(event,this)"><span class="ind-label">4 h</span></label>
+  <label id="int_1d" role="radio" aria-checked="false" tabindex="0" onclick="changeInterval('1d',this)" onkeydown="toucheIntervalle(event,this)"><span class="ind-label">1 j</span></label>
   <span class="sep"></span>
   <!-- « Choisir l'affichage » : un seul panneau, dans les deux modes (calques, préréglages, réglages
        fins). Libellé court (« Affichage ») quand la place manque, jamais coupé. -->

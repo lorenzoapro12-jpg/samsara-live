@@ -1605,6 +1605,9 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
   display: flex; align-items: center; gap: 6px; pointer-events: none;
 }
 .astuce-tap[hidden], .astuce-phrase[hidden] { display: none; }
+/* Sous une bulle qui ne peut l'éviter (js : dessinerCalque), la clé s'efface sans quitter sa place :
+   la bulle reste où elle est. Revue du 14/10 (C35). */
+.astuce-tap.sous-bulle { visibility: hidden; }
 .cle-aide {
   flex-shrink: 0; width: 28px; height: 28px; padding: 0; border-radius: min(50%, var(--r-bar)); pointer-events: auto; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
