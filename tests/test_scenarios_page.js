@@ -231,6 +231,25 @@ const etat = page => page.evaluate(() => {
         await t.page.touchscreen.tap(x, y); await t.page.waitForTimeout(200);
         const retire = await t.page.evaluate(() => ({ survol: scenEtat.survol, crossX }));
         check('… un 3e tap au même endroit la retire', retire.survol === null && retire.crossX === null, retire);
+        // Revue du 14/10/2026 : au téléphone, la bulle en détail peut couvrir le point touché (ni
+        // dessous ni dessus n'ont sa hauteur ; selon l'heure, le libellé est plus ou moins haut) ;
+        // le 3e toucher au même endroit la retirait seulement quand elle ne le couvrait pas. Ici, la
+        // bulle est posée par-dessus le point : le contrôle ne dépend plus de l'heure.
+        const force = await t.page.evaluate(([x, y]) => {
+          crossX = null; crossY = null; bulleDetail = null; dessinerCalque();
+          const R = canvas.getBoundingClientRect(), tx = x - R.left, ty = y - R.top;
+          const couvrir = () => { lienBulle = null; if (bulleOuverte) Object.assign(bulleOuverte, { x: Math.max(0, tx - 60), y: Math.max(0, ty - 30), w: 200, h: 160 }); };
+          tapGraphique(x, y); tapGraphique(x, y);   // l'explication, puis son détail
+          const detail = bulleDetail;
+          couvrir();
+          const couvre = !!bulleOuverte && tx >= bulleOuverte.x && tx <= bulleOuverte.x + bulleOuverte.w && ty >= bulleOuverte.y && ty <= bulleOuverte.y + bulleOuverte.h;
+          tapGraphique(x + 30, y + 40); couvrir();   // ailleurs dans la bulle : on lit, rien ne bouge
+          const lit = { crossX, bulleDetail };
+          tapGraphique(x, y);                        // au point même : retirée
+          return { detail, couvre, lit, tx, apres: { crossX, survol: scenEtat.survol ? scenEtat.survol.titre : null } };
+        }, [x, y]);
+        check('… bulle en détail par-dessus le point touché : un toucher ailleurs dans la bulle la laisse, un 3e tap au point même la retire',
+          force.detail !== null && force.couvre && force.lit.crossX === force.tx && force.lit.bulleDetail !== null && force.apres.crossX === null && force.apres.survol === null, force);
       }
       check('écran tactile : aucune erreur JavaScript', !t.erreurs.length, t.erreurs);
       await t.ctx.close();

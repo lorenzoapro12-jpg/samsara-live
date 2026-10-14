@@ -1676,9 +1676,12 @@ function tapGraphique(clientX, clientY) {
     location.href = lienBulle.url; return true;
   }
   // Un clic (ou un toucher) dans la bulle : son détail, la bulle reste en place ; déjà en détail,
-  // rien ne bouge (on lit).
+  // rien ne bouge (on lit). Sauf au point même qui l'a ouverte : au téléphone, une bulle en détail
+  // plus haute que la place libre au-dessus comme au-dessous couvre ce point, et le 3e toucher au
+  // même endroit doit la retirer comme ailleurs (bulle en trois niveaux, 11/10).
   const B = bulleOuverte;
-  if (B && crossX !== null && tx >= B.x && tx <= B.x + B.w && ty >= B.y && ty <= B.y + B.h) {
+  const auPoint = bulleDetail !== null && crossX !== null && Math.abs(crossX - tx) < 8 && Math.abs(crossY - ty) < 8;
+  if (B && crossX !== null && !auPoint && tx >= B.x && tx <= B.x + B.w && ty >= B.y && ty <= B.y + B.h) {
     bulleTenue = B.cle;
     if (B.resume) { bulleDetail = B.cle; dessinerCalque(); }
     return true;
