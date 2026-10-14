@@ -1084,6 +1084,7 @@ function ouvrirFiche(id, ancre) {
   const p = document.getElementById('fichePop');
   if (!p || !FICHES[id]) return;
   p.innerHTML = ficheHtml(id);
+  p.setAttribute('aria-label', 'Légende');
   // « En savoir plus » : replié sur l'écran calme, ouvert avec « Le détail » (qui veut tout voir).
   const plus = p.querySelector('.fiche-plus');
   if (plus) plus.open = detailAllume();
@@ -1104,7 +1105,7 @@ function ouvrirFiche(id, ancre) {
 }
 function fermerFiche() {
   const p = document.getElementById('fichePop');
-  if (p) p.hidden = true;
+  if (p) { p.hidden = true; p.setAttribute('aria-label', 'Légende'); }
   if (ficheRetour && ficheRetour.focus) ficheRetour.focus();
   ficheOuverte = null; ficheRetour = null;
 }
@@ -1140,14 +1141,23 @@ function ouvrirGlossaire(ancre) {
     + '<p class="fiche-touches">' + RACCOURCIS_TERMINAL + '</p>'
     + '<h4>Ce que montre l’écran</h4><div class="glossaire">' + GLOSSAIRE_DEBUTANT.map(i => bouton(i, FICHES[i].titreDeb || FICHES[i].titre)).join('') + '</div>'
     + '<details class="glossaire-plus"><summary>Toutes les fiches ▸</summary>' + tous + '</details>';
+  p.setAttribute('aria-label', 'Légende');
   p.hidden = false;
   p.style.left = ''; p.style.top = '';
   ficheOuverte = 'glossaire'; ficheRetour = ancre || null;
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && ficheOuverte) fermerFiche(); });
+// Un clic hors de la bulle la ferme. « Dedans » se lit sur le CHEMIN du clic (composedPath, fixé au
+// départ du clic) et non sur sa cible seule : un bouton de la bulle qui en change le contenu
+// (un titre du glossaire qui ouvre sa fiche, « Retirer » un palier de la calculette) est détaché
+// avant que le clic arrive ici — p.contains(cible) disait alors « dehors » et la bulle se refermait
+// aussitôt (mesuré le 13/10/2026 sur le glossaire, à 1440 et 390 px).
 document.addEventListener('click', e => {
   const p = document.getElementById('fichePop');
-  if (ficheOuverte && p && !p.contains(e.target) && !(e.target.closest && e.target.closest('.info-btn, #legendesBtn'))) fermerFiche();
+  if (!ficheOuverte || !p) return;
+  const chemin = typeof e.composedPath === 'function' ? e.composedPath() : [];
+  const dedans = chemin.includes(p) || p.contains(e.target);
+  if (!dedans && !(e.target.closest && e.target.closest('.info-btn, #legendesBtn'))) fermerFiche();
 });
 
 // ─── Lecture courte : ce que dit la valeur DU MOMENT, en mots, sans conseil ────────────────

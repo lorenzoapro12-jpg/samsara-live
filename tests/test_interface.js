@@ -27,7 +27,8 @@
 //      forme ET un mot) et sa fiche ; chaque préréglage, la sélection gardée d'une visite à l'autre,
 //      « Revenir au départ » ; « Tout afficher » : au plus 3 sous-graphes, les autres en onglets
 //      qu'un clic échange, le prix à 60 % ; la légende du ruban (calques allumés, la croix masque).
-//   8. LE PANNEAU TIENT DANS L'ÉCRAN, à 360, 390 et 1440 px, dans neuf thèmes et les deux modes.
+//   8. LE PANNEAU TIENT DANS L'ÉCRAN, à 360, 390 et 1440 px, dans neuf thèmes et les deux modes
+//      (le bouton des « Outils » compris).
 //
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
 // USAGE   node tests/test_interface.js
@@ -619,9 +620,10 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
           return { cle: l.dataset.ind, nom: txt(l.querySelector('.aff-nom')), quoi: txt(l.querySelector('.aff-quoi')), imp: imp && txt(imp), classe: imp && [...imp.classList].find(c => c.startsWith('imp-')),
             forme: imp && fond(imp), fiche: !!l.querySelector('.info-btn'), coche: !!l.querySelector('input[type="checkbox"]') };
         });
-        const fins = m.querySelector('details.aff-fins');
+        const fins = m.querySelector('details.aff-fins'), outils = m.querySelector('.aff-outils');
         return { boutons: [...m.querySelectorAll('.aff-boutons button')].map(txt), presets: [...m.querySelectorAll('.aff-preset')].map(txt), cats, lignes,
           garder: (() => { const g = m.querySelector('.aff-tete > .aff-presets + .aff-garder'); return g ? txt(g) : null; })(),
+          outils: outils && { boutons: [...outils.querySelectorAll('button')].map(txt), avantFins: outils.nextElementSibling === fins },
           filtre: !!m.querySelector('#indFiltre'), apercu: !!m.querySelector('#indApercu'),
           fins: fins && { ouvert: fins.open, titre: txt(fins.querySelector('summary')), reglages: fins.querySelectorAll('.reglage').length, dernier: fins === m.querySelector('.ind-liste').lastElementChild } };
       });
@@ -651,6 +653,10 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
       check('la recherche et l’aperçu gardés ; « Réglages fins » repliés tout en bas, avec les réglages d’affichage',
         pan.filtre && pan.apercu && pan.fins && !pan.fins.ouvert && pan.fins.titre === 'Réglages fins' && pan.fins.reglages >= 8 && pan.fins.dernier, pan.fins);
       check('chaque case dit si son calque est allumé', !e.cases.length, e.cases);
+      // Plan du 13/10/2026, idée 7 : un bloc « Outils » (la calculette de risque) juste avant les
+      // « Réglages fins », qui restent le dernier bloc ; ni ligne d'indicateur ni bouton de tête.
+      check('« Outils » : un seul bouton, « Calculette de risque », juste avant les « Réglages fins »',
+        pan.outils && meme(pan.outils.boutons, ['Calculette de risque']) && pan.outils.avantFins && pan.fins && pan.fins.dernier, pan.outils);
 
       // B. Les préréglages : chacun REMPLACE la sélection ; Guide et scénarios restent comme ils sont
       // (sauf « L'essentiel ») ; « Tout » allume tout. Gardés sous samsara-affichage-v1.
@@ -805,7 +811,7 @@ const dansLEcran = m => m.ouvert && m.haut >= 8 - 0.5 && m.bas <= m.H - 8 + 0.5 
           const r = await o8.page.evaluate(() => {
             const m = document.getElementById('indMenu'), rm = m.getBoundingClientRect(), b = document.getElementById('indDropdownBtn');
             const vis = el => el && el.getClientRects().length > 0 && getComputedStyle(el).display !== 'none';
-            const dehors = [...m.querySelectorAll('label[data-ind], .aff-tete button, .aff-fins select, .aff-fins input')].filter(vis)
+            const dehors = [...m.querySelectorAll('label[data-ind], .aff-tete button, .aff-outils button, .aff-fins select, .aff-fins input')].filter(vis)
               .filter(el => { const r = el.getBoundingClientRect(); return r.left < rm.left - 0.5 || r.right > rm.right + 0.5; }).map(el => el.dataset.ind || el.id || el.textContent.trim().slice(0, 20));
             return { large: m.scrollWidth - m.clientWidth, dehors, court: vis(b.querySelector('.aff-court')), long: vis(b.querySelector('.aff-long')), coupe: b.scrollWidth - b.clientWidth, L: innerWidth };
           });

@@ -575,6 +575,13 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 /* « Aide à la lecture » (Complet) : deux cases, séparées des calques par un filet — ce ne sont pas
    des indicateurs (ni importance ni fiche). */
 .ind-dropdown-menu .aff-aide-titre { margin: 8px 6px 0; padding-top: 10px; border-top: 1px solid var(--hairline); }
+/* « Outils » (plan du 13/10/2026, idée 7) : un bouton par outil — la calculette de risque —, juste
+   avant les « Réglages fins », séparé par un filet ; carré dans les thèmes carrés (--r-bar). */
+.aff-outils { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; margin: 10px 6px 0; padding: 10px 10px 2px; border-top: 1px solid var(--hairline); }
+.aff-outils[hidden] { display: none; }
+.aff-outils-titre { font-size: 9px; font-weight: 700; letter-spacing: 0.9px; text-transform: uppercase; color: var(--ink-3); }
+.aff-outils .aff-btn { border-radius: var(--r-bar); }
+@media (pointer: coarse) { .aff-outils .aff-btn { min-height: 40px; } }
 /* L'aperçu du menu : ce que c'est et comment s'en servir, pour la ligne survolée ou touchée.
    Collé en bas du menu (qui défile), toujours visible. */
 .ind-dropdown-menu { max-width: min(380px, calc(100vw - 16px)); }
@@ -1444,6 +1451,26 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 }
 .ligne-reglage { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
 .ligne-reglage input { width: 64px; }
+/* Calculette de risque (js/calculette.js), dans la bulle des légendes : les champs en haut (au
+   téléphone, le clavier couvre le bas de la feuille), les résultats dessous. Un nom à gauche, le
+   champ prend le reste ; 16 px au doigt (en dessous, le téléphone zoome sur le champ) et 40 px de
+   haut ; les boutons sont ceux du glossaire, habillés par chaque thème. */
+.calc-champs { margin: 6px 0 4px; }
+.calc .calc-ligne { flex-wrap: nowrap; margin: 5px 0; }
+.calc-nom { flex: 0 0 8.6em; color: var(--ink-2); font-size: 12px; }
+.calc .calc-ligne input { flex: 1 1 auto; width: auto; min-width: 0; font-variant-numeric: tabular-nums; }
+.calc-paliers { margin: 8px 0 0; padding: 0; border: 0; min-width: 0; }
+.calc-legende { padding: 0; font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--ink-3); }
+.calc .calc-retirer { flex: 0 0 auto; }
+.calc .calc-ajouter { margin: 4px 0 2px; }
+.calc-resultats { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--hairline); }
+.calc-message { margin: 4px 0; font-weight: 650; color: var(--ink-1); }
+.calc-message.calc-attente { font-weight: 400; color: var(--ink-2); }
+.calc-rappel { margin: 6px 0 0; font-size: 11.5px; color: var(--ink-2); }
+@media (pointer: coarse) {
+  .calc .calc-ligne input { font-size: 16px; min-height: 40px; }
+  .calc .glossaire-item { min-height: 40px; }
+}
 .puces { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
 .puce-case {
   display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--r-bar);

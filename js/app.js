@@ -528,6 +528,10 @@ const PARAM = {
   // un même repère franchi n'est redit qu'après `passageMs` ; la marque « nouveau » est un point de
   // rayon `marque` (`marqueComplet`, plus discret, en Complet).
   apprendre: { dureeLisible: 8000, dureeComplet: 6000, passageMs: 15 * 60000, marque: 3, marqueComplet: 2.2 },
+  // Calculette de risque (js/calculette.js, plan du 13/10/2026, idée 7) : la part du capital perdue
+  // si tous les paliers se remplissent puis que le stop saute (`part`, en %, la valeur de départ du
+  // champ) ; de 1 à `paliersMax` paliers. Sans mémoire : rien n'est gardé d'une ouverture à l'autre.
+  risque: { part: 1, paliersMax: 5 },
   // Scénarios du matin (js/scenarios.js) : les nombres de leur dessin et de leurs mots.
   scenarios: {
     point: '07h00',               // l'heure du point du matin dans la routine (à Paris) ; affichée à l'heure de l'appareil (heurePointMatin)
@@ -872,6 +876,8 @@ function filtrerMenu(t) {
   for (const c of menu.querySelectorAll('.cat-title[data-cat]')) c.hidden = !menu.querySelector('label[data-cat="' + c.dataset.cat + '"]:not([hidden])');
   // L'aide à la lecture n'est pas un indicateur : masquée pendant une recherche.
   for (const el of menu.querySelectorAll('.aff-aide, .aff-aide-titre, .aff-legende')) el.hidden = !!q;
+  // Les outils non plus, sauf si la recherche les nomme (« calculette », « risque »…).
+  for (const el of menu.querySelectorAll('.aff-outils')) el.hidden = !!q && !sansAccents(el.textContent + ' stop paliers').includes(q);
   const vide = menu.querySelector('.ind-aucun');
   if (vide) vide.hidden = !!menu.querySelector('label[data-ind]:not([hidden])');
 }
@@ -932,6 +938,10 @@ function buildDropdown() {
   html += '<p class="ind-aucun" hidden>Aucun indicateur ne correspond.</p>';
   // L'aide à la lecture (apprendre), avec « Le détail » : couper la ligne, couper les marques.
   if (detail) html += apprPanneau();
+  // Les outils (plan du 13/10/2026, idée 7) : la calculette de risque, un panneau qu'on ouvre ;
+  // juste avant les « Réglages fins », qui restent le dernier bloc.
+  html += '<div class="aff-outils" role="group" aria-label="Outils"><span class="aff-outils-titre">Outils</span>'
+    + '<button type="button" class="aff-btn aff-calculette" onclick="ouvrirCalculetteMenu()" title="Taille des paliers, prix moyen et perte au stop, pour une part choisie du capital">Calculette de risque</button></div>';
   html += '<details class="aff-fins" id="affFins"' + (finsOuverts ? ' open' : '') + ' ontoggle="finsOuverts = this.open"><summary>Réglages fins</summary>'
     + '<div class="aff-fins-corps">' + (typeof reglagesHtml === 'function' ? reglagesHtml() : '') + '</div></details>';
   html += '</div><div class="ind-apercu" id="indApercu" aria-live="polite">' + apercuPanneau(menuApercu) + '</div>';
