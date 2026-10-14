@@ -1937,11 +1937,18 @@ const Guide = (function () {
   const cleObjectif = f => (famille(f) === 'drapeau' ? 'objectifMat' : famille(f) === 'lignes' ? 'objectifLargeur' : 'objectif');
   /** La phrase de lecture, ses variantes de la plus riche à la plus courte (la dernière est la
    *  forme COMPACTE). o = { prix (live), unite, choix, enTest (bande où est le prix, ou null),
-   *  regime, maintenant (la vue montre le passé), itv (« 15m ») }. Jamais de %, d'heure, ni de nom
-   *  d'indicateur : le verbe vient du régime (le même objet que le badge Expert). */
+   *  regime, maintenant (la vue montre le passé), itv (« 15m »), fourchette (fourchette(…) | null),
+   *  horloge (ms : l'heure de la page) }. Jamais de %, ni de nom d'indicateur : le verbe vient du
+   *  régime (le même objet que le badge Expert). Une seule heure : celle d'une cassure de la
+   *  fourchette, dans la phrase de ses 24 h (phrasesCassureDebutant). */
   const VERBE_DEBUTANT = { hausse: 'monte', baisse: 'baisse', faible: 'hésite', sans: 'hésite', incertaine: 's’agite' };
   function phrasesDebutant(o) {
     if (!fini(o.prix)) return ['Prix en direct indisponible pour l’instant.'];
+    // La fourchette de 7 jours vient de casser (revue du 14/10/2026, N1 ; oui de Lorenzo à Q2) :
+    // pendant 24 h, la phrase la dit À LA PLACE de la lecture du moment, à la même place ; rien
+    // n'est ajouté le reste du temps. Jamais « Maintenant, » : elle porte son heure.
+    const fc = phrasesCassureDebutant(o.fourchette, o.horloge);
+    if (fc.length) return fc.concat([fc[fc.length - 1]]);
     const u = o.unite, ch = o.reperes || choixDebutant(o.choix), rA = ch.dessus && raisonPrincipale(ch.dessus), rB = ch.dessous && raisonPrincipale(ch.dessous);
     const A = rA && prixR(rA, u), B = rB && prixR(rB, u), Bc = rB && chiffresR(rB);
     const H = HORIZON_DEBUTANT[o.itv] || null, Hc = HORIZON_COURT[o.itv] || null, cle = o.regime ? o.regime.cle : 'inconnu';
@@ -3127,8 +3134,9 @@ const Guide = (function () {
   // La part des retours (« une fois sur deux ») n'est mesurée que sur ces paires (marche/range-cassure).
   const FOURCHETTE_MESUREE = ['BTCUSDT'];
   /** La cassure DITE (fourchette(…).cassure, le prix pas revenu dedans), sinon null : une seule
-   *  règle pour « En résumé », la barre du téléphone et la couche du graphique (revue du
-   *  14/10/2026, C1 : la couche garde alors le bord cassé, au lieu du nouveau bas). */
+   *  règle pour « En résumé », la barre du téléphone, la couche du graphique (revue du 14/10/2026,
+   *  C1 : la couche garde alors le bord cassé, au lieu du nouveau bas) et la phrase du haut du
+   *  graphique (revue du 14/10/2026, N1). */
   const cassureDite = fo => (fo && fo.cassure && !fo.cassure.revenu ? fo.cassure : null);
   /** L'heure de la cassure : la FIN de la période qui a cassé (pas son début), heure de l'appareil ;
    *  « à 18:00 », sinon « hier à 18:00 » (la phrase reste jusqu'à 24 h : une heure seule se lirait
@@ -3148,6 +3156,31 @@ const Guide = (function () {
       FOURCHETTE_MESUREE.includes(symbole) ? 'Une fois sur deux, il est revenu dedans dans la journée.' : 'Il revient souvent dedans dans la journée.'];
   }
   const texteCassureFourchette = (fo, symbole, maintenant) => phrasesCassureFourchette(fo, symbole, maintenant).join(' ');
+  /** La phrase du haut du graphique (Lisible) quand la fourchette vient de casser (cassureDite :
+   *  pendant les P.fourchette.phrasePeriodes périodes qui suivent, 24 h, tant que le prix n'est pas
+   *  revenu dedans), sinon [] : ses variantes, de la plus riche à la plus courte, dans l'ordre de
+   *  l'étiquette de la couche (revue du 14/10/2026, C1) : l'heure part d'abord (la bulle la dit
+   *  alors), puis « 7 jours » (« fourchette » n'est que la sienne, M3) ; le côté reste toujours.
+   *  « hier à » n'est jamais raccourci en « à ». Revue du 14/10/2026, N1 (oui de Lorenzo à Q2). */
+  function phrasesCassureDebutant(fo, maintenant) {
+    const k = cassureDite(fo);
+    if (!k) return [];
+    const q = quandCassure(k, maintenant), fin = ' cassée par le ' + (k.sens < 0 ? 'bas' : 'haut');
+    const longue = 'Fourchette de ' + fo.jours + ' jours' + fin, courte = 'Fourchette ' + fo.jours + ' jours' + fin;
+    return (q ? [longue + ' ' + q + '.', courte + ' ' + q + '.'] : []).concat([longue + '.', courte + '.', 'Fourchette' + fin + '.']);
+  }
+  /** La bulle de cette phrase (titre : la phrase posée) : la phrase mesurée de « En résumé »
+   *  (phrasesCassureFourchette) ; sa 1re phrase seulement si le titre n'a pas pu garder l'heure ou
+   *  « 7 jours » (charte, règle 3 : pas de redite), avec les bords de la fourchette cassée ; le
+   *  résumé (1er toucher) : la suite mesurée (« ça bouge souvent fort… » pendant la 1re période,
+   *  puis « pas revenu dedans »), et les retours. → null | { texte, resume } */
+  function bulleCassureDebutant(fo, symbole, maintenant, titre, unite) {
+    const k = cassureDite(fo);
+    if (!k) return null;
+    const L = phrasesCassureFourchette(fo, symbole, maintenant), q = quandCassure(k, maintenant), t = String(titre || '');
+    const tete = q && t.includes(q) && t.includes(fo.jours + ' jours') ? [] : [L[0]];
+    return { texte: tete.concat(['Bas ' + prix(k.bas, unite) + ', haut ' + prix(k.haut, unite) + '.'], L.slice(1), [AVERTISSEMENT]), resume: L.slice(1) };
+  }
 
   // ─── 9. En résumé : tout ce que la page montre, recoupé en une lecture ──────
   /** L'encadré « En résumé » (en tête de la liste « Sur le graphique ») : UNE phrase qui dit où
@@ -3268,6 +3301,6 @@ const Guide = (function () {
     texteSuiteDebutant, prixRond, USAGES_CHIFFRES, usageChiffre, avecUsage, cleEcart, ageLu, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
     MARQUES_FIN, motEchec, nomFormeDetail, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, libelleFormeCourt, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant,
-    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, exempleSvg, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, fourchette, cassureDite, quandCassure, phrasesCassureFourchette, texteCassureFourchette, synthese };
+    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, exempleSvg, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, fourchette, cassureDite, quandCassure, phrasesCassureFourchette, texteCassureFourchette, phrasesCassureDebutant, bulleCassureDebutant, synthese };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;

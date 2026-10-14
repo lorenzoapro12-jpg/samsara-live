@@ -439,6 +439,87 @@ const etat = page => page.evaluate(() => {
       } finally { H.arreter(); }
     }
 
+    // La cassure dite en haut du graphique (revue du 14/10/2026, N1 ; oui de Lorenzo à Q2), sur la
+    // journée réelle du 08/10 rejouée, en Lisible (l'écran de départ). Pendant les 24 h qui suivent la
+    // cassure de 16:00 UTC, la phrase du haut dit « Fourchette de 7 jours cassée par le bas à <heure>. »
+    // à SA place (aucun texte de plus au budget de 5) ; sa bulle reprend la phrase mesurée de « En
+    // résumé ». En 1 min aussi : la fourchette est refaite avec des bougies de 4 h demandées à part
+    // (3 000 bougies d'1 min ne font pas 7 jours). Rien d'ajouté le reste du temps (15:40, avant ; le
+    // 09/10 à 04:10, revenu dedans). Avant : « Sur 3 h 30, le prix baisse. », rien sur la cassure ;
+    // en 1 min, pas de fourchette du tout. Lancé avant la correction, ce bloc échoue.
+    titre('Cassure dite en haut du graphique (08/10 rejoué, Lisible) : 24 h, à la place de la phrase, en 1 min aussi');
+    {
+      const H = require('./scenarios-jour-harnais.js'), X = require('./fixtures/rejeu-jour-0810.json');
+      const MOTS = t => String(t).split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
+      // La phrase posée, la fourchette lue par la page, la bulle de la phrase (sans réticule resté).
+      const lireP = () => {
+        crossX = crossY = null; bulleDetail = null; drawChart(); dessinerCalque();
+        const F = fourchetteDonnees(), k = F && F.cassure, c = guideEtat && guideEtat.ciblePhrase, it = debEtat ? debEtat.items : [];
+        return { itv: chartInterval, n: candles.length, joursCharges: candles.length > 1 ? (candles[candles.length - 1].time - candles[0].time) / 86400 : 0,
+          k: k && { sens: k.sens, bas: k.bas, tFin: k.tFin, revenu: k.revenu, depuis: k.depuis }, heure: k ? Fmt.heure(k.tFin * 1000) : null,
+          phrase: (it.find(i => i.role === 'phrase') || {}).texte || null, roles: it.map(i => i.role), titre: c && c.titre, texte: c ? c.texte : [], resume: c ? c.resume : [],
+          rect: c && c.rects[0], aria: canvas.getAttribute('aria-label'), avert: Guide.AVERTISSEMENT, bannis: Guide.motsBannis(c ? [c.titre].concat(c.texte).join(' ') : '') };
+      };
+      const bulle = () => { const B = guideEtat && guideEtat.bulle; return B && { corps: B.corps.join(' '), resume: B.resume, lignes: B.lignes, nombres: B.nombres, dans: B.y >= 0 && B.y + B.h <= geo.mainH }; };
+      const toucher = async (o, R) => {
+        const b0 = await o.page.evaluate(() => { const q = canvas.getBoundingClientRect(); crossX = crossY = null; bulleDetail = null; return { x: q.left, y: q.top }; });
+        await o.page.touchscreen.tap(b0.x + (R.x0 + R.x1) / 2, b0.y + (R.y0 + R.y1) / 2); await o.page.waitForTimeout(250);
+        return o.page.evaluate(bulle);
+      };
+      try {
+        // A. 16:20 UTC, 390 px, Bureau 95 : la phrase, sa bulle (1er puis 2e toucher), puis en 1 min.
+        let o = await H.ouvrir(nav, H.harnais(X, '2026-10-08T16:20:00Z'), { vue: { width: 390, height: 844 }, tactile: true, theme: 'bureau95', mode: 'debutant' });
+        let r = await o.page.evaluate(lireP);
+        const attendu = 'Fourchette de 7 jours cassée par le bas à ' + r.heure + '.';
+        check(`16:20, 390 px · Lisible : la phrase du haut dit « ${r.phrase} » (la cassure de 16:00 UTC, par le bas), à sa place, ${r.roles.length} textes (≤ 5) ; le graphique porte ce nom`,
+          !!r.k && r.k.sens === -1 && r.k.tFin === Date.parse('2026-10-08T16:00:00Z') / 1000 && r.phrase === attendu && r.titre === attendu && r.aria === attendu
+          && r.roles.filter(x => x === 'phrase').length === 1 && r.roles.length <= 5 && !r.bannis.length, r);
+        let B = r.rect && await toucher(o, r.rect);
+        const mesuree = 'Attention : ça bouge souvent fort juste après, dans les deux sens.';
+        check(`… 1er toucher : le résumé reprend la phrase mesurée (« ${mesuree} »), ${B && B.lignes} lignes, ${B && B.nombres} nombres`,
+          !!B && B.resume && B.corps.startsWith(mesuree) && B.lignes <= 4 && B.nombres <= 3 && B.dans, B);
+        B = r.rect && await (async () => { const b0 = await o.page.evaluate(() => { const q = canvas.getBoundingClientRect(); return { x: q.left, y: q.top }; });
+          await o.page.touchscreen.tap(b0.x + (r.rect.x0 + r.rect.x1) / 2, b0.y + (r.rect.y0 + r.rect.y1) / 2); await o.page.waitForTimeout(250); return o.page.evaluate(bulle); })();
+        const corps = r.texte.slice(0, -1).join(' ');
+        check(`… 2e toucher : les bords de la fourchette cassée, la phrase mesurée, les retours, l'avertissement une fois ; ${MOTS(corps)} mots (≤ 50), sans redire l'heure du titre`,
+          !!B && !B.resume && /^Bas 82 228 \$, haut [\d\s  ]+ \$\./.test(r.texte[0]) && r.texte.includes(mesuree) && r.texte.includes('Une fois sur deux, il est revenu dedans dans la journée.')
+          && r.texte[r.texte.length - 1] === r.avert && MOTS(corps) <= 50 && !corps.includes(r.heure) && B.dans, { B, texte: r.texte });
+        await o.page.evaluate(async () => { await changeInterval('1m', document.getElementById('int_1m')); });
+        await o.page.waitForTimeout(2500);
+        r = await o.page.evaluate(lireP);
+        check(`16:20, 1 min (${r.n} bougies, ${r.joursCharges.toFixed(1)} jours chargés) : la fourchette est refaite en bougies de 4 h, la même cassure ; la phrase dit « ${r.phrase} »`,
+          r.itv === '1m' && r.joursCharges < 7 && !!r.k && r.k.sens === -1 && Math.abs(r.k.bas - 82227.56) < 0.01 && r.k.tFin === Date.parse('2026-10-08T16:00:00Z') / 1000 && r.phrase === attendu && r.roles.length <= 5, r);
+        check('16:20 : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
+        await o.ctx.close();
+        // B. Les autres largeurs et thèmes : la phrase la plus riche qui tient, jamais coupée.
+        for (const [vue, theme] of [[{ width: 1440, height: 900 }, 'bureau95'], [{ width: 390, height: 844 }, 'diazo'], [{ width: 360, height: 740 }, 'neon']]) {
+          const nom = '16:20, ' + vue.width + ' px · ' + theme;
+          o = await H.ouvrir(nav, H.harnais(X, '2026-10-08T16:20:00Z'), { vue, tactile: vue.width < 500, theme, mode: 'debutant' });
+          r = await o.page.evaluate(lireP);
+          const V = await o.page.evaluate(() => Guide.phrasesCassureDebutant(fourchetteDonnees(), Horloges.maintenant()));
+          check(`${nom} : la phrase dit la cassure, entière (« ${r.phrase} »)`, V.includes(r.phrase) && !/…/.test(r.phrase || '') && (vue.width < 1000 || r.phrase === 'Fourchette de 7 jours cassée par le bas à ' + r.heure + '.') && r.roles.length <= 5, { phrase: r.phrase, V });
+          check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+          await o.ctx.close();
+        }
+        // C. Le lendemain (09/10, 02:30 UTC), 390 px : « hier » ne tient pas en 48 caractères, la
+        // phrase garde le côté et la bulle donne l'heure (« hier à … ») ; plus de « juste après ».
+        o = await H.ouvrir(nav, H.harnais(X, '2026-10-09T02:30:00Z'), { vue: { width: 390, height: 844 }, tactile: true, theme: 'bureau95', mode: 'debutant' });
+        r = await o.page.evaluate(lireP);
+        check(`09/10 02:30, 390 px : « ${r.phrase} » ; la bulle commence par « ${r.texte[0]} » et dit « Il n’est pas revenu dedans depuis. »`,
+          r.phrase === 'Fourchette de 7 jours cassée par le bas.' && r.texte[0] === 'Le prix a cassé le bas de sa fourchette de 7 jours hier à ' + r.heure + '.'
+          && r.resume[0] === 'Il n’est pas revenu dedans depuis.' && !r.texte.join(' ').includes('juste après'), r);
+        await o.ctx.close();
+        // D. Rien d'ajouté le reste du temps : avant la cassure, puis une fois le prix revenu dedans.
+        for (const a of ['2026-10-08T15:40:00Z', '2026-10-09T04:10:00Z']) {
+          o = await H.ouvrir(nav, H.harnais(X, a), { vue: { width: 390, height: 844 }, tactile: true, theme: 'bureau95', mode: 'debutant' });
+          r = await o.page.evaluate(lireP);
+          check(`${a.slice(5, 16).replace('T', ' ')} UTC : pas de cassure dite (${r.k ? 'revenu dedans' : 'aucune'}), la phrase de toujours (« ${r.phrase} »)`,
+            (!r.k || r.k.revenu) && !!r.phrase && !/[Ff]ourchette/.test(r.phrase) && !/[Ff]ourchette/.test(r.texte.join(' ')), r);
+          await o.ctx.close();
+        }
+      } finally { H.arreter(); }
+    }
+
     // Chaque trait se nomme (revue du 14/10/2026, C6 et M2), sur la journée réelle du 08/10 rejouée à
     // 15:40 UTC, 390 px, Lisible. « Mon écran » posait trois traits de supports / résistances sans nom
     // (83 048, 82 228 et 81 773 $) : les toucher n'ouvrait que la boîte des bougies, et la puce du
