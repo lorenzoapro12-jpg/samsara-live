@@ -314,7 +314,10 @@ STRUCTURES.tableau = {
 // recule, sinon stable. Aucun seuil (rien de nouveau à déclarer), aucun adjectif : un compte
 // rendu, pas un avis. Un niveau (le financement) ou un état (le GEX) se cite sans verbe ; une
 // clause dont la valeur est « — » est omise.
-const GAZETTE_CLES = { financement: 'Funding', interet: 'OI 24h', cvd: 'CVD 24h', gex: 'GEX' };
+// Le financement est le libellé exact de la cote, « Funding an. » (KPIS_ENTETE, js/app.js) : avec
+// « Funding », la clause disparaissait sans bruit (revue du 14/10, C27). Le taux est annualisé : la
+// manchette dit « par an », sinon il se lirait comme un taux par période, ce qui serait faux.
+const GAZETTE_CLES = { financement: 'Funding an.', interet: 'OI 24h', cvd: 'CVD 24h', gex: 'GEX' };
 const verbeGazette = t => t[0] === '+' ? 'progresse' : t[0] === '−' ? 'recule' : 'stable';
 /** La manchette, en segments [texte, est-une-valeur]. `lire(libellé)` rend le texte affiché du
  *  chiffre clé (ou null) ; `heure`, le texte affiché de #updated. Fonction pure. */
@@ -322,7 +325,7 @@ function manchetteGazette(lire, heure) {
   const cite = cle => { const t = lire(GAZETTE_CLES[cle]); return t && t !== '—' ? t : null; };
   const f = cite('financement'), oi = cite('interet'), cvd = cite('cvd'), gex = cite('gex');
   const titre = [];
-  if (f) titre.push(['Le financement des perpétuels à ', 0], [f, 1]);
+  if (f) titre.push(['Le financement des perpétuels à ', 0], [f, 1], [' par\u00a0an', 0]);
   if (oi) titre.push([(titre.length ? '\u00a0; l’' : 'L’') + 'intérêt ouvert ' + verbeGazette(oi) + '\u00a0: ', 0], [oi, 1], [' en\u00a024\u00a0h', 0]);
   const chapeau = [];
   for (const [cle, v] of [['cvd', cvd], ['gex', gex]]) if (v) chapeau.push([(chapeau.length ? ' · ' : '') + GAZETTE_CLES[cle] + '\u00a0', 0], [v, 1]);
