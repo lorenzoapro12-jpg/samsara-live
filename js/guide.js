@@ -2854,12 +2854,19 @@ const Guide = (function () {
   }
   const surDix = pm => Math.round(pm / 100);
   const mesurable = M => !!M && M.sens.v !== 'peu' && M.obj.v !== 'peu' && M.sens.p !== null && M.obj.p !== null;
+  /** Un écart au hasard que la ligne courte peut dire. Revue du 14/10/2026 (C7) : « plus? » et
+   *  « moins? » (|z| ≥ 1,96 sur environ 230 comparaisons, sans correction) ne tiennent pas, il en
+   *  sort quelques-uns par simple hasard ; ils se lisent « comme au hasard », la nuance reste dans
+   *  le panneau (VERDICT_ANNEES). Jamais deux fois le même nombre (« 5 sur 10 (au hasard 5) »). */
+  const ecartCourt = m => (m.v === 'PLUS' || m.v === 'MOINS') && surDix(m.p) !== surDix(m.q);
+  /** Sens et objectif comme au hasard, lus comme la ligne courte (ligneHasard) ; false sans mesure. */
+  const commeHasard = M => mesurable(M) && !ecartCourt(M.sens) && !ecartCourt(M.obj);
   /** La ligne honnête : « sens prévu 5 sur 10, objectif atteint 5 sur 10, comme au hasard ». Un
-   *  écart au hasard dit le chiffre du hasard à côté ; null si trop peu de cas. */
+   *  écart net au hasard (ecartCourt) dit le chiffre du hasard à côté ; null si trop peu de cas. */
   function ligneHasard(M) {
     if (!mesurable(M)) return null;
-    const deux = M.sens.v === 'pareil' && M.obj.v === 'pareil';
-    const x = (m, nom, dernier) => nom + ' ' + surDix(m.p) + ' sur 10' + (m.v !== 'pareil' ? ' (au hasard ' + surDix(m.q) + ')' : !deux || dernier ? ', comme au hasard' : '');
+    const deux = commeHasard(M);
+    const x = (m, nom, dernier) => nom + ' ' + surDix(m.p) + ' sur 10' + (ecartCourt(m) ? ' (au hasard ' + surDix(m.q) + ')' : !deux || dernier ? ', comme au hasard' : '');
     return x(M.sens, 'sens prévu', false) + ', ' + x(M.obj, 'objectif atteint', true);
   }
   /** Un verdict de la mesure sur des années, en mots (le panneau). */
@@ -3087,8 +3094,9 @@ const Guide = (function () {
   /** L'encadré « En résumé » (en tête de la liste « Sur le graphique ») : UNE phrase qui dit où
    *  penchent les signaux déjà affichés, le pourquoi en lignes courtes (un signal par ligne, son
    *  sens : +1, −1 ou 0), puis les deux repères qui changeraient la lecture. Rien de nouveau n'est
-   *  calculé : la tendance (régime du Guide), un repère franchi et validé, la figure en cours, le
-   *  scénario du matin montré, un repère dépassé puis repoussé (la mèche d'etatFerme, sans sens) ;
+   *  calculé : la tendance (régime du Guide), un repère franchi et validé, la figure en cours (sans
+   *  sens : son objectif, revue du 14/10/2026, C2), le scénario du matin montré, un repère dépassé
+   *  puis repoussé (la mèche d'etatFerme, sans sens) ;
    *  et, couche allumée ou non, la fourchette de 7 jours qui vient de casser (fourchette, sans sens). Aucun pourcentage, aucun conseil, aucune flèche seule. Honnête : un
    *  sens n'est dit que si au moins deux signaux vont dans ce sens et aucun en face ; sinon « pas
    *  de sens net », et pourquoi.
@@ -3133,8 +3141,14 @@ const Guide = (function () {
     const F = (o.figures || []).filter(f => !f.fin && !f.ebauche).map(f => ({ f, e: etatForme(f) }));
     const fv = F.find(x => x.e.cle === 'confirme' && (x.f.sens === 1 || x.f.sens === -1));
     const fd = !fv && F.find(x => x.e.cle === 'demi');
-    if (fv) pourquoi.push({ texte: NOM_LONG_DEBUTANT[fv.f.type] + ' validé : il pointe vers ' + (fv.f.sens > 0 ? 'le haut.' : 'le bas.'), sens: fv.f.sens, fam: 'figure' });
-    else if (fd) {
+    // Une figure validée : dite pour son niveau (l'objectif de sa bulle, ciblesFigure), SANS sens
+    // (revue du 14/10/2026, C2) : elle ne compte plus dans le titre et ne dit plus de direction.
+    // Sur des années, ces figures font comme au hasard (mesureFigure) : la ligne le dit, comme la
+    // bulle, quand la mesure existe pour ce graphique et ne montre aucun écart net.
+    if (fv) {
+      const O = ciblesFigure(fv.f, null, null).find(x => x.s === fv.f.sens), hasard = commeHasard(mesureFigure(fv.f.type, { symbole: o.symbole, intervalle: o.itv }));
+      pourquoi.push({ texte: NOM_LONG_DEBUTANT[fv.f.type] + ' validé' + (O ? ' : objectif ' + prixRond(O.p, u) : '') + (hasard ? ', comme au hasard.' : '.'), sens: 0, fam: 'figure' });
+    } else if (fd) {
       const s = deuxCotes(fd.f) || famille(fd.f) === 'drapeau' ? fd.f.demiSens : fd.f.sens;
       if (s === 1 || s === -1) pourquoi.push({ texte: NOM_LONG_DEBUTANT[fd.f.type] + ' : sorti par ' + (s > 0 ? 'le haut' : 'le bas') + ', pas encore validé.', sens: 0, fam: 'figure' });
     } else {

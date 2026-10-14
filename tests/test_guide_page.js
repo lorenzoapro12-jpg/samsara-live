@@ -428,6 +428,40 @@ const etat = page => page.evaluate(() => {
         }
       } finally { H.arreter(); }
     }
+
+    // Une figure n'a jamais l'air de battre le hasard (revue du 14/10/2026, C2 et C7), sur la journée
+    // réelle du 08/10 rejouée. À 15:40 UTC, « En résumé » disait « Double sommet validé : il pointe
+    // vers le bas. » et comptait cette ligne : avec la tendance, le titre (seule phrase de la barre du
+    // téléphone) devenait « Les signaux penchent plutôt vers la baisse. ». Le 09/10 à 02:30, la bulle
+    // du triple creux validé disait « sens prévu 4 sur 10 (au hasard 5) ».
+    titre('Figure validée (08/10 rejoué) : « En résumé » sans sens, la bulle sans écart au hasard');
+    {
+      const H = require('./scenarios-jour-harnais.js'), X = require('./fixtures/rejeu-jour-0810.json');
+      const lire = () => {
+        crossX = crossY = null; bulleDetail = null; drawChart(); dessinerCalque();
+        const R = syntheseLecture(), c = guideEtat && guideEtat.cibles.find(x => x.figure), S = c && statsBulle(c), res = document.getElementById('reperesResume');
+        return { titre: R && R.titre, ton: R && R.ton, pourquoi: R ? R.pourquoi : [], barre: res && !res.hidden ? res.textContent : null, stats: S && S.texte, type: c && c.figure.f.type,
+          liste: (document.getElementById('synthese') || {}).textContent || '' };
+      };
+      try {
+        let o = await H.ouvrir(nav, H.harnais(X, '2026-10-08T15:40:00Z'), { vue: { width: 390, height: 844 }, tactile: true, theme: 'bureau95', mode: 'expert' });
+        let r = await o.page.evaluate(lire);
+        const lf = r.pourquoi.find(p => p.fam === 'figure') || {}, obj = (/^Objectif ([\d\s]+ \$)/.exec(r.stats || '') || [])[1];
+        check(`15:40, 390 px · expert : la ligne de la figure est sans sens (« ${lf.texte} »), avec l'objectif de sa bulle et « comme au hasard »`,
+          r.type === 'double_sommet' && lf.sens === 0 && !!obj && lf.texte === 'Double sommet validé : objectif ' + obj + ', comme au hasard.' && / comme au hasard ▸$/.test(r.stats || '') && r.liste.includes(lf.texte),
+          { ligne: lf, stats: r.stats });
+        check(`15:40, 390 px · expert : la figure ne fait plus pencher le titre ni la barre (« ${r.titre} » ; avant : « penchent plutôt vers la baisse »)`,
+          r.ton === 'calme' && r.titre === 'Pas de sens net pour l’instant.' && r.barre === r.titre && !r.pourquoi.some(p => p.fam === 'figure' && p.sens), { titre: r.titre, barre: r.barre, pourquoi: r.pourquoi });
+        check('15:40 : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
+        await o.ctx.close();
+        o = await H.ouvrir(nav, H.harnais(X, '2026-10-09T02:30:00Z'), { vue: { width: 390, height: 844 }, tactile: true, theme: 'bureau95', mode: 'debutant' });
+        r = await o.page.evaluate(lire);
+        check(`09/10 02:30, 390 px : la bulle du triple creux validé (« moins? » en 15 min) dit « comme au hasard », sans « (au hasard 5) » (« ${r.stats} »)`,
+          r.type === 'triple_creux' && /ces figures : sens prévu 4 sur 10, objectif atteint 5 sur 10, comme au hasard ▸$/.test(r.stats || '') && !/\(au hasard/.test(r.stats || ''), r.stats);
+        check('09/10 02:30 : aucune erreur JavaScript', !o.erreurs.length, o.erreurs);
+        await o.ctx.close();
+      } finally { H.arreter(); }
+    }
   } finally { await nav.close(); serveur.close(); }
   console.log(ko ? `\n❌ GUIDE À L'ÉCRAN : ${ko} contrôle(s) en échec` : '\n✅ GUIDE À L\'ÉCRAN : TOUS LES CONTRÔLES PASSENT');
   process.exit(ko ? 1 : 0);

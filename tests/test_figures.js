@@ -487,8 +487,29 @@ titre('8 bis. Objectif et statistiques : la ligne courte de la bulle et le déta
     && unites.every(u => G.TYPES.every(t => { const m = M.u[u][t]; return m && m.length === 8 && [m[3], m[7]].every(v => ['pareil', 'plus?', 'moins?', 'PLUS', 'MOINS', 'peu'].includes(v)) && [m[1], m[2], m[5], m[6]].every(x => x === null || x >= 0 && x <= 1000); })));
   const btc = Object.assign({}, ctx, { symbole: 'BTCUSDT', intervalle: '15m' });
   const dc = G.ligneHasard(G.mesureFigure('double_creux', btc)), ts = G.ligneHasard(G.mesureFigure('triple_sommet', btc));
-  check('la ligne honnête : « sens prévu 5 sur 10, objectif atteint 5 sur 10, comme au hasard » ; un écart au hasard dit le chiffre du hasard',
-    dc === 'sens prévu 5 sur 10, objectif atteint 5 sur 10, comme au hasard' && ts === 'sens prévu 4 sur 10 (au hasard 5), objectif atteint 5 sur 10, comme au hasard', { dc, ts });
+  // Revue du 14/10/2026 (C7) : le triple sommet en 15 min (« moins? ») disait « sens prévu 4 sur 10
+  // (au hasard 5) ». Un écart « plus? » / « moins? » ne tient pas (|z| ≥ 1,96 sur environ 230
+  // comparaisons) : la ligne courte le lit « comme au hasard », la nuance reste dans le panneau.
+  check('la ligne honnête : « sens prévu 5 sur 10, objectif atteint 5 sur 10, comme au hasard » ; « moins? » (triple sommet en 15 min) se lit comme au hasard',
+    dc === 'sens prévu 5 sur 10, objectif atteint 5 sur 10, comme au hasard' && ts === 'sens prévu 4 sur 10, objectif atteint 5 sur 10, comme au hasard', { dc, ts });
+  {
+    // Les cas de la revue (Rectangle en 4 h, triples en 15 min, double creux et tête-épaules à
+    // l'envers en 1 h) et tous les autres : aucun « (au hasard N) » tant que la mesure ne montre pas
+    // d'écart net, jamais « N sur 10 (au hasard N) ».
+    const lignes = [].concat(...unites.map(u => G.TYPES.map(t => [u + ' ' + t, G.ligneHasard(G.mesureFigure(t, Object.assign({}, btc, { intervalle: u })))]))).filter(x => x[1]);
+    const ecarts = lignes.filter(x => /au hasard \d/.test(x[1])), cas = ['4h range', '15m triple_sommet', '15m triple_creux', '1h double_creux', '1h ete_inverse'];
+    check(`ligne courte (revue du 14/10, C7) : ${lignes.length} lignes mesurées, aucune avec « (au hasard N) » ; les 5 cas de la revue finissent par « comme au hasard »`,
+      lignes.length > 30 && !ecarts.length && cas.every(k => / sur 10, objectif atteint \d+ sur 10, comme au hasard$/.test((lignes.find(x => x[0] === k) || [])[1])), ecarts);
+    const m = (v, p, q) => ({ v, p, q }), L = (s, ob) => G.ligneHasard({ n: 500, sens: s, obj: ob });
+    check('un écart net (« PLUS » / « MOINS ») dit encore le chiffre du hasard, sauf s’il serait le même nombre deux fois',
+      L(m('PLUS', 700, 500), m('pareil', 500, 500)) === 'sens prévu 7 sur 10 (au hasard 5), objectif atteint 5 sur 10, comme au hasard'
+      && L(m('MOINS', 460, 540), m('pareil', 500, 500)) === 'sens prévu 5 sur 10, objectif atteint 5 sur 10, comme au hasard'
+      && L(m('plus?', 667, 502), m('moins?', 300, 400)) === 'sens prévu 7 sur 10, objectif atteint 3 sur 10, comme au hasard',
+      [L(m('PLUS', 700, 500), m('pareil', 500, 500)), L(m('MOINS', 460, 540), m('pareil', 500, 500)), L(m('plus?', 667, 502), m('moins?', 300, 400))]);
+    const pan = G.statsFigure({ type: 'triple_sommet', famille: 'extremes', sens: -1, phase: 'confirme', fin: null, objectif: 80000, invalidation: 83000 }, null, btc, P, '$').annees;
+    check('le panneau garde la nuance : « un peu moins souvent qu’au hasard, sans que ce soit net » et le chiffre du hasard',
+      /Le sens : un peu moins souvent qu’au hasard, sans que ce soit net\./.test(pan.verdict) && /sens prévu 4 fois sur 10 \(au hasard : 5\)/.test(pan.phrase), pan);
+  }
   check('trop peu de cas (fanion en 1 h) : pas de ligne ; autre paire ou autre unité : pas de mesure',
     G.ligneHasard(G.mesureFigure('fanion', Object.assign({}, btc, { intervalle: '1h' }))) === null && G.mesureFigure('double_creux', Object.assign({}, btc, { symbole: 'SOLUSDT' })) === null
     && G.mesureFigure('double_creux', Object.assign({}, btc, { intervalle: '5m' })) === null);
