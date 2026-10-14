@@ -4609,6 +4609,8 @@ function resolveChart(candles, padL, padR, chartH, W) {
   const scen = scenPreparer({ pad, pw, ph, W, minP, maxP, range, vs, ve, gap, candleW, n: visible.length }, guide);
   scenEtat = scen;
   if (scen) scenBandes(scen);
+  // L'heure d'une annonce (le CPI) : un trait fin, sous les bougies, dans les deux modes (revue du 14/10).
+  if (scen) scenMomentsTraits(scen);
   if (guide) guideBandes(guide);
 
   // Candles
@@ -6615,8 +6617,9 @@ function syntheseLecture() {
     scenario = { rang: m.sc.rang, forme: m.sc.forme, ouvert: !!m.ouvert, tombe, sens: m.pos && m.pos.forme === 'chemin' ? m.pos.sens : 0 };
   }
   // La fourchette de 7 jours qui vient de casser : dite couche allumée ou non (plan du 13/10/2026, idée 5).
+  // L'agitation attendue du point du matin (revue du 14/10/2026, Q3) : sans sens, avec son heure.
   return Guide.synthese({ prix: isNum(livePrice) ? livePrice : D.ref, unite: guideUnite(), itv: chartInterval, regime: D.regime, choix: D.choix, suite: D.suite, figures, scenario,
-    fourchette: fourchetteDonnees(), symbole: activeSymbol, maintenant: Horloges.maintenant() });
+    fourchette: fourchetteDonnees(), symbole: activeSymbol, maintenant: Horloges.maintenant(), agitation: ampleurTexte() });
 }
 /** L'encadré « En résumé », en tête de la liste « Sur le graphique » : la phrase en gras, le
  *  pourquoi (un trait de couleur par signal : hausse, baisse ou neutre, et les mots qui le disent),
@@ -7304,6 +7307,67 @@ function scenDessinables() {
   const L = Scenarios.vivants(previsions, Horloges.maintenant());
   return L.length ? L : null;
 }
+/** L'agitation attendue du point du matin (revue du 14/10/2026, Q3 de Lorenzo : « Les deux ») : les
+ *  deux phrases de Scenarios.texteAmpleur, SANS sens, avec l'heure du calcul — BTCUSDT seulement,
+ *  couche des scénarios affichée (c'est son fichier qui la porte) ; null sinon, ou fenêtre finie. */
+function ampleurTexte() {
+  if (!overlays.scenarios || activeSymbol !== 'BTCUSDT' || !previsions || typeof Scenarios === 'undefined') return null;
+  return Scenarios.texteAmpleur(previsions.ampleur, Horloges.maintenant());
+}
+/** Les heures à retenir du fichier (le CPI, Scenarios.momentsConnus) que la vue montre : leur x. */
+function scenMomentsVus(S) {
+  if (!S || !previsions || activeSymbol !== 'BTCUSDT') return [];
+  const g = S.g;
+  return Scenarios.momentsConnus(previsions).map(m => Object.assign({ x: S.xDeT(m.t) }, m)).filter(m => m.x >= g.pad.left && m.x <= S.xMax);
+}
+/** SOUS les bougies, dans les deux modes : un trait vertical pointillé fin à l'heure d'une annonce
+ *  (le CPI), sans texte — en Débutant, il ne prend aucune place du budget des textes ; il se touche
+ *  (scenMoments). Revue du 14/10/2026, N4 / Q3. */
+function scenMomentsTraits(S) {
+  const M = scenMomentsVus(S);
+  if (!M.length) return;
+  const g = S.g, top = g.pad.top, bas = top + g.ph;
+  ctx.save();
+  ctx.strokeStyle = avecAlpha(COLORS.text, 0.6); ctx.lineWidth = 1.2; ctx.setLineDash([2, 3]);
+  for (const m of M) { ctx.beginPath(); ctx.moveTo(m.x, top); ctx.lineTo(m.x, bas); ctx.stroke(); }
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+/** Les annonces (famille « Heure à retenir ») : la bulle de leur trait, et, avec « Le détail », leur
+ *  nom sur le tracé (« CPI · 14:30 »), posé comme ceux du point et de la fin (scenReperes), après
+ *  eux. Débutant : AUCUNE étiquette (rien de permanent de plus sur l'écran de départ, budget de 5
+ *  textes inchangé) ; le trait seul se touche et ouvre sa bulle. */
+function scenMoments(S, top, bas) {
+  const { g } = S, H = 14;
+  for (const m of scenMomentsVus(S)) {
+    const h = Fmt.jourHeure(m.t, S.maintenant), nomsTous = [m.nom + ' · ' + h, m.court + ' · ' + h, m.micro + ' · ' + h];
+    const texte = [m.effet, Guide.AVERTISSEMENT];
+    const c = { rects: [], segs: [[m.x, top, m.x, bas]], prio: 3, coul: COLORS.ink3, ico: 'moment', titre: nomsTous[0], texte, moment: m.cle };
+    S.cibles.push(c);
+    if (S.deb) continue;
+    // Téléphone en Complet : les deux formes les plus courtes, comme les traits du point et de la fin.
+    const noms = etiqCourtes(g.pw) ? nomsTous.slice(-2) : nomsTous;
+    ctx.font = chartFont(8.5, 650);
+    const rangs = [0, 1, 2, 3, 4].map(k => top + 2 + k * (H + 2)).concat([bas - H - 26, bas - H - 42]);
+    let pose = null, nom = null, xl = 0, w = 0;
+    for (const n of noms) {
+      w = ctx.measureText(n).width + 12 + ICO;
+      for (const xc of [m.x + 3, m.x - 3 - w]) {
+        if (xc < g.pad.left || xc + w > S.xMax) continue;
+        if ((pose = guidePlacer(S.rects, xc, w, H, rangs, top, bas, 1, 0, 0))) { xl = xc; nom = n; break; }
+      }
+      if (pose) break;
+    }
+    if (!pose) continue;
+    c.rects = [guideZone(pose)];
+    etiquettesAFaire.push(() => {
+      ctx.font = chartFont(8.5, 650);
+      ctx.globalAlpha = 0.92; ctx.fillStyle = COLORS.bulle; ctx.beginPath(); ctx.roundRect(xl, pose.y, w, H, rE(3)); ctx.fill(); ctx.globalAlpha = 1;
+      const ico = Icones.dessiner(ctx, 'moment', xl + 2.5, pose.y + 3, 8, COLORS.text);
+      ctx.fillStyle = COLORS.text; ctx.fillText(nom, xl + 5 + (ico ? ICO + 2 : 0), pose.y + H - 4);
+    });
+  }
+}
 /** Au moins un scénario dessinera-t-il une flèche dans la marge de futur (chemin ouvert, rangs 1 à
  *  3, suivi possible sur ces bougies) ? Sinon, sans le Guide, pas de marge : vide, elle se lirait
  *  comme un trou. Mémorisé sur (fichier, intervalle, dernière bougie, minute). */
@@ -7592,10 +7656,12 @@ function scenTracer(S) {
     const un1 = S.F ? S.items.find(i => scenUnEnFondu(S, i)) : null;
     if (un1) scenMarques(S, un1, top, bas);
     scenBoiteDebutant(S);
+    // Le trait d'une annonce (CPI) : touchable, sans étiquette (budget des textes inchangé).
+    scenMoments(S, top, bas);
     return;
   }
   scenBoite(S, top, bas);
-  if (!S.F) return;
+  if (!S.F) { scenMoments(S, top, bas); return; }
   // Le chemin du scénario NOMMÉ (plus petit écart) d'abord : les autres le contournent. S'il n'a
   // pas de place pour sa flèche, aucun autre n'en a (une seule flèche partant du prix, celle d'un
   // scénario moins proche, se lirait comme la plus probable) : leurs repères restent.
@@ -7609,6 +7675,8 @@ function scenTracer(S) {
   const un = S.items.find(it => it.sc.rang === '1');
   if (!un || S.unPose) { const sb = scenSurBougies(S); for (const it of S.items) if (it.sc.rang !== '1') scenLibelle(S, it, top, bas, sb); }
   scenReperes(S, top, bas);
+  // Les annonces (CPI) en dernier : leur nom prend une place restante (sinon, le trait et sa bulle).
+  scenMoments(S, top, bas);
 }
 /** Le bord de la zone z que le prix a franchi en venant de ref (le prix du point, ou la cible
  *  précédente) : le bas d'une zone au-dessus, le haut d'une zone au-dessous. La marque d'un contact
@@ -8233,6 +8301,9 @@ function scenTexteBoite(S, sansBilan, court) {
   // Le même avertissement avec ou sans « Le détail » (revue du 14/10/2026, C19).
   const fin = Guide.AVERTISSEMENT_CLAUDE;
   const officiel = exp ? 'États : suivi en direct (bougies ' + S.itv + ') ; officiel : le journal, le lendemain (bougies 1 min).' : '« (en direct) » : suivi par le site ; la note officielle (journal) vient le lendemain.';
+  // L'agitation attendue, calculée au point du matin (revue du 14/10/2026, Q3) : une ligne sans sens,
+  // avec son heure, après les scénarios, avant le matin précédent et l'avertissement.
+  const ag = ampleurTexte(), agitation = ag ? [ag.join(' ')] : [];
   if (court && F) {
     // Les lignes courtes des scénarios (niveaux, invalidation, état), le bilan, ce qui est en direct.
     const large = S.items.some(i => i.et.cle === 'large');
@@ -8243,6 +8314,7 @@ function scenTexteBoite(S, sansBilan, court) {
       .concat([[PJ.length ? PJ[Math.min(1, PJ.length - 1)] : null, RE.length ? RE[Math.min(1, RE.length - 1)] : null].filter(Boolean).join(' · ')].filter(Boolean).map(t => t + '.'))
       .concat(S.items.map(it => Scenarios.ligne(it.sc, large && it.et.cle === 'large' ? null : it.et, S.mode, true) + (J && it.j ? Scenarios.suffixeExpert(it.j, J) : '')))
       .concat(large ? [Scenarios.noteLarge(S.itv, 'debutant')] : [])
+      .concat(agitation)
       .concat([(b ? b + ' · ' : '') + (exp ? 'Claude (IA), sans pourcentage.' : 'Classé par Claude (une IA), sans pourcentage.')])
       .concat([fin]);
   }
@@ -8257,6 +8329,7 @@ function scenTexteBoite(S, sansBilan, court) {
     else if (F && F.bilan) out.push('Pas encore de matin compté dans la mesure de l’ordre.');
     else if (F) out.push('Ce fichier ne donne aucun chiffre de réussite.');
   }
+  out.push(...agitation);
   if (F && F.precedents.length) {
     const st = F.statuts || Scenarios.STATUTS, m = F.precedents[0];
     out.push('Matin du ' + Scenarios.jourGroupe(m.groupe) + ' (journal) : ' + m.scenarios.slice(0, 3).map(x => {
@@ -8481,7 +8554,11 @@ function scenTexteLigneDebutant(S) {
       const e = previsionsEchec, h = e ? Fmt.jourHeure(e.a) : null;
       out.push('Fichier des scénarios illisible' + (e ? ' (' + scenRaison(e.raison) + (h ? ', ' + h : '') + ')' : '') + ' : rien n’est dessiné.');
     }
-    out.push(chaque, avert);
+    // L'agitation attendue (revue du 14/10/2026, N4 ; Q3) peut accompagner un fichier d'attente :
+    // entière si elle tient dans le budget, sinon sa première phrase, sinon rien.
+    const ag = ampleurTexte(), max = PARAM.guide.debutant.bulleMots;
+    const agit = ag ? [ag.join(' '), ag[0]].find(x => motsDe([...out, chaque, x].join(' ')) <= max) : null;
+    out.push(chaque, ...(agit ? [agit] : []), avert);
     return out;
   }
   // Revue du 14/10/2026 (M6 : cette bulle faisait 131 mots pour un budget de 50,
@@ -8507,6 +8584,9 @@ function scenTexteLigneDebutant(S) {
   const marque = une === '(journal)' ? prendre('Journal : la note officielle, le lendemain.')
     : une === '(en direct)' ? prendre('En direct : calcul du site. Le journal note le lendemain.')
       : une === null ? prendre('« (en direct) » : calcul du site. « (journal) » : la note du lendemain.') : null;
+  // L'agitation attendue du point du matin (revue du 14/10/2026, N4 ; Q3 de Lorenzo : « Les deux ») :
+  // sans sens, avec son heure ; entière si elle tient dans le budget, sinon sa première phrase.
+  const ag = ampleurTexte(), agit = ag ? prendre(ag.join(' '), ag[0]) : null;
   const r = J ? prendre(Scenarios.texteResteDebutant(J, S.maintenant, true)) : null;
   brefs.forEach((b, i) => { if (b && prendre(BREF)) lignes[i] += BREF; });
   const iNom = J ? S.items.findIndex(it => it.j && J.meneur === it.j) : -1;
@@ -8518,7 +8598,7 @@ function scenTexteLigneDebutant(S) {
   const hors = J && J.hors ? prendre('Le prix est allé au-delà de tous les niveaux du matin.') : null;
   const meneur = prendre(m);
   if (classe) out.push(classe);
-  for (const x of lignes.map(l => l + '.').concat([r, hors, meneur, marque])) if (x) out.push(x);
+  for (const x of lignes.map(l => l + '.').concat([r, hors, meneur, agit, marque])) if (x) out.push(x);
   out.push(avert);
   return out;
 }

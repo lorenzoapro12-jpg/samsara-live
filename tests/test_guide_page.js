@@ -252,10 +252,16 @@ const etat = page => page.evaluate(() => {
           const res = document.getElementById('reperesResume');
           return el && { premier: premier === el, titre: el.querySelector('.synthese-titre').textContent, gras: +getComputedStyle(el.querySelector('.synthese-titre')).fontWeight,
             pourquoi: el.querySelectorAll('.synthese-liste')[0] ? el.querySelectorAll('.synthese-liste')[0].children.length : 0, texte: el.innerText,
-            dansEcran: r.height > 60 && r.top >= 0 && r.bottom <= innerHeight + 1, barre: res && !res.hidden ? res.textContent : null };
+            dansEcran: r.height > 60 && r.top >= 0 && r.bottom <= innerHeight + 1, barre: res && !res.hidden ? res.textContent : null,
+            agitation: typeof ampleurTexte === 'function' ? ampleurTexte() : null };
         });
+        // Le seul % permis : l'écart attendu du point du matin (revue du 14/10/2026, N4 ; Q3 de
+        // Lorenzo : « Les deux »), quand le fichier du matin le donne ; il est retiré avant de chercher un %.
+        const syTexte = sy ? (sy.agitation || []).reduce((x, ph) => x.split(ph).join(''), sy.texte) : '';
         check(`${nom} : « En résumé » en tête de la liste, visible, la phrase en gras, le pourquoi et l'avertissement`, sy && sy.premier && sy.dansEcran && sy.gras >= 700 && sy.pourquoi >= 1
-          && /Une description, pas un conseil\./.test(sy.texte) && !/%/.test(sy.texte) && (enColonne ? sy.barre === null : sy.barre === sy.titre), sy);
+          && /Une description, pas un conseil\./.test(sy.texte) && !/%/.test(syTexte) && (enColonne ? sy.barre === null : sy.barre === sy.titre), sy);
+        if (sy && sy.agitation) check(`${nom} : « En résumé » dit l'agitation attendue, sans sens, avec l'heure du calcul (« ${sy.agitation.join(' ')} »)`,
+          sy.agitation.every(ph => sy.texte.includes(ph)) && /^Écart attendu entre plus bas et plus haut/.test(sy.agitation[0]) && /\(calcul de \d\d:\d\d\)\.$/.test(sy.agitation[1]), sy.agitation);
         // La colonne ouverte rétrécit le graphique : la liste est relue (les repères de la vue).
         const lignes2 = await o.page.evaluate(() => [...document.querySelectorAll('#reperesListe button')].map(b => b.textContent));
         const k = lignes2.indexOf((pub.find(L => lignes2.includes(L.titre)) || {}).titre);

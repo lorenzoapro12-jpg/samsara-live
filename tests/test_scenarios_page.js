@@ -13,7 +13,12 @@
 //      DOIGT (390 px) : un tap sur le libellé (ou l'encadré replié) → l'explication, un 2e tap la retire ;
 //   3. FICHIER D'ATTENTE : une ligne, la note du fichier ; FICHIER ABSENT : « pas de fichier
 //      lisible (HH:MM UTC) » ; rien d'autre n'est dessiné ;
-//   4. MASQUÉ dans le menu : plus rien, choix gardé (samsara-scenarios-v1).
+//   4. MASQUÉ dans le menu : plus rien, choix gardé (samsara-scenarios-v1) ;
+//   5. HEURE À RETENIR ET AGITATION (revue du 14/10/2026, N4 ; Q3 de Lorenzo : « Les deux ») : le
+//      trait du CPI (L'essentiel : sans nom, touchable, budget des textes du départ inchangé ; Le
+//      détail : nommé et dans la liste), sa bulle ; l'agitation attendue, sans sens, avec sa source
+//      et son heure, dans la bulle des scénarios et dans « En résumé » ; le FOMC lu, pas dessiné ;
+//      sans les deux clés (fichier d'avant), rien de tout cela.
 // Binance simulé (bougies déterministes autour de 86 000) ; tests/fixtures/previsions.json
 // décalé pour que le point du matin tombe 3 h avant maintenant.
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
@@ -23,6 +28,7 @@ const REPO = path.resolve(__dirname, '..');
 const { previsionsFixture, previsionsAttente, estPrevisions } = require('./previsions-fixture');
 const Fm = require(path.join(REPO, 'js/format.js'));
 const Sc = require(path.join(REPO, 'js/scenarios.js'));
+const Guide = require(path.join(REPO, 'js/guide.js'));
 
 let playwright = null;
 for (const p of ['playwright', '/opt/node22/lib/node_modules/playwright', process.env.PLAYWRIGHT_MODULE].filter(Boolean)) {
@@ -62,7 +68,8 @@ const serveur = http.createServer((req, res) => {
 });
 
 /** prev : 'complet' | 'attente' | 'absent' | 'hier' (point 26 h avant maintenant, rangs 1 à 3 finis) |
- *  'ferme' (le rang 1 invalidé en direct : cibles 89 000 puis 90 000, invalidation 86 000) ;
+ *  'ferme' (le rang 1 invalidé en direct : cibles 89 000 puis 90 000, invalidation 86 000) |
+ *  'sansAgitation' (le fichier complet d'avant le 14/10/2026 : ni « ampleur » ni « moments ») ;
  *  sansGuide : le Guide masqué. */
 async function ouvrir(nav, vue, mode, prev, tactile, sansGuide) {
   const ctx = await nav.newContext(Object.assign({ viewport: vue, deviceScaleFactor: 1 }, tactile ? { hasTouch: true, isMobile: true } : {}));
@@ -77,7 +84,8 @@ async function ouvrir(nav, vue, mode, prev, tactile, sansGuide) {
       if (estPrevisions(u)) {
         if (prev === 'absent') return r.fulfill({ status: 404, headers: cors, body: '' });
         const ferme = d => { const s = d.scenarios.find(x => x.rang === '1'); s.cibles = [89000, 90000]; s.invalidation = 86000; s.origines = {}; };
-        return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: prev === 'attente' ? previsionsAttente() : previsionsFixture(prev === 'hier' ? { ilYaMs: 26 * 3600e3 } : prev === 'ferme' ? { modifier: ferme } : {}) });
+        return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: prev === 'attente' ? previsionsAttente()
+          : previsionsFixture(prev === 'hier' ? { ilYaMs: 26 * 3600e3 } : prev === 'ferme' ? { modifier: ferme } : prev === 'sansAgitation' ? { sansAgitation: true } : {}) });
       }
       if (u.includes('heatmap')) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: fs.readFileSync(path.join(REPO, 'heatmap.json')) });
       if (/\/master\/market-data\.json/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: MD });
@@ -311,6 +319,111 @@ const etat = page => page.evaluate(() => {
       check('absent (404) : « Scénarios du matin : pas de fichier lisible (HH:MM) », à l\'heure de l\'appareil', ez && ez.boite && ez.boite.seule && /^Scénarios du matin : pas de fichier lisible \(\d\d:\d\d\)$/.test(ez.boite.lignes[0]), ez && ez.boite);
       check('absent : aucune erreur JavaScript', !z.erreurs.length, z.erreurs);
       await z.ctx.close();
+    }
+
+    titre('Heure à retenir (CPI) et agitation attendue (revue du 14/10/2026, N4 ; Q3 : « Les deux »)');
+    {
+      const EFFET = 'Souvent 2 à 4 fois plus agité pendant quelques heures, dans les deux sens.';
+      const SENS = /hausse|baisse|monte|montée|descend|grimpe|chute|rebond|achet|vend/i;
+      const motsN = x => x.split(/\s+/).filter(w => /[\p{L}\d]/u.test(w)).length;
+      const lit = page => page.evaluate(() => {
+        const S = scenEtat, R = syntheseLecture();
+        const bo = S && ((S.boite && S.boite.cible) || S.cibles.find(c => c.ico === 'scenario' && c.prio <= 1 && /^Scénarios/.test(c.titre || '')));
+        return {
+          ag: ampleurTexte(), max: PARAM.guide.debutant.bulleMots,
+          // La bulle de L'essentiel avec un seul scénario : la place de l'agitation dans le budget.
+          seul: S && debutant() && S.items.length ? scenTexteLigneDebutant(Object.assign({}, S, { items: S.items.slice(0, 1) })) : null,
+          lus: previsions && previsions.moments ? previsions.moments.map(m => m.nom) : null,
+          cpi: S ? S.cibles.filter(c => c.moment).map(c => ({ moment: c.moment, ico: c.ico, titre: c.titre, texte: c.texte, rects: c.rects.length, segs: c.segs.map(q => q.slice()) })) : [],
+          titres: S ? S.cibles.map(c => c.titre || '') : [], top: S && S.g.pad.top, ph: S && S.g.ph,
+          boite: bo ? { texte: [].concat(bo.texte || []), court: bo.texteCourt ? [].concat(bo.texteCourt) : null } : null,
+          resume: R ? R.pourquoi.map(p => ({ texte: p.texte, sens: p.sens, agitation: !!p.agitation })) : null,
+          items: typeof debEtat !== 'undefined' && debEtat ? debEtat.items.map(i => ({ role: i.role, texte: i.texte })) : null,
+          liste: [...document.querySelectorAll('#reperesListe button')].map(b => b.textContent),
+        };
+      });
+      /** Le trait du CPI touché (doigt) ou survolé (souris) là où il est seul sous le doigt : sa bulle. */
+      const toucherCpi = async (o, tactile) => {
+        const pt = await o.page.evaluate(() => {
+          const c = scenEtat.cibles.find(q => q.moment), s = c && c.segs[0], R = canvas.getBoundingClientRect();
+          if (!s) return null;
+          for (let k = 2; k < 30; k++) { const y = s[1] + (s[3] - s[1]) * k / 30; if (guideCibleSous(s[0] + 2, y, geo.mainH) === c) return { x: R.left + s[0] + 2, y: R.top + y }; }
+          return null;
+        });
+        if (!pt) return null;
+        if (tactile) await o.page.touchscreen.tap(pt.x, pt.y); else { await o.page.mouse.move(pt.x - 10, pt.y - 3); await o.page.mouse.move(pt.x, pt.y, { steps: 3 }); }
+        await o.page.waitForTimeout(250);
+        return o.page.evaluate(() => ({ survol: scenEtat.survol ? scenEtat.survol.titre : null, corps: scenEtat.bulle ? scenEtat.bulle.corps.join(' ') : '', titre: reperesBulleTitre }));
+      };
+      const sansSens = ph => ph.every(x => motsN(x) <= 15 && !Guide.motsBannis(x).length && !SENS.test(x));
+      const rolesSans = {};
+      for (const [vue, mode, tactile] of [[{ width: 1440, height: 900 }, 'debutant', false], [{ width: 390, height: 800 }, 'debutant', true], [{ width: 1440, height: 900 }, 'expert', false], [{ width: 390, height: 800 }, 'expert', true]]) {
+        const nom = vue.width + ' px · ' + (mode === 'debutant' ? 'L’essentiel' : 'Le détail');
+        // D'abord le fichier d'avant : rien de neuf ; la liste des textes du départ, pour comparer.
+        const z = await ouvrir(nav, vue, mode, 'sansAgitation', tactile);
+        const ez = await lit(z.page);
+        rolesSans[nom] = ez.items && ez.items.map(i => i.role);
+        check(`${nom} · sans « ampleur » ni « moments » : ni trait du CPI, ni ligne d’agitation (bulle des scénarios, En résumé)`,
+          ez.ag === null && !ez.cpi.length && !(ez.lus || []).length && ez.boite && !ez.boite.texte.some(t => /Écart attendu|Une fois sur dix/.test(t))
+          && !(ez.resume || []).some(p => p.agitation || /Écart attendu/.test(p.texte)) && !ez.titres.some(t => /CPI|inflation/i.test(t)), ez);
+        check(`${nom} · sans les deux clés : aucune erreur JavaScript`, !z.erreurs.length, z.erreurs);
+        await z.ctx.close();
+
+        const o = await ouvrir(nav, vue, mode, 'complet', tactile);
+        if (process.env.SCEN_CAPTURES) await o.page.screenshot({ path: path.join(process.env.SCEN_CAPTURES, 'cpi-' + vue.width + '-' + mode + '.png') });
+        const e = await lit(o.page);
+        // L'agitation : deux phrases, la source (le calcul du matin) et son heure ; 3,07 → 3,1 % ; 6,19 → 6,2 %.
+        const ph = e.ag || [];
+        check(`${nom} : l’agitation attendue, deux phrases sans sens, avec l’heure du calcul (« ${ph.join(' ')} »)`, ph.length === 2
+          && /^Écart attendu entre plus bas et plus haut d’ici (demain |le \d\d\/\d\d )?\d\d:\d\d : en général 3,1 %\.$/.test(ph[0]) && /^Une fois sur dix, plus de 6,2 % \(calcul de \d\d:\d\d\)\.$/.test(ph[1]) && sansSens(ph), ph);
+        if (mode === 'debutant') {
+          // L'essentiel : la bulle garde son budget de mots hors avertissement (PARAM.guide.debutant.bulleMots,
+          // revue du 14/10/2026, M6). L'agitation y entre entière, ou sa 1re phrase, si elle tient ;
+          // sinon elle reste dans « En résumé », où N4 la demandait. Quatre scénarios (ce fichier)
+          // prennent la place ; avec un seul, elle tient entière.
+          const t = e.boite ? e.boite.texte : [], aG = t.filter(x => x === ph.join(' ') || x === ph[0]), mots = motsN(t.slice(0, -1).join(' '));
+          check(`${nom} : dans la bulle des scénarios, au plus une fois et dans le budget (${mots} ≤ ${e.max} mots)`, ph.length && e.boite && aG.length <= 1 && mots <= e.max
+            && (!e.boite.court || aG.every(x => e.boite.court.includes(x))), e.boite);
+          check(`${nom} : avec un seul scénario, elle tient entière dans la bulle, en une ligne, avant l’avertissement`, ph.length && e.seul && e.seul.filter(x => x === ph.join(' ')).length === 1
+            && e.seul.indexOf(ph.join(' ')) < e.seul.length - 1 && motsN(e.seul.slice(0, -1).join(' ')) <= e.max, e.seul);
+        } else check(`${nom} : dans la bulle des scénarios${e.boite && e.boite.court ? ' (entière et courte)' : ''}, en une ligne`, ph.length && e.boite && e.boite.texte.filter(t => t === ph.join(' ')).length === 1
+          && (!e.boite.court || e.boite.court.includes(ph.join(' '))), e.boite);
+        const rAg = (e.resume || []).filter(p => p.agitation);
+        check(`${nom} : dans « En résumé », la dernière ligne du pourquoi, sans sens`, rAg.length === 1 && rAg[0].texte === ph.join(' ') && rAg[0].sens === 0 && e.resume[e.resume.length - 1].agitation, e.resume);
+        // Le trait du CPI : la famille « Heure à retenir », son nom entier dans la bulle, l'effet mesuré.
+        const c = e.cpi[0];
+        check(`${nom} : un trait du CPI, famille « Heure à retenir », de haut en bas du tracé (« ${c && c.titre} »)`, e.cpi.length === 1 && c.moment === 'CPI' && c.ico === 'moment'
+          && /^Chiffres américains de l’inflation \(CPI\) · \d\d:\d\d$/.test(c.titre) && c.segs.length === 1 && c.segs[0][0] === c.segs[0][2] && c.segs[0][1] === e.top && Math.abs(c.segs[0][3] - (e.top + e.ph)) < 0.5, e.cpi);
+        // L'avertissement partagé du Guide, le même dans les deux modes (revue du 14/10/2026, C19 :
+        // plus de « pas une recommandation »).
+        check(`${nom} : sa bulle dit l’effet mesuré, sans sens, puis « pas un conseil »`, c && c.texte[0] === EFFET
+          && c.texte[1] === Guide.AVERTISSEMENT && sansSens([c.texte[0].replace('dans les deux sens', '')]), c && c.texte);
+        check(`${nom} : le FOMC est lu, jamais dessiné`, e.lus && e.lus.includes('FOMC') && !e.titres.some(t => /FOMC|\bFed\b/.test(t)), [e.lus, e.titres]);
+        if (mode === 'debutant') {
+          // L'écran de départ : rien de permanent en plus. Le trait n'a pas de nom ; les textes du
+          // budget (5 au plus) sont les mêmes qu'avec le fichier d'avant.
+          check(`${nom} : le trait du CPI n’a aucun nom sur le tracé`, c && c.rects === 0, c);
+          check(`${nom} : budget des textes du départ inchangé (${e.items && e.items.length} ≤ ${5}), aucun ne parle du CPI ni de l’agitation`, e.items && e.items.length <= 5
+            && JSON.stringify(e.items.map(i => i.role)) === JSON.stringify(rolesSans[nom]) && !e.items.some(i => /CPI|inflation|Écart attendu|plus agité/i.test(i.texte)), [e.items, rolesSans[nom]]);
+        } else {
+          // Le détail : le nom posé si la place le permet (grand écran : toujours ici), et la ligne de la liste.
+          if (vue.width >= 1024) check(`${nom} : le nom du CPI posé sur le tracé`, c && c.rects === 1, c);
+          check(`${nom} : la liste « Sur le graphique » a sa ligne (« ${c && c.titre} »)`, c && e.liste.includes(c.titre), e.liste);
+        }
+        const b = c ? await toucherCpi(o, tactile) : null;
+        check(`${nom} : ${tactile ? 'toucher' : 'survoler'} le trait ouvre sa bulle : son nom, l’effet`, b && b.survol === c.titre && b.titre === c.titre && b.corps.includes(EFFET), b);
+        // Une autre paire : ni agitation (elle est mesurée sur BTC/USDT seulement), ni trait.
+        const autre = await o.page.evaluate(() => { const s0 = activeSymbol; activeSymbol = 'ETHUSDT'; const r = { ag: ampleurTexte(), cpi: scenEtat ? scenMomentsVus(scenEtat).length : 0 }; activeSymbol = s0; return r; });
+        check(`${nom} : sur une autre paire, ni agitation ni trait`, autre.ag === null && autre.cpi === 0, autre);
+        check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
+        await o.ctx.close();
+      }
+      // La fenêtre finie (fichier d'hier, non republié) : l'agitation n'est plus dite.
+      const h = await ouvrir(nav, { width: 1440, height: 900 }, 'expert', 'hier');
+      const eh = await lit(h.page);
+      check('fichier d’hier (fenêtre de 24 h finie) : plus de ligne d’agitation, ni dans la bulle ni dans « En résumé »', eh.ag === null && eh.boite && !eh.boite.texte.some(t => /Écart attendu/.test(t)) && !(eh.resume || []).some(p => p.agitation), eh);
+      check('fichier d’hier : aucune erreur JavaScript', !h.erreurs.length, h.erreurs);
+      await h.ctx.close();
     }
 
     titre('Masqué dans le menu : plus rien, choix gardé');

@@ -63,6 +63,9 @@ const BANNIS = Guide.MOTS_BANNIS_DEBUTANT, EXPLIQUES = Guide.EXPLIQUES_DEBUTANT;
 const bannis = t => BANNIS.filter(re => re.test(t)).map(re => t.match(re)[0]);
 // Les formats de l'Expert : « $82 », « 1.6B », « 54.8K » (A6) ; « UTC » est déjà dans la liste.
 const FORMATS_EXPERT = [/\$\d/, /\d[.,]\d+[KMB]\b/];
+// L'écart attendu du point du matin (Scenarios.texteAmpleur ; revue du 14/10/2026, Q3) : ses deux
+// phrases, le seul pourcentage permis dans la bulle de la boîte des scénarios.
+const AGITATION = /Écart attendu entre plus bas et plus haut d’ici [^.]* : en général [\d,]+ %\.\s*Une fois sur dix, plus de [\d,]+ % \(calcul de \d\d:\d\d\)\./g;
 /** Un texte de bulle : un terme technique n'y est permis qu'avec son explication (EXPLIQUES). */
 function bannisBulle(t) {
   let s = t;
@@ -189,7 +192,7 @@ const dessin = page => page.evaluate(() => {
     gd: guideEtat && guideEtat.debutant ? guideEtat.debutant.items.length : null,
     chemins: guideEtat ? guideEtat.chemins || null : 'sans guide',
     cibles: (guideEtat ? guideEtat.cibles : []).map(c => ({ prio: c.prio, titre: c.titre })),
-    scen: scenEtat ? { libelles: scenEtat.libelles, cibles: scenEtat.cibles.map(c => ({ prio: c.prio, titre: c.titre, scenario: c.scenario || null, texte: [].concat(c.texte || []) })),
+    scen: scenEtat ? { libelles: scenEtat.libelles, cibles: scenEtat.cibles.map(c => ({ prio: c.prio, titre: c.titre, scenario: c.scenario || null, texte: [].concat(c.texte || []), moment: c.moment || null, rects: (c.rects || []).length, segs: (c.segs || []).length })),
       boite: scenEtat.boite ? { deb: !!scenEtat.boite.deb, cede: !!scenEtat.boite.cede, replie: !!scenEtat.boite.replie, texte: scenEtat.boite.texte || null, lignes: scenEtat.boite.lignes.map(l => l.t) } : null,
       items: scenEtat.items.map(i => ({ rang: i.sc.rang, cle: i.et.cle })), montre: scenEtat.montre ? scenEtat.montre.sc.rang : null } : null,
     sous: geo.sous.map(s => s.cle),
@@ -331,7 +334,12 @@ async function controlerEcran(o, nom, opts = {}) {
   check(`${nom} : ni badge du régime, ni « Et ensuite ? » (guideEtat.chemins vide)`, !e.cibles.some(c => /^Tendance/.test(c.titre || '')) && !e.chemins, { chemins: e.chemins, cibles: e.cibles.map(c => c.titre) });
   // Le scénario MONTRÉ (rang 1 tant qu'il est ouvert ou réalisé ; sinon le suivant encore ouvert —
   // contrat de la journée, plan-scenarios.md M7) : son libellé seul, jamais deux.
-  if (e.scen) check(`${nom} : un seul libellé de scénario, celui du scénario montré (${e.scen.montre || '1'}) ; ni nom du point et de la fin`, e.scen.libelles.length <= 1 && e.scen.libelles.every(l => l.rang === (e.scen.montre || '1')) && !e.scen.cibles.some(c => c.prio === 3), e.scen);
+  // L'heure d'une annonce (le CPI ; revue du 14/10/2026, N4 / Q3) : son trait se touche (même famille,
+  // même rang que ceux du point et de la fin), mais en L'essentiel il n'a AUCUN nom posé sur le tracé.
+  if (e.scen) check(`${nom} : un seul libellé de scénario, celui du scénario montré (${e.scen.montre || '1'}) ; ni nom du point et de la fin`, e.scen.libelles.length <= 1 && e.scen.libelles.every(l => l.rang === (e.scen.montre || '1')) && !e.scen.cibles.some(c => c.prio === 3 && !c.moment), e.scen);
+  const cpiDeb = e.scen ? e.scen.cibles.filter(c => c.moment) : [];
+  if (cpiDeb.length) check(`${nom} : le trait du CPI se touche (« ${cpiDeb[0].titre} »), sans nom posé sur le tracé, sans texte de plus au départ`,
+    cpiDeb.every(c => c.moment === 'CPI' && c.rects === 0 && c.segs === 1 && /^Chiffres américains de l’inflation \(CPI\) · /.test(c.titre)) && !e.trace.some(t => /CPI|inflation/i.test(t)) && !(e.items || []).some(i => /CPI|inflation/i.test(i.texte)), cpiDeb);
   // Les puces du ruban : une par calque de marché choisi (opts.calques ; opts.puces : des calques
   // posés sur les bougies seulement, sans le Volume — la fourchette de 7 jours), aucune sinon.
   const nPuces = opts.calques ? opts.calques.length : opts.puces || 0;
@@ -488,9 +496,10 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
           // lieu du rang ; jamais « place prise ».)
           if (role === 'scenario') detail = new RegExp('^Scénario ' + mo + ' de Claude$').test(r.titre) && !autres.some(x => new RegExp('(^|\\s)' + x + '\\. ').test(r.corps)) && (/sans pourcentage/.test(r.corps) || /Les autres/.test(r.corps)) && /Une hypothèse de Claude \(une IA\), pas un conseil/.test(r.corps) && !/place prise/.test(r.corps);
           if (role === 'boite') detail = /\b1\. /.test(r.corps) && /\b2\. /.test(r.corps) && /\b3\. /.test(r.corps) && /journal/.test(r.corps);
-          // Choix 1B : le classement est celui de Claude (une IA), sans pourcentage ; le seul « % »
-          // admis est la marge d'une zone (« ± 0,3 % »), qui n'est pas une probabilité.
-          if (role === 'scenario' || role === 'boite') detail = detail && /Claude[ ,(]+une IA/.test(r.corps) && !/%/.test(r.corps.replace(/±\s*[\d,]+\s*%/g, '') + r.titre);
+          // Choix 1B : le classement est celui de Claude (une IA), sans pourcentage ; les seuls « % »
+          // admis sont la marge d'une zone (« ± 0,3 % »), qui n'est pas une probabilité, et l'écart
+          // attendu du point du matin, sans sens (revue du 14/10/2026, N4 ; Q3 de Lorenzo : « Les deux »).
+          if (role === 'scenario' || role === 'boite') detail = detail && /Claude[ ,(]+une IA/.test(r.corps) && !/%/.test(r.corps.replace(/±\s*[\d,]+\s*%/g, '').replace(AGITATION, '') + r.titre);
           check(`${nom} : ${role}${k ? ' ' + (k + 1) : ''} « ${r.vise} » → sa bulle (${r.titre}), le détail attendu, sans infobulle des prix${tactile ? '' : ', curseur main'}, sans jargon ni base du hasard`,
             ok.titre && ok.ohlcv && ok.curseur && !ok.mots.length && !ok.conseil && !ok.hasard && detail, { r, ok, detail });
           // La preuve de la revue du 14/10/2026 (M6, C16) : le détail tient dans son budget, un seul avertissement.

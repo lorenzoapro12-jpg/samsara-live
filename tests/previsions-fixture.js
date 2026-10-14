@@ -5,6 +5,10 @@
 // Les heures du fichier complet sont DÉCALÉES pour que le point du matin tombe `ilYaMs` avant
 // maintenant (3 h par défaut) : les bougies simulées des harnais, qui finissent « maintenant »,
 // ont alors des bougies depuis le point, et la marge de futur montre les flèches.
+// Les deux clés facultatives écrites par la routine depuis le 14/10/2026 (revue du site, Q3) sont
+// décalées avec lui : « ampleur » (calcul au point, fenêtre de 24 h) et « moments » (un CPI 2 h après
+// le point, donc 1 h avant maintenant par défaut, sur les bougies ; un FOMC le lendemain, que la page
+// ne dessine pas). opts.sansAgitation : le fichier d'avant, sans ces deux clés.
 //
 //   const { previsionsFixture, estPrevisions } = require('./previsions-fixture');
 //   if (estPrevisions(url)) return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: previsionsFixture() });
@@ -16,7 +20,7 @@ const iso = ms => new Date(ms).toISOString().slice(0, 16) + 'Z';
 const decaler = (s, d) => (typeof s === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/.test(s) ? iso(Date.parse(s) + d) : s);
 const jour = (g, d) => (typeof g === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(g) ? new Date(Date.parse(g + 'T12:00Z') + Math.round(d / 864e5) * 864e5).toISOString().slice(0, 10) : g);
 
-/** Le fichier complet (objet), heures décalées ; opts = { ilYaMs, maintenant, modifier(d) }. */
+/** Le fichier complet (objet), heures décalées ; opts = { ilYaMs, maintenant, modifier(d), sansAgitation }. */
 function previsionsObjet(opts = {}) {
   const d = lire('previsions.json');
   const maintenant = opts.maintenant || Date.now();
@@ -29,6 +33,12 @@ function previsionsObjet(opts = {}) {
     s.groupe = jour(s.groupe, delta);
   }
   for (const p of d.precedents) p.groupe = jour(p.groupe, delta);
+  if (opts.sansAgitation) { delete d.ampleur; delete d.moments; }
+  if (d.ampleur) {
+    for (const k of ['calcul_utc', 'debut_utc', 'fin_utc']) d.ampleur[k] = decaler(d.ampleur[k], delta);
+    d.ampleur.groupe = jour(d.ampleur.groupe, delta);
+  }
+  for (const m of d.moments || []) m.utc = decaler(m.utc, delta);
   if (opts.modifier) opts.modifier(d);
   return d;
 }
