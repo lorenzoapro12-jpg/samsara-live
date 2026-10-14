@@ -1,19 +1,22 @@
 {
- "updated": "2026-10-14T09:35:53+00:00",
+ "updated": "2026-10-14T09:50:53+00:00",
  "generator": "historique.py v1.0 — séries publiées dans la branche orpheline `historique`, décrites par `meta` (07/10/2026)",
  "source": "binance (futures et spot) · deribit et coinbase via market-data.json · git (master, publications passées)",
  "branche": "historique",
  "status": {
   "worktree": "ok",
   "amorcage": "non exécuté : les séries existent déjà",
-  "funding": "ok",
+  "funding": "error: URLError: <urlopen error [Errno -3] Temporary failure in name resolution>",
   "open_interest_1h": "ok",
-  "long_short_1h": "ok",
+  "long_short_1h": "error: URLError: <urlopen error [Errno -3] Temporary failure in name resolution>",
   "positionnement": "ok",
   "long_short_1h_controle": "ok",
   "index": "ok"
  },
- "errors": [],
+ "errors": [
+  "funding: URLError: <urlopen error [Errno -3] Temporary failure in name resolution>",
+  "long_short_1h: URLError: <urlopen error [Errno -3] Temporary failure in name resolution>"
+ ],
  "series": {
   "positionnement": {
    "libelle": "Positionnement — une ligne par publication de market-data.json",
@@ -42,11 +45,11 @@
    "fichiers": [
     "series/positionnement/2026-10.csv"
    ],
-   "lignes": 1149,
-   "octets": 179245,
+   "lignes": 1150,
+   "octets": 179416,
    "periode": {
     "debut": "2026-10-02T11:18:18+00:00",
-    "fin": "2026-10-14T09:33:53+00:00"
+    "fin": "2026-10-14T09:48:53+00:00"
    },
    "trous": [],
    "trous_nombre": 0,
