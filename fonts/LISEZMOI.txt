@@ -14,7 +14,7 @@ noms réservés (Reserved Font Name), les polices qui en déclarent un ont été
   cinzel.woff2             « Cinzel » ← Cinzel (aucun nom réservé) — cinzel.OFL.txt — thème Codex
   eb-garamond.woff2        « EB Garamond » ← EB Garamond (aucun nom réservé) — ebgaramond.OFL.txt — thème Codex
   bureau95-titres.woff2    « Pixelify Sans » ← Pixelify Sans (aucun nom réservé) — pixelifysans.OFL.txt — thème Bureau 95
-                            instance wght=700 ; glyphes composés (là où ils manquent) : Ā ā Ṃ ṃ ; plages : PLAGES_LATIN sans les chiffres (ils retombent sur la police système)
+                            instance wght=700 ; glyphes composés (là où ils manquent) : Ā ā Ṃ ṃ ; plages : PLAGES_LATIN sans les chiffres ni les parenthèses (ils retombent sur la police système)
   gare-palettes.woff2      « Noto Sans Mono » ← Noto Sans Mono (aucun nom réservé) — notosansmono.OFL.txt — thème Gare
                             instance wdth=75, wght 500–700
   barlow-condensed-500.woff2 « Barlow Condensed » ← Barlow Condensed (aucun nom réservé) — barlowcondensed.OFL.txt — thème Gare

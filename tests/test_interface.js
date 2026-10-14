@@ -6,12 +6,15 @@
 //      bornés à 8 px des bords, défilants s'ils sont plus hauts que l'écran. Dans chaque thème, deux
 //      couleurs qui ne trompent pas (revue du 14/10, C13 et C14) : « Tout afficher » a l'habit des
 //      autres boutons, pas celui d'un bouton enfoncé ; « En résumé » est à l'encre neutre, et seule
-//      la barre d'un résumé en hausse ou en baisse prend leur couleur.
+//      la barre d'un résumé en hausse ou en baisse prend leur couleur. En Bureau 95 et son
+//      contraste, les boutons de tête du panneau ont le relief du thème (revue du 14/10, M19).
 //   2. CROCHETS DU GRAPHIQUE (jetons de thème lus par lireJetons) : sans jeton, le graphique
 //      d'avant (rampe de chaleur historique à l'octet près, bougies pleines, grille pleine) ; avec
 //      un jeton, la FORME change — bougies creuses ou en barres, grille en trait mixte, police
 //      du canvas, encre de la chaleur — jamais la position d'un prix ; la couche de chaleur est
-//      refaite quand le thème change (son id est dans la clé du cache).
+//      refaite quand le thème change (son id est dans la clé du cache). Coins des étiquettes :
+//      --etiquette-rayon, sinon carrés dans un thème carré (--r-tile à 0), et la carte des ordres
+//      décrite carrée dans ces thèmes seulement (revue du 14/10, M18).
 //   3. DISPOSITION : sur un canvas bas, les sous-graphes sont réduits et ne débordent jamais
 //      sur le sélecteur de plage ; sur un canvas haut, ils gardent leur hauteur. Le tracé du prix
 //      garde 60 % de la hauteur utile ; au plus 3 sous-graphes dessinés, chacun tracé (jamais un
@@ -161,6 +164,30 @@ async function deuxCouleurs(page, id) {
     boite && neutres.every(n => n.barre === J.ink3 && n.loin >= 24) && T.hausse.barre === J.upInk && T.baisse.barre === J.downInk, { tons: T, J, neutres });
 }
 
+/** Bureau 95 et son contraste (structure « fenetres ») : les boutons de tête de « Choisir
+ *  l'affichage » ont le relief du thème, comme ses autres boutons (revue du 14/10, M19 : ils étaient
+ *  blancs et plats, à filet gris) — fond --surface, --releve, sans filet ; enfoncé (« Mon écran »
+ *  forcé à aria-pressed) : --pill-actif et --enfonce-mince. Les autres thèmes ne sont pas visés. */
+async function relief95(page, id) {
+  const r = await page.evaluate(() => {
+    const jeton = (prop, n) => { const i = document.createElement('i'); i.style[prop] = `var(${n})`; document.body.append(i); const s = getComputedStyle(i); const c = prop === 'boxShadow' ? s.boxShadow : s.backgroundColor + ' ' + s.backgroundImage; i.remove(); return c; };
+    const habit = b => { const s = getComputedStyle(b); return { t: b.textContent.trim(), presse: b.getAttribute('aria-pressed') === 'true', ombre: s.boxShadow, fond: s.backgroundColor + ' ' + s.backgroundImage, bord: s.borderTopColor }; };
+    const mon = document.querySelector('#indMenu .aff-boutons .aff-mon-ecran'), avant = mon && mon.getAttribute('aria-pressed');
+    const btns = () => [...document.querySelectorAll('#indMenu .aff-tete .aff-btn, #indMenu .aff-tete .aff-preset')].map(habit);
+    const libres = btns();
+    if (mon) mon.setAttribute('aria-pressed', 'true');
+    const enfonce = mon ? habit(mon) : null;
+    if (mon) mon.setAttribute('aria-pressed', avant);
+    return { fenetres: document.documentElement.getAttribute('data-structure') === 'fenetres', libres, enfonce,
+      J: { releve: jeton('boxShadow', '--releve'), enfonce: jeton('boxShadow', '--enfonce-mince'), surface: jeton('background', '--surface'), actif: jeton('background', '--pill-actif') } };
+  });
+  if (!r.fenetres) return;
+  const { J } = r, plats = r.libres.filter(b => !b.presse && (b.ombre !== J.releve || b.fond !== J.surface || b.bord !== 'rgba(0, 0, 0, 0)')).map(b => b.t);
+  const presses = r.libres.filter(b => b.presse).concat(r.enfonce ? [r.enfonce] : []).filter(b => b.ombre !== J.enfonce || b.fond !== J.actif).map(b => b.t);
+  check(`${id.padEnd(9)} · « Choisir l'affichage » : ${r.libres.length} boutons de tête en relief (fond du thème, sans filet), le bouton enfoncé creusé et tramé`,
+    r.libres.length >= 9 && !!r.enfonce && J.releve !== 'none' && !plats.length && !presses.length, { plats, presses, J, exemple: r.libres[0], enfonce: r.enfonce });
+}
+
 (async () => {
   await new Promise(r => serveur.listen(0, '127.0.0.1', r));
   const nav = await playwright.chromium.launch();
@@ -175,7 +202,7 @@ async function deuxCouleurs(page, id) {
         // Sous le bouton quand il y a la place ; sinon AU-DESSUS (jamais par-dessus le bouton).
         const cote = place ? m.haut >= m.boutonBas : m.bas <= m.boutonHaut;
         check(`${t.id.padEnd(9)} · menu ${nom.padEnd(11)} entier dans l'écran, ${place ? 'sous' : 'au-dessus de'} son bouton`, dansLEcran(m) && cote, m);
-        if (nom === 'Affichage') await deuxCouleurs(o.page, t.id);
+        if (nom === 'Affichage') { await deuxCouleurs(o.page, t.id); await relief95(o.page, t.id); }
       }
       check(`${t.id.padEnd(9)} · aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
@@ -224,6 +251,22 @@ async function deuxCouleurs(page, id) {
       check(`${t.id.padEnd(9)} · bougies « ${d.forme} », rayon ${d.rayon}, grille « ${d.tirets || 'pleine'} » : celles de la feuille (défauts sinon)`,
         d.forme === attenduForme && d.rayon === attenduRayon && d.tirets === attenduTirets, d);
       check(`${t.id.padEnd(9)} · police du canvas = --police-graphique, à défaut --font`, d.police === '500 10px ' + (d.polGraph || d.font), { police: d.police, font: d.font, polGraph: d.polGraph });
+      // Thèmes carrés jusqu'au bout (revue du 14/10, M18) : les coins des pastilles, bulles et de la
+      // pilule du prix suivent --etiquette-rayon ; sans lui, 0 dans un thème carré (--r-tile à 0 :
+      // Gazette, Cyanotype et Diazo restaient arrondis sur le graphique), 1 sinon (Néon, Codex, Gare,
+      // Aero, Kāla : inchangés). Dessin complet relevé : aucun coin rond dans un thème carré. Et le
+      // terminal décrit « carré » à la carte des ordres exactement dans ces thèmes.
+      const rr = await o.page.evaluate(() => {
+        const cs = getComputedStyle(document.documentElement), tok = n => cs.getPropertyValue(n).trim();
+        const L = [], r0 = CanvasRenderingContext2D.prototype.roundRect;
+        CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) { L.push(Array.isArray(r) ? Math.max(...r) : r); return r0.apply(this, arguments); };
+        try { drawChart(); dessinerCalque(); } finally { CanvasRenderingContext2D.prototype.roundRect = r0; }
+        const carte = Liaison.lireTheme(localStorage.getItem(Liaison.CLE_THEME));
+        return { etiq: COLORS.etiqRayon, etiqTok: tok('--etiquette-rayon'), rTile: tok('--r-tile'), rE11: rE(11), n: L.length, ronds: L.filter(r => r > 0).length, carte: carte && carte.carre };
+      });
+      const carre = parseFloat(rr.rTile) === 0, attenduEtiq = rr.etiqTok !== '' ? +rr.etiqTok : carre ? 0 : 1;
+      check(`${t.id.padEnd(9)} · coins des étiquettes du graphique : facteur ${rr.etiq} (${rr.etiqTok !== '' ? '--etiquette-rayon' : '--r-tile « ' + rr.rTile + ' »'})${carre ? `, aucun coin rond sur ${rr.n} roundRect` : ''} ; carte des ordres décrite ${rr.carte ? 'carrée' : 'arrondie'}`,
+        rr.etiq === attenduEtiq && rr.rE11 === 11 * attenduEtiq && (!carre || (rr.n > 0 && rr.ronds === 0)) && rr.carte === carre, rr);
       for (const [i, cote] of [[0, 'bid'], [1, 'ask']]) {
         if (!d.chaleur[i]) {
           const ok = d[cote].every((x, k) => x === LEG[cote][k]);

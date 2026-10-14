@@ -3568,8 +3568,11 @@ function lireJetons() {
   COLORS.bougieForme = Object.prototype.hasOwnProperty.call(FORMES_BOUGIE, forme) ? forme : 'pleine';
   COLORS.bougieRayon = Math.max(0, num('--bougie-rayon', 2));
   // --etiquette-rayon : facteur des coins des pastilles, bulles et encadrés dessinés sur le graphique
-  // (1 par défaut, 0 = angles vifs : Bureau 95, demande du 11/10/2026).
-  COLORS.etiqRayon = Math.max(0, num('--etiquette-rayon', 1));
+  // (1 par défaut, 0 = angles vifs : Bureau 95, demande du 11/10/2026). Sans ce jeton, un thème
+  // CARRÉ (--r-tile à 0 : Gazette, Cyanotype, Diazo) a aussi des angles vifs sur le graphique : sa
+  // page l'était, mais sa pilule du prix, ses étiquettes et ses bulles restaient rondes (revue du
+  // 14/10, M18). Les thèmes aux coins arrondis, même petits (Néon, Codex, Gare), ne changent pas.
+  COLORS.etiqRayon = Math.max(0, num('--etiquette-rayon', num('--r-tile', 1) === 0 ? 0 : 1));
   const tirets = v('--grille-tirets', 'none');
   COLORS.grilleTirets = tirets === 'none' ? [] : tirets.split(/[\s,]+/).map(Number).filter(x => isFinite(x) && x >= 0);
   const encre = (nom, r) => { const c = rvb(v(nom, '')); return c ? rampeU32(c.concat(CHALEUR_ALPHA.base), [0, 0, 0, CHALEUR_ALPHA.pente]) : rampeU32(r.base, r.pente); };
@@ -4845,7 +4848,8 @@ const GUIDE_FORMES = { cle: null, val: null, base: null, tF: null };   // formes
 // le refaire sur tout l'historique. Au plus 6 séries (les plus récemment vues).
 const GUIDE_SERIES = new Map();
 let srBadges = [];                                // badges S/R posés dans la frame : le Guide les évite
-/** Le rayon d'une pastille, d'une bulle ou d'un encadré dessiné : r, multiplié par --etiquette-rayon. */
+/** Le rayon d'une pastille, d'une bulle ou d'un encadré dessiné : r, multiplié par --etiquette-rayon
+ *  (0 dans un thème carré qui ne le pose pas : lireJetons). */
 const rE = r => r * (COLORS.etiqRayon === undefined ? 1 : COLORS.etiqRayon);
 const guideUnite = () => (activeSymbol === 'BTCSOL' ? 'SOL' : '$');
 const frN = v => v.toLocaleString('fr-FR');                     // 0.5 → « 0,5 »
@@ -6960,7 +6964,8 @@ function guideBulle(c, W, mainH, evite) {
 //   (priceWindow) — sur BTC/USDT seulement. Le terminal s'ouvre toujours sur BTC/USDT, à son
 //   intervalle par défaut : le lien ne change pas l'intervalle. Un prix mal écrit, ou à plus de
 //   10 % du prix du moment, est ignoré sans un mot.
-// • Le thème est décrit pour la carte (publierThemeCarte) : à l'ouverture et à chaque changement.
+// • Le thème est décrit pour la carte (publierThemeCarte : id, ton, accent, carré ou non) : à
+//   l'ouverture et à chaque changement.
 let marqueCarte = null;    // { p, ok } : le prix venu de la carte ; ok : jugé plausible
 let ciblesPrix = [];       // cibles hors Guide qui portent un prix (supports / résistances) : refaites à chaque dessin
 /** Les cibles hors Guide et hors scénarios qui entrent aussi dans « Sur le graphique » (liste : la
@@ -6974,8 +6979,12 @@ function liaisonCarte() {
   window.addEventListener('hashchange', () => { marqueCarte = (p => (p === null ? null : { p, ok: false }))(Liaison.lirePrix(location.hash)); drawChart(); });
 }
 function publierThemeCarte() {
-  const t = themeCourant();
-  try { localStorage.setItem(Liaison.CLE_THEME, Liaison.decrireTheme(t.id, t.mode, getComputedStyle(document.documentElement).getPropertyValue('--accent'))); } catch (e) {}
+  const t = themeCourant(), cs = getComputedStyle(document.documentElement);
+  // « Carré » (--r-tile à 0, comme pour les étiquettes du graphique : lireJetons) : la carte met
+  // alors ses angles à 0. Un oui ou un non, jamais le nom du thème (revue du 14/10, M18 : la carte
+  // restait arrondie, même ouverte depuis Bureau 95, le thème par défaut).
+  const carre = parseFloat(cs.getPropertyValue('--r-tile')) === 0;
+  try { localStorage.setItem(Liaison.CLE_THEME, Liaison.decrireTheme(t.id, t.mode, cs.getPropertyValue('--accent'), carre)); } catch (e) {}
 }
 /** Le prix venu de la carte, s'il se montre ici (BTC/USDT, à moins de 10 % de la dernière bougie) ; sinon null. */
 function prixMarqueCarte() {

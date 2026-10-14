@@ -564,6 +564,13 @@ html.survol .lg-ring-cotes::before, html.survol .lg-ring-cotes::after { -webkit-
 /* « Mon écran » (plan du site, idée 9) : enfoncé quand l'affichage est exactement le sien. Sous les
    préréglages, le lien qui le garde, puis la phrase qui le confirme (pas de fenêtre). */
 .aff-btn.aff-mon-ecran[aria-pressed="true"] { color: var(--pill-actif-ink); background: var(--pill-actif); border-color: transparent; }
+/* Bureau 95 et son contraste (structure « fenetres ») : ces boutons ont le relief du thème, comme
+   « Ajouter un palier » et les boutons des Légendes — gris, clair en haut, sombre en bas ; appuyé
+   pendant le clic ; enfoncé quand il est l'affichage en cours. Ils étaient blancs et plats, à
+   filet gris (revue du 14/10, M19). Pas de survol coloré en 1995 : le focus reste le pointillé. */
+:root[data-structure="fenetres"] :is(.aff-btn, .aff-preset) { background: var(--surface); border-color: transparent; box-shadow: var(--releve); }
+:root[data-structure="fenetres"] :is(.aff-btn, .aff-preset):active { box-shadow: var(--appuye); }
+:root[data-structure="fenetres"] :is(.aff-btn, .aff-preset)[aria-pressed="true"] { background: var(--pill-actif); box-shadow: var(--enfonce-mince); }
 .aff-garder, .aff-garde-dit { display: block; margin: 5px 0 0; padding: 3px 0; font: inherit; font-size: 11px; font-weight: 600; text-align: left; }
 .aff-garder { color: var(--accent-2); background: none; border: 0; cursor: pointer; }
 .aff-garder:hover, .aff-garder:focus-visible { text-decoration: underline; outline: none; }

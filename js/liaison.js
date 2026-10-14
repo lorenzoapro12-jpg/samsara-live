@@ -14,9 +14,10 @@
 //
 // LE THÈME DE LA CARTE — le terminal décrit son thème sous CLE_THEME : son identifiant, clair ou
 //   sombre (lu dans SON registre, les <link data-theme-id data-mode> d'index.html : pas de
-//   deuxième liste à tenir) et sa couleur d'accent (lue dans ses jetons, sans toucher aux feuilles
-//   de thème). La carte pose cette description sur <html> avant son premier rendu, et la suit
-//   quand elle change dans un autre onglet (évènement storage). Sans description : sombre.
+//   deuxième liste à tenir), sa couleur d'accent et s'il est CARRÉ (coins à 0) — lus dans ses
+//   jetons, sans toucher aux feuilles de thème. La carte pose cette description sur <html> avant son
+//   premier rendu, et la suit quand elle change dans un autre onglet (évènement storage). Sans
+//   description : sombre, arrondie.
 // ═══════════════════════════════════════════════════════════════════════════════
 const Liaison = (function () {
   'use strict';
@@ -56,19 +57,21 @@ const Liaison = (function () {
     if (!m) return null;
     return '#' + (m[1].length === 3 ? m[1].split('').map(x => x + x).join('') : m[1]).toLowerCase();
   }
-  /** La description d'un thème, à ranger sous CLE_THEME (chaîne JSON). */
-  function decrireTheme(id, mode, accent) {
-    return JSON.stringify({ id: String(id), mode: mode === 'sombre' ? 'sombre' : 'clair', accent: hex6(accent) });
+  /** La description d'un thème, à ranger sous CLE_THEME (chaîne JSON). carre : ses coins sont à 0
+   *  (revue du 14/10, M18 : un oui ou un non, jamais un nom de thème). */
+  function decrireTheme(id, mode, accent, carre) {
+    return JSON.stringify({ id: String(id), mode: mode === 'sombre' ? 'sombre' : 'clair', accent: hex6(accent), carre: carre === true });
   }
-  /** La description lue (chaîne JSON) → { id, mode, accent } VALIDÉ, ou null (absente, illisible,
-   *  valeur inconnue). Une couleur d'accent illisible est oubliée (null), le reste gardé. */
+  /** La description lue (chaîne JSON) → { id, mode, accent, carre } VALIDÉ, ou null (absente,
+   *  illisible, valeur inconnue). Une couleur d'accent illisible est oubliée (null), le reste gardé ;
+   *  carre n'est vrai que s'il vaut true (une description d'avant, sans lui : arrondie). */
   function lireTheme(texte) {
     if (typeof texte !== 'string' || texte.length > 300) return null;
     let o;
     try { o = JSON.parse(texte); } catch (e) { return null; }
     if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
     if (!MOTIF_ID.test(String(o.id)) || (o.mode !== 'clair' && o.mode !== 'sombre')) return null;
-    return { id: o.id, mode: o.mode, accent: hex6(o.accent) };
+    return { id: o.id, mode: o.mode, accent: hex6(o.accent), carre: o.carre === true };
   }
   /** Une couleur « #rrggbb » à l'opacité a : « rgba(r, g, b, a) ». */
   function teinte(accent, a) {
@@ -77,18 +80,20 @@ const Liaison = (function () {
     const n = parseInt(h.slice(1), 16);
     return 'rgba(' + (n >> 16) + ', ' + ((n >> 8) & 255) + ', ' + (n & 255) + ', ' + a + ')';
   }
-  /** Pose le thème t (lireTheme) sur l'élément racine : data-theme-mode (clair | sombre), et la
+  /** Pose le thème t (lireTheme) sur l'élément racine : data-theme-mode (clair | sombre),
+   *  data-theme-carre (présent si le thème est carré : la feuille met ses angles à 0), et la
    *  couleur d'accent du cadre (--accent, --accent-fond, --accent-bord). t null : tout est retiré,
-   *  la feuille garde ses couleurs par défaut (sombre). */
+   *  la feuille garde ses couleurs par défaut (sombre) et ses coins arrondis. */
   function poserTheme(racine, t) {
     const st = racine.style;
     if (!t) {
-      racine.removeAttribute('data-theme-mode'); racine.removeAttribute('data-theme-terminal');
+      racine.removeAttribute('data-theme-mode'); racine.removeAttribute('data-theme-terminal'); racine.removeAttribute('data-theme-carre');
       for (const v of ['--accent', '--accent-fond', '--accent-bord']) st.removeProperty(v);
       return;
     }
     racine.setAttribute('data-theme-mode', t.mode);
     racine.setAttribute('data-theme-terminal', t.id);
+    if (t.carre) racine.setAttribute('data-theme-carre', '1'); else racine.removeAttribute('data-theme-carre');
     if (t.accent) {
       st.setProperty('--accent', t.accent);
       st.setProperty('--accent-fond', teinte(t.accent, 0.16));
