@@ -49,6 +49,9 @@ node test_reglages.js || ko=1
 etape "2c'. Calculette de risque : nombres à la française, taille des paliers, prix moyen, perte = la part choisie, achat / vente, messages, mots du Lisible, aucun stockage — hors ligne"
 node test_calculette.js || ko=1
 
+etape "2c''. Grid Bot : pas de verdict ni de Sharpe sous 10 opérations closes, capital ≤ 0 refusé, témoin jamais comparé à lui-même, bornes de l'aide dans l'ordre — hors ligne"
+node test_gridbot.js || ko=1
+
 etape "2d. Indicateurs réécrits en boucles : les mêmes valeurs qu'avant, au bit près, sur 3 000 bougies réelles — hors ligne"
 node test_indicateurs_boucles.js || ko=1
 

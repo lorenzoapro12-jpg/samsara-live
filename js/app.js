@@ -538,6 +538,11 @@ const PARAM = {
   // si tous les paliers se remplissent puis que le stop saute (`part`, en %, la valeur de départ du
   // champ) ; de 1 à `paliersMax` paliers. Sans mémoire : rien n'est gardé d'une ouverture à l'autre.
   risque: { part: 1, paliersMax: 5 },
+  // Grid Bot (revue du 14/10, C12) : sous `operationsMin` opérations closes, ni verdict, ni ✅/❌,
+  // ni ratio de Sharpe, ni « Gains / pertes » ; sur 1 opération, ils s'affichaient en gros
+  // (« ✅ gagne et bat le marché », Sharpe 25, « ∞ »). `operationsVisees` : le nombre que la note
+  // propose d'atteindre en élargissant la période.
+  gridBot: { operationsMin: 10, operationsVisees: 30 },
   // Scénarios du matin (js/scenarios.js) : les nombres de leur dessin et de leurs mots.
   scenarios: {
     point: '07h00',               // l'heure du point du matin dans la routine (à Paris) ; affichée à l'heure de l'appareil (heurePointMatin)
@@ -10065,6 +10070,16 @@ function onStratChange() {
   btUserParams = {};
   buildStratParamUI();
   onStratParamChange();
+  majComparer();
+}
+
+// « Comparer au témoin » grisé quand le témoin (la grille fixe) est la stratégie choisie : il se
+// comparait à lui-même, « Écart : 0,00 $ » (revue du 14/10, C12).
+function majComparer() {
+  const b = document.getElementById('stratDumbCmp');
+  if (!b) return;
+  b.disabled = btActiveStrategy === 'dumb_grid';
+  b.title = b.disabled ? 'La grille fixe est déjà le témoin.' : '';
 }
 
 function onStratParamChange() {
@@ -10079,7 +10094,19 @@ function onStratParamChange() {
       btUserParams[k] = (raw === '' || raw === null) ? 0 : (parseFloat(raw) || def.value);
     }
   }
-  btCapital = parseFloat(document.getElementById('stratCapital').value) || ST_DEFAULT_CAPITAL;
+  // Le capital : plus grand que zéro, comme dans la calculette (revue du 14/10, C12). Un capital
+  // de −5 000 était gardé et donnait « ✅ gagne » à côté de « −11,76 $ ». Refusé, le champ reprend
+  // le capital d'avant ; un nombre ≤ 0 tapé est dit avec la phrase de la calculette.
+  const champ = document.getElementById('stratCapital'), cap = parseFloat(champ.value);
+  if (cap > 0) btCapital = cap;
+  else {
+    champ.value = btCapital;
+    if (!isNaN(cap)) {
+      const div = document.getElementById('stratStats');
+      div.style.display = 'block';
+      div.innerHTML = '<div class="strat-note">' + Calculette.MESSAGES.capital_nul + '</div>';
+    }
+  }
   // Clear old results when params change
   btResult = null;
 }
@@ -10110,9 +10137,12 @@ function previewGrid() {
   try { levels = strat.generateLevels(candles, idx, params, ind) || []; }
   catch (e) { return null; }
   if (levels.length < 2) return null;
+  // Les bornes dans l'ordre, le pas sans signe (revue du 14/10, C12) : la grille EMA va de l'EMA
+  // au prix ; prix sous l'EMA, l'aide écrivait « 82 624,71 $ → 81 185,37 $ · pas de −159,93 $ ».
+  const a = levels[0].price, b = levels[levels.length - 1].price;
   return {
-    lo: levels[0].price, hi: levels[levels.length - 1].price, n: levels.length,
-    step: levels[1].price - levels[0].price,
+    lo: Math.min(a, b), hi: Math.max(a, b), n: levels.length,
+    step: Math.abs(levels[1].price - levels[0].price),
     manual: params.priceLow > 0 || params.priceHigh > 0,
     signal: strat.trigger(candles, idx, params, ind),
   };
@@ -10289,6 +10319,10 @@ function nombreBot(t, dec) { return isFinite(parseFloat(t)) ? Fmt.nombre(parseFl
 function decimalesDe(v) { return (String(v).split('.')[1] || '').length; }
 // Durée d'une bougie en minutes : traduit la fenêtre testée en « 8 h » / « 3,2 j ».
 const INTERVAL_MIN = { '1m': 1, '5m': 5, '15m': 15, '1h': 60, '4h': 240, '1d': 1440 };
+// Assez d'opérations closes pour un verdict, un ratio de Sharpe et « Gains / pertes » (PARAM.gridBot).
+const assezDOperations = r => r.tradeCount >= PARAM.gridBot.operationsMin;
+// « 1 opération close », « 2 opérations closes » : on lisait « opération(s) close(s) » (revue du 14/10).
+const operationsCloses = n => n + (n > 1 ? ' opérations closes' : ' opération close');
 
 function showStratStats(result) {
   const div = document.getElementById('stratStats');
@@ -10305,7 +10339,13 @@ function showStratStats(result) {
   const mins = (result.endIdx - result.startIdx + 1) * (INTERVAL_MIN[chartInterval] || 15);
   const durStr = mins >= 1440 ? Fmt.nombre(mins / 1440, 1) + ' j' : mins >= 60 ? Fmt.nombre(mins / 60, 1) + ' h' : mins + ' min';
   let html = '';
-  if (hold !== null) {
+  const juge = assezDOperations(result);
+  if (!juge) {
+    // Trop peu d'opérations : ni verdict, ni ✅/❌ (revue du 14/10, C12). Sur 1 opération, « ✅ gagne
+    // et bat le marché » s'affichait en gros ; sur 0, « perd » à 0,00 %.
+    const n = result.tradeCount;
+    html += '<div class="verdict">' + (n ? n + (n > 1 ? ' opérations' : ' opération') + ' : trop peu pour juger.' : 'Aucune opération sur cette période.') + '</div>';
+  } else if (hold !== null) {
     const v = (ret > 0 && ret > hold) ? ['stat-pos', '✅ gagne et bat le marché']
       : (ret > 0) ? ['stat-val', '⚠️ gagne, mais garder le ' + actif + ' rapportait plus']
       : (ret > hold) ? ['stat-val', '⚠️ perd, mais moins que le marché']
@@ -10317,14 +10357,15 @@ function showStratStats(result) {
   html +=
     '<div>Opérations closes : <span class="stat-val">' + result.tradeCount + '</span> | Gagnantes : <span title="Part des opérations closes en profit" class="' + (result.winRate >= 50 ? 'stat-pos' : 'stat-neg') + '">' + Fmt.nombre(result.winRate, 1) + ' %</span></div>' +
     '<div>Résultat : <span title="Profit ou perte, frais de 0,1 % déjà déduits" class="' + (result.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + pnlStr + ' ' + unite + '</span> (' + Fmt.pct(ret, 2) + ')</div>' +
-    '<div>Perte max : <span title="Plus forte baisse depuis un sommet du capital (drawdown)" class="stat-neg">' + Fmt.nombre(result.maxDrawdownPct, 1) + ' %</span> | Ratio de Sharpe : <span title="Rendement par unité de risque, annualisé. Au-delà de 1 c\'est bon ; sur une fenêtre courte il ne veut rien dire." class="stat-val">' + nombreBot(result.sharpe, 3) + '</span></div>' +
-    '<div>Gains / pertes : <span title="Total des gains divisé par le total des pertes. Au-dessus de 1, la grille gagne." class="stat-val">' + nombreBot(result.profitFactor, 2) + '</span> | Gain moyen : <span title="Gain moyen par opération gagnante" class="stat-pos">' + Fmt.nombre(result.avgWin, 2) + ' ' + unite + '</span> | Perte moyenne : <span title="Perte moyenne par opération perdante" class="stat-neg">' + Fmt.nombre(result.avgLoss, 2) + ' ' + unite + '</span></div>';
-  if (result.tradeCount < 10) html += '<div class="strat-note">' + result.tradeCount + ' opération(s) close(s) : trop peu pour conclure — visez 30, ou élargissez la période avec les champs « Du » / « Au ».</div>';
+    '<div>Perte max : <span title="Plus forte baisse depuis un sommet du capital (drawdown)" class="stat-neg">' + Fmt.nombre(result.maxDrawdownPct, 1) + ' %</span>' + (juge ? ' | Ratio de Sharpe : <span title="Rendement par unité de risque, annualisé. Au-delà de 1 c\'est bon ; sur une fenêtre courte il ne veut rien dire." class="stat-val">' + nombreBot(result.sharpe, 3) + '</span>' : '') + '</div>' +
+    '<div>' + (juge ? 'Gains / pertes : <span title="Total des gains divisé par le total des pertes. Au-dessus de 1, la grille gagne." class="stat-val">' + nombreBot(result.profitFactor, 2) + '</span> | ' : '') + 'Gain moyen : <span title="Gain moyen par opération gagnante" class="stat-pos">' + Fmt.nombre(result.avgWin, 2) + ' ' + unite + '</span> | Perte moyenne : <span title="Perte moyenne par opération perdante" class="stat-neg">' + Fmt.nombre(result.avgLoss, 2) + ' ' + unite + '</span></div>';
+  // Le « trop peu » est dit en tête : la note ne garde que le moyen d'en avoir plus.
+  if (!juge) html += '<div class="strat-note">Visez ' + PARAM.gridBot.operationsVisees + ' opérations closes : élargissez la période avec les champs « Du » / « Au ».</div>';
   div.innerHTML = html;
 }
 
 function onCompareDumbGrid() {
-  if (!candles || candles.length < 20) return;
+  if (!candles || candles.length < 20 || btActiveStrategy === 'dumb_grid') return;   // le témoin ne se compare pas à lui-même
   const vs = Math.max(0, viewStart);
   const ve = Math.min(candles.length - 1, viewEnd);
   const taResult = runBacktest(btActiveStrategy, candles, vs, ve, btUserParams, btCapital);
@@ -10336,7 +10377,7 @@ function onCompareDumbGrid() {
   // Au format de la page (js/format.js), dans la devise de cotation de la paire.
   const unite = guideUnite(), montant = v => Fmt.signe(v, x => Fmt.nombre(x, 2)) + ' ' + unite;
   const ligne = (nom, r) => '<div><b>' + nom + '</b> : <span class="' + (r.totalPnl >= 0 ? 'stat-pos' : 'stat-neg') + '">' + montant(r.totalPnl) + '</span> ('
-    + r.tradeCount + ' opération(s) close(s), ratio de Sharpe ' + nombreBot(r.sharpe, 3) + ')</div>';
+    + operationsCloses(r.tradeCount) + (assezDOperations(r) ? ', ratio de Sharpe ' + nombreBot(r.sharpe, 3) : '') + ')</div>';
   const ecart = taResult.totalPnl - dumbResult.totalPnl;
   div.innerHTML =
     '<div style="margin-bottom:6px;color:var(--accent);font-weight:700">📊 Comparaison avec la grille fixe (témoin)</div>' +
@@ -10361,7 +10402,7 @@ function toggleAdvanced() {
 }
 
 // Build initial param UI on load
-setTimeout(() => { fillStrategySelect(); buildStratParamUI(); }, 100);
+setTimeout(() => { fillStrategySelect(); buildStratParamUI(); majComparer(); }, 100);
 
 // ============ WALK-FORWARD ANALYSIS ============
 function runWalkForward(strategyKey, candles, userParams, capital, segments) {
