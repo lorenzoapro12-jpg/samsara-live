@@ -126,7 +126,11 @@ const NB = '\\d{1,3}(?: \\d{3})*';   // partie entière à la française (espace
     ['Variation 24 h réelle', /[+−]?\d+,\d\d % en 24 h/.test(html)],
     ['Range 24 h (haut/bas réels)', new RegExp('Haut\\s*<b>' + NB + ',\\d</b>').test(html) && new RegExp('Bas\\s*<b>' + NB + ',\\d</b>').test(html)],
     ['Carnet live : ratio affiché', /Ratio bid\/ask\s*[\d.,]+/.test(html) || /Ratio bid\/ask\s*—/.test(html)],
-    ['Carnet live : valeurs en BTC', /Bids\s*<b>[\d.,]+ BTC<\/b>/.test(html)],
+    // Revue du 14/10 (C10) : une bande que le carnet reçu ne couvre pas (c'était le cas ce matin
+    // avec les réglages d'origine) écrit « — », plus « Bids 0,0 BTC · Asks 0,0 BTC ».
+    ['Carnet live : valeurs en BTC, ou « — » si la bande n\'est pas couverte', /Bids\s*<b>[\d.,]+ BTC<\/b>/.test(html)
+      || (/bande non couverte par le carnet reçu/.test(html) && /Bids — · Asks — \(carnet reçu trop court\)/.test(html))],
+    ['Carnet live : jamais « 0,0 BTC » pour une bande non couverte', !/bande non couverte/.test(html) || !/Bids\s*<b>0,0 BTC/.test(html)],
     // 500 niveaux couvrent ≈ ±0,13 % : la carte annonçait « ±1 % ». La bande affichée doit
     // être couverte, et la couverture réelle doit se lire.
     ['Carnet live : bande couverte (pas « ±1 % »)', /Carnet en direct ±0,1 %/.test(html) && !/Carnet en direct ±1 %/.test(html)],

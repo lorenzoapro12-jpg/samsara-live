@@ -9,6 +9,10 @@
 //   2. UN SEUIL, l'âge ARRONDI : à 20 min 10 s, « 20 min » partout et aucun retard ; à 20 min
 //      45 s, « 21 min » et « en retard » partout (voyant, pastille, bandeau des cartes).
 //   3. VOYANT avant la première lecture : neutre (pas vert), et il dit ce qu'il attend.
+//  3b. BINANCE ET SON MIROIR INJOIGNABLES (revue du 14/10, C11) : le graphique dit « Binance
+//      injoignable depuis ce poste » puis « Nouvel essai bientôt » (plus « Chargement… » sans
+//      fin), en entier à gauche de l'échelle des prix ; la bulle du voyant dit que le prix n'arrive
+//      pas, sa teinte reste celle de l'âge de la publication ; tout revient seul avec le réseau.
 //   4. NOMS : la barre des tâches dit la paire comme l'en-tête (« SOL/USDT », pas « SOLUSDT ») ;
 //      boutons « Infos du marché (I) » et « En direct (à la seconde) ».
 //   5. LA MÊME VARIATION 24 h dans l'en-tête et dans le panneau ⚡ (ouverture → dernier prix).
@@ -84,7 +88,8 @@ const serveur = http.createServer((req, res) => {
   fs.createReadStream(f).pipe(res);
 });
 
-/** o = { vue, mode ('debutant' | 'expert'), theme, ageS, retenir (la publication n'arrive qu'à la demande) }. */
+/** o = { vue, mode ('debutant' | 'expert'), theme, ageS, retenir (la publication n'arrive qu'à la demande),
+ *        coupe ({ actif } : tant que actif est vrai, Binance et son miroir refusent la connexion) }. */
 async function ouvrir(nav, o) {
   const tactile = o.vue.width <= 480;
   const ctx = await nav.newContext(Object.assign({ viewport: o.vue, deviceScaleFactor: 1, timezoneId: FUSEAU }, tactile ? { hasTouch: true, isMobile: true } : {}));
@@ -92,6 +97,18 @@ async function ouvrir(nav, o) {
   await ctx.addInitScript(([m, t]) => {
     try { localStorage.clear(); localStorage.setItem('samsara-mode', m); localStorage.setItem('samsara-theme', t); localStorage.setItem('samsara-astuce-tap-v1', '1'); } catch (e) { /* */ }
   }, [o.mode, o.theme || 'aero']);
+  // Ce que le graphique écrit tant qu'il n'a pas de bougies, avec ses bords (texte centré).
+  if (o.coupe) await ctx.addInitScript(() => {
+    const f = CanvasRenderingContext2D.prototype.fillText;
+    window.__attente = [];
+    CanvasRenderingContext2D.prototype.fillText = function (t, x) {
+      if (this.canvas && this.canvas.id === 'chart' && typeof candles !== 'undefined' && candles.length < 2) {
+        const l = this.measureText(String(t)).width;
+        window.__attente.push({ t: String(t), g: Math.round(x - l / 2), d: Math.round(x + l / 2) });
+      }
+      return f.apply(this, arguments);
+    };
+  });
   const page = await ctx.newPage();
   const erreurs = [], retenues = [];
   page.on('pageerror', e => erreurs.push(e.message));
@@ -99,6 +116,7 @@ async function ouvrir(nav, o) {
   await page.route('**/*', r => {
     const u = r.request().url(), h = new URL(u).host, cors = { 'access-control-allow-origin': '*' };
     if (h.startsWith('127.0.0.1')) return r.continue();
+    if (o.coupe && o.coupe.actif && /binance/.test(h)) return r.abort('connectionrefused');
     if (h === 'api.binance.com') return r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(binance(u)) });
     if (h === 'raw.githubusercontent.com' && /market-data/.test(u)) {
       const servir = () => r.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: MD }).catch(() => {});
@@ -108,7 +126,8 @@ async function ouvrir(nav, o) {
     return r.fulfill({ status: 404, headers: cors, body: '' });
   });
   await page.goto(`http://127.0.0.1:${serveur.address().port}/index.html`);
-  if (!o.retenir) await page.waitForFunction(() => typeof marketData !== 'undefined' && marketData && typeof livePrice !== 'undefined' && livePrice, null, { timeout: 15000 }).catch(() => {});
+  if (o.coupe) await page.waitForFunction(() => typeof marketData !== 'undefined' && marketData && ['bougies', 'prix'].every(k => Horloges.sources[k] && Horloges.sources[k].classe), null, { timeout: 15000 }).catch(() => {});
+  else if (!o.retenir) await page.waitForFunction(() => typeof marketData !== 'undefined' && marketData && typeof livePrice !== 'undefined' && livePrice, null, { timeout: 15000 }).catch(() => {});
   await page.waitForTimeout(700);
   return { ctx, page, erreurs, servir: () => { while (retenues.length) retenues.shift()(); } };
 }
@@ -221,6 +240,35 @@ const lireEntete = page => page.evaluate(() => {
       await o.page.waitForTimeout(300);
       const apres = await o.page.evaluate(() => document.getElementById('dot').title);
       check(`après : « ${apres.slice(0, 70)}… » (l’âge des infos du marché, pas « temps réel »)`, /^Infos du marché publiées il y a \d+ min/.test(apres) && !/temps réel/i.test(apres), apres);
+      await o.ctx.close();
+    }
+
+    // ── 3b. Binance et son miroir injoignables (revue du 14/10, C11) ─────────────
+    titre('3b. Binance et son miroir injoignables : le graphique le dit, la bulle du voyant aussi ; sa teinte reste celle de l’âge');
+    for (const [vue, theme, mode] of [[{ width: 390, height: 844 }, 'bureau95', 'debutant'], [{ width: 1440, height: 900 }, 'aero', 'expert']]) {
+      const coupe = { actif: true }, nom = `${vue.width} px, ${theme}`;
+      const o = await ouvrir(nav, { vue, mode, theme, coupe });
+      const e = await o.page.evaluate(() => {
+        window.__attente = []; drawChart();
+        const d = document.getElementById('dot'), sonde = document.createElement('span'); document.body.appendChild(sonde);
+        sonde.style.background = 'var(--up)'; const vert = getComputedStyle(sonde).backgroundColor; sonde.remove();
+        return { textes: window.__attente, W: canvas.width / devicePixelRatio, bougies: candles.length, titre: d.title, tache: document.getElementById('taskbarDot').title,
+          fondVert: getComputedStyle(d).backgroundColor === vert, bougiesSrc: Horloges.sources.bougies && Horloges.sources.bougies.classe };
+      });
+      const t = e.textes.map(x => x.t).join(' / ');
+      check(`${nom} : le graphique dit « ${t} », plus « Chargement… »`, e.bougies < 2 && e.bougiesSrc === 'hors_ligne'
+        && /^Binance injoignable depuis ce poste/.test(t) && /nouvel essai bientôt/i.test(t) && !/Chargement/.test(t), e);
+      check(`${nom} : ce texte est entier, à gauche de l’échelle des prix (${e.textes.map(x => x.g + '…' + x.d).join(', ')} px sur ${e.W - 50})`,
+        e.textes.length > 0 && e.textes.every(x => x.g >= 0 && x.d <= e.W - 50), e);
+      check(`${nom} : la bulle du voyant dit « ${(e.titre.split('. ')[1] || '').slice(0, 60)} » (plus « lu à la seconde ») ; barre des tâches de même`,
+        /Le prix du haut n’arrive pas : hors ligne ou requête bloquée\.$/.test(e.titre) && !/lu à la seconde/.test(e.titre) && e.tache === e.titre, e.titre);
+      check(`${nom} : la teinte du voyant reste celle d’une publication de 2 min (elle ne mesure pas le prix)`, e.fondVert, e);
+      coupe.actif = false;
+      await o.page.waitForFunction(() => candles.length > 100 && Horloges.sources.prix && Horloges.sources.prix.ok && !Horloges.sources.prix.classe, null, { timeout: 20000 }).catch(() => {});
+      await o.page.waitForTimeout(1200);
+      const r = await o.page.evaluate(() => ({ bougies: candles.length, titre: document.getElementById('dot').title, prix: document.getElementById('price').textContent }));
+      check(`${nom} : le réseau revient, tout revient seul (${r.bougies} bougies, prix « ${r.prix} », « lu à la seconde »)`, r.bougies > 100 && /Le prix du haut est lu à la seconde\.$/.test(r.titre) && /\d/.test(r.prix), r);
+      check(`${nom} : aucune erreur de script`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();
     }
 

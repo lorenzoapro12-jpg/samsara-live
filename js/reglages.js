@@ -22,6 +22,15 @@ const REGLAGES_DEFAUT = {
 const LIVE_NIVEAUX = [100, 500, 1000, 5000];
 const LIVE_TRADES = [100, 500, 1000];
 const LIVE_BANDES = [0.02, 0.05, 0.1, 0.25, 0.5, 1];
+// Seuils de lecture du ⚡ : [minimum, maximum, pas], posés sur les champs ET imposés à ce qui est
+// gardé. Revue du 14/10 (C9) : un seuil vidé (0) ou tapé sous le minimum (0,5) était gardé, même
+// après un rechargement, et le ⚡ lisait un carnet presque équilibré « déséquilibre acheteur marqué ».
+const LIVE_SEUILS = { ratioMarque: [1.01, 5, 0.05], ratioLeger: [1.01, 5, 0.05], takerDominant: [51, 95, 1], takerLeger: [50.5, 95, 0.5] };
+// Dans chaque paire, le seuil « marqué » (ou « dominant ») reste au-dessus du « léger ».
+const LIVE_PAIRES = [['ratioMarque', 'ratioLeger'], ['takerDominant', 'takerLeger']];
+function ordonnerSeuils(L) {
+  for (const [fort, leger] of LIVE_PAIRES) if (L[fort] < L[leger]) [L[fort], L[leger]] = [L[leger], L[fort]];
+}
 
 function lireReglages() {
   let r = {};
@@ -31,6 +40,11 @@ function lireReglages() {
   if (!LIVE_NIVEAUX.includes(o.live.niveaux)) o.live.niveaux = REGLAGES_DEFAUT.live.niveaux;
   if (!LIVE_TRADES.includes(o.live.trades)) o.live.trades = REGLAGES_DEFAUT.live.trades;
   if (!Array.isArray(o.live.bandes) || !o.live.bandes.length) o.live.bandes = REGLAGES_DEFAUT.live.bandes.slice();
+  // Un seuil déjà gardé hors bornes (avant le 14/10 : 0, 0,5, 16…) revient à sa valeur par défaut.
+  for (const [k, [mn, mx]] of Object.entries(LIVE_SEUILS)) {
+    if (typeof o.live[k] !== 'number' || !(o.live[k] >= mn && o.live[k] <= mx)) o.live[k] = REGLAGES_DEFAUT.live[k];
+  }
+  ordonnerSeuils(o.live);
   return o;
 }
 let REGLAGES = lireReglages();
@@ -105,6 +119,11 @@ function choix(id, valeurs, actuel, fmt) {
   return '<select id="' + id + '" onchange="changerReglage(this)">' + valeurs.map(v =>
     '<option value="' + echapR(v) + '"' + (String(v) === String(actuel) ? ' selected' : '') + '>' + echapR(fmt ? fmt(v) : v) + '</option>').join('') + '</select>';
 }
+/** Un champ de seuil du ⚡, ses bornes lues dans LIVE_SEUILS (celles que changerReglage impose). */
+function champSeuil(k) {
+  const [mn, mx, pas] = LIVE_SEUILS[k];
+  return '<input type="number" id="r_live_' + k + '" min="' + mn + '" max="' + mx + '" step="' + pas + '" value="' + REGLAGES.live[k] + '" onchange="changerReglage(this)">';
+}
 function reglagesHtml() {
   const R = REGLAGES, md = typeof marketData !== 'undefined' ? marketData : null, lq = (md && md.liquidity) || {};
   const pub = Object.keys(lq.bandes || {}).map(Number).sort((a, b) => a - b);
@@ -122,11 +141,9 @@ function reglagesHtml() {
     + '<span class="fine">Une bande que le carnet reçu ne couvre pas s’affiche « non couverte », jamais tronquée.</span></div>'
     + '<label class="reglage">Exécutions lues ' + choix('r_live_trades', LIVE_TRADES, R.live.trades, v => v + ' dernières') + '</label>'
     + '<div class="reglage">Seuils de lecture du ratio bid/ask <span class="fine">(convention de lecture : le ratio, lui, ne change pas)</span>'
-    + '<div class="ligne-reglage">marqué ≥ <input type="number" id="r_live_ratioMarque" min="1.01" max="5" step="0.05" value="' + R.live.ratioMarque + '" onchange="changerReglage(this)">'
-    + ' léger ≥ <input type="number" id="r_live_ratioLeger" min="1.01" max="5" step="0.05" value="' + R.live.ratioLeger + '" onchange="changerReglage(this)"> (et leurs inverses)</div></div>'
+    + '<div class="ligne-reglage">marqué ≥ ' + champSeuil('ratioMarque') + ' léger ≥ ' + champSeuil('ratioLeger') + ' (et leurs inverses)</div></div>'
     + '<div class="reglage">Seuils de lecture des achats au marché <span class="fine">(en % du volume)</span>'
-    + '<div class="ligne-reglage">dominant ≥ <input type="number" id="r_live_takerDominant" min="51" max="95" step="1" value="' + R.live.takerDominant + '" onchange="changerReglage(this)">'
-    + ' léger ≥ <input type="number" id="r_live_takerLeger" min="50.5" max="95" step="0.5" value="' + R.live.takerLeger + '" onchange="changerReglage(this)"></div></div>'
+    + '<div class="ligne-reglage">dominant ≥ ' + champSeuil('takerDominant') + ' léger ≥ ' + champSeuil('takerLeger') + '</div></div>'
     // Carnet du fichier
     // La bande choisie change aussi la carte « Ordres en attente » du Débutant (où ces réglages
     // sont masqués) : on le dit ici, et le sous-titre de cette carte le dit là-bas.
@@ -168,8 +185,21 @@ function changerReglage(el) {
     R.carnet.bandesPerso = el.checked ? [...new Set(R.carnet.bandesPerso.concat(b))].sort((x, y) => x - y) : R.carnet.bandesPerso.filter(x => x !== b);
   } else {
     const [, bloc, cle] = el.id.split('_');
-    const v = el.value === 'auto' ? null : Number(el.value);
-    if (v === null || isFinite(v)) R[bloc][cle] = v;
+    if (bloc === 'live' && LIVE_SEUILS[cle]) {
+      // Seuil du ⚡ (revue du 14/10, C9) : un champ vide garde l'ancienne valeur (Number('') valait
+      // 0) ; une valeur est ramenée dans ses bornes ; « marqué » reste au-dessus de « léger ».
+      const brut = String(el.value).trim(), v = Number(brut), [mn, mx] = LIVE_SEUILS[cle];
+      if (brut !== '' && isFinite(v)) { R.live[cle] = Math.min(mx, Math.max(mn, v)); ordonnerSeuils(R.live); }
+      // Les champs montrent ce qui est gardé : l'ancienne valeur, la borne, ou la paire échangée.
+      for (const k of Object.keys(LIVE_SEUILS)) {
+        const c = document.getElementById('r_live_' + k);
+        if (c && c.value !== String(R.live[k])) c.value = String(R.live[k]);
+      }
+      if (brut === '' || !isFinite(v)) return;
+    } else {
+      const v = el.value === 'auto' ? null : Number(el.value);
+      if (v === null || isFinite(v)) R[bloc][cle] = v;
+    }
   }
   sauverReglages();
   appliquerReglages();
