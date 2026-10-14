@@ -1144,6 +1144,8 @@ html[data-structure="planche"] .plan-cartouche > #updated:not(:empty)::after { c
 .strat-btn:active { transform: scale(0.97); }
 .strat-btn.secondary { background: var(--card); color: var(--ink-1); }
 .strat-btn.forward { background: var(--forward); color: #fff; }
+/* Grisé (revue du 14/10, C12) : « Comparer au témoin » quand le témoin est la stratégie choisie. */
+.strat-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 .strat-section .strat-stats {
   padding: 10px 12px; line-height: 1.6; font-size: 11px;
   background: var(--card); border: 1px solid var(--hairline); border-radius: var(--r-tile);
