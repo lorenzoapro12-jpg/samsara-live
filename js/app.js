@@ -27,6 +27,13 @@ function appliquerTheme(id) {
   // qui porte une couleur par thème hors du CSS : relu une fois, ici, pas à chaque image.
   appliquerStructure(themeCourant().structure);
   lireJetons(); majLegende(); verreDuTheme(); remplirMenuThemes(); publierThemeCarte();
+  // Le menu reste ouvert pour comparer, mais la structure a pu déplacer le bouton Thème (Bureau 95
+  // → Kāla) : il se replace près de lui, et encore une fois les polices du thème chargées (la tête
+  // de la Gazette se remesure alors). Revue du 14/10 (C36) : il flottait loin, bas hors de l'écran.
+  const menuT = document.getElementById('themeMenu'), btnT = document.getElementById('themeBtn');
+  const replacer = () => { if (menuT && btnT && menuT.classList.contains('open')) placerMenu(menuT, btnT, false); };
+  replacer();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(replacer).catch(() => {});
   drawChart();
   redessinerApresPolices();
 }
@@ -214,7 +221,12 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 't' || e.key === 'T') { themeSuivant(); e.preventDefault(); }
   if (e.key === 'r' || e.key === 'R' || e.key === 'f' || e.key === 'F') { resetView(); e.preventDefault(); }
   if (e.key === '?') { ouvrirGlossaire(); e.preventDefault(); }
-  if (e.key === 'Escape') { document.getElementById('indMenu').classList.remove('open'); document.getElementById('themeMenu').classList.remove('open'); document.getElementById('paireMenu').classList.remove('open'); }
+  if (e.key === 'Escape') {
+    document.getElementById('indMenu').classList.remove('open'); document.getElementById('themeMenu').classList.remove('open'); document.getElementById('paireMenu').classList.remove('open');
+    // Le bouton du panneau le dit fermé aux lecteurs d'écran (revue du 14/10, C37 : il disait « ouvert »).
+    const b = document.getElementById('indDropdownBtn');
+    if (b) b.setAttribute('aria-expanded', 'false');
+  }
   // Flèches : scroller horizontalement
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
     e.preventDefault();
@@ -877,6 +889,8 @@ function apercuPanneau(key) {
     : apercuHtml(key);
 }
 let apercuMinuteur = 0;   // l'aperçu du menu suit la ligne où la souris se pose
+/** Un focus venu du clavier (:focus-visible) ; un navigateur qui ne connaît pas ce sélecteur dit oui. */
+const focusClavier = el => { try { return el.matches(':focus-visible'); } catch (e) { return true; } };
 function montrerApercu(key) {
   if (key === menuApercu) return;
   menuApercu = key;
@@ -974,8 +988,11 @@ function buildDropdown() {
     // change pas l'aperçu : il suit la ligne où elle se pose.
     l.addEventListener('mouseenter', () => { clearTimeout(apercuMinuteur); apercuMinuteur = setTimeout(() => montrerApercu(k), 160); });
     l.addEventListener('mouseleave', () => clearTimeout(apercuMinuteur));
-    l.addEventListener('pointerdown', () => { clearTimeout(apercuMinuteur); montrerApercu(k); });
-    l.addEventListener('focusin', () => montrerApercu(k));
+    // Au clic, pas au doigt posé (revue du 14/10, C23) : l'aperçu grandissait sous le doigt et
+    // prenait le clic de la dernière ligne visible, qui ne se cochait pas. Le clic vient après la case.
+    l.addEventListener('click', () => { clearTimeout(apercuMinuteur); montrerApercu(k); });
+    // Le focus, au clavier seulement : le doigt posé sur la case lui donne aussi le focus, avant le clic.
+    l.addEventListener('focusin', e => { if (focusClavier(e.target)) montrerApercu(k); });
   }
   const filtre = document.getElementById('indFiltre');
   if (filtre && menuFiltre) { filtre.value = menuFiltre; filtrerMenu(menuFiltre); }
@@ -1230,8 +1247,9 @@ function toggleDropdown(e) {
   }
 
   // Rempli PUIS ouvert PUIS placé : sa hauteur décide s'il s'ouvre au-dessus du bouton. La phrase
-  // « C'est gardé » de « Mon écran » ne dure qu'une ouverture.
-  monEcranConfirme = false;
+  // « C'est gardé » de « Mon écran » ne dure qu'une ouverture, le filtre aussi (gardé pendant
+  // qu'on coche) : revue du 14/10 (C37), un texte tapé restait d'une fermeture à la suivante.
+  monEcranConfirme = false; menuFiltre = '';
   buildDropdown();
   menu.classList.add('open');
   btn.setAttribute('aria-expanded', 'true');
@@ -1261,9 +1279,16 @@ window.addEventListener('resize', () => {
   }
 });
 
+// Les intervalles se choisissent aussi au clavier (index.html : role="radio", tabindex="0") :
+// Entrée ou Espace sur l'intervalle atteint par Tab. Revue du 14/10 (C37) : hors d'atteinte.
+function toucheIntervalle(e, label) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  label.click();
+}
 async function changeInterval(interval, label) {
-  document.querySelectorAll('#indicatorBar label[id^="int_"]').forEach(l => l.classList.remove('active'));
-  label.classList.add('active');
+  document.querySelectorAll('#indicatorBar label[id^="int_"]').forEach(l => { l.classList.remove('active'); l.setAttribute('aria-checked', 'false'); });
+  label.classList.add('active'); label.setAttribute('aria-checked', 'true');
   chartInterval = interval;
   priceScale = 1.0; pricePan = 0;
   // Une couche qui ne dessine rien sur cet intervalle (la fourchette de 7 jours en 1 jour) : grisée
@@ -1740,7 +1765,13 @@ canvas.addEventListener('touchend', (e) => {
   if (tapDebut && t && !tapDebut.bouge && e.touches.length === 0 && performance.now() - tapDebut.t <= TAP_MAX_MS
     && Math.hypot(t.clientX - tapDebut.x, t.clientY - tapDebut.y) <= TAP_MAX_PX) tapGraphique(t.clientX, t.clientY);
   tapDebut = null;
-  touchMode = null; pinchStartDist = 0; pinchStartVisible = 0;
+  pinchStartDist = 0; pinchStartVisible = 0;
+  // Un doigt levé après un zoom à deux doigts : celui qui reste continue à faire glisser le
+  // graphique, depuis la vue du moment. Revue du 14/10 (C36) : il le figeait jusqu'au toucher suivant.
+  if (touchMode === 'pinch' && e.touches.length === 1) {
+    touchMode = 'pan'; touchStartX = e.touches[0].clientX; touchStartView = viewStart;
+    geste(true);   // le geste continue : le verre reste suspendu
+  } else touchMode = null;
   canvas.style.cursor = '';
 });
 
@@ -3723,6 +3754,9 @@ function dessinerCalque() {
   reperesBulleTitre = null;
   calqueDessin();
   if (!bulleOuverte) ancreBulle = null;   // plus de bulle : la prochaine s'ouvre où est le curseur
+  // Le « ? » qu'une bulle ouverte ne peut pas éviter s'efface ; il revient à sa fermeture (C35).
+  const aide = document.getElementById('astuceTap');
+  if (aide) aide.classList.toggle('sous-bulle', !!(bulleOuverte && bulleOuverte.couvreAide));
   for (const b of document.querySelectorAll('#reperesListe button[data-k]')) {
     const c = reperesCibles[+b.dataset.k];
     b.classList.toggle('survole', !!c && c.titre === reperesBulleTitre);
@@ -6824,11 +6858,15 @@ function guideBulle(c, W, mainH, evite) {
   // La touche « ? » (HTML, par-dessus le tracé) ne couvre pas la bulle : sa dernière ligne est un
   // lien. Sinon la bulle remonte au-dessus d'elle, ou passe à sa droite.
   const aide = document.getElementById('astuceTap');
+  let couvreAide = false;
   if (aide && !aide.hidden && aide.offsetParent) {
     const ra = aide.getBoundingClientRect(), rc = canvas.getBoundingClientRect(), a = { x: ra.left - rc.left, y: ra.top - rc.top, w: ra.width, h: ra.height };
     if (a.w > 0 && bx < a.x + a.w && bx + bw > a.x && by < a.y + a.h && by + bh > a.y) {
       if (a.y - bh - 6 >= 4) by = a.y - bh - 6;
       else if (a.x + a.w + 6 + bw <= W - 75) bx = a.x + a.w + 6;
+      // Ni au-dessus ni à droite (une longue bulle de scénario au téléphone) : le « ? » s'efface
+      // tant qu'elle est ouverte (dessinerCalque). Revue du 14/10 (C35) : il cachait une ligne.
+      else couvreAide = true;
     }
   }
   // Relue par les tests : la place, le corps, et pour le résumé du Débutant ses lignes (titre
@@ -6859,7 +6897,7 @@ function guideBulle(c, W, mainH, evite) {
   else if (lStats) poserLienStats(stats, lStats, cle, bx, by, bw, bh, hLien, fC, hC);
   cx.restore();
   // La bulle de cette image : la souris peut aller sur elle (versBulle), un clic dedans ouvre son détail.
-  bulleOuverte = { cle, x: bx, y: by, w: bw, h: bh, ancre: { x: ax, y: ay }, resume: !!acces };
+  bulleOuverte = { cle, x: bx, y: by, w: bw, h: bh, ancre: { x: ax, y: ay }, resume: !!acces, couvreAide };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
