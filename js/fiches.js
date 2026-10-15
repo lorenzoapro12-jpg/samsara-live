@@ -234,7 +234,7 @@ const FICHES = {
   // ── Indicateurs du fichier (bloc tf) ──
   rsi_tf: {
     // « publié » plutôt que « fichier » : le lecteur ne voit pas de fichier (revue du 14/10/2026, M13).
-    titre: 'RSI (publié, par échelle de temps)', champ: 'tf.*.rsi_14',
+    titre: 'RSI (publié, par échelle de temps)', champ: 'tf.*.rsi_12',
     simple: 'Force des hausses face aux baisses récentes, de 0 à 100, par échelle de temps.',
     lectures: [
       { s: 'convention', t: 'Ces seuils sont ceux de Wilder, l’inventeur du RSI.' },
@@ -304,6 +304,7 @@ const FICHES = {
       { s: 'usuel', t: 'Divergence : nouveau plus haut du prix sans celui du RSI, lu comme un essoufflement.' },
       { s: 'usuel', t: 'En tendance forte, le RSI peut rester longtemps au-delà de ces seuils.' },
       { s: 'usuel', t: 'Beaucoup surveillent aussi le passage de 50.' },
+      { s: 'usuel', t: 'Trois périodes : la courte réagit vite, la longue lisse. Beaucoup guettent leurs croisements.' },
     ],
     limites: 'Calculé sur les bougies chargées, bougie en cours incluse.',
   },
@@ -663,6 +664,11 @@ function prmMeta(cle, nom) {
 }
 /** « 14 bougies », lu dans meta ; sinon les mots de repli. */
 const bougiesMeta = (cle, nom, repli) => { const v = prmMeta(cle, nom); return v !== null ? nbF(v) + ' bougies' : repli; };
+/** « 6, 12 et 24 » : une liste de nombres en mots. */
+const listeMots = ns => ns.map(nbF).join(', ').replace(/, ([^,]*)$/, ' et $1');
+/** « 6, 12 et 24 bougies » : les périodes des RSI publiés (rsi_6, rsi_12, rsi_24), lues dans meta. */
+const rsiTfMeta = repli => { const ps = ['rsi_6', 'rsi_12', 'rsi_24'].map(c => prmMeta('tf.*.' + c, 'periode'));
+  return ps.every(p => p !== null) ? listeMots(ps) + ' bougies' : repli; };
 /** « 30 dernières bougies », lu dans meta ; sinon « dernières bougies ». */
 const dernieresMeta = (cle, nom) => { const v = prmMeta(cle, nom); return (v !== null ? nbF(v) + ' ' : '') + 'dernières bougies'; };
 /** Minuit UTC (le début du jour UTC, une définition de calcul) dit en clair, avec l'heure qui lui
@@ -800,7 +806,7 @@ const COURT = {
   // ── Indicateurs du fichier (bloc tf) ──
   rsi_tf: { quoi: 'Le RSI du graphique, calculé pour plusieurs durées.',
     traders: 'Au-dessus de 70, on dit « suracheté » ; sous 30, « survendu ». Quand plusieurs durées le disent ensemble, beaucoup y croient davantage.',
-    calcul: () => 'Le serveur fait le calcul du graphique sur ' + bougiesMeta('tf.*.rsi_14', 'periode', 'les dernières périodes') + ' de chaque durée. La période en cours compte.' },
+    calcul: () => 'Le serveur fait le calcul du graphique sur ' + rsiTfMeta('les dernières périodes') + ' de chaque durée. La période en cours compte.' },
   ema_tf: { quoi: 'Les moyennes du prix, calculées par le serveur pour plusieurs durées.',
     traders: 'Prix au-dessus des moyennes : tendance lue à la hausse ; en dessous, à la baisse. Beaucoup comparent les durées pour voir si elles s’accordent.',
     calcul: () => { const a = prmMeta('tf.*.ema20', 'periode'), b = prmMeta('tf.*.ema50', 'periode');
@@ -825,7 +831,7 @@ const COURT = {
   // ── Indicateurs du graphique ──
   rsi: { quoi: 'Le RSI compare la force des hausses et des baisses récentes, de 0 à 100.',
     traders: 'Au-dessus de 70, on dit « suracheté » : beaucoup y guettent un repli. Sous 30, « survendu » : beaucoup y guettent un rebond.',
-    calcul: P => 'On compare hausses et baisses moyennes sur les ' + P.rsi.periode + ' dernières périodes. Que des hausses : 100 ; que des baisses : 0.' },
+    calcul: P => 'Hausses et baisses moyennes comparées sur les ' + listeMots(P.rsi.periodes) + ' dernières périodes, une ligne chacune. Que des hausses : 100 ; que des baisses : 0.' },
   ema: { quoi: 'Une ligne qui suit le prix moyen récent : elle lisse les secousses.',
     traders: 'Prix au-dessus d’une moyenne qui monte : tendance à la hausse, et inversement. Beaucoup guettent aussi le croisement d’une moyenne courte et d’une longue.',
     calcul: 'La moyenne des prix de fin des dernières périodes ; leur nombre est dans le nom. L’« exponentielle » compte plus les récents.' },
@@ -927,7 +933,7 @@ for (const k of Object.keys(COURT)) if (FICHES[k] && COURT[k].traders) {
 // exacte, publiée, suit. Aucun nombre avec unité écrit en dur ici (tests/test_fiches.js).
 const CALCUL = {
   // ── Indicateurs du graphique ──
-  rsi: P => 'Moyennes des hausses et des baisses de clôture, lissées « à la Wilder » sur ' + P.rsi.periode + ' bougies (poids 1/' + P.rsi.periode + '). RSI = 100 − 100 / (1 + hausses / baisses) ; 50 : hausses et baisses égales.',
+  rsi: P => 'Moyennes des hausses et des baisses de clôture, lissées « à la Wilder » sur ' + listeMots(P.rsi.periodes) + ' bougies (poids ' + P.rsi.periodes.map(p => '1/' + p).join(', ') + '). RSI = 100 − 100 / (1 + hausses / baisses) ; 50 : hausses et baisses égales.',
   ema: () => 'EMA N : poids k = 2 / (N + 1), amorcée par la moyenne simple des N premières clôtures, puis eₜ = k·cₜ + (1 − k)·eₜ₋₁. SMA N : moyenne des N dernières clôtures. N est dans le nom.',
   bb: P => 'Milieu : moyenne simple des ' + P.bb.periode + ' dernières clôtures. Bandes : milieu ± ' + P.bb.ecarts + ' écarts-types de ces clôtures.',
   vwap: P => 'Σ (prix typique × volume) / Σ volume, prix typique = (H + B + C) / 3. Remis à zéro toutes les ' + (P.vwap.ancrageIntradayS / 3600) + ' h, à ' + minuitUtcMots() + ', en intraday ; sinon toutes les ' + P.vwap.ancrageBougies + ' bougies.',
@@ -976,7 +982,7 @@ const CALCUL = {
       + (typeof b === 'number' && isFinite(b) ? ' (±' + nbF(b) + ' %)' : '') + ' du carnet Binance. Si le carnet reçu ne la couvre pas des deux côtés : la plus étroite publiée.'; },
   murs: () => { const t = prmMeta('liquidity.bid_walls', 'tranche_usd'), n = prmMeta('liquidity.bid_walls', 'n');
     return 'Carnet Binance découpé en tranches' + (t !== null ? ' de ' + nbF(t) + ' $' : '') + ', quantités additionnées. Les murs : les ' + (n !== null ? nbF(n) + ' ' : '') + 'tranches les plus chargées de chaque côté.'; },
-  rsi_tf: () => 'Le RSI du graphique (Wilder, ' + bougiesMeta('tf.*.rsi_14', 'periode', 'période publiée par le fichier') + '), calculé par le serveur sur chaque échelle de temps, bougie en cours comprise.',
+  rsi_tf: () => 'Le RSI du graphique (Wilder, ' + rsiTfMeta('période publiée par le fichier') + '), calculé par le serveur sur chaque échelle de temps, bougie en cours comprise.',
   ema_tf: () => { const a = prmMeta('tf.*.ema20', 'periode'), b = prmMeta('tf.*.ema50', 'periode');
     return 'Moyennes exponentielles des clôtures' + (a !== null && b !== null ? ' sur ' + nbF(a) + ' et ' + nbF(b) + ' bougies' : ', courte et longue,') + ' de chaque échelle de temps, bougie en cours comprise.'; },
   croisement: () => { const a = prmMeta('tf.*.ema20_sous_ema50', 'courte'), b = prmMeta('tf.*.ema20_sous_ema50', 'longue');
@@ -1239,7 +1245,18 @@ function lectureCourte(id, v, v2) {
     case 'ls': if (n(v)) t = (r2(v) > 1 ? 'Plus de comptes acheteurs que vendeurs' : r2(v) < 1 ? 'Plus de comptes vendeurs qu’acheteurs' : 'Autant de comptes acheteurs que vendeurs') + ' — des comptes, pas des montants.'; break;
     case 'cvd': if (n(v)) t = v > 0 ? 'Sur 24 h, les achats au marché ont dominé.' : 'Sur 24 h, les ventes au marché ont dominé.'; break;
     case 'gex': if (n(v)) t = v > 0 ? 'Régime « long gamma » selon la convention ; lecture usuelle : mouvements amortis.' : 'Régime « short gamma » selon la convention ; lecture usuelle : mouvements amplifiés.'; break;
-    case 'rsi_tf': if (n(v)) t = v >= 70 ? '« Suracheté » (au-dessus de 70) : la hausse récente a été forte.' : v <= 30 ? '« Survendu » (sous 30) : la baisse récente a été forte.' : 'Zone neutre (entre 30 et 70).'; break;
+    // Les RSI 6, 12, 24 (v : valeurs, v2 : périodes) ; une seule valeur se lit comme avant.
+    case 'rsi_tf': {
+      const vs = Array.isArray(v) ? v : [v], ps = Array.isArray(v2) ? v2 : [];
+      if (!vs.length || !vs.every(n)) break;
+      const qui = (idx, mot) => vs.length === 1 ? '« ' + mot[0].toUpperCase() + mot.slice(1) + ' »'
+        : idx.length === vs.length ? 'Les trois « ' + mot + 's »' : 'RSI ' + listeMots(idx.map(i => ps[i])) + ' « ' + mot + (idx.length > 1 ? 's' : '') + ' »';
+      const hauts = vs.map((x, i) => x >= 70 ? i : -1).filter(i => i >= 0), bas = vs.map((x, i) => x <= 30 ? i : -1).filter(i => i >= 0);
+      t = hauts.length ? qui(hauts, 'suracheté') + ' (au-dessus de 70) : la hausse récente a été forte.'
+        : bas.length ? qui(bas, 'survendu') + ' (sous 30) : la baisse récente a été forte.'
+        : (vs.length > 1 ? 'Les trois en zone neutre' : 'Zone neutre') + ' (entre 30 et 70).';
+      break;
+    }
     case 'vix': if (n(v)) t = phraseVix(v); break;
     case 'prime': {
       const x = n(v2) ? v2 : v, seuil = prmMeta('micro.premium_state', 'seuil_pct');

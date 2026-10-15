@@ -31,7 +31,9 @@ l'incluent. C'est publié (`bougie_en_cours`), parce que la valeur bouge jusqu'�
 """
 from datetime import datetime, timezone
 
-RSI_PERIODE = 14
+RSI_PERIODE = 14         # le champ historique `rsi_14` (comparaison avec l'ancien module, traces)
+# Les RSI affichés par le site : 6, 12 et 24, comme sur Binance (demande de Lorenzo, 15/10/2026).
+RSI_PERIODES = (6, 12, 24)
 EMA_COURTE = 20
 EMA_LONGUE = 50
 SR_BOUGIES = 30          # support / résistance / amplitude : min / max des N dernières bougies
@@ -116,6 +118,7 @@ def indicateurs_tf(c, heures, maintenant_ms=None):
     highs = [x["high"] for x in fen]
     lows = [x["low"] for x in fen]
     rsi = rsi_wilder(closes)
+    rsis = {f"rsi_{p}": rsi_wilder(closes, p) for p in RSI_PERIODES}
     e_c = ema(closes, EMA_COURTE)
     e_l = ema(closes, EMA_LONGUE)
     bas, haut = min(lows), max(highs)
@@ -151,6 +154,7 @@ def indicateurs_tf(c, heures, maintenant_ms=None):
         "range_24h_pct": amplitude,
         "sr_window_h": SR_BOUGIES * heures,
         # ── champs canoniques : le nom dit ce que c'est ──
+        **rsis,
         "ema20": round(e_c, 2),
         "ema50": round(e_l, 2),
         "ema_ecart_pct": round((e_c / e_l - 1) * 100, 2),
@@ -193,14 +197,15 @@ def meta():
     fen = f"{SR_BOUGIES} dernières bougies du TF (dernière en cours incluse)"
     base = f"{BOUGIES_CHARGEES} bougies du TF demandées à Binance, dernière en cours incluse"
     m = {
-        "rsi_14": {
-            "libelle": f"RSI {RSI_PERIODE}", "unite": "indice 0–100",
+        # Le nom `rsi_14` est fixe (historique) : si RSI_PERIODE change, il ment, et le harnais le dit.
+        **{nom: {
+            "libelle": f"RSI {p}", "unite": "indice 0–100",
             "formule": (f"RSI de Wilder : moyennes des hausses et des baisses de clôture, "
-                        f"amorcées par leur moyenne simple sur {RSI_PERIODE} variations puis "
-                        f"lissées à 1/{RSI_PERIODE} ; RSI = 100 − 100 / (1 + hausses / baisses)"),
+                        f"amorcées par leur moyenne simple sur {p} variations puis "
+                        f"lissées à 1/{p} ; RSI = 100 − 100 / (1 + hausses / baisses)"),
             "fenetre": base, "nature": "mesure",
-            "params": {"periode": RSI_PERIODE, "methode": "wilder"},
-        },
+            "params": {"periode": p, "methode": "wilder"},
+        } for nom, p in (("rsi_14", RSI_PERIODE), *((f"rsi_{q}", q) for q in RSI_PERIODES))},
         "ema20": {
             "libelle": f"EMA {EMA_COURTE}", "unite": "USD",
             "formule": (f"moyenne mobile exponentielle des clôtures, k = 2/({EMA_COURTE}+1), "

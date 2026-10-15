@@ -443,7 +443,8 @@ const coucheLiq = () => overlays.liq;
 // rapide (%K brut sur 14, %D = moyenne de 3). tests/test_fiches.js échoue si un libellé ou un
 // appel de calcul réécrit un de ces nombres à la main.
 const PARAM = {
-  rsi: { periode: 14 },
+  // Trois RSI, du plus rapide au plus lent, comme sur Binance (demande de Lorenzo, 15/10/2026).
+  rsi: { periodes: [6, 12, 24] },
   macd: { rapide: 12, lente: 26, signal: 9 },
   stoch: { k: 14, d: 3 },
   atr: { periode: 14 },
@@ -613,7 +614,7 @@ const PARAM = {
 };
 const periodeDe = cle => +String(cle).replace(/\D/g, '');     // 'ema20' -> 20
 const ETIQ = {
-  rsi: () => 'RSI (' + PARAM.rsi.periode + ')',
+  rsi: () => 'RSI (' + PARAM.rsi.periodes.join(', ') + ')',
   macd: () => 'MACD (' + PARAM.macd.rapide + ',' + PARAM.macd.lente + ',' + PARAM.macd.signal + ')',
   stoch: () => 'Stochastique rapide (' + PARAM.stoch.k + ',' + PARAM.stoch.d + ')',
   atr: () => 'ATR (' + PARAM.atr.periode + ')',
@@ -8752,6 +8753,30 @@ function drawLine(data, minP, range, pad, gap, ph, color, dash, width, dataOffse
   }
 }
 
+// Les RSI du graphique (PARAM.rsi.periodes), chacun avec sa couleur : le plus rapide en jaune, le
+// plus lent en violet (l'ordre de Binance). Jetons des thèmes existants : aucun thème à retoucher.
+function rsisPage() { const cl = cols().close; return PARAM.rsi.periodes.map(p => memoized('rsi_' + p, calcRSI, cl, p)); }
+function couleursRsi() { return [COLORS.macd, COLORS.macd_signal, COLORS.rsi]; }
+/** La légende du sous-graphique RSI, après son titre : un point de couleur et la période de chaque
+ *  ligne. Rien quand elle ne tient pas avant la colonne de l'axe (le réticule dit les trois valeurs
+ *  dans le même ordre). */
+function legendeRsi(y0, pad, W) {
+  ctx.font = chartFont(9.5, 700);
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0.6px';
+  const fin = pad.left + 17 + ctx.measureText(titreSous('rsi', W - pad.right - pad.left - 17)).width;
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+  ctx.font = chartFont(9.5, 650);
+  const ps = PARAM.rsi.periodes, cs = couleursRsi();
+  const larg = ps.reduce((t, p) => t + 9 + ctx.measureText(String(p)).width + 8, 0);
+  let x = fin + 10;
+  if (x + larg > W - pad.right) return;
+  ps.forEach((p, j) => {
+    ctx.fillStyle = cs[j % cs.length]; ctx.beginPath(); ctx.arc(x + 3, y0 + 10, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = COLORS.ink3; ctx.fillText(String(p), x + 9, y0 + 13.5);
+    x += 9 + ctx.measureText(String(p)).width + 8;
+  });
+}
+
 // Titre d'un sous-graphe : le nom du menu (« Stochastique rapide (14,3) », « ADX / DMI (14) »),
 // pas une abréviation à part (« STOCH », « ADX (14) ») — un seul nom par chose.
 function subTitle(key) {
@@ -8859,22 +8884,26 @@ function resolveSub(candles, y0, subH, W, key) {
       ctx.globalAlpha = 1;
     }
   } else if (key === 'rsi') {
-    const closes = cols().close;
-    const rsi = memoized('sub_rsi', calcRSI, closes, PARAM.rsi.periode);
     // Bande 30-70 teintée : la zone « normale » se lit d'un coup d'œil, les sorties ressortent.
     ctx.save(); ctx.globalAlpha = COLORS.bandeAlpha; ctx.fillStyle = COLORS.rsi;
     ctx.fillRect(pad.left, y0 + pad.top + ph * 0.3, pw, ph * 0.4); ctx.restore();
     subGrid(y0, pad, ph, W, { levels: [30, 50, 70] });
-    // RSI line
-    ctx.strokeStyle = COLORS.rsi; ctx.lineWidth = 1.5;
-    ctx.beginPath(); let started = false;
-    for (let i = vs; i < ve; i++) {
-      if (i >= rsi.length || rsi[i] === null) continue;
-      const x = pad.left + gap * (i - vs) + gap/2;
-      const y = y0 + pad.top + ph * (1 - rsi[i] / 100);
-      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    // Une ligne par période, la plus lente dessous ; la légende (« ● 6 ● 12 ● 24 ») suit le titre
+    // quand elle tient avant la colonne de l'axe.
+    const rsis = rsisPage(), cs = couleursRsi();
+    for (let j = rsis.length - 1; j >= 0; j--) {
+      const rsi = rsis[j];
+      ctx.strokeStyle = cs[j % cs.length]; ctx.lineWidth = 1.3;
+      ctx.beginPath(); let started = false;
+      for (let i = vs; i < ve; i++) {
+        if (i >= rsi.length || rsi[i] === null) continue;
+        const x = pad.left + gap * (i - vs) + gap/2;
+        const y = y0 + pad.top + ph * (1 - rsi[i] / 100);
+        if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
     }
-    ctx.stroke();
+    legendeRsi(y0, pad, W);
   } else if (key === 'macd') {
     const closes = cols().close;
     const macd = memoized('sub_macd', calcMACD, closes, PARAM.macd.rapide, PARAM.macd.lente, PARAM.macd.signal);
@@ -9371,7 +9400,8 @@ function getSubIndicatorValue(key, idx) {
     switch(key) {
       // Les formats de l'axe de chaque sous-graphe (js/format.js) : « 54,8 k », « 45,3 », « −0,0012 ».
       case 'vol': return Fmt.compact(c[idx].volume);
-      case 'rsi': { const v = memoized('gsi_rsi', calcRSI, closes, PARAM.rsi.periode); return v[idx] !== null ? Fmt.nombre(v[idx], 1) : null; }
+      // Les trois RSI dans l'ordre de la légende (6 · 12 · 24).
+      case 'rsi': { const v = rsisPage().map(r => r[idx]); return v.every(x => x !== null && x !== undefined) ? v.map(x => Fmt.nombre(x, 1)).join(' · ') : null; }
       case 'macd': { const v = memoized('gsi_macd', calcMACD, closes, PARAM.macd.rapide, PARAM.macd.lente, PARAM.macd.signal); return v.macdLine[idx] !== null ? Fmt.nombre(v.macdLine[idx], decimalesCote()) : null; }
       case 'stoch': { const v = memoized('gsi_stoch', calcStoch, highs, lows, closes, PARAM.stoch.k, PARAM.stoch.d); return v.k[idx] !== null ? Fmt.nombre(v.k[idx], 1) : null; }
       case 'atr': { const v = memoized('gsi_atr', calcATR, highs, lows, closes, PARAM.atr.periode); return v[idx] !== null ? Fmt.prix(v[idx], guideUnite(), decimalesCote()) : null; }
@@ -9773,13 +9803,16 @@ function trackHtml(val, lo, hi, gauche, droite) {
     + (p === null ? '' : '<span class="track-fill" style="width:' + p + '%"></span><span class="track-dot" style="left:' + p + '%"></span>')
     + '</div><div class="track-legende"><span>' + gauche + '</span><span>' + droite + '</span></div></div>';
 }
-// Jauge RSI : zones de survente (≤ 30) et de surachat (≥ 70) teintées, un point à la valeur.
-function rsiMeter(v) {
-  const p = pct1(v);
-  const etat = !isNum(v) ? '' : v >= 70 ? ' chaud' : v <= 30 ? ' froid' : '';
-  return '<div class="rsi-meter' + etat + '" title="RSI : zones 30 / 70"><span class="rsi-zone bas"></span><span class="rsi-zone haut"></span>'
-    + (p === null ? '' : '<span class="rsi-dot" style="left:' + p + '%"></span>') + '</div>';
+// Jauge RSI : zones de survente (≤ 30) et de surachat (≥ 70) teintées, un point par RSI publié
+// (6, 12, 24), de la couleur de sa ligne sur le graphique.
+const RSI_TF = [['rsi_6', 6, '--s-macd'], ['rsi_12', 12, '--s-signal'], ['rsi_24', 24, '--s-rsi']];
+function rsiMeter(t) {
+  const pts = RSI_TF.map(([c, , coul]) => [pct1(t[c]), coul]).filter(([p]) => p !== null);
+  return '<div class="rsi-meter" title="RSI 6, 12 et 24 : zones 30 / 70"><span class="rsi-zone bas"></span><span class="rsi-zone haut"></span>'
+    + pts.map(([p, coul]) => '<span class="rsi-dot" style="left:' + p + '%;background:var(' + coul + ')"></span>').join('') + '</div>';
 }
+/** « RSI 6 41,2 · 12 45,0 · 24 48,3 » d'une échelle de temps publiée. */
+const rsiTfHtml = t => '<span class="tf-rsi">RSI ' + RSI_TF.map(([c, p]) => p + '&nbsp;<b>' + fmtNum(t[c], 1) + '</b>').join(' · ') + '</span>';
 // Barre à deux segments (long/short, bids/asks), séparés par 2 px de surface.
 function splitHtml(a, b, gauche, droite) {
   const t = (+a || 0) + (+b || 0), pa = t > 0 ? (+a || 0) / t * 100 : 50;
@@ -9826,13 +9859,14 @@ const tuile = (lbl, val, sub, fiche, lecture) => '<div class="tuile"><div class=
 // « RSI 4 h » (avec l'espace, comme partout) et « Taux annuel » plutôt que « Funding an. », mot
 // anglais coupé (revue du 14/10/2026, M12). La manchette de la Gazette cite le financement par ce
 // libellé (GAZETTE_CLES, js/structures.js).
-const KPIS_ENTETE = [['RSI 4\u00a0h', 'tf.4h.rsi_14'], ['Taux annuel', 'micro.funding_annual_pct'], ['OI 24h', 'micro.oi_change_24h_pct'],
+// Le RSI : les trois périodes du graphique (6 · 12 · 24) sous un seul chiffre clé, sans trace.
+const KPIS_ENTETE = [['RSI 4\u00a0h', 'tf.4h.rsi'], ['Taux annuel', 'micro.funding_annual_pct'], ['OI 24h', 'micro.oi_change_24h_pct'],
   ['CVD 24h', 'micro.cvd_24h_usd'], ['GEX', 'micro.gex_usd_1pct'], ['L/S', 'micro.ls_ratio'], ['DXY', 'macro.dxy_spot'], ['VIX', 'macro.vix']];
 // Mêmes précisions que les cartes et le panneau ⚡ (funding annualisé 1 décimale, OI 1, L/S 2).
 function valeurKpi(chemin, d) {
   const x = d.micro || {}, m = d.macro || {}, t4 = (d.tf || {})['4h'] || {};
   switch (chemin) {
-    case 'tf.4h.rsi_14': return fmtNum(t4.rsi_14, 1);
+    case 'tf.4h.rsi': return RSI_TF.every(([c]) => isNum(t4[c])) ? RSI_TF.map(([c]) => fmtNum(t4[c], 0)).join(' · ') : '—';
     case 'micro.funding_annual_pct': return pctSigne(x.funding_annual_pct, 1);
     case 'micro.oi_change_24h_pct': return pctSigne(isNum(x.oi_change_24h_pct) ? x.oi_change_24h_pct : x.oi_change_1d_pct, 1);
     case 'micro.cvd_24h_usd': return fmtSigned(x.cvd_24h_usd);
@@ -9849,7 +9883,8 @@ const EPINGLES_CLE = 'samsara-epingles-v1';
 function epingles() {
   try {
     const v = JSON.parse(localStorage.getItem(EPINGLES_CLE) || '[]');
-    return Array.isArray(v) ? v.filter(c => KPIS_ENTETE.some(k => k[1] === c)) : [];
+    // Le RSI 14 épinglé avant le 15/10/2026 reste épinglé : ce sont maintenant les RSI 6, 12, 24.
+    return Array.isArray(v) ? v.map(c => c === 'tf.4h.rsi_14' ? 'tf.4h.rsi' : c).filter(c => KPIS_ENTETE.some(k => k[1] === c)) : [];
   } catch (e) { return []; }
 }
 function basculerEpingle(chemin) {
@@ -10122,13 +10157,13 @@ function renderFeedTo(container) {
     const ecart = isNum(t.ema_ecart_pct) ? 'écart ' + pctSigne(t.ema_ecart_pct) : 'écart absolu ' + fmtNum(t.ema_gap_pct,2) + ' %';
     const ampl = isNum(t.amplitude_30_pct) ? t.amplitude_30_pct : t.range_24h_pct;
     indBody += '<div class="tf-row"><div class="tf-tete"><span class="tf-nom">' + (tfLabel[k]||k) + '</span>'
-      + '<span class="tf-rsi">RSI&nbsp;<b>' + fmtNum(t.rsi_14,1) + '</b></span>' + rsiMeter(t.rsi_14) + crossTag(sous) + '</div>'
+      + rsiTfHtml(t) + rsiMeter(t) + crossTag(sous) + '</div>'
       // Canal S/R : où le dernier cours se situe entre le support et la résistance de la fenêtre.
       + trackHtml(t.last_close, t.support_30, t.resistance_30, 'S&nbsp;<b>' + fmtUsd(t.support_30) + '</b>', 'R&nbsp;<b>' + fmtUsd(t.resistance_30) + '</b>')
       + '<div class="tf-pied">EMA 20 ' + fmtUsd(e20) + ' · EMA 50 ' + fmtUsd(e50)
       + ' (' + ecart + ') · amplitude ' + fmtNum(ampl,2) + ' % (min/max ' + fen + ')'
       + (isNum(t.atr_14) ? '<span class="chiffres-seul"> · ATR ' + fmtUsd(t.atr_14) + ' (' + fmtNum(t.atr_14_pct,2) + ' %)</span>' : '') + '</div>'
-      + (k === '4h' ? lectureCourte('rsi_tf', t.rsi_14) : '') + '</div>';
+      + (k === '4h' ? lectureCourte('rsi_tf', RSI_TF.map(([c]) => t[c]), RSI_TF.map(([, p]) => p)) : '') + '</div>';
   }
   indBody += '<div class="fiches-ligne">' + ['rsi_tf', 'croisement', 'ema_tf', 'sr_tf', 'amplitude', 'atr_tf'].map(f =>
     '<span class="fiche-lien">' + FICHES[f].titre.replace(/ \((fichier|graphique)[^)]*\)/, '') + infoBtn(f) + '</span>').join('') + '</div>';
@@ -10315,7 +10350,7 @@ function renderFeedTo(container) {
 // L'historique vient de js/chronique.js : publications relues à /master~N/ (même hôte que
 // DATA_URL), puis chaque lecture vivante. Suivis : les chiffres clés de l'en-tête et le champ
 // de chaque fiche (un champ par TF se lit sur le 4h). Rendu à l'arrivée d'une donnée seulement.
-const CHRONIQUE_KPIS = ['tf.4h.rsi_14', 'micro.funding_annual_pct', 'micro.oi_change_24h_pct', 'micro.cvd_24h_usd',
+const CHRONIQUE_KPIS = ['tf.4h.rsi_6', 'tf.4h.rsi_12', 'tf.4h.rsi_24', 'micro.funding_annual_pct', 'micro.oi_change_24h_pct', 'micro.cvd_24h_usd',
   'micro.gex_usd_1pct', 'micro.ls_ratio', 'macro.dxy_spot', 'macro.vix'];
 const cheminFiche = champ => champ.replace('.*.', '.4h.');
 const chronique = (function () {
@@ -10336,6 +10371,7 @@ function traceKpi(chemin) {
 /** Le résumé de la trace en infobulle du chiffre clé : lisible même quand la trace a cédé sa
  *  place (ajusterKpis). */
 function titreKpi(chemin) {
+  if (chemin === 'tf.4h.rsi') return ' title="RSI 6 · 12 · 24, bougies de 4 h"';
   const r = chemin ? chronique.resume(chemin, { meta: metaChronique(chemin), fmt: fmtChronique }) : '';
   return r ? ' title="' + escHtml(r).replace(/"/g, '&quot;') + '"' : '';
 }

@@ -1172,7 +1172,7 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
       const lu = k => (b.find(x => x.cle === k) || { t: [] }).t;
       // (Le Volume compte des bitcoins : lui seul les dit.)
       check(`${nom} : le réticule dit « ${lu('vol').join(' ')} » (Volume), « ${lu('rsi').join(' ')} » (RSI) et « ${lu('macd').join(' ')} » (MACD) : chacun son unité en mots, « bitcoins » pour le Volume seul`,
-        lu('rsi').length === 1 && /^\d{1,3},\d sur 100$/.test(lu('rsi')[0]) && lu('macd').length === 1 && /^[−-]?\d[\d  ]*(,\d+)? \$ d’écart$/.test(lu('macd')[0])
+        lu('rsi').length === 1 && /^\d{1,3},\d · \d{1,3},\d · \d{1,3},\d sur 100$/.test(lu('rsi')[0]) && lu('macd').length === 1 && /^[−-]?\d[\d  ]*(,\d+)? \$ d’écart$/.test(lu('macd')[0])
         && lu('vol').length === 1 && / bitcoins$/.test(lu('vol')[0]) && !b.some(x => x.t.some(y => /RSI|MACD/.test(y) || (x.cle !== 'vol' && /bitcoins/.test(y)))), b);
       check(`${nom} : aucune erreur JavaScript`, !o.erreurs.length, o.erreurs);
       await o.ctx.close();

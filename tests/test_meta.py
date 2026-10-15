@@ -300,6 +300,8 @@ for tf, heures in IND.TFS:
     pr = lambda n: tf_meta(n)["params"]
     ok = []
     ok.append(abs(round(ref_rsi(cl, pr("rsi_14")["periode"]), 1) - pub["rsi_14"]) < 1e-9)
+    for n in ("rsi_6", "rsi_12", "rsi_24"):   # les RSI du site (15/10/2026)
+        ok.append(abs(round(ref_rsi(cl, pr(n)["periode"]), 1) - pub[n]) < 1e-9)
     ok.append(abs(round(ref_ema(cl, pr("ema20")["periode"]), 2) - pub["ema20"]) < 1e-6)
     ok.append(abs(round(ref_ema(cl, pr("ema50")["periode"]), 2) - pub["ema50"]) < 1e-6)
     e20, e50 = ref_ema(cl, pr("ema_ecart_pct")["courte"]), ref_ema(cl, pr("ema_ecart_pct")["longue"])
