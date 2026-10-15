@@ -412,7 +412,7 @@ const etat = page => page.evaluate(() => {
         // Le trait du CPI : la famille « Heure à retenir », son nom entier dans la bulle, l'effet mesuré.
         const c = e.cpi[0];
         check(`${nom} : un trait du CPI, famille « Heure à retenir », de haut en bas du tracé (« ${c && c.titre} »)`, e.cpi.length === 1 && c.moment === 'CPI' && c.ico === 'moment'
-          && /^Chiffres américains de l’inflation \(CPI\) · \d\d:\d\d$/.test(c.titre) && c.segs.length === 1 && c.segs[0][0] === c.segs[0][2] && c.segs[0][1] === e.top && Math.abs(c.segs[0][3] - (e.top + e.ph)) < 0.5, e.cpi);
+          && /^Chiffres américains de l’inflation \(CPI\) · (\d\d\/\d\d )?\d\d:\d\d$/.test(c.titre) && c.segs.length === 1 && c.segs[0][0] === c.segs[0][2] && c.segs[0][1] === e.top && Math.abs(c.segs[0][3] - (e.top + e.ph)) < 0.5, e.cpi);
         // L'avertissement partagé du Guide, le même dans les deux modes (revue du 14/10/2026, C19 :
         // plus de « pas une recommandation »).
         check(`${nom} : sa bulle dit l’effet mesuré, sans sens, puis « pas un conseil »`, c && c.texte[0] === EFFET
@@ -441,6 +441,11 @@ const etat = page => page.evaluate(() => {
       const h = await ouvrir(nav, { width: 1440, height: 900 }, 'expert', 'hier');
       const eh = await lit(h.page);
       check('fichier d’hier (fenêtre de 24 h finie) : plus de ligne d’agitation, ni dans la bulle ni dans « En résumé »', eh.ag === null && eh.boite && !eh.boite.texte.some(t => /Écart attendu/.test(t)) && !(eh.resume || []).some(p => p.agitation), eh);
+      // Après minuit, le trait du CPI de la veille porte sa date (« 14/10 23:18 ») : la date compte
+      // pour un seul nombre, et le résumé de L'essentiel garde l'effet (titre + effet ≤ 3 nombres).
+      const nb = await h.page.evaluate(E => { const t = 'Chiffres américains de l’inflation (CPI) · 14/10 23:18';
+        return { titre: nombresDe(t), effet: nombresDe(E), max: PARAM.guide.debutant.bulleNombres }; }, EFFET);
+      check(`titre daté du CPI (après minuit) : ${nb.titre} nombres, effet ${nb.effet} : le résumé garde l’effet (≤ ${nb.max})`, nb.titre === 2 && nb.titre + nb.effet <= nb.max, nb);
       check('fichier d’hier : aucune erreur JavaScript', !h.erreurs.length, h.erreurs);
       await h.ctx.close();
     }

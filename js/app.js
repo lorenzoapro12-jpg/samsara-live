@@ -6773,7 +6773,9 @@ function guideSurvol(W, mainH, evite) {
 const nombresDe = t => {
   const s = String(t).replace(/n° ?\d+/g, '');
   let n = 0;
-  for (const m of s.matchAll(/\d+(?:[\u00a0\u202f ]\d{3})*(?:[,.:]\d+)?/g))
+  // « 14/10 » (une date) compte pour un nombre, comme « 23:18 » : le trait du CPI d'hier, vu
+  // après minuit, porte sa date dans le titre (Fmt.jourHeure), et sa bulle doit garder l'effet.
+  for (const m of s.matchAll(/\d+(?:[\u00a0\u202f ]\d{3})*(?:[,.:/]\d+)?/g))
     if (m[0].length > 1 || /^[\u00a0\u202f ]?(?:%|\$|h\b|min\b|j\b|BTC|fois)/.test(s.slice(m.index + 1))) n++;
   return n;
 };
