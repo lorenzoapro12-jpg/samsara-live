@@ -1374,11 +1374,7 @@ async function changeSymbol(symbol, label) {
   compterIndicateurs(); majLegende();
   if (document.getElementById('indMenu').classList.contains('open')) buildDropdown();
   // Les cartes du Débutant nomment le bitcoin sur une autre paire : elles suivent la paire.
-  if (marketData) {
-    renderFeed();
-    const mm = document.getElementById('marketModal');
-    if (mm && mm.style.display === 'flex') renderFeedTo(document.getElementById('marketModalBody'));
-  }
+  if (marketData) renderFeed();         // (la fenêtre du téléphone ouverte aussi : renderFeed)
   await afficherSerie();
   // Retour sur BTCUSDT : les scénarios du matin, s'ils n'ont pas été relus depuis une cadence.
   if (symbol === 'BTCUSDT' && (!previsions || Horloges.maintenant() - previsions.luA > CADENCES.previsions_lue)) fetchPrevisions();
@@ -9734,9 +9730,11 @@ const svgIco = d => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 // Apparition en fondu au PREMIER rendu d'un conteneur seulement : les cartes sont réécrites
 // toutes les 60 s (et le panneau ⚡ toutes les 5 s) — l'animation ne doit pas se rejouer.
 let carteEntree = false;
-function mCard(icon, title, sub, right, body) {
+// `cls` : une classe de plus sur la carte (« chiffres-seul » : la carte entière n'existe qu'avec
+// « Les chiffres du marché »).
+function mCard(icon, title, sub, right, body, cls) {
   const ic = ICONES[icon];
-  return '<div class="demon-card carte-' + (ic ? ic[0] : 'autre') + (carteEntree ? ' entree' : '') + '"><div class="demon-header">'
+  return '<div class="demon-card carte-' + (ic ? ic[0] : 'autre') + (cls ? ' ' + cls : '') + (carteEntree ? ' entree' : '') + '"><div class="demon-header">'
     + '<div class="demon-avatar"><div class="avatar-orb">' + (ic ? svgIco(ic[1]) : icon) + '</div></div>'
     + '<div class="demon-titres"><div class="demon-name">' + title + '</div><div class="demon-role">' + sub + '</div></div>'
     + (right ? '<span class="demon-right">' + right + '</span>' : '')
@@ -9926,7 +9924,15 @@ const ariaKpiDeb = min => 'Infos du marché — ' + titreKpiDeb(min);
 })();
 const titreKpiDeb = min => (min === null ? 'Infos publiées : âge inconnu' : 'Infos publiées il y a ' + Fmt.duree(min)) + ' (toutes les ' + CADENCES.attendue_min + ' min'
   + (min !== null && min > CADENCES.vieux_min ? ' : en retard' : '') + '). Le prix du haut est en direct.';
-function renderFeed() { renderFeedTo(document.getElementById('feed')); }
+// La fenêtre du téléphone, ouverte, suit les mêmes rendus que le panneau (publication nouvelle,
+// seuil de retard franchi : majAges). Sans « Les chiffres du marché », sa ligne de tête est le seul
+// endroit où l'âge s'écrit (revue du 14/10/2026, M7) : restée ouverte, elle disait encore « Publié
+// à 15:26. » à 22 min, ou « Publié à 15:45, il y a 0 min » à 16:10, après une publication nouvelle.
+function renderFeed() {
+  renderFeedTo(document.getElementById('feed'));
+  const mm = document.getElementById('marketModal');
+  if (mm && mm.style.display === 'flex') renderFeedTo(document.getElementById('marketModalBody'));
+}
 // Un âge et son unité (« 25 min », « 1 h 31 » : Fmt.duree, la règle de tous les âges du site, revue
 // du 14/10/2026, M7), réécrit sur place à chaque tour par majAges().
 const ageDe = (updated, min) => '<span data-age-de="' + escHtml(updated) + '">' + Fmt.duree(min) + '</span>';
@@ -9995,8 +10001,10 @@ const envDebutant = h => '<div class="env-deb sans-chiffres">' + h + '</div>';
 // Débutant : un prix au format français (« 80 394 $ »), un nombre de BTC à l'unité.
 const prixDeb = v => (isNum(v) ? escHtml(Guide.prix(v, '$')) : '—');
 const btcDeb = v => (isNum(v) ? escHtml(Guide.nombre(v, v >= 10 ? 0 : 1)) + ' BTC' : '—');
-// « il y a 18 min » (l'âge est réécrit sur place chaque minute, majAges).
-const ilYaDeb = (updated, min) => (min === null ? 'âge inconnu' : 'il y a ' + ageDe(updated, min));
+// Sans « Les chiffres du marché », l'heure de la publication est dite UNE fois, en tête des cartes
+// (« Publié à 17:40 ») : chaque carte disait « il y a 0 min » (revue du 14/10/2026, M7). L'heure de
+// l'APPAREIL, comme #updated ; le jour devant quand ce n'est pas aujourd'hui.
+const publieA = ms => 'Publié ' + (Fmt.memeJour(ms, Date.now()) ? 'à ' : 'le ' + Fmt.jour(ms) + ' à ') + Fmt.heure(ms);
 // Où est une valeur dans [lo, hi], de 0 à 1 (ou null).
 const positionDans = (v, lo, hi) => (isNum(v) && isNum(lo) && isNum(hi) && hi > lo ? Math.max(0, Math.min(1, (v - lo) / (hi - lo))) : null);
 function ageBannerHtml(d) {
@@ -10010,13 +10018,15 @@ function ageBannerHtml(d) {
   // à l'âge de son dernier rendu.
   const min = Math.max(0, Math.round((Date.now() - upd) / 60000));
   if (min <= CADENCES.vieux_min) return '';
+  // Sans « Les chiffres du marché », ce bandeau est la ligne de tête des cartes (revue du 14/10/2026,
+  // M7) : il redit l'heure de la publication, et c'est le seul endroit où son âge s'écrit.
   const fige = min > CADENCES.fige_min, n = ageDe(d.updated, min);
   return '<div class="age-banner' + (fige ? '' : ' retard') + '" style="display:block">'
     + (fige
         ? modes('Données figées depuis ' + n + ' — la publication s’est arrêtée',
-          'Données figées depuis ' + n + ' : la publication s’est arrêtée.')
+          publieA(upd) + '. Données figées depuis ' + n + ' : la publication s’est arrêtée.')
         : modes('Dernière publication il y a ' + n + ' (cadence attendue : ' + CADENCES.attendue_min + ' min)',
-          'Dernière publication il y a ' + n + ' (attendue toutes les ' + CADENCES.attendue_min + ' min).'))
+          publieA(upd) + ', il y a ' + n + ' (attendu toutes les ' + CADENCES.attendue_min + ' min).'))
     + '</div>';
 }
 
@@ -10061,12 +10071,14 @@ function renderFeedTo(container) {
   // « Plus bas et plus haut des 24 h » dans les deux modes (l'Expert disait « Marché live » : ce
   // n'est pas du direct ; « Fourchette des 24 h » jusqu'à la revue du 14/10/2026, M3 : le mot est
   // réservé à la fourchette de 7 jours). Un seul prix en grand à l'écran, celui du haut, en direct ;
-  // le prix publié, plus petit (Expert) ou en ligne (Débutant), avec son âge.
+  // le prix publié, plus petit (Expert, avec son âge) ou en ligne (sans « Les chiffres du marché » :
+  // l'heure est dite en tête des cartes). « Le prix du haut » se lisait à côté de « Haut publié » :
+  // sans les chiffres, c'est « le prix en tête de page » (revue du 14/10/2026, M7).
   html += mCard('📊', btcTitre('Plus bas et plus haut des 24 h'), modes('Binance spot · publié à ' + hhmm
-      + (ageMin !== null ? ' (il y a ' + ageDe(d.updated, ageMin) + ' — le prix du haut est en direct)' : ''), 'Binance · le prix du haut est en direct'), '',
+      + (ageMin !== null ? ' (il y a ' + ageDe(d.updated, ageMin) + ' — le prix du haut est en direct)' : ''), 'Binance · le prix en tête de page est en direct'), '',
     envExpert('<div class="hero hero-publie"><span class="hero-lbl">Prix publié</span><span class="hero-val">' + fmtUsd(b.price) + '</span>'
     + '<span class="' + chipCls(b.change_24h_pct) + '">' + pctSigne(b.change_24h_pct) + ' en 24 h</span></div>')
-    + envDebutant('<div class="fine">' + (autrePaire ? 'Prix du bitcoin publié ' : 'Prix publié ') + ilYaDeb(d.updated, ageMin) + ' : <b style="color:var(--ink-1)">' + prixDeb(b.price) + '</b></div>')
+    + envDebutant('<div class="fine">' + (autrePaire ? 'Prix du bitcoin publié' : 'Prix publié') + ' : <b style="color:var(--ink-1)">' + prixDeb(b.price) + '</b></div>')
     + trackHtml(b.price, b.low_24h, b.high_24h, modes('Bas&nbsp;<b>' + fmtUsd(b.low_24h) + '</b>', 'Bas publié&nbsp;<b>' + prixDeb(b.low_24h) + '</b>'),
       modes('Haut&nbsp;<b>' + fmtUsd(b.high_24h) + '</b>', 'Haut publié&nbsp;<b>' + prixDeb(b.high_24h) + '</b>'))
     + phraseCarte('fourchette', positionDans(b.price, b.low_24h, b.high_24h), '24 h', sujet)
@@ -10077,7 +10089,7 @@ function renderFeedTo(container) {
   // valeurs du moment — l'ancienne carte ne le disait que pour le DXY.
   const ferme = !!m.dxy_is_weekend;
   // Débutant : « Bourses américaines », la seule tuile du VIX (le dollar est en Expert).
-  html += mCard('🌍', modes('Macro', 'Bourses américaines'), modes('Dollar et volatilité · Yahoo', 'Yahoo · ' + ilYaDeb(d.updated, ageMin)), '',
+  html += mCard('🌍', modes('Macro', 'Bourses américaines'), modes('Dollar et volatilité · Yahoo', 'Yahoo'), '',
     '<div class="tuiles deb-une">'
     + envExpert(tuile('DXY', fmtNum(m.dxy_spot,2), ferme ? 'clôture' + (m.dxy_date ? ' du ' + escHtml(dateSeule(m.dxy_date)) : '') : 'indice dollar', 'dxy'))
     + tuile(modes('VIX', 'Nervosité des bourses'), modes(fmtNum(m.vix,1), isNum(m.vix) ? escHtml(Guide.nombre(m.vix, 1)) : '—'),
@@ -10122,7 +10134,7 @@ function renderFeedTo(container) {
   const fenCourt = h => (h % 24 === 0 ? (h / 24) + ' j' : h + ' h');
   const indDeb = t4 ? trackHtml(t4.last_close, t4.support_30, t4.resistance_30, 'Bas ' + fenCourt(fen4) + '&nbsp;<b>' + prixDeb(t4.support_30) + '</b>', 'Haut ' + fenCourt(fen4) + '&nbsp;<b>' + prixDeb(t4.resistance_30) + '</b>')
     + phraseCarte('fourchette', positionDans(t4.last_close, t4.support_30, t4.resistance_30), fenMots(fen4), sujet) : '<div class="fine">En attente de la prochaine publication.</div>';
-  html += mCard('📈', modes(btcTitre('Indicateurs'), btcTitre('Plus bas et plus haut des ' + (fen4 ? fenMots(fen4) : '5 jours'))), modes('Binance 4 h / 1 h / 1 j · RSI Wilder · bougie en cours incluse', 'Publié ' + ilYaDeb(d.updated, ageMin)), '',
+  html += mCard('📈', modes(btcTitre('Indicateurs'), btcTitre('Plus bas et plus haut des ' + (fen4 ? fenMots(fen4) : '5 jours'))), modes('Binance 4 h / 1 h / 1 j · RSI Wilder · bougie en cours incluse', 'Binance'), '',
     envExpert(indBody) + envDebutant(indDeb));
 
   // ── 4. MICROSTRUCTURE ──
@@ -10190,7 +10202,7 @@ function renderFeedTo(container) {
     + lectureCourte('prime', x.premium_pct, x.premium_hors_usdt_pct) + '</div>';
   // Débutant : « Achats et ventes » — une phrase qui porte la valeur (l'écart des achats et des
   // ventes immédiats sur 24 h) ; le reste est en Expert.
-  html += mCard('📡', modes(btcTitre('Microstructure'), btcTitre('Achats et ventes')), modes('Binance Futures · Deribit · Coinbase', 'Binance, 24 h · ' + ilYaDeb(d.updated, ageMin)), '',
+  html += mCard('📡', modes(btcTitre('Microstructure'), btcTitre('Achats et ventes')), modes('Binance Futures · Deribit · Coinbase', 'Binance, 24 h'), '',
     envExpert(microBody) + (isNum(x.cvd_24h_usd) ? phraseCarte('cvd', x.cvd_24h_usd) : envDebutant('<div class="fine">En attente de la prochaine publication.</div>')));
 
   // ── 5. LIQUIDITÉ ──
@@ -10239,7 +10251,7 @@ function renderFeedTo(container) {
       + lectureCourte('carnet', bt.ratio)
       + '<div class="fine" style="margin-top:6px">Une photo : ces ordres peuvent être retirés à tout moment.</div>';
   }
-  html += mCard('💧', modes(btcTitre('Liquidité'), btcTitre('Ordres en attente')), modes('Carnet Binance spot · BTC posés', liqSousDeb + ' · relevés ' + ilYaDeb(d.updated, ageMin)), '',
+  html += mCard('💧', modes(btcTitre('Liquidité'), btcTitre('Ordres en attente')), modes('Carnet Binance spot · BTC posés', liqSousDeb), '',
     envExpert(liqBody) + envDebutant(liqDeb));
 
   // ── 6. ÉTAT DU FLUX ──
@@ -10265,23 +10277,26 @@ function renderFeedTo(container) {
     // une note de développeur, pas une information du lecteur.)
     + '<div class="fine" style="margin-top:8px">Sources : ' + escHtml(nomsSources(d.source)) + '</div>';
   const ageFlux = 'il y a ' + (ageMin === null ? '—' : ageDe(d.updated, ageMin)) + (vieille ? ' · en retard' : '');
-  html += mCard('🔌', modes('Flux', 'Publication'), modes('Blocs de la dernière publication · ' + ageFlux, 'Dernière publication · ' + ageFlux), '',
-    envExpert(stBody) + envDebutant('<div class="hero"><span class="hero-val' + (nOk < nTot ? ' stat-neg' : '') + '" style="font-size:19px">' + nOk + '/' + nTot + ' infos publiées</span></div>')
-    + phraseCarte('sources', nOk, nTot));
+  // Flux, Horloges et Contre-expertise parlent du site, pas du bitcoin : sans « Les chiffres du
+  // marché », ces trois cartes (« Publication 8/8 », « Heures des données », « Vérification »)
+  // n'apparaissent plus (revue du 14/10/2026, M7). Une publication incomplète reste dite, en tête.
+  html += mCard('🔌', 'Flux', 'Blocs de la dernière publication · ' + ageFlux, '', stBody, 'chiffres-seul');
 
   // ── 7. HORLOGES ── chaque instant que la page affiche, son âge (js/horloges.js)
-  html += mCard('⏱', modes('Horloges', 'Heures des données'), modes('Chaque instant affiché, son âge', 'Publication ' + ilYaDeb(d.updated, ageMin) + ' · prix en direct.'), '',
-    envExpert(horlogesHtml(d)) + envDebutant('<div class="fine">Les infos du marché sont publiées toutes les ' + CADENCES.attendue_min + ' min ; le prix en haut de l’écran est relu chaque seconde.</div>'));
+  html += mCard('⏱', 'Horloges', 'Chaque instant affiché, son âge', '', horlogesHtml(d), 'chiffres-seul');
   // ── 8. CONTRE-EXPERTISE ── la publication recalculée ici (js/contre-expertise.js)
-  html += mCard('🔎', modes('Contre-expertise', 'Vérification'), modes('Vérifié par votre navigateur · Binance spot', 'Recalculé par le navigateur'), contreDroite(d), contreCorps(d));
+  html += mCard('🔎', 'Contre-expertise', 'Vérifié par votre navigateur · Binance spot', contreDroite(d), contreCorps(d), 'chiffres-seul');
   carteEntree = false;
   if (container.dataset) container.dataset.vu = '1';
 
   // Le bandeau d'âge voyage AVEC les cartes : il apparaît donc dans le conteneur
-  // réellement affiché, quel qu'il soit.
+  // réellement affiché, quel qu'il soit. Sans « Les chiffres du marché », il est la ligne de tête :
+  // à l'heure, « Publié à 17:40. » (pas d'âge) ; en retard, le bandeau, qui redit l'heure avec l'âge.
   // Sur une autre paire, la note « bitcoin » s'affiche dans les DEUX modes (elle n'existait qu'en
   // Débutant : l'Expert sur SOL lisait les chiffres du bitcoin sans que rien ne le dise).
-  container.innerHTML = ageBannerHtml(d) + epinglesHtml()
+  const bandeau = ageBannerHtml(d);
+  container.innerHTML = (bandeau || (upd ? '<div class="pub-heure sans-chiffres">' + publieA(upd.getTime()) + '.</div>' : ''))
+    + (nOk < nTot ? phraseCarte('sources', nOk, nTot) : '') + epinglesHtml()
     + (autrePaire ? '<div class="deb-btc">Ces infos parlent du bitcoin (en dollars), pas de ' + escHtml(NOMS_PAIRES[activeSymbol] || activeSymbol) + '.</div>' : '') + html;
   for (const b of container.querySelectorAll ? container.querySelectorAll('.epingle-btn') : []) b.addEventListener('click', () => basculerEpingle(b.dataset.chemin));
   brancherContre(container);
@@ -10396,8 +10411,8 @@ const ETATS_CONTRE = { ok: ['✓', 'retrouvé'], approx: ['≈', 'cohérent'], d
 function contreDroite(d) {
   if (!d || contre.pour !== d.updated || !contre.res) return '';
   const c = contre.res.comptes || {};
-  return '<span class="contre-compte' + (c.diff ? ' ko' : '') + '">' + modes((c.ok || 0) + ' ✓ · ' + (c.approx || 0) + ' ≈ · ' + (c.diff || 0) + ' ✗',
-    (c.ok || 0) + ' identiques · ' + (c.approx || 0) + ' proches · ' + (c.diff || 0) + ' différents') + '</span>';
+  // (La carte n'existe qu'avec « Les chiffres du marché » : revue du 14/10/2026, M7.)
+  return '<span class="contre-compte' + (c.diff ? ' ko' : '') + '">' + (c.ok || 0) + ' ✓ · ' + (c.approx || 0) + ' ≈ · ' + (c.diff || 0) + ' ✗</span>';
 }
 function valeurContre(v) {
   if (v === null || v === undefined) return '—';
@@ -10405,8 +10420,7 @@ function valeurContre(v) {
   return escHtml(String(v));
 }
 function contreCorps(d) {
-  if (!d) return '';
-  return envDebutant('<div class="fine">Le navigateur recalcule les chiffres publiés : détail avec « Les chiffres du marché ».</div>') + envExpert(contreCorpsExpert(d));
+  return d ? contreCorpsExpert(d) : '';
 }
 function contreCorpsExpert(d) {
   const pub = Date.parse(d.updated), hm = isFinite(pub) ? Fmt.jourHeure(pub) : '—';
