@@ -3493,6 +3493,7 @@ const COLORS = {
 // contour ou un tiret de 2 px ne se lit plus. js/fiches.js (fiche « bougies ») lit ces constantes.
 // --bougie-rayon : rayon des coins des corps et des barres de volume (0 = angles vifs).
 // --grille-tirets : motif de la grille (ex. « 8 3 2 3 », trait mixte) ; « none » = trait plein.
+// --prix-rayon : rayon des coins de l'étiquette du dernier prix (px ; défaut : la pilule, rE(11)).
 // --police-graphique : famille du texte du canvas (repli : --font).
 // --chaleur-bid / --chaleur-ask : encre de la couche « Ordres en attente (carte) » (voir HEAT_RAMPE).
 // --up-sur / --down-sur : encre du texte posé SUR une marque de hausse / de baisse (l'étiquette du
@@ -3594,6 +3595,12 @@ function lireJetons() {
   // page l'était, mais sa pilule du prix, ses étiquettes et ses bulles restaient rondes (revue du
   // 14/10, M18). Les thèmes aux coins arrondis, même petits (Néon, Codex, Gare), ne changent pas.
   COLORS.etiqRayon = Math.max(0, num('--etiquette-rayon', num('--r-tile', 1) === 0 ? 0 : 1));
+  // --prix-rayon : le rayon des coins de l'étiquette du dernier prix, sur l'axe ; sans ce jeton, la
+  // pilule d'avant (rE(11)). Jamais plus rond que rE(11) : un thème carré reste carré. Néon : le
+  // rayon de ses boutons (--r-bar, posé par css/app.css), et non plus une pilule toute ronde dans un
+  // thème à coins de 3 à 6 px (revue du 14/10, M20) ; les autres étiquettes gardent rE().
+  const rPrix = num('--prix-rayon', -1);
+  COLORS.prixRayon = rPrix >= 0 ? rPrix : null;
   const tirets = v('--grille-tirets', 'none');
   COLORS.grilleTirets = tirets === 'none' ? [] : tirets.split(/[\s,]+/).map(Number).filter(x => isFinite(x) && x >= 0);
   const encre = (nom, r) => { const c = rvb(v(nom, '')); return c ? rampeU32(c.concat(CHALEUR_ALPHA.base), [0, 0, 0, CHALEUR_ALPHA.pente]) : rampeU32(r.base, r.pente); };
@@ -3868,7 +3875,7 @@ function calqueDessin() {
       cx.font = chartFont(11, 700);
       const lw = cx.measureText(lpStr).width + 12, bx = Math.min(triX + 10, W - 3 - lw);
       cx.fillStyle = tagC;
-      cx.beginPath(); cx.roundRect(bx, y - 11, lw, 22, rE(11)); cx.fill();
+      cx.beginPath(); cx.roundRect(bx, y - 11, lw, 22, COLORS.prixRayon == null ? rE(11) : Math.min(rE(11), COLORS.prixRayon)); cx.fill();
       // Pointe vers le tracé : elle reste visible si le badge a reculé
       cx.beginPath(); cx.moveTo(triX, y - 4); cx.lineTo(triX + 8, y); cx.lineTo(triX, y + 4); cx.closePath(); cx.fill();
       cx.fillStyle = baisse ? COLORS.surDown : COLORS.surUp;   // --up-sur / --down-sur
