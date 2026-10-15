@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-15T15:20:55+00:00",
+ "updated": "2026-10-15T15:35:55+00:00",
  "generator": "historique.py v1.0 — séries publiées dans la branche orpheline `historique`, décrites par `meta` (07/10/2026)",
  "source": "binance (futures et spot) · deribit et coinbase via market-data.json · git (master, publications passées)",
  "branche": "historique",
@@ -7,6 +7,7 @@
   "worktree": "ok",
   "amorcage": "non exécuté : les séries existent déjà",
   "funding": "ok",
+  "open_interest_1h_controle": "ok : 2 point(s) faux de la source écarté(s)",
   "open_interest_1h": "ok",
   "long_short_1h": "ok",
   "positionnement": "ok",
@@ -42,11 +43,11 @@
    "fichiers": [
     "series/positionnement/2026-10.csv"
    ],
-   "lignes": 1268,
-   "octets": 199454,
+   "lignes": 1269,
+   "octets": 199623,
    "periode": {
     "debut": "2026-10-02T11:18:18+00:00",
-    "fin": "2026-10-15T15:18:55+00:00"
+    "fin": "2026-10-15T15:33:55+00:00"
    },
    "trous": [],
    "trous_nombre": 0,
@@ -84,21 +85,39 @@
    "fichiers": [
     "series/open-interest-1h.csv"
    ],
-   "lignes": 684,
-   "octets": 32333,
+   "lignes": 682,
+   "octets": 32238,
    "periode": {
     "debut": "2026-09-17T02:00:00+00:00",
     "fin": "2026-10-15T15:00:00+00:00"
    },
    "trous": [
     {
-     "debut": "2026-10-15T12:00:00+00:00",
+     "debut": "2026-10-15T10:00:00+00:00",
      "fin": "2026-10-15T15:00:00+00:00",
-     "manquants": 2
+     "manquants": 4
     }
    ],
    "trous_nombre": 1,
-   "trous_tronques": false
+   "trous_tronques": false,
+   "controle": {
+    "reference": "OI direct de la série positionnement, relevé le plus proche entre −5 et +10 min",
+    "ecart_max_pct": 5.0,
+    "ecartes": [
+     {
+      "heure_utc": "2026-10-15T11:00:00+00:00",
+      "oi_btc": "100231.443",
+      "oi_direct_btc": "92086.036",
+      "ecart_pct": 8.85
+     },
+     {
+      "heure_utc": "2026-10-15T12:00:00+00:00",
+      "oi_btc": "99045.558",
+      "oi_direct_btc": "91921.589",
+      "ecart_pct": 7.75
+     }
+    ]
+   }
   },
   "long_short_1h": {
    "libelle": "Positionnement des comptes, des gros traders et du taker — un point par heure",
