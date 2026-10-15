@@ -290,6 +290,19 @@ rapport: dict = {}
 # liste tronquée en silence se lirait comme un historique complet.
 TROUS_MAX = 50
 
+# ─── CONTRÔLE DE L'OI HORAIRE CONTRE L'OI DIRECT ─────────────────────────────
+# `openInterestHist` peut rendre un point FAUX et le garder : le 15/10/2026, 100 231 BTC à
+# 11:00 et 99 046 à 12:00, quand l'OI direct publié par publish.py au même moment valait
+# 92 086 et 91 922 (+8 à 9 %). Les heures voisines concordaient à 0,1 % près. Comme
+# `fusionner_serie` remplace un point par ce que la source rend, un point faux revenait à
+# chaque passage. Chaque point horaire est donc confronté au relevé direct le plus proche
+# de la série `positionnement` (fenêtre ci-dessous) ; au-delà de l'écart toléré, il n'est
+# pas écrit et, s'il l'était déjà, il est retiré. Un trou dit vrai ; une valeur fausse ment.
+OI_ECART_MAX_PCT = 5.0
+OI_FENETRE_AVANT_S = 5 * 60
+OI_FENETRE_APRES_S = 10 * 60
+CONTROLE_OI: dict = {}
+
 
 class NonConfigure(RuntimeError):
     """Dépendance absente de CET environnement — pas une panne."""
@@ -669,7 +682,7 @@ def ajouter_positionnement(cfg, doc, mois_courant: str):
     return True
 
 
-def fusionner_serie(cfg, nom, points):
+def fusionner_serie(cfg, nom, points, retirer=()):
     """Fusionne des points (dicts déjà au format colonnes) dans une série plate.
 
     « Rapatrié une fois puis prolongé » : la clé est la colonne de temps, un point déjà
@@ -684,6 +697,8 @@ def fusionner_serie(cfg, nom, points):
     for p in points:
         if p.get(cle):
             anciennes[p[cle]] = p
+    for k in retirer:                       # points reconnus faux : retirés, jamais gardés
+        anciennes.pop(k, None)
     if len(anciennes) > TAILLE_SERIE_MAX:
         lignes = sorted(anciennes.values(), key=lambda l: l[cle])[-TAILLE_SERIE_MAX:]
         # Une coupe est une PERTE : elle se dit, elle ne se fait pas en silence.
@@ -698,7 +713,8 @@ def fusionner_serie(cfg, nom, points):
         return False
     change = ecrire_si_change(texte, chemin)
     STATUS[nom] = "ok"
-    rapport[nom] = f"{len(points)} points lus, {len(anciennes) - len(avant)} nouveaux"
+    rapport[nom] = f"{len(points)} points lus, {len(anciennes) - len(avant)} nouveaux" \
+        + (f", {len(retirer)} écarté(s)" if retirer else "")
     return change
 
 
@@ -807,6 +823,46 @@ def points_long_short():
     return [par_heure[h] for h in sorted(par_heure)]
 
 
+def oi_direct(cfg):
+    """(instant, OI direct) de toutes les publications de la série `positionnement`."""
+    out = []
+    for f in sorted(glob.glob(os.path.join(cfg["hist_dir"], SERIES["positionnement"]["motif"]))):
+        for l in lire_csv(f, COLS_POSITIONNEMENT):
+            try:
+                out.append((dt.datetime.fromisoformat(l["updated"].replace("Z", "+00:00")),
+                            float(l["oi_btc"])))
+            except (ValueError, TypeError, KeyError):
+                continue                              # case vide : rien à confronter
+    return sorted(out)
+
+
+def controler_oi(cfg, points):
+    """Sépare les points horaires d'OI en (gardés, écartés) contre l'OI direct.
+
+    Un point sans relevé direct dans la fenêtre est gardé : on n'écarte que sur preuve.
+    """
+    directs = oi_direct(cfg)
+    gardes, ecartes = [], []
+    for p in points:
+        try:
+            t = dt.datetime.fromisoformat(p["heure_utc"])
+            v = float(p["oi_btc"])
+        except (ValueError, TypeError, KeyError):
+            gardes.append(p)
+            continue
+        proches = [(abs((d - t).total_seconds()), o) for d, o in directs
+                   if -OI_FENETRE_AVANT_S <= (d - t).total_seconds() <= OI_FENETRE_APRES_S]
+        if proches:
+            ref = min(proches)[1]
+            ecart = (v / ref - 1) * 100 if ref else 0.0
+            if abs(ecart) > OI_ECART_MAX_PCT:
+                ecartes.append({"heure_utc": p["heure_utc"], "oi_btc": p["oi_btc"],
+                                "oi_direct_btc": nombre(ref, 3), "ecart_pct": round(ecart, 2)})
+                continue
+        gardes.append(p)
+    return gardes, ecartes
+
+
 # ─── INDEX ───────────────────────────────────────────────────────────────────
 def trous(dates, pas_s):
     """Intervalles manquants entre la première et la dernière date observée.
@@ -872,6 +928,9 @@ def construire_index(cfg, ts):
             ERRORS.append(f"{nom}: fichier(s) au-delà de {MAX_OCTETS} octets : "
                           + ", ".join(os.path.basename(x) for x in trop_gros))
         index["series"][nom] = entree
+
+    if CONTROLE_OI:
+        index["series"]["open_interest_1h"]["controle"] = CONTROLE_OI
 
     # ── contrôle d'unité, sur le fichier PUBLIÉ ─────────────────────────────
     # Il vient après la boucle parce qu'il porte sur ce qui est sur le disque, pas sur ce
@@ -971,7 +1030,21 @@ def collecter_binance(cfg, sans_reseau):
                 STATUS[nom] = "vide"
                 ERRORS.append(f"{nom}: Binance n'a rendu aucun point")
                 continue
-            fusionner_serie(cfg, nom, points)
+            retirer = ()
+            if nom == "open_interest_1h":
+                points, ecartes = controler_oi(cfg, points)
+                retirer = [e["heure_utc"] for e in ecartes]
+                CONTROLE_OI.update({
+                    "reference": "OI direct de la série positionnement, relevé le plus proche "
+                                 f"entre −{OI_FENETRE_AVANT_S // 60} et "
+                                 f"+{OI_FENETRE_APRES_S // 60} min",
+                    "ecart_max_pct": OI_ECART_MAX_PCT,
+                    "ecartes": ecartes,
+                })
+                STATUS["open_interest_1h_controle"] = (
+                    "ok" if not ecartes else
+                    f"ok : {len(ecartes)} point(s) faux de la source écarté(s)")
+            fusionner_serie(cfg, nom, points, retirer)
         except Exception as e:                       # noqa: BLE001 — l'échec se publie
             STATUS[nom] = f"error: {type(e).__name__}: {nettoie(e, cfg)}"
             ERRORS.append(f"{nom}: {type(e).__name__}: {nettoie(e, cfg)}")
@@ -984,6 +1057,7 @@ def reinitialiser():
     STATUS.clear()
     ERRORS.clear()
     rapport.clear()
+    CONTROLE_OI.clear()
 
 
 def principale(cfg=None, argv=None) -> int:
