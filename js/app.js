@@ -8718,8 +8718,7 @@ function drawLine(data, minP, range, pad, gap, ph, color, dash, width, dataOffse
 function rsisPage() { const cl = cols().close; return PARAM.rsi.periodes.map(p => memoized('rsi_' + p, calcRSI, cl, p)); }
 function couleursRsi() { return [COLORS.macd, COLORS.macd_signal, COLORS.rsi]; }
 /** La légende du sous-graphique RSI, après son titre : un point de couleur et la période de chaque
- *  ligne. Rien quand elle ne tient pas avant la colonne de l'axe (le réticule dit les trois valeurs
- *  dans le même ordre). */
+ *  ligne ; en haut de la colonne de l'axe quand elle ne tient pas après le titre. */
 function legendeRsi(y0, pad, W) {
   ctx.font = chartFont(9.5, 700);
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0.6px';
@@ -8729,11 +8728,12 @@ function legendeRsi(y0, pad, W) {
   const ps = PARAM.rsi.periodes, cs = couleursRsi();
   const larg = ps.reduce((t, p) => t + 9 + ctx.measureText(String(p)).width + 8, 0);
   let x = fin + 10;
-  if (x + larg > W - pad.right) return;
+  // Trop étroit après le titre (téléphone, titre en mots) : en haut de la colonne de l'axe.
+  if (x + larg > W - pad.right) { ctx.font = chartFont(9, 650); x = W - pad.right + 2; }
   ps.forEach((p, j) => {
     ctx.fillStyle = cs[j % cs.length]; ctx.beginPath(); ctx.arc(x + 3, y0 + 10, 3, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = COLORS.ink3; ctx.fillText(String(p), x + 9, y0 + 13.5);
-    x += 9 + ctx.measureText(String(p)).width + 8;
+    x += 9 + ctx.measureText(String(p)).width + (x > W - pad.right ? 5 : 8);
   });
 }
 
