@@ -8884,14 +8884,14 @@ function resolveSub(candles, y0, subH, W, key) {
       ctx.fillRect(x + gap*0.2, Math.min(midY, midY - h), barW, Math.abs(h));
     }
     // MACD line
-    drawLineAt(macd.macdLine, midY, scale, pad, gap, COLORS.macd, [], 1.5, vs);
-    drawLineAt(macd.signal, midY, scale, pad, gap, COLORS.macd_signal, [], 1, vs);
+    drawLineAt(macd.macdLine, midY, scale, pad, gap, COLORS.macd, [], 1.5, vs, ve);
+    drawLineAt(macd.signal, midY, scale, pad, gap, COLORS.macd_signal, [], 1, vs, ve);
   } else if (key === 'stoch') {
     const highs = cols().high, lows = cols().low, closes = cols().close;
     const stoch = memoized('sub_stoch', calcStoch, highs, lows, closes, PARAM.stoch.k, PARAM.stoch.d);
     subGrid(y0, pad, ph, W, { levels: [20, 50, 80] });
-    drawLineAt(stoch.k, y0 + pad.top + ph, ph/100, pad, gap, COLORS.stoch_k, [], 1.5, vs);
-    drawLineAt(stoch.d, y0 + pad.top + ph, ph/100, pad, gap, COLORS.stoch_d, [3, 3], 1, vs);
+    drawLineAt(stoch.k, y0 + pad.top + ph, ph/100, pad, gap, COLORS.stoch_k, [], 1.5, vs, ve);
+    drawLineAt(stoch.d, y0 + pad.top + ph, ph/100, pad, gap, COLORS.stoch_d, [3, 3], 1, vs, ve);
   } else if (key === 'atr') {
     const highs = cols().high, lows = cols().low, closes = cols().close;
     const atr = memoized('sub_atr', calcATR, highs, lows, closes, PARAM.atr.periode);
@@ -8900,7 +8900,7 @@ function resolveSub(candles, y0, subH, W, key) {
     const scale = ph / maxA;
     const dc = decimalesCote(), unite = guideUnite();
     subGrid(y0, pad, ph, W, { levels: [0, maxA/2, maxA], min: 0, max: maxA, f: v => Fmt.prix(v, unite, dc) });
-    drawLineAt(atr, y0 + pad.top + ph, scale, pad, gap, COLORS.atr, [], 1.5, vs);
+    drawLineAt(atr, y0 + pad.top + ph, scale, pad, gap, COLORS.atr, [], 1.5, vs, ve);
   } else if (key === 'obv') {
     const closes = cols().close, volumes = cols().vol;
     const obv = memoized('sub_obv', calcOBV, closes, volumes);
@@ -8912,7 +8912,7 @@ function resolveSub(candles, y0, subH, W, key) {
     // L'axe et le badge du réticule au même format (« 54,8 k », « −2,3 M ») : avant, l'axe en K ou M
     // selon la taille, le badge toujours en millions (« 0.05M » à côté de « 50.0K »).
     subGrid(y0, pad, ph, W, { levels: [bas, (bas + haut) / 2, haut], min: bas, max: haut, f: v => Fmt.compact(v) });
-    drawLineAt(obv.slice(0, ve), y0 + pad.top + ph + bas * scale, scale, pad, gap, COLORS.obv, [], 1.5, vs);
+    drawLineAt(obv.slice(0, ve), y0 + pad.top + ph + bas * scale, scale, pad, gap, COLORS.obv, [], 1.5, vs, ve);
   } else if (key === 'mfi') {
     const closes = cols().close, highs = cols().high, lows = cols().low, vols = cols().vol;
     const mfi = memoized('sub_mfi', calcMFI, highs, lows, closes, vols, PARAM.mfi.periode);
@@ -8929,15 +8929,15 @@ function resolveSub(candles, y0, subH, W, key) {
     // marquaient en fait ±200). Au-delà de ±200, la courbe est coupée au bord du panneau.
     subGrid(y0, pad, ph, W, { levels: [100, 0, -100], span: 400 });
     ctx.save(); ctx.beginPath(); ctx.rect(pad.left, y0 + pad.top, pw, ph); ctx.clip();
-    drawLineAt(cci, y0 + pad.top + ph/2, ph/400, pad, gap, COLORS.cci, [], 1.5, vs);
+    drawLineAt(cci, y0 + pad.top + ph/2, ph/400, pad, gap, COLORS.cci, [], 1.5, vs, ve);
     ctx.restore();
   } else if (key === 'adx') {
     const closes = cols().close, highs = cols().high, lows = cols().low;
     const adxData = memoized('sub_adx', calcADX, highs, lows, closes, PARAM.adx.periode);
     subGrid(y0, pad, ph, W, { levels: [25, 50] });
-    drawLineAt(adxData.adx, y0 + pad.top + ph, ph/100, pad, gap, COLORS.adx, [], 1.5, vs);
-    drawLineAt(adxData.plusDI, y0 + pad.top + ph, ph/100, pad, gap, COLORS.adx_plusDI, [3, 3], 1, vs);
-    drawLineAt(adxData.minusDI, y0 + pad.top + ph, ph/100, pad, gap, COLORS.adx_minusDI, [3, 3], 1, vs);
+    drawLineAt(adxData.adx, y0 + pad.top + ph, ph/100, pad, gap, COLORS.adx, [], 1.5, vs, ve);
+    drawLineAt(adxData.plusDI, y0 + pad.top + ph, ph/100, pad, gap, COLORS.adx_plusDI, [3, 3], 1, vs, ve);
+    drawLineAt(adxData.minusDI, y0 + pad.top + ph, ph/100, pad, gap, COLORS.adx_minusDI, [3, 3], 1, vs, ve);
   } else if (key === 'ao') {
     const highs = cols().high, lows = cols().low;
     const ao = memoized('sub_ao', calcAO, highs, lows, PARAM.ao.rapide, PARAM.ao.lente);
@@ -8973,14 +8973,17 @@ function basHautFenetre(a, vs, ve) {
   const marge = (haut - bas) * 0.08 || Math.max(Math.abs(haut) * 0.01, 1);
   return { bas: bas - marge, haut: haut + marge };
 }
-function drawLineAt(data, baseY, scale, pad, gap, color, dash, width, dataOffset) {
+// Seulement les bougies VISIBLES [dataOffset, dataEnd) : sans la borne de fin, une vue reculée
+// dans le passé prolongeait les lignes (MACD, stochastique, ATR, CCI, ADX) au-delà du tracé, sur
+// la colonne de l'axe et ses graduations, avec des valeurs hors de l'échelle de la vue.
+function drawLineAt(data, baseY, scale, pad, gap, color, dash, width, dataOffset, dataEnd) {
   ctx.strokeStyle = color; ctx.lineWidth = width;
   if (dash.length > 0) ctx.setLineDash(dash);
   ctx.beginPath(); let started = false;
-  for (let i = 0; i < data.length; i++) {
+  const fin = Math.min(data.length, dataEnd === undefined ? data.length : dataEnd);
+  for (let i = Math.max(0, dataOffset || 0); i < fin; i++) {
     if (data[i] === null) continue;
     const idx = i - (dataOffset || 0);
-    if (idx < 0) continue;
     const x = pad.left + gap * idx + gap / 2;
     const y = baseY - data[i] * scale;
     if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
