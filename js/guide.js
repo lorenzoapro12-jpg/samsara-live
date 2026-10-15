@@ -3014,16 +3014,63 @@ const Guide = (function () {
       const ms = finMs(ctx, g.jConf), d = dureeMots(delaiIssue(g, ctx));
       return { quand: fini(ms) ? (ctx && ctx.pas >= 86400 ? dateVue(ms) : dateVue(ms) + ' ' + heureVue(ms)) : '—', marque: marqueIssue(g),
         issue: ({ atteint: 'objectif atteint', invalide: 'ratée avant l’objectif', expire: 'délai écoulé' })[g.fin] + (d ? ', ' + d + ' après' : ''),
-        fin: g.fin, debut: g.debut, jConf: g.jConf, jFin: g.jFin, sens: g.sens, niveau: fini(g.niveau) ? g.niveau : null, objectif: g.objectif, invalidation: g.invalidation };
+        fin: g.fin, debut: g.debut, jConf: g.jConf, jFin: g.jFin, sens: g.sens, niveau: fini(g.niveau) ? g.niveau : null, objectif: g.objectif, invalidation: g.invalidation,
+        // Le dessin de la figure, comme sur le graphique (demande de Lorenzo du 15/10/2026 : « on la
+        // cherche ») : ses points et sa ligne de cou (ou ses bornes) jusqu'à la validation.
+        geo: geoFigure(g, g.jConf) };
     });
     return S;
+  }
+  /** La géométrie d'une figure, en (indice de bougie, prix) : le zigzag de ses points, les droites
+   *  qui la VALIDENT (ligne de cou, bornes, côté du mât), les autres droites, l'aplat, ses points
+   *  et le point en attente d'une ébauche. iFin : la bougie en cours pour une figure vivante (ses
+   *  lignes suivent le prix jusqu'à elle), celle de son issue pour une figure finie. */
+  function geoFigure(f, iFin, suit) {
+    const fam = famille(f), Lg = ligne, o = { zig: [], valide: [], autres: [], aplat: [], points: [], petits: [], creux: null, pointe: null };
+    const pt = q => [q.i, q.p];
+    const dte = (L, i0, i1) => [[i0, Lg(L, i0)], [i1, Lg(L, i1)]];
+    const pend = f.ebauche && f.pend ? f.pend : null;
+    // Le point en attente suit la bougie en cours quand elle va plus loin (graphique : toutes les 5 s).
+    const creux = pend ? (suit ? [suit.i, suit.p] : [pend.i, pend.p]) : null;
+    const finConf = f.phase === 'confirme' && fini(f.jConf) ? Math.min(iFin, f.jConf) : iFin;
+    if (fam === 'extremes' || fam === 'ete') {
+      const triple = /^triple/.test(f.type), ete = fam === 'ete';
+      const Q = ete ? [f.G, f.N1, f.T, f.N2, f.D] : triple ? [f.a, f.c1, f.b, f.c2, f.c] : [f.a, f.cou, f.b];
+      const zig = Q.map(pt);
+      if (creux) zig[zig.length - 1] = creux;
+      o.zig.push(zig);
+      o.points = (ete ? [f.G, f.T, f.D] : triple ? [f.a, f.b, f.c] : [f.a, f.b]).map(pt);
+      if (creux) { o.points.pop(); o.creux = creux; }
+      const niv = i => (ete ? Lg(f.couL, i) : f.niveau), i0 = Q[0].i, iD = zig[zig.length - 1][0];
+      o.valide.push([[i0, niv(i0)], [iFin, niv(iFin)]]);
+      o.aplat = zig.concat([[iD, niv(iD)], [i0, niv(i0)]]);
+    } else {
+      const drap = fam === 'drapeau', i0 = drap ? f.debutPause : f.debut;
+      const iB = Math.max(i0 + 1, Math.min(finConf, isFinite(f.apex) ? Math.floor(f.apex) : Infinity));
+      const H = dte(f.hautL, i0, iB), B = dte(f.basL, i0, iB);
+      if (drap) {
+        o.zig.push([[f.mat.i0, f.mat.p0], [f.mat.i1, f.mat.p1]]);
+        o.valide.push(f.sens > 0 ? H : B); o.autres.push(f.sens > 0 ? B : H);
+      } else o.valide.push(H, B);
+      o.aplat = [H[0], H[1], B[1], B[0]];
+      o.petits = (f.pivotsH || []).concat(f.pivotsB || []).filter(q => !pend || q.i !== pend.i).map(pt);
+      if (creux) o.creux = creux;
+      if (isFinite(f.apex)) o.pointe = f.apex;
+    }
+    // Confirmée : son niveau d'invalidation, de la bougie de validation à la bougie en cours (ou à sa
+    // chute : la ✗ se pose au bout). Rien après une cible atteinte ou un délai écoulé.
+    o.inval = f.phase === 'confirme' && fini(f.jConf) && fini(f.invalidation) && (!f.fin || f.fin === 'invalide') && iFin > f.jConf
+      ? [[f.jConf, f.invalidation], [iFin, f.invalidation]] : null;
+    return o;
   }
   /** Un cas passé en petit (plan du 13/10/2026, idée 4) : le prix (les clôtures C, indices du
    *  rejeu) avant, pendant et après la figure — de `avant` clôtures avant son début à `apres` après
    *  son issue (PARAM.guide.exemples), sans aller au-delà de la dernière clôture n − 1 ; la figure
    *  sur un fond à peine marqué ; le niveau franchi jusqu'à la validation (un carré au point de
    *  validation) ; l'objectif et l'invalidation depuis la validation ; la marque d'issue (✓ ✗ –) au
-   *  point de l'issue. d = un élément de statsFigure(…).dernieres. SVG en chaîne, PUR : role="img",
+   *  point de l'issue ; et la figure elle-même, comme sur le graphique (d.geo = geoFigure : ses points
+   *  reliés, sa ligne de cou ou ses bornes jusqu'à la validation, demande de Lorenzo du 15/10/2026 :
+   *  sans elle, « on la cherche »). d = un élément de statsFigure(…).dernieres. SVG en chaîne, PUR : role="img",
    *  <title>, des classes (les couleurs sont celles du thème, css/app.css), aucune couleur ici.
    *  → '' quand le cas ne se redessine pas (indices hors de l'historique, prix manquants). */
   function exempleSvg(d, C, n, P, titre) {
@@ -3032,7 +3079,11 @@ const Guide = (function () {
     const i0 = Math.max(0, d.debut - (E.avant || 0)), i1 = Math.min(N - 1, d.jFin + (E.apres || 0));
     const vals = [];
     for (let i = i0; i <= i1; i++) { if (!fini(C[i])) return ''; vals.push(C[i]); }
-    const lignes = [d.niveau, d.objectif, d.invalidation].filter(fini);
+    // La figure : ses droites (ligne de cou, bornes) et ses points, ceux qui tiennent dans la fenêtre.
+    const G = d.geo || {}, dans = q => Array.isArray(q) && fini(q[0]) && fini(q[1]) && q[0] >= i0 && q[0] <= i1;
+    const droites = (G.valide || []).map(l => ({ l, cl: 'ex-cou' })).concat((G.autres || []).map(l => ({ l, cl: 'ex-cou autre' }))).filter(x => x.l.length === 2 && x.l.every(dans));
+    const zigs = (G.zig || []).filter(z => z.length > 1 && z.every(dans)), pts = (G.points || []).concat(G.petits || []).filter(dans);
+    const lignes = [d.niveau, d.objectif, d.invalidation].concat(...droites.map(x => x.l.map(q => q[1])), ...zigs.map(z => z.map(q => q[1])), pts.map(q => q[1])).filter(fini);
     const lo = Math.min(...vals, ...lignes), hi = Math.max(...vals, ...lignes);
     if (!(hi > lo) || i1 <= i0) return '';
     const r1 = x => Math.round(x * 10) / 10, haut = 7, bas = 7;   // place de la marque d'issue, en haut ou en bas
@@ -3042,11 +3093,15 @@ const Guide = (function () {
     const issue = d.fin === 'atteint' ? 'ok' : d.fin === 'invalide' ? 'ko' : 'neutre', xF = X(d.jFin), yF = Y(C[d.jFin]);
     const xM = Math.max(5, Math.min(W - 5, xF)), yM = yF > H / 2 ? yF - 4 : yF + 11;
     let corps = '<rect class="ex-pendant" x="' + X(d.debut) + '" y="0" width="' + r1(Math.max(1, X(d.jFin) - X(d.debut))) + '" height="' + H + '"/>'
-      + ligne('ex-niveau', X(d.debut), X(d.jConf), d.niveau)
+      + (droites.length ? '' : ligne('ex-niveau', X(d.debut), X(d.jConf), d.niveau))
       + ligne('ex-objectif', X(d.jConf), W - 1, d.objectif) + ligne('ex-inval', X(d.jConf), W - 1, d.invalidation);
     if (d.debut > i0) corps += '<path class="ex-avant" d="' + trace(i0, d.debut) + '"/>';
     corps += '<path class="ex-prix" d="' + trace(d.debut, d.jFin) + '"/>';
     if (i1 > d.jFin) corps += '<path class="ex-apres" d="' + trace(d.jFin, i1) + '"/>';
+    // Le dessin de la figure par-dessus le prix, à sa couleur (la même pour toutes les figures).
+    corps += droites.map(x => '<line class="' + x.cl + '" x1="' + X(x.l[0][0]) + '" x2="' + X(x.l[1][0]) + '" y1="' + Y(x.l[0][1]) + '" y2="' + Y(x.l[1][1]) + '"/>').join('')
+      + zigs.map(z => '<path class="ex-zig" d="' + z.map((q, k) => (k ? 'L' : 'M') + X(q[0]) + ' ' + Y(q[1])).join('') + '"/>').join('')
+      + pts.map(q => '<circle class="ex-point" cx="' + X(q[0]) + '" cy="' + Y(q[1]) + '" r="1.8"/>').join('');
     corps += '<rect class="ex-valide" x="' + r1(X(d.jConf) - 2) + '" y="' + r1(Y(C[d.jConf]) - 2) + '" width="4" height="4"/>'
       + (d.marque ? '<text class="ex-issue ' + issue + '" x="' + xM + '" y="' + r1(yM) + '" text-anchor="middle">' + echapXml(d.marque) + '</text>' : '');
     const t = echapXml(titre || '');
@@ -3311,6 +3366,6 @@ const Guide = (function () {
     texteSuiteDebutant, prixRond, USAGES_CHIFFRES, usageChiffre, avecUsage, cleEcart, ageLu, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
     MARQUES_FIN, motEchec, nomFormeDetail, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, libelleFormeCourt, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant,
-    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, exempleSvg, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, fourchette, cassureDite, quandCassure, phrasesCassureFourchette, texteCassureFourchette, phrasesCassureDebutant, bulleCassureDebutant, synthese };
+    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, geoFigure, exempleSvg, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, fourchette, cassureDite, quandCassure, phrasesCassureFourchette, texteCassureFourchette, phrasesCassureDebutant, bulleCassureDebutant, synthese };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;
