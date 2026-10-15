@@ -652,6 +652,9 @@ const etat = page => page.evaluate(() => {
     // (deux « signaux », aucun en face) faisaient « Les signaux penchent plutôt vers la baisse. », dans
     // la boîte et sur la barre du téléphone, avec « Cette lecture tombe si le prix finit un quart d'heure
     // au-dessus du repère du haut. ». Lancé avant la correction, ce bloc échoue.
+    // Les niveaux de market-data.json (murs, gamma) sont des repères : celui du dépôt change à chaque
+    // publication, et le repère repassé dessous en dépendait (rouge à 01:18 UTC le 15/10, vert à 00:33).
+    // Ce bloc lit donc un market-data.json figé (celui du 15/10, 00:33 UTC).
     titre('« En résumé » décrit sans pencher (08/10 rejoué, 12:00 UTC) : titre, règle, barre, colonne');
     {
       const H = require('./scenarios-jour-harnais.js'), X = require('./fixtures/rejeu-jour-0810.json');
@@ -663,7 +666,8 @@ const etat = page => page.evaluate(() => {
       };
       try {
         for (const [vue, theme] of [[{ width: 390, height: 844 }, 'bureau95'], [{ width: 1440, height: 900 }, 'gazette']]) {
-          const o = await H.ouvrir(nav, H.harnais(X, '2026-10-08T12:00:00Z'), { vue, tactile: vue.width < 500, theme, mode: 'expert' });
+          const o = await H.ouvrir(nav, H.harnais(X, '2026-10-08T12:00:00Z'), { vue, tactile: vue.width < 500, theme, mode: 'expert',
+            marketData: path.join(__dirname, 'fixtures', 'market-data-1015.json') });
           const r = await o.page.evaluate(lire), nom = `12:00, ${vue.width} px · ${theme}`;
           check(`${nom} : le titre décrit (« ${r.titre} » ; avant : « Les signaux penchent plutôt vers la baisse. »), ${vue.width < 768 ? 'la barre du téléphone aussi' : 'dans la colonne'}`,
             r.titre === 'Le prix baisse depuis un moment.' && r.ton === 'calme' && !!r.boite && r.boite.titre === r.titre && /\bton-calme\b/.test(r.boite.classe)
