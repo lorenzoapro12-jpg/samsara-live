@@ -76,14 +76,16 @@ async function demarrer() {
 }
 const arreter = () => { if (serveur) serveur.close(); serveur = null; };
 
-/** Une page à l'heure du harnais. opts = { vue, mode, tactile, theme, sansGuide }. */
+/** Une page à l'heure du harnais. opts = { vue, mode, tactile, theme, sansGuide, marketData }.
+ *  marketData : un market-data.json figé (chemin) au lieu de celui du dépôt, que les publications
+ *  remplacent toutes les 15 min ; ses niveaux (murs, gamma) entrent dans les repères du Guide. */
 async function ouvrir(nav, h, opts = {}) {
   const ctx = await nav.newContext(Object.assign({ viewport: opts.vue || { width: 1440, height: 900 }, deviceScaleFactor: 1 }, opts.tactile ? { hasTouch: true, isMobile: true } : {}));
   await ctx.clock.install({ time: h.t });
   const page = await ctx.newPage();
   const erreurs = [];
   page.on('pageerror', e => erreurs.push(e.message));
-  const md = JSON.parse(fs.readFileSync(path.join(REPO, 'market-data.json'), 'utf8'));
+  const md = JSON.parse(fs.readFileSync(opts.marketData || path.join(REPO, 'market-data.json'), 'utf8'));
   await page.route('**/*', r => {
     const u = r.request().url(), host = new URL(u).host, cors = { 'access-control-allow-origin': '*' };
     if (host.startsWith('127.0.0.1')) return r.continue();

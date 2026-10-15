@@ -1,0 +1,1824 @@
+{
+ "updated": "2026-10-15T00:33:14+00:00",
+ "generator": "publish.py v4.0 — calculs dans le dépôt, champs décrits par `meta` (06/10/2026)",
+ "source": "binance · deribit · coinbase · yahoo",
+ "btc": {
+  "price": 81739.99,
+  "change_24h_pct": -2.059,
+  "high_24h": 84146.72,
+  "low_24h": 81444.42,
+  "quote_volume_24h_usd": 1534917000.833946
+ },
+ "macro": {
+  "dxy_spot": 102.20500183105469,
+  "dxy_date": "2026-10-15",
+  "dxy_is_weekend": false,
+  "vix": 16.87,
+  "vix_at": "2026-10-14T20:15+00:00"
+ },
+ "tf": {
+  "4h": {
+   "rsi_14": 38.7,
+   "ema20_4h": 82797.01,
+   "ema50_4h": 83208.27,
+   "death_cross_4h": true,
+   "ema_gap_pct": 0.49,
+   "support_30": 81033.66,
+   "resistance_30": 84352.0,
+   "last_close": 81739.99,
+   "avg_volume_10": 2449.8,
+   "last_5_candles": [
+    {
+     "open": 83582.28,
+     "high": 84146.72,
+     "low": 83028.7,
+     "close": 83465.94,
+     "body": 0.14,
+     "direction": "🔴",
+     "wick_top": 0.68,
+     "wick_bottom": 0.52
+    },
+    {
+     "open": 83465.94,
+     "high": 83933.0,
+     "low": 81588.88,
+     "close": 81641.44,
+     "body": 2.19,
+     "direction": "🔴",
+     "wick_top": 0.56,
+     "wick_bottom": 0.06
+    },
+    {
+     "open": 81641.44,
+     "high": 82083.04,
+     "low": 81514.28,
+     "close": 81840.53,
+     "body": 0.24,
+     "direction": "🟢",
+     "wick_top": 0.3,
+     "wick_bottom": 0.16
+    },
+    {
+     "open": 81840.95,
+     "high": 81980.1,
+     "low": 81444.42,
+     "close": 81682.01,
+     "body": 0.19,
+     "direction": "🔴",
+     "wick_top": 0.17,
+     "wick_bottom": 0.29
+    },
+    {
+     "open": 81682.02,
+     "high": 81832.93,
+     "low": 81666.0,
+     "close": 81739.99,
+     "body": 0.07,
+     "direction": "🟢",
+     "wick_top": 0.11,
+     "wick_bottom": 0.02
+    }
+   ],
+   "range_24h_pct": 4.1,
+   "sr_window_h": 120,
+   "ema20": 82797.01,
+   "ema50": 83208.27,
+   "ema_ecart_pct": -0.49,
+   "ema20_sous_ema50": true,
+   "amplitude_30_pct": 4.1,
+   "volume_moyen_10_btc": 2449.8,
+   "atr_14": 807.37,
+   "atr_14_pct": 0.99,
+   "bougies_lues": 200,
+   "bougie_en_cours": true,
+   "derniere_cloture_a": "2026-10-15T03:59:59.999000+00:00"
+  },
+  "1h": {
+   "rsi_14": 35.2,
+   "ema20_4h": 82255.32,
+   "ema50_4h": 82733.39,
+   "death_cross_4h": true,
+   "ema_gap_pct": 0.58,
+   "support_30": 81444.42,
+   "resistance_30": 84146.72,
+   "last_close": 81740.0,
+   "avg_volume_10": 617.8,
+   "last_5_candles": [
+    {
+     "open": 81840.95,
+     "high": 81980.1,
+     "low": 81649.4,
+     "close": 81784.05,
+     "body": 0.07,
+     "direction": "🔴",
+     "wick_top": 0.17,
+     "wick_bottom": 0.16
+    },
+    {
+     "open": 81784.05,
+     "high": 81966.83,
+     "low": 81646.02,
+     "close": 81778.46,
+     "body": 0.01,
+     "direction": "🔴",
+     "wick_top": 0.22,
+     "wick_bottom": 0.16
+    },
+    {
+     "open": 81778.47,
+     "high": 81794.12,
+     "low": 81444.42,
+     "close": 81660.01,
+     "body": 0.14,
+     "direction": "🔴",
+     "wick_top": 0.02,
+     "wick_bottom": 0.26
+    },
+    {
+     "open": 81660.01,
+     "high": 81711.18,
+     "low": 81472.0,
+     "close": 81682.01,
+     "body": 0.03,
+     "direction": "🟢",
+     "wick_top": 0.04,
+     "wick_bottom": 0.23
+    },
+    {
+     "open": 81682.02,
+     "high": 81832.93,
+     "low": 81666.0,
+     "close": 81740.0,
+     "body": 0.07,
+     "direction": "🟢",
+     "wick_top": 0.11,
+     "wick_bottom": 0.02
+    }
+   ],
+   "range_24h_pct": 3.32,
+   "sr_window_h": 30,
+   "ema20": 82255.32,
+   "ema50": 82733.39,
+   "ema_ecart_pct": -0.58,
+   "ema20_sous_ema50": true,
+   "amplitude_30_pct": 3.32,
+   "volume_moyen_10_btc": 617.8,
+   "atr_14": 410.23,
+   "atr_14_pct": 0.5,
+   "bougies_lues": 200,
+   "bougie_en_cours": true,
+   "derniere_cloture_a": "2026-10-15T00:59:59.999000+00:00"
+  },
+  "1d": {
+   "rsi_14": 47.0,
+   "ema20_4h": 82897.38,
+   "ema50_4h": 80352.9,
+   "death_cross_4h": false,
+   "ema_gap_pct": 3.17,
+   "support_30": 75064.82,
+   "resistance_30": 87395.67,
+   "last_close": 81740.0,
+   "avg_volume_10": 12890.65,
+   "last_5_candles": [
+    {
+     "open": 82988.35,
+     "high": 84199.0,
+     "low": 82804.65,
+     "close": 83773.12,
+     "body": 0.95,
+     "direction": "🟢",
+     "wick_top": 0.51,
+     "wick_bottom": 0.22
+    },
+    {
+     "open": 83773.12,
+     "high": 84352.0,
+     "low": 81750.09,
+     "close": 81850.0,
+     "body": 2.3,
+     "direction": "🔴",
+     "wick_top": 0.69,
+     "wick_bottom": 0.12
+    },
+    {
+     "open": 81850.01,
+     "high": 84168.0,
+     "low": 81033.66,
+     "close": 83169.0,
+     "body": 1.61,
+     "direction": "🟢",
+     "wick_top": 1.22,
+     "wick_bottom": 1.0
+    },
+    {
+     "open": 83169.01,
+     "high": 84146.72,
+     "low": 81444.42,
+     "close": 81682.01,
+     "body": 1.79,
+     "direction": "🔴",
+     "wick_top": 1.18,
+     "wick_bottom": 0.29
+    },
+    {
+     "open": 81682.02,
+     "high": 81832.93,
+     "low": 81666.0,
+     "close": 81740.0,
+     "body": 0.07,
+     "direction": "🟢",
+     "wick_top": 0.11,
+     "wick_bottom": 0.02
+    }
+   ],
+   "range_24h_pct": 16.43,
+   "sr_window_h": 720,
+   "ema20": 82897.38,
+   "ema50": 80352.9,
+   "ema_ecart_pct": 3.17,
+   "ema20_sous_ema50": false,
+   "amplitude_30_pct": 16.43,
+   "volume_moyen_10_btc": 12890.65,
+   "atr_14": 2068.11,
+   "atr_14_pct": 2.53,
+   "bougies_lues": 200,
+   "bougie_en_cours": true,
+   "derniere_cloture_a": "2026-10-15T23:59:59.999000+00:00"
+  }
+ },
+ "micro": {
+  "funding_rate_pct": -0.00285,
+  "funding_annual_pct": -3.13,
+  "funding_prochain_at": "2026-10-15T08:00+00:00",
+  "mark_price": 81697.5,
+  "oi_btc": 93343.542,
+  "oi_usd": 7625934023,
+  "oi_change_24h_pct": 0.67,
+  "oi_change_1d_pct": 0.67,
+  "oi_hist_at": "2026-10-15T00:00+00:00",
+  "oi_change_5d_pct": 0.64,
+  "ls_ratio": 1.7716,
+  "long_pct": 63.9,
+  "short_pct": 36.1,
+  "top_ls_ratio": 1.5373,
+  "taker_ratio": 1.1084,
+  "cvd_1h_usd": 7462817,
+  "taker_buy_1h_pct": 56.6,
+  "cvd_4h_usd": -6487856,
+  "taker_buy_4h_pct": 48.3,
+  "cvd_24h_usd": -99790963,
+  "taker_buy_24h_pct": 46.7,
+  "cvd_window_end": "2026-10-15T00:33:17+00:00",
+  "cvd": -99790963,
+  "cvd_updated_at": "2026-10-15T00:33:17+00:00",
+  "gex_usd_1pct": 46344907,
+  "gex_calls_usd_1pct": 317513195,
+  "gex_puts_usd_1pct": -271168288,
+  "gex_0_7j_usd_1pct": -72050602,
+  "gex_state": "LONG_GAMMA",
+  "zero_gamma": 80678,
+  "spot_vs_zero_gamma_pct": 1.19,
+  "call_wall": 90000.0,
+  "put_wall": 80000.0,
+  "gamma_walls": [
+   90000.0,
+   78000.0,
+   95000.0
+  ],
+  "num_strikes": 90,
+  "num_options": 756,
+  "gex_convention": "dealers acheteurs des calls, vendeurs des puts (hypothèse standard, non observable)",
+  "spot_deribit": 81639.89,
+  "dealer_gamma": 46344907,
+  "premium_pct": -0.121,
+  "premium_state": "NEGATIVE",
+  "us_demand": false,
+  "coinbase_mid": 81641.74,
+  "binance_mid": 81740.64,
+  "usdt_usd": 0.99866,
+  "premium_hors_usdt_pct": 0.0125,
+  "premium_at": "2026-10-15T00:33:18+00:00"
+ },
+ "liquidity": {
+  "mid": 81740.64,
+  "couverture_pct": 0.971,
+  "bandes": {
+   "0.1": {
+    "bid_btc": 85.82,
+    "ask_btc": 82.3,
+    "ratio": 1.04
+   },
+   "0.5": {
+    "bid_btc": 200.19,
+    "ask_btc": 207.73,
+    "ratio": 0.96
+   }
+  },
+  "bande_ref_pct": 0.5,
+  "ratio_bid_ask": 0.96,
+  "total_bid": 200.19,
+  "total_ask": 207.73,
+  "bid_walls": [
+   [
+    81000,
+    77.7
+   ],
+   [
+    80980,
+    22.8
+   ],
+   [
+    81100,
+    20.1
+   ],
+   [
+    81080,
+    19.4
+   ],
+   [
+    81640,
+    19.2
+   ],
+   [
+    81680,
+    18.6
+   ]
+  ],
+  "ask_walls": [
+   [
+    81800,
+    33.8
+   ],
+   [
+    82520,
+    29.3
+   ],
+   [
+    82060,
+    29.2
+   ],
+   [
+    81780,
+    22.0
+   ],
+   [
+    81760,
+    19.8
+   ],
+   [
+    81840,
+    16.4
+   ]
+  ],
+  "wall_bin_usd": 20,
+  "unit": "BTC",
+  "bandes_demandees_pct": [
+   0.1,
+   0.5,
+   1.0
+  ],
+  "murs_n": 6,
+  "niveaux_demandes": 5000,
+  "niveaux_recus": {
+   "bids": 5000,
+   "asks": 5000
+  },
+  "meilleur_bid": 81740.64,
+  "meilleur_ask": 81740.65,
+  "profil_bids": [
+   [
+    80940,
+    0.75
+   ],
+   [
+    80960,
+    0.185
+   ],
+   [
+    80980,
+    22.842
+   ],
+   [
+    81000,
+    77.664
+   ],
+   [
+    81020,
+    3.049
+   ],
+   [
+    81040,
+    15.643
+   ],
+   [
+    81060,
+    1.558
+   ],
+   [
+    81080,
+    19.41
+   ],
+   [
+    81100,
+    20.133
+   ],
+   [
+    81120,
+    1.653
+   ],
+   [
+    81140,
+    0.763
+   ],
+   [
+    81160,
+    2.559
+   ],
+   [
+    81180,
+    4.389
+   ],
+   [
+    81200,
+    10.749
+   ],
+   [
+    81220,
+    6.518
+   ],
+   [
+    81240,
+    3.594
+   ],
+   [
+    81260,
+    1.171
+   ],
+   [
+    81280,
+    2.053
+   ],
+   [
+    81300,
+    10.219
+   ],
+   [
+    81320,
+    2.19
+   ],
+   [
+    81340,
+    3.129
+   ],
+   [
+    81360,
+    1.543
+   ],
+   [
+    81380,
+    6.313
+   ],
+   [
+    81400,
+    7.614
+   ],
+   [
+    81420,
+    10.268
+   ],
+   [
+    81440,
+    13.048
+   ],
+   [
+    81460,
+    0.297
+   ],
+   [
+    81480,
+    0.12
+   ],
+   [
+    81500,
+    13.978
+   ],
+   [
+    81520,
+    1.493
+   ],
+   [
+    81540,
+    10.479
+   ],
+   [
+    81560,
+    12.161
+   ],
+   [
+    81580,
+    4.51
+   ],
+   [
+    81600,
+    5.837
+   ],
+   [
+    81620,
+    4.309
+   ],
+   [
+    81640,
+    19.229
+   ],
+   [
+    81660,
+    14.649
+   ],
+   [
+    81680,
+    18.578
+   ],
+   [
+    81700,
+    18.495
+   ],
+   [
+    81720,
+    15.568
+   ],
+   [
+    81740,
+    16.755
+   ]
+  ],
+  "profil_asks": [
+   [
+    81740,
+    6.546
+   ],
+   [
+    81760,
+    19.832
+   ],
+   [
+    81780,
+    21.95
+   ],
+   [
+    81800,
+    33.838
+   ],
+   [
+    81820,
+    13.357
+   ],
+   [
+    81840,
+    16.399
+   ],
+   [
+    81860,
+    7.694
+   ],
+   [
+    81880,
+    12.313
+   ],
+   [
+    81900,
+    8.91
+   ],
+   [
+    81920,
+    8.022
+   ],
+   [
+    81940,
+    5.588
+   ],
+   [
+    81960,
+    8.765
+   ],
+   [
+    81980,
+    0.942
+   ],
+   [
+    82000,
+    5.018
+   ],
+   [
+    82020,
+    4.472
+   ],
+   [
+    82040,
+    1.378
+   ],
+   [
+    82060,
+    29.182
+   ],
+   [
+    82080,
+    1.901
+   ],
+   [
+    82100,
+    1.498
+   ],
+   [
+    82120,
+    0.098
+   ],
+   [
+    82140,
+    0.391
+   ],
+   [
+    82160,
+    0.159
+   ],
+   [
+    82180,
+    0.068
+   ],
+   [
+    82200,
+    1.526
+   ],
+   [
+    82220,
+    1.239
+   ],
+   [
+    82240,
+    0.295
+   ],
+   [
+    82260,
+    1.783
+   ],
+   [
+    82280,
+    1.374
+   ],
+   [
+    82300,
+    3.616
+   ],
+   [
+    82320,
+    0.446
+   ],
+   [
+    82340,
+    0.309
+   ],
+   [
+    82360,
+    0.101
+   ],
+   [
+    82380,
+    0.291
+   ],
+   [
+    82400,
+    0.273
+   ],
+   [
+    82420,
+    0.351
+   ],
+   [
+    82440,
+    0.182
+   ],
+   [
+    82460,
+    12.777
+   ],
+   [
+    82480,
+    0.087
+   ],
+   [
+    82500,
+    4.301
+   ],
+   [
+    82520,
+    29.26
+   ]
+  ],
+  "snapshot_at": "2026-10-15T00:33:18+00:00"
+ },
+ "status": {
+  "btc_spot": "ok",
+  "indicators": "ok",
+  "macro": "ok",
+  "micro_futures": "ok",
+  "cvd": "ok",
+  "gex": "ok",
+  "premium": "ok",
+  "liquidity": "ok"
+ },
+ "errors": [],
+ "meta": {
+  "version": 1,
+  "champs": {
+   "btc.price": {
+    "libelle": "Prix",
+    "unite": "USDT",
+    "formule": "dernier prix échangé (ticker 24 h)",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {}
+   },
+   "btc.change_24h_pct": {
+    "libelle": "Variation 24 h",
+    "unite": "%",
+    "formule": "(dernier − prix d'il y a 24 h) / prix d'il y a 24 h × 100",
+    "fenetre": "24 h glissantes",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {
+     "fenetre_h": 24
+    }
+   },
+   "btc.high_24h": {
+    "libelle": "Plus haut 24 h",
+    "unite": "USDT",
+    "formule": "plus haut échangé",
+    "fenetre": "24 h glissantes",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {
+     "fenetre_h": 24
+    }
+   },
+   "btc.low_24h": {
+    "libelle": "Plus bas 24 h",
+    "unite": "USDT",
+    "formule": "plus bas échangé",
+    "fenetre": "24 h glissantes",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {
+     "fenetre_h": 24
+    }
+   },
+   "btc.quote_volume_24h_usd": {
+    "libelle": "Volume 24 h",
+    "unite": "USDT",
+    "formule": "somme des montants échangés (en devise de cotation)",
+    "fenetre": "24 h glissantes",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {
+     "fenetre_h": 24
+    }
+   },
+   "macro.dxy_spot": {
+    "libelle": "DXY",
+    "unite": "indice",
+    "formule": "dernière clôture JOURNALIÈRE d'un jour ouvré de DX-Y.NYB (la barre du jour porte le dernier cours tant que la séance est ouverte)",
+    "fenetre": "barres journalières, 14d",
+    "nature": "mesure",
+    "source": "Yahoo Finance (différé)",
+    "params": {}
+   },
+   "macro.dxy_date": {
+    "libelle": "Date du DXY",
+    "unite": "date",
+    "formule": "jour de la barre retenue",
+    "fenetre": "—",
+    "nature": "horodatage",
+    "source": "Yahoo Finance",
+    "params": {}
+   },
+   "macro.dxy_is_weekend": {
+    "libelle": "Marché fermé (week-end)",
+    "unite": "booléen",
+    "formule": "samedi ou dimanche UTC au moment de la publication",
+    "fenetre": "—",
+    "nature": "mesure",
+    "source": "horloge du serveur",
+    "params": {}
+   },
+   "macro.vix": {
+    "libelle": "VIX",
+    "unite": "points de volatilité annualisée (%)",
+    "formule": "regularMarketPrice de ^VIX : volatilité implicite à 30 jours du S&P 500",
+    "fenetre": "dernier cours diffusé (hors séance US : dernière clôture)",
+    "nature": "mesure",
+    "source": "Yahoo Finance (différé)",
+    "params": {}
+   },
+   "macro.vix_at": {
+    "libelle": "Heure du VIX",
+    "unite": "date",
+    "formule": "regularMarketTime de Yahoo",
+    "fenetre": "—",
+    "nature": "horodatage",
+    "source": "Yahoo Finance",
+    "params": {}
+   },
+   "tf.*.rsi_14": {
+    "libelle": "RSI 14",
+    "unite": "indice 0–100",
+    "formule": "RSI de Wilder : moyennes des hausses et des baisses de clôture, amorcées par leur moyenne simple sur 14 variations puis lissées à 1/14 ; RSI = 100 − 100 / (1 + hausses / baisses)",
+    "fenetre": "200 bougies du TF demandées à Binance, dernière en cours incluse",
+    "nature": "mesure",
+    "params": {
+     "periode": 14,
+     "methode": "wilder"
+    },
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.ema20": {
+    "libelle": "EMA 20",
+    "unite": "USD",
+    "formule": "moyenne mobile exponentielle des clôtures, k = 2/(20+1), amorcée par la moyenne simple des 20 premières",
+    "fenetre": "200 bougies du TF demandées à Binance, dernière en cours incluse",
+    "nature": "mesure",
+    "params": {
+     "periode": 20,
+     "amorce": "sma",
+     "poids_amorce_pct": 0.0
+    },
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.ema50": {
+    "libelle": "EMA 50",
+    "unite": "USD",
+    "formule": "moyenne mobile exponentielle des clôtures, k = 2/(50+1), amorcée par la moyenne simple des 50 premières",
+    "fenetre": "200 bougies du TF demandées à Binance, dernière en cours incluse",
+    "nature": "mesure",
+    "params": {
+     "periode": 50,
+     "amorce": "sma",
+     "poids_amorce_pct": 0.248
+    },
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.ema_ecart_pct": {
+    "libelle": "Écart EMA 20 / EMA 50",
+    "unite": "%",
+    "formule": "(EMA20 / EMA50 − 1) × 100, SIGNÉ",
+    "fenetre": "200 bougies du TF demandées à Binance, dernière en cours incluse",
+    "nature": "mesure",
+    "params": {
+     "courte": 20,
+     "longue": 50,
+     "signe": true
+    },
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.ema20_sous_ema50": {
+    "libelle": "EMA 20 sous EMA 50",
+    "unite": "booléen",
+    "formule": "EMA20 < EMA50 — un ÉTAT, pas un croisement",
+    "fenetre": "200 bougies du TF demandées à Binance, dernière en cours incluse",
+    "nature": "mesure",
+    "params": {
+     "courte": 20,
+     "longue": 50
+    },
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.support_30": {
+    "libelle": "Support",
+    "unite": "USD",
+    "formule": "plus bas des 30 dernières bougies — un extrême, pas un niveau testé",
+    "fenetre": "30 dernières bougies du TF (dernière en cours incluse)",
+    "nature": "mesure",
+    "params": {
+     "bougies": 30,
+     "agregat": "min"
+    },
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.resistance_30": {
+    "libelle": "Résistance",
+    "unite": "USD",
+    "formule": "plus haut des 30 dernières bougies — un extrême, pas un niveau testé",
+    "fenetre": "30 dernières bougies du TF (dernière en cours incluse)",
+    "nature": "mesure",
+    "params": {
+     "bougies": 30,
+     "agregat": "max"
+    },
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.amplitude_30_pct": {
+    "libelle": "Amplitude",
+    "unite": "%",
+    "formule": "(plus haut − plus bas) / plus bas × 100, sur les 30 dernières bougies",
+    "fenetre": "30 dernières bougies du TF (dernière en cours incluse)",
+    "nature": "mesure",
+    "params": {
+     "bougies": 30,
+     "reference": "plus_bas"
+    },
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.volume_moyen_10_btc": {
+    "libelle": "Volume moyen",
+    "unite": "BTC par bougie",
+    "formule": "moyenne du volume de base des 10 dernières bougies",
+    "fenetre": "10 dernières bougies du TF (dernière en cours incluse : elle tire la moyenne vers le bas)",
+    "nature": "mesure",
+    "params": {
+     "bougies": 10
+    },
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.atr_14": {
+    "libelle": "ATR 14",
+    "unite": "USD",
+    "formule": "ATR de Wilder : vrai range max(H−B, |H−C₋₁|, |B−C₋₁|), moyenne des 14 premiers puis lissage à 1/14",
+    "fenetre": "200 bougies du TF demandées à Binance, dernière en cours incluse",
+    "nature": "mesure",
+    "params": {
+     "periode": 14,
+     "methode": "wilder"
+    },
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.atr_14_pct": {
+    "libelle": "ATR 14 en %",
+    "unite": "% du dernier prix",
+    "formule": "ATR14 / dernière clôture × 100",
+    "fenetre": "200 bougies du TF demandées à Binance, dernière en cours incluse",
+    "nature": "mesure",
+    "params": {
+     "periode": 14
+    },
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.sr_window_h": {
+    "libelle": "Fenêtre S/R",
+    "unite": "heures",
+    "formule": "30 × durée d'une bougie du TF",
+    "fenetre": "—",
+    "nature": "mesure",
+    "params": {
+     "bougies": 30
+    },
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.last_close": {
+    "libelle": "Dernière clôture",
+    "unite": "USD",
+    "formule": "clôture de la dernière bougie reçue — EN COURS : c'est le dernier prix, pas une clôture",
+    "fenetre": "—",
+    "nature": "mesure",
+    "params": {},
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.last_5_candles": {
+    "libelle": "5 dernières bougies",
+    "unite": "OHLC + corps / mèches en % de l'ouverture",
+    "formule": "corps = |C − O| / O × 100 ; mèches haute / basse en % de O ; 🔴 si C ≤ O (doji compris)",
+    "fenetre": "5 dernières bougies du TF",
+    "nature": "mesure",
+    "params": {
+     "bougies": 5
+    },
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.bougies_lues": {
+    "libelle": "Bougies lues",
+    "unite": "nombre",
+    "formule": "bougies reçues (demandées : 200 ; minimum publié : 50)",
+    "fenetre": "—",
+    "nature": "mesure",
+    "params": {},
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.derniere_cloture_a": {
+    "libelle": "Clôture de la dernière bougie",
+    "unite": "date",
+    "formule": "heure de clôture (prévue) de la dernière bougie reçue",
+    "fenetre": "—",
+    "nature": "horodatage",
+    "params": {},
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.bougie_en_cours": {
+    "libelle": "Dernière bougie en cours",
+    "unite": "booléen",
+    "formule": "la clôture de la dernière bougie reçue est dans le futur : ses valeurs bougent encore",
+    "fenetre": "—",
+    "nature": "mesure",
+    "params": {},
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.ema20_4h": {
+    "libelle": "EMA 20",
+    "unite": "USD",
+    "formule": "moyenne mobile exponentielle des clôtures, k = 2/(20+1), amorcée par la moyenne simple des 20 premières",
+    "fenetre": "200 bougies du TF demandées à Binance, dernière en cours incluse",
+    "nature": "mesure",
+    "params": {
+     "periode": 20,
+     "amorce": "sma",
+     "poids_amorce_pct": 0.0
+    },
+    "alias_de": "ema20",
+    "nom_trompeur": "le suffixe « _4h » est historique : la valeur porte le TF du bloc",
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.ema50_4h": {
+    "libelle": "EMA 50",
+    "unite": "USD",
+    "formule": "moyenne mobile exponentielle des clôtures, k = 2/(50+1), amorcée par la moyenne simple des 50 premières",
+    "fenetre": "200 bougies du TF demandées à Binance, dernière en cours incluse",
+    "nature": "mesure",
+    "params": {
+     "periode": 50,
+     "amorce": "sma",
+     "poids_amorce_pct": 0.248
+    },
+    "alias_de": "ema50",
+    "nom_trompeur": "le suffixe « _4h » est historique : la valeur porte le TF du bloc",
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.death_cross_4h": {
+    "libelle": "EMA 20 sous EMA 50",
+    "unite": "booléen",
+    "formule": "EMA20 < EMA50 — un ÉTAT, pas un croisement",
+    "fenetre": "200 bougies du TF demandées à Binance, dernière en cours incluse",
+    "nature": "mesure",
+    "params": {
+     "courte": 20,
+     "longue": 50
+    },
+    "alias_de": "ema20_sous_ema50",
+    "nom_trompeur": "ce n'est ni un croisement ni le « death cross » usuel (SMA50/SMA200 daily) : c'est l'état EMA20 < EMA50, sur le TF du bloc",
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.ema_gap_pct": {
+    "libelle": "Écart EMA 20 / EMA 50",
+    "unite": "%",
+    "formule": "|EMA20 − EMA50| / EMA50 × 100",
+    "fenetre": "200 bougies du TF demandées à Binance, dernière en cours incluse",
+    "nature": "mesure",
+    "params": {
+     "courte": 20,
+     "longue": 50,
+     "signe": false
+    },
+    "alias_de": "ema_ecart_pct",
+    "nom_trompeur": "valeur ABSOLUE : le sens de l'écart est perdu",
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.range_24h_pct": {
+    "libelle": "Amplitude",
+    "unite": "%",
+    "formule": "(plus haut − plus bas) / plus bas × 100, sur les 30 dernières bougies",
+    "fenetre": "30 dernières bougies du TF (dernière en cours incluse)",
+    "nature": "mesure",
+    "params": {
+     "bougies": 30,
+     "reference": "plus_bas"
+    },
+    "alias_de": "amplitude_30_pct",
+    "nom_trompeur": "ne couvre PAS 24 h : 30 bougies du TF (voir sr_window_h)",
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "tf.*.avg_volume_10": {
+    "libelle": "Volume moyen",
+    "unite": "BTC par bougie",
+    "formule": "moyenne du volume de base des 10 dernières bougies",
+    "fenetre": "10 dernières bougies du TF (dernière en cours incluse : elle tire la moyenne vers le bas)",
+    "nature": "mesure",
+    "params": {
+     "bougies": 10
+    },
+    "alias_de": "volume_moyen_10_btc",
+    "source": "Binance spot BTCUSDT, bougies du TF"
+   },
+   "micro.funding_rate_pct": {
+    "libelle": "Funding",
+    "unite": "% par échéance",
+    "formule": "lastFundingRate de premiumIndex : taux courant, appliqué à la prochaine échéance (funding_prochain_at)",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {}
+   },
+   "micro.funding_annual_pct": {
+    "libelle": "Funding annualisé",
+    "unite": "% par an",
+    "formule": "funding × 3 échéances/jour × 365 — suppose le taux constant",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "convention",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {
+     "echeances_par_jour": 3
+    }
+   },
+   "micro.funding_prochain_at": {
+    "libelle": "Prochaine échéance de funding",
+    "unite": "date",
+    "formule": "nextFundingTime",
+    "fenetre": "—",
+    "nature": "horodatage",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {}
+   },
+   "micro.mark_price": {
+    "libelle": "Prix mark (perp)",
+    "unite": "USDT",
+    "formule": "prix de marque du contrat perpétuel",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {}
+   },
+   "micro.oi_btc": {
+    "libelle": "Open interest",
+    "unite": "BTC",
+    "formule": "contrats ouverts",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {}
+   },
+   "micro.oi_usd": {
+    "libelle": "Open interest",
+    "unite": "USDT",
+    "formule": "oi_btc × mark_price",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {}
+   },
+   "micro.oi_change_24h_pct": {
+    "libelle": "Δ OI 24 h",
+    "unite": "%",
+    "formule": "(OI horaire courant / OI d'il y a 24 points − 1) × 100",
+    "fenetre": "24 h glissantes, série horaire",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {
+     "fenetre_h": 24
+    }
+   },
+   "micro.oi_change_1d_pct": {
+    "libelle": "Δ OI 24 h",
+    "unite": "%",
+    "formule": "identique à oi_change_24h_pct",
+    "fenetre": "24 h glissantes, série horaire",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {
+     "fenetre_h": 24
+    },
+    "alias_de": "micro.oi_change_24h_pct"
+   },
+   "micro.oi_change_5d_pct": {
+    "libelle": "Δ OI 5 j",
+    "unite": "%",
+    "formule": "(OI horaire courant / OI d'il y a 120 points − 1) × 100",
+    "fenetre": "120 h glissantes, série horaire",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {
+     "fenetre_h": 120
+    }
+   },
+   "micro.oi_hist_at": {
+    "libelle": "Heure du dernier point d'OI",
+    "unite": "date",
+    "formule": "horodatage du dernier point horaire",
+    "fenetre": "—",
+    "nature": "horodatage",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {}
+   },
+   "micro.ls_ratio": {
+    "libelle": "Ratio L/S (comptes)",
+    "unite": "ratio",
+    "formule": "comptes nets acheteurs / comptes nets vendeurs — UN COMPTE = UNE VOIX, quelle que soit sa taille",
+    "fenetre": "dernier point de la série 1h",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {}
+   },
+   "micro.long_pct": {
+    "libelle": "Comptes acheteurs",
+    "unite": "%",
+    "formule": "part des comptes nets acheteurs",
+    "fenetre": "dernier point 1h",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {}
+   },
+   "micro.short_pct": {
+    "libelle": "Comptes vendeurs",
+    "unite": "%",
+    "formule": "part des comptes nets vendeurs",
+    "fenetre": "dernier point 1h",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {}
+   },
+   "micro.top_ls_ratio": {
+    "libelle": "Ratio L/S (gros traders, positions)",
+    "unite": "ratio",
+    "formule": "positions longues / courtes des « top traders » de Binance (pondéré par la TAILLE des positions)",
+    "fenetre": "dernier point 1h",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {}
+   },
+   "micro.taker_ratio": {
+    "libelle": "Ratio acheteurs/vendeurs taker (perp)",
+    "unite": "ratio",
+    "formule": "volume acheté au marché / volume vendu au marché, sur le PERPÉTUEL",
+    "fenetre": "dernier point 1h",
+    "nature": "mesure",
+    "source": "Binance futures USDⓈ-M BTCUSDT",
+    "params": {}
+   },
+   "micro.cvd_1h_usd": {
+    "libelle": "CVD 1h",
+    "unite": "USDT",
+    "formule": "Σ (achats taker − ventes taker) = Σ (2 × achats taker − volume) sur 12 bougies de 5 min",
+    "fenetre": "1h glissantes, finissant à cvd_window_end (bougie en cours incluse)",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT (spot, pas le perp)",
+    "params": {
+     "fenetre_h": 1.0,
+     "bougies": 12,
+     "intervalle_min": 5
+    }
+   },
+   "micro.taker_buy_1h_pct": {
+    "libelle": "Part d'achats taker 1h",
+    "unite": "%",
+    "formule": "achats taker / volume total × 100, sur 12 bougies de 5 min",
+    "fenetre": "1h glissantes",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {
+     "fenetre_h": 1.0,
+     "bougies": 12
+    }
+   },
+   "micro.cvd_4h_usd": {
+    "libelle": "CVD 4h",
+    "unite": "USDT",
+    "formule": "Σ (achats taker − ventes taker) = Σ (2 × achats taker − volume) sur 48 bougies de 5 min",
+    "fenetre": "4h glissantes, finissant à cvd_window_end (bougie en cours incluse)",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT (spot, pas le perp)",
+    "params": {
+     "fenetre_h": 4.0,
+     "bougies": 48,
+     "intervalle_min": 5
+    }
+   },
+   "micro.taker_buy_4h_pct": {
+    "libelle": "Part d'achats taker 4h",
+    "unite": "%",
+    "formule": "achats taker / volume total × 100, sur 48 bougies de 5 min",
+    "fenetre": "4h glissantes",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {
+     "fenetre_h": 4.0,
+     "bougies": 48
+    }
+   },
+   "micro.cvd_24h_usd": {
+    "libelle": "CVD 24h",
+    "unite": "USDT",
+    "formule": "Σ (achats taker − ventes taker) = Σ (2 × achats taker − volume) sur 288 bougies de 5 min",
+    "fenetre": "24h glissantes, finissant à cvd_window_end (bougie en cours incluse)",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT (spot, pas le perp)",
+    "params": {
+     "fenetre_h": 24.0,
+     "bougies": 288,
+     "intervalle_min": 5
+    }
+   },
+   "micro.taker_buy_24h_pct": {
+    "libelle": "Part d'achats taker 24h",
+    "unite": "%",
+    "formule": "achats taker / volume total × 100, sur 288 bougies de 5 min",
+    "fenetre": "24h glissantes",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {
+     "fenetre_h": 24.0,
+     "bougies": 288
+    }
+   },
+   "micro.cvd": {
+    "libelle": "CVD",
+    "unite": "USDT",
+    "formule": "identique à cvd_24h_usd (ancien nom)",
+    "fenetre": "24h glissantes",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {},
+    "alias_de": "micro.cvd_24h_usd"
+   },
+   "micro.cvd_window_end": {
+    "libelle": "Fin des fenêtres CVD",
+    "unite": "date",
+    "formule": "heure du calcul",
+    "fenetre": "—",
+    "nature": "horodatage",
+    "source": "Binance spot BTCUSDT",
+    "params": {}
+   },
+   "micro.cvd_updated_at": {
+    "libelle": "Fin des fenêtres CVD",
+    "unite": "date",
+    "formule": "identique à cvd_window_end",
+    "fenetre": "—",
+    "nature": "horodatage",
+    "source": "Binance spot BTCUSDT",
+    "params": {},
+    "alias_de": "micro.cvd_window_end"
+   },
+   "micro.gex_usd_1pct": {
+    "libelle": "GEX net",
+    "unite": "USD par 1 % de mouvement",
+    "formule": "Σ signe × Γ(Black-Scholes, IV mark) × OI × S² × 0,01 ; signe : dealers ACHETEURS des calls, VENDEURS des puts — hypothèse standard, non observable",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "convention",
+    "source": "Deribit, options BTC (OI, IV mark, forward)",
+    "params": {
+     "mouvement_pct": 1
+    }
+   },
+   "micro.gex_calls_usd_1pct": {
+    "libelle": "GEX des calls",
+    "unite": "USD par 1 % de mouvement",
+    "formule": "Σ Γ × OI × S² × 0,01 sur les calls",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "modèle",
+    "source": "Deribit, options BTC (OI, IV mark, forward)",
+    "params": {
+     "mouvement_pct": 1
+    }
+   },
+   "micro.gex_puts_usd_1pct": {
+    "libelle": "GEX des puts",
+    "unite": "USD par 1 % de mouvement",
+    "formule": "−Σ Γ × OI × S² × 0,01 sur les puts",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "convention",
+    "source": "Deribit, options BTC (OI, IV mark, forward)",
+    "params": {
+     "mouvement_pct": 1
+    }
+   },
+   "micro.gex_0_7j_usd_1pct": {
+    "libelle": "GEX net des échéances ≤ 7 j",
+    "unite": "USD par 1 % de mouvement",
+    "formule": "GEX net restreint aux options expirant dans 7 jours au plus",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "convention",
+    "source": "Deribit, options BTC (OI, IV mark, forward)",
+    "params": {
+     "mouvement_pct": 1,
+     "jours_max": 7
+    }
+   },
+   "micro.dealer_gamma": {
+    "libelle": "GEX net",
+    "unite": "USD par 1 % de mouvement",
+    "formule": "identique à gex_usd_1pct (ancien nom)",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "convention",
+    "source": "Deribit, options BTC (OI, IV mark, forward)",
+    "params": {},
+    "alias_de": "micro.gex_usd_1pct"
+   },
+   "micro.gex_state": {
+    "libelle": "Régime gamma",
+    "unite": "état",
+    "formule": "LONG_GAMMA si GEX net > 0, sinon SHORT_GAMMA",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "convention",
+    "source": "Deribit, options BTC (OI, IV mark, forward)",
+    "params": {}
+   },
+   "micro.zero_gamma": {
+    "libelle": "Zéro gamma",
+    "unite": "USD",
+    "formule": "prix où le GEX total recalculé change de signe, sur une grille ±15 % par pas de 0.5 % (IV et échéances figées) ; le plus proche du spot",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "convention",
+    "source": "Deribit, options BTC (OI, IV mark, forward)",
+    "params": {
+     "balayage_pct": 15.0,
+     "pas_pct": 0.5
+    }
+   },
+   "micro.spot_vs_zero_gamma_pct": {
+    "libelle": "Spot vs zéro gamma",
+    "unite": "%",
+    "formule": "(index Deribit / zéro gamma − 1) × 100",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "convention",
+    "source": "Deribit, options BTC (OI, IV mark, forward)",
+    "params": {}
+   },
+   "micro.call_wall": {
+    "libelle": "Mur de calls",
+    "unite": "USD",
+    "formule": "strike au plus grand GEX des calls (gamma × OI, pas l'OI seul)",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "modèle",
+    "source": "Deribit, options BTC (OI, IV mark, forward)",
+    "params": {}
+   },
+   "micro.put_wall": {
+    "libelle": "Mur de puts",
+    "unite": "USD",
+    "formule": "strike au plus grand GEX des puts (gamma × OI, pas l'OI seul)",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "modèle",
+    "source": "Deribit, options BTC (OI, IV mark, forward)",
+    "params": {}
+   },
+   "micro.gamma_walls": {
+    "libelle": "Murs de gamma",
+    "unite": "USD",
+    "formule": "3 strikes au plus grand |GEX net| du strike",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "convention",
+    "source": "Deribit, options BTC (OI, IV mark, forward)",
+    "params": {}
+   },
+   "micro.num_strikes": {
+    "libelle": "Strikes",
+    "unite": "nombre",
+    "formule": "strikes distincts retenus",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Deribit, options BTC (OI, IV mark, forward)",
+    "params": {}
+   },
+   "micro.num_options": {
+    "libelle": "Options",
+    "unite": "nombre",
+    "formule": "options vivantes avec OI, IV et forward ; échéance plancher 1 h",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Deribit, options BTC (OI, IV mark, forward)",
+    "params": {}
+   },
+   "micro.gex_convention": {
+    "libelle": "Convention du GEX",
+    "unite": "texte",
+    "formule": "dealers ACHETEURS des calls, VENDEURS des puts — hypothèse standard, non observable",
+    "fenetre": "—",
+    "nature": "convention",
+    "source": "Deribit, options BTC (OI, IV mark, forward)",
+    "params": {}
+   },
+   "micro.spot_deribit": {
+    "libelle": "Index Deribit",
+    "unite": "USD",
+    "formule": "index btc_usd de Deribit",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Deribit",
+    "params": {}
+   },
+   "micro.premium_pct": {
+    "libelle": "Prime Coinbase",
+    "unite": "%",
+    "formule": "(mid Coinbase BTC-USD − mid Binance BTC-USDT) / mid Binance × 100 — compare des USD à des USDT",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Coinbase Exchange (BTC-USD, USDT-USD) et Binance (BTCUSDT)",
+    "params": {}
+   },
+   "micro.premium_state": {
+    "libelle": "État de la prime",
+    "unite": "état",
+    "formule": "EXTREME_POSITIVE > 0.15 % ; POSITIVE > 0.03 % ; NEUTRAL entre ±0.03 % ; NEGATIVE < −0.03 % ; EXTREME_NEGATIVE < −0.15 %",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "seuil",
+    "source": "Coinbase Exchange (BTC-USD, USDT-USD) et Binance (BTCUSDT)",
+    "params": {
+     "seuil_pct": 0.03,
+     "seuil_extreme_pct": 0.15
+    }
+   },
+   "micro.us_demand": {
+    "libelle": "Demande US",
+    "unite": "booléen",
+    "formule": "premium_pct > 0.03 %",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "seuil",
+    "source": "Coinbase Exchange (BTC-USD, USDT-USD) et Binance (BTCUSDT)",
+    "params": {
+     "seuil_pct": 0.03
+    }
+   },
+   "micro.coinbase_mid": {
+    "libelle": "Mid Coinbase",
+    "unite": "USD",
+    "formule": "(meilleur bid + meilleur ask) / 2, BTC-USD",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Coinbase Exchange (BTC-USD, USDT-USD) et Binance (BTCUSDT)",
+    "params": {}
+   },
+   "micro.binance_mid": {
+    "libelle": "Mid Binance",
+    "unite": "USDT",
+    "formule": "(meilleur bid + meilleur ask) / 2, BTCUSDT",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Coinbase Exchange (BTC-USD, USDT-USD) et Binance (BTCUSDT)",
+    "params": {}
+   },
+   "micro.usdt_usd": {
+    "libelle": "USDT en USD",
+    "unite": "USD",
+    "formule": "mid Coinbase USDT-USD",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Coinbase Exchange (BTC-USD, USDT-USD) et Binance (BTCUSDT)",
+    "params": {}
+   },
+   "micro.premium_hors_usdt_pct": {
+    "libelle": "Prime Coinbase hors USDT",
+    "unite": "%",
+    "formule": "(mid Coinbase BTC-USD / (mid Binance BTC-USDT × USDT-USD) − 1) × 100 — des USD contre des USD",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Coinbase Exchange (BTC-USD, USDT-USD) et Binance (BTCUSDT)",
+    "params": {}
+   },
+   "micro.premium_at": {
+    "libelle": "Heure de la prime",
+    "unite": "date",
+    "formule": "heure de la mesure",
+    "fenetre": "—",
+    "nature": "horodatage",
+    "source": "Coinbase Exchange (BTC-USD, USDT-USD) et Binance (BTCUSDT)",
+    "params": {}
+   },
+   "liquidity.mid": {
+    "libelle": "Mid du carnet",
+    "unite": "USDT",
+    "formule": "(meilleur bid + meilleur ask) / 2",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {}
+   },
+   "liquidity.couverture_pct": {
+    "libelle": "Couverture du carnet",
+    "unite": "%",
+    "formule": "distance au mid du dernier niveau reçu, côté le plus court (5000 niveaux demandés)",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {
+     "niveaux": 5000
+    }
+   },
+   "liquidity.bandes.*.bid_btc": {
+    "libelle": "Bids dans la bande",
+    "unite": "BTC",
+    "formule": "Σ quantités des bids entre mid × (1 − bande) et le mid",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {
+     "bandes_pct": [
+      0.1,
+      0.5,
+      1.0
+     ]
+    }
+   },
+   "liquidity.bandes.*.ask_btc": {
+    "libelle": "Asks dans la bande",
+    "unite": "BTC",
+    "formule": "Σ quantités des asks entre le mid et mid × (1 + bande)",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {
+     "bandes_pct": [
+      0.1,
+      0.5,
+      1.0
+     ]
+    }
+   },
+   "liquidity.bandes.*.ratio": {
+    "libelle": "Ratio bid/ask de la bande",
+    "unite": "ratio",
+    "formule": "bids / asks de la bande ; une bande n'est publiée que si le carnet reçu la couvre des deux côtés",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {
+     "bandes_pct": [
+      0.1,
+      0.5,
+      1.0
+     ]
+    }
+   },
+   "liquidity.bande_ref_pct": {
+    "libelle": "Bande de référence",
+    "unite": "%",
+    "formule": "±0.5 % si couverte, sinon la plus étroite publiée",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {}
+   },
+   "liquidity.ratio_bid_ask": {
+    "libelle": "Ratio bid/ask",
+    "unite": "ratio",
+    "formule": "ratio de la bande de référence",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {}
+   },
+   "liquidity.total_bid": {
+    "libelle": "Bids (bande de réf.)",
+    "unite": "BTC",
+    "formule": "bid_btc de la bande de référence",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {}
+   },
+   "liquidity.total_ask": {
+    "libelle": "Asks (bande de réf.)",
+    "unite": "BTC",
+    "formule": "ask_btc de la bande de référence",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {}
+   },
+   "liquidity.bid_walls": {
+    "libelle": "Murs (bids)",
+    "unite": "[prix, BTC]",
+    "formule": "les 6 tranches de 20 $ à la plus grande SOMME de quantités, dans la bande couverte",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {
+     "tranche_usd": 20.0,
+     "n": 6
+    }
+   },
+   "liquidity.profil_bids": {
+    "libelle": "Profil (bids)",
+    "unite": "[prix, BTC]",
+    "formule": "Σ quantités par tranche de 20 $ (prix bas de la tranche), dans la bande couverte",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {
+     "tranche_usd": 20.0
+    }
+   },
+   "liquidity.ask_walls": {
+    "libelle": "Murs (asks)",
+    "unite": "[prix, BTC]",
+    "formule": "les 6 tranches de 20 $ à la plus grande SOMME de quantités, dans la bande couverte",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {
+     "tranche_usd": 20.0,
+     "n": 6
+    }
+   },
+   "liquidity.profil_asks": {
+    "libelle": "Profil (asks)",
+    "unite": "[prix, BTC]",
+    "formule": "Σ quantités par tranche de 20 $ (prix bas de la tranche), dans la bande couverte",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {
+     "tranche_usd": 20.0
+    }
+   },
+   "liquidity.wall_bin_usd": {
+    "libelle": "Tranche des murs",
+    "unite": "USD",
+    "formule": "largeur de la tranche",
+    "fenetre": "—",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {}
+   },
+   "liquidity.unit": {
+    "libelle": "Unité des quantités",
+    "unite": "texte",
+    "formule": "unité des quantités du carnet",
+    "fenetre": "—",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {}
+   },
+   "liquidity.bandes_demandees_pct": {
+    "libelle": "Bandes calculées",
+    "unite": "%",
+    "formule": "bandes tentées ; seules les bandes couvertes sont publiées",
+    "fenetre": "—",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {
+     "bandes_pct": [
+      0.1,
+      0.5,
+      1.0
+     ]
+    }
+   },
+   "liquidity.murs_n": {
+    "libelle": "Murs publiés par côté",
+    "unite": "nombre",
+    "formule": "nombre de tranches retenues par côté",
+    "fenetre": "—",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {}
+   },
+   "liquidity.niveaux_demandes": {
+    "libelle": "Niveaux demandés",
+    "unite": "nombre",
+    "formule": "profondeur demandée à l'API",
+    "fenetre": "—",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {}
+   },
+   "liquidity.niveaux_recus": {
+    "libelle": "Niveaux reçus",
+    "unite": "nombre par côté",
+    "formule": "niveaux effectivement renvoyés",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {}
+   },
+   "liquidity.meilleur_bid": {
+    "libelle": "Meilleur bid",
+    "unite": "USDT",
+    "formule": "premier niveau acheteur",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {}
+   },
+   "liquidity.meilleur_ask": {
+    "libelle": "Meilleur ask",
+    "unite": "USDT",
+    "formule": "premier niveau vendeur",
+    "fenetre": "instantané au moment de la publication",
+    "nature": "mesure",
+    "source": "Binance spot BTCUSDT",
+    "params": {}
+   },
+   "macro.pannes": {
+    "libelle": "Pannes macro",
+    "unite": "texte",
+    "formule": "source en échec à cette publication (le champ concerné est vide)",
+    "fenetre": "—",
+    "nature": "mesure",
+    "source": "Yahoo Finance",
+    "params": {}
+   },
+   "liquidity.snapshot_at": {
+    "libelle": "Heure du carnet",
+    "unite": "date",
+    "formule": "heure de la lecture",
+    "fenetre": "—",
+    "nature": "horodatage",
+    "source": "Binance spot BTCUSDT",
+    "params": {}
+   }
+  }
+ }
+}
