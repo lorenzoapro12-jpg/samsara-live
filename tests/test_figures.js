@@ -549,18 +549,33 @@ titre('8 bis. Objectif et statistiques : la ligne courte de la bulle et le déta
       const parts = (d.debut > i0 ? 1 : 0) + (i1 > d.jFin ? 1 : 0);
       const mal = !/^<svg class="ex-svg" width="140" height="60" viewBox="0 0 140 60" role="img" aria-label="[^"]+"><title>[^<]+<\/title>/.test(svg)
         || !/class="ex-pendant"/.test(svg) || !/class="ex-prix"/.test(svg) || !/class="ex-objectif"/.test(svg) || !/class="ex-inval"/.test(svg) || !/class="ex-valide"/.test(svg)
-        || (d.niveau !== null && !/class="ex-niveau"/.test(svg))
+        // Le dessin de la figure (demande du 15/10/2026) : ses droites (ligne de cou, bornes) et ses
+        // points reliés ; le simple niveau pointillé ne double plus la ligne de cou.
+        || !/class="ex-cou"/.test(svg) || !/class="ex-point"/.test(svg) || /class="ex-niveau"/.test(svg)
+        || (d.geo.zig.length > 0 && !/class="ex-zig"/.test(svg))
         || !new RegExp('<text class="ex-issue (ok|ko|neutre)"[^>]*>' + d.marque + '</text>').test(svg)
         || /#[0-9a-f]{3}|rgb|hsl|fill=|stroke=|style=/i.test(svg)
         || xs.some(x => x < -2.5 || x > 142) || ys.some(y => y < -0.5 || y > 60.5)
         || pts !== (i1 - i0 + 1) + parts;   // chaque clôture de la fenêtre, une fois (plus les jonctions avant/pendant/après)
       if (mal) fautes.push({ d: [d.debut, d.jConf, d.jFin, d.fin], pts, attendu: i1 - i0 + 1 + parts, svg: svg.slice(0, 200) });
     }
-    check(`chaque cas en petit : un SVG (role="img", <title>), le prix de ${E.avant} clôtures avant à ${E.apres} après, la figure marquée, le niveau franchi, l’objectif, l’invalidation, la marque d’issue ; des classes, aucune couleur écrite ; tout dans le cadre`,
+    check(`chaque cas en petit : un SVG (role="img", <title>), le prix de ${E.avant} clôtures avant à ${E.apres} après, la figure marquée et dessinée (ses points, sa ligne de cou ou ses bornes), l’objectif, l’invalidation, la marque d’issue ; des classes, aucune couleur écrite ; tout dans le cadre`,
       !fautes.length, fautes.slice(0, 2));
     const d0 = cas[0];
     check('un cas qui sort de l’historique (indices au-delà de la dernière clôture, ou prix manquant) : rien de dessiné',
       G.exempleSvg(Object.assign({}, d0, { jFin: NN + 5 }), C, NN, P, 't') === '' && G.exempleSvg(d0, C.slice(0, d0.jFin), NN, P, 't') === '' && G.exempleSvg(null, C, NN, P, 't') === '', null);
+    // Le dessin suit la figure : chaque point de la figure (sommets, creux) est un cercle à sa place.
+    {
+      const mal = [];
+      for (const d of cas) {
+        const svg = G.exempleSvg(d, C, NN, P, 't'), n = (svg.match(/class="ex-point"/g) || []).length;
+        const attendus = d.geo.points.length + d.geo.petits.length;
+        if (n !== attendus) mal.push({ fin: d.fin, n, attendus });
+      }
+      check('chaque point de la figure (sommets, creux, appuis des bornes) est dessiné sur la petite carte', !mal.length, mal.slice(0, 3));
+      const sans = Object.assign({}, d0, { geo: null });
+      check('sans dessin connu : le niveau franchi en pointillé, comme avant', /class="ex-niveau"/.test(G.exempleSvg(sans, C, NN, P, 't')) || d0.niveau === null, null);
+    }
     check('le titre est échappé (pas de balise injectée)', !G.exempleSvg(d0, C, NN, P, '<b>"x"</b>').includes('<b>'), null);
   }
   // Le témoin, quand il existe, est celui du bilan.

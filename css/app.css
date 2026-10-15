@@ -1527,7 +1527,10 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .stats-quand { color: var(--ink-1); font-variant-numeric: tabular-nums; }
 /* Exemples passés d'une figure (plan du 13/10/2026, idée 4) : une bande qu'on fait défiler de côté
    (elle seule : la page et la bulle ne s'élargissent pas), une petite carte par cas, sans animation.
-   Le prix de la figure à l'encre pleine, avant et après plus pâle ; le niveau franchi en pointillé ;
+   Le prix de la figure à l'encre pleine, avant et après plus pâle ; la figure elle-même (ses points reliés,
+   sa ligne de cou ou ses bornes) comme on la voit sur le graphique, à la couleur « attention » du
+   thème (la seule qui ne se confond, dans aucun thème, ni avec le prix ni avec ✓ et ✗) ;
+   le niveau franchi en pointillé quand la figure n'a pas de dessin ;
    l'objectif et l'invalidation aux couleurs de la barre des issues (✓ atteint, ✗ annulée). Carré
    dans les thèmes carrés (--r-tile) ; en Bureau 95, la carte est creusée comme un champ. */
 .stats-exemples {
@@ -1548,6 +1551,10 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .ex-objectif { stroke: var(--up-ink); stroke-width: 1.2; stroke-dasharray: 4 2; }
 .ex-inval { stroke: var(--down-ink); stroke-width: 1.2; stroke-dasharray: 4 2; }
 .ex-valide { fill: var(--ink-2); }
+.ex-cou { stroke: var(--warn-ink); stroke-width: 1.3; }
+.ex-cou.autre { stroke-width: 1; stroke-dasharray: 3 2; }
+.ex-zig { fill: none; stroke: var(--warn-ink); stroke-width: 1.2; stroke-linejoin: round; }
+.ex-point { fill: var(--warn-ink); }
 .ex-issue { font-size: 11px; font-weight: 800; }
 .ex-issue.ok { fill: var(--up-ink); } .ex-issue.ko { fill: var(--down-ink); } .ex-issue.neutre { fill: var(--ink-3); }
 .glossaire { display: flex; flex-wrap: wrap; gap: 5px; }
