@@ -1593,6 +1593,8 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .calc-message { margin: 4px 0; font-weight: 650; color: var(--ink-1); }
 .calc-message.calc-attente { font-weight: 400; color: var(--ink-2); }
 .calc-rappel { margin: 6px 0 0; font-size: 11.5px; color: var(--ink-2); }
+/* Revue du 14/10 (N3) : la ligne mesurée, sous le rappel, à son allure (un fait, pas une alerte). */
+.calc-mesure { margin: 6px 0 0; font-size: 11.5px; color: var(--ink-2); }
 /* Revue du 14/10. C5 : une mise plus grande que le capital se dit en couleur d'alerte, comme
    l'écart d'horloge. N2 : ce que veut dire un nom de champ, en plus petit sous le nom (dans la
    légende des paliers, à sa suite, en casse ordinaire). M1 : l'écart du stop au prix moyen, sous

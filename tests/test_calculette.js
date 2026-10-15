@@ -15,6 +15,9 @@
 //      faudrait emprunter), sans conseil, et seulement au-delà du capital ; jamais « 0,00 % » ; le
 //      stop redit avec son écart au prix moyen ; les nombres réécrits « 80 000 » en quittant un
 //      champ (même nombre relu) ; « palier », « stop » et « part risquée » dits en mots simples.
+//   7. REVUE DU 14/10 (N3, vision-4 ; « Les deux » de Lorenzo à Q3) : sous les résultats d'un achat,
+//      ce que notre mesure des paliers a trouvé, avec sa condition et sa source, au passé ; rien en
+//      vente ni sans calcul ; aucune valeur conseillée, aucun champ prérempli.
 //
 // USAGE   node tests/test_calculette.js
 const fs = require('fs'), path = require('path'), vm = require('vm');
@@ -102,7 +105,8 @@ titre('4. Les mots : courts, ceux du Lisible, jamais un conseil');
 // Revue du 14/10 : les noms des champs disent ce qu'ils veulent dire (N2), et la ligne d'alerte d'une
 // mise plus grande que le capital (C5) passe par les mêmes règles de mots.
 const ALERTE = C.textes(C.calculer({ capital: '10 000', part: '1', stop: '82 900', paliers: ['83 000'] }), { base: 'BTC', unite: '$' });
-const TOUS = [C.PHRASE, C.PIED, T.rappel, Tv.rappel, ALERTE.alerte || '', ...T.lignes.flat(), ...Tv.lignes.flat(), ...Object.values(C.MESSAGES).map(m => (typeof m === 'function' ? m(2) : m)),
+// Revue du 14/10 (N3) : la ligne mesurée passe par les mêmes règles de mots.
+const TOUS = [C.PHRASE, C.PIED, T.rappel, Tv.rappel, ALERTE.alerte || '', T.mesure || '', ...T.lignes.flat(), ...Tv.lignes.flat(), ...Object.values(C.MESSAGES).map(m => (typeof m === 'function' ? m(2) : m)),
   'Calculette de risque', 'Capital ($)', ...Object.values(C.NOMS).map(n => n.join(' ')), 'Palier 1', 'Ajouter un palier', 'Retirer', 'Outils'];
 const longues = TOUS.flatMap(phrases).filter(p => mots(p).length > 15);
 check('une idée par phrase, 15 mots au plus', !longues.length, longues);
@@ -200,6 +204,34 @@ titre('6. Revue du 14/10 : mise au-delà du capital, stop redit, « 80 000 », m
   // N2 (textes-14) : les trois mots dits en mots simples, dans les noms mêmes.
   check('« part risquée », « stop », « palier » : chacun avec ce qu’il veut dire',
     C.NOMS.part.join(' ') === 'Part risquée (% du capital perdu au stop)' && C.NOMS.stop.join(' ') === 'Stop (prix où la perte est coupée)' && C.NOMS.paliers.join(' ') === 'Paliers (prix où un ordre attend)', C.NOMS);
+}
+
+// ── 7. Revue du 14/10 : la mesure des paliers ──
+titre('7. Revue du 14/10 : ce que la mesure des paliers a trouvé, avec sa condition et sa source');
+{
+  // N3 [vision-4], oui de Lorenzo à Q3 (14/10) : marche/paliers/rapport.md, BTC 1 h 2019 → 12/10/2026,
+  // « tout rempli puis stop » 59 % puis 62 % des trades (6 fois sur 10), pour des paliers dans le tiers
+  // bas de la fourchette de 7 jours et un stop juste sous son bas. Note du contradicteur : ce chiffre
+  // ne vaut que dans ce cas (4 fois sur 10 avec un stop sous le plus bas de 14 jours), la ligne dit
+  // donc la condition. Avant : aucune ligne de ce genre (textes() n'avait pas de « mesure »).
+  const LIGNE = 'Mesuré sur BTC (2019-2026) : paliers au bas d’une fourchette de 7 jours, stop juste dessous. Tout s’est rempli puis le prix a touché le stop, 6 fois sur 10.';
+  check('achat (l’exemple du jour) : sous les résultats, « Mesuré sur BTC (2019-2026) : paliers au bas d’une fourchette de 7 jours, stop juste dessous. Tout s’est rempli puis le prix a touché le stop, 6 fois sur 10. »',
+    C.MESURE === LIGNE && T.mesure === LIGNE, [C.MESURE, T.mesure]);
+  const m = T.mesure || '';
+  check('la source (« Mesuré sur BTC (2019-2026) ») et la condition (paliers au bas d’une fourchette de 7 jours, stop juste dessous) sont dites, avant le chiffre',
+    /^Mesuré sur BTC \(2019-2026\)/.test(m) && /au bas d’une fourchette de 7 jours/.test(m) && /stop juste dessous/.test(m) && m.indexOf('dessous') < m.indexOf('6 fois sur 10'), m);
+  check('un fait mesuré, au passé, pas une prévision (ni « va », « sera », « finira », « souvent »)', /s’est rempli/.test(m) && /a touché/.test(m) && !/\b(va|vont|sera|seront|finira|finiront|fera|risque de|souvent)\b/i.test(m), m);
+  check('aucune valeur conseillée : ni nombre de paliers, ni écart, ni place du stop, ni prix, ni %', !/\$|%|ATR|\d+\s*paliers|écart|tiers|0,25|0,5/.test(m) && !CONSEIL.test(m), m);
+  const unPalier = C.textes(C.calculer({ capital: '10000', part: '1', stop: '80000', paliers: ['83000'] }), {});
+  check('tout achat la montre (un seul palier aussi), avec le rappel', unPalier.mesure === LIGNE && !!unPalier.rappel, unPalier);
+  check('vente (stop au-dessus des paliers) : pas de ligne mesurée (la mesure ne porte que sur des achats)', Tv.mesure === '' && !!Tv.rappel, Tv);
+  check('sans calcul (champs vides, stop entre les paliers) : pas de ligne mesurée', C.textes(C.calculer({}), {}).mesure === '' && Te.mesure === '' && C.textes(null, {}).mesure === '', [C.textes(C.calculer({}), {}), Te]);
+  // Aucun champ prérempli : la calculette s'ouvre comme avant (capital, stop et palier vides, part 1).
+  const page = chargerPage({ stockage: {} });
+  vm.runInContext('ouvrirCalculette(null)', page.sandbox);
+  const p = page.T.el('fichePop').innerHTML;
+  check('aucun champ prérempli par la mesure : capital, stop et palier vides, la part à 1 ; pas de ligne mesurée avant un calcul',
+    /id="calcCapital"[^>]*value=""/.test(p) && /id="calcStop"[^>]*value=""/.test(p) && /id="calcPalier0"[^>]*value=""/.test(p) && /id="calcPart"[^>]*value="1"/.test(p) && !/calc-mesure|Mesuré/.test(p), p.slice(0, 200));
 }
 
 console.log(ko ? `\n❌ CALCULETTE : ${ko} contrôle(s) en échec` : '\n✅ CALCULETTE : TOUS LES CONTRÔLES PASSENT');
