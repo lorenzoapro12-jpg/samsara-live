@@ -248,6 +248,42 @@ def macro():
 FUNDING_PAR_JOUR = 3        # échéances de financement par jour (toutes les 8 h) — annualisation
 OI_HIST_POINTS = 121        # série horaire : 120 h (5 j) + le point courant
 POSITIONNEMENT_PERIODE = "1h"   # ratios L/S et taker : dernier point de la série horaire
+# Saut au-delà duquel un point horaire d'OI est tenu pour faux. Le 15/10/2026, Binance a
+# rendu 100 231 BTC à 11:00 et 99 046 à 12:00 dans openInterestHist alors que l'OI direct
+# valait 92 086 et 91 922 : « Δ OI 24 h » a affiché +8,9 % au lieu de +0,2 %. Un vrai
+# mouvement de 3 % en une à quatre heures est déjà rare (mesuré le 15/10) ; 5 % laisse passer
+# les vrais mouvements et attrape un point isolé de cette taille.
+OI_SAUT_MAX_PCT = 5.0
+
+
+def oi_points_aberrants(valeurs, live=None, seuil=OI_SAUT_MAX_PCT):
+    """Indices des points horaires d'OI à écarter : un point qui s'écarte de plus de `seuil`
+    de ses voisins, des DEUX côtés et dans le même sens (un palier réel touche un côté
+    seulement). Le dernier point, qui n'a pas de voisin après lui, est jugé contre l'OI
+    direct `live`. Les points déjà écartés ne servent pas de voisins : deux points faux
+    côte à côte ne se couvrent pas l'un l'autre.
+    """
+    n = len(valeurs)
+    ecartes = set()
+
+    def ecart(v, ref):
+        return (v / ref - 1) * 100 if ref else 0.0
+
+    def mediane(xs):
+        xs = sorted(xs)
+        m = len(xs) // 2
+        return xs[m] if len(xs) % 2 else (xs[m - 1] + xs[m]) / 2
+
+    if n and live:
+        if abs(ecart(valeurs[-1], live)) > seuil:
+            ecartes.add(n - 1)
+    for i in range(n - 2, -1, -1):
+        avant = valeurs[max(0, i - 3):i]
+        apres = [valeurs[j] for j in range(i + 1, n) if j not in ecartes][:3]
+        cotes = [ecart(valeurs[i], mediane(c)) for c in (avant, apres) if c]
+        if cotes and all(abs(e) > seuil for e in cotes) and len({e > 0 for e in cotes}) == 1:
+            ecartes.add(i)
+    return ecartes
 
 
 @block("micro_futures", required=("funding_rate_pct", "mark_price", "oi_btc"))
@@ -275,13 +311,24 @@ def micro_futures():
     # « Δ1j » −0,26 % publié, +1,18 % réels sur 24 h glissantes — signe inversé.
     hist = http_json(f"{F}/futures/data/openInterestHist?symbol=BTCUSDT&period=1h&limit={OI_HIST_POINTS}")
     if hist and len(hist) >= 25:
-        cur = float(hist[-1]["sumOpenInterest"])
-        r["oi_change_24h_pct"] = round((cur / float(hist[-25]["sumOpenInterest"]) - 1) * 100, 2)
-        r["oi_change_1d_pct"] = r["oi_change_24h_pct"]     # ancien nom, même sens désormais
+        # Un point faux de la source ne se publie pas en variation : la case reste vide et
+        # l'anomalie est dite dans `errors`. Mieux vaut « — » qu'un +8,9 % inventé.
+        valeurs = [float(x["sumOpenInterest"]) for x in hist]
+        faux = oi_points_aberrants(valeurs, live=r["oi_btc"])
+        if faux:
+            ERRORS.append("micro_futures: point(s) d'OI horaire incohérent(s) écarté(s) — "
+                          + ", ".join(datetime.fromtimestamp(hist[i]["timestamp"] / 1000,
+                                                             timezone.utc).strftime("%d/%m %H:%M")
+                                      + f" = {valeurs[i]:,.0f} BTC".replace(",", " ")
+                                      for i in sorted(faux)))
+        cur = valeurs[-1]
         r["oi_hist_at"] = datetime.fromtimestamp(hist[-1]["timestamp"] / 1000, timezone.utc
                                                  ).isoformat(timespec="minutes")
-        if len(hist) >= OI_HIST_POINTS:
-            r["oi_change_5d_pct"] = round((cur / float(hist[0]["sumOpenInterest"]) - 1) * 100, 2)
+        if not {len(valeurs) - 1, len(valeurs) - 25} & faux:
+            r["oi_change_24h_pct"] = round((cur / valeurs[-25] - 1) * 100, 2)
+            r["oi_change_1d_pct"] = r["oi_change_24h_pct"]     # ancien nom, même sens désormais
+        if len(hist) >= OI_HIST_POINTS and not {len(valeurs) - 1, 0} & faux:
+            r["oi_change_5d_pct"] = round((cur / valeurs[0] - 1) * 100, 2)
 
     ls = http_json(f"{F}/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period={POSITIONNEMENT_PERIODE}&limit=1")
     if ls:

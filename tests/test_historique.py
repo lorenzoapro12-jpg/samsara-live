@@ -519,6 +519,30 @@ def main():
                   len(ser.stdout.strip().splitlines()) == 5,   # en-tête + 4
                   f"{len(ser.stdout.strip().splitlines())} lignes")
 
+        # ─── 9b. OI HORAIRE CONTRE OI DIRECT ────────────────────────────────
+        # Le défaut du 15/10/2026, à l'échelle : Binance rend un point horaire +8,9 % au-
+        # dessus de l'OI direct publié au même moment. Il doit être écarté à l'arrivée ET
+        # retiré s'il était déjà écrit — sinon la source le réécrit à chaque passage.
+        print("\n9b. OI horaire : un point faux de la source est écarté")
+        chemin_oi = os.path.join(hist, "series", "open-interest-1h.csv")
+        bon = {"heure_utc": "2026-09-01T00:00:00+00:00", "oi_btc": "94100.000", "oi_usd": "1"}
+        faux = {"heure_utc": "2026-09-01T01:00:00+00:00", "oi_btc": "102500.000", "oi_usd": "1"}
+        sans_direct = {"heure_utc": "2026-09-01T02:00:00+00:00", "oi_btc": "103000.000",
+                       "oi_usd": "1"}
+        gardes, ecartes = H.controler_oi(cfg, [bon, faux, sans_direct])
+        check("le point à +8,9 % de l'OI direct est écarté",
+              [e["heure_utc"] for e in ecartes] == [faux["heure_utc"]], str(ecartes))
+        check("l'écart est chiffré contre l'OI direct le plus proche",
+              ecartes and ecartes[0]["oi_direct_btc"] == "94120.500"
+              and ecartes[0]["ecart_pct"] == 8.9, str(ecartes))
+        check("un point sans relevé direct dans la fenêtre est gardé (on n'écarte que sur preuve)",
+              sans_direct in gardes and bon in gardes, str(gardes))
+        H.fusionner_serie(cfg, "open_interest_1h", [bon, faux])        # écrit avant le contrôle
+        H.fusionner_serie(cfg, "open_interest_1h", gardes, [e["heure_utc"] for e in ecartes])
+        heures = [l["heure_utc"] for l in lire_csv_dicts(chemin_oi)]
+        check("un point faux déjà écrit est retiré du fichier",
+              faux["heure_utc"] not in heures and bon["heure_utc"] in heures, str(heures))
+
         # ─── 10. LIGNE DE COMMANDE ──────────────────────────────────────────
         print("\n10. Ligne de commande (code de sortie)")
         base2 = tempfile.mkdtemp(prefix="hist-cli-")

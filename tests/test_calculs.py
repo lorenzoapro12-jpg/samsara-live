@@ -149,6 +149,56 @@ H.reencoder_avant(st)
 check("colonnes d'avant ré-encodées : 4 BTC sur l'ancienne échelle = 4 BTC sur la nouvelle (± 1 cran)",
       abs(st["1"]["b"]["10"] - H.intensite(4.0)) <= 1, (st, H.intensite(4.0)))
 
+# ── OI horaire : un point faux de la source ne devient pas une variation ──────
+# Le 15/10/2026, openInterestHist a rendu 100 231 BTC à 11:00 et 99 046 à 12:00 pour un OI
+# direct de 92 086 : « Δ OI 24 h » a affiché +8,9 % au lieu de +0,2 %.
+serie = [92000 + 30 * i for i in range(121)]
+check("série régulière : aucun point écarté", P.oi_points_aberrants(serie, live=serie[-1]) == set())
+palier = serie[:60] + [v * 1.12 for v in serie[60:]]
+check("palier réel de +12 % (vrai mouvement) : rien d'écarté",
+      P.oi_points_aberrants(palier, live=palier[-1]) == set(), P.oi_points_aberrants(palier, live=palier[-1]))
+pic = list(serie); pic[50] *= 1.09
+check("pic isolé de +9 % au milieu : écarté", P.oi_points_aberrants(pic, live=pic[-1]) == {50})
+queue = serie[:-2] + [serie[-2] * 1.089, serie[-1] * 1.077]
+check("deux derniers points faux (15/10) : tous deux écartés grâce à l'OI direct",
+      P.oi_points_aberrants(queue, live=serie[-1]) == {119, 120}, P.oi_points_aberrants(queue, live=serie[-1]))
+
+
+def faux_fapi(hist):
+    def f(url, *a, **k):
+        if "premiumIndex" in url:
+            return {"lastFundingRate": "0.00001", "markPrice": "81000", "nextFundingTime": 1791000000000}
+        if "openInterestHist" in url:
+            return [{"sumOpenInterest": str(v), "timestamp": 1791000000000 + i * 3600000}
+                    for i, v in enumerate(hist)]
+        if "openInterest" in url:
+            return {"openInterest": str(serie[-1])}
+        if "LongShortAccountRatio" in url:
+            return [{"longShortRatio": "1.7", "longAccount": "0.63", "shortAccount": "0.37"}]
+        if "topLongShort" in url:
+            return [{"longShortRatio": "1.4"}]
+        if "takerlongshort" in url:
+            return [{"buySellRatio": "0.9"}]
+        raise RuntimeError(url)
+    return f
+
+
+vraie_http = P.http_json
+try:
+    P.ERRORS.clear(); P.http_json = faux_fapi(queue)
+    m = P.micro_futures()
+    check("source fautive : Δ OI 24 h et 5 j non publiés (case vide, pas +8,9 %)",
+          m.get("oi_change_24h_pct") is None and m.get("oi_change_5d_pct") is None, m)
+    check("source fautive : l'anomalie est dite dans `errors`",
+          any("OI horaire incohérent" in e for e in P.ERRORS), P.ERRORS)
+    P.ERRORS.clear(); P.http_json = faux_fapi(serie)
+    m = P.micro_futures()
+    check("source saine : Δ OI 24 h publiée comme avant",
+          m.get("oi_change_24h_pct") == round((serie[-1] / serie[-25] - 1) * 100, 2) and not P.ERRORS, m)
+finally:
+    P.http_json = vraie_http
+    P.ERRORS.clear()
+
 ko = CHECKS.count(False)
 print(f"\n{'✅ CALCULS SERVEUR : TOUS LES CONTRÔLES PASSENT' if not ko else f'❌ {ko} contrôle(s) en échec'}")
 sys.exit(1 if ko else 0)
