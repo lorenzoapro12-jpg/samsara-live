@@ -6,9 +6,11 @@
 // sur 10, comme au hasard ▸ », Guide.resumeStatsFigure). La toucher (ou cliquer sur la figure dont
 // la bulle est déjà ouverte en entier) ouvre ce détail, dans la bulle des légendes (#fichePop,
 // js/fiches.js) : l'objectif de la figure et comment il se calcule, ce que ces figures ont fait sur
-// des années, puis ce qui a été mesuré sur l'historique chargé (Guide.statsFigure), et les derniers
-// cas de ce type en petit, à faire défiler (idée 4 du plan du 13/10/2026). Les mots sont ceux de
-// tout le monde ; les barres disent les proportions sans pourcentage.
+// des années, puis ce qui a été mesuré sur l'historique chargé (Guide.statsFigure), les derniers
+// cas de ce type en petit, à faire défiler (idée 4 du plan du 13/10/2026), et enfin le tableau des
+// comptes (cet ordre : revue du 14/10/2026, M8, accord de Lorenzo du 15/10). Les mots sont ceux de
+// tout le monde ; les barres disent les proportions sans pourcentage, et seulement quand il y a
+// assez de cas.
 /** Une barre de proportions : [[nombre, classe, titre]…], la largeur de chaque part ∝ son nombre. */
 function barreStats(parts) {
   const tot = parts.reduce((a, p) => a + p[0], 0);
@@ -45,23 +47,29 @@ function statsFigureHtml(S, K) {
   if (S.annees) h += '<h4>Sur des années</h4><p class="stats-phrase">' + echapF(S.annees.phrase) + '</p>'
     + (S.annees.verdict ? '<p class="stats-phrase"><b>' + echapF(S.annees.verdict) + '</b></p>' : '') + '<p class="stats-note">' + echapF(S.annees.source) + '</p>';
   // 3. La réussite mesurée ici : la phrase, la barre des issues, la comparaison au hasard.
+  // Échantillon faible : ni barre ni légende, l'alerte juste sous la phrase. Une barre pleine
+  // largeur pour 4 cas était la chose la plus voyante du panneau, plus que la mesure sur des années,
+  // et « Trop peu de cas » n'arrivait que trois paragraphes plus bas (revue du 14/10/2026, M8 ;
+  // vision-14). Les comptes restent dans la phrase et dans « Les chiffres ».
   if (S.taux) {
     const T = S.taux;
     h += '<h4>Sur ce graphique</h4><p class="stats-phrase">' + echapF(S.phrase) + '</p>';
-    if (T.finis) {
+    if (S.faible) h += '<p class="fiche-alerte">Trop peu de cas pour en tirer une règle : ces comptes peuvent beaucoup changer.</p>';
+    else if (T.finis) {
       // « ratées » après la validation, « annulées » avant : un mot par issue (revue du 14/10/2026, M5).
       h += barreStats([[T.atteints, 'ok', 'Objectif atteint : ' + T.atteints], [T.invalides, 'ko', 'Ratées avant l’objectif : ' + T.invalides], [T.expires, 'neutre', 'Délai écoulé : ' + T.expires]])
         + '<p class="stats-legende"><span class="ok">✓ objectif atteint ' + T.atteints + '</span> <span class="ko">✗ ratée avant ' + T.invalides + '</span>' + (T.expires ? ' <span class="neutre">– délai écoulé ' + T.expires + '</span>' : '') + '</p>';
     }
     if (S.temoin) {
       h += '<p class="stats-phrase">' + echapF(S.temoin.phrase) + '</p>'
-        + barreStats([[S.temoin.atteints, 'ok pale', 'Atteint : ' + nb(S.temoin.atteints)], [S.temoin.departs - S.temoin.atteints, 'ko pale', 'Pas atteint : ' + nb(S.temoin.departs - S.temoin.atteints)]]);
+        + (S.faible ? '' : barreStats([[S.temoin.atteints, 'ok pale', 'Atteint : ' + nb(S.temoin.atteints)], [S.temoin.departs - S.temoin.atteints, 'ko pale', 'Pas atteint : ' + nb(S.temoin.departs - S.temoin.atteints)]]));
     }
     if (S.delai) h += '<p class="stats-phrase">' + echapF(S.delai) + '</p>';
-    if (S.faible) h += '<p class="fiche-alerte">Trop peu de cas pour en tirer une règle : ces comptes peuvent beaucoup changer.</p>';
+    // Les exemples passés avant le tableau : la partie qui se comprend le plus vite venait après
+    // 7 lignes de comptes (revue du 14/10/2026, M8 ; vA-5).
+    h += exemplesHtml(S, K);
     // « Les chiffres » : « Le détail » est le nom de la case (revue du 14/10/2026, M9).
     h += '<h4>Les chiffres</h4><dl class="stats-table">' + S.lignes.map(([k, v]) => '<dt>' + echapF(k) + '</dt><dd>' + echapF(v) + '</dd>').join('') + '</dl>';
-    h += exemplesHtml(S, K);
   } else h += '<p class="stats-phrase">Pas encore de mesure pour ce graphique.</p>';
   h += '<p class="fiche-pied">' + echapF(S.source) + ' ' + echapF(S.risque) + '</p>';
   return h;

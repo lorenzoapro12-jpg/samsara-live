@@ -24,11 +24,14 @@
 //   5 bis. CIBLE ET STATISTIQUES (11/10/2026) : la bulle (résumé du Lisible compris) finit par « Cible … ·
 //      atteinte X fois sur Y ▸ » ; la toucher ouvre le détail (#fichePop) : cible en gros, réussite
 //      mesurée, barre, détail, sans mot banni ; Échap le ferme ; en Complet, un clic sur le libellé aussi.
+//      Échantillon faible : aucune barre, « Trop peu de cas » juste sous la phrase ; les exemples
+//      passés avant « Les chiffres » ; avec assez de cas, la barre revient (revue du 14/10/2026, M8).
 //   5 ter. EXEMPLES PASSÉS (plan du 13/10/2026, idée 4) : dans le détail, les derniers cas de ce type
 //      sur ce graphique, sans tri, en petites cartes (le prix avant, pendant et après, l'objectif,
 //      l'invalidation, l'issue) dans une bande qu'on fait défiler de côté ; ni la page ni le panneau
 //      ne s'élargissent ; carrées dans les thèmes carrés, couleurs du thème ; onze thèmes à 390 px.
 //      Aucune ligne du panneau ne coupe un nombre ni ne commence par « : » (revue du 14/10/2026, C8).
+//      Le même ordre dans chaque thème, l'alerte collée à la phrase (revue du 14/10/2026, M8).
 //   6. Aucune erreur JavaScript ; pas de défilement horizontal à 390 px.
 //   7. TEMPS (amendement E2) : le rejeu dans Chromium, processeur ralenti 4 fois, en 1 min (où il
 //      revient chaque minute) et en 15 min : ≤ 100 ms à chaque clôture. Le rejeu complet dépassant
@@ -181,6 +184,31 @@ function exemplesOk(ex, tactile) {
     && ex.cartes.every((c, k) => c.svg && c.h >= 40 && c.w >= 130 && c.w <= 150 && c.legende.includes(ex.dernieres[k].quand) && c.legende.includes(ex.dernieres[k].marque))
     && B.g >= ex.panneau.g - 0.5 && B.d <= ex.panneau.d + 0.5 && ex.bulle <= 1 && (!tactile || ex.page <= 0)
     && (ex.n < 3 || B.large > B.client);   // trois cartes ne tiennent pas de front : la bande défile
+}
+/** L'ordre du panneau des statistiques ouvert (revue du 14/10/2026, M8) : ses parties dans l'ordre
+ *  (titres h4, phrases, alerte, barres, légende), la place de l'alerte sous la phrase à l'écran, et
+ *  le même panneau rendu comme s'il y avait assez de cas (S.faible faux) : ses barres reviennent. */
+const lireOrdre = page => page.evaluate(() => {
+  const p = document.getElementById('fichePop'), S = window.__statsFigure;
+  const nom = e => e.tagName === 'H4' ? 'h4:' + e.textContent.trim() : e.classList.contains('fiche-alerte') ? 'alerte' : e.classList.contains('stats-barre') ? 'barre'
+    : e.classList.contains('stats-legende') ? 'legende' : e.classList.contains('stats-phrase') ? 'phrase' : e.className || e.tagName.toLowerCase();
+  const enfants = [...p.children], ordre = enfants.map(nom), i = ordre.indexOf('h4:Sur ce graphique');
+  const r = k => enfants[k] && enfants[k].getBoundingClientRect();
+  const sous = i >= 0 && ordre[i + 2] === 'alerte' ? Math.round(r(i + 2).top - r(i + 1).bottom) : null;
+  const t = document.createElement('template'); t.innerHTML = S && S.taux ? statsFigureHtml(Object.assign({}, S, { faible: false }), null) : '';
+  return { faible: !!(S && S.faible), finis: S && S.taux ? S.taux.finis : 0, temoin: !!(S && S.temoin), annees: !!(S && S.annees), ordre, sous,
+    assez: { barres: t.content.querySelectorAll('.stats-barre').length, alertes: t.content.querySelectorAll('.fiche-alerte').length } };
+});
+/** Échantillon faible : ni barre ni légende, « Trop peu de cas » juste sous la phrase (à moins de
+ *  16 px) ; les exemples passés avant « Les chiffres » ; la mesure sur des années avant « Sur ce
+ *  graphique » ; avec assez de cas, la barre des issues (et celle du témoin) revient, sans alerte. */
+function ordreOk(o) {
+  const O = o.ordre, i = O.indexOf('h4:Sur ce graphique'), ex = O.indexOf('h4:Exemples passés'), ch = O.indexOf('h4:Les chiffres');
+  if (i < 0 || O[i + 1] !== 'phrase' || ex < 0 || ch < 0 || ex > ch) return false;
+  if (o.annees && !(O.indexOf('h4:Sur des années') >= 0 && O.indexOf('h4:Sur des années') < i)) return false;
+  if (o.faible && (O[i + 2] !== 'alerte' || O.includes('barre') || O.includes('legende') || o.sous === null || o.sous > 16)) return false;
+  if (!o.faible && O.includes('alerte')) return false;
+  return !o.finis || (o.assez.barres >= (o.temoin ? 2 : 1) && !o.assez.alertes);
 }
 /** L'état des figures dans la page : registre Débutant, figures dessinées, styles, libellés. */
 const lireEtat = page => page.evaluate(() => {
@@ -409,9 +437,15 @@ async function bulle(o, tactile) {
       const d = await o.page.evaluate(() => { const p = document.getElementById('fichePop'), r = p.getBoundingClientRect(); return { ouvert: !p.hidden, texte: p.innerText, prix: [...p.querySelectorAll('.stats-prix')].map(x => x.textContent), barres: p.querySelectorAll('.stats-barre').length, S: window.__statsFigure,
         dedans: r.left >= 0 && r.right <= innerWidth + 0.5 && r.top >= 0 && r.bottom <= innerHeight + 0.5, chemin: location.pathname.replace(/^.*\//, ''), scroll: document.documentElement.scrollWidth - innerWidth }; });
       // Le tableau s'intitule « Les chiffres » : « Le détail » ne nomme plus que la case (revue du 14/10/2026, M9).
-      check(`${mode} ${w} px : la ligne ouvre « ${d.S && d.S.titre} » : l’objectif de la figure en gros (${d.prix.join(' / ')}), sur des années si mesuré, la réussite mesurée et sa barre, les chiffres, sans mot banni, dans l’écran, sans changer de page`,
-        d.ouvert && d.S && d.prix.length >= 1 && d.prix.length === d.S.cibles.length && d.barres >= 1 && /Sur ce graphique/i.test(d.texte) && /Objectif de la figure/i.test(d.texte) && (!d.S.annees || /Sur des années/i.test(d.texte)) && !/cible/i.test(d.texte) && /Les chiffres/i.test(d.texte)
+      // Sa barre seulement s'il y a assez de cas (revue du 14/10/2026, M8 : la barre de 4 cas était
+      // la chose la plus voyante du panneau).
+      check(`${mode} ${w} px : la ligne ouvre « ${d.S && d.S.titre} » : l’objectif de la figure en gros (${d.prix.join(' / ')}), sur des années si mesuré, la réussite mesurée (${d.S && d.S.faible ? 'échantillon faible : sans barre' : 'et sa barre'}), les chiffres, sans mot banni, dans l’écran, sans changer de page`,
+        d.ouvert && d.S && d.prix.length >= 1 && d.prix.length === d.S.cibles.length && (d.S.faible ? d.barres === 0 : d.barres >= 1) && /Sur ce graphique/i.test(d.texte) && /Objectif de la figure/i.test(d.texte) && (!d.S.annees || /Sur des années/i.test(d.texte)) && !/cible/i.test(d.texte) && /Les chiffres/i.test(d.texte)
         && /usage des analystes/.test(d.texte) && !G.motsBannis(d.texte).length && d.dedans && d.chemin === 'index.html' && (!tactile || d.scroll <= 0), { d: Object.assign({}, d, { texte: d.texte.slice(0, 400) }), bannis: G.motsBannis(d.texte) });
+      // L'ordre du panneau (revue du 14/10/2026, M8).
+      const od = await lireOrdre(o.page);
+      check(`${mode} ${w} px : ${od.faible ? 'échantillon faible : ni barre ni légende, « Trop peu de cas » juste sous la phrase (' + od.sous + ' px)' : 'assez de cas : la barre, pas d’alerte'} ; les exemples passés avant « Les chiffres » ; rendu avec assez de cas : ${od.assez.barres} barre(s), sans alerte`,
+        ordreOk(od), od);
       // Les exemples passés (plan du 13/10/2026, idée 4) : la bande des derniers cas, ou une phrase.
       const ex = await lireExemples(o.page);
       check(`${mode} ${w} px : exemples passés — ${ex.n ? ex.n + ' cas en petit, dans une bande à faire défiler, sans débord' : '« Aucun cas fini sur ce graphique. »'}`, exemplesOk(ex, tactile), ex);
@@ -436,8 +470,8 @@ async function bulle(o, tactile) {
     for (const [mode, w, h, themes] of [['debutant', 390, 844, ['bureau95', 'aero', 'bureau95-contraste', 'gazette', 'neon', 'diazo', 'codex', 'cyanotype', 'gare', 'kala', 'aero-nuit']], ['expert', 1440, 900, ['bureau95', 'aero']]]) {
       const tactile = w < 500;
       const o = await ouvrir(nav, { iC: seq.iC + 2, mode, w, h, theme: themes[0] });
-      const fautes = [], coupees = [];
-      let vu = 0;
+      const fautes = [], coupees = [], ordres = [];
+      let vu = 0, faibles = 0;
       for (const th of themes) {
         await o.page.evaluate(t => { fermerFiche(); appliquerTheme(t); }, th); await o.page.waitForTimeout(350);
         // La figure dont le type a le plus de cas finis : la bande a de quoi défiler.
@@ -449,12 +483,18 @@ async function bulle(o, tactile) {
         await o.page.waitForTimeout(150);
         const ex = await lireExemples(o.page);
         vu = Math.max(vu, ex.cartes.length);
+        // L'ordre du panneau dans chaque thème (revue du 14/10/2026, M8).
+        const od = await lireOrdre(o.page);
+        if (od.faible) faibles++;
+        if (!ordreOk(od)) ordres.push(Object.assign({ th }, od));
         for (const c of await coupuresLignes(o.page, '#fichePop')) coupees.push(th + ' : ' + c);
         if (n < 1 || !exemplesOk(ex, tactile)) fautes.push({ th, n, ex: Object.assign({}, ex, { texte: undefined }) });
         // Carré dans les thèmes carrés ; l'objectif et l'invalidation aux couleurs de la barre des issues ; aucune animation.
         const carre = ex.rTile === 0 ? ex.cartes.every(c => c.rayon === 0) : ex.cartes.every(c => c.rayon <= 8);
         if (!carre || !ex.couleurs || ex.couleurs.objectif !== ex.couleurs.up || ex.couleurs.inval !== ex.couleurs.down || ex.cartes.some(c => c.anim)) fautes.push({ th, carre, couleurs: ex.couleurs, rTile: ex.rTile, rayons: ex.cartes.map(c => c.rayon) });
       }
+      check(`${mode} ${w} px : dans ${themes.length} thèmes (${faibles} à échantillon faible), le panneau sans barre quand il y a trop peu de cas, « Trop peu de cas » juste sous la phrase, les exemples passés avant « Les chiffres »`,
+        !ordres.length, ordres.slice(0, 3));
       check(`${mode} ${w} px : dans ${themes.length} thèmes, la bande des derniers cas (jusqu’à ${vu} cartes) tient dans le panneau, sans défilement de côté de la page ; cartes de 40 px de haut au moins, carrées dans les thèmes carrés ; objectif et invalidation aux couleurs du thème ; sans mot banni`,
         !fautes.length && vu >= 3, fautes.slice(0, 3));
       // Revue du 14/10/2026, C8 : on lisait « 2 918 fois sur 5 » puis « 103. » à la ligne, « (15 » puis
