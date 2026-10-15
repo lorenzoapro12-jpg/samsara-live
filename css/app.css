@@ -1421,6 +1421,14 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
   margin: 0 0 8px; padding: 6px 9px; border-radius: min(8px, var(--r-tile)); font-size: 11.5px; line-height: 1.4;
   color: var(--ink-1); background: var(--rail); border-left: 2px solid var(--warn);
 }
+/* Sans « Les chiffres du marché » : l'heure de la publication, dite une fois en tête des cartes
+   (js/app.js renderFeedTo, revue du 14/10/2026, M7). En retard, le bandeau d'âge prend sa place. */
+.pub-heure { margin: 0 0 8px; padding: 0 2px; font-size: 12px; font-weight: 650; line-height: 1.4; color: var(--ink-2); }
+/* Gare, grand tableau (écran haut et large) : chaque bloc des infos du marché y est une colonne de
+   330 px (themes/gare.css) ; l'heure de tête garde la largeur de son texte. */
+@media (min-height: 1000px) and (min-width: 1200px) {
+  :root[data-structure="tableau"] .feed > .pub-heure { flex: 0 0 auto; margin: 0; }
+}
 .glossaire-plus > summary { cursor: pointer; margin-top: 10px; font-size: 11.5px; font-weight: 700; color: var(--ink-2); }
 .fiches-ligne { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 10.5px; color: var(--ink-3); }
 .fiche-lien { white-space: nowrap; }

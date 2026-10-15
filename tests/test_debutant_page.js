@@ -551,9 +551,32 @@ async function quitter(o, tactile, x, y) { if (tactile) await o.page.touchscreen
         const cartes = await o.page.evaluate(() => {
           const vis = el => el.getClientRects().length > 0;
           const box = document.getElementById(innerWidth <= 768 ? 'marketModalBody' : 'feed');
-          return { n: box ? [...box.querySelectorAll('.demon-card')].filter(vis).length : 0, titres: box ? [...box.querySelectorAll('.demon-name')].map(x => x.innerText) : [] };
+          const vues = box ? [...box.querySelectorAll('.demon-card')].filter(vis) : [];
+          return { n: vues.length, titres: vues.map(c => c.querySelector('.demon-name').innerText), tete: box && box.firstElementChild ? box.firstElementChild.innerText : '', ilYa: box ? (box.innerText.match(/il y a/g) || []).length : -1 };
         });
-        check(`${nom} : la pastille « Infos du marché » ouvre les 8 cartes, chacune avec son titre Débutant`, cartes.n === 8 && cartes.titres.every(t => t && !/Microstructure|Liquidité|Contre-expertise/.test(t)), cartes);
+        // (Changé exprès, revue du 14/10/2026, M7 : sans « Les chiffres du marché », les cartes qui
+        // parlent du site — Publication, Heures des données, Vérification — n'apparaissent plus, et
+        // l'heure de la publication est dite une fois, en tête, au lieu de « il y a 0 min » sur 7 cartes.)
+        check(`${nom} : la pastille « Infos du marché » ouvre 5 cartes, chacune avec son titre Débutant, sous « ${cartes.tete} » ; aucun « il y a »`, cartes.n === 5
+          && cartes.titres.every(t => t && !/Microstructure|Liquidité|Contre-expertise|Publication|Heures des données|Vérification/.test(t)) && /^Publié (à|le \d\d\/\d\d à) \d\d:\d\d\.$/.test(cartes.tete) && cartes.ilYa === 0, cartes);
+        // Revue du 14/10/2026 (M7) : restée OUVERTE, la fenêtre suit l'âge. Sa ligne de tête est le
+        // seul âge écrit : au téléphone, elle disait encore « Publié à 15:26. » le seuil de retard
+        // franchi, puis « Publié à 15:45, il y a 0 min » à l'arrivée d'une publication nouvelle.
+        const ouverte = await o.page.evaluate(() => {
+          const box = document.getElementById(innerWidth <= 768 ? 'marketModalBody' : 'feed');
+          const tete = () => (box && box.firstElementChild ? box.firstElementChild.innerText : '');
+          const garde = marketData, ret = CADENCES.vieux_min + 5, iso = ms => new Date(ms).toISOString();
+          marketData = Object.assign({}, garde, { updated: iso(Date.now() - ret * 60000) });
+          majAges(false);                          // un tour de la minute : le seuil de retard est franchi
+          const retard = tete();
+          marketData = Object.assign({}, garde, { updated: iso(Date.now()) });
+          renderFeed(); majAges(true);             // ce que fait fetchMarket à l'arrivée d'une publication
+          const nouvelle = tete();
+          marketData = garde; renderFeed(); majAges(true);
+          return { ret, retard, nouvelle };
+        });
+        check(`${nom} : restée ouverte, la ligne de tête suit l'âge (« ${ouverte.retard} », puis « ${ouverte.nouvelle} »)`,
+          new RegExp('^Publié\\s(à|le\\s\\d\\d/\\d\\d\\sà)\\s\\d\\d:\\d\\d,\\sil\\sy\\sa\\s' + ouverte.ret + '\\smin\\b').test(ouverte.retard) && /^Publié (à|le \d\d\/\d\d à) \d\d:\d\d\.$/.test(ouverte.nouvelle), ouverte);
         scanTexte(`${nom}, cartes ouvertes`, await texteVisible(o.page));
         await o.page.evaluate(() => { if (innerWidth <= 768) closeMarketModal(); else toggleFeed(); });
         await o.page.waitForTimeout(450);

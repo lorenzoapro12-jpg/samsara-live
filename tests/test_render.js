@@ -216,14 +216,37 @@ try {
       const CONSEIL = /\b(achetez|vendez|achète[rz]?\b|vends\b|il faut (?:acheter|vendre)|entrez|sortez|prenez position|signal d['’]achat|signal de vente|recommand(?:e|ons))/i;
       const cartes = feed.innerHTML.split('<div class="demon-card').slice(1);
       const deb = cartes.map(c => sansExpert('<div class="demon-card' + c));
-      const titres = deb.map(c => texteDe((c.match(/<div class="demon-name">([\s\S]*?)<\/div>/) || [])[1] || ''));
+      // (Changé exprès, revue du 14/10/2026, M7 : Flux, Horloges et Contre-expertise parlent du site,
+      // pas du bitcoin ; sans « Les chiffres du marché », ces trois cartes n'apparaissent plus.)
+      const vues = deb.filter(c => c), reservees = cartes.filter((c, i) => !deb[i]).map(c => (c.match(/^ carte-(\w+) chiffres-seul\b/) || [])[1]);
+      const titres = vues.map(c => texteDe((c.match(/<div class="demon-name">([\s\S]*?)<\/div>/) || [])[1] || ''));
       const vu = texteDe(sansExpert(feed.innerHTML)), bannis = Gd.motsBannis(vu);
       if (bannis.length) console.log('      Débutant, mots techniques visibles :', bannis.join(', '));
+      // Revue du 14/10/2026 (M7) : l'heure de la publication est dite UNE fois, en tête (« Publié à
+      // 17:40. ») ; aucune carte ne répète plus « il y a 0 min ». En retard, le bandeau de tête redit
+      // l'heure avec l'âge : le seul âge écrit, réécrit chaque minute (majAges, [data-age-de]).
+      const z = x => String(x).padStart(2, '0');
+      const quand = t => { const d = new Date(t); return (d.toDateString() === new Date().toDateString() ? 'à ' : 'le ' + z(d.getDate()) + '/' + z(d.getMonth() + 1) + ' à ') + z(d.getHours()) + ':' + z(d.getMinutes()); };
+      const rendu = min => {
+        const t = Date.now() - min * 60000, el = mkEl('feed-m7-' + min);
+        sandbox.__TEST__.setData(Object.assign({}, D, { updated: new Date(t).toISOString() }));
+        sandbox.__TEST__.render(el);
+        return { t, deb: sansExpert(el.innerHTML), tout: el.innerHTML };
+      };
+      const vieux = vm.runInContext('CADENCES.vieux_min', sandbox), frais = rendu(2), tard = rendu(vieux + 5);
+      sandbox.__TEST__.setData(D);
+      const tf = texteDe(frais.deb), tt = texteDe(tard.deb);
       return [
-        ['Débutant : 8 cartes, chacune avec un titre Débutant (ni « Microstructure », ni « Liquidité », ni « Contre-expertise »)', cartes.length === 8 && titres.every(t => t && !/Microstructure|Liquidité|Contre-expertise|Marché live|Macro|Indicateurs|Flux/.test(t))],
-        ['Débutant : chaque carte garde un texte en mots simples', deb.every(c => texteDe(c.replace(/<div class="demon-header">[\s\S]*?<div class="demon-body">/, '')).length > 20)],
+        ['Débutant : 5 cartes sur 8, chacune avec un titre Débutant ; Flux, Horloges et Contre-expertise réservées à « Les chiffres du marché »', cartes.length === 8 && vues.length === 5 && reservees.join() === 'flux,horloges,contre'
+          && titres.every(t => t && !/Microstructure|Liquidité|Contre-expertise|Marché live|Macro|Indicateurs|Flux|Publication|Heures des données|Vérification/.test(t))],
+        ['Débutant : chaque carte garde un texte en mots simples', vues.every(c => texteDe(c.replace(/<div class="demon-header">[\s\S]*?<div class="demon-body">/, '')).length > 20)],
         ['Débutant : texte visible sans mot technique (liste du Guide), sans conseil', !bannis.length && !CONSEIL.test(vu)],
-        ['Débutant : les âges écrits restent réécrits chaque minute ([data-age-de] visibles)', /data-age-de/.test(sansExpert(feed.innerHTML))],
+        [`Débutant, publication de 2 min : « Publié ${quand(frais.t)}. » une fois, en tête ; aucun « il y a » (il y en avait 7) ; « le prix en tête de page est en direct »`,
+          tf.startsWith('Publié ' + quand(frais.t) + '.') && tf.split('Publié ').length === 2 && !/il y a/.test(tf) && /le prix en tête de page est en direct/.test(tf) && !/prix du haut/.test(tf)],
+        [`Débutant, publication de ${vieux + 5} min : un seul âge, dans le bandeau de tête qui redit l’heure, réécrit chaque minute ([data-age-de])`,
+          tt.startsWith('Publié ' + quand(tard.t) + ', il y a ' + (vieux + 5) + ' min') && tt.split('il y a').length === 2 && /^<div class="age-banner retard"[^>]*>[\s\S]*?data-age-de/.test(tard.deb)],
+        ['« Les chiffres du marché » : rien ne change (« publié à …, il y a … — le prix du haut est en direct », cartes Flux, Horloges, Contre-expertise)',
+          /Binance spot · publié à \d\d:\d\d \(il y a <span data-age-de="[^"]+">\d+ min<\/span> — le prix du haut est en direct\)/.test(frais.tout) && /Blocs de la dernière publication · il y a/.test(frais.tout) && /carte-horloges/.test(frais.tout) && /carte-contre/.test(frais.tout)],
       ];
     })(),
     // Ni note de développeur (nom de fichier, version, débogage, capitales d'insistance), ni code

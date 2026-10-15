@@ -213,11 +213,8 @@ function reinitReglages() {
 }
 /** Réaffiche ce que les réglages touchent. Rien n'est recalculé côté serveur. */
 function appliquerReglages() {
-  if (typeof renderFeed === 'function' && typeof marketData !== 'undefined' && marketData) {
-    renderFeed();
-    const mm = document.getElementById('marketModal');
-    if (mm && mm.style.display === 'flex') renderFeedTo(document.getElementById('marketModalBody'));
-  }
+  // (renderFeed refait aussi la fenêtre du téléphone, si elle est ouverte.)
+  if (typeof renderFeed === 'function' && typeof marketData !== 'undefined' && marketData) renderFeed();
   const lm = document.getElementById('liveModal');
   if (lm && lm.style.display === 'flex' && typeof renderLive === 'function') renderLive();
   if (typeof drawChart === 'function') drawChart();
