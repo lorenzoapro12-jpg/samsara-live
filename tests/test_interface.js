@@ -683,6 +683,8 @@ async function relief95(page, id) {
           monGarde: (() => { try { return JSON.parse(localStorage.getItem('samsara-mon-ecran-v1')); } catch (e) { return 'illisible'; } })(),
           lien: !!document.querySelector('#indMenu .aff-garder'), dit: (document.querySelector('#indMenu .aff-garde-dit') || {}).textContent || null,
           mode: modeCourant(),
+          // L'intervalle et la paire affichés, et l'intervalle allumé dans le ruban (revue du 14/10/2026, M21).
+          itv: chartInterval, sym: activeSymbol, ruban: [...document.querySelectorAll('#indicatorBar label[id^="int_"].active')].map(l => l.id),
         };
       }, SITE);
       const meme = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -851,8 +853,9 @@ async function relief95(page, id) {
 
       // I. « Mon écran » (plan du site, idée 9, 13/10/2026) : un instantané nommé de l'affichage, rappelé
       // d'un geste, gardé à part (samsara-mon-ecran-v1) : les préréglages et « Revenir au départ » ne
-      // le touchent pas. Sans rien de gardé : le RSI et le MACD, les supports / résistances, le Guide
-      // et les scénarios, sans « Le détail » (PARAM.monEcran). Jamais de fenêtre : une phrase.
+      // le touchent pas. Sans rien de gardé : le Volume, le RSI et le MACD (revue du 14/10/2026, M21 :
+      // le Volume manquait), les supports / résistances, le Guide et les scénarios, sans « Le détail »
+      // (PARAM.monEcran). Jamais de fenêtre : une phrase.
       let fenetres = 0;
       p7.on('dialog', d => { fenetres++; d.dismiss().catch(() => {}); });
       await p7.click('#indDropdownBtn'); await pause(200);
@@ -865,8 +868,9 @@ async function relief95(page, id) {
         /^Affichage proposé : /.test(ditAvant) && /les repères et la phrase de lecture/.test(ditAvant) && !/Guide/.test(ditAvant), ditAvant);
       await p7.click('#indMenu .aff-mon-ecran'); await pause(300);
       e = await etat();
-      check('« Mon écran » sans rien de gardé : RSI et MACD dessous, supports / résistances, Guide et scénarios, sans « Le détail » ; bouton enfoncé, aucun préréglage enfoncé ; rien de gardé sous sa clé',
-        meme(e.ov, ['sr']) && meme(e.sg, ['macd', 'rsi']) && meme(e.site, [true, true]) && e.mode === 'debutant' && e.mon === 'true' && meme(e.presse, []) && e.monGarde === null && meme(e.dessines, ['rsi', 'macd']), e);
+      check('« Mon écran » sans rien de gardé : Volume, RSI et MACD dessous, supports / résistances, Guide et scénarios, sans « Le détail » ; l’intervalle affiché reste ; bouton enfoncé, aucun préréglage enfoncé ; rien de gardé sous sa clé',
+        meme(e.ov, ['sr']) && meme(e.sg, ['macd', 'rsi', 'vol']) && meme(e.site, [true, true]) && e.mode === 'debutant' && e.mon === 'true' && meme(e.presse, []) && e.monGarde === null && meme(e.dessines, ['vol', 'rsi', 'macd'])
+        && e.itv === '15m' && meme(e.ruban, ['int_15m']), e);
       // Garder un autre affichage : « La tendance », Guide masqué, avec « Le détail ».
       await p7.click('#indMenu .aff-preset[data-preset="tendance"]'); await pause(250);
       await p7.evaluate(() => { toggleAny('guide'); choisirMode('expert'); }); await pause(300);
@@ -875,12 +879,13 @@ async function relief95(page, id) {
       await p7.click('#indMenu .aff-garder'); await pause(250);
       e = await etat();
       const TENDANCE = ['ema20', 'ema200', 'ema50', 'ichimoku'];
-      check(`« Garder cet affichage comme mon écran » : gardé sous samsara-mon-ecran-v1 (calques, sous-graphiques, Guide, scénarios, Le détail) ; une phrase le confirme dans le panneau (« ${e.dit} »), sans fenêtre ; bouton enfoncé`,
+      check(`« Garder cet affichage comme mon écran » : gardé sous samsara-mon-ecran-v1 (calques, sous-graphiques, Guide, scénarios, Le détail, intervalle ; pas la paire) ; une phrase le confirme dans le panneau (« ${e.dit} »), sans fenêtre ; bouton enfoncé`,
         e.monGarde && meme(e.monGarde.ov.slice().sort(), TENDANCE) && meme(e.monGarde.sg, []) && e.monGarde.guide === false && e.monGarde.scenarios === true && e.monGarde.detail === true
+        && e.monGarde.itv === '15m' && meme(Object.keys(e.monGarde).sort(), ['detail', 'guide', 'itv', 'ov', 'scenarios', 'sg'])
         && e.dit === 'C’est gardé : « Mon écran » rappellera cet affichage.' && !e.lien && e.ouvert && e.mon === 'true' && !fenetres, { e, fenetres });
       const garde = JSON.stringify(e.monGarde);
       const ditGarde = await p7.evaluate(() => document.querySelector('#indMenu .aff-mon-ecran').title);
-      check(`« Mon écran » gardé : l’infobulle dit « Votre affichage : … » (« ${ditGarde} »)`, /^Votre affichage : EMA/.test(ditGarde) && !/Guide|repères/.test(ditGarde), ditGarde);   // revue du 14/10/2026, M11
+      check(`« Mon écran » gardé : l’infobulle dit « Votre affichage : … », et son intervalle (« ${ditGarde} »)`, /^Votre affichage : EMA/.test(ditGarde) && !/Guide|repères/.test(ditGarde) && /, en 15 min$/.test(ditGarde), ditGarde);   // revue du 14/10/2026, M11 et M21
       // Les préréglages et « Revenir au départ » changent l'affichage, jamais « Mon écran ».
       await p7.click('#indMenu .aff-preset[data-preset="volume"]'); await pause(250);
       e = await etat();
@@ -905,6 +910,34 @@ async function relief95(page, id) {
       await p7.click('#indDropdownBtn'); await pause(200);
       e = await etat();
       check('rouvert sur « Mon écran » : le bouton est enfoncé', meme(e.ov, TENDANCE) && e.mon === 'true', e);
+      // J. L'intervalle (revue du 14/10/2026, M21 ; oui de Lorenzo à Q4) : « Mon écran » le garde et le
+      // rappelle — on revenait en 15 min à chaque fois —, jamais au chargement (la page s'ouvre en
+      // 15 min) ; la paire n'en fait pas partie. Lancé avant la correction, ce bloc échoue.
+      await p7.click('#int_1h'); await pause(600);
+      await p7.click('#indDropdownBtn'); await pause(200);
+      e = await etat();
+      check('en 1 h : « Mon écran » (gardé en 15 min) n’est plus enfoncé', e.itv === '1h' && e.mon === 'false' && e.lien, e);
+      await p7.click('#indMenu .aff-garder'); await pause(250);
+      e = await etat();
+      const dit1h = await p7.evaluate(() => document.querySelector('#indMenu .aff-mon-ecran').title);
+      check(`gardé en 1 h : l’intervalle est noté (« ${dit1h} »), bouton enfoncé`, e.monGarde && e.monGarde.itv === '1h' && e.mon === 'true' && /, en 1 h$/.test(dit1h), { e, dit1h });
+      await p7.click('#indMenu .aff-boutons .aff-btn:not(.aff-tout):not(.aff-mon-ecran)'); await pause(300);
+      await p7.evaluate(() => document.getElementById('indMenu').classList.remove('open'));
+      await p7.click('#int_15m'); await pause(600);
+      await p7.evaluate(() => changeSymbol('SOLUSDT', document.getElementById('sym_SOLUSDT'))); await pause(800);
+      await p7.click('#indDropdownBtn'); await pause(200);
+      await p7.click('#indMenu .aff-mon-ecran'); await pause(600);
+      e = await etat();
+      check('« Revenir au départ », 15 min, SOL/USDT, puis « Mon écran » : il revient en 1 h (ruban compris), bouton enfoncé ; la paire reste SOL/USDT',
+        meme(e.ov, TENDANCE) && e.itv === '1h' && meme(e.ruban, ['int_1h']) && e.mon === 'true' && e.sym === 'SOLUSDT', e);
+      await p7.evaluate(() => { changeSymbol('BTCUSDT', document.getElementById('sym_BTCUSDT')); sessionStorage.setItem('__garder', '1'); }); await pause(400);
+      await p7.reload(); await pause(1800);
+      await p7.click('#indDropdownBtn'); await pause(200);
+      e = await etat();
+      check('rouvert : en 15 min (l’intervalle de « Mon écran » n’est jamais posé d’office), le bouton relâché', e.itv === '15m' && meme(e.ruban, ['int_15m']) && meme(e.ov, TENDANCE) && e.mon === 'false' && e.monGarde.itv === '1h', e);
+      await p7.click('#indMenu .aff-mon-ecran'); await pause(600);
+      e = await etat();
+      check('rouvert, « Mon écran » : en 1 h, bouton enfoncé', e.itv === '1h' && meme(e.ruban, ['int_1h']) && e.mon === 'true', e);
       await p7.evaluate(() => { document.getElementById('indMenu').classList.remove('open'); revenirAuDepart(); localStorage.removeItem('samsara-mon-ecran-v1'); });
       check('aucune erreur JavaScript', !o7.erreurs.length, o7.erreurs);
       await o7.ctx.close();
