@@ -1729,6 +1729,14 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 :where(html):not([data-chiffres="1"]) .kpis { flex: 0 0 auto; order: 2; }
 html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header { flex-wrap: wrap; row-gap: 6px; }
 html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header-right { order: 3; margin-left: auto; }
+/* Néon (structure « hud ») sans « Les chiffres du marché » : la pastille est restée dans l'en-tête
+   (js/structures.js), la bande de télémétrie n'aurait que son étiquette : elle se cache et rend sa
+   rangée au graphique : 33 px au téléphone (23 au doigt : l'en-tête s'écarte de 10 px pour la zone
+   de la pastille, plus bas), 51 à 1440 px (revue du 14/10, M20). Avec les chiffres, elle revient. */
+:root[data-structure="hud"]:not([data-chiffres="1"]) .hud-bande { display: none; }
+/* Néon : l'étiquette du dernier prix, sur le graphique (js/app.js, lireJetons), a les coins de ses
+   boutons (--r-bar), et non plus ceux d'une pilule toute ronde (revue du 14/10, M20). */
+:root[data-structure="hud"] { --prix-rayon: var(--r-bar); }
 @media (max-width: 1100px) {
   html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header { column-gap: 8px; }
   html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header-right { gap: 6px; }
@@ -1926,17 +1934,19 @@ html:not([data-chiffres="1"]):not([data-structure="fenetres"]) .header-right { o
   :root[data-structure] .indicator-bar label[id^="int_"]::before { z-index: -1; }
   /* « Infos du marché » (Lisible) : la zone de la bande qui la porte, sous la pastille et les chiffres
      épinglés (même action). Avec des chiffres épinglés, la bande garde son rognage. Bureau 95 : la
-     pastille est dans la barre d'état de la fenêtre, à 3 px de son bord ; Néon : la bande à coins
-     coupés rogne sa zone à 27 px de haut (l'agrandir changerait leur dessin). */
+     pastille est dans la barre d'état de la fenêtre, à 3 px de son bord. Néon : la pastille est dans
+     l'en-tête (revue du 14/10, M20), sa zone y a ses 40 px. */
   :root[data-structure]:not([data-chiffres="1"]):not([data-structure="fenetres"]) #cycle:not(.a-epingles) { position: relative; overflow: visible; isolation: isolate; }
   :root[data-structure]:not([data-chiffres="1"]):not([data-structure="fenetres"]) #cycle:not(.a-epingles):not(:empty)::before {
     content: ''; position: absolute; inset: min(0px, calc(50% - 20px)); z-index: -1;
   }
   /* L'en-tête rogne ce qui le dépasse : 8 px au-dessus de la paire et sous les boutons ronds ; en
-     Complet, les deux premiers boutons sont sous la paire : 16 px entre les rangées. Bureau 95, Complet :
-     1 px de plus sous la paire. */
+     Complet, les deux premiers boutons sont sous la paire : 16 px entre les rangées. Néon, Lisible : la
+     pastille est sous la paire (revue du 14/10, M20), 16 px aussi. Bureau 95, Complet : 1 px de plus
+     sous la paire. */
   :root:is([data-structure="hud"], [data-structure="codex"], [data-structure="tableau"], [data-structure="planche"]) .header { padding-top: 8px; padding-bottom: 8px; }
-  :root[data-chiffres="1"]:is([data-structure="hud"], [data-structure="codex"], [data-structure="tableau"], [data-structure="planche"]) .header { row-gap: 16px; }
+  :root[data-chiffres="1"]:is([data-structure="hud"], [data-structure="codex"], [data-structure="tableau"], [data-structure="planche"]) .header,
+  :root[data-structure="hud"]:not([data-chiffres="1"]) .header { row-gap: 16px; }
   :root[data-structure="fenetres"] .header { padding-bottom: 6px; }
   /* Lisible : les boutons ronds à 42 px de centre à centre (la place est libre à leur gauche) ; en
      Néon, « Thème » s'écarte du coin arrondi de l'en-tête, qui rognait sa zone. */

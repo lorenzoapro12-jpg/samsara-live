@@ -43,6 +43,9 @@
 //  13. ÉPINGLER (1440, 1024 et 390 px) : depuis « Infos du marché » (avec les chiffres du marché),
 //      un chiffre choisi reste dans l'en-tête ensuite sans eux (en tête de la bande avec), gardé
 //      sur l'appareil.
+//  14. NÉON (revue du 14/10, M20 ; 390, 360 et 1440 px, les quatre états des deux cases) : sans « Les
+//      chiffres du marché », la pastille dans l'en-tête, sur la rangée des boutons, et pas de bande ;
+//      avec eux, la bande de télémétrie et ses chiffres ; quitter le thème rend l'en-tête de la base.
 //
 // Binance simulé (prix 86 012,50, ouverture 85 700 : +0,36 % ; Binance arrondit à +0,365), le
 // fichier publié du dépôt avec l'heure de publication réglée par contrôle ; horloge fixée au
@@ -98,14 +101,16 @@ const serveur = http.createServer((req, res) => {
 });
 
 /** o = { vue, mode ('debutant' | 'expert'), theme, ageS, retenir (la publication n'arrive qu'à la demande),
- *        coupe ({ actif } : tant que actif est vrai, Binance et son miroir refusent la connexion) }. */
+ *        coupe ({ actif } : tant que actif est vrai, Binance et son miroir refusent la connexion),
+ *        chiffres ('0' | '1' : « Les chiffres du marché » gardés ; sans : l'état du détail) }. */
 async function ouvrir(nav, o) {
   const tactile = o.vue.width <= 480;
   const ctx = await nav.newContext(Object.assign({ viewport: o.vue, deviceScaleFactor: 1, timezoneId: FUSEAU }, tactile ? { hasTouch: true, isMobile: true } : {}));
   await ctx.clock.install({ time: maintenant() });
-  await ctx.addInitScript(([m, t]) => {
-    try { localStorage.clear(); localStorage.setItem('samsara-mode', m); localStorage.setItem('samsara-theme', t); localStorage.setItem('samsara-astuce-tap-v1', '1'); } catch (e) { /* */ }
-  }, [o.mode, o.theme || 'aero']);
+  await ctx.addInitScript(([m, t, c]) => {
+    try { localStorage.clear(); localStorage.setItem('samsara-mode', m); localStorage.setItem('samsara-theme', t); localStorage.setItem('samsara-astuce-tap-v1', '1');
+      if (c) localStorage.setItem('samsara-chiffres-v1', c); } catch (e) { /* */ }
+  }, [o.mode, o.theme || 'aero', o.chiffres || null]);
   // Ce que le graphique écrit tant qu'il n'a pas de bougies, avec ses bords (texte centré).
   if (o.coupe) await ctx.addInitScript(() => {
     const f = CanvasRenderingContext2D.prototype.fillText;
@@ -639,7 +644,8 @@ const lireEntete = page => page.evaluate(() => {
     // Là où le ruban est plein (Néon, Gazette, Planche, 360 px, Lisible), un intervalle étroit a ses
     // 40 px de haut et l'écart à ses voisins. Aucune zone ne prend un autre bouton : chaque point du dessin d'un
     // bouton le touche, lui. Non exigé (dessin du thème) : la pastille de Bureau 95 (barre d'état de la
-    // fenêtre) et de Néon (bande à coins coupés).
+    // fenêtre). Celle de Néon l'est depuis qu'elle est dans l'en-tête, comme ailleurs : sa bande à
+    // coins coupés la rognait à 27 px de haut (revue du 14/10, M20).
     titre('8b. Au doigt, thèmes à structure (360 et 390 px, écran tactile) : chaque bouton de l’en-tête et du ruban, 40 × 40 px (Bureau 95 : 32 × 34), sans prendre un voisin ; panneau et croix des fiches (revue du 14/10, C25)');
     for (const theme of ['bureau95', 'bureau95-contraste', 'neon', 'codex', 'gare', 'gazette', 'cyanotype', 'diazo']) for (const mode of ['debutant', 'expert']) for (const w of [360, 390]) {
       const o = await ouvrir(nav, { vue: { width: w, height: 800 }, mode, theme, ageS: 25 * 60 });
@@ -649,9 +655,9 @@ const lireEntete = page => page.evaluate(() => {
         const [L, H] = fen ? [32, 34] : [40, 40], hl = L / 2 - 0.5, hh = H / 2 - 0.5;
         const dot = document.getElementById('dot');
         if (dot) dot.classList.add('ping');   // l'onde du voyant
-        const cycle = document.getElementById('cycle'), structure = document.documentElement.dataset.structure;
+        const cycle = document.getElementById('cycle');
         const nomDe = b => b.id || (typeof b.className === 'string' ? b.className.split(' ')[0] : b.tagName);
-        const pastille = !fen && structure !== 'hud' ? ', .kpi-deb' : '';
+        const pastille = !fen ? ', .kpi-deb' : '';
         const cibles = [...document.querySelectorAll('.header-right > .ico-btn:not(#reglagesBtn), #paireBtn, .indicator-bar label[id^="int_"]' + pastille)].filter(vis);
         const affichage = document.getElementById('indDropdownBtn');
         const autre = (h, b) => [...cibles, affichage].find(c => c !== b && (c.contains(h) || (c.classList.contains('kpi-deb') && h === cycle)));
@@ -684,7 +690,7 @@ const lireEntete = page => page.evaluate(() => {
         }
         return { mesures, prisAff: [...prisAff], dot: dot ? getComputedStyle(dot).pointerEvents : null, page: document.documentElement.scrollWidth - innerWidth };
       }, [/^bureau95/.test(theme), w === 360 && mode === 'debutant' && /neon|gazette|cyanotype|diazo/.test(theme)]);
-      const attendu = /^bureau95/.test(theme) ? 7 : mode === 'debutant' ? (theme === 'neon' ? 11 : 12) : 13;
+      const attendu = /^bureau95/.test(theme) ? 7 : mode === 'debutant' ? 12 : 13;
       const exige = /^bureau95/.test(theme) ? '32 × 34' : '40 × 40';
       check(`${nom} : ${m.mesures.length} cibles (${m.mesures.map(c => c.id + ' ' + c.zone.join('×') + (c.etroit ? '*' : '')).join(', ')}) — chacune couvre un carré de ${exige} px${m.mesures.some(c => c.etroit) ? ' (* ruban plein : 40 px de haut et l’écart aux voisins)' : ''}, voyant en onde`,
         m.mesures.length === attendu && m.mesures.every(c => c.ok) && m.dot === 'none', { mal: m.mesures.filter(c => !c.ok), dot: m.dot });
@@ -774,6 +780,52 @@ const lireEntete = page => page.evaluate(() => {
       const c = await lire();
       check(`${nom} : décochés, l’en-tête revient comme avant`, mode === 'expert' ? c.vus[0] === 'RSI 4\u00a0h' : c.vus.length === 0, c);
       check(`${nom} : aucune erreur de script`, !o.erreurs.length, o.erreurs);
+      await o.ctx.close();
+    }
+
+    // ── 10. Néon : la bande du haut avec les chiffres seulement ─────────────────
+    // Revue du 14/10 (M20) : sans « Les chiffres du marché », la bande de télémétrie de Néon ne portait
+    // que la pastille « Infos du marché ▸ » (et « TÉLÉMÉTRIE // 15 MIN » à 1440 px) : une rangée prise
+    // au graphique pour presque rien (33 px au téléphone). La pastille est maintenant dans l'en-tête,
+    // sur la rangée des boutons et à leur gauche, comme dans les autres thèmes ; la bande ne se montre
+    // qu'avec les chiffres, qu'elle porte. Chaque page s'ouvre dans un état des deux cases, puis la case
+    // des chiffres est basculée et rebasculée (js/structures.js suit data-chiffres) ; quitter Néon rend
+    // #cycle à sa place de la base.
+    titre('10. Néon : sans « Les chiffres du marché », la pastille dans l’en-tête et pas de bande ; avec eux, la bande et ses chiffres (revue du 14/10, M20)');
+    const etatNeon = page => page.evaluate(() => {
+      const vis = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
+      const R = e => e.getBoundingClientRect();
+      const tete = document.querySelector('.header'), bande = document.querySelector('.hud-bande'), cy = document.getElementById('cycle');
+      const deb = cy.querySelector('.kpi-deb'), rd = vis(deb) ? R(deb) : null, milieu = rd && rd.top + rd.height / 2;
+      const boutons = [...document.querySelectorAll('.header-right > *')].filter(vis).map(R);
+      return { chiffres: document.documentElement.dataset.chiffres, dansTete: cy.parentNode === tete, dansBande: !!bande && cy.parentNode === bande,
+        bande: vis(bande), tag: vis(document.querySelector('.hud-bande-tag')), pastille: !!rd, kpis: [...cy.querySelectorAll('.kpi')].filter(vis).length,
+        rangee: !!rd && boutons.some(b => milieu > b.top && milieu < b.bottom), aGauche: !!rd && rd.left >= 0 && boutons.every(b => rd.right <= b.left + 0.5),
+        ecart: Math.round(R(document.querySelector('.main-area')).top - R(tete).bottom), page: document.documentElement.scrollWidth - innerWidth };
+    });
+    const sansChiffres = e => e.chiffres === '0' && e.dansTete && !e.bande && !e.tag && e.pastille && e.rangee && e.aGauche && e.ecart <= 12 && e.page <= 0;
+    const avecChiffres = (e, w) => e.chiffres === '1' && e.dansBande && e.bande && e.tag === (w > 768) && !e.pastille && e.kpis > 0 && e.page <= 0;
+    for (const w of [390, 360, 1440]) for (const mode of ['debutant', 'expert']) for (const chiffres of ['0', '1']) {
+      const o = await ouvrir(nav, { vue: { width: w, height: w <= 480 ? 844 : 900 }, mode, chiffres, theme: 'neon' });
+      const nom = `neon · ${w} · ${mode === 'debutant' ? 'sans' : 'avec'} « Le détail », ${chiffres === '1' ? 'avec' : 'sans'} les chiffres au chargement`;
+      const etats = [await etatNeon(o.page)];
+      for (let i = 0; i < 2; i++) {
+        await o.page.evaluate(() => appliquerChiffres(!chiffresAllumes()));
+        await o.page.waitForTimeout(250);
+        etats.push(await etatNeon(o.page));
+      }
+      const ok = etats.every(e => (e.chiffres === '1' ? avecChiffres(e, w) : sansChiffres(e)));
+      const sans = etats.find(e => e.chiffres === '0'), avec = etats.find(e => e.chiffres === '1');
+      check(`${nom}, puis basculés deux fois : sans eux, la pastille dans l’en-tête (rangée des boutons, à leur gauche), pas de bande ; avec eux, la bande et ses ${avec.kpis} chiffres${w > 768 ? ', « TÉLÉMÉTRIE » compris' : ''}`,
+        ok && etats[0].chiffres === chiffres && etats[2].chiffres === chiffres, etats);
+      check(`${nom} : entre l’en-tête et le graphique, ${sans.ecart} px sans les chiffres (rien que l’écart), ${avec.ecart} px avec eux (la bande)`,
+        sans.ecart <= 12 && avec.ecart - sans.ecart >= 30, { sans: sans.ecart, avec: avec.ecart });
+      await o.page.evaluate(() => appliquerTheme('aero'));
+      await o.page.waitForTimeout(200);
+      const base = await o.page.evaluate(() => { const cy = document.getElementById('cycle');
+        return { parent: cy.parentNode.className, avant: (cy.previousElementSibling || {}).className, apres: (cy.nextElementSibling || {}).className, bandes: document.querySelectorAll('.hud-bande').length }; });
+      check(`${nom} : quitter Néon rend #cycle à sa place de la base (entre .header-left et .header-right), sans bande ; aucune erreur de script`,
+        base.parent === 'header' && base.avant === 'header-left' && base.apres === 'header-right' && !base.bandes && !o.erreurs.length, { base, erreurs: o.erreurs });
       await o.ctx.close();
     }
   } finally {

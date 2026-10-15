@@ -93,10 +93,10 @@ function structureDuTheme(id) {
 }
 
 // ─── HUD (thème Néon) : un poste de pilotage ───────────────────────────────────
-// Les chiffres clés quittent l'en-tête pour une bande de télémétrie pleine largeur ; le
-// panneau du marché passe à gauche, comme un rail de systèmes ; la barre des indicateurs
-// devient une console sous le graphique ; le graphique reçoit des coins de visée et un
-// balayage ; le titre « glitche ».
+// Les chiffres clés quittent l'en-tête pour une bande de télémétrie pleine largeur (avec « Les
+// chiffres du marché ») ; le panneau du marché passe à gauche, comme un rail de systèmes ; la
+// barre des indicateurs devient une console sous le graphique ; le graphique reçoit des coins de
+// visée et un balayage ; le titre « glitche ».
 STRUCTURES.hud = {
   nom: 'Poste de pilotage',
   construire() {
@@ -104,7 +104,23 @@ STRUCTURES.hud = {
     const tete = document.querySelector('.header'), main = document.querySelector('.main-area');
     const bande = c.conteneur('div', 'hud-bande', tete.parentNode, tete.nextSibling, 'Télémétrie : dernière publication');
     c.decor('span', 'hud-bande-tag', bande, null, 'TÉLÉMÉTRIE // ' + CADENCES.attendue_min + ' MIN');   // js/cadences.js
-    c.deplacer($('cycle'), bande);
+    // Les chiffres clés montent dans la bande AVEC « Les chiffres du marché » seulement. Sans eux, elle
+    // ne portait que la pastille « Infos du marché ▸ » (et son étiquette à 1440 px) : une rangée de
+    // 33 px prise au graphique pour presque rien (revue du 14/10, M20). #cycle reste alors à sa place
+    // de la base, dans l'en-tête (sur la rangée des boutons, à leur gauche, comme les autres thèmes),
+    // et la bande vide se cache (css/app.css). Suivi quand la case change (data-chiffres,
+    // js/fiches.js) ; défaire le chantier rend #cycle à sa place de la base, où qu'il soit.
+    const cycle = $('cycle'), base = cycle && [cycle.parentNode, cycle.nextSibling];
+    c.deplacer(cycle, bande);
+    const placerCycle = () => {
+      if (!cycle) return;
+      const avec = document.documentElement.getAttribute('data-chiffres') === '1';
+      if (avec && cycle.parentNode !== bande) bande.appendChild(cycle);
+      else if (!avec && cycle.parentNode === bande) base[0].insertBefore(cycle, base[1] && base[1].parentNode === base[0] ? base[1] : null);
+    };
+    placerCycle();
+    const obsChiffres = typeof MutationObserver !== 'undefined' ? new MutationObserver(placerCycle) : null;
+    if (obsChiffres) obsChiffres.observe(document.documentElement, { attributes: true, attributeFilter: ['data-chiffres'] });
     c.deplacer($('feedPanel'), main, main.firstChild);
     c.deplacer($('indicatorBar'), main.parentNode, main.nextSibling);
     const cc = document.querySelector('.chart-container');
@@ -125,7 +141,7 @@ STRUCTURES.hud = {
     c.attribut(h1, 'data-glitch', h1 ? h1.textContent : '');
     const tl = document.querySelector('.taskbar-left');
     if (tl) c.decor('span', 'hud-invite', tl, tl.firstChild, '>_');
-    return () => { if (obs) obs.disconnect(); c.defaire(); };
+    return () => { if (obs) obs.disconnect(); if (obsChiffres) obsChiffres.disconnect(); c.defaire(); };
   },
 };
 

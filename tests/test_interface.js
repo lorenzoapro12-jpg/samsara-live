@@ -14,7 +14,8 @@
 //      du canvas, encre de la chaleur — jamais la position d'un prix ; la couche de chaleur est
 //      refaite quand le thème change (son id est dans la clé du cache). Coins des étiquettes :
 //      --etiquette-rayon, sinon carrés dans un thème carré (--r-tile à 0), et la carte des ordres
-//      décrite carrée dans ces thèmes seulement (revue du 14/10, M18).
+//      décrite carrée dans ces thèmes seulement (revue du 14/10, M18). L'étiquette du dernier prix :
+//      rE(11) ; en Néon, les coins de ses boutons (--r-bar), et non plus une pilule (revue du 14/10, M20).
 //   3. DISPOSITION : sur un canvas bas, les sous-graphes sont réduits et ne débordent jamais
 //      sur le sélecteur de plage ; sur un canvas haut, ils gardent leur hauteur. Le tracé du prix
 //      garde 60 % de la hauteur utile ; au plus 3 sous-graphes dessinés, chacun tracé (jamais un
@@ -256,17 +257,30 @@ async function relief95(page, id) {
       // Gazette, Cyanotype et Diazo restaient arrondis sur le graphique), 1 sinon (Néon, Codex, Gare,
       // Aero, Kāla : inchangés). Dessin complet relevé : aucun coin rond dans un thème carré. Et le
       // terminal décrit « carré » à la carte des ordres exactement dans ces thèmes.
+      // L'étiquette du dernier prix (le rectangle de 22 px de haut du calque, à la couleur de la bougie
+      // en cours) : en Néon, les coins de ses boutons (--r-bar, 4 px), et non plus une pilule ronde de
+      // 11 px dans un thème à coins de 3 à 6 px (revue du 14/10, M20) ; ailleurs, rE(11), inchangé.
       const rr = await o.page.evaluate(() => {
         const cs = getComputedStyle(document.documentElement), tok = n => cs.getPropertyValue(n).trim();
-        const L = [], r0 = CanvasRenderingContext2D.prototype.roundRect;
-        CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) { L.push(Array.isArray(r) ? Math.max(...r) : r); return r0.apply(this, arguments); };
+        const L = [], prix = [], r0 = CanvasRenderingContext2D.prototype.roundRect;
+        const sens = [COLORS.candleUp, COLORS.candleDown].map(c => { const t = document.createElement('canvas').getContext('2d'); t.fillStyle = c; return t.fillStyle; });
+        CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+          const rv = Array.isArray(r) ? Math.max(...r) : r;
+          L.push(rv);
+          if (this.canvas.id === 'chartCalque' && h === 22 && sens.includes(this.fillStyle)) prix.push(rv);
+          return r0.apply(this, arguments);
+        };
         try { drawChart(); dessinerCalque(); } finally { CanvasRenderingContext2D.prototype.roundRect = r0; }
         const carte = Liaison.lireTheme(localStorage.getItem(Liaison.CLE_THEME));
-        return { etiq: COLORS.etiqRayon, etiqTok: tok('--etiquette-rayon'), rTile: tok('--r-tile'), rE11: rE(11), n: L.length, ronds: L.filter(r => r > 0).length, carte: carte && carte.carre };
+        return { etiq: COLORS.etiqRayon, etiqTok: tok('--etiquette-rayon'), rTile: tok('--r-tile'), rE11: rE(11), n: L.length, ronds: L.filter(r => r > 0).length, carte: carte && carte.carre,
+          prix, prixTok: tok('--prix-rayon'), rBar: tok('--r-bar') };
       });
       const carre = parseFloat(rr.rTile) === 0, attenduEtiq = rr.etiqTok !== '' ? +rr.etiqTok : carre ? 0 : 1;
       check(`${t.id.padEnd(9)} · coins des étiquettes du graphique : facteur ${rr.etiq} (${rr.etiqTok !== '' ? '--etiquette-rayon' : '--r-tile « ' + rr.rTile + ' »'})${carre ? `, aucun coin rond sur ${rr.n} roundRect` : ''} ; carte des ordres décrite ${rr.carte ? 'carrée' : 'arrondie'}`,
         rr.etiq === attenduEtiq && rr.rE11 === 11 * attenduEtiq && (!carre || (rr.n > 0 && rr.ronds === 0)) && rr.carte === carre, rr);
+      const attenduPrix = t.id === 'neon' ? parseFloat(rr.rBar) : 11 * attenduEtiq;
+      check(`${t.id.padEnd(9)} · étiquette du dernier prix : coins de ${[...new Set(rr.prix)].join(', ')} px — ${t.id === 'neon' ? `ceux des boutons du thème (--r-bar « ${rr.rBar} »), pas une pilule` : 'rE(11), comme avant'}`,
+        rr.prix.length > 0 && rr.prix.every(r => r === attenduPrix) && (t.id === 'neon' ? attenduPrix === 4 && rr.prixTok === rr.rBar : rr.prixTok === ''), rr);
       for (const [i, cote] of [[0, 'bid'], [1, 'ask']]) {
         if (!d.chaleur[i]) {
           const ok = d[cote].every((x, k) => x === LEG[cote][k]);
