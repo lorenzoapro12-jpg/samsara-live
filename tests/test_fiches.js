@@ -67,16 +67,16 @@ check('aucune fiche de champ ne porte sa propre formule', champs.every(([, f]) =
 titre('3. Indicateurs de la page : libellés et formules suivent PARAM');
 const libelle = k => T.INDICATORS.flatMap(c => c.items).find(i => i.key === k).label;
 check('libellés du menu = PARAM (RSI, MACD, ATR, ADX, CCI, Bollinger, stochastique)',
-  libelle('rsi').includes(String(T.PARAM.rsi.periode)) && libelle('macd').includes(T.PARAM.macd.rapide + ',' + T.PARAM.macd.lente + ',' + T.PARAM.macd.signal)
+  libelle('rsi') === 'RSI (' + T.PARAM.rsi.periodes.join(', ') + ')' && libelle('macd').includes(T.PARAM.macd.rapide + ',' + T.PARAM.macd.lente + ',' + T.PARAM.macd.signal)
   && libelle('atr').includes(String(T.PARAM.atr.periode)) && libelle('adx').includes(String(T.PARAM.adx.periode))
   && libelle('cci').includes(String(T.PARAM.cci.periode)) && libelle('bb').includes(String(T.PARAM.bb.periode))
   && libelle('stoch') === 'Stochastique rapide (' + T.PARAM.stoch.k + ',' + T.PARAM.stoch.d + ')');
 check('le stochastique ne se dit plus « 14,3,3 » (version lente) : c’est la version rapide qui est calculée', !/14,3,3/.test(libelle('stoch')) && /rapide/i.test(libelle('stoch')));
 // Les dents : on change PARAM, le libellé et la légende suivent.
 const sauve = JSON.stringify(T.PARAM);
-T.PARAM.rsi.periode = 21; T.PARAM.atr.periode = 9; T.PARAM.vwap.ancrageBougies = 30;
-check('PARAM.rsi = 21 → libellé « RSI (21) », sous-graphe et légende disent 21',
-  T.ETIQ.rsi() === 'RSI (21)' && T.subTitle('rsi').includes('21') && T.ficheHtml('rsi').includes('sur 21 bougies'));
+T.PARAM.rsi.periodes = [7, 14, 21]; T.PARAM.atr.periode = 9; T.PARAM.vwap.ancrageBougies = 30;
+check('PARAM.rsi = 7, 14, 21 → libellé « RSI (7, 14, 21) », sous-graphe et légende disent 7, 14 et 21',
+  T.ETIQ.rsi() === 'RSI (7, 14, 21)' && T.subTitle('rsi').includes('7, 14, 21') && T.ficheHtml('rsi').includes('sur 7, 14 et 21 bougies'));
 check('PARAM.atr = 9 → légende de l’ATR dit 9', T.ficheHtml('atr').includes('sur 9 bougies'));
 check('PARAM.vwap.ancrageBougies = 30 → légende du VWAP dit 30', T.ficheHtml('vwap').includes('toutes les 30 bougies'));
 Object.assign(T.PARAM, JSON.parse(sauve));
@@ -292,7 +292,7 @@ titre('9. Chaque indicateur du menu : comment les traders l’utilisent, comment
   check('les lignes du Débutant (guide, scénarios) : aucun mot de la liste du Guide', !debSales.length, debSales);
   check('la fiche affiche « Comment les traders l’utilisent » et « Comment c’est calculé » (dans les deux modes)', /Comment les traders l’utilisent/.test(T.ficheHtml('rsi')) && /Comment c’est calculé/.test(T.ficheHtml('rsi'))
     && !/expert-seul[^>]*>[^<]*Comment c’est calculé/.test(T.ficheHtml('rsi')) && /Comment s’en servir/.test(T.ficheHtml('guide')));
-  check('le calcul en mots suit PARAM (RSI 14 → 21)', (() => { const v = T.PARAM.rsi.periode; T.PARAM.rsi.periode = 21; const ok = T.ficheHtml('rsi').includes('à la Wilder » sur 21 bougies'); T.PARAM.rsi.periode = v; return ok; })());
+  check('le calcul en mots suit PARAM (RSI 6, 12, 24 → 9, 21)', (() => { const v = T.PARAM.rsi.periodes; T.PARAM.rsi.periodes = [9, 21]; const ok = T.ficheHtml('rsi').includes('à la Wilder » sur 9 et 21 bougies (poids 1/9, 1/21)'); T.PARAM.rsi.periodes = v; return ok; })());
   MODE.v = null;
   const apDeb = T.apercuHtml('guide'), apVide = T.apercuHtml(null);
   MODE.v = 'expert';
@@ -327,12 +327,12 @@ titre('10. Les nombres des textes sont LUS (PARAM, meta.champs, CADENCES, carte 
   // Dynamique : chaque source change, le texte suit.
   const calc = k => { const f = T.FICHES[k]; return typeof f.calcul === 'function' ? f.calcul(T.PARAM) : f.calcul; };
   const meta2 = JSON.parse(JSON.stringify(META)), prm = (c, o) => Object.assign(meta2[c].params, o);
-  prm('tf.*.rsi_14', { periode: 21 }); prm('tf.*.atr_14', { periode: 9 }); prm('tf.*.support_30', { bougies: 40 }); prm('tf.*.amplitude_30_pct', { bougies: 45 });
+  prm('tf.*.rsi_6', { periode: 7 }); prm('tf.*.rsi_12', { periode: 14 }); prm('tf.*.rsi_24', { periode: 21 }); prm('tf.*.atr_14', { periode: 9 }); prm('tf.*.support_30', { bougies: 40 }); prm('tf.*.amplitude_30_pct', { bougies: 45 });
   prm('tf.*.volume_moyen_10_btc', { bougies: 12 }); prm('tf.*.ema20', { periode: 21 }); prm('tf.*.ema50', { periode: 55 }); prm('tf.*.ema20_sous_ema50', { courte: 9, longue: 21 });
   prm('liquidity.bid_walls', { tranche_usd: 50, n: 4 }); prm('micro.funding_annual_pct', { echeances_par_jour: 6 }); prm('micro.oi_change_24h_pct', { fenetre_h: 12 });
   prm('micro.cvd_24h_usd', { intervalle_min: 1 }); prm('micro.gex_usd_1pct', { mouvement_pct: 2 }); prm('micro.premium_state', { seuil_pct: 0.5 });
   T.setData(Object.assign({}, DATA, { meta: { version: 1, champs: meta2 } }));
-  const suit = { rsi_tf: 'Wilder, 21 bougies', atr_tf: 'lissé sur 9 bougies', sr_tf: 'des 40 dernières bougies', amplitude: 'des 45 dernières bougies', volume_tf: 'des 12 dernières bougies',
+  const suit = { rsi_tf: 'Wilder, 7, 14 et 21 bougies', atr_tf: 'lissé sur 9 bougies', sr_tf: 'des 40 dernières bougies', amplitude: 'des 45 dernières bougies', volume_tf: 'des 12 dernières bougies',
     ema_tf: 'sur 21 et 55 bougies', croisement: 'exponentielle 9 est sous la 21', murs: 'tranches de 50 $', funding: '6 fois par jour (toutes les 4 h)', oi: 'il y a 12 h', cvd: 'bougie de 1 min', gex: 'pour 2 % de prix' };
   const rate = Object.entries(suit).filter(([k, t]) => !calc(k).includes(t)).map(([k]) => [k, calc(k)]);
   check('meta.champs change (périodes, fenêtres, tranche, échéances, mouvement) → chaque calcul en mots suit', !rate.length, rate);
@@ -447,8 +447,8 @@ titre('12. Chaque fiche en trois lignes d’ado : ce que c’est, comment les tr
     return ['quoi', 'traders', 'usage', 'calcul'].filter(c => C[k][c] && pl.includes(esc(ct(C[k][c])))).map(c => k + '.' + c).concat(T.FICHES[k].simple && pl.includes(esc(T.FICHES[k].simple)) ? [k + '.simple'] : []); });
   check('« En savoir plus » ne redit ni les lignes courtes ni la définition', !redites.length, redites);
   const sauveP2 = JSON.stringify(T.PARAM);
-  T.PARAM.rsi.periode = 21; T.PARAM.bb.periode = 30;
-  check('les trois lignes suivent PARAM (RSI 21, Bollinger 30)', ct(C.rsi.calcul).includes('les 21 dernières périodes') && ct(C.bb.calcul).includes('des 30 derniers prix'));
+  T.PARAM.rsi.periodes = [7, 21]; T.PARAM.bb.periode = 30;
+  check('les trois lignes suivent PARAM (RSI 7 et 21, Bollinger 30)', ct(C.rsi.calcul).includes('les 7 et 21 dernières périodes') && ct(C.bb.calcul).includes('des 30 derniers prix'));
   Object.assign(T.PARAM, JSON.parse(sauveP2));
   // L'usage classique (demande du 13/10/2026) : les oscillateurs nomment leurs zones comme les
   // traders, et la fiche RSI dit ce que beaucoup y guettent ; l'ATR, la distance du stop.

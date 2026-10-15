@@ -176,7 +176,7 @@ const ContreExpertise = (function () {
     const derniere = a => a[a.length - 1];
     const ema = p => derniere(calc.calcEMA(Cl, p));
     const ext = (a, n, f) => f(...a.slice(-n));
-    num('rsi_14', p => derniere(calc.calcRSI(Cl, p.periode)));
+    for (const nom of ['rsi_14', 'rsi_6', 'rsi_12', 'rsi_24']) num(nom, p => derniere(calc.calcRSI(Cl, p.periode)));
     for (const nom of ['ema20', 'ema50', 'ema20_4h', 'ema50_4h']) num(nom, p => ema(p.periode));
     num('ema_ecart_pct', p => (ema(p.courte) / ema(p.longue) - 1) * 100);
     num('ema_gap_pct', p => Math.abs(ema(p.courte) - ema(p.longue)) / ema(p.longue) * 100);

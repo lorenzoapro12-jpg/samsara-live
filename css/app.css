@@ -907,7 +907,7 @@ html[data-structure="planche"] { font-variant-ligatures: none; }
 .track-legende { display: flex; justify-content: space-between; gap: 8px; font-size: 10.5px; color: var(--ink-3); margin-top: 5px; }
 .track-legende b { color: var(--ink-1); font-weight: 650; }
 
-/* Jauge RSI : zones 30 / 70 teintées, un point à la valeur */
+/* Jauge RSI : zones 30 / 70 teintées, un point par RSI (6, 12, 24), de la couleur de sa ligne */
 .rsi-meter { position: relative; flex: 1 1 70px; max-width: 130px; height: 5px; border-radius: var(--r-bar); background: var(--rail); margin: 0 4px; }
 .rsi-zone { position: absolute; top: 0; bottom: 0; width: 30%; }
 /* Les deux zones de la même teinte neutre : sous 30, ce n'est pas une « bonne nouvelle » (vert),
@@ -918,9 +918,8 @@ html[data-structure="planche"] { font-variant-ligatures: none; }
   position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%;
   background: var(--accent-2); box-shadow: 0 0 0 2px var(--card-solid), 0 2px 6px rgba(0,0,0,0.2);
 }
-.rsi-meter.chaud .rsi-dot, .rsi-meter.froid .rsi-dot { background: var(--warn); }
 .tf-row + .tf-row { margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--hairline); }
-.tf-tete { display: flex; align-items: center; gap: 8px; }
+.tf-tete { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .tf-nom {
   font-size: 10.5px; font-weight: 750; color: var(--ink-1); background: var(--rail);
   border-radius: min(7px, var(--r-tile)); padding: 1px 7px; min-width: 30px; text-align: center;
