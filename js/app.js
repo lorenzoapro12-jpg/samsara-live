@@ -5539,48 +5539,8 @@ function guideStyleFigure(f, jClos, mode) {
   if (f.phase === 'confirme') return { dash: [], lw: 1.8, a: 0.75, aplat: 0.09, age: 0 };
   return { dash: [5, 3], lw: 1.8, a: 0.75, aplat: 0.09, age: 0 };
 }
-/** La géométrie d'une figure, en (indice de bougie, prix) : le zigzag de ses points, les droites
- *  qui la VALIDENT (ligne de cou, bornes, côté du mât), les autres droites, l'aplat, ses points
- *  et le point en attente d'une ébauche. iFin : la bougie en cours pour une figure vivante (ses
- *  lignes suivent le prix jusqu'à elle), celle de son issue pour une figure finie. */
-function guideFigureGeo(f, iFin, suit) {
-  const fam = Guide.famille(f), Lg = Guide.ligne, o = { zig: [], valide: [], autres: [], aplat: [], points: [], petits: [], creux: null, pointe: null };
-  const pt = q => [q.i, q.p];
-  const dte = (L, i0, i1) => [[i0, Lg(L, i0)], [i1, Lg(L, i1)]];
-  const pend = f.ebauche && f.pend ? f.pend : null;
-  // Le point en attente suit la bougie en cours quand elle va plus loin (graphique : toutes les 5 s).
-  const creux = pend ? (suit ? [suit.i, suit.p] : [pend.i, pend.p]) : null;
-  const finConf = f.phase === 'confirme' && isNum(f.jConf) ? Math.min(iFin, f.jConf) : iFin;
-  if (fam === 'extremes' || fam === 'ete') {
-    const triple = /^triple/.test(f.type), ete = fam === 'ete';
-    const Q = ete ? [f.G, f.N1, f.T, f.N2, f.D] : triple ? [f.a, f.c1, f.b, f.c2, f.c] : [f.a, f.cou, f.b];
-    const zig = Q.map(pt);
-    if (creux) zig[zig.length - 1] = creux;
-    o.zig.push(zig);
-    o.points = (ete ? [f.G, f.T, f.D] : triple ? [f.a, f.b, f.c] : [f.a, f.b]).map(pt);
-    if (creux) { o.points.pop(); o.creux = creux; }
-    const niv = i => (ete ? Lg(f.couL, i) : f.niveau), i0 = Q[0].i, iD = zig[zig.length - 1][0];
-    o.valide.push([[i0, niv(i0)], [iFin, niv(iFin)]]);
-    o.aplat = zig.concat([[iD, niv(iD)], [i0, niv(i0)]]);
-  } else {
-    const drap = fam === 'drapeau', i0 = drap ? f.debutPause : f.debut;
-    const iB = Math.max(i0 + 1, Math.min(finConf, isFinite(f.apex) ? Math.floor(f.apex) : Infinity));
-    const H = dte(f.hautL, i0, iB), B = dte(f.basL, i0, iB);
-    if (drap) {
-      o.zig.push([[f.mat.i0, f.mat.p0], [f.mat.i1, f.mat.p1]]);
-      o.valide.push(f.sens > 0 ? H : B); o.autres.push(f.sens > 0 ? B : H);
-    } else o.valide.push(H, B);
-    o.aplat = [H[0], H[1], B[1], B[0]];
-    o.petits = (f.pivotsH || []).concat(f.pivotsB || []).filter(q => !pend || q.i !== pend.i).map(pt);
-    if (creux) o.creux = creux;
-    if (isFinite(f.apex)) o.pointe = f.apex;
-  }
-  // Confirmée : son niveau d'invalidation, de la bougie de validation à la bougie en cours (ou à sa
-  // chute : la ✗ se pose au bout). Rien après une cible atteinte ou un délai écoulé.
-  o.inval = f.phase === 'confirme' && isNum(f.jConf) && isNum(f.invalidation) && (!f.fin || f.fin === 'invalide') && iFin > f.jConf
-    ? [[f.jConf, f.invalidation], [iFin, f.invalidation]] : null;
-  return o;
-}
+/** La géométrie d'une figure : Guide.geoFigure (la même sert aux exemples passés en petit). */
+function guideFigureGeo(f, iFin, suit) { return Guide.geoFigure(f, iFin, suit); }
 /** Le style d'une figure PASSÉE (plan §8) : un contour léger, en points ronds, sans aplat, ses
  *  points petits, et la marque de son issue (Guide.marqueIssue : ✓ cible atteinte, ✗ invalidée ou
  *  annulée, – délai écoulé, ○ sans suite) bien lisible — jamais le style d'une figure en cours. */

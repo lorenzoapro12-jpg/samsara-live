@@ -30,6 +30,8 @@
 //      sur ce graphique, sans tri, en petites cartes (le prix avant, pendant et après, l'objectif,
 //      l'invalidation, l'issue) dans une bande qu'on fait défiler de côté ; ni la page ni le panneau
 //      ne s'élargissent ; carrées dans les thèmes carrés, couleurs du thème ; onze thèmes à 390 px.
+//      Chaque carte dessine la figure (ses points, sa ligne de cou ou ses bornes) dans une couleur
+//      à part, ni celle du prix ni celles de ✓ et ✗ (demande de Lorenzo du 15/10/2026).
 //      Aucune ligne du panneau ne coupe un nombre ni ne commence par « : » (revue du 14/10/2026, C8).
 //      Le même ordre dans chaque thème, l'alerte collée à la phrase (revue du 14/10/2026, M8).
 //   6. Aucune erreur JavaScript ; pas de défilement horizontal à 390 px.
@@ -161,16 +163,17 @@ const lireExemples = page => page.evaluate(() => {
   const p = document.getElementById('fichePop'), b = p.querySelector('.stats-exemples'), S = window.__statsFigure || { dernieres: [] }, rp = p.getBoundingClientRect();
   const couleur = v => { const e = document.createElement('i'); e.style.color = 'var(' + v + ')'; p.appendChild(e); const c = getComputedStyle(e).color; e.remove(); return c; };
   const phrases = [...p.querySelectorAll('.stats-phrase')].map(x => x.textContent);
-  const rb = b && b.getBoundingClientRect(), obj = b && b.querySelector('.ex-objectif'), inv = b && b.querySelector('.ex-inval');
+  const rb = b && b.getBoundingClientRect(), obj = b && b.querySelector('.ex-objectif'), inv = b && b.querySelector('.ex-inval'), cou = b && b.querySelector('.ex-cou'), prix = b && b.querySelector('.ex-prix');
   const cartes = b ? [...b.querySelectorAll('.stats-exemple')].map(c => {
     const r = c.getBoundingClientRect(), st = getComputedStyle(c), svg = c.querySelector('svg'), fc = c.querySelector('figcaption');
     return { w: r.width, h: r.height, rayon: parseFloat(st.borderTopLeftRadius) || 0, svg: !!svg && svg.getAttribute('role') === 'img' && !!svg.querySelector('title'),
-      legende: fc ? fc.textContent : '', anim: st.animationName !== 'none' || parseFloat(st.transitionDuration) > 0 };
+      legende: fc ? fc.textContent : '', dessin: !!c.querySelector('.ex-cou') && !!c.querySelector('.ex-point'), anim: st.animationName !== 'none' || parseFloat(st.transitionDuration) > 0 };
   }) : [];
   return { n: S.dernieres.length, dernieres: S.dernieres.map(d => ({ quand: d.quand, marque: d.marque })), phrases, cartes,
     bande: b && { large: b.scrollWidth, client: b.clientWidth, g: rb.left, d: rb.right, defile: getComputedStyle(b).overflowX, snap: getComputedStyle(b).scrollSnapType, focus: b.tabIndex === 0 },
     panneau: { g: rp.left, d: rp.right }, page: document.documentElement.scrollWidth - innerWidth, bulle: p.scrollWidth - p.clientWidth,
-    couleurs: obj && inv ? { objectif: getComputedStyle(obj).stroke, inval: getComputedStyle(inv).stroke, up: couleur('--up-ink'), down: couleur('--down-ink') } : null,
+    couleurs: obj && inv ? { objectif: getComputedStyle(obj).stroke, inval: getComputedStyle(inv).stroke, up: couleur('--up-ink'), down: couleur('--down-ink'),
+      figure: cou ? getComputedStyle(cou).stroke : null, prix: prix ? getComputedStyle(prix).stroke : null } : null,
     rTile: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--r-tile')) || 0, texte: p.innerText };
 });
 /** La bande dit les derniers cas (sans tri), un par carte, chacun avec son SVG et sa légende (date,
@@ -181,7 +184,7 @@ function exemplesOk(ex, tactile) {
   if (!ex.n) return ex.phrases.includes('Aucun cas fini sur ce graphique.') && !ex.bande;
   const B = ex.bande;
   return ex.phrases.includes('Les derniers cas sur ce graphique, sans tri :') && !!B && ex.cartes.length === ex.n && B.defile === 'auto' && /x/.test(B.snap) && B.focus
-    && ex.cartes.every((c, k) => c.svg && c.h >= 40 && c.w >= 130 && c.w <= 150 && c.legende.includes(ex.dernieres[k].quand) && c.legende.includes(ex.dernieres[k].marque))
+    && ex.cartes.every((c, k) => c.svg && c.dessin && c.h >= 40 && c.w >= 130 && c.w <= 150 && c.legende.includes(ex.dernieres[k].quand) && c.legende.includes(ex.dernieres[k].marque))
     && B.g >= ex.panneau.g - 0.5 && B.d <= ex.panneau.d + 0.5 && ex.bulle <= 1 && (!tactile || ex.page <= 0)
     && (ex.n < 3 || B.large > B.client);   // trois cartes ne tiennent pas de front : la bande défile
 }
@@ -491,11 +494,14 @@ async function bulle(o, tactile) {
         if (n < 1 || !exemplesOk(ex, tactile)) fautes.push({ th, n, ex: Object.assign({}, ex, { texte: undefined }) });
         // Carré dans les thèmes carrés ; l'objectif et l'invalidation aux couleurs de la barre des issues ; aucune animation.
         const carre = ex.rTile === 0 ? ex.cartes.every(c => c.rayon === 0) : ex.cartes.every(c => c.rayon <= 8);
-        if (!carre || !ex.couleurs || ex.couleurs.objectif !== ex.couleurs.up || ex.couleurs.inval !== ex.couleurs.down || ex.cartes.some(c => c.anim)) fautes.push({ th, carre, couleurs: ex.couleurs, rTile: ex.rTile, rayons: ex.cartes.map(c => c.rayon) });
+        // Le dessin de la figure (15/10/2026) : une couleur à lui, ni celle du prix ni celles de ✓ et ✗.
+        const U = ex.couleurs, figureAPart = !!U && !!U.figure && ![U.up, U.down, U.prix].includes(U.figure);
+        if (!carre || !U || U.objectif !== U.up || U.inval !== U.down || !figureAPart || ex.cartes.some(c => c.anim)) fautes.push({ th, carre, couleurs: U, figureAPart, rTile: ex.rTile, rayons: ex.cartes.map(c => c.rayon) });
+        if (process.env.CAPTURES) await o.page.locator('#fichePop .stats-exemples').screenshot({ path: path.join(process.env.CAPTURES, 'exemples-' + mode + '-' + w + '-' + th + '.png') }).catch(() => {});
       }
       check(`${mode} ${w} px : dans ${themes.length} thèmes (${faibles} à échantillon faible), le panneau sans barre quand il y a trop peu de cas, « Trop peu de cas » juste sous la phrase, les exemples passés avant « Les chiffres »`,
         !ordres.length, ordres.slice(0, 3));
-      check(`${mode} ${w} px : dans ${themes.length} thèmes, la bande des derniers cas (jusqu’à ${vu} cartes) tient dans le panneau, sans défilement de côté de la page ; cartes de 40 px de haut au moins, carrées dans les thèmes carrés ; objectif et invalidation aux couleurs du thème ; sans mot banni`,
+      check(`${mode} ${w} px : dans ${themes.length} thèmes, la bande des derniers cas (jusqu’à ${vu} cartes) tient dans le panneau, sans défilement de côté de la page ; cartes de 40 px de haut au moins, la figure dessinée sur chacune (ligne de cou ou bornes, points) dans une couleur à part, carrées dans les thèmes carrés ; objectif et invalidation aux couleurs du thème ; sans mot banni`,
         !fautes.length && vu >= 3, fautes.slice(0, 3));
       // Revue du 14/10/2026, C8 : on lisait « 2 918 fois sur 5 » puis « 103. » à la ligne, « (15 » puis
       // « min) », « sans tri » puis « : » seul.
