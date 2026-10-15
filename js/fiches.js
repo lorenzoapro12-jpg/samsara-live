@@ -1057,7 +1057,8 @@ function ficheHtml(id) {
       // &nbsp; : la valeur et son unité, deux balises, ne se séparent pas en fin de ligne (revue du
       // 14/10/2026, C8 ; Fmt.insecables ne lie que dans un même texte).
       + (m && m.unite ? '&nbsp;<span class="fiche-unite">' + echapF(m.unite) + '</span>' : '')
-      + (age !== null ? ' <span class="fiche-age">· publié il y a ' + age + ' min</span>' : '');
+      // L'âge comme partout (Fmt.duree : « 47 min », « 1 h 31 », « 5 h » ; revue du 14/10/2026, M7).
+      + (age !== null ? ' <span class="fiche-age">· publié il y a ' + Fmt.duree(age) + '</span>' : '');
   }
   // « En savoir plus » : seulement ce que les lignes courtes ne disent pas.
   h += '<details class="fiche-plus"><summary>En savoir plus</summary>';

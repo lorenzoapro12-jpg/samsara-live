@@ -515,6 +515,17 @@ titre('13. Petits textes justes : plus de « Complet / Lisible », deux avertiss
   check('C20 : la bulle des scénarios dit « les 3 terminés. » et « Journal : les 3 réalisés ✓. » (plus « les 3 terminé »)',
     l1 && /les 3 terminés\.$/.test(l1[1]) && l2 && /^Journal : les 3 réalisés ✓\.$/.test(l2[1]), [l1, l2]);
 
+  // M7 (une seule règle pour les âges) : la valeur publiée d'une fiche dit son âge comme le voyant
+  // et la pastille (Fmt.duree), plus « publié il y a 300 min » quand ils disent « 5 h ».
+  const mdAvant = T.marketData, ageFiche = min => {
+    T.setData(Object.assign({}, mdAvant, { updated: new Date(Date.now() - min * 60000).toISOString() }));
+    return (/publié il y a ([^<]*)</.exec(T.ficheHtml('amplitude')) || [])[1];
+  };
+  const ages = [ageFiche(47), ageFiche(91), ageFiche(300)];
+  T.setData(mdAvant);
+  check(`M7 : la valeur publiée d’une fiche dit son âge comme le voyant (« ${ages.join(' », « ')} ») : minutes jusqu’à 90, puis heures`,
+    JSON.stringify(ages) === JSON.stringify(['47 min', '1 h 31', '5 h']), ages);
+
   // C21 : l'apostrophe ’ partout, comme le terminal le faisait déjà presque partout (infobulles du
   // Grid Bot et des Infos du marché comprises). Une apostrophe droite entre deux lettres, hors
   // commentaires, est un texte oublié.
