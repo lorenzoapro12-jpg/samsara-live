@@ -10365,13 +10365,16 @@ function metaChronique(chemin) {
   return c ? c[chemin] || c[chemin.replace(/^tf\.[^.]+\./, 'tf.*.')] || null : null;
 }
 const fmtChronique = v => typeof fmtValF === 'function' ? fmtValF(v) : String(v);
+// Le chiffre clé des RSI (6 · 12 · 24) porte la trace du RSI 12, celui du milieu (dit dans son titre).
+const TRACE_KPI = { 'tf.4h.rsi': 'tf.4h.rsi_12' };
 function traceKpi(chemin) {
+  chemin = TRACE_KPI[chemin] || chemin;
   return chemin ? chronique.trace(chemin, { l: 36, h: 10, classe: 'chron-spark', meta: metaChronique(chemin), fmt: fmtChronique }) : '';
 }
 /** Le résumé de la trace en infobulle du chiffre clé : lisible même quand la trace a cédé sa
  *  place (ajusterKpis). */
 function titreKpi(chemin) {
-  if (chemin === 'tf.4h.rsi') return ' title="RSI 6 · 12 · 24, bougies de 4 h"';
+  if (chemin === 'tf.4h.rsi') return ' title="RSI 6 · 12 · 24, bougies de 4 h (la trace : RSI 12)"';
   const r = chemin ? chronique.resume(chemin, { meta: metaChronique(chemin), fmt: fmtChronique }) : '';
   return r ? ' title="' + escHtml(r).replace(/"/g, '&quot;') + '"' : '';
 }
