@@ -96,6 +96,26 @@ check('RSI page = Wilder', Math.abs(rsi[C.length - 1] - refRSI(C, 14)) < 1e-9);
 const ema = page.calcEMA(C, 20);
 check('EMA amorcée par la SMA des 20 premières', Math.abs(ema[19] - C.slice(0, 20).reduce((x, y) => x + y) / 20) < 1e-9);
 
+// MACD (12, 26, 9) : rapide − lente, signal = EMA 9 du MACD amorcée par la moyenne de ses 9 premières
+// valeurs, histogramme = MACD − signal. Référence écrite à part (vérification du 15/10/2026).
+{
+  const calcMACD = new Function('calcEMA', extraire('calcMACD') + '\nreturn calcMACD;')(page.calcEMA);
+  const refEma = (v, p) => { const k = 2 / (p + 1), o = v.map(() => null), d = v.findIndex(x => x !== null);
+    if (d < 0 || v.length - d < p) return o;
+    o[d + p - 1] = v.slice(d, d + p).reduce((a, b) => a + b) / p;
+    for (let i = d + p; i < v.length; i++) o[i] = v[i] * k + o[i - 1] * (1 - k);
+    return o; };
+  const r12 = refEma(C, 12), r26 = refEma(C, 26), rl = C.map((_, i) => r12[i] !== null && r26[i] !== null ? r12[i] - r26[i] : null);
+  const rs = refEma(rl, 9), rh = rl.map((x, i) => x !== null && rs[i] !== null ? x - rs[i] : null);
+  const m = calcMACD(C, 12, 26, 9);
+  const pareil = (a, b) => a.length === b.length && a.every((x, i) => (x === null) === (b[i] === null) && (x === null || Math.abs(x - b[i]) < 1e-9));
+  check('MACD (12, 26, 9) : ligne, signal et histogramme = la référence, mêmes débuts (indices 25 et 33)',
+    pareil(m.macdLine, rl) && pareil(m.signal, rs) && pareil(m.histogram, rh) && m.macdLine.findIndex(x => x !== null) === 25 && m.signal.findIndex(x => x !== null) === 33);
+}
+// Les lignes des sous-graphiques s'arrêtent à la dernière bougie VISIBLE : vue reculée, le MACD ne
+// déborde plus sur la colonne de l'axe.
+check('chaque drawLineAt d’un sous-graphique reçoit la fin de la vue (ve)', (SRC.match(/drawLineAt\([^;]*\);/g) || []).every(x => /, vs, ve\);$/.test(x)) && /drawLineAt\([^;]*\);/.test(SRC));
+
 // mergeTail : remplace la bougie en cours, ajoute la nouvelle, refuse un trou.
 const mk = t => ({ time: t, open: 1, high: 1, low: 1, close: t, volume: 1 });
 let arr = [mk(1), mk(2), mk(3)];
