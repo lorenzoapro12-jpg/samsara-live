@@ -543,6 +543,20 @@ def main():
         check("un point faux déjà écrit est retiré du fichier",
               faux["heure_utc"] not in heures and bon["heure_utc"] in heures, str(heures))
 
+        # Le 16/10, la source a remplacé les points faux par une valeur FIGÉE, à +1 % de
+        # l'OI direct seulement : le contrôle d'écart ne la voyait pas. Fenêtre réelle.
+        reel = [("10", "91761.740"), ("11", "93118.075"), ("12", "93118.075"),
+                ("13", "93118.075"), ("14", "93118.075"), ("15", "93118.075"),
+                ("16", "93247.062")]
+        plateau = [{"heure_utc": f"2026-10-15T{h}:00:00+00:00", "oi_btc": v, "oi_usd": "1"}
+                   for h, v in reel]
+        gardes, ecartes = H.controler_oi(cfg, list(reversed(plateau)))   # ordre de la source indifférent
+        check("série figée du 15/10 (93 118,075 de 11:00 à 15:00) : les 5 points écartés",
+              [e["heure_utc"][11:13] for e in ecartes] == ["11", "12", "13", "14", "15"]
+              and all(e["raison"].startswith("série figée") for e in ecartes), str(ecartes))
+        check("les heures voisines, qui bougent, sont gardées",
+              sorted(p["heure_utc"][11:13] for p in gardes) == ["10", "16"], str(gardes))
+
         # ─── 10. LIGNE DE COMMANDE ──────────────────────────────────────────
         print("\n10. Ligne de commande (code de sortie)")
         base2 = tempfile.mkdtemp(prefix="hist-cli-")

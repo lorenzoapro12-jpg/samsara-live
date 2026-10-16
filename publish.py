@@ -254,17 +254,35 @@ POSITIONNEMENT_PERIODE = "1h"   # ratios L/S et taker : dernier point de la sér
 # mouvement de 3 % en une à quatre heures est déjà rare (mesuré le 15/10) ; 5 % laisse passer
 # les vrais mouvements et attrape un point isolé de cette taille.
 OI_SAUT_MAX_PCT = 5.0
+# Le lendemain, Binance a remplacé ces deux points par une valeur FIGÉE : 93 118,075 BTC
+# de 11:00 à 15:00 (et à chaque point 5 min de 10:55 à 13:30). Un OI réel ne se répète
+# pas au millième de BTC d'une heure à l'autre : sur 53 566 heures de 2020 à 2026, deux
+# valeurs identiques de suite ne sont arrivées que 4 fois, toutes dans des gels de ce genre.
+OI_FIGE_MIN = 2
+
+
+def oi_points_figes(valeurs, n_min=OI_FIGE_MIN):
+    """Indices des points pris dans une suite d'au moins `n_min` valeurs identiques
+    consécutives. Toute la suite est écartée, la première valeur comprise : rien ne dit
+    laquelle est la vraie, et un trou dit vrai."""
+    out, debut = set(), 0
+    for i in range(1, len(valeurs) + 1):
+        if i == len(valeurs) or valeurs[i] != valeurs[debut]:
+            if i - debut >= n_min:
+                out.update(range(debut, i))
+            debut = i
+    return out
 
 
 def oi_points_aberrants(valeurs, live=None, seuil=OI_SAUT_MAX_PCT):
-    """Indices des points horaires d'OI à écarter : un point qui s'écarte de plus de `seuil`
+    """Indices des points horaires d'OI à écarter : ceux d'une série figée, et un point qui s'écarte de plus de `seuil`
     de ses voisins, des DEUX côtés et dans le même sens (un palier réel touche un côté
     seulement). Le dernier point, qui n'a pas de voisin après lui, est jugé contre l'OI
     direct `live`. Les points déjà écartés ne servent pas de voisins : deux points faux
     côte à côte ne se couvrent pas l'un l'autre.
     """
     n = len(valeurs)
-    ecartes = set()
+    ecartes = oi_points_figes(valeurs)
 
     def ecart(v, ref):
         return (v / ref - 1) * 100 if ref else 0.0
