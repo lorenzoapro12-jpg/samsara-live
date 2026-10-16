@@ -195,6 +195,11 @@ try:
           m.get("oi_change_24h_pct") is None and m.get("oi_change_5d_pct") is None, m)
     check("source fautive : l'anomalie est dite dans `errors`",
           any("OI horaire incohérent" in e for e in P.ERRORS), P.ERRORS)
+    P.ERRORS.clear(); P.http_json = faux_fapi(fige)
+    m = P.micro_futures()
+    check("série figée au milieu (cas du 16/10) : variations publiées, aucune erreur (rien n'est retiré)",
+          m.get("oi_change_24h_pct") is not None and m.get("oi_change_5d_pct") is not None and not P.ERRORS,
+          (m, P.ERRORS))
     P.ERRORS.clear(); P.http_json = faux_fapi(serie)
     m = P.micro_futures()
     check("source saine : Δ OI 24 h publiée comme avant",
