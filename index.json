@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-16T05:20:15+00:00",
+ "updated": "2026-10-16T05:27:06+00:00",
  "generator": "historique.py v1.0 — séries publiées dans la branche orpheline `historique`, décrites par `meta` (07/10/2026)",
  "source": "binance (futures et spot) · deribit et coinbase via market-data.json · git (master, publications passées)",
  "branche": "historique",
@@ -7,7 +7,7 @@
   "worktree": "ok",
   "amorcage": "non exécuté : les séries existent déjà",
   "funding": "ok",
-  "open_interest_1h_controle": "ok",
+  "open_interest_1h_controle": "ok : 5 point(s) faux de la source écarté(s)",
   "open_interest_1h": "ok",
   "long_short_1h": "ok",
   "positionnement": "ok",
@@ -85,19 +85,52 @@
    "fichiers": [
     "series/open-interest-1h.csv"
    ],
-   "lignes": 700,
-   "octets": 33084,
+   "lignes": 695,
+   "octets": 32849,
    "periode": {
     "debut": "2026-09-17T02:00:00+00:00",
     "fin": "2026-10-16T05:00:00+00:00"
    },
-   "trous": [],
-   "trous_nombre": 0,
+   "trous": [
+    {
+     "debut": "2026-10-15T10:00:00+00:00",
+     "fin": "2026-10-15T16:00:00+00:00",
+     "manquants": 5
+    }
+   ],
+   "trous_nombre": 1,
    "trous_tronques": false,
    "controle": {
     "reference": "OI direct de la série positionnement, relevé le plus proche entre −5 et +10 min",
     "ecart_max_pct": 5.0,
-    "ecartes": []
+    "fige_min_heures": 2,
+    "ecartes": [
+     {
+      "heure_utc": "2026-10-15T11:00:00+00:00",
+      "oi_btc": "93118.075",
+      "raison": "série figée (même valeur au moins 2 h de suite)"
+     },
+     {
+      "heure_utc": "2026-10-15T12:00:00+00:00",
+      "oi_btc": "93118.075",
+      "raison": "série figée (même valeur au moins 2 h de suite)"
+     },
+     {
+      "heure_utc": "2026-10-15T13:00:00+00:00",
+      "oi_btc": "93118.075",
+      "raison": "série figée (même valeur au moins 2 h de suite)"
+     },
+     {
+      "heure_utc": "2026-10-15T14:00:00+00:00",
+      "oi_btc": "93118.075",
+      "raison": "série figée (même valeur au moins 2 h de suite)"
+     },
+     {
+      "heure_utc": "2026-10-15T15:00:00+00:00",
+      "oi_btc": "93118.075",
+      "raison": "série figée (même valeur au moins 2 h de suite)"
+     }
+    ]
    }
   },
   "long_short_1h": {
