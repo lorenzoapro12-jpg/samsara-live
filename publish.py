@@ -333,19 +333,26 @@ def micro_futures():
         # l'anomalie est dite dans `errors`. Mieux vaut « — » qu'un +8,9 % inventé.
         valeurs = [float(x["sumOpenInterest"]) for x in hist]
         faux = oi_points_aberrants(valeurs, live=r["oi_btc"])
-        if faux:
+        n = len(valeurs)
+        bornes_24h = {n - 1, n - 25}
+        bornes_5j = {n - 1, 0} if n >= OI_HIST_POINTS else set()
+        # Seul un point faux qui retire un chiffre se dit dans `errors` (la carte d'état
+        # passe au rouge) : un point faux au milieu de la série ne fausse aucune variation
+        # publiée, le signaler pendant cinq jours ne serait que du bruit.
+        retires = faux & (bornes_24h | bornes_5j)
+        if retires:
             ERRORS.append("micro_futures: point(s) d'OI horaire incohérent(s) écarté(s) — "
                           + ", ".join(datetime.fromtimestamp(hist[i]["timestamp"] / 1000,
                                                              timezone.utc).strftime("%d/%m %H:%M")
                                       + f" = {valeurs[i]:,.0f} BTC".replace(",", " ")
-                                      for i in sorted(faux)))
+                                      for i in sorted(retires)))
         cur = valeurs[-1]
         r["oi_hist_at"] = datetime.fromtimestamp(hist[-1]["timestamp"] / 1000, timezone.utc
                                                  ).isoformat(timespec="minutes")
-        if not {len(valeurs) - 1, len(valeurs) - 25} & faux:
+        if not bornes_24h & faux:
             r["oi_change_24h_pct"] = round((cur / valeurs[-25] - 1) * 100, 2)
             r["oi_change_1d_pct"] = r["oi_change_24h_pct"]     # ancien nom, même sens désormais
-        if len(hist) >= OI_HIST_POINTS and not {len(valeurs) - 1, 0} & faux:
+        if bornes_5j and not bornes_5j & faux:
             r["oi_change_5d_pct"] = round((cur / valeurs[0] - 1) * 100, 2)
 
     ls = http_json(f"{F}/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period={POSITIONNEMENT_PERIODE}&limit=1")
