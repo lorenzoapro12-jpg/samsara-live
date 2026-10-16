@@ -160,6 +160,10 @@ check("palier réel de +12 % (vrai mouvement) : rien d'écarté",
 pic = list(serie); pic[50] *= 1.09
 check("pic isolé de +9 % au milieu : écarté", P.oi_points_aberrants(pic, live=pic[-1]) == {50})
 queue = serie[:-2] + [serie[-2] * 1.089, serie[-1] * 1.077]
+fige = serie[:100] + [93118.075] * 5 + serie[105:]
+check("série figée (16/10 : 93 118,075 cinq heures de suite) : les 5 points écartés",
+      P.oi_points_aberrants(fige, live=fige[-1]) == set(range(100, 105)), P.oi_points_aberrants(fige, live=fige[-1]))
+check("série qui bouge au millième près : rien d'écarté", P.oi_points_figes([92000.001, 92000.002, 92000.001]) == set())
 check("deux derniers points faux (15/10) : tous deux écartés grâce à l'OI direct",
       P.oi_points_aberrants(queue, live=serie[-1]) == {119, 120}, P.oi_points_aberrants(queue, live=serie[-1]))
 

@@ -299,6 +299,11 @@ TROUS_MAX = 50
 # de la série `positionnement` (fenêtre ci-dessous) ; au-delà de l'écart toléré, il n'est
 # pas écrit et, s'il l'était déjà, il est retiré. Un trou dit vrai ; une valeur fausse ment.
 OI_ECART_MAX_PCT = 5.0
+# Le 16/10, Binance avait remplacé ces points par une valeur figée (93 118,075 BTC de 11:00
+# à 15:00), à +1 % de l'OI direct seulement : le contrôle d'écart la laissait passer. Deux
+# heures de suite à la même valeur au millième n'arrivent pas sur un OI réel (4 fois en
+# 53 566 heures 2020-2026, toutes dans des gels de la source).
+OI_FIGE_MIN = 2
 OI_FENETRE_AVANT_S = 5 * 60
 OI_FENETRE_APRES_S = 10 * 60
 CONTROLE_OI: dict = {}
@@ -837,13 +842,28 @@ def oi_direct(cfg):
 
 
 def controler_oi(cfg, points):
-    """Sépare les points horaires d'OI en (gardés, écartés) contre l'OI direct.
+    """Sépare les points horaires d'OI en (gardés, écartés).
 
-    Un point sans relevé direct dans la fenêtre est gardé : on n'écarte que sur preuve.
+    Deux preuves écartent un point : il appartient à une série FIGÉE (même valeur au
+    millième sur au moins `OI_FIGE_MIN` heures de suite, ce qu'un OI réel ne fait pas), ou
+    il s'écarte de l'OI direct relevé au même moment. Un point sans relevé direct dans la
+    fenêtre et hors série figée est gardé : on n'écarte que sur preuve.
     """
     directs = oi_direct(cfg)
     gardes, ecartes = [], []
-    for p in points:
+    points = sorted(points, key=lambda p: p.get("heure_utc") or "")
+    figes = set()
+    debut = 0
+    for i in range(1, len(points) + 1):
+        if i == len(points) or points[i].get("oi_btc") != points[debut].get("oi_btc"):
+            if i - debut >= OI_FIGE_MIN and points[debut].get("oi_btc"):
+                figes.update(range(debut, i))
+            debut = i
+    for i, p in enumerate(points):
+        if i in figes:
+            ecartes.append({"heure_utc": p["heure_utc"], "oi_btc": p["oi_btc"],
+                            "raison": f"série figée (même valeur au moins {OI_FIGE_MIN} h de suite)"})
+            continue
         try:
             t = dt.datetime.fromisoformat(p["heure_utc"])
             v = float(p["oi_btc"])
@@ -857,6 +877,7 @@ def controler_oi(cfg, points):
             ecart = (v / ref - 1) * 100 if ref else 0.0
             if abs(ecart) > OI_ECART_MAX_PCT:
                 ecartes.append({"heure_utc": p["heure_utc"], "oi_btc": p["oi_btc"],
+                                "raison": "écart à l'OI direct",
                                 "oi_direct_btc": nombre(ref, 3), "ecart_pct": round(ecart, 2)})
                 continue
         gardes.append(p)
@@ -1039,6 +1060,7 @@ def collecter_binance(cfg, sans_reseau):
                                  f"entre −{OI_FENETRE_AVANT_S // 60} et "
                                  f"+{OI_FENETRE_APRES_S // 60} min",
                     "ecart_max_pct": OI_ECART_MAX_PCT,
+                    "fige_min_heures": OI_FIGE_MIN,
                     "ecartes": ecartes,
                 })
                 STATUS["open_interest_1h_controle"] = (
