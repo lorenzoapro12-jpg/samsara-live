@@ -1,0 +1,303 @@
+{
+ "format": "previsions-1",
+ "updated": "2026-10-17T05:28Z",
+ "groupe": "2026-10-17",
+ "version_methode": "v1",
+ "marge_pct": 1,
+ "emis_utc": "2026-10-17T05:24Z",
+ "prix_emission": 81615,
+ "scenarios": [
+  {
+   "id": "P0025",
+   "rang": "1",
+   "groupe": "2026-10-17",
+   "emis_utc": "2026-10-17T05:24Z",
+   "fin_utc": "2026-10-18T04:20Z",
+   "horizon_h": 22.917,
+   "prix_emission": 81615,
+   "forme": "range",
+   "cibles": [],
+   "invalidation": null,
+   "range": [
+    80809,
+    82941
+   ],
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure",
+    "calendrier"
+   ],
+   "origines": {
+    "80809": "plus bas du 16/10 (17:15 UTC)",
+    "82941": "plus haut du 16/10 (11:15 UTC)"
+   },
+   "enonce": "Week-end dans le range de vendredi, entre 80 809 et 82 941",
+   "version_methode": "v1",
+   "base_hasard_pct": 93.4,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [],
+   "invalidation_utc": null
+  },
+  {
+   "id": "P0026",
+   "rang": "2",
+   "groupe": "2026-10-17",
+   "emis_utc": "2026-10-17T05:25Z",
+   "fin_utc": "2026-10-18T04:20Z",
+   "horizon_h": 22.9116,
+   "prix_emission": 81604,
+   "forme": "chemin",
+   "cibles": [
+    79950
+   ],
+   "invalidation": 83280,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure",
+    "mur_options",
+    "zero_gamma"
+   ],
+   "origines": {
+    "79950": "mur de puts 80 000 et plus bas du 15/10 (79 800)",
+    "83280": "grappe 83 120-83 173 (08-14/10), clôture du 13/10 (83 169)"
+   },
+   "enonce": "Retour vers 80 000 (mur de puts) avant 83 280",
+   "version_methode": "v1",
+   "base_hasard_pct": 0.2,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [
+    null
+   ],
+   "invalidation_utc": null
+  },
+  {
+   "id": "P0027",
+   "rang": "3",
+   "groupe": "2026-10-17",
+   "emis_utc": "2026-10-17T05:25Z",
+   "fin_utc": "2026-10-18T04:20Z",
+   "horizon_h": 22.905,
+   "prix_emission": 81604,
+   "forme": "chemin",
+   "cibles": [
+    83280
+   ],
+   "invalidation": 79950,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure",
+    "cvd"
+   ],
+   "origines": {
+    "83280": "grappe 83 120-83 173 (08-14/10), clôture du 13/10 (83 169)",
+    "79950": "mur de puts 80 000 et plus bas du 15/10 (79 800)"
+   },
+   "enonce": "Retour vers 83 280 (grappe 83 120-83 173) avant 80 000",
+   "version_methode": "v1",
+   "base_hasard_pct": 62.5,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [
+    null
+   ],
+   "invalidation_utc": null
+  }
+ ],
+ "precedents": [
+  {
+   "groupe": "2026-10-16",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Pause après la cassure : entre 81 400 et 83 150",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "La cassure continue : 83 933 avant 80 226",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "3",
+     "enonce": "Fausse cassure : retour à 80 226 avant 83 933",
+     "statut": "✅",
+     "premier_ok": "oui"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-15",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Suite de la baisse sous le plus bas d'octobre : 79 760 avant 83 150",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "2",
+     "enonce": "Cassure ratée sous 80 394, rebond : 83 150 avant 79 760",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "3",
+     "enonce": "Pause entre les extrêmes de la nuit 80 226-81 967",
+     "statut": "✅",
+     "premier_ok": null
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-14",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Le plafond tient au CPI : 81 850 avant 85 766",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "2",
+     "enonce": "Aller-retour du CPI dans la boîte 82 410-84 352",
+     "statut": "❌",
+     "premier_ok": "bas"
+    },
+    {
+     "rang": "3",
+     "enonce": "Sortie par le haut après le CPI : 85 766 avant 81 850",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-13",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range d'attente avant le CPI : 82 410 à 84 000 $",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Rebond après la purge de la nuit : 85101 $ avant 81682 $",
+     "statut": "⌛",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Rechute sous le mur de 84 000 : 81682 $ avant 85101 $",
+     "statut": "⌛",
+     "premier_ok": null
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-12",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range sous le double sommet : 83 277 à 84 199 $",
+     "statut": "❌",
+     "premier_ok": "bas"
+    },
+    {
+     "rang": "2",
+     "enonce": "Suite de la cassure : 85500 $ avant 82000 $",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "3",
+     "enonce": "Échec sous 84 200 $ : 82000 $ avant 85500 $",
+     "statut": "✅",
+     "premier_ok": "oui"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-11",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range de dimanche entre 82 546 et 83 173 $",
+     "statut": "❌",
+     "premier_ok": "haut"
+    },
+    {
+     "rang": "2",
+     "enonce": "Sortie par le haut : 84 600 $ avant 81 200 $",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "3",
+     "enonce": "Nouvel échec sous 83 000-83 500 $ : 81 200 $ avant 84 600 $",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-10",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range de week-end entre le plus bas et le plus haut du 09/10",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Sortie par le haut : 84 500 avant 81 000",
+     "statut": "⌛",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Nouvel échec sous 83 500 : 81 000 avant 84 500",
+     "statut": "⌛",
+     "premier_ok": null
+    }
+   ]
+  }
+ ],
+ "bilan": {
+  "ordre": {
+   "matins": 5,
+   "reussis": 3,
+   "regle": "chemin le mieux classé avec invalidation, première zone touchée avant l'invalidation"
+  }
+ },
+ "statuts": {
+  "⏳": "en cours",
+  "✅": "réalisé",
+  "❌": "invalidé d'abord",
+  "◐": "partiel",
+  "⌛": "rien de touché",
+  "⚠": "ambigu"
+ },
+ "ampleur": {
+  "groupe": "2026-10-17",
+  "calcul_utc": "2026-10-17T05:26Z",
+  "debut_utc": "2026-10-17T05:00Z",
+  "fin_utc": "2026-10-18T05:00Z",
+  "typique_pct": 2.0,
+  "une_fois_sur_dix_pct": 4.8
+ },
+ "moments": []
+}
