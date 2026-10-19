@@ -1,12 +1,12 @@
 {
- "updated": "2026-10-18T03:10:09+00:00",
+ "updated": "2026-10-19T03:10:27+00:00",
  "generator": "publier_archives.py v2.1 — archives du VPS (carnet, liquidations, flux insiders, tables sol-radar ; OHLCV en annuel depuis le 14/10/2026)",
  "source": "collecteurs locaux (carnet Binance/Coinbase, liquidations Binance) · ~/.hermes/archive-insiders (Binance fapi 5m, OKX rubik et liquidations, Deribit surface d'options) · base sol-radar (lecture seule)",
  "branche": "historique",
  "repertoire": "series/archives",
  "status": {
   "synchronisation": "à jour",
-  "copie": "2 fichier(s) copié(s)",
+  "copie": "3 fichier(s) copié(s)",
   "insiders": "13 flux, 35 fichier(s), 13 fichier(s) écrit(s)",
   "sol_radar_periodes_closes_reecrites": "ohlcv_1w-2017.csv.gz, ohlcv_1w-2018.csv.gz, ohlcv_1w-2019.csv.gz, ohlcv_1w-2020.csv.gz, ohlcv_1w-2021.csv.gz, ohlcv_1w-2022.csv.gz, ohlcv_1w-2023.csv.gz, ohlcv_1w-2024.csv.gz",
   "sol_radar": "9 table(s), 57 fichier(s), 18 fichier(s) écrit(s), base ouverte en LECTURE SEULE"
@@ -60,13 +60,14 @@
     "cb_mur_ask_usd"
    ],
    "fichiers": [
-    "series/archives/carnet-2026-W42.csv"
+    "series/archives/carnet-2026-W42.csv",
+    "series/archives/carnet-2026-W43.csv"
    ],
-   "lignes": 1306,
-   "octets": 306616,
+   "lignes": 1594,
+   "octets": 374500,
    "periode": {
     "debut": "2026-10-13T14:16:45+00:00",
-    "fin": "2026-10-18T03:05:56+00:00"
+    "fin": "2026-10-19T03:09:07+00:00"
    },
    "cadence_s": 300
   },
@@ -84,11 +85,11 @@
    "fichiers": [
     "series/archives/liquidations-binance-2026-10.csv"
    ],
-   "lignes": 4361,
-   "octets": 236923,
+   "lignes": 5090,
+   "octets": 276639,
    "periode": {
     "debut": "2026-10-13T14:50:40+00:00",
-    "fin": "2026-10-18T03:09:05+00:00"
+    "fin": "2026-10-19T03:03:05+00:00"
    },
    "cadence_s": null
   },
@@ -144,15 +145,15 @@
      {
       "chemin": "series/archives/insiders/binance_funding_8h/binance_funding_8h-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00.001000+00:00",
-      "fin": "2026-10-18T00:00:00+00:00",
-      "lignes": 52,
-      "octets": 653
+      "fin": "2026-10-19T00:00:00+00:00",
+      "lignes": 55,
+      "octets": 682
      }
     ],
-    "lignes": 561,
-    "octets": 6482,
+    "lignes": 564,
+    "octets": 6511,
     "debut": "2026-04-14T08:00:00.003000+00:00",
-    "fin": "2026-10-18T00:00:00+00:00",
+    "fin": "2026-10-19T00:00:00+00:00",
     "colonnes": [
      "ts",
      "funding",
@@ -175,15 +176,15 @@
      {
       "chemin": "series/archives/insiders/binance_oi_5m/binance_oi_5m-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
-      "fin": "2026-10-18T02:55:00+00:00",
-      "lignes": 7468,
-      "octets": 151843
+      "fin": "2026-10-19T02:55:00+00:00",
+      "lignes": 7756,
+      "octets": 158719
      }
     ],
-    "lignes": 8857,
-    "octets": 184031,
+    "lignes": 9145,
+    "octets": 190907,
     "debut": "2026-09-26T04:15:00+00:00",
-    "fin": "2026-10-18T02:55:00+00:00",
+    "fin": "2026-10-19T02:55:00+00:00",
     "colonnes": [
      "ts",
      "btc",
@@ -208,15 +209,15 @@
      {
       "chemin": "series/archives/insiders/binance_premium/binance_premium-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:01:01+00:00",
-      "fin": "2026-10-18T03:00:07+00:00",
-      "lignes": 1644,
-      "octets": 54400
+      "fin": "2026-10-19T03:00:25+00:00",
+      "lignes": 1740,
+      "octets": 57501
      }
     ],
-    "lignes": 1950,
-    "octets": 64882,
+    "lignes": 2046,
+    "octets": 67983,
     "debut": "2026-09-27T21:52:22+00:00",
-    "fin": "2026-10-18T03:00:07+00:00",
+    "fin": "2026-10-19T03:00:25+00:00",
     "colonnes": [
      "ts",
      "mark",
@@ -243,15 +244,15 @@
      {
       "chemin": "series/archives/insiders/binance_retails_5m/binance_retails_5m-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
-      "fin": "2026-10-18T02:55:00+00:00",
-      "lignes": 4932,
-      "octets": 61738
+      "fin": "2026-10-19T03:00:00+00:00",
+      "lignes": 5221,
+      "octets": 65349
      }
     ],
-    "lignes": 6321,
-    "octets": 77687,
+    "lignes": 6610,
+    "octets": 81298,
     "debut": "2026-09-26T04:15:00+00:00",
-    "fin": "2026-10-18T02:55:00+00:00",
+    "fin": "2026-10-19T03:00:00+00:00",
     "colonnes": [
      "ts",
      "btc",
@@ -276,15 +277,15 @@
      {
       "chemin": "series/archives/insiders/binance_taker_5m/binance_taker_5m-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
-      "fin": "2026-10-18T02:50:00+00:00",
-      "lignes": 4931,
-      "octets": 85363
+      "fin": "2026-10-19T02:50:00+00:00",
+      "lignes": 5219,
+      "octets": 90385
      }
     ],
-    "lignes": 6322,
-    "octets": 108515,
+    "lignes": 6610,
+    "octets": 113537,
     "debut": "2026-09-26T04:05:00+00:00",
-    "fin": "2026-10-18T02:50:00+00:00",
+    "fin": "2026-10-19T02:50:00+00:00",
     "colonnes": [
      "ts",
      "btc",
@@ -309,15 +310,15 @@
      {
       "chemin": "series/archives/insiders/binance_topls_5m/binance_topls_5m-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
-      "fin": "2026-10-18T02:55:00+00:00",
-      "lignes": 4932,
-      "octets": 63509
+      "fin": "2026-10-19T02:55:00+00:00",
+      "lignes": 5220,
+      "octets": 67186
      }
     ],
-    "lignes": 6321,
-    "octets": 80280,
+    "lignes": 6609,
+    "octets": 83957,
     "debut": "2026-09-26T04:15:00+00:00",
-    "fin": "2026-10-18T02:55:00+00:00",
+    "fin": "2026-10-19T02:55:00+00:00",
     "colonnes": [
      "ts",
      "btc",
@@ -342,15 +343,15 @@
      {
       "chemin": "series/archives/insiders/coinbase_1h/coinbase_1h-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
-      "fin": "2026-10-18T02:00:00+00:00",
-      "lignes": 411,
-      "octets": 7656
+      "fin": "2026-10-19T03:00:00+00:00",
+      "lignes": 436,
+      "octets": 8125
      }
     ],
-    "lignes": 835,
-    "octets": 15831,
+    "lignes": 860,
+    "octets": 16300,
     "debut": "2026-09-13T08:00:00+00:00",
-    "fin": "2026-10-18T02:00:00+00:00",
+    "fin": "2026-10-19T03:00:00+00:00",
     "colonnes": [
      "ts",
      "close",
@@ -374,15 +375,15 @@
      {
       "chemin": "series/archives/insiders/deribit_options_surface/deribit_options_surface-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:01:02.728311+00:00",
-      "fin": "2026-10-18T03:00:09.104659+00:00",
-      "lignes": 1640,
-      "octets": 265906
+      "fin": "2026-10-19T03:00:27.671729+00:00",
+      "lignes": 1736,
+      "octets": 280270
      }
     ],
-    "lignes": 1940,
-    "octets": 315178,
+    "lignes": 2036,
+    "octets": 329542,
     "debut": "2026-09-27T21:53:03.712823+00:00",
-    "fin": "2026-10-18T03:00:09.104659+00:00",
+    "fin": "2026-10-19T03:00:27.671729+00:00",
     "colonnes": [
      "ts",
      "n_instruments",
@@ -417,15 +418,15 @@
      {
       "chemin": "series/archives/insiders/okx_funding_inverse_8h/okx_funding_inverse_8h-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
-      "fin": "2026-10-18T00:00:00+00:00",
-      "lignes": 52,
-      "octets": 774
+      "fin": "2026-10-19T00:00:00+00:00",
+      "lignes": 55,
+      "octets": 810
      }
     ],
-    "lignes": 161,
-    "octets": 2503,
+    "lignes": 164,
+    "octets": 2539,
     "debut": "2026-08-25T16:00:00+00:00",
-    "fin": "2026-10-18T00:00:00+00:00",
+    "fin": "2026-10-19T00:00:00+00:00",
     "colonnes": [
      "ts",
      "inst",
@@ -456,15 +457,15 @@
      {
       "chemin": "series/archives/insiders/okx_funding_swap_8h/okx_funding_swap_8h-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
-      "fin": "2026-10-18T00:00:00+00:00",
-      "lignes": 52,
-      "octets": 862
+      "fin": "2026-10-19T00:00:00+00:00",
+      "lignes": 55,
+      "octets": 905
      }
     ],
-    "lignes": 161,
-    "octets": 2605,
+    "lignes": 164,
+    "octets": 2648,
     "debut": "2026-08-25T16:00:00+00:00",
-    "fin": "2026-10-18T00:00:00+00:00",
+    "fin": "2026-10-19T00:00:00+00:00",
     "colonnes": [
      "ts",
      "inst",
@@ -488,15 +489,15 @@
      {
       "chemin": "series/archives/insiders/okx_liquidations/okx_liquidations-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:09:54.040000+00:00",
-      "fin": "2026-10-18T02:43:00.448000+00:00",
-      "lignes": 17630,
-      "octets": 534077
+      "fin": "2026-10-19T02:52:04.247000+00:00",
+      "lignes": 18753,
+      "octets": 567351
      }
     ],
-    "lignes": 21707,
-    "octets": 659441,
+    "lignes": 22830,
+    "octets": 692715,
     "debut": "2026-09-27T14:48:28.470000+00:00",
-    "fin": "2026-10-18T02:43:00.448000+00:00",
+    "fin": "2026-10-19T02:52:04.247000+00:00",
     "colonnes": [
      "ts",
      "inst",
@@ -531,15 +532,15 @@
      {
       "chemin": "series/archives/insiders/okx_rubik_ls_1h/okx_rubik_ls_1h-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
-      "fin": "2026-10-18T02:00:00+00:00",
-      "lignes": 411,
-      "octets": 2972
+      "fin": "2026-10-19T02:00:00+00:00",
+      "lignes": 435,
+      "octets": 3148
      }
     ],
-    "lignes": 1205,
-    "octets": 8728,
+    "lignes": 1229,
+    "octets": 8904,
     "debut": "2026-08-28T22:00:00+00:00",
-    "fin": "2026-10-18T02:00:00+00:00",
+    "fin": "2026-10-19T02:00:00+00:00",
     "colonnes": [
      "ts",
      "ratio",
@@ -569,15 +570,15 @@
      {
       "chemin": "series/archives/insiders/okx_rubik_oi_1h/okx_rubik_oi_1h-2026-10.jsonl.gz",
       "debut": "2026-10-01T00:00:00+00:00",
-      "fin": "2026-10-18T02:00:00+00:00",
-      "lignes": 411,
-      "octets": 9382
+      "fin": "2026-10-19T02:00:00+00:00",
+      "lignes": 435,
+      "octets": 9961
      }
     ],
-    "lignes": 1205,
-    "octets": 28909,
+    "lignes": 1229,
+    "octets": 29488,
     "debut": "2026-08-28T22:00:00+00:00",
-    "fin": "2026-10-18T02:00:00+00:00",
+    "fin": "2026-10-19T02:00:00+00:00",
     "colonnes": [
      "ts",
      "oi",
@@ -661,15 +662,15 @@
      {
       "chemin": "series/archives/sol-radar/ohlcv_1d/ohlcv_1d-2026.csv.gz",
       "debut": "2026-01-01",
-      "fin": "2026-10-18",
-      "lignes": 873,
-      "octets": 45091
+      "fin": "2026-10-19",
+      "lignes": 876,
+      "octets": 45255
      }
     ],
-    "lignes": 6531,
-    "octets": 341463,
+    "lignes": 6534,
+    "octets": 341627,
     "debut": "2017-08-17",
-    "fin": "2026-10-18",
+    "fin": "2026-10-19",
     "colonnes": [
      "symbol",
      "date",
@@ -760,15 +761,15 @@
      {
       "chemin": "series/archives/sol-radar/ohlcv_4h/ohlcv_4h-2026.csv.gz",
       "debut": "2026-01-01 00:00:00",
-      "fin": "2026-10-17 12:00:00",
-      "lignes": 4779,
-      "octets": 231898
+      "fin": "2026-10-18 12:00:00",
+      "lignes": 4782,
+      "octets": 232060
      }
     ],
-    "lignes": 38706,
-    "octets": 1941073,
+    "lignes": 38709,
+    "octets": 1941235,
     "debut": "2017-08-17 04:00:00",
-    "fin": "2026-10-17 12:00:00",
+    "fin": "2026-10-18 12:00:00",
     "colonnes": [
      "symbol",
      "date",
@@ -798,7 +799,7 @@
       "debut": "2017-08-14",
       "fin": "2017-12-25",
       "lignes": 20,
-      "octets": 1036
+      "octets": 1037
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2018.csv.gz",
@@ -812,21 +813,21 @@
       "debut": "2019-01-07",
       "fin": "2019-12-30",
       "lignes": 52,
-      "octets": 2511
+      "octets": 2510
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2020.csv.gz",
       "debut": "2020-01-06",
       "fin": "2020-12-28",
       "lignes": 73,
-      "octets": 3413
+      "octets": 3414
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2021.csv.gz",
       "debut": "2021-01-04",
       "fin": "2021-12-27",
       "lignes": 104,
-      "octets": 4759
+      "octets": 4761
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2022.csv.gz",
@@ -840,34 +841,34 @@
       "debut": "2023-01-02",
       "fin": "2023-12-25",
       "lignes": 104,
-      "octets": 4475
+      "octets": 4474
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2024.csv.gz",
       "debut": "2024-01-01",
       "fin": "2024-12-30",
       "lignes": 145,
-      "octets": 6338
+      "octets": 6348
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2025.csv.gz",
       "debut": "2025-01-06",
       "fin": "2025-12-29",
       "lignes": 156,
-      "octets": 6771
+      "octets": 6785
      },
      {
       "chemin": "series/archives/sol-radar/ohlcv_1w/ohlcv_1w-2026.csv.gz",
       "debut": "2026-01-05",
-      "fin": "2026-10-12",
-      "lignes": 123,
-      "octets": 5211
+      "fin": "2026-10-19",
+      "lignes": 126,
+      "octets": 5333
      }
     ],
-    "lignes": 934,
-    "octets": 41599,
+    "lignes": 937,
+    "octets": 41747,
     "debut": "2017-08-14",
-    "fin": "2026-10-12",
+    "fin": "2026-10-19",
     "colonnes": [
      "symbol",
      "date",
@@ -921,15 +922,15 @@
      {
       "chemin": "series/archives/sol-radar/funding_rates/funding_rates-2026-10.csv.gz",
       "debut": "2026-10-05T12:22:33.678648+00:00",
-      "fin": "2026-10-18T00:30:53.871681+00:00",
-      "lignes": 231,
-      "octets": 7501
+      "fin": "2026-10-19T00:31:13.291050+00:00",
+      "lignes": 249,
+      "octets": 8046
      }
     ],
-    "lignes": 1562,
-    "octets": 46784,
+    "lignes": 1580,
+    "octets": 47329,
     "debut": "2026-05-31T15:33:32.357885+00:00",
-    "fin": "2026-10-18T00:30:53.871681+00:00",
+    "fin": "2026-10-19T00:31:13.291050+00:00",
     "colonnes": [
      "symbol",
      "timestamp",
@@ -985,15 +986,15 @@
      {
       "chemin": "series/archives/sol-radar/orderbook_snapshots/orderbook_snapshots-2026-10.csv.gz",
       "debut": "2026-10-05T12:22:33.942752+00:00",
-      "fin": "2026-10-18T00:30:54.144299+00:00",
-      "lignes": 231,
-      "octets": 20436
+      "fin": "2026-10-19T00:31:13.562070+00:00",
+      "lignes": 249,
+      "octets": 21980
      }
     ],
-    "lignes": 1562,
-    "octets": 135229,
+    "lignes": 1580,
+    "octets": 136773,
     "debut": "2026-05-31T15:33:32.604348+00:00",
-    "fin": "2026-10-18T00:30:54.144299+00:00",
+    "fin": "2026-10-19T00:31:13.562070+00:00",
     "colonnes": [
      "id",
      "symbol",
@@ -1040,15 +1041,15 @@
      {
       "chemin": "series/archives/sol-radar/gex_snapshots/gex_snapshots-2026-10.csv.gz",
       "debut": "2026-10-13T14:18:06.029428+00:00",
-      "fin": "2026-10-18T00:05:03.984742+00:00",
-      "lignes": 29,
-      "octets": 38292
+      "fin": "2026-10-19T00:05:21.947413+00:00",
+      "lignes": 35,
+      "octets": 45555
      }
     ],
-    "lignes": 456,
-    "octets": 570147,
+    "lignes": 462,
+    "octets": 577410,
     "debut": "2026-06-06T08:18:43.649275+00:00",
-    "fin": "2026-10-18T00:05:03.984742+00:00",
+    "fin": "2026-10-19T00:05:21.947413+00:00",
     "colonnes": [
      "id",
      "timestamp",
@@ -1095,15 +1096,15 @@
      {
       "chemin": "series/archives/sol-radar/coinbase_premium/coinbase_premium-2026-10.csv.gz",
       "debut": "2026-10-13T14:18:06.498396+00:00",
-      "fin": "2026-10-18T00:05:04.512081+00:00",
-      "lignes": 29,
-      "octets": 1142
+      "fin": "2026-10-19T00:05:22.376516+00:00",
+      "lignes": 35,
+      "octets": 1357
      }
     ],
-    "lignes": 456,
-    "octets": 16161,
+    "lignes": 462,
+    "octets": 16376,
     "debut": "2026-06-06T08:18:44.264294+00:00",
-    "fin": "2026-10-18T00:05:04.512081+00:00",
+    "fin": "2026-10-19T00:05:22.376516+00:00",
     "colonnes": [
      "id",
      "timestamp",
@@ -1151,15 +1152,15 @@
      {
       "chemin": "series/archives/sol-radar/macro_snapshots/macro_snapshots-2026-10.csv.gz",
       "debut": "2026-10-05 12:18:21",
-      "fin": "2026-10-18 00:30:55",
-      "lignes": 78,
-      "octets": 1265
+      "fin": "2026-10-19 00:31:14",
+      "lignes": 84,
+      "octets": 1319
      }
     ],
-    "lignes": 368,
-    "octets": 5671,
+    "lignes": 374,
+    "octets": 5725,
     "debut": "2026-06-29 20:24:54",
-    "fin": "2026-10-18 00:30:55",
+    "fin": "2026-10-19 00:31:14",
     "colonnes": [
      "id",
      "timestamp",
@@ -1208,15 +1209,15 @@
      {
       "chemin": "series/archives/sol-radar/signal_events/signal_events-2026-10.csv.gz",
       "debut": "2026-10-01T00:03:15.379695+00:00",
-      "fin": "2026-10-18T02:47:20.738871+00:00",
-      "lignes": 6112,
-      "octets": 180855
+      "fin": "2026-10-19T03:08:40.163371+00:00",
+      "lignes": 6451,
+      "octets": 191020
      }
     ],
-    "lignes": 49890,
-    "octets": 1500722,
+    "lignes": 50229,
+    "octets": 1510887,
     "debut": "2026-06-02T11:30:30.549748+00:00",
-    "fin": "2026-10-18T02:47:20.738871+00:00",
+    "fin": "2026-10-19T03:08:40.163371+00:00",
     "colonnes": [
      "id",
      "timestamp",
@@ -1234,7 +1235,7 @@
    }
   }
  },
- "total_octets": 6153921,
+ "total_octets": 6245438,
  "lecture": "l'index de la branche (`index.json` à la racine) décrit les séries de positionnement, funding et intérêt ouvert ; CE fichier décrit le sous-arbre `series/archives`, que l'autre n'énumère pas",
  "meta": {
   "decoupage": {
