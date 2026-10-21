@@ -1523,6 +1523,20 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .stats-table { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; margin: 4px 0; font-size: 12px; }
 .stats-table dt { color: var(--ink-2); }
 .stats-table dd { margin: 0; color: var(--ink-1); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+/* Le parcours du prix après la validation (demande de Lorenzo du 18/10/2026) : une rangée par
+   groupe, le trait du milieu = la validation ; vers la droite, le chemin fait vers l'objectif (◆) ;
+   vers la gauche, l'autre sens. Couleurs de la barre des issues ; le hasard plus pâle. */
+.parcours-jauge { margin: 6px 0 4px; font-size: 11px; color: var(--ink-2); }
+.parcours-rangee { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+.parcours-nom { flex: 0 0 70px; }
+.parcours-piste { position: relative; flex: 1; height: 10px; border-radius: min(5px, var(--r-tile)); background: var(--rail); }
+.parcours-piste::before { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--ink-2); }
+.parcours-piste i { position: absolute; top: 1px; bottom: 1px; display: block; }
+.parcours-mieux { background: var(--up); } .parcours-contre { background: var(--down); }
+.parcours-piste .pale { opacity: 0.45; }
+.parcours-objectif { position: absolute; top: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; transform: rotate(45deg); background: var(--up-ink); }
+.parcours-axe { display: flex; justify-content: space-between; margin-left: 76px; font-size: 10px; color: var(--ink-3); }
+.stats-parcours { display: inline-block; margin-top: 2px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .stats-marque { display: inline-block; width: 1.1em; font-weight: 800; text-align: center; }
 .stats-quand { color: var(--ink-1); font-variant-numeric: tabular-nums; }
 /* Exemples passés d'une figure (plan du 13/10/2026, idée 4) : une bande qu'on fait défiler de côté
