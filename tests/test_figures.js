@@ -588,6 +588,49 @@ titre('8 bis. Objectif et statistiques : la ligne courte de la bulle et le déta
       !!T0 && T0.phrase.includes(' : ' + x10 + ' fois sur 10 (' + fr(T0.atteints) + ' sur ' + fr(T0.departs) + ').') && !/\d fois sur \d{2,}(?!\d)/.test(T0.phrase.replace(/fois sur 10 \(/, '')), T0 && T0.phrase); }
 }
 
+// ── 8 ter. Le parcours du prix après la validation (demande de Lorenzo du 18/10/2026) ──
+titre('8 ter. Parcours du prix après la validation : plus haut, plus bas, distance à l’objectif, prix au bout');
+{
+  // Série fabriquée : validation à 100 (indice 0), objectif à 110 (D = 10) ; le prix monte à 106 (mèche),
+  // descend à 96 (mèche), finit à 98 au bout de 3 bougies.
+  const Sx = { h: [100, 103, 106, 101, 99, 120], l: [100, 99, 102, 96, 97, 90], c: [100, 102, 104, 97, 98, 95], n: 6 };
+  const p = G.parcoursDepuis(Sx, 0, 1, 10, 4), q = G.parcoursDepuis(Sx, 0, -1, 10, 4), r = G.parcoursDepuis(Sx, 0, 1, 10, 9);
+  check('parcoursDepuis (hausse) : au plus haut 106 (6 dixièmes du chemin), au plus bas 96 (4 dixièmes dans l’autre sens), fin 98, fenêtre entière (4 bougies, la 5e ignorée)',
+    p && p.pMieux === 106 && Math.abs(p.mieux - 0.6) < 1e-9 && p.pContre === 96 && Math.abs(p.contre - 0.4) < 1e-9 && p.cFin === 98 && Math.abs(p.fin + 0.2) < 1e-9 && p.complet && p.bougies === 4, p);
+  check('parcoursDepuis (baisse) : le sens prévu est le bas (96), l’autre sens le haut (106) ; au-delà de la dernière bougie : « suivi en cours »',
+    q && q.pMieux === 96 && q.pContre === 106 && Math.abs(q.fin - 0.2) < 1e-9 && r && !r.complet && r.bougies === 5 && G.parcoursDepuis(Sx, 0, 1, 0, 4) === null, { q, r });
+  const ctx = ctxDe(NN), b = R.bilan, Pp = P;
+  const val = R.formes.filter(f => !f.doublon && Number.isInteger(f.jConf) && f.jConf !== null);
+  const avec = val.filter(f => f.parcours);
+  // Chaque parcours est celui de sa clôture de validation, sans regarder au-delà de la fenêtre.
+  const okP = avec.every(f => { const e = G.parcoursFigure(f, S, Pp); return e && e.pMieux === f.parcours.pMieux && e.jFenetre <= f.jConf + Pp.horizon && (f.sens > 0 ? e.pMieux >= C[f.jConf] || e.mieux < 0 : true); });
+  check(`${avec.length} figures validées sur ${val.length} ont leur parcours (les autres : objectif déjà dépassé à la validation)`, avec.length >= val.length * 0.8 && okP);
+  // Le résumé du type : les cas finis à fenêtre entière ; « rates » = objectif pas atteint.
+  let okB = true;
+  for (const t of G.TYPES) {
+    const x = b[t].parcours, L = R.formes.filter(f => f.type === t && !f.doublon && f.parcours && f.parcours.complet && ['atteint', 'invalide', 'expire'].includes(f.fin));
+    const Lr = L.filter(f => f.fin !== 'atteint');
+    if (x.tous.n !== L.length || x.rates.n !== Lr.length || (Lr.length && x.rates.mieux !== G.mediane(Lr.map(f => f.parcours.mieux)))) okB = false;
+  }
+  check('bilan : par type, les médianes des parcours finis (tous, et objectif pas atteint), et celles du hasard', okB && G.TYPES.some(t => b[t].temoin.parcours.rates.n > 0));
+  // Les mots : ni « % », ni mot banni, ni conseil ; le prix au plus loin et la distance à l'objectif.
+  const rate = R.formes.filter(f => !f.doublon && ['invalide', 'expire'].includes(f.fin) && f.parcours && f.parcours.mieux < 1).pop();
+  const lp = rate && G.lignesParcours(rate, ctx, Pp, '$'), ph = rate && G.phraseParcours(rate, ctx, Pp, '$'), l = rate && G.resumeStatsFigure(rate, b[rate.type], ctx, Pp, '$');
+  check(`ratée : « ${lp && lp.mieux} » / « ${lp && lp.contre} » / « ${lp && lp.fin} »`, !!lp && lp.mieux.includes(G.prixRond(rate.parcours.pMieux, '$')) && / de l’objectif$/.test(lp.mieux)
+    && lp.mieux.startsWith(rate.sens > 0 ? 'Au plus haut ' : 'Au plus bas ') && /^\d+ h après : /.test(lp.fin) && /[↑↓]/.test(lp.fin), lp);
+  check(`ratée, bulle : « ${ph} »`, !!ph && ph.startsWith('Après la validation, le prix est ') && ph.includes(G.prixRond(rate.parcours.pContre, '$')) && !G.motsBannis(ph).length && !CONSEIL.test(ph) && !/%/.test(ph), ph);
+  check(`ratée, ligne courte : « ${l} »`, !!l && l.includes('pas atteint (au plus près ' + G.prixRond(rate.parcours.pMieux, '$') + ')') && !/%/.test(l), l);
+  const Pt = G.parcoursType(b[rate.type], ctx, Pp), txt = JSON.stringify(Pt);
+  check('panneau : les cas sans objectif atteint d’abord, le hasard, une jauge à deux rangées ; sans « % » ni mot banni', !!Pt && /^Quand l’objectif n’a pas été atteint \(\d+ cas\)/.test(Pt.phrases[0])
+    && Pt.jauge.length === 2 && !/%/.test(txt) && !G.motsBannis(txt).length && !CONSEIL.test(txt), Pt);
+  check('parts du chemin en mots : presque rien, un quart, la moitié, presque tout, tout, 1,4 fois', ['presque rien', 'environ un quart', 'environ la moitié', 'presque tout', 'tout', '1,4 fois'].join('|')
+    === [0.05, 0.24, 0.52, 0.9, 1, 1.4].map(G.partChemin).join('|'));
+  // Sur des années : seulement pour le bitcoin, 15 min / 1 h / 4 h ; trop peu de cas dit tel quel.
+  const btc = u => ({ symbole: 'BTCUSDT', intervalle: u }), A1 = G.parcoursAnnees('range', btc('15m')), A2 = G.parcoursAnnees('fanion', btc('4h'));
+  check(`sur des années : « ${A1 && A1.phrase} »`, !!A1 && /\(340 cas\)/.test(A1.phrase) && /au hasard/.test(A1.phrase) && /^Vers l’objectif : comme au hasard\. Dans l’autre sens : plus loin qu’au hasard/.test(A1.verdict)
+    && /trop peu/.test(A2.phrase) && G.parcoursAnnees('range', { symbole: 'ETHUSDT', intervalle: '15m' }) === null && !/%/.test(A1.phrase + A1.verdict), A1);
+}
+
 // ── 9. Temps ──
 titre('9. Temps');
 {

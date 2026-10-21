@@ -1148,6 +1148,7 @@ const Guide = (function () {
   /** Le repère SANS forme d'une figure confirmée : depuis une bougie sur `pas` de tout
    *  l'historique chargé, les mêmes distances (en ATR de cette bougie) et le même sens, la même
    *  règle (clôtures, invalidation jugée d'abord, P.horizon bougies au plus). Ajouté à t. */
+  const PARCOURS_TEMOIN_PAS = 8;
   function temoin(f, S, P, pas, t) {
     const C = S.c, A = S.atr, n = S.n, s = f.sens;
     for (let k = 0; k < n - 1; k += pas) {
@@ -1163,7 +1164,57 @@ const Guide = (function () {
       if (!issue) continue;                 // issue encore inconnue (fin de l'historique) : pas comptée
       t.departs++;
       if (issue === 'obj') t.atteints++; else if (issue === 'inv') t.invalides++; else t.expires++;
+      // Le parcours, sur la même fenêtre que celui des figures (seulement quand elle est entière) :
+      // un départ sur PARCOURS_TEMOIN_PAS suffit pour des médianes, et le rejeu de chaque clôture
+      // reste rapide (la fenêtre entière est lue, pas seulement jusqu'à l'issue).
+      if (t.parcours && S.h && S.l && k + P.horizon <= n - 1 && t.departs % PARCOURS_TEMOIN_PAS === 0) {
+        const p = parcoursDepuis(S, k, s, f.dObj * a, P.horizon);
+        if (p) { const q = { mieux: p.mieux, contre: p.contre, fin: p.fin }; t.parcours.tous.push(q); if (issue !== 'obj') t.parcours.rates.push(q); }
+      }
     }
+  }
+  // ─── Le parcours du prix après la validation (demande de Lorenzo du 18/10/2026) ───
+  // « Atteint ou pas » ne dit pas comment le prix s'est comporté quand l'objectif n'est pas atteint.
+  // Le parcours le dit, sur une fenêtre FIXE : les P.horizon bougies qui suivent la clôture de
+  // validation (le délai même de l'objectif), mèches comprises, quelle que soit l'issue — les cas se
+  // comparent entre eux, et au trajet au hasard, sur la même durée.
+  /** Le parcours depuis la clôture k0, sens s, objectif à la distance D (> 0) de cette clôture :
+   *  jusqu'où le prix est allé dans le sens prévu (mieux) et dans l'autre (contre), en parts de D
+   *  (1 = l'objectif ; négatif : jamais au-delà de la clôture de départ), et où il finit (fin, en
+   *  parts de D, > 0 : dans le sens prévu). Les prix et bougies de ces points ; complet : la fenêtre
+   *  entière est connue (sinon, suivi en cours). PUR. → null sans bougie après k0. */
+  function parcoursDepuis(S, k0, s, D, horizon) {
+    const C = S.c, H = S.h, L = S.l, n = S.n, c0 = C[k0];
+    if (!(D > 0) || !fini(c0)) return null;
+    const jW = Math.min(n - 1, k0 + horizon);
+    if (!(jW > k0)) return null;
+    let fav = -Infinity, con = -Infinity, jM = k0, jC = k0;
+    for (let j = k0 + 1; j <= jW; j++) {
+      const v = s > 0 ? H[j] - c0 : c0 - L[j], w = s > 0 ? c0 - L[j] : H[j] - c0;
+      if (v > fav) { fav = v; jM = j; }
+      if (w > con) { con = w; jC = j; }
+    }
+    return { mieux: fav / D, contre: con / D, fin: s * (C[jW] - c0) / D, c0, pMieux: c0 + s * fav, pContre: c0 - s * con, cFin: C[jW],
+      jMieux: jM, jContre: jC, jFenetre: jW, bougies: jW - k0, complet: k0 + horizon <= n - 1 };
+  }
+  /** Le parcours d'une figure validée (parcoursDepuis depuis sa clôture de validation) ; null sans
+   *  validation, ou quand cette clôture avait déjà dépassé l'objectif (pas de chemin à mesurer). */
+  function parcoursFigure(f, S, P) {
+    if (!f || !fini(f.jConf) || !fini(f.objectif) || !S || !S.h || !S.l) return null;
+    const c0 = S.c[f.jConf], D = f.sens * (f.objectif - c0);
+    return D > 0 ? parcoursDepuis(S, f.jConf, f.sens, D, P.horizon) : null;
+  }
+  /** La médiane d'une liste de nombres (null si vide). */
+  function mediane(x) {
+    if (!x.length) return null;
+    const y = x.slice().sort((a, b) => a - b), m = y.length >> 1;
+    return y.length % 2 ? y[m] : (y[m - 1] + y[m]) / 2;
+  }
+  /** Le résumé de parcours COMPLETS ([{ mieux, contre, fin }]) : { n, mieux, contre (médianes),
+   *  sensPrevu (fini dans le sens prévu), touche (objectif touché en mèche) }. */
+  function resumeParcours(L) {
+    return { n: L.length, mieux: mediane(L.map(p => p.mieux)), contre: mediane(L.map(p => p.contre)),
+      sensPrevu: L.filter(p => p.fin > 0).length, touche: L.filter(p => p.mieux >= 1).length };
   }
   /** Intervalle de Wilson à 95 % d'un taux k / n. */
   function wilson(k, n) {
@@ -1183,7 +1234,8 @@ const Guide = (function () {
   function bilan(formes, S, P, ebauches) {
     const b = {};
     for (const t of TYPES) b[t] = { type: t, formes: 0, confirmes: 0, atteints: 0, invalides: 0, expires: 0, ouverts: 0, invalidesAvant: 0, expiresAvant: 0, devenusTriples: 0,
-      haut: 0, bas: 0, temoin: { departs: 0, atteints: 0, invalides: 0, expires: 0 }, ebauches: { n: 0, devenues: 0, confirmees: 0 } };
+      haut: 0, bas: 0, temoin: { departs: 0, atteints: 0, invalides: 0, expires: 0, parcours: { tous: [], rates: [] } }, ebauches: { n: 0, devenues: 0, confirmees: 0 },
+      parcours: { tous: [], rates: [] } };
     const conf = [];
     for (const f of formes) {
       if (f.doublon || !b[f.type]) continue;
@@ -1199,6 +1251,14 @@ const Guide = (function () {
       else if (f.fin === 'invalide') x.invalides++;
       else if (f.fin === 'expire') x.expires++;
       else x.ouverts++;
+      // Le parcours du prix après la validation (finie ou pas) ; les cas à fenêtre entière et à issue
+      // connue entrent dans le résumé du type (« rates » : objectif pas atteint).
+      f.parcours = S && P ? parcoursFigure(f, S, P) : null;
+      if (f.parcours && f.parcours.complet && ['atteint', 'invalide', 'expire'].includes(f.fin)) {
+        const q = { mieux: f.parcours.mieux, contre: f.parcours.contre, fin: f.parcours.fin };
+        x.parcours.tous.push(q);
+        if (f.fin !== 'atteint') x.parcours.rates.push(q);
+      }
       if (fini(f.dObj) && fini(f.dInv)) conf.push(f);
     }
     // Ébauches : seules celles dont l'issue est connue ; « devenue » si la figure née d'elle est
@@ -1215,6 +1275,8 @@ const Guide = (function () {
       for (const t of TYPES) b[t].temoin.pas = pas;
     }
     if (P) for (const t of TYPES) b[t].ecart = ecartTemoin(b[t], P);
+    // Les listes de parcours deviennent leurs résumés (médianes et comptes).
+    for (const t of TYPES) for (const x of [b[t], b[t].temoin]) x.parcours = { tous: resumeParcours(x.parcours.tous), rates: resumeParcours(x.parcours.rates) };
     return b;
   }
 
@@ -2800,6 +2862,8 @@ const Guide = (function () {
       if (C.length) texte.push(C[0]);
       // La règle de détection : dans la fiche des figures (charte du 12/10/2026).
       if (valide && fini(f.objectif)) texte.push('Objectif théorique (convention, non garanti) : ' + prix(f.objectif, unite) + (f.fin === 'atteint' ? ', atteint.' : ', pas atteint.'));
+      const PP = valide ? phraseParcours(f, ctx, P, unite) : null;
+      if (PP) texte.push(PP);
       if (b) {
         let t = texteBilan(b, ctx, P, 'expertCompact');
         if (CLASSIQUE[f.type]) t += ' · lecture classique (débattue) : ' + CLASSIQUE[f.type] + (FAMILLES[f.type] === 'lignes' ? '' : ' ; mesuré ↑ ' + b.haut + ' / ↓ ' + b.bas);
@@ -2825,7 +2889,9 @@ const Guide = (function () {
     const conf = valide ? finMs(ctx, f.jConf) : NaN, qc = fini(conf) && heureVueSi(conf) ? ' ' + quandDeb(conf, ctx) : '';
     const texte = [def, valide ? 'Figure validée' + qc + ' ; objectif théorique selon l’usage des analystes : ' + prix(f.objectif, unite) + ', non garanti.' : '',
       // Ce qui s'est passé ensuite : la marque de fin (quand, pourquoi) et le délai, sans redire le résumé.
-      valide && dm && marqueFin(f, ctx, 'debutant', unite) ? marqueFin(f, ctx, 'debutant', unite).replace(/\.$/, '') + ' (' + dm + ' après la validation).' : marqueFin(f, ctx, 'debutant', unite) || (valide ? ensuite[0] : '')]
+      valide && dm && marqueFin(f, ctx, 'debutant', unite) ? marqueFin(f, ctx, 'debutant', unite).replace(/\.$/, '') + ' (' + dm + ' après la validation).' : marqueFin(f, ctx, 'debutant', unite) || (valide ? ensuite[0] : ''),
+      // Ce que le prix a fait au lieu de (ou en plus de) l'objectif (demande de Lorenzo du 18/10/2026).
+      valide ? phraseParcours(f, ctx, P, unite) : '']
       .concat(C.length ? [C[0]] : [], b ? [bilanDebutant(f, b, ctx, P)] : [], [AVERTISSEMENT]);
     return { titre, texte: texte.filter(Boolean), resume: [ensuite, C] };
   }
@@ -2905,6 +2971,67 @@ const Guide = (function () {
         triangle_descendant: [7, null, null, 'peu', 6, null, null, 'peu'],
         triangle_symetrique: [5, null, null, 'peu', 5, null, null, 'peu'],
         fanion: [1, null, null, 'peu', 1, null, null, 'peu'] } } };
+  // Le parcours du prix quand l'objectif n'est PAS atteint (demande de Lorenzo du 18/10/2026),
+  // mesuré hors du site le 21/10/2026 avec CE détecteur et parcoursDepuis, sur les mêmes bougies et
+  // périodes que MESURES_FIGURES (/mnt/project-files/marche/figures-parcours : scripts, résultats).
+  // Fenêtre : les P.horizon (60) bougies après la validation, plus hauts et plus bas compris. Par type
+  // (et « * » : tous types) : [cas sans objectif atteint, vers l'objectif ‰ du chemin (médiane), autre
+  // sens ‰ (médiane), du côté prévu au bout ‰, puis les trois mêmes au hasard (200 départs de même
+  // géométrie par figure), puis les verdicts (« plus? » / « moins? » : |z| ≥ 1,96 dans les deux
+  // découpages de fenêtres ; « PLUS » / « MOINS » : en plus |z| ≥ 3 ; « peu » : moins de 20 cas)].
+  const PARCOURS_FIGURES = { le: '21/10/2026', u: {
+      '15m': { drapeau: [361, 365, 600, 385, 403, 571, 430, 'pareil', 'pareil', 'pareil'],
+        range: [340, 692, 1890, 274, 637, 1575, 327, 'pareil', 'PLUS', 'pareil'],
+        double_creux: [335, 701, 2711, 230, 679, 2553, 267, 'pareil', 'pareil', 'pareil'],
+        double_sommet: [304, 708, 2949, 230, 718, 2651, 254, 'pareil', 'plus?', 'pareil'],
+        biseau_montant: [115, 735, 1465, 409, 682, 1410, 362, 'pareil', 'pareil', 'pareil'],
+        triple_sommet: [115, 730, 2687, 217, 671, 2361, 242, 'pareil', 'pareil', 'pareil'],
+        triple_creux: [99, 729, 2473, 253, 632, 2263, 274, 'pareil', 'pareil', 'pareil'],
+        biseau_descendant: [90, 684, 1412, 344, 686, 1433, 382, 'pareil', 'pareil', 'pareil'],
+        ete: [76, 542, 1518, 276, 558, 1277, 319, 'pareil', 'pareil', 'pareil'],
+        canal_montant: [74, 689, 2743, 216, 772, 2181, 311, 'pareil', 'pareil', 'pareil'],
+        triangle_symetrique: [67, 604, 846, 463, 573, 944, 409, 'pareil', 'pareil', 'pareil'],
+        ete_inverse: [63, 616, 1264, 349, 516, 1189, 341, 'pareil', 'pareil', 'pareil'],
+        triangle_ascendant: [57, 805, 1891, 333, 657, 1335, 369, 'pareil', 'plus?', 'pareil'],
+        canal_descendant: [51, 868, 2274, 373, 782, 2360, 323, 'pareil', 'pareil', 'pareil'],
+        triangle_descendant: [44, 961, 1219, 341, 640, 1269, 380, 'pareil', 'pareil', 'pareil'],
+        fanion: [19, 469, 619, 263, 381, 484, 450, 'peu', 'peu', 'peu'],
+        '*': [2210, 634, 1758, 296, 608, 1556, 328, 'pareil', 'PLUS', 'MOINS'] },
+      '1h': { drapeau: [249, 397, 647, 414, 404, 592, 417, 'pareil', 'pareil', 'pareil'],
+        double_creux: [194, 723, 2619, 263, 694, 2607, 260, 'pareil', 'pareil', 'pareil'],
+        range: [190, 632, 1750, 268, 638, 1667, 309, 'pareil', 'pareil', 'pareil'],
+        double_sommet: [175, 697, 3054, 246, 732, 2836, 221, 'pareil', 'pareil', 'pareil'],
+        triple_sommet: [63, 555, 2831, 127, 689, 2541, 233, 'pareil', 'pareil', 'pareil'],
+        triple_creux: [59, 472, 2893, 136, 646, 2114, 263, 'pareil', 'plus?', 'moins?'],
+        biseau_montant: [53, 770, 1335, 377, 702, 1514, 343, 'pareil', 'pareil', 'pareil'],
+        ete_inverse: [44, 327, 1592, 227, 527, 1140, 350, 'moins?', 'pareil', 'pareil'],
+        ete: [40, 565, 1889, 225, 589, 1612, 272, 'pareil', 'pareil', 'pareil'],
+        biseau_descendant: [34, 599, 1768, 265, 678, 1443, 364, 'pareil', 'pareil', 'pareil'],
+        canal_descendant: [33, 779, 2420, 333, 760, 2491, 293, 'pareil', 'pareil', 'pareil'],
+        triangle_symetrique: [33, 622, 1262, 424, 612, 1051, 385, 'pareil', 'pareil', 'pareil'],
+        canal_montant: [32, 1028, 1801, 312, 737, 2089, 291, 'plus?', 'pareil', 'pareil'],
+        triangle_ascendant: [31, 808, 1819, 387, 699, 1391, 355, 'pareil', 'pareil', 'pareil'],
+        triangle_descendant: [22, 529, 2501, 182, 689, 1617, 347, 'pareil', 'pareil', 'pareil'],
+        fanion: [9, 482, 385, 778, 369, 526, 430, 'peu', 'peu', 'peu'],
+        '*': [1261, 597, 1729, 293, 606, 1589, 313, 'pareil', 'PLUS', 'pareil'] },
+      '4h': { drapeau: [52, 485, 793, 404, 420, 637, 403, 'pareil', 'pareil', 'pareil'],
+        double_creux: [51, 929, 2407, 255, 667, 2710, 260, 'pareil', 'pareil', 'pareil'],
+        range: [39, 637, 1550, 308, 578, 1343, 325, 'pareil', 'pareil', 'pareil'],
+        double_sommet: [34, 742, 2756, 176, 743, 3178, 218, 'pareil', 'pareil', 'pareil'],
+        biseau_montant: [13, 618, 1945, 231, 629, 1580, 317, 'peu', 'peu', 'peu'],
+        ete_inverse: [12, 432, 1084, 167, 516, 1054, 361, 'peu', 'peu', 'peu'],
+        triple_creux: [12, 624, 2675, 167, 563, 1721, 280, 'peu', 'peu', 'peu'],
+        canal_descendant: [11, 965, 1346, 364, 745, 2350, 318, 'peu', 'peu', 'peu'],
+        triple_sommet: [11, 795, 3815, 182, 665, 2806, 207, 'peu', 'peu', 'peu'],
+        canal_montant: [10, 740, 1821, 300, 722, 2072, 289, 'peu', 'peu', 'peu'],
+        ete: [8, 695, 2652, 250, 533, 1346, 293, 'peu', 'peu', 'peu'],
+        triangle_ascendant: [6, 1975, 1554, 833, 728, 1507, 384, 'peu', 'peu', 'peu'],
+        biseau_descendant: [5, 493, 1508, 200, 680, 1351, 390, 'peu', 'peu', 'peu'],
+        triangle_symetrique: [5, 159, 1466, 200, 555, 986, 396, 'peu', 'peu', 'peu'],
+        triangle_descendant: [3, 889, 6350, 0, 716, 2474, 265, 'peu', 'peu', 'peu'],
+        fanion: [1, 461, 478, 1000, 330, 503, 432, 'peu', 'peu', 'peu'],
+        '*': [273, 637, 1635, 286, 589, 1616, 311, 'plus?', 'pareil', 'pareil'] }
+ } };
   /** La mesure sur des années d'un type pour ce graphique (ctx : { symbole, intervalle }) ; null
    *  pour une autre paire ou une autre unité de temps. */
   function mesureFigure(type, ctx) {
@@ -2943,10 +3070,11 @@ const Guide = (function () {
    *  la mesure existe (mesureFigure) ; sinon le compte de ce graphique, avec le verdict du témoin. */
   function resumeStatsFigure(f, b, ctx, P, unite) {
     const O = ciblesFigure(f, ctx, P), pr = o => prixRond(o.p, unite), h = ligneHasard(mesureFigure(f.type, ctx)), t = tauxCible(b);
+    const lp = f.fin && f.fin !== 'atteint' ? lignesParcours(f, ctx, P, unite) : null;
     const taux = h ? 'ces figures : ' + h : t ? 'sur ce graphique : ' + t + (b.ecart && VERDICT_ECART[b.ecart] && t !== 'aucun cas terminé' ? ', ' + VERDICT_ECART[b.ecart] : '') : '';
     if (!O.length) return (taux ? majuscule(taux) : 'Statistiques') + ' ▸';
     const o = O.length > 1 ? 'Objectif ' + O.map(o => pr(o) + ' ' + enHautBas(o.s)).join(' ou ')
-      : 'Objectif ' + pr(O[0]) + (f.fin === 'atteint' ? ' atteint' : f.fin ? ' pas atteint' : '');
+      : 'Objectif ' + pr(O[0]) + (f.fin === 'atteint' ? ' atteint' : f.fin ? ' pas atteint' + (lp ? ' (' + lp.pres + ')' : '') : '');
     return o + (taux ? ' · ' + taux : '') + ' ▸';
   }
   /** Le détail des statistiques d'une figure : son objectif et comment il se calcule, ce que ces
@@ -2955,17 +3083,113 @@ const Guide = (function () {
    *  [{ s, p, texte }], cibleEtat, comment, annees: { phrase, verdict, source } | null, taux: {
    *  atteints, invalides, expires, finis, ouverts }, phrase, temoin: { atteints, departs, phrase } |
    *  null, delai, lignes, dernieres: [{ quand, marque, issue }], source, faible, risque }. */
+  /** Un verdict du parcours sur des années, en mots (« plus loin », « moins loin »). */
+  const VERDICT_LOIN = { pareil: 'comme au hasard', 'plus?': 'un peu plus loin qu’au hasard, sans que ce soit net', 'moins?': 'un peu moins loin qu’au hasard, sans que ce soit net',
+    PLUS: 'plus loin qu’au hasard', MOINS: 'moins loin qu’au hasard' };
+  /** Le parcours sur des années quand l'objectif n'est pas atteint (PARCOURS_FIGURES), pour le
+   *  panneau : { phrase, verdict } ; null hors de la mesure. */
+  function parcoursAnnees(type, ctx) {
+    const U = ctx && ctx.symbole === MESURES_FIGURES.symbole ? PARCOURS_FIGURES.u[ctx.intervalle] : null, m = U && U[type];
+    if (!m) return null;
+    if (m[7] === 'peu') return { phrase: 'Quand l’objectif n’a pas été atteint : trop peu de cas passés (' + m[0] + ') pour dire ce que fait le prix.', verdict: '' };
+    const pas = { '15m': 900, '1h': 3600, '4h': 14400 }[ctx.intervalle], fen = fenetreMots({ pas, intervalle: ctx.intervalle }, { horizon: 60 });
+    const ch = x => { const t = partChemin(x / 1000); return /tout$|fois$/.test(t) ? t + ' le chemin' : t + ' du chemin'; };
+    const di = x => { const t = partChemin(x / 1000); return /tout$/.test(t) ? t.replace('tout', 'autant') : /fois$/.test(t) ? t + ' cette distance' : t + ' de cette distance'; };
+    const court = x => partChemin(x / 1000).replace(/^environ /, '');
+    const phrase = 'Quand l’objectif n’a pas été atteint (' + nombre(m[0], 0) + ' cas) : en général, le prix a fait ' + ch(m[1]) + ' vers lui (au hasard : ' + court(m[4]) + '), puis '
+      + di(m[2]) + ' dans l’autre sens (au hasard : ' + court(m[5]) + ') ; ' + fen + ' après la validation, il était du côté prévu ' + surDix(m[3]) + ' fois sur 10 (au hasard : ' + surDix(m[6]) + ').';
+    const verdict = m[7] === 'pareil' && m[8] === 'pareil' && m[9] === 'pareil' ? 'Comme un trajet de même taille pris au hasard.'
+      : 'Vers l’objectif : ' + VERDICT_LOIN[m[7]] + '. Dans l’autre sens : ' + VERDICT_LOIN[m[8]] + '. Du côté prévu : ' + VERDICT_ANNEES[m[9]] + '.';
+    return { phrase, verdict };
+  }
   /** Ce que ces figures ont fait sur des années, pour le panneau ; null hors de la mesure. */
   function annees(f, ctx) {
     const M = mesureFigure(f.type, ctx);
     if (!M) return null;
     const source = 'Mesuré sur le bitcoin (Binance) en ' + nomIntervalle(ctx.intervalle) + ', de ' + M.depuis + ' au ' + M.le + ', avec les règles de ce site.';
-    if (!mesurable(M)) return { phrase: 'Trop peu de cas passés (' + M.n + ') pour juger.', verdict: '', source };
+    if (!mesurable(M)) return { phrase: 'Trop peu de cas passés (' + M.n + ') pour juger.', verdict: '', source, parcours: parcoursAnnees(f.type, ctx) };
     const sur = m => surDix(m.p) + ' fois sur 10 (au hasard : ' + surDix(m.q) + ')';
+    const parcours = parcoursAnnees(f.type, ctx);
     return { phrase: 'Les ' + nombre(M.n, 0) + ' cas passés de cette figure : partis d’abord dans le sens prévu ' + sur(M.sens) + ', objectif atteint ' + sur(M.obj) + '.',
       verdict: M.sens.v === 'pareil' && M.obj.v === 'pareil' ? 'Comme un trajet de même taille pris au hasard.'
         : 'Le sens : ' + VERDICT_ANNEES[M.sens.v] + '. L’objectif : ' + VERDICT_ANNEES[M.obj.v] + '.',
-      source };
+      source, parcours };
+  }
+  // ─── Le parcours du prix en mots (demande de Lorenzo du 18/10/2026) ───
+  /** La durée de la fenêtre du parcours (P.horizon bougies) : « 15 h », « 60 h », « 10 jours ». */
+  function fenetreMots(ctx, P) {
+    const s = ctx && fini(ctx.pas) && ctx.pas > 0 ? P.horizon * ctx.pas : NaN;
+    if (!fini(s)) return P.horizon + ' ' + periode(ctx && ctx.intervalle)[3];
+    return s <= 72 * 3600 ? Math.max(1, Math.round(s / 3600)) + ' h' : nombre(Math.round(s / 86400), 0) + ' jours';
+  }
+  /** Une part du chemin vers l'objectif, en mots (le panneau ne dit pas de « % ») : « presque rien »,
+   *  « un quart », « la moitié », « trois quarts », « tout », « 1,4 fois ». */
+  function partChemin(x) {
+    if (!fini(x) || x < 0.1) return 'presque rien';
+    if (x >= 1.15) return nombre(Math.round(x * 10) / 10, 1).replace(/,0$/, '') + ' fois';
+    if (x >= 0.97) return 'tout';
+    if (x >= 0.87) return 'presque tout';
+    const F = [[0.25, 'un quart'], [1 / 3, 'un tiers'], [0.5, 'la moitié'], [2 / 3, 'deux tiers'], [0.75, 'trois quarts']];
+    let m = F[0];
+    for (const f of F) if (Math.abs(f[0] - x) < Math.abs(m[0] - x)) m = f;
+    return 'environ ' + m[1];
+  }
+  /** Le parcours d'une figure validée (f.parcours, fait par le bilan), en lignes courtes : jusqu'où
+   *  le prix est allé dans le sens prévu (au plus haut pour une figure haussière, au plus bas pour
+   *  une baissière) et sa distance à l'objectif, jusqu'où dans l'autre sens, où il était au bout de
+   *  la fenêtre. → { mieux, contre, fin, pres } (pres : « au plus près 83 200 $ » pour la ligne du
+   *  bas de la bulle) | null. */
+  function lignesParcours(f, ctx, P, unite) {
+    const p = f && f.parcours;
+    if (!p || !fini(f.objectif)) return null;
+    const pr = v => prixRond(v, unite), haut = f.sens > 0, ecart = Math.abs(f.objectif - p.pMieux);
+    const vers = p.mieux >= 1 ? (ecart >= 0.5 ? pr(ecart) + ' au-delà de l’objectif' : 'pile à l’objectif') : 'à ' + pr(ecart) + ' de l’objectif';
+    // Le prix au bout de la fenêtre, et de combien il est au-dessus (↑) ou au-dessous (↓) de la validation.
+    const dv = p.cFin - p.c0, fl = dv > 0 ? '↑ ' : dv < 0 ? '↓ ' : '';
+    const fin = p.complet ? fenetreMots(ctx, P) + ' après : ' + pr(p.cFin) + (fl ? ' (' + fl + pr(Math.abs(dv)) + ')' : '') : 'Suivi en cours';
+    return { mieux: (haut ? 'Au plus haut ' : 'Au plus bas ') + pr(p.pMieux) + ' · ' + vers,
+      contre: (haut ? 'Au plus bas ' : 'Au plus haut ') + pr(p.pContre),
+      fin, pres: p.mieux >= 1 ? 'touché sans y rester' : 'au plus près ' + pr(p.pMieux) };
+  }
+  /** Le parcours d'une figure passée en une phrase (sa bulle) : « Après la validation, le prix est
+   *  monté jusqu’à 83 200 $, à 900 $ de l’objectif, et descendu jusqu’à 81 000 $ ; 15 h après, il
+   *  était à 82 400 $. » Sans mot technique (les deux modes). null sans parcours. */
+  function phraseParcours(f, ctx, P, unite) {
+    const p = f && f.parcours;
+    if (!p || !fini(f.objectif)) return null;
+    const pr = v => prixRond(v, unite), haut = f.sens > 0, ecart = Math.abs(f.objectif - p.pMieux);
+    const va = haut ? 'monté' : 'descendu', revient = haut ? 'descendu' : 'monté';
+    const vers = p.mieux >= 1 ? (ecart >= 0.5 ? pr(ecart) + ' au-delà de l’objectif' : 'pile à l’objectif') : 'à ' + pr(ecart) + ' de l’objectif';
+    const t = p.mieux > 0 ? 'le prix est ' + va + ' jusqu’à ' + pr(p.pMieux) + ', ' + vers : 'le prix n’est jamais ' + va + ' plus loin que son prix de validation (' + vers + ')';
+    const c = p.contre > 0 ? ', et ' + revient + ' jusqu’à ' + pr(p.pContre) : '';
+    const fin = p.complet ? ' ; ' + fenetreMots(ctx, P) + ' après, il était à ' + pr(p.cFin) + '.' : ' (suivi en cours).';
+    return 'Après la validation, ' + t + c + fin;
+  }
+  /** Le parcours des cas d'un type (le bilan : b.parcours, b.temoin.parcours), pour le panneau : des
+   *  phrases et la jauge (les médianes : jusqu'où dans le sens prévu, jusqu'où dans l'autre sens, en
+   *  parts du chemin vers l'objectif). Les cas sans objectif atteint d'abord : c'est la question
+   *  (« quand une figure ne fonctionne pas, le comportement exact du prix »). → null sans cas. */
+  function parcoursType(b, ctx, P) {
+    const B = b && b.parcours, T = b && b.temoin && b.temoin.parcours;
+    if (!B || !B.tous.n) return null;
+    const R = B.rates, A = B.tous, fen = fenetreMots(ctx, P), surDixT = (k, n) => Math.round(k / n * 10);
+    // « la moitié du chemin », « tout le chemin », « 1,4 fois le chemin » ; la même distance dans l'autre sens.
+    const chemin = x => { const t = partChemin(x); return /tout$/.test(t) ? t + ' le chemin' : /fois$/.test(t) ? t + ' le chemin' : t + ' du chemin'; };
+    const distance = x => { const t = partChemin(x); return /tout$/.test(t) ? t.replace('tout', 'autant') : /fois$/.test(t) ? t + ' cette distance' : t + ' de cette distance'; };
+    const phrases = [];
+    if (R.n) phrases.push('Quand l’objectif n’a pas été atteint (' + R.n + ' cas) : en général, le prix a fait ' + chemin(R.mieux) + ' vers lui, et '
+      + distance(R.contre) + ' dans l’autre sens. ' + fen + ' après la validation, il était du côté prévu ' + R.sensPrevu + ' fois sur ' + R.n + '.'
+      + (R.touche ? ' ' + R.touche + ' fois, le prix a touché l’objectif sans y rester.' : ''));
+    else phrases.push('Chaque fois, l’objectif a été atteint.');
+    phrases.push('Toutes les figures validées (' + A.n + ' cas) : en général ' + chemin(A.mieux) + ', ' + distance(A.contre) + ' dans l’autre sens, du côté prévu '
+      + A.sensPrevu + ' fois sur ' + A.n + ' au bout de ' + fen + '.');
+    const temoin = T && T.rates.n && T.tous.n ? 'Au hasard (un trajet de même taille parti n’importe quand), quand l’objectif n’est pas atteint : ' + chemin(T.rates.mieux) + ', '
+      + distance(T.rates.contre) + ' dans l’autre sens, du côté prévu ' + surDixT(T.rates.sensPrevu, T.rates.n) + ' fois sur 10.' : null;
+    const jauge = [];
+    if (R.n) jauge.push({ nom: 'Pas atteint', mieux: R.mieux, contre: R.contre, cl: '' });
+    if (R.n && T && T.rates.n) jauge.push({ nom: 'Au hasard', mieux: T.rates.mieux, contre: T.rates.contre, cl: 'pale' });
+    return { phrases, temoin, jauge, rates: R, tous: A,
+      note: 'Mesuré sur les ' + fen + ' qui suivent la validation, plus hauts et plus bas compris, quelle que soit l’issue. « Du côté prévu » : au-delà du prix de validation, dans le sens de la figure. « En général » : la moitié des cas vont moins loin, l’autre moitié plus loin.' };
   }
   function statsFigure(f, res, ctx, P, unite) {
     const b = res && res.bilan ? res.bilan[f.type] : null, fam = famille(f), per = periode(ctx && ctx.intervalle), O = ciblesFigure(f, ctx, P);
@@ -2973,7 +3197,7 @@ const Guide = (function () {
     const S = { titre: nomL + ' : statistiques', type: f.type, cibles: O.map(o => ({ s: o.s, p: o.p, texte: prix(o.p, unite) + (O.length > 1 ? ' si le prix sort ' + (o.s > 0 ? 'par le haut' : 'par le bas') : '') })),
       cibleEtat: f.fin === 'atteint' ? 'Atteint.' : f.fin && O.length ? 'Pas atteint : la figure est finie.' : !O.length ? 'Pas d’objectif : la figure n’a jamais été validée.' : f.phase === 'confirme' ? 'La figure est validée : l’objectif compte à partir de maintenant.' : 'Il ne compte que si la figure est validée.',
       comment: 'Comment il se calcule : ' + commentCible(f) + ' C’est l’usage des analystes, pas une mesure du site, et rien ne le garantit.',
-      annees: annees(f, ctx), taux: null, phrase: '', temoin: null, delai: null, lignes: [], dernieres: [], faible: false,
+      annees: annees(f, ctx), taux: null, phrase: '', temoin: null, delai: null, lignes: [], dernieres: [], faible: false, parcours: null,
       source: 'Mesuré par le site sur ' + (dernieres(ctx && ctx.duree) ? 'les ' + dernieres(ctx.duree) : 'l’historique') + ' de ce graphique (' + nomIntervalle(ctx && ctx.intervalle) + '), sans regarder l’avenir : à chaque instant, seul le passé est connu.',
       risque: AVERTISSEMENT };
     if (!b) return S;
@@ -2991,6 +3215,7 @@ const Guide = (function () {
     const D = atteintes.map(g => delaiIssue(g, ctx)).filter(fini).sort((x, y) => x - y);
     const dm = D.length ? dureeMots(D[Math.floor((D.length - 1) / 2)]) : null;
     if (dm) S.delai = 'Quand il a été atteint, c’était ' + (D.length > 1 ? 'en général ' : '') + dm + ' après la validation' + (D.length > 1 ? ' (la moitié des fois plus vite)' : '') + '.';
+    S.parcours = parcoursType(b, ctx, P);
     const L = S.lignes, ex = x => x > 1 ? 's' : '';
     L.push([fam === 'lignes' ? 'Figures repérées' : 'Repérées', b.formes + (b.devenusTriples ? ' (dont ' + b.devenusTriples + ' devenu' + ex(b.devenusTriples) + ' triple' + ex(b.devenusTriples) + ')' : '')]);
     L.push([majuscule(valides), String(b.confirmes)]);
@@ -3017,7 +3242,9 @@ const Guide = (function () {
         fin: g.fin, debut: g.debut, jConf: g.jConf, jFin: g.jFin, sens: g.sens, niveau: fini(g.niveau) ? g.niveau : null, objectif: g.objectif, invalidation: g.invalidation,
         // Le dessin de la figure, comme sur le graphique (demande de Lorenzo du 15/10/2026 : « on la
         // cherche ») : ses points et sa ligne de cou (ou ses bornes) jusqu'à la validation.
-        geo: geoFigure(g, g.jConf) };
+        geo: geoFigure(g, g.jConf),
+        // Ce que le prix a fait après la validation (demande de Lorenzo du 18/10/2026).
+        parcours: lignesParcours(g, ctx, P, unite) };
     });
     return S;
   }
@@ -3366,6 +3593,6 @@ const Guide = (function () {
     texteSuiteDebutant, prixRond, USAGES_CHIFFRES, usageChiffre, avecUsage, cleEcart, ageLu, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
     MARQUES_FIN, motEchec, nomFormeDetail, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, libelleFormeCourt, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant,
-    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, geoFigure, exempleSvg, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, fourchette, cassureDite, quandCassure, phrasesCassureFourchette, texteCassureFourchette, phrasesCassureDebutant, bulleCassureDebutant, synthese };
+    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, parcoursDepuis, parcoursFigure, resumeParcours, mediane, lignesParcours, phraseParcours, parcoursType, fenetreMots, partChemin, PARCOURS_FIGURES, parcoursAnnees, geoFigure, exempleSvg, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, fourchette, cassureDite, quandCassure, phrasesCassureFourchette, texteCassureFourchette, phrasesCassureDebutant, bulleCassureDebutant, synthese };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;
