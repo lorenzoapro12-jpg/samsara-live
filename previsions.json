@@ -1,0 +1,303 @@
+{
+ "format": "previsions-1",
+ "updated": "2026-10-24T04:31Z",
+ "groupe": "2026-10-24",
+ "version_methode": "v1",
+ "marge_pct": 1,
+ "emis_utc": "2026-10-24T04:29Z",
+ "prix_emission": 80865,
+ "scenarios": [
+  {
+   "id": "P0034",
+   "rang": "1",
+   "groupe": "2026-10-24",
+   "emis_utc": "2026-10-24T04:29Z",
+   "fin_utc": "2026-10-25T05:20Z",
+   "horizon_h": 24.8363,
+   "prix_emission": 80865,
+   "forme": "range",
+   "cibles": [],
+   "invalidation": null,
+   "range": [
+    80513,
+    81214
+   ],
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure",
+    "calendrier"
+   ],
+   "origines": {
+    "80513": "plus bas de la nuit (23/10 23:0x UTC), le plus bas depuis le 15/10",
+    "81214": "plus haut de la nuit (24/10 00:00 UTC)"
+   },
+   "enonce": "Le week-end reste entre le plus bas de la nuit 80 513 et son plus haut 81 214",
+   "version_methode": "v1",
+   "base_hasard_pct": 53.6,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [],
+   "invalidation_utc": null
+  },
+  {
+   "id": "P0035",
+   "rang": "2",
+   "groupe": "2026-10-24",
+   "emis_utc": "2026-10-24T04:30Z",
+   "fin_utc": "2026-10-25T05:20Z",
+   "horizon_h": 24.8311,
+   "prix_emission": 80865,
+   "forme": "chemin",
+   "cibles": [
+    79060
+   ],
+   "invalidation": 82670,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure",
+    "long_short",
+    "zero_gamma"
+   ],
+   "origines": {
+    "79060": "zéro gamma 79 054 (Samsara 04:19 UTC)",
+    "82670": "plus bas du 21/10 (82 635) et de la nuit du 22/10 (82 671), ancien support"
+   },
+   "enonce": "Baisse vers 79 060 (zéro gamma) avant 82 670",
+   "version_methode": "v1",
+   "base_hasard_pct": 11.2,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [
+    null
+   ],
+   "invalidation_utc": null
+  },
+  {
+   "id": "P0036",
+   "rang": "3",
+   "groupe": "2026-10-24",
+   "emis_utc": "2026-10-24T04:30Z",
+   "fin_utc": "2026-10-25T05:20Z",
+   "horizon_h": 24.8289,
+   "prix_emission": 80865,
+   "forme": "chemin",
+   "cibles": [
+    82670
+   ],
+   "invalidation": 79060,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "cvd",
+    "mur_carnet"
+   ],
+   "origines": {
+    "82670": "plus bas du 21/10 (82 635) et de la nuit du 22/10 (82 671), ancien support",
+    "79060": "zéro gamma 79 054 (Samsara 04:19 UTC)"
+   },
+   "enonce": "Retour vers 82 670 (ancien support des 21-22/10) avant 79 060",
+   "version_methode": "v1",
+   "base_hasard_pct": 47.3,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [
+    null
+   ],
+   "invalidation_utc": null
+  }
+ ],
+ "precedents": [
+  {
+   "groupe": "2026-10-23",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range entre le plus bas d'hier 80 940 et le plus haut de la nuit 82 034",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Retour vers 79 930 (zéro gamma, plus bas du 15/10) avant 83 440",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "3",
+     "enonce": "Retour vers 83 440 (plus haut du 20/10) avant 79 930",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-22",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range entre le mur de puts 82 000 et le mur de gamma 84 000",
+     "statut": "❌",
+     "premier_ok": "bas"
+    },
+    {
+     "rang": "2",
+     "enonce": "Retour vers 81 200 (plus bas du 20/10) avant 84 580",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "3",
+     "enonce": "Retour vers 84 580 (haut de la cassure du 21/10) avant 81 200",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-17",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Week-end dans le range de vendredi, entre 80 809 et 82 941",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Retour vers 80 000 (mur de puts) avant 83 280",
+     "statut": "⌛",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Retour vers 83 280 (grappe 83 120-83 173) avant 80 000",
+     "statut": "⌛",
+     "premier_ok": null
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-16",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Pause après la cassure : entre 81 400 et 83 150",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "La cassure continue : 83 933 avant 80 226",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "3",
+     "enonce": "Fausse cassure : retour à 80 226 avant 83 933",
+     "statut": "✅",
+     "premier_ok": "oui"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-15",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Suite de la baisse sous le plus bas d'octobre : 79 760 avant 83 150",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "2",
+     "enonce": "Cassure ratée sous 80 394, rebond : 83 150 avant 79 760",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "3",
+     "enonce": "Pause entre les extrêmes de la nuit 80 226-81 967",
+     "statut": "✅",
+     "premier_ok": null
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-14",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Le plafond tient au CPI : 81 850 avant 85 766",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "2",
+     "enonce": "Aller-retour du CPI dans la boîte 82 410-84 352",
+     "statut": "❌",
+     "premier_ok": "bas"
+    },
+    {
+     "rang": "3",
+     "enonce": "Sortie par le haut après le CPI : 85 766 avant 81 850",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-13",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range d'attente avant le CPI : 82 410 à 84 000 $",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Rebond après la purge de la nuit : 85101 $ avant 81682 $",
+     "statut": "⌛",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Rechute sous le mur de 84 000 : 81682 $ avant 85101 $",
+     "statut": "⌛",
+     "premier_ok": null
+    }
+   ]
+  }
+ ],
+ "bilan": {
+  "ordre": {
+   "matins": 7,
+   "reussis": 5,
+   "regle": "chemin le mieux classé avec invalidation, première zone touchée avant l'invalidation"
+  }
+ },
+ "statuts": {
+  "⏳": "en cours",
+  "✅": "réalisé",
+  "❌": "invalidé d'abord",
+  "◐": "partiel",
+  "⌛": "rien de touché",
+  "⚠": "ambigu"
+ },
+ "ampleur": {
+  "groupe": "2026-10-24",
+  "calcul_utc": "2026-10-24T04:30Z",
+  "debut_utc": "2026-10-24T04:00Z",
+  "fin_utc": "2026-10-25T04:00Z",
+  "typique_pct": 1.9,
+  "une_fois_sur_dix_pct": 4.4
+ },
+ "moments": []
+}
