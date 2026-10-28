@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-28T16:50:20+00:00",
+ "updated": "2026-10-28T17:05:20+00:00",
  "generator": "historique.py v1.0 — séries publiées dans la branche orpheline `historique`, décrites par `meta` (07/10/2026)",
  "source": "binance (futures et spot) · deribit et coinbase via market-data.json · git (master, publications passées)",
  "branche": "historique",
@@ -43,11 +43,11 @@
    "fichiers": [
     "series/positionnement/2026-10.csv"
    ],
-   "lignes": 2522,
-   "octets": 409754,
+   "lignes": 2523,
+   "octets": 409922,
    "periode": {
     "debut": "2026-10-02T11:18:18+00:00",
-    "fin": "2026-10-28T16:48:20+00:00"
+    "fin": "2026-10-28T17:03:20+00:00"
    },
    "trous": [],
    "trous_nombre": 0,
@@ -85,11 +85,11 @@
    "fichiers": [
     "series/open-interest-1h.csv"
    ],
-   "lignes": 999,
-   "octets": 47137,
+   "lignes": 1000,
+   "octets": 47184,
    "periode": {
     "debut": "2026-09-17T02:00:00+00:00",
-    "fin": "2026-10-28T16:00:00+00:00"
+    "fin": "2026-10-28T17:00:00+00:00"
    },
    "trous": [],
    "trous_nombre": 0,
@@ -115,11 +115,11 @@
    "fichiers": [
     "series/long-short-1h.csv"
    ],
-   "lignes": 1000,
-   "octets": 48083,
+   "lignes": 1001,
+   "octets": 48120,
    "periode": {
     "debut": "2026-09-17T01:00:00+00:00",
-    "fin": "2026-10-28T16:00:00+00:00"
+    "fin": "2026-10-28T17:00:00+00:00"
    },
    "trous": [],
    "trous_nombre": 0,
