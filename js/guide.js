@@ -2908,8 +2908,18 @@ const Guide = (function () {
     if (fam === 'drapeau') return 'la longueur du mât (le mouvement rapide d’avant la pause) est reportée à partir du point où le prix sort de la pause.';
     return 'la largeur de la figure à son début est reportée à partir du point où le prix en sort, du côté de la sortie.';
   }
-  /** Le taux de réussite d'un type, en mots : « atteint 3 fois sur 8 » (validées et terminées). */
-  const tauxCible = b => { const n = b ? b.atteints + b.invalides + b.expires : 0; return !b ? '' : n ? 'atteint ' + b.atteints + ' fois sur ' + n : 'aucun cas terminé'; };
+  /** Le taux de réussite d'un type, en mots : « atteint 14 fois sur 25 » (validées et terminées).
+   *  Sous le seuil de cas (ecart 'peu'), le compte se lisait comme une probabilité (« 7 fois sur
+   *  10 » pour 70 %, question de Lorenzo du 29/10/2026) : il dit le nombre de cas, le hasard à
+   *  côté quand le témoin existe, et qu'il y a trop peu de cas pour juger. */
+  const tauxCible = b => {
+    const n = b ? b.atteints + b.invalides + b.expires : 0, T = b && b.temoin;
+    if (!b) return '';
+    if (!n) return 'aucun cas terminé';
+    if (b.ecart && b.ecart !== 'peu') return 'atteint ' + b.atteints + ' fois sur ' + n;
+    const hasard = T && T.departs > 0 ? ' (au hasard : ' + Math.round(T.atteints / T.departs * 10) + ' sur 10)' : '';
+    return 'atteint ' + b.atteints + ' fois en ' + n + ' cas' + hasard + ', trop peu pour juger';
+  };
   /** Le verdict du témoin de ce graphique (ecartTemoin), en mots ; rien sous le seuil de cas. */
   const VERDICT_ECART = { pareil: 'comme au hasard', plus: 'plus souvent qu’au hasard', moins: 'moins souvent qu’au hasard' };
   // ─── Ce que ces figures ont fait sur des années (plan du site du 13/10/2026, idée 3) ───

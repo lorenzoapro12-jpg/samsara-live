@@ -431,7 +431,7 @@ async function bulle(o, tactile) {
         aide: (() => { const a = document.getElementById('astuceTap'); if (!a || a.hidden || !a.offsetParent) return null; const r = a.getBoundingClientRect(), cb = canvas.getBoundingClientRect(); return { x: r.left - cb.left, y: r.top - cb.top, w: r.width, h: r.height }; })() }));
       const L1 = r1.lien;
       check(`${mode} ${w} px · ${mode === 'debutant' ? 'résumé (1er ' + (tactile ? 'toucher' : 'survol') + ')' : 'survol'} : la bulle finit par « ${L1 && L1.texte} » (la cible et le taux mesuré), dans la bulle`,
-        L1 && L1.texte === r1.attendu && /^Objectif .+ \$.* · (ces figures : sens prévu \d+ sur 10|sur ce graphique : atteint \d+ fois sur \d+).* ▸$/.test(L1.texte) && L1.rect.y + L1.rect.h <= L1.bulle.y + L1.bulle.h + 8 && (mode === 'expert' || r1.resume), r1);
+        L1 && L1.texte === r1.attendu && /^Objectif .+ \$.* · (ces figures : sens prévu \d+ sur 10|sur ce graphique : atteint \d+ fois (sur \d+|en \d+ cas)).* ▸$/.test(L1.texte) && L1.rect.y + L1.rect.h <= L1.bulle.y + L1.bulle.h + 8 && (mode === 'expert' || r1.resume), r1);
       if (r1.aide && L1) check(`${mode} ${w} px : la touche « ? » ne couvre pas la bulle`, !(L1.bulle.x < r1.aide.x + r1.aide.w && L1.bulle.x + L1.bulle.w > r1.aide.x && L1.bulle.y < r1.aide.y + r1.aide.h && L1.bulle.y + L1.bulle.h > r1.aide.y), r1);
       // Toucher (cliquer) la ligne : le détail s'ouvre, la page ne change pas.
       const cible = await o.page.evaluate(() => { const b = canvas.getBoundingClientRect(), R = lienBulle.rect; return { x: b.left + R.x + R.w / 2, y: b.top + R.y + R.h / 2 }; });

@@ -463,7 +463,10 @@ titre('8 bis. Objectif et statistiques : la ligne courte de la bulle et le déta
     // La cible dite est celle de la machine (niveauxFigure, ou l'objectif de la figure finie), arrondie au dollar.
     const prixOk = O.every(o => l.includes(G.prixRond(o.p, '$')));
     // Hors de la mesure sur des années (le harnais n'a pas de paire) : le compte de ce graphique.
-    const tauxOk = finis(x) ? l.toLowerCase().includes('sur ce graphique : atteint ' + x.atteints + ' fois sur ' + finis(x)) : /aucun cas terminé/.test(l);
+    // Sous le seuil de cas (29/10/2026) : « atteint 7 fois en 10 cas (au hasard : 6 sur 10), trop peu
+    // pour juger », jamais « 7 fois sur 10 », qui se lisait comme une probabilité.
+    const T = x.temoin, peu = x.ecart === 'peu', hz = T.departs > 0 ? ' (au hasard : ' + Math.round(T.atteints / T.departs * 10) + ' sur 10)' : '';
+    const tauxOk = finis(x) ? l.toLowerCase().includes('sur ce graphique : atteint ' + x.atteints + (peu ? ' fois en ' + finis(x) + ' cas' + hz + ', trop peu pour juger' : ' fois sur ' + finis(x))) : /aucun cas terminé/.test(l);
     check(`${f.type} (${f.fin || f.phase}) : « ${l} » — objectif${O.length > 1 ? 's' : ''} de la machine et taux mesuré, ▸ au bout, sans « % » ni mot banni`,
       prixOk && tauxOk && / ▸$/.test(l) && (O.length ? /^Objectif /.test(l) : /^(Statistiques|Sur ce graphique)/.test(l)) && !/cible/i.test(l) && !/%/.test(l) && !G.motsBannis(l).length, { l, O });
     const St = G.statsFigure(f, R, ctx, P, '$'), txt = JSON.stringify(St);
