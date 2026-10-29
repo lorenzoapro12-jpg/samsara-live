@@ -23,6 +23,11 @@
 //   7. REVUE DU 14/10 (N3, vision-4 ; « Les deux » de Lorenzo à Q3) : sous les résultats d'un achat,
 //      la ligne mesurée (source et condition dites), sous le rappel, dans la bulle, aux jetons du
 //      thème, sans « : » ni « jours » en tête de ligne ; aucune avant un calcul ni en vente.
+//   8. CALCULETTE LISIBLE (29/10, « Tout » de Lorenzo) : deux onglets, une question en tête de
+//      chacun, « Essayer un exemple » qui remplit les champs (la bulle reste ouverte), la perte en $
+//      (capital facultatif) ou en %, la phrase de tête du résultat au-dessus du détail, l'onglet
+//      « Position ouverte » (0,28 BTC à 84 300, stop 67 000 → 4 844 $), ce qui est tapé gardé d'un
+//      onglet à l'autre, Entrée qui reste dans l'onglet ouvert.
 //
 // Sans Playwright : « non exécuté », dit à l'écran (ce n'est pas un succès).
 // USAGE   node tests/test_calculette_page.js
@@ -94,7 +99,7 @@ async function ouvrir(nav, theme, w, h, mode) {
 /** L'état de la bulle : place, contenu, champs, résultats. */
 const lire = page => page.evaluate(() => {
   const p = document.getElementById('fichePop'), r = p.getBoundingClientRect(), vis = el => el && el.getClientRects().length > 0;
-  const champs = [...p.querySelectorAll('.calc input')].map(i => {
+  const champs = [...p.querySelectorAll('.calc input')].filter(i => !i.closest('[hidden]')).map(i => {
     const b = i.getBoundingClientRect(), s = getComputedStyle(i);
     return { id: i.id, type: i.type, mode: i.inputMode, auto: i.autocomplete, valeur: i.value, taille: parseFloat(s.fontSize), haut: b.height, bas: b.bottom, gauche: b.left, droite: b.right };
   });
@@ -104,7 +109,10 @@ const lire = page => page.evaluate(() => {
   return { cache: p.hidden, ouverte: typeof ficheOuverte !== 'undefined' ? ficheOuverte : null, aria: p.getAttribute('aria-label'),
     tete: p.firstElementChild && p.firstElementChild.className, titre: (p.querySelector('.fiche-titre') || {}).textContent,
     focus: document.activeElement && document.activeElement.className, texte: p.innerText,
-    phrase: (p.querySelector('.calc > .fiche-simple') || {}).textContent, pied: (p.querySelector('.fiche-pied') || {}).textContent,
+    phrase: (p.querySelector('.calc-volet:not([hidden]) .calc-question') || {}).textContent,
+    resume: (p.querySelector('.calc-resume') || {}).textContent || null,
+    onglets: [...p.querySelectorAll('.calc-onglet')].map(b => [b.textContent, b.getAttribute('aria-pressed')]),
+    unites: [...p.querySelectorAll('.calc-unite')].map(b => [b.textContent, b.getAttribute('aria-pressed')]), pied: (p.querySelector('.fiche-pied') || {}).textContent,
     message: (p.querySelector('.calc-message') || {}).textContent || null, rappel: (p.querySelector('.calc-rappel') || {}).textContent || null,
     alerte: (p.querySelector('.calc-alerte') || {}).textContent || null,
     mesure: (p.querySelector('.calc-mesure') || {}).textContent || null,
@@ -174,17 +182,26 @@ const LIGNE_MESUREE = 'Mesuré sur BTC (2019-2026) : paliers au bas d’une four
       check('le bouton ferme le panneau (aria-expanded="false") et ouvre la calculette dans la bulle des légendes, sa tête d’abord', !menuApres.ouvert && menuApres.aria === 'false'
         && !e.cache && e.ouverte === 'calculette' && /fiche-tete/.test(e.tete) && e.titre === 'Calculette de risque' && e.aria === 'Calculette de risque', [menuApres, e.cache, e.ouverte, e.tete, e.titre, e.aria]);
       check('le focus est sur la croix, pas sur un champ (pas de clavier qui surgit)', /fiche-fermer/.test(e.focus || ''), e.focus);
-      // Revue du 14/10 (N2) : « le prix touche le stop » au lieu de « le stop saute ».
-      check('une phrase en tête dit ce qu’elle fait ; le pied « Un calcul, pas un conseil. »', /taille de chaque palier/.test(e.phrase || '') && /le prix touche le stop/.test(e.phrase || '') && e.pied === 'Un calcul, pas un conseil.', [e.phrase, e.pied]);
+      // 29/10 (A) : la question en tête, deux onglets, « Avant d'entrer » d'abord ; la perte en $.
+      check('29/10 : deux onglets (« Avant d’entrer » pris), la question en tête, « Essayer un exemple », la perte en $ ; le pied « Un calcul, pas un conseil. »',
+        e.phrase === 'Combien prendre à chaque palier pour ne pas perdre plus qu’une somme choisie au stop ?' && e.pied === 'Un calcul, pas un conseil.'
+        && JSON.stringify(e.onglets) === JSON.stringify([['Avant d’entrer', 'true'], ['Position ouverte', 'false']]) && JSON.stringify(e.unites) === JSON.stringify([['$', 'true'], ['%', 'false']])
+        && e.boutons.some(b => b.t === 'Essayer un exemple'), [e.phrase, e.pied, e.onglets, e.unites]);
       const noms = await page.evaluate(() => [...document.querySelectorAll('#fichePop .calc-nom, #fichePop .calc-legende')].map(l => l.textContent));
-      check('revue du 14/10 : les noms disent les mots (« Part risquée (% du capital perdu au stop) », « Stop (prix où la perte est coupée) », « Paliers (prix où un ordre attend) »)',
-        noms.includes('Part risquée (% du capital perdu au stop)') && noms.includes('Stop (prix où la perte est coupée)') && noms.includes('Paliers (prix où un ordre attend)'), noms);
-      check('les champs : capital, part (1 au départ), stop, un palier ; texte au clavier décimal, sans saisie automatique',
-        JSON.stringify(e.champs.map(c => c.id)) === JSON.stringify(['calcCapital', 'calcPart', 'calcStop', 'calcPalier0']) && e.champs.every(c => c.type === 'text' && c.mode === 'decimal' && c.auto === 'off')
-        && e.champs[1].valeur === '1' && e.champs.filter(c => c.id !== 'calcPart').every(c => c.valeur === ''), e.champs);
+      check('revue du 14/10 : les noms disent les mots (« Perte acceptable (si le prix touche le stop) », « Capital ($) (facultatif) », « Stop (prix où la perte est coupée) », « Paliers (prix où un ordre attend) »)',
+        noms.includes('Perte acceptable (si le prix touche le stop)') && noms.includes('Capital ($) (facultatif)') && noms.includes('Stop (prix où la perte est coupée)') && noms.includes('Paliers (prix où un ordre attend)'), noms);
+      check('les champs visibles : perte, capital, stop, un palier, tous vides ; texte au clavier décimal, sans saisie automatique',
+        JSON.stringify(e.champs.map(c => c.id)) === JSON.stringify(['calcPerte', 'calcCapital', 'calcStop', 'calcPalier0']) && e.champs.every(c => c.type === 'text' && c.mode === 'decimal' && c.auto === 'off')
+        && e.champs.every(c => c.valeur === ''), e.champs);
       check('avant la saisie : une phrase d’attente, pas de calcul', e.message && /quand les champs sont remplis/.test(e.message) && !e.lignes.length, e.message);
       // Revue du 14/10 (N3) : la mesure ne s'affiche qu'avec un calcul, et ne remplit aucun champ.
       check('revue du 14/10 : avant la saisie, pas de ligne mesurée ; aucun champ prérempli', e.mesure === null && !/Mesuré/.test(e.texte), [e.mesure, e.champs.map(x => x.valeur)]);
+      // 29/10 (B) : « % » choisi, le champ devient la part risquée (1 au départ), le capital n'est plus facultatif.
+      await page.click('#fichePop .calc-unite[data-unite="%"]'); await page.waitForTimeout(60);
+      e = await lire(page);
+      const noms2 = await page.evaluate(() => [...document.querySelectorAll('#fichePop .calc-nom')].filter(l => !l.closest('[hidden]')).map(l => l.textContent));
+      check('29/10 : « % » pris : « Part risquée (% du capital perdu au stop) » à 1, « Capital ($) » sans « facultatif », la bulle ouverte',
+        !e.cache && JSON.stringify(e.unites) === JSON.stringify([['$', 'false'], ['%', 'true']]) && e.champs[0].valeur === '1' && noms2[0] === 'Part risquée (% du capital perdu au stop)' && noms2[1] === 'Capital ($)', [e.unites, e.champs.map(x => x.valeur), noms2]);
       // 2. La saisie : l'exemple du jour.
       await taper(page, 'calcCapital', '10 000');
       await taper(page, 'calcStop', '80 197');
@@ -199,10 +216,13 @@ const LIGNE_MESUREE = 'Mesuré sur BTC (2019-2026) : paliers au bas d’une four
       await page.waitForTimeout(80);
       e = await lire(page);
       const c = e.calc || {};
-      check('résultats en direct : 3 paliers, achat, 0,02134 BTC par palier, perte 100 $ (1 % du capital), prix moyen 81 759 $, mise 5 235 $',
+      check('résultats en direct : 3 paliers, achat ; en tête « 0,02134 BTC à chaque palier (≈ 1 745 $). Tout rempli, si le prix touche 80 197 $ : perte de 100 $ (1 % du capital). » ; prix moyen 81 759 $, mise 5 235 $',
         c.ok && c.n === 3 && c.sens === 1 && Math.abs(c.quantite - 100 / 4685) < 1e-12 && Math.abs(c.perte - 100) < 1e-9
-        && valeur(e, 'Sens') === 'achat (stop dessous)' && /^0,02134 BTC \(≈ 1 745 \$\)$/.test(valeur(e, 'Quantité par palier') || '')
-        && valeur(e, 'Prix moyen, tout rempli') === '81 759 $' && valeur(e, 'Perte au stop, tout rempli') === '100 $ (1 % du capital)' && valeur(e, 'Mise, tout rempli') === '5 235 $ (52 % du capital)', [c, e.lignes]);
+        && e.resume === '0,02134 BTC à chaque palier (≈ 1 745 $). Tout rempli, si le prix touche 80 197 $ : perte de 100 $ (1 % du capital).'
+        && valeur(e, 'Sens') === 'achat (stop dessous)' && valeur(e, 'Prix moyen, tout rempli') === '81 759 $' && valeur(e, 'Mise, tout rempli') === '5 235 $ (52 % du capital)', [c, e.resume, e.lignes]);
+      const ordre = await page.evaluate(() => { const r = document.querySelector('#fichePop .calc-resume'), t = document.querySelector('#fichePop .calc-table');
+        return !!r && !!t && r.getBoundingClientRect().bottom <= t.getBoundingClientRect().top + 0.5 && parseFloat(getComputedStyle(r.querySelector('strong')).fontWeight) >= 600; });
+      check('29/10 (C) : la phrase de tête au-dessus du détail, la quantité en gras', ordre);
       check('la ligne de rappel : « Le 1 % est la perte, pas la mise. Un trou de prix sous le stop coûterait plus. »', e.rappel === 'Le 1 % est la perte, pas la mise. Un trou de prix sous le stop coûterait plus.', e.rappel);
       // Revue du 14/10 (N3, vision-4) : avant, rien ne disait que cette perte « tout rempli » est l'issue
       // la plus fréquente de la méthode mesurée. La ligne dit sa source et sa condition.
@@ -222,9 +242,9 @@ const LIGNE_MESUREE = 'Mesuré sur BTC (2019-2026) : paliers au bas d’une four
         check('au doigt : champs en 16 px et 40 px de haut (le téléphone ne zoome pas), boutons « Ajouter » / « Retirer » de 40 px', !petits.length && !btn.length, { petits, btn });
       }
       // La part choisie se lit dans le rappel ; retirer un palier ; un stop mélangé ; la vente.
-      await taper(page, 'calcPart', '0,5'); await page.waitForTimeout(60);
+      await taper(page, 'calcPerte', '0,5'); await page.waitForTimeout(60);
       e = await lire(page);
-      check('part 0,5 : perte 50 $, la part dans le rappel (« Le 0,5 % est la perte… »)', valeur(e, 'Perte au stop, tout rempli') === '50 $ (0,5 % du capital)' && /^Le 0,5 % est la perte, pas la mise\./.test(e.rappel || ''), [e.lignes, e.rappel]);
+      check('part 0,5 : perte 50 $, la part dans le rappel (« Le 0,5 % est la perte… »)', /: perte de 50 \$ \(0,5 % du capital\)\.$/.test(e.resume || '') && /^Le 0,5 % est la perte, pas la mise\./.test(e.rappel || ''), [e.resume, e.rappel]);
       await page.click('#fichePop button[aria-label="Retirer le palier 3"]'); await page.waitForTimeout(80);
       e = await lire(page);
       check('« Retirer » : la bulle reste ouverte, deux paliers, le calcul refait', !e.cache && e.ouverte === 'calculette' && e.champs.length === 3 + 2 && e.calc && e.calc.n === 2
@@ -273,8 +293,41 @@ const LIGNE_MESUREE = 'Mesuré sur BTC (2019-2026) : paliers au bas d’une four
       await page.click('#indDropdownBtn'); await page.waitForTimeout(150);
       await page.click('#indMenu .aff-calculette'); await page.waitForTimeout(120);
       e = await lire(page);
-      check('rouverte : les champs sont vides (la part revient à 1), un seul palier — sans mémoire',
-        !e.cache && e.champs.length === 4 && e.champs[0].valeur === '' && e.champs[1].valeur === '1' && e.champs[2].valeur === '' && e.champs[3].valeur === '', e.champs.map(x => x.valeur));
+      check('rouverte : les champs sont vides, la perte revient en $, un seul palier — sans mémoire',
+        !e.cache && e.champs.length === 4 && e.champs.every(x => x.valeur === '') && e.unites[0][1] === 'true', e.champs.map(x => x.valeur));
+      // 8. 29/10 : « Essayer un exemple » (A), la perte en $ sans capital (B), la position ouverte (D).
+      await page.click('#fichePop .calc-exemple'); await page.waitForTimeout(80);
+      e = await lire(page);
+      check('29/10 (A) : « Essayer un exemple » remplit les champs autour du prix du moment (86 012,5) : perte 100, capital 10 000, stop 80 900, paliers 84 300 / 83 400 / 82 600 ; la bulle reste ouverte, le calcul se fait',
+        !e.cache && e.ouverte === 'calculette' && e.champs.map(x => x.valeur).join(' | ') === '100 | 10 000 | 80 900 | 84 300 | 83 400 | 82 600' && e.calc && e.calc.ok && e.calc.n === 3
+        && /^0,01315 BTC à chaque palier/.test(e.resume || ''), [e.cache, e.champs.map(x => x.valeur), e.resume]);
+      await taper(page, 'calcCapital', ''); await taper(page, 'calcPerte', '1 500'); await taper(page, 'calcStop', '67 000');
+      await page.click('#fichePop button[aria-label="Retirer le palier 3"]'); await page.click('#fichePop button[aria-label="Retirer le palier 2"]'); await page.waitForTimeout(60);
+      await taper(page, 'calcPalier0', '84 300'); await page.waitForTimeout(60);
+      e = await lire(page);
+      check('29/10 (B) : perte 1 500 $ sans capital, stop 67 000, un palier à 84 300 → « 0,0867 BTC (≈ 7 309 $). Si le prix touche 67 000 $ : perte de 1 500 $. »',
+        e.calc && e.calc.ok && e.calc.capital === null && e.resume === '0,0867 BTC (≈ 7 309 $). Si le prix touche 67 000 $ : perte de 1 500 $.' && e.rappel === 'Ces 1 500 $ sont la perte, pas la mise. Un trou de prix sous le stop coûterait plus.', [e.resume, e.rappel]);
+      await page.click('#fichePop .calc-onglet[data-onglet="ouverte"]'); await page.waitForTimeout(60);
+      e = await lire(page);
+      check('29/10 (D) : « Position ouverte » pris : sa question, quantité / prix moyen / stop (ou liquidation) / capital, vides ; la bulle reste ouverte',
+        !e.cache && e.phrase === 'Que coûte une position déjà ouverte si le prix touche le stop ?' && e.onglets[1][1] === 'true'
+        && JSON.stringify(e.champs.map(x => x.id)) === JSON.stringify(['calcQuantite', 'calcEntree', 'calcStopPosition', 'calcCapitalPosition']) && e.champs.every(x => x.valeur === '') && /quand les champs sont remplis/.test(e.message || ''), [e.phrase, e.onglets, e.champs]);
+      await taper(page, 'calcQuantite', '0,28'); await page.keyboard.press('Enter');
+      await page.keyboard.type('84300'); await page.keyboard.press('Enter');
+      await page.keyboard.type('67000'); await page.keyboard.press('Enter'); await page.waitForTimeout(80);
+      e = await lire(page);
+      const focusPos = await page.evaluate(() => document.activeElement && document.activeElement.id);
+      check('Entrée passe au champ suivant de l’onglet ouvert (jusqu’au capital) ; « 84300 » réécrit « 84 300 »',
+        focusPos === 'calcCapitalPosition' && e.champs[1].valeur === '84 300' && e.champs[2].valeur === '67 000', [focusPos, e.champs.map(x => x.valeur)]);
+      check('29/10 (D) : 0,28 BTC à 84 300, stop 67 000 → « Si le prix touche 67 000 $ : perte de 4 844 $. Compté depuis le prix moyen. » ; au prix du moment (86 012,5) +480 $, puis −5 324 $ jusqu’au stop',
+        e.calc && e.calc.ok && Math.abs(e.calc.auStop + 4844) < 1e-6 && e.resume === 'Si le prix touche 67 000 $ : perte de 4 844 $. Compté depuis le prix moyen.'
+        && /^\+480 \$/.test(valeur(e, 'Au prix du moment') || '') && /^−5 324 \$/.test(valeur(e, 'Du prix du moment au stop') || '')
+        && e.rappel === 'Frais et financement non comptés. Un trou de prix sous le stop coûterait plus.' && e.mesure === null, [e.resume, e.lignes, e.rappel]);
+      await page.click('#fichePop .calc-onglet[data-onglet="avant"]'); await page.waitForTimeout(60);
+      e = await lire(page);
+      check('de retour sur « Avant d’entrer » : ce qui était tapé est toujours là, et son calcul', e.champs.map(x => x.valeur).join(' | ') === '1 500 |  | 67 000 | 84 300' && /^0,0867 BTC/.test(e.resume || ''), [e.champs.map(x => x.valeur), e.resume]);
+      const bannis2 = Guide.motsBannis(e.texte), conseil2 = e.texte.match(CONSEIL);
+      check('29/10 : aucun mot interdit du Lisible, aucun conseil, aucun défilement de côté', !bannis2.length && !conseil2 && e.pageLarge <= 0 && e.bulleLarge <= 1, { bannis2, conseil2: conseil2 && conseil2[0] });
       await page.keyboard.press('Escape'); await page.waitForTimeout(60);
       check('Échap ferme la bulle', await page.evaluate(() => document.getElementById('fichePop').hidden));
       // 5. Le glossaire : un titre touché ouvre sa fiche, qui reste ouverte.
@@ -290,10 +343,13 @@ const LIGNE_MESUREE = 'Mesuré sur BTC (2019-2026) : paliers au bas d’une four
       if (process.env.CAPTURES) {
         await page.click('#indDropdownBtn'); await page.waitForTimeout(150);
         await page.click('#indMenu .aff-calculette'); await page.waitForTimeout(120);
-        await taper(page, 'calcCapital', '10 000'); await taper(page, 'calcStop', '80 197'); await taper(page, 'calcPalier0', '82 152');
-        await page.click('#fichePop .calc-ajouter'); await page.keyboard.type('81 759'); await page.click('#fichePop .calc-ajouter'); await page.keyboard.type('81 365');
+        await page.screenshot({ path: path.join(process.env.CAPTURES, `calc-${theme}-${w}-ouverture.png`) });
+        await page.click('#fichePop .calc-exemple'); await page.waitForTimeout(100);
+        await page.screenshot({ path: path.join(process.env.CAPTURES, `calc-${theme}-${w}-exemple.png`) });
+        await page.click('#fichePop .calc-onglet[data-onglet="ouverte"]');
+        await taper(page, 'calcQuantite', '0,28'); await taper(page, 'calcEntree', '84 300'); await taper(page, 'calcStopPosition', '67 000');
         await page.evaluate(() => document.activeElement.blur()); await page.waitForTimeout(100);
-        await page.screenshot({ path: path.join(process.env.CAPTURES, `calc-${theme}-${w}.png`) });
+        await page.screenshot({ path: path.join(process.env.CAPTURES, `calc-${theme}-${w}-position.png`) });
       }
       void fautes;
       await o.ctx.close();

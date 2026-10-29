@@ -933,8 +933,9 @@ function montrerApercu(key) {
   if (a) { a.innerHTML = apercuPanneau(key); Fmt.insecables(a); }   // fins de ligne : revue du 14/10/2026, C8
 }
 /** Les mots cachés des outils, que la recherche trouve aussi (la calculette : « levier », « position »,
- *  « taille » ; revue du 14/10/2026, M15). */
-const CHERCHE_OUTILS = 'stop paliers levier position taille';
+ *  « taille » ; revue du 14/10/2026, M15 ; « perte », « liquidation » depuis l'onglet « Position
+ *  ouverte », 29/10/2026). */
+const CHERCHE_OUTILS = 'stop paliers levier position taille perte liquidation';
 /** Le filtre du panneau : sur le libellé, le nom court, le titre de la fiche, la question,
  *  l'importance et les mots cachés de la ligne (item.cherche), sans accents. */
 function filtrerMenu(t) {
@@ -1011,7 +1012,7 @@ function buildDropdown() {
   // Les outils (plan du 13/10/2026, idée 7) : la calculette de risque, un panneau qu'on ouvre ;
   // juste avant les « Réglages fins », qui restent le dernier bloc.
   html += '<div class="aff-outils" role="group" aria-label="Outils"><span class="aff-outils-titre">Outils</span>'
-    + '<button type="button" class="aff-btn aff-calculette" onclick="ouvrirCalculetteMenu()" title="Taille des paliers, prix moyen et perte au stop, pour une part choisie du capital">Calculette de risque</button></div>';
+    + '<button type="button" class="aff-btn aff-calculette" onclick="ouvrirCalculetteMenu()" title="Combien prendre pour une perte choisie au stop, ou ce que coûte une position ouverte">Calculette de risque</button></div>';
   html += '<details class="aff-fins" id="affFins"' + (finsOuverts ? ' open' : '') + ' ontoggle="finsOuverts = this.open"><summary>Réglages fins</summary>'
     + '<div class="aff-fins-corps">' + (typeof reglagesHtml === 'function' ? reglagesHtml() : '') + '</div></details>';
   html += '</div><div class="ind-apercu" id="indApercu" aria-live="polite">' + apercuPanneau(menuApercu) + '</div>';

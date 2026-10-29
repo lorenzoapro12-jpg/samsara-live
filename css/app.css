@@ -1610,6 +1610,21 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
    champ prend le reste ; 16 px au doigt (en dessous, le téléphone zoome sur le champ) et 40 px de
    haut ; les boutons sont ceux du glossaire, habillés par chaque thème. */
 .calc-champs { margin: 6px 0 4px; }
+/* 29/10 (A, B, D) : les deux onglets en tête (« Avant d'entrer », « Position ouverte »), la question
+   et « Essayer un exemple » sur une ligne, le choix « $ / % » à droite du champ de la perte ; le
+   choix pris aux couleurs d'un bouton enfoncé du thème (comme les présélections du panneau). La
+   phrase de tête du résultat, plus grande que le détail. */
+.calc-onglets { display: flex; gap: 4px; margin: 2px 0 6px; }
+.calc-onglets .calc-onglet { flex: 1 1 0; font-weight: 650; }
+.calc-choix[aria-pressed="true"] { color: var(--pill-actif-ink); background: var(--pill-actif); border-color: transparent; font-weight: 700; }
+:root[data-structure="fenetres"] .calc-choix[aria-pressed="true"] { background: var(--pill-actif); box-shadow: var(--enfonce-mince); }
+.calc-tete { display: flex; align-items: flex-start; gap: 8px; }
+.calc-tete .calc-question { flex: 1 1 auto; margin: 2px 0; font-weight: 650; color: var(--ink-1); }
+.calc-tete .calc-exemple { flex: 0 0 auto; }
+.calc-unites { display: inline-flex; flex: 0 0 auto; gap: 2px; }
+.calc-unites .calc-unite { min-width: 2.6em; }
+.calc-resume { margin: 2px 0 6px; font-size: 13px; color: var(--ink-1); }
+.calc-resume strong { font-size: 14px; }
 .calc .calc-ligne { flex-wrap: nowrap; margin: 5px 0; }
 .calc-nom { flex: 0 0 8.6em; color: var(--ink-2); font-size: 12px; }
 .calc .calc-ligne input { flex: 1 1 auto; width: auto; min-width: 0; font-variant-numeric: tabular-nums; }
