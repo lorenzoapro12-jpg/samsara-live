@@ -95,7 +95,7 @@ const ouvrirStats = page => page.evaluate(() => {
         await p.evaluate(() => fermerFiche());
       }
       await p.evaluate(() => ouvrirCalculette()); await p.waitForTimeout(150);
-      await p.fill('#calcCapital', '10000'); await p.fill('#calcStop', '80000'); await p.fill('#calcPalier0', '83000');
+      await p.fill('#calcPerte', '100'); await p.fill('#calcCapital', '10000'); await p.fill('#calcStop', '80000'); await p.fill('#calcPalier0', '83000');   // la perte en $ depuis le 29/10
       await p.evaluate(() => { document.getElementById('calcPaliers').querySelector('.calc-ajouter').click(); });
       await p.waitForTimeout(250);
       const c = await p.evaluate(() => { const P = document.getElementById('fichePop'); P.scrollTop = 0; const pr = P.getBoundingClientRect(), q = P.querySelector('.fiche-pied').getBoundingClientRect(); return { defile: P.scrollHeight - P.clientHeight, pied: [q.top, q.bottom], pop: [pr.top, pr.bottom], texte: P.querySelector('.fiche-pied').textContent }; });
