@@ -1,0 +1,304 @@
+{
+ "format": "previsions-1",
+ "updated": "2026-10-31T05:34Z",
+ "groupe": "2026-10-31",
+ "version_methode": "v1",
+ "marge_pct": 1,
+ "emis_utc": "2026-10-31T05:31Z",
+ "prix_emission": 77209,
+ "scenarios": [
+  {
+   "id": "P0055",
+   "rang": "1",
+   "groupe": "2026-10-31",
+   "emis_utc": "2026-10-31T05:31Z",
+   "fin_utc": "2026-11-01T05:20Z",
+   "horizon_h": 23.8082,
+   "prix_emission": 77209,
+   "forme": "range",
+   "cibles": [],
+   "invalidation": null,
+   "range": [
+    76326,
+    78110
+   ],
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure",
+    "echeance_options",
+    "mur_carnet"
+   ],
+   "origines": {
+    "76326": "plus bas du 30/10 (18:52 UTC)",
+    "78110": "plus haut du 30/10 après l'ouverture de Wall Street (15:18 UTC)"
+   },
+   "enonce": "Samedi calme : range entre le plus bas du 30/10 (76 326) et le plus haut de 15:18 UTC (78 110)",
+   "version_methode": "v1",
+   "base_hasard_pct": 74.8,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [],
+   "invalidation_utc": null
+  },
+  {
+   "id": "P0056",
+   "rang": "2",
+   "groupe": "2026-10-31",
+   "emis_utc": "2026-10-31T05:31Z",
+   "fin_utc": "2026-11-01T05:20Z",
+   "horizon_h": 23.8034,
+   "prix_emission": 77209,
+   "forme": "chemin",
+   "cibles": [
+    75197
+   ],
+   "invalidation": 79221,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure",
+    "long_short",
+    "prime_coinbase"
+   ],
+   "origines": {
+    "75197": "à égale distance de 79 221 ; la zone contient 75 400 et 75 000",
+    "79221": "ancien plancher : plus bas de 30 jours du 24/10, cassé le 29/10"
+   },
+   "enonce": "Plus bas du 30/10 cassé : 75197 avant l'ancien plancher 79 221",
+   "version_methode": "v1",
+   "base_hasard_pct": 23.1,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [
+    null
+   ],
+   "invalidation_utc": null
+  },
+  {
+   "id": "P0057",
+   "rang": "3",
+   "groupe": "2026-10-31",
+   "emis_utc": "2026-10-31T05:32Z",
+   "fin_utc": "2026-11-01T05:20Z",
+   "horizon_h": 23.7995,
+   "prix_emission": 77209,
+   "forme": "chemin",
+   "cibles": [
+    79221
+   ],
+   "invalidation": 75197,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "mur_carnet",
+    "cvd"
+   ],
+   "origines": {
+    "79221": "ancien plancher : plus bas de 30 jours du 24/10, cassé le 29/10",
+    "75197": "à égale distance de 79 221 ; la zone contient 75 400 et 75 000"
+   },
+   "enonce": "Rebond jusqu'à l'ancien plancher 79 221 avant 75 197",
+   "version_methode": "v1",
+   "base_hasard_pct": 26.8,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [
+    null
+   ],
+   "invalidation_utc": null
+  }
+ ],
+ "precedents": [
+  {
+   "groupe": "2026-10-30",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Plancher de 79 221 cassé : retour vers les plus bas de la nuit (76 740) avant 80 514",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "2",
+     "enonce": "Après la purge, range entre le mur de gamma 77 000 et l'ancien plancher 79 700",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Rebond prolongé : retour sous l'ancien range, 80 514, avant 76 740",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-29",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Veille de la grosse échéance : retour dans l'ancien range, entre le plus bas de la nuit 79 710 et 80 845",
+     "statut": "❌",
+     "premier_ok": "haut"
+    },
+    {
+     "rang": "2",
+     "enonce": "Baisse vers 78707 (sous le plus bas de 30 jours 79 221) avant 82 061",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "3",
+     "enonce": "Hausse vers 82 061 (plus haut du 23/10) avant 78707",
+     "statut": "✅",
+     "premier_ok": "oui"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-28",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Hausse vers 82 992 (sommet du rebond du 22/10) avant 78902",
+     "statut": "⌛",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Baisse vers 78 902 (sous le plus bas de 30 jours 79 221) avant 82 992",
+     "statut": "⌛",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Malgré la Fed, le prix reste entre le plus bas de la nuit 80 621 et le plus haut d'hier 81 300",
+     "statut": "❌",
+     "premier_ok": "bas"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-27",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Veille de la Fed : le prix reste entre le plus bas d'hier 79 451 et le plus haut d'hier 80 845",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Baisse vers 77764 (sous le mur de gamma 79 000) avant 81 846",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "3",
+     "enonce": "Hausse vers 81 846 (plus haut du 23/10 16:45) avant 77 764",
+     "statut": "✅",
+     "premier_ok": "oui"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-26",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Avant la Fed, le prix reste entre le plus bas de la nuit 79 369 et son plus haut 80 386",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Baisse vers 78 474 (sous le zéro gamma) avant 81 846",
+     "statut": "⌛",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Hausse vers 81 846 (plus haut du 23/10 16:45) avant 78 474",
+     "statut": "⌛",
+     "premier_ok": null
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-25",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Le dimanche reste entre le plus bas de la nuit 80 305 et son plus haut 81 034",
+     "statut": "❌",
+     "premier_ok": "bas"
+    },
+    {
+     "rang": "2",
+     "enonce": "Baisse vers 78 978 (zéro gamma) avant 82 670",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "3",
+     "enonce": "Hausse vers 82 670 (ancien support) avant 78 978",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-24",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Le week-end reste entre le plus bas de la nuit 80 513 et son plus haut 81 214",
+     "statut": "❌",
+     "premier_ok": "bas"
+    },
+    {
+     "rang": "2",
+     "enonce": "Baisse vers 79 060 (zéro gamma) avant 82 670",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "3",
+     "enonce": "Retour vers 82 670 (ancien support des 21-22/10) avant 79 060",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  }
+ ],
+ "bilan": {
+  "ordre": {
+   "matins": 12,
+   "reussis": 8,
+   "regle": "chemin le mieux classé avec invalidation, première zone touchée avant l'invalidation"
+  }
+ },
+ "statuts": {
+  "⏳": "en cours",
+  "✅": "réalisé",
+  "❌": "invalidé d'abord",
+  "◐": "partiel",
+  "⌛": "rien de touché",
+  "⚠": "ambigu"
+ },
+ "ampleur": {
+  "groupe": "2026-10-31",
+  "calcul_utc": "2026-10-31T05:32Z",
+  "debut_utc": "2026-10-31T05:00Z",
+  "fin_utc": "2026-11-01T05:00Z",
+  "typique_pct": 1.9,
+  "une_fois_sur_dix_pct": 4.3
+ },
+ "moments": []
+}
