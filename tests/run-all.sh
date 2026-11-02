@@ -204,6 +204,9 @@ node test_planche.js || ko=1
 etape "9g. Finitions par thème (revue du 14/10) dans Chromium : cartouche de la Planche entière, panneaux sous l'en-tête et sur la cartouche, avertissement de la calculette visible, barre du bas à 360 px, bulles sans ombre floue dans un thème plat, « i » et croix au rayon du thème, bords de Bureau 95, contraste d'Aero, compteur sur un fond, trait de la publication hors des étiquettes, titre des longs panneaux en haut (non exécuté sans Playwright)"
 node test_finitions_page.js || ko=1
 
+etape "Réticule : la verticale traverse le tracé et tous les sous-graphiques, curseur sur l'un ou l'autre, tous les thèmes, 1440 et 390 — vrai navigateur"
+node test_reticule_page.js || ko=1
+
 # Le budget d'image (≈ 30 min : mesures entrelacées, prix en mouvement) ne tourne pas ici : il
 # se relance quand une feuille de thème change — node tests/test_budget.js --enregistrer — et le
 # contrat (étape 8) refuse une feuille dont la mesure n'est plus à jour.

@@ -3966,7 +3966,9 @@ function calqueDessin() {
   } else if (crossY < mainH && P) {
     cx.strokeStyle = COLORS.reticule;
     cx.lineWidth = 1; cx.setLineDash([3, 3]);
-    cx.beginPath(); cx.moveTo(crossX, 0); cx.lineTo(crossX, mainH); cx.stroke();
+    // Verticale : du haut du tracé au bas du dernier sous-graphique (RSI, Volume, OBV…), pour
+    // lire la même bougie partout d'un seul regard.
+    cx.beginPath(); cx.moveTo(crossX, 0); cx.lineTo(crossX, geo.basSous); cx.stroke();
     // Horizontale : s'arrête avant la colonne des prix
     cx.beginPath(); cx.moveTo(16, crossY); cx.lineTo(W - 75, crossY); cx.stroke();
     cx.setLineDash([]);
@@ -4032,9 +4034,11 @@ function calqueDessin() {
   // --- Réticule des sous-graphes : une verticale à travers eux, la valeur de chacun ---
   if (crossY > mainH && crossY < geo.basSous && idx >= 0 && idx < n) {
     const realIdx = geo.vs + idx;
+    // La même verticale que sur le tracé, de haut en bas : la bougie se suit jusqu'au prix.
     cx.strokeStyle = COLORS.reticule;
-    cx.lineWidth = 0.5;
-    cx.beginPath(); cx.moveTo(crossX, mainH + 2); cx.lineTo(crossX, geo.basSous); cx.stroke();
+    cx.lineWidth = 1; cx.setLineDash([3, 3]);
+    cx.beginPath(); cx.moveTo(crossX, 0); cx.lineTo(crossX, geo.basSous); cx.stroke();
+    cx.setLineDash([]);
     for (const { cle: key, y: sY, trace } of geo.sous) {
       if (!trace) continue;   // trop réduit pour être tracé : pas de badge orphelin
       const val = getSubIndicatorValue(key, realIdx);
