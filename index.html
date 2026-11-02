@@ -6,6 +6,7 @@
 <title>Saṃsāra — Terminal BTC</title>
 <script src="js/binance-repli.js"></script>
 <script src="js/repli-raw.js"></script>
+<script src="js/okx.js"></script>
 <script>
 /* Les lectures du premier écran partent ICI, avant les feuilles et les scripts : lancées par
    js/app.js (différé), elles attendaient la fin de son exécution (première page de bougies
@@ -168,6 +169,16 @@
   <label id="sym_XRPUSDT" role="menuitemradio" onclick="changeSymbol('XRPUSDT',this)"><span class="ind-label">XRP / USDT</span></label>
   <label id="sym_TAOUSDT" role="menuitemradio" onclick="changeSymbol('TAOUSDT',this)"><span class="ind-label">TAO / USDT</span></label>
   <label id="sym_BTCSOL" role="menuitemradio" onclick="changeSymbol('BTCSOL',this)"><span class="ind-label">BTC / SOL</span></label>
+  <!-- Matières premières : contrats perpétuels OKX (js/okx.js lit OKX à la place de Binance). -->
+  <div class="cat-title">Matières premières · OKX</div>
+  <label id="sym_XAU-USDT-SWAP" role="menuitemradio" onclick="changeSymbol('XAU-USDT-SWAP',this)"><span class="ind-label">Or · XAU/USDT</span></label>
+  <label id="sym_XAG-USDT-SWAP" role="menuitemradio" onclick="changeSymbol('XAG-USDT-SWAP',this)"><span class="ind-label">Argent · XAG/USDT</span></label>
+  <label id="sym_XPT-USDT-SWAP" role="menuitemradio" onclick="changeSymbol('XPT-USDT-SWAP',this)"><span class="ind-label">Platine · XPT/USDT</span></label>
+  <label id="sym_XPD-USDT-SWAP" role="menuitemradio" onclick="changeSymbol('XPD-USDT-SWAP',this)"><span class="ind-label">Palladium · XPD/USDT</span></label>
+  <label id="sym_XCU-USDT-SWAP" role="menuitemradio" onclick="changeSymbol('XCU-USDT-SWAP',this)"><span class="ind-label">Cuivre · XCU/USDT</span></label>
+  <label id="sym_CL-USDT-SWAP" role="menuitemradio" onclick="changeSymbol('CL-USDT-SWAP',this)"><span class="ind-label">Pétrole WTI · CL/USDT</span></label>
+  <label id="sym_BZ-USDT-SWAP" role="menuitemradio" onclick="changeSymbol('BZ-USDT-SWAP',this)"><span class="ind-label">Pétrole Brent · BZ/USDT</span></label>
+  <label id="sym_NG-USDT-SWAP" role="menuitemradio" onclick="changeSymbol('NG-USDT-SWAP',this)"><span class="ind-label">Gaz naturel · NG/USDT</span></label>
 </div>
 <div class="theme-menu" id="themeMenu" role="menu" aria-label="Thèmes" onclick="event.stopPropagation()"></div>
 

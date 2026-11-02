@@ -67,6 +67,9 @@ node test_repli_raw.js || ko=1
 etape "2f'. Repli Binance : api.binance.com d'abord, miroir data-api.binance.vision si refusé ou injoignable — hors ligne"
 node test_binance_repli.js || ko=1
 
+etape "2f'''. Matières premières OKX : bougies et prix au format Binance, www.okx.com puis www.okx.cab — hors ligne"
+node test_okx.js || ko=1
+
 etape "2g. Horloges : liste dérivée de meta.champs, pannes nommées, décalage avec Binance — hors ligne"
 node test_horloges.js || ko=1
 

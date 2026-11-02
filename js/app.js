@@ -1343,13 +1343,26 @@ async function changeInterval(interval, label) {
 }
 
 const NOMS_PAIRES = { BTCUSDT: 'BTC/USDT', SOLUSDT: 'SOL/USDT', XRPUSDT: 'XRP/USDT', TAOUSDT: 'TAO/USDT', BTCSOL: 'BTC/SOL' };
+// Matières premières : contrats perpétuels OKX (symbole = instId OKX, « XAU-USDT-SWAP »). Bougies et
+// prix arrivent par js/okx.js, qui répond au format Binance ; les couches propres au bitcoin
+// (Ordres en attente, scénarios, infos du marché) y sont grisées comme sur SOL ou XRP.
+// Volume : en unités de cotation de l'actif (OKX, colonne volCcy) — onces, livres, barils, MMBtu.
+const MATIERES = {
+  'XAU-USDT-SWAP': { nom: 'Or', unite: 'oz' }, 'XAG-USDT-SWAP': { nom: 'Argent', unite: 'oz' },
+  'XPT-USDT-SWAP': { nom: 'Platine', unite: 'oz' }, 'XPD-USDT-SWAP': { nom: 'Palladium', unite: 'oz' },
+  'XCU-USDT-SWAP': { nom: 'Cuivre', unite: 'lb' }, 'CL-USDT-SWAP': { nom: 'Pétrole WTI', unite: 'barils' },
+  'BZ-USDT-SWAP': { nom: 'Pétrole Brent', unite: 'barils' }, 'NG-USDT-SWAP': { nom: 'Gaz naturel', unite: 'MMBtu' },
+};
+for (const s in MATIERES) NOMS_PAIRES[s] = s.split('-')[0] + '/USDT';
+/** Le nom de la paire en clair : « Or · XAU/USDT » pour une matière première, « SOL/USDT » sinon. */
+const nomPaireLong = s => MATIERES[s] ? MATIERES[s].nom + ' · ' + NOMS_PAIRES[s] : (NOMS_PAIRES[s] || s);
 /** L'intervalle en Expert, écrit comme dans le ruban : « 15m », « 4h », « 1 j » (jamais « 1D »), « 1 sem. ». */
 const nomTf = tf => ({ '1d': '1 j', '1w': '1 sem.' })[tf] || tf;
 /** L'intervalle en mots du Lisible, au pluriel : « quarts d’heure », « heures », « tranches de 4 h »,
  *  « journées », « semaines » (Guide.PERIODE_DEBUTANT) ; jamais « 15m » ni « 4h », mots bannis. */
 const nomTfMots = tf => (Guide.PERIODE_DEBUTANT[tf] || [])[3] || ({ '1w': 'semaines' })[tf] || 'périodes';
 /** L'actif de base de la paire affichée, l'unité du volume : BTC (BTC/USDT et BTC/SOL), SOL, XRP, TAO. */
-const uniteVolume = () => (NOMS_PAIRES[activeSymbol] || activeSymbol).split('/')[0];
+const uniteVolume = () => MATIERES[activeSymbol] ? MATIERES[activeSymbol].unite : (NOMS_PAIRES[activeSymbol] || activeSymbol).split('/')[0];
 function ouvrirPaires(e) {
   if (e) e.stopPropagation();
   const m = document.getElementById('paireMenu'), b = document.getElementById('paireBtn');
@@ -3746,7 +3759,7 @@ function drawChart() {
   // La paire sous son nom (« BTC/USDT », comme l'en-tête) ; l'intervalle en mots (« 15 min »),
   // comme le ruban.
   const deb = debutant();
-  const filigrane = (NOMS_PAIRES[activeSymbol] || activeSymbol) + '  ·  ' + Guide.nomIntervalle(chartInterval);
+  const filigrane = nomPaireLong(activeSymbol) + '  ·  ' + Guide.nomIntervalle(chartInterval);
   ctx.font = chartFont(Math.min(40, Math.round((W - 16 - 75) / (filigrane.length * 0.9))), 300);
   if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
