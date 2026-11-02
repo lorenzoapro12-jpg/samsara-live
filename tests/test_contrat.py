@@ -53,7 +53,9 @@ NOYAU = ["color-scheme", "--fond", "--surface", "--ink-1", "--ink-2", "--ink-3",
          "--card", "--card-solid", "--card-edge", "--card-shadow",
          "--chart-1", "--chart-2", "--chart-3",
          "--ov-ema20", "--ov-ema50", "--ov-ema100", "--ov-ema200", "--ov-sma20", "--ov-sma50"]
-HOTES_APPELES = {"api.binance.com", "data-api.binance.vision", "raw.githubusercontent.com", "api.github.com"}
+# OKX (02/11/2026) : bougies et prix des matières premières, js/okx.js seul ; www.okx.cab en repli.
+HOTES_APPELES = {"api.binance.com", "data-api.binance.vision", "raw.githubusercontent.com", "api.github.com",
+                 "www.okx.com", "www.okx.cab"}
 # Espaces de noms XML (SVG) : écrits dans le code, jamais téléchargés.
 ESPACES_DE_NOMS = {"www.w3.org"}
 
@@ -228,7 +230,7 @@ if BUDGETS:
         "contre-épreuves du budget refusées", ", ".join(f"{k} {'✓' if v.get('refusee') else '✗'}" for k, v in ce.items()) or "aucune enregistrée")
 
 # ── 5. réseau ──
-titre("5. Réseau : Binance et GitHub Raw, rien d'autre (" + ", ".join(PAGES) + ")")
+titre("5. Réseau : Binance, OKX et GitHub Raw, rien d'autre (" + ", ".join(PAGES) + ")")
 for f in PAGES + TOUS_SERVIS:
     if not (REPO / f).exists():
         echec(f"{f} · référencé par la page", "fichier absent")
