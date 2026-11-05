@@ -11,7 +11,7 @@ ko=0
 etape() { printf '\n\033[1m── %s ──\033[0m\n' "$1"; }
 
 etape "0. Compilation des scripts Python"
-for f in ../publish.py ../heatmap.py ../executions.py ../profondeur.py ../historique.py ../samsara_config.py ../options_gex.py ../indicateurs.py ../fonts/fabriquer.py *.py; do   # tout script Python des tests : aucune liste à tenir
+for f in ../publish.py ../heatmap.py ../executions.py ../profondeur.py ../historique.py ../samsara_config.py ../options_gex.py ../visites.py ../indicateurs.py ../fonts/fabriquer.py *.py; do   # tout script Python des tests : aucune liste à tenir
   if python3 -m py_compile "$f" 2>/dev/null; then
     echo "  ✓ $f"
   else
@@ -66,6 +66,7 @@ node test_repli_raw.js || ko=1
 
 etape "2f'. Repli Binance : api.binance.com d'abord, miroir data-api.binance.vision si refusé ou injoignable — hors ligne"
 node test_binance_repli.js || ko=1
+node test_mesure.js || ko=1
 
 etape "2f'''. Matières premières OKX : bougies et prix au format Binance, www.okx.com puis www.okx.cab — hors ligne"
 node test_okx.js || ko=1
