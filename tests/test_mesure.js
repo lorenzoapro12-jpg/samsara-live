@@ -27,7 +27,7 @@ function monter({ code = 'essai', host = 'lorenzoapro12-jpg.github.io', proto = 
     Image: function () {},
   };
   g.window = g;
-  vm.runInNewContext(SRC.replace("var MESURE_ADRESSE = '';", `var MESURE_ADRESSE = '${code ? 'https://' + code + '.goatcounter.com/count' : ''}';`), g);
+  vm.runInNewContext(SRC.replace("var MESURE_ADRESSE = 'https://samsara.goatcounter.com/count';", `var MESURE_ADRESSE = '${code ? 'https://' + code + '.goatcounter.com/count' : ''}';`), g);
   return { g, envois, ecoute, store, doc };
 }
 const params = u => Object.fromEntries(new URL(u).searchParams);

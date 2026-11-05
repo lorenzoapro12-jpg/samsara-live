@@ -22,7 +22,7 @@
 (function (g) {
   'use strict';
   // Adresse du compteur (compte GoatCounter de Lorenzo). Vide = compteur éteint.
-  var MESURE_ADRESSE = '';
+  var MESURE_ADRESSE = 'https://samsara.goatcounter.com/count';
   var HOTES_PUBLIES = /(^|\.)github\.io$/;       // le site publié (GitHub Pages)
   var CLE_MOI = 'samsara-mesure-moi';
   var MAX_OUTILS = 40;                           // plafond d'événements « outil » par visite
