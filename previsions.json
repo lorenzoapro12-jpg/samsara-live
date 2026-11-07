@@ -1,0 +1,300 @@
+{
+ "format": "previsions-1",
+ "updated": "2026-11-07T05:34Z",
+ "groupe": "2026-11-07",
+ "version_methode": "v1",
+ "marge_pct": 1,
+ "emis_utc": "2026-11-07T05:30Z",
+ "prix_emission": 76023,
+ "scenarios": [
+  {
+   "id": "P0076",
+   "rang": "1",
+   "groupe": "2026-11-07",
+   "emis_utc": "2026-11-07T05:30Z",
+   "fin_utc": "2026-11-08T05:20Z",
+   "horizon_h": 23.826,
+   "prix_emission": 76023,
+   "forme": "range",
+   "cibles": [],
+   "invalidation": null,
+   "range": [
+    74250,
+    77800
+   ],
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure",
+    "calendrier"
+   ],
+   "origines": {
+    "74250": "sous le plus bas du 06/11 (74 888 à 15:05 UTC), au-dessus du mur de gamma 74 000",
+    "77800": "EMA 50 en 4 h (77 836), au-dessus du haut du 05/11 (77 006)"
+   },
+   "enonce": "Range du week-end entre 74 250 et 77 800",
+   "version_methode": "v1",
+   "base_hasard_pct": 99.1,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [],
+   "invalidation_utc": null
+  },
+  {
+   "id": "P0077",
+   "rang": "2",
+   "groupe": "2026-11-07",
+   "emis_utc": "2026-11-07T05:30Z",
+   "fin_utc": "2026-11-08T05:20Z",
+   "horizon_h": 23.8216,
+   "prix_emission": 76023,
+   "forme": "chemin",
+   "cibles": [
+    74250
+   ],
+   "invalidation": 77800,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure"
+   ],
+   "origines": {
+    "74250": "sous le plus bas du 06/11 (74 888 à 15:05 UTC), au-dessus du mur de gamma 74 000",
+    "77800": "EMA 50 en 4 h (77 836), au-dessus du haut du 05/11 (77 006)"
+   },
+   "enonce": "Baisse d'abord : 74 250 avant 77 800",
+   "version_methode": "v1",
+   "base_hasard_pct": 18.5,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [
+    null
+   ],
+   "invalidation_utc": null
+  },
+  {
+   "id": "P0078",
+   "rang": "3",
+   "groupe": "2026-11-07",
+   "emis_utc": "2026-11-07T05:30Z",
+   "fin_utc": "2026-11-08T05:20Z",
+   "horizon_h": 23.817,
+   "prix_emission": 76023,
+   "forme": "chemin",
+   "cibles": [
+    77800
+   ],
+   "invalidation": 74250,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure"
+   ],
+   "origines": {
+    "77800": "EMA 50 en 4 h (77 836), au-dessus du haut du 05/11 (77 006)",
+    "74250": "sous le plus bas du 06/11 (74 888 à 15:05 UTC), au-dessus du mur de gamma 74 000"
+   },
+   "enonce": "Rebond d'abord : 77 800 avant 74 250",
+   "version_methode": "v1",
+   "base_hasard_pct": 32.2,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [
+    null
+   ],
+   "invalidation_utc": null
+  }
+ ],
+ "precedents": [
+  {
+   "groupe": "2026-11-06",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Baisse d'abord : 74 000 avant 77 100",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "2",
+     "enonce": "Range 74 000 - 77 100",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Rebond d'abord : 77 100 avant 73 900",
+     "statut": "✅",
+     "premier_ok": "oui"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-05",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range entre l'ancien plafond 78 718 et le sommet du 29/10 (81 971)",
+     "statut": "❌",
+     "premier_ok": "bas"
+    },
+    {
+     "rang": "2",
+     "enonce": "Sortie confirmée : 82 100 avant 78 790",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "3",
+     "enonce": "Fausse sortie : retour à 78 790 avant 82 100",
+     "statut": "✅",
+     "premier_ok": "oui"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-04",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range entre le plus bas de la nuit électorale (75 736) et le plus haut d'hier soir (78 063), tenu par le gamma positif",
+     "statut": "❌",
+     "premier_ok": "haut"
+    },
+    {
+     "rang": "2",
+     "enonce": "Rebond électoral vendu sous 78 000 : 75895 avant 79 071",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "3",
+     "enonce": "Rachat après l'élection : 79071 avant 75 895",
+     "statut": "✅",
+     "premier_ok": "oui"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-03",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Plus bas du 30/10 cassé sous le zéro gamma : 75052 avant 78 192",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "2",
+     "enonce": "Range entre le plus bas du 30/10 (76 326) et le plus bas de dimanche soir (77 620), devenu plafond",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Double plancher 76 326-76 541 tenu : 78192 avant 75 052",
+     "statut": "✅",
+     "premier_ok": "oui"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-02",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Lundi tenu par les options : range entre le plus bas de dimanche soir (77 620) et le plus haut de la nuit (78 878)",
+     "statut": "❌",
+     "premier_ok": "bas"
+    },
+    {
+     "rang": "2",
+     "enonce": "Sortie du range du week-end confirmée : 80 000 avant 76716",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "3",
+     "enonce": "Rejet sous 79 000 : 76716 avant 80 000",
+     "statut": "✅",
+     "premier_ok": "oui"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-01",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Dimanche calme : range entre le plus bas de samedi (77 114) et le plus haut du 30/10 (78 110)",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Rebond du week-end rejeté : 76054 avant l'ancien plancher 79 710",
+     "statut": "⌛",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Rebond prolongé jusqu'à l'ancien plancher 79 710 avant 76054",
+     "statut": "⌛",
+     "premier_ok": null
+    }
+   ]
+  },
+  {
+   "groupe": "2026-10-31",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Samedi calme : range entre le plus bas du 30/10 (76 326) et le plus haut de 15:18 UTC (78 110)",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Plus bas du 30/10 cassé : 75197 avant l'ancien plancher 79 221",
+     "statut": "⌛",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Rebond jusqu'à l'ancien plancher 79 221 avant 75 197",
+     "statut": "⌛",
+     "premier_ok": null
+    }
+   ]
+  }
+ ],
+ "bilan": {
+  "ordre": {
+   "matins": 17,
+   "reussis": 8,
+   "regle": "chemin le mieux classé avec invalidation, première zone touchée avant l'invalidation"
+  }
+ },
+ "statuts": {
+  "⏳": "en cours",
+  "✅": "réalisé",
+  "❌": "invalidé d'abord",
+  "◐": "partiel",
+  "⌛": "rien de touché",
+  "⚠": "ambigu"
+ },
+ "ampleur": {
+  "groupe": "2026-11-07",
+  "calcul_utc": "2026-11-07T05:31Z",
+  "debut_utc": "2026-11-07T05:00Z",
+  "fin_utc": "2026-11-08T05:00Z",
+  "typique_pct": 2.2,
+  "une_fois_sur_dix_pct": 4.5
+ },
+ "moments": []
+}
