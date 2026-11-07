@@ -1,13 +1,13 @@
 {
- "updated": "2026-11-07T06:48:58+00:00",
+ "updated": "2026-11-07T07:03:58+00:00",
  "generator": "publish.py v4.0 — calculs dans le dépôt, champs décrits par `meta` (06/10/2026)",
  "source": "binance · deribit · coinbase · yahoo",
  "btc": {
-  "price": 76044.63,
-  "change_24h_pct": 0.366,
+  "price": 76031.59,
+  "change_24h_pct": 0.754,
   "high_24h": 76378.0,
   "low_24h": 74888.0,
-  "quote_volume_24h_usd": 1153497008.9018638
+  "quote_volume_24h_usd": 1151235199.2150812
  },
  "macro": {
   "dxy_spot": 102.30000305175781,
@@ -18,15 +18,15 @@
  },
  "tf": {
   "4h": {
-   "rsi_14": 40.0,
-   "ema20_4h": 76931.83,
-   "ema50_4h": 77840.27,
+   "rsi_14": 39.9,
+   "ema20_4h": 76930.59,
+   "ema50_4h": 77839.76,
    "death_cross_4h": true,
    "ema_gap_pct": 1.17,
    "support_30": 74888.0,
    "resistance_30": 81196.01,
-   "last_close": 76044.63,
-   "avg_volume_10": 2903.51,
+   "last_close": 76031.59,
+   "avg_volume_10": 2909.54,
    "last_5_candles": [
     {
      "open": 76147.72,
@@ -72,24 +72,24 @@
      "open": 75893.66,
      "high": 76070.01,
      "low": 75847.3,
-     "close": 76044.63,
-     "body": 0.2,
+     "close": 76031.59,
+     "body": 0.18,
      "direction": "🟢",
-     "wick_top": 0.03,
+     "wick_top": 0.05,
      "wick_bottom": 0.06
     }
    ],
    "range_24h_pct": 8.42,
    "sr_window_h": 120,
-   "rsi_6": 38.2,
-   "rsi_12": 39.4,
+   "rsi_6": 37.8,
+   "rsi_12": 39.2,
    "rsi_24": 41.7,
-   "ema20": 76931.83,
-   "ema50": 77840.27,
+   "ema20": 76930.59,
+   "ema50": 77839.76,
    "ema_ecart_pct": -1.17,
    "ema20_sous_ema50": true,
    "amplitude_30_pct": 8.42,
-   "volume_moyen_10_btc": 2903.51,
+   "volume_moyen_10_btc": 2909.54,
    "atr_14": 949.45,
    "atr_14_pct": 1.25,
    "bougies_lues": 200,
@@ -97,26 +97,16 @@
    "derniere_cloture_a": "2026-11-07T07:59:59.999000+00:00"
   },
   "1h": {
-   "rsi_14": 47.2,
-   "ema20_4h": 76014.13,
-   "ema50_4h": 76611.74,
+   "rsi_14": 46.8,
+   "ema20_4h": 76016.78,
+   "ema50_4h": 76589.38,
    "death_cross_4h": true,
-   "ema_gap_pct": 0.78,
+   "ema_gap_pct": 0.75,
    "support_30": 74888.0,
-   "resistance_30": 76403.9,
-   "last_close": 76044.63,
-   "avg_volume_10": 366.96,
+   "resistance_30": 76378.0,
+   "last_close": 76031.59,
+   "avg_volume_10": 325.96,
    "last_5_candles": [
-    {
-     "open": 76038.09,
-     "high": 76101.36,
-     "low": 76015.04,
-     "close": 76041.8,
-     "body": 0.0,
-     "direction": "🟢",
-     "wick_top": 0.08,
-     "wick_bottom": 0.03
-    },
     {
      "open": 76041.8,
      "high": 76102.52,
@@ -151,40 +141,50 @@
      "open": 76034.01,
      "high": 76070.01,
      "low": 76014.0,
-     "close": 76044.63,
-     "body": 0.01,
+     "close": 76056.11,
+     "body": 0.03,
      "direction": "🟢",
-     "wick_top": 0.03,
+     "wick_top": 0.02,
      "wick_bottom": 0.03
+    },
+    {
+     "open": 76056.11,
+     "high": 76070.01,
+     "low": 76031.59,
+     "close": 76031.59,
+     "body": 0.03,
+     "direction": "🔴",
+     "wick_top": 0.02,
+     "wick_bottom": 0.0
     }
    ],
-   "range_24h_pct": 2.02,
+   "range_24h_pct": 1.99,
    "sr_window_h": 30,
-   "rsi_6": 61.0,
-   "rsi_12": 49.4,
-   "rsi_24": 43.4,
-   "ema20": 76014.13,
-   "ema50": 76611.74,
-   "ema_ecart_pct": -0.78,
+   "rsi_6": 58.3,
+   "rsi_12": 48.8,
+   "rsi_24": 43.3,
+   "ema20": 76016.78,
+   "ema50": 76589.38,
+   "ema_ecart_pct": -0.75,
    "ema20_sous_ema50": true,
-   "amplitude_30_pct": 2.02,
-   "volume_moyen_10_btc": 366.96,
-   "atr_14": 327.11,
-   "atr_14_pct": 0.43,
+   "amplitude_30_pct": 1.99,
+   "volume_moyen_10_btc": 325.96,
+   "atr_14": 306.49,
+   "atr_14_pct": 0.4,
    "bougies_lues": 200,
    "bougie_en_cours": true,
-   "derniere_cloture_a": "2026-11-07T06:59:59.999000+00:00"
+   "derniere_cloture_a": "2026-11-07T07:59:59.999000+00:00"
   },
   "1d": {
-   "rsi_14": 38.7,
-   "ema20_4h": 78918.99,
-   "ema50_4h": 79685.45,
+   "rsi_14": 38.6,
+   "ema20_4h": 78917.74,
+   "ema50_4h": 79684.94,
    "death_cross_4h": true,
    "ema_gap_pct": 0.96,
    "support_30": 74888.0,
    "resistance_30": 84898.0,
-   "last_close": 76044.63,
-   "avg_volume_10": 15363.76,
+   "last_close": 76031.59,
+   "avg_volume_10": 15369.79,
    "last_5_candles": [
     {
      "open": 76816.01,
@@ -230,24 +230,24 @@
      "open": 75844.0,
      "high": 76102.52,
      "low": 75790.0,
-     "close": 76044.63,
-     "body": 0.26,
+     "close": 76031.59,
+     "body": 0.25,
      "direction": "🟢",
-     "wick_top": 0.08,
+     "wick_top": 0.09,
      "wick_bottom": 0.07
     }
    ],
    "range_24h_pct": 13.37,
    "sr_window_h": 720,
-   "rsi_6": 36.8,
-   "rsi_12": 38.0,
+   "rsi_6": 36.7,
+   "rsi_12": 37.9,
    "rsi_24": 42.6,
-   "ema20": 78918.99,
-   "ema50": 79685.45,
+   "ema20": 78917.74,
+   "ema50": 79684.94,
    "ema_ecart_pct": -0.96,
    "ema20_sous_ema50": true,
    "amplitude_30_pct": 13.37,
-   "volume_moyen_10_btc": 15363.76,
+   "volume_moyen_10_btc": 15369.79,
    "atr_14": 2237.24,
    "atr_14_pct": 2.94,
    "bougies_lues": 200,
@@ -256,37 +256,37 @@
   }
  },
  "micro": {
-  "funding_rate_pct": 0.00172,
-  "funding_annual_pct": 1.89,
+  "funding_rate_pct": 0.00152,
+  "funding_annual_pct": 1.66,
   "funding_prochain_at": "2026-11-07T08:00+00:00",
-  "mark_price": 76001.5,
-  "oi_btc": 95751.658,
-  "oi_usd": 7277269635,
-  "oi_hist_at": "2026-11-07T06:00+00:00",
-  "oi_change_24h_pct": 0.54,
-  "oi_change_1d_pct": 0.54,
-  "oi_change_5d_pct": 0.39,
-  "ls_ratio": 3.0833,
-  "long_pct": 75.5,
-  "short_pct": 24.5,
-  "top_ls_ratio": 2.0147,
-  "taker_ratio": 1.3426,
-  "cvd_1h_usd": -1630093,
-  "taker_buy_1h_pct": 46.6,
-  "cvd_4h_usd": -1213368,
-  "taker_buy_4h_pct": 49.4,
-  "cvd_24h_usd": 86208324,
+  "mark_price": 75992.4635,
+  "oi_btc": 95718.093,
+  "oi_usd": 7273853689,
+  "oi_hist_at": "2026-11-07T07:00+00:00",
+  "oi_change_24h_pct": 0.24,
+  "oi_change_1d_pct": 0.24,
+  "oi_change_5d_pct": 0.31,
+  "ls_ratio": 3.0683,
+  "long_pct": 75.4,
+  "short_pct": 24.6,
+  "top_ls_ratio": 2.0001,
+  "taker_ratio": 1.0487,
+  "cvd_1h_usd": -2576491,
+  "taker_buy_1h_pct": 44.4,
+  "cvd_4h_usd": 761380,
+  "taker_buy_4h_pct": 50.4,
+  "cvd_24h_usd": 85669402,
   "taker_buy_24h_pct": 53.7,
-  "cvd_window_end": "2026-11-07T06:49:01+00:00",
-  "cvd": 86208324,
-  "cvd_updated_at": "2026-11-07T06:49:01+00:00",
-  "gex_usd_1pct": -10578655,
-  "gex_calls_usd_1pct": 252459834,
-  "gex_puts_usd_1pct": -263038489,
-  "gex_0_7j_usd_1pct": -27504221,
+  "cvd_window_end": "2026-11-07T07:04:02+00:00",
+  "cvd": 85669402,
+  "cvd_updated_at": "2026-11-07T07:04:02+00:00",
+  "gex_usd_1pct": -11463430,
+  "gex_calls_usd_1pct": 251499883,
+  "gex_puts_usd_1pct": -262963313,
+  "gex_0_7j_usd_1pct": -27949874,
   "gex_state": "SHORT_GAMMA",
-  "zero_gamma": 76017,
-  "spot_vs_zero_gamma_pct": -0.1,
+  "zero_gamma": 76013,
+  "spot_vs_zero_gamma_pct": -0.11,
   "call_wall": 80000.0,
   "put_wall": 76000.0,
   "gamma_walls": [
@@ -297,45 +297,49 @@
   "num_strikes": 89,
   "num_options": 770,
   "gex_convention": "dealers acheteurs des calls, vendeurs des puts (hypothèse standard, non observable)",
-  "spot_deribit": 75941.3,
-  "dealer_gamma": -10578655,
-  "premium_pct": -0.1547,
-  "premium_state": "EXTREME_NEGATIVE",
+  "spot_deribit": 75932.04,
+  "dealer_gamma": -11463430,
+  "premium_pct": -0.1451,
+  "premium_state": "NEGATIVE",
   "us_demand": false,
-  "coinbase_mid": 75926.99,
-  "binance_mid": 76044.64,
+  "coinbase_mid": 75921.29,
+  "binance_mid": 76031.6,
   "usdt_usd": 0.9987,
-  "premium_hors_usdt_pct": -0.0252,
-  "premium_at": "2026-11-07T06:49:02+00:00"
+  "premium_hors_usdt_pct": -0.0156,
+  "premium_at": "2026-11-07T07:04:03+00:00"
  },
  "liquidity": {
-  "mid": 76044.64,
-  "couverture_pct": 1.219,
+  "mid": 76031.6,
+  "couverture_pct": 1.226,
   "bandes": {
    "0.1": {
-    "bid_btc": 52.09,
-    "ask_btc": 84.44,
-    "ratio": 0.62
+    "bid_btc": 53.26,
+    "ask_btc": 64.26,
+    "ratio": 0.83
    },
    "0.5": {
-    "bid_btc": 147.91,
-    "ask_btc": 173.62,
-    "ratio": 0.85
+    "bid_btc": 153.32,
+    "ask_btc": 161.41,
+    "ratio": 0.95
    },
    "1": {
-    "bid_btc": 228.88,
-    "ask_btc": 201.9,
-    "ratio": 1.13
+    "bid_btc": 233.86,
+    "ask_btc": 185.81,
+    "ratio": 1.26
    }
   },
   "bande_ref_pct": 0.5,
-  "ratio_bid_ask": 0.85,
-  "total_bid": 147.91,
-  "total_ask": 173.62,
+  "ratio_bid_ask": 0.95,
+  "total_bid": 153.32,
+  "total_ask": 161.41,
   "bid_walls": [
    [
+    75100,
+    42.7
+   ],
+   [
     75500,
-    36.1
+    35.4
    ],
    [
     76000,
@@ -346,42 +350,38 @@
     16.8
    ],
    [
-    76020,
-    14.2
-   ],
-   [
     75200,
     13.9
    ],
    [
-    75960,
-    13.2
+    75300,
+    13.1
    ]
   ],
   "ask_walls": [
    [
     76040,
-    24.5
-   ],
-   [
-    76100,
-    23.0
-   ],
-   [
-    76060,
-    21.8
+    17.2
    ],
    [
     76080,
-    15.1
+    16.3
    ],
    [
-    76200,
-    14.5
+    76060,
+    16.0
+   ],
+   [
+    76120,
+    14.4
    ],
    [
     76860,
     13.4
+   ],
+   [
+    76100,
+    13.3
    ]
   ],
   "wall_bin_usd": 20,
@@ -397,16 +397,20 @@
    "bids": 5000,
    "asks": 5000
   },
-  "meilleur_bid": 76044.63,
-  "meilleur_ask": 76044.64,
+  "meilleur_bid": 76031.59,
+  "meilleur_ask": 76031.6,
   "profil_bids": [
    [
+    75080,
+    0.0
+   ],
+   [
     75100,
-    0.008
+    42.7
    ],
    [
     75120,
-    0.476
+    0.475
    ],
    [
     75140,
@@ -422,7 +426,7 @@
    ],
    [
     75200,
-    13.909
+    13.912
    ],
    [
     75220,
@@ -430,7 +434,7 @@
    ],
    [
     75240,
-    0.731
+    0.732
    ],
    [
     75260,
@@ -442,7 +446,7 @@
    ],
    [
     75300,
-    13.048
+    13.074
    ],
    [
     75320,
@@ -450,7 +454,7 @@
    ],
    [
     75340,
-    4.79
+    4.791
    ],
    [
     75360,
@@ -462,7 +466,7 @@
    ],
    [
     75400,
-    12.105
+    12.104
    ],
    [
     75420,
@@ -478,19 +482,19 @@
    ],
    [
     75480,
-    1.115
+    1.109
    ],
    [
     75500,
-    36.06
+    35.379
    ],
    [
     75520,
-    1.079
+    1.085
    ],
    [
     75540,
-    2.421
+    2.42
    ],
    [
     75560,
@@ -498,11 +502,11 @@
    ],
    [
     75580,
-    0.257
+    0.507
    ],
    [
     75600,
-    3.978
+    3.979
    ],
    [
     75620,
@@ -522,7 +526,7 @@
    ],
    [
     75700,
-    2.453
+    2.455
    ],
    [
     75720,
@@ -530,133 +534,133 @@
    ],
    [
     75740,
-    5.989
+    2.464
    ],
    [
     75760,
-    0.188
+    7.277
    ],
    [
     75780,
-    4.43
+    1.534
    ],
    [
     75800,
-    16.772
+    16.776
    ],
    [
     75820,
-    0.232
+    4.425
    ],
    [
     75840,
-    10.856
+    11.024
    ],
    [
     75860,
-    4.708
+    11.734
    ],
    [
     75880,
-    11.47
+    11.289
    ],
    [
     75900,
-    9.471
+    8.65
    ],
    [
     75920,
-    8.57
+    7.441
    ],
    [
     75940,
-    8.756
+    9.556
    ],
    [
     75960,
-    13.202
+    12.082
    ],
    [
     75980,
-    10.414
+    11.169
    ],
    [
     76000,
-    19.736
+    19.689
    ],
    [
     76020,
-    14.192
-   ],
-   [
-    76040,
-    0.539
+    9.753
    ]
   ],
   "profil_asks": [
    [
+    76020,
+    9.845
+   ],
+   [
     76040,
-    24.54
+    17.151
    ],
    [
     76060,
-    21.754
+    15.98
    ],
    [
     76080,
-    15.071
+    16.264
    ],
    [
     76100,
-    23.043
+    13.294
    ],
    [
     76120,
-    6.585
+    14.355
    ],
    [
     76140,
-    8.914
+    9.118
    ],
    [
     76160,
-    3.622
+    3.556
    ],
    [
     76180,
-    11.563
+    10.434
    ],
    [
     76200,
-    14.474
+    12.276
    ],
    [
     76220,
-    1.118
+    2.409
    ],
    [
     76240,
-    3.576
+    6.344
    ],
    [
     76260,
-    4.622
+    6.175
    ],
    [
     76280,
-    9.459
+    2.488
    ],
    [
     76300,
-    12.595
+    12.577
    ],
    [
     76320,
-    7.282
+    0.286
    ],
    [
     76340,
-    1.793
+    5.316
    ],
    [
     76360,
@@ -688,7 +692,7 @@
    ],
    [
     76500,
-    6.091
+    5.61
    ],
    [
     76520,
@@ -708,7 +712,7 @@
    ],
    [
     76600,
-    3.17
+    3.191
    ],
    [
     76620,
@@ -716,11 +720,11 @@
    ],
    [
     76640,
-    0.323
+    0.324
    ],
    [
     76660,
-    0.405
+    0.434
    ],
    [
     76680,
@@ -752,7 +756,7 @@
    ],
    [
     76820,
-    0.4
+    0.426
    ],
    [
     76840,
@@ -780,10 +784,10 @@
    ],
    [
     76960,
-    0.158
+    0.062
    ]
   ],
-  "snapshot_at": "2026-11-07T06:49:02+00:00"
+  "snapshot_at": "2026-11-07T07:04:04+00:00"
  },
  "status": {
   "btc_spot": "ok",
