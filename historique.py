@@ -565,7 +565,12 @@ def synchroniser(cfg, hist):
     if git(["merge-base", "--is-ancestor", tete, dist], cwd=hist, check=False).returncode == 0:
         git(["reset", "-q", "--hard", dist], cwd=hist)
         return "avancé"
-    git(["rebase", "-q", dist], cwd=hist)     # nos commits locaux par-dessus
+    # La distante est un ANCÊTRE de notre tête : nous avons un commit local non poussé.
+    # Ce n'est pas une divergence — un rebase ici ne fait rien d'utile et, sur un arbre
+    # sale, il échoue et bloque TOUTE la publication (vécu du 04/11 au 10/11/2026).
+    if git(["merge-base", "--is-ancestor", dist, tete], cwd=hist, check=False).returncode == 0:
+        return "locale en avance"
+    git(["rebase", "-q", "--autostash", dist], cwd=hist)   # vraie divergence : nos commits par-dessus
     return "rebasé"
 
 
