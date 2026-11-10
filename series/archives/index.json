@@ -1,19 +1,16 @@
 {
- "updated": "2026-11-10T08:51:31+00:00",
+ "updated": "2026-11-10T08:52:01+00:00",
  "generator": "publier_archives.py v2.1 — archives du VPS (carnet, liquidations, flux insiders, tables sol-radar ; OHLCV en annuel depuis le 14/10/2026)",
  "source": "collecteurs locaux (carnet Binance/Coinbase, liquidations Binance) · ~/.hermes/archive-insiders (Binance fapi 5m, OKX rubik et liquidations, Deribit surface d'options) · base sol-radar (lecture seule)",
  "branche": "historique",
  "repertoire": "series/archives",
  "status": {
   "synchronisation": "à jour",
-  "copie": "3 fichier(s) copié(s)",
-  "insiders": "13 flux, 48 fichier(s), 13 fichier(s) écrit(s)",
-  "sol_radar_periodes_closes_reecrites": "ohlcv_1w-2017.csv.gz, ohlcv_1w-2018.csv.gz, ohlcv_1w-2019.csv.gz, ohlcv_1w-2020.csv.gz, ohlcv_1w-2021.csv.gz, ohlcv_1w-2022.csv.gz, ohlcv_1w-2023.csv.gz, ohlcv_1w-2024.csv.gz",
-  "sol_radar": "9 table(s), 63 fichier(s), 18 fichier(s) écrit(s), base ouverte en LECTURE SEULE"
+  "copie": "rien à copier",
+  "insiders": "13 flux, 48 fichier(s), 0 fichier(s) écrit(s)",
+  "sol_radar": "9 table(s), 63 fichier(s), 0 fichier(s) écrit(s), base ouverte en LECTURE SEULE"
  },
- "errors": [
-  "période CLOSE réécrite — la source a gagné une ligne rétroactive : ohlcv_1w-2017.csv.gz, ohlcv_1w-2018.csv.gz, ohlcv_1w-2019.csv.gz, ohlcv_1w-2020.csv.gz, ohlcv_1w-2021.csv.gz, ohlcv_1w-2022.csv.gz, ohlcv_1w-2023.csv.gz, ohlcv_1w-2024.csv.gz, … (8 au total) (publié ET signalé, jamais silencieux)"
- ],
+ "errors": [],
  "periodes_ouvertes": {
   "mois": [
    "2026-09",
