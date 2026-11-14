@@ -1,0 +1,301 @@
+{
+ "format": "previsions-1",
+ "updated": "2026-11-14T05:41Z",
+ "groupe": "2026-11-14",
+ "version_methode": "v1",
+ "marge_pct": 1,
+ "emis_utc": "2026-11-14T05:30Z",
+ "prix_emission": 67102,
+ "scenarios": [
+  {
+   "id": "P0097",
+   "rang": "1",
+   "groupe": "2026-11-14",
+   "emis_utc": "2026-11-14T05:30Z",
+   "fin_utc": "2026-11-15T05:20Z",
+   "horizon_h": 23.8247,
+   "prix_emission": 67102,
+   "forme": "range",
+   "cibles": [],
+   "invalidation": null,
+   "range": [
+    65731,
+    68482
+   ],
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure",
+    "calendrier"
+   ],
+   "origines": {
+    "65731": "sous le plus bas de la nuit (66 456 à 04:14 UTC) et le mur d'achat de 66 000",
+    "68482": "au-dessus du mur de gamma de 68 000 et du plus haut du 14/11 (68 446 à 00:08 UTC), juste sous le plus haut de la nuit (68 497 à 22:02 UTC)"
+   },
+   "enonce": "Range de samedi entre 65731 et 68482",
+   "version_methode": "v1",
+   "base_hasard_pct": 68.1,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [],
+   "invalidation_utc": null
+  },
+  {
+   "id": "P0098",
+   "rang": "2",
+   "groupe": "2026-11-14",
+   "emis_utc": "2026-11-14T05:30Z",
+   "fin_utc": "2026-11-15T05:20Z",
+   "horizon_h": 23.8228,
+   "prix_emission": 67104,
+   "forme": "chemin",
+   "cibles": [
+    65731
+   ],
+   "invalidation": 68482,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure"
+   ],
+   "origines": {
+    "65731": "sous le plus bas de la nuit (66 456 à 04:14 UTC) et le mur d'achat de 66 000",
+    "68482": "au-dessus du mur de gamma de 68 000 et du plus haut du 14/11 (68 446 à 00:08 UTC), juste sous le plus haut de la nuit (68 497 à 22:02 UTC)"
+   },
+   "enonce": "Baisse d'abord : 65731 avant 68482",
+   "version_methode": "v1",
+   "base_hasard_pct": 46.9,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [
+    null
+   ],
+   "invalidation_utc": null
+  },
+  {
+   "id": "P0099",
+   "rang": "3",
+   "groupe": "2026-11-14",
+   "emis_utc": "2026-11-14T05:30Z",
+   "fin_utc": "2026-11-15T05:20Z",
+   "horizon_h": 23.8222,
+   "prix_emission": 67104,
+   "forme": "chemin",
+   "cibles": [
+    68482
+   ],
+   "invalidation": 65731,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure",
+    "mur_options"
+   ],
+   "origines": {
+    "68482": "au-dessus du mur de gamma de 68 000 et du plus haut du 14/11 (68 446 à 00:08 UTC), juste sous le plus haut de la nuit (68 497 à 22:02 UTC)",
+    "65731": "sous le plus bas de la nuit (66 456 à 04:14 UTC) et le mur d'achat de 66 000"
+   },
+   "enonce": "Rebond d'abord : 68482 avant 65731",
+   "version_methode": "v1",
+   "base_hasard_pct": 48.8,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [
+    null
+   ],
+   "invalidation_utc": null
+  }
+ ],
+ "precedents": [
+  {
+   "groupe": "2026-11-13",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Baisse d'abord : 67 100 avant 70 000",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "2",
+     "enonce": "Range entre 67 100 et 70 000",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Rebond d'abord : 70 000 avant 67 100",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-12",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Baisse d'abord : 72 150 avant 75 170",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "2",
+     "enonce": "Range entre 72 150 et 75 170",
+     "statut": "❌",
+     "premier_ok": "bas"
+    },
+    {
+     "rang": "3",
+     "enonce": "Rebond d'abord : 75 170 avant 72 150",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-11",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Baisse d'abord : 72 280 avant 75 270",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "2",
+     "enonce": "Range entre 72 280 et 75 270",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Rebond d'abord : 75 270 avant 72 280",
+     "statut": "✅",
+     "premier_ok": "oui"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-10",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Baisse d'abord autour du CPI : 73 300 avant 76 320",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "2",
+     "enonce": "Range malgré le CPI entre 73 300 et 76 320",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Rebond d'abord : 76 320 avant 73 270",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-09",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range avant le CPI entre 72 910 et 76 200",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Baisse d'abord : 72 910 avant 76 200",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "3",
+     "enonce": "Rebond d'abord : 76 200 avant 72 910",
+     "statut": "✅",
+     "premier_ok": "oui"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-08",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range du dimanche entre 74 320 et 77 420",
+     "statut": "❌",
+     "premier_ok": "bas"
+    },
+    {
+     "rang": "2",
+     "enonce": "Baisse d'abord : 74 320 avant 77 420",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "3",
+     "enonce": "Rebond d'abord : 77 420 avant 74 320",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-07",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range du week-end entre 74 250 et 77 800",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Baisse d'abord : 74 250 avant 77 800",
+     "statut": "⌛",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Rebond d'abord : 77 800 avant 74 250",
+     "statut": "⌛",
+     "premier_ok": null
+    }
+   ]
+  }
+ ],
+ "bilan": {
+  "ordre": {
+   "matins": 23,
+   "reussis": 12,
+   "regle": "chemin le mieux classé avec invalidation, première zone touchée avant l'invalidation"
+  }
+ },
+ "statuts": {
+  "⏳": "en cours",
+  "✅": "réalisé",
+  "❌": "invalidé d'abord",
+  "◐": "partiel",
+  "⌛": "rien de touché",
+  "⚠": "ambigu"
+ },
+ "ampleur": {
+  "groupe": "2026-11-14",
+  "calcul_utc": "2026-11-14T05:30Z",
+  "debut_utc": "2026-11-14T05:00Z",
+  "fin_utc": "2026-11-15T05:00Z",
+  "typique_pct": 2.1,
+  "une_fois_sur_dix_pct": 4.4
+ },
+ "moments": []
+}
