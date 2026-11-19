@@ -763,8 +763,9 @@ async function relief95(page, id) {
       check('chaque case dit si son calque est allumé', !e.cases.length, e.cases);
       // Plan du 13/10/2026, idée 7 : un bloc « Outils » (la calculette de risque) juste avant les
       // « Réglages fins », qui restent le dernier bloc ; ni ligne d'indicateur ni bouton de tête.
-      check('« Outils » : un seul bouton, « Calculette de risque », juste avant les « Réglages fins »',
-        pan.outils && meme(pan.outils.boutons, ['Calculette de risque']) && pan.outils.avantFins && pan.fins && pan.fins.dernier, pan.outils);
+      // Le 19/11/2026 : « Bilan des figures » (le tableau de toutes les figures) s'y ajoute.
+      check('« Outils » : « Calculette de risque » et « Bilan des figures », juste avant les « Réglages fins »',
+        pan.outils && meme(pan.outils.boutons, ['Calculette de risque', 'Bilan des figures']) && pan.outils.avantFins && pan.fins && pan.fins.dernier, pan.outils);
       // Revue du 14/10/2026, M15 [vision-10] : « range » ne trouvait rien (« Aucun indicateur ne
       // correspond. ») ; des mots cachés le mènent à la fourchette, « levier » à la calculette.
       const cherche = async (mot) => {

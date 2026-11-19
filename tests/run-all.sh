@@ -191,6 +191,9 @@ node test_figures_revue2.js || ko=1
 etape "9b⁗'''. Figures passées dans Chromium : Lisible rien au présent, une seule dans le passé avec sa marque (budget de 5 textes, résumé puis détail, sans mot banni), effacée au retour ; Complet non / validées / toutes, ≤ 6, ligne du compte, choix gardé au rechargement ; 1440 et 390 (non exécuté sans Playwright)"
 node test_figures_passees_page.js || ko=1
 
+etape "Tableau de toutes les figures (19/11/2026) : comptes du bilan, hasard, si raté, cinq thèmes à 390 px"
+node test_tableau_figures_page.js || ko=1
+
 etape "9b⁗''''. Apprendre dans Chromium : le prix franchit un repère → une ligne dans le budget de 5 textes (ni sur le prix ni sur une étiquette), effacée seule ; deux changements → un message ; marque « nouveau » lue puis gardée ; Complet discret, cases « Aide à la lecture » gardées ; 1440 et 390 (non exécuté sans Playwright)"
 node test_apprendre_page.js || ko=1
 

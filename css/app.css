@@ -1540,6 +1540,46 @@ html[data-chiffres="1"] .lecture-courte { margin-top: 5px; padding: 2px 0 2px 7p
 .stats-parcours { display: inline-block; margin-top: 2px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .stats-marque { display: inline-block; width: 1.1em; font-weight: 800; text-align: center; }
 .stats-quand { color: var(--ink-1); font-variant-numeric: tabular-nums; }
+/* Le tableau de toutes les figures (demande de Lorenzo du 19/11/2026, js/stats-figures.js) : le
+   total en quatre cases, puis une carte par type : validées / annulées, l'objectif (✓ ✗ –) avec le
+   trait | du hasard, et « si raté » la jauge du parcours. Couleurs : validée = encre (l'accent se confond avec « atteint » en Bureau 95), annulée =
+   attention, atteint / raté / délai = la barre des issues. Peu de cas : la carte pâlit. */
+.tab-retour { display: inline-block; margin: 2px 0 4px; padding: 0; border: 0; background: none; color: var(--accent-2); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.tab-total { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 6px 0 4px; }
+.tab-case { display: flex; flex-direction: column; align-items: center; padding: 4px 2px; border-radius: min(6px, var(--r-tile)); background: var(--rail); font-size: 10.5px; color: var(--ink-2); text-align: center; line-height: 1.2; }
+.tab-case b { font-size: 18px; font-weight: 800; color: var(--ink-1); font-variant-numeric: tabular-nums; }
+.tab-case small { font-size: 11px; font-weight: 700; color: var(--ink-2); }
+b.tab-val, .tab-num .tab-val { color: var(--ink-1); } b.tab-ann { color: var(--warn-ink); } b.tab-ok { color: var(--up-ink); }
+.stats-barre .tab-val, .tab-legende .tab-val { background: var(--ink-1); opacity: 0.8; } .stats-barre .tab-ann, .tab-legende .tab-ann { background: var(--warn); } .stats-barre .tab-form { background: transparent; }
+.tab-barre-obj { position: relative; flex: 1; min-width: 0; }
+.tab-barre-obj .stats-barre { margin: 0; }
+.tab-barre-vide { flex: 1; color: var(--ink-3); font-size: 11px; }
+.tab-hasard { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink-1); border-radius: 1px; }
+.tab-hasard-ico { display: inline-block; width: 2px; height: 11px; vertical-align: -1px; background: var(--ink-1); }
+.tab-honnete { margin: 4px 0 2px; font-size: 11.5px; color: var(--ink-2); }
+.tab-legende { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 4px 0 6px; font-size: 10.5px; color: var(--ink-3); }
+.tab-legende i { display: inline-block; width: 8px; height: 8px; margin-right: 3px; border-radius: min(2px, var(--r-tile)); vertical-align: 0; }
+.tab-legende .ok { background: var(--up); } .tab-legende .ko { background: var(--down); } .tab-legende .neutre { background: var(--ink-3); }
+.tab-rangs { display: flex; flex-direction: column; gap: 6px; }
+.tab-rang { padding: 5px 7px 4px; border-radius: min(8px, var(--r-tile)); box-shadow: var(--enfonce-mince, inset 0 0 0 1px var(--hairline)); }
+.tab-rang.faible .stats-barre, .tab-rang.faible .tab-jauge, .tab-rang.faible .tab-rate { opacity: 0.5; }
+.tab-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin-bottom: 2px; }
+.tab-nom { padding: 0; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 750; color: var(--ink-1); text-align: left; cursor: pointer; }
+span.tab-nom { cursor: default; }
+button.tab-nom:hover, button.tab-nom:focus-visible { color: var(--accent-2); }
+.tab-verdict { flex: none; padding: 0 6px; border-radius: min(8px, var(--r-tile)); font-size: 10px; font-weight: 700; color: var(--ink-2); background: var(--rail); white-space: nowrap; }
+.tab-verdict.v-plus { color: var(--up-ink); background: var(--up-soft); } .tab-verdict.v-moins { color: var(--down-ink); background: var(--down-soft); }
+.tab-ligne { display: flex; align-items: center; gap: 6px; min-height: 16px; font-size: 11px; color: var(--ink-2); }
+.tab-ligne > .stats-barre { flex: 1; min-width: 0; margin: 0; }
+.tab-lib { flex: 0 0 52px; color: var(--ink-3); font-size: 10.5px; white-space: nowrap; }
+.tab-num { flex: 0 0 48px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
+.tab-num b { color: var(--ink-1); }
+.tab-jauge { position: relative; flex: 1; min-width: 0; height: 10px; border-radius: min(5px, var(--r-tile)); background: var(--rail); }
+.tab-jauge::before { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--ink-2); }
+.tab-jauge i { position: absolute; top: 1px; bottom: 1px; display: block; }
+.tab-jauge .tab-hasard { top: -2px; bottom: -2px; opacity: 0.55; }
+.tab-rate { display: flex; flex-wrap: wrap; gap: 0 12px; margin: 1px 0 0 58px; font-size: 11px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.tab-rate b { color: var(--ink-1); }
 /* Exemples passés d'une figure (plan du 13/10/2026, idée 4) : une bande qu'on fait défiler de côté
    (elle seule : la page et la bulle ne s'élargissent pas), une petite carte par cas, sans animation.
    Le prix de la figure à l'encre pleine, avant et après plus pâle ; la figure elle-même (ses points reliés,
