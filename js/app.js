@@ -1012,7 +1012,9 @@ function buildDropdown() {
   // Les outils (plan du 13/10/2026, idée 7) : la calculette de risque, un panneau qu'on ouvre ;
   // juste avant les « Réglages fins », qui restent le dernier bloc.
   html += '<div class="aff-outils" role="group" aria-label="Outils"><span class="aff-outils-titre">Outils</span>'
-    + '<button type="button" class="aff-btn aff-calculette" onclick="ouvrirCalculetteMenu()" title="Combien prendre pour une perte choisie au stop, ou ce que coûte une position ouverte">Calculette de risque</button></div>';
+    + '<button type="button" class="aff-btn aff-calculette" onclick="ouvrirCalculetteMenu()" title="Combien prendre pour une perte choisie au stop, ou ce que coûte une position ouverte">Calculette de risque</button>'
+    // Le tableau de toutes les figures (demande de Lorenzo du 19/11/2026).
+    + '<button type="button" class="aff-btn aff-tableau" onclick="ouvrirTableauFiguresMenu()" title="Toutes les figures de ce graphique : validées, annulées, objectif atteint, et ce que fait le prix quand il ne l’est pas">Bilan des figures</button></div>';
   html += '<details class="aff-fins" id="affFins"' + (finsOuverts ? ' open' : '') + ' ontoggle="finsOuverts = this.open"><summary>Réglages fins</summary>'
     + '<div class="aff-fins-corps">' + (typeof reglagesHtml === 'function' ? reglagesHtml() : '') + '</div></details>';
   html += '</div><div class="ind-apercu" id="indApercu" aria-live="polite">' + apercuPanneau(menuApercu) + '</div>';

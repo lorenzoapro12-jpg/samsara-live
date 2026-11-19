@@ -3258,6 +3258,52 @@ const Guide = (function () {
     });
     return S;
   }
+  // ─── Le tableau de toutes les figures (demande de Lorenzo du 19/11/2026) ───
+  // « Les statistiques historiques complètes, rapides et faciles à lire : figures validées /
+  // annulées ; sur les validées, combien de fois l'objectif est atteint ; s'il ne l'est pas, le
+  // chemin fait vers lui et ce que le prix a fait. » Une rangée par type vu sur ce graphique, relue
+  // dans le bilan du rejeu (rien n'est recalculé) ; le hasard (le même trajet parti n'importe quand)
+  // à côté de chaque taux, pour que l'honnêteté se voie sans phrase.
+  /** Le verdict court d'une rangée, d'après b.ecart (intervalle de Wilson 95 % du taux de la figure). */
+  const VERDICT_TABLEAU = { pareil: 'comme au hasard', plus: 'plus que le hasard', moins: 'moins que le hasard', peu: 'trop peu de cas' };
+  /** → { portee, rangs: [rangée], total, annees } | null sans bilan. Les rangées : les types vus au
+   *  moins une fois, les plus fréquents d'abord. res = le rejeu (bilan, formes), ctx = guideEtat.ctxF. */
+  function tableauFigures(res, ctx, P) {
+    const B = res && res.bilan;
+    if (!B) return null;
+    const tot = { reperees: 0, validees: 0, annulees: 0, sansSuite: 0, enCours: 0, atteints: 0, rates: 0, delai: 0, finis: 0, tDeparts: 0, tAtteints: 0 };
+    const rangs = [];
+    for (const t of TYPES) {
+      const b = B[t];
+      if (!b || !b.formes) continue;
+      const reperees = b.formes - (b.devenusTriples || 0), finis = b.atteints + b.invalides + b.expires, T = b.temoin || { departs: 0, atteints: 0 };
+      const R = b.parcours && b.parcours.rates, TR = b.temoin && b.temoin.parcours && b.temoin.parcours.rates;
+      // La dernière figure de ce type (finie ou pas) : toucher la rangée ouvre ses statistiques.
+      const der = (res.formes || []).filter(g => g.type === t && !g.doublon).sort((x, y) => (y.jFin ?? y.t ?? 0) - (x.jFin ?? x.t ?? 0))[0] || null;
+      const r = { type: t, nom: NOM_LONG_DEBUTANT[t] || NOMS_FORMES[t][0], reperees, validees: b.confirmes, annulees: b.invalidesAvant, sansSuite: b.expiresAvant,
+        enFormation: Math.max(0, reperees - b.confirmes - b.invalidesAvant - b.expiresAvant), atteints: b.atteints, rates: b.invalides, delai: b.expires, enCours: b.ouverts, finis,
+        hasard: T.departs > 0 ? T.atteints / T.departs : null, verdict: b.ecart || 'peu', faible: (b.ecart || 'peu') === 'peu',
+        // Objectif pas atteint (ratée ou délai écoulé) : les médianes de la fenêtre de P.horizon bougies.
+        rate: R && R.n ? { n: R.n, pres: R.mieux, contre: R.contre, prevu: R.sensPrevu, touche: R.touche } : null,
+        rateHasard: TR && TR.n ? { pres: TR.mieux, contre: TR.contre, prevu: TR.sensPrevu / TR.n } : null, derniere: der };
+      r.texteVerdict = VERDICT_TABLEAU[r.verdict] || VERDICT_TABLEAU.peu;
+      rangs.push(r);
+      tot.reperees += reperees; tot.validees += b.confirmes; tot.annulees += b.invalidesAvant; tot.sansSuite += b.expiresAvant; tot.enCours += b.ouverts;
+      tot.atteints += b.atteints; tot.rates += b.invalides; tot.delai += b.expires; tot.finis += finis; tot.tDeparts += T.departs || 0; tot.tAtteints += T.atteints || 0;
+    }
+    rangs.sort((x, y) => y.validees - x.validees || y.reperees - x.reperees);
+    tot.hasard = tot.tDeparts > 0 ? tot.tAtteints / tot.tDeparts : null;
+    tot.faible = tot.finis < P.echantillonFaible;
+    // Sur des années (BTC, 15 min / 1 h / 4 h) : combien de types font comme au hasard.
+    const U = ctx && ctx.symbole === MESURES_FIGURES.symbole ? MESURES_FIGURES.u[ctx.intervalle] : null;
+    let annees = null;
+    if (U) {
+      const M = Object.keys(U).map(t => mesureFigure(t, ctx)).filter(mesurable);
+      annees = { types: M.length, commeHasard: M.filter(commeHasard).length, depuis: MESURES_FIGURES.depuis[ctx.intervalle], le: MESURES_FIGURES.le };
+    }
+    const d = dernieres(ctx && ctx.duree);
+    return { portee: (d ? 'Les ' + d : 'L’historique') + ' de ce graphique (' + nomIntervalle(ctx && ctx.intervalle) + ')', fenetre: fenetreMots(ctx, P), rangs, total: tot, annees };
+  }
   /** La géométrie d'une figure, en (indice de bougie, prix) : le zigzag de ses points, les droites
    *  qui la VALIDENT (ligne de cou, bornes, côté du mât), les autres droites, l'aplat, ses points
    *  et le point en attente d'une ébauche. iFin : la bougie en cours pour une figure vivante (ses
@@ -3603,6 +3649,6 @@ const Guide = (function () {
     texteSuiteDebutant, prixRond, USAGES_CHIFFRES, usageChiffre, avecUsage, cleEcart, ageLu, ETATS_DEBUTANT, texteEtatDebutant, origineDebutant, ageDebutant, heureVueSi, heureParis: HEURE_PARIS_EXPORT, dernieres, environ, libelleFormeDebutant, texteFormeDebutant, texteEnCoursDebutant: (f, e, unite, itv) => texteFormeDebutant(f, null, { intervalle: itv }, null, unite).slice(0, -1).join(' '),
     MARQUES_FIN, motEchec, nomFormeDetail, partMots, NOM_FORME_DEBUTANT, NOM_LONG_DEBUTANT, LIBELLES_VIVANTS, libelleVivantDebutant, libelleDevenuTriple, couvre, libellesPossiblesDebutant, libellesFormeExpert, libelleFormeCourt, texteFormeExpert, texteVivantFigure, titreForme, marqueFin, DEFINITION_FORME, bilanDebutant, texteEcart, quandVu,
     MOTS_BANNIS_DEBUTANT, motsBannis, EXPLIQUES_DEBUTANT, quoiDebutant, ouEstPrixDebutant,
-    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, parcoursDepuis, parcoursFigure, resumeParcours, mediane, lignesParcours, phraseParcours, parcoursType, fenetreMots, partChemin, PARCOURS_FIGURES, parcoursAnnees, geoFigure, exempleSvg, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, fourchette, cassureDite, quandCassure, phrasesCassureFourchette, texteCassureFourchette, phrasesCassureDebutant, bulleCassureDebutant, synthese };
+    MARQUE_ATTEINT, marqueIssue, CHOIX_PASSEES, PASSEES_MAX, figuresPassees, dureeMots, texteComptePassees, libellePassee, texteFigurePassee, RISQUE, AVERTISSEMENT, AVERTISSEMENT_CLAUDE, resumeStatsFigure, statsFigure, tableauFigures, VERDICT_TABLEAU, parcoursDepuis, parcoursFigure, resumeParcours, mediane, lignesParcours, phraseParcours, parcoursType, fenetreMots, partChemin, PARCOURS_FIGURES, parcoursAnnees, geoFigure, exempleSvg, ciblesFigure, mesureFigure, ligneHasard, MESURES_FIGURES, fourchette, cassureDite, quandCassure, phrasesCassureFourchette, texteCassureFourchette, phrasesCassureDebutant, bulleCassureDebutant, synthese };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = Guide;

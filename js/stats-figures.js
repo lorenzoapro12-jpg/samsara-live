@@ -64,6 +64,8 @@ function exemplesHtml(S, K) {
 function statsFigureHtml(S, K) {
   const nb = x => (typeof Fmt !== 'undefined' && Fmt.nombre ? Fmt.nombre(x, 0) : String(x));
   let h = '<div class="fiche-tete"><h3 class="fiche-titre">' + echapF(S.titre) + '</h3><button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>';
+  // Le tableau de toutes les figures (demande de Lorenzo du 19/11/2026), à un toucher.
+  h += '<button type="button" class="tab-retour" onclick="ouvrirTableauFigures()">Toutes les figures ▸</button>';
   // 1. L'objectif de la figure : le prix d'abord, en gros ; son état ; comment il se calcule.
   h += '<div class="stats-cible"><span class="stats-etiquette">Objectif de la figure</span>' + S.cibles.map(c => '<b class="stats-prix">' + echapF(c.texte) + '</b>').join('<span class="stats-ou">ou</span>')
     + '<p class="stats-note">' + echapF(S.cibleEtat) + '</p></div>';
@@ -126,4 +128,102 @@ function ouvrirStatsFigure(f) {
   const b = p.querySelector('.fiche-fermer');
   if (b && b.focus) b.focus({ preventScroll: true });
   return true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Le tableau de toutes les figures (demande de Lorenzo du 19/11/2026)
+// ─────────────────────────────────────────────────────────────────────────────
+// Toutes les figures de ce graphique d'un coup d'œil, une rangée par type (Guide.tableauFigures) :
+// validées / annulées, l'objectif atteint ou non, et quand il ne l'est pas, le chemin fait vers lui
+// et ce que le prix a fait ensuite. « Au maximum visuel et pas trop verbeux » : des barres, des
+// nombres, un mot par case ; le trait | du hasard posé sur chaque barre d'objectif dit l'honnêteté
+// sans phrase. Toucher le nom d'une figure ouvre ses statistiques détaillées.
+/** Un pourcentage du chemin : « 68 % », « touché » au-delà. */
+const pcChemin = x => (x >= 1 ? 'touché' : Math.round(Math.max(0, x) * 100) + ' %');
+/** « 1,7× » */
+const foisF = x => (typeof Fmt !== 'undefined' && Fmt.nombre ? Fmt.nombre(Math.round(x * 10) / 10, 1) : (Math.round(x * 10) / 10).toFixed(1)).replace(/,0$/, '') + '×';
+/** La barre de l'objectif : atteint ✓, raté ✗, délai –, et le trait du hasard (h : 0..1). */
+function barreObjectif(a, r, d, h) {
+  const b = barreStats([[a, 'ok', 'Objectif atteint : ' + a], [r, 'ko', 'Ratées : ' + r], [d, 'neutre', 'Délai écoulé : ' + d]]);
+  if (!b) return '<div class="tab-barre-vide">–</div>';
+  return '<div class="tab-barre-obj">' + b + (h !== null && h !== undefined ? '<b class="tab-hasard" style="left:' + (h * 100).toFixed(1) + '%" title="Au hasard : ' + Math.round(h * 10) + ' sur 10"></b>' : '') + '</div>';
+}
+/** La jauge « si raté » : de la validation (le trait du milieu) vers l'objectif ◆ à droite, l'autre
+ *  sens à gauche ; les traits pâles : le hasard. Échelle : l'objectif à mi-chemin du bord droit. */
+function jaugeRate(x, h) {
+  const m = Math.min(3, Math.max(1.2, x.pres, x.contre)), w = v => Math.max(0, Math.min(50, v / m * 50));
+  const tic = (v, droite) => (h ? '<b class="tab-hasard" style="left:' + (droite ? 50 + w(v) : 50 - w(v)).toFixed(1) + '%"></b>' : '');
+  return '<span class="tab-jauge" aria-hidden="true"><i class="parcours-contre" style="right:50%;width:' + w(x.contre).toFixed(1) + '%"></i><i class="parcours-mieux" style="left:50%;width:' + w(Math.min(x.pres, 1)).toFixed(1) + '%"></i>'
+    + '<b class="parcours-objectif" style="left:' + (50 + w(1)).toFixed(1) + '%"></b>' + (h ? tic(h.pres, true) + tic(h.contre, false) : '') + '</span>';
+}
+/** Le HTML du tableau : T = Guide.tableauFigures(…). */
+function tableauFiguresHtml(T) {
+  const nb = x => (typeof Fmt !== 'undefined' && Fmt.nombre ? Fmt.nombre(x, 0) : String(x));
+  let h = '<div class="fiche-tete"><h3 class="fiche-titre">Toutes les figures</h3><button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>';
+  if (!T || !T.rangs.length) return h + '<p class="stats-phrase">Pas encore de figure repérée sur ce graphique.</p>';
+  const S = T.total;
+  // 1. Le total, en quatre cases.
+  h += '<div class="tab-total">'
+    + '<span class="tab-case"><b>' + nb(S.reperees) + '</b>repérées</span>'
+    + '<span class="tab-case"><b class="tab-val">' + nb(S.validees) + '</b>validées</span>'
+    + '<span class="tab-case"><b class="tab-ann">' + nb(S.annulees + S.sansSuite) + '</b>annulées</span>'
+    + '<span class="tab-case"><b class="tab-ok">' + nb(S.atteints) + '<small>/' + nb(S.finis) + '</small></b>objectif atteint</span></div>'
+    + barreObjectif(S.atteints, S.rates, S.delai, S.hasard);
+  // 2. L'honnêteté, en une ligne : le hasard ici, et sur des années quand c'est mesuré.
+  const ici = S.hasard !== null ? 'Au hasard <b class="tab-hasard-ico" aria-hidden="true"></b> ' + Math.round(S.hasard * 10) + ' sur 10' : '';
+  const ans = T.annees && T.annees.types ? 'sur des années : ' + T.annees.commeHasard + ' figures sur ' + T.annees.types + ' comme au hasard' : '';
+  if (ici || ans) h += '<p class="tab-honnete">' + [ici, ans].filter(Boolean).join(' · ') + '</p>';
+  // 3. La légende, une fois.
+  h += '<p class="tab-legende"><span><i class="tab-val"></i>validée</span><span><i class="tab-ann"></i>annulée</span><span><i class="ok"></i>atteint</span><span><i class="ko"></i>raté</span><span><i class="neutre"></i>délai</span></p>';
+  // 4. Une rangée par type.
+  h += '<div class="tab-rangs">' + T.rangs.map(r => {
+    const vr = '<span class="tab-verdict v-' + r.verdict + '">' + echapF(r.texteVerdict) + '</span>';
+    const nom = r.derniere ? '<button type="button" class="tab-nom" onclick="ouvrirStatsType(\'' + r.type + '\')">' + echapF(r.nom) + ' ▸</button>' : '<span class="tab-nom">' + echapF(r.nom) + '</span>';
+    const val = barreStats([[r.validees, 'tab-val', 'Validées : ' + r.validees], [r.annulees + r.sansSuite, 'tab-ann', 'Annulées : ' + (r.annulees + r.sansSuite)], [r.enFormation, 'tab-form', 'En formation : ' + r.enFormation]]);
+    let q = '<div class="tab-rang' + (r.faible ? ' faible' : '') + '"><div class="tab-tete">' + nom + vr + '</div>'
+      + '<div class="tab-ligne"><span class="tab-lib">' + nb(r.reperees) + ' rep.</span>' + val + '<span class="tab-num"><b class="tab-val">' + r.validees + '</b> / <b class="tab-ann">' + (r.annulees + r.sansSuite) + '</b></span></div>';
+    q += '<div class="tab-ligne"><span class="tab-lib">Objectif</span>' + barreObjectif(r.atteints, r.rates, r.delai, r.hasard)
+      + '<span class="tab-num">' + (r.finis ? '<b class="tab-ok">' + r.atteints + '</b>/' + r.finis : '–') + '</span></div>';
+    if (r.rate) {
+      q += '<div class="tab-ligne"><span class="tab-lib">Si raté</span>' + jaugeRate(r.rate, r.rateHasard) + '<span class="tab-num">' + r.rate.n + ' cas</span></div>'
+        + '<p class="tab-rate"><span title="Vers l’objectif, au plus près (cas typique)">→◆ <b>' + pcChemin(r.rate.pres) + '</b></span><span title="Ensuite, dans l’autre sens (fois la distance à l’objectif)">← <b>' + foisF(r.rate.contre) + '</b></span><span title="Au bout de ' + echapF(T.fenetre) + ', du bon côté de la validation">au bout, bon côté <b>' + r.rate.prevu + '/' + r.rate.n + '</b></span></p>';
+    }
+    return q + '</div>';
+  }).join('') + '</div>';
+  h += '<p class="fiche-pied">' + echapF(T.portee) + '. « Si raté » : objectif pas atteint ; →◆ le chemin fait vers lui, ← ce qu’il repart à l’envers (fois la distance à l’objectif), sur les ' + echapF(T.fenetre) + ' après la validation, cas typique (la moitié plus, la moitié moins). '
+    + echapF(Guide.AVERTISSEMENT) + '</p>';
+  return h;
+}
+/** Le tableau de ce graphique ; null sans rejeu. */
+function tableauFiguresCourant() {
+  const R = typeof GUIDE_FORMES !== 'undefined' ? GUIDE_FORMES.val : null, E = typeof guideEtat !== 'undefined' ? guideEtat : null;
+  return R && R.bilan && E && E.ctxF ? Guide.tableauFigures(R, E.ctxF, PARAM.guide) : null;
+}
+/** Ouvre le tableau de toutes les figures (dans #fichePop). */
+function ouvrirTableauFigures() {
+  const p = document.getElementById('fichePop');
+  if (!p) return false;
+  const T = tableauFiguresCourant();
+  p.innerHTML = tableauFiguresHtml(T);
+  Fmt.insecables(p);
+  p.hidden = false;
+  p.style.left = ''; p.style.top = '';
+  p.scrollTop = 0;
+  ficheOuverte = 'tableau'; ficheRetour = null;
+  window.__tableauFigures = T;   // relu par les tests
+  const b = p.querySelector('.fiche-fermer');
+  if (b && b.focus) b.focus({ preventScroll: true });
+  return true;
+}
+/** Depuis le menu (Outils) : le ferme, puis ouvre le tableau. */
+function ouvrirTableauFiguresMenu() {
+  const m = document.getElementById('indMenu'), b = document.getElementById('indDropdownBtn');
+  if (m) m.classList.remove('open');
+  if (b) b.setAttribute('aria-expanded', 'false');
+  ouvrirTableauFigures();
+}
+/** Une rangée touchée : les statistiques détaillées de la dernière figure de ce type. */
+function ouvrirStatsType(t) {
+  const T = window.__tableauFigures, r = T && T.rangs.find(x => x.type === t);
+  return !!(r && r.derniere && ouvrirStatsFigure(r.derniere));
 }
