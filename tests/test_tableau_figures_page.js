@@ -54,7 +54,7 @@ const lire = page => page.evaluate(() => {
       const tri = d.T && d.T.valid.every((v, i, a) => !i || a[i - 1] >= v);
       check(`${W} px : « ${d.titre} », ${d.cases} cases de total, ${d.T && d.T.n} rangées triées par validées, comptes = bilan`, d.ouvert && d.titre === 'Toutes les figures' && d.cases === 4 && d.T && d.T.n >= 1 && d.rangs.length === d.T.n && tri && d.comptes, Object.assign({}, d, { texte: d.texte.slice(0, 300) }));
       check(`${W} px : le trait du hasard sur chaque barre d'objectif mesurée, « Si raté » quand il y a des cas ratés`, d.rangs.every((r, i) => r.hasard === (d.T.hasard[i] ? 1 : 0) || !d.T.hasard[i]) && d.rangs.every((r, i) => r.rate === d.T.rate[i]) && d.T.rate.some(Boolean), d.rangs);
-      check(`${W} px : aucun mot banni, le hasard dit en tête`, !G.motsBannis(d.texte).length && /Au hasard/.test(d.texte), G.motsBannis(d.texte));
+      check(`${W} px : aucun mot banni, le hasard expliqué en tête`, !G.motsBannis(d.texte).length && /ce que ferait le hasard/.test(d.texte), G.motsBannis(d.texte));
       check(`${W} px : dans l'écran, rien ne déborde, pas de défilement de côté`, d.dedans && !d.rangs.some(r => r.hors) && d.scroll <= 0, { dedans: d.dedans, scroll: d.scroll, hors: d.rangs.filter(r => r.hors) });
       // 2. Une rangée → ses statistiques → retour.
       await p.click('#fichePop button.tab-nom'); await p.waitForTimeout(250);
