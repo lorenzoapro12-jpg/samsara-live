@@ -138,8 +138,6 @@ function ouvrirStatsFigure(f) {
 // et ce que le prix a fait ensuite. « Au maximum visuel et pas trop verbeux » : des barres, des
 // nombres, un mot par case ; le trait | du hasard posé sur chaque barre d'objectif dit l'honnêteté
 // sans phrase. Toucher le nom d'une figure ouvre ses statistiques détaillées.
-/** Un pourcentage du chemin : « 68 % », « touché » au-delà. */
-const pcChemin = x => (x >= 1 ? 'touché' : Math.round(Math.max(0, x) * 100) + ' %');
 /** « 1,7× » */
 const foisF = x => (typeof Fmt !== 'undefined' && Fmt.nombre ? Fmt.nombre(Math.round(x * 10) / 10, 1) : (Math.round(x * 10) / 10).toFixed(1)).replace(/,0$/, '') + '×';
 /** La barre de l'objectif : atteint ✓, raté ✗, délai –, et le trait du hasard (h : 0..1). */
@@ -148,17 +146,12 @@ function barreObjectif(a, r, d, h) {
   if (!b) return '<div class="tab-barre-vide">–</div>';
   return '<div class="tab-barre-obj">' + b + (h !== null && h !== undefined ? '<b class="tab-hasard" style="left:' + (h * 100).toFixed(1) + '%" title="Au hasard : ' + Math.round(h * 10) + ' sur 10"></b>' : '') + '</div>';
 }
-/** La jauge « si raté » : de la validation (le trait du milieu) vers l'objectif ◆ à droite, l'autre
- *  sens à gauche ; les traits pâles : le hasard. Échelle : l'objectif à mi-chemin du bord droit. */
-function jaugeRate(x, h) {
-  const m = Math.min(3, Math.max(1.2, x.pres, x.contre)), w = v => Math.max(0, Math.min(50, v / m * 50));
-  const tic = (v, droite) => (h ? '<b class="tab-hasard" style="left:' + (droite ? 50 + w(v) : 50 - w(v)).toFixed(1) + '%"></b>' : '');
-  return '<span class="tab-jauge" aria-hidden="true"><i class="parcours-contre" style="right:50%;width:' + w(x.contre).toFixed(1) + '%"></i><i class="parcours-mieux" style="left:50%;width:' + w(Math.min(x.pres, 1)).toFixed(1) + '%"></i>'
-    + '<b class="parcours-objectif" style="left:' + (50 + w(1)).toFixed(1) + '%"></b>' + (h ? tic(h.pres, true) + tic(h.contre, false) : '') + '</span>';
-}
 /** Le HTML du tableau : T = Guide.tableauFigures(…). */
 function tableauFiguresHtml(T) {
+  // Lorenzo, 19/11/2026 au soir : « trop cryptique ». Plus de symboles (→◆, ←, ×, « rep. ») : chaque
+  // barre a sa phrase au-dessus, en mots de tous les jours ; « si raté » est une phrase entière.
   const nb = x => (typeof Fmt !== 'undefined' && Fmt.nombre ? Fmt.nombre(x, 0) : String(x));
+  const fois = (k, n) => k + ' fois sur ' + n;
   let h = '<div class="fiche-tete"><h3 class="fiche-titre">Toutes les figures</h3><button type="button" class="fiche-fermer" onclick="fermerFiche()" aria-label="Fermer">×</button></div>';
   if (!T || !T.rangs.length) return h + '<p class="stats-phrase">Pas encore de figure repérée sur ce graphique.</p>';
   const S = T.total;
@@ -167,31 +160,30 @@ function tableauFiguresHtml(T) {
     + '<span class="tab-case"><b>' + nb(S.reperees) + '</b>repérées</span>'
     + '<span class="tab-case"><b class="tab-val">' + nb(S.validees) + '</b>validées</span>'
     + '<span class="tab-case"><b class="tab-ann">' + nb(S.annulees + S.sansSuite) + '</b>annulées</span>'
-    + '<span class="tab-case"><b class="tab-ok">' + nb(S.atteints) + '<small>/' + nb(S.finis) + '</small></b>objectif atteint</span></div>'
-    + barreObjectif(S.atteints, S.rates, S.delai, S.hasard);
-  // 2. L'honnêteté, en une ligne : le hasard ici, et sur des années quand c'est mesuré.
-  const ici = S.hasard !== null ? 'Au hasard <b class="tab-hasard-ico" aria-hidden="true"></b> ' + Math.round(S.hasard * 10) + ' sur 10' : '';
-  const ans = T.annees && T.annees.types ? 'sur des années : ' + T.annees.commeHasard + ' figures sur ' + T.annees.types + ' comme au hasard' : '';
-  if (ici || ans) h += '<p class="tab-honnete">' + [ici, ans].filter(Boolean).join(' · ') + '</p>';
-  // 3. La légende, une fois.
-  h += '<p class="tab-legende"><span><i class="tab-val"></i>validée</span><span><i class="tab-ann"></i>annulée</span><span><i class="ok"></i>atteint</span><span><i class="ko"></i>raté</span><span><i class="neutre"></i>délai</span></p>';
-  // 4. Une rangée par type.
+    + '<span class="tab-case"><b class="tab-ok">' + nb(S.atteints) + '<small>/' + nb(S.finis) + '</small></b>objectif atteint</span></div>';
+  // 2. Comment lire, en deux phrases.
+  h += '<p class="tab-honnete">Une figure est <b>validée</b> quand le prix franchit sa ligne ; <b>annulée</b> quand elle tombe avant.</p>';
+  if (S.hasard !== null) h += '<p class="tab-honnete">Le trait noir <b class="tab-hasard-ico" aria-hidden="true"></b> sur les barres d’objectif : ce que ferait le hasard (un trajet de même taille pris n’importe quand), ici '
+    + Math.round(S.hasard * 10) + ' fois sur 10. Si la partie « atteint » finit près du trait, la figure ne fait pas mieux que le hasard.</p>';
+  if (T.annees && T.annees.types) h += '<p class="tab-honnete">Mesuré sur des années de bitcoin : ' + (T.annees.commeHasard === T.annees.types ? 'aucune figure ne fait mieux que le hasard.' : T.annees.commeHasard + ' figures sur ' + T.annees.types + ' ne font pas mieux que le hasard.') + '</p>';
+  // 3. Une carte par type.
   h += '<div class="tab-rangs">' + T.rangs.map(r => {
-    const vr = '<span class="tab-verdict v-' + r.verdict + '">' + echapF(r.texteVerdict) + '</span>';
+    const vr = '<span class="tab-verdict v-' + r.verdict + '">' + echapF(r.verdict === 'pareil' ? 'pas mieux que le hasard' : r.texteVerdict) + '</span>';
     const nom = r.derniere ? '<button type="button" class="tab-nom" onclick="ouvrirStatsType(\'' + r.type + '\')">' + echapF(r.nom) + ' ▸</button>' : '<span class="tab-nom">' + echapF(r.nom) + '</span>';
-    const val = barreStats([[r.validees, 'tab-val', 'Validées : ' + r.validees], [r.annulees + r.sansSuite, 'tab-ann', 'Annulées : ' + (r.annulees + r.sansSuite)], [r.enFormation, 'tab-form', 'En formation : ' + r.enFormation]]);
+    const ann = r.annulees + r.sansSuite;
+    const val = barreStats([[r.validees, 'tab-val', 'Validées : ' + r.validees], [ann, 'tab-ann', 'Annulées : ' + ann], [r.enFormation, 'tab-form', 'En formation : ' + r.enFormation]]);
     let q = '<div class="tab-rang' + (r.faible ? ' faible' : '') + '"><div class="tab-tete">' + nom + vr + '</div>'
-      + '<div class="tab-ligne"><span class="tab-lib">' + nb(r.reperees) + ' rep.</span>' + val + '<span class="tab-num"><b class="tab-val">' + r.validees + '</b> / <b class="tab-ann">' + (r.annulees + r.sansSuite) + '</b></span></div>';
-    q += '<div class="tab-ligne"><span class="tab-lib">Objectif</span>' + barreObjectif(r.atteints, r.rates, r.delai, r.hasard)
-      + '<span class="tab-num">' + (r.finis ? '<b class="tab-ok">' + r.atteints + '</b>/' + r.finis : '–') + '</span></div>';
+      + '<p class="tab-dit"><b class="tab-val">' + r.validees + ' validée' + (r.validees > 1 ? 's' : '') + '</b>, <b class="tab-ann">' + ann + ' annulée' + (ann > 1 ? 's' : '') + '</b></p>' + val;
+    q += r.finis ? '<p class="tab-dit">Objectif atteint <b class="tab-ok">' + fois(r.atteints, r.finis) + '</b>' + (r.hasard !== null ? ' <span class="tab-gris">(hasard : ' + Math.round(r.hasard * 10) + ' sur 10)</span>' : '') + '</p>' + barreObjectif(r.atteints, r.rates, r.delai, r.hasard)
+      : '<p class="tab-dit tab-gris">Objectif : aucune validée allée au bout.</p>';
     if (r.rate) {
-      q += '<div class="tab-ligne"><span class="tab-lib">Si raté</span>' + jaugeRate(r.rate, r.rateHasard) + '<span class="tab-num">' + r.rate.n + ' cas</span></div>'
-        + '<p class="tab-rate"><span title="Vers l’objectif, au plus près (cas typique)">→◆ <b>' + pcChemin(r.rate.pres) + '</b></span><span title="Ensuite, dans l’autre sens (fois la distance à l’objectif)">← <b>' + foisF(r.rate.contre) + '</b></span><span title="Au bout de ' + echapF(T.fenetre) + ', du bon côté de la validation">au bout, bon côté <b>' + r.rate.prevu + '/' + r.rate.n + '</b></span></p>';
+      const x = r.rate, haut = x.pres >= 1;
+      q += '<p class="tab-rate"><b>Quand c’est raté</b> (' + x.n + ' fois) : le prix ' + (haut ? 'touche l’objectif sans y rester' : 'fait <b>' + Math.round(Math.max(0, x.pres) * 100) + ' %</b> du chemin vers l’objectif')
+        + ', puis repart dans l’autre sens <b>' + foisF(x.contre).replace('×', ' fois') + '</b> cette distance. Au bout de ' + echapF(T.fenetre) + ', il est du côté prévu <b>' + fois(x.prevu, x.n) + '</b>.</p>';
     }
     return q + '</div>';
   }).join('') + '</div>';
-  h += '<p class="fiche-pied">' + echapF(T.portee) + '. « Si raté » : objectif pas atteint ; →◆ le chemin fait vers lui, ← ce qu’il repart à l’envers (fois la distance à l’objectif), sur les ' + echapF(T.fenetre) + ' après la validation, cas typique (la moitié plus, la moitié moins). '
-    + echapF(Guide.AVERTISSEMENT) + '</p>';
+  h += '<p class="fiche-pied">' + echapF(T.portee) + '. Chiffres « en général » : la moitié des cas font moins, l’autre moitié plus. ' + echapF(Guide.AVERTISSEMENT) + '</p>';
   return h;
 }
 /** Le tableau de ce graphique ; null sans rejeu. */
