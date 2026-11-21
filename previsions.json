@@ -1,0 +1,302 @@
+{
+ "format": "previsions-1",
+ "updated": "2026-11-21T05:43Z",
+ "groupe": "2026-11-21",
+ "version_methode": "v1",
+ "marge_pct": 1,
+ "emis_utc": "2026-11-21T05:30Z",
+ "prix_emission": 56182,
+ "scenarios": [
+  {
+   "id": "P0118",
+   "rang": "1",
+   "groupe": "2026-11-21",
+   "emis_utc": "2026-11-21T05:30Z",
+   "fin_utc": "2026-11-22T05:20Z",
+   "horizon_h": 23.8237,
+   "prix_emission": 56182,
+   "forme": "range",
+   "cibles": [],
+   "invalidation": null,
+   "range": [
+    54800,
+    57800
+   ],
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure",
+    "mur_carnet"
+   ],
+   "origines": {
+    "54800": "mur acheteur du carnet Binance (29,7 BTC, Samsara 21/11 05:18 UTC), sous le mur de 55 000 (512 BTC)",
+    "57800": "plus bas de l'année (01/07/2026), percé en mèche le 20/11 à 19:26 UTC (57 778) puis cassé le 21/11 à 03:31 UTC"
+   },
+   "enonce": "Range entre 54 800 et 57 800",
+   "version_methode": "v1",
+   "base_hasard_pct": 39.9,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [],
+   "invalidation_utc": null
+  },
+  {
+   "id": "P0119",
+   "rang": "2",
+   "groupe": "2026-11-21",
+   "emis_utc": "2026-11-21T05:30Z",
+   "fin_utc": "2026-11-22T05:20Z",
+   "horizon_h": 23.8218,
+   "prix_emission": 56163,
+   "forme": "chemin",
+   "cibles": [
+    54800
+   ],
+   "invalidation": 57800,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure",
+    "mur_carnet"
+   ],
+   "origines": {
+    "54800": "mur acheteur du carnet Binance (29,7 BTC, Samsara 21/11 05:18 UTC), sous le mur de 55 000 (512 BTC)",
+    "57800": "plus bas de l'année (01/07/2026), percé en mèche le 20/11 à 19:26 UTC (57 778) puis cassé le 21/11 à 03:31 UTC"
+   },
+   "enonce": "Baisse d'abord vers 54 800, invalidation 57 800",
+   "version_methode": "v1",
+   "base_hasard_pct": 54.3,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [
+    null
+   ],
+   "invalidation_utc": null
+  },
+  {
+   "id": "P0120",
+   "rang": "3",
+   "groupe": "2026-11-21",
+   "emis_utc": "2026-11-21T05:30Z",
+   "fin_utc": "2026-11-22T05:20Z",
+   "horizon_h": 23.8206,
+   "prix_emission": 56123,
+   "forme": "chemin",
+   "cibles": [
+    57800
+   ],
+   "invalidation": 54800,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure",
+    "funding"
+   ],
+   "origines": {
+    "57800": "plus bas de l'année (01/07/2026), percé en mèche le 20/11 à 19:26 UTC (57 778) puis cassé le 21/11 à 03:31 UTC",
+    "54800": "mur acheteur du carnet Binance (29,7 BTC, Samsara 21/11 05:18 UTC), sous le mur de 55 000 (512 BTC)"
+   },
+   "enonce": "Rebond d'abord vers 57 800, invalidation 54 800",
+   "version_methode": "v1",
+   "base_hasard_pct": 41,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [
+    null
+   ],
+   "invalidation_utc": null
+  }
+ ],
+ "precedents": [
+  {
+   "groupe": "2026-11-20",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range entre le mur des puts 60 000 et 63 300",
+     "statut": "❌",
+     "premier_ok": "bas"
+    },
+    {
+     "rang": "2",
+     "enonce": "Baisse d'abord vers le mur des puts 60 000, sans repasser 63 300",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "3",
+     "enonce": "Rebond d'abord vers 63 300, sans toucher 60 000",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-19",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range entre 62 063 et 64 785 jusqu'à demain 06h20",
+     "statut": "❌",
+     "premier_ok": "bas"
+    },
+    {
+     "rang": "2",
+     "enonce": "Hausse d'abord : 64 785 puis 66 132, sans revenir sur 62 063",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "3",
+     "enonce": "Baisse d'abord : 62 063 puis 60 000, sans repasser 64 785",
+     "statut": "◐",
+     "premier_ok": "oui"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-18",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range entre 64 000 et 65 447, ouverture de Wall Street et compte rendu de la Fed compris",
+     "statut": "❌",
+     "premier_ok": "bas"
+    },
+    {
+     "rang": "2",
+     "enonce": "Retour sur 63 336 puis 62 006, sans repasser 66 132",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "3",
+     "enonce": "Sortie par le haut : 66 132 puis 67 568, sans revenir sur 63 336",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-17",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range entre 63 680 et 66 350, résultats de Nvidia compris",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Sortie par le haut : 66 360 puis 67 750",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "3",
+     "enonce": "Retour sur 63 680 puis 62 100",
+     "statut": "◐",
+     "premier_ok": "oui"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-16",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range 63490-66130 jusqu'à mardi matin, dans le couloir de dimanche",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Reprise de 66190 puis 67650, sans retomber sous 63540",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "3",
+     "enonce": "Retour sous 63540 puis 62000, sans reprendre 66190",
+     "statut": "❌",
+     "premier_ok": "oui"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-15",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range 63 540-66 190 jusqu'à lundi matin, après le rebond de la nuit",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Retour sous 63 540 puis 62 000, sans reprendre 66 190",
+     "statut": "❌",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "3",
+     "enonce": "Reprise de 66 190 puis 68 000, sans retomber sous 63 540",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-14",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range de samedi entre 65731 et 68482",
+     "statut": "❌",
+     "premier_ok": "bas"
+    },
+    {
+     "rang": "2",
+     "enonce": "Baisse d'abord : 65731 avant 68482",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "3",
+     "enonce": "Rebond d'abord : 68482 avant 65731",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  }
+ ],
+ "bilan": {
+  "ordre": {
+   "matins": 30,
+   "reussis": 16,
+   "regle": "chemin le mieux classé avec invalidation, première zone touchée avant l'invalidation"
+  }
+ },
+ "statuts": {
+  "⏳": "en cours",
+  "✅": "réalisé",
+  "❌": "invalidé d'abord",
+  "◐": "partiel",
+  "⌛": "rien de touché",
+  "⚠": "ambigu"
+ },
+ "ampleur": {
+  "groupe": "2026-11-21",
+  "calcul_utc": "2026-11-21T05:30Z",
+  "debut_utc": "2026-11-21T05:00Z",
+  "fin_utc": "2026-11-22T05:00Z",
+  "typique_pct": 3.8,
+  "une_fois_sur_dix_pct": 8.2
+ },
+ "moments": []
+}
