@@ -1,0 +1,299 @@
+{
+ "format": "previsions-1",
+ "updated": "2026-11-28T05:43Z",
+ "groupe": "2026-11-28",
+ "version_methode": "v1",
+ "marge_pct": 1,
+ "emis_utc": "2026-11-28T05:31Z",
+ "prix_emission": 59788,
+ "scenarios": [
+  {
+   "id": "P0139",
+   "rang": "1",
+   "groupe": "2026-11-28",
+   "emis_utc": "2026-11-28T05:31Z",
+   "fin_utc": "2026-11-29T05:20Z",
+   "horizon_h": 23.8116,
+   "prix_emission": 59788,
+   "forme": "range",
+   "cibles": [],
+   "invalidation": null,
+   "range": [
+    58456,
+    61126
+   ],
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure"
+   ],
+   "origines": {
+    "58456": "plus bas de la bougie 4h du 25/11 08:00 UTC",
+    "61126": "plus haut de la bougie 4h du 26/11 04:00 UTC"
+   },
+   "enonce": "Range 58 456-61 126 jusqu'à demain matin",
+   "version_methode": "v1",
+   "base_hasard_pct": 84.9,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [],
+   "invalidation_utc": null
+  },
+  {
+   "id": "P0140",
+   "rang": "2",
+   "groupe": "2026-11-28",
+   "emis_utc": "2026-11-28T05:31Z",
+   "fin_utc": "2026-11-29T05:20Z",
+   "horizon_h": 23.8088,
+   "prix_emission": 59788,
+   "forme": "chemin",
+   "cibles": [
+    58456
+   ],
+   "invalidation": 61126,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure"
+   ],
+   "origines": {
+    "58456": "plus bas de la bougie 4h du 25/11 08:00 UTC",
+    "61126": "plus haut de la bougie 4h du 26/11 04:00 UTC"
+   },
+   "enonce": "Baisse d'abord vers 58 456, invalidation 61 126",
+   "version_methode": "v1",
+   "base_hasard_pct": 38.6,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [
+    null
+   ],
+   "invalidation_utc": null
+  },
+  {
+   "id": "P0141",
+   "rang": "3",
+   "groupe": "2026-11-28",
+   "emis_utc": "2026-11-28T05:31Z",
+   "fin_utc": "2026-11-29T05:20Z",
+   "horizon_h": 23.807,
+   "prix_emission": 59779,
+   "forme": "chemin",
+   "cibles": [
+    61126
+   ],
+   "invalidation": 58456,
+   "range": null,
+   "marge_pct": 1,
+   "etiquettes": [
+    "structure"
+   ],
+   "origines": {
+    "61126": "plus haut de la bougie 4h du 26/11 04:00 UTC",
+    "58456": "plus bas de la bougie 4h du 25/11 08:00 UTC"
+   },
+   "enonce": "Rebond d'abord vers 61 126, invalidation 58 456",
+   "version_methode": "v1",
+   "base_hasard_pct": 39.8,
+   "statut": "⏳",
+   "premier_ok": null,
+   "resolu_utc": null,
+   "note": null,
+   "touches_utc": [
+    null
+   ],
+   "invalidation_utc": null
+  }
+ ],
+ "precedents": [
+  {
+   "groupe": "2026-11-27",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Rebond d'abord vers 63 300, invalidation 60 600",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "2",
+     "enonce": "Baisse d'abord vers 60 600, invalidation 63 300",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "3",
+     "enonce": "Range 60 600-63 300 jusqu'à demain matin",
+     "statut": "❌",
+     "premier_ok": "bas"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-26",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range 59 260-62 640 jusqu'à demain matin",
+     "statut": "✅",
+     "premier_ok": null
+    },
+    {
+     "rang": "2",
+     "enonce": "Rebond d'abord vers 62 640, invalidation 59 260",
+     "statut": "⌛",
+     "premier_ok": null
+    },
+    {
+     "rang": "3",
+     "enonce": "Baisse d'abord vers 59 260, invalidation 62 640",
+     "statut": "⌛",
+     "premier_ok": null
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-25",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range 57 381-60 769 jusqu'à demain matin",
+     "statut": "❌",
+     "premier_ok": "haut"
+    },
+    {
+     "rang": "2",
+     "enonce": "Baisse d'abord vers 57 381, invalidation 60 769",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "3",
+     "enonce": "Rebond d'abord vers 60 769, invalidation 57 381",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-24",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Baisse d'abord vers 59 455, invalidation 62 000",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "2",
+     "enonce": "Rebond d'abord vers 62 000, invalidation 59 455",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "3",
+     "enonce": "Range 59 455-62 000 jusqu'à demain matin",
+     "statut": "✅",
+     "premier_ok": null
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-23",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Rebond d'abord vers 63 000, invalidation 60 000",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "2",
+     "enonce": "Baisse d'abord vers 60 000, invalidation 63 000",
+     "statut": "❌",
+     "premier_ok": "non"
+    },
+    {
+     "rang": "3",
+     "enonce": "Range 60 000-63 000 jusqu'à demain matin",
+     "statut": "❌",
+     "premier_ok": "haut"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-22",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range 57 500-60 479 jusqu'à demain matin",
+     "statut": "❌",
+     "premier_ok": "haut"
+    },
+    {
+     "rang": "2",
+     "enonce": "Rebond d'abord vers 60 479, invalidation 57 500",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "3",
+     "enonce": "Baisse d'abord vers 57 500, invalidation 60 479",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  },
+  {
+   "groupe": "2026-11-21",
+   "scenarios": [
+    {
+     "rang": "1",
+     "enonce": "Range entre 54 800 et 57 800",
+     "statut": "❌",
+     "premier_ok": "haut"
+    },
+    {
+     "rang": "2",
+     "enonce": "Baisse d'abord vers 54 800, invalidation 57 800",
+     "statut": "✅",
+     "premier_ok": "oui"
+    },
+    {
+     "rang": "3",
+     "enonce": "Rebond d'abord vers 57 800, invalidation 54 800",
+     "statut": "❌",
+     "premier_ok": "non"
+    }
+   ]
+  }
+ ],
+ "bilan": {
+  "ordre": {
+   "matins": 36,
+   "reussis": 21,
+   "regle": "chemin le mieux classé avec invalidation, première zone touchée avant l'invalidation"
+  }
+ },
+ "statuts": {
+  "⏳": "en cours",
+  "✅": "réalisé",
+  "❌": "invalidé d'abord",
+  "◐": "partiel",
+  "⌛": "rien de touché",
+  "⚠": "ambigu"
+ },
+ "ampleur": {
+  "groupe": "2026-11-28",
+  "calcul_utc": "2026-11-28T05:30Z",
+  "debut_utc": "2026-11-28T05:00Z",
+  "fin_utc": "2026-11-29T05:00Z",
+  "typique_pct": 4.1,
+  "une_fois_sur_dix_pct": 9.3
+ },
+ "moments": []
+}
